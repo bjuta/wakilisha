@@ -21,6 +21,40 @@ type RequestBody = {
   write?: boolean | null;
 };
 
+type ParsedRequest = {
+  sourceRunId: string | null;
+  chartProgramId: string | null;
+  chartEditionId: string | null;
+  provider: "apple_music";
+  storefront: string;
+  limit: number;
+  minAutoAccept: number;
+  write: boolean;
+};
+
+type EnrichmentItemInsert = {
+  run_id: string;
+  chart_entry_id: string | null;
+  registry_track_id: string | null;
+  rank: number | null;
+  track_title: string;
+  artist_name: string | null;
+  isrc?: string | null;
+  provider: string;
+  storefront: string;
+  status: "queued";
+  provider_url?: string | null;
+  preview_url?: string | null;
+  artwork_url?: string | null;
+  metadata: Record<string, unknown>;
+};
+
+type CandidateLoadResult = {
+  items: EnrichmentItemInsert[];
+  candidateSource: "wk_chart_entries_v2" | "chart_ingest_candidates";
+  candidateSourceId: string | null;
+};
+
 function jsonResponse(body: Record<string, unknown>, status = 200): Response {
   return new Response(JSON.stringify(body), {
     status,
@@ -39,6 +73,20 @@ function isUuidLike(value: unknown): value is string {
 function normalizeOptionalUuid(value: unknown): string | null {
   if (value === undefined || value === null || value === "") return null;
   return isUuidLike(value) ? value : "__invalid_uuid__";
+}
+
+function uuidOrNull(value: unknown): string | null {
+  return isUuidLike(value) ? value : null;
+}
+
+function cleanRequiredTitle(value: unknown): string {
+  const title = typeof value === "string" ? value.trim() : "";
+  return title || "Untitled";
+}
+
+function cleanOptionalText(value: unknown): string | null {
+  const text = typeof value === "string" ? value.trim() : "";
+  return text || null;
 }
 
 async function readCredential(
@@ -93,16 +141,7 @@ async function assertCanManageCharts(authClient: ReturnType<typeof createClient>
 
 function validateBody(raw: RequestBody): {
   ok: true;
-  value: {
-    sourceRunId: string | null;
-    chartProgramId: string | null;
-    chartEditionId: string | null;
-    provider: "apple_music";
-    storefront: string;
-    limit: number;
-    minAutoAccept: number;
-    write: boolean;
-  };
+  value: ParsedRequest;
 } | {
   ok: false;
   error: string;
@@ -155,6 +194,161 @@ function validateBody(raw: RequestBody): {
       minAutoAccept,
       write: raw.write === true,
     },
+  };
+}
+
+function mapChartEntryToItem(
+  runId: string,
+  value: ParsedRequest,
+  entry: Record<string, unknown>,
+): EnrichmentItemInsert {
+  return {
+    run_id: runId,
+    chart_entry_id: uuidOrNull(entry.id),
+    registry_track_id: uuidOrNull(entry.canonical_track_id),
+    rank: typeof entry.rank === "number" ? entry.rank : null,
+    track_title: cleanRequiredTitle(entry.track_title),
+    artist_name: cleanOptionalText(entry.artist_name),
+    provider: value.provider,
+    storefront: value.storefront,
+    status: "queued",
+    artwork_url: cleanOptionalText(entry.artwork_url),
+    metadata: {
+      candidate_source: "wk_chart_entries_v2",
+      normalized_key: cleanOptionalText(entry.normalized_key),
+      release_date: cleanOptionalText(entry.release_date),
+    },
+  };
+}
+
+function mapIngestCandidateToItem(
+  runId: string,
+  value: ParsedRequest,
+  candidate: Record<string, unknown>,
+): EnrichmentItemInsert {
+  return {
+    run_id: runId,
+    chart_entry_id: null,
+    registry_track_id: null,
+    rank: null,
+    track_title: cleanRequiredTitle(candidate.title),
+    artist_name: cleanOptionalText(candidate.artist_display),
+    isrc: cleanOptionalText(candidate.isrc),
+    provider: value.provider,
+    storefront: value.storefront,
+    status: "queued",
+    provider_url: cleanOptionalText(candidate.external_url),
+    preview_url: cleanOptionalText(candidate.preview_url),
+    artwork_url: cleanOptionalText(candidate.artwork_url),
+    metadata: {
+      candidate_source: "chart_ingest_candidates",
+      candidate_id: uuidOrNull(candidate.id),
+      normalized_key: cleanOptionalText(candidate.normalized_key),
+      release_date: cleanOptionalText(candidate.release_date),
+    },
+  };
+}
+
+async function loadChartEntries(
+  db: ReturnType<typeof createClient>,
+  runId: string,
+  value: ParsedRequest,
+  editionId: string,
+): Promise<CandidateLoadResult> {
+  const { data, error } = await db
+    .from("wk_chart_entries_v2")
+    .select("id, canonical_track_id, rank, track_title, artist_name, artwork_url, normalized_key, release_date")
+    .eq("edition_id", editionId)
+    .order("rank", { ascending: true })
+    .limit(value.limit);
+
+  if (error) throw new Error(`failed_to_load_chart_entries: ${error.message}`);
+
+  return {
+    items: (data ?? []).map((entry: Record<string, unknown>) => mapChartEntryToItem(runId, value, entry)),
+    candidateSource: "wk_chart_entries_v2",
+    candidateSourceId: editionId,
+  };
+}
+
+async function loadIngestCandidates(
+  db: ReturnType<typeof createClient>,
+  runId: string,
+  value: ParsedRequest,
+  sourceRunId: string,
+): Promise<CandidateLoadResult> {
+  const { data, error } = await db
+    .from("chart_ingest_candidates")
+    .select("id, title, artist_display, isrc, external_url, preview_url, artwork_url, normalized_key, release_date")
+    .eq("run_id", sourceRunId)
+    .eq("status", "eligible")
+    .order("created_at", { ascending: true })
+    .limit(value.limit);
+
+  if (error) throw new Error(`failed_to_load_ingest_candidates: ${error.message}`);
+
+  return {
+    items: (data ?? []).map((candidate: Record<string, unknown>) => mapIngestCandidateToItem(runId, value, candidate)),
+    candidateSource: "chart_ingest_candidates",
+    candidateSourceId: sourceRunId,
+  };
+}
+
+async function loadCandidates(
+  db: ReturnType<typeof createClient>,
+  runId: string,
+  value: ParsedRequest,
+): Promise<CandidateLoadResult> {
+  if (value.chartEditionId) {
+    return await loadChartEntries(db, runId, value, value.chartEditionId);
+  }
+
+  if (value.sourceRunId) {
+    const { data: sourceRun, error } = await db
+      .from("chart_ingest_runs")
+      .select("id, commit_edition_id")
+      .eq("id", value.sourceRunId)
+      .maybeSingle();
+
+    if (error) throw new Error(`failed_to_load_source_run: ${error.message}`);
+    if (!sourceRun) throw new Error("source_run_not_found");
+
+    const commitEditionId = uuidOrNull(sourceRun.commit_edition_id);
+    if (commitEditionId) {
+      return await loadChartEntries(db, runId, value, commitEditionId);
+    }
+
+    return await loadIngestCandidates(db, runId, value, value.sourceRunId);
+  }
+
+  if (value.chartProgramId) {
+    const { data: edition, error } = await db
+      .from("wk_chart_editions_v2")
+      .select("id")
+      .eq("program_id", value.chartProgramId)
+      .in("status", ["committed", "published"])
+      .order("edition_date", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    if (error) throw new Error(`failed_to_load_latest_edition: ${error.message}`);
+
+    const editionId = uuidOrNull(edition?.id);
+    if (!editionId) {
+      return {
+        items: [],
+        candidateSource: "wk_chart_entries_v2",
+        candidateSourceId: null,
+      };
+    }
+
+    return await loadChartEntries(db, runId, value, editionId);
+  }
+
+  return {
+    items: [],
+    candidateSource: "wk_chart_entries_v2",
+    candidateSourceId: null,
   };
 }
 
@@ -241,9 +435,60 @@ Deno.serve(async (req) => {
     return jsonResponse({ ok: false, error: "insert_failed" }, 500);
   }
 
-  return jsonResponse({
-    ok: true,
-    run_id: data.id,
-    status: data.status,
-  }, 201);
+  const runId = data.id as string;
+
+  try {
+    const loaded = await loadCandidates(serviceClient, runId, value);
+
+    for (let i = 0; i < loaded.items.length; i += 100) {
+      const chunk = loaded.items.slice(i, i + 100);
+      const { error: itemInsertError } = await serviceClient
+        .from("wk_chart_playback_enrichment_items")
+        .insert(chunk);
+
+      if (itemInsertError) {
+        throw new Error(`failed_to_insert_candidates: ${itemInsertError.message}`);
+      }
+    }
+
+    const runMetadata = {
+      limit: value.limit,
+      phase: "candidate_loading",
+      candidate_source: loaded.candidateSource,
+      candidate_source_id: loaded.candidateSourceId,
+      loaded_at: new Date().toISOString(),
+    };
+
+    await serviceClient
+      .from("wk_chart_playback_enrichment_runs")
+      .update({
+        total_candidates: loaded.items.length,
+        metadata: runMetadata,
+      })
+      .eq("id", runId);
+
+    return jsonResponse({
+      ok: true,
+      run_id: runId,
+      status: "queued",
+      total_candidates: loaded.items.length,
+      candidate_source: loaded.candidateSource,
+    }, 201);
+  } catch (candidateError: unknown) {
+    const message = candidateError instanceof Error ? candidateError.message : String(candidateError);
+
+    await serviceClient
+      .from("wk_chart_playback_enrichment_runs")
+      .update({
+        status: "failed",
+        error_message: message,
+      })
+      .eq("id", runId);
+
+    return jsonResponse({
+      ok: false,
+      run_id: runId,
+      error: message,
+    }, 500);
+  }
 });
