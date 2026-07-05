@@ -1242,7 +1242,16 @@ async function run(): Promise<void> {
   const token = buildAppleMusicDeveloperToken();
 
   if (!databaseUrl) {
-    throw new Error('DATABASE_URL is required.');
+    throw new Error(
+      [
+        'DATABASE_URL is required for this legacy local script.',
+        '',
+        'Preferred path: use the Supabase Edge Function run-chart-playback-enrichment from Admin Charts edition detail.',
+        'The Edge Function reads Apple Music credentials from backend/admin settings, creates durable enrichment runs, and can persist accepted provider links with write=true.',
+        '',
+        'This local script is retained only for emergency/manual database work.'
+      ].join('\n')
+    );
   }
 
   console.log('\nWAKILISHA Phase 9 Apple Music Chart Playback Enrichment');

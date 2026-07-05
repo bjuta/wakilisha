@@ -26,6 +26,10 @@ type AppleSong = {
     genreNames?: string[];
     contentRating?: string;
   };
+  relationships?: {
+    artists?: { data?: { id: string; type?: string; attributes?: { name?: string } }[] };
+    albums?: { data?: { id: string; type?: string; attributes?: { name?: string } }[] };
+  };
 };
 
 type AppleSearchPayload = {
@@ -173,6 +177,14 @@ function appleArtworkUrl(song: AppleSong, size = 600): string | null {
 
 function applePreviewUrl(song: AppleSong): string | null {
   return song.attributes?.previews?.find((item) => item.url)?.url ?? null;
+}
+
+function appleReleaseId(song: AppleSong): string | null {
+  return song.relationships?.albums?.data?.[0]?.id ?? null;
+}
+
+function appleArtistIds(song: AppleSong): string[] {
+  return song.relationships?.artists?.data?.map((artist) => artist.id).filter(Boolean) ?? [];
 }
 
 function scoreSearchMatch(item: QueuedEnrichmentItem, song: AppleSong): number {
@@ -615,6 +627,7 @@ type MatchingCounters = {
 
 type MatchingResult = MatchingCounters & {
   status: "queued" | "completed" | "partial" | "failed";
+  persistedProviderLinkCount: number;
 };
 
 function emptyMatchingCounters(): MatchingCounters {
@@ -634,6 +647,114 @@ function matchingStatus(counters: MatchingCounters, totalItems: number): Matchin
   if (counters.processedCount === 0 && counters.failedCount > 0) return "failed";
   if (counters.failedCount > 0) return "partial";
   return "completed";
+}
+
+async function persistAcceptedProviderLinks(
+  db: ReturnType<typeof createClient>,
+  runId: string,
+  storefront: string,
+): Promise<number> {
+  const { data: acceptedItems, error } = await db
+    .from("wk_chart_playback_enrichment_items")
+    .select("id, registry_track_id, provider_track_id, provider_url, preview_url, artwork_url, confidence, match_method, raw_match_payload, metadata")
+    .eq("run_id", runId)
+    .eq("status", "accepted")
+    .not("registry_track_id", "is", null)
+    .not("provider_track_id", "is", null);
+
+  if (error) throw new Error(`failed_to_load_accepted_provider_links: ${error.message}`);
+
+  let persisted = 0;
+
+  for (const item of acceptedItems ?? []) {
+    const trackId = uuidOrNull(item.registry_track_id);
+    const providerTrackId = cleanOptionalText(item.provider_track_id);
+    if (!trackId || !providerTrackId) continue;
+
+    const song = item.raw_match_payload && typeof item.raw_match_payload === "object"
+      ? item.raw_match_payload as AppleSong
+      : null;
+
+    const attrs = song?.attributes ?? {};
+    const payload = {
+      provider: "apple_music",
+      id: providerTrackId,
+      storefront,
+      name: attrs.name ?? null,
+      artistName: attrs.artistName ?? null,
+      albumName: attrs.albumName ?? null,
+      isrc: attrs.isrc ?? null,
+      matchMethod: cleanOptionalText(item.match_method),
+      matchConfidence: typeof item.confidence === "number" ? item.confidence : null,
+      matchStatus: "matched",
+      enrichedAt: new Date().toISOString(),
+      enrichmentRunId: runId,
+      enrichmentItemId: item.id,
+    };
+
+    const { error: linkError } = await db
+      .from("registry_track_provider_links")
+      .upsert({
+        track_id: trackId,
+        provider_key: "apple_music",
+        provider_track_id: providerTrackId,
+        provider_release_id: song ? appleReleaseId(song) : null,
+        provider_artist_ids: song ? appleArtistIds(song) : [],
+        isrc: normalizeIsrc(attrs.isrc ?? null),
+        preview_url: cleanOptionalText(item.preview_url),
+        artwork_url: cleanOptionalText(item.artwork_url),
+        duration_ms: attrs.durationInMillis ?? null,
+        storefront,
+        match_method: cleanOptionalText(item.match_method) ?? "exact_title_artist",
+        match_confidence: typeof item.confidence === "number" ? item.confidence : 0,
+        match_status: "matched",
+        raw_payload: { song, providerPayload: payload },
+        last_checked_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      }, {
+        onConflict: "provider_key,provider_track_id",
+      });
+
+    if (linkError) throw new Error(`failed_to_persist_provider_link: ${linkError.message}`);
+
+    const { data: existingTrack, error: existingTrackError } = await db
+      .from("registry_tracks")
+      .select("metadata")
+      .eq("id", trackId)
+      .maybeSingle();
+
+    if (existingTrackError) {
+      throw new Error(`failed_to_load_registry_track_metadata: ${existingTrackError.message}`);
+    }
+
+    const existingMetadata = existingTrack?.metadata && typeof existingTrack.metadata === "object"
+      ? existingTrack.metadata as Record<string, unknown>
+      : {};
+    const existingProviders = existingMetadata.providers && typeof existingMetadata.providers === "object"
+      ? existingMetadata.providers as Record<string, unknown>
+      : {};
+
+    const { error: trackError } = await db
+      .from("registry_tracks")
+      .update({
+        metadata: {
+          ...existingMetadata,
+          providers: {
+            ...existingProviders,
+            apple_music: payload,
+          },
+          apple_music_track_id: providerTrackId,
+          apple_music_catalog_id: providerTrackId,
+        },
+      })
+      .eq("id", trackId);
+
+    if (trackError) throw new Error(`failed_to_update_registry_track_metadata: ${trackError.message}`);
+
+    persisted += 1;
+  }
+
+  return persisted;
 }
 
 async function processAppleMatching(
@@ -760,9 +881,14 @@ async function processAppleMatching(
     }
   }
 
+  const persistedProviderLinkCount = value.write
+    ? await persistAcceptedProviderLinks(db, runId, value.storefront)
+    : 0;
+
   return {
     ...counters,
     status: matchingStatus(counters, (items ?? []).length),
+    persistedProviderLinkCount,
   };
 }
 
@@ -943,6 +1069,7 @@ Deno.serve(async (req) => {
           ...runMetadata,
           phase: "apple_matching",
           matched_at: finishedAt,
+          persisted_provider_link_count: matched.persistedProviderLinkCount,
         },
       })
       .eq("id", runId);
@@ -957,6 +1084,7 @@ Deno.serve(async (req) => {
       accepted_count: matched.acceptedCount,
       needs_review_count: matched.needsReviewCount,
       failed_count: matched.failedCount,
+      persisted_provider_link_count: matched.persistedProviderLinkCount,
     }, 201);
   } catch (candidateError: unknown) {
     const message = candidateError instanceof Error ? candidateError.message : String(candidateError);
