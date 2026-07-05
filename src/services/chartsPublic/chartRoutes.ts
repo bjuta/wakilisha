@@ -60,14 +60,10 @@ export function isLegacyChartSlug(inputSlug: string): boolean {
  * Build the canonical chart path for a family, optionally with an edition.
  * Includes market slug for proper URL structure.
  */
-export function getCanonicalChartPath(
-  family: ChartFamily,
-  editionSlug?: string
-): string {
+export function getCanonicalChartPath(family: ChartFamily, editionSlug?: string): string {
   const publicSlug = family.publicSlug ?? family.slug ?? family.familyKey;
-  const marketSlug = (family.marketSlug ?? "").toLowerCase();
   if (editionSlug) {
-    return `/charts/${publicSlug}/${marketSlug}/${editionSlug}`;
+    return `/charts/${publicSlug}/${editionSlug}`;
   }
   return `/charts/${publicSlug}`;
 }
@@ -94,16 +90,11 @@ export function getLegacyRedirectTarget(
  * Includes market slug when available for proper 3-segment URL structure.
  */
 export function getCanonicalChartPathFromSlugs(
-  familySlug: string,
+  canonicalFamilySlug: string,
   editionSlug?: string,
-  marketSlug?: string
+  _marketSlug?: string
 ): string {
-  const canonicalFamilySlug = resolveChartRouteSlug(familySlug);
-  const market = (marketSlug ?? "").toLowerCase();
   if (editionSlug) {
-    if (market) {
-      return `/charts/${canonicalFamilySlug}/${market}/${editionSlug}`;
-    }
     return `/charts/${canonicalFamilySlug}/${editionSlug}`;
   }
   return `/charts/${canonicalFamilySlug}`;

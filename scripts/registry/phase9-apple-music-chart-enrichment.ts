@@ -244,7 +244,14 @@ function buildAppleMusicDeveloperToken(): string {
 
   if (!teamId || !keyId || !privateKey) {
     throw new Error(
-      'Apple Music auth is required. Provide APPLE_MUSIC_DEVELOPER_TOKEN as a JWT, or provide APPLE_MUSIC_TEAM_ID, APPLE_MUSIC_KEY_ID, and APPLE_MUSIC_PRIVATE_KEY.',
+      [
+        'Apple Music auth is required for this legacy local script.',
+        '',
+        'Preferred path: use Admin Charts edition detail → Apple Music Playback Enrichment.',
+        'That flow calls the Supabase Edge Function run-chart-playback-enrichment, reads Apple Music credentials from backend/admin settings, creates durable enrichment runs, and persists accepted provider links with write=true.',
+        '',
+        'Only use this local script for emergency/manual database work with explicit local credentials.'
+      ].join('\\n'),
     );
   }
 

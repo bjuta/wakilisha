@@ -134,8 +134,8 @@ export default function ChartEdition() {
       }
 
       // Redirect 2-segment URLs to canonical 3-segment when market is available
-      if (!market && editionSlug && (family.marketSlug)) {
-        navigate(`/charts/${publicSlug}/${marketSlug.toLowerCase()}/${editionSlug}`, { replace: true });
+      if (market && editionSlug) {
+        navigate(`/charts/${publicSlug}/${editionSlug}`, { replace: true });
         return;
       }
 
@@ -648,7 +648,7 @@ export default function ChartEdition() {
             <div className="chart-archive-carousel">
               {archive.latest && (
                 <Link
-                  to={`/charts/${publicSlug}/${marketSlug}/${archive.latest.slug}`}
+                  to={`/charts/${publicSlug}/${archive.latest.slug}`}
                   className={`chart-archive-card ${archive.latest.slug === edition.slug ? "active" : ""}`}
                 >
                   <span className="chart-archive-card-badge">Latest</span>
@@ -690,7 +690,7 @@ export default function ChartEdition() {
               {archive.previous.slice(0, 8).map((item) => (
                 <Link
                   key={item.slug}
-                  to={`/charts/${publicSlug}/${marketSlug}/${item.slug}`}
+                  to={`/charts/${publicSlug}/${item.slug}`}
                   className={`chart-archive-card ${item.slug === edition.slug ? "active" : ""}`}
                 >
                   <span className="chart-archive-card-label">{item.label}</span>
