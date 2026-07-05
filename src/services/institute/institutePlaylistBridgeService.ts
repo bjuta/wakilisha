@@ -188,6 +188,36 @@ export async function fetchInstitutePlaylistDraft(playlistId: string): Promise<I
   };
 }
 
+export async function updateInstitutePlaylistDraftMetadata(
+  playlistId: string,
+  payload: {
+    title: string;
+    description: string;
+    curatorLabel: string;
+  },
+): Promise<InstitutePlaylistDraft> {
+  const title = payload.title.trim();
+  if (title.length < 3) {
+    throw new Error("Playlist title must be at least 3 characters.");
+  }
+
+  const { error } = await supabase
+    .from("wk_playlists")
+    .update({
+      title,
+      description: payload.description.trim(),
+      curator_label: payload.curatorLabel.trim() || "WAKILISHA",
+    })
+    .eq("id", playlistId);
+
+  if (error) throw new Error(`Failed to update playlist draft: ${error.message}`);
+
+  const playlist = await fetchInstitutePlaylistDraft(playlistId);
+  if (!playlist) throw new Error("Playlist draft was updated but could not be reloaded.");
+
+  return playlist;
+}
+
 export async function createInstitutePlaylistDraft(
   inquiry: InquiryDraft,
   payload: {

@@ -3,6 +3,7 @@ import {
   createInstitutePlaylistDraft,
   fetchInstitutePlaylistDraft,
   fetchInstitutePlaylistDraftLink,
+  updateInstitutePlaylistDraftMetadata,
   type InstitutePlaylistDraft,
   type InstitutePlaylistDraftItem,
   type InstitutePlaylistDraftLink,
@@ -67,6 +68,8 @@ export function InstitutePlaylistWorkspace({ draft }: Props) {
   const [curatorLabel, setCuratorLabel] = useState("WAKILISHA");
   const [itemsJson, setItemsJson] = useState(sampleItems);
   const [creating, setCreating] = useState(false);
+  const [savingMetadata, setSavingMetadata] = useState(false);
+  const [editingMetadata, setEditingMetadata] = useState(false);
   const [loadingExisting, setLoadingExisting] = useState(false);
   const [notice, setNotice] = useState("");
   const [error, setError] = useState("");
@@ -126,6 +129,56 @@ export function InstitutePlaylistWorkspace({ draft }: Props) {
       alive = false;
     };
   }, [draft.id]);
+
+  const startEditingMetadata = () => {
+    if (!existingDraft) return;
+
+    setTitle(existingDraft.title);
+    setDescription(existingDraft.description ?? "");
+    setCuratorLabel(existingDraft.curatorLabel ?? "WAKILISHA");
+    setError("");
+    setNotice("");
+    setEditingMetadata(true);
+  };
+
+  const cancelEditingMetadata = () => {
+    if (existingDraft) {
+      setTitle(existingDraft.title);
+      setDescription(existingDraft.description ?? "");
+      setCuratorLabel(existingDraft.curatorLabel ?? "WAKILISHA");
+    }
+
+    setError("");
+    setEditingMetadata(false);
+  };
+
+  const saveMetadata = async () => {
+    if (!existingDraft) return;
+
+    setError("");
+    setNotice("");
+
+    if (title.trim().length < 3) {
+      setError("Add a playlist title first.");
+      return;
+    }
+
+    setSavingMetadata(true);
+    try {
+      const playlist = await updateInstitutePlaylistDraftMetadata(existingDraft.id, {
+        title: title.trim(),
+        description: description.trim(),
+        curatorLabel: curatorLabel.trim() || "WAKILISHA",
+      });
+      setExistingDraft(playlist);
+      setNotice(`Playlist details saved: ${playlist.slug}`);
+      setEditingMetadata(false);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to save playlist details.");
+    } finally {
+      setSavingMetadata(false);
+    }
+  };
 
   const createDraft = async () => {
     setError("");
@@ -191,11 +244,74 @@ export function InstitutePlaylistWorkspace({ draft }: Props) {
 
         {existingDraft ? (
           <div className="mt-5 rounded-xl border border-wk-success/30 bg-wk-success-soft p-4 text-[12px] leading-5 text-wk-text-muted">
-            <div><strong className="text-wk-text">Title:</strong> {existingDraft.title}</div>
-            <div><strong className="text-wk-text">Slug:</strong> {existingDraft.slug}</div>
-            <div><strong className="text-wk-text">Status:</strong> {statusLabel(existingDraft.status)}</div>
-            <div><strong className="text-wk-text">Items:</strong> {existingDraft.items.length}</div>
-            <div><strong className="text-wk-text">Updated:</strong> {new Date(existingDraft.updatedAt).toLocaleString()}</div>
+            {editingMetadata ? (
+              <div className="grid gap-4">
+                <label className="block">
+                  <span className="mb-2 block text-[10px] font-black uppercase tracking-[0.14em] text-wk-text-faint">Title</span>
+                  <input
+                    value={title}
+                    onChange={(event) => setTitle(event.target.value)}
+                    className="w-full rounded-lg border border-wk-border bg-wk-bg px-3 py-3 text-[13px] font-bold text-wk-text outline-none focus:border-wk-brand"
+                  />
+                </label>
+
+                <label className="block">
+                  <span className="mb-2 block text-[10px] font-black uppercase tracking-[0.14em] text-wk-text-faint">Description</span>
+                  <textarea
+                    value={description}
+                    onChange={(event) => setDescription(event.target.value)}
+                    rows={3}
+                    className="w-full resize-y rounded-lg border border-wk-border bg-wk-bg px-3 py-3 text-[13px] leading-6 text-wk-text outline-none focus:border-wk-brand"
+                  />
+                </label>
+
+                <label className="block">
+                  <span className="mb-2 block text-[10px] font-black uppercase tracking-[0.14em] text-wk-text-faint">Curator label</span>
+                  <input
+                    value={curatorLabel}
+                    onChange={(event) => setCuratorLabel(event.target.value)}
+                    className="w-full rounded-lg border border-wk-border bg-wk-bg px-3 py-3 text-[13px] font-bold text-wk-text outline-none focus:border-wk-brand"
+                  />
+                </label>
+
+                <div className="flex flex-wrap gap-2">
+                  <button
+                    type="button"
+                    onClick={saveMetadata}
+                    disabled={savingMetadata}
+                    className="rounded-lg bg-wk-brand px-4 py-2 text-[12px] font-black text-wk-brand-on disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    {savingMetadata ? "Saving..." : "Save details"}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={cancelEditingMetadata}
+                    disabled={savingMetadata}
+                    className="rounded-lg border border-wk-border bg-wk-surface px-4 py-2 text-[12px] font-black text-wk-text-muted disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <>
+                <div><strong className="text-wk-text">Title:</strong> {existingDraft.title}</div>
+                <div><strong className="text-wk-text">Description:</strong> {existingDraft.description || "No description yet"}</div>
+                <div><strong className="text-wk-text">Curator:</strong> {existingDraft.curatorLabel || "WAKILISHA"}</div>
+                <div><strong className="text-wk-text">Slug:</strong> {existingDraft.slug}</div>
+                <div><strong className="text-wk-text">Status:</strong> {statusLabel(existingDraft.status)}</div>
+                <div><strong className="text-wk-text">Items:</strong> {existingDraft.items.length}</div>
+                <div><strong className="text-wk-text">Updated:</strong> {new Date(existingDraft.updatedAt).toLocaleString()}</div>
+
+                <button
+                  type="button"
+                  onClick={startEditingMetadata}
+                  className="mt-4 rounded-lg bg-wk-text px-4 py-2 text-[12px] font-black text-wk-bg"
+                >
+                  Edit details
+                </button>
+              </>
+            )}
           </div>
         ) : null}
 
