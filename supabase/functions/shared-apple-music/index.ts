@@ -45,10 +45,10 @@ export async function createAppleMusicJWT(pk: string, tid: string, kid: string):
 /** Fetch Apple Music credentials and return a JWT token. */
 export async function getAppleMusicToken(db?: ReturnType<typeof createClient>): Promise<{ token: string } | { error: string }> {
   const privateKey = await readCredential("APPLE_MUSIC_PRIVATE_KEY", "apple_music_private_key", db);
-  const teamId = await readCredential("APPLE_TEAM_ID", "apple_music_team_id", db);
+  const teamId = await readCredential("APPLE_MUSIC_TEAM_ID", "apple_music_team_id", db);
   const musicKeyId = await readCredential("APPLE_MUSIC_KEY_ID", "apple_music_key_id", db);
   if (!privateKey || !teamId || !musicKeyId) {
-    const missing = [!privateKey && "APPLE_MUSIC_PRIVATE_KEY", !teamId && "APPLE_TEAM_ID", !musicKeyId && "APPLE_MUSIC_KEY_ID"].filter(Boolean);
+    const missing = [!privateKey && "APPLE_MUSIC_PRIVATE_KEY", !teamId && "APPLE_MUSIC_TEAM_ID", !musicKeyId && "APPLE_MUSIC_KEY_ID"].filter(Boolean);
     return { error: "Apple Music credentials missing: " + missing.join(", ") };
   }
   try {

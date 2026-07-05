@@ -16,7 +16,7 @@ const TS = ["canonicalized","rejected"];
 
 async function getAC(db:ReturnType<typeof createClient>):Promise<{token:string}|{error:string}>{
   const pk=await rCred("APPLE_MUSIC_PRIVATE_KEY","apple_music_private_key",db);
-  const tid=await rCred("APPLE_TEAM_ID","apple_music_team_id",db);
+  const tid=await rCred("APPLE_MUSIC_TEAM_ID","apple_music_team_id",db);
   const kid=await rCred("APPLE_MUSIC_KEY_ID","apple_music_key_id",db);
   if(!pk||!tid||!kid) return {error:"Apple Music credentials not configured."};
   try{return{token:await cAJWT(pk,tid,kid)};}catch(e){return{error:"JWT failed: "+(e instanceof Error?e.message:String(e))};}

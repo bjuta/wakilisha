@@ -248,7 +248,7 @@ async function createAppleMusicJWT(pk: string, tid: string, kid: string): Promis
 
 async function getAppleMusicToken(db: ReturnType<typeof createClient>): Promise<string | null> {
   const pk = await readCredential(db, "APPLE_MUSIC_PRIVATE_KEY", "apple_music_private_key");
-  const tid = await readCredential(db, "APPLE_TEAM_ID", "apple_music_team_id");
+  const tid = await readCredential(db, "APPLE_MUSIC_TEAM_ID", "apple_music_team_id");
   const kid = await readCredential(db, "APPLE_MUSIC_KEY_ID", "apple_music_key_id");
   if (!pk || !tid || !kid) return null;
   try {

@@ -126,7 +126,7 @@ Deno.serve(async (req: Request) => {
     ]);
 
     const privateKey = normalizeSecret(Deno.env.get("APPLE_MUSIC_PRIVATE_KEY")) || dbPrivateKey;
-    const teamId = normalizeSecret(Deno.env.get("APPLE_TEAM_ID")) || dbTeamId;
+    const teamId = normalizeSecret(Deno.env.get("APPLE_MUSIC_TEAM_ID")) || dbTeamId;
     const musicKeyId = normalizeSecret(Deno.env.get("APPLE_MUSIC_KEY_ID")) || dbKeyId;
 
     if (!privateKey || isPlaceholderSecret(privateKey)) {
