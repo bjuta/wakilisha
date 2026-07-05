@@ -5,6 +5,8 @@ import {
   deleteInstitutePlaylistItem,
   fetchInstitutePlaylistDraft,
   fetchInstitutePlaylistDraftLink,
+  fetchInstitutePlaylistReviewHistory,
+  fetchInstitutePlaylistReviewState,
   moveInstitutePlaylistItem,
   submitInstitutePlaylistDraftForReview,
   updateInstitutePlaylistDraftMetadata,
@@ -12,6 +14,7 @@ import {
   type InstitutePlaylistDraft,
   type InstitutePlaylistDraftItem,
   type InstitutePlaylistDraftLink,
+  type InstitutePlaylistReviewState,
 } from "@/services/institute/institutePlaylistBridgeService";
 import type { InquiryDraft } from "./types";
 
@@ -101,6 +104,8 @@ export function InstitutePlaylistWorkspace({ draft }: Props) {
   const [error, setError] = useState("");
   const [createdLink, setCreatedLink] = useState<InstitutePlaylistDraftLink | null>(null);
   const [existingDraft, setExistingDraft] = useState<InstitutePlaylistDraft | null>(null);
+  const [reviewState, setReviewState] = useState<InstitutePlaylistReviewState | null>(null);
+  const [reviewHistory, setReviewHistory] = useState<InstitutePlaylistReviewState[]>([]);
 
   const activeLink = createdLink;
 
@@ -134,7 +139,15 @@ export function InstitutePlaylistWorkspace({ draft }: Props) {
         const playlist = await fetchInstitutePlaylistDraft(link.playlistId);
         if (!alive) return;
 
+        const [latestReviewState, reviewRows] = await Promise.all([
+          fetchInstitutePlaylistReviewState(draft, link),
+          fetchInstitutePlaylistReviewHistory(draft, link),
+        ]);
+        if (!alive) return;
+
         setExistingDraft(playlist);
+        setReviewState(latestReviewState);
+        setReviewHistory(reviewRows);
         if (playlist) {
           setTitle(playlist.title);
           setDescription(playlist.description ?? "");
@@ -355,16 +368,26 @@ export function InstitutePlaylistWorkspace({ draft }: Props) {
   };
 
   const submitForReview = async () => {
-    if (!existingDraft) return;
+    if (!existingDraft || !activeLink) return;
 
     setError("");
     setNotice("");
     setSubmittingReview(true);
 
     try {
-      const playlist = await submitInstitutePlaylistDraftForReview(existingDraft.id);
+      const submission = await submitInstitutePlaylistDraftForReview(draft, activeLink, existingDraft);
+      const playlist = await fetchInstitutePlaylistDraft(existingDraft.id);
       setExistingDraft(playlist);
-      setNotice(`Playlist submitted for review: ${playlist.slug}`);
+      setReviewState(submission);
+      setReviewHistory((current) => {
+        if (current.some((item) => item.packetId === submission.packetId)) return current;
+        return [...current, submission].sort((first, second) => first.packetVersion - second.packetVersion);
+      });
+      setNotice(
+        submission.alreadySubmitted
+          ? `Playlist already submitted for review: v${submission.packetVersion}`
+          : `Playlist submitted for review: v${submission.packetVersion}`,
+      );
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to submit playlist for review.");
     } finally {
@@ -414,6 +437,11 @@ export function InstitutePlaylistWorkspace({ draft }: Props) {
   };
 
   const hasLinkedDraft = Boolean(activeLink || existingDraft);
+  const canSubmitForReview =
+    Boolean(existingDraft && activeLink) &&
+    reviewState?.status !== "submitted" &&
+    reviewState?.status !== "under_review" &&
+    existingDraft?.status !== "submitted_for_review";
 
   return (
     <div className="space-y-5">
@@ -494,6 +522,9 @@ export function InstitutePlaylistWorkspace({ draft }: Props) {
                 <div><strong className="text-wk-text">Status:</strong> {statusLabel(existingDraft.status)}</div>
                 <div><strong className="text-wk-text">Items:</strong> {existingDraft.items.length}</div>
                 <div><strong className="text-wk-text">Updated:</strong> {new Date(existingDraft.updatedAt).toLocaleString()}</div>
+                {reviewState ? (
+                  <div><strong className="text-wk-text">Review:</strong> v{reviewState.packetVersion} · {statusLabel(reviewState.status)}</div>
+                ) : null}
 
                 <button
                   type="button"
@@ -523,11 +554,38 @@ export function InstitutePlaylistWorkspace({ draft }: Props) {
             <button
               type="button"
               onClick={submitForReview}
-              disabled={submittingReview || existingDraft.status === "submitted_for_review"}
+              disabled={submittingReview || !canSubmitForReview}
               className="rounded-lg border border-wk-border bg-wk-surface px-4 py-2 text-[12px] font-black text-wk-text-muted disabled:cursor-not-allowed disabled:opacity-50"
             >
-              {submittingReview ? "Submitting..." : existingDraft.status === "submitted_for_review" ? "Submitted for review" : "Submit for review"}
+              {submittingReview ? "Submitting..." : !canSubmitForReview ? "Submitted for review" : "Submit for review"}
             </button>
+          </div>
+        ) : null}
+
+        {reviewState ? (
+          <div className="mt-5 rounded-xl border border-wk-border bg-wk-bg-subtle p-4 text-[12px] leading-5 text-wk-text-muted">
+            <div className="text-[10px] font-black uppercase tracking-[0.16em] text-wk-text-faint">Review state</div>
+            <div className="mt-2"><strong className="text-wk-text">Latest:</strong> v{reviewState.packetVersion} · {statusLabel(reviewState.status)}</div>
+            <div><strong className="text-wk-text">Submitted:</strong> {new Date(reviewState.submittedAt).toLocaleString()}</div>
+            {reviewState.editorNotes ? (
+              <div className="mt-2 rounded-lg border border-wk-border bg-wk-surface px-3 py-2">
+                <strong className="text-wk-text">Editor notes:</strong> {reviewState.editorNotes}
+              </div>
+            ) : null}
+
+            {reviewHistory.length > 1 ? (
+              <div className="mt-3">
+                <div className="text-[10px] font-black uppercase tracking-[0.14em] text-wk-text-faint">Review history</div>
+                <div className="mt-2 space-y-2">
+                  {reviewHistory.map((item) => (
+                    <div key={item.packetId} className="rounded-lg border border-wk-border bg-wk-surface px-3 py-2">
+                      <strong className="text-wk-text">v{item.packetVersion}</strong>
+                      {" "}· {statusLabel(item.status)} · {new Date(item.submittedAt).toLocaleString()}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ) : null}
           </div>
         ) : null}
 
