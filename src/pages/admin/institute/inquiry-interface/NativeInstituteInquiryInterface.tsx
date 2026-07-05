@@ -2385,6 +2385,7 @@ function ReviewDeskScreen() {
   const snapshot = activePacket?.snapshot;
   const inquiry = snapshot?.inquiry;
   const article = snapshot?.articleDraft;
+  const playlist = snapshot?.playlistDraft;
   const workProduct = snapshot?.workProduct;
   const articleAdminUrl = article?.slug ? `/admin/content/articles/${article.slug}` : null;
   const isPublishedWork = activePacket?.liveWorkProductStatus === "published";
@@ -2529,8 +2530,15 @@ function ReviewDeskScreen() {
               <div className="space-y-3">
                 {filteredPackets.map((packet) => {
                 const packetArticle = packet.snapshot?.articleDraft;
+                const packetPlaylist = packet.snapshot?.playlistDraft;
                 const packetInquiry = packet.snapshot?.inquiry;
+                const packetWorkProduct = packet.snapshot?.workProduct;
                 const selected = activePacket?.id === packet.id;
+                const packetTitle =
+                  packetArticle?.title ||
+                  packetPlaylist?.title ||
+                  packetWorkProduct?.productSlug ||
+                  "Untitled submission";
 
                 return (
                   <button
@@ -2550,7 +2558,11 @@ function ReviewDeskScreen() {
                         {(packet.liveWorkProductStatus === "published" ? "published" : packet.status).replaceAll("_", " ")}
                       </Chip>
                     </div>
-                    <div className="mt-2 text-[15px] font-black text-wk-text">{packetArticle?.title || packetArticle?.slug || "Untitled article draft"}</div>
+                    <div className="mt-2 text-[15px] font-black text-wk-text">{packetTitle}</div>
+                    <div className="mt-1 flex flex-wrap gap-2">
+                      <Chip>{packetWorkProduct?.formatLabel ?? (packetPlaylist ? "Playlist" : "Article")}</Chip>
+                      {packetPlaylist?.itemCount ? <Chip>{packetPlaylist.itemCount} item{packetPlaylist.itemCount === 1 ? "" : "s"}</Chip> : null}
+                    </div>
                     <p className="mt-1 line-clamp-2 text-[12px] leading-5 text-wk-text-muted">
                       {packetInquiry?.workingQuestion || packetInquiry?.rawQuestion || "No question saved."}
                     </p>
@@ -2565,7 +2577,7 @@ function ReviewDeskScreen() {
           </Panel>
 
           <div className="space-y-5">
-            <Panel eyebrow="Submission" title={article?.title || "Selected review"}>
+            <Panel eyebrow="Submission" title={article?.title || playlist?.title || "Selected review"}>
               <div className="grid gap-3 md:grid-cols-2">
                 <div className="rounded-lg border border-wk-border bg-wk-bg-subtle p-3">
                   <div className="text-[10px] font-black uppercase tracking-[0.12em] text-wk-text-faint">Inquiry</div>
@@ -2580,14 +2592,19 @@ function ReviewDeskScreen() {
                 </div>
 
                 <div className="rounded-lg border border-wk-border bg-wk-bg-subtle p-3">
-                  <div className="text-[10px] font-black uppercase tracking-[0.12em] text-wk-text-faint">Article draft</div>
-                  <div className="mt-2 text-[15px] font-black text-wk-text">{article?.slug ?? workProduct?.productSlug ?? "No article slug"}</div>
+                  <div className="text-[10px] font-black uppercase tracking-[0.12em] text-wk-text-faint">
+                    {playlist ? "Playlist draft" : "Article draft"}
+                  </div>
+                  <div className="mt-2 text-[15px] font-black text-wk-text">
+                    {playlist?.slug ?? article?.slug ?? workProduct?.productSlug ?? "No work product slug"}
+                  </div>
                   <p className="mt-2 text-[13px] leading-6 text-wk-text-muted">
-                    {article?.excerpt || "No excerpt saved."}
+                    {playlist?.description || article?.excerpt || "No summary saved."}
                   </p>
                   <div className="mt-3 flex flex-wrap gap-2">
-                    <Chip tone="warning">{article?.wpStatus ?? "pending"}</Chip>
-                    <Chip>Private draft</Chip>
+                    <Chip tone="warning">{playlist?.status ?? article?.wpStatus ?? "pending"}</Chip>
+                    <Chip>{playlist ? `${playlist.itemCount ?? playlist.items?.length ?? 0} playlist item(s)` : "Private draft"}</Chip>
+                    {playlist?.curatorLabel ? <Chip>{playlist.curatorLabel}</Chip> : null}
                   </div>
                 </div>
               </div>
@@ -2599,13 +2616,49 @@ function ReviewDeskScreen() {
                 </p>
               </div>
 
-              <div className="mt-4 rounded-xl border border-wk-border bg-wk-bg p-4">
-                <div className="text-[10px] font-black uppercase tracking-[0.12em] text-wk-text-faint">Article preview</div>
-                <div
-                  className="prose prose-sm mt-3 max-h-[360px] overflow-auto text-wk-text"
-                  dangerouslySetInnerHTML={{ __html: article?.contentHtml || "<p>No article body saved.</p>" }}
-                />
-              </div>
+              {article ? (
+                <div className="mt-4 rounded-xl border border-wk-border bg-wk-bg p-4">
+                  <div className="text-[10px] font-black uppercase tracking-[0.12em] text-wk-text-faint">Article preview</div>
+                  <div
+                    className="prose prose-sm mt-3 max-h-[360px] overflow-auto text-wk-text"
+                    dangerouslySetInnerHTML={{ __html: article.contentHtml || "<p>No article body saved.</p>" }}
+                  />
+                </div>
+              ) : null}
+
+              {playlist ? (
+                <div className="mt-4 rounded-xl border border-wk-border bg-wk-bg p-4">
+                  <div className="text-[10px] font-black uppercase tracking-[0.12em] text-wk-text-faint">Playlist preview</div>
+                  {playlist.items?.length ? (
+                    <div className="mt-3 space-y-3">
+                      {playlist.items.map((item) => (
+                        <article key={item.id ?? `${item.position}-${item.title}`} className="rounded-lg border border-wk-border bg-wk-surface px-3 py-3">
+                          <div className="flex flex-wrap items-start justify-between gap-3">
+                            <div>
+                              <div className="text-[13px] font-black text-wk-text">
+                                {item.position ? `${item.position}. ` : null}{item.title || item.providerTrackId || "Untitled playlist item"}
+                              </div>
+                              <p className="mt-1 text-[12px] leading-5 text-wk-text-muted">
+                                {item.artistNames?.filter(Boolean).join(", ") || "Unknown artist"}
+                              </p>
+                            </div>
+                            <Chip>{item.matchStatus?.replaceAll("_", " ") ?? "pending"}</Chip>
+                          </div>
+
+                          <div className="mt-3 grid gap-2 text-[11px] leading-5 text-wk-text-muted md:grid-cols-2">
+                            {item.providerKey ? <div><strong className="text-wk-text">Provider:</strong> {item.providerKey}</div> : null}
+                            {item.providerTrackId ? <div><strong className="text-wk-text">Provider ID:</strong> {item.providerTrackId}</div> : null}
+                            {item.providerUrl ? <div className="md:col-span-2"><strong className="text-wk-text">URL:</strong> {item.providerUrl}</div> : null}
+                            {item.notes ? <div className="md:col-span-2"><strong className="text-wk-text">Notes:</strong> {item.notes}</div> : null}
+                          </div>
+                        </article>
+                      ))}
+                    </div>
+                  ) : (
+                    <EmptyState title="No playlist items in snapshot" body="The submitted packet did not include item details." />
+                  )}
+                </div>
+              ) : null}
             </Panel>
 
             {packetVersionHistory.length > 1 ? (

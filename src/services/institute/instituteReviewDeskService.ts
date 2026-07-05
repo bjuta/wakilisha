@@ -43,6 +43,26 @@ export type InstituteReviewPacketSnapshot = {
     seo?: Record<string, unknown>;
     wpStatus?: string | null;
   };
+  playlistDraft?: {
+    id?: string;
+    slug?: string;
+    title?: string;
+    description?: string | null;
+    curatorLabel?: string | null;
+    status?: string;
+    itemCount?: number;
+    items?: Array<{
+      id?: string;
+      position?: number;
+      title?: string | null;
+      artistNames?: string[];
+      providerKey?: string | null;
+      providerTrackId?: string | null;
+      providerUrl?: string | null;
+      matchStatus?: string | null;
+      notes?: string | null;
+    }>;
+  };
   governance?: {
     contributorCanPublish?: boolean;
     editorMustReviewBeforePublication?: boolean;
