@@ -22,6 +22,7 @@ import {
   type InstituteArticleDraftLink,
   type InstituteLinkedArticleReviewState,
 } from "@/services/institute/instituteArticleBridgeService";
+import { fetchInstitutePlaylistDraftLink, type InstitutePlaylistDraftLink } from "@/services/institute/institutePlaylistBridgeService";
 import { useEffect, useMemo, useState } from "react";
 import { createPortal } from "react-dom";
 import type { ReactNode } from "react";
@@ -1650,6 +1651,7 @@ function EvidenceScreen({
   const [articleLinkError, setArticleLinkError] = useState<string | null>(null);
   const [articleReviewState, setArticleReviewState] = useState<InstituteLinkedArticleReviewState | null>(null);
   const [articleReviewHistory, setArticleReviewHistory] = useState<InstituteLinkedArticleReviewState[]>([]);
+  const [playlistLink, setPlaylistLink] = useState<InstitutePlaylistDraftLink | null>(null);
 
   const activeDefinition = activeFormat ? workspaceDefinitionFor(activeFormat) : null;
   const isArticleWorkspace = activeDefinition?.workspaceType === "article";
@@ -1667,6 +1669,30 @@ function EvidenceScreen({
           : articleReviewState?.status === "rejected"
             ? "Rejected. Start a new Inquiry to rebuild it."
             : "Draft, save, preview, then submit.";
+
+  useEffect(() => {
+    let alive = true;
+
+    async function loadPlaylistLink() {
+      if (!draft?.id) {
+        setPlaylistLink(null);
+        return;
+      }
+
+      try {
+        const link = await fetchInstitutePlaylistDraftLink(draft.id);
+        if (alive) setPlaylistLink(link);
+      } catch {
+        if (alive) setPlaylistLink(null);
+      }
+    }
+
+    void loadPlaylistLink();
+
+    return () => {
+      alive = false;
+    };
+  }, [draft?.id]);
 
   useEffect(() => {
     let alive = true;
@@ -1914,7 +1940,8 @@ function EvidenceScreen({
                 const definition = workspaceDefinitionFor(format);
                 const items = evidenceForFormat(evidence, format);
                 const latest = items[0];
-                const completion = latest ? workspaceCompletion(latest) : 0;
+                const hasLinkedPlaylistDraft = definition.workspaceType === "playlist" && Boolean(playlistLink);
+                const completion = hasLinkedPlaylistDraft ? 100 : latest ? workspaceCompletion(latest) : 0;
                 const selected = activeFormat === format;
 
                 return (
@@ -1930,8 +1957,8 @@ function EvidenceScreen({
                         <div className="text-[13px] font-black text-wk-text">{format}</div>
                         <p className="mt-1 text-[11px] leading-4 text-wk-text-muted">{definition.deck}</p>
                       </div>
-                      <Chip tone={completion >= 80 ? "success" : items.length ? "warning" : "neutral"}>
-                        {completion >= 80 ? "Near review" : items.length ? "Started" : "Not started"}
+                      <Chip tone={completion >= 80 ? "success" : items.length || hasLinkedPlaylistDraft ? "warning" : "neutral"}>
+                        {hasLinkedPlaylistDraft ? "Linked draft" : completion >= 80 ? "Near review" : items.length ? "Started" : "Not started"}
                       </Chip>
                     </div>
 
