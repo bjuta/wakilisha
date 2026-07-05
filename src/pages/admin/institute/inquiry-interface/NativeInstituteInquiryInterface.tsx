@@ -1850,10 +1850,10 @@ function EvidenceScreen({
               {draft.code} · Evidence workspaces
             </div>
             <h1 className="mt-3 max-w-4xl text-[34px] font-black leading-[1.02] tracking-[-0.065em] text-wk-text lg:text-[42px]">
-              Produce the formats promised in Workbench.
+              Quick evidence capture.
             </h1>
             <p className="mt-3 max-w-3xl text-[14px] leading-6 text-wk-text-muted">
-              This is not another setup page. Workbench decided the evidence formats. This page is where contributors put the work on the table.
+              Capture evidence quickly here. Review and refine later.
             </p>
           </div>
 
@@ -1885,13 +1885,13 @@ function EvidenceScreen({
       {!formats.length ? (
         <Panel eyebrow="No formats selected" title="Go back to Workbench first">
           <EmptyState
-            title="Evidence has nothing to produce yet"
-            body="Choose evidence formats in Workbench. Once selected, they appear here as production workspaces."
+            title="No evidence to capture yet"
+            body="Choose evidence formats in Workbench. They will appear here for quick capture."
           />
         </Panel>
       ) : (
         <>
-          <Panel eyebrow="1 · Format queue" title="What did the contributor promise to produce?">
+          <Panel eyebrow="1 · Format queue" title="Formats promised for capture">
             <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
               {formats.map((format) => {
                 const definition = workspaceDefinitionFor(format);
