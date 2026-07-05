@@ -10,6 +10,257 @@ const corsHeaders = {
   "Vary": "Origin",
 };
 
+type AppleSong = {
+  id: string;
+  type?: "songs";
+  attributes?: {
+    name?: string;
+    artistName?: string;
+    albumName?: string;
+    durationInMillis?: number;
+    isrc?: string;
+    url?: string;
+    previews?: { url?: string }[];
+    artwork?: { url?: string; width?: number; height?: number };
+    releaseDate?: string;
+    genreNames?: string[];
+    contentRating?: string;
+  };
+};
+
+type AppleSearchPayload = {
+  results?: {
+    songs?: {
+      data?: AppleSong[];
+    };
+  };
+};
+
+type AppleMatchResult = {
+  song: AppleSong;
+  confidence: number;
+  method: "isrc" | "exact_title_artist" | "fuzzy_title_artist";
+  status: "accepted" | "needs_review";
+  reason: string;
+};
+
+type QueuedEnrichmentItem = {
+  id?: string;
+  rank?: number | null;
+  track_title: string;
+  artist_name: string | null;
+  isrc?: string | null;
+  storefront?: string | null;
+};
+
+function base64UrlFromString(input: string): string {
+  return btoa(input).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+}
+
+function base64UrlFromBytes(input: Uint8Array): string {
+  let binary = "";
+  for (const byte of input) binary += String.fromCharCode(byte);
+  return btoa(binary).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+}
+
+async function createAppleMusicJWT(privateKey: string, teamId: string, keyId: string): Promise<string> {
+  const header = { alg: "ES256", kid: keyId, typ: "JWT" };
+  const now = Math.floor(Date.now() / 1000);
+  const payload = { iss: teamId, iat: now, exp: now + 3600 };
+
+  const encodedHeader = base64UrlFromString(JSON.stringify(header));
+  const encodedPayload = base64UrlFromString(JSON.stringify(payload));
+  const signingInput = `${encodedHeader}.${encodedPayload}`;
+
+  const keyData = privateKey
+    .replace(/\\n/g, "\n")
+    .replace("-----BEGIN PRIVATE KEY-----", "")
+    .replace("-----END PRIVATE KEY-----", "")
+    .replace(/\s/g, "");
+
+  const key = await crypto.subtle.importKey(
+    "pkcs8",
+    Uint8Array.from(atob(keyData), (char) => char.charCodeAt(0)),
+    { name: "ECDSA", namedCurve: "P-256" },
+    false,
+    ["sign"],
+  );
+
+  const signature = await crypto.subtle.sign(
+    { name: "ECDSA", hash: "SHA-256" },
+    key,
+    new TextEncoder().encode(signingInput),
+  );
+
+  return `${signingInput}.${base64UrlFromBytes(new Uint8Array(signature))}`;
+}
+
+function normalizeText(value: string): string {
+  return value
+    .toLowerCase()
+    .replace(/\([^)]*(feat|ft|with)[^)]*\)/gi, "")
+    .replace(/\[[^\]]*(feat|ft|with)[^\]]*\]/gi, "")
+    .replace(/&/g, " and ")
+    .replace(/[^a-z0-9]+/g, " ")
+    .trim()
+    .replace(/\s+/g, " ");
+}
+
+function normalizeIsrc(value: string | null | undefined): string | null {
+  if (!value) return null;
+  const normalized = value.replace(/[^a-zA-Z0-9]/g, "").toUpperCase();
+  return normalized.length >= 8 ? normalized : null;
+}
+
+function splitArtistNames(value: string): string[] {
+  return value
+    .split(/,|&|\bfeat\.?\b|\bft\.?\b|\bwith\b|\bx\b/gi)
+    .map((part) => normalizeText(part))
+    .filter(Boolean);
+}
+
+function scoreArtistMatch(entryArtistRaw: string, songArtistRaw: string): number {
+  const entryArtist = normalizeText(entryArtistRaw);
+  const songArtist = normalizeText(songArtistRaw);
+  const entryArtists = splitArtistNames(entryArtistRaw);
+  const songArtists = splitArtistNames(songArtistRaw);
+
+  if (!entryArtist || !songArtist) return 0;
+  if (entryArtist === songArtist) return 0.35;
+
+  for (const entryPart of entryArtists) {
+    for (const songPart of songArtists) {
+      if (entryPart === songPart) return 0.35;
+      if (entryPart.includes(songPart) || songPart.includes(entryPart)) return 0.30;
+    }
+  }
+
+  if (entryArtist.includes(songArtist) || songArtist.includes(entryArtist)) return 0.24;
+
+  return 0;
+}
+
+function strippedVersionTitle(title: string): string {
+  const normalized = title.trim();
+  const stripped = normalized
+    .replace(/\s[-–—:]\s*(home\s+session|live\s+session|acoustic\s+session|session|home\s+version|live|acoustic)$/i, "")
+    .replace(/\s+\((home\s+session|live\s+session|acoustic\s+session|session|home\s+version|live|acoustic)\)$/i, "")
+    .replace(/\s+\[(home\s+session|live\s+session|acoustic\s+session|session|home\s+version|live|acoustic)\]$/i, "")
+    .trim();
+
+  return stripped && stripped !== normalized ? stripped : normalized;
+}
+
+function searchTermsForItem(item: QueuedEnrichmentItem): string[] {
+  const terms = new Set<string>();
+  const title = item.track_title.trim();
+  const artist = item.artist_name?.trim() ?? "";
+  const full = `${title} ${artist}`.trim();
+  const strippedTitle = strippedVersionTitle(title);
+  const stripped = `${strippedTitle} ${artist}`.trim();
+
+  if (full) terms.add(full);
+  if (stripped && stripped !== full) terms.add(stripped);
+
+  return [...terms];
+}
+
+function appleArtworkUrl(song: AppleSong, size = 600): string | null {
+  const url = song.attributes?.artwork?.url;
+  if (!url) return null;
+  return url.replace("{w}", String(size)).replace("{h}", String(size));
+}
+
+function applePreviewUrl(song: AppleSong): string | null {
+  return song.attributes?.previews?.find((item) => item.url)?.url ?? null;
+}
+
+function scoreSearchMatch(item: QueuedEnrichmentItem, song: AppleSong): number {
+  const itemTitle = normalizeText(item.track_title);
+  const songTitle = normalizeText(song.attributes?.name ?? "");
+  let score = 0;
+
+  if (itemTitle && songTitle && itemTitle === songTitle) score += 0.58;
+  else if (itemTitle && songTitle && (itemTitle.includes(songTitle) || songTitle.includes(itemTitle))) score += 0.42;
+
+  score += scoreArtistMatch(item.artist_name ?? "", song.attributes?.artistName ?? "");
+
+  const itemIsrc = normalizeIsrc(item.isrc);
+  const songIsrc = normalizeIsrc(song.attributes?.isrc);
+  if (itemIsrc && songIsrc && itemIsrc === songIsrc) score = Math.max(score, 0.99);
+
+  return Math.min(Number(score.toFixed(4)), 1);
+}
+
+async function appleRequest<T>(path: string, token: string): Promise<T> {
+  const response = await fetch(`https://api.music.apple.com${path}`, {
+    headers: {
+      Authorization: `Bearer ${token}`,
+      Accept: "application/json",
+    },
+  });
+
+  if (!response.ok) {
+    const text = await response.text();
+    throw new Error(`Apple Music API ${response.status} ${response.statusText}: ${text.slice(0, 300)}`);
+  }
+
+  return await response.json() as T;
+}
+
+async function searchAppleSong(
+  item: QueuedEnrichmentItem,
+  storefront: string,
+  minAutoAccept: number,
+  token: string,
+): Promise<AppleMatchResult | null> {
+  const terms = searchTermsForItem(item);
+  if (terms.length === 0) return null;
+
+  const ranked: Array<{ song: AppleSong; confidence: number; term: string }> = [];
+
+  for (const term of terms) {
+    const params = new URLSearchParams();
+    params.set("term", term);
+    params.set("types", "songs");
+    params.set("limit", "10");
+
+    const payload = await appleRequest<AppleSearchPayload>(
+      `/v1/catalog/${storefront}/search?${params.toString()}`,
+      token,
+    );
+
+    for (const song of payload.results?.songs?.data ?? []) {
+      ranked.push({
+        song,
+        confidence: scoreSearchMatch(item, song),
+        term,
+      });
+    }
+  }
+
+  ranked.sort((a, b) => b.confidence - a.confidence);
+  const best = ranked[0];
+
+  if (!best || best.confidence < 0.72) return null;
+
+  const itemIsrc = normalizeIsrc(item.isrc);
+  const songIsrc = normalizeIsrc(best.song.attributes?.isrc);
+  const method = itemIsrc && songIsrc && itemIsrc === songIsrc
+    ? "isrc"
+    : best.confidence >= 0.9
+      ? "exact_title_artist"
+      : "fuzzy_title_artist";
+
+  return {
+    song: best.song,
+    confidence: Number(best.confidence.toFixed(4)),
+    method,
+    status: best.confidence >= minAutoAccept ? "accepted" : "needs_review",
+    reason: `Apple search best match confidence ${best.confidence.toFixed(2)} via "${best.term}"`,
+  };
+}
+
 type RequestBody = {
   source_run_id?: string | null;
   chart_program_id?: string | null;
@@ -352,6 +603,170 @@ async function loadCandidates(
   };
 }
 
+type MatchingCounters = {
+  processedCount: number;
+  matchedCount: number;
+  acceptedCount: number;
+  needsReviewCount: number;
+  failedCount: number;
+  topTenCoverageCount: number;
+  fullCoverageCount: number;
+};
+
+type MatchingResult = MatchingCounters & {
+  status: "queued" | "completed" | "partial" | "failed";
+};
+
+function emptyMatchingCounters(): MatchingCounters {
+  return {
+    processedCount: 0,
+    matchedCount: 0,
+    acceptedCount: 0,
+    needsReviewCount: 0,
+    failedCount: 0,
+    topTenCoverageCount: 0,
+    fullCoverageCount: 0,
+  };
+}
+
+function matchingStatus(counters: MatchingCounters, totalItems: number): MatchingResult["status"] {
+  if (totalItems === 0) return "queued";
+  if (counters.processedCount === 0 && counters.failedCount > 0) return "failed";
+  if (counters.failedCount > 0) return "partial";
+  return "completed";
+}
+
+async function processAppleMatching(
+  db: ReturnType<typeof createClient>,
+  runId: string,
+  value: ParsedRequest,
+  token: string,
+): Promise<MatchingResult> {
+  const startedAt = new Date().toISOString();
+
+  await db
+    .from("wk_chart_playback_enrichment_runs")
+    .update({
+      status: "running",
+      started_at: startedAt,
+    })
+    .eq("id", runId);
+
+  const { data: items, error } = await db
+    .from("wk_chart_playback_enrichment_items")
+    .select("id, rank, track_title, artist_name, isrc, storefront, metadata, created_at")
+    .eq("run_id", runId)
+    .eq("status", "queued")
+    .order("rank", { ascending: true, nullsFirst: false })
+    .order("created_at", { ascending: true })
+    .limit(value.limit);
+
+  if (error) throw new Error(`failed_to_load_queued_items: ${error.message}`);
+
+  const counters = emptyMatchingCounters();
+
+  for (const item of items ?? []) {
+    const itemId = uuidOrNull(item.id);
+    if (!itemId) continue;
+
+    try {
+      await db
+        .from("wk_chart_playback_enrichment_items")
+        .update({ status: "running" })
+        .eq("id", itemId);
+
+      const queuedItem: QueuedEnrichmentItem = {
+        id: itemId,
+        rank: typeof item.rank === "number" ? item.rank : null,
+        track_title: cleanRequiredTitle(item.track_title),
+        artist_name: cleanOptionalText(item.artist_name),
+        isrc: cleanOptionalText(item.isrc),
+        storefront: cleanOptionalText(item.storefront),
+      };
+
+      const match = await searchAppleSong(
+        queuedItem,
+        queuedItem.storefront ?? value.storefront,
+        value.minAutoAccept,
+        token,
+      );
+
+      counters.processedCount += 1;
+
+      if (!match) {
+        await db
+          .from("wk_chart_playback_enrichment_items")
+          .update({
+            status: "not_found",
+            error_message: "No safe Apple Music title/artist match",
+          })
+          .eq("id", itemId);
+
+        continue;
+      }
+
+      counters.matchedCount += 1;
+      counters.fullCoverageCount += 1;
+
+      if (match.status === "accepted") counters.acceptedCount += 1;
+      if (match.status === "needs_review") counters.needsReviewCount += 1;
+      if (queuedItem.rank !== null && queuedItem.rank !== undefined && queuedItem.rank >= 1 && queuedItem.rank <= 10) {
+        counters.topTenCoverageCount += 1;
+      }
+
+      const attrs = match.song.attributes ?? {};
+      const updatePayload: Record<string, unknown> = {
+        status: match.status,
+        match_method: match.method,
+        confidence: match.confidence,
+        auto_accept: match.status === "accepted",
+        provider_track_id: match.song.id,
+        raw_match_payload: match.song,
+        error_message: null,
+        metadata: {
+          ...(item.metadata && typeof item.metadata === "object" ? item.metadata : {}),
+          phase: "apple_matching",
+          apple_reason: match.reason,
+          apple_artist_name: attrs.artistName ?? null,
+          apple_title: attrs.name ?? null,
+          apple_album_name: attrs.albumName ?? null,
+          apple_release_date: attrs.releaseDate ?? null,
+          apple_isrc: attrs.isrc ?? null,
+        },
+      };
+
+      if (attrs.url) updatePayload.provider_url = attrs.url;
+
+      const preview = applePreviewUrl(match.song);
+      if (preview) updatePayload.preview_url = preview;
+
+      const artwork = appleArtworkUrl(match.song);
+      if (artwork) updatePayload.artwork_url = artwork;
+
+      await db
+        .from("wk_chart_playback_enrichment_items")
+        .update(updatePayload)
+        .eq("id", itemId);
+    } catch (itemError: unknown) {
+      counters.failedCount += 1;
+
+      await db
+        .from("wk_chart_playback_enrichment_items")
+        .update({
+          status: "failed",
+          error_message: itemError instanceof Error ? itemError.message : String(itemError),
+        })
+        .eq("id", itemId);
+    }
+  }
+
+  return {
+    ...counters,
+    status: matchingStatus(counters, (items ?? []).length),
+  };
+}
+
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { status: 204, headers: corsHeaders });
@@ -467,12 +882,81 @@ Deno.serve(async (req) => {
       })
       .eq("id", runId);
 
+    if (loaded.items.length === 0) {
+      return jsonResponse({
+        ok: true,
+        run_id: runId,
+        status: "queued",
+        total_candidates: 0,
+        processed_count: 0,
+        matched_count: 0,
+        accepted_count: 0,
+        needs_review_count: 0,
+        failed_count: 0,
+        candidate_source: loaded.candidateSource,
+      }, 201);
+    }
+
+    let token: string;
+    try {
+      token = await createAppleMusicJWT(privateKey, teamId, keyId);
+    } catch (tokenError: unknown) {
+      const message = tokenError instanceof Error ? tokenError.message : String(tokenError);
+
+      await serviceClient
+        .from("wk_chart_playback_enrichment_runs")
+        .update({
+          status: "failed",
+          error_message: message,
+          finished_at: new Date().toISOString(),
+          metadata: {
+            ...runMetadata,
+            phase: "apple_matching",
+            matched_at: new Date().toISOString(),
+          },
+        })
+        .eq("id", runId);
+
+      return jsonResponse({
+        ok: false,
+        run_id: runId,
+        error: message,
+      }, 500);
+    }
+
+    const matched = await processAppleMatching(serviceClient, runId, value, token);
+    const finishedAt = new Date().toISOString();
+
+    await serviceClient
+      .from("wk_chart_playback_enrichment_runs")
+      .update({
+        status: matched.status,
+        processed_count: matched.processedCount,
+        matched_count: matched.matchedCount,
+        accepted_count: matched.acceptedCount,
+        needs_review_count: matched.needsReviewCount,
+        failed_count: matched.failedCount,
+        top_ten_coverage_count: matched.topTenCoverageCount,
+        full_coverage_count: matched.fullCoverageCount,
+        finished_at: finishedAt,
+        metadata: {
+          ...runMetadata,
+          phase: "apple_matching",
+          matched_at: finishedAt,
+        },
+      })
+      .eq("id", runId);
+
     return jsonResponse({
       ok: true,
       run_id: runId,
-      status: "queued",
+      status: matched.status,
       total_candidates: loaded.items.length,
-      candidate_source: loaded.candidateSource,
+      processed_count: matched.processedCount,
+      matched_count: matched.matchedCount,
+      accepted_count: matched.acceptedCount,
+      needs_review_count: matched.needsReviewCount,
+      failed_count: matched.failedCount,
     }, 201);
   } catch (candidateError: unknown) {
     const message = candidateError instanceof Error ? candidateError.message : String(candidateError);
