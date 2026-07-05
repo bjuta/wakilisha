@@ -9,6 +9,145 @@ import {
   type WakilishaRecordSearchResult,
 } from "./useWakilishaRecordSearch";
 
+const registryWorkModes = [
+  { key: "use_existing_record", label: "Use existing record" },
+  { key: "suggest_missing_record", label: "Suggest missing record" },
+  { key: "suggest_correction", label: "Suggest correction" },
+  { key: "suggest_merge_duplicate", label: "Suggest merge duplicate" },
+  { key: "suggest_relationship", label: "Suggest relationship" },
+  { key: "suggest_provider_media_credit_update", label: "Suggest provider/media/credit update" },
+] as const;
+
+type RegistryWorkMode = typeof registryWorkModes[number]["key"];
+
+type RegistryReviewPayload = {
+  workMode: RegistryWorkMode;
+  fieldName?: string;
+  currentValue?: string;
+  proposedValue?: string;
+  relationshipType?: string;
+  relatedEntityLabel?: string;
+  duplicateEntityLabel?: string;
+  providerKey?: string;
+  providerUrl?: string;
+  supportingLinks?: string[];
+  explanation?: string;
+  confidence?: string;
+  publicImpact?: string;
+  culturalQaNote?: string;
+  limitations?: string;
+  suggestedEntityType?: WakilishaRecordEntityType;
+  suggestedEntityLabel?: string;
+  suggestedEntitySlug?: string;
+  suggestedPublicUrl?: string;
+};
+
+function normalizeSupportingLinks(value: string | string[]): string[] {
+  if (Array.isArray(value)) {
+    return value.map((v) => v.trim()).filter(Boolean);
+  }
+  return value
+    .split(/\n+/)
+    .map((v) => v.trim())
+    .filter(Boolean);
+}
+
+function omitEmptyRegistryReviewFields(payload: RegistryReviewPayload): RegistryReviewPayload {
+  const entries = Object.entries(payload).filter(([, value]) => {
+    if (value === undefined || value === null) return false;
+    if (Array.isArray(value)) return value.length > 0;
+    if (typeof value === "string") return value.trim() !== "";
+    return true;
+  });
+
+  return Object.fromEntries(entries) as RegistryReviewPayload;
+}
+
+function buildRegistryReviewPayload(
+  workMode: RegistryWorkMode,
+  fields: {
+    fieldName?: string;
+    currentValue?: string;
+    proposedValue?: string;
+    relationshipType?: string;
+    relatedEntityLabel?: string;
+    duplicateEntityLabel?: string;
+    providerKey?: string;
+    providerUrl?: string;
+    supportingLinks?: string | string[];
+    explanation?: string;
+    confidence?: string;
+    publicImpact?: string;
+    culturalQaNote?: string;
+    limitations?: string;
+    suggestedEntityType?: WakilishaRecordEntityType;
+    suggestedEntityLabel?: string;
+    suggestedEntitySlug?: string;
+    suggestedPublicUrl?: string;
+  }
+): RegistryReviewPayload | undefined {
+  if (workMode === "use_existing_record") {
+    return { workMode };
+  }
+  if (workMode === "suggest_correction") {
+    if (!fields.proposedValue?.trim() && !fields.explanation?.trim()) return undefined;
+  }
+  if (workMode === "suggest_merge_duplicate") {
+    if (!fields.duplicateEntityLabel?.trim() && !fields.explanation?.trim()) return undefined;
+  }
+  if (workMode === "suggest_relationship") {
+    if (!fields.relationshipType?.trim() && !fields.relatedEntityLabel?.trim() && !fields.explanation?.trim()) return undefined;
+  }
+  if (workMode === "suggest_provider_media_credit_update") {
+    if (!fields.providerUrl?.trim() && !fields.proposedValue?.trim() && !fields.explanation?.trim()) return undefined;
+  }
+
+  const base: RegistryReviewPayload = {
+    workMode,
+    fieldName: fields.fieldName?.trim() || undefined,
+    currentValue: fields.currentValue?.trim() || undefined,
+    proposedValue: fields.proposedValue?.trim() || undefined,
+    relationshipType: fields.relationshipType?.trim() || undefined,
+    relatedEntityLabel: fields.relatedEntityLabel?.trim() || undefined,
+    duplicateEntityLabel: fields.duplicateEntityLabel?.trim() || undefined,
+    providerKey: fields.providerKey?.trim() || undefined,
+    providerUrl: fields.providerUrl?.trim() || undefined,
+    supportingLinks: fields.supportingLinks ? normalizeSupportingLinks(fields.supportingLinks) : undefined,
+    explanation: fields.explanation?.trim() || undefined,
+    confidence: fields.confidence?.trim() || undefined,
+    publicImpact: fields.publicImpact?.trim() || undefined,
+    culturalQaNote: fields.culturalQaNote?.trim() || undefined,
+    limitations: fields.limitations?.trim() || undefined,
+    suggestedEntityType: fields.suggestedEntityType,
+    suggestedEntityLabel: fields.suggestedEntityLabel?.trim() || undefined,
+    suggestedEntitySlug: fields.suggestedEntitySlug?.trim() || undefined,
+    suggestedPublicUrl: fields.suggestedPublicUrl?.trim() || undefined,
+  };
+
+  return omitEmptyRegistryReviewFields(base);
+}
+
+function hasMeaningfulRegistryReviewPayload(payload: RegistryReviewPayload | undefined): boolean {
+  if (!payload) return false;
+  if (payload.workMode === "use_existing_record") return true;
+  if (payload.workMode === "suggest_correction") {
+    return !!(payload.proposedValue || payload.explanation);
+  }
+  if (payload.workMode === "suggest_merge_duplicate") {
+    return !!(payload.duplicateEntityLabel || payload.explanation);
+  }
+  if (payload.workMode === "suggest_relationship") {
+    return !!(payload.relationshipType || payload.relatedEntityLabel || payload.explanation);
+  }
+  if (payload.workMode === "suggest_provider_media_credit_update") {
+    return !!(payload.providerUrl || payload.proposedValue || payload.explanation);
+  }
+  if (payload.workMode === "suggest_missing_record") {
+    return true;
+  }
+  return false;
+}
+
 type Props = {
   draft: InquiryDraft;
   addEvidence: (inquiryId: string, evidence: Omit<EvidenceItem, "id" | "createdAt" | "updatedAt">) => Promise<EvidenceItem>;
@@ -588,6 +727,20 @@ export function WakilishaRecordWorkspace({ draft, addEvidence, onSaved }: Props)
   const [enrichmentType, setEnrichmentType] = useState(enrichmentTypes[0]);
   const [enrichmentNote, setEnrichmentNote] = useState("");
 
+  const [workMode, setWorkMode] = useState<RegistryWorkMode>("use_existing_record");
+  const [fieldName, setFieldName] = useState("");
+  const [currentValue, setCurrentValue] = useState("");
+  const [proposedValue, setProposedValue] = useState("");
+  const [relationshipType, setRelationshipType] = useState("");
+  const [relatedEntityLabel, setRelatedEntityLabel] = useState("");
+  const [duplicateEntityLabel, setDuplicateEntityLabel] = useState("");
+  const [providerKey, setProviderKey] = useState("");
+  const [providerUrl, setProviderUrl] = useState("");
+  const [reviewSupportingLinks, setReviewSupportingLinks] = useState("");
+  const [reviewExplanation, setReviewExplanation] = useState("");
+  const [publicImpact, setPublicImpact] = useState("");
+  const [culturalQaNote, setCulturalQaNote] = useState("");
+
   const [suggestedType, setSuggestedType] = useState<WakilishaRecordEntityType>("artist");
   const [suggestedTitle, setSuggestedTitle] = useState("");
   const [suggestedDetails, setSuggestedDetails] = useState("");
@@ -657,6 +810,30 @@ export function WakilishaRecordWorkspace({ draft, addEvidence, onSaved }: Props)
     return claimSupported.trim() || selectedRecord.contextText || selectedRecord.subtitle;
   }, [claimSupported, selectedRecord]);
 
+  type EvidenceMetadata = {
+    workspaceVersion: number;
+    workspaceFormat: string;
+    workspaceType: string;
+    savedFrom: string;
+    recordEvidenceMode: string;
+    entityType?: WakilishaRecordEntityType;
+    entitySlug?: string;
+    entityLabel?: string;
+    entityHref?: string;
+    recordSnapshot?: unknown;
+    recordHealth?: unknown;
+    evidenceRole?: string;
+    claimSupported?: string;
+    limitations?: string;
+    confidence?: Confidence;
+    enrichmentNeeded?: boolean;
+    enrichmentType?: string;
+    enrichmentNote?: string;
+    inquiryCode?: string;
+    inquiryQuestion?: string;
+    registryReviewPayload?: RegistryReviewPayload;
+  };
+
   const saveExistingRecordEvidence = async () => {
     if (!selectedRecord || !canSaveExisting) return;
 
@@ -665,6 +842,65 @@ export function WakilishaRecordWorkspace({ draft, addEvidence, onSaved }: Props)
 
     try {
       const enrichmentNeeded = enrichmentType !== "No enrichment needed";
+
+      const registryReviewPayload = buildRegistryReviewPayload(workMode, {
+        fieldName,
+        currentValue,
+        proposedValue,
+        relationshipType,
+        relatedEntityLabel,
+        duplicateEntityLabel,
+        providerKey,
+        providerUrl,
+        supportingLinks: reviewSupportingLinks,
+        explanation: reviewExplanation,
+        confidence,
+        publicImpact,
+        culturalQaNote,
+        limitations,
+      });
+
+      if (workMode !== "use_existing_record" && !hasMeaningfulRegistryReviewPayload(registryReviewPayload)) {
+        let msg = "Please complete the required registry review fields before saving.";
+        if (workMode === "suggest_correction") {
+          msg = "Add a proposed value or explanation before saving this correction.";
+        } else if (workMode === "suggest_merge_duplicate") {
+          msg = "Add a duplicate entity label or explanation before saving this merge suggestion.";
+        } else if (workMode === "suggest_relationship") {
+          msg = "Add a relationship type, related entity, or explanation before saving this relationship suggestion.";
+        } else if (workMode === "suggest_provider_media_credit_update") {
+          msg = "Add a provider URL, proposed value, or explanation before saving this update.";
+        }
+        setSavedNotice(msg);
+        setSaving(false);
+        return;
+      }
+
+      const metadata: EvidenceMetadata = {
+        workspaceVersion: 2,
+        workspaceFormat: "WAKILISHA record",
+        workspaceType: "registry",
+        savedFrom: "wakilisha_record_workspace",
+        recordEvidenceMode: enrichmentNeeded ? "existing_record_enrichment" : "existing_record",
+        entityType: selectedRecord.entityType,
+        entitySlug: selectedRecord.slug,
+        entityLabel: selectedRecord.label,
+        entityHref: selectedRecord.href,
+        recordSnapshot: selectedSnapshot(selectedRecord, detail),
+        recordHealth: selectedRecord.health,
+        evidenceRole,
+        claimSupported: claimSupported.trim(),
+        limitations: limitations.trim(),
+        confidence,
+        enrichmentNeeded,
+        enrichmentType,
+        enrichmentNote: enrichmentNote.trim(),
+        inquiryCode: draft.code,
+        inquiryQuestion: draft.workingQuestion,
+      };
+      if (registryReviewPayload) {
+        metadata.registryReviewPayload = registryReviewPayload;
+      }
 
       await addEvidence(draft.id, {
         title: selectedRecordEvidenceTitle,
@@ -675,28 +911,7 @@ export function WakilishaRecordWorkspace({ draft, addEvidence, onSaved }: Props)
         whyItMatters: evidenceRole,
         mediaMinutes: 0,
         reviewState: enrichmentNeeded || selectedRecord.health.status !== "usable" ? "Needs review" : "Draft",
-        metadata: {
-          workspaceVersion: 2,
-          workspaceFormat: "WAKILISHA record",
-          workspaceType: "registry",
-          savedFrom: "wakilisha_record_workspace",
-          recordEvidenceMode: enrichmentNeeded ? "existing_record_enrichment" : "existing_record",
-          entityType: selectedRecord.entityType,
-          entitySlug: selectedRecord.slug,
-          entityLabel: selectedRecord.label,
-          entityHref: selectedRecord.href,
-          recordSnapshot: selectedSnapshot(selectedRecord, detail),
-          recordHealth: selectedRecord.health,
-          evidenceRole,
-          claimSupported: claimSupported.trim(),
-          limitations: limitations.trim(),
-          confidence,
-          enrichmentNeeded,
-          enrichmentType,
-          enrichmentNote: enrichmentNote.trim(),
-          inquiryCode: draft.code,
-          inquiryQuestion: draft.workingQuestion,
-        },
+        metadata,
       });
 
       setSavedNotice("Saved WAKILISHA record evidence.");
@@ -706,6 +921,21 @@ export function WakilishaRecordWorkspace({ draft, addEvidence, onSaved }: Props)
     }
   };
 
+  type MissingRecordEvidenceMetadata = {
+    workspaceVersion: number;
+    workspaceFormat: string;
+    workspaceType: string;
+    savedFrom: string;
+    recordEvidenceMode: string;
+    suggestedEntityType: WakilishaRecordEntityType;
+    suggestedTitle: string;
+    suggestedDetails: string;
+    supportingLinks: string[];
+    inquiryCode: string;
+    inquiryQuestion: string;
+    registryReviewPayload?: RegistryReviewPayload;
+  };
+
   const saveMissingRecordSuggestion = async () => {
     if (!canSaveSuggestion) return;
 
@@ -713,6 +943,32 @@ export function WakilishaRecordWorkspace({ draft, addEvidence, onSaved }: Props)
     setSavedNotice("");
 
     try {
+      const registryReviewPayload = buildRegistryReviewPayload("suggest_missing_record", {
+        supportingLinks,
+        explanation: suggestedDetails,
+        confidence,
+        limitations,
+        suggestedEntityType: suggestedType,
+        suggestedEntityLabel: suggestedTitle,
+      });
+
+      const metadata: MissingRecordEvidenceMetadata = {
+        workspaceVersion: 2,
+        workspaceFormat: "WAKILISHA record",
+        workspaceType: "registry",
+        savedFrom: "wakilisha_record_workspace",
+        recordEvidenceMode: "missing_record_suggestion",
+        suggestedEntityType: suggestedType,
+        suggestedTitle: suggestedTitle.trim(),
+        suggestedDetails: suggestedDetails.trim(),
+        supportingLinks: normalizeSupportingLinks(supportingLinks),
+        inquiryCode: draft.code,
+        inquiryQuestion: draft.workingQuestion,
+      };
+      if (registryReviewPayload) {
+        metadata.registryReviewPayload = registryReviewPayload;
+      }
+
       await addEvidence(draft.id, {
         title: `Suggested ${entityLabel(suggestedType)} record: ${suggestedTitle.trim()}`,
         kind: "WAKILISHA record",
@@ -722,22 +978,7 @@ export function WakilishaRecordWorkspace({ draft, addEvidence, onSaved }: Props)
         whyItMatters: "Missing WAKILISHA record needed for this inquiry.",
         mediaMinutes: 0,
         reviewState: "Needs review",
-        metadata: {
-          workspaceVersion: 2,
-          workspaceFormat: "WAKILISHA record",
-          workspaceType: "registry",
-          savedFrom: "wakilisha_record_workspace",
-          recordEvidenceMode: "missing_record_suggestion",
-          suggestedEntityType: suggestedType,
-          suggestedTitle: suggestedTitle.trim(),
-          suggestedDetails: suggestedDetails.trim(),
-          supportingLinks: supportingLinks
-            .split(/\n+/)
-            .map((item) => item.trim())
-            .filter(Boolean),
-          inquiryCode: draft.code,
-          inquiryQuestion: draft.workingQuestion,
-        },
+        metadata,
       });
 
       setSavedNotice("Saved missing record suggestion for editor review.");
@@ -968,6 +1209,170 @@ export function WakilishaRecordWorkspace({ draft, addEvidence, onSaved }: Props)
                 <option>High</option>
               </select>
             </label>
+          </div>
+        </section>
+
+        <section className="rounded-[22px] border border-wk-border bg-wk-surface p-5 shadow-sm">
+          <div className="text-[10px] font-black uppercase tracking-[0.18em] text-wk-brand">Registry review</div>
+          <h3 className="mt-2 text-[18px] font-black tracking-[-0.04em] text-wk-text">Registry work mode and details</h3>
+          <div className="mt-4 space-y-4">
+            <label className="block">
+              <span className="mb-2 block text-[10px] font-black uppercase tracking-[0.12em] text-wk-text-faint">Registry work mode</span>
+              <select
+                value={workMode}
+                onChange={(event) => setWorkMode(event.target.value as RegistryWorkMode)}
+                className="w-full rounded-lg border border-wk-border bg-wk-bg px-3 py-3 text-[13px] font-bold text-wk-text outline-none focus:border-wk-brand"
+              >
+                {registryWorkModes.map((mode) => (
+                  <option key={mode.key} value={mode.key}>{mode.label}</option>
+                ))}
+              </select>
+            </label>
+
+            {(workMode === "suggest_correction" || workMode === "suggest_provider_media_credit_update") && (
+              <>
+                <label className="block">
+                  <span className="mb-2 block text-[10px] font-black uppercase tracking-[0.12em] text-wk-text-faint">Field name</span>
+                  <input
+                    value={fieldName}
+                    onChange={(e) => setFieldName(e.target.value)}
+                    className="w-full rounded-lg border border-wk-border bg-wk-bg px-3 py-2 text-[13px] font-bold text-wk-text outline-none focus:border-wk-brand"
+                  />
+                </label>
+                <label className="block">
+                  <span className="mb-2 block text-[10px] font-black uppercase tracking-[0.12em] text-wk-text-faint">Current value</span>
+                  <input
+                    value={currentValue}
+                    onChange={(e) => setCurrentValue(e.target.value)}
+                    className="w-full rounded-lg border border-wk-border bg-wk-bg px-3 py-2 text-[13px] font-bold text-wk-text outline-none focus:border-wk-brand"
+                  />
+                </label>
+                <label className="block">
+                  <span className="mb-2 block text-[10px] font-black uppercase tracking-[0.12em] text-wk-text-faint">Proposed value</span>
+                  <input
+                    value={proposedValue}
+                    onChange={(e) => setProposedValue(e.target.value)}
+                    className="w-full rounded-lg border border-wk-border bg-wk-bg px-3 py-2 text-[13px] font-bold text-wk-text outline-none focus:border-wk-brand"
+                  />
+                </label>
+              </>
+            )}
+
+            {workMode === "suggest_relationship" && (
+              <>
+                <label className="block">
+                  <span className="mb-2 block text-[10px] font-black uppercase tracking-[0.12em] text-wk-text-faint">Relationship type</span>
+                  <input
+                    value={relationshipType}
+                    onChange={(e) => setRelationshipType(e.target.value)}
+                    className="w-full rounded-lg border border-wk-border bg-wk-bg px-3 py-2 text-[13px] font-bold text-wk-text outline-none focus:border-wk-brand"
+                  />
+                </label>
+                <label className="block">
+                  <span className="mb-2 block text-[10px] font-black uppercase tracking-[0.12em] text-wk-text-faint">Related entity label</span>
+                  <input
+                    value={relatedEntityLabel}
+                    onChange={(e) => setRelatedEntityLabel(e.target.value)}
+                    className="w-full rounded-lg border border-wk-border bg-wk-bg px-3 py-2 text-[13px] font-bold text-wk-text outline-none focus:border-wk-brand"
+                  />
+                </label>
+              </>
+            )}
+
+            {workMode === "suggest_merge_duplicate" && (
+              <label className="block">
+                <span className="mb-2 block text-[10px] font-black uppercase tracking-[0.12em] text-wk-text-faint">Duplicate entity label</span>
+                <input
+                  value={duplicateEntityLabel}
+                  onChange={(e) => setDuplicateEntityLabel(e.target.value)}
+                  className="w-full rounded-lg border border-wk-border bg-wk-bg px-3 py-2 text-[13px] font-bold text-wk-text outline-none focus:border-wk-brand"
+                />
+              </label>
+            )}
+
+            {workMode === "suggest_provider_media_credit_update" && (
+              <>
+                <label className="block">
+                  <span className="mb-2 block text-[10px] font-black uppercase tracking-[0.12em] text-wk-text-faint">Provider key</span>
+                  <input
+                    value={providerKey}
+                    onChange={(e) => setProviderKey(e.target.value)}
+                    className="w-full rounded-lg border border-wk-border bg-wk-bg px-3 py-2 text-[13px] font-bold text-wk-text outline-none focus:border-wk-brand"
+                  />
+                </label>
+                <label className="block">
+                  <span className="mb-2 block text-[10px] font-black uppercase tracking-[0.12em] text-wk-text-faint">Provider URL</span>
+                  <input
+                    value={providerUrl}
+                    onChange={(e) => setProviderUrl(e.target.value)}
+                    className="w-full rounded-lg border border-wk-border bg-wk-bg px-3 py-2 text-[13px] font-bold text-wk-text outline-none focus:border-wk-brand"
+                  />
+                </label>
+              </>
+            )}
+
+            <label className="block">
+              <span className="mb-2 block text-[10px] font-black uppercase tracking-[0.12em] text-wk-text-faint">Supporting links</span>
+              <textarea
+                value={reviewSupportingLinks}
+                onChange={(e) => setReviewSupportingLinks(e.target.value)}
+                rows={2}
+                placeholder="Paste links, one per line"
+                className="w-full resize-y rounded-lg border border-wk-border bg-wk-bg px-3 py-2 text-[13px] leading-6 text-wk-text outline-none focus:border-wk-brand"
+              />
+            </label>
+
+            <label className="block">
+              <span className="mb-2 block text-[10px] font-black uppercase tracking-[0.12em] text-wk-text-faint">Explanation</span>
+              <textarea
+                value={reviewExplanation}
+                onChange={(e) => setReviewExplanation(e.target.value)}
+                rows={2}
+                placeholder="Explain the registry suggestion"
+                className="w-full resize-y rounded-lg border border-wk-border bg-wk-bg px-3 py-2 text-[13px] leading-6 text-wk-text outline-none focus:border-wk-brand"
+              />
+            </label>
+
+            <label className="block">
+              <span className="mb-2 block text-[10px] font-black uppercase tracking-[0.12em] text-wk-text-faint">Public impact</span>
+              <input
+                value={publicImpact}
+                onChange={(e) => setPublicImpact(e.target.value)}
+                className="w-full rounded-lg border border-wk-border bg-wk-bg px-3 py-2 text-[13px] font-bold text-wk-text outline-none focus:border-wk-brand"
+              />
+            </label>
+
+            <label className="block">
+              <span className="mb-2 block text-[10px] font-black uppercase tracking-[0.12em] text-wk-text-faint">Cultural QA note</span>
+              <input
+                value={culturalQaNote}
+                onChange={(e) => setCulturalQaNote(e.target.value)}
+                className="w-full rounded-lg border border-wk-border bg-wk-bg px-3 py-2 text-[13px] font-bold text-wk-text outline-none focus:border-wk-brand"
+              />
+            </label>
+          </div>
+          <div className="mt-4">
+            <div className="text-[12px] font-bold text-wk-text-muted mb-2">Registry review summary</div>
+            <div className="rounded-lg border border-wk-border bg-wk-bg px-3 py-2 text-[12px] text-wk-text-muted">
+              <ul className="list-disc pl-4">
+                <li>Work mode: {workMode}</li>
+                {fieldName && <li>Field: {fieldName}</li>}
+                {currentValue && <li>Current: {currentValue}</li>}
+                {proposedValue && <li>Proposed: {proposedValue}</li>}
+                {relationshipType && <li>Relationship: {relationshipType}</li>}
+                {relatedEntityLabel && <li>Related entity: {relatedEntityLabel}</li>}
+                {duplicateEntityLabel && <li>Duplicate entity: {duplicateEntityLabel}</li>}
+                {providerKey && <li>Provider key: {providerKey}</li>}
+                {providerUrl && <li>Provider URL: {providerUrl}</li>}
+                {reviewSupportingLinks && normalizeSupportingLinks(reviewSupportingLinks).length > 0 && (
+                  <li>Links: {normalizeSupportingLinks(reviewSupportingLinks).join(", ")}</li>
+                )}
+                {reviewExplanation && <li>Explanation: {reviewExplanation}</li>}
+                {publicImpact && <li>Public impact: {publicImpact}</li>}
+                {culturalQaNote && <li>Cultural QA: {culturalQaNote}</li>}
+                {limitations && <li>Limitations: {limitations}</li>}
+              </ul>
+            </div>
           </div>
         </section>
 
