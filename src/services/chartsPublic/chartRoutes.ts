@@ -21,17 +21,6 @@ import type { ChartFamily } from "./types";
  */
 
 const LEGACY_CHART_ROUTE_MAP: Record<string, string> = {
-  "charts": "top100",
-  "charts-kenya": "top100",
-  "kenya": "top100",
-  "kenya-kenya": "top100",
-  "rnb": "top100",
-  "rnb-kenya": "top100",
-  "gengetone": "top100",
-  "gengetone-kenya": "top100",
-  "2026": "top100",
-  "2026-kenya": "top100",
-  "top-songs-kenya": "top100",
 };
 
 export function normalizeChartProgramSlug(slug?: string | null): string {
