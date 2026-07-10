@@ -1,75 +1,42 @@
 import { useEffect, useMemo, useRef } from "react";
 import { useLocation } from "react-router-dom";
-
-const STORAGE_KEY = "wk_ga_measurement_id";
-const INJECTED_ATTR = "data-wk-gtag-injected";
+import { sendServerGa4PageView } from "@/services/ga4ServerAnalytics";
 
 declare global {
   interface Window {
     dataLayer?: unknown[][];
     gtag?: (...args: unknown[]) => void;
+    __WAKILISHA_GA4_ID__?: string;
+    __WAKILISHA_GA4_READY__?: boolean;
   }
 }
 
-function getConfiguredMeasurementId(): string {
+function getMeasurementId(): string {
   const envId = import.meta.env.VITE_GA_MEASUREMENT_ID?.trim();
 
   if (envId) {
     return envId;
   }
 
-  try {
-    return localStorage.getItem(STORAGE_KEY)?.trim() ?? "";
-  } catch {
-    return "";
+  if (typeof window !== "undefined" && window.__WAKILISHA_GA4_ID__) {
+    return window.__WAKILISHA_GA4_ID__;
   }
+
+  return "";
 }
 
 function isValidMeasurementId(id: string): boolean {
   return /^G-[A-Z0-9]+$/i.test(id);
 }
 
+function currentPagePath(pathname: string, search: string): string {
+  return `${pathname}${search}`;
+}
+
 export default function GtagInjector() {
   const location = useLocation();
-  const injectedRef = useRef<string | null>(null);
-  const measurementId = useMemo(() => getConfiguredMeasurementId(), []);
-
-  useEffect(() => {
-    if (window.location.pathname.startsWith("/admin")) {
-      return;
-    }
-
-    if (!measurementId || !isValidMeasurementId(measurementId)) {
-      return;
-    }
-
-    if (injectedRef.current === measurementId) {
-      return;
-    }
-
-    window.dataLayer = window.dataLayer || [];
-    window.gtag = (...args: unknown[]) => {
-      window.dataLayer?.push(args);
-    };
-
-    window.gtag("js", new Date());
-    window.gtag("config", measurementId, {
-      send_page_view: false,
-    });
-
-    const script = document.createElement("script");
-    script.src = `https://www.googletagmanager.com/gtag/js?id=${encodeURIComponent(measurementId)}`;
-    script.async = true;
-    script.setAttribute(INJECTED_ATTR, "true");
-
-    document.head.appendChild(script);
-    injectedRef.current = measurementId;
-
-    return () => {
-      document.querySelectorAll(`[${INJECTED_ATTR}]`).forEach((node) => node.remove());
-      injectedRef.current = null;
-    };
-  }, [measurementId]);
+  const lastTrackedPath = useRef<string | null>(null);
+  const measurementId = useMemo(() => getMeasurementId(), []);
 
   useEffect(() => {
     if (!measurementId || !isValidMeasurementId(measurementId)) {
@@ -80,10 +47,28 @@ export default function GtagInjector() {
       return;
     }
 
-    window.gtag?.("event", "page_view", {
+    if (typeof window.gtag !== "function") {
+      return;
+    }
+
+    const pagePath = currentPagePath(location.pathname, location.search);
+
+    if (lastTrackedPath.current === pagePath) {
+      return;
+    }
+
+    lastTrackedPath.current = pagePath;
+
+    window.gtag("config", measurementId, {
       page_title: document.title,
       page_location: window.location.href,
-      page_path: `${location.pathname}${location.search}`,
+      page_path: pagePath,
+    });
+
+    void sendServerGa4PageView({
+      pagePath,
+      pageTitle: document.title,
+      pageUrl: window.location.href,
     });
   }, [location.pathname, location.search, measurementId]);
 
