@@ -1,0 +1,115 @@
+-- Fix Registry missing-artist intake contributor provenance.
+-- Maps auth users to contributors.id and creates one internal contributor profile when needed.
+
+create or replace function public.create_registry_missing_artist_intake(
+  p_legacy_slug text,
+  p_display_name text,
+  p_reason text,
+  p_source_url text default null
+)
+returns public.contributor_submissions
+language plpgsql
+security definer
+set search_path = public, auth
+as $$
+declare
+  v_slug text := lower(btrim(p_legacy_slug));
+  v_result public.contributor_submissions;
+  v_contributor_id uuid;
+  v_contributor_name text;
+begin
+  if not (
+    auth.role() = 'service_role'
+    or public.current_user_has_capability('manage_registry')
+    or public.current_user_has_capability('manage_review_queue')
+    or public.current_user_is_administrator()
+  ) then
+    raise exception 'You do not have permission to create Registry artist intake submissions.';
+  end if;
+
+  if nullif(v_slug, '') is null or v_slug !~ '^[a-z0-9]+(?:-[a-z0-9]+)*$' then
+    raise exception 'A valid missing artist slug is required.';
+  end if;
+  if nullif(btrim(p_display_name), '') is null then
+    raise exception 'A proposed artist display name is required.';
+  end if;
+  if nullif(btrim(p_reason), '') is null then
+    raise exception 'An intake reason is required.';
+  end if;
+  if not exists (
+    select 1
+    from public.registry_relationship_endpoint_work_queue q
+    where q.endpoint_work_state = 'missing_entity'
+      and q.missing_entity_type = 'artist'
+      and q.legacy_slug = v_slug
+  ) then
+    raise exception 'This slug is not currently required by the missing-artist endpoint queue.';
+  end if;
+  if exists (select 1 from public.registry_artists a where a.slug = v_slug) then
+    raise exception 'A canonical Registry artist already exists for this slug.';
+  end if;
+  if exists (
+    select 1
+    from public.contributor_submissions s
+    where s.source_note like 'missing_artist_slug:' || v_slug || '%'
+      and s.review_status not in ('rejected', 'archived', 'merged')
+  ) then
+    raise exception 'An active intake submission already exists for this missing artist.';
+  end if;
+
+  select id into v_contributor_id
+  from public.contributors
+  where user_id = auth.uid();
+
+  if v_contributor_id is null then
+    v_contributor_name := coalesce(
+      nullif(auth.jwt() ->> 'name', ''),
+      nullif(auth.jwt() ->> 'email', ''),
+      'Registry administrator'
+    );
+
+    insert into public.contributors (
+      user_id,
+      display_name,
+      role_note,
+      contributor_status,
+      trust_level
+    ) values (
+      auth.uid(),
+      v_contributor_name,
+      'Created automatically for internal Registry review work.',
+      'active',
+      'trusted'
+    )
+    on conflict (user_id) where user_id is not null
+    do update set updated_at = now()
+    returning id into v_contributor_id;
+  end if;
+
+  insert into public.contributor_submissions (
+    contributor_id,
+    submission_type,
+    title,
+    body,
+    source_url,
+    source_note,
+    consent_status,
+    review_status
+  ) values (
+    v_contributor_id,
+    'context_note',
+    btrim(p_display_name),
+    btrim(p_reason),
+    nullif(btrim(p_source_url), ''),
+    'missing_artist_slug:' || v_slug || ' source:registry_relationship_endpoint_work_queue',
+    'internal_use',
+    'submitted'
+  )
+  returning * into v_result;
+
+  return v_result;
+end;
+$$;
+
+revoke all on function public.create_registry_missing_artist_intake(text, text, text, text) from public, anon;
+grant execute on function public.create_registry_missing_artist_intake(text, text, text, text) to authenticated, service_role;
