@@ -94,6 +94,7 @@ export interface RelationshipReviewDraft {
   evidenceSummary: string;
   evidenceMainClaim: string;
   publicExplanation: string;
+  reviewReason: string;
   uncertaintyNote: string;
   reliability: "low" | "medium" | "high";
   confidence: "low" | "medium" | "high";
@@ -181,6 +182,7 @@ export async function draftRelationshipReview(relationshipId: string): Promise<R
       evidence_summary?: string;
       evidence_main_claim?: string;
       public_explanation?: string;
+      review_reason?: string;
       uncertainty_note?: string;
       reliability?: "low" | "medium" | "high";
       confidence?: "low" | "medium" | "high";
@@ -188,7 +190,13 @@ export async function draftRelationshipReview(relationshipId: string): Promise<R
     error?: string;
   } | null;
   const draft = payload?.data;
-  if (!payload?.ok || !draft?.evidence_title || !draft.evidence_summary || !draft.public_explanation) {
+  if (
+    !payload?.ok
+    || !draft?.evidence_title
+    || !draft.evidence_summary
+    || !draft.public_explanation
+    || !draft.review_reason
+  ) {
     throw new Error(payload?.error || "The Culture Context Engine returned an incomplete review draft.");
   }
   return {
@@ -197,6 +205,7 @@ export async function draftRelationshipReview(relationshipId: string): Promise<R
     evidenceSummary: draft.evidence_summary,
     evidenceMainClaim: draft.evidence_main_claim || "",
     publicExplanation: draft.public_explanation,
+    reviewReason: draft.review_reason,
     uncertaintyNote: draft.uncertainty_note || "",
     reliability: draft.reliability || "medium",
     confidence: draft.confidence || "medium",
