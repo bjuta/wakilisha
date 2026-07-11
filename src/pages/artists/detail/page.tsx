@@ -10,10 +10,9 @@ import { supabase } from "@/lib/supabase";
 import { ArtistDetailHero } from "./components/ArtistDetailHero";
 import { ArtistChartSection } from "./components/ArtistChartSection";
 import { ArtistDiscography } from "./components/ArtistDiscography";
-import { RelatedArtistsShelf } from "./components/RelatedArtistsShelf";
+import { RelatedArtistsShelf, type ArtistConnection } from "./components/RelatedArtistsShelf";
 import { ArtistTopSongs } from "./components/ArtistTopSongs";
 import { ArtistBioSection, cleanBioExcerpt } from "./components/ArtistBioSection";
-import { ArtistRelationshipsSection } from "./components/ArtistRelationshipsSection";
 import { ArtistVideos } from "./components/ArtistVideos";
 import { ArtistNewsletterSection } from "./components/ArtistNewsletterSection";
 import { ArtistTaggedArticles } from "./components/ArtistTaggedArticles";
@@ -35,6 +34,44 @@ async function getArtistRegisteredGenres(slug: string): Promise<string[]> {
   const metadata = (data.metadata || {}) as Record<string, unknown>;
   const genres = Array.isArray(metadata.genres) ? metadata.genres : [];
   return genres.map(String).filter(Boolean);
+}
+
+function buildArtistConnections(
+  relatedArtists: PublicArtistDetail["relatedArtists"],
+  relationships: PublicArtistRelationship[],
+): ArtistConnection[] {
+  const bySlug = new Map<string, ArtistConnection>();
+
+  relatedArtists.forEach((artist) => {
+    bySlug.set(artist.slug, { ...artist });
+  });
+
+  relationships
+    .filter((relationship) => relationship.relatedEntityType === "artist")
+    .forEach((relationship) => {
+      const existing = bySlug.get(relationship.relatedEntitySlug);
+      bySlug.set(relationship.relatedEntitySlug, {
+        ...(existing || {
+          slug: relationship.relatedEntitySlug,
+          name: relationship.relatedEntityName,
+          imageUrl: relationship.relatedEntityImageUrl || undefined,
+        }),
+        name: relationship.relatedEntityName,
+        imageUrl: existing?.imageUrl || relationship.relatedEntityImageUrl || undefined,
+        reviewed: true,
+        reviewedReason: relationship.plainReason,
+        evidenceCount: relationship.evidenceCount,
+        relationshipLabel: relationship.relationshipRole || relationship.relationshipType,
+      });
+    });
+
+  return Array.from(bySlug.values()).sort((left, right) => {
+    if (Boolean(left.reviewed) !== Boolean(right.reviewed)) return left.reviewed ? -1 : 1;
+    const leftStrength = left.sharedTracksAll || left.score || 0;
+    const rightStrength = right.sharedTracksAll || right.score || 0;
+    if (leftStrength !== rightStrength) return rightStrength - leftStrength;
+    return left.name.localeCompare(right.name);
+  });
 }
 
 export default function ArtistDetail() {
@@ -147,13 +184,13 @@ export default function ArtistDetail() {
       })
     : "";
 
+  const artistConnections = buildArtistConnections(artist.relatedArtists, relationships);
   const hasChartEntries = artist.chartEntries.length > 0;
   const hasAppearsOn = appearsOn.length > 0;
   const hasReleases = artist.releases.length > 0;
-  const hasRelated = artist.relatedArtists.length > 0;
+  const hasConnections = artistConnections.length > 0;
   const hasTopSongs = artist.topSongs.length > 0;
   const hasBio = artist.bio || artist.fullBio;
-  const hasRelationships = relationships.length > 0;
   const hasVideos = artist.videos && artist.videos.length > 0;
   const heroBio = cleanBioExcerpt(artist.fullBio || artist.bio || "");
   const bioForSeo = cleanBioExcerpt(artist.fullBio || artist.bio || "");
@@ -186,7 +223,7 @@ export default function ArtistDetail() {
           genre: registeredGenres,
           url: typeof window !== "undefined" ? window.location.href : undefined,
           sameAs: artist.spotifyUrl ? [artist.spotifyUrl] : undefined,
-        }}
+        } satisfies MusicGroupSchema}
       />
 
       <ArtistDetailHero
@@ -224,10 +261,6 @@ export default function ArtistDetail() {
               releaseCount={artist.releaseCount}
               artistType={artist.artistType}
             />
-          )}
-
-          {hasRelationships && (
-            <ArtistRelationshipsSection artistName={artist.name} relationships={relationships} />
           )}
 
           {hasTopSongs && (
@@ -269,9 +302,9 @@ export default function ArtistDetail() {
           )}
         </div>
 
-        {hasRelated && (
+        {hasConnections && (
           <div className="mt-14 md:mt-16">
-            <RelatedArtistsShelf artists={artist.relatedArtists} />
+            <RelatedArtistsShelf artists={artistConnections} />
           </div>
         )}
       </div>
