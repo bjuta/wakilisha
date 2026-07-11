@@ -18,15 +18,9 @@ const NAV_GROUPS: NavGroup[] = [
     { path: "/admin/analytics", label: "Analytics", icon: "BarChart3", requiredCapability: "view_dashboard" },
   ] },
   { label: "Institute", icon: "BookOpen", visible: (can) => can("view_dashboard") || can("view_admin_readonly"), items: [
-    { path: "/admin/institute/inquiry-interface?screen=home", label: "All inquiries", icon: "LayoutDashboard" },
-    { path: "/admin/institute/inquiry-interface?screen=workbench", label: "Workbench", icon: "BookOpen" },
-    { path: "/admin/institute/inquiry-interface?screen=clinic", label: "Question Clinic", icon: "HelpCircle" },
-    { path: "/admin/institute/inquiry-interface?screen=anchorBrief", label: "Anchor brief", icon: "Fingerprint" },
-    { path: "/admin/institute/inquiry-interface?screen=evidence", label: "Evidence", icon: "FileText" },
-    { path: "/admin/institute/inquiry-interface?screen=relationships", label: "Relationships", icon: "GitBranch" },
-    { path: "/admin/institute/inquiry-interface?screen=claims", label: "Claims", icon: "GitPullRequest" },
+    { path: "/admin/institute/inquiry-interface?screen=home", label: "Inquiries", icon: "LayoutDashboard" },
+    { path: "/admin/institute/inquiry-interface?screen=workbench", label: "Work", icon: "BookOpen" },
     { path: "/admin/institute/inquiry-interface?screen=review", label: "Review", icon: "GitPullRequest" },
-    { path: "/admin/institute/inquiry-interface?screen=learned", label: "How this learned", icon: "History" },
   ] },
   { label: "Community", icon: "MessageSquare", visible: (can) => can("moderate_community"), items: [
     { path: "/admin/community", label: "Moderation", icon: "MessageSquare", requiredCapability: "moderate_community", badgeKey: "pendingReports" },
