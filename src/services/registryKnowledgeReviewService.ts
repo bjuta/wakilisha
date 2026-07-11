@@ -73,6 +73,21 @@ export interface RegistryKnowledgeReviewSnapshot {
   relationships: ConsolidationRow[];
 }
 
+export interface RelationshipReviewInput {
+  relationshipId: string;
+  evidenceTitle: string;
+  evidenceType: string;
+  sourceUrl: string;
+  evidenceSummary: string;
+  evidenceMainClaim: string;
+  reliability: string;
+  confidence: string;
+  plainReason: string;
+  reviewReason: string;
+  nextReviewStatus: "pending_review" | "approved" | "rejected" | "disputed";
+  publicSafe: boolean;
+}
+
 function throwQueryError(error: { message: string } | null, label: string) {
   if (error) throw new Error(`${label}: ${error.message}`);
 }
@@ -121,4 +136,50 @@ export async function acceptMissingArtistIntake(input: { submissionId: string; r
   });
   if (error) throw new Error(error.message);
   return data;
+}
+
+export async function completeRelationshipReview(input: RelationshipReviewInput) {
+  const { data, error } = await supabase.rpc("complete_registry_relationship_review", {
+    p_relationship_id: input.relationshipId,
+    p_evidence_title: input.evidenceTitle.trim(),
+    p_evidence_type: input.evidenceType,
+    p_source_url: input.sourceUrl.trim() || null,
+    p_evidence_summary: input.evidenceSummary.trim(),
+    p_evidence_main_claim: input.evidenceMainClaim.trim() || null,
+    p_reliability: input.reliability,
+    p_confidence: input.confidence,
+    p_plain_reason: input.plainReason.trim(),
+    p_review_reason: input.reviewReason.trim(),
+    p_next_review_status: input.nextReviewStatus,
+    p_public_safe: input.publicSafe,
+  });
+  if (error) throw new Error(error.message);
+  return data;
+}
+
+export async function draftRelationshipExplanation(input: {
+  relationshipId: string;
+  evidenceTitle: string;
+  evidenceType: string;
+  evidenceSummary: string;
+  evidenceMainClaim: string;
+}): Promise<{ draft: string; uncertaintyNote: string }> {
+  const { data, error } = await supabase.functions.invoke("registry-relationship-context", {
+    body: {
+      relationshipId: input.relationshipId,
+      evidenceTitle: input.evidenceTitle.trim(),
+      evidenceType: input.evidenceType,
+      evidenceSummary: input.evidenceSummary.trim(),
+      evidenceMainClaim: input.evidenceMainClaim.trim(),
+    },
+  });
+  if (error) throw new Error("The Culture Context Engine could not finish this draft.");
+  const payload = data as { ok?: boolean; data?: { draft?: string; uncertainty_note?: string }; error?: string } | null;
+  if (!payload?.ok || !payload.data?.draft) {
+    throw new Error(payload?.error || "The Culture Context Engine returned no draft.");
+  }
+  return {
+    draft: payload.data.draft,
+    uncertaintyNote: payload.data.uncertainty_note ?? "",
+  };
 }
