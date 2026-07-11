@@ -1,4 +1,4 @@
-import { useRef } from "react";
+import { useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { useScrollReveal } from "@/hooks/useScrollReveal";
 import { Ch19GradientImage } from "@/components/media/Ch19GradientImage";
@@ -23,12 +23,6 @@ interface RelatedArtistsShelfProps {
   artists: ArtistConnection[];
 }
 
-function scoreLabel(score: number): { label: string; color: string } {
-  if (score >= 100) return { label: "Strong", color: "bg-emerald-500" };
-  if (score >= 10) return { label: "Medium", color: "bg-amber-500" };
-  return { label: "Light", color: "bg-zinc-400" };
-}
-
 function readableLabel(value: string) {
   return value.replace(/_/g, " ");
 }
@@ -36,20 +30,12 @@ function readableLabel(value: string) {
 export function RelatedArtistsShelf({ artists }: RelatedArtistsShelfProps) {
   const scrollRef = useRef<HTMLDivElement>(null);
   const { ref, revealed } = useScrollReveal<HTMLElement>(0.1);
+  const [openSlug, setOpenSlug] = useState<string | null>(null);
 
   const scroll = (dir: "left" | "right") => {
     if (!scrollRef.current) return;
     scrollRef.current.scrollBy({ left: dir === "left" ? -280 : 280, behavior: "smooth" });
   };
-
-  const hasRichData = artists.some(
-    (artist) =>
-      artist.reviewed ||
-      (artist.score && artist.score > 0) ||
-      (artist.sharedTracksAll && artist.sharedTracksAll > 0) ||
-      artist.featuresThem ||
-      artist.theyFeature,
-  );
 
   return (
     <section ref={ref} className={`${revealed ? "is-visible" : ""} reveal-up`}>
@@ -60,7 +46,7 @@ export function RelatedArtistsShelf({ artists }: RelatedArtistsShelfProps) {
             Artist Connections
           </h2>
           <p className="mt-2 max-w-2xl text-[14px] leading-6 text-[var(--wk-text-muted)]">
-            Shared music credits and reviewed connections, brought together without repeats.
+            Shared tracks, features, and reviewed connections.
           </p>
         </div>
         <div className="flex items-center gap-2">
@@ -87,119 +73,125 @@ export function RelatedArtistsShelf({ artists }: RelatedArtistsShelfProps) {
         style={{ scrollbarWidth: "none", msOverflowStyle: "none" }}
       >
         {artists.map((artist) => {
-          const score = scoreLabel(artist.score || 0);
           const sharedTitles = artist.sharedTitles || [];
           const relationshipLabel = artist.relationshipLabel
             ? readableLabel(artist.relationshipLabel)
             : null;
+          const isOpen = openSlug === artist.slug;
+          const hasRevealContent = Boolean(
+            artist.reviewedReason || artist.evidenceCount || sharedTitles.length,
+          );
 
           return (
-            <Link
+            <article
               key={artist.slug}
-              to={`/artists/${artist.slug}`}
-              className="group block shrink-0 overflow-hidden rounded-xl border border-[var(--wk-border)] bg-[var(--wk-surface)] transition-all hover:border-[var(--wk-brand)]"
+              className="group relative block shrink-0 overflow-hidden rounded-xl border border-[var(--wk-border)] bg-[var(--wk-surface)] transition-all hover:border-[var(--wk-brand)] focus-within:border-[var(--wk-brand)]"
               style={{ width: "220px" }}
+              onMouseLeave={() => setOpenSlug((current) => current === artist.slug ? null : current)}
             >
-              <div className="relative aspect-[3/4] overflow-hidden bg-[var(--wk-surface-raised)]">
-                {artist.imageUrl ? (
-                  <img
-                    src={artist.imageUrl}
-                    alt={artist.name}
-                    loading="lazy"
-                    className="h-full w-full object-cover object-top transition-transform duration-[var(--wk-d-slow)] group-hover:scale-105"
-                  />
-                ) : (
-                  <Ch19GradientImage slug={artist.slug} name={artist.name} />
-                )}
-                <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/15 to-transparent" />
-
-                {artist.reviewed ? (
-                  <div className="absolute right-3 top-3 flex items-center gap-1.5 rounded-full bg-black/65 px-2.5 py-1 backdrop-blur-sm">
-                    <i className="ri-shield-check-line text-[11px] text-emerald-300" />
-                    <span className="text-[11px] font-semibold text-white/90">Reviewed</span>
-                  </div>
-                ) : artist.score && artist.score > 0 ? (
-                  <div className="absolute right-3 top-3 flex items-center gap-1.5 rounded-full bg-black/60 px-2.5 py-1 backdrop-blur-sm">
-                    <span className={`h-1.5 w-1.5 rounded-full ${score.color}`} />
-                    <span className="text-[11px] font-semibold text-white/90">{score.label}</span>
-                  </div>
-                ) : null}
-
-                <div className="absolute left-3 top-3 flex flex-col gap-1">
-                  {relationshipLabel ? (
-                    <span className="rounded-full bg-emerald-500/90 px-2 py-0.5 text-[10px] font-bold capitalize text-white backdrop-blur-sm">
-                      {relationshipLabel}
-                    </span>
+              <button
+                type="button"
+                className="block w-full cursor-pointer text-left"
+                aria-expanded={isOpen}
+                aria-label={`${isOpen ? "Hide" : "Show"} details for ${artist.name}`}
+                onClick={() => setOpenSlug((current) => current === artist.slug ? null : artist.slug)}
+                onFocus={() => setOpenSlug(artist.slug)}
+              >
+                <div className="relative aspect-[3/4] overflow-hidden bg-[var(--wk-surface-raised)]">
+                  {artist.imageUrl ? (
+                    <img
+                      src={artist.imageUrl}
+                      alt={artist.name}
+                      loading="lazy"
+                      className="h-full w-full object-cover object-top transition-transform duration-[var(--wk-d-slow)] group-hover:scale-105"
+                    />
                   ) : (
-                    <>
-                      {artist.featuresThem ? (
-                        <span className="rounded-full bg-emerald-500/90 px-2 py-0.5 text-[10px] font-bold text-white backdrop-blur-sm">
-                          Features
-                        </span>
-                      ) : null}
-                      {artist.theyFeature ? (
-                        <span className="rounded-full bg-sky-500/90 px-2 py-0.5 text-[10px] font-bold text-white backdrop-blur-sm">
-                          Featured By
-                        </span>
-                      ) : null}
-                    </>
+                    <Ch19GradientImage slug={artist.slug} name={artist.name} />
                   )}
-                </div>
+                  <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/15 to-transparent" />
 
-                <div className="absolute inset-x-0 bottom-0 p-4">
-                  <h3 className="text-[16px] font-bold leading-[1.2] text-white">{artist.name}</h3>
-
-                  {artist.reviewedReason ? (
-                    <p className="mt-2 line-clamp-3 text-[11px] leading-4 text-white/80">
-                      {artist.reviewedReason}
-                    </p>
+                  {artist.reviewed ? (
+                    <div className="absolute right-3 top-3 flex items-center gap-1.5 rounded-full bg-black/65 px-2.5 py-1 backdrop-blur-sm">
+                      <i className="ri-shield-check-line text-[11px] text-emerald-300" />
+                      <span className="text-[11px] font-semibold text-white/90">Reviewed</span>
+                    </div>
                   ) : null}
 
-                  {hasRichData && artist.sharedTracksAll && artist.sharedTracksAll > 0 ? (
-                    <div className="mt-2 flex items-center gap-2 text-[11px] text-white/75">
-                      <span className="flex items-center gap-1">
-                        <i className="ri-music-line text-[10px]" />
-                        {artist.sharedTracksAll} {artist.sharedTracksAll === 1 ? "shared track" : "shared tracks"}
+                  <div className="absolute left-3 top-3 flex flex-col gap-1">
+                    {relationshipLabel ? (
+                      <span className="rounded-full bg-emerald-500/90 px-2 py-0.5 text-[10px] font-bold capitalize text-white backdrop-blur-sm">
+                        {relationshipLabel}
                       </span>
-                      {artist.sharedChartTracks && artist.sharedChartTracks > 0 ? (
-                        <span className="flex items-center gap-1 text-amber-300">
-                          <i className="ri-bar-chart-line text-[10px]" />
-                          {artist.sharedChartTracks} chart
+                    ) : (
+                      <>
+                        {artist.featuresThem ? (
+                          <span className="rounded-full bg-emerald-500/90 px-2 py-0.5 text-[10px] font-bold text-white backdrop-blur-sm">Features</span>
+                        ) : null}
+                        {artist.theyFeature ? (
+                          <span className="rounded-full bg-sky-500/90 px-2 py-0.5 text-[10px] font-bold text-white backdrop-blur-sm">Featured By</span>
+                        ) : null}
+                      </>
+                    )}
+                  </div>
+
+                  <div className="absolute inset-x-0 bottom-0 p-4">
+                    <h3 className="text-[16px] font-bold leading-[1.2] text-white">{artist.name}</h3>
+                    {artist.sharedTracksAll && artist.sharedTracksAll > 0 ? (
+                      <div className="mt-2 flex items-center gap-2 text-[11px] text-white/75">
+                        <span className="flex items-center gap-1">
+                          <i className="ri-music-line text-[10px]" />
+                          {artist.sharedTracksAll} {artist.sharedTracksAll === 1 ? "shared track" : "shared tracks"}
                         </span>
-                      ) : null}
-                    </div>
-                  ) : null}
+                        {artist.sharedChartTracks && artist.sharedChartTracks > 0 ? (
+                          <span className="flex items-center gap-1 text-amber-300">
+                            <i className="ri-bar-chart-line text-[10px]" />
+                            {artist.sharedChartTracks} chart
+                          </span>
+                        ) : null}
+                      </div>
+                    ) : null}
+                    {hasRevealContent ? (
+                      <div className="mt-2 flex items-center gap-1 text-[10px] font-semibold text-white/60 md:hidden">
+                        <span>{isOpen ? "Hide Details" : "Tap For Details"}</span>
+                        <i className={isOpen ? "ri-arrow-up-s-line" : "ri-arrow-down-s-line"} />
+                      </div>
+                    ) : null}
+                  </div>
 
-                  {artist.reviewed && artist.evidenceCount ? (
-                    <div className="mt-2 flex items-center gap-1 text-[10px] font-semibold text-white/65">
-                      <i className="ri-shield-check-line" />
-                      {artist.evidenceCount} {artist.evidenceCount === 1 ? "source" : "sources"} reviewed
-                    </div>
-                  ) : null}
-
-                  {!artist.reviewedReason && sharedTitles.length > 0 ? (
-                    <div className="mt-2 flex flex-wrap gap-1 opacity-0 transition-opacity duration-200 group-hover:opacity-100">
-                      {sharedTitles.slice(0, 3).map((title) => (
-                        <span
-                          key={title}
-                          className="max-w-[175px] truncate rounded-full bg-white/15 px-2 py-0.5 text-[10px] text-white/80"
-                        >
-                          {title}
-                        </span>
-                      ))}
-                      {sharedTitles.length > 3 ? (
-                        <span className="text-[10px] text-white/50">+{sharedTitles.length - 3} more</span>
-                      ) : null}
-                    </div>
-                  ) : null}
-
-                  <div className="mt-2 flex items-center gap-1 text-[11px] font-semibold text-white/60 opacity-0 transition-opacity group-hover:opacity-100">
-                    <span>View Artist</span>
-                    <i className="ri-arrow-right-line text-[10px]" />
+                  <div
+                    className={`absolute inset-0 flex flex-col justify-end bg-black/80 p-4 backdrop-blur-[2px] transition-all duration-200 md:group-hover:opacity-100 md:group-hover:translate-y-0 md:group-focus-within:opacity-100 md:group-focus-within:translate-y-0 ${
+                      isOpen ? "translate-y-0 opacity-100" : "translate-y-3 opacity-0 pointer-events-none md:pointer-events-auto"
+                    }`}
+                  >
+                    <p className="text-[16px] font-bold text-white">{artist.name}</p>
+                    {artist.reviewedReason ? (
+                      <p className="mt-3 text-[12px] leading-5 text-white/85">{artist.reviewedReason}</p>
+                    ) : null}
+                    {sharedTitles.length > 0 ? (
+                      <div className="mt-3 flex flex-wrap gap-1">
+                        {sharedTitles.slice(0, 3).map((title) => (
+                          <span key={title} className="max-w-[175px] truncate rounded-full bg-white/15 px-2 py-0.5 text-[10px] text-white/85">{title}</span>
+                        ))}
+                      </div>
+                    ) : null}
+                    {artist.reviewed && artist.evidenceCount ? (
+                      <div className="mt-3 flex items-center gap-1 text-[10px] font-semibold text-white/70">
+                        <i className="ri-shield-check-line" />
+                        {artist.evidenceCount} {artist.evidenceCount === 1 ? "source" : "sources"} reviewed
+                      </div>
+                    ) : null}
+                    <Link
+                      to={`/artists/${artist.slug}`}
+                      className="mt-4 inline-flex items-center gap-1 text-[12px] font-bold text-white"
+                      onClick={(event) => event.stopPropagation()}
+                    >
+                      <span>View Artist</span>
+                      <i className="ri-arrow-right-line text-[11px]" />
+                    </Link>
                   </div>
                 </div>
-              </div>
-            </Link>
+              </button>
+            </article>
           );
         })}
       </div>
