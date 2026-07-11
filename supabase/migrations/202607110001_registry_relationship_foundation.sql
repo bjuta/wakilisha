@@ -100,6 +100,29 @@ end $$;
 alter table public.registry_entity_relationships
   validate constraint registry_entity_relationships_supersession_check;
 
+do $$
+begin
+  if not exists (
+    select 1
+    from pg_constraint
+    where conname = 'registry_entity_relationships_public_safe_check'
+  ) then
+    alter table public.registry_entity_relationships
+      add constraint registry_entity_relationships_public_safe_check
+      check (
+        public_safe = false
+        or (
+          review_status = 'approved'
+          and relationship_status = 'active'
+          and reviewed_at is not null
+        )
+      ) not valid;
+  end if;
+end $$;
+
+alter table public.registry_entity_relationships
+  validate constraint registry_entity_relationships_public_safe_check;
+
 -- Safe canonical-ID backfills. Slugs remain in place for compatibility.
 update public.registry_entity_relationships rel
 set source_entity_id = entity_row.id
