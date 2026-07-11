@@ -1,5 +1,6 @@
 export type InquiryScreen =
   | "home"
+  | "inquiry"
   | "workbench"
   | "anchorBrief"
   | "evidence"
@@ -14,6 +15,13 @@ export type InquiryScreen =
   | "public"
   | "learned"
   | "ai";
+
+export type InquirySection =
+  | "overview"
+  | "material"
+  | "notes"
+  | "work"
+  | "history";
 
 export type RegistryAnchorType = "artist" | "track" | "release" | "label" | "genre";
 export type AnchorCategory = RegistryAnchorType | "none";
@@ -131,6 +139,7 @@ export type InquiryDraft = {
 
 export type InstituteState = {
   screen: InquiryScreen;
+  section: InquirySection;
   activeId: string | null;
   questionDraft: string;
   selectedAnchor: RegistryAnchor | null;
