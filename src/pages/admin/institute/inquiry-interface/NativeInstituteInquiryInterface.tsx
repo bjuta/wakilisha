@@ -2847,6 +2847,48 @@ function InquiryShell({
     { key: "history", label: "History" },
   ];
 
+  const isProceduralSnapshotItem = (title: string) => {
+    const normalized = title.trim().toLowerCase();
+
+    return (
+      normalized.startsWith("anchor type") ||
+      normalized.startsWith("anchor label") ||
+      normalized.startsWith("anchor context") ||
+      normalized.startsWith("anchor metadata") ||
+      normalized === "evidence has not been reviewed yet" ||
+      normalized === "claims are not settled" ||
+      normalized === "primary sources" ||
+      normalized === "relationship evidence"
+    );
+  };
+
+  const usefulKnowns =
+    draft.anchorContextSnapshot?.knowns.filter(
+      (item) => !isProceduralSnapshotItem(item.title),
+    ) ?? [];
+
+  const usefulUnknowns =
+    draft.anchorContextSnapshot?.unknowns.filter(
+      (item) => !isProceduralSnapshotItem(item.title),
+    ) ?? [];
+
+  const usefulNextSteps =
+    draft.anchorContextSnapshot?.evidenceGaps.filter(
+      (item) => !isProceduralSnapshotItem(item.title),
+    ) ?? [];
+
+  const establishedMaterial = draft.evidence.filter(
+    (item) =>
+      item.reviewState === "Accepted for internal memory" ||
+      item.reviewState === "Public-safe candidate",
+  );
+
+  const uncertainMaterial = draft.evidence.filter(
+    (item) =>
+      item.reviewState === "Needs more evidence" ||
+      item.reviewState === "Kept as doubt",
+  );
+
   return (
     <div className="mx-auto max-w-[1200px] space-y-5">
       <header className="rounded-2xl border border-wk-border bg-wk-surface px-5 py-5">
@@ -2886,22 +2928,23 @@ function InquiryShell({
 
       {section === "overview" ? (
         <div className="grid gap-5 lg:grid-cols-2">
-          <Panel eyebrow="Question" title="What this Inquiry is trying to understand">
+          <Panel eyebrow="Question" title="What are we trying to understand?">
             <p className="text-[14px] leading-6 text-wk-text">{draft.workingQuestion}</p>
+
             {draft.rawQuestion !== draft.workingQuestion ? (
-              <div className="mt-5 rounded-xl border border-wk-border bg-wk-bg px-4 py-3">
-                <div className="text-[10px] font-black uppercase tracking-[0.14em] text-wk-text-faint">
-                  Original question
-                </div>
-                <p className="mt-2 text-[13px] leading-5 text-wk-text-muted">{draft.rawQuestion}</p>
-              </div>
+              <details className="mt-5 rounded-xl border border-wk-border bg-wk-bg px-4 py-3">
+                <summary className="cursor-pointer text-[11px] font-black uppercase tracking-[0.14em] text-wk-text-faint">
+                  See the original question
+                </summary>
+                <p className="mt-3 text-[13px] leading-5 text-wk-text-muted">{draft.rawQuestion}</p>
+              </details>
             ) : null}
           </Panel>
 
-          <Panel eyebrow="Current record" title="What is attached">
+          <Panel eyebrow="Current state" title="Where does this Inquiry stand?">
             <dl className="space-y-3 text-[13px]">
               <div className="flex items-center justify-between gap-4">
-                <dt className="text-wk-text-muted">Material</dt>
+                <dt className="text-wk-text-muted">Material collected</dt>
                 <dd className="font-black text-wk-text">{draft.evidence.length}</dd>
               </div>
               <div className="flex items-center justify-between gap-4">
@@ -2909,8 +2952,8 @@ function InquiryShell({
                 <dd className="font-black text-wk-text">{draft.versionCount}</dd>
               </div>
               <div className="flex items-center justify-between gap-4">
-                <dt className="text-wk-text-muted">Anchor</dt>
-                <dd className="text-right font-black text-wk-text">{draft.anchor?.label ?? "None"}</dd>
+                <dt className="text-wk-text-muted">Main subject</dt>
+                <dd className="text-right font-black text-wk-text">{draft.anchor?.label ?? "None yet"}</dd>
               </div>
               <div className="flex items-center justify-between gap-4">
                 <dt className="text-wk-text-muted">Last updated</dt>
@@ -2921,8 +2964,85 @@ function InquiryShell({
             </dl>
           </Panel>
 
+          <Panel eyebrow="Current understanding" title="What do we know so far?">
+            {usefulKnowns.length ? (
+              <div className="space-y-3">
+                {usefulKnowns.slice(0, 4).map((item) => (
+                  <div key={`${item.title}:${item.body}`} className="rounded-xl border border-wk-border bg-wk-bg px-4 py-3">
+                    <div className="text-[13px] font-black text-wk-text">{item.title}</div>
+                    <p className="mt-1 text-[12px] leading-5 text-wk-text-muted">{item.body}</p>
+                  </div>
+                ))}
+              </div>
+            ) : establishedMaterial.length ? (
+              <div className="space-y-3">
+                {establishedMaterial.slice(0, 4).map((item) => (
+                  <div key={item.id} className="rounded-xl border border-wk-border bg-wk-bg px-4 py-3">
+                    <div className="text-[13px] font-black text-wk-text">{item.title}</div>
+                    <p className="mt-1 text-[12px] leading-5 text-wk-text-muted">
+                      {item.summary || item.whyItMatters || "Material saved for this Inquiry."}
+                    </p>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <EmptyState
+                title="Nothing established yet"
+                body="Add material before deciding what this Inquiry knows."
+              />
+            )}
+          </Panel>
+
+          <Panel eyebrow="Open questions" title="What is still unclear?">
+            {usefulUnknowns.length ? (
+              <div className="space-y-3">
+                {usefulUnknowns.slice(0, 4).map((item) => (
+                  <div key={`${item.title}:${item.body}`} className="rounded-xl border border-wk-border bg-wk-bg px-4 py-3">
+                    <div className="text-[13px] font-black text-wk-text">{item.title}</div>
+                    <p className="mt-1 text-[12px] leading-5 text-wk-text-muted">{item.body}</p>
+                  </div>
+                ))}
+              </div>
+            ) : uncertainMaterial.length ? (
+              <div className="space-y-3">
+                {uncertainMaterial.slice(0, 4).map((item) => (
+                  <div key={item.id} className="rounded-xl border border-wk-border bg-wk-bg px-4 py-3">
+                    <div className="text-[13px] font-black text-wk-text">{item.title}</div>
+                    <p className="mt-1 text-[12px] leading-5 text-wk-text-muted">
+                      {item.summary || item.whyItMatters || "This still needs more checking."}
+                    </p>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <EmptyState
+                title="No open questions recorded"
+                body="Keep uncertainty visible as the Inquiry develops."
+              />
+            )}
+          </Panel>
+
           <div className="lg:col-span-2">
-            <AnchorBriefScreen draft={draft} />
+            <Panel eyebrow="Next step" title="What should happen next?">
+              {usefulNextSteps.length ? (
+                <div className="grid gap-3 md:grid-cols-2">
+                  {usefulNextSteps.slice(0, 4).map((item) => (
+                    <div key={`${item.title}:${item.body}`} className="rounded-xl border border-wk-border bg-wk-bg px-4 py-3">
+                      <div className="text-[13px] font-black text-wk-text">{item.title}</div>
+                      <p className="mt-1 text-[12px] leading-5 text-wk-text-muted">{item.body}</p>
+                    </div>
+                  ))}
+                </div>
+              ) : draft.evidence.length === 0 ? (
+                <p className="text-[13px] leading-5 text-wk-text-muted">
+                  Start by adding the first useful piece of material.
+                </p>
+              ) : (
+                <p className="text-[13px] leading-5 text-wk-text-muted">
+                  Review the material, record a finding, or begin a piece of work.
+                </p>
+              )}
+            </Panel>
           </div>
         </div>
       ) : section === "material" ? (
