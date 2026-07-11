@@ -42,6 +42,7 @@ import type {
   EvidenceKind,
   InquiryDraft,
   InquiryScreen,
+  InquirySection,
   InquirySetup,
   InstituteState,
   RegistryAnchor,
@@ -686,7 +687,7 @@ function HomeScreen({
                 <button
                   key={draft.id}
                   type="button"
-                  onClick={() => setState({ activeId: draft.id, screen: "workbench" })}
+                  onClick={() => setState({ activeId: draft.id, screen: "inquiry", section: "overview" })}
                   className="w-full rounded-lg border border-wk-border bg-wk-surface px-4 py-3 text-left"
                 >
                   <div className="text-[11px] font-black text-wk-text-faint">{draft.code} · open it</div>
@@ -707,7 +708,7 @@ function HomeScreen({
             Create Inquiry
           </button>
           <span className="text-[12px] leading-5 text-wk-text-faint">
-            Creates a production Inquiry and opens the workbench.
+            Creates a production Inquiry and opens its workspace.
           </span>
         </div>
       </Panel>
@@ -726,7 +727,7 @@ function HomeScreen({
             <button
               key={draft.id}
               type="button"
-              onClick={() => setState({ activeId: draft.id, screen: "workbench" })}
+              onClick={() => setState({ activeId: draft.id, screen: "inquiry", section: "overview" })}
               className="rounded-2xl border border-wk-border bg-wk-surface p-5 text-left transition hover:border-wk-brand/40 hover:shadow-sm"
             >
               <div className="relative -m-5 mb-4 h-32 overflow-hidden rounded-t-2xl bg-wk-bg-subtle">
@@ -2810,9 +2811,140 @@ function ReviewDeskScreen() {
   );
 }
 
+function InquiryShell({
+  draft,
+  section,
+  setSection,
+  addEvidence,
+  updateDraft,
+  reloadInquiries,
+}: {
+  draft: InquiryDraft | null;
+  section: InquirySection;
+  setSection: (section: InquirySection) => void;
+  addEvidence: (inquiryId: string, evidence: Omit<EvidenceItem, "id" | "createdAt" | "updatedAt">) => Promise<EvidenceItem>;
+  updateDraft: (patch: Partial<InquiryDraft>) => void;
+  reloadInquiries: () => Promise<void>;
+}) {
+  if (!draft) {
+    return (
+      <div className="mx-auto max-w-[1000px]">
+        <Panel eyebrow="Inquiry" title="Choose an Inquiry">
+          <EmptyState
+            title="No Inquiry selected"
+            body="Return to Inquiries and choose the question you want to continue."
+          />
+        </Panel>
+      </div>
+    );
+  }
+
+  const sections: Array<{ key: InquirySection; label: string }> = [
+    { key: "overview", label: "Overview" },
+    { key: "material", label: "Material" },
+    { key: "notes", label: "Notes and findings" },
+    { key: "work", label: "Work" },
+    { key: "history", label: "History" },
+  ];
+
+  return (
+    <div className="mx-auto max-w-[1200px] space-y-5">
+      <header className="rounded-2xl border border-wk-border bg-wk-surface px-5 py-5">
+        <div className="flex flex-wrap items-center gap-2">
+          <Chip tone="brand">{draft.code}</Chip>
+          <Chip>{draft.status}</Chip>
+        </div>
+
+        <h1 className="mt-4 max-w-[900px] text-[24px] font-black leading-tight text-wk-text sm:text-[30px]">
+          {draft.workingQuestion}
+        </h1>
+
+        {draft.anchor ? (
+          <p className="mt-2 text-[12px] leading-5 text-wk-text-muted">
+            Anchored to {draft.anchor.label}
+          </p>
+        ) : null}
+
+        <nav className="mt-5 flex gap-2 overflow-x-auto pb-1" aria-label="Inquiry sections">
+          {sections.map((item) => (
+            <button
+              key={item.key}
+              type="button"
+              onClick={() => setSection(item.key)}
+              className={cx(
+                "whitespace-nowrap rounded-lg border px-3 py-2 text-[12px] font-black transition",
+                section === item.key
+                  ? "border-wk-brand bg-wk-brand text-wk-brand-on"
+                  : "border-wk-border bg-wk-bg text-wk-text-muted hover:border-wk-brand/40 hover:text-wk-text",
+              )}
+            >
+              {item.label}
+            </button>
+          ))}
+        </nav>
+      </header>
+
+      {section === "overview" ? (
+        <div className="grid gap-5 lg:grid-cols-2">
+          <Panel eyebrow="Question" title="What this Inquiry is trying to understand">
+            <p className="text-[14px] leading-6 text-wk-text">{draft.workingQuestion}</p>
+            {draft.rawQuestion !== draft.workingQuestion ? (
+              <div className="mt-5 rounded-xl border border-wk-border bg-wk-bg px-4 py-3">
+                <div className="text-[10px] font-black uppercase tracking-[0.14em] text-wk-text-faint">
+                  Original question
+                </div>
+                <p className="mt-2 text-[13px] leading-5 text-wk-text-muted">{draft.rawQuestion}</p>
+              </div>
+            ) : null}
+          </Panel>
+
+          <Panel eyebrow="Current record" title="What is attached">
+            <dl className="space-y-3 text-[13px]">
+              <div className="flex items-center justify-between gap-4">
+                <dt className="text-wk-text-muted">Material</dt>
+                <dd className="font-black text-wk-text">{draft.evidence.length}</dd>
+              </div>
+              <div className="flex items-center justify-between gap-4">
+                <dt className="text-wk-text-muted">Question versions</dt>
+                <dd className="font-black text-wk-text">{draft.versionCount}</dd>
+              </div>
+              <div className="flex items-center justify-between gap-4">
+                <dt className="text-wk-text-muted">Anchor</dt>
+                <dd className="text-right font-black text-wk-text">{draft.anchor?.label ?? "None"}</dd>
+              </div>
+              <div className="flex items-center justify-between gap-4">
+                <dt className="text-wk-text-muted">Last updated</dt>
+                <dd className="font-black text-wk-text">
+                  {new Date(draft.updatedAt).toLocaleDateString()}
+                </dd>
+              </div>
+            </dl>
+          </Panel>
+
+          <div className="lg:col-span-2">
+            <AnchorBriefScreen draft={draft} />
+          </div>
+        </div>
+      ) : section === "material" ? (
+        <>
+          <EvidenceScreen draft={draft} addEvidence={addEvidence} updateDraft={updateDraft} />
+          <EvidenceReaderPanel draft={draft} onEvidenceChanged={reloadInquiries} />
+        </>
+      ) : section === "notes" ? (
+        <InstituteClaimsWorkspace draft={draft} addEvidence={addEvidence} />
+      ) : section === "work" ? (
+        <WorkbenchScreen draft={draft} updateDraft={updateDraft} />
+      ) : (
+        <HowThisLearnedScreen draft={draft} />
+      )}
+    </div>
+  );
+}
+
 function LockedScreen({ screen }: { screen: InquiryScreen }) {
   const labels: Record<InquiryScreen, string> = {
     home: "Home",
+    inquiry: "Inquiry",
     workbench: "Workbench",
     anchorBrief: "Anchor Brief",
     evidence: "Evidence",
@@ -2841,10 +2973,16 @@ function LockedScreen({ screen }: { screen: InquiryScreen }) {
   );
 }
 
-const globalInstituteScreens = new Set<InquiryScreen>(["home", "workbench", "anchorBrief", "evidence", "claims", "review", "clinic", "learned", "relationships"]);
+const globalInstituteScreens = new Set<InquiryScreen>(["home", "inquiry", "workbench", "anchorBrief", "evidence", "claims", "review", "clinic", "learned", "relationships"]);
 
 function readInstituteScreen(value: string | null): InquiryScreen {
   return value && globalInstituteScreens.has(value as InquiryScreen) ? (value as InquiryScreen) : "home";
+}
+
+const inquirySections = new Set<InquirySection>(["overview", "material", "notes", "work", "history"]);
+
+function readInquirySection(value: string | null): InquirySection {
+  return value && inquirySections.has(value as InquirySection) ? (value as InquirySection) : "overview";
 }
 
 export default function NativeInstituteInquiryInterface() {
@@ -2857,7 +2995,8 @@ export default function NativeInstituteInquiryInterface() {
   const { inquiries: drafts, loading: inquiriesLoading, error: inquiriesError, addInquiry, addEvidence, updateInquiry, reloadInquiries } = useSupabaseInquiries();
   const [state, setRawState] = useState<InstituteState>({
     screen: readInstituteScreen(searchParams.get("screen")),
-    activeId: null,
+    section: readInquirySection(searchParams.get("section")),
+    activeId: searchParams.get("inquiry"),
     questionDraft: "",
     selectedAnchor: null,
     selectedAnchorCategory: null,
@@ -2868,17 +3007,49 @@ export default function NativeInstituteInquiryInterface() {
 
   useEffect(() => {
     const nextScreen = readInstituteScreen(searchParams.get("screen"));
-    setRawState((current) => (current.screen === nextScreen ? current : { ...current, screen: nextScreen }));
+    const nextSection = readInquirySection(searchParams.get("section"));
+    const nextActiveId = searchParams.get("inquiry");
+
+    setRawState((current) => {
+      if (
+        current.screen === nextScreen &&
+        current.section === nextSection &&
+        current.activeId === nextActiveId
+      ) {
+        return current;
+      }
+
+      return {
+        ...current,
+        screen: nextScreen,
+        section: nextSection,
+        activeId: nextActiveId,
+      };
+    });
   }, [searchParams]);
 
   const setState = (patch: Partial<InstituteState>) => {
     setRawState((current) => ({ ...current, ...patch }));
 
+    const nextParams = new URLSearchParams(searchParams);
+
     if (patch.screen) {
-      const nextParams = new URLSearchParams(searchParams);
       nextParams.set("screen", patch.screen);
-      setSearchParams(nextParams, { replace: true });
     }
+
+    if (patch.section) {
+      nextParams.set("section", patch.section);
+    }
+
+    if ("activeId" in patch) {
+      if (patch.activeId) {
+        nextParams.set("inquiry", patch.activeId);
+      } else {
+        nextParams.delete("inquiry");
+      }
+    }
+
+    setSearchParams(nextParams, { replace: true });
   };
 
   const active = useMemo(
@@ -2893,7 +3064,8 @@ export default function NativeInstituteInquiryInterface() {
     const inquiry = await addInquiry(question, state.selectedAnchor);
     setState({
       activeId: inquiry.id,
-      screen: "workbench",
+      screen: "inquiry",
+      section: "overview",
       questionDraft: "",
       selectedAnchor: null,
       selectedAnchorCategory: null,
@@ -2920,6 +3092,15 @@ export default function NativeInstituteInquiryInterface() {
               createDraft={createDraft}
               inquiriesLoading={inquiriesLoading}
               inquiriesError={inquiriesError}
+            />
+          ) : state.screen === "inquiry" ? (
+            <InquiryShell
+              draft={active}
+              section={state.section}
+              setSection={(section) => setState({ section })}
+              addEvidence={addEvidence}
+              updateDraft={updateActiveDraft}
+              reloadInquiries={reloadInquiries}
             />
           ) : state.screen === "workbench" ? (
             <WorkbenchScreen draft={active} updateDraft={updateActiveDraft} />
