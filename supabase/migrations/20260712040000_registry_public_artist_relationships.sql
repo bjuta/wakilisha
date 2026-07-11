@@ -34,7 +34,14 @@ as $$
       r.reviewed_at,
       (select count(*)::integer from public.registry_relationship_evidence e where e.relationship_id = r.id) as evidence_count
     from public.registry_entity_relationships r
-    where r.relationship_status = 'active'
+    where p_artist_id is not null
+      and exists (
+        select 1
+        from public.registry_artists current_artist
+        where current_artist.id = p_artist_id
+          and current_artist.status = 'active'
+      )
+      and r.relationship_status = 'active'
       and r.review_status = 'approved'
       and r.public_safe = true
       and nullif(btrim(r.plain_reason), '') is not null
