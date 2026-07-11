@@ -37,8 +37,6 @@ async function getUser(req: Request) {
 }
 
 async function hasReviewAccess(db: ReturnType<typeof createClient>, userId: string): Promise<boolean> {
-  const { data } = await db.rpc("current_user_is_administrator", {}, { headers: { "x-user-id": userId } });
-  if (data === true) return true;
   const { data: rows } = await db
     .from("user_role_assignments")
     .select("role_key, role_definitions!inner(role_capabilities(capability_key))")
