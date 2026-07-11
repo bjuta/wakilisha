@@ -5,6 +5,7 @@ import { MetaTags } from "@/components/seo/MetaTags";
 import { SchemaOrg } from "@/components/seo/SchemaOrg";
 import type { MusicGroupSchema } from "@/components/seo/SchemaOrg";
 import { getArtist, getArtistAppearsOn, clearDiscographyCache, type PublicArtistDetail, type RegistryAppearsOnRelease } from "@/services/publicContent/client";
+import { getPublicArtistRelationships, type PublicArtistRelationship } from "@/services/publicArtistRelationships";
 import { supabase } from "@/lib/supabase";
 import { ArtistDetailHero } from "./components/ArtistDetailHero";
 import { ArtistChartSection } from "./components/ArtistChartSection";
@@ -12,6 +13,7 @@ import { ArtistDiscography } from "./components/ArtistDiscography";
 import { RelatedArtistsShelf } from "./components/RelatedArtistsShelf";
 import { ArtistTopSongs } from "./components/ArtistTopSongs";
 import { ArtistBioSection, cleanBioExcerpt } from "./components/ArtistBioSection";
+import { ArtistRelationshipsSection } from "./components/ArtistRelationshipsSection";
 import { ArtistVideos } from "./components/ArtistVideos";
 import { ArtistNewsletterSection } from "./components/ArtistNewsletterSection";
 import { ArtistTaggedArticles } from "./components/ArtistTaggedArticles";
@@ -48,6 +50,7 @@ export default function ArtistDetail() {
   const [artist, setArtist] = useState<PublicArtistDetail | null>(null);
   const [registeredGenres, setRegisteredGenres] = useState<string[]>([]);
   const [appearsOn, setAppearsOn] = useState<RegistryAppearsOnRelease[]>([]);
+  const [relationships, setRelationships] = useState<PublicArtistRelationship[]>([]);
   const [status, setStatus] = useState<"loading" | "ready" | "error">("loading");
   const [error, setError] = useState<string | null>(null);
 
@@ -88,6 +91,24 @@ export default function ArtistDetail() {
       });
     return () => { alive = false; };
   }, [slug]);
+
+  useEffect(() => {
+    let alive = true;
+    if (!artist?.id) {
+      setRelationships([]);
+      return;
+    }
+
+    getPublicArtistRelationships(artist.id)
+      .then((items) => {
+        if (alive) setRelationships(items);
+      })
+      .catch(() => {
+        if (alive) setRelationships([]);
+      });
+
+    return () => { alive = false; };
+  }, [artist?.id]);
 
   if (status === "loading") {
     return (
@@ -132,6 +153,7 @@ export default function ArtistDetail() {
   const hasRelated = artist.relatedArtists.length > 0;
   const hasTopSongs = artist.topSongs.length > 0;
   const hasBio = artist.bio || artist.fullBio;
+  const hasRelationships = relationships.length > 0;
   const hasVideos = artist.videos && artist.videos.length > 0;
   const heroBio = cleanBioExcerpt(artist.fullBio || artist.bio || "");
   const bioForSeo = cleanBioExcerpt(artist.fullBio || artist.bio || "");
@@ -202,6 +224,10 @@ export default function ArtistDetail() {
               releaseCount={artist.releaseCount}
               artistType={artist.artistType}
             />
+          )}
+
+          {hasRelationships && (
+            <ArtistRelationshipsSection artistName={artist.name} relationships={relationships} />
           )}
 
           {hasTopSongs && (
