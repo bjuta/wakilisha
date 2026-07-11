@@ -27,6 +27,11 @@ function readableLabel(value: string) {
   return value.replace(/_/g, " ");
 }
 
+function titleAlreadyExplained(title: string, explanation?: string) {
+  if (!explanation) return false;
+  return explanation.toLocaleLowerCase().includes(title.toLocaleLowerCase());
+}
+
 export function RelatedArtistsShelf({ artists }: RelatedArtistsShelfProps) {
   const scrollRef = useRef<HTMLDivElement>(null);
   const { ref, revealed } = useScrollReveal<HTMLElement>(0.1);
@@ -58,9 +63,10 @@ export function RelatedArtistsShelf({ artists }: RelatedArtistsShelfProps) {
       <div ref={scrollRef} className="flex gap-4 overflow-x-auto pb-3 scrollbar-hide" style={{ scrollbarWidth: "none", msOverflowStyle: "none" }}>
         {artists.map((artist) => {
           const sharedTitles = artist.sharedTitles || [];
+          const revealTitles = sharedTitles.filter((title) => !titleAlreadyExplained(title, artist.reviewedReason));
           const relationshipLabel = artist.relationshipLabel ? readableLabel(artist.relationshipLabel) : null;
           const isOpen = openSlug === artist.slug;
-          const hasRevealContent = Boolean(artist.reviewedReason || artist.evidenceCount || sharedTitles.length);
+          const hasRevealContent = Boolean(artist.reviewedReason || artist.evidenceCount || revealTitles.length);
           const toggle = () => setOpenSlug((current) => current === artist.slug ? null : artist.slug);
 
           return (
@@ -130,9 +136,9 @@ export function RelatedArtistsShelf({ artists }: RelatedArtistsShelfProps) {
                   <div className={`absolute inset-0 flex flex-col justify-end bg-black/80 p-4 backdrop-blur-[2px] transition-all duration-200 md:group-hover:translate-y-0 md:group-hover:opacity-100 md:group-focus-within:translate-y-0 md:group-focus-within:opacity-100 ${isOpen ? "translate-y-0 opacity-100" : "pointer-events-none translate-y-3 opacity-0 md:pointer-events-auto"}`}>
                     <p className="text-[16px] font-bold text-white">{artist.name}</p>
                     {artist.reviewedReason ? <p className="mt-3 text-[12px] leading-5 text-white/85">{artist.reviewedReason}</p> : null}
-                    {sharedTitles.length > 0 ? (
+                    {revealTitles.length > 0 ? (
                       <div className="mt-3 flex flex-wrap gap-1">
-                        {sharedTitles.slice(0, 3).map((title) => <span key={title} className="max-w-[175px] truncate rounded-full bg-white/15 px-2 py-0.5 text-[10px] text-white/85">{title}</span>)}
+                        {revealTitles.slice(0, 3).map((title) => <span key={title} className="max-w-[175px] truncate rounded-full bg-white/15 px-2 py-0.5 text-[10px] text-white/85">{title}</span>)}
                       </div>
                     ) : null}
                     {artist.reviewed && artist.evidenceCount ? (
