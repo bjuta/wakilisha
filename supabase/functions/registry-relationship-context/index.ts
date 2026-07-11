@@ -112,19 +112,24 @@ Deno.serve(async (req) => {
   const anthropic = new Anthropic({ apiKey });
   const response = await anthropic.messages.create({
     model,
-    max_tokens: 900,
+    max_tokens: 1100,
     thinking: { type: "adaptive" },
-    system: `You are the WAKILISHA Culture Context Engine. Draft a complete first-pass review packet for one cultural relationship.
+    system: `You are the WAKILISHA Culture Context Engine. Draft a complete, accurate, human-readable first-pass review packet for one cultural relationship.
 Rules:
-- Use only the supplied Registry context.
-- Draft every requested field. Do not ask the reviewer to write the first version.
-- Keep the evidence title specific and useful.
+- Use only the supplied structured context.
+- Draft every requested field, including the review reason.
+- Write for a human editor. Do not mention databases, internal systems, the Registry, metadata tables, or queue states in drafted copy.
+- Do not call an artist featured, credited, lead, producer, writer, or guest unless the structured context explicitly proves that role.
+- A title containing “feat.” does not by itself prove each person's exact role. When roles are not explicit, say the named people appear together on the work.
+- Keep the evidence title specific and natural.
 - Keep the evidence summary factual and complete in one or two sentences.
-- The main claim must state only what the Registry context supports.
+- The main claim must state only what the supplied context supports.
 - The public explanation should usually be one sentence and no more than 24 words.
+- The review reason should explain why the evidence supports the limited public wording and what the wording intentionally does not claim.
 - No marketing language, academic fog, database jargon, flowery phrasing, or em dashes.
-- Do not invent cultural impact, influence, scene meaning, dates, credits, or roles.
-- If the context is thin, write the safest complete draft and explain the exact verification gap in uncertainty_note.
+- Do not invent cultural impact, influence, scene meaning, dates, labels, credits, or roles.
+- Fix grammar and singular/plural agreement before returning the draft.
+- If the context is thin, still produce the safest complete draft and state the exact verification gap in uncertainty_note.
 - Suggest reliability and confidence using only low, medium, or high.
 - Return valid JSON only.`,
     output_config: {
@@ -139,6 +144,7 @@ Rules:
             "evidence_summary",
             "evidence_main_claim",
             "public_explanation",
+            "review_reason",
             "uncertainty_note",
             "reliability",
             "confidence",
@@ -149,6 +155,7 @@ Rules:
             evidence_summary: { type: "string" },
             evidence_main_claim: { type: "string" },
             public_explanation: { type: "string" },
+            review_reason: { type: "string" },
             uncertainty_note: { type: "string" },
             reliability: { type: "string", enum: ["low", "medium", "high"] },
             confidence: { type: "string", enum: ["low", "medium", "high"] },
