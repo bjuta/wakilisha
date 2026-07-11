@@ -51,6 +51,40 @@ export async function loadRelationshipReviewContext(relationshipId: string): Pro
   return data as RelationshipReviewContext;
 }
 
+export async function createReviewedRelationshipEvidence(input: {
+  title: string;
+  evidenceType: "article" | "official_documentation" | "release_metadata" | "track_metadata" | "artist_metadata" | "interview" | "video";
+  sourceUrl: string;
+  summary: string;
+  mainClaim: string;
+  reviewReason: string;
+}): Promise<ReviewEvidenceItem> {
+  const { data, error } = await supabase.rpc("create_registry_relationship_review_evidence", {
+    p_title: input.title,
+    p_evidence_type: input.evidenceType,
+    p_source_url: input.sourceUrl,
+    p_summary: input.summary,
+    p_main_claim: input.mainClaim,
+    p_review_reason: input.reviewReason,
+  });
+  if (error) throw new Error(error.message);
+  const row = data as Record<string, unknown>;
+  return {
+    id: String(row.id),
+    title: String(row.title),
+    evidenceType: String(row.evidence_type),
+    sourceUrl: row.source_url ? String(row.source_url) : null,
+    summary: String(row.summary),
+    mainClaim: row.main_claim ? String(row.main_claim) : null,
+    whyItMatters: row.why_it_matters ? String(row.why_it_matters) : null,
+    reviewStatus: String(row.review_status),
+    retrievalStatus: String(row.retrieval_status),
+    reliability: String(row.reliability),
+    confidence: String(row.confidence),
+    attached: false,
+  };
+}
+
 export async function draftRelationshipExplanation(relationshipId: string, evidenceId: string): Promise<ContextDraft> {
   const { data, error } = await supabase.functions.invoke("registry-context-draft", {
     body: { relationshipId, evidenceId },
