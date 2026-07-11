@@ -1,14 +1,14 @@
-import { useMemo, useState } from "react";
+import { useMemo, useState, type ReactNode } from "react";
 import type { EvidenceItem, InquiryDraft } from "./types";
 
-type ClaimRelation =
+type EvidenceRelation =
   | "supports"
   | "weakly supports"
   | "contradicts"
   | "background only"
   | "needs verification";
 
-type ClaimStrength =
+type FindingStrength =
   | "unsupported"
   | "needs evidence"
   | "workable"
@@ -17,47 +17,64 @@ type ClaimStrength =
 
 type Confidence = "Low" | "Medium" | "High";
 
-type ClaimEvidenceLink = {
+type FindingEvidenceLink = {
   evidenceId: string;
   title: string;
   kind: string;
   source: string;
-  relation: ClaimRelation;
+  relation: EvidenceRelation;
   reviewState: string;
   summary: string;
   sourceUrl: string;
 };
 
-type ClaimRecord = {
+type FindingRecord = {
   id: string;
-  title: string;
-  claimText: string;
-  claimUse: string;
-  publicWording: string;
+  text: string;
+  kind: string;
   confidence: Confidence;
   caveat: string;
-  strength: ClaimStrength;
-  links: ClaimEvidenceLink[];
+  strength: FindingStrength;
+  links: FindingEvidenceLink[];
   reviewState: string;
+  createdAt: string;
+};
+
+type NoteRecord = {
+  id: string;
+  text: string;
+  noteType: string;
   createdAt: string;
 };
 
 type Props = {
   draft: InquiryDraft | null;
-  addEvidence: (inquiryId: string, evidence: Omit<EvidenceItem, "id" | "createdAt" | "updatedAt">) => Promise<EvidenceItem>;
+  addEvidence: (
+    inquiryId: string,
+    evidence: Omit<EvidenceItem, "id" | "createdAt" | "updatedAt">,
+  ) => Promise<EvidenceItem>;
 };
 
-const claimUseOptions = [
-  "Central claim",
-  "Supporting claim",
-  "Timeline claim",
-  "Relationship claim",
-  "Correction claim",
-  "Context claim",
-  "Counter-claim",
+const findingKinds = [
+  "Main finding",
+  "Supporting finding",
+  "Timeline finding",
+  "Relationship finding",
+  "Correction finding",
+  "Context finding",
+  "Counterpoint",
 ];
 
-const relationOptions: ClaimRelation[] = [
+const noteTypes = [
+  "Observation",
+  "Question",
+  "Interpretation",
+  "Doubt",
+  "Reminder",
+  "To verify",
+];
+
+const relationOptions: EvidenceRelation[] = [
   "supports",
   "weakly supports",
   "contradicts",
@@ -73,18 +90,21 @@ function Pill({
   children,
   tone = "neutral",
 }: {
-  children: React.ReactNode;
-  tone?: "brand" | "success" | "warning" | "neutral" | "dark";
+  children: ReactNode;
+  tone?: "brand" | "success" | "warning" | "neutral";
 }) {
   return (
     <span
       className={cx(
         "inline-flex items-center rounded-full border px-2.5 py-1 text-[10px] font-black",
-        tone === "brand" && "border-wk-brand/30 bg-wk-brand-soft text-wk-brand",
-        tone === "success" && "border-wk-success/30 bg-wk-success-soft text-wk-success",
-        tone === "warning" && "border-wk-warning/30 bg-wk-warning-soft text-wk-warning",
-        tone === "dark" && "border-wk-text bg-wk-text text-wk-bg",
-        tone === "neutral" && "border-wk-border bg-wk-surface text-wk-text-muted",
+        tone === "brand" &&
+          "border-wk-brand/30 bg-wk-brand-soft text-wk-brand",
+        tone === "success" &&
+          "border-wk-success/30 bg-wk-success-soft text-wk-success",
+        tone === "warning" &&
+          "border-wk-warning/30 bg-wk-warning-soft text-wk-warning",
+        tone === "neutral" &&
+          "border-wk-border bg-wk-surface text-wk-text-muted",
       )}
     >
       {children}
@@ -96,22 +116,24 @@ function Panel({
   eyebrow,
   title,
   children,
-  className,
 }: {
   eyebrow?: string;
   title: string;
-  children: React.ReactNode;
-  className?: string;
+  children: ReactNode;
 }) {
   return (
-    <section className={cx("rounded-[22px] border border-wk-border bg-wk-surface p-5 shadow-sm", className)}>
+    <section className="rounded-[22px] border border-wk-border bg-wk-surface p-5 shadow-sm">
       {eyebrow ? (
         <div className="mb-2 flex items-center gap-2 text-[10px] font-black uppercase tracking-[0.22em] text-wk-brand">
           <span className="h-px w-7 bg-wk-brand" />
           {eyebrow}
         </div>
       ) : null}
-      <h2 className="text-[20px] font-black tracking-[-0.04em] text-wk-text">{title}</h2>
+
+      <h2 className="text-[20px] font-black tracking-[-0.04em] text-wk-text">
+        {title}
+      </h2>
+
       <div className="mt-4">{children}</div>
     </section>
   );
@@ -119,7 +141,7 @@ function Panel({
 
 function EmptyState({ title, body }: { title: string; body: string }) {
   return (
-    <div className="rounded-lg border border-dashed border-wk-border/60 bg-wk-bg-subtle p-3">
+    <div className="rounded-lg border border-dashed border-wk-border/60 bg-wk-bg-subtle p-4">
       <div className="text-[13px] font-black text-wk-text">{title}</div>
       <p className="mt-1 text-[12px] leading-5 text-wk-text-muted">{body}</p>
     </div>
@@ -127,7 +149,9 @@ function EmptyState({ title, body }: { title: string; body: string }) {
 }
 
 function metadataOf(item: EvidenceItem) {
-  return item.metadata && typeof item.metadata === "object" ? item.metadata : {};
+  return item.metadata && typeof item.metadata === "object"
+    ? item.metadata
+    : {};
 }
 
 function textValue(value: unknown, fallback = "") {
@@ -135,96 +159,181 @@ function textValue(value: unknown, fallback = "") {
   return next || fallback;
 }
 
-function isClaimItem(item: EvidenceItem) {
+function isLegacyClaim(item: EvidenceItem) {
   const metadata = metadataOf(item);
-  return metadata.workspaceType === "claims" && metadata.claimVersion === 1;
+
+  return (
+    metadata.workspaceType === "claims" &&
+    metadata.claimVersion === 1
+  );
 }
 
-function extractClaims(evidence: EvidenceItem[]): ClaimRecord[] {
-  return evidence
-    .filter(isClaimItem)
-    .map((item) => {
-      const metadata = metadataOf(item);
+function isFinding(item: EvidenceItem) {
+  const metadata = metadataOf(item);
 
-      return {
-        id: item.id,
-        title: item.title,
-        claimText: textValue(metadata.claimText, item.summary),
-        claimUse: textValue(metadata.claimUse, item.whyItMatters),
-        publicWording: textValue(metadata.publicWording),
-        confidence: (textValue(metadata.claimConfidence, "Medium") as Confidence) || "Medium",
-        caveat: textValue(metadata.claimCaveat),
-        strength: (textValue(metadata.claimStrength, "unsupported") as ClaimStrength) || "unsupported",
-        links: Array.isArray(metadata.attachedEvidence) ? (metadata.attachedEvidence as ClaimEvidenceLink[]) : [],
-        reviewState: item.reviewState,
-        createdAt: item.createdAt,
-      };
-    });
+  return (
+    isLegacyClaim(item) ||
+    (metadata.workspaceType === "findings" &&
+      metadata.findingVersion === 1)
+  );
 }
 
-function strengthForLinks(links: ClaimEvidenceLink[]): ClaimStrength {
-  const supports = links.filter((link) => link.relation === "supports").length;
-  const weakSupports = links.filter((link) => link.relation === "weakly supports").length;
-  const contradicts = links.filter((link) => link.relation === "contradicts").length;
-  const needsVerification = links.filter((link) => link.relation === "needs verification").length;
+function isInquiryNote(item: EvidenceItem) {
+  const metadata = metadataOf(item);
+
+  return (
+    metadata.workspaceType === "notes" &&
+    metadata.noteVersion === 1
+  );
+}
+
+function extractFindings(evidence: EvidenceItem[]): FindingRecord[] {
+  return evidence.filter(isFinding).map((item) => {
+    const metadata = metadataOf(item);
+
+    return {
+      id: item.id,
+      text: textValue(
+        metadata.findingText ?? metadata.claimText,
+        item.summary,
+      ),
+      kind: textValue(
+        metadata.findingKind ?? metadata.claimUse,
+        "Finding",
+      ),
+      confidence: textValue(
+        metadata.findingConfidence ?? metadata.claimConfidence,
+        "Medium",
+      ) as Confidence,
+      caveat: textValue(
+        metadata.findingCaveat ?? metadata.claimCaveat,
+      ),
+      strength: textValue(
+        metadata.findingStrength ?? metadata.claimStrength,
+        "unsupported",
+      ) as FindingStrength,
+      links: Array.isArray(metadata.attachedEvidence)
+        ? (metadata.attachedEvidence as FindingEvidenceLink[])
+        : [],
+      reviewState: item.reviewState,
+      createdAt: item.createdAt,
+    };
+  });
+}
+
+function extractNotes(evidence: EvidenceItem[]): NoteRecord[] {
+  return evidence.filter(isInquiryNote).map((item) => {
+    const metadata = metadataOf(item);
+
+    return {
+      id: item.id,
+      text: textValue(metadata.noteText, item.summary),
+      noteType: textValue(metadata.noteType, "Note"),
+      createdAt: item.createdAt,
+    };
+  });
+}
+
+function strengthForLinks(
+  links: FindingEvidenceLink[],
+): FindingStrength {
+  const supports = links.filter(
+    (link) => link.relation === "supports",
+  ).length;
+
+  const weakSupports = links.filter(
+    (link) => link.relation === "weakly supports",
+  ).length;
+
+  const contradicts = links.filter(
+    (link) => link.relation === "contradicts",
+  ).length;
+
+  const needsVerification = links.filter(
+    (link) => link.relation === "needs verification",
+  ).length;
 
   if (!links.length) return "unsupported";
   if (contradicts > 0) return "contested";
   if (supports >= 2 && needsVerification === 0) return "strong";
   if (supports >= 1 || weakSupports >= 2) return "workable";
+
   return "needs evidence";
 }
 
-function toneForStrength(strength: ClaimStrength): "success" | "warning" | "neutral" {
-  if (strength === "strong" || strength === "workable") return "success";
-  if (strength === "contested" || strength === "needs evidence" || strength === "unsupported") return "warning";
+function toneForStrength(
+  strength: FindingStrength,
+): "success" | "warning" | "neutral" {
+  if (strength === "strong" || strength === "workable") {
+    return "success";
+  }
+
+  if (
+    strength === "contested" ||
+    strength === "needs evidence" ||
+    strength === "unsupported"
+  ) {
+    return "warning";
+  }
+
   return "neutral";
 }
 
-function relationTone(relation: ClaimRelation): "success" | "warning" | "neutral" {
+function relationTone(
+  relation: EvidenceRelation,
+): "success" | "warning" | "neutral" {
   if (relation === "supports") return "success";
-  if (relation === "contradicts" || relation === "needs verification") return "warning";
+
+  if (
+    relation === "contradicts" ||
+    relation === "needs verification"
+  ) {
+    return "warning";
+  }
+
   return "neutral";
 }
 
-function relationSummary(links: ClaimEvidenceLink[]) {
-  const supports = links.filter((link) => link.relation === "supports").length;
-  const weak = links.filter((link) => link.relation === "weakly supports").length;
-  const contradicts = links.filter((link) => link.relation === "contradicts").length;
-  const background = links.filter((link) => link.relation === "background only").length;
-  const needs = links.filter((link) => link.relation === "needs verification").length;
-
-  return { supports, weak, contradicts, background, needs };
-}
-
-function EvidenceMetric({ label, value, note }: { label: string; value: string | number; note: string }) {
-  return (
-    <div className="rounded-lg border border-wk-border bg-wk-bg-subtle p-3">
-      <div className="text-[10px] font-black uppercase tracking-[0.12em] text-wk-text-faint">{label}</div>
-      <div className="mt-2 text-[26px] font-black tracking-[-0.05em] text-wk-text">{value}</div>
-      <p className="mt-1 text-[11px] leading-4 text-wk-text-muted">{note}</p>
-    </div>
-  );
-}
-
-export function InstituteClaimsWorkspace({ draft, addEvidence }: Props) {
+export function InstituteClaimsWorkspace({
+  draft,
+  addEvidence,
+}: Props) {
   const evidence = draft?.evidence ?? [];
-  const claims = useMemo(() => extractClaims(evidence), [evidence]);
-  const sourceEvidence = evidence.filter((item) => !isClaimItem(item));
 
-  const [claimText, setClaimText] = useState("");
-  const [claimUse, setClaimUse] = useState(claimUseOptions[0]);
-  const [publicWording, setPublicWording] = useState("");
+  const findings = useMemo(
+    () => extractFindings(evidence),
+    [evidence],
+  );
+
+  const notes = useMemo(
+    () => extractNotes(evidence),
+    [evidence],
+  );
+
+  const sourceMaterial = evidence.filter(
+    (item) => !isFinding(item) && !isInquiryNote(item),
+  );
+
+  const [noteText, setNoteText] = useState("");
+  const [noteType, setNoteType] = useState(noteTypes[0]);
+  const [findingText, setFindingText] = useState("");
+  const [findingKind, setFindingKind] = useState(findingKinds[0]);
   const [confidence, setConfidence] = useState<Confidence>("Medium");
   const [caveat, setCaveat] = useState("");
-  const [selectedEvidenceIds, setSelectedEvidenceIds] = useState<string[]>([]);
-  const [relations, setRelations] = useState<Record<string, ClaimRelation>>({});
-  const [saving, setSaving] = useState(false);
-  const [savedNotice, setSavedNotice] = useState("");
+  const [selectedMaterialIds, setSelectedMaterialIds] = useState<string[]>([]);
+  const [relations, setRelations] = useState<
+    Record<string, EvidenceRelation>
+  >({});
+  const [savingNote, setSavingNote] = useState(false);
+  const [savingFinding, setSavingFinding] = useState(false);
+  const [notice, setNotice] = useState("");
 
-  const attachedEvidence = selectedEvidenceIds
+  const attachedMaterial = selectedMaterialIds
     .map((id) => {
-      const item = sourceEvidence.find((evidenceItem) => evidenceItem.id === id);
+      const item = sourceMaterial.find(
+        (material) => material.id === id,
+      );
+
       if (!item) return null;
 
       return {
@@ -236,24 +345,18 @@ export function InstituteClaimsWorkspace({ draft, addEvidence }: Props) {
         reviewState: item.reviewState,
         summary: item.summary,
         sourceUrl: item.sourceUrl,
-      } satisfies ClaimEvidenceLink;
+      } satisfies FindingEvidenceLink;
     })
-    .filter(Boolean) as ClaimEvidenceLink[];
+    .filter(Boolean) as FindingEvidenceLink[];
 
-  const liveStrength = strengthForLinks(attachedEvidence);
-  const liveSummary = relationSummary(attachedEvidence);
+  const liveStrength = strengthForLinks(attachedMaterial);
 
-  const unsupportedClaims = claims.filter((claim) => claim.strength === "unsupported" || claim.strength === "needs evidence").length;
-  const contestedClaims = claims.filter((claim) => claim.strength === "contested").length;
-  const reviewableClaims = claims.filter((claim) => claim.strength === "workable" || claim.strength === "strong").length;
-
-  const canSave = Boolean(draft && claimText.trim().length >= 8 && caveat.trim().length >= 4 && !saving);
-
-  const toggleEvidence = (id: string) => {
-    setSelectedEvidenceIds((current) => {
-      if (current.includes(id)) return current.filter((item) => item !== id);
-      return [...current, id];
-    });
+  const toggleMaterial = (id: string) => {
+    setSelectedMaterialIds((current) =>
+      current.includes(id)
+        ? current.filter((item) => item !== id)
+        : [...current, id],
+    );
 
     setRelations((current) => ({
       ...current,
@@ -261,317 +364,345 @@ export function InstituteClaimsWorkspace({ draft, addEvidence }: Props) {
     }));
   };
 
-  const resetForm = () => {
-    setClaimText("");
-    setClaimUse(claimUseOptions[0]);
-    setPublicWording("");
-    setConfidence("Medium");
-    setCaveat("");
-    setSelectedEvidenceIds([]);
-    setRelations({});
-  };
+  const saveNote = async () => {
+    if (!draft || noteText.trim().length < 3 || savingNote) return;
 
-  const saveClaim = async () => {
-    if (!draft || !canSave) return;
-
-    setSaving(true);
-    setSavedNotice("");
+    setSavingNote(true);
+    setNotice("");
 
     try {
-      const nextStrength = strengthForLinks(attachedEvidence);
+      await addEvidence(draft.id, {
+        title: `${noteType}: ${noteText.trim().slice(0, 96)}`,
+        kind: "Personal note",
+        source: "Inquiry notes",
+        sourceUrl: "",
+        summary: noteText.trim(),
+        whyItMatters: noteType,
+        mediaMinutes: 0,
+        reviewState: "Draft",
+        metadata: {
+          workspaceVersion: 1,
+          workspaceFormat: "Note",
+          workspaceType: "notes",
+          savedFrom: "inquiry_notes_findings",
+          noteVersion: 1,
+          noteType,
+          noteText: noteText.trim(),
+          inquiryCode: draft.code,
+        },
+      });
+
+      setNoteText("");
+      setNoteType(noteTypes[0]);
+      setNotice("Note saved.");
+    } finally {
+      setSavingNote(false);
+    }
+  };
+
+  const saveFinding = async () => {
+    if (
+      !draft ||
+      findingText.trim().length < 8 ||
+      caveat.trim().length < 4 ||
+      savingFinding
+    ) {
+      return;
+    }
+
+    setSavingFinding(true);
+    setNotice("");
+
+    try {
+      const strength = strengthForLinks(attachedMaterial);
       const reviewState =
-        nextStrength === "strong" || nextStrength === "workable"
+        strength === "strong" || strength === "workable"
           ? "Needs review"
           : "Needs more evidence";
 
       await addEvidence(draft.id, {
-        title: `${claimUse}: ${claimText.trim().slice(0, 96)}`,
+        title: `${findingKind}: ${findingText.trim().slice(0, 96)}`,
         kind: "Personal note",
-        source: "Institute claims workspace",
+        source: "Inquiry findings",
         sourceUrl: "",
-        summary: claimText.trim(),
-        whyItMatters: claimUse,
+        summary: findingText.trim(),
+        whyItMatters: findingKind,
         mediaMinutes: 0,
         reviewState,
         metadata: {
           workspaceVersion: 1,
-          workspaceFormat: "Claim",
-          workspaceType: "claims",
-          savedFrom: "institute_claims_workspace",
-          claimVersion: 1,
-          claimText: claimText.trim(),
-          claimUse,
-          publicWording: publicWording.trim(),
-          claimConfidence: confidence,
-          claimCaveat: caveat.trim(),
-          claimStrength: nextStrength,
-          attachedEvidence,
-          relationSummary: relationSummary(attachedEvidence),
+          workspaceFormat: "Finding",
+          workspaceType: "findings",
+          savedFrom: "inquiry_notes_findings",
+          findingVersion: 1,
+          findingText: findingText.trim(),
+          findingKind,
+          findingConfidence: confidence,
+          findingCaveat: caveat.trim(),
+          findingStrength: strength,
+          attachedEvidence: attachedMaterial,
           inquiryCode: draft.code,
           inquiryQuestion: draft.workingQuestion,
         },
       });
 
-      setSavedNotice("Saved claim to the inquiry.");
-      resetForm();
+      setFindingText("");
+      setFindingKind(findingKinds[0]);
+      setConfidence("Medium");
+      setCaveat("");
+      setSelectedMaterialIds([]);
+      setRelations({});
+      setNotice("Finding saved.");
     } finally {
-      setSaving(false);
+      setSavingFinding(false);
     }
   };
 
   if (!draft) {
     return (
-      <div className="mx-auto max-w-[1000px]">
-        <Panel eyebrow="Claims" title="No Active Inquiry">
-          <EmptyState title="Nothing to shape yet" body="Create or select an Inquiry first." />
-        </Panel>
-      </div>
+      <Panel eyebrow="Notes and findings" title="Choose an Inquiry">
+        <EmptyState
+          title="No Inquiry selected"
+          body="Return to Inquiries and choose the question you want to continue."
+        />
+      </Panel>
     );
   }
 
   return (
     <div className="mx-auto max-w-[1240px] space-y-5">
-      <section className="rounded-[22px] border border-wk-border bg-wk-surface p-6 shadow-sm lg:p-7">
-        <div className="flex flex-wrap items-start justify-between gap-4">
-          <div>
-            <div className="text-[10px] font-black uppercase tracking-[0.24em] text-wk-brand">
-              {draft.code} · Claims workspace
-            </div>
-            <h1 className="mt-3 max-w-4xl text-[34px] font-black leading-[1.02] tracking-[-0.065em] text-wk-text lg:text-[42px]">
-              Shape claims from evidence.
-            </h1>
-            <p className="mt-3 max-w-3xl text-[14px] leading-6 text-wk-text-muted">
-              Claims are not facts yet. Tie each claim to evidence, mark the relationship honestly, and keep unsupported ideas visible.
-            </p>
-          </div>
-
-          <div className="rounded-xl border border-wk-warning/30 bg-wk-warning-soft p-4 text-left">
-            <div className="text-[10px] font-black uppercase tracking-[0.12em] text-wk-warning">No overclaiming</div>
-            <p className="mt-2 max-w-[300px] text-[12px] leading-5 text-wk-text-muted">
-              A claim can be useful and still need proof. This workspace keeps that distinction clear.
-            </p>
-          </div>
+      <section className="rounded-[22px] border border-wk-border bg-wk-surface p-6 shadow-sm">
+        <div className="text-[10px] font-black uppercase tracking-[0.24em] text-wk-brand">
+          Notes and findings
         </div>
 
-        <div className="mt-5 rounded-lg border border-wk-border bg-wk-bg-subtle p-3">
-          <div className="text-[10px] font-black uppercase tracking-[0.12em] text-wk-text-faint">Inquiry being tested</div>
-          <p className="mt-2 text-[16px] font-black leading-6 text-wk-text">{draft.workingQuestion}</p>
-          <div className="mt-3 flex flex-wrap items-center gap-2">
-            {draft.anchor ? <Pill tone="brand">{draft.anchor.label}</Pill> : <Pill tone="warning">No anchor</Pill>}
-            <Pill>{sourceEvidence.length} evidence item(s)</Pill>
-            <Pill>{claims.length} claim(s)</Pill>
-          </div>
+        <h2 className="mt-3 text-[30px] font-black tracking-[-0.055em] text-wk-text">
+          Think openly. Record carefully.
+        </h2>
+
+        <p className="mt-2 max-w-3xl text-[14px] leading-6 text-wk-text-muted">
+          Notes can stay uncertain. Findings should show what supports them
+          and what could still change.
+        </p>
+
+        <div className="mt-5 flex flex-wrap gap-2">
+          <Pill>{notes.length} notes</Pill>
+          <Pill>{findings.length} findings</Pill>
+          <Pill>{sourceMaterial.length} material items</Pill>
         </div>
       </section>
 
-      <div className="grid gap-3 md:grid-cols-4">
-        <EvidenceMetric label="Evidence" value={sourceEvidence.length} note="Material available for claim testing." />
-        <EvidenceMetric label="Claims" value={claims.length} note="Saved claim records in this inquiry." />
-        <EvidenceMetric label="Reviewable" value={reviewableClaims} note="Claims with workable or strong evidence." />
-        <EvidenceMetric label="Needs care" value={unsupportedClaims + contestedClaims} note="Unsupported, thin, or contested claims." />
-      </div>
+      {notice ? (
+        <div className="rounded-xl border border-wk-success/30 bg-wk-success-soft px-4 py-3 text-[12px] font-bold text-wk-text-muted">
+          {notice}
+        </div>
+      ) : null}
 
-      <div className="grid gap-5 xl:grid-cols-[minmax(0,0.95fr)_minmax(0,1.05fr)]">
-        <Panel eyebrow="1 · Build a claim" title="Write the claim, then attach evidence">
+      <div className="grid gap-5 xl:grid-cols-2">
+        <Panel eyebrow="Add a note" title="Save something worth remembering">
           <div className="space-y-4">
-            <label className="block">
-              <span className="mb-2 block text-[10px] font-black uppercase tracking-[0.12em] text-wk-text-faint">Claim</span>
+            <label>
+              <span className="mb-2 block text-[10px] font-black uppercase tracking-[0.12em] text-wk-text-faint">
+                Note type
+              </span>
+
+              <select
+                value={noteType}
+                onChange={(event) => setNoteType(event.target.value)}
+                className="w-full rounded-lg border border-wk-border bg-wk-bg px-3 py-2.5 text-[13px] font-bold text-wk-text"
+              >
+                {noteTypes.map((option) => (
+                  <option key={option}>{option}</option>
+                ))}
+              </select>
+            </label>
+
+            <label>
+              <span className="mb-2 block text-[10px] font-black uppercase tracking-[0.12em] text-wk-text-faint">
+                Note
+              </span>
+
               <textarea
-                value={claimText}
-                onChange={(event) => setClaimText(event.target.value)}
-                rows={4}
-                placeholder="What do we think is true, changing, connected, or worth testing?"
+                value={noteText}
+                onChange={(event) => setNoteText(event.target.value)}
+                rows={6}
+                placeholder="Write the observation, question, doubt, or reminder."
+                className="w-full resize-y rounded-xl border border-wk-border bg-wk-bg px-4 py-3 text-[14px] leading-6 text-wk-text outline-none focus:border-wk-brand"
+              />
+            </label>
+
+            <button
+              type="button"
+              disabled={noteText.trim().length < 3 || savingNote}
+              onClick={() => void saveNote()}
+              className="rounded-lg bg-wk-brand px-5 py-3 text-[13px] font-black text-wk-brand-on disabled:cursor-not-allowed disabled:opacity-40"
+            >
+              {savingNote ? "Saving..." : "Save Note"}
+            </button>
+          </div>
+        </Panel>
+
+        <Panel eyebrow="Add a finding" title="Record what the Inquiry can support">
+          <div className="space-y-4">
+            <label>
+              <span className="mb-2 block text-[10px] font-black uppercase tracking-[0.12em] text-wk-text-faint">
+                Finding
+              </span>
+
+              <textarea
+                value={findingText}
+                onChange={(event) => setFindingText(event.target.value)}
+                rows={5}
+                placeholder="What can the Inquiry currently stand behind?"
                 className="w-full resize-y rounded-xl border border-wk-border bg-wk-bg px-4 py-3 text-[14px] font-bold leading-6 text-wk-text outline-none focus:border-wk-brand"
               />
             </label>
 
-            <div className="grid gap-3 md:grid-cols-3">
-              <label className="block">
-                <span className="mb-2 block text-[10px] font-black uppercase tracking-[0.12em] text-wk-text-faint">Use</span>
+            <div className="grid gap-3 md:grid-cols-2">
+              <label>
+                <span className="mb-2 block text-[10px] font-black uppercase tracking-[0.12em] text-wk-text-faint">
+                  Kind
+                </span>
+
                 <select
-                  value={claimUse}
-                  onChange={(event) => setClaimUse(event.target.value)}
-                  className="w-full rounded-lg border border-wk-border bg-wk-bg px-3 py-3 text-[13px] font-bold text-wk-text outline-none focus:border-wk-brand"
+                  value={findingKind}
+                  onChange={(event) => setFindingKind(event.target.value)}
+                  className="w-full rounded-lg border border-wk-border bg-wk-bg px-3 py-2.5 text-[13px] font-bold text-wk-text"
                 >
-                  {claimUseOptions.map((option) => (
-                    <option key={option} value={option}>{option}</option>
+                  {findingKinds.map((option) => (
+                    <option key={option}>{option}</option>
                   ))}
                 </select>
               </label>
 
-              <label className="block">
-                <span className="mb-2 block text-[10px] font-black uppercase tracking-[0.12em] text-wk-text-faint">Confidence</span>
+              <label>
+                <span className="mb-2 block text-[10px] font-black uppercase tracking-[0.12em] text-wk-text-faint">
+                  Confidence
+                </span>
+
                 <select
                   value={confidence}
-                  onChange={(event) => setConfidence(event.target.value as Confidence)}
-                  className="w-full rounded-lg border border-wk-border bg-wk-bg px-3 py-3 text-[13px] font-bold text-wk-text outline-none focus:border-wk-brand"
+                  onChange={(event) =>
+                    setConfidence(event.target.value as Confidence)
+                  }
+                  className="w-full rounded-lg border border-wk-border bg-wk-bg px-3 py-2.5 text-[13px] font-bold text-wk-text"
                 >
                   <option>Low</option>
                   <option>Medium</option>
                   <option>High</option>
                 </select>
               </label>
-
-              <div className="rounded-lg border border-wk-border bg-wk-bg-subtle p-3">
-                <div className="text-[10px] font-black uppercase tracking-[0.12em] text-wk-text-faint">Live strength</div>
-                <div className="mt-2">
-                  <Pill tone={toneForStrength(liveStrength)}>{liveStrength}</Pill>
-                </div>
-              </div>
             </div>
 
-            <label className="block">
-              <span className="mb-2 block text-[10px] font-black uppercase tracking-[0.12em] text-wk-text-faint">Public wording candidate</span>
-              <textarea
-                value={publicWording}
-                onChange={(event) => setPublicWording(event.target.value)}
-                rows={3}
-                placeholder="Optional. How could this be phrased publicly without overstating it?"
-                className="w-full resize-y rounded-xl border border-wk-border bg-wk-bg px-4 py-3 text-[13px] leading-6 text-wk-text outline-none focus:border-wk-brand"
-              />
-            </label>
+            <label>
+              <span className="mb-2 block text-[10px] font-black uppercase tracking-[0.12em] text-wk-text-faint">
+                What could change this?
+              </span>
 
-            <label className="block">
-              <span className="mb-2 block text-[10px] font-black uppercase tracking-[0.12em] text-wk-text-faint">Limits, doubt, or what would change your mind</span>
               <textarea
                 value={caveat}
                 onChange={(event) => setCaveat(event.target.value)}
                 rows={3}
-                placeholder="What does this claim not prove yet? What needs another source?"
+                placeholder="Record the limit, doubt, contradiction, or missing source."
                 className="w-full resize-y rounded-xl border border-wk-border bg-wk-bg px-4 py-3 text-[13px] leading-6 text-wk-text outline-none focus:border-wk-brand"
               />
             </label>
 
-            <div className="rounded-xl border border-wk-border bg-wk-bg-subtle p-4">
-              <div className="flex flex-wrap items-center justify-between gap-3">
-                <div>
-                  <div className="text-[10px] font-black uppercase tracking-[0.12em] text-wk-text-faint">Attached evidence</div>
-                  <p className="mt-1 text-[12px] leading-5 text-wk-text-muted">
-                    Supports: {liveSummary.supports} · Weak: {liveSummary.weak} · Contradicts: {liveSummary.contradicts} · Background: {liveSummary.background} · Needs check: {liveSummary.needs}
-                  </p>
+            <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-wk-border bg-wk-bg-subtle p-4">
+              <div>
+                <div className="text-[10px] font-black uppercase tracking-[0.12em] text-wk-text-faint">
+                  Current support
                 </div>
-                <button
-                  type="button"
-                  disabled={!canSave}
-                  onClick={() => void saveClaim()}
-                  className="rounded-lg bg-wk-text px-5 py-3 text-[13px] font-black text-wk-bg transition disabled:cursor-not-allowed disabled:opacity-40"
-                >
-                  {saving ? "Saving..." : "Save claim"}
-                </button>
+                <div className="mt-2">
+                  <Pill tone={toneForStrength(liveStrength)}>
+                    {liveStrength}
+                  </Pill>
+                </div>
               </div>
 
-              {savedNotice ? (
-                <div className="mt-3 rounded-lg border border-wk-success/30 bg-wk-success-soft px-3 py-2 text-[12px] font-bold text-wk-text-muted">
-                  {savedNotice}
-                </div>
-              ) : null}
+              <button
+                type="button"
+                disabled={
+                  findingText.trim().length < 8 ||
+                  caveat.trim().length < 4 ||
+                  savingFinding
+                }
+                onClick={() => void saveFinding()}
+                className="rounded-lg bg-wk-text px-5 py-3 text-[13px] font-black text-wk-bg disabled:cursor-not-allowed disabled:opacity-40"
+              >
+                {savingFinding ? "Saving..." : "Save Finding"}
+              </button>
             </div>
           </div>
         </Panel>
-
-        <Panel eyebrow="2 · Evidence picker" title="Attach evidence honestly">
-          {!sourceEvidence.length ? (
-            <EmptyState
-              title="No evidence yet"
-              body="Add WAKILISHA records or other evidence first. You can still save an unsupported claim later, but evidence makes it useful."
-            />
-          ) : (
-            <div className="max-h-[760px] space-y-3 overflow-y-auto pr-1">
-              {sourceEvidence.map((item) => {
-                const selected = selectedEvidenceIds.includes(item.id);
-                const relation = relations[item.id] ?? "supports";
-
-                return (
-                  <article
-                    key={item.id}
-                    className={cx(
-                      "rounded-xl border p-4 transition",
-                      selected ? "border-wk-brand bg-wk-brand-soft shadow-sm" : "border-wk-border bg-wk-bg",
-                    )}
-                  >
-                    <div className="flex flex-wrap items-start justify-between gap-3">
-                      <button type="button" onClick={() => toggleEvidence(item.id)} className="min-w-0 flex-1 text-left">
-                        <div className="flex flex-wrap items-center gap-2">
-                          <Pill tone={selected ? "brand" : "neutral"}>{selected ? "Attached" : "Attach"}</Pill>
-                          <Pill>{item.kind}</Pill>
-                          <Pill tone={item.reviewState === "Draft" ? "neutral" : "warning"}>{item.reviewState}</Pill>
-                        </div>
-                        <h3 className="mt-3 text-[15px] font-black leading-5 text-wk-text">{item.title}</h3>
-                        <p className="mt-2 line-clamp-3 text-[12px] leading-5 text-wk-text-muted">{item.summary}</p>
-                      </button>
-
-                      {selected ? (
-                        <select
-                          value={relation}
-                          onChange={(event) =>
-                            setRelations((current) => ({
-                              ...current,
-                              [item.id]: event.target.value as ClaimRelation,
-                            }))
-                          }
-                          className="rounded-lg border border-wk-border bg-wk-surface px-3 py-2 text-[12px] font-black text-wk-text outline-none focus:border-wk-brand"
-                        >
-                          {relationOptions.map((option) => (
-                            <option key={option} value={option}>{option}</option>
-                          ))}
-                        </select>
-                      ) : null}
-                    </div>
-
-                    {selected ? (
-                      <div className="mt-3">
-                        <Pill tone={relationTone(relation)}>{relation}</Pill>
-                      </div>
-                    ) : null}
-                  </article>
-                );
-              })}
-            </div>
-          )}
-        </Panel>
       </div>
 
-      <Panel eyebrow="3 · Claim board" title="Saved claims">
-        {!claims.length ? (
+      <Panel eyebrow="Supporting material" title="What supports or challenges the finding?">
+        {!sourceMaterial.length ? (
           <EmptyState
-            title="No claims shaped yet"
-            body="Create the first claim above. Unsupported claims are allowed, but they will be marked as needing evidence."
+            title="No material available"
+            body="Add material before recording a supported finding."
           />
         ) : (
           <div className="grid gap-3 lg:grid-cols-2">
-            {claims.map((claim) => {
-              const summary = relationSummary(claim.links);
+            {sourceMaterial.map((item) => {
+              const selected = selectedMaterialIds.includes(item.id);
+              const relation = relations[item.id] ?? "supports";
 
               return (
-                <article key={claim.id} className="rounded-xl border border-wk-border bg-wk-bg p-4">
-                  <div className="flex flex-wrap items-center gap-2">
-                    <Pill tone="brand">{claim.claimUse}</Pill>
-                    <Pill tone={toneForStrength(claim.strength)}>{claim.strength}</Pill>
-                    <Pill>{claim.reviewState}</Pill>
-                  </div>
-                  <h3 className="mt-3 text-[16px] font-black leading-6 text-wk-text">{claim.claimText}</h3>
-                  {claim.publicWording ? (
-                    <p className="mt-2 rounded-lg border border-wk-border bg-wk-surface px-3 py-2 text-[12px] leading-5 text-wk-text-muted">
-                      Public wording: {claim.publicWording}
-                    </p>
-                  ) : null}
-                  <p className="mt-3 text-[12px] leading-5 text-wk-text-muted">{claim.caveat}</p>
-                  <div className="mt-3 flex flex-wrap gap-2">
-                    <Pill>{claim.links.length} evidence link(s)</Pill>
-                    <Pill tone={summary.contradicts ? "warning" : "neutral"}>{summary.contradicts} contradiction(s)</Pill>
-                    <Pill>{summary.supports + summary.weak} support signal(s)</Pill>
-                  </div>
+                <article
+                  key={item.id}
+                  className={cx(
+                    "rounded-xl border p-4",
+                    selected
+                      ? "border-wk-brand bg-wk-brand-soft"
+                      : "border-wk-border bg-wk-bg",
+                  )}
+                >
+                  <button
+                    type="button"
+                    onClick={() => toggleMaterial(item.id)}
+                    className="w-full text-left"
+                  >
+                    <div className="flex flex-wrap items-center gap-2">
+                      <Pill tone={selected ? "brand" : "neutral"}>
+                        {selected ? "Attached" : "Attach"}
+                      </Pill>
+                      <Pill>{item.kind}</Pill>
+                    </div>
 
-                  {claim.links.length ? (
-                    <div className="mt-3 space-y-2">
-                      {claim.links.slice(0, 4).map((link) => (
-                        <div key={`${claim.id}-${link.evidenceId}`} className="rounded-lg border border-wk-border bg-wk-surface px-3 py-2">
-                          <div className="flex flex-wrap items-center gap-2">
-                            <Pill tone={relationTone(link.relation)}>{link.relation}</Pill>
-                            <span className="text-[12px] font-black text-wk-text">{link.title}</span>
-                          </div>
-                        </div>
-                      ))}
+                    <h3 className="mt-3 text-[14px] font-black text-wk-text">
+                      {item.title}
+                    </h3>
+
+                    <p className="mt-2 line-clamp-3 text-[12px] leading-5 text-wk-text-muted">
+                      {item.summary}
+                    </p>
+                  </button>
+
+                  {selected ? (
+                    <div className="mt-3">
+                      <select
+                        value={relation}
+                        onChange={(event) =>
+                          setRelations((current) => ({
+                            ...current,
+                            [item.id]: event.target
+                              .value as EvidenceRelation,
+                          }))
+                        }
+                        className="w-full rounded-lg border border-wk-border bg-wk-surface px-3 py-2 text-[12px] font-bold text-wk-text"
+                      >
+                        {relationOptions.map((option) => (
+                          <option key={option}>{option}</option>
+                        ))}
+                      </select>
+
+                      <div className="mt-2">
+                        <Pill tone={relationTone(relation)}>
+                          {relation}
+                        </Pill>
+                      </div>
                     </div>
                   ) : null}
                 </article>
@@ -580,6 +711,81 @@ export function InstituteClaimsWorkspace({ draft, addEvidence }: Props) {
           </div>
         )}
       </Panel>
+
+      <div className="grid gap-5 xl:grid-cols-2">
+        <Panel eyebrow="Notes" title="Working thoughts">
+          {!notes.length ? (
+            <EmptyState
+              title="No notes yet"
+              body="Save observations, questions, doubts, and reminders here."
+            />
+          ) : (
+            <div className="space-y-3">
+              {notes.map((note) => (
+                <article
+                  key={note.id}
+                  className="rounded-xl border border-wk-border bg-wk-bg p-4"
+                >
+                  <Pill tone="brand">{note.noteType}</Pill>
+
+                  <p className="mt-3 text-[13px] leading-6 text-wk-text">
+                    {note.text}
+                  </p>
+
+                  <p className="mt-3 text-[11px] text-wk-text-faint">
+                    {new Date(note.createdAt).toLocaleString()}
+                  </p>
+                </article>
+              ))}
+            </div>
+          )}
+        </Panel>
+
+        <Panel eyebrow="Findings" title="What the Inquiry can currently support">
+          {!findings.length ? (
+            <EmptyState
+              title="No findings yet"
+              body="Record a finding when material gives the Inquiry something it can stand behind."
+            />
+          ) : (
+            <div className="space-y-3">
+              {findings.map((finding) => (
+                <article
+                  key={finding.id}
+                  className="rounded-xl border border-wk-border bg-wk-bg p-4"
+                >
+                  <div className="flex flex-wrap gap-2">
+                    <Pill tone="brand">{finding.kind}</Pill>
+                    <Pill tone={toneForStrength(finding.strength)}>
+                      {finding.strength}
+                    </Pill>
+                    <Pill>{finding.confidence} confidence</Pill>
+                  </div>
+
+                  <h3 className="mt-3 text-[15px] font-black leading-6 text-wk-text">
+                    {finding.text}
+                  </h3>
+
+                  {finding.caveat ? (
+                    <p className="mt-3 text-[12px] leading-5 text-wk-text-muted">
+                      What could change this: {finding.caveat}
+                    </p>
+                  ) : null}
+
+                  <div className="mt-3 flex flex-wrap gap-2">
+                    <Pill>{finding.links.length} supporting links</Pill>
+                    <Pill>{finding.reviewState}</Pill>
+                  </div>
+
+                  <p className="mt-3 text-[11px] text-wk-text-faint">
+                    {new Date(finding.createdAt).toLocaleString()}
+                  </p>
+                </article>
+              ))}
+            </div>
+          )}
+        </Panel>
+      </div>
     </div>
   );
 }
