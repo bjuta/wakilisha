@@ -1,10 +1,12 @@
 import { useEffect, useMemo, useState } from "react";
 import { WkIcon } from "@/components/design-system/Icon";
+import { RelationshipEvidenceCreator } from "./RelationshipEvidenceCreator";
 import {
   completeRelationshipReview,
   draftRelationshipExplanation,
   loadRelationshipReviewContext,
   type RelationshipReviewContext,
+  type ReviewEvidenceItem,
 } from "@/services/registryRelationshipReviewService";
 
 function humanize(value: string | null | undefined) {
@@ -70,8 +72,22 @@ export function RelationshipReviewDrawer({
     publicEvidence: Boolean(selectedEvidence?.reviewStatus === "approved" && selectedEvidence.retrievalStatus === "default_retrieval"),
   };
 
+  const publicationChecks: Array<[string, boolean]> = [
+    ["Both identities resolved", checks.endpoints],
+    ["Evidence selected", checks.evidence],
+    ["Explanation reviewed", checks.explanation],
+    ["Evidence reviewed", checks.reviewedEvidence],
+    ["Evidence cleared for public retrieval", checks.publicEvidence],
+  ];
+
   const canApprove = checks.endpoints && checks.evidence && checks.explanation && checks.reviewedEvidence && reviewReason.trim().length > 0;
   const canPublish = canApprove && checks.publicEvidence;
+
+  const handleEvidenceCreated = (item: ReviewEvidenceItem) => {
+    setContext((current) => current ? { ...current, evidence: [item, ...current.evidence] } : current);
+    setEvidenceId(item.id);
+    setError(null);
+  };
 
   const handleDraft = async () => {
     if (!evidenceId) {
@@ -146,6 +162,7 @@ export function RelationshipReviewDrawer({
               <section>
                 <h3 className="text-[13px] font-black text-wk-text">Supporting Evidence</h3>
                 <p className="mt-1 text-[12px] text-wk-text-muted">Choose the reviewed source that proves this relationship.</p>
+                <RelationshipEvidenceCreator onCreated={handleEvidenceCreated} />
                 <div className="mt-3 space-y-2">
                   {context.evidence.map((item) => (
                     <label key={item.id} className={`block cursor-pointer rounded-xl border p-3 ${evidenceId === item.id ? "border-wk-brand bg-wk-brand-soft" : "border-wk-border bg-wk-surface-raised"}`}>
@@ -163,7 +180,7 @@ export function RelationshipReviewDrawer({
                       </div>
                     </label>
                   ))}
-                  {context.evidence.length === 0 ? <div className="rounded-xl border border-wk-warning/20 bg-wk-warning/10 px-4 py-3 text-[12px] text-wk-warning">No reviewed evidence is available yet.</div> : null}
+                  {context.evidence.length === 0 ? <div className="rounded-xl border border-wk-warning/20 bg-wk-warning/10 px-4 py-3 text-[12px] text-wk-warning">No reviewed evidence is available yet. Add the source you checked above.</div> : null}
                 </div>
               </section>
 
@@ -195,7 +212,7 @@ export function RelationshipReviewDrawer({
               <section className="rounded-xl border border-wk-border bg-wk-surface-raised p-4">
                 <h3 className="text-[13px] font-black text-wk-text">Publication Check</h3>
                 <div className="mt-3 grid gap-2 sm:grid-cols-2">
-                  {[['Both identities resolved', checks.endpoints], ['Evidence selected', checks.evidence], ['Explanation reviewed', checks.explanation], ['Evidence reviewed', checks.reviewedEvidence], ['Evidence cleared for public retrieval', checks.publicEvidence]].map(([label, passed]) => <div key={String(label)} className="flex items-center gap-2 text-[12px]"><WkIcon name={passed ? "Check" : "Circle"} size={14} className={passed ? "text-wk-success" : "text-wk-text-faint"} /><span className={passed ? "text-wk-text" : "text-wk-text-muted"}>{String(label)}</span></div>)}
+                  {publicationChecks.map(([label, passed]) => <div key={label} className="flex items-center gap-2 text-[12px]"><WkIcon name={passed ? "Check" : "Circle"} size={14} className={passed ? "text-wk-success" : "text-wk-text-faint"} /><span className={passed ? "text-wk-text" : "text-wk-text-muted"}>{label}</span></div>)}
                 </div>
               </section>
             </>
