@@ -58,13 +58,14 @@ export function RelationshipReviewDrawer({
     endpoints: Boolean(row.source_entity_id && row.target_entity_id),
     evidence: Boolean(evidenceTitle.trim() && evidenceSummary.trim()),
     explanation: Boolean(plainReason.trim()),
+    reviewReason: Boolean(reviewReason.trim()),
     approved: decision === "approved",
     publicSafe,
-  }), [decision, evidenceSummary, evidenceTitle, plainReason, publicSafe, row.source_entity_id, row.target_entity_id]);
+  }), [decision, evidenceSummary, evidenceTitle, plainReason, publicSafe, reviewReason, row.source_entity_id, row.target_entity_id]);
 
   const canSave = gates.endpoints
-    && Boolean(reviewReason.trim())
-    && Boolean(plainReason.trim())
+    && gates.reviewReason
+    && gates.explanation
     && (decision === "rejected" || decision === "disputed" || gates.evidence)
     && (!publicSafe || decision === "approved");
 
@@ -78,6 +79,7 @@ export function RelationshipReviewDrawer({
       setEvidenceSummary(result.evidenceSummary);
       setEvidenceMainClaim(result.evidenceMainClaim);
       setPlainReason(result.publicExplanation);
+      setReviewReason(result.reviewReason);
       setReliability(result.reliability);
       setConfidence(result.confidence);
       setUncertainty(result.uncertaintyNote);
@@ -121,8 +123,8 @@ export function RelationshipReviewDrawer({
   };
 
   return (
-    <div className="fixed inset-0 z-50 bg-black/40" role="dialog" aria-modal="true">
-      <div className="absolute inset-y-0 right-0 flex w-full max-w-2xl flex-col border-l border-wk-border bg-wk-surface shadow-2xl">
+    <div className="fixed inset-0 z-50 overflow-y-auto bg-black/40" role="dialog" aria-modal="true">
+      <div className="ml-auto w-full max-w-2xl border-l border-wk-border bg-wk-surface shadow-2xl">
         <div className="flex items-start justify-between gap-4 border-b border-wk-border p-5">
           <div>
             <div className="text-[11px] font-black uppercase tracking-wide text-wk-brand">Relationship Review</div>
@@ -134,14 +136,14 @@ export function RelationshipReviewDrawer({
           </button>
         </div>
 
-        <div className="flex-1 space-y-6 overflow-y-auto p-5">
+        <div className="space-y-6 p-5">
           {error ? <div className="rounded-xl border border-wk-danger/20 bg-wk-danger/10 px-4 py-3 text-[12px] font-semibold text-wk-danger">{error}</div> : null}
 
           <section className="rounded-xl border border-wk-brand/20 bg-wk-brand-soft p-4">
             <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
               <div>
                 <h3 className="text-[14px] font-black text-wk-text">Start With A Complete Draft</h3>
-                <p className="mt-1 text-[12px] text-wk-text-muted">The Culture Context Engine will draft the evidence record and public explanation from the Registry context.</p>
+                <p className="mt-1 text-[12px] text-wk-text-muted">The Culture Context Engine drafts every required field from the available relationship context.</p>
               </div>
               <button onClick={handleDraft} disabled={drafting} className="inline-flex items-center justify-center gap-2 rounded-lg bg-wk-brand px-4 py-2.5 text-[12px] font-black text-wk-brand-on disabled:opacity-50">
                 <WkIcon name={drafting ? "Loader2" : "Sparkles"} size={14} className={drafting ? "animate-spin" : ""} />
@@ -192,7 +194,7 @@ export function RelationshipReviewDrawer({
           <section className="space-y-4 border-t border-wk-border pt-5">
             <div>
               <h3 className="text-[14px] font-black text-wk-text">Public Explanation</h3>
-              <p className="mt-1 text-[12px] text-wk-text-muted">Review the drafted sentence. It should state what happened without adding meaning the evidence does not support.</p>
+              <p className="mt-1 text-[12px] text-wk-text-muted">Review the drafted sentence. It should state what happened without assigning unverified roles.</p>
             </div>
             <textarea value={plainReason} onChange={(event) => setPlainReason(event.target.value)} rows={4} className="w-full resize-none rounded-lg border border-wk-border bg-wk-surface-raised px-3 py-2.5 text-[13px] text-wk-text outline-none focus:border-wk-brand" />
             {uncertainty ? <p className="text-[11px] text-wk-text-muted">Check before approval: {uncertainty}</p> : null}
@@ -226,6 +228,7 @@ export function RelationshipReviewDrawer({
             <Gate pass={gates.endpoints}>Both artists are resolved</Gate>
             <Gate pass={gates.evidence}>Evidence is ready</Gate>
             <Gate pass={gates.explanation}>Public explanation is ready</Gate>
+            <Gate pass={gates.reviewReason}>Review reason is ready</Gate>
             <Gate pass={gates.approved}>Human decision is approved</Gate>
             <Gate pass={gates.publicSafe}>Public use is confirmed</Gate>
           </section>
