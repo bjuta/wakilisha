@@ -31,11 +31,9 @@ interface PublicArtistRelationshipRow {
 }
 
 export async function getPublicArtistRelationships(artistId: string): Promise<PublicArtistRelationship[]> {
-  const { data, error } = await supabase
-    .from("registry_public_artist_relationships")
-    .select("relationship_id,direction,related_entity_id,related_entity_type,related_entity_name,related_entity_slug,related_entity_image_url,related_entity_url,relationship_type,relationship_role,plain_reason,evidence_count")
-    .eq("artist_id", artistId)
-    .order("reviewed_at", { ascending: false });
+  const { data, error } = await supabase.rpc("get_public_artist_relationships", {
+    p_artist_id: artistId,
+  });
 
   if (error) throw error;
 
