@@ -47,7 +47,7 @@ export function ArtistRelationshipsSection({
         <p className="mb-2 text-[11px] font-black uppercase tracking-[0.16em] text-[var(--wk-brand)]">Connected Through The Music</p>
         <h2 id="artist-relationships-title" className="wk-h-section">How {artistName} connects</h2>
         <p className="mt-2 max-w-2xl text-[14px] leading-6 text-[var(--wk-text-muted)]">
-          Reviewed links from the WAKILISHA knowledge layer, shown only when the relationship has supporting evidence.
+          Verified connections supported by reviewed evidence.
         </p>
       </div>
 
