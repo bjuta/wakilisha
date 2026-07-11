@@ -5,6 +5,7 @@ import {
   type InstituteReviewPacketStatus,
 } from "@/services/institute/instituteReviewDeskService";
 import { ArticleEditorWorkspace } from "@/pages/admin/content/articles/detail/ArticleEditorWorkspace";
+import { useAdminUser } from "@/hooks/useAdminUser";
 import { WakilishaRecordWorkspace } from "./WakilishaRecordWorkspace";
 import { InstituteClaimsWorkspace } from "./InstituteClaimsWorkspace";
 import { InstitutePlaylistWorkspace } from "./InstitutePlaylistWorkspace";
@@ -3109,7 +3110,11 @@ function EvidenceScreen({
   );
 }
 
-function ReviewDeskScreen() {
+function ReviewDeskScreen({
+  canManageReview,
+}: {
+  canManageReview: boolean;
+}) {
   const [packets, setPackets] = useState<InstituteReviewPacket[]>([]);
   const [activeId, setActiveId] = useState<string | null>(null);
   const [editorNotes, setEditorNotes] = useState("");
@@ -3184,7 +3189,7 @@ function ReviewDeskScreen() {
   }, [activePacket?.id]);
 
   const updateStatus = async (status: InstituteReviewPacketStatus) => {
-    if (!activePacket || savingStatus) return;
+    if (!canManageReview || !activePacket || savingStatus) return;
 
     setSavingStatus(status);
     setError(null);
@@ -3537,11 +3542,18 @@ function ReviewDeskScreen() {
             ) : null}
 
             <Panel eyebrow="Editor decision" title="Decision">
+              {!canManageReview ? (
+                <div className="mb-4 rounded-xl border border-wk-border bg-wk-bg px-4 py-3 text-[12px] leading-5 text-wk-text-muted">
+                  You can inspect this submission, but you do not have permission to make review decisions.
+                </div>
+              ) : null}
+
               <label className="block">
                 <span className="mb-2 block text-[10px] font-black uppercase tracking-[0.12em] text-wk-text-faint">Editor notes</span>
                 <textarea
                   value={editorNotes}
                   onChange={(event) => setEditorNotes(event.target.value)}
+                  readOnly={!canManageReview}
                   rows={6}
                   placeholder="What should happen next? What needs revision? What is approved?"
                   className="w-full resize-y rounded-lg border border-wk-border bg-wk-bg px-3 py-2.5 text-[13px] leading-6 text-wk-text outline-none focus:border-wk-brand"
@@ -3549,19 +3561,19 @@ function ReviewDeskScreen() {
               </label>
 
               <div className="mt-4 flex flex-wrap gap-2">
-                <button type="button" disabled={Boolean(savingStatus)} onClick={() => void updateStatus("under_review")} className={actionClass}>
+                <button type="button" disabled={!canManageReview || Boolean(savingStatus)} onClick={() => void updateStatus("under_review")} className={actionClass}>
                   Start review
                 </button>
-                <button type="button" disabled={Boolean(savingStatus)} onClick={() => void updateStatus("changes_requested")} className={actionClass}>
+                <button type="button" disabled={!canManageReview || Boolean(savingStatus)} onClick={() => void updateStatus("changes_requested")} className={actionClass}>
                   Request changes
                 </button>
-                <button type="button" disabled={Boolean(savingStatus)} onClick={() => void updateStatus("approved_for_promotion")} className={actionClass}>
+                <button type="button" disabled={!canManageReview || Boolean(savingStatus)} onClick={() => void updateStatus("approved_for_promotion")} className={actionClass}>
                   Approve
                 </button>
-                <button type="button" disabled={Boolean(savingStatus)} onClick={() => void updateStatus("accepted_for_internal_memory")} className={actionClass}>
+                <button type="button" disabled={!canManageReview || Boolean(savingStatus)} onClick={() => void updateStatus("accepted_for_internal_memory")} className={actionClass}>
                   Keep internally
                 </button>
-                <button type="button" disabled={Boolean(savingStatus)} onClick={() => void updateStatus("rejected")} className={actionClass}>
+                <button type="button" disabled={!canManageReview || Boolean(savingStatus)} onClick={() => void updateStatus("rejected")} className={actionClass}>
                   Reject
                 </button>
               </div>
@@ -3925,6 +3937,9 @@ function readInquirySection(value: string | null): InquirySection {
 
 export default function NativeInstituteInquiryInterface() {
   const [searchParams, setSearchParams] = useSearchParams();
+  const adminUser = useAdminUser();
+  const canViewReview = adminUser.can("view_review_queue");
+  const canManageReview = adminUser.can("manage_review_queue");
 
   useEffect(() => {
     stripLegacyInstituteHash();
@@ -3942,6 +3957,38 @@ export default function NativeInstituteInquiryInterface() {
   });
 
   const { anchors, loading: anchorsLoading, error: anchorsError } = useInstituteAnchorSearch(state.selectedAnchorCategory, state.anchorSearch);
+
+  useEffect(() => {
+    if (adminUser.loading || canViewReview || state.screen !== "review") {
+      return;
+    }
+
+    const nextScreen: InquiryScreen = state.activeId ? "inquiry" : "home";
+    const nextParams = new URLSearchParams(searchParams);
+
+    nextParams.set("screen", nextScreen);
+
+    if (state.activeId) {
+      nextParams.set("section", "overview");
+    } else {
+      nextParams.delete("section");
+    }
+
+    setRawState((current) => ({
+      ...current,
+      screen: nextScreen,
+      section: "overview",
+    }));
+
+    setSearchParams(nextParams, { replace: true });
+  }, [
+    adminUser.loading,
+    canViewReview,
+    searchParams,
+    setSearchParams,
+    state.activeId,
+    state.screen,
+  ]);
 
   useEffect(() => {
     const nextScreen = readInstituteScreen(searchParams.get("screen"));
@@ -4051,8 +4098,8 @@ export default function NativeInstituteInquiryInterface() {
             </>
           ) : state.screen === "claims" ? (
             <InstituteClaimsWorkspace draft={active} addEvidence={addEvidence} />
-          ) : state.screen === "review" ? (
-            <ReviewDeskScreen />
+          ) : state.screen === "review" && canViewReview ? (
+            <ReviewDeskScreen canManageReview={canManageReview} />
           ) : state.screen === "clinic" ? (
             <ClinicScreen draft={active} onQuestionChanged={reloadInquiries} />
           ) : state.screen === "learned" ? (
