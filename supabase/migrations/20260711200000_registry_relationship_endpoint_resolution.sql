@@ -25,7 +25,7 @@ from public.registry_entity_relationships r
 left join lateral (
   select
     count(*)::integer as match_count,
-    min(i.entity_id) as candidate_entity_id,
+    min(i.entity_id::text)::uuid as candidate_entity_id,
     min(i.entity_type) as candidate_entity_type,
     min(i.slug) as candidate_slug
   from public.registry_entity_index i
@@ -54,7 +54,7 @@ from public.registry_entity_relationships r
 left join lateral (
   select
     count(*)::integer as match_count,
-    min(i.entity_id) as candidate_entity_id,
+    min(i.entity_id::text)::uuid as candidate_entity_id,
     min(i.entity_type) as candidate_entity_type,
     min(i.slug) as candidate_slug
   from public.registry_entity_index i
