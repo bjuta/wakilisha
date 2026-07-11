@@ -88,6 +88,17 @@ export interface RelationshipReviewInput {
   publicSafe: boolean;
 }
 
+export interface RelationshipReviewDraft {
+  evidenceTitle: string;
+  evidenceType: string;
+  evidenceSummary: string;
+  evidenceMainClaim: string;
+  publicExplanation: string;
+  uncertaintyNote: string;
+  reliability: "low" | "medium" | "high";
+  confidence: "low" | "medium" | "high";
+}
+
 function throwQueryError(error: { message: string } | null, label: string) {
   if (error) throw new Error(`${label}: ${error.message}`);
 }
@@ -157,29 +168,37 @@ export async function completeRelationshipReview(input: RelationshipReviewInput)
   return data;
 }
 
-export async function draftRelationshipExplanation(input: {
-  relationshipId: string;
-  evidenceTitle: string;
-  evidenceType: string;
-  evidenceSummary: string;
-  evidenceMainClaim: string;
-}): Promise<{ draft: string; uncertaintyNote: string }> {
+export async function draftRelationshipReview(relationshipId: string): Promise<RelationshipReviewDraft> {
   const { data, error } = await supabase.functions.invoke("registry-relationship-context", {
-    body: {
-      relationshipId: input.relationshipId,
-      evidenceTitle: input.evidenceTitle.trim(),
-      evidenceType: input.evidenceType,
-      evidenceSummary: input.evidenceSummary.trim(),
-      evidenceMainClaim: input.evidenceMainClaim.trim(),
-    },
+    body: { relationshipId },
   });
-  if (error) throw new Error("The Culture Context Engine could not finish this draft.");
-  const payload = data as { ok?: boolean; data?: { draft?: string; uncertainty_note?: string }; error?: string } | null;
-  if (!payload?.ok || !payload.data?.draft) {
-    throw new Error(payload?.error || "The Culture Context Engine returned no draft.");
+  if (error) throw new Error("The Culture Context Engine could not finish this review draft.");
+  const payload = data as {
+    ok?: boolean;
+    data?: {
+      evidence_title?: string;
+      evidence_type?: string;
+      evidence_summary?: string;
+      evidence_main_claim?: string;
+      public_explanation?: string;
+      uncertainty_note?: string;
+      reliability?: "low" | "medium" | "high";
+      confidence?: "low" | "medium" | "high";
+    };
+    error?: string;
+  } | null;
+  const draft = payload?.data;
+  if (!payload?.ok || !draft?.evidence_title || !draft.evidence_summary || !draft.public_explanation) {
+    throw new Error(payload?.error || "The Culture Context Engine returned an incomplete review draft.");
   }
   return {
-    draft: payload.data.draft,
-    uncertaintyNote: payload.data.uncertainty_note ?? "",
+    evidenceTitle: draft.evidence_title,
+    evidenceType: draft.evidence_type || "track_metadata",
+    evidenceSummary: draft.evidence_summary,
+    evidenceMainClaim: draft.evidence_main_claim || "",
+    publicExplanation: draft.public_explanation,
+    uncertaintyNote: draft.uncertainty_note || "",
+    reliability: draft.reliability || "medium",
+    confidence: draft.confidence || "medium",
   };
 }

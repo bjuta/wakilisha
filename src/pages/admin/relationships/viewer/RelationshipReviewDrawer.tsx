@@ -2,7 +2,7 @@ import { useMemo, useState } from "react";
 import { WkIcon } from "@/components/design-system/Icon";
 import {
   completeRelationshipReview,
-  draftRelationshipExplanation,
+  draftRelationshipReview,
   type ConsolidationRow,
   type RelationshipReviewInput,
 } from "@/services/registryKnowledgeReviewService";
@@ -38,12 +38,12 @@ export function RelationshipReviewDrawer({
   onComplete: (message: string) => Promise<void>;
 }) {
   const [evidenceTitle, setEvidenceTitle] = useState("");
-  const [evidenceType, setEvidenceType] = useState("article");
+  const [evidenceType, setEvidenceType] = useState("track_metadata");
   const [sourceUrl, setSourceUrl] = useState("");
   const [evidenceSummary, setEvidenceSummary] = useState("");
   const [evidenceMainClaim, setEvidenceMainClaim] = useState("");
-  const [reliability, setReliability] = useState("high");
-  const [confidence, setConfidence] = useState("high");
+  const [reliability, setReliability] = useState("medium");
+  const [confidence, setConfidence] = useState("medium");
   const [plainReason, setPlainReason] = useState(row.plain_reason ?? "");
   const [reviewReason, setReviewReason] = useState("");
   const [decision, setDecision] = useState<RelationshipReviewInput["nextReviewStatus"]>("pending_review");
@@ -52,13 +52,14 @@ export function RelationshipReviewDrawer({
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [uncertainty, setUncertainty] = useState("");
+  const [drafted, setDrafted] = useState(false);
 
   const gates = useMemo(() => ({
     endpoints: Boolean(row.source_entity_id && row.target_entity_id),
     evidence: Boolean(evidenceTitle.trim() && evidenceSummary.trim()),
     explanation: Boolean(plainReason.trim()),
     approved: decision === "approved",
-    publicSafe: publicSafe,
+    publicSafe,
   }), [decision, evidenceSummary, evidenceTitle, plainReason, publicSafe, row.source_entity_id, row.target_entity_id]);
 
   const canSave = gates.endpoints
@@ -71,17 +72,18 @@ export function RelationshipReviewDrawer({
     setDrafting(true);
     setError(null);
     try {
-      const result = await draftRelationshipExplanation({
-        relationshipId: row.relationship_id,
-        evidenceTitle,
-        evidenceType,
-        evidenceSummary,
-        evidenceMainClaim,
-      });
-      setPlainReason(result.draft);
+      const result = await draftRelationshipReview(row.relationship_id);
+      setEvidenceTitle(result.evidenceTitle);
+      setEvidenceType(result.evidenceType);
+      setEvidenceSummary(result.evidenceSummary);
+      setEvidenceMainClaim(result.evidenceMainClaim);
+      setPlainReason(result.publicExplanation);
+      setReliability(result.reliability);
+      setConfidence(result.confidence);
       setUncertainty(result.uncertaintyNote);
+      setDrafted(true);
     } catch (draftError) {
-      setError(draftError instanceof Error ? draftError.message : "The Culture Context Engine could not draft the explanation.");
+      setError(draftError instanceof Error ? draftError.message : "The Culture Context Engine could not draft this review.");
     } finally {
       setDrafting(false);
     }
@@ -135,10 +137,23 @@ export function RelationshipReviewDrawer({
         <div className="flex-1 space-y-6 overflow-y-auto p-5">
           {error ? <div className="rounded-xl border border-wk-danger/20 bg-wk-danger/10 px-4 py-3 text-[12px] font-semibold text-wk-danger">{error}</div> : null}
 
+          <section className="rounded-xl border border-wk-brand/20 bg-wk-brand-soft p-4">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+              <div>
+                <h3 className="text-[14px] font-black text-wk-text">Start With A Complete Draft</h3>
+                <p className="mt-1 text-[12px] text-wk-text-muted">The Culture Context Engine will draft the evidence record and public explanation from the Registry context.</p>
+              </div>
+              <button onClick={handleDraft} disabled={drafting} className="inline-flex items-center justify-center gap-2 rounded-lg bg-wk-brand px-4 py-2.5 text-[12px] font-black text-wk-brand-on disabled:opacity-50">
+                <WkIcon name={drafting ? "Loader2" : "Sparkles"} size={14} className={drafting ? "animate-spin" : ""} />
+                {drafting ? "Drafting Full Review" : drafted ? "Redraft Full Review" : "Draft Full Review"}
+              </button>
+            </div>
+          </section>
+
           <section className="space-y-4">
             <div>
               <h3 className="text-[14px] font-black text-wk-text">Evidence</h3>
-              <p className="mt-1 text-[12px] text-wk-text-muted">Add the source that proves this relationship.</p>
+              <p className="mt-1 text-[12px] text-wk-text-muted">Review and correct the drafted source record before saving.</p>
             </div>
             <div className="grid gap-4 sm:grid-cols-2">
               <label className="block sm:col-span-2">
@@ -152,7 +167,7 @@ export function RelationshipReviewDrawer({
                 </select>
               </label>
               <label className="block">
-                <span className="mb-1.5 block text-[11px] font-bold text-wk-text-muted">Source URL</span>
+                <span className="mb-1.5 block text-[11px] font-bold text-wk-text-muted">Source URL <span className="font-normal">(optional)</span></span>
                 <input value={sourceUrl} onChange={(event) => setSourceUrl(event.target.value)} placeholder="https://" className="w-full rounded-lg border border-wk-border bg-wk-surface-raised px-3 py-2.5 text-[13px] text-wk-text outline-none focus:border-wk-brand" />
               </label>
               <label className="block sm:col-span-2">
@@ -160,7 +175,7 @@ export function RelationshipReviewDrawer({
                 <textarea value={evidenceSummary} onChange={(event) => setEvidenceSummary(event.target.value)} rows={4} className="w-full resize-none rounded-lg border border-wk-border bg-wk-surface-raised px-3 py-2.5 text-[13px] text-wk-text outline-none focus:border-wk-brand" />
               </label>
               <label className="block sm:col-span-2">
-                <span className="mb-1.5 block text-[11px] font-bold text-wk-text-muted">Main Claim <span className="font-normal">(optional)</span></span>
+                <span className="mb-1.5 block text-[11px] font-bold text-wk-text-muted">Main Claim</span>
                 <input value={evidenceMainClaim} onChange={(event) => setEvidenceMainClaim(event.target.value)} className="w-full rounded-lg border border-wk-border bg-wk-surface-raised px-3 py-2.5 text-[13px] text-wk-text outline-none focus:border-wk-brand" />
               </label>
               <label className="block">
@@ -175,15 +190,9 @@ export function RelationshipReviewDrawer({
           </section>
 
           <section className="space-y-4 border-t border-wk-border pt-5">
-            <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-              <div>
-                <h3 className="text-[14px] font-black text-wk-text">Public Explanation</h3>
-                <p className="mt-1 text-[12px] text-wk-text-muted">State what happened. Keep the sentence factual.</p>
-              </div>
-              <button onClick={handleDraft} disabled={drafting || !evidenceTitle.trim() || !evidenceSummary.trim()} className="inline-flex items-center justify-center gap-2 rounded-lg border border-wk-brand px-3 py-2 text-[12px] font-black text-wk-brand disabled:opacity-40">
-                <WkIcon name={drafting ? "Loader2" : "Sparkles"} size={14} className={drafting ? "animate-spin" : ""} />
-                Draft With Culture Context Engine
-              </button>
+            <div>
+              <h3 className="text-[14px] font-black text-wk-text">Public Explanation</h3>
+              <p className="mt-1 text-[12px] text-wk-text-muted">Review the drafted sentence. It should state what happened without adding meaning the evidence does not support.</p>
             </div>
             <textarea value={plainReason} onChange={(event) => setPlainReason(event.target.value)} rows={4} className="w-full resize-none rounded-lg border border-wk-border bg-wk-surface-raised px-3 py-2.5 text-[13px] text-wk-text outline-none focus:border-wk-brand" />
             {uncertainty ? <p className="text-[11px] text-wk-text-muted">Check before approval: {uncertainty}</p> : null}
