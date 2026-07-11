@@ -12,16 +12,25 @@ alter table public.cultural_entities
   add column if not exists review_note text,
   add column if not exists metadata jsonb not null default '{}'::jsonb;
 
+-- Production already carries earlier entity and status constraints. Replace them
+-- explicitly so the migration replays cleanly while preserving legacy entity types.
+alter table public.cultural_entities
+  drop constraint if exists cultural_entities_entity_type_check;
+
 alter table public.cultural_entities
   add constraint cultural_entities_entity_type_check
   check (entity_type in (
     'artist','track','release','label','genre',
     'person','scene','place','event','institution','work','concept',
-    'language','movement','publication','organization'
+    'language','movement','publication','organization',
+    'article','inquiry','memory','source'
   )) not valid;
 
 alter table public.cultural_entities
   validate constraint cultural_entities_entity_type_check;
+
+alter table public.cultural_entities
+  drop constraint if exists cultural_entities_status_check;
 
 alter table public.cultural_entities
   add constraint cultural_entities_status_check
