@@ -4,9 +4,11 @@ import {
   acceptMissingArtistIntake,
   createMissingArtistIntake,
   loadRegistryKnowledgeReviewSnapshot,
+  type ConsolidationRow,
   type MissingArtistIntakeRow,
   type RegistryKnowledgeReviewSnapshot,
 } from "@/services/registryKnowledgeReviewService";
+import { RelationshipReviewDrawer } from "./RelationshipReviewDrawer";
 
 type WorkspaceTab = "artists" | "endpoints" | "evidence" | "relationships";
 type DialogMode = "create" | "accept";
@@ -125,6 +127,7 @@ export default function AdminRelationshipViewerPage() {
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [dialog, setDialog] = useState<{ mode: DialogMode; row: MissingArtistIntakeRow } | null>(null);
+  const [reviewRow, setReviewRow] = useState<ConsolidationRow | null>(null);
   const [actionBusy, setActionBusy] = useState(false);
 
   const load = useCallback(async () => {
@@ -165,6 +168,15 @@ export default function AdminRelationshipViewerPage() {
     return snapshot.relationships.filter((row) => row.source_slug.includes(normalized) || row.target_slug.includes(normalized) || row.relationship_type.includes(normalized));
   }, [query, snapshot.relationships]);
 
+  const openRelationshipReview = (relationshipId: string) => {
+    const row = snapshot.relationships.find((item) => item.relationship_id === relationshipId);
+    if (!row) {
+      setError("That relationship could not be opened for review.");
+      return;
+    }
+    setReviewRow(row);
+  };
+
   const handleDialogSubmit = async (values: { displayName: string; reason: string; sourceUrl: string }) => {
     if (!dialog) return;
     setActionBusy(true);
@@ -200,7 +212,7 @@ export default function AdminRelationshipViewerPage() {
         <div>
           <div className="text-[11px] font-black uppercase tracking-wider text-wk-brand">Registry Knowledge Layer</div>
           <h1 className="mt-1 text-[24px] font-black tracking-tight text-wk-text">Knowledge Review</h1>
-          <p className="mt-1 max-w-2xl text-[13px] text-wk-text-muted">Resolve missing identities, prepare relationships for evidence review, and see exactly what is still blocked before anything can become public.</p>
+          <p className="mt-1 max-w-2xl text-[13px] text-wk-text-muted">Resolve missing identities, review evidence, and decide what is ready for public use.</p>
         </div>
         <button onClick={() => void load()} disabled={loading} className="inline-flex items-center justify-center gap-2 rounded-lg border border-wk-border bg-wk-surface px-3 py-2 text-[12px] font-bold text-wk-text-muted hover:bg-wk-surface-raised disabled:opacity-50">
           <WkIcon name="RefreshCw" size={14} className={loading ? "animate-spin" : ""} />
@@ -271,15 +283,16 @@ export default function AdminRelationshipViewerPage() {
         ) : null}
 
         {!loading && tab === "evidence" ? (
-          <div className="overflow-x-auto"><table className="w-full min-w-[900px] text-left"><thead className="bg-wk-surface-raised text-[10px] font-black uppercase tracking-wide text-wk-text-muted"><tr><th className="px-4 py-3">Source</th><th className="px-4 py-3">Relationship</th><th className="px-4 py-3">Target</th><th className="px-4 py-3">Evidence</th><th className="px-4 py-3">Reason</th><th className="px-4 py-3">Next Step</th></tr></thead><tbody className="divide-y divide-wk-border">{filteredEvidence.map((row) => <tr key={row.relationship_id}><td className="px-4 py-3 text-[12px] font-bold text-wk-text">{row.source_slug}</td><td className="px-4 py-3 text-[12px] text-wk-text-muted">{humanize(row.relationship_type)}</td><td className="px-4 py-3 text-[12px] font-bold text-wk-text">{row.target_slug}</td><td className="px-4 py-3 text-[12px] text-wk-text-muted">{row.evidence_count}</td><td className="px-4 py-3 text-[12px] text-wk-text-muted">{row.has_plain_reason ? "Added" : "Missing"}</td><td className="px-4 py-3"><StatusPill value={row.evidence_work_state} /></td></tr>)}</tbody></table></div>
+          <div className="overflow-x-auto"><table className="w-full min-w-[980px] text-left"><thead className="bg-wk-surface-raised text-[10px] font-black uppercase tracking-wide text-wk-text-muted"><tr><th className="px-4 py-3">Source</th><th className="px-4 py-3">Relationship</th><th className="px-4 py-3">Target</th><th className="px-4 py-3">Evidence</th><th className="px-4 py-3">Reason</th><th className="px-4 py-3">Next Step</th><th className="px-4 py-3">Action</th></tr></thead><tbody className="divide-y divide-wk-border">{filteredEvidence.map((row) => <tr key={row.relationship_id}><td className="px-4 py-3 text-[12px] font-bold text-wk-text">{row.source_slug}</td><td className="px-4 py-3 text-[12px] text-wk-text-muted">{humanize(row.relationship_type)}</td><td className="px-4 py-3 text-[12px] font-bold text-wk-text">{row.target_slug}</td><td className="px-4 py-3 text-[12px] text-wk-text-muted">{row.evidence_count}</td><td className="px-4 py-3 text-[12px] text-wk-text-muted">{row.has_plain_reason ? "Added" : "Missing"}</td><td className="px-4 py-3"><StatusPill value={row.evidence_work_state} /></td><td className="px-4 py-3"><button onClick={() => openRelationshipReview(row.relationship_id)} className="rounded-lg bg-wk-brand px-3 py-2 text-[11px] font-black text-wk-brand-on">Review Relationship</button></td></tr>)}</tbody></table></div>
         ) : null}
 
         {!loading && tab === "relationships" ? (
-          <div className="overflow-x-auto"><table className="w-full min-w-[980px] text-left"><thead className="bg-wk-surface-raised text-[10px] font-black uppercase tracking-wide text-wk-text-muted"><tr><th className="px-4 py-3">Source</th><th className="px-4 py-3">Type</th><th className="px-4 py-3">Target</th><th className="px-4 py-3">Review</th><th className="px-4 py-3">Evidence</th><th className="px-4 py-3">Public</th><th className="px-4 py-3">Queue State</th></tr></thead><tbody className="divide-y divide-wk-border">{filteredRelationships.map((row) => <tr key={row.relationship_id}><td className="px-4 py-3 text-[12px] font-bold text-wk-text">{row.source_slug}</td><td className="px-4 py-3 text-[12px] text-wk-text-muted">{humanize(row.relationship_type)}</td><td className="px-4 py-3 text-[12px] font-bold text-wk-text">{row.target_slug}</td><td className="px-4 py-3 text-[12px] text-wk-text-muted">{humanize(row.review_status)}</td><td className="px-4 py-3 text-[12px] text-wk-text-muted">{row.evidence_count}</td><td className="px-4 py-3 text-[12px] font-bold text-wk-text-muted">{row.public_safe ? "Yes" : "No"}</td><td className="px-4 py-3"><StatusPill value={row.consolidation_state} /></td></tr>)}</tbody></table></div>
+          <div className="overflow-x-auto"><table className="w-full min-w-[1080px] text-left"><thead className="bg-wk-surface-raised text-[10px] font-black uppercase tracking-wide text-wk-text-muted"><tr><th className="px-4 py-3">Source</th><th className="px-4 py-3">Type</th><th className="px-4 py-3">Target</th><th className="px-4 py-3">Review</th><th className="px-4 py-3">Evidence</th><th className="px-4 py-3">Public</th><th className="px-4 py-3">Queue State</th><th className="px-4 py-3">Action</th></tr></thead><tbody className="divide-y divide-wk-border">{filteredRelationships.map((row) => <tr key={row.relationship_id}><td className="px-4 py-3 text-[12px] font-bold text-wk-text">{row.source_slug}</td><td className="px-4 py-3 text-[12px] text-wk-text-muted">{humanize(row.relationship_type)}</td><td className="px-4 py-3 text-[12px] font-bold text-wk-text">{row.target_slug}</td><td className="px-4 py-3 text-[12px] text-wk-text-muted">{humanize(row.review_status)}</td><td className="px-4 py-3 text-[12px] text-wk-text-muted">{row.evidence_count}</td><td className="px-4 py-3 text-[12px] font-bold text-wk-text-muted">{row.public_safe ? "Yes" : "No"}</td><td className="px-4 py-3"><StatusPill value={row.consolidation_state} /></td><td className="px-4 py-3"><button onClick={() => setReviewRow(row)} className="rounded-lg bg-wk-brand px-3 py-2 text-[11px] font-black text-wk-brand-on">Review Relationship</button></td></tr>)}</tbody></table></div>
         ) : null}
       </div>
 
       {dialog ? <ActionDialog row={dialog.row} mode={dialog.mode} busy={actionBusy} onClose={() => setDialog(null)} onSubmit={handleDialogSubmit} /> : null}
+      {reviewRow ? <RelationshipReviewDrawer row={reviewRow} onClose={() => setReviewRow(null)} onComplete={async (message) => { setNotice(message); await load(); }} /> : null}
     </div>
   );
 }
