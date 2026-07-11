@@ -1,58 +1,241 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
 import type { InquiryDraft } from "./types";
 import {
-  LEARNING_GROUP_LABELS,
   type LearningEntry,
   type LearningGroup,
   fetchLearningTimeline,
 } from "@/services/institute/howThisLearnedService";
 
-// How This Learned. Institutional memory made visible: the trail from raw
-// question through evidence and decisions, readable, not a raw audit log.
+type HistoryFilter = LearningGroup | "all";
 
-const GROUP_ORDER: Array<LearningGroup | "all"> = ["all", "question", "evidence", "assistant", "review", "other"];
+const FILTER_ORDER: HistoryFilter[] = [
+  "all",
+  "question",
+  "evidence",
+  "relationships",
+  "review",
+  "assistant",
+  "other",
+];
 
-export default function HowThisLearnedScreen({ draft }: { draft: InquiryDraft | null }) {
+const FILTER_LABELS: Record<HistoryFilter, string> = {
+  all: "Everything",
+  question: "Question",
+  evidence: "Material",
+  relationships: "Relationships",
+  review: "Review",
+  assistant: "Suggestions",
+  other: "Other",
+};
+
+function cx(...classes: Array<string | false | null | undefined>) {
+  return classes.filter(Boolean).join(" ");
+}
+
+function Pill({
+  children,
+  tone = "neutral",
+}: {
+  children: ReactNode;
+  tone?: "brand" | "success" | "warning" | "neutral";
+}) {
+  return (
+    <span
+      className={cx(
+        "inline-flex items-center rounded-full border px-2.5 py-1 text-[10px] font-black",
+        tone === "brand" &&
+          "border-wk-brand/30 bg-wk-brand-soft text-wk-brand",
+        tone === "success" &&
+          "border-wk-success/30 bg-wk-success-soft text-wk-success",
+        tone === "warning" &&
+          "border-wk-warning/30 bg-wk-warning-soft text-wk-warning",
+        tone === "neutral" &&
+          "border-wk-border bg-wk-surface text-wk-text-muted",
+      )}
+    >
+      {children}
+    </span>
+  );
+}
+
+function historyTone(
+  entry: LearningEntry,
+): "brand" | "success" | "warning" | "neutral" {
+  const text = `${entry.title} ${entry.body}`.toLowerCase();
+
+  if (
+    text.includes("accepted") ||
+    text.includes("approved") ||
+    text.includes("published")
+  ) {
+    return "success";
+  }
+
+  if (
+    text.includes("rejected") ||
+    text.includes("withdrawn") ||
+    text.includes("changes requested") ||
+    text.includes("contradict")
+  ) {
+    return "warning";
+  }
+
+  if (entry.group === "question" || entry.group === "review") {
+    return "brand";
+  }
+
+  return "neutral";
+}
+
+function cleanTitle(entry: LearningEntry) {
+  const title = entry.title.trim();
+  const lower = title.toLowerCase();
+
+  if (lower === "the question arrived") {
+    return "Inquiry started";
+  }
+
+  if (lower.startsWith("the question moved to v")) {
+    return "Question updated";
+  }
+
+  if (lower.includes("evidence review")) {
+    return "Material reviewed";
+  }
+
+  if (lower.includes("relationship accepted")) {
+    return "Relationship accepted";
+  }
+
+  if (lower.includes("relationship status changed")) {
+    return "Relationship updated";
+  }
+
+  if (lower.startsWith("a suggestion was accepted")) {
+    return "Suggestion accepted";
+  }
+
+  if (lower.startsWith("a suggestion was edited and accepted")) {
+    return "Suggestion edited and accepted";
+  }
+
+  if (lower.startsWith("a suggestion was rejected")) {
+    return "Suggestion rejected";
+  }
+
+  if (lower.startsWith("a suggestion was kept as doubt")) {
+    return "Suggestion kept as doubt";
+  }
+
+  if (lower.startsWith("review packet") && lower.includes("submitted")) {
+    return "Work sent for review";
+  }
+
+  if (lower.startsWith("review packet") && lower.includes("changes requested")) {
+    return "Changes requested";
+  }
+
+  if (
+    lower.startsWith("review packet") &&
+    (lower.includes("approved") || lower.includes("accepted"))
+  ) {
+    return "Work accepted";
+  }
+
+  return title
+    .replaceAll("_", " ")
+    .replace(/\b\w/g, (letter) => letter.toUpperCase());
+}
+
+function entryDescription(entry: LearningEntry) {
+  const body = entry.body.trim();
+  const detail = entry.detail?.trim();
+
+  if (body && detail && body !== detail) {
+    return { body, detail };
+  }
+
+  return {
+    body: body || detail || "",
+    detail: null,
+  };
+}
+
+function EmptyState({ title, body }: { title: string; body: string }) {
+  return (
+    <div className="rounded-xl border border-dashed border-wk-border bg-wk-bg p-6 text-center">
+      <p className="text-[14px] font-black text-wk-text">{title}</p>
+      <p className="mt-2 text-[12px] leading-5 text-wk-text-muted">{body}</p>
+    </div>
+  );
+}
+
+export default function HowThisLearnedScreen({
+  draft,
+}: {
+  draft: InquiryDraft | null;
+}) {
   const [entries, setEntries] = useState<LearningEntry[]>([]);
   const [loading, setLoading] = useState(true);
-  const [notice, setNotice] = useState<string | null>(null);
-  const [group, setGroup] = useState<LearningGroup | "all">("all");
+  const [notice, setNotice] = useState("");
+  const [filter, setFilter] = useState<HistoryFilter>("all");
 
   const refresh = useCallback(async () => {
-    if (!draft) return;
+    if (!draft) {
+      setEntries([]);
+      setLoading(false);
+      return;
+    }
+
+    setLoading(true);
+
     try {
       setEntries(await fetchLearningTimeline(draft.id));
-      setNotice(null);
+      setNotice("");
     } catch {
-      setNotice("The learning trail could not load. Try again in a moment.");
+      setNotice("History could not be loaded. Try again later.");
     } finally {
       setLoading(false);
     }
   }, [draft?.id]);
 
   useEffect(() => {
-    setLoading(true);
     void refresh();
   }, [refresh]);
 
-  const visible = useMemo(
-    () => (group === "all" ? entries : entries.filter((entry) => entry.group === group)),
-    [entries, group],
+  const visibleEntries = useMemo(
+    () =>
+      filter === "all"
+        ? entries
+        : entries.filter((entry) => entry.group === filter),
+    [entries, filter],
   );
 
-  const groupCounts = useMemo(() => {
-    const counts = new Map<string, number>();
-    entries.forEach((entry) => counts.set(entry.group, (counts.get(entry.group) ?? 0) + 1));
-    return counts;
+  const counts = useMemo(() => {
+    const next = new Map<HistoryFilter, number>();
+    next.set("all", entries.length);
+
+    entries.forEach((entry) => {
+      next.set(entry.group, (next.get(entry.group) ?? 0) + 1);
+    });
+
+    return next;
   }, [entries]);
 
   if (!draft) {
     return (
       <div className="mx-auto max-w-[1040px]">
-        <section className="rounded-[22px] border border-wk-border bg-wk-surface p-8 text-center shadow-sm">
-          <div className="text-[10px] font-black uppercase tracking-[0.24em] text-wk-brand">How this learned</div>
-          <h1 className="mt-2 text-[26px] font-black tracking-[-0.04em] text-wk-text">No inquiry selected</h1>
-          <p className="mt-2 text-[14px] text-wk-text-muted">Pick an inquiry first to see how it has learned.</p>
+        <section className="rounded-[22px] border border-wk-border bg-wk-surface p-6 shadow-sm">
+          <div className="text-[10px] font-black uppercase tracking-[0.24em] text-wk-brand">
+            History
+          </div>
+          <h1 className="mt-3 text-[26px] font-black tracking-[-0.05em] text-wk-text">
+            Choose an Inquiry
+          </h1>
+          <p className="mt-2 text-[13px] leading-5 text-wk-text-muted">
+            Return to Inquiries and choose the question whose history you want
+            to read.
+          </p>
         </section>
       </div>
     );
@@ -62,71 +245,103 @@ export default function HowThisLearnedScreen({ draft }: { draft: InquiryDraft | 
     <div className="mx-auto max-w-[1040px] space-y-5">
       <section className="rounded-[22px] border border-wk-border bg-wk-surface p-6 shadow-sm lg:p-7">
         <div className="text-[10px] font-black uppercase tracking-[0.24em] text-wk-brand">
-          Inquiry {draft.code.replace("Inquiry ", "")} · How this learned
+          History
         </div>
-        <h1 className="mt-3 text-[30px] font-black leading-[1.05] tracking-[-0.06em] text-wk-text lg:text-[34px]">
-          The trail from question to understanding
+
+        <h1 className="mt-3 text-[30px] font-black leading-[1.05] tracking-[-0.06em] text-wk-text lg:text-[36px]">
+          The story of this Inquiry
         </h1>
-        <p className="mt-2 max-w-[70ch] text-[14px] leading-6 text-wk-text-muted">
-          Every refinement, reading, and decision on this inquiry, in order. Corrections belong here too; changing
-          our minds on the record is the method working.
+
+        <p className="mt-3 max-w-[68ch] text-[14px] leading-6 text-wk-text-muted">
+          See how the question changed, what was reviewed, which decisions were
+          made, and when the work moved forward.
         </p>
 
-        <div className="mt-4 flex flex-wrap gap-2">
-          {GROUP_ORDER.map((key) => {
-            const count = key === "all" ? entries.length : groupCounts.get(key) ?? 0;
+        <div className="mt-5 flex flex-wrap gap-2">
+          {FILTER_ORDER.map((key) => {
+            const count = counts.get(key) ?? 0;
+
             if (key !== "all" && count === 0) return null;
+
             return (
               <button
                 key={key}
                 type="button"
-                onClick={() => setGroup(key)}
-                className={`rounded-full px-4 py-2 text-[12px] font-bold ${
-                  group === key
-                    ? "bg-wk-brand text-wk-brand-on"
-                    : "border border-wk-border bg-wk-bg text-wk-text-muted hover:text-wk-text"
-                }`}
+                onClick={() => setFilter(key)}
+                className={cx(
+                  "rounded-full border px-4 py-2 text-[12px] font-black transition",
+                  filter === key
+                    ? "border-wk-brand bg-wk-brand text-wk-brand-on"
+                    : "border-wk-border bg-wk-bg text-wk-text-muted hover:border-wk-brand/40 hover:text-wk-text",
+                )}
               >
-                {key === "all" ? "Everything" : LEARNING_GROUP_LABELS[key]} ({count})
+                {FILTER_LABELS[key]} ({count})
               </button>
             );
           })}
         </div>
-
-        {notice && (
-          <div className="mt-4 rounded-xl border border-wk-border bg-wk-bg px-4 py-3 text-[13px] text-wk-text">{notice}</div>
-        )}
       </section>
 
-      <section className="rounded-[22px] border border-wk-border bg-wk-surface p-6 shadow-sm lg:p-7">
+      {notice ? (
+        <div className="rounded-xl border border-wk-warning/30 bg-wk-warning-soft px-4 py-3 text-[12px] font-bold text-wk-text-muted">
+          {notice}
+        </div>
+      ) : null}
+
+      <section className="rounded-[22px] border border-wk-border bg-wk-surface p-5 shadow-sm lg:p-6">
         {loading ? (
-          <p className="text-[13px] text-wk-text-muted">Loading the learning trail...</p>
-        ) : visible.length === 0 ? (
-          <div className="rounded-xl border border-dashed border-wk-border bg-wk-bg px-5 py-10 text-center">
-            <p className="text-[15px] font-bold text-wk-text">Nothing on the record yet</p>
-            <p className="mt-1 text-[13px] text-wk-text-muted">
-              Refine the question, read some evidence, or decide a suggestion. The trail writes itself.
-            </p>
-          </div>
+          <p className="text-[13px] text-wk-text-muted">Loading history...</p>
+        ) : visibleEntries.length === 0 ? (
+          <EmptyState
+            title="Nothing has changed yet"
+            body="Question updates, material decisions, review activity, and other important changes will appear here."
+          />
         ) : (
-          <ol className="relative space-y-4 border-l border-wk-border pl-5">
-            {visible.map((entry) => (
-              <li key={entry.id} className="relative">
-                <span className="absolute -left-[26px] top-1.5 h-2.5 w-2.5 rounded-full bg-wk-brand" />
-                <div className="flex flex-wrap items-center gap-2 text-[10px] font-black uppercase tracking-[0.16em] text-wk-text-faint">
-                  <span className="text-wk-brand">{LEARNING_GROUP_LABELS[entry.group]}</span>
-                  <span>{new Date(entry.at).toLocaleString()}</span>
-                </div>
-                <h3 className="mt-1 text-[15px] font-black leading-snug text-wk-text">{entry.title}</h3>
-                {entry.body && <p className="mt-1 text-[13px] leading-6 text-wk-text-muted">{entry.body}</p>}
-                {entry.detail && (
-                  <p className="mt-1 text-[12px] text-wk-text-faint">
-                    <span className="font-bold">Why:</span> {entry.detail}
-                  </p>
-                )}
-              </li>
-            ))}
-          </ol>
+          <div className="space-y-3">
+            {visibleEntries.map((entry) => {
+              const description = entryDescription(entry);
+
+              return (
+                <article
+                  key={entry.id}
+                  className="rounded-xl border border-wk-border bg-wk-bg p-4"
+                >
+                  <div className="flex flex-wrap items-center justify-between gap-3">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <Pill tone={historyTone(entry)}>
+                        {FILTER_LABELS[entry.group]}
+                      </Pill>
+
+                      <span className="text-[11px] text-wk-text-faint">
+                        {new Date(entry.at).toLocaleString()}
+                      </span>
+                    </div>
+                  </div>
+
+                  <h2 className="mt-3 text-[16px] font-black leading-6 text-wk-text">
+                    {cleanTitle(entry)}
+                  </h2>
+
+                  {description.body ? (
+                    <p className="mt-2 text-[13px] leading-6 text-wk-text-muted">
+                      {description.body}
+                    </p>
+                  ) : null}
+
+                  {description.detail ? (
+                    <div className="mt-3 rounded-lg border border-wk-border bg-wk-surface px-3 py-2">
+                      <div className="text-[10px] font-black uppercase tracking-[0.12em] text-wk-text-faint">
+                        Reason or note
+                      </div>
+                      <p className="mt-1 text-[12px] leading-5 text-wk-text-muted">
+                        {description.detail}
+                      </p>
+                    </div>
+                  ) : null}
+                </article>
+              );
+            })}
+          </div>
         )}
       </section>
     </div>
