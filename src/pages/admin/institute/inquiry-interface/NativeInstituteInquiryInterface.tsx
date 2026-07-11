@@ -397,18 +397,18 @@ function Rail({
   active: InquiryDraft | null;
 }) {
   const inquiryNav: Array<{ screen: InquiryScreen; label: string; badge?: string; disabled?: boolean }> = [
-    { screen: "workbench", label: "Workbench" },
+    { screen: "workbench", label: "Legacy setup" },
     { screen: "anchorBrief", label: "Anchor brief", badge: active?.anchorContextSnapshot ? "ready" : "none" },
-    { screen: "evidence", label: "Evidence", badge: active?.evidence?.length ? String(active.evidence.length) : "0" },
-    { screen: "claims", label: "Claims", badge: active?.evidence?.filter((item) => item.metadata?.workspaceType === "claims").length ? String(active.evidence.filter((item) => item.metadata?.workspaceType === "claims").length) : "0" },
+    { screen: "evidence", label: "Legacy workspaces", badge: active?.evidence?.length ? String(active.evidence.length) : "0" },
+    { screen: "claims", label: "Notes and findings", badge: active?.evidence?.filter((item) => item.metadata?.workspaceType === "claims").length ? String(active.evidence.filter((item) => item.metadata?.workspaceType === "claims").length) : "0" },
     { screen: "relationships", label: "Relationships" },
     { screen: "review", label: "Review", badge: "desk" },
     { screen: "summary", label: "Inquiry summary", disabled: true },
     { screen: "clinic", label: "Question & clinic", badge: active ? `v${active.versionCount}` : "" },
-    { screen: "lineage", label: "Lineage & forks", disabled: true },
+    { screen: "lineage", label: "Inquiry links", disabled: true },
     { screen: "memory", label: "Contributor memory", disabled: true },
     { screen: "corrections", label: "Corrections", disabled: true },
-    { screen: "learned", label: "How this learned" },
+    { screen: "learned", label: "History" },
   ];
 
   return (
@@ -1282,7 +1282,7 @@ function AnchorBriefScreen({ draft }: { draft: InquiryDraft | null }) {
         <Panel eyebrow={`${draft.code} · Anchor Brief`} title="No anchor attached">
           <EmptyState
             title="This inquiry has no anchor"
-            body="Use the Workbench and Evidence surfaces to frame it manually. Anchor suggestions come later."
+            body="Use Overview and Material to frame it manually. Anchor suggestions can come later."
           />
         </Panel>
       </div>
@@ -2667,10 +2667,10 @@ function EvidenceScreen({
       </div>
 
       {!formats.length ? (
-        <Panel eyebrow="No formats selected" title="Go back to Workbench first">
+        <Panel eyebrow="No formats selected" title="Return to the Inquiry first">
           <EmptyState
             title="No evidence to capture yet"
-            body="Choose evidence formats in Workbench. They will appear here for quick capture."
+            body="Open the Inquiry and choose the material or work you want to continue."
           />
         </Panel>
       ) : (
@@ -2835,9 +2835,9 @@ function EvidenceScreen({
 
                   <InstituteWorkspaceOverlay
                     open={Boolean(articleLink && articleWorkspaceOpen)}
-                    eyebrow="Evidence · Article"
+                    eyebrow="Work · Article"
                     title="Article workspace"
-                    description="Write in focus. Close returns you to Evidence without losing the inquiry context."
+                    description="Write in focus. Close returns you to Work without losing the Inquiry."
                     onClose={closeWorkspace}
                   >
                     {articleLink ? (
@@ -2894,7 +2894,7 @@ function EvidenceScreen({
 
               <InstituteWorkspaceOverlay
                 open={registryWorkspaceOpen}
-                eyebrow="Evidence · WAKILISHA record"
+                eyebrow="Material · WAKILISHA record"
                 title="WAKILISHA record workspace"
                 description="Use real WAKILISHA records as structured evidence. Suggest missing records or corrections without mutating the public registry."
                 onClose={closeWorkspace}
@@ -2933,7 +2933,7 @@ function EvidenceScreen({
 
               <InstituteWorkspaceOverlay
                 open={playlistWorkspaceOpen}
-                eyebrow="Evidence · Playlist"
+                eyebrow="Work · Playlist"
                 title="Playlist workspace"
                 description="Create a private playlist draft linked to this Inquiry. Editors control public use later."
                 onClose={closeWorkspace}
@@ -3603,6 +3603,22 @@ function InquiryShell({
     setSearchParams(nextParams, { replace: false });
   };
 
+  useEffect(() => {
+    const frame = window.requestAnimationFrame(() => {
+      document
+        .querySelector<HTMLButtonElement>(
+          `[data-inquiry-section="${section}"]`,
+        )
+        ?.scrollIntoView({
+          behavior: "smooth",
+          block: "nearest",
+          inline: "center",
+        });
+    });
+
+    return () => window.cancelAnimationFrame(frame);
+  }, [section]);
+
   if (!draft) {
     return (
       <div className="mx-auto max-w-[1000px]">
@@ -3668,13 +3684,13 @@ function InquiryShell({
 
   return (
     <div className="mx-auto max-w-[1200px] space-y-5">
-      <header className="rounded-2xl border border-wk-border bg-wk-surface px-5 py-5">
+      <header className="min-w-0 overflow-hidden rounded-2xl border border-wk-border bg-wk-surface px-4 py-4 sm:px-5 sm:py-5">
         <div className="flex flex-wrap items-center gap-2">
           <Chip tone="brand">{draft.code}</Chip>
           <Chip>{draft.status}</Chip>
         </div>
 
-        <h1 className="mt-4 max-w-[900px] text-[24px] font-black leading-tight text-wk-text sm:text-[30px]">
+        <h1 className="mt-4 max-w-[900px] break-words text-[22px] font-black leading-[1.12] tracking-[-0.035em] text-wk-text sm:text-[30px] sm:leading-tight">
           {draft.workingQuestion}
         </h1>
 
@@ -3684,14 +3700,18 @@ function InquiryShell({
           </p>
         ) : null}
 
-        <nav className="mt-5 flex gap-2 overflow-x-auto pb-1" aria-label="Inquiry sections">
+        <nav
+          className="-mx-4 mt-5 flex min-w-0 snap-x snap-mandatory gap-2 overflow-x-auto overscroll-x-contain px-4 pb-2 sm:-mx-5 sm:px-5"
+          aria-label="Inquiry sections"
+        >
           {sections.map((item) => (
             <button
               key={item.key}
               type="button"
               onClick={() => setSection(item.key)}
+              data-inquiry-section={item.key}
               className={cx(
-                "whitespace-nowrap rounded-lg border px-3 py-2 text-[12px] font-black transition",
+                "shrink-0 snap-center whitespace-nowrap rounded-lg border px-3 py-2 text-[12px] font-black transition",
                 section === item.key
                   ? "border-wk-brand bg-wk-brand text-wk-brand-on"
                   : "border-wk-border bg-wk-bg text-wk-text-muted hover:border-wk-brand/40 hover:text-wk-text",
@@ -3863,19 +3883,19 @@ function LockedScreen({ screen }: { screen: InquiryScreen }) {
   const labels: Record<InquiryScreen, string> = {
     home: "Home",
     inquiry: "Inquiry",
-    workbench: "Workbench",
-    anchorBrief: "Anchor Brief",
-    evidence: "Evidence",
-    claims: "Claims",
+    workbench: "Legacy setup",
+    anchorBrief: "Legacy overview",
+    evidence: "Legacy workspaces",
+    claims: "Notes and findings",
     relationships: "Relationships",
     memory: "Contributor Memory",
     corrections: "Corrections",
     review: "Review",
     summary: "Inquiry Summary",
-    clinic: "Question & Clinic",
-    lineage: "Lineage & Forks",
-    public: "Public Preview",
-    learned: "How This Learned",
+    clinic: "Question",
+    lineage: "Inquiry links",
+    public: "Preview",
+    learned: "History",
     ai: "AI Readiness",
   };
 

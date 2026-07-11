@@ -123,9 +123,9 @@ export default function EvidenceReaderPanel({
   if (evidence.length === 0) {
     return (
       <section className="mx-auto mt-5 max-w-[1180px] rounded-[22px] border border-wk-border bg-wk-surface p-6 shadow-sm lg:p-7">
-        <div className="text-[10px] font-black uppercase tracking-[0.24em] text-wk-brand">Evidence Reader · Help, never approval</div>
+        <div className="text-[10px] font-black uppercase tracking-[0.24em] text-wk-brand">Material review</div>
         <p className="mt-3 text-[13px] text-wk-text-muted">
-          Nothing has entered this part of the inquiry yet. Add evidence above, then let the reader prepare it.
+          There is nothing to review yet. Add material first.
         </p>
       </section>
     );
@@ -133,8 +133,8 @@ export default function EvidenceReaderPanel({
 
   return (
     <section className="mx-auto mt-5 max-w-[1180px] rounded-[22px] border border-wk-border bg-wk-surface p-6 shadow-sm lg:p-7">
-      <div className="text-[10px] font-black uppercase tracking-[0.24em] text-wk-brand">Evidence Reader · Help, never approval</div>
-      <h2 className="mt-2 text-[24px] font-black leading-tight tracking-[-0.04em] text-wk-text">Read, then decide</h2>
+      <div className="text-[10px] font-black uppercase tracking-[0.24em] text-wk-brand">Material review</div>
+      <h2 className="mt-2 text-[24px] font-black leading-tight tracking-[-0.04em] text-wk-text">Review this material</h2>
       <p className="mt-1 max-w-[70ch] text-[13px] leading-5 text-wk-text-muted">
         The reader extracts what each piece of evidence contains. You judge the extraction and record where the
         evidence stands. Reading is not claim judgment.
@@ -165,7 +165,7 @@ export default function EvidenceReaderPanel({
                     onClick={() => void readEvidence(item.id)}
                     className="rounded-full bg-wk-brand px-4 py-2 text-[12px] font-extrabold text-wk-brand-on disabled:opacity-50"
                   >
-                    {readingId === item.id ? "Reading..." : extractions.length ? "Read again" : "Read this evidence"}
+                    {readingId === item.id ? "Reading..." : extractions.length ? "Read again" : "Review Material"}
                   </button>
                   <button
                     type="button"
