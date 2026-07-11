@@ -57,9 +57,18 @@ order by inquiry_id, version_number;
 select
   count(*)::bigint as setup_rows,
   count(*) filter (where nullif(trim(inquiry_type), '') is not null)::bigint as with_inquiry_type,
-  count(*) filter (where coalesce(array_length(output_surfaces, 1), 0) > 0)::bigint as with_output_surfaces,
-  count(*) filter (where coalesce(array_length(evidence_formats, 1), 0) > 0)::bigint as with_evidence_formats,
-  count(*) filter (where coalesce(array_length(tools, 1), 0) > 0)::bigint as with_tools,
+  count(*) filter (
+    where jsonb_typeof(output_surfaces) = 'array'
+      and jsonb_array_length(output_surfaces) > 0
+  )::bigint as with_output_surfaces,
+  count(*) filter (
+    where jsonb_typeof(evidence_formats) = 'array'
+      and jsonb_array_length(evidence_formats) > 0
+  )::bigint as with_evidence_formats,
+  count(*) filter (
+    where jsonb_typeof(tools) = 'array'
+      and jsonb_array_length(tools) > 0
+  )::bigint as with_tools,
   count(*) filter (where scope_edges <> '{}'::jsonb)::bigint as with_scope_edges,
   count(*) filter (where care_defaults <> '{}'::jsonb)::bigint as with_care_defaults,
   count(*) filter (where estimated_attention <> '{}'::jsonb)::bigint as with_estimated_attention
@@ -71,8 +80,7 @@ from public.institute_evidence_items
 group by evidence_kind, review_state
 order by evidence_kind, review_state;
 
-select
-  count(*)::bigint as possible_claim_shim_rows
+select count(*)::bigint as possible_claim_shim_rows
 from public.institute_evidence_items
 where metadata->>'workspaceFormat' = 'Claim'
    or metadata->>'workspaceType' = 'claims'
@@ -113,7 +121,8 @@ from public.institute_review_packets
 group by status
 order by status;
 
--- 11. Packet versus linked-work status mismatches.
+-- 11. Packet versus linked-work status combinations.
+-- A null work status means the packet points to a missing or unreadable link.
 with packet_links as (
   select
     p.id as packet_id,
@@ -168,6 +177,7 @@ select
   i.id,
   i.code,
   i.current_question,
+  i.updated_at,
   count(distinct q.id) as question_versions,
   count(distinct e.id) as material_items,
   count(distinct s.id) as assistant_suggestions,
@@ -182,7 +192,7 @@ left join public.institute_relationships r on r.inquiry_id = i.id
 left join public.institute_work_product_links w on w.inquiry_id = i.id
 left join public.institute_review_packets p on p.inquiry_id = i.id
 where i.deleted_at is null
-group by i.id, i.code, i.current_question
+group by i.id, i.code, i.current_question, i.updated_at
 order by
   count(distinct p.id) desc,
   count(distinct w.id) desc,
