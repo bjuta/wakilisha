@@ -22,6 +22,10 @@ import {
   type InstituteArticleDraftLink,
   type InstituteLinkedArticleReviewState,
 } from "@/services/institute/instituteArticleBridgeService";
+import {
+  fetchInstitutePlaylistDraftLink,
+  type InstitutePlaylistDraftLink,
+} from "@/services/institute/institutePlaylistBridgeService";
 import { useEffect, useMemo, useState } from "react";
 import { createPortal } from "react-dom";
 import type { ReactNode } from "react";
@@ -1984,17 +1988,326 @@ function MaterialSection({
   );
 }
 
+
+function workStatusLabel(status?: string | null) {
+  if (!status) return "Draft";
+
+  return status
+    .replaceAll("_", " ")
+    .replace(/\b\w/g, (letter) => letter.toUpperCase());
+}
+
+function workStatusTone(
+  status?: string | null,
+): "success" | "warning" | "neutral" {
+  if (
+    status === "published" ||
+    status === "approved" ||
+    status === "approved_for_promotion"
+  ) {
+    return "success";
+  }
+
+  if (
+    status === "submitted" ||
+    status === "submitted_for_review" ||
+    status === "under_review" ||
+    status === "changes_requested"
+  ) {
+    return "warning";
+  }
+
+  return "neutral";
+}
+
+function WorkSection({ draft }: { draft: InquiryDraft | null }) {
+  const [searchParams, setSearchParams] = useSearchParams();
+  const [articleLink, setArticleLink] =
+    useState<InstituteArticleDraftLink | null>(null);
+  const [playlistLink, setPlaylistLink] =
+    useState<InstitutePlaylistDraftLink | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [creatingArticle, setCreatingArticle] = useState(false);
+  const [error, setError] = useState("");
+
+  useEffect(() => {
+    let alive = true;
+
+    async function loadWork() {
+      if (!draft?.id) {
+        setArticleLink(null);
+        setPlaylistLink(null);
+        return;
+      }
+
+      setLoading(true);
+      setError("");
+
+      try {
+        const [article, playlist] = await Promise.all([
+          fetchInstituteArticleDraftLink(draft.id),
+          fetchInstitutePlaylistDraftLink(draft.id),
+        ]);
+
+        if (!alive) return;
+
+        setArticleLink(article);
+        setPlaylistLink(playlist);
+      } catch (nextError) {
+        if (!alive) return;
+
+        setError(
+          nextError instanceof Error
+            ? nextError.message
+            : "Failed to load work for this Inquiry.",
+        );
+      } finally {
+        if (alive) setLoading(false);
+      }
+    }
+
+    void loadWork();
+
+    return () => {
+      alive = false;
+    };
+  }, [draft?.id]);
+
+  const openWorkspace = (workspace: "article" | "playlist") => {
+    const nextParams = new URLSearchParams(searchParams);
+
+    nextParams.set("screen", "inquiry");
+    nextParams.set("section", "work");
+    nextParams.set("workspace", workspace);
+
+    setSearchParams(nextParams, { replace: false });
+  };
+
+  const startArticle = async () => {
+    if (!draft || creatingArticle) return;
+
+    setCreatingArticle(true);
+    setError("");
+
+    try {
+      const link = await createOrFetchInstituteArticleDraftLink(draft);
+      setArticleLink(link);
+      openWorkspace("article");
+    } catch (nextError) {
+      setError(
+        nextError instanceof Error
+          ? nextError.message
+          : "Failed to start the article.",
+      );
+    } finally {
+      setCreatingArticle(false);
+    }
+  };
+
+  if (!draft) {
+    return (
+      <Panel eyebrow="Work" title="Choose an Inquiry">
+        <EmptyState
+          title="No Inquiry selected"
+          body="Return to Inquiries and choose the question you want to continue."
+        />
+      </Panel>
+    );
+  }
+
+  const workCount =
+    Number(Boolean(articleLink)) + Number(Boolean(playlistLink));
+
+  return (
+    <div className="mx-auto max-w-[1180px] space-y-5">
+      <section className="rounded-[22px] border border-wk-border bg-wk-surface p-6 shadow-sm">
+        <div className="text-[10px] font-black uppercase tracking-[0.24em] text-wk-brand">
+          Work
+        </div>
+
+        <h2 className="mt-3 text-[30px] font-black tracking-[-0.055em] text-wk-text">
+          Work made from this Inquiry
+        </h2>
+
+        <p className="mt-2 max-w-3xl text-[14px] leading-6 text-wk-text-muted">
+          Open the article, playlist, or other work that this Inquiry is
+          producing.
+        </p>
+
+        <div className="mt-5 flex flex-wrap gap-2">
+          <Chip>{workCount} work item(s)</Chip>
+          <Chip>{draft.code}</Chip>
+        </div>
+      </section>
+
+      {error ? (
+        <div className="rounded-xl border border-wk-warning/30 bg-wk-warning-soft px-4 py-3 text-[12px] font-bold text-wk-text-muted">
+          {error}
+        </div>
+      ) : null}
+
+      {loading ? (
+        <Panel eyebrow="Work" title="Loading work">
+          <p className="text-[13px] text-wk-text-muted">
+            Checking what has already been started.
+          </p>
+        </Panel>
+      ) : workCount ? (
+        <div className="grid gap-4 lg:grid-cols-2">
+          {articleLink ? (
+            <article className="rounded-[22px] border border-wk-border bg-wk-surface p-5 shadow-sm">
+              <div className="flex flex-wrap items-center gap-2">
+                <Chip tone="brand">Article</Chip>
+                <Chip tone={workStatusTone(articleLink.status)}>
+                  {workStatusLabel(articleLink.status)}
+                </Chip>
+              </div>
+
+              <h3 className="mt-4 text-[19px] font-black leading-6 text-wk-text">
+                {draft.workingQuestion || "Article draft"}
+              </h3>
+
+              <p className="mt-2 break-all text-[12px] leading-5 text-wk-text-muted">
+                {articleLink.articleSlug}
+              </p>
+
+              <p className="mt-4 text-[11px] text-wk-text-faint">
+                Updated{" "}
+                {new Date(articleLink.updatedAt).toLocaleString()}
+              </p>
+
+              <div className="mt-5 flex flex-wrap gap-2">
+                <button
+                  type="button"
+                  onClick={() => openWorkspace("article")}
+                  className="rounded-lg bg-wk-text px-4 py-2.5 text-[12px] font-black text-wk-bg"
+                >
+                  Open
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => openWorkspace("article")}
+                  className="rounded-lg border border-wk-border bg-wk-bg px-4 py-2.5 text-[12px] font-black text-wk-text"
+                >
+                  Preview
+                </button>
+              </div>
+            </article>
+          ) : null}
+
+          {playlistLink ? (
+            <article className="rounded-[22px] border border-wk-border bg-wk-surface p-5 shadow-sm">
+              <div className="flex flex-wrap items-center gap-2">
+                <Chip tone="brand">Playlist</Chip>
+                <Chip tone={workStatusTone(playlistLink.status)}>
+                  {workStatusLabel(playlistLink.status)}
+                </Chip>
+              </div>
+
+              <h3 className="mt-4 text-[19px] font-black leading-6 text-wk-text">
+                {playlistLink.playlistSlug || "Playlist draft"}
+              </h3>
+
+              <p className="mt-2 text-[12px] leading-5 text-wk-text-muted">
+                A listening path connected to this Inquiry.
+              </p>
+
+              {playlistLink.updatedAt ? (
+                <p className="mt-4 text-[11px] text-wk-text-faint">
+                  Updated{" "}
+                  {new Date(playlistLink.updatedAt).toLocaleString()}
+                </p>
+              ) : null}
+
+              <div className="mt-5 flex flex-wrap gap-2">
+                <button
+                  type="button"
+                  onClick={() => openWorkspace("playlist")}
+                  className="rounded-lg bg-wk-text px-4 py-2.5 text-[12px] font-black text-wk-bg"
+                >
+                  Open
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => openWorkspace("playlist")}
+                  className="rounded-lg border border-wk-border bg-wk-bg px-4 py-2.5 text-[12px] font-black text-wk-text"
+                >
+                  Preview
+                </button>
+              </div>
+            </article>
+          ) : null}
+        </div>
+      ) : (
+        <Panel eyebrow="Work" title="Nothing has been started yet">
+          <EmptyState
+            title="No work yet"
+            body="Start an article or playlist when the Inquiry is ready to become something people can read or hear."
+          />
+        </Panel>
+      )}
+
+      <Panel eyebrow="Start something" title="What should this Inquiry become?">
+        <div className="grid gap-3 md:grid-cols-2">
+          {!articleLink ? (
+            <button
+              type="button"
+              disabled={creatingArticle}
+              onClick={() => void startArticle()}
+              className="rounded-xl border border-wk-border bg-wk-bg p-5 text-left transition hover:border-wk-brand disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              <div className="text-[14px] font-black text-wk-text">
+                {creatingArticle ? "Starting Article..." : "Start Article"}
+              </div>
+              <p className="mt-2 text-[12px] leading-5 text-wk-text-muted">
+                Create a private article draft and open the editor.
+              </p>
+            </button>
+          ) : null}
+
+          {!playlistLink ? (
+            <button
+              type="button"
+              onClick={() => openWorkspace("playlist")}
+              className="rounded-xl border border-wk-border bg-wk-bg p-5 text-left transition hover:border-wk-brand"
+            >
+              <div className="text-[14px] font-black text-wk-text">
+                Start Playlist
+              </div>
+              <p className="mt-2 text-[12px] leading-5 text-wk-text-muted">
+                Add the first track and create a playlist draft.
+              </p>
+            </button>
+          ) : null}
+
+          {articleLink && playlistLink ? (
+            <p className="text-[13px] leading-6 text-wk-text-muted">
+              The currently supported work types have already been started.
+            </p>
+          ) : null}
+        </div>
+      </Panel>
+    </div>
+  );
+}
+
 function EvidenceScreen({
   draft,
   addEvidence,
   updateDraft,
+  focusedWorkspace,
+  onCloseFocusedWorkspace,
 }: {
   draft: InquiryDraft | null;
   addEvidence: (inquiryId: string, evidence: Omit<EvidenceItem, "id" | "createdAt" | "updatedAt">) => Promise<EvidenceItem>;
   updateDraft: (patch: Partial<InquiryDraft>) => void;
+  focusedWorkspace?: "article";
+  onCloseFocusedWorkspace?: () => void;
 }) {
   const [searchParams, setSearchParams] = useSearchParams();
-  const activeWorkspace = searchParams.get("workspace");
+  const activeWorkspace = focusedWorkspace ?? searchParams.get("workspace");
   const articleWorkspaceOpen = activeWorkspace === "article";
   const registryWorkspaceOpen = activeWorkspace === "registry";
   const playlistWorkspaceOpen = activeWorkspace === "playlist";
@@ -2007,6 +2320,11 @@ function EvidenceScreen({
   };
 
   const closeWorkspace = () => {
+    if (onCloseFocusedWorkspace) {
+      onCloseFocusedWorkspace();
+      return;
+    }
+
     const nextParams = new URLSearchParams(searchParams);
     nextParams.delete("workspace");
     setSearchParams(nextParams, { replace: false });
@@ -2050,7 +2368,9 @@ function EvidenceScreen({
   const [articleReviewHistory, setArticleReviewHistory] = useState<InstituteLinkedArticleReviewState[]>([]);
 
   const activeDefinition = activeFormat ? workspaceDefinitionFor(activeFormat) : null;
-  const isArticleWorkspace = activeDefinition?.workspaceType === "article";
+  const isArticleWorkspace =
+    focusedWorkspace === "article" ||
+    activeDefinition?.workspaceType === "article";
   const canSubmitArticleForReview =
     !articleReviewState ||
     articleReviewState.status === "changes_requested" ||
@@ -2255,6 +2575,55 @@ function EvidenceScreen({
       setSaving(false);
     }
   };
+
+  if (focusedWorkspace === "article") {
+    return (
+      <div className="mx-auto max-w-[1240px] space-y-4">
+        <button
+          type="button"
+          onClick={closeWorkspace}
+          className="rounded-lg border border-wk-border bg-wk-surface px-4 py-2 text-[12px] font-black text-wk-text"
+        >
+          Back to Work
+        </button>
+
+        {articleLinkLoading ? (
+          <Panel eyebrow="Article" title="Loading Article">
+            <p className="text-[13px] text-wk-text-muted">
+              Opening the linked article draft.
+            </p>
+          </Panel>
+        ) : articleLinkError ? (
+          <Panel eyebrow="Article" title="Article Could Not Open">
+            <p className="text-[13px] text-wk-text-muted">
+              {articleLinkError}
+            </p>
+          </Panel>
+        ) : articleLink ? (
+          <ArticleEditorWorkspace
+            slug={articleLink.articleSlug}
+            mode="institute"
+            returnPath={`/admin/institute/inquiry-interface?screen=inquiry&section=work&inquiry=${draft.id}`}
+            allowSubmitForReview={canSubmitArticleForReview}
+            submitForReviewLabel={
+              articleReviewState?.status === "changes_requested"
+                ? "Resubmit for Review"
+                : "Submit for Review"
+            }
+            instituteNotice={articleReviewNotice}
+            onSubmittedForReview={submitLinkedArticleForReview}
+          />
+        ) : (
+          <Panel eyebrow="Article" title="No Article Draft">
+            <EmptyState
+              title="The article draft is not ready"
+              body="Return to Work and start the article again."
+            />
+          </Panel>
+        )}
+      </div>
+    );
+  }
 
   return (
     <div className="mx-auto max-w-[1240px] space-y-5">
@@ -3223,6 +3592,17 @@ function InquiryShell({
   updateDraft: (patch: Partial<InquiryDraft>) => void;
   reloadInquiries: () => Promise<void>;
 }) {
+  const [searchParams, setSearchParams] = useSearchParams();
+  const activeWorkWorkspace = searchParams.get("workspace");
+
+  const closeFocusedWork = () => {
+    const nextParams = new URLSearchParams(searchParams);
+    nextParams.delete("workspace");
+    nextParams.set("screen", "inquiry");
+    nextParams.set("section", "work");
+    setSearchParams(nextParams, { replace: false });
+  };
+
   if (!draft) {
     return (
       <div className="mx-auto max-w-[1000px]">
@@ -3450,8 +3830,28 @@ function InquiryShell({
         />
       ) : section === "notes" ? (
         <InstituteClaimsWorkspace draft={draft} addEvidence={addEvidence} />
+      ) : section === "work" && activeWorkWorkspace === "playlist" ? (
+        <div className="mx-auto max-w-[1240px] space-y-4">
+          <button
+            type="button"
+            onClick={closeFocusedWork}
+            className="rounded-lg border border-wk-border bg-wk-surface px-4 py-2 text-[12px] font-black text-wk-text"
+          >
+            Back to Work
+          </button>
+
+          <InstitutePlaylistWorkspace draft={draft} />
+        </div>
+      ) : section === "work" && activeWorkWorkspace === "article" ? (
+        <EvidenceScreen
+          draft={draft}
+          addEvidence={addEvidence}
+          updateDraft={updateDraft}
+          focusedWorkspace="article"
+          onCloseFocusedWorkspace={closeFocusedWork}
+        />
       ) : section === "work" ? (
-        <WorkbenchScreen draft={draft} updateDraft={updateDraft} />
+        <WorkSection draft={draft} />
       ) : (
         <HowThisLearnedScreen draft={draft} />
       )}
