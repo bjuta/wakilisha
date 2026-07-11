@@ -18,7 +18,7 @@ function cors(req: Request) {
     "Access-Control-Allow-Origin": allowed ? origin : ALLOWED_ORIGINS[0],
     "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
     "Access-Control-Allow-Methods": "POST, OPTIONS",
-    "Vary": "Origin",
+    Vary: "Origin",
   };
 }
 
@@ -41,8 +41,6 @@ async function getUser(req: Request) {
 }
 
 async function hasReviewAccess(db: ReturnType<typeof createClient>, userId: string) {
-  const { data } = await db.rpc("current_user_is_administrator");
-  if (data === true) return true;
   const { data: roles } = await db
     .from("user_role_assignments")
     .select("role_key, role_definitions!inner(role_capabilities(capability_key))")
@@ -63,20 +61,14 @@ Deno.serve(async (req) => {
   if (req.method !== "POST") return json({ error: "Use POST." }, headers, 405);
 
   const user = await getUser(req);
-  if (!user) return json({ error: "Sign in to draft a relationship explanation." }, headers, 401);
+  if (!user) return json({ error: "Sign in to draft a relationship review." }, headers, 401);
 
   const db = createClient(SUPABASE_URL, SERVICE_KEY);
   if (!(await hasReviewAccess(db, user.id))) {
-    return json({ error: "Your role cannot draft Registry relationship explanations." }, headers, 403);
+    return json({ error: "Your role cannot draft Registry relationship reviews." }, headers, 403);
   }
 
-  let body: {
-    relationshipId?: string;
-    evidenceTitle?: string;
-    evidenceType?: string;
-    evidenceSummary?: string;
-    evidenceMainClaim?: string;
-  };
+  let body: { relationshipId?: string };
   try {
     body = await req.json();
   } catch {
@@ -84,15 +76,11 @@ Deno.serve(async (req) => {
   }
 
   const relationshipId = String(body.relationshipId ?? "").trim();
-  const evidenceTitle = String(body.evidenceTitle ?? "").trim();
-  const evidenceSummary = String(body.evidenceSummary ?? "").trim();
-  if (!relationshipId || !evidenceTitle || !evidenceSummary) {
-    return json({ error: "Relationship, evidence title, and evidence summary are required." }, headers, 400);
-  }
+  if (!relationshipId) return json({ error: "Relationship is required." }, headers, 400);
 
   const { data: relationship } = await db
     .from("registry_entity_relationships")
-    .select("id, source_entity_id, target_entity_id, source_entity_type, target_entity_type, relationship_type, relationship_role")
+    .select("id, source_entity_id, target_entity_id, source_entity_type, target_entity_type, relationship_type, relationship_role, source_slug, target_slug, metadata")
     .eq("id", relationshipId)
     .maybeSingle();
   if (!relationship) return json({ error: "Registry relationship not found." }, headers, 404);
@@ -109,8 +97,14 @@ Deno.serve(async (req) => {
       : Promise.resolve({ data: null }),
   ]);
 
-  const sourceName = sourceArtist?.display_name ?? "the source artist";
-  const targetName = targetArtist?.display_name ?? targetTrack?.title ?? "the related work";
+  const sourceName = sourceArtist?.display_name ?? relationship.source_slug;
+  const targetName = targetArtist?.display_name ?? targetTrack?.title ?? relationship.target_slug;
+  const metadata = (relationship.metadata ?? {}) as Record<string, unknown>;
+  const sharedTitles = Array.isArray(metadata.shared_titles)
+    ? metadata.shared_titles.filter((value): value is string => typeof value === "string")
+    : [];
+  const sharedTrackCount = typeof metadata.shared_track_count === "number" ? metadata.shared_track_count : null;
+
   const apiKey = Deno.env.get("ANTHROPIC_API_KEY");
   if (!apiKey) return json({ error: "The Culture Context Engine is not configured." }, headers, 503);
 
@@ -118,27 +112,46 @@ Deno.serve(async (req) => {
   const anthropic = new Anthropic({ apiKey });
   const response = await anthropic.messages.create({
     model,
-    max_tokens: 500,
+    max_tokens: 900,
     thinking: { type: "adaptive" },
-    system: `You are the WAKILISHA Culture Context Engine. Draft one restrained public explanation for a reviewed cultural relationship.
+    system: `You are the WAKILISHA Culture Context Engine. Draft a complete first-pass review packet for one cultural relationship.
 Rules:
-- Use only the supplied names and evidence.
-- State what happened. Do not invent cultural impact, scene meaning, influence, or importance.
-- Prefer one sentence. Maximum 24 words.
-- No marketing language, academic language, database language, or flowery phrasing.
-- No em dashes.
-- If the evidence does not identify a specific work or event, say the artists collaborated without adding detail.
-- Return JSON with draft and uncertainty_note.`,
+- Use only the supplied Registry context.
+- Draft every requested field. Do not ask the reviewer to write the first version.
+- Keep the evidence title specific and useful.
+- Keep the evidence summary factual and complete in one or two sentences.
+- The main claim must state only what the Registry context supports.
+- The public explanation should usually be one sentence and no more than 24 words.
+- No marketing language, academic fog, database jargon, flowery phrasing, or em dashes.
+- Do not invent cultural impact, influence, scene meaning, dates, credits, or roles.
+- If the context is thin, write the safest complete draft and explain the exact verification gap in uncertainty_note.
+- Suggest reliability and confidence using only low, medium, or high.
+- Return valid JSON only.`,
     output_config: {
       format: {
         type: "json_schema",
         schema: {
           type: "object",
           additionalProperties: false,
-          required: ["draft", "uncertainty_note"],
+          required: [
+            "evidence_title",
+            "evidence_type",
+            "evidence_summary",
+            "evidence_main_claim",
+            "public_explanation",
+            "uncertainty_note",
+            "reliability",
+            "confidence",
+          ],
           properties: {
-            draft: { type: "string" },
+            evidence_title: { type: "string" },
+            evidence_type: { type: "string", enum: ["track_metadata", "release_metadata", "artist_metadata"] },
+            evidence_summary: { type: "string" },
+            evidence_main_claim: { type: "string" },
+            public_explanation: { type: "string" },
             uncertainty_note: { type: "string" },
+            reliability: { type: "string", enum: ["low", "medium", "high"] },
+            confidence: { type: "string", enum: ["low", "medium", "high"] },
           },
         },
       },
@@ -150,10 +163,8 @@ Rules:
         targetName,
         relationshipType: relationship.relationship_type,
         relationshipRole: relationship.relationship_role,
-        evidenceTitle,
-        evidenceType: body.evidenceType ?? "",
-        evidenceSummary,
-        evidenceMainClaim: body.evidenceMainClaim ?? "",
+        sharedTitles,
+        sharedTrackCount,
       }),
     }],
   });
