@@ -1587,6 +1587,403 @@ function EvidenceMetric({ label, value, note }: { label: string; value: string |
   );
 }
 
+function MaterialSection({
+  draft,
+  addEvidence,
+  reloadInquiries,
+}: {
+  draft: InquiryDraft | null;
+  addEvidence: (
+    inquiryId: string,
+    evidence: Omit<EvidenceItem, "id" | "createdAt" | "updatedAt">,
+  ) => Promise<EvidenceItem>;
+  reloadInquiries: () => Promise<void>;
+}) {
+  const [typeFilter, setTypeFilter] = useState("All");
+  const [statusFilter, setStatusFilter] = useState("All");
+  const [reviewOpen, setReviewOpen] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [form, setForm] = useState({
+    title: "",
+    kind: "Article" as EvidenceKind,
+    source: "",
+    sourceUrl: "",
+    summary: "",
+    whyItMatters: "",
+  });
+
+  if (!draft) {
+    return (
+      <Panel eyebrow="Material" title="Choose an Inquiry">
+        <EmptyState
+          title="No Inquiry selected"
+          body="Return to Inquiries and choose the question you want to continue."
+        />
+      </Panel>
+    );
+  }
+
+  const material = draft.evidence ?? [];
+  const kinds = Array.from(new Set(material.map((item) => item.kind))).sort();
+  const statuses = Array.from(new Set(material.map((item) => item.reviewState))).sort();
+
+  const visibleMaterial = material.filter((item) => {
+    const matchesType = typeFilter === "All" || item.kind === typeFilter;
+    const matchesStatus = statusFilter === "All" || item.reviewState === statusFilter;
+    return matchesType && matchesStatus;
+  });
+
+  const canSave =
+    form.title.trim().length >= 3 &&
+    form.summary.trim().length >= 8;
+
+  const saveMaterial = async () => {
+    if (!canSave || saving) return;
+
+    setSaving(true);
+
+    try {
+      await addEvidence(draft.id, {
+        title: form.title.trim(),
+        kind: form.kind,
+        source: form.source.trim(),
+        sourceUrl: form.sourceUrl.trim(),
+        summary: form.summary.trim(),
+        whyItMatters: form.whyItMatters.trim(),
+        mediaMinutes: 0,
+        reviewState: "Draft",
+        metadata: {
+          savedFrom: "inquiry_material_section",
+        },
+      });
+
+      setForm({
+        title: "",
+        kind: "Article",
+        source: "",
+        sourceUrl: "",
+        summary: "",
+        whyItMatters: "",
+      });
+
+      await reloadInquiries();
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const statusTone = (status: ReviewState) => {
+    if (
+      status === "Accepted for internal memory" ||
+      status === "Public-safe candidate"
+    ) {
+      return "success" as const;
+    }
+
+    if (
+      status === "Needs review" ||
+      status === "Needs more evidence" ||
+      status === "Kept as doubt"
+    ) {
+      return "warning" as const;
+    }
+
+    return "neutral" as const;
+  };
+
+  return (
+    <div className="space-y-5">
+      <section className="rounded-[22px] border border-wk-border bg-wk-surface p-5 shadow-sm sm:p-6">
+        <div className="flex flex-wrap items-start justify-between gap-4">
+          <div>
+            <div className="text-[10px] font-black uppercase tracking-[0.22em] text-wk-brand">
+              Material
+            </div>
+            <h2 className="mt-2 text-[28px] font-black tracking-[-0.05em] text-wk-text">
+              Everything collected for this Inquiry.
+            </h2>
+            <p className="mt-2 max-w-2xl text-[13px] leading-6 text-wk-text-muted">
+              Sources, notes, recordings, images, records, and other useful material belong here.
+            </p>
+          </div>
+
+          <div className="rounded-xl border border-wk-border bg-wk-bg px-4 py-3">
+            <div className="text-[10px] font-black uppercase tracking-[0.14em] text-wk-text-faint">
+              Total material
+            </div>
+            <div className="mt-1 text-[24px] font-black text-wk-text">{material.length}</div>
+          </div>
+        </div>
+      </section>
+
+      <details className="rounded-[22px] border border-wk-border bg-wk-surface p-5 shadow-sm">
+        <summary className="cursor-pointer list-none">
+          <div className="flex items-center justify-between gap-4">
+            <div>
+              <div className="text-[10px] font-black uppercase tracking-[0.2em] text-wk-brand">
+                Add Material
+              </div>
+              <div className="mt-1 text-[18px] font-black text-wk-text">
+                Save something useful
+              </div>
+            </div>
+            <span className="rounded-lg bg-wk-brand px-4 py-2 text-[12px] font-black text-wk-brand-on">
+              Add Material
+            </span>
+          </div>
+        </summary>
+
+        <div className="mt-5 grid gap-4">
+          <div className="grid gap-4 md:grid-cols-2">
+            <label>
+              <span className="mb-2 block text-[10px] font-black uppercase tracking-[0.12em] text-wk-text-faint">
+                Title
+              </span>
+              <input
+                value={form.title}
+                onChange={(event) =>
+                  setForm((current) => ({ ...current, title: event.target.value }))
+                }
+                placeholder="Name this material"
+                className="w-full rounded-lg border border-wk-border bg-wk-bg px-3 py-2.5 text-[13px] text-wk-text outline-none focus:border-wk-brand"
+              />
+            </label>
+
+            <label>
+              <span className="mb-2 block text-[10px] font-black uppercase tracking-[0.12em] text-wk-text-faint">
+                Type
+              </span>
+              <select
+                value={form.kind}
+                onChange={(event) =>
+                  setForm((current) => ({
+                    ...current,
+                    kind: event.target.value as EvidenceKind,
+                  }))
+                }
+                className="w-full rounded-lg border border-wk-border bg-wk-bg px-3 py-2.5 text-[13px] text-wk-text outline-none focus:border-wk-brand"
+              >
+                <option>Article</option>
+                <option>Link</option>
+                <option>Citation</option>
+                <option>Audio</option>
+                <option>Video</option>
+                <option>Photo</option>
+                <option>Interview</option>
+                <option>Contributor memory</option>
+                <option>Social post</option>
+                <option>Chart data</option>
+                <option>Playlist data</option>
+                <option>Archive document</option>
+                <option>WAKILISHA record</option>
+                <option>Personal note</option>
+              </select>
+            </label>
+          </div>
+
+          <div className="grid gap-4 md:grid-cols-2">
+            <label>
+              <span className="mb-2 block text-[10px] font-black uppercase tracking-[0.12em] text-wk-text-faint">
+                Source
+              </span>
+              <input
+                value={form.source}
+                onChange={(event) =>
+                  setForm((current) => ({ ...current, source: event.target.value }))
+                }
+                placeholder="Who or where this came from"
+                className="w-full rounded-lg border border-wk-border bg-wk-bg px-3 py-2.5 text-[13px] text-wk-text outline-none focus:border-wk-brand"
+              />
+            </label>
+
+            <label>
+              <span className="mb-2 block text-[10px] font-black uppercase tracking-[0.12em] text-wk-text-faint">
+                Link
+              </span>
+              <input
+                value={form.sourceUrl}
+                onChange={(event) =>
+                  setForm((current) => ({ ...current, sourceUrl: event.target.value }))
+                }
+                placeholder="Optional URL"
+                className="w-full rounded-lg border border-wk-border bg-wk-bg px-3 py-2.5 text-[13px] text-wk-text outline-none focus:border-wk-brand"
+              />
+            </label>
+          </div>
+
+          <label>
+            <span className="mb-2 block text-[10px] font-black uppercase tracking-[0.12em] text-wk-text-faint">
+              Summary
+            </span>
+            <textarea
+              value={form.summary}
+              onChange={(event) =>
+                setForm((current) => ({ ...current, summary: event.target.value }))
+              }
+              rows={4}
+              placeholder="What does this material contain?"
+              className="w-full resize-y rounded-lg border border-wk-border bg-wk-bg px-3 py-2.5 text-[13px] leading-6 text-wk-text outline-none focus:border-wk-brand"
+            />
+          </label>
+
+          <label>
+            <span className="mb-2 block text-[10px] font-black uppercase tracking-[0.12em] text-wk-text-faint">
+              Why it matters
+            </span>
+            <textarea
+              value={form.whyItMatters}
+              onChange={(event) =>
+                setForm((current) => ({ ...current, whyItMatters: event.target.value }))
+              }
+              rows={3}
+              placeholder="How could this help the Inquiry?"
+              className="w-full resize-y rounded-lg border border-wk-border bg-wk-bg px-3 py-2.5 text-[13px] leading-6 text-wk-text outline-none focus:border-wk-brand"
+            />
+          </label>
+
+          <div>
+            <button
+              type="button"
+              disabled={!canSave || saving}
+              onClick={() => void saveMaterial()}
+              className="rounded-lg bg-wk-brand px-5 py-3 text-[13px] font-black text-wk-brand-on disabled:cursor-not-allowed disabled:opacity-40"
+            >
+              {saving ? "Saving..." : "Save Material"}
+            </button>
+          </div>
+        </div>
+      </details>
+
+      <section className="rounded-[22px] border border-wk-border bg-wk-surface p-5 shadow-sm">
+        <div className="flex flex-wrap items-end justify-between gap-4">
+          <div>
+            <div className="text-[10px] font-black uppercase tracking-[0.2em] text-wk-brand">
+              Collected Material
+            </div>
+            <h2 className="mt-2 text-[22px] font-black tracking-[-0.04em] text-wk-text">
+              {visibleMaterial.length} item{visibleMaterial.length === 1 ? "" : "s"}
+            </h2>
+          </div>
+
+          <div className="flex flex-wrap gap-2">
+            <select
+              value={typeFilter}
+              onChange={(event) => setTypeFilter(event.target.value)}
+              className="rounded-lg border border-wk-border bg-wk-bg px-3 py-2 text-[12px] font-bold text-wk-text"
+            >
+              <option>All</option>
+              {kinds.map((kind) => (
+                <option key={kind}>{kind}</option>
+              ))}
+            </select>
+
+            <select
+              value={statusFilter}
+              onChange={(event) => setStatusFilter(event.target.value)}
+              className="rounded-lg border border-wk-border bg-wk-bg px-3 py-2 text-[12px] font-bold text-wk-text"
+            >
+              <option>All</option>
+              {statuses.map((status) => (
+                <option key={status}>{status}</option>
+              ))}
+            </select>
+          </div>
+        </div>
+
+        {visibleMaterial.length ? (
+          <div className="mt-5 space-y-3">
+            {visibleMaterial.map((item) => (
+              <article
+                key={item.id}
+                className="rounded-xl border border-wk-border bg-wk-bg p-4"
+              >
+                <div className="flex flex-wrap items-start justify-between gap-3">
+                  <div className="min-w-0 flex-1">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <Chip tone="brand">{item.kind}</Chip>
+                      <Chip tone={statusTone(item.reviewState)}>{item.reviewState}</Chip>
+                    </div>
+
+                    <h3 className="mt-3 text-[17px] font-black tracking-[-0.03em] text-wk-text">
+                      {item.title}
+                    </h3>
+
+                    {item.source ? (
+                      <p className="mt-1 text-[11px] font-bold text-wk-text-faint">
+                        Source: {item.source}
+                      </p>
+                    ) : null}
+
+                    <p className="mt-2 text-[13px] leading-6 text-wk-text-muted">
+                      {item.summary || "No summary saved yet."}
+                    </p>
+
+                    <p className="mt-3 text-[11px] text-wk-text-faint">
+                      Updated {new Date(item.updatedAt).toLocaleString()}
+                    </p>
+                  </div>
+
+                  {item.sourceUrl ? (
+                    <a
+                      href={item.sourceUrl}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="rounded-lg border border-wk-border bg-wk-surface px-3 py-2 text-[11px] font-black text-wk-text"
+                    >
+                      Open Source
+                    </a>
+                  ) : null}
+                </div>
+              </article>
+            ))}
+          </div>
+        ) : (
+          <div className="mt-5">
+            <EmptyState
+              title={material.length ? "Nothing matches these filters" : "No material yet"}
+              body={
+                material.length
+                  ? "Change the type or status filter."
+                  : "Add the first useful source, note, recording, image, or record."
+              }
+            />
+          </div>
+        )}
+      </section>
+
+      <section className="rounded-[22px] border border-wk-border bg-wk-surface p-5 shadow-sm">
+        <div className="flex flex-wrap items-center justify-between gap-4">
+          <div>
+            <div className="text-[10px] font-black uppercase tracking-[0.2em] text-wk-brand">
+              Review
+            </div>
+            <h2 className="mt-1 text-[18px] font-black text-wk-text">
+              Check material more closely
+            </h2>
+          </div>
+
+          <button
+            type="button"
+            onClick={() => setReviewOpen((current) => !current)}
+            className="rounded-lg border border-wk-border bg-wk-bg px-4 py-2 text-[12px] font-black text-wk-text"
+          >
+            {reviewOpen ? "Close Review" : "Review Material"}
+          </button>
+        </div>
+
+        {reviewOpen ? (
+          <div className="mt-5">
+            <EvidenceReaderPanel
+              draft={draft}
+              onEvidenceChanged={reloadInquiries}
+            />
+          </div>
+        ) : null}
+      </section>
+    </div>
+  );
+}
+
 function EvidenceScreen({
   draft,
   addEvidence,
@@ -3046,10 +3443,11 @@ function InquiryShell({
           </div>
         </div>
       ) : section === "material" ? (
-        <>
-          <EvidenceScreen draft={draft} addEvidence={addEvidence} updateDraft={updateDraft} />
-          <EvidenceReaderPanel draft={draft} onEvidenceChanged={reloadInquiries} />
-        </>
+        <MaterialSection
+          draft={draft}
+          addEvidence={addEvidence}
+          reloadInquiries={reloadInquiries}
+        />
       ) : section === "notes" ? (
         <InstituteClaimsWorkspace draft={draft} addEvidence={addEvidence} />
       ) : section === "work" ? (
