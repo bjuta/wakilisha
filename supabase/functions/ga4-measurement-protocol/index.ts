@@ -18,8 +18,6 @@ const corsHeaders = {
 const allowedHosts = new Set([
   "wakilisha.africa",
   "www.wakilisha.africa",
-  "localhost",
-  "127.0.0.1",
 ]);
 
 function jsonResponse(body: unknown, status = 200) {
@@ -119,6 +117,18 @@ Deno.serve(async (req) => {
     );
   }
 
+  const authorization = req.headers.get("Authorization") ?? "";
+
+  if (authorization !== `Bearer ${serviceRoleKey}`) {
+    return jsonResponse(
+      {
+        error: "Server authorization required.",
+        request_id: requestId,
+      },
+      403,
+    );
+  }
+
   let payload: AnalyticsPayload;
 
   try {
@@ -127,7 +137,27 @@ Deno.serve(async (req) => {
     return jsonResponse({ error: "Invalid JSON.", request_id: requestId }, 400);
   }
 
-  const eventName = safeString(payload.event_name, 64) ?? "page_view";
+  const eventName = safeString(payload.event_name, 64);
+
+  if (!eventName) {
+    return jsonResponse(
+      {
+        error: "event_name is required.",
+        request_id: requestId,
+      },
+      400,
+    );
+  }
+
+  if (eventName === "page_view") {
+    return jsonResponse(
+      {
+        error: "Server-side page_view delivery is disabled. Browser gtag is the canonical page-view source.",
+        request_id: requestId,
+      },
+      410,
+    );
+  }
   const pageUrl = safeString(payload.page_url, 500);
   const pagePath = safeString(payload.page_path, 300);
   const pageTitle = safeString(payload.page_title, 300);
