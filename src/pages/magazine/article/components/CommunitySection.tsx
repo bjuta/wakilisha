@@ -1,4 +1,4 @@
-import { useState, useCallback, useMemo } from "react";
+import { useState, useCallback, useEffect, useMemo } from "react";
 import { Link } from "react-router-dom";
 import type { CommunityEntity, CommunityComment, SortMode, ReactionType } from "@/services/community";
 import { useCommunityThread } from "@/hooks/useCommunityThread";
@@ -7,6 +7,7 @@ import type { AuthUser } from "@/hooks/useAuthUser";
 import { CommentCard } from "@/components/feature/community/CommentCard";
 import { CommentComposer, LoginToComment } from "@/components/feature/community/CommentComposer";
 import { ContributionSheet } from "@/components/feature/community/ContributionSheet";
+import { getPublicLivingMemory, type LivingMemoryEditorial } from "@/services/livingMemory";
 
 interface CommunitySectionProps {
   entity: CommunityEntity;
@@ -25,9 +26,14 @@ function isWholeEntityComment(comment: CommunityComment): boolean {
   return !comment.anchorType || comment.anchorType === "whole_entity";
 }
 
+function supportsLivingMemory(type: CommunityEntity["type"]): type is "artist" | "release" | "track" {
+  return type === "artist" || type === "release" || type === "track";
+}
+
 export function CommunitySection({ entity, user }: CommunitySectionProps) {
   const userId = user?.id || (user && !user.loading ? user.id : undefined);
   const isLoggedIn = !!userId && userId.length > 0;
+  const [livingMemory, setLivingMemory] = useState<LivingMemoryEditorial | null>(null);
 
   const {
     thread,
@@ -50,6 +56,29 @@ export function CommunitySection({ entity, user }: CommunitySectionProps) {
   const visibleCommentCount = visibleComments.length;
   const [contributionOpen, setContributionOpen] = useState(false);
   const [contribSourceCommentId, setContribSourceCommentId] = useState<string | undefined>(undefined);
+
+  useEffect(() => {
+    let alive = true;
+
+    if (!supportsLivingMemory(entity.type)) {
+      setLivingMemory(null);
+      return () => {
+        alive = false;
+      };
+    }
+
+    getPublicLivingMemory({
+      entityType: entity.type,
+      entityId: entity.id,
+      entitySlug: entity.slug,
+    }).then((result) => {
+      if (alive) setLivingMemory(result);
+    });
+
+    return () => {
+      alive = false;
+    };
+  }, [entity.id, entity.slug, entity.type]);
 
   const handlePostComment = useCallback(
     async (body: string) => {
@@ -140,13 +169,15 @@ export function CommunitySection({ entity, user }: CommunitySectionProps) {
         <div className="w-12 h-12 mx-auto mb-4 rounded-full bg-[var(--wk-surface-strong)] flex items-center justify-center">
           <i className="ri-chat-3-line text-[22px] text-[var(--wk-text-faint)]" />
         </div>
-        <p className="text-[15px] font-bold text-[var(--wk-text)] mb-1">No comments yet</p>
-        <p className="text-[13px] text-[var(--wk-text-muted)] max-w-xs mx-auto">
-          Be the first to share your thoughts on this.
+        <p className="text-[15px] font-bold text-[var(--wk-text)] mb-1">
+          {livingMemory ? "The record is still open" : "No comments yet"}
+        </p>
+        <p className="text-[13px] text-[var(--wk-text-muted)] max-w-md mx-auto">
+          {livingMemory?.publicPrompt || "Be the first to share your thoughts on this."}
         </p>
       </div>
     ),
-    []
+    [livingMemory]
   );
 
   const errorState = useMemo(
@@ -174,11 +205,35 @@ export function CommunitySection({ entity, user }: CommunitySectionProps) {
   return (
     <section id="community-section" className="border-t border-[var(--wk-border)] bg-[var(--wk-bg)]">
       <div className="max-w-[740px] mx-auto px-6 lg:px-8 py-12">
-        {/* Header */}
+        {livingMemory && (
+          <div className="mb-10 overflow-hidden rounded-2xl border border-[var(--wk-border)] bg-[var(--wk-surface)]">
+            <div className="px-6 py-6 md:px-8 md:py-8">
+              <div className="mb-4 inline-flex items-center gap-2 rounded-full border border-[var(--wk-brand)]/20 bg-[var(--wk-brand-soft)]/40 px-3 py-1 text-[10px] font-extrabold uppercase tracking-[0.18em] text-[var(--wk-brand)]">
+                <i className="ri-double-quotes-l" />
+                Editorial
+              </div>
+              <p className="text-[18px] font-bold leading-[1.7] tracking-[-0.015em] text-[var(--wk-text)] md:text-[21px]">
+                {livingMemory.editorialOpener}
+              </p>
+              <p className="mt-5 border-t border-[var(--wk-border)] pt-4 text-[11px] font-semibold leading-relaxed text-[var(--wk-text-muted)]">
+                {livingMemory.editorialLabel}
+              </p>
+              <div className="mt-5 rounded-xl bg-[var(--wk-brand-soft)]/45 px-4 py-3">
+                <div className="text-[9px] font-extrabold uppercase tracking-[0.18em] text-[var(--wk-brand)]">
+                  Your Turn
+                </div>
+                <p className="mt-1 text-[14px] font-bold leading-relaxed text-[var(--wk-text)]">
+                  {livingMemory.publicPrompt}
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
+
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-6">
           <div className="flex items-center gap-3 shrink-0">
             <h2 className="text-[20px] font-black text-[var(--wk-text)] tracking-[-0.02em]">
-              Community
+              {livingMemory ? "Living Memory" : "Community"}
             </h2>
             {!loading && (
               <span className="text-[12px] font-bold text-[var(--wk-text-muted)] bg-[var(--wk-surface)] border border-[var(--wk-border)] px-2.5 py-0.5 rounded-full">
@@ -187,7 +242,6 @@ export function CommunitySection({ entity, user }: CommunitySectionProps) {
             )}
           </div>
 
-          {/* Sort selector */}
           {!loading && visibleComments.length > 0 && (
             <div className="flex items-center gap-1 bg-[var(--wk-surface)] border border-[var(--wk-border)] rounded-full p-1 overflow-x-auto max-w-full">
               {SORT_OPTIONS.map((opt) => (
@@ -207,13 +261,12 @@ export function CommunitySection({ entity, user }: CommunitySectionProps) {
           )}
         </div>
 
-        {/* Composer or login prompt */}
         <div className="mb-8">
           {isLoggedIn && user ? (
             <CommentComposer
               user={user}
               onSubmit={handlePostComment}
-              placeholder="Share your thoughts..."
+              placeholder={livingMemory?.publicPrompt || "Share your thoughts..."}
             />
           ) : (
             <LoginToComment
@@ -224,7 +277,6 @@ export function CommunitySection({ entity, user }: CommunitySectionProps) {
           )}
         </div>
 
-        {/* Comments */}
         {loading ? (
           loadingSkeleton
         ) : error ? (
@@ -254,7 +306,6 @@ export function CommunitySection({ entity, user }: CommunitySectionProps) {
         )}
       </div>
 
-      {/* Contribution sheet */}
       <ContributionSheet
         entity={entity}
         open={contributionOpen}
