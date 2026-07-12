@@ -155,6 +155,9 @@ export type PublicArtistDetail = PublicArtist & {
     tracks: Array<{ title: string; duration: string; previewUrl?: string }>;
   }>;
   topSongs: Array<{
+    id: string;
+    slug: string;
+    artistSlug: string;
     title: string;
     artists: string;
     image: string;

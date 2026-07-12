@@ -1,9 +1,14 @@
 import React, { useState } from "react";
+import { Link } from "react-router-dom";
 import { useScrollReveal } from "@/hooks/useScrollReveal";
 import { Ch19GradientImage } from "@/components/media/Ch19GradientImage";
 import { usePlayer } from "@/context/PlayerContext";
+import type { PublicArtistRelationship } from "@/services/publicArtistRelationships";
 
 interface Song {
+  id: string;
+  slug: string;
+  artistSlug: string;
   title: string;
   artists: string;
   image: string;
@@ -14,6 +19,7 @@ interface Song {
 interface ArtistTopSongsProps {
   songs: Song[];
   artistSlug?: string;
+  reviewedRelationships?: PublicArtistRelationship[];
 }
 
 /* ─────────────────────────────────────────────
@@ -24,10 +30,12 @@ function SongExpandedPanel({
   song,
   rank,
   artistSlug,
+  reviewedRelationship,
 }: {
   song: Song;
   rank: number;
   artistSlug?: string;
+  reviewedRelationship?: PublicArtistRelationship;
 }) {
   const { playTrack, currentTrack, isPlaying, togglePlay } = usePlayer();
   const artistList = song.artists
@@ -35,7 +43,7 @@ function SongExpandedPanel({
     .map((a) => a.trim())
     .filter(Boolean);
 
-  const trackId = `top-song-${song.title}-${song.artists}`.toLowerCase().replace(/\s+/g, "-");
+  const trackId = `top-song-${song.id}`;
   const isCurrentTrack = currentTrack?.id === trackId;
   const isTrackPlaying = isCurrentTrack && isPlaying;
 
@@ -95,6 +103,37 @@ function SongExpandedPanel({
           )}
         </div>
 
+        {reviewedRelationship && (
+          <div className="mb-3.5 rounded-xl border border-[var(--wk-border)] bg-[var(--wk-surface)] px-3.5 py-3">
+            <div className="mb-1.5 flex flex-wrap items-center justify-between gap-2">
+              <span className="text-[9px] font-black uppercase tracking-[0.16em] text-[var(--wk-brand)]">
+                Reviewed connection
+              </span>
+              <span className="text-[10px] font-semibold text-[var(--wk-text-faint)]">
+                {reviewedRelationship.evidenceCount} {reviewedRelationship.evidenceCount === 1 ? "source" : "sources"}
+              </span>
+            </div>
+
+            <p className="text-[12px] leading-relaxed text-[var(--wk-text-muted)]">
+              {reviewedRelationship.plainReason}
+            </p>
+
+            {(reviewedRelationship.relatedEntityUrl ||
+              (song.artistSlug && song.slug)) && (
+              <Link
+                to={
+                  reviewedRelationship.relatedEntityUrl ||
+                  `/tracks/${song.artistSlug}/${song.slug}`
+                }
+                className="mt-2.5 inline-flex items-center gap-1 text-[11px] font-bold text-[var(--wk-brand)] transition-opacity hover:opacity-70"
+              >
+                View Track
+                <i className="ri-arrow-right-line text-[10px]" />
+              </Link>
+            )}
+          </div>
+        )}
+
         {/* Bottom row: artist chips + listen link */}
         <div className="flex flex-wrap items-center justify-between gap-2">
           <div className="flex flex-wrap items-center gap-1.5">
@@ -126,12 +165,22 @@ function SongExpandedPanel({
 /* ─────────────────────────────────────────────
    Single song row — mirrors ChartRow exactly
    ───────────────────────────────────────────── */
-function ArtistSongRow({ song, index, artistSlug }: { song: Song; index: number; artistSlug?: string }) {
+function ArtistSongRow({
+  song,
+  index,
+  artistSlug,
+  reviewedRelationship,
+}: {
+  song: Song;
+  index: number;
+  artistSlug?: string;
+  reviewedRelationship?: PublicArtistRelationship;
+}) {
   const { playTrack, currentTrack, isPlaying, togglePlay } = usePlayer();
   const [isExpanded, setIsExpanded] = useState(false);
   const rank = index + 1;
 
-  const trackId = `top-song-${song.title}-${song.artists}`.toLowerCase().replace(/\s+/g, "-");
+  const trackId = `top-song-${song.id}`;
   const isCurrentTrack = currentTrack?.id === trackId;
   const isTrackPlaying = isCurrentTrack && isPlaying;
 
@@ -189,9 +238,22 @@ function ArtistSongRow({ song, index, artistSlug }: { song: Song; index: number;
 
         {/* Title + artist */}
         <div className="min-w-0 flex-1">
-          <div className="truncate text-[14px] font-bold text-[var(--wk-text)]">
-            {song.title}
+          <div className="flex min-w-0 items-center gap-2">
+            <div className="truncate text-[14px] font-bold text-[var(--wk-text)]">
+              {song.title}
+            </div>
+
+            {reviewedRelationship && (
+              <span
+                title="Reviewed by WAKILISHA against the listed sources."
+                aria-label="Reviewed by WAKILISHA against the listed sources"
+                className="shrink-0 rounded-full border border-[var(--wk-border)] px-1.5 py-0.5 text-[8px] font-black uppercase tracking-[0.12em] text-[var(--wk-brand)]"
+              >
+                Reviewed
+              </span>
+            )}
           </div>
+
           <div className="truncate text-[12px] text-[var(--wk-text-muted)]">
             {song.artists}
           </div>
@@ -237,7 +299,12 @@ function ArtistSongRow({ song, index, artistSlug }: { song: Song; index: number;
           transition: "grid-template-rows 0.25s ease",
         }}
       >
-        <SongExpandedPanel song={song} rank={rank} artistSlug={artistSlug} />
+        <SongExpandedPanel
+          song={song}
+          rank={rank}
+          artistSlug={artistSlug}
+          reviewedRelationship={reviewedRelationship}
+        />
       </div>
     </div>
   );
@@ -246,8 +313,18 @@ function ArtistSongRow({ song, index, artistSlug }: { song: Song; index: number;
 /* ─────────────────────────────────────────────
    Section
    ───────────────────────────────────────────── */
-export function ArtistTopSongs({ songs, artistSlug }: ArtistTopSongsProps) {
+export function ArtistTopSongs({
+  songs,
+  artistSlug,
+  reviewedRelationships = [],
+}: ArtistTopSongsProps) {
   const { ref, revealed } = useScrollReveal<HTMLElement>(0.1);
+  const reviewedByTrackId = new Map(
+    reviewedRelationships.map((relationship) => [
+      relationship.relatedEntityId,
+      relationship,
+    ]),
+  );
 
   return (
     <section ref={ref} className={`${revealed ? "is-visible" : ""} reveal-up`}>
@@ -271,7 +348,13 @@ export function ArtistTopSongs({ songs, artistSlug }: ArtistTopSongsProps) {
 
         <div className="divide-y divide-[var(--wk-divider)]">
           {songs.map((song, index) => (
-            <ArtistSongRow key={`${index}-${song.title}`} song={song} index={index} artistSlug={artistSlug} />
+            <ArtistSongRow
+              key={song.id || `${index}-${song.title}`}
+              song={song}
+              index={index}
+              artistSlug={artistSlug}
+              reviewedRelationship={reviewedByTrackId.get(song.id)}
+            />
           ))}
         </div>
       </div>
