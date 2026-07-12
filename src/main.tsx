@@ -2,6 +2,7 @@ import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 import "./index.css";
 import App from "./App";
+import { initializeGa4Bootstrap } from "@/lib/analytics/ga4Bootstrap";
 import { getSiteIdentitySettings } from "@/services/adminSettings/settingsStore";
 
 function syncSavedFavicon() {
@@ -22,6 +23,7 @@ function syncSavedFavicon() {
   });
 }
 
+initializeGa4Bootstrap();
 syncSavedFavicon();
 window.addEventListener("wk_settings_changed", syncSavedFavicon);
 
