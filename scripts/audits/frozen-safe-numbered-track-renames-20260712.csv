@@ -1,0 +1,79 @@
+track_id,title,artist_slugs,current_slug,proposed_slug,old_path,new_path,same_artist_collision,already_redirected,proposed_path_candidate_count
+c82d10bd-8b55-4e87-970d-d9e5bb40c553,PLUMBER,[bensoul],plumber-2,plumber,/tracks/bensoul/plumber-2,/tracks/bensoul/plumber,false,false,1
+eeceac4c-76cc-4b31-a8dc-0230e15644a8,Decide,[bien],decide-2,decide,/tracks/bien/decide-2,/tracks/bien/decide,false,false,1
+00544b1c-351a-4abb-bdf0-3ffa349da8ff,Lifestyle,[bien],lifestyle-2,lifestyle,/tracks/bien/lifestyle-2,/tracks/bien/lifestyle,false,false,1
+b48788e1-ca57-482c-acdd-7c8cb9e3c867,True Love,[bien],true-love-2,true-love,/tracks/bien/true-love-2,/tracks/bien/true-love,false,false,1
+ac642239-885d-4b53-92c1-418f36e2fa2d,Dedi Dedilee,[breeder-lw],dedi-dedilee-2,dedi-dedilee,/tracks/breeder-lw/dedi-dedilee-2,/tracks/breeder-lw/dedi-dedilee,false,false,1
+cb2587c4-6d96-4718-b049-38bb572dffc9,Grateful,[bridget-blue],grateful-2,grateful,/tracks/bridget-blue/grateful-2,/tracks/bridget-blue/grateful,false,false,1
+d7370b5c-1d64-4a98-85d0-f35d4f9dbd90,Ni Wewe,[bridget-blue],ni-wewe-2,ni-wewe,/tracks/bridget-blue/ni-wewe-2,/tracks/bridget-blue/ni-wewe,false,false,1
+42d01b1b-6d84-499b-86aa-be70bdf7d568,Ningelijua,[bridget-blue],ningelijua-2,ningelijua,/tracks/bridget-blue/ningelijua-2,/tracks/bridget-blue/ningelijua,false,false,1
+75f6e64f-05cf-4169-bcc3-5431faa3c67f,Set Me Free,[bridget-blue],set-me-free-2,set-me-free,/tracks/bridget-blue/set-me-free-2,/tracks/bridget-blue/set-me-free,false,false,1
+1a16ce1c-8d51-472b-b434-db838a8a286a,Sober,[bridget-blue],sober-3,sober,/tracks/bridget-blue/sober-3,/tracks/bridget-blue/sober,false,false,1
+5522db74-c9af-49eb-9529-6a462ed857a2,Woman,[bridget-blue],woman-2,woman,/tracks/bridget-blue/woman-2,/tracks/bridget-blue/woman,false,false,1
+448a9a51-877b-45ab-afa1-4d2746bc23ca,Ex,[buruklyn-boyz],ex-2,ex,/tracks/buruklyn-boyz/ex-2,/tracks/buruklyn-boyz/ex,false,false,1
+359d8832-8156-4480-8ae7-5f210ecac89d,Intro,[buruklyn-boyz],intro-8,intro,/tracks/buruklyn-boyz/intro-8,/tracks/buruklyn-boyz/intro,false,false,1
+5aabcf79-bfb1-4ecc-ac50-06e40304c8b4,Taliban,[buruklyn-boyz],taliban-2,taliban,/tracks/buruklyn-boyz/taliban-2,/tracks/buruklyn-boyz/taliban,false,false,1
+d3e6fe47-ec63-4fa7-accf-be9133b7a0ec,INTRO,[charisma],intro-4,intro,/tracks/charisma/intro-4,/tracks/charisma/intro,false,false,1
+246381a4-b39c-4021-8273-81d979ca8be7,TONIGHT,[charisma],tonight-2,tonight,/tracks/charisma/tonight-2,/tracks/charisma/tonight,false,false,1
+c72a672a-e3cb-4219-8691-b44c9a6a3766,Stereo,[chimano],stereo-2,stereo,/tracks/chimano/stereo-2,/tracks/chimano/stereo,false,false,1
+c1b6c6db-188c-40ad-8a4c-bf0f88da6751,Intro,[coster-ojwang],intro-3,intro,/tracks/coster-ojwang/intro-3,/tracks/coster-ojwang/intro,false,false,1
+89781c83-1a8c-4ee7-92e9-1fa07b53b0ba,Atoti,[dyana-cods],atoti-2,atoti,/tracks/dyana-cods/atoti-2,/tracks/dyana-cods/atoti,false,false,1
+57a8dc94-ea97-40d3-8d63-a47d4eea3868,Now you know,[dyana-cods],now-you-know-2,now-you-know,/tracks/dyana-cods/now-you-know-2,/tracks/dyana-cods/now-you-know,false,false,1
+ec777247-defe-491e-b091-2593caadaf1f,Dala,[fancy-fingers],dala-3,dala,/tracks/fancy-fingers/dala-3,/tracks/fancy-fingers/dala,false,false,1
+870fb959-a20c-4be7-9efa-2793582bfff2,Nitarudi,[fancy-fingers],nitarudi-2,nitarudi,/tracks/fancy-fingers/nitarudi-2,/tracks/fancy-fingers/nitarudi,false,false,1
+42783c0d-e2ce-4814-ad4e-1fa6b2473beb,Pokunena,[fancy-fingers],pokunena-2,pokunena,/tracks/fancy-fingers/pokunena-2,/tracks/fancy-fingers/pokunena,false,false,1
+6fe23a09-28da-49da-8fc7-ed23d6d2e145,Balance,[femi-one],balance-2,balance,/tracks/femi-one/balance-2,/tracks/femi-one/balance,false,false,1
+ca62f90d-91f2-4150-8e3b-f7b12b84b1d7,Pewa,[femi-one],pewa-2,pewa,/tracks/femi-one/pewa-2,/tracks/femi-one/pewa,false,false,1
+2bdbd42d-3e16-4713-831b-d8393513adb6,Mali Safi,[fena-gitu],mali-safi-3,mali-safi,/tracks/fena-gitu/mali-safi-3,/tracks/fena-gitu/mali-safi,false,false,1
+160445fb-2c37-44bb-9bef-0cdc33e11939,December,[iyanii],december-2,december,/tracks/iyanii/december-2,/tracks/iyanii/december,false,false,1
+cf522b83-8634-4a47-819e-da784566263f,Tamu,[iyanii],tamu-2,tamu,/tracks/iyanii/tamu-2,/tracks/iyanii/tamu,false,false,1
+eef361ee-e50c-4775-a5a0-b9761e37853b,Asante,[janet-otieno],asante-2,asante,/tracks/janet-otieno/asante-2,/tracks/janet-otieno/asante,false,false,1
+99ff0807-85c1-4ca2-8e14-48f476a06bc2,Ni Wewe,[janet-otieno],ni-wewe-3,ni-wewe,/tracks/janet-otieno/ni-wewe-3,/tracks/janet-otieno/ni-wewe,false,false,1
+5210ec07-47a9-46eb-bea1-39aec5a6e92f,Habibi,[jua-cali],habibi-2,habibi,/tracks/jua-cali/habibi-2,/tracks/jua-cali/habibi,false,false,1
+f423551d-e056-40ce-be48-c5850735d2a6,Interlude,[jua-cali],interlude-5,interlude,/tracks/jua-cali/interlude-5,/tracks/jua-cali/interlude,false,false,1
+7656974e-e099-4f15-8cc7-6bce215c3082,Interlude 3,[jua-cali],interlude-3-2,interlude-3,/tracks/jua-cali/interlude-3-2,/tracks/jua-cali/interlude-3,false,false,1
+221b4ded-351f-4ae5-bae4-4b65781017b0,Intro,[jua-cali],intro-7,intro,/tracks/jua-cali/intro-7,/tracks/jua-cali/intro,false,false,1
+f3e92b9d-92f2-46d1-864c-87e099e25be3,Outro,[jua-cali],outro-3,outro,/tracks/jua-cali/outro-3,/tracks/jua-cali/outro,false,false,1
+bb349d90-3084-4d6b-bd0f-c9493f860047,I Know,[karun],i-know-2,i-know,/tracks/karun/i-know-2,/tracks/karun/i-know,false,false,1
+ac5305dc-d0db-48a5-bcff-5b9886f82ea2,One in a Million,[karun],one-in-a-million-2,one-in-a-million,/tracks/karun/one-in-a-million-2,/tracks/karun/one-in-a-million,false,false,1
+ef2a6d23-51f5-4796-bb0e-b679588e04cb,Fly,[king-kaka],fly-3,fly,/tracks/king-kaka/fly-3,/tracks/king-kaka/fly,false,false,1
+c33fa53f-e948-4e9b-9a5e-10eaf4cc0a1c,Poison,[king-kaka],poison-2,poison,/tracks/king-kaka/poison-2,/tracks/king-kaka/poison,false,false,1
+e1bfa286-e382-49ae-a6a3-f0f432c4d1ec,Furahia,[kleptomaniax],furahia-2,furahia,/tracks/kleptomaniax/furahia-2,/tracks/kleptomaniax/furahia,false,false,1
+687fa82e-c4cf-4cad-abd8-dabe93d30aa7,Interlude,[kleptomaniax],interlude-3,interlude,/tracks/kleptomaniax/interlude-3,/tracks/kleptomaniax/interlude,false,false,1
+a4d3b204-1d89-4a7a-aca6-7a60ac33d61c,Interlude 2,[kleptomaniax],interlude-2-2,interlude-2,/tracks/kleptomaniax/interlude-2-2,/tracks/kleptomaniax/interlude-2,false,false,1
+8368f851-6d4f-46fe-8f31-b612bf3cab31,Intro,[kleptomaniax],intro-6,intro,/tracks/kleptomaniax/intro-6,/tracks/kleptomaniax/intro,false,false,1
+b24dfa3a-ab15-436f-8d73-f960cbb1f840,Magnetic,[kleptomaniax],magnetic-2,magnetic,/tracks/kleptomaniax/magnetic-2,/tracks/kleptomaniax/magnetic,false,false,1
+640a1df5-43a0-4f5b-a35a-a574a6030f3a,Tonight,[kodongklan],tonight-3,tonight,/tracks/kodongklan/tonight-3,/tracks/kodongklan/tonight,false,false,1
+d7c41ebc-4347-4419-80b4-e73c66b818b5,Amina,[matata],amina-2,amina,/tracks/matata/amina-2,/tracks/matata/amina,false,false,1
+7afb5ed5-fa2e-4a82-b5e0-0d12b881a6ee,This Love,[matata],this-love-2,this-love,/tracks/matata/this-love-2,/tracks/matata/this-love,false,false,1
+2d45071a-2f92-46f7-aa9b-75fd39d680d6,Asali,[maya-amolo],asali-3,asali,/tracks/maya-amolo/asali-3,/tracks/maya-amolo/asali,false,false,1
+832d7793-968a-4aeb-a227-bb9d004a2cdb,I Know,[maya-amolo],i-know-3,i-know,/tracks/maya-amolo/i-know-3,/tracks/maya-amolo/i-know,false,false,1
+82c8f94d-6030-43b3-b092-a515499055ea,Weh Decide,[mejja],weh-decide-2,weh-decide,/tracks/mejja/weh-decide-2,/tracks/mejja/weh-decide,false,false,1
+043de864-79d3-4c46-952d-6d4e39edd2c7,Intro,[nikita-kering],intro-2,intro,/tracks/nikita-kering/intro-2,/tracks/nikita-kering/intro,false,false,1
+b25018a7-2820-40f0-a959-02db0898f59d,Balance,[nyashinski],balance-3,balance,/tracks/nyashinski/balance-3,/tracks/nyashinski/balance,false,false,1
+a7eb6b97-344f-4912-b53f-e73443e12c1a,Time,[nyashinski],time-2,time,/tracks/nyashinski/time-2,/tracks/nyashinski/time,false,false,1
+1aef7a80-de5e-4c4d-a0cb-7b647588457a,Fly,[onyach-pala],fly-2,fly,/tracks/onyach-pala/fly-2,/tracks/onyach-pala/fly,false,false,1
+a8ec78e9-133a-45a0-9e26-3aafe18ca923,Coming Home,[sauti-sol],coming-home-2,coming-home,/tracks/sauti-sol/coming-home-2,/tracks/sauti-sol/coming-home,false,false,1
+c69bf6c9-701f-4245-818b-ce309e9c3380,Interlude,[sauti-sol],interlude-2,interlude,/tracks/sauti-sol/interlude-2,/tracks/sauti-sol/interlude,false,false,1
+c28935b0-8a30-452a-ab75-ff91bbeb5ec8,Intro,[sauti-sol],intro-5,intro,/tracks/sauti-sol/intro-5,/tracks/sauti-sol/intro,false,false,1
+9b44eb7a-0b91-40b3-a755-5e8a0041b504,Sober,[sauti-sol],sober-2,sober,/tracks/sauti-sol/sober-2,/tracks/sauti-sol/sober,false,false,1
+62a0944c-844e-4bb5-bd6d-30e56a6d6b3b,Subira,[sauti-sol],subira-2,subira,/tracks/sauti-sol/subira-2,/tracks/sauti-sol/subira,false,false,1
+9837a2d0-d0db-4e00-9e24-caa8aafbaff3,Jahera Na,[tina-ardor],jahera-na-2,jahera-na,/tracks/tina-ardor/jahera-na-2,/tracks/tina-ardor/jahera-na,false,false,1
+286608af-a443-432d-a9d4-8283e1995a08,Sumbua,[tina-ardor],sumbua-2,sumbua,/tracks/tina-ardor/sumbua-2,/tracks/tina-ardor/sumbua,false,false,1
+26be3f2f-b7f8-4ae9-85df-5d52bae0987d,Thugnificent,[toxic-lyrikali],thugnificent-2,thugnificent,/tracks/toxic-lyrikali/thugnificent-2,/tracks/toxic-lyrikali/thugnificent,false,false,1
+892f1f9b-fa65-4abe-86ec-3bf97bf061d2,Amen,[v-be],amen-2,amen,/tracks/v-be/amen-2,/tracks/v-be/amen,false,false,1
+92841f08-2d1c-483a-b0b4-418c26c2f254,Leave Me Alone,[v-be],leave-me-alone-2,leave-me-alone,/tracks/v-be/leave-me-alone-2,/tracks/v-be/leave-me-alone,false,false,1
+ef5dc94f-f7bc-4cf3-91e4-fee1cd82bfbb,Chunga,[wakadinali],chunga-2,chunga,/tracks/wakadinali/chunga-2,/tracks/wakadinali/chunga,false,false,1
+01dc9e03-0437-4f3a-a6ea-971d02dc0ff2,Eastlando,[wakadinali],eastlando-2,eastlando,/tracks/wakadinali/eastlando-2,/tracks/wakadinali/eastlando,false,false,1
+eb633d81-3f80-4298-954a-b5682ea6f47d,Extra Pressure,[wakadinali],extra-pressure-2,extra-pressure,/tracks/wakadinali/extra-pressure-2,/tracks/wakadinali/extra-pressure,false,false,1
+1d49cb8a-78d2-48ff-84dd-bb20bebcdd9b,Hallelujah,[wakadinali],hallelujah-2,hallelujah,/tracks/wakadinali/hallelujah-2,/tracks/wakadinali/hallelujah,false,false,1
+60dec912-617d-4747-b5ee-56dd8f9d2407,Nitangoja,[wanavokali],nitangoja-2,nitangoja,/tracks/wanavokali/nitangoja-2,/tracks/wanavokali/nitangoja,false,false,1
+20a6c5f2-0f4c-4bfb-91da-c9c5df660d8b,Asali,[watendawili],asali-2,asali,/tracks/watendawili/asali-2,/tracks/watendawili/asali,false,false,1
+e24a4db2-9f7d-4123-adf0-399618e7da77,Safari,[watendawili],safari-2,safari,/tracks/watendawili/safari-2,/tracks/watendawili/safari,false,false,1
+c2f3f574-7ffa-4bcd-b5d5-7ec3e5f77469,Sianda,[watendawili],sianda-2,sianda,/tracks/watendawili/sianda-2,/tracks/watendawili/sianda,false,false,1
+3aa64aac-e704-4e7a-992b-ad94bc7b8f01,Keki,[willy-paul],keki-2,keki,/tracks/willy-paul/keki-2,/tracks/willy-paul/keki,false,false,1
+bf42fed8-be37-4c1f-a711-718654e9f3f6,Liar,[willy-paul],liar-2,liar,/tracks/willy-paul/liar-2,/tracks/willy-paul/liar,false,false,1
+c1f42c8e-40d7-4969-b2b2-23083a6c3418,Heaven,[winyo],heaven-2,heaven,/tracks/winyo/heaven-2,/tracks/winyo/heaven,false,false,1
+476f5f38-6205-4cc9-b54b-dd44cebb67a3,Mimi Na Wewe,[winyo],mimi-na-wewe-2,mimi-na-wewe,/tracks/winyo/mimi-na-wewe-2,/tracks/winyo/mimi-na-wewe,false,false,1
+3e774e1f-f78f-4f2a-b872-5cc41af5b83e,Salama,[winyo],salama-2,salama,/tracks/winyo/salama-2,/tracks/winyo/salama,false,false,1
+79c27d82-6abf-4630-914e-07187d5059dc,Lowkey,[xenia-manasseh],lowkey-2,lowkey,/tracks/xenia-manasseh/lowkey-2,/tracks/xenia-manasseh/lowkey,false,false,1
