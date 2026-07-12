@@ -261,7 +261,6 @@ export default function RegistryEntityEditorDrawer({
   }, [entity, draft, schema]);
 
   const hasChanges = dirtyFields.length > 0;
-  const hasValidationErrors = Object.keys(validationErrors).length > 0;
 
   const groupedFields = useMemo(
     () => groupEditableFields(schema.editableFields.filter((f) => f.access === "editable")),
@@ -278,11 +277,22 @@ export default function RegistryEntityEditorDrawer({
         const error = validateField(value, fieldDef);
         setValidationErrors((prev) => {
           const next = { ...prev };
+
+          if (
+            key === "living_memory_status" &&
+            value !== "published"
+          ) {
+            delete next.living_memory_editorial_opener;
+            delete next.living_memory_public_prompt;
+            delete next.living_memory_editorial_label;
+          }
+
           if (error) {
             next[key] = error;
           } else {
             delete next[key];
           }
+
           return next;
         });
       }
@@ -1024,7 +1034,7 @@ export default function RegistryEntityEditorDrawer({
               <button
                 type="button"
                 onClick={handleSave}
-                disabled={saving || !hasChanges || hasValidationErrors}
+                disabled={saving || !hasChanges}
                 className="flex items-center gap-1.5 rounded-xl bg-[#85c441] px-5 py-2.5 text-sm font-black text-[#102006] shadow-sm transition-all hover:bg-[#76b33a] hover:shadow-md disabled:cursor-not-allowed disabled:opacity-50 disabled:shadow-none whitespace-nowrap"
               >
                 {saving ? (

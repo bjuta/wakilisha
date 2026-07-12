@@ -198,7 +198,30 @@ export async function saveRegistryEntityPatch(
       body: JSON.stringify(payload),
     });
 
-    const result: RegistrySaveResult & { error?: string | { code?: string; message?: string }; errorCode?: string; message?: string; duplicateField?: string | null; duplicateValue?: string | null; conflictingEntity?: Record<string, unknown> | null; currentEntity?: Record<string, unknown> } = await res.json();
+    const envelope: {
+      ok?: boolean;
+      data?: RegistrySaveResult;
+      meta?: Record<string, unknown>;
+      error?: string | { code?: string; message?: string };
+      errorCode?: string;
+      message?: string;
+      duplicateField?: string | null;
+      duplicateValue?: string | null;
+      conflictingEntity?: Record<string, unknown> | null;
+      currentEntity?: Record<string, unknown>;
+    } = await res.json();
+
+    const result =
+      envelope.ok === true &&
+      envelope.data &&
+      typeof envelope.data === "object" &&
+      !Array.isArray(envelope.data)
+        ? {
+            ...envelope.data,
+            ok: true,
+            meta: envelope.meta ?? envelope.data.meta,
+          }
+        : envelope;
 
     if (!result.ok) {
       const nestedError =
@@ -229,8 +252,10 @@ export async function saveRegistryEntityPatch(
 
     return {
       ...result,
+      savedFields: result.savedFields ?? [],
       skippedFields: [...skippedFields, ...(result.skippedFields ?? [])],
-      rejectedFields,
+      rejectedFields: [...rejectedFields, ...(result.rejectedFields ?? [])],
+      warnings: result.warnings ?? [],
     };
   } catch (err) {
     return {

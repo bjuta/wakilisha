@@ -385,6 +385,11 @@ export default function TracksPage() {
         track.id === updatedEntity.id ? (updatedEntity as RegistryEntityProfile) : track,
       ),
     );
+    setSelectedTrack((current) =>
+      current?.id === updatedEntity.id
+        ? (updatedEntity as EnrichedTrack)
+        : current,
+    );
     showToast(`Saved ${String(updatedEntity.title ?? "track")}`);
   }
 

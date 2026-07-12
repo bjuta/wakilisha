@@ -375,6 +375,11 @@ export default function ReleasesPage() {
         release.id === updatedEntity.id ? (updatedEntity as RegistryEntityProfile) : release,
       ),
     );
+    setSelectedRelease((current) =>
+      current?.id === updatedEntity.id
+        ? (updatedEntity as EnrichedRelease)
+        : current,
+    );
     showToast(`Saved ${String(updatedEntity.title ?? "release")}`);
   }
 

@@ -1640,6 +1640,11 @@ export default function ArtistsPage() {
         artist.id === updatedEntity.id ? (updatedEntity as RegistryEntityProfile) : artist,
       ),
     );
+    setSelectedArtist((current) =>
+      current?.id === updatedEntity.id
+        ? (updatedEntity as EnrichedArtist)
+        : current,
+    );
     showToast(`Saved ${getDisplayName(updatedEntity)}`);
   }
 
