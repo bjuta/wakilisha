@@ -1,10 +1,104 @@
 import type { RouteObject } from "react-router-dom";
 import { Navigate, useParams } from "react-router-dom";
+import {
+  AdminAnalyticsPage,
+  AdminApiDocsPage,
+  AdminArticleDetailPage,
+  AdminArticlesPage,
+  AdminArtistAliasesPage,
+  AdminArtistDecouplePage,
+  AdminArtistDetailPage,
+  AdminArtistIntakePage,
+  AdminArtistsPage,
+  AdminAuthorDetailPage,
+  AdminAuthorsPage,
+  AdminBrokenLinksPage,
+  AdminCategoriesPage,
+  AdminChartsArtistResolution,
+  AdminChartsBackfillPlanner,
+  AdminChartsCanonGaps,
+  AdminChartsDashboard,
+  AdminChartsEditionDetail,
+  AdminChartsEditions,
+  AdminChartsFamilies,
+  AdminChartsIngest,
+  AdminChartsIngestDetail,
+  AdminChartsIngestHealth,
+  AdminChartsIngestRunDetail,
+  AdminChartsIngestRuns,
+  AdminChartsIntegrationMap,
+  AdminChartsLayout,
+  AdminChartsNoMatch,
+  AdminChartsPublicApiQa,
+  AdminChartsReviewQueue,
+  AdminChartsScoringRuns,
+  AdminChartsSnapshots,
+  AdminCommunityPage,
+  AdminContentArchivePage,
+  AdminContentLayout,
+  AdminDashboardPage,
+  AdminDuplicateMergePage,
+  AdminFeaturedArtistsPage,
+  AdminFeaturedGuidesPage,
+  AdminGenreDetailPage,
+  AdminGenresPage,
+  AdminGuideDetailPage,
+  AdminGuidesPage,
+  AdminImportsJobDetailPage,
+  AdminImportsJobsPage,
+  AdminImportsLayout,
+  AdminImportsPage,
+  AdminInquiryInterfacePage,
+  AdminLabelDetailPage,
+  AdminLabelsPage,
+  AdminLoginPage,
+  AdminLyricsPage,
+  AdminMediaLayout,
+  AdminMediaLibraryPage,
+  AdminMediaMigratePage,
+  AdminMissingImagesPage,
+  AdminNewArticlePage,
+  AdminPagesPage,
+  AdminPublishingDashboardPage,
+  AdminRegistryLayout,
+  AdminRegistryOverview,
+  AdminRelationshipViewerPage,
+  AdminRelationshipsLayout,
+  AdminReleaseDetailPage,
+  AdminReleasesPage,
+  AdminReviewLayout,
+  AdminReviewQueuePage,
+  AdminScraperPage,
+  AdminSettingsAirplay,
+  AdminSettingsAudience,
+  AdminSettingsAudit,
+  AdminSettingsChartDefaults,
+  AdminSettingsChartDefaultsMarketScopes,
+  AdminSettingsDesignSystem,
+  AdminSettingsEmailBriefings,
+  AdminSettingsFrontendAppearance,
+  AdminSettingsGscData,
+  AdminSettingsHub,
+  AdminSettingsIntegrations,
+  AdminSettingsLayout,
+  AdminSettingsMaintenance,
+  AdminSettingsNavigation,
+  AdminSettingsPlayerPlayback,
+  AdminSettingsRegistry,
+  AdminSettingsSeo,
+  AdminSettingsSiteIdentity,
+  AdminShell,
+  AdminTagsPage,
+  AdminTrackDetailPage,
+  AdminTracksPage,
+  AdminTrashPage,
+  AdminUsersLayout,
+  AdminUsersPage,
+} from "./lazyAdmin";
 import { ResponsiveAppLayout } from "@/components/mobile/ResponsiveAppLayout";
 import { ResponsivePage } from "@/components/mobile/ResponsivePage";
 import { MobileFullPlayer } from "@/components/mobile/MobileFullPlayer";
 import NotFound from "../pages/NotFound";
-import AdminLoginPage from "../pages/admin/login/page";
 import ResetPasswordPage from "../pages/auth/reset-password/page";
 
 // Author profiles
@@ -12,114 +106,20 @@ import AuthorProfilePage from "../pages/authors/detail/page";
 import LegacyArticleRedirect from "../pages/LegacyArticleRedirect";
 
 // Admin Shell — WordPress-like production engine
-import { AdminShell } from "../pages/admin/AdminShell";
-import AdminDashboardPage from "../pages/admin/dashboard/page";
-import AdminArticlesPage from "../pages/admin/content/articles/page";
-import AdminGuidesPage from "../pages/admin/content/guides/page";
-import AdminGuideDetailPage from "../pages/admin/content/guides/detail/page";
-import AdminPagesPage from "../pages/admin/content/pages/page";
-import AdminRegistryOverview from "../pages/admin/registry/page";
-import AdminArtistsPage from "../pages/admin/registry/artists/page";
-import AdminTracksPage from "../pages/admin/registry/tracks/page";
-import AdminReleasesPage from "../pages/admin/registry/releases/page";
-import AdminArtistAliasesPage from "../pages/admin/registry/artist-aliases/page";
-import AdminArtistDecouplePage from "../pages/admin/registry/artist-aliases/decouple/page";
-import AdminLabelsPage from "../pages/admin/registry/labels/page";
-import AdminGenresPage from "../pages/admin/registry/genres/page";
-import AdminMediaLibraryPage from "../pages/admin/media/library/page";
-import AdminMissingImagesPage from "../pages/admin/media/missing/page";
-import AdminBrokenLinksPage from "../pages/admin/media/broken/page";
-import AdminMediaMigratePage from "../pages/admin/media/migrate/page";
-import AdminReviewQueuePage from "../pages/admin/review/queue/page";
-import AdminImportsPage from "../pages/admin/imports/page";
-import AdminImportsJobsPage from "../pages/admin/imports/jobs/page";
-import AdminImportsJobDetailPage from "../pages/admin/imports/jobs/detail/page";
-import AdminScraperPage from "../pages/admin/imports/scraper/page";
-import AdminArticleDetailPage from "../pages/admin/content/articles/detail/page";
-import AdminNewArticlePage from "../pages/admin/content/articles/new/page";
-import AdminArtistDetailPage from "../pages/admin/registry/artists/detail/page";
-import AdminArtistIntakePage from "../pages/admin/registry/artists/intake/page";
-import AdminTrackDetailPage from "../pages/admin/registry/tracks/detail/page";
-import AdminReleaseDetailPage from "../pages/admin/registry/releases/detail/page";
-import AdminLabelDetailPage from "../pages/admin/registry/labels/detail/page";
-import AdminGenreDetailPage from "../pages/admin/registry/genres/detail/page";
-import AdminAuthorsPage from "../pages/admin/registry/authors/page";
-import AdminAuthorDetailPage from "../pages/admin/registry/authors/detail/page";
-import AdminRelationshipViewerPage from "../pages/admin/relationships/viewer/page";
-import AdminDuplicateMergePage from "../pages/admin/relationships/duplicates/page";
-import AdminPublishingDashboardPage from "../pages/admin/content/publishing/page";
-import AdminContentArchivePage from "../pages/admin/content/archive/page";
-import AdminLyricsPage from "../pages/admin/content/lyrics/page";
-import AdminUsersPage from "../pages/admin/users/page";
-import AdminTrashPage from "../pages/admin/content/articles/trash/page";
-import AdminCategoriesPage from "../pages/admin/content/categories/page";
-import AdminTagsPage from "../pages/admin/content/tags/page";
-import AdminFeaturedArtistsPage from "../pages/admin/magazine/featured-artists/page";
-import AdminFeaturedGuidesPage from "../pages/admin/magazine/featured-guides/page";
 
 // Section-level admin guards
-import {
-  AdminContentLayout,
-  AdminUsersLayout,
-  AdminRegistryLayout,
-  AdminMediaLayout,
-  AdminReviewLayout,
-  AdminImportsLayout,
-  AdminRelationshipsLayout,
-} from "@/components/admin/AdminSectionLayouts";
 
 // Admin Charts Ingestion Studio
-import { AdminChartsLayout } from "../pages/admin/charts/AdminChartsLayout";
-import AdminChartsDashboard from "../pages/admin/charts/dashboard/page";
-import AdminChartsFamilies from "../pages/admin/charts/families/page";
-import AdminChartsIngest from "../pages/admin/charts/ingest/page";
-import AdminChartsBackfillPlanner from "../pages/admin/charts/backfill/page";
-import AdminChartsIngestDetail from "../pages/admin/charts/ingest/detail/page";
-import AdminChartsEditions from "../pages/admin/charts/editions/page";
-import AdminChartsSnapshots from "../pages/admin/charts/snapshots/page";
-import AdminChartsIntegrationMap from "../pages/admin/charts/integration-map/page";
-import AdminChartsPublicApiQa from "../pages/admin/charts/public-api-qa/page";
-import AdminChartsReviewQueue from "../pages/admin/charts/review-queue/page";
-import AdminChartsNoMatch from "../pages/admin/charts/no-match/page";
-import AdminChartsCanonGaps from "../pages/admin/charts/canon-gaps/page";
-import AdminChartsIngestRuns from "../pages/admin/charts/ingest-runs/page";
-import AdminChartsIngestRunDetail from "../pages/admin/charts/ingest-run-detail/page";
-import AdminChartsScoringRuns from "../pages/admin/charts/scoring-runs/page";
-import AdminChartsEditionDetail from "../pages/admin/charts/edition-detail/page";
-import AdminChartsIngestHealth from "../pages/admin/charts/ingest-health/page";
-import AdminChartsArtistResolution from "../pages/admin/charts/artist-resolution/page";
 
 // Admin Share Analytics (redirected to main analytics)
-import AdminAnalyticsPage from "../pages/admin/analytics/page";
 
 // Admin Settings
-import { AdminSettingsLayout } from "../pages/admin/settings/AdminSettingsLayout";
-import AdminSettingsHub from "../pages/admin/settings/page";
-import AdminSettingsChartDefaults from "../pages/admin/settings/chart-defaults/page";
-import AdminSettingsChartDefaultsMarketScopes from "../pages/admin/settings/chart-defaults/market-scopes/page";
-import AdminSettingsIntegrations from "../pages/admin/settings/integrations/page";
-import AdminSettingsGscData from "../pages/admin/settings/gsc-data/page";
-import AdminSettingsFrontendAppearance from "../pages/admin/settings/frontend-appearance/page";
-import AdminSettingsPlayerPlayback from "../pages/admin/settings/player-playback/page";
-import AdminSettingsRegistry from "../pages/admin/settings/registry/page";
-import AdminSettingsAirplay from "../pages/admin/settings/airplay/page";
-import AdminSettingsAudience from "../pages/admin/settings/audience/page";
-import AdminSettingsEmailBriefings from "../pages/admin/settings/email-briefings/page";
-import AdminSettingsMaintenance from "../pages/admin/settings/maintenance/page";
-import AdminSettingsSeo from "../pages/admin/settings/seo/page";
-import AdminSettingsNavigation from "../pages/admin/settings/navigation/page";
-import AdminSettingsAudit from "../pages/admin/settings/audit/page";
-import AdminSettingsSiteIdentity from "../pages/admin/settings/site-identity/page";
-import AdminSettingsDesignSystem from "../pages/admin/settings/design-system/page";
 
 // Admin API Docs
-import AdminApiDocsPage from "../pages/admin/api-docs/page";
 
 // Admin Community Moderation
-import AdminCommunityPage from "../pages/admin/community/page";
 
 // Admin Institute
-import AdminInquiryInterfacePage from "../pages/admin/institute/inquiry-interface/page";
 
 // Public API Docs
 import PublicApiDocsPage from "../pages/api-docs/page";
