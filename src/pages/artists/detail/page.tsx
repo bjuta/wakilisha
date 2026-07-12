@@ -185,6 +185,11 @@ export default function ArtistDetail() {
     : "";
 
   const artistConnections = buildArtistConnections(artist.relatedArtists, relationships);
+  const reviewedPopularTracks = relationships.filter(
+    (relationship) =>
+      relationship.relatedEntityType === "track" &&
+      relationship.relationshipType === "popular_track",
+  );
   const hasChartEntries = artist.chartEntries.length > 0;
   const hasAppearsOn = appearsOn.length > 0;
   const hasReleases = artist.releases.length > 0;
@@ -264,7 +269,11 @@ export default function ArtistDetail() {
           )}
 
           {hasTopSongs && (
-            <ArtistTopSongs songs={artist.topSongs} artistSlug={artist.slug} />
+            <ArtistTopSongs
+              songs={artist.topSongs}
+              artistSlug={artist.slug}
+              reviewedRelationships={reviewedPopularTracks}
+            />
           )}
 
           {hasReleases && (
