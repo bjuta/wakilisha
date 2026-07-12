@@ -1,68 +1,120 @@
 import { useEffect, useRef, useState } from "react";
 import { publicContentReadSpec } from "@/data/api-specs/public-content-read";
 import { adminRouterSpec } from "@/data/api-specs/admin-router";
-
-declare global {
-  interface Window {
-    Redoc: {
-      init: (spec: unknown, options: Record<string, unknown>, element: HTMLElement, callback?: () => void) => void;
-    };
-  }
-}
+import { loadRedoc } from "@/lib/redocLoader";
 
 type TabKey = "public" | "admin";
+type LoadState = "loading" | "ready" | "error";
 
-const TABS: { key: TabKey; label: string; icon: string; spec: unknown; description: string }[] = [
+const TABS: {
+  key: TabKey;
+  label: string;
+  icon: string;
+  spec: unknown;
+  description: string;
+}[] = [
   {
     key: "public",
     label: "Public API",
     icon: "ri-global-line",
     spec: publicContentReadSpec,
-    description: "Read-only gateway for artists, tracks, releases, labels, genres, charts, magazine, authors and guides. No authentication required.",
+    description:
+      "Read-only access to artists, tracks, releases, labels, genres, charts, magazine stories, authors, and guides.",
   },
   {
     key: "admin",
     label: "Admin API",
     icon: "ri-shield-keyhole-line",
     spec: adminRouterSpec,
-    description: "Admin gateway for registry CRUD, chart ingestion pipeline, provider credentials, and user management. JWT authentication required.",
+    description:
+      "Authenticated access to registry records, chart ingestion, provider credentials, and user management.",
   },
 ];
 
+const REDOC_OPTIONS = {
+  nativeScrollbars: true,
+  theme: {
+    colors: {
+      primary: { main: "#1a1a1a" },
+    },
+    typography: {
+      fontFamily: "'Inter', 'DM Sans', sans-serif",
+      headings: {
+        fontFamily: "'Inter', 'DM Sans', sans-serif",
+      },
+      code: {
+        fontFamily: "'DM Mono', monospace",
+        fontSize: "13px",
+        lineHeight: "1.5",
+      },
+    },
+  },
+};
+
 export default function AdminApiDocsPage() {
-  const [activeTab, setActiveTab] = useState<TabKey>("public");
+  const [activeTab, setActiveTab] =
+    useState<TabKey>("public");
+
+  const [loadState, setLoadState] =
+    useState<LoadState>("loading");
+
   const containerRef = useRef<HTMLDivElement>(null);
-  const activeSpec = TABS.find((t) => t.key === activeTab) ?? TABS[0];
+
+  const activeSpec =
+    TABS.find((tab) => tab.key === activeTab) ??
+    TABS[0];
 
   useEffect(() => {
-    if (!containerRef.current || !window.Redoc) return;
-    containerRef.current.innerHTML = "";
-    window.Redoc.init(
-      activeSpec.spec,
-      {
-        nativeScrollbars: true,
-        theme: {
-          colors: {
-            primary: { main: "#1a1a1a" },
+    const container = containerRef.current;
+
+    if (!container) {
+      return;
+    }
+
+    let cancelled = false;
+
+    container.innerHTML = "";
+    setLoadState("loading");
+
+    loadRedoc()
+      .then((redoc) => {
+        if (cancelled) {
+          return;
+        }
+
+        redoc.init(
+          activeSpec.spec,
+          REDOC_OPTIONS,
+          container,
+          () => {
+            if (!cancelled) {
+              setLoadState("ready");
+            }
           },
-          typography: {
-            fontFamily: "'Inter', 'DM Sans', sans-serif",
-            headings: { fontFamily: "'Inter', 'DM Sans', sans-serif" },
-            code: { fontFamily: "'DM Mono', monospace", fontSize: "13px", lineHeight: "1.5" },
-          },
-        },
-      },
-      containerRef.current,
-    );
-  }, [activeTab]);
+        );
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setLoadState("error");
+        }
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [activeTab, activeSpec.spec]);
 
   return (
     <div className="space-y-6">
       <div className="flex items-center gap-3">
-        <i className="ri-book-open-line text-2xl text-foreground-700"></i>
+        <i className="ri-book-open-line text-2xl text-foreground-700" />
         <div>
-          <h1 className="text-2xl font-black tracking-tight text-foreground-950">API Documentation</h1>
-          <p className="mt-1 text-sm text-foreground-600">WAKILISHA API reference — OpenAPI 3.0.3 specs rendered with Redoc</p>
+          <h1 className="text-2xl font-black tracking-tight text-foreground-950">
+            API Documentation
+          </h1>
+          <p className="mt-1 text-sm text-foreground-600">
+            WAKILISHA OpenAPI 3.0.3 reference.
+          </p>
         </div>
       </div>
 
@@ -70,6 +122,7 @@ export default function AdminApiDocsPage() {
         {TABS.map((tab) => (
           <button
             key={tab.key}
+            type="button"
             onClick={() => setActiveTab(tab.key)}
             className={`flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-semibold whitespace-nowrap transition-all cursor-pointer ${
               activeTab === tab.key
@@ -77,19 +130,45 @@ export default function AdminApiDocsPage() {
                 : "text-foreground-600 hover:text-foreground-800"
             }`}
           >
-            <i className={`${tab.icon} text-base`}></i>
+            <i className={`${tab.icon} text-base`} />
             {tab.label}
           </button>
         ))}
       </div>
 
       <div className="rounded-xl border border-background-200/70 bg-background-50 p-4">
-        <i className={`${activeSpec.icon} text-base text-foreground-600`}></i>
-        <span className="ml-2 text-sm text-foreground-600">{activeSpec.description}</span>
+        <i
+          className={`${activeSpec.icon} text-base text-foreground-600`}
+        />
+        <span className="ml-2 text-sm text-foreground-600">
+          {activeSpec.description}
+        </span>
       </div>
 
+      {loadState === "loading" && (
+        <p
+          role="status"
+          className="text-sm text-foreground-600"
+        >
+          Loading the API reference.
+        </p>
+      )}
+
+      {loadState === "error" && (
+        <div
+          role="alert"
+          className="rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-800"
+        >
+          The API reference could not load. Refresh this page to try again.
+        </div>
+      )}
+
       <div className="rounded-xl border border-background-200/70 bg-white">
-        <div ref={containerRef} className="redoc-container" />
+        <div
+          ref={containerRef}
+          className="redoc-container"
+          aria-busy={loadState === "loading"}
+        />
       </div>
     </div>
   );

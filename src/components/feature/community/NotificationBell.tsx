@@ -231,8 +231,8 @@ export function NotificationBell({ userId, className = '', placement = 'auto' }:
       <div ref={containerRef} className={`relative ${className}`}>
         <button
           onClick={handleToggle}
-          className="flex flex-col items-center justify-center gap-[2px] w-full h-full text-[var(--wk-text-faint)] cursor-pointer"
-          aria-label={`Notifications${unreadCount > 0 ? ` (${unreadCount} unread)` : ''}`}
+          className="flex flex-col items-center justify-center gap-[2px] w-full h-full text-[var(--wk-text-muted)] cursor-pointer"
+          aria-label={`Alerts${unreadCount > 0 ? ` (${unreadCount} unread)` : ''}`}
         >
           <div className="relative">
             <WkIcon name="Bell" size={18} />

@@ -28,7 +28,7 @@ export default function Home() {
     setLoading(true);
     setLoadError(null);
     try {
-      const [storiesData] = await Promise.all([listMagazineStories()]);
+      const [storiesData] = await Promise.all([listMagazineStories(24)]);
       setStories(storiesData);
 
       const { data: { families } } = await getChartFamilies();

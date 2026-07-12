@@ -44,7 +44,8 @@
   "scripts": {
     "analytics:audit": "node scripts/analytics/audit-ga4-implementation.mjs",
     "analytics:audit:dist": "node scripts/analytics/audit-ga4-build-output.mjs",
-    "build": "npm run analytics:audit && vite build && npm run analytics:audit:dist && node scripts/seo/prerender-metadata.mjs && node scripts/seo/build-public-magazine-fallback.mjs && node scripts/seo/build-public-sitemap-html.mjs && node scripts/seo/audit-prerender-output.mjs",
+    "performance:audit": "node scripts/performance/audit-home-delivery.mjs",
+    "build": "npm run performance:audit && npm run analytics:audit && vite build && npm run analytics:audit:dist && node scripts/seo/prerender-metadata.mjs && node scripts/seo/build-public-magazine-fallback.mjs && node scripts/seo/build-public-sitemap-html.mjs && node scripts/seo/audit-prerender-output.mjs",
     "charts:generate-public-csv-data": "tsx scripts/charts/generate-public-csv-data.ts",
     "charts:v2-api-fixture-check": "tsx scripts/charts/compare-v2-api-fixtures.ts",
     "charts:v2-api-fixtures": "tsx scripts/charts/generate-v2-api-fixtures.ts",

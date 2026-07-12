@@ -60,6 +60,8 @@ export function MagazineCard({ story, variant = "standard", rank }: MagazineCard
             src={story.heroUrl}
             alt={story.title}
             loading="lazy"
+            fetchPriority="low"
+            decoding="async"
             className="absolute inset-0 h-full w-full object-cover object-top opacity-90 transition-transform duration-700 group-hover:scale-105 group-hover:rotate-[0.35deg] group-focus-visible:scale-105"
           />
         ) : (
@@ -124,6 +126,8 @@ export function MagazineCard({ story, variant = "standard", rank }: MagazineCard
               src={story.heroUrl}
               alt={story.title}
               loading="lazy"
+            fetchPriority="low"
+            decoding="async"
               className="h-full w-full object-cover object-top transition-transform duration-500 group-hover:scale-105 group-hover:rotate-[0.3deg]"
             />
           ) : (
@@ -205,6 +209,8 @@ export function MagazineCard({ story, variant = "standard", rank }: MagazineCard
               src={story.heroUrl}
               alt={story.title}
               loading="lazy"
+            fetchPriority="low"
+            decoding="async"
               className="h-full w-full object-cover object-top transition-transform duration-400 group-hover:scale-110 group-hover:rotate-[1deg]"
             />
           ) : (
@@ -231,6 +237,8 @@ export function MagazineCard({ story, variant = "standard", rank }: MagazineCard
             src={story.heroUrl}
             alt={story.title}
             loading="lazy"
+            fetchPriority="low"
+            decoding="async"
             className="h-full w-full object-cover object-top transition-transform duration-500 group-hover:scale-105 group-hover:rotate-[0.35deg]"
           />
         ) : (
