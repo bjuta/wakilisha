@@ -8,6 +8,7 @@ import { FeaturedArtistSpotlight } from "./components/FeaturedArtistSpotlight";
 import { FeaturedGuideSpotlight } from "./components/FeaturedGuideSpotlight";
 import { SkeletonMagazinePage } from "@/components/skeletons/Skeletons";
 import { Chapter19FallbackImage } from "@/components/media/Chapter19FallbackImage";
+import { ResponsiveMediaImage } from "@/components/media/ResponsiveMediaImage";
 import { useAuthUser } from "@/hooks/useAuthUser";
 import {
   DndContext,
@@ -535,9 +536,13 @@ export default function Magazine() {
         className="relative min-h-[88vh] flex items-end overflow-hidden bg-[#0a0a0a] block group cursor-pointer -mt-16"
       >
         {heroStory.heroUrl ? (
-          <img
+          <ResponsiveMediaImage
             ref={heroImgRef}
             src={heroStory.heroUrl}
+            preset="hero"
+            loading="eager"
+            fetchPriority="high"
+            decoding="async"
             alt=""
             className="absolute inset-0 w-full h-full object-cover opacity-85 will-change-transform"
           />
@@ -714,8 +719,12 @@ function CompactCardFill({ story, rank }: { story: MagazineArticle; rank: number
     >
       <div className="w-24 shrink-0 rounded-lg overflow-hidden bg-[var(--wk-surface-raised)] self-stretch min-h-[90px]">
         {story.heroUrl ? (
-          <img
+          <ResponsiveMediaImage
             src={story.heroUrl}
+            preset="thumbnail"
+            loading="lazy"
+            fetchPriority="low"
+            decoding="async"
             alt=""
             className="w-full h-full object-cover object-top transition-transform duration-500 group-hover:scale-110"
           />

@@ -5,6 +5,7 @@ import { getAuthorMeta } from "@/services/authorProfiles";
 import { MagazineCard } from "@/pages/magazine/components/MagazineCard";
 import { SkeletonMagazinePage } from "@/components/skeletons/Skeletons";
 import { Chapter19FallbackImage } from "@/components/media/Chapter19FallbackImage";
+import { ResponsiveMediaImage } from "@/components/media/ResponsiveMediaImage";
 import { trackEvent, getAnalyticsSessionId, getCanonicalPageUrl } from "@/services/analytics";
 import { BRIEFING_SLUGS, briefingInterest, subscribeToBriefings } from "@/services/audienceSubscriptionService";
 
@@ -186,9 +187,10 @@ export default function MobileMagazine() {
         className="relative h-screen flex items-end overflow-hidden bg-[#0a0a0a] block -mt-16 cursor-pointer"
       >
         {heroStory.heroUrl ? (
-          <img
+          <ResponsiveMediaImage
             ref={heroImgRef}
             src={heroStory.heroUrl}
+            preset="hero"
             alt=""
             loading="eager"
             fetchPriority="high"
@@ -287,8 +289,9 @@ export default function MobileMagazine() {
                 >
                   <div className="aspect-[4/5] overflow-hidden bg-[var(--wk-surface-raised)]">
                     {story.heroUrl ? (
-                      <img
+                      <ResponsiveMediaImage
                         src={story.heroUrl}
+                        preset="card"
                         alt={story.title}
                         loading="lazy"
                         fetchPriority="low"
@@ -350,8 +353,9 @@ export default function MobileMagazine() {
                         className="group relative shrink-0 snap-start w-[260px] sm:w-[300px] aspect-[4/5] rounded-2xl overflow-hidden bg-[#0a0a0a]"
                       >
                         {story.heroUrl ? (
-                          <img
+                          <ResponsiveMediaImage
                             src={story.heroUrl}
+                            preset="card"
                             alt={story.title}
                             loading="lazy"
                             fetchPriority="low"
@@ -432,8 +436,9 @@ export default function MobileMagazine() {
                         className="group relative shrink-0 snap-start w-[300px] sm:w-[360px] aspect-[3/2] rounded-2xl overflow-hidden bg-[#0a0a0a]"
                       >
                         {story.heroUrl ? (
-                          <img
+                          <ResponsiveMediaImage
                             src={story.heroUrl}
+                            preset="feature"
                             alt={story.title}
                             loading="lazy"
                             fetchPriority="low"
@@ -484,8 +489,9 @@ export default function MobileMagazine() {
                       >
                         <div className="aspect-[3/4] overflow-hidden bg-[var(--wk-surface-raised)]">
                           {story.heroUrl ? (
-                            <img
+                            <ResponsiveMediaImage
                               src={story.heroUrl}
+                              preset="card"
                               alt={story.title}
                               loading="lazy"
                               fetchPriority="low"
@@ -537,8 +543,9 @@ export default function MobileMagazine() {
                       className="group relative overflow-hidden rounded-2xl bg-[#0a0a0a] aspect-[16/10]"
                     >
                       {heroItem.heroUrl ? (
-                        <img
+                        <ResponsiveMediaImage
                           src={heroItem.heroUrl}
+                          preset="feature"
                           alt={heroItem.title}
                           loading="lazy"
                           fetchPriority="low"
@@ -583,8 +590,9 @@ export default function MobileMagazine() {
                     >
                       <div className="w-[72px] h-[72px] shrink-0 rounded-lg overflow-hidden bg-[var(--wk-surface-raised)]">
                         {story.heroUrl ? (
-                          <img
+                          <ResponsiveMediaImage
                             src={story.heroUrl}
+                            preset="thumbnail"
                             alt=""
                             loading="lazy"
                             fetchPriority="low"

@@ -2,6 +2,7 @@ import { Link, useNavigate } from "react-router-dom";
 import { getAuthorMeta } from "@/services/authorProfiles";
 import type { MagazineArticle } from "@/services/magazineArticles";
 import { Chapter19FallbackImage } from "@/components/media/Chapter19FallbackImage";
+import { ResponsiveMediaImage } from "@/components/media/ResponsiveMediaImage";
 
 interface MagazineCardProps {
   story: MagazineArticle;
@@ -56,8 +57,9 @@ export function MagazineCard({ story, variant = "standard", rank }: MagazineCard
         style={{ minHeight: "clamp(340px, 42vw, 480px)" }}
       >
         {story.heroUrl ? (
-          <img
+          <ResponsiveMediaImage
             src={story.heroUrl}
+            preset="lead"
             alt={story.title}
             loading="lazy"
             fetchPriority="low"
@@ -122,8 +124,9 @@ export function MagazineCard({ story, variant = "standard", rank }: MagazineCard
       >
         <div className="aspect-[16/10] shrink-0 overflow-hidden rounded-lg bg-[var(--wk-surface-raised)] sm:h-full sm:w-[45%] sm:aspect-auto">
           {story.heroUrl ? (
-            <img
+            <ResponsiveMediaImage
               src={story.heroUrl}
+              preset="feature"
               alt={story.title}
               loading="lazy"
             fetchPriority="low"
@@ -205,8 +208,9 @@ export function MagazineCard({ story, variant = "standard", rank }: MagazineCard
         </div>
         <div className="h-16 w-16 shrink-0 overflow-hidden rounded-lg bg-[var(--wk-surface-raised)]">
           {story.heroUrl ? (
-            <img
+            <ResponsiveMediaImage
               src={story.heroUrl}
+              preset="thumbnail"
               alt={story.title}
               loading="lazy"
             fetchPriority="low"
@@ -233,8 +237,9 @@ export function MagazineCard({ story, variant = "standard", rank }: MagazineCard
     >
       <div className="aspect-[16/10] overflow-hidden bg-[var(--wk-surface-raised)]">
         {story.heroUrl ? (
-          <img
+          <ResponsiveMediaImage
             src={story.heroUrl}
+            preset="card"
             alt={story.title}
             loading="lazy"
             fetchPriority="low"
