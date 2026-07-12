@@ -1,0 +1,1 @@
+delete from public.registry_entity_relationships r where r.source_entity_type='chart_entries' and r.target_entity_type='media_assets' and r.relationship_type='entity_media' and r.relationship_role='artwork' and exists (select 1 from public.registry_provenance_links p where p.original_relationship_id=r.id);;

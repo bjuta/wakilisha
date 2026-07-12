@@ -2,6 +2,7 @@ import { useEffect, useState, type ReactNode } from "react";
 import { useParams, Link, useNavigate, useLocation } from "react-router-dom";
 import { usePlayer } from "@/context/PlayerContext";
 import { getTrack, type PublicTrackDetail } from "@/services/publicApi/client";
+import { resolveScopedSlugRedirect } from "@/services/slugRedirects";
 import { buildTrackHeroIntro, buildTrackSeoDescription } from "@/services/cultureContext/trackAdapters";
 import { TrackChartSparkline } from "@/components/charts/TrackChartSparkline";
 import { MetaTags } from "@/components/seo/MetaTags";
@@ -793,9 +794,25 @@ export default function TrackDetail() {
     setTrackSaved(false);
     setTrackSaveError(null);
     getTrack(artistSlug, trackSlug)
-      .then((apiData) => {
+      .then(async (apiData) => {
         if (!alive) return;
         if (!apiData) {
+          const redirect = await resolveScopedSlugRedirect(
+            "track",
+            artistSlug,
+            trackSlug,
+          );
+
+          if (!alive) return;
+
+          if (redirect && redirect.newPath !== location.pathname) {
+            navigate(
+              `${redirect.newPath}${location.search || ""}${location.hash || ""}`,
+              { replace: true },
+            );
+            return;
+          }
+
           trackEvent("page_not_found", {
             pageType: "404",
             entityType: "broken_page",
@@ -829,7 +846,7 @@ export default function TrackDetail() {
       });
 
     return () => { alive = false; };
-  }, [artistSlug, trackSlug, location.pathname, location.search, location.hash]);
+  }, [artistSlug, trackSlug, navigate, location.pathname, location.search, location.hash]);
 
   if (loading) {
     return (
