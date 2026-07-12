@@ -1119,14 +1119,30 @@ export async function getReleaseFilterYears(): Promise<string[]> {
   return Array.from(years).sort((a, b) => Number(b) - Number(a));
 }
 
-export async function listMagazineStories(): Promise<PublicStory[]> {
-  const result = await safeApiGet<{ stories: PublicStory[] }>("/magazine?limit=500", { stories: [] });
+export async function listMagazineStories(limit = 500): Promise<PublicStory[]> {
+  const requestedLimit = Number.isFinite(limit) ? Math.floor(limit) : 500;
+  const safeLimit = Math.min(500, Math.max(1, requestedLimit));
+
+  const result = await safeApiGet<{ stories: PublicStory[] }>(
+    `/magazine?limit=${safeLimit}`,
+    { stories: [] },
+  );
+
   const apiStories = Array.isArray(result.stories) ? result.stories : [];
-  const sourceStories = apiStories.length > 0 ? apiStories : getInlineMagazineFallbackStories();
+  const fallbackStories = getInlineMagazineFallbackStories();
+  const sourceStories =
+    apiStories.length > 0
+      ? apiStories
+      : fallbackStories.slice(0, safeLimit);
 
   const mapped = sourceStories.map((story) => ({
     ...story,
-    heroUrl: image(story.heroUrl, { id: story.id, slug: story.slug, name: story.title, type: "article" }),
+    heroUrl: image(story.heroUrl, {
+      id: story.id,
+      slug: story.slug,
+      name: story.title,
+      type: "article",
+    }),
   }));
 
   return await enrichArticlesMedia(mapped) as PublicStory[];

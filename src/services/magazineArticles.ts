@@ -73,8 +73,8 @@ function storyToArticle(story: PublicStory): MagazineArticle {
   };
 }
 
-export async function listMagazineArticles(): Promise<MagazineArticle[]> {
-  const stories = await listMagazineStories();
+export async function listMagazineArticles(limit = 500): Promise<MagazineArticle[]> {
+  const stories = await listMagazineStories(limit);
   return stories.map(storyToArticle);
 }
 
@@ -227,23 +227,28 @@ export async function getArticlesByAuthor(authorSlug: string): Promise<MagazineA
   return [];
 }
 
-function initialMagazineArticles(): MagazineArticle[] {
-  return getInlineMagazineFallbackStories().map(storyToArticle);
+function initialMagazineArticles(limit = 500): MagazineArticle[] {
+  const requestedLimit = Number.isFinite(limit) ? Math.floor(limit) : 500;
+  const safeLimit = Math.min(500, Math.max(1, requestedLimit));
+
+  return getInlineMagazineFallbackStories()
+    .slice(0, safeLimit)
+    .map(storyToArticle);
 }
 
-export function useMagazineArticles() {
-  const initialArticles = initialMagazineArticles();
+export function useMagazineArticles(limit = 500) {
+  const initialArticles = initialMagazineArticles(limit);
   const [articles, setArticles] = useState<MagazineArticle[]>(initialArticles);
   const [loading, setLoading] = useState(initialArticles.length === 0);
   const [error, setError] = useState<string | null>(null);
 
   const refresh = useCallback(() => {
-    const fallbackArticles = initialMagazineArticles();
+    const fallbackArticles = initialMagazineArticles(limit);
 
     setLoading(fallbackArticles.length === 0);
     setError(null);
 
-    listMagazineArticles()
+    listMagazineArticles(limit)
       .then((items) => {
         setArticles(items.length > 0 ? items : fallbackArticles);
         setLoading(false);
@@ -253,7 +258,7 @@ export function useMagazineArticles() {
         setError(fallbackArticles.length > 0 ? null : err instanceof Error ? err.message : 'Failed to load articles');
         setLoading(false);
       });
-  }, []);
+  }, [limit]);
 
   useEffect(() => {
     refresh();

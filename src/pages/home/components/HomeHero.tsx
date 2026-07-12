@@ -199,6 +199,9 @@ export function HomeHero({ chartEntries, stories, loading }: Props) {
         <img
           src="https://wakilisha.africa/api/search-image?query=Abstract%20artistic%20composition%20inspired%20by%20African%20cultural%20patterns%20and%20textures%20warm%20earthy%20tones%20deep%20ochre%20amber%20terracotta%20rich%20dark%20green%20subtle%20gold%20accents%20flowing%20organic%20shapes%20contemporary%20art%20gallery%20quality%20cinematic%20lighting%20with%20soft%20volumetric%20rays%20dramatic%20shadows%20artistic%20installation%20photography%20refined%20sophisticated%20aesthetic%20cultural%20depth%20modern%20minimal%20composition&width=1600&height=1100&seq=hero-main-wk26-v2&orientation=landscape"
           alt=""
+          loading="eager"
+          fetchPriority="high"
+          decoding="async"
           className="w-full h-full object-cover"
           style={{
             transform: `scale(1.08) translateY(${scrollY * 0.04}px)`,

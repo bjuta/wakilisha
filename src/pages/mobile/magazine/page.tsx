@@ -41,9 +41,9 @@ function MobileSectionLabel({ children, count, href }: { children: string; count
   return (
     <div className="flex items-end justify-between mb-5 gap-3">
       <div className="flex items-center gap-2.5">
-        <span className="text-[10px] font-black uppercase tracking-[0.22em] text-[var(--wk-brand)]">
+        <h2 className="text-[10px] font-black uppercase tracking-[0.22em] text-[var(--wk-brand)]">
           {children}
-        </span>
+        </h2>
         {count !== undefined && (
           <span className="text-[10px] font-bold text-[var(--wk-text-faint)] bg-[var(--wk-surface)] border border-[var(--wk-border)] px-2 py-0.5 rounded-full">
             {count}
@@ -60,7 +60,7 @@ function MobileSectionLabel({ children, count, href }: { children: string; count
 }
 
 export default function MobileMagazine() {
-  const { articles: stories, loading, error } = useMagazineArticles();
+  const { articles: stories, loading, error } = useMagazineArticles(24);
   const [status, setStatus] = useState<"loading" | "ready" | "error">("loading");
   const [activeSection, setActiveSection] = useState("All");
   const heroRef = useRef<HTMLDivElement>(null);
@@ -182,7 +182,7 @@ export default function MobileMagazine() {
         tabIndex={0}
         onClick={handleHeroOpen}
         onKeyDown={handleHeroKeyDown}
-        aria-label={`Read ${heroStory.title}`}
+        aria-labelledby="wk-mobile-magazine-hero-title"
         className="relative h-screen flex items-end overflow-hidden bg-[#0a0a0a] block -mt-16 cursor-pointer"
       >
         {heroStory.heroUrl ? (
@@ -190,6 +190,9 @@ export default function MobileMagazine() {
             ref={heroImgRef}
             src={heroStory.heroUrl}
             alt=""
+            loading="eager"
+            fetchPriority="high"
+            decoding="async"
             className="absolute inset-0 w-full h-full object-cover opacity-85 will-change-transform"
           />
         ) : (
@@ -202,7 +205,10 @@ export default function MobileMagazine() {
         <div className="absolute inset-0 bg-gradient-to-b from-black/10 via-black/25 to-black/90" />
 
         <div className="relative z-10 w-full px-5 pb-12 pt-24 text-white">
-          <h1 className="text-[34px] sm:text-[42px] font-black tracking-[-0.05em] leading-[0.94]">
+          <h1
+            id="wk-mobile-magazine-hero-title"
+            className="text-[34px] sm:text-[42px] font-black tracking-[-0.05em] leading-[0.94]"
+          >
             {heroStory.title}
           </h1>
 
@@ -284,6 +290,9 @@ export default function MobileMagazine() {
                       <img
                         src={story.heroUrl}
                         alt={story.title}
+                        loading="lazy"
+                        fetchPriority="low"
+                        decoding="async"
                         className="w-full h-full object-cover object-top transition-transform duration-500 group-hover:scale-105"
                       />
                     ) : (
@@ -295,9 +304,9 @@ export default function MobileMagazine() {
                     )}
                   </div>
                   <div className="p-2.5 flex flex-col gap-1 flex-1">
-                    <h4 className="text-[12px] sm:text-[13px] font-black tracking-[-0.015em] leading-snug text-[var(--wk-text)] group-hover:text-[var(--wk-brand)] transition-colors line-clamp-2">
+                    <h3 className="text-[12px] sm:text-[13px] font-black tracking-[-0.015em] leading-snug text-[var(--wk-text)] group-hover:text-[var(--wk-brand)] transition-colors line-clamp-2">
                       {story.title}
-                    </h4>
+                    </h3>
                     <div className="flex items-center gap-1.5 text-[10px] text-[var(--wk-text-faint)] mt-auto">
                       <span className="font-semibold text-[var(--wk-text-muted)] truncate">{story.author}</span>
                     </div>
@@ -325,7 +334,7 @@ export default function MobileMagazine() {
             const secStories = sectionMap[section] || [];
             if (secStories.length === 0) return null;
 
-            // Layout 0: Carousel — image-overlay portrait cards, horizontal scroll
+            // Layout 0: Carousel: image-overlay portrait cards, horizontal scroll
             if (sectionIndex === 0) {
               return (
                 <section key={section} className="mag-reveal">
@@ -344,6 +353,9 @@ export default function MobileMagazine() {
                           <img
                             src={story.heroUrl}
                             alt={story.title}
+                            loading="lazy"
+                            fetchPriority="low"
+                            decoding="async"
                             className="absolute inset-0 w-full h-full object-cover object-top transition-transform duration-700 group-hover:scale-105"
                           />
                         ) : (
@@ -363,9 +375,9 @@ export default function MobileMagazine() {
                           <i className="ri-bookmark-line text-[13px]" />
                         </div>
                         <div className="absolute bottom-0 left-0 right-0 z-10 p-4 pb-5">
-                          <h4 className="text-[15px] sm:text-[16px] font-black tracking-[-0.025em] leading-snug text-white group-hover:text-white/90 transition-colors line-clamp-2 mb-2">
+                          <h3 className="text-[15px] sm:text-[16px] font-black tracking-[-0.025em] leading-snug text-white group-hover:text-white/90 transition-colors line-clamp-2 mb-2">
                             {story.title}
-                          </h4>
+                          </h3>
                           {story.dek && (
                             <p className="text-[11px] sm:text-[12px] leading-relaxed text-white/55 line-clamp-2 mb-3">
                               {story.dek}
@@ -404,7 +416,7 @@ export default function MobileMagazine() {
               );
             }
 
-            // Layout 1: Wide Landscape Scroll — cinematic widescreen cards, horizontal scroll
+            // Layout 1: Wide Landscape Scroll: cinematic widescreen cards, horizontal scroll
             if (sectionIndex === 1) {
               return (
                 <section key={section} className="mag-reveal">
@@ -423,6 +435,9 @@ export default function MobileMagazine() {
                           <img
                             src={story.heroUrl}
                             alt={story.title}
+                            loading="lazy"
+                            fetchPriority="low"
+                            decoding="async"
                             className="absolute inset-0 w-full h-full object-cover object-top transition-transform duration-700 group-hover:scale-105"
                           />
                         ) : (
@@ -439,9 +454,9 @@ export default function MobileMagazine() {
                           </span>
                         </div>
                         <div className="absolute bottom-0 left-0 right-0 z-10 p-4 pb-5">
-                          <h4 className="text-[16px] sm:text-[18px] font-black tracking-[-0.03em] leading-snug text-white group-hover:text-white/90 transition-colors line-clamp-2 mb-1.5">
+                          <h3 className="text-[16px] sm:text-[18px] font-black tracking-[-0.03em] leading-snug text-white group-hover:text-white/90 transition-colors line-clamp-2 mb-1.5">
                             {story.title}
-                          </h4>
+                          </h3>
                           <div className="flex items-center gap-2 text-[11px] text-white/40">
                             <span className="font-semibold text-white/60">{story.author}</span>
                             <span className="text-white/15">·</span>
@@ -455,7 +470,7 @@ export default function MobileMagazine() {
               );
             }
 
-            // Layout 2: 2-Column Grid — image-forward vertical cards with taller images
+            // Layout 2: 2-Column Grid: image-forward vertical cards with taller images
             if (sectionIndex === 2) {
               return (
                 <section key={section} className="mag-reveal">
@@ -472,6 +487,9 @@ export default function MobileMagazine() {
                             <img
                               src={story.heroUrl}
                               alt={story.title}
+                              loading="lazy"
+                              fetchPriority="low"
+                              decoding="async"
                               className="w-full h-full object-cover object-top transition-transform duration-500 group-hover:scale-105"
                             />
                           ) : (
@@ -486,9 +504,9 @@ export default function MobileMagazine() {
                           <span className="text-[9px] font-black uppercase tracking-[0.16em] text-[var(--wk-brand)]">
                             {story.section}
                           </span>
-                          <h4 className="text-[13px] sm:text-[14px] font-black tracking-[-0.02em] leading-snug text-[var(--wk-text)] group-hover:text-[var(--wk-brand)] transition-colors line-clamp-3">
+                          <h3 className="text-[13px] sm:text-[14px] font-black tracking-[-0.02em] leading-snug text-[var(--wk-text)] group-hover:text-[var(--wk-brand)] transition-colors line-clamp-3">
                             {story.title}
-                          </h4>
+                          </h3>
                           {story.dek && (
                             <p className="text-[10px] sm:text-[11px] leading-relaxed text-[var(--wk-text-soft)] line-clamp-2">
                               {story.dek}
@@ -507,7 +525,7 @@ export default function MobileMagazine() {
               );
             }
 
-            // Layout 3: Hero + Compact List — one big image-overlay hero, rest as thumb rows
+            // Layout 3: Hero + Compact List: one big image-overlay hero, rest as thumb rows
             const [heroItem, ...restItems] = secStories;
             return (
               <section key={section} className="mag-reveal">
@@ -522,6 +540,9 @@ export default function MobileMagazine() {
                         <img
                           src={heroItem.heroUrl}
                           alt={heroItem.title}
+                          loading="lazy"
+                          fetchPriority="low"
+                          decoding="async"
                           className="absolute inset-0 w-full h-full object-cover object-top transition-transform duration-700 group-hover:scale-105"
                         />
                       ) : (
@@ -538,9 +559,9 @@ export default function MobileMagazine() {
                         </span>
                       </div>
                       <div className="absolute bottom-0 left-0 right-0 z-10 p-4 pb-5">
-                        <h4 className="text-[18px] sm:text-[20px] font-black tracking-[-0.035em] leading-snug text-white line-clamp-2 mb-1.5">
+                        <h3 className="text-[18px] sm:text-[20px] font-black tracking-[-0.035em] leading-snug text-white line-clamp-2 mb-1.5">
                           {heroItem.title}
-                        </h4>
+                        </h3>
                         {heroItem.dek && (
                           <p className="text-[12px] leading-relaxed text-white/55 line-clamp-2 mb-2">
                             {heroItem.dek}
@@ -565,6 +586,9 @@ export default function MobileMagazine() {
                           <img
                             src={story.heroUrl}
                             alt=""
+                            loading="lazy"
+                            fetchPriority="low"
+                            decoding="async"
                             className="w-full h-full object-cover object-top transition-transform duration-400 group-hover:scale-110"
                           />
                         ) : (
@@ -579,9 +603,9 @@ export default function MobileMagazine() {
                         <span className="text-[9px] font-black uppercase tracking-[0.16em] text-[var(--wk-brand)]">
                           {story.section}
                         </span>
-                        <h4 className="text-[14px] font-bold tracking-[-0.02em] leading-snug text-[var(--wk-text)] group-hover:text-[var(--wk-brand)] transition-colors line-clamp-2">
+                        <h3 className="text-[14px] font-bold tracking-[-0.02em] leading-snug text-[var(--wk-text)] group-hover:text-[var(--wk-brand)] transition-colors line-clamp-2">
                           {story.title}
-                        </h4>
+                        </h3>
                         <div className="flex items-center gap-1.5 text-[10px] text-[var(--wk-text-faint)]">
                           <span className="font-semibold">{story.author}</span>
                           <span className="text-[var(--wk-border-strong)]">·</span>
@@ -615,7 +639,7 @@ export default function MobileMagazine() {
           <p className="text-[20px] font-black tracking-[-0.035em] text-[var(--wk-text)] leading-snug max-w-[320px] mx-auto">
             Stories that move East African culture forward.
           </p>
-          <p className="mt-2 text-[11px] text-[var(--wk-text-faint)]">
+          <p className="mt-2 text-[11px] text-[var(--wk-text-muted)]">
             Issue {issueNum} &middot; {issueDate}
           </p>
         </footer>
@@ -668,7 +692,7 @@ function MobileNewsletterCTA() {
           <div className="w-12 h-12 rounded-full bg-[var(--wk-brand)] flex items-center justify-center mx-auto mb-4">
             <i className="ri-check-line text-[24px] text-[var(--wk-brand-on)]" />
           </div>
-          <h3 className="text-[20px] font-black tracking-[-0.03em] text-[var(--wk-text)] mb-2">You’re on the list</h3>
+          <h2 className="text-[20px] font-black tracking-[-0.03em] text-[var(--wk-text)] mb-2">You’re on the list</h2>
           <p className="text-[13px] text-[var(--wk-text-muted)] max-w-[320px] mx-auto leading-relaxed">
             Expect WAKILISHA stories, charts, and cultural dispatches. No noise.
           </p>
