@@ -95,15 +95,61 @@ import {
   AdminUsersLayout,
   AdminUsersPage,
 } from "./lazyAdmin";
+import {
+  NotFound,
+  ResetPasswordPage,
+  AuthorProfilePage,
+  LegacyArticleRedirect,
+  PublicApiDocsPage,
+  PublicProfilePage,
+  PublicBriefingsPage,
+  BriefingConfirmPage,
+  BriefingUnsubscribePage,
+  BriefingPreferencesPage,
+  BriefingIssuePage,
+  ChartsDirectory,
+  ChartEdition,
+  Artists,
+  ArtistDetail,
+  Releases,
+  ReleaseDetail,
+  MobileReleaseDetail,
+  Genres,
+  GenreDetail,
+  Labels,
+  LabelDetail,
+  ArticlePage,
+  PreviewPage,
+  TrackDetail,
+  LyricContribution,
+  ProfilePage,
+  MobileProfilePage,
+  SettingsPage,
+  MobileSettingsPage,
+  Search,
+  GuidesPage,
+  GuideDetailPage,
+  VeniceFieldGuidePage,
+  MobileChartEdition,
+  MobileGenres,
+  MobileLabels,
+  MobileArticlePage,
+  AuthPage,
+  CategoriesIndex,
+  CategoryDetail,
+  TagsIndex,
+  TagDetail,
+  AboutPage,
+  ContactPage,
+  FaqsPage,
+  PrivacyPage,
+  TermsPage,
+  MobileFullPlayer,
+} from "./lazyPublic";
 import { ResponsiveAppLayout } from "@/components/mobile/ResponsiveAppLayout";
 import { ResponsivePage } from "@/components/mobile/ResponsivePage";
-import { MobileFullPlayer } from "@/components/mobile/MobileFullPlayer";
-import NotFound from "../pages/NotFound";
-import ResetPasswordPage from "../pages/auth/reset-password/page";
 
 // Author profiles
-import AuthorProfilePage from "../pages/authors/detail/page";
-import LegacyArticleRedirect from "../pages/LegacyArticleRedirect";
 
 // Admin Shell — WordPress-like production engine
 
@@ -122,75 +168,28 @@ import LegacyArticleRedirect from "../pages/LegacyArticleRedirect";
 // Admin Institute
 
 // Public API Docs
-import PublicApiDocsPage from "../pages/api-docs/page";
 
-import PublicProfilePage from "../pages/profile/public/page";
 
 // Briefing public pages
-import PublicBriefingsPage from "../pages/briefings/page";
-import BriefingConfirmPage from "../pages/briefing/confirm/page";
-import BriefingUnsubscribePage from "../pages/briefing/unsubscribe/page";
-import BriefingPreferencesPage from "../pages/briefing/preferences/page";
-import BriefingIssuePage from "../pages/briefing/issue/page";
 
 // Charts
-import ChartsDirectory from "../pages/charts/directory/page";
-import ChartEdition from "../pages/charts/edition/page";
 
 // Artists
-import Artists from "../pages/artists/page";
-import ArtistDetail from "../pages/artists/detail/page";
 
 // Other entity pages
-import Releases from "../pages/releases/page";
-import ReleaseDetail from "../pages/releases/detail/page";
-import MobileReleaseDetail from "../pages/mobile/releases/detail/page";
-import Genres from "../pages/genres/page";
-import GenreDetail from "../pages/genres/detail/page";
-import Labels from "../pages/labels/page";
-import LabelDetail from "../pages/labels/detail/page";
 import Magazine from "../pages/magazine/page";
-import ArticlePage from "../pages/magazine/article/page";
-import PreviewPage from "../pages/preview/page";
-import TrackDetail from "../pages/tracks/detail/page";
-import LyricContribution from "../pages/tracks/lyrics/contribute/page";
-import ProfilePage from "../pages/profile/page";
-import MobileProfilePage from "../pages/mobile/profile/page";
-import SettingsPage from "../pages/settings/page";
-import MobileSettingsPage from "../pages/mobile/settings/page";
 
 // Search
-import Search from "../pages/search/page";
 
 // Guides
-import GuidesPage from "../pages/guides/page";
-import GuideDetailPage from "../pages/guides/detail/page";
-import VeniceFieldGuidePage from "../pages/guides/field-guide/page";
 
 
 // Mobile pages
-import MobileHome from "../pages/mobile/home/page";
-import MobileChartsDirectory from "../pages/mobile/charts/directory/page";
-import MobileChartEdition from "../pages/mobile/charts/edition/page";
-import MobileGenres from "../pages/mobile/genres/page";
-import MobileLabels from "../pages/mobile/labels/page";
 import MobileMagazine from "../pages/mobile/magazine/page";
-import MobileArticlePage from "../pages/mobile/magazine/article/page";
-import MobileLyricContribution from "../pages/mobile/tracks/lyrics/contribute/page";
-import AuthPage from "../pages/auth/page";
 
 // Public taxonomy archive pages
-import CategoriesIndex from "../pages/categories/page";
-import CategoryDetail from "../pages/categories/detail/page";
-import TagsIndex from "../pages/tags/page";
-import TagDetail from "../pages/tags/detail/page";
 
 // Housekeeping pages
-import AboutPage from "../pages/about/page";
-import ContactPage from "../pages/contact/page";
-import FaqsPage from "../pages/faqs/page";
-import PrivacyPage from "../pages/privacy/page";
-import TermsPage from "../pages/terms/page";
 
 function LegacyTaxonomyRedirect({ base }: { base: "/categories" | "/tags" }) {
   const { slug } = useParams<{ slug?: string }>();
