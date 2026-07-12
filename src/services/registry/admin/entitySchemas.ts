@@ -3,6 +3,50 @@ import {
   type RegistryEntityType,
 } from "./types";
 
+const LIVING_MEMORY_EDITABLE_FIELDS: RegistryEntitySchema["editableFields"] = [
+  {
+    key: "living_memory_editorial_opener",
+    label: "Editorial opener",
+    type: "textarea",
+    access: "editable",
+    normalizer: "trim",
+    helpText: "The WAKILISHA opening frame shown above public contributions.",
+  },
+  {
+    key: "living_memory_public_prompt",
+    label: "Public prompt",
+    type: "textarea",
+    access: "editable",
+    normalizer: "trim",
+    helpText: "The question shown to readers and used in the contribution composer.",
+  },
+  {
+    key: "living_memory_editorial_label",
+    label: "Editorial disclosure",
+    type: "textarea",
+    access: "editable",
+    normalizer: "trim",
+    helpText: "Explains what WAKILISHA wrote and what belongs to contributors.",
+  },
+  {
+    key: "living_memory_status",
+    label: "Living Memory status",
+    type: "select",
+    access: "editable",
+    options: ["draft", "published", "archived"],
+    helpText: "Only published entries appear on public pages.",
+  },
+];
+
+const LIVING_MEMORY_READONLY_FIELDS: RegistryEntitySchema["readonlyFields"] = [
+  {
+    key: "living_memory_updated_at",
+    label: "Living Memory updated",
+    type: "date",
+    access: "readonly",
+  },
+];
+
 export const artistSchema: RegistryEntitySchema = {
   entityType: "artist",
   table: "registry_artists",
@@ -69,6 +113,7 @@ export const artistSchema: RegistryEntitySchema = {
       type: "url",
       access: "editable",
     },
+    ...LIVING_MEMORY_EDITABLE_FIELDS,
     {
       key: "status",
       label: "Status",
@@ -78,6 +123,7 @@ export const artistSchema: RegistryEntitySchema = {
     },
   ],
   readonlyFields: [
+    ...LIVING_MEMORY_READONLY_FIELDS,
     { key: "id", label: "Registry ID", type: "text", access: "readonly" },
     { key: "normalized_name", label: "Normalized name", type: "text", access: "readonly" },
     { key: "origin_confidence", label: "Origin confidence", type: "number", access: "readonly" },
@@ -154,6 +200,7 @@ export const trackSchema: RegistryEntitySchema = {
       type: "number",
       access: "editable",
     },
+    ...LIVING_MEMORY_EDITABLE_FIELDS,
     {
       key: "status",
       label: "Status",
@@ -163,6 +210,7 @@ export const trackSchema: RegistryEntitySchema = {
     },
   ],
   readonlyFields: [
+    ...LIVING_MEMORY_READONLY_FIELDS,
     { key: "id", label: "Registry ID", type: "text", access: "readonly" },
     { key: "normalized_title", label: "Normalized title", type: "text", access: "readonly" },
     { key: "release_id", label: "Release ID", type: "text", access: "readonly" },
@@ -227,6 +275,7 @@ export const releaseSchema: RegistryEntitySchema = {
       type: "textarea",
       access: "editable",
     },
+    ...LIVING_MEMORY_EDITABLE_FIELDS,
     {
       key: "status",
       label: "Status",
@@ -236,6 +285,7 @@ export const releaseSchema: RegistryEntitySchema = {
     },
   ],
   readonlyFields: [
+    ...LIVING_MEMORY_READONLY_FIELDS,
     { key: "id", label: "Registry ID", type: "text", access: "readonly" },
     { key: "normalized_title", label: "Normalized title", type: "text", access: "readonly" },
     { key: "label_id", label: "Label ID", type: "text", access: "readonly" },

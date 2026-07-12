@@ -198,9 +198,18 @@ export async function saveRegistryEntityPatch(
       body: JSON.stringify(payload),
     });
 
-    const result: RegistrySaveResult & { error?: string; errorCode?: string; message?: string; duplicateField?: string | null; duplicateValue?: string | null; conflictingEntity?: Record<string, unknown> | null; currentEntity?: Record<string, unknown> } = await res.json();
+    const result: RegistrySaveResult & { error?: string | { code?: string; message?: string }; errorCode?: string; message?: string; duplicateField?: string | null; duplicateValue?: string | null; conflictingEntity?: Record<string, unknown> | null; currentEntity?: Record<string, unknown> } = await res.json();
 
     if (!result.ok) {
+      const nestedError =
+        result.error && typeof result.error === "object"
+          ? result.error
+          : null;
+      const textError =
+        typeof result.error === "string"
+          ? result.error
+          : null;
+
       return {
         ok: false,
         entityType,
@@ -209,8 +218,8 @@ export async function saveRegistryEntityPatch(
         skippedFields,
         rejectedFields,
         warnings: [],
-        errorCode: result.errorCode ?? "save_failed",
-        message: result.message ?? result.error ?? "Save failed",
+        errorCode: result.errorCode ?? nestedError?.code ?? "save_failed",
+        message: result.message ?? nestedError?.message ?? textError ?? "Save failed",
         duplicateField: result.duplicateField ?? null,
         duplicateValue: result.duplicateValue ?? null,
         conflictingEntity: result.conflictingEntity ?? null,

@@ -10,7 +10,7 @@ import { WkIcon } from "@/components/design-system/Icon";
 
 const schema = getEntitySchema("artist");
 const PAGE_SIZE = 20;
-const FETCH_LIMIT = 2000;
+const FETCH_LIMIT = 5000;
 
 type SortMode = "recent" | "name" | "completeness_low" | "completeness_high";
 

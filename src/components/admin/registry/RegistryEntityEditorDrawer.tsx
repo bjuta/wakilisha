@@ -87,10 +87,22 @@ const FIELD_GROUPS: Record<string, string[]> = {
     "preview_url",
   ],
   Metadata: ["isrc", "upc", "duration_ms", "release_date"],
+  "Living Memory": [
+    "living_memory_editorial_opener",
+    "living_memory_public_prompt",
+    "living_memory_editorial_label",
+    "living_memory_status",
+  ],
   Publishing: ["status"],
 };
 
 const SHORT_FIELD_TYPES = new Set(["text", "select", "number", "date", "boolean"]);
+
+const LIVING_MEMORY_ENTITY_TYPES = new Set<RegistryEntityType>([
+  "artist",
+  "release",
+  "track",
+]);
 
 function groupEditableFields(
   fields: RegistryFieldSchema[],
@@ -286,6 +298,24 @@ export default function RegistryEntityEditorDrawer({
       const error = validateField(draft[field.key], field);
       if (error) errors[field.key] = error;
     }
+
+    if (
+      LIVING_MEMORY_ENTITY_TYPES.has(entityType) &&
+      draft.living_memory_status === "published"
+    ) {
+      const requiredLivingMemoryFields = [
+        ["living_memory_editorial_opener", "Editorial opener"],
+        ["living_memory_public_prompt", "Public prompt"],
+        ["living_memory_editorial_label", "Editorial disclosure"],
+      ] as const;
+
+      for (const [key, label] of requiredLivingMemoryFields) {
+        if (!String(draft[key] ?? "").trim()) {
+          errors[key] = `${label} is required before publishing.`;
+        }
+      }
+    }
+
     setValidationErrors(errors);
     if (Object.keys(errors).length > 0) return;
 
