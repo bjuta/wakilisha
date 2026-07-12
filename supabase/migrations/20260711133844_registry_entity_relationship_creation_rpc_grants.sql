@@ -1,0 +1,3 @@
+revoke all on function public.create_registry_entity_relationship(text, uuid, text, uuid, text, text, text, date, date, uuid, text, text, jsonb) from public, anon;
+grant execute on function public.create_registry_entity_relationship(text, uuid, text, uuid, text, text, text, date, date, uuid, text, text, jsonb) to authenticated, service_role;
+comment on function public.create_registry_entity_relationship(text, uuid, text, uuid, text, text, text, date, date, uuid, text, text, jsonb) is 'Creates a draft relationship between canonical Registry entities and optionally attaches evidence atomically.';;
