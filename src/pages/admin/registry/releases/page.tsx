@@ -10,6 +10,7 @@ import { WkIcon } from "@/components/design-system/Icon";
 
 const schema = getEntitySchema("release");
 const PAGE_SIZE = 20;
+const FETCH_LIMIT = 5000;
 
 type SortMode = "recent" | "title" | "completeness_low" | "completeness_high";
 
@@ -273,7 +274,7 @@ export default function ReleasesPage() {
   async function fetchReleases() {
     setLoading(true);
     setError(null);
-    const { data, error: fetchError } = await getRegistryEntityList("release", { limit: 250 });
+    const { data, error: fetchError } = await getRegistryEntityList("release", { limit: FETCH_LIMIT });
     if (fetchError) {
       setError(fetchError);
       setReleases([]);
@@ -373,6 +374,11 @@ export default function ReleasesPage() {
       prev.map((release) =>
         release.id === updatedEntity.id ? (updatedEntity as RegistryEntityProfile) : release,
       ),
+    );
+    setSelectedRelease((current) =>
+      current?.id === updatedEntity.id
+        ? (updatedEntity as EnrichedRelease)
+        : current,
     );
     showToast(`Saved ${String(updatedEntity.title ?? "release")}`);
   }

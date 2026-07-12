@@ -10,6 +10,7 @@ import { WkIcon } from "@/components/design-system/Icon";
 
 const schema = getEntitySchema("track");
 const PAGE_SIZE = 20;
+const FETCH_LIMIT = 5000;
 
 type SortMode = "recent" | "title" | "completeness_low" | "completeness_high";
 
@@ -272,7 +273,7 @@ export default function TracksPage() {
   async function fetchTracks() {
     setLoading(true);
     setError(null);
-    const { data, error: fetchError } = await getRegistryEntityList("track", { limit: 250 });
+    const { data, error: fetchError } = await getRegistryEntityList("track", { limit: FETCH_LIMIT });
     if (fetchError) {
       setError(fetchError);
       setTracks([]);
@@ -383,6 +384,11 @@ export default function TracksPage() {
       prev.map((track) =>
         track.id === updatedEntity.id ? (updatedEntity as RegistryEntityProfile) : track,
       ),
+    );
+    setSelectedTrack((current) =>
+      current?.id === updatedEntity.id
+        ? (updatedEntity as EnrichedTrack)
+        : current,
     );
     showToast(`Saved ${String(updatedEntity.title ?? "track")}`);
   }

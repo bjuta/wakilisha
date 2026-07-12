@@ -87,10 +87,22 @@ const FIELD_GROUPS: Record<string, string[]> = {
     "preview_url",
   ],
   Metadata: ["isrc", "upc", "duration_ms", "release_date"],
+  "Living Memory": [
+    "living_memory_editorial_opener",
+    "living_memory_public_prompt",
+    "living_memory_editorial_label",
+    "living_memory_status",
+  ],
   Publishing: ["status"],
 };
 
 const SHORT_FIELD_TYPES = new Set(["text", "select", "number", "date", "boolean"]);
+
+const LIVING_MEMORY_ENTITY_TYPES = new Set<RegistryEntityType>([
+  "artist",
+  "release",
+  "track",
+]);
 
 function groupEditableFields(
   fields: RegistryFieldSchema[],
@@ -249,7 +261,6 @@ export default function RegistryEntityEditorDrawer({
   }, [entity, draft, schema]);
 
   const hasChanges = dirtyFields.length > 0;
-  const hasValidationErrors = Object.keys(validationErrors).length > 0;
 
   const groupedFields = useMemo(
     () => groupEditableFields(schema.editableFields.filter((f) => f.access === "editable")),
@@ -266,11 +277,22 @@ export default function RegistryEntityEditorDrawer({
         const error = validateField(value, fieldDef);
         setValidationErrors((prev) => {
           const next = { ...prev };
+
+          if (
+            key === "living_memory_status" &&
+            value !== "published"
+          ) {
+            delete next.living_memory_editorial_opener;
+            delete next.living_memory_public_prompt;
+            delete next.living_memory_editorial_label;
+          }
+
           if (error) {
             next[key] = error;
           } else {
             delete next[key];
           }
+
           return next;
         });
       }
@@ -286,6 +308,24 @@ export default function RegistryEntityEditorDrawer({
       const error = validateField(draft[field.key], field);
       if (error) errors[field.key] = error;
     }
+
+    if (
+      LIVING_MEMORY_ENTITY_TYPES.has(entityType) &&
+      draft.living_memory_status === "published"
+    ) {
+      const requiredLivingMemoryFields = [
+        ["living_memory_editorial_opener", "Editorial opener"],
+        ["living_memory_public_prompt", "Public prompt"],
+        ["living_memory_editorial_label", "Editorial disclosure"],
+      ] as const;
+
+      for (const [key, label] of requiredLivingMemoryFields) {
+        if (!String(draft[key] ?? "").trim()) {
+          errors[key] = `${label} is required before publishing.`;
+        }
+      }
+    }
+
     setValidationErrors(errors);
     if (Object.keys(errors).length > 0) return;
 
@@ -994,7 +1034,7 @@ export default function RegistryEntityEditorDrawer({
               <button
                 type="button"
                 onClick={handleSave}
-                disabled={saving || !hasChanges || hasValidationErrors}
+                disabled={saving || !hasChanges}
                 className="flex items-center gap-1.5 rounded-xl bg-[#85c441] px-5 py-2.5 text-sm font-black text-[#102006] shadow-sm transition-all hover:bg-[#76b33a] hover:shadow-md disabled:cursor-not-allowed disabled:opacity-50 disabled:shadow-none whitespace-nowrap"
               >
                 {saving ? (
