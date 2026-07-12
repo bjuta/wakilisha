@@ -1,3 +1,4 @@
+import { Suspense } from "react";
 import { BrowserRouter } from "react-router-dom";
 import { AppRoutes } from "./router";
 import { I18nextProvider } from "react-i18next";
@@ -32,7 +33,19 @@ function App() {
               <PageViewTracker />
               <GtagInjector />
               <div className="page-transition">
-                <AppRoutes />
+                <Suspense
+                  fallback={
+                    <div
+                      role="status"
+                      aria-live="polite"
+                      className="flex min-h-[40vh] items-center justify-center px-6 text-sm text-foreground-600"
+                    >
+                      Loading page.
+                    </div>
+                  }
+                >
+                  <AppRoutes />
+                </Suspense>
               </div>
             </PlayerProvider>
           </AccentProvider>
