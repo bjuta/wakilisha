@@ -1,5 +1,6 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.1";
 import { SignJWT } from "npm:jose@5.9.6";
+import { resolveScopedTrackIdentity } from "./trackIdentity.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -429,12 +430,10 @@ Deno.serve(async (req: Request) => {
 
     const allActiveReleases = existingReleasesRes.data ?? [];
 
-    const existingTrackBySlug = new Map<string, string>();
     const existingTrackByIsrc = new Map<string, string>();
     const existingTrackIdToSlug = new Map<string, string>();
     for (const t of existingTracksRes.data ?? []) {
       const tid = t.id as string;
-      existingTrackBySlug.set(t.slug as string, tid);
       existingTrackIdToSlug.set(tid, t.slug as string);
       if (t.isrc && (t.isrc as string).trim()) {
         const normalized = (t.isrc as string).trim().toUpperCase();
@@ -450,12 +449,6 @@ Deno.serve(async (req: Request) => {
           .range(from, to)
       );
     if (existingTrackArtistsError) return fail(stage, "track_artist_preload_failed", existingTrackArtistsError.message, { mode, artistSlug, storefront, duration_ms: Date.now() - start });
-    const existingTrackArtistSet = new Set<string>(
-      (existingTrackArtists ?? []).map((r: { track_id: string; artist_slug: string }) =>
-        `${r.track_id}:${r.artist_slug}`
-      )
-    );
-
     const existingTrackByArtistAndSlug = new Map<string, string>();
     for (const row of existingTrackArtists ?? []) {
       const trackSlug = existingTrackIdToSlug.get(String(row.track_id));
@@ -614,7 +607,6 @@ Deno.serve(async (req: Request) => {
       }
 
       const seenReleaseSlugs = new Set(existingReleaseSlugs);
-      const seenTrackSlugs = new Set<string>();
 
       const releaseRows: Record<string, unknown>[] = [];
       const releaseArtistRows: Record<string, unknown>[] = [];
@@ -768,29 +760,19 @@ Deno.serve(async (req: Request) => {
           const trackNum = tAttrs.trackNumber ?? null;
           const durationMs = tAttrs.durationInMillis ?? null;
           const explicit = (tAttrs.contentRating ?? "") === "explicit";
-          let trackId: string | undefined;
-          let trackSlug: string;
+          const {
+            trackId,
+            trackSlug,
+          } = resolveScopedTrackIdentity({
+            artistSlug,
+            rawTrackSlug,
+            trackIsrc,
+            existingTrackByIsrc,
+            existingTrackByArtistAndSlug,
+            existingTrackIdToSlug,
+            createTrackId: () => crypto.randomUUID(),
+          });
 
-          if (trackIsrc) trackId = existingTrackByIsrc.get(trackIsrc);
-
-          if (!trackId) {
-            const slugMatchId = existingTrackByArtistAndSlug.get(`${artistSlug}:${rawTrackSlug}`);
-            if (slugMatchId && existingTrackArtistSet.has(`${slugMatchId}:${artistSlug}`)) {
-              trackId = slugMatchId;
-            }
-          }
-
-          if (!trackId) {
-            trackId = crypto.randomUUID();
-            trackSlug = dedupeSlug(rawTrackSlug, seenTrackSlugs);
-            existingTrackBySlug.set(trackSlug, trackId);
-            existingTrackIdToSlug.set(trackId, trackSlug);
-            existingTrackByArtistAndSlug.set(`${artistSlug}:${trackSlug}`, trackId);
-            if (trackIsrc) existingTrackByIsrc.set(trackIsrc, trackId);
-            seenTrackSlugs.add(trackSlug);
-          } else {
-            trackSlug = existingTrackIdToSlug.get(trackId) ?? rawTrackSlug;
-          }
           processedTrackIds.add(trackId);
           trackCount++;
           let trackAwUrl: string | null = null;
