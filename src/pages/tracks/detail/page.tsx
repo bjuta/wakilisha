@@ -810,13 +810,12 @@ export default function TrackDetail() {
       .then(async (apiData) => {
         if (!alive) return;
         if (!apiData) {
-          const redirect = releaseSlug
-            ? null
-            : await resolveScopedSlugRedirect(
-                "track",
-                artistSlug,
-                trackSlug,
-              );
+          const redirect = await resolveScopedSlugRedirect(
+            "track",
+            artistSlug,
+            trackSlug,
+            { releaseSlug },
+          );
 
           if (!alive) return;
 

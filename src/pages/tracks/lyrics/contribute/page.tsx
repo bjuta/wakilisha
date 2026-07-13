@@ -1,8 +1,9 @@
 import { useState, useEffect, useCallback } from 'react';
-import { useParams, Link } from 'react-router-dom';
+import { useParams, Link, useLocation, useNavigate } from 'react-router-dom';
 import { usePlayer } from '@/context/PlayerContext';
 import { getReleaseTrack, getTrack } from '@/services/publicApi/client';
 import { releaseTrackUrl, trackUrl } from '@/utils/trackUrl';
+import { resolveScopedSlugRedirect } from '@/services/slugRedirects';
 import { trackEvent, getAnalyticsSessionId, getCanonicalPageUrl } from '@/services/analytics';
 import { WkIcon } from '@/components/design-system/Icon';
 
@@ -41,6 +42,8 @@ export default function LyricContribution() {
     trackSlug: string;
   }>();
   const { playTrack, currentTrack, isPlaying, togglePlay, currentTime } = usePlayer();
+  const navigate = useNavigate();
+  const location = useLocation();
   const [track, setTrack] = useState<TrackData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -71,9 +74,33 @@ export default function LyricContribution() {
       : getTrack(artistSlug, trackSlug);
 
     request
-      .then((apiData) => {
+      .then(async (apiData) => {
         if (!alive) return;
         if (!apiData) {
+          const redirect = await resolveScopedSlugRedirect(
+            "track",
+            artistSlug,
+            trackSlug,
+            { releaseSlug },
+          );
+
+          if (!alive) return;
+
+          const redirectedLyricsPath = redirect
+            ? `${redirect.newPath}/lyrics/contribute`
+            : "";
+
+          if (
+            redirectedLyricsPath &&
+            redirectedLyricsPath !== location.pathname
+          ) {
+            navigate(
+              `${redirectedLyricsPath}${location.search || ""}${location.hash || ""}`,
+              { replace: true },
+            );
+            return;
+          }
+
           setLoading(false);
           setError('Track not found.');
           return;
@@ -103,7 +130,15 @@ export default function LyricContribution() {
         setError('Could not load track.');
       });
     return () => { alive = false; };
-  }, [artistSlug, releaseSlug, trackSlug]);
+  }, [
+    artistSlug,
+    releaseSlug,
+    trackSlug,
+    navigate,
+    location.pathname,
+    location.search,
+    location.hash,
+  ]);
 
   const isThisTrackPlaying = currentTrack?.id === trackSlug && isPlaying;
 

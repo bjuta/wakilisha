@@ -42,6 +42,14 @@ describe("release-scoped track routes", () => {
       "src/pages/tracks/detail/page.tsx",
       "utf8",
     );
+    const lyricsPage = readFileSync(
+      "src/pages/tracks/lyrics/contribute/page.tsx",
+      "utf8",
+    );
+    const redirectService = readFileSync(
+      "src/services/slugRedirects.ts",
+      "utf8",
+    );
     const publicClient = readFileSync(
       "src/services/publicApi/client.ts",
       "utf8",
@@ -62,6 +70,21 @@ describe("release-scoped track routes", () => {
     );
     expect(trackPage).toContain(
       "getReleaseTrack(artistSlug, releaseSlug, trackSlug)",
+    );
+    expect(trackPage).toContain(
+      "{ releaseSlug },",
+    );
+    expect(lyricsPage).toContain(
+      "resolveScopedSlugRedirect(",
+    );
+    expect(lyricsPage).toContain(
+      "`${redirect.newPath}/lyrics/contribute`",
+    );
+    expect(redirectService).toContain(
+      "releaseSlug?: string",
+    );
+    expect(redirectService).toContain(
+      "return `/releases/${scopeSlug}/${releaseSlug}/`;",
     );
     expect(publicClient).toContain(
       "/releases/${encodeURIComponent(artistSlug)}/${encodeURIComponent(releaseSlug)}/${encodeURIComponent(trackSlug)}",
