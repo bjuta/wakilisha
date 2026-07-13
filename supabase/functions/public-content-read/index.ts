@@ -810,6 +810,10 @@ Deno.serve(async (req) => {
 
   const url = new URL(req.url);
   const path = normalizePath(url.pathname);
+  const releasePathSegments = path.startsWith("/releases/")
+    ? path.replace(/^\/releases\//, "").split("/").filter(Boolean)
+    : [];
+  const isReleaseTrackPath = releasePathSegments.length === 3;
 
   try {
     let data: unknown;
@@ -1121,7 +1125,7 @@ Deno.serve(async (req) => {
       }
     }
 
-    else if (path.startsWith("/releases/")) {
+    else if (path.startsWith("/releases/") && !isReleaseTrackPath) {
       const relSegments = path.replace(/^\/releases\//, "").split("/").filter(Boolean);
       const releaseSlug = relSegments[relSegments.length - 1] || "";
       const urlArtistSlug = relSegments.length > 1 ? relSegments[0] : null;
@@ -1204,13 +1208,105 @@ Deno.serve(async (req) => {
 
     else if (path === "/labels" || path === "/labels/") { const { data: labels } = await supabase.from("registry_labels").select("id, slug, name, country_code, description, status").eq("status", "active").order("name", { ascending: true }).limit(500); data = { labels: (labels ?? []).map((l: any) => ({ id: String(l.id), slug: String(l.slug), name: String(l.name), country: l.country_code || null, logoUrl: null, artistCount: 0, releaseCount: 0, featuredArtists: [], isFeatured: false, description: l.description || null })) }; }
 
-    else if (path.startsWith("/tracks/")) {
-      const tSegments = path.replace(/^\/tracks\//, "").split("/").filter(Boolean);
+    else if (path.startsWith("/tracks/") || isReleaseTrackPath) {
+      const tSegments = isReleaseTrackPath
+        ? releasePathSegments
+        : path.replace(/^\/tracks\//, "").split("/").filter(Boolean);
       const trackSlug = tSegments[tSegments.length - 1] || "";
       const urlArtistSlug = tSegments.length > 1 ? tSegments[0] : null;
+      const urlReleaseSlug = isReleaseTrackPath ? tSegments[1] || null : null;
       let track: any = null;
-      const isIsrcLookup = trackSlug.toLowerCase().startsWith("isrc:");
-      if (isIsrcLookup) {
+      let releaseScopedMembership: any = null;
+      const isIsrcLookup =
+        !isReleaseTrackPath &&
+        trackSlug.toLowerCase().startsWith("isrc:");
+
+      if (isReleaseTrackPath) {
+        if (!urlArtistSlug || !urlReleaseSlug || !trackSlug) {
+          return jsonResponse(
+            { data: null, meta: { reason: "invalid_release_track_path" } },
+            origin,
+            404,
+          );
+        }
+
+        const scopedRelease = await findReleaseByScopedPublicSlug(
+          supabase,
+          urlArtistSlug,
+          urlReleaseSlug,
+        );
+
+        if (!scopedRelease) {
+          return jsonResponse(
+            { data: null, meta: { reason: "release_not_found_for_artist" } },
+            origin,
+            404,
+          );
+        }
+
+        const { data: scopedMembershipRows } = await supabase
+          .from("registry_release_tracks")
+          .select("release_id, track_id, track_number, disc_number")
+          .eq("release_id", String(scopedRelease.id))
+          .eq("status", "active")
+          .order("disc_number", { ascending: true })
+          .order("track_number", { ascending: true })
+          .limit(500);
+
+        const scopedTrackIds = [
+          ...new Set(
+            (scopedMembershipRows ?? [])
+              .map((row: any) => String(row.track_id || ""))
+              .filter(Boolean),
+          ),
+        ];
+
+        const { data: scopedTracks } = scopedTrackIds.length > 0
+          ? await supabase
+              .from("registry_tracks")
+              .select(MUSIC_ENTITY_SELECT)
+              .in("id", scopedTrackIds)
+              .in("status", ["active", "needs_review", "draft"])
+          : { data: [] };
+
+        const normalizedRequestedSlug = slugify(trackSlug);
+        const scopedMatches = (scopedTracks ?? []).filter((row: any) => {
+          const storedSlug = slugify(String(row.slug || ""));
+          const publicSlug = cleanPublicMusicSlug(
+            row.slug,
+            row.title,
+            urlArtistSlug,
+          );
+
+          return (
+            storedSlug === normalizedRequestedSlug ||
+            publicSlug === normalizedRequestedSlug
+          );
+        });
+
+        if (scopedMatches.length > 1) {
+          return jsonResponse(
+            {
+              data: null,
+              meta: {
+                reason: "ambiguous_release_track_slug",
+                matchCount: scopedMatches.length,
+              },
+            },
+            origin,
+            409,
+          );
+        }
+
+        track = scopedMatches[0] ?? null;
+
+        if (track) {
+          releaseScopedMembership =
+            (scopedMembershipRows ?? []).find(
+              (row: any) => String(row.track_id) === String(track.id),
+            ) ?? null;
+        }
+      } else if (isIsrcLookup) {
         const isrc = trackSlug.slice(5);
         const { data: byIsrc } = await supabase
           .from("registry_tracks")
@@ -1223,7 +1319,11 @@ Deno.serve(async (req) => {
         track = byIsrc && byIsrc.length > 0 ? byIsrc[0] : null;
       } else {
         if (urlArtistSlug) {
-          track = await findTrackByScopedPublicSlug(supabase, urlArtistSlug, trackSlug);
+          track = await findTrackByScopedPublicSlug(
+            supabase,
+            urlArtistSlug,
+            trackSlug,
+          );
         }
 
         if (!track) {
@@ -1241,7 +1341,7 @@ Deno.serve(async (req) => {
       // v15: Chart-entry fallback — tracks not yet in registry can still have pages
       // The chart pipeline stores slugs with spaces (e.g. "baddies need love"), 
       // but the URL arrives with hyphens ("baddies-need-love"). We need to match both.
-      if (!track && !isIsrcLookup) {
+      if (!track && !isIsrcLookup && !isReleaseTrackPath) {
         const withSpaces = trackSlug.replace(/-/g, " ");
         const { data: chartEntries } = await supabase.from("wk_chart_entries_v2")
           .select("track_title, track_slug, artist_name, artist_slug, artwork_url, rank, previous_rank, movement, edition_id, total_score, release_date")
@@ -1329,7 +1429,7 @@ Deno.serve(async (req) => {
       }
 
       if (!track) return jsonResponse({ data: null }, origin, 404);
-      if (urlArtistSlug && !isIsrcLookup) {
+      if (urlArtistSlug && !isIsrcLookup && !isReleaseTrackPath) {
         const normalizedUrlArtistSlug = slugify(urlArtistSlug);
         const trackMeta = (track.metadata || {}) as Record<string, unknown>;
         const metadataArtistSlug = String(trackMeta.primary_artist_slug || "").trim();
@@ -1358,13 +1458,15 @@ Deno.serve(async (req) => {
       }
       const trackId = String(track.id);
 
-      let releaseMembership: any = track.release_id
-        ? {
-            release_id: String(track.release_id),
-            track_number: Number(track.track_number || 0),
-            disc_number: Number(track.disc_number || 1),
-          }
-        : null;
+      let releaseMembership: any = releaseScopedMembership ?? (
+        track.release_id
+          ? {
+              release_id: String(track.release_id),
+              track_number: Number(track.track_number || 0),
+              disc_number: Number(track.disc_number || 1),
+            }
+          : null
+      );
 
       if (!releaseMembership) {
         const { data: membershipRows } = await supabase

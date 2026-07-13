@@ -251,9 +251,9 @@ const routePaths = [
   ),
 ].map((match) => match[1]);
 
-if (routePaths.length !== 147) {
+if (routePaths.length !== 149) {
   fail(
-    `expected 147 route paths, found ${routePaths.length}`,
+    `expected 149 route paths, found ${routePaths.length}`,
   );
 }
 
@@ -266,7 +266,7 @@ const routeChecksum = crypto
   .digest("hex");
 
 const expectedRouteChecksum =
-  "bc7655d5f426c8ddd218584a57f78596d48ed1eada1725ee01c27cd43b20e9a5";
+  "1eada3188aed314c87069d43a5a80c760d539b3af1997dc708ccca722bf44fa4";
 
 if (
   routeChecksum !==
@@ -308,5 +308,5 @@ if (
 
 console.log(
   "Public route splitting audit passed: " +
-  "49 lazy imports, 147 route paths preserved.",
+  "49 lazy imports, 149 route paths preserved.",
 );

@@ -81,3 +81,13 @@ export function getTrack(
     `/tracks/${encodeURIComponent(artistSlug)}/${encodeURIComponent(trackSlug)}`
   );
 }
+
+export function getReleaseTrack(
+  artistSlug: string,
+  releaseSlug: string,
+  trackSlug: string
+): Promise<PublicTrackDetail | null> {
+  return fetchPublic<PublicTrackDetail | null>(
+    `/releases/${encodeURIComponent(artistSlug)}/${encodeURIComponent(releaseSlug)}/${encodeURIComponent(trackSlug)}`
+  );
+}

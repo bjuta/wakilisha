@@ -2,7 +2,7 @@ import { Link } from "react-router-dom";
 import { WkIcon } from "@/components/design-system/Icon";
 import { useScrollReveal } from "@/hooks/useScrollReveal";
 import { usePlayer } from "@/context/PlayerContext";
-import { trackUrl } from "@/utils/trackUrl";
+import { releaseTrackUrl } from "@/utils/trackUrl";
 import type { PublicReleaseDetail } from "@/services/publicContent/client";
 
 function formatDuration(seconds: number): string {
@@ -124,7 +124,7 @@ export default function ReleaseTracklist({
 
                 {/* Track info — clicking navigates to track detail */}
                 <Link
-                  to={trackUrl(track.slug, [artistSlug])}
+                  to={releaseTrackUrl(artistSlug, release.slug, track.slug)}
                   className="min-w-0 block"
                   onClick={(e) => {
                     // Don't navigate if we're interacting with the play button area
@@ -163,7 +163,7 @@ export default function ReleaseTracklist({
 
                 {/* Chevron to detail page */}
                 <Link
-                  to={trackUrl(track.slug, [artistSlug])}
+                  to={releaseTrackUrl(artistSlug, release.slug, track.slug)}
                   className="flex items-center justify-center"
                 >
                   <WkIcon
