@@ -7,6 +7,10 @@ export type ScopedSlugRedirect = {
   redirectStatus: 301 | 308;
 };
 
+export type ScopedSlugRedirectContext = {
+  releaseSlug?: string;
+};
+
 const routePrefixByEntityType = {
   track: "/tracks",
   release: "/releases",
@@ -20,13 +24,31 @@ function isPermanentRedirectStatus(value: number): value is 301 | 308 {
   return value === 301 || value === 308;
 }
 
+function buildScopedRoutePrefix(
+  entityType: ScopedRedirectEntityType,
+  scopeSlug: string,
+  context: ScopedSlugRedirectContext,
+): string {
+  const releaseSlug = cleanRouteSegment(context.releaseSlug || "");
+
+  if (entityType === "track" && releaseSlug) {
+    return `/releases/${scopeSlug}/${releaseSlug}/`;
+  }
+
+  return `${routePrefixByEntityType[entityType]}/${scopeSlug}/`;
+}
+
 function isSafeTargetPath(
   entityType: ScopedRedirectEntityType,
   scopeSlug: string,
   newPath: string,
+  context: ScopedSlugRedirectContext,
 ): boolean {
-  const expectedPrefix =
-    `${routePrefixByEntityType[entityType]}/${scopeSlug}/`;
+  const expectedPrefix = buildScopedRoutePrefix(
+    entityType,
+    scopeSlug,
+    context,
+  );
 
   return (
     newPath.startsWith(expectedPrefix) &&
@@ -39,16 +61,30 @@ export async function resolveScopedSlugRedirect(
   entityType: ScopedRedirectEntityType,
   scopeSlug: string,
   oldSlug: string,
+  context: ScopedSlugRedirectContext = {},
 ): Promise<ScopedSlugRedirect | null> {
   const cleanScopeSlug = cleanRouteSegment(scopeSlug);
   const cleanOldSlug = cleanRouteSegment(oldSlug);
+  const cleanReleaseSlug = cleanRouteSegment(context.releaseSlug || "");
 
   if (!cleanScopeSlug || !cleanOldSlug) {
     return null;
   }
 
+  if (entityType === "track" && context.releaseSlug && !cleanReleaseSlug) {
+    return null;
+  }
+
+  const cleanContext: ScopedSlugRedirectContext = {
+    releaseSlug: cleanReleaseSlug || undefined,
+  };
+
   const oldPath =
-    `${routePrefixByEntityType[entityType]}/${cleanScopeSlug}/${cleanOldSlug}`;
+    `${buildScopedRoutePrefix(
+      entityType,
+      cleanScopeSlug,
+      cleanContext,
+    )}${cleanOldSlug}`;
 
   const { data, error } = await supabase
     .from("wk_slug_redirects")
@@ -75,7 +111,12 @@ export async function resolveScopedSlugRedirect(
   if (
     !newPath ||
     newPath === oldPath ||
-    !isSafeTargetPath(entityType, cleanScopeSlug, newPath) ||
+    !isSafeTargetPath(
+      entityType,
+      cleanScopeSlug,
+      newPath,
+      cleanContext,
+    ) ||
     !isPermanentRedirectStatus(redirectStatus)
   ) {
     return null;
