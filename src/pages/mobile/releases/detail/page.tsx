@@ -4,7 +4,7 @@ import { WkIcon } from "@/components/design-system/Icon";
 import { MetaTags } from "@/components/seo/MetaTags";
 import { usePlayer } from "@/context/PlayerContext";
 import { getRelease, slugify, listReleases, type PublicReleaseDetail, type PublicRelease } from "@/services/publicContent/client";
-import { trackUrl } from "@/utils/trackUrl";
+import { releaseTrackUrl } from "@/utils/trackUrl";
 import { useScrollDepthTracking } from "@/hooks/useScrollDepthTracking";
 import { MobileShareButton } from "@/components/design-system/share/ShareSheet";
 import { CommunitySection } from "@/pages/magazine/article/components/CommunitySection";
@@ -468,7 +468,7 @@ export default function MobileReleaseDetail() {
                     >
                       <i className={`${isCurrentTrack && isPlaying ? "ri-pause-fill" : "ri-play-fill"} text-sm`} />
                     </button>
-                    <Link to={trackUrl(track.slug, [slugify(release.artist)])} className="min-w-0 flex-1">
+                    <Link to={releaseTrackUrl(artistSlug, releaseSlug, track.slug)} className="min-w-0 flex-1">
                       <div className="text-[13px] font-bold text-[var(--wk-text)] truncate">{track.title}</div>
                       <div className="text-[11px] text-[var(--wk-text-muted)] truncate">{track.artist}</div>
                     </Link>

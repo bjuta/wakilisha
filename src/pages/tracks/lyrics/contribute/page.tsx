@@ -1,7 +1,8 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { usePlayer } from '@/context/PlayerContext';
-import { getTrack } from '@/services/publicApi/client';
+import { getReleaseTrack, getTrack } from '@/services/publicApi/client';
+import { releaseTrackUrl, trackUrl } from '@/utils/trackUrl';
 import { trackEvent, getAnalyticsSessionId, getCanonicalPageUrl } from '@/services/analytics';
 import { WkIcon } from '@/components/design-system/Icon';
 
@@ -34,7 +35,11 @@ interface TrackData {
 }
 
 export default function LyricContribution() {
-  const { artistSlug, trackSlug } = useParams<{ artistSlug: string; trackSlug: string }>();
+  const { artistSlug, releaseSlug, trackSlug } = useParams<{
+    artistSlug: string;
+    releaseSlug?: string;
+    trackSlug: string;
+  }>();
   const { playTrack, currentTrack, isPlaying, togglePlay, currentTime } = usePlayer();
   const [track, setTrack] = useState<TrackData | null>(null);
   const [loading, setLoading] = useState(true);
@@ -61,7 +66,11 @@ export default function LyricContribution() {
 
     setLoading(true);
     setError(null);
-    getTrack(artistSlug, trackSlug)
+    const request = releaseSlug
+      ? getReleaseTrack(artistSlug, releaseSlug, trackSlug)
+      : getTrack(artistSlug, trackSlug);
+
+    request
       .then((apiData) => {
         if (!alive) return;
         if (!apiData) {
@@ -94,7 +103,7 @@ export default function LyricContribution() {
         setError('Could not load track.');
       });
     return () => { alive = false; };
-  }, [artistSlug, trackSlug]);
+  }, [artistSlug, releaseSlug, trackSlug]);
 
   const isThisTrackPlaying = currentTrack?.id === trackSlug && isPlaying;
 
@@ -212,6 +221,10 @@ export default function LyricContribution() {
     );
   }
 
+  const canonicalTrackPath = releaseSlug
+    ? releaseTrackUrl(artistSlug, releaseSlug, trackSlug)
+    : trackUrl(trackSlug, [artistSlug]);
+
   if (submitted) {
     return (
       <main className="min-h-screen bg-[var(--wk-bg)]">
@@ -225,7 +238,7 @@ export default function LyricContribution() {
             Once more contributors upvote than downvote, they'll go live.
           </p>
           <div className="flex items-center justify-center gap-4">
-            <Link to={`/tracks/${artistSlug}/${trackSlug}`} className="rounded-xl border border-[var(--wk-border)] bg-[var(--wk-surface)] px-6 py-3 text-[14px] font-bold text-[var(--wk-text)] hover:bg-[var(--wk-surface-raised)] transition-colors">Back to track</Link>
+            <Link to={canonicalTrackPath} className="rounded-xl border border-[var(--wk-border)] bg-[var(--wk-surface)] px-6 py-3 text-[14px] font-bold text-[var(--wk-text)] hover:bg-[var(--wk-surface-raised)] transition-colors">Back to track</Link>
             <button onClick={() => setSubmitted(false)} className="rounded-xl bg-[var(--wk-brand)] px-6 py-3 text-[14px] font-bold text-[var(--wk-brand-on)] hover:opacity-90 transition-opacity">Submit another</button>
           </div>
         </div>
@@ -238,7 +251,7 @@ export default function LyricContribution() {
       {/* Header */}
       <div className="border-b border-[var(--wk-border)] bg-[var(--wk-surface)]">
         <div className="mx-auto flex max-w-[900px] items-center gap-4 px-6 py-4">
-          <Link to={`/tracks/${artistSlug}/${trackSlug}`} className="flex items-center gap-2 text-[12px] font-bold text-[var(--wk-text-muted)] hover:text-[var(--wk-text)] transition-colors">
+          <Link to={canonicalTrackPath} className="flex items-center gap-2 text-[12px] font-bold text-[var(--wk-text-muted)] hover:text-[var(--wk-text)] transition-colors">
             <WkIcon name="ArrowLeft" size={16} />
             Back
           </Link>

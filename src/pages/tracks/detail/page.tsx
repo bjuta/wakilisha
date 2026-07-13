@@ -1,7 +1,7 @@
 import { useEffect, useState, type ReactNode } from "react";
 import { useParams, Link, useNavigate, useLocation } from "react-router-dom";
 import { usePlayer } from "@/context/PlayerContext";
-import { getTrack, type PublicTrackDetail } from "@/services/publicApi/client";
+import { getReleaseTrack, getTrack, type PublicTrackDetail } from "@/services/publicApi/client";
 import { resolveScopedSlugRedirect } from "@/services/slugRedirects";
 import { buildTrackHeroIntro, buildTrackSeoDescription } from "@/services/cultureContext/trackAdapters";
 import { TrackChartSparkline } from "@/components/charts/TrackChartSparkline";
@@ -12,6 +12,7 @@ import TrackLyricsSection from "./components/TrackLyricsSection";
 import TrackRelatedTracks from "./components/TrackRelatedTracks";
 import TrackReleaseTracklist from "./components/TrackReleaseTracklist";
 import { releaseUrl } from "@/utils/releaseUrl";
+import { releaseTrackUrl, trackUrl } from "@/utils/trackUrl";
 import { WkIcon } from "@/components/design-system/Icon";
 import { ShareButton } from "@/components/design-system/share/ShareSheet";
 import { ContributionBadges } from "@/components/feature/community/ContributionBadges";
@@ -717,7 +718,11 @@ function ConnectedArtists({ artists, artworkUrl }: { artists: TrackViewModel["ar
 }
 
 export default function TrackDetail() {
-  const { artistSlug, trackSlug } = useParams<{ artistSlug: string; trackSlug: string }>();
+  const { artistSlug, releaseSlug, trackSlug } = useParams<{
+    artistSlug: string;
+    releaseSlug?: string;
+    trackSlug: string;
+  }>();
   const navigate = useNavigate();
   const location = useLocation();
   const { playTrack, currentTrack, isPlaying, togglePlay, playbackBackend } = usePlayer();
@@ -743,10 +748,14 @@ export default function TrackDetail() {
     const cleanedTrackSlug = cleanDirtyTrackSlug(artistSlug, trackSlug);
     if (!artistSlug || !trackSlug || !cleanedTrackSlug || cleanedTrackSlug === trackSlug) return;
 
-    navigate(`/tracks/${artistSlug}/${cleanedTrackSlug}${location.search || ""}${location.hash || ""}`, {
+    const cleanedPath = releaseSlug
+      ? releaseTrackUrl(artistSlug, releaseSlug, cleanedTrackSlug)
+      : trackUrl(cleanedTrackSlug, [artistSlug]);
+
+    navigate(`${cleanedPath}${location.search || ""}${location.hash || ""}`, {
       replace: true,
     });
-  }, [artistSlug, trackSlug, navigate, location.search, location.hash]);
+  }, [artistSlug, releaseSlug, trackSlug, navigate, location.search, location.hash]);
 
   useEffect(() => {
     const syncApplePlaybackState = () => {
@@ -793,15 +802,21 @@ export default function TrackDetail() {
     setError(null);
     setTrackSaved(false);
     setTrackSaveError(null);
-    getTrack(artistSlug, trackSlug)
+    const request = releaseSlug
+      ? getReleaseTrack(artistSlug, releaseSlug, trackSlug)
+      : getTrack(artistSlug, trackSlug);
+
+    request
       .then(async (apiData) => {
         if (!alive) return;
         if (!apiData) {
-          const redirect = await resolveScopedSlugRedirect(
-            "track",
-            artistSlug,
-            trackSlug,
-          );
+          const redirect = releaseSlug
+            ? null
+            : await resolveScopedSlugRedirect(
+                "track",
+                artistSlug,
+                trackSlug,
+              );
 
           if (!alive) return;
 
@@ -816,7 +831,9 @@ export default function TrackDetail() {
           trackEvent("page_not_found", {
             pageType: "404",
             entityType: "broken_page",
-            entitySlug: `${artistSlug || "unknown"}/${trackSlug || "unknown"}`,
+            entitySlug: releaseSlug
+              ? `${artistSlug || "unknown"}/${releaseSlug}/${trackSlug || "unknown"}`
+              : `${artistSlug || "unknown"}/${trackSlug || "unknown"}`,
             context: {
               status_code: 404,
               not_found_path: location.pathname,
@@ -824,10 +841,20 @@ export default function TrackDetail() {
               not_found_hash: location.hash || "",
               route_guess: "missing_track",
               suggested_fix: cleanDirtyTrackSlug(artistSlug, trackSlug)
-                ? `/tracks/${artistSlug}/${cleanDirtyTrackSlug(artistSlug, trackSlug)}`
+                ? releaseSlug
+                  ? releaseTrackUrl(
+                      artistSlug,
+                      releaseSlug,
+                      cleanDirtyTrackSlug(artistSlug, trackSlug),
+                    )
+                  : trackUrl(
+                      cleanDirtyTrackSlug(artistSlug, trackSlug),
+                      [artistSlug],
+                    )
                 : "",
               soft_404_surface: "track_detail",
               artist_slug: artistSlug,
+              release_slug: releaseSlug || "",
               track_slug: trackSlug,
             },
           });
@@ -846,7 +873,7 @@ export default function TrackDetail() {
       });
 
     return () => { alive = false; };
-  }, [artistSlug, trackSlug, navigate, location.pathname, location.search, location.hash]);
+  }, [artistSlug, releaseSlug, trackSlug, navigate, location.pathname, location.search, location.hash]);
 
   if (loading) {
     return (
@@ -885,6 +912,12 @@ export default function TrackDetail() {
   const hasAppleCatalog = Boolean(track.appleMusicCatalogId || track.appleMusicId);
   const canPlayFullTrack = hasAppleCatalog && applePlaybackConnected;
   const hasPlayableSource = track.isPlayable || canPlayFullTrack;
+  const canonicalPath = artistSlug && trackSlug
+    ? releaseSlug
+      ? releaseTrackUrl(artistSlug, releaseSlug, trackSlug)
+      : trackUrl(trackSlug, [artistSlug])
+    : trackUrl(track.slug, track.artistSlug ? [track.artistSlug] : []);
+  const lyricsContributionPath = `${canonicalPath}/lyrics/contribute`;
   const playButtonLabel = isTrackPlaying
     ? (playbackBackend === "apple" ? "Pause" : "Pause preview")
     : canPlayFullTrack
@@ -932,10 +965,6 @@ export default function TrackDetail() {
   const handleSaveTrack = async () => {
     if (!track) return;
 
-    const canonicalPath = artistSlug && trackSlug
-      ? `/tracks/${artistSlug}/${trackSlug}`
-      : `/tracks/${track.slug}`;
-
     setTrackSaveError(null);
 
     try {
@@ -960,7 +989,7 @@ export default function TrackDetail() {
     type: "track" as const,
     id: trackSlug || undefined,
     slug: trackSlug || undefined,
-    url: typeof window !== "undefined" ? window.location.href : `/tracks/${artistSlug}/${trackSlug}`,
+    url: typeof window !== "undefined" ? window.location.href : canonicalPath,
     title: track.title,
     subtitle: track.artist,
     imageUrl: track.artworkUrl,
@@ -1051,7 +1080,7 @@ export default function TrackDetail() {
                   <WkIcon name={isTrackPlaying ? "Pause" : "Play"} size={18} />
                   {playButtonLabel}
                 </button>
-                <Link to={`/tracks/${artistSlug}/${trackSlug}/lyrics/contribute`} className="inline-flex items-center gap-2.5 rounded-xl border border-[var(--wk-border)] bg-[var(--wk-surface)] text-[var(--wk-text)] px-5 py-3 text-[13px] font-bold hover:bg-[var(--wk-surface-raised)] transition-colors whitespace-nowrap">
+                <Link to={lyricsContributionPath} className="inline-flex items-center gap-2.5 rounded-xl border border-[var(--wk-border)] bg-[var(--wk-surface)] text-[var(--wk-text)] px-5 py-3 text-[13px] font-bold hover:bg-[var(--wk-surface-raised)] transition-colors whitespace-nowrap">
                   <WkIcon name="Edit3" size={16} />
                   Contribute lyrics
                 </Link>
