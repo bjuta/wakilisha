@@ -13,12 +13,14 @@ const targets = [
   "upsert_user_scope_admin(uuid, text, text, text, boolean, boolean, boolean)",
 ];
 
+const compact = sql.replace(/\s+/g, " ").toLowerCase();
+
 for (const signature of targets) {
-  const escaped = signature.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-  const revoke = new RegExp(`revoke\\s+execute\\s+on\\s+function\\s+public\\.${escaped}\\s+from\\s+public,\\s*anon,\\s*authenticated`, "i");
-  const grant = new RegExp(`grant\\s+execute\\s+on\\s+function\\s+public\\.${escaped}\\s+to\\s+service_role`, "i");
-  if (!revoke.test(sql)) throw new Error(`Missing public/anon/authenticated revoke for ${signature}`);
-  if (!grant.test(sql)) throw new Error(`Missing service_role grant for ${signature}`);
+  const target = `public.${signature}`.toLowerCase();
+  const revoke = `revoke execute on function ${target} from public, anon, authenticated`;
+  const grant = `grant execute on function ${target} to service_role`;
+  if (!compact.includes(revoke)) throw new Error(`Missing public/anon/authenticated revoke for ${signature}`);
+  if (!compact.includes(grant)) throw new Error(`Missing service_role grant for ${signature}`);
 }
 
 console.log(`Verified ${targets.length} privileged admin RPC execution boundaries.`);
