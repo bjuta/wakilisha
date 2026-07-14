@@ -192,6 +192,9 @@ describe("release-scoped track routes", () => {
     expect(prerender).toContain(
       '"Track metadata"',
     );
+    expect(prerender).toContain(
+      'clean === "/sitemap.html"',
+    );
   });
 
 });
