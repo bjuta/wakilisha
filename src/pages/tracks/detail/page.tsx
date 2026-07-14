@@ -80,6 +80,7 @@ type TrackViewModel = {
   appleMusicCatalogId: string | null;
   albumTitle: string;
   albumSlug: string;
+  albumArtistSlug: string;
   albumTrackNumber: number;
   albumTotalTracks: number;
   chartHistory: number[];
@@ -249,6 +250,21 @@ function apiToViewModel(api: PublicTrackDetail): TrackViewModel {
     relMetadata.slug
   );
   const albumSlug = rawAlbumSlug.includes("--") ? rawAlbumSlug.split("--").slice(1).join("--") || rawAlbumSlug : rawAlbumSlug;
+  const albumArtistSlug = firstString(
+    releaseData?.artistSlug,
+    releaseData?.artist_slug,
+    releaseData?.primaryArtistSlug,
+    releaseData?.primary_artist_slug,
+    trackData.releaseArtistSlug,
+    trackData.release_artist_slug,
+    raw.releaseArtistSlug,
+    raw.release_artist_slug,
+    relMetadata.primaryArtistSlug,
+    relMetadata.primary_artist_slug,
+    relMetadata.artistSlug,
+    relMetadata.artist_slug,
+    resolvedArtistSlug,
+  );
   const albumTrackNumber = firstNumber(
     trackData.trackNumber,
     trackData.track_number,
@@ -357,6 +373,7 @@ function apiToViewModel(api: PublicTrackDetail): TrackViewModel {
     appleMusicCatalogId: trackData.appleMusicCatalogId || trackData.appleMusicId || raw.appleMusicCatalogId || raw.appleMusicId || null,
     albumTitle,
     albumSlug,
+    albumArtistSlug,
     albumTrackNumber,
     albumTotalTracks,
     chartHistory: history,
@@ -646,7 +663,16 @@ function TrackSidebar({ vm }: { vm: TrackViewModel }) {
             <WkIcon name="Disc3" size={13} />
             Release
           </div>
-          <Link to={releaseUrl({ slug: vm.albumSlug, artist: vm.artist })} className="group flex items-center gap-3 p-2 -mx-2 rounded-xl hover:bg-[var(--wk-surface-raised)] transition-colors">
+          <Link
+            to={releaseUrl({
+              slug: vm.albumSlug,
+              artist:
+                vm.albumArtistSlug ||
+                vm.artistSlug ||
+                vm.artist,
+            })}
+            className="group flex items-center gap-3 p-2 -mx-2 rounded-xl hover:bg-[var(--wk-surface-raised)] transition-colors"
+          >
             <div className="w-10 h-10 rounded-lg overflow-hidden shrink-0 bg-[var(--wk-bg)] border border-[var(--wk-border)]">
               {vm.artworkUrl && <img src={vm.artworkUrl} alt={vm.albumTitle} loading="lazy" className="w-full h-full object-cover" />}
             </div>
@@ -862,7 +888,37 @@ export default function TrackDetail() {
           setLoading(false);
           return;
         }
-        setTrack(apiToViewModel(apiData));
+        const nextTrack = apiToViewModel(apiData);
+        const scopedArtistSlug =
+          nextTrack.albumArtistSlug ||
+          nextTrack.artistSlug ||
+          artistSlug;
+        const scopedTrackSlug =
+          nextTrack.slug ||
+          trackSlug;
+
+        if (
+          !releaseSlug &&
+          scopedArtistSlug &&
+          nextTrack.albumSlug &&
+          scopedTrackSlug
+        ) {
+          const scopedPath = releaseTrackUrl(
+            scopedArtistSlug,
+            nextTrack.albumSlug,
+            scopedTrackSlug,
+          );
+
+          if (scopedPath !== location.pathname) {
+            navigate(
+              `${scopedPath}${location.search || ""}${location.hash || ""}`,
+              { replace: true },
+            );
+            return;
+          }
+        }
+
+        setTrack(nextTrack);
         setLoading(false);
       })
       .catch((err) => {
@@ -911,11 +967,36 @@ export default function TrackDetail() {
   const hasAppleCatalog = Boolean(track.appleMusicCatalogId || track.appleMusicId);
   const canPlayFullTrack = hasAppleCatalog && applePlaybackConnected;
   const hasPlayableSource = track.isPlayable || canPlayFullTrack;
-  const canonicalPath = artistSlug && trackSlug
-    ? releaseSlug
-      ? releaseTrackUrl(artistSlug, releaseSlug, trackSlug)
-      : trackUrl(trackSlug, [artistSlug])
-    : trackUrl(track.slug, track.artistSlug ? [track.artistSlug] : []);
+  const canonicalArtistSlug =
+    track.albumArtistSlug ||
+    track.artistSlug ||
+    artistSlug ||
+    "";
+  const canonicalTrackSlug =
+    track.slug ||
+    trackSlug ||
+    "";
+  const canonicalReleaseSlug =
+    track.albumSlug ||
+    releaseSlug ||
+    "";
+  const canonicalPath =
+    canonicalReleaseSlug && canonicalArtistSlug
+      ? releaseTrackUrl(
+          canonicalArtistSlug,
+          canonicalReleaseSlug,
+          canonicalTrackSlug,
+        )
+      : trackUrl(
+          canonicalTrackSlug,
+          canonicalArtistSlug
+            ? [canonicalArtistSlug]
+            : [],
+        );
+  const canonicalAbsoluteUrl =
+    typeof window !== "undefined"
+      ? `${window.location.origin}${canonicalPath}`
+      : `https://wakilisha.africa${canonicalPath}`;
   const lyricsContributionPath = `${canonicalPath}/lyrics/contribute`;
   const playButtonLabel = isTrackPlaying
     ? (playbackBackend === "apple" ? "Pause" : "Pause preview")
@@ -986,9 +1067,9 @@ export default function TrackDetail() {
 
   const communityEntity = {
     type: "track" as const,
-    id: trackSlug || undefined,
-    slug: trackSlug || undefined,
-    url: typeof window !== "undefined" ? window.location.href : canonicalPath,
+    id: track.slug || trackSlug || undefined,
+    slug: track.slug || trackSlug || undefined,
+    url: canonicalAbsoluteUrl,
     title: track.title,
     subtitle: track.artist,
     imageUrl: track.artworkUrl,
@@ -999,6 +1080,7 @@ export default function TrackDetail() {
       <MetaTags
         title={`${track.title} by ${track.artist}`}
         description={seoDescription}
+        url={canonicalAbsoluteUrl}
         imageUrl={track.artworkUrl}
         type="music.song"
         artistName={track.artist}
@@ -1013,10 +1095,16 @@ export default function TrackDetail() {
           image: track.artworkUrl,
           duration: track.duration > 0 ? `PT${String(Math.floor(track.duration / 60))}M${String(track.duration % 60)}S` : undefined,
           datePublished: track.releaseDate || track.releaseYear,
-          inAlbum: track.albumTitle ? { "@type": "MusicAlbum", name: track.albumTitle, url: `/releases/${track.artistSlug}/${track.albumSlug}` } : undefined,
+          inAlbum: track.albumTitle ? {
+            "@type": "MusicAlbum",
+            name: track.albumTitle,
+            url: canonicalReleaseSlug && canonicalArtistSlug
+              ? `/releases/${canonicalArtistSlug}/${canonicalReleaseSlug}`
+              : undefined,
+          } : undefined,
           genre: track.genres.length > 0 ? track.genres : undefined,
           isrcCode: track.isrc || undefined,
-          url: typeof window !== "undefined" ? window.location.href : undefined,
+          url: canonicalAbsoluteUrl,
         }}
       />
 

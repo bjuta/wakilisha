@@ -99,4 +99,57 @@ describe("release-scoped track routes", () => {
       '.select("release_id, track_id, track_number, disc_number")',
     );
   });
+  it("makes release-connected tracks own release-scoped canonical URLs", () => {
+    const trackPage = readFileSync(
+      "src/pages/tracks/detail/page.tsx",
+      "utf8",
+    );
+    const pageTitle = readFileSync(
+      "src/components/seo/PageTitle.tsx",
+      "utf8",
+    );
+    const prerender = readFileSync(
+      "scripts/seo/prerender-metadata.mjs",
+      "utf8",
+    );
+    const sitemapFunction = readFileSync(
+      "supabase/functions/seo-sitemap-admin/index.ts",
+      "utf8",
+    );
+
+    expect(trackPage).toContain(
+      "!releaseSlug &&",
+    );
+    expect(trackPage).toContain(
+      "const scopedPath = releaseTrackUrl(",
+    );
+    expect(trackPage).toContain(
+      "url={canonicalAbsoluteUrl}",
+    );
+    expect(trackPage).toContain(
+      "url: canonicalAbsoluteUrl,",
+    );
+    expect(pageTitle).toContain(
+      'section === "releases" && parts.length >= 4',
+    );
+    expect(pageTitle).toContain(
+      'ogType: "music.song"',
+    );
+    expect(prerender).toContain(
+      'parts[0] === "releases" && parts.length >= 4',
+    );
+    expect(prerender).toContain(
+      'kind: "track"',
+    );
+    expect(sitemapFunction).toContain(
+      'db.from("registry_release_tracks")',
+    );
+    expect(sitemapFunction).toContain(
+      "path: `/releases/${releaseArtistSlug}/${releaseSlug}/${row.slug}`",
+    );
+    expect(sitemapFunction).toContain(
+      "if (scopedItems.length)",
+    );
+  });
+
 });

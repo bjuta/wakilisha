@@ -705,7 +705,7 @@ async function fetchReleaseMetadataManifest() {
     return metadataByPath;
   }
 
-  const paths = structuredDataTargetPaths("releases").filter((pagePath) => pagePath.split("/").filter(Boolean).length >= 3);
+  const paths = structuredDataTargetPaths("releases").filter((pagePath) => pagePath.split("/").filter(Boolean).length === 3);
 
   await promisePool(paths, 6, async (pagePath) => {
     try {
@@ -746,7 +746,23 @@ async function fetchTrackMetadataManifest() {
     return metadataByPath;
   }
 
-  const paths = structuredDataTargetPaths("tracks").filter((pagePath) => pagePath.split("/").filter(Boolean).length >= 3);
+  const paths = [
+    ...new Set(
+      [
+        ...readSitemapPaths(),
+        ...DB_METADATA_BY_PATH.keys(),
+      ]
+        .filter(isCanonicalPublicPath)
+        .map(cleanPath),
+    ),
+  ].filter((pagePath) => {
+    const parts = pagePath.split("/").filter(Boolean);
+
+    return (
+      (parts[0] === "tracks" && parts.length >= 3) ||
+      (parts[0] === "releases" && parts.length >= 4)
+    );
+  });
 
   await promisePool(paths, 6, async (pagePath) => {
     try {
@@ -1105,6 +1121,19 @@ function modelFromPath(pagePath) {
     return {
       title: `${track} by ${artist}`,
       description: firstSentence(`Explore ${track} by ${artist} on WAKILISHA, including chart context, credits, and music metadata.`),
+      canonicalPath: page,
+      robots: "index, follow",
+      ogType: "music.song",
+      kind: "track",
+    };
+  }
+
+  if (section === "releases" && parts.length >= 4) {
+    const artist = titleCase(parts[1]);
+    const track = titleCase(parts[3]);
+    return {
+      title: `${track} by ${artist}`,
+      description: firstSentence(`Explore ${track} by ${artist} on WAKILISHA, including release context, credits, chart context, and music metadata.`),
       canonicalPath: page,
       robots: "index, follow",
       ogType: "music.song",
