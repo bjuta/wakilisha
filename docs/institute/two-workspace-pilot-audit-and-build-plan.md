@@ -13,6 +13,28 @@ It supersedes:
 
 All future work on Articles, Playlists, Audio, Video, Media, Registry, Charts, corrections, evidence, review, provenance, Field Capture, and Inquiry Mode must reference this plan.
 
+## Programme status
+
+Last updated: 14 July 2026
+
+Current phase: **Phase 1: Platform kernel**
+
+Completed:
+
+- **Phase 0A: Security perimeter**, closed through PR #452
+- **Phase 0B: Engineering control plane**, closed through PR #453
+
+Active implementation:
+
+- **PR 1A: Resource identity and domain boundaries**
+
+PR 1B remains blocked until PR 1A meets its exit gate.
+
+Phase 0 established the security and engineering conditions required to
+begin permanent platform-kernel work. The programme must not reopen Phase 0
+scope except for a verified security, migration, data-loss, or critical
+compatibility defect.
+
 ## Decision
 
 Do not continue building the Institute as a standalone product, sidebar destination, or collection of duplicate editors.
@@ -1290,9 +1312,9 @@ Every PR must be:
 - covered by relevant tests
 - tied to a named cultural or operational outcome
 
-## Phase 0: Secure and control the existing estate
+## Phase 0: Secure and control the existing estate (complete)
 
-### PR 0A: Security perimeter
+### PR 0A: Security perimeter (complete)
 
 Scope:
 
@@ -1317,7 +1339,19 @@ Exit gate:
 - security advisor errors are resolved
 - remaining warnings are documented and accepted intentionally
 
-### PR 0B: Engineering control plane
+
+Completion record, 14 July 2026:
+
+- closed through [PR #452](https://github.com/bjuta/wakilisha/pull/452)
+- merged as commit `5e580951a5e78d60d89285b9a84a23c75578d112`
+- all Phase 0A production migrations were applied
+- the production closure verifier returned zero unresolved rows
+- no anonymous storage upload policy remained
+- Supabase Security Advisor reported zero error findings
+- remaining accepted warnings were documented
+- leaked-password protection follow-up remained tracked separately in issue #451
+
+### PR 0B: Engineering control plane (complete)
 
 Scope:
 
@@ -1339,9 +1373,29 @@ Exit gate:
 - a critical RLS or lifecycle regression blocks merge
 - legacy Institute can no longer attract new work
 
-## Phase 1: Platform kernel
 
-### PR 1A: Resource identity and domain boundaries
+Completion record, 14 July 2026:
+
+- closed through [PR #453](https://github.com/bjuta/wakilisha/pull/453)
+- merged as commit `b0fd55fee73f82bdf20ff1d742ed7aaa041326ff`
+- `supabase/migrations` became the sole executable migration authority
+- obsolete migration trees moved outside executable paths
+- production-generated public-schema types and a schema hash baseline were committed
+- live schema drift became a merge-blocking check
+- `test:critical` passed 102 tests across security, lifecycle, routes, and control-plane contracts
+- the `critical` status check became mandatory on `main`
+- structured Supabase request IDs and failure reporting shipped
+- the legacy Institute disappeared from normal navigation while direct reference routes remained available
+- the post-merge Critical Control Plane workflow passed
+- the frontend deployed to `35.176.52.252`
+- local, server, homepage, and admin index hashes matched
+- the homepage and admin route both returned HTTP 200
+
+Phase 0 is complete.
+
+## Phase 1: Platform kernel (active)
+
+### PR 1A: Resource identity and domain boundaries (next)
 
 Build:
 
@@ -2066,23 +2120,50 @@ After canonical editors and Inquiry Mode are proven:
 
 ## Immediate next implementation
 
-After this plan is merged, implementation begins with Phase 0.
+Phase 0 is closed.
 
-The first implementation PR is **PR 0A: Security perimeter**.
+The active implementation is
+**PR 1A: Resource identity and domain boundaries**.
 
-It must:
+Its objective is to give every supported cultural object one stable
+WAKILISHA resource identity without moving typed domain content into a
+generic table.
 
-- inventory the exposed function and policy surface
-- close privileged anonymous or inherited execution paths
-- establish the private command boundary
-- preserve only the compatibility routes that are explicitly required
-- include automated security regression tests
+PR 1A must:
 
-The next PR is **PR 0B: Engineering control plane**.
+- define the first permanent domain schemas and their ownership boundaries
+- create the resource-kind registry
+- create `editorial.resources`
+- define canonical pointers and integrity rules
+- define ownership, visibility, and lifecycle fields
+- create resource aliases and redirect-safe identity history
+- establish strict API exposure boundaries
+- generate typed contracts for the new resource layer
+- connect one existing Article, one Playlist, and one Registry record
+- preserve the existing canonical domain tables as the content authorities
+- provide migration verification and forward-repair procedures
+- add tests for identity uniqueness, pointer integrity, permissions, and aliases
 
-Do not begin Article trust infrastructure, Playlist completion, Media redesign, or Inquiry Mode before Phase 0 meets its exit gates.
+PR 1A must not:
 
-The first platform implementation after Phase 0 is **PR 1A: Resource identity and domain boundaries**.
+- begin command, idempotency, job, or outbox work assigned to PR 1B
+- build Sources, Citations, Credits, Corrections, or Provenance from Phase 3
+- redesign Article, Playlist, Registry, Media, Audio, or Video editors
+- move domain content into a universal content table
+- create Inquiry Mode controls or new Institute workspaces
+- migrate more records than required to prove the first vertical slice
+- expose a generic privileged resource mutation API
+
+The implementation begins with a focused audit of the current Article,
+Playlist, and Registry identifiers, routes, aliases, ownership fields,
+lifecycle fields, and cross-domain references.
+
+The PR 1A exit gate remains:
+
+- one Article, one Playlist, and one Registry record have stable resource identities
+- shared systems can reference them without polymorphic text guesses
+
+Do not begin PR 1B until these conditions are proven in production.
 
 ## Production freeze principle
 
@@ -2106,4 +2187,4 @@ New product ideas are recorded without automatically reopening frozen foundation
 - frontend deployment needed: No
 - Readdy Finish update needed: No
 - documentation review needed: Yes
-- next implementation plan: Phase 0A security perimeter
+- next implementation plan: Phase 1A resource identity and domain boundaries
