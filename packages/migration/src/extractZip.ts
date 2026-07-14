@@ -142,7 +142,7 @@ async function main(): Promise<void> {
 
   const csvCount = fs.readdirSync(rawDir).filter((file) => file.toLowerCase().endsWith('.csv')).length;
   console.log(`CSV extraction complete. Found ${csvCount} CSV files in: ${rawDir}`);
-  console.log('Next: run npm run migration:audit');
+  console.log('Next: run npm run legacy:migration:audit');
 }
 
 main().catch((error) => {

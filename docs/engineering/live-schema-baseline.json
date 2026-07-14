@@ -1,0 +1,9 @@
+{
+  "projectRef": "pgzizndxdyhqmtyywjmt",
+  "schema": "public",
+  "generatedAt": "2026-07-14T20:12:20Z",
+  "typesSha256": "901a76dc41e3ffa06ce4c7e92589107dcafb2dea6d97c4ed823085dcb9f4a601",
+  "authoritativeMigrationDirectory": "supabase/migrations",
+  "migrationCount": 147,
+  "latestMigration": "20260714230000_consolidate_final_numbered_tracks.sql"
+}

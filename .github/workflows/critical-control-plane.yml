@@ -1,0 +1,77 @@
+name: Critical Control Plane
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: critical-control-plane-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  critical:
+    name: critical
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    env:
+      SUPABASE_PROJECT_REF: pgzizndxdyhqmtyywjmt
+      SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+      CONTROL_PLANE_BASE_REF: origin/main
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Use Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Require Supabase control-plane access
+        run: |
+          if [ -z "$SUPABASE_ACCESS_TOKEN" ]; then
+            echo "SUPABASE_ACCESS_TOKEN repository secret is required."
+            exit 1
+          fi
+
+      - name: Resolve public RLS test credentials
+        run: |
+          npx supabase projects api-keys \
+            --project-ref "$SUPABASE_PROJECT_REF" \
+            -o json \
+            > /tmp/supabase-api-keys.json
+
+          ANON_KEY="$(
+            node \
+              scripts/control-plane/resolve-supabase-anon-key.mjs \
+              /tmp/supabase-api-keys.json
+          )"
+
+          if [ -z "$ANON_KEY" ]; then
+            echo "Could not resolve the public Supabase API key."
+            exit 1
+          fi
+
+          echo "::add-mask::$ANON_KEY"
+          echo "VITE_PUBLIC_SUPABASE_URL=https://${SUPABASE_PROJECT_REF}.supabase.co" >> "$GITHUB_ENV"
+          echo "VITE_PUBLIC_SUPABASE_ANON_KEY=$ANON_KEY" >> "$GITHUB_ENV"
+
+      - name: Run critical security and lifecycle tests
+        run: npm run test:critical
+
+      - name: Detect live schema drift
+        run: npm run schema:verify
+
+      - name: Build application
+        run: npm run build:app

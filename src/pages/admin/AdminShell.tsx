@@ -17,11 +17,6 @@ const NAV_GROUPS: NavGroup[] = [
     { path: "/admin", label: "Overview", icon: "LayoutDashboard", requiredCapability: "view_dashboard" },
     { path: "/admin/analytics", label: "Analytics", icon: "BarChart3", requiredCapability: "view_dashboard" },
   ] },
-  { label: "Institute", icon: "BookOpen", visible: (can) => can("view_dashboard") || can("view_admin_readonly"), items: [
-    { path: "/admin/institute/inquiry-interface?screen=home", label: "Inquiries", icon: "LayoutDashboard" },
-    { path: "/admin/institute/inquiry-interface?screen=workbench", label: "Work", icon: "BookOpen" },
-    { path: "/admin/institute/inquiry-interface?screen=review", label: "Review", icon: "GitPullRequest", requiredCapability: "view_review_queue" },
-  ] },
   { label: "Community", icon: "MessageSquare", visible: (can) => can("moderate_community"), items: [
     { path: "/admin/community", label: "Moderation", icon: "MessageSquare", requiredCapability: "moderate_community", badgeKey: "pendingReports" },
   ] },

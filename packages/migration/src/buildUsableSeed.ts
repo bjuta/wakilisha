@@ -4,7 +4,7 @@ import { DEFAULT_REPORT_DIR } from './config.js';
 import { generateSeedSql } from './db.js';
 
 const reportDir = process.env.WAKILISHA_REPORT_DIR ?? DEFAULT_REPORT_DIR;
-const outputDir = process.env.WAKILISHA_SEED_DIR ?? path.join(process.cwd(), 'packages', 'db', 'migrations');
+const outputDir = process.env.WAKILISHA_SEED_DIR ?? path.join(process.cwd(), 'archive', 'legacy-migrations', 'generated');
 
 function copyIfBetter(sourceFile: string, targetFile: string): void {
   const sourcePath = path.join(reportDir, sourceFile);

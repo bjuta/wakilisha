@@ -4,7 +4,7 @@ import { DEFAULT_REPORT_DIR } from './config.js';
 import { ensureDir } from './csv.js';
 
 const reportDir = process.env.WAKILISHA_REPORT_DIR ?? DEFAULT_REPORT_DIR;
-const outputDir = process.env.WAKILISHA_CHUNKED_SEED_DIR ?? path.join(process.cwd(), 'packages', 'db', 'migrations', 'seed_chunks');
+const outputDir = process.env.WAKILISHA_CHUNKED_SEED_DIR ?? path.join(process.cwd(), 'archive', 'legacy-migrations', 'generated', 'seed_chunks');
 const chunkSize = Number(process.env.WAKILISHA_SEED_CHUNK_SIZE ?? 1000);
 const schema = 'wakilisha_repaired';
 
