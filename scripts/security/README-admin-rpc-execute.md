@@ -1,0 +1,1 @@
+Run `node scripts/security/verify-user-access-admin-rpc-execute.mjs` for the static migration check. Run the SQL in `scripts/security/verify-user-access-admin-rpc-execute.sql` against the target database; a secure result returns zero rows.
