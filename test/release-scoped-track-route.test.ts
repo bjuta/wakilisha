@@ -177,6 +177,15 @@ describe("release-scoped track routes", () => {
     expect(sitemapFunction).toContain(
       ".range(from, to)",
     );
+    expect(prerender).toContain(
+      "PRERENDER_FETCH_TIMEOUT_MS",
+    );
+    expect(prerender).toContain(
+      "fetchWithTimeout(",
+    );
+    expect(prerender).toContain(
+      '"Track metadata"',
+    );
   });
 
 });

@@ -178,6 +178,35 @@ function envValue(key) {
   return process.env[key] || readEnvFileValue(key) || "";
 }
 
+const PRERENDER_FETCH_TIMEOUT_MS = Math.max(
+  1000,
+  Number(
+    envValue("SEO_PRERENDER_FETCH_TIMEOUT_MS")
+      || 5000,
+  ),
+);
+
+async function fetchWithTimeout(
+  url,
+  options = {},
+  timeoutMs = PRERENDER_FETCH_TIMEOUT_MS,
+) {
+  const controller = new AbortController();
+  const timer = setTimeout(
+    () => controller.abort(),
+    timeoutMs,
+  );
+
+  try {
+    return await fetch(url, {
+      ...options,
+      signal: controller.signal,
+    });
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 async function fetchDbMetadataManifest() {
   const explicitUrl = envValue("SEO_METADATA_MANIFEST_URL");
   const supabaseUrl = envValue("VITE_PUBLIC_SUPABASE_URL").replace(/\/+$/, "");
@@ -190,7 +219,7 @@ async function fetchDbMetadataManifest() {
   }
 
   try {
-    const response = await fetch(metadataUrl, {
+    const response = await fetchWithTimeout(metadataUrl, {
       headers: {
         Accept: "application/json",
         ...(anonKey ? { apikey: anonKey, Authorization: `Bearer ${anonKey}` } : {}),
@@ -271,7 +300,7 @@ async function fetchArticleImageManifest() {
   }
 
   try {
-    const response = await fetch(`${apiBase}/magazine?limit=1000`, {
+    const response = await fetchWithTimeout(`${apiBase}/magazine?limit=1000`, {
       headers: publicContentHeaders(anonKey),
     });
 
@@ -316,7 +345,7 @@ async function fetchArticleMetadataManifest() {
   }
 
   try {
-    const response = await fetch(`${apiBase}/magazine?limit=1000`, {
+    const response = await fetchWithTimeout(`${apiBase}/magazine?limit=1000`, {
       headers: publicContentHeaders(anonKey),
     });
 
@@ -429,7 +458,7 @@ async function fetchArtistMetadataManifest() {
   }
 
   try {
-    const response = await fetch(`${apiBase}/artists?limit=3000`, {
+    const response = await fetchWithTimeout(`${apiBase}/artists?limit=3000`, {
       headers: publicContentHeaders(anonKey),
     });
 
@@ -669,9 +698,12 @@ function publicContentApiBase() {
 }
 
 async function fetchPublicContentJson(apiBase, anonKey, pagePath) {
-  const response = await fetch(`${apiBase}${pagePath}`, {
-    headers: publicContentHeaders(anonKey),
-  });
+  const response = await fetchWithTimeout(
+    `${apiBase}${pagePath}`,
+    {
+      headers: publicContentHeaders(anonKey),
+    },
+  );
 
   if (!response.ok) return null;
   return response.json();
@@ -683,14 +715,40 @@ function structuredDataTargetPaths(section) {
     .filter((pagePath) => pagePath.startsWith(`/${section}/`));
 }
 
-async function promisePool(items, concurrency, worker) {
+async function promisePool(
+  items,
+  concurrency,
+  worker,
+  label = "Prerender metadata",
+) {
   const queue = [...items];
-  const workers = Array.from({ length: Math.max(1, concurrency) }, async () => {
-    while (queue.length) {
-      const item = queue.shift();
-      await worker(item);
-    }
-  });
+  let completed = 0;
+
+  console.log(`${label}: 0/${items.length}`);
+
+  const workers = Array.from(
+    { length: Math.max(1, concurrency) },
+    async () => {
+      while (queue.length) {
+        const item = queue.shift();
+
+        try {
+          await worker(item);
+        } finally {
+          completed += 1;
+
+          if (
+            completed % 100 === 0
+            || completed === items.length
+          ) {
+            console.log(
+              `${label}: ${completed}/${items.length}`,
+            );
+          }
+        }
+      }
+    },
+  );
 
   await Promise.all(workers);
 }
@@ -730,7 +788,7 @@ async function fetchReleaseMetadataManifest() {
     } catch {
       return;
     }
-  });
+  }, "Release metadata");
 
   console.log(`Release metadata manifest loaded: ${metadataByPath.size.toLocaleString()} release rows.`);
   return metadataByPath;
@@ -792,7 +850,7 @@ async function fetchTrackMetadataManifest() {
     } catch {
       return;
     }
-  });
+  }, "Track metadata");
 
   console.log(`Track metadata manifest loaded: ${metadataByPath.size.toLocaleString()} track rows.`);
   return metadataByPath;
@@ -828,7 +886,7 @@ async function fetchChartMetadataManifest() {
     } catch {
       return;
     }
-  });
+  }, "Chart metadata");
 
   console.log(`Chart metadata manifest loaded: ${metadataByPath.size.toLocaleString()} chart rows.`);
   return metadataByPath;
