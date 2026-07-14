@@ -1,0 +1,7 @@
+assign_user_role_admin
+record_admin_audit
+record_password_reset_admin
+revoke_user_role_admin
+revoke_user_scope_admin
+suspend_user_access_admin
+upsert_user_scope_admin
