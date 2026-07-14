@@ -181,6 +181,12 @@ describe("release-scoped track routes", () => {
       "PRERENDER_FETCH_TIMEOUT_MS",
     );
     expect(prerender).toContain(
+      "PRERENDER_MANIFEST_TIMEOUT_MS",
+    );
+    expect(prerender).toContain(
+      "SEO_PRERENDER_MANIFEST_TIMEOUT_MS",
+    );
+    expect(prerender).toContain(
       "fetchWithTimeout(",
     );
     expect(prerender).toContain(

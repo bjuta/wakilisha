@@ -186,6 +186,14 @@ const PRERENDER_FETCH_TIMEOUT_MS = Math.max(
   ),
 );
 
+const PRERENDER_MANIFEST_TIMEOUT_MS = Math.max(
+  PRERENDER_FETCH_TIMEOUT_MS,
+  Number(
+    envValue("SEO_PRERENDER_MANIFEST_TIMEOUT_MS")
+      || 30000,
+  ),
+);
+
 async function fetchWithTimeout(
   url,
   options = {},
@@ -219,12 +227,16 @@ async function fetchDbMetadataManifest() {
   }
 
   try {
-    const response = await fetchWithTimeout(metadataUrl, {
-      headers: {
-        Accept: "application/json",
-        ...(anonKey ? { apikey: anonKey, Authorization: `Bearer ${anonKey}` } : {}),
+    const response = await fetchWithTimeout(
+      metadataUrl,
+      {
+        headers: {
+          Accept: "application/json",
+          ...(anonKey ? { apikey: anonKey, Authorization: `Bearer ${anonKey}` } : {}),
+        },
       },
-    });
+      PRERENDER_MANIFEST_TIMEOUT_MS,
+    );
 
     if (!response.ok) {
       console.warn(`SEO metadata manifest skipped: ${response.status} ${response.statusText}`);
