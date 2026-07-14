@@ -5,3 +5,9 @@ verify_jwt = false
 
 [functions.media-upload-api]
 verify_jwt = false
+
+[functions.purge-staging-records]
+verify_jwt = true
+
+[functions.batch-delete-staging]
+verify_jwt = true
