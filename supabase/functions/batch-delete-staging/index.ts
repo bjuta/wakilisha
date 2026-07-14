@@ -1,75 +1,150 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { requireImportManagementAccess } from "../_shared/require-import-management-access.ts";
+
+function jsonResponse(
+  body: Record<string, unknown>,
+  status = 200,
+  extraHeaders: Record<string, string> = {},
+): Response {
+  return new Response(JSON.stringify(body), {
+    status,
+    headers: {
+      "Content-Type": "application/json",
+      "Cache-Control": "no-store",
+      ...extraHeaders,
+    },
+  });
+}
 
 serve(async (req: Request) => {
-  const supabaseUrl = Deno.env.get("SUPABASE_URL") ?? "";
-  const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
+  if (req.method !== "POST") {
+    return jsonResponse(
+      {
+        status: "error",
+        error: "method_not_allowed",
+      },
+      405,
+      {
+        Allow: "POST",
+      },
+    );
+  }
 
-  if (!supabaseUrl || !serviceRoleKey) {
-    return new Response(JSON.stringify({ error: "Supabase service role key missing. This function requires SERVICE_ROLE_KEY to delete staging records." }), { status: 500 });
+  const supabaseUrl = Deno.env.get("SUPABASE_URL") ?? "";
+  const anonKey = Deno.env.get("SUPABASE_ANON_KEY") ?? "";
+  const serviceRoleKey =
+    Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
+
+  if (!supabaseUrl || !anonKey || !serviceRoleKey) {
+    return jsonResponse(
+      {
+        status: "error",
+        error: "server_not_configured",
+      },
+      500,
+    );
+  }
+
+  const access = await requireImportManagementAccess(
+    req,
+    supabaseUrl,
+    anonKey,
+  );
+
+  if (!access.ok) {
+    return jsonResponse(
+      {
+        status: "error",
+        error: access.error,
+      },
+      access.status,
+    );
   }
 
   const baseUrl = supabaseUrl.replace(/\/$/, "");
-  const rpcUrl = `${baseUrl}/rest/v1/rpc/delete_batch_from_staging`;
-  const BATCH_SIZE = 2000;
+  const rpcUrl =
+    `${baseUrl}/rest/v1/rpc/delete_batch_from_staging`;
+
+  const batchSize = 2000;
   let totalDeleted = 0;
   let batch = 0;
 
   try {
     while (batch < 500) {
-      batch++;
+      batch += 1;
+
       const response = await fetch(rpcUrl, {
         method: "POST",
         headers: {
-          "Authorization": `Bearer ${serviceRoleKey}`,
-          "apikey": serviceRoleKey,
+          Authorization: `Bearer ${serviceRoleKey}`,
+          apikey: serviceRoleKey,
           "Content-Type": "application/json",
-          "Prefer": "return=representation",
+          Prefer: "return=representation",
         },
-        body: JSON.stringify({ batch_size: BATCH_SIZE }),
+        body: JSON.stringify({
+          batch_size: batchSize,
+        }),
       });
 
       const rawText = await response.text();
 
       if (!response.ok) {
-        return new Response(JSON.stringify({
-          status: "error",
-          batch,
-          total_deleted: totalDeleted,
-          http_status: response.status,
-          body: rawText.slice(0, 500),
-        }), { status: 500 });
+        return jsonResponse(
+          {
+            status: "error",
+            batch,
+            total_deleted: totalDeleted,
+            upstream_status: response.status,
+            upstream_error: rawText.slice(0, 500),
+          },
+          500,
+        );
       }
 
-      const deletedThisBatch = parseInt(rawText.trim(), 10) || 0;
+      const parsed = Number.parseInt(rawText.trim(), 10);
+      const deletedThisBatch = Number.isNaN(parsed) ? 0 : parsed;
+
       totalDeleted += deletedThisBatch;
 
-      console.log(`Batch ${batch}: deleted ${deletedThisBatch}, total: ${totalDeleted}`);
+      console.log(
+        JSON.stringify({
+          event: "staging_batch_delete",
+          requested_by: access.userId,
+          batch,
+          deleted: deletedThisBatch,
+          total_deleted: totalDeleted,
+        }),
+      );
 
       if (deletedThisBatch === 0) {
         break;
       }
 
       if (batch >= 500) {
-        return new Response(JSON.stringify({
+        return jsonResponse({
           status: "incomplete",
           total_batches: batch,
           total_deleted: totalDeleted,
-        }), { status: 200 });
+        });
       }
     }
 
-    return new Response(JSON.stringify({
+    return jsonResponse({
       status: "done",
       total_batches: batch,
       total_deleted: totalDeleted,
-    }), { status: 200 });
-  } catch (err) {
-    return new Response(JSON.stringify({
-      status: "error",
-      error: err instanceof Error ? err.message : String(err),
-      stack: err instanceof Error ? err.stack : null,
-      batch,
-      total_deleted: totalDeleted,
-    }), { status: 500 });
+    });
+  } catch (error: unknown) {
+    return jsonResponse(
+      {
+        status: "error",
+        error: error instanceof Error
+          ? error.message
+          : String(error),
+        batch,
+        total_deleted: totalDeleted,
+      },
+      500,
+    );
   }
 });
