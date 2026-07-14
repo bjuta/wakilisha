@@ -146,6 +146,49 @@ async function sha256(value: string) {
   return Array.from(new Uint8Array(hash)).map((byte) => byte.toString(16).padStart(2, "0")).join("");
 }
 
+async function fetchAllPages(
+  label: string,
+  loadPage: (
+    from: number,
+    to: number,
+  ) => PromiseLike<any>,
+) {
+  const pageSize = 1000;
+  const rows: any[] = [];
+
+  for (
+    let from = 0;
+    ;
+    from += pageSize
+  ) {
+    const to = from + pageSize - 1;
+    const { data, error } = await loadPage(
+      from,
+      to,
+    );
+
+    if (error) {
+      throw new Error(
+        `${label} pagination failed: ${
+          error.message || String(error)
+        }`,
+      );
+    }
+
+    const page = Array.isArray(data)
+      ? data
+      : [];
+
+    rows.push(...page);
+
+    if (page.length < pageSize) {
+      break;
+    }
+  }
+
+  return { data: rows };
+}
+
 async function buildInternalItems(db: ReturnType<typeof createClient>): Promise<SitemapItem[]> {
   const items: SitemapItem[] = [
     { loc: makeUrl("/"), url_type: "static" },
@@ -183,7 +226,16 @@ async function buildInternalItems(db: ReturnType<typeof createClient>): Promise<
     db.from("registry_artists").select("id, slug, updated_at").eq("status", "active").limit(5000),
     db.from("registry_releases").select("*").in("status", ["active", "draft"]).limit(5000),
     db.from("registry_tracks").select("*").eq("status", "active").limit(5000),
-    db.from("registry_release_tracks").select("release_id, track_id, track_number, disc_number").limit(30000),
+    fetchAllPages(
+      "registry_release_tracks",
+      (from, to) =>
+        db
+          .from("registry_release_tracks")
+          .select(
+            "release_id, track_id, track_number, disc_number",
+          )
+          .range(from, to),
+    ),
     db.from("registry_release_artists").select("release_id, artist_slug, artist_name_text, is_primary, is_featured, credit_order, status").in("status", ["active", "shadow"]).limit(20000),
     db.from("registry_track_artists").select("track_id, artist_slug, artist_name_text, is_primary, is_featured, credit_order, status").in("status", ["active", "shadow"]).limit(20000),
     db.from("registry_genres").select("id, slug, updated_at").limit(1000),
@@ -1171,6 +1223,14 @@ Deno.serve(async (req) => {
   const db = createClient(SUPABASE_URL, SERVICE_KEY);
   const url = new URL(req.url);
   const action = url.searchParams.get("action") || "";
+
+  if (
+    req.method === "GET" &&
+    action === "xml_live"
+  ) {
+    const items = await buildInternalItems(db);
+    return xml(buildXml(items), headers);
+  }
 
   if (req.method === "GET" && action === "metadata") {
     const metadata = await buildSeoMetadataManifest(db);

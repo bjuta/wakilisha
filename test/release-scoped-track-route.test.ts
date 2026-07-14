@@ -142,13 +142,22 @@ describe("release-scoped track routes", () => {
       'kind: "track"',
     );
     expect(sitemapFunction).toContain(
-      'db.from("registry_release_tracks")',
+      '.from("registry_release_tracks")',
     );
     expect(sitemapFunction).toContain(
       "path: `/releases/${releaseArtistSlug}/${releaseSlug}/${row.slug}`",
     );
     expect(sitemapFunction).toContain(
       "if (scopedItems.length)",
+    );
+    expect(sitemapFunction).toContain(
+      'action === "xml_live"',
+    );
+    expect(sitemapFunction).toContain(
+      '"registry_release_tracks",',
+    );
+    expect(sitemapFunction).toContain(
+      ".range(from, to)",
     );
   });
 
