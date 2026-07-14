@@ -13,21 +13,44 @@ const retired = [
   "cleanup-unscoped-slugs",
   "rebuild-discography-from-metadata",
   "trigger-phase1",
+  "resolve-relationships-phase1",
+  "fix_magazine_rls",
+  "import-wp-chart-editions",
+  "import-wp-charts-v2",
+  "promote-wp-staging-to-v2",
+  "clean-chart-v2-tables",
+  "clean-wp-chart-import",
+  "grab-wp-charts-v2",
+  "import-wp-articles",
+  "split-multi-release-tracks",
+  "smoke-test-rebuild",
+  "minimal-test",
 ];
 
 const verifierPath =
   "scripts/security/verify-retired-edge-functions.mjs";
 
+const ignoredPrefixes = [
+  "docs/",
+  "reports/",
+  "supabase/retired-functions/",
+];
+
+const ignoredFiles = new Set([
+  "project_plan.md",
+  verifierPath,
+]);
+
 for (const slug of retired) {
-  const directory = path.join(
+  const activeDirectory = path.join(
     "supabase",
     "functions",
     slug,
   );
 
-  if (fs.existsSync(directory)) {
+  if (fs.existsSync(activeDirectory)) {
     throw new Error(
-      `Retired function source still exists: ${slug}`,
+      `Retired function source remains active: ${slug}`,
     );
   }
 }
@@ -39,7 +62,15 @@ const trackedFiles = execFileSync(
   .toString("utf8")
   .split("\0")
   .filter(Boolean)
-  .filter((file) => file !== verifierPath);
+  .filter((file) => {
+    if (ignoredFiles.has(file)) {
+      return false;
+    }
+
+    return !ignoredPrefixes.some(
+      (prefix) => file.startsWith(prefix),
+    );
+  });
 
 for (const file of trackedFiles) {
   if (!fs.existsSync(file)) {
@@ -57,12 +88,12 @@ for (const file of trackedFiles) {
   for (const slug of retired) {
     if (source.includes(slug)) {
       throw new Error(
-        `Retired function ${slug} is still referenced in ${file}`,
+        `Retired function ${slug} is actively referenced in ${file}`,
       );
     }
   }
 }
 
 console.log(
-  "PASS: Retired maintenance Edge Functions have no source directories or tracked repository call sites.",
+  "PASS: Retired Edge Functions have no active source directories or tracked runtime call sites.",
 );
