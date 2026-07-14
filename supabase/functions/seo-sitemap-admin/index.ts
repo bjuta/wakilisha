@@ -223,9 +223,36 @@ async function buildInternalItems(db: ReturnType<typeof createClient>): Promise<
     chartPrograms,
   ] = await Promise.all([
     db.from("wk_articles").select("id, slug, modified_at, published_at").eq("wp_status", "publish").limit(5000),
-    db.from("registry_artists").select("id, slug, updated_at").eq("status", "active").limit(5000),
-    db.from("registry_releases").select("*").in("status", ["active", "draft"]).limit(5000),
-    db.from("registry_tracks").select("*").eq("status", "active").limit(5000),
+    fetchAllPages(
+      "registry_artists",
+      (from, to) =>
+        db
+          .from("registry_artists")
+          .select("id, slug, updated_at")
+          .eq("status", "active")
+          .order("id", { ascending: true })
+          .range(from, to),
+    ),
+    fetchAllPages(
+      "registry_releases",
+      (from, to) =>
+        db
+          .from("registry_releases")
+          .select("*")
+          .in("status", ["active", "draft"])
+          .order("id", { ascending: true })
+          .range(from, to),
+    ),
+    fetchAllPages(
+      "registry_tracks",
+      (from, to) =>
+        db
+          .from("registry_tracks")
+          .select("*")
+          .eq("status", "active")
+          .order("id", { ascending: true })
+          .range(from, to),
+    ),
     fetchAllPages(
       "registry_release_tracks",
       (from, to) =>
@@ -234,10 +261,36 @@ async function buildInternalItems(db: ReturnType<typeof createClient>): Promise<
           .select(
             "release_id, track_id, track_number, disc_number",
           )
+          .order("release_id", { ascending: true })
+          .order("track_id", { ascending: true })
           .range(from, to),
     ),
-    db.from("registry_release_artists").select("release_id, artist_slug, artist_name_text, is_primary, is_featured, credit_order, status").in("status", ["active", "shadow"]).limit(20000),
-    db.from("registry_track_artists").select("track_id, artist_slug, artist_name_text, is_primary, is_featured, credit_order, status").in("status", ["active", "shadow"]).limit(20000),
+    fetchAllPages(
+      "registry_release_artists",
+      (from, to) =>
+        db
+          .from("registry_release_artists")
+          .select(
+            "release_id, artist_slug, artist_name_text, is_primary, is_featured, credit_order, status",
+          )
+          .in("status", ["active", "shadow"])
+          .order("release_id", { ascending: true })
+          .order("credit_order", { ascending: true })
+          .range(from, to),
+    ),
+    fetchAllPages(
+      "registry_track_artists",
+      (from, to) =>
+        db
+          .from("registry_track_artists")
+          .select(
+            "track_id, artist_slug, artist_name_text, is_primary, is_featured, credit_order, status",
+          )
+          .in("status", ["active", "shadow"])
+          .order("track_id", { ascending: true })
+          .order("credit_order", { ascending: true })
+          .range(from, to),
+    ),
     db.from("registry_genres").select("id, slug, updated_at").limit(1000),
     db.from("registry_labels").select("id, slug, updated_at").limit(1000),
     db.from("wk_guides").select("id, slug, updated_at, status").eq("status", "published").limit(2000),

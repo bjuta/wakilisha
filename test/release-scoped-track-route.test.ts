@@ -154,7 +154,25 @@ describe("release-scoped track routes", () => {
       'action === "xml_live"',
     );
     expect(sitemapFunction).toContain(
+      '"registry_artists",',
+    );
+    expect(sitemapFunction).toContain(
+      '"registry_releases",',
+    );
+    expect(sitemapFunction).toContain(
+      '"registry_tracks",',
+    );
+    expect(sitemapFunction).toContain(
       '"registry_release_tracks",',
+    );
+    expect(sitemapFunction).toContain(
+      '"registry_release_artists",',
+    );
+    expect(sitemapFunction).toContain(
+      '"registry_track_artists",',
+    );
+    expect(sitemapFunction).toContain(
+      '.order("id", { ascending: true })',
     );
     expect(sitemapFunction).toContain(
       ".range(from, to)",
