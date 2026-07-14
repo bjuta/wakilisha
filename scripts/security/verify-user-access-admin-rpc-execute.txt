@@ -1,0 +1,2 @@
+Static verifier: node scripts/security/verify-user-access-admin-rpc-execute.mjs
+Production verifier: execute scripts/security/verify-user-access-admin-rpc-execute.sql and expect zero rows.
