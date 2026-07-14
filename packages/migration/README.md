@@ -1,3 +1,8 @@
+> **Frozen legacy tooling**
+>
+> This package is retained for historical import reconstruction only.
+> It must not create deployable migrations or receive new product development.
+> `supabase/migrations` is the sole production migration authority.
 # WAKILISHA Migration Package
 
 This package rebuilds the WAKILISHA relationship graph from raw Supabase CSV exports before any React UI work begins.
@@ -7,7 +12,7 @@ This package rebuilds the WAKILISHA relationship graph from raw Supabase CSV exp
 ### 1. Audit CSV imports
 
 ```bash
-npm run migration:audit
+npm run legacy:migration:audit
 ```
 
 Detects all CSV files in `data/supabase-imports/2026-05-30/raw/` by column signatures, not filenames.
@@ -19,7 +24,7 @@ Produces:
 ### 2. First graph pass
 
 ```bash
-npm run migration:graph
+npm run legacy:migration:graph
 ```
 
 Builds a basic relationship graph from the flat imported tables.
@@ -33,7 +38,7 @@ Produces:
 ### 3. Full repair pass
 
 ```bash
-npm run migration:repair
+npm run legacy:migration:repair
 ```
 
 Deeply parses `wk_old_registry_rows` to reconstruct the full relationship graph:
@@ -68,13 +73,13 @@ Produces:
 ### 4. Generate seed SQL
 
 ```bash
-npm run migration:seed
+npm run legacy:migration:seed
 ```
 
 Generates runnable SQL from the repair reports to populate the `wakilisha_repaired` schema.
 
 Produces:
-- `packages/db/migrations/003_seed_repaired_data.sql`
+- `archive/legacy-migrations/packages-db/003_seed_repaired_data.sql`
 
 ## Environment variables
 

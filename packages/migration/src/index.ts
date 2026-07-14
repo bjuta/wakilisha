@@ -67,7 +67,7 @@ async function main() {
   }
 
   if (command === 'seed') {
-    const outputDir = process.env.WAKILISHA_SEED_DIR ?? path.join(process.cwd(), 'packages', 'db', 'migrations');
+    const outputDir = process.env.WAKILISHA_SEED_DIR ?? path.join(process.cwd(), 'archive', 'legacy-migrations', 'generated');
     const seedPath = generateSeedSql(reportDir, outputDir);
     console.log(`Seed SQL generated: ${seedPath}`);
     return;

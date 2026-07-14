@@ -45,9 +45,9 @@ async function main() {
   console.log('');
   console.log('Next steps:');
   console.log('  1. npm install');
-  console.log('  2. npm run migration:audit');
-  console.log('  3. npm run migration:graph');
-  console.log('  4. npm run migration:repair');
+  console.log('  2. npm run legacy:migration:audit');
+  console.log('  3. npm run legacy:migration:graph');
+  console.log('  4. npm run legacy:migration:repair');
 }
 
 main().catch((err) => {
