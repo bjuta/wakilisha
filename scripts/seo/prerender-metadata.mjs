@@ -1340,6 +1340,10 @@ function isCanonicalPublicPath(pagePath) {
   const clean = cleanPath(pagePath);
   const parts = clean.split("/").filter(Boolean);
 
+  if (clean === "/sitemap.html") {
+    return false;
+  }
+
   if (parts[0] === "tracks") {
     return parts.length >= 3;
   }
