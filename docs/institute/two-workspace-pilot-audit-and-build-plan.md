@@ -1,47 +1,138 @@
 # WAKILISHA Editorial Production System and Inquiry Mode Project Plan
 
-## Status
+## Status and authority
 
-This document is the current implementation plan for the next phase of WAKILISHA cultural production.
+This document is the authoritative implementation plan for the next major phase of WAKILISHA cultural production.
 
-It supersedes the earlier two-workspace Institute pilot plan.
+It supersedes:
 
-The previous plan treated the Institute as a destination containing its own workspaces. That architecture is now rejected.
+- the two-workspace Institute pilot plan
+- the destination-based Institute architecture
+- the earlier editor-first implementation sequence
+- any proposal that treats schemas, screens, assistants, or infrastructure as the cultural outcome
+
+All future work on Articles, Playlists, Audio, Video, Media, Registry, Charts, corrections, evidence, review, provenance, Field Capture, and Inquiry Mode must reference this plan.
 
 ## Decision
 
 Do not continue building the Institute as a standalone product, sidebar destination, or collection of duplicate editors.
 
-The Institute will become a capability distributed across the existing WAKILISHA production system.
+The Institute becomes a capability distributed across the canonical WAKILISHA production system.
 
 An Inquiry is the active power-up.
 
-When Inquiry Mode is off, an editor performs its normal production function.
+When Inquiry Mode is off, each editor performs its normal production function.
 
 When Inquiry Mode is on, the same editor gains additional institutional capabilities such as:
 
 - starting or attaching an Inquiry
 - attaching sources and material
-- recording notes and findings
+- recording notes and Findings
 - linking Registry records
 - preserving provenance
-- submitting reviewable claims
+- reviewing claims and interpretation
 - publishing uncertainty and corrections
 - carrying the active Inquiry across WAKILISHA
 
 Inquiry Mode is not the next implementation phase.
 
-Before it can be built responsibly, the canonical production editors and their shared editorial infrastructure must be completed, hardened, tested, and placed into a production freeze.
+Before it can be built responsibly, WAKILISHA must secure the current estate, establish a durable platform kernel, complete the canonical production editors, prove the system under real operational and scale conditions, and place the foundations into a production freeze.
 
-## Primary objective
+## Five-year objective
 
-Build the WAKILISHA Editorial Production System once, make it reliable enough for the first major season of cultural work, and avoid reopening foundational editor infrastructure during that season.
+Build the WAKILISHA production and cultural-record platform so that foundational editorial and data architecture does not require wholesale replacement before 2031.
 
-The production system must enable the team to create, review, publish, update, correct, preserve, and connect real cultural outputs without entering a separate Institute application.
+This does not mean the code will stop changing.
+
+New providers, output formats, policies, interfaces, workflows, and public experiences will continue to arrive.
+
+Five-year durability means those changes should be additive. WAKILISHA should not need to replace:
+
+- global resource identity
+- the publication lifecycle
+- revision integrity
+- the source and citation system
+- the review system
+- correction and provenance foundations
+- media identity and preservation rules
+- the command and job substrate
+- the permissions boundary
+- the public delivery contract
+- the relationship model between cultural work and Inquiry
+
+A future output type should require:
+
+1. a typed canonical domain object
+2. an appropriate editor and public presentation
+3. registration with the global resource identity layer
+4. reuse of Media, Sources, Citations, Credits, Review, Corrections, Provenance, Registry links, and Inquiry
+
+It should not require another institutional rewrite.
+
+## Why the plan changed
+
+The earlier plan was credible for completing missing editors.
+
+It was not sufficient for the platform WAKILISHA intends to become.
+
+The current system already shows the shape of the next five years:
+
+- operational events grow much faster than published cultural records
+- analytics and request logs can become larger than the editorial core
+- sources, citations, review decisions, corrections, and provenance relationships multiply around every public output
+- media storage and processing will outgrow ordinary database rows
+- public read traffic will become materially larger than editorial write traffic
+- one poorly bounded privileged function can expose unrelated domains
+- one client-orchestrated multi-request transition can leave permanent partial state
+- duplicate authorities create more long-term risk than row count alone
+
+PostgreSQL and Supabase remain appropriate foundations.
+
+The problem is not that WAKILISHA may hold millions of rows.
+
+The problem would be millions of rows inside an architecture with:
+
+- unbounded scans
+- overlapping authorities
+- privileged public functions
+- fake or incomplete revisions
+- mutable media masters
+- no retention policy
+- no background-work contract
+- no stable public read model
+- no recovery proof
+
+The new sequence therefore places security and the platform kernel before editor completion.
+
+## Current scale signals
+
+The live system already contains high-volume tables that materially exceed the canonical editorial record.
+
+Approximate counts observed during the July 2026 audit include:
+
+- about 255,000 minute-level rate-limit log rows
+- more than 107,000 Search Console rows
+- more than 31,000 analytics events
+- about 10,000 chart raw-ingest rows
+- about 9,500 chart candidates
+- about 8,400 daily signal records
+- more than 6,300 provenance links
+- more than 2,300 Registry tracks
+- more than 1,200 Registry artists
+- more than 800 Registry releases
+- more than 200 articles
+
+These figures are operational snapshots, not permanent product targets.
+
+They establish an important principle:
+
+> High-volume event data must be separated from the durable cultural record.
+
+The durable record should remain easy to understand, query, review, restore, and prove even when analytics, logs, jobs, and ingestion streams become very large.
 
 ## Product doctrine
 
-### The output is the centre
+### The cultural output is the centre
 
 Work begins in the canonical tool for the output being created:
 
@@ -49,21 +140,24 @@ Work begins in the canonical tool for the output being created:
 - Playlist Editor for playlists
 - Audio Editor for podcasts and audio publications
 - Video Editor for video publications
-- Registry editors for cultural records
+- Registry editors for reusable cultural records
 - Chart tools for chart data and interpretation
 - Media Library for reusable files and preservation masters
+- Field Capture for safe live-to-newsroom intake
 
 The Institute never rebuilds these tools.
 
 ### The Institute is a capability
 
-The Institute is the shared set of abilities that makes ordinary editorial production behave institutionally.
+The Institute is the shared set of abilities that makes ordinary cultural production behave institutionally.
 
-It should make WAKILISHA feel deeper, not like a different product.
+It should make WAKILISHA feel deeper, more accountable, and more connected.
+
+It should not feel like a separate product.
 
 ### Inquiry Mode is progressive enhancement
 
-Turning on Inquiry Mode must reveal additional functionality inside a familiar workflow.
+Turning on Inquiry Mode reveals additional capability inside a familiar workflow.
 
 It must not replace the page, open a second editor, or force every output into the same research template.
 
@@ -71,18 +165,21 @@ It must not replace the page, open a second editor, or force every output into t
 
 Each output and record has one canonical authority.
 
-- Articles live in the article system.
-- Playlists live in the playlist system.
-- Audio publications live in the audio system.
-- Video publications live in the video system.
+- Articles live in the Article domain.
+- Playlists live in the Playlist domain.
+- Audio publications live in the Audio domain.
+- Video publications live in the Video domain.
 - Registry facts live in Registry.
-- Media files live in Media Library.
-- Inquiries own questions, interpretation history, findings, and relationships to work.
+- Chart editions and methodology live in Charts.
+- Media files and their preservation state live in Media.
+- Inquiries own questions, interpretation history, Findings, and relationships to work.
+- Shared trust systems own sources, citations, credits, review events, corrections, and provenance.
 
 ### Reusable systems are built once
 
 The following must not be independently reimplemented inside every editor:
 
+- resource identity
 - sources
 - citations
 - revisions
@@ -93,167 +190,642 @@ The following must not be independently reimplemented inside every editor:
 - Registry links
 - media selection
 - publication state
+- command execution
+- background processing
+- public route aliases
 
 ### Real work is the acceptance test
 
 No editor or shared capability is complete because its schema exists or its form saves.
 
-Each phase must produce and publish a real cultural output through the completed workflow.
+Every phase must produce, review, publish, update, preserve, or correct real cultural work through the completed workflow.
 
-## Current state
+### Public and admin ship together
 
-### Article Editor
+A production workflow is not complete until the internal tool and the public result both work.
 
-The Article Editor is the strongest current production tool and will be the reference implementation for the shared editorial core.
+The public result includes:
 
-It is not considered fully complete until it supports the universal capabilities defined in this plan.
+- the correct published version
+- meaningful dates
+- credits
+- sources where appropriate
+- correction behaviour
+- provenance
+- accessibility
+- stable routes
+- reliable delivery
 
-### Playlist
+## Architecture target
 
-Playlist schema and Institute bridge work exist, but Playlist is not yet a complete canonical WAKILISHA publishing product.
+WAKILISHA will remain a modular monolith unless real operational evidence justifies further separation.
 
-The current implementation is structurally tied to the old Institute through Institute-specific links, permissions, routes, and workspace assumptions.
+The target is not a collection of speculative microservices.
 
-Playlist must be separated from the Institute and completed as a standalone production vertical before Inquiry Mode is added.
+The target is one platform with strict internal boundaries.
 
-### Media Library
+```text
+Public application                 Admin application
+        |                                  |
+        +---------- Versioned API ---------+
+                           |
+             Query layer and command layer
+                           |
+    +---------------+---------------+---------------+
+    | Editorial     | Registry      | Media         |
+    | Content       | Inquiry       | Community     |
+    | Charts        | Search        | Operations    |
+    +---------------+---------------+---------------+
+                           |
+              PostgreSQL and object storage
+                           |
+            Jobs, outbox, workers, and indexing
+```
 
-The shared media service already recognises image, document, audio, video, archive, and other file kinds.
+The modules may live in the same repository and Supabase project.
 
-The current Media Library interface only accepts images and PDFs.
+The boundaries must exist in:
 
-The media data model is therefore ahead of the production interface.
+- database schemas
+- table ownership
+- commands
+- TypeScript packages
+- API routes
+- permissions
+- tests
+- public read models
 
-The Media Library must be completed rather than replaced by separate image, audio, and video libraries.
+## Permanent platform kernel
 
-### Audio and video
+### 1. Global resource identity
 
-There are currently no complete canonical Audio Editor or Video Editor workflows.
+Every publishable, reviewable, correctable, or connectable object receives one stable WAKILISHA identity.
 
-These must be built as publishing systems, not browser-based production studios.
+Conceptually:
 
-WAKILISHA will ingest finished masters, organise them, process derivatives, review them, publish them, syndicate them where necessary, and preserve their provenance.
+```text
+editorial.resources
 
-### Citations, corrections, and provenance
+id
+resource_kind
+canonical_table
+canonical_id
+owner_id
+visibility
+lifecycle_state
+current_version_id
+published_version_id
+created_at
+created_by
+```
 
-These are not optional Institute extras.
+Resource kinds include, at minimum:
 
-They are shared editorial infrastructure required by articles, playlists, audio, video, Registry, charts, and future Inquiry Mode.
+- article
+- playlist
+- playlist item
+- audio show
+- audio season
+- audio episode
+- standalone audio
+- video
+- video series
+- video episode
+- chart edition
+- Registry record
+- correction case
+- Inquiry
+- Finding
 
-## Canonical output set for the first cultural season
+The resource table does not become a generic CMS blob.
 
-The first production freeze must include four canonical editorial outputs.
+Domain-specific content remains in typed canonical tables.
 
-## 1. Article
+Resource identity gives shared systems a stable target for:
 
-The Article Editor remains the reference editor.
+- citations
+- credits
+- review
+- provenance
+- corrections
+- media usage
+- Inquiry relationships
+- search indexing
+- notifications
+- public aliases
 
-Required completion work:
+### 2. Typed canonical domains
 
+Each content type keeps an appropriate domain model.
+
+- Articles retain article-specific structure.
+- Playlists retain ordered item models.
+- Audio retains show, season, episode, and feed semantics.
+- Video retains series, episode, rendition, caption, and chapter semantics.
+- Registry retains reusable cultural truth.
+- Charts retain ingestion, edition, methodology, and scoring semantics.
+- Inquiry retains questions, Findings, interpretation, and connected work.
+
+Shared capabilities connect through resource identity.
+
+Do not create a universal content table that replaces typed constraints with arbitrary JSON.
+
+### 3. Current state plus immutable history
+
+WAKILISHA does not require pure event sourcing.
+
+It requires:
+
+- a current editable record for fast production work
+- immutable submitted versions
+- immutable approved versions
+- immutable published versions
+- append-only review events
+- append-only provenance events
+- reconstructable public snapshots
+
+Draft autosaves may update an active draft.
+
+A reviewed or published version must never change silently.
+
+A public page must always be reconstructable exactly as it appeared when published.
+
+### 4. Transactional commands
+
+Critical state changes become explicit server-side commands.
+
+Examples include:
+
+```text
+save_article_draft
+submit_resource_for_review
+request_resource_changes
+approve_resource_version
+schedule_resource_version
+publish_resource_version
+apply_correction
+reorder_playlist_items
+promote_field_submission
+attach_source
+replace_media_master
+```
+
+Every command includes:
+
+- actor
+- capability context
+- expected current version
+- idempotency key
+- command payload
+- audit context
+- correlation ID
+
+Every command must:
+
+- execute inside one transaction where possible
+- reject stale writes
+- tolerate safe retries
+- return a command receipt
+- enqueue asynchronous follow-up through an outbox
+- leave no hidden partial state
+
+### 5. Jobs and transactional outbox
+
+Anything that does not need to finish inside the request becomes a job.
+
+Examples:
+
+- media processing
+- transcription
+- caption generation
+- search indexing
+- sitemap updates
+- notification delivery
+- RSS regeneration
+- cache invalidation
+- analytics rollups
+- contribution notifications
+- affected-resource review alerts
+- storage reconciliation
+
+The shared job contract includes:
+
+- job type
+- payload version
+- status
+- priority
+- attempts
+- maximum attempts
+- run-after time
+- lease holder
+- lease expiry
+- last error
+- dead-letter state
+- idempotency key
+- correlation ID
+
+A job must be inspectable, retryable, and safely dead-lettered.
+
+No feature invents its own hidden queue.
+
+### 6. Shared trust layer
+
+The permanent trust layer contains:
+
+- sources
+- source versions
+- source locators
+- citations
+- credits
+- review events
+- provenance events
+- correction cases
+- resource-to-Registry links
+- contributor acknowledgements
+- source withdrawal state
+
+The same authority is consumed by Articles, Playlists, Audio, Video, Registry, Charts, and Inquiry.
+
+### 7. Proper media object model
+
+Media distinguishes three concepts.
+
+#### Logical asset
+
+The editorial object workers select and reuse.
+
+#### File object
+
+An immutable stored binary with:
+
+- checksum
+- size
+- MIME type
+- storage key
+- creation time
+- technical metadata
+- preservation status
+
+#### Variant
+
+A derivative or alternate representation, including:
+
+- thumbnail
+- poster frame
+- waveform
+- streaming audio
+- downloadable audio
+- HLS video rendition
+- caption file
+- transcript file
+- redacted copy
+- compressed field preview
+
+A separate usage link records which resource uses an asset and for what purpose.
+
+Rights records include:
+
+- ownership
+- licence
+- consent
+- restrictions
+- embargo
+- sensitivity
+- public-safe state
+- expiry where relevant
+
+Never overwrite the preservation master.
+
+Replacing a master creates a new immutable file object and changes the logical asset's active pointer through a reviewed command.
+
+### 8. Versioned public read models
+
+The public application must not recreate complex editorial joins in the browser.
+
+Each public domain receives a stable read model, including:
+
+- article detail
+- playlist detail
+- audio show detail
+- audio episode detail
+- video detail
+- Registry profile detail
+- chart edition detail
+- Inquiry detail
+
+Read models may use:
+
+- indexed read tables
+- materialized views
+- carefully scoped SQL functions
+- cached API responses
+
+The public API supports:
+
+- versioned contracts
+- cursor pagination
+- stable error shapes
+- cache control
+- ETags or equivalent validators
+- explicit cache invalidation
+- predictable route resolution
+
+### 9. Search as a maintained product
+
+Search begins with PostgreSQL and a stable search contract.
+
+Build:
+
+- generated search documents
+- full-text indexes
+- trigram indexes
+- weighted fields
+- canonical aliases
+- incremental reindex jobs
+- resource-aware result types
+
+Editors and public pages must not depend on broad `%term%` scans over operational tables.
+
+The search contract must allow a future backend replacement without changing every editor.
+
+### 10. Data classes and retention
+
+Not all data deserves permanent storage.
+
+#### Permanent
+
+- canonical cultural records
+- reviewed and published versions
+- provenance
+- review decisions
+- corrections
+- sources and citations
+- rights and consent records
+- preservation-master metadata
+- Registry identity and relationship history
+
+#### Long-lived but managed
+
+- community contributions
+- field submissions
+- moderation events
+- security audit events
+- provider histories
+- command receipts
+
+#### Retained and rolled up
+
+- analytics events
+- rate-limit events
+- request logs
+- media-processing logs
+- search analytics
+- delivery logs
+- ingestion diagnostics
+
+Append-heavy tables receive:
+
+- a declared retention policy
+- time partitioning when volume justifies it
+- automatic expiry or archival
+- daily or monthly rollups
+- separation from the core editorial query path
+
+Small canonical tables are not partitioned prematurely.
+
+### 11. Security boundary
+
+Only a deliberate API surface is exposed.
+
+Recommended schema pattern:
+
+```text
+api          versioned public and authenticated API
+editorial    shared resource and lifecycle records
+content      canonical editorial outputs
+registry     canonical cultural records
+media        media metadata and usage
+inquiry      Inquiry and Finding state
+community    contributions and intake
+operations   jobs, outbox, command receipts, and audit support
+analytics    raw events and rollups
+private      privileged helpers and secrets
+```
+
+Privileged functions belong in a non-exposed schema.
+
+Execution is revoked from `PUBLIC` by default.
+
+Every privileged command requires:
+
+- authenticated actor resolution
+- explicit capability verification
+- a fixed `search_path`
+- validated input
+- audit context
+- idempotency
+
+The service-role key is not a general substitute for ordinary editorial write policies.
+
+### 12. Observability and recovery
+
+Commercial grade means the team can answer:
+
+- What failed?
+- Which resource was affected?
+- Which user initiated it?
+- Did it partially apply?
+- Can it be retried safely?
+- How long has it been failing?
+- Can it be restored?
+- Can WAKILISHA prove that no acknowledged work was lost?
+
+Required capabilities include:
+
+- structured request logs
+- correlation IDs
+- command receipts
+- job dashboards
+- error tracking
+- processing metrics
+- slow-query monitoring
+- audit trails
+- backup verification
+- restoration drills
+- media checksum inventory
+- database growth dashboards
+
+A backup that has never been restored is not considered proven.
+
+## Security and architecture findings that must be corrected
+
+The current system contains useful work, but several patterns must not become permanent foundations.
+
+### Giant Admin Router
+
+Administrative authentication, users, articles, charts, providers, scoring, and unrelated operational logic are concentrated in one large Edge Function.
+
+Replace this with bounded command services and shared command infrastructure.
+
+Do not create dozens of speculative microservices.
+
+### Giant public-content read function
+
+Public Registry, article, route, and related read behaviour is concentrated in one service-role function with per-request database rate logging and weak cache behaviour.
+
+Replace it with:
+
+- versioned public read APIs
+- cached domain read models
+- CDN and edge rate limiting
+- cursor pagination
+- explicit invalidation
+
+### Privileged public-schema RPC sprawl
+
+Sensitive `SECURITY DEFINER` functions and compatibility helpers must not remain broadly reachable through exposed schemas or inherited grants.
+
+The security perimeter phase must inventory and reclassify every callable function.
+
+### Client-orchestrated important writes
+
+Lifecycle transitions, review submission, object linking, reordering, and promotion must not depend on several independent browser requests.
+
+Move them into transactional commands.
+
+### Incomplete revision integrity
+
+Revision controls must be real, recoverable, and enforced.
+
+A revision UI without durable revision behaviour does not pass acceptance.
+
+### Mutable media assumptions
+
+A media row pointing to one mutable file is insufficient for preservation masters, derivatives, captions, transcripts, replacements, redactions, and rights history.
+
+Adopt logical assets, immutable files, and variants.
+
+### Offset pagination and broad exact counts
+
+Large collections use cursor pagination, indexed search, and maintained summaries.
+
+Avoid exact count work on every request where it is not operationally necessary.
+
+### JSON used in place of durable relationships
+
+Reusable taxonomies and relationships must use canonical records and join tables where queryability, validation, history, or reuse matters.
+
+JSON remains appropriate for bounded metadata, snapshots, and provider payloads.
+
+### Monolithic sitemap generation
+
+Move to an incremental sitemap index with sharded sitemaps.
+
+Publishing one new resource must not require rebuilding the entire public URL corpus.
+
+## Canonical output set
+
+The first production freeze covers the following canonical work.
+
+## Article
+
+The Article Editor remains the reference implementation for the shared editorial lifecycle.
+
+Required capabilities:
+
+- truthful autosave and recovery
+- optimistic concurrency
 - reusable sources and citations
-- immutable review and publication revisions
+- immutable review and publication versions
 - universal review lifecycle
 - contributor and editorial credits
 - Registry entity links
 - meaningful publication, update, review, and correction dates
 - correction cases and public correction notes
-- reliable preview
+- exact public preview
 - safe scheduling and publishing
-- public provenance presentation
-- recovery from interrupted saves
+- public provenance
+- atomic slug and redirect handling
+- normalized categories and tags
 
 Completion proof:
 
-- publish one real article
-- submit it through review
+- create one real article
+- submit a specific version for review
+- approve and publish that version
 - materially update or correct it
-- confirm the public page shows the correct provenance without treating technical metadata changes as editorial updates
+- confirm that the public page displays accurate provenance
+- confirm that technical metadata changes do not create false editorial-update claims
 
-## 2. Playlist
+## Playlist
 
-Playlist becomes a canonical WAKILISHA product independent of the Institute.
+Playlist becomes a canonical WAKILISHA product independent of the legacy Institute.
 
-Required editor capabilities:
+Required capabilities:
 
-- create and edit playlist metadata
+- create and edit metadata
 - title, slug, description, cover, curator, and credits
-- search and select Registry tracks
-- attach Registry releases and artists where relevant
-- add external provider tracks where Registry records do not yet exist
-- server-side provider normalisation
-- match against Registry tracks and provider identities
+- Registry track selection
+- Registry release and artist links
+- provider track normalization
+- Registry identity matching
 - external-only pending items
-- missing record suggestions
-- drag-and-drop ordering
+- missing-record suggestions
+- atomic drag-and-drop ordering
 - duplicate detection
-- per-track editorial notes
+- per-track notes
 - per-track sources and citations
 - curatorial argument
-- preview
-- review submission
-- approval, scheduling, publishing, archiving, and restoration
-- revision history
+- exact preview
+- immutable review and publication versions
+- scheduling, publishing, archiving, and restoration
 - public corrections and missing-track suggestions
-- complete public playlist page
-- mobile and desktop playback behaviour
+- mobile and desktop playback
 - public SEO and sharing metadata
 
 Required public behaviour:
 
 - stable `/playlists` and `/playlists/:slug` routes
-- no draft or rejected content exposure
-- links to matched artists, tracks, and releases
+- no draft or rejected exposure
+- links to matched Registry records
 - public curator and contributor credits
-- meaningful published, updated, reviewed, and corrected dates
+- meaningful dates
 - compact provenance and source presentation
 
 Completion proof:
 
 - publish one real editorial playlist
 - include at least one Registry-matched track
-- include at least one track requiring provider normalisation or review
-- process it through review and publication
-- verify public playback, internal links, provenance, and mobile behaviour
+- include at least one track requiring provider normalization or review
+- verify review, publication, playback, internal links, provenance, and mobile behaviour
 
-## 3. Audio
+## Audio
 
-Audio supports standalone audio publications and podcast production.
+Audio supports shows, seasons, episodes, trailers, bonus episodes, and standalone audio publications.
 
-Required content model:
+Required capabilities:
 
-- audio shows
-- seasons where applicable
-- episodes
-- trailers and bonus episodes
-- standalone audio publications
-- stable episode identifiers and slugs
-- episode and season numbers
-- artwork
-- hosts, guests, producers, editors, and contributors
-- explicit-content designation
-- publication and review state
-
-Required editor capabilities:
-
-- upload or select a finished audio master
-- resumable large-file upload
+- stable show and episode identity
+- finished-master selection or upload
+- resumable upload
 - processing status
-- duration and technical metadata
+- preservation master
 - streaming derivative
 - optional download derivative
-- preservation master
+- technical metadata
 - show notes
 - chapters and timestamps
 - transcript
-- caption or transcript file upload
-- source and citation attachment
+- caption or transcript assets
+- sources and citations
 - Registry links
 - credits
-- preview
-- review, scheduling, publishing, archiving, and restoration
-- corrections to metadata, audio, show notes, and transcript
+- exact preview
+- immutable review and publication versions
+- scheduling, archiving, restoration, and corrections
+- stable RSS GUID and enclosure behaviour
 
-Required public capabilities:
+Required public behaviour:
 
 - accessible audio player
 - chapter navigation
@@ -263,60 +835,47 @@ Required public capabilities:
 - related Registry records and publications
 - meaningful provenance dates
 - correction history where appropriate
-- podcast RSS feed
-- stable GUID and enclosure URL behaviour
+- valid podcast RSS feed
 
 Completion proof:
 
-- publish one complete podcast or audio episode
-- validate playback and transcript
-- validate RSS output in at least one external podcast feed validator or client
-- apply one controlled metadata or transcript correction and verify public provenance
+- publish one real audio episode
+- validate playback, chapters, and transcript
+- validate RSS in an external feed validator or client
+- apply one controlled metadata or transcript correction
 
-## 4. Video
+## Video
 
-Video supports standalone videos and series-based publishing.
+Video supports standalone videos, series, episodes, documentaries, interviews, performances, explainers, and field footage.
 
-Required content model:
+Required capabilities:
 
-- standalone video
-- video series
-- series episodes
-- documentary
-- interview
-- performance
-- explainer
-- field footage
-- editorial status and publication state
-
-Required editor capabilities:
-
-- upload or select a finished video master
-- resumable large-file upload
+- finished-master selection or upload
+- resumable upload
 - processing status
-- adaptive streaming derivatives
 - preservation master
-- poster frame and thumbnails
-- portrait, landscape, and square format handling
+- adaptive streaming renditions
+- poster frames and thumbnails
+- portrait, landscape, and square handling
 - duration, dimensions, and technical metadata
 - chapters
 - captions
 - transcript
 - credits
-- source and citation attachment
+- sources and citations
 - Registry links
 - rights, sensitivity, and embargo controls
-- preview
-- review, scheduling, publishing, archiving, and restoration
-- corrections to metadata, captions, transcript, and public context
+- exact preview
+- immutable review and publication versions
+- scheduling, archiving, restoration, and corrections
 
-Required public capabilities:
+Required public behaviour:
 
-- accessible streaming player
+- accessible responsive streaming player
 - captions
 - transcript
 - chapters
-- poster and responsive presentation
+- posters and responsive presentation
 - credits
 - sources where appropriate
 - related Registry records and publications
@@ -325,20 +884,47 @@ Required public capabilities:
 
 Completion proof:
 
-- publish one complete video
+- publish one real captioned video
 - verify adaptive playback on desktop and mobile
-- verify captions and transcript
-- verify public provenance and correction handling
+- verify captions, transcript, provenance, and correction handling
+
+## Registry and Charts
+
+Registry and Charts remain authoritative for their own domain records.
+
+They adopt the shared trust infrastructure without being rebuilt as Institute tools.
+
+Registry additions include:
+
+- sources and citations for reviewed changes
+- field-level provenance where practical
+- correction cases
+- review events
+- meaningful review dates
+- affected-resource review alerts
+
+Chart additions include:
+
+- methodology sources
+- citations
+- reviewed interpretation
+- provenance
+- correction support
+- stable editions and publication snapshots
+
+Completion proof:
+
+- one reviewed Registry change uses the shared trust layer
+- one chart-related update uses the shared trust layer
+- neither workflow depends on Institute-specific evidence authority
 
 ## Shared editorial core
 
-The shared editorial core is built once and consumed by every canonical editor.
+### Sources
 
-## Sources
+A source is a reusable record representing material used in cultural work.
 
-A source is a reusable record representing material used in editorial work.
-
-Supported source types must include:
+Supported source types include:
 
 - interview
 - book
@@ -356,14 +942,14 @@ Supported source types must include:
 - physical artefact
 - other reviewed source
 
-A source must support, where relevant:
+A source supports, where relevant:
 
 - title
 - source type
 - creator or author
 - publisher or custodian
 - source URL
-- Media Library asset
+- Media asset
 - archive identifier
 - publication date
 - capture date
@@ -378,10 +964,12 @@ A source must support, where relevant:
 - linked Registry entities
 - internal notes
 - review status
+- withdrawal state
+- version history
 
-## Citations
+### Citations
 
-A citation identifies the exact portion of a source used by an output.
+A citation identifies the exact portion of a source used by an output or Finding.
 
 A citation may point to:
 
@@ -397,7 +985,7 @@ A citation may point to:
 - section heading
 - whole source when a narrower locator is not possible
 
-Citations must be attachable to:
+Citations attach to:
 
 - article text
 - playlist and track notes
@@ -405,31 +993,13 @@ Citations must be attachable to:
 - video chapters and transcript sections
 - Registry changes
 - chart methodology and interpretation
-- future Inquiry findings
+- Inquiry Findings
 
-Public citation presentation adapts to the output type.
+The public presentation adapts to the output type.
 
-The data authority remains shared.
+The authority remains shared.
 
-## Revisions
-
-Every publishable resource must preserve immutable review and publication revisions.
-
-Draft autosaves may continue updating the active draft.
-
-A new immutable revision is required when:
-
-- work is submitted for review
-- a reviewer makes a decision
-- work is approved
-- work is published
-- a material update is published
-- a correction is applied
-- work is archived or restored where public state changes
-
-Published work must never silently inherit later Inquiry or source changes without editorial review.
-
-## Review lifecycle
+### Review lifecycle
 
 The default lifecycle is:
 
@@ -442,23 +1012,24 @@ The default lifecycle is:
 7. Published
 8. Archived
 
-Review events must record:
+Review events record:
 
 - actor
 - action
 - reason or note
-- resource type and ID
-- resource revision
+- resource identity
+- resource version
 - prior state
 - resulting state
 - timestamp
 - requested changes
+- correlation ID
 
-Review transitions that affect multiple records must use server-side transactional operations.
+Review transitions that affect multiple records use transactional commands.
 
-## Credits
+### Credits
 
-The shared credit system must support:
+The shared credit system supports:
 
 - author
 - editor
@@ -477,13 +1048,13 @@ The shared credit system must support:
 - fact checker
 - other explicit role
 
-Credits must link to Registry authors, users, or named external contributors where appropriate.
+Credits may link to Registry authors, authenticated users, or named external contributors.
 
-## Provenance
+### Provenance
 
-Public provenance cannot rely on generic `updated_at` timestamps.
+Public provenance does not rely on generic `updated_at` timestamps.
 
-Required editorial dates and states include:
+Required editorial dates include:
 
 - first published
 - last materially updated
@@ -494,35 +1065,17 @@ Required editorial dates and states include:
 
 A material update changes public meaning, facts, interpretation, structure, or substantive presentation.
 
-A technical save, slug repair, metadata synchronisation, or typo fix must not automatically produce a public material-update claim.
+A technical save, slug repair, metadata synchronization, or typo fix does not automatically become a public material-update claim.
 
-Meaningful actions must generate append-only provenance events.
-
-Provenance events may include:
-
-- created
-- submitted for review
-- approved
-- published
-- materially updated
-- reviewed without change
-- corrected
-- archived
-- restored
-- source added
-- source withdrawn
-- Registry record changed
-- public contribution accepted
-- later Inquiry attached
-- Inquiry reopened
+Meaningful actions generate append-only provenance events.
 
 Not every internal event is public.
 
-Every public editorial change must have an internal provenance event.
+Every public editorial change has an internal provenance event.
 
-## Corrections
+### Corrections
 
-Corrections are a shared institutional system, not an article-only form.
+Corrections are a shared institutional system.
 
 A correction case may target:
 
@@ -531,63 +1084,42 @@ A correction case may target:
 - playlist item or note
 - audio episode or transcript
 - video or transcript
-- Registry artist, track, release, label, genre, person, place, or relationship
+- Registry record or relationship
 - chart or methodology
-- future Inquiry finding
+- Inquiry Finding
 
 Correction flow:
 
-1. Public or internal correction is submitted.
+1. A public or internal correction is submitted.
 2. A correction case is created.
 3. Supporting material is attached.
 4. An editor investigates.
 5. A decision is recorded.
-6. The correction is applied through a new revision or reviewed Registry change.
+6. The correction is applied through a new immutable version or reviewed Registry change.
 7. A public correction note is published where appropriate.
 8. Related affected resources are flagged for review.
 9. The contributor is notified where possible and safe.
 
-Corrections must never directly overwrite public work without a record.
-
-## Registry links
-
-Every canonical editor must be able to link work to relevant Registry entities.
-
-At minimum:
-
-- artists
-- tracks
-- releases
-- labels
-- genres
-- authors and contributors
-- people
-- places
-- relationships
-
-The Registry remains the authority for reusable cultural records.
-
-Editors may propose corrections or enrichment, but normal editorial workflows must not bypass Registry review and mutate canonical truth invisibly.
+Corrections never directly overwrite public work without a record.
 
 ## Media platform
 
-The existing Media Library becomes the single media authority for all editors.
+The existing Media Library becomes the single media authority.
 
 Do not build separate image, audio, video, document, or archive libraries.
 
-## Supported media types
-
-The completed Media Library must support:
+Supported kinds include:
 
 - images
 - PDFs and documents
 - audio
 - video
 - archive files
-- caption and transcript files
+- captions
+- transcripts
 - other reviewed formats where preservation is justified
 
-## Required media metadata
+Required metadata includes:
 
 - original filename
 - display filename
@@ -595,7 +1127,7 @@ The completed Media Library must support:
 - file kind
 - size
 - dimensions or duration
-- technical processing state
+- processing state
 - checksum
 - content date
 - capture date
@@ -609,55 +1141,26 @@ The completed Media Library must support:
 - country and place
 - language
 - tags
-- linked Registry entities
-- linked publications
+- Registry links
+- publication links
 - preservation status
 - replacement history
 - internal notes
 
-## Upload architecture
-
-Images and small documents may continue using the existing straightforward upload path where reliable.
-
-Audio, video, and other large files require:
+Large-file handling requires:
 
 - resumable uploads
-- chunked transfer
+- chunked or multipart transfer
 - upload sessions
 - retry after network failure
 - checksum validation
-- direct large-file transfer to storage
+- direct transfer to storage
 - background processing
 - visible processing state
 - failed-processing recovery
 - safe cancellation
 
-Original masters must be preserved separately from public delivery derivatives.
-
-## Audio processing
-
-Required outputs:
-
-- preservation master
-- public streaming derivative
-- optional downloadable derivative
-- duration
-- waveform data where useful
-- loudness and technical metadata
-- transcript and caption assets
-
-## Video processing
-
-Required outputs:
-
-- preservation master
-- adaptive streaming renditions
-- poster frame
-- thumbnails
-- duration and dimensions
-- captions
-- transcript
-- technical metadata
+Original masters are preserved separately from public derivatives.
 
 ## Field Capture
 
@@ -671,67 +1174,57 @@ Required capabilities:
 - upload immediately
 - queue on weak connectivity
 - resume after interruption
-- enter a short description
-- enter time and place where safe
+- add a short description
+- record time and place where safe
 - choose whether identity may be disclosed
 - submit anonymously where policy permits
-- capture rights and consent information
+- capture rights and consent
 - mark sensitivity
 - set embargo or private handling
 - strip unsafe metadata where required
+- protect exact location where safety requires it
 - preserve the immutable original
 - confirm successful receipt
-- send into editorial review before publication
+- route into editorial review before publication
 
-Political and protest material must be private by default until reviewed.
+Political and protest material is private by default until reviewed.
 
-The system must support protecting identities, delaying publication, blurring or editing before release, and withholding exact location where safety requires it.
+The system must support protecting identities, delaying publication, redaction, blurring, safe derivatives, and withholding exact location.
 
-## Deferred public livestreaming
-
-Do not initially build custom public livestreaming infrastructure.
-
-Do not build:
-
-- native broadcast ingest
-- custom live transcoding
-- live chat
-- multicamera control
-- live audience concurrency infrastructure
-- instant public clipping and moderation systems
-
-When real usage proves a need for public livestreaming, use managed streaming infrastructure and connect it to WAKILISHA editorial controls.
+Custom public livestreaming infrastructure is deferred until real usage proves the need.
 
 ## Inquiry Mode target architecture
 
 Inquiry Mode begins only after the production freeze gates are complete.
 
-### Institute Mode control
+### Inquiry Mode control
 
-Every supported editor gains a common on or off control.
+Every supported editor gains a common control.
 
-When active, it allows the worker to:
+When active, it allows a worker to:
 
 - start an Inquiry
 - attach an existing Inquiry
 - switch the active Inquiry
 - open shared Inquiry context
-- detach the current resource
+- attach or detach the current resource
 - exit Inquiry Mode
 
 ### Persistent active Inquiry
 
-The active Inquiry follows the authenticated worker across supported WAKILISHA admin routes.
+The active Inquiry follows the authenticated worker across supported admin routes.
 
 The application shell remembers the active Inquiry.
 
-Visiting a page must not automatically attach it.
+Visiting a page does not attach it automatically.
 
-The worker explicitly attaches an existing resource, while resources created through a related-work action may attach automatically.
+The worker explicitly attaches an existing resource.
+
+Resources created through a related-work action may attach automatically.
 
 ### Shared Inquiry capabilities
 
-The shared Inquiry panel contains:
+The shared Inquiry sidecar contains:
 
 - question
 - scope
@@ -739,10 +1232,11 @@ The shared Inquiry panel contains:
 - open uncertainties
 - material
 - notes
-- findings
+- Findings
 - connected Registry entities
 - connected outputs
-- review and change history
+- review history
+- change history
 
 Page-specific Inquiry actions remain inside the canonical editor.
 
@@ -752,7 +1246,7 @@ An Inquiry may connect to many resources.
 
 A resource may connect to many Inquiries.
 
-The relationship must record a role such as:
+The relationship records a role such as:
 
 - primary outcome
 - supporting outcome
@@ -770,199 +1264,610 @@ Public presentation scales with the Inquiry.
 
 A singular Inquiry output receives compact context appropriate to its type.
 
-A larger Inquiry automatically presents grouped outcomes, affected cultural records, sources, findings, history, contributors, and correction routes.
+A larger Inquiry presents grouped outcomes, affected cultural records, sources, Findings, history, contributors, uncertainty, and correction routes.
 
-Every participating page displays the same Inquiry identity and only the most relevant connected work.
+Every participating page displays the same Inquiry identity and the connected work most relevant to that page.
 
-## Build programme
+# Build programme
 
-## Phase 0: Plan replacement and Institute freeze
+## Delivery shape
 
-Objectives:
+The programme contains thirteen phases, numbered 0 through 12.
 
-- establish this document as the authoritative plan
-- reject the old destination-based Institute architecture
-- stop new feature development in the legacy Institute
-- retain legacy routes only for migration, reference, and critical data access
-- remove the current Institute from primary navigation in a later implementation PR
+Each phase has a maximum of two implementation PRs.
+
+The programme ceiling is 26 PRs.
+
+The expected range is approximately 20 to 23 PRs because some later phases may fit safely into one PR once the platform kernel exists.
+
+Do not force the programme into fewer PRs by creating unreviewable changes.
+
+Every PR must be:
+
+- independently reviewable
+- deployable
+- reversible
+- covered by relevant tests
+- tied to a named cultural or operational outcome
+
+## Phase 0: Secure and control the existing estate
+
+### PR 0A: Security perimeter
+
+Scope:
+
+- inventory every callable database function
+- classify public, authenticated, administrative, and internal commands
+- revoke inherited execution from privileged functions
+- move sensitive helpers into a private or command schema
+- remove administrative grant helpers from the exposed API
+- replace unsafe `SECURITY DEFINER` usage
+- fix mutable function `search_path`
+- review service-role bypasses
+- repair overly permissive RLS policies
+- review public storage bucket listing
+- enable leaked-password protection
+- verify anonymous and authenticated attack paths
+- retain temporary compatibility wrappers only where migration requires them
 
 Exit gate:
 
-- this plan is merged
-- all subsequent editor and Inquiry work references this plan
+- no privileged anonymous RPC remains
+- every privileged command has an explicit capability check
+- security advisor errors are resolved
+- remaining warnings are documented and accepted intentionally
 
-## Phase 1: Shared editorial core through Article
+### PR 0B: Engineering control plane
+
+Scope:
+
+- freeze legacy Institute development
+- remove Institute from normal navigation
+- declare one migration directory authoritative
+- establish a live-schema baseline
+- archive obsolete migration trees outside the executable path
+- generate committed database types
+- add schema drift detection
+- add `test:critical`
+- make security and migration tests mandatory
+- introduce structured request IDs and error reporting
+- document deployment, rollback, and incident procedures
+
+Exit gate:
+
+- a migration cannot silently diverge from production
+- a critical RLS or lifecycle regression blocks merge
+- legacy Institute can no longer attract new work
+
+## Phase 1: Platform kernel
+
+### PR 1A: Resource identity and domain boundaries
 
 Build:
 
-- source records
-- citations and locators
+- domain schemas
+- `editorial.resources`
+- resource-kind registry
+- canonical pointers
+- ownership
+- visibility
+- lifecycle state
+- resource aliases
+- genuinely universal resource relationships
+- strict API exposure boundaries
+
+Migrate Article, Playlist, and selected Registry objects into the identity layer without moving their domain content.
+
+Exit gate:
+
+- one article, one playlist, and one Registry record have stable resource identities
+- shared systems can reference them without polymorphic text guesses
+
+### PR 1B: Commands, idempotency, jobs, and outbox
+
+Build:
+
+- command receipts
+- idempotency keys
+- expected-version concurrency
+- transactional command helpers
+- append-only audit context
+- transactional outbox
+- shared jobs table
+- leases
+- retries
+- dead-letter handling
+- worker execution contract
+
+Exit gate:
+
+- a retried command cannot duplicate work
+- a failed asynchronous task can be inspected, retried, and dead-lettered
+- one existing multi-request lifecycle transition has been moved into a single server-side command
+
+## Phase 2: Article authority
+
+### PR 2A: Durable drafts and immutable versions
+
+Build:
+
+- truthful autosave
+- draft recovery
+- revision pruning policy
+- immutable review versions
+- optimistic concurrency
+- transactional save and revision creation
+- normalized categories and tags
+- ownership and edit scopes
+- atomic slug and redirect handling
+- migration of useful existing revisions
+
+Exit gate:
+
+- drafts survive interruption
+- stale clients cannot overwrite newer content
+- every submitted version can be reconstructed
+
+### PR 2B: Review and publication lifecycle
+
+Build:
+
+- review submission
+- requested changes
+- approval
+- scheduling
+- publication
+- archive and restore
+- publication snapshots
+- meaningful dates
+- cached article read model
+- exact public preview
+
+Exit gate:
+
+- one real article completes the full lifecycle
+- the public page is served from a stable version
+- later draft changes cannot alter the published version silently
+
+## Phase 3: Trust infrastructure
+
+### PR 3A: Sources, citations, and credits
+
+Build once:
+
+- reusable sources
+- typed source locators
+- citations
+- source versions
+- source withdrawals
 - credits
-- immutable revisions
-- review events and transactional transitions
-- provenance events
-- material update and reviewed dates
+- external contributors
+- Registry entity links
+- inline Article citations
+- public notes and source presentation
+
+Exit gate:
+
+- one source can be reused by an Article, Registry change, and later Playlist note
+- citations remain stable when display formatting changes
+
+### PR 3B: Corrections and provenance
+
+Build:
+
 - correction cases
+- correction targets
+- evidence attachment
+- investigation ownership
+- decision history
+- correction application command
 - public correction notes
-- Registry links
-- public provenance component
-
-Article integration:
-
-- select or create sources in the Article Editor
-- insert or attach citations
-- add credits
-- submit a specific revision for review
-- approve and publish a specific revision
-- create and resolve a correction
-- display public provenance and corrections
+- affected-resource flags
+- contributor notification jobs
+- append-only provenance events
 
 Exit gate:
 
-- one real article is created, reviewed, published, materially updated or corrected, and publicly displays accurate provenance
+- a submitted correction becomes a case
+- a reviewed correction creates a new resource version
+- the public history explains what changed and why
 
-## Phase 2: Canonical Playlist Editor
+## Phase 4: Media platform
 
-Build:
-
-- independent Playlist admin routes and navigation
-- playlist list and detail editor
-- complete item management
-- Registry and provider matching
-- per-item notes and citations
-- shared credits, review, provenance, and corrections
-- public playlist routes
-- public playback and SEO
-- migration path from useful Institute-linked playlist drafts
-
-Exit gate:
-
-- one real editorial playlist is reviewed and published through the canonical editor
-- the old Institute Playlist workspace is no longer required for new work
-
-## Phase 3: Complete Media Library and large-file pipeline
+### PR 4A: Media authority redesign
 
 Build:
 
-- audio and video acceptance in Media Library
-- media-type previews
-- full rights, consent, sensitivity, and provenance metadata
-- resumable large-file uploads
+- logical assets
+- immutable file objects
+- variants
+- usage links
 - checksums
-- processing jobs and status
-- derivative creation
-- preservation masters
-- caption and transcript asset handling
-- safe replacement and reference preservation
+- technical metadata
+- preservation state
+- rights
+- consent
+- sensitivity
+- embargo
+- source protection
+- replacement history
+- retention status
+- migration bridge for existing media records
 
 Exit gate:
 
-- one real podcast master and one real video master upload successfully through interruption and processing tests
-- both are previewable and reusable by canonical editors
+- existing assets remain usable
+- one logical asset can safely hold an original and several derivatives
+- no editor depends directly on a mutable storage URL
 
-## Phase 4: Audio Editor
+### PR 4B: Upload and processing pipeline
 
 Build:
 
-- shows, seasons, episodes, and standalone audio publications
-- editor and public routes
-- media selection and processing integration
-- transcripts, chapters, sources, citations, credits, review, provenance, and corrections
-- accessible public player
-- RSS feed and stable podcast identifiers
+- resumable upload sessions
+- direct multipart transfer
+- upload retry
+- completion verification
+- processing jobs
+- audio derivatives
+- video renditions
+- poster frames
+- thumbnails
+- waveform data
+- transcripts
+- captions
+- signed private delivery
+- public CDN delivery
+- storage reconciliation
+- orphan cleanup
+- failed-processing recovery
 
 Exit gate:
 
-- one complete real audio publication is reviewed and published
-- feed and playback validation pass
+- real audio and video masters survive interrupted uploads
+- original checksums are verified
+- public derivatives play
+- processing can be retried without another master upload
 
-## Phase 5: Video Editor
+## Phase 5: Playlist
+
+### PR 5A: Canonical Playlist authority
 
 Build:
 
-- video and video-series content models
-- editor and public routes
-- media selection and processing integration
-- poster frames, captions, transcripts, chapters, credits, review, provenance, and corrections
-- accessible public streaming player
+- independent Playlist domain
+- list and editor routes
+- metadata
+- cover assets
+- atomic ordering
+- item identity
+- Registry and provider matching
+- external pending tracks
+- duplicate detection
+- notes
+- versions
+- credits
+- capabilities
 
 Exit gate:
 
-- one complete real video is reviewed and published
-- desktop and mobile playback, captions, transcript, provenance, and correction paths pass
+- a Playlist can be created and reviewed without Institute involvement
+- concurrent ordering cannot corrupt positions
 
-## Phase 6: Field Capture
+### PR 5B: Public Playlist product
 
 Build:
 
-- mobile-first field upload interface
-- resumable weak-network transfer
-- private newsroom intake
-- contributor identity and anonymity controls
-- rights, consent, sensitivity, and embargo controls
-- unsafe metadata handling
-- transformation of accepted material into canonical Media Library assets and editorial work
+- public collection and detail routes
+- responsive playback
+- citations
+- provenance
+- corrections
+- scheduling
+- SEO
+- cached read model
+- migration of useful existing drafts
 
 Exit gate:
 
-- interrupted and weak-network upload tests pass
-- a submitted field asset can be privately reviewed and promoted into an Audio or Video publication without losing provenance
+- one real Playlist is reviewed and published end to end
 
-## Phase 7: Adapt Registry and Chart tools
+## Phase 6: Audio
 
-Add the shared editorial core without rewriting canonical tools.
+### PR 6A: Audio publication authority
 
-Registry additions:
+Build:
 
-- sources and citations for reviewed changes
-- field-level provenance where practical
-- correction cases
+- shows
+- seasons
+- episodes
+- standalone audio
+- immutable episode versions
+- Audio Editor
+- master selection
+- chapters
+- transcripts
+- credits
+- citations
+- RSS contract
+- stable GUID and enclosure identity
+
+### PR 6B: Public Audio product
+
+Build:
+
+- public player
+- show and episode pages
+- transcript navigation
+- chapters
+- RSS generation
+- review
+- provenance
+- corrections
+- scheduling
+- search and SEO read models
+
+Exit gate:
+
+- one real podcast episode is published
+- its RSS feed validates
+- a transcript correction preserves public history
+
+## Phase 7: Video
+
+### PR 7A: Video publication authority
+
+Build:
+
+- standalone videos
+- series
+- episodes
+- documentary, interview, performance, explainer, and field-footage classifications
+- Video Editor
+- master and derivative management
+- posters
+- chapters
+- captions
+- transcript
+- credits
+- citations
+
+### PR 7B: Public Video product
+
+Build:
+
+- responsive streaming player
+- public routes
+- accessibility
+- review
+- scheduling
+- provenance
+- corrections
+- search
+- SEO
+- cached read models
+
+Exit gate:
+
+- one real captioned video publishes successfully across desktop and mobile
+
+## Phase 8: Field Capture
+
+### PR 8A: Safe mobile intake
+
+Build:
+
+- mobile capture
+- file selection
+- weak-network queue
+- resumable transfer
+- private originals
+- optional identity disclosure
+- anonymous-intake policy
+- consent and rights
+- sensitivity
+- embargo
+- metadata stripping
+- location protection
+- submission receipt
+
+### PR 8B: Newsroom triage and promotion
+
+Build:
+
+- urgent queue
+- verification
+- source protection
+- redaction requirements
+- holds
+- rejection
+- embargo
+- editorial notes
+- contributor communication
+- promotion to Media, Article, Audio, or Video
+- immutable intake history
+
+Exit gate:
+
+- a simulated protest recording survives connection loss
+- it enters private review
+- a safe derivative becomes a draft publication without losing original provenance
+
+## Phase 9: Public delivery, search, and SEO at scale
+
+### PR 9A: Versioned public API and search
+
+Build:
+
+- domain-based public query handlers
+- API versioning
+- cursor pagination
+- cached read models
+- validators such as ETags
+- outbox-driven cache invalidation
+- search documents
+- full-text and trigram indexes
+- incremental reindexing
+- removal of direct complex browser joins
+
+Exit gate:
+
+- public pages no longer require the giant read function
+- list performance remains stable at representative large volumes
+
+### PR 9B: Incremental SEO and route infrastructure
+
+Build:
+
+- sitemap index
+- sharded sitemaps
+- incremental URL updates
+- route aliases
+- redirect history
+- canonical URLs
+- publication-driven sitemap jobs
+- SEO metadata read models
+- load testing
+
+Exit gate:
+
+- adding one publication updates only the relevant sitemap shard
+- no build process fetches the entire public corpus
+
+## Phase 10: Registry, Charts, and evidence consolidation
+
+### PR 10A: Shared trust adapters
+
+Integrate:
+
+- Registry evidence
+- relationship evidence
+- Chart methodology sources
+- citations
+- corrections
 - review events
+- provenance
 - meaningful review dates
 
-Chart additions:
+Decouple evidence permissions from Institute-specific capabilities.
 
-- methodology sources
-- citations
-- reviewed interpretation
-- provenance and correction support
+Keep Registry and Charts authoritative for their own records.
 
-Exit gate:
+### PR 10B: Consolidation and scale hygiene
 
-- one reviewed Registry change and one chart-related editorial update use the shared core
+Complete:
 
-## Phase 8: Production freeze
-
-Once Phases 1 through 7 meet their exit gates:
-
-- freeze editor foundations for the first cultural season
-- permit only security, data-loss, publication-blocker, accessibility, and severe reliability fixes
-- record new product ideas without immediately building them
-- begin Inquiry Mode as the next product layer
-
-## Phase 9: Inquiry Mode vertical slice
-
-Build the first complete power-up through one real Inquiry.
-
-Required proof:
-
-1. Open the normal Article Editor.
-2. Confirm it works with Inquiry Mode off.
-3. Turn Inquiry Mode on.
-4. Start or attach a real Inquiry.
-5. Attach sources and create findings using shared infrastructure.
-6. Publish the article with compact public Inquiry context.
-7. Create a related playlist in the canonical Playlist Editor.
-8. Carry the same active Inquiry into that editor.
-9. Attach and publish the playlist.
-10. Attach at least one Registry record as an affected record.
-11. Complete a reviewed Registry change.
-12. Confirm article, playlist, Registry page, and public Inquiry page share one Inquiry identity.
-13. Exit Inquiry Mode and confirm normal editor behaviour remains intact.
+- migrate parallel evidence and Inquiry records into chosen authorities
+- remove duplicate ownership paths
+- archive compatibility tables and functions
+- add missing foreign-key indexes
+- simplify overlapping RLS policies
+- introduce retention and partitioning for high-volume tables
+- create analytics and operational rollups
+- retire the database-backed request-rate log
 
 Exit gate:
 
-- a real article, playlist, and Registry change are connected by one active Inquiry without using the legacy Institute as a destination
+- one reviewed Registry change and one Chart update use the shared trust layer
+- no active workflow depends on competing evidence authorities
+
+## Phase 11: Operational proof and production freeze
+
+### PR 11A: Scale and resilience proof
+
+Test in isolated environments with representative volumes of at least:
+
+- 100,000 editorial resources
+- hundreds of thousands of sources
+- millions of citations and resource links
+- millions of provenance and review events
+- millions of analytics and operational rows
+- large media catalogues
+- high concurrent public reads
+- competing editorial writes
+
+Verify:
+
+- index usage
+- queue throughput
+- cursor pagination
+- command idempotency
+- stale-write handling
+- migration duration
+- public latency
+- cache behaviour
+- restoration from failed jobs
+- security boundaries
+
+### PR 11B: Disaster recovery and freeze
+
+Establish:
+
+- point-in-time recovery target
+- metadata exports
+- media inventory
+- checksum reconciliation
+- restore rehearsal
+- queue and worker dashboards
+- database-growth dashboards
+- slow-query alerts
+- incident runbooks
+- ownership of each system
+- production freeze policy
+
+Target outcomes include:
+
+- no acknowledged editorial command is lost
+- core metadata recovery point is measured in minutes, not days
+- restoration is rehearsed rather than assumed
+- cached public reads remain available during editorial-processing failures
+- media originals remain recoverable even when derivatives fail
+
+Exit gate:
+
+- the production team can use every canonical editor without developer assistance
+- the restoration drill succeeds
+- editor and platform foundations enter freeze
+
+## Phase 12: Inquiry Mode
+
+### PR 12A: Internal power-up
+
+Build:
+
+- active Inquiry state
+- start, attach, switch, and exit controls
+- persistent context across admin routes
+- explicit resource attachment
+- many-to-many resource roles
+- question versions
+- Findings
+- Finding-to-source relationships
+- publication snapshots
+- shared Inquiry sidecar
+- contextual actions inside canonical editors
+
+### PR 12B: Public Inquiry product and legacy retirement
+
+Build:
+
+- singular-output Inquiry treatments
+- plural Inquiry pages
+- connected-work navigation
+- Findings and uncertainty
+- affected Registry records
+- contributors
+- sources
+- provenance
+- corrections
+- legacy Inquiry migration
+- old Institute retirement
+
+Exit gate:
+
+- one real Inquiry connects an Article, Playlist, and Registry change
+- all pages preserve the same Inquiry identity and history
+- Inquiry Mode can be turned off without weakening ordinary editors
 
 ## Definition of editor completion
 
@@ -976,22 +1881,24 @@ Every canonical editor must pass the same baseline.
 - validate required fields
 - prevent duplicate accidental publication
 - surface partial-save failure clearly
+- reject stale overwrites
 
 ### Production
 
-- attach or select media
-- attach sources and citations
+- attach or select Media assets
+- attach Sources and Citations
 - link Registry entities
-- add contributors and credits
+- add contributors and Credits
 - preview the exact public result
 
 ### Governance
 
-- submit a specific revision for review
+- submit a specific version for review
 - request changes
-- approve a specific revision
+- approve a specific version
 - schedule or publish
 - record who acted, what changed, and why
+- execute critical transitions transactionally
 
 ### Life after publication
 
@@ -1001,14 +1908,14 @@ Every canonical editor must pass the same baseline.
 - reopen where applicable
 - archive
 - restore
-- preserve earlier published revisions
+- preserve earlier published versions
 
 ### Public trust
 
 - show publication date
 - show meaningful update and review dates
-- show credits
-- show sources where appropriate
+- show Credits
+- show Sources where appropriate
 - show correction notes
 - accept correction submissions
 - remain accessible on mobile and desktop
@@ -1019,27 +1926,47 @@ Every canonical editor must pass the same baseline.
 - handle lost connectivity
 - preserve drafts
 - prevent silent partial writes
-- use transactional state changes for critical transitions
+- use idempotent transactional commands
 - maintain tests around critical lifecycle behaviour
-- support backup and export of content and media references
+- support backup and export of content and Media references
+- expose failed jobs and recovery controls
 
-## Development rules
+## Engineering rules
+
+These rules are non-negotiable.
+
+1. No critical write is coordinated through several frontend requests.
+2. Every command is idempotent and concurrency-aware.
+3. Every reviewed or published state points to an immutable version.
+4. Every public editorial change has provenance.
+5. Every source, citation, credit, correction, and Inquiry link targets stable resource identity.
+6. No privileged function is accidentally callable through inherited grants.
+7. No large public collection depends on offset pagination or an exact count per request.
+8. No append-heavy table grows forever without a retention or partition plan.
+9. No Media preservation master is overwritten.
+10. No public route requires loading an entire domain into memory.
+11. No new format receives its own citation, review, correction, or Media system.
+12. No migration ships without production introspection, rehearsal, and rollback.
+13. No architecture is accepted only because the interface looks complete.
+14. No phase closes without real cultural work and operational proof.
+
+## Delivery rules
 
 ### No infrastructure victory by itself
 
-Every meaningful implementation PR must identify:
+Every meaningful implementation PR identifies:
 
-- the cultural output it enables
+- the cultural output or operational safeguard it enables
 - the worker using it
-- the exact blockage removed
+- the exact blockage or risk removed
 - the public or institutional result
-- the real record used for verification
+- the real record or test scenario used for verification
 
 A PR is not complete merely because:
 
 - a schema exists
 - a route loads
-- a table is ready but empty
+- a table is empty but ready
 - an assistant returns structured data
 - a polished screen exists
 - an abstraction supports hypothetical future work
@@ -1047,34 +1974,41 @@ A PR is not complete merely because:
 ### Infrastructure is justified only when it
 
 - unblocks named cultural work
-- protects data, security, rights, consent, provenance, or review integrity
+- protects data, security, rights, consent, provenance, recovery, or review integrity
 - removes machinery from the worker's path
+- prevents a known scale or operational failure
 
 ### No duplicate editors
 
 The canonical editor is always used.
 
-The Institute may add contextual capability later, but it may not create an Institute-specific version of Article, Playlist, Audio, Video, Registry, Chart, Media, Citation, or Correction tools.
+Inquiry Mode may add contextual capability later, but it may not create an Inquiry-specific version of Article, Playlist, Audio, Video, Registry, Charts, Media, Citations, Review, or Corrections.
 
 ### No premature universal builder
 
 Do not build a generic block editor or universal cultural-output editor.
 
-Different outputs retain their own appropriate production and public experiences while sharing infrastructure underneath.
+Different outputs retain appropriate production and public experiences while sharing infrastructure underneath.
 
 ### No mock-only acceptance
 
 Mock data may support tests.
 
-The primary acceptance proof for each phase must use real cultural work.
+The primary acceptance proof for each product phase uses real cultural work.
 
-### Public and admin must ship together
+### Production changes stay reversible
 
-A production workflow is not complete until its public output, provenance, review, and correction behaviour are delivered.
+Every implementation phase includes:
 
-## Explicit non-goals for this programme
+- migration rollback or forward-repair strategy
+- compatibility treatment
+- data validation
+- observability
+- deployment verification
 
-Do not build during the editor-completion programme:
+## Explicit non-goals
+
+Do not build during this programme:
 
 - a new standalone Institute application
 - new Institute workspaces
@@ -1083,67 +2017,87 @@ Do not build during the editor-completion programme:
 - a browser-based audio workstation
 - a browser-based video editor
 - custom public livestreaming infrastructure
+- speculative microservices
+- Kubernetes or Kafka without demonstrated need
 - real-time Google Docs-style collaboration
 - separate review systems for each output
 - separate correction systems for each output
-- separate media libraries
+- separate Media libraries
+- a universal content blob
 - a universal block builder
-- advanced semantic research or retrieval infrastructure
+- an external search engine before PostgreSQL search is proven insufficient
+- advanced semantic-research infrastructure before real work requires it
 - a graph explorer
 - new assistant personas
 - speculative output types without a real first-season need
 
 Photo essays may use the Article Editor initially.
 
-Interview transcripts may use Article, Audio, or Video publication structures.
+Interview transcripts may use Article, Audio, or Video structures.
 
-Documents remain Media Library assets.
+Documents remain Media assets.
 
-Specialist timelines, datasets, and interactive experiences are introduced only when real work proves the need.
+Specialist timelines, datasets, interactives, and livestreams are introduced only when real work proves the need.
 
 ## Legacy Institute treatment
 
-The legacy Institute is frozen after this plan is accepted.
+The legacy Institute is frozen when this plan is accepted.
 
 Until migration is complete:
 
 - preserve data
 - preserve direct routes required for reference
-- fix only security, permission, data-loss, and migration-blocking defects
+- fix only security, permission, data-loss, migration, and critical compatibility defects
 - do not polish the legacy interface
 - do not add new workspaces
 - do not add new assistant jobs
 - do not route new canonical work into Institute-specific editors
+- do not create new Institute-specific authorities
 
 After canonical editors and Inquiry Mode are proven:
 
 - migrate useful questions and question history
-- migrate valid sources into the shared source authority
-- migrate valid claims into findings where appropriate
+- migrate valid Sources into the shared Source authority
+- migrate valid claims into Findings where appropriate
 - migrate useful work-product relationships
 - preserve review and assistant audit history
 - make legacy routes read-only
-- remove obsolete UI and schema through a separate guarded retirement programme
+- remove obsolete interface and schema through a guarded retirement programme
 
 ## Immediate next implementation
 
-The next implementation after this plan is merged is Phase 1, Shared Editorial Core through Article.
+After this plan is merged, implementation begins with Phase 0.
 
-The first PR should define the shared data contracts and lifecycle for:
+The first implementation PR is **PR 0A: Security perimeter**.
 
-- sources
-- citations and locators
-- credits
-- revisions
-- review events
-- provenance events
-- correction cases
+It must:
 
-The first vertical implementation must then integrate those contracts into the existing Article Editor and public article page.
+- inventory the exposed function and policy surface
+- close privileged anonymous or inherited execution paths
+- establish the private command boundary
+- preserve only the compatibility routes that are explicitly required
+- include automated security regression tests
 
-The acceptance milestone is not a merged infrastructure PR.
+The next PR is **PR 0B: Engineering control plane**.
 
-The acceptance milestone is a real article researched, cited, reviewed, published, and later updated or corrected through the completed system.
+Do not begin Article trust infrastructure, Playlist completion, Media redesign, or Inquiry Mode before Phase 0 meets its exit gates.
+
+The first platform implementation after Phase 0 is **PR 1A: Resource identity and domain boundaries**.
+
+## Production freeze principle
+
+The production freeze begins only after Phase 11 passes.
+
+During the freeze, foundational changes are limited to:
+
+- security fixes
+- data-loss prevention
+- publication blockers
+- accessibility defects
+- severe reliability defects
+- legally required changes
+
+New product ideas are recorded without automatically reopening frozen foundations.
 
 ## Deployment and verification for this documentation change
 
@@ -1152,4 +2106,4 @@ The acceptance milestone is a real article researched, cited, reviewed, publishe
 - frontend deployment needed: No
 - Readdy Finish update needed: No
 - documentation review needed: Yes
-- next implementation plan: Phase 1 shared editorial core through Article
+- next implementation plan: Phase 0A security perimeter
