@@ -363,6 +363,20 @@ function modelFromPath(pathname: string): SeoModel {
     };
   }
 
+  if (section === "releases" && parts.length >= 4) {
+    const artist = titleCase(parts[1]);
+    const track = titleCase(parts[3]);
+    return {
+      title: `${track} by ${artist}`,
+      description: firstSentence(`Explore ${track} by ${artist} on WAKILISHA, including release context, credits, chart context, and music metadata.`),
+      canonicalPath: path,
+      robots: "index, follow",
+      ogType: "music.song",
+      kind: "track",
+      jsonLd: [],
+    };
+  }
+
   if (section === "releases" && parts.length >= 3) {
     const artist = titleCase(parts[1]);
     const release = titleCase(parts[2]);
