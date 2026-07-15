@@ -1,12 +1,57 @@
 begin;
 
 drop policy if exists "Service role can manage secrets" on public.admin_settings_secrets;
-drop policy if exists "Service role manage briefing_catalog" on public.briefing_catalog;
-drop policy if exists "Service role manage briefing_issue_recipients" on public.briefing_issue_recipients;
-drop policy if exists "Service role manage briefing_issues" on public.briefing_issues;
-drop policy if exists "Service role manage briefing_opt_ins" on public.briefing_opt_ins;
-drop policy if exists "Service role manage briefing_subscribers" on public.briefing_subscribers;
-drop policy if exists "Service role manage briefing_tokens" on public.briefing_tokens;
+do $migration$
+declare
+  target record;
+begin
+  for target in
+    select *
+    from (
+      values
+        (
+          'Service role manage briefing_catalog',
+          'briefing_catalog'
+        ),
+        (
+          'Service role manage briefing_issue_recipients',
+          'briefing_issue_recipients'
+        ),
+        (
+          'Service role manage briefing_issues',
+          'briefing_issues'
+        ),
+        (
+          'Service role manage briefing_opt_ins',
+          'briefing_opt_ins'
+        ),
+        (
+          'Service role manage briefing_subscribers',
+          'briefing_subscribers'
+        ),
+        (
+          'Service role manage briefing_tokens',
+          'briefing_tokens'
+        )
+    ) as policies(policy_name, table_name)
+  loop
+    if to_regclass(
+      format(
+        'public.%I',
+        target.table_name
+      )
+    ) is not null
+    then
+      execute format(
+        'drop policy if exists %I on %I.%I',
+        target.policy_name,
+        'public',
+        target.table_name
+      );
+    end if;
+  end loop;
+end
+$migration$;
 
 drop policy if exists auth_all_gsc_connections on public.gsc_connections;
 create policy gsc_connections_admin_all
