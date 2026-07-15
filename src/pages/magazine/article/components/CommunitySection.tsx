@@ -54,6 +54,9 @@ export function CommunitySection({ entity, user }: CommunitySectionProps) {
     [comments]
   );
   const visibleCommentCount = visibleComments.length;
+  const visibleCountLabel = livingMemory
+    ? `memor${visibleCommentCount === 1 ? "y" : "ies"}`
+    : `comment${visibleCommentCount === 1 ? "" : "s"}`;
   const [contributionOpen, setContributionOpen] = useState(false);
   const [contribSourceCommentId, setContribSourceCommentId] = useState<string | undefined>(undefined);
 
@@ -173,7 +176,9 @@ export function CommunitySection({ entity, user }: CommunitySectionProps) {
           {livingMemory ? "The record is still open" : "No comments yet"}
         </p>
         <p className="text-[13px] text-[var(--wk-text-muted)] max-w-md mx-auto">
-          {livingMemory?.publicPrompt || "Be the first to share your thoughts on this."}
+          {livingMemory
+            ? "Be the first to add a memory."
+            : "Be the first to share your thoughts."}
         </p>
       </div>
     ),
@@ -237,7 +242,7 @@ export function CommunitySection({ entity, user }: CommunitySectionProps) {
             </h2>
             {!loading && (
               <span className="text-[12px] font-bold text-[var(--wk-text-muted)] bg-[var(--wk-surface)] border border-[var(--wk-border)] px-2.5 py-0.5 rounded-full">
-                {visibleCommentCount} {visibleCommentCount === 1 ? "comment" : "comments"}
+                {visibleCommentCount} {visibleCountLabel}
               </span>
             )}
           </div>
@@ -266,7 +271,7 @@ export function CommunitySection({ entity, user }: CommunitySectionProps) {
             <CommentComposer
               user={user}
               onSubmit={handlePostComment}
-              placeholder={livingMemory?.publicPrompt || "Share your thoughts..."}
+              placeholder={livingMemory ? "Share what you remember…" : "Share your thoughts…"}
             />
           ) : (
             <LoginToComment
