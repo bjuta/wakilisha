@@ -1,7 +1,7 @@
 import fs from "node:fs";
 
 const migration =
-  "supabase/migrations/20260714222000_phase_0a_lock_down_content_publishing_rpc_anon_access.sql";
+  "supabase/migrations/20260714190345_phase_0a_lock_down_content_publishing_rpc_anon_access.sql";
 
 const sql = fs
   .readFileSync(migration, "utf8")
