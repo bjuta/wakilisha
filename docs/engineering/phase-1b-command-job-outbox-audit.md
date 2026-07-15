@@ -6,9 +6,9 @@ Phase: Phase 1, PR 1B
 
 Audit status: Complete
 
-Implementation status: Migration written and rollback-only production-schema rehearsal passed
+Implementation status: Deployed and permanently verified in production
 
-Production changed: No
+Production changed: Yes
 
 ## Objective
 
@@ -597,3 +597,54 @@ Scope boundary:
 - no frontend implementation
 - no canonical content mutation
 - no route or alias mutation
+
+## Phase 1B production closure record
+
+Closure date: July 15, 2026
+
+Merge record:
+
+- pull request `#458`
+- merge commit `a350caaf78564a630e398e0975c1c67c8cca900a`
+
+Production migration:
+
+- `20260715143000_phase_1b_command_job_outbox_foundation.sql`
+- recorded in production migration history
+- four private orchestration tables present
+- row-level security enabled on all four tables
+- one public submission RPC present
+- six service-role worker functions present
+
+Permanent production proof:
+
+- command receipt `3ea7dcab-81d7-4e9d-a733-390ab0045171`
+- durable job `a1ed0228-185a-4d7e-89cf-342ff13fdcc3`
+- accepted event `32f029d8-3516-41d8-a804-e198388a3bda`
+- receipt state `accepted`
+- job state `queued`
+- job attempt count `0`
+- accepted event state `pending`
+- principal `service:service_role`
+- idempotency key `phase1b-production-article-proof-20260715`
+
+Permanent proof result:
+
+- one receipt exists
+- one job exists
+- one accepted event exists
+- idempotent replay returned the same three identities
+- replay created no duplicate rows
+- direct production verification passed
+
+Intentional retained state:
+
+- the proof job remains queued
+- the accepted outbox event remains pending
+- Phase 1B does not deploy a worker or dispatcher
+- later vertical slices may claim this durable work through the Phase 1B contract
+
+Exit gate:
+
+- every Phase 1B closure condition has passed
+- Phase 2A may begin from this production baseline
