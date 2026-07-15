@@ -12073,6 +12073,19 @@ export type Database = {
         }
         Relationships: []
       }
+      wk_resource_index: {
+        Row: {
+          canonical_path: string | null
+          canonical_record_id: string | null
+          created_at: string | null
+          lifecycle_state: string | null
+          resource_id: string | null
+          resource_kind: string | null
+          updated_at: string | null
+          visibility: string | null
+        }
+        Relationships: []
+      }
     }
     Functions: {
       accept_registry_missing_artist_intake: {
