@@ -6,7 +6,7 @@
  *
  * Reads use the shared content pipeline (contentPipeline.ts) for consistent
  * HTML transformation across admin preview and public rendering.
- * Writes wrap the update_article RPC with optimistic locking.
+ * Writes use Phase 2A versioned Article RPCs with draft-version locking.
  */
 
 import { supabase } from "@/lib/supabase";
@@ -39,6 +39,7 @@ export interface ArticleRow {
   updated_at: string | null;
   preview_nonce?: string | null;
   preview_nonce_expires_at?: string | null;
+  draft_version?: number | null;
 }
 
 /* ─── Admin Detail View ─── */
@@ -58,6 +59,7 @@ export interface AdminArticleDetail {
   heroImageUrl: string;
   createdAt: string;
   updatedAt: string | null;
+  draftVersion: number;
   previewNonce?: string | null;
 }
 
@@ -108,6 +110,10 @@ export interface SaveResult {
   error?: string;
   errorCode?: "stale_update" | "permission_denied" | "not_found" | "unknown";
   currentServerState?: AdminArticleDetail;
+  articleSlug?: string;
+  draftVersion?: number;
+  versionId?: string;
+  versionNumber?: number;
 }
 
 /* ─── Revision Payload ─── */
@@ -125,12 +131,13 @@ export interface RevisionPayload {
   publishedAt: string | null;
   wpStatus: string | null;
   createdBy: "manual_save" | "autosave";
+  draftVersion?: number | null;
 }
 
 /* ─── Select columns used across all queries ─── */
 
 const ARTICLE_SELECT =
-  "id, slug, title, excerpt, content_html, author, published_at, modified_at, categories, tags, seo, wp_status, hero_image_url, created_at, updated_at, preview_nonce, preview_nonce_expires_at";
+  "id, slug, title, excerpt, content_html, author, published_at, modified_at, categories, tags, seo, wp_status, hero_image_url, created_at, updated_at, draft_version, preview_nonce, preview_nonce_expires_at";
 
 /* ════════════════════════════════════════════
    READ OPERATIONS
@@ -246,6 +253,7 @@ export async function fetchArticleForAdmin(slug: string): Promise<AdminArticleDe
     heroImageUrl: row.hero_image_url ?? "",
     createdAt: row.created_at,
     updatedAt: row.updated_at,
+    draftVersion: Number(row.draft_version ?? 1),
     previewNonce: row.preview_nonce ?? null,
   };
 }
@@ -412,68 +420,216 @@ export async function createArticleDraftForAdmin(payload: ArticleDraftCreatePayl
    WRITE OPERATIONS
    ════════════════════════════════════════════ */
 
+type ArticleVersionKind = "manual_save" | "submitted";
+
+type TaxonomyPayloadItem = {
+  name: string;
+  slug?: string;
+};
+
+function parseTaxonomyPayload(value: string | undefined): TaxonomyPayloadItem[] {
+  if (!value) return [];
+
+  try {
+    const parsed = JSON.parse(value) as unknown;
+    if (!Array.isArray(parsed)) return [];
+
+    return parsed
+      .map((item) => {
+        if (typeof item === "string") {
+          return { name: item };
+        }
+
+        if (item && typeof item === "object") {
+          const record = item as Record<string, unknown>;
+          const name = String(record.name ?? "").trim();
+          const slug = String(record.slug ?? "").trim();
+          if (!name && !slug) return null;
+          return { name: name || slug, slug: slug || undefined };
+        }
+
+        return null;
+      })
+      .filter((item): item is TaxonomyPayloadItem => Boolean(item));
+  } catch {
+    return [];
+  }
+}
+
+async function resolveTaxonomyIds(
+  taxonomy: "category" | "post_tag",
+  items: TaxonomyPayloadItem[],
+): Promise<string[]> {
+  if (items.length === 0) return [];
+
+  const { data, error } = await supabase.rpc("get_taxonomy_terms", {
+    p_taxonomy: taxonomy,
+    p_search: null,
+    p_page: 1,
+    p_page_size: null,
+  });
+
+  if (error) {
+    throw new Error(`Failed to load ${taxonomy} terms: ${error.message}`);
+  }
+
+  const rows = (data ?? []) as Array<{
+    id: string;
+    name: string;
+    slug: string;
+  }>;
+
+  const bySlug = new Map(rows.map((row) => [row.slug.toLowerCase(), row.id]));
+  const byName = new Map(rows.map((row) => [row.name.toLowerCase(), row.id]));
+
+  const ids: string[] = [];
+
+  for (const item of items) {
+    const id =
+      (item.slug ? bySlug.get(item.slug.toLowerCase()) : undefined) ??
+      byName.get(item.name.toLowerCase());
+
+    if (!id) {
+      throw new Error(`Taxonomy term is not in registry: ${item.name}`);
+    }
+
+    if (!ids.includes(id)) ids.push(id);
+  }
+
+  return ids;
+}
+
+async function resolvePayloadTaxonomyIds(payload: ArticleSavePayload): Promise<string[]> {
+  const categoryIds = await resolveTaxonomyIds(
+    "category",
+    parseTaxonomyPayload(payload.categories),
+  );
+
+  const tagIds = await resolveTaxonomyIds(
+    "post_tag",
+    parseTaxonomyPayload(payload.tags),
+  );
+
+  return [...categoryIds, ...tagIds];
+}
+
+function classifySaveError(message: string): SaveResult["errorCode"] {
+  const msg = message.toLowerCase();
+
+  if (
+    msg.includes("stale") ||
+    msg.includes("modified") ||
+    msg.includes("conflict") ||
+    msg.includes("concurrent")
+  ) {
+    return "stale_update";
+  }
+
+  if (msg.includes("permission") || msg.includes("unauthorized") || msg.includes("policy")) {
+    return "permission_denied";
+  }
+
+  if (msg.includes("not found") || msg.includes("does not exist")) {
+    return "not_found";
+  }
+
+  return "unknown";
+}
+
 /**
- * Save article via the update_article RPC.
- * Uses optimistic locking when expectedUpdatedAt is provided.
+ * Save article via the Phase 2A versioned save RPC.
  */
 export async function saveArticle(
   articleId: string,
   payload: ArticleSavePayload,
-  expectedUpdatedAt: string | null
+  expectedDraftVersion: number | null,
+  versionKind: ArticleVersionKind = "manual_save",
 ): Promise<SaveResult> {
-  const { data, error } = await supabase.rpc("update_article", {
-    article_id: articleId,
-    payload: payload,
-    expected_updated_at: expectedUpdatedAt ?? null,
-  });
-
-  if (error) {
-    // Detect stale update from RPC error
-    const msg = error.message.toLowerCase();
-    if (msg.includes("stale") || msg.includes("modified") || msg.includes("conflict") || msg.includes("concurrent")) {
-      return {
-        ok: false,
-        error: "This article was modified by someone else while you were editing. Please review the latest version before saving.",
-        errorCode: "stale_update",
-      };
-    }
-
-    if (msg.includes("permission") || msg.includes("unauthorized") || msg.includes("policy")) {
-      return {
-        ok: false,
-        error: `Permission denied: ${error.message}`,
-        errorCode: "permission_denied",
-      };
-    }
-
-    if (msg.includes("not found") || msg.includes("does not exist")) {
-      return {
-        ok: false,
-        error: `Article not found: ${error.message}`,
-        errorCode: "not_found",
-      };
-    }
-
+  if (expectedDraftVersion == null) {
     return {
       ok: false,
-      error: `Save failed: ${error.message}`,
-      errorCode: "unknown",
+      error: "Cannot save because the editor does not know the current draft version. Reload the article and try again.",
+      errorCode: "stale_update",
     };
   }
 
-  return { ok: true };
+  try {
+    const taxonomyTermIds = await resolvePayloadTaxonomyIds(payload);
+    const { categories, tags, ...versionedPayload } = payload;
+
+    void categories;
+    void tags;
+
+    const { data, error } = await supabase.rpc("save_article_versioned", {
+      p_article_id: articleId,
+      p_payload: versionedPayload,
+      p_expected_draft_version: expectedDraftVersion,
+      p_version_kind: versionKind,
+      p_taxonomy_term_ids: taxonomyTermIds,
+    });
+
+    if (error) {
+      const errorCode = classifySaveError(error.message);
+      return {
+        ok: false,
+        error:
+          errorCode === "stale_update"
+            ? "This article was modified by someone else while you were editing. Please review the latest version before saving."
+            : `Save failed: ${error.message}`,
+        errorCode,
+      };
+    }
+
+    const row = Array.isArray(data) ? data[0] : null;
+
+    return {
+      ok: true,
+      articleSlug: row?.article_slug as string | undefined,
+      draftVersion: typeof row?.draft_version === "number" ? row.draft_version : undefined,
+      versionId: row?.version_id as string | undefined,
+      versionNumber: typeof row?.version_number === "number" ? row.version_number : undefined,
+    };
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "Unknown save failure";
+    const errorCode = classifySaveError(message);
+
+    return {
+      ok: false,
+      error:
+        errorCode === "stale_update"
+          ? "This article was modified by someone else while you were editing. Please review the latest version before saving."
+          : `Save failed: ${message}`,
+      errorCode,
+    };
+  }
 }
 
 /**
- * Create a revision snapshot for a manual save or autosave.
+ * Create a durable autosave snapshot.
  */
 export async function createRevision(payload: RevisionPayload): Promise<void> {
-  void payload;
-  return;
+  if (payload.createdBy === "manual_save") return;
+  if (payload.draftVersion == null) return;
+
+  const { error } = await supabase.rpc("create_article_autosave", {
+    p_article_id: payload.articleId,
+    p_expected_draft_version: payload.draftVersion,
+    p_payload: {
+      title: payload.title,
+      excerpt: payload.excerpt,
+      content_html: payload.contentHtml,
+      author: payload.author,
+      seo: payload.seo,
+    },
+  });
+
+  if (error) {
+    throw new Error(`Autosave failed: ${error.message}`);
+  }
 }
 
 /**
- * Get the latest revision for an article (used for recovery check).
+ * Get the latest durable autosave for an article.
  */
 export async function getLatestRevision(articleId: string): Promise<{
   revisionNumber: number;
@@ -488,12 +644,35 @@ export async function getLatestRevision(articleId: string): Promise<{
   publishedAt: string;
   wpStatus: string | null;
 } | null> {
-  void articleId;
-  return null;
+  const { data, error } = await supabase.rpc("get_latest_article_autosave", {
+    p_article_id: articleId,
+  });
+
+  if (error) {
+    console.warn("Failed to load latest autosave:", error.message);
+    return null;
+  }
+
+  const row = Array.isArray(data) ? data[0] : null;
+  if (!row) return null;
+
+  return {
+    revisionNumber: Number(row.version_number ?? 0),
+    createdAt: String(row.created_at ?? ""),
+    title: String(row.title ?? ""),
+    excerpt: String(row.excerpt ?? ""),
+    contentHtml: String(row.content_html ?? ""),
+    author: String(row.author_display ?? ""),
+    categories: normalizeTaxonomyTerms(row.category_snapshot).map(processText),
+    tags: normalizeTaxonomyTerms(row.tag_snapshot).map(processText),
+    seo: (row.seo as Record<string, unknown>) ?? {},
+    publishedAt: "",
+    wpStatus: null,
+  };
 }
 
 /**
- * Clean up old revisions — keep only the most recent 20.
+ * Revision pruning now happens inside the Phase 2A database RPCs.
  */
 export async function pruneRevisions(articleId: string): Promise<void> {
   void articleId;
@@ -648,6 +827,7 @@ export async function getArticleByPreviewNonce(nonce: string): Promise<AdminArti
     heroImageUrl: row.hero_image_url ?? "",
     createdAt: row.created_at,
     updatedAt: row.updated_at,
+    draftVersion: Number(row.draft_version ?? 1),
     previewNonce: row.preview_nonce ?? null,
   };
 }

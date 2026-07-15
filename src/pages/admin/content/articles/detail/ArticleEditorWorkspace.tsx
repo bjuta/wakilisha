@@ -185,8 +185,9 @@ export function ArticleEditorWorkspace({
   });
   stateRef.current = { isDirty, isSaving, isPublishing, isAutosaving, draft, article };
 
-  // Ref for optimistic locking
+  // Refs for optimistic locking
   const articleUpdatedAtRef = useRef<string | null>(null);
+  const articleDraftVersionRef = useRef<number | null>(null);
   // Ref for autosave dedup
   const lastAutosavedContentRef = useRef<string | null>(null);
 
@@ -210,6 +211,7 @@ export function ArticleEditorWorkspace({
         }
 
         articleUpdatedAtRef.current = data.updatedAt ?? null;
+        articleDraftVersionRef.current = data.draftVersion;
         setArticle(data);
         setPreviewNonce(data.previewNonce ?? null);
 
@@ -464,6 +466,7 @@ export function ArticleEditorWorkspace({
 
   function applyServerArticleState(freshArticle: AdminArticleDetail, resetDraft = true) {
     articleUpdatedAtRef.current = freshArticle.updatedAt ?? null;
+    articleDraftVersionRef.current = freshArticle.draftVersion;
     setArticle(freshArticle);
     setPreviewNonce(freshArticle.previewNonce ?? null);
 
@@ -515,9 +518,13 @@ export function ArticleEditorWorkspace({
     const payload = buildSavePayload(extraFields);
     const expectedStatus = (extraFields.wp_status as string | undefined) ?? currentArticle.wpStatus;
     const expectedPublishedAt = (extraFields.published_at as string | undefined) ?? currentDraft.publishedAt;
-    let lockTimestamp = forceOverwrite ? null : articleUpdatedAtRef.current;
+    let expectedDraftVersion = articleDraftVersionRef.current;
 
-    let result = await saveArticle(currentArticle.id, payload, lockTimestamp);
+    if (forceOverwrite && expectedDraftVersion == null) {
+      expectedDraftVersion = currentArticle.draftVersion;
+    }
+
+    let result = await saveArticle(currentArticle.id, payload, expectedDraftVersion);
 
     if (!result.ok && result.errorCode === "stale_update" && !forceOverwrite) {
       const freshArticle = await fetchArticleForAdmin(currentArticle.slug);
@@ -535,8 +542,8 @@ export function ArticleEditorWorkspace({
 
         if (serverStillMatchesOurLastSavedArticle) {
           applyServerArticleState(freshArticle, false);
-          lockTimestamp = freshArticle.updatedAt ?? null;
-          result = await saveArticle(currentArticle.id, payload, lockTimestamp);
+          expectedDraftVersion = freshArticle.draftVersion;
+          result = await saveArticle(currentArticle.id, payload, expectedDraftVersion);
 
           if (!result.ok && result.errorCode === "stale_update") {
             const afterRetry = await fetchArticleForAdmin(currentArticle.slug);
@@ -570,22 +577,7 @@ export function ArticleEditorWorkspace({
 
     const newStatus = (extraFields.wp_status as string | undefined) ?? currentArticle.wpStatus;
 
-    await createRevision({
-      articleId: currentArticle.id,
-      revisionNumber: 0,
-      title: currentDraft.title || null,
-      excerpt: currentDraft.excerpt || null,
-      contentHtml: currentDraft.content || null,
-      author: currentDraft.author || null,
-      categories: currentDraft.categories,
-      tags: currentDraft.tags,
-      seo: currentDraft.seo,
-      publishedAt: currentDraft.publishedAt || null,
-      wpStatus: newStatus ?? null,
-      createdBy: "manual_save",
-    });
-
-    const refreshedArticle = await fetchArticleForAdmin(currentArticle.slug);
+    const refreshedArticle = await fetchArticleForAdmin(result.articleSlug ?? currentArticle.slug);
 
     if (refreshedArticle) {
       applyServerArticleState(refreshedArticle, true);
@@ -651,6 +643,7 @@ export function ArticleEditorWorkspace({
     const freshData = await fetchArticleForAdmin(slug);
     if (freshData) {
       articleUpdatedAtRef.current = freshData.updatedAt ?? null;
+      articleDraftVersionRef.current = freshData.draftVersion;
       setArticle(freshData);
       setPreviewNonce(freshData.previewNonce ?? null);
       setDraft({
