@@ -14297,6 +14297,21 @@ export type Database = {
           result: Json
         }[]
       }
+      submit_resource_reconciliation_command: {
+        Args: {
+          p_idempotency_key: string
+          p_metadata?: Json
+          p_reason?: string
+          p_resource_id: string
+        }
+        Returns: {
+          accepted_event_id: string
+          command_receipt_id: string
+          idempotent_replay: boolean
+          job_id: string
+          receipt_status: string
+        }[]
+      }
       suspend_user_access_admin: {
         Args: { reason?: string; target_user_id: string }
         Returns: boolean
