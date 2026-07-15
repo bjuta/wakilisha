@@ -10076,6 +10076,7 @@ export type Database = {
           categories: Json
           content_html: string | null
           created_at: string
+          draft_version: number
           excerpt: string | null
           hero_image_id: string | null
           hero_image_url: string | null
@@ -10098,6 +10099,7 @@ export type Database = {
           categories?: Json
           content_html?: string | null
           created_at?: string
+          draft_version?: number
           excerpt?: string | null
           hero_image_id?: string | null
           hero_image_url?: string | null
@@ -10120,6 +10122,7 @@ export type Database = {
           categories?: Json
           content_html?: string | null
           created_at?: string
+          draft_version?: number
           excerpt?: string | null
           hero_image_id?: string | null
           hero_image_url?: string | null
@@ -12981,6 +12984,19 @@ export type Database = {
           wp_status: string
         }[]
       }
+      create_article_autosave: {
+        Args: {
+          p_article_id: string
+          p_expected_draft_version: number
+          p_payload: Json
+        }
+        Returns: {
+          created_at: string
+          source_draft_version: number
+          version_id: string
+          version_number: number
+        }[]
+      }
       create_import_run: {
         Args: {
           p_errors?: string[]
@@ -13461,6 +13477,23 @@ export type Database = {
           isOneToOne: false
           isSetofReturn: true
         }
+      }
+      get_latest_article_autosave: {
+        Args: { p_article_id: string }
+        Returns: {
+          author_display: string
+          category_snapshot: Json
+          content_html: string
+          created_at: string
+          excerpt: string
+          seo: Json
+          slug: string
+          source_draft_version: number
+          tag_snapshot: Json
+          title: string
+          version_id: string
+          version_number: number
+        }[]
       }
       get_public_artist_relationships: {
         Args: { p_artist_id: string }
@@ -14272,6 +14305,22 @@ export type Database = {
       run_artist_intake_matching: {
         Args: { p_intake_run_id: string }
         Returns: Json
+      }
+      save_article_versioned: {
+        Args: {
+          p_article_id: string
+          p_expected_draft_version: number
+          p_payload: Json
+          p_taxonomy_term_ids?: string[]
+          p_version_kind?: string
+        }
+        Returns: {
+          article_id: string
+          article_slug: string
+          draft_version: number
+          version_id: string
+          version_number: number
+        }[]
       }
       seed_taxonomy_terms_from_articles: {
         Args: never
