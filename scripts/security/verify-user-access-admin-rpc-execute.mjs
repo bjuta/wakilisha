@@ -1,7 +1,7 @@
 import fs from "node:fs";
 
 const migration =
-  "supabase/migrations/20260714220500_phase_0a_lock_down_user_access_admin_rpcs.sql";
+  "supabase/migrations/20260714185539_phase_0a_lock_down_user_access_admin_rpcs.sql";
 
 const sql = fs.readFileSync(migration, "utf8");
 const compact = sql.replace(/\s+/g, " ").toLowerCase();
