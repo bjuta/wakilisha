@@ -98,6 +98,23 @@ function stripHtmlForDiff(html: string | null): string {
   return html.replace(/<[^>]*>/g, " ").replace(/&[a-z]+;/gi, " ").replace(/\s+/g, " ").trim();
 }
 
+function normalizeVersionTerms(value: unknown): string[] {
+  if (!Array.isArray(value)) return [];
+
+  return value
+    .map((item) => {
+      if (typeof item === "string") return item;
+
+      if (item && typeof item === "object" && "name" in item) {
+        return String((item as { name?: unknown }).name ?? "");
+      }
+
+      return String(item ?? "");
+    })
+    .map((item) => item.trim())
+    .filter(Boolean);
+}
+
 /* ─── Component ─── */
 
 interface Props {
@@ -121,20 +138,43 @@ export function ArticleRevisionHistory({ articleId, currentStatus, currentTitle,
   useEffect(() => {
     async function load() {
       setLoading(true);
-      const { data, error } = await supabase
-        .from("wk_article_revisions")
-        .select("id, revision_number, created_at, created_by, title, content_html, excerpt, author, categories, tags, seo, wp_status, published_at")
-        .eq("article_id", articleId)
-        .order("revision_number", { ascending: false })
-        .limit(30);
+
+      const { data, error } = await (supabase as unknown as {
+        rpc: (
+          name: string,
+          args: Record<string, unknown>,
+        ) => Promise<{ data: unknown; error: { message: string } | null }>;
+      }).rpc("list_article_versions", {
+        p_article_id: articleId,
+        p_limit: 30,
+      });
 
       if (error) {
+        console.warn("Failed to load article versions:", error.message);
         setRevisions([]);
       } else {
-        setRevisions(data || []);
+        const rows = Array.isArray(data) ? data as Array<Record<string, unknown>> : [];
+
+        setRevisions(rows.map((row) => ({
+          id: String(row.id ?? ""),
+          revision_number: Number(row.revision_number ?? 0),
+          created_at: String(row.created_at ?? ""),
+          created_by: String(row.created_by ?? "System"),
+          title: row.title == null ? null : String(row.title),
+          content_html: row.content_html == null ? null : String(row.content_html),
+          excerpt: row.excerpt == null ? null : String(row.excerpt),
+          author: row.author == null ? null : String(row.author),
+          categories: normalizeVersionTerms(row.categories),
+          tags: normalizeVersionTerms(row.tags),
+          seo: (row.seo as Record<string, unknown>) ?? {},
+          wp_status: row.wp_status == null ? null : String(row.wp_status),
+          published_at: row.published_at == null ? null : String(row.published_at),
+        })));
       }
+
       setLoading(false);
     }
+
     load();
   }, [articleId]);
 
