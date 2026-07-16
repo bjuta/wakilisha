@@ -797,7 +797,11 @@ export function ArticleEditorWorkspace({
     setIsSavingHero(true);
 
     try {
-      const result = await saveArticle(article.id, { hero_image_url: url || null }, null);
+      const result = await saveArticle(
+        article.id,
+        { hero_image_url: url || null },
+        articleDraftVersionRef.current ?? article.draftVersion,
+      );
 
       if (!result.ok) {
         addToast("error", result.error ?? "Hero image save failed.");
@@ -840,7 +844,11 @@ export function ArticleEditorWorkspace({
       return false;
     }
 
-    const result = await saveArticle(article.id, { slug: newSlug }, articleUpdatedAtRef.current);
+    const result = await saveArticle(
+      article.id,
+      { slug: newSlug },
+      articleDraftVersionRef.current ?? article.draftVersion,
+    );
 
     if (!result.ok) {
       addToast("error", result.error ?? "Failed to update slug.");
