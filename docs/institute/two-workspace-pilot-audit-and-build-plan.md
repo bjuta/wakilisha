@@ -15,20 +15,23 @@ All future work on Articles, Playlists, Audio, Video, Media, Registry, Charts, c
 
 ## Programme status
 
-Last updated: 14 July 2026
+Last updated: 16 July 2026
 
-Current phase: **Phase 1: Platform kernel**
+Current phase: **Phase 2B: Review and publication lifecycle**
 
 Completed:
 
 - **Phase 0A: Security perimeter**, closed through PR #452
 - **Phase 0B: Engineering control plane**, closed through PR #453
+- **Phase 1A: Resource identity and domain boundaries**, closed through PR #457
+- **Phase 1B: Commands, jobs, and outbox**, closed through PR #458 and PR #459
+- **Phase 2A: Durable Article drafts and immutable versions**, closed through PR #460, PR #461, PR #463, and PR #464
 
 Active implementation:
 
-- **PR 1A: Resource identity and domain boundaries**
+- **PR 2B: Review and publication lifecycle**
 
-PR 1B remains blocked until PR 1A meets its exit gate.
+Phase 2A is closed. PR 2B now starts from the production-tested versioned Article editor.
 
 Phase 0 established the security and engineering conditions required to
 begin permanent platform-kernel work. The programme must not reopen Phase 0
@@ -1393,9 +1396,9 @@ Completion record, 14 July 2026:
 
 Phase 0 is complete.
 
-## Phase 1: Platform kernel (active)
+## Phase 1: Platform kernel (complete)
 
-### PR 1A: Resource identity and domain boundaries (next)
+### PR 1A: Resource identity and domain boundaries (complete)
 
 Build:
 
@@ -1417,7 +1420,15 @@ Exit gate:
 - one article, one playlist, and one Registry record have stable resource identities
 - shared systems can reference them without polymorphic text guesses
 
-### PR 1B: Commands, idempotency, jobs, and outbox
+Completion record, 15 July 2026:
+
+- closed through PR #457
+- production migration `20260715054810_phase_1a_resource_identity_foundation.sql` was applied
+- `editorial.resources` and Article resource bindings were established
+- proof resources and aliases validated stable resource identity
+- production changed: schema only
+
+### PR 1B: Commands, idempotency, jobs, and outbox (complete)
 
 Build:
 
@@ -1439,9 +1450,17 @@ Exit gate:
 - a failed asynchronous task can be inspected, retried, and dead-lettered
 - one existing multi-request lifecycle transition has been moved into a single server-side command
 
-## Phase 2: Article authority
+Completion record, 15 July 2026:
 
-### PR 2A: Durable drafts and immutable versions
+- closed through PR #458 and PR #459
+- production migration `20260715143000_phase_1b_command_job_outbox_foundation.sql` was applied
+- command receipts, jobs, and outbox foundations were established
+- production proof command created a command receipt, job, and outbox event
+- production changed: schema only
+
+## Phase 2: Article authority (active)
+
+### PR 2A: Durable drafts and immutable versions (complete)
 
 Build:
 
@@ -1462,7 +1481,17 @@ Exit gate:
 - stale clients cannot overwrite newer content
 - every submitted version can be reconstructed
 
-### PR 2B: Review and publication lifecycle
+Completion record, 16 July 2026:
+
+- closed through PR #460, PR #461, PR #463, and PR #464
+- production migrations `20260715173634_phase_2a_durable_article_versions.sql`, `20260716172500_phase_2a_article_editor_runtime_fix.sql`, and `20260716183000_phase_2a_save_article_versioned_runtime_fix.sql` were applied
+- every Article has a resource binding, baseline immutable version, and working version pointer
+- Article editor uses `draft_version` locking for versioned save and autosave
+- Article revision history reads Phase 2A Article versions instead of legacy revision rows
+- production smoke confirmed autosave, Save Draft, reload persistence, and visible revision history on a real Article
+- production changed: schema and frontend
+
+### PR 2B: Review and publication lifecycle (next)
 
 Build:
 
