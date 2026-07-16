@@ -13790,6 +13790,25 @@ export type Database = {
           result: Json
         }[]
       }
+      list_article_versions: {
+        Args: { p_article_id: string; p_limit?: number }
+        Returns: {
+          author: string
+          categories: Json
+          content_html: string
+          created_at: string
+          created_by: string
+          excerpt: string
+          id: string
+          published_at: string
+          revision_number: number
+          seo: Json
+          tags: Json
+          title: string
+          version_kind: string
+          wp_status: string
+        }[]
+      }
       merge_registry_relationship_duplicate: {
         Args: {
           p_duplicate_relationship_id: string
