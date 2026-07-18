@@ -53,7 +53,6 @@ const trackedFiles = execFileSync(
     (file) =>
       !file.startsWith("docs/") &&
       !file.startsWith("reports/") &&
-      file !== "project_plan.md" &&
       file !==
         "scripts/security/verify-nondeployable-edge-modules.mjs",
   );
