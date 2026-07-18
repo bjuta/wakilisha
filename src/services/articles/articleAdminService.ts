@@ -604,6 +604,163 @@ export async function saveArticle(
   }
 }
 
+
+type ArticleLifecycleRpcName =
+  | "submit_article_for_review"
+  | "request_article_changes"
+  | "approve_article_version"
+  | "publish_article_version"
+  | "schedule_article_publication"
+  | "unpublish_article"
+  | "archive_article"
+  | "restore_article_from_archive";
+
+async function callArticleLifecycleRpc(
+  rpcName: ArticleLifecycleRpcName,
+  args: Record<string, unknown>,
+): Promise<SaveResult> {
+  try {
+    const { data, error } = await (supabase as any).rpc(rpcName, args);
+
+    if (error) {
+      const errorCode = classifySaveError(error.message);
+      return {
+        ok: false,
+        error:
+          errorCode === "stale_update"
+            ? "This article was modified by someone else while you were editing. Please review the latest version before saving."
+            : `Lifecycle action failed: ${error.message}`,
+        errorCode,
+      };
+    }
+
+    const row = Array.isArray(data) ? data[0] : null;
+
+    return {
+      ok: true,
+      articleSlug: row?.article_slug as string | undefined,
+      draftVersion: typeof row?.draft_version === "number" ? row.draft_version : undefined,
+      versionId: row?.version_id as string | undefined,
+      versionNumber: typeof row?.version_number === "number" ? row.version_number : undefined,
+    };
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "Unknown lifecycle failure";
+    const errorCode = classifySaveError(message);
+
+    return {
+      ok: false,
+      error:
+        errorCode === "stale_update"
+          ? "This article was modified by someone else while you were editing. Please review the latest version before saving."
+          : `Lifecycle action failed: ${message}`,
+      errorCode,
+    };
+  }
+}
+
+export async function submitArticleForReview(
+  articleId: string,
+  expectedDraftVersion: number | null,
+  note: string | null = null,
+): Promise<SaveResult> {
+  if (expectedDraftVersion == null) {
+    return {
+      ok: false,
+      error: "Cannot submit because the editor does not know the current draft version. Reload the article and try again.",
+      errorCode: "stale_update",
+    };
+  }
+
+  return callArticleLifecycleRpc("submit_article_for_review", {
+    p_article_id: articleId,
+    p_expected_draft_version: expectedDraftVersion,
+    p_note: note,
+  });
+}
+
+export async function requestArticleChanges(
+  articleId: string,
+  versionId: string | null = null,
+  note: string | null = null,
+): Promise<SaveResult> {
+  return callArticleLifecycleRpc("request_article_changes", {
+    p_article_id: articleId,
+    p_version_id: versionId,
+    p_note: note,
+  });
+}
+
+export async function approveArticleVersion(
+  articleId: string,
+  versionId: string | null = null,
+  note: string | null = null,
+): Promise<SaveResult> {
+  return callArticleLifecycleRpc("approve_article_version", {
+    p_article_id: articleId,
+    p_version_id: versionId,
+    p_note: note,
+  });
+}
+
+export async function publishArticleVersion(
+  articleId: string,
+  versionId: string | null = null,
+  publishedAt: string | null = null,
+  note: string | null = null,
+): Promise<SaveResult> {
+  return callArticleLifecycleRpc("publish_article_version", {
+    p_article_id: articleId,
+    p_version_id: versionId,
+    p_published_at: publishedAt,
+    p_note: note,
+  });
+}
+
+export async function scheduleArticlePublication(
+  articleId: string,
+  versionId: string | null = null,
+  publishAt: string,
+  note: string | null = null,
+): Promise<SaveResult> {
+  return callArticleLifecycleRpc("schedule_article_publication", {
+    p_article_id: articleId,
+    p_version_id: versionId,
+    p_publish_at: publishAt,
+    p_note: note,
+  });
+}
+
+export async function unpublishArticle(
+  articleId: string,
+  note: string | null = null,
+): Promise<SaveResult> {
+  return callArticleLifecycleRpc("unpublish_article", {
+    p_article_id: articleId,
+    p_note: note,
+  });
+}
+
+export async function archiveArticle(
+  articleId: string,
+  note: string | null = null,
+): Promise<SaveResult> {
+  return callArticleLifecycleRpc("archive_article", {
+    p_article_id: articleId,
+    p_note: note,
+  });
+}
+
+export async function restoreArticleFromArchive(
+  articleId: string,
+  note: string | null = null,
+): Promise<SaveResult> {
+  return callArticleLifecycleRpc("restore_article_from_archive", {
+    p_article_id: articleId,
+    p_note: note,
+  });
+}
+
+
 /**
  * Create a durable autosave snapshot.
  */
@@ -733,17 +890,7 @@ export async function lookupSlugRedirect(oldSlug: string): Promise<string | null
  * Trash an article (set wp_status = "trash").
  */
 export async function trashArticle(articleId: string): Promise<SaveResult> {
-  const { error } = await supabase.rpc("update_article", {
-    article_id: articleId,
-    payload: { wp_status: "trash" },
-    expected_updated_at: null,
-  });
-
-  if (error) {
-    return { ok: false, error: `Failed to trash article: ${error.message}` };
-  }
-
-  return { ok: true };
+  return archiveArticle(articleId);
 }
 
 /* ════════════════════════════════════════════
@@ -873,17 +1020,7 @@ export async function listTrashedArticles(): Promise<TrashedArticle[]> {
  * Restore a trashed article back to draft status.
  */
 export async function restoreArticle(articleId: string): Promise<SaveResult> {
-  const { error } = await supabase.rpc("update_article", {
-    article_id: articleId,
-    payload: { wp_status: "draft" },
-    expected_updated_at: null,
-  });
-
-  if (error) {
-    return { ok: false, error: `Failed to restore article: ${error.message}` };
-  }
-
-  return { ok: true };
+  return restoreArticleFromArchive(articleId);
 }
 
 /**
