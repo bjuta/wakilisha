@@ -10556,6 +10556,47 @@ export type Database = {
           },
         ]
       }
+      wk_article_preview_links: {
+        Row: {
+          article_id: string
+          created_at: string
+          created_by: string | null
+          expires_at: string
+          id: string
+          nonce: string
+          revoked_at: string | null
+          version_id: string
+        }
+        Insert: {
+          article_id: string
+          created_at?: string
+          created_by?: string | null
+          expires_at: string
+          id?: string
+          nonce?: string
+          revoked_at?: string | null
+          version_id: string
+        }
+        Update: {
+          article_id?: string
+          created_at?: string
+          created_by?: string | null
+          expires_at?: string
+          id?: string
+          nonce?: string
+          revoked_at?: string | null
+          version_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "wk_article_preview_links_article_id_fkey"
+            columns: ["article_id"]
+            isOneToOne: false
+            referencedRelation: "wk_articles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       wk_article_publication_snapshots: {
         Row: {
           article_id: string
@@ -13645,6 +13686,18 @@ export type Database = {
           version_number: number
         }[]
       }
+      create_article_preview_link: {
+        Args: {
+          p_article_id: string
+          p_expires_at?: string
+          p_version_id?: string
+        }
+        Returns: {
+          expires_at: string
+          nonce: string
+          version_id: string
+        }[]
+      }
       create_import_run: {
         Args: {
           p_errors?: string[]
@@ -14786,6 +14839,30 @@ export type Database = {
           lifecycle_status: string
           version_id: string
           version_number: number
+        }[]
+      }
+      resolve_article_preview_nonce: {
+        Args: { p_nonce: string }
+        Returns: {
+          author: string
+          categories: Json
+          content_html: string
+          created_at: string
+          draft_version: number
+          excerpt: string
+          hero_image_url: string
+          id: string
+          preview_expires_at: string
+          published_at: string
+          raw_meta: Json
+          seo: Json
+          slug: string
+          tags: Json
+          title: string
+          updated_at: string
+          version_id: string
+          version_number: number
+          wp_status: string
         }[]
       }
       resolve_registry_relationship_endpoint: {
