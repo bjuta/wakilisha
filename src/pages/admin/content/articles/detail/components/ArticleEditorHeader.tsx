@@ -15,7 +15,14 @@ interface Props {
   onDelete: () => void;
   onPreview: () => void;
   onSubmitForReview: () => void;
+  onRequestChanges?: () => void;
+  onApproveVersion?: () => void;
   allowSubmitForReview?: boolean;
+  canSubmitForReview?: boolean;
+  canRequestChanges?: boolean;
+  canApproveVersion?: boolean;
+  reviewActionBusy?: boolean;
+  publishDisabledReason?: string | null;
   submitForReviewLabel?: string;
   userCanPublish?: boolean;
   userCanEditOthers?: boolean;
@@ -52,7 +59,14 @@ export function ArticleEditorHeader({
   onDelete,
   onPreview,
   onSubmitForReview,
+  onRequestChanges,
+  onApproveVersion,
   allowSubmitForReview = true,
+  canSubmitForReview = allowSubmitForReview,
+  canRequestChanges = false,
+  canApproveVersion = false,
+  reviewActionBusy = false,
+  publishDisabledReason = null,
   submitForReviewLabel = "Submit for Review",
   userCanPublish = true,
   userCanEditOthers = true,
@@ -64,6 +78,8 @@ export function ArticleEditorHeader({
   const statusColor = status ? (STATUS_COLORS[status] ?? STATUS_COLORS.draft) : STATUS_COLORS.draft;
   const isPublished = status === "publish";
   const isFuture = status === "future";
+  const shouldShowSubmitForReview = !isPublished && !isFuture && canSubmitForReview;
+  const shouldShowPublish = userCanPublish && !publishDisabledReason;
 
   return (
     <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
@@ -190,28 +206,61 @@ export function ArticleEditorHeader({
         </button>
         )}
 
-        {/* Publish / Unpublish / Submit */}
-        {isPublished ? (
-          userCanPublish ? (
-            <button
-              onClick={onPublish}
-              disabled={isSaving || isPublishing}
-              className="wk-button wk-button-primary wk-button-sm whitespace-nowrap"
-            >
-              {isPublishing ? (
-                <>
-                  <WkIcon name="Loader2" size={14} className="animate-spin" />
-                  Updating…
-                </>
-              ) : (
-                <>
-                  <WkIcon name="RefreshCw" size={14} />
-                  Update
-                </>
-              )}
-            </button>
-          ) : null
-        ) : isFuture ? (
+        {/* Review / Publish / Unpublish / Submit */}
+        {canRequestChanges ? (
+          <button
+            onClick={onRequestChanges}
+            disabled={isSaving || isPublishing || reviewActionBusy}
+            className="wk-button wk-button-secondary wk-button-sm whitespace-nowrap"
+          >
+            <WkIcon name="Flag" size={14} />
+            Request Changes
+          </button>
+        ) : null}
+
+        {canApproveVersion ? (
+          <button
+            onClick={onApproveVersion}
+            disabled={isSaving || isPublishing || reviewActionBusy}
+            className="wk-button wk-button-primary wk-button-sm whitespace-nowrap"
+          >
+            <WkIcon name="Shield" size={14} />
+            Approve Version
+          </button>
+        ) : null}
+
+        {!canRequestChanges && !canApproveVersion && shouldShowSubmitForReview ? (
+          <button
+            onClick={onSubmitForReview}
+            disabled={isSaving || reviewActionBusy}
+            className="wk-button wk-button-secondary wk-button-sm whitespace-nowrap"
+          >
+            <WkIcon name="Send" size={14} />
+            {submitForReviewLabel}
+          </button>
+        ) : null}
+
+        {!canRequestChanges && !canApproveVersion && !shouldShowSubmitForReview && isPublished && shouldShowPublish ? (
+          <button
+            onClick={onPublish}
+            disabled={isSaving || isPublishing}
+            className="wk-button wk-button-primary wk-button-sm whitespace-nowrap"
+          >
+            {isPublishing ? (
+              <>
+                <WkIcon name="Loader2" size={14} className="animate-spin" />
+                Updating…
+              </>
+            ) : (
+              <>
+                <WkIcon name="RefreshCw" size={14} />
+                Update
+              </>
+            )}
+          </button>
+        ) : null}
+
+        {!canRequestChanges && !canApproveVersion && !shouldShowSubmitForReview && isFuture ? (
           <button
             onClick={onUnpublish}
             disabled={isSaving || isPublishing}
@@ -220,7 +269,9 @@ export function ArticleEditorHeader({
             <WkIcon name="EyeOff" size={14} />
             Unschedule
           </button>
-        ) : userCanPublish ? (
+        ) : null}
+
+        {!canRequestChanges && !canApproveVersion && !shouldShowSubmitForReview && !isPublished && !isFuture && shouldShowPublish ? (
           <button
             onClick={onPublish}
             disabled={isSaving || isPublishing}
@@ -238,15 +289,12 @@ export function ArticleEditorHeader({
               </>
             )}
           </button>
-        ) : allowSubmitForReview ? (
-          <button
-            onClick={onSubmitForReview}
-            disabled={isSaving}
-            className="wk-button wk-button-secondary wk-button-sm whitespace-nowrap"
-          >
-            <WkIcon name="Send" size={14} />
-            {submitForReviewLabel}
-          </button>
+        ) : null}
+
+        {!canRequestChanges && !canApproveVersion && !shouldShowSubmitForReview && publishDisabledReason ? (
+          <span className="rounded-lg border border-wk-warning/30 bg-wk-warning-soft px-3 py-2 text-[11px] font-bold text-wk-text-muted">
+            {publishDisabledReason}
+          </span>
         ) : null}
       </div>
     </div>

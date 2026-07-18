@@ -11,6 +11,8 @@ import {
   fetchArticleForAdmin,
   saveArticle,
   submitArticleForReview,
+  requestArticleChanges,
+  approveArticleVersion,
   publishArticleVersion,
   scheduleArticlePublication,
   unpublishArticle,
@@ -22,8 +24,10 @@ import {
   insertSlugRedirect,
   trashArticle,
   generatePreviewNonce,
+  fetchArticleLifecycleEvents,
   type AdminArticleDetail,
   type ArticleSavePayload,
+  type ArticleLifecycleEvent,
 } from "@/services/articles/articleAdminService";
 import { processArticleContent } from "@/services/articles/contentPipeline";
 import { syncInstituteArticlePublicationState } from "@/services/institute/institutePublicationSyncService";
@@ -109,6 +113,7 @@ export function ArticleEditorWorkspace({
 
   const userCanPublish = adminUser.can("publish_articles");
   const userCanEditOthers = adminUser.can("edit_others_articles");
+  const userCanManageReviewQueue = adminUser.can("manage_review_queue");
   const isAdmin = adminUser.role === "administrator" || adminUser.can("admin_god_mode");
 
   // ── State ──
@@ -168,6 +173,10 @@ export function ArticleEditorWorkspace({
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [showRecovery, setShowRecovery] = useState<RecoveryPayload | null>(null);
   const [showPublishChecklist, setShowPublishChecklist] = useState(false);
+  const [lifecycleEvents, setLifecycleEvents] = useState<ArticleLifecycleEvent[]>([]);
+  const [reviewActionModal, setReviewActionModal] = useState<null | "request_changes" | "approve">(null);
+  const [reviewActionNote, setReviewActionNote] = useState("");
+  const [isReviewActionBusy, setIsReviewActionBusy] = useState(false);
 
   // ── Conflict detection state ──
   const [showConflict, setShowConflict] = useState(false);
@@ -188,6 +197,66 @@ export function ArticleEditorWorkspace({
     article,
   });
   stateRef.current = { isDirty, isSaving, isPublishing, isAutosaving, draft, article };
+
+  async function refreshArticleLifecycleEvents(articleId: string) {
+    const rows = await fetchArticleLifecycleEvents(articleId);
+    setLifecycleEvents(rows);
+  }
+
+  useEffect(() => {
+    if (!article?.id) {
+      setLifecycleEvents([]);
+      return;
+    }
+
+    void refreshArticleLifecycleEvents(article.id);
+  }, [article?.id, article?.wpStatus, article?.draftVersion]);
+
+  const latestReviewAction = useMemo(() => {
+    return lifecycleEvents.find((event) =>
+      ["submitted", "changes_requested", "approved", "scheduled", "published"].includes(event.action),
+    )?.action ?? null;
+  }, [lifecycleEvents]);
+
+  const articleWpStatus = article?.wpStatus ?? "draft";
+  const isPendingReview = articleWpStatus === "pending";
+  const isLiveOrScheduled = articleWpStatus === "publish" || articleWpStatus === "future";
+  const canSubmitCurrentArticleForReview = Boolean(
+    article &&
+      allowSubmitForReview &&
+      articlePermissions.canEdit &&
+      !isPendingReview &&
+      !isLiveOrScheduled &&
+      (articleWpStatus === "draft" || articleWpStatus === "" || latestReviewAction === "changes_requested"),
+  );
+  const canManageArticleReview = Boolean(article && (isAdmin || userCanManageReviewQueue));
+  const canRequestArticleChanges = Boolean(
+    article &&
+      canManageArticleReview &&
+      isPendingReview &&
+      (latestReviewAction === "submitted" || latestReviewAction === null),
+  );
+  const canApproveCurrentArticleVersion = Boolean(
+    article &&
+      canManageArticleReview &&
+      isPendingReview &&
+      (latestReviewAction === "submitted" || latestReviewAction === null),
+  );
+  const canPublishApprovedArticleVersion = Boolean(
+    article &&
+      articlePermissions.canPublish &&
+      latestReviewAction === "approved",
+  );
+  const publishDisabledReason =
+    article &&
+    articlePermissions.canPublish &&
+    !canPublishApprovedArticleVersion &&
+    !canSubmitCurrentArticleForReview &&
+    !canRequestArticleChanges &&
+    !canApproveCurrentArticleVersion &&
+    !isFuture
+      ? "Approve the submitted version before publishing."
+      : null;
 
   // Refs for optimistic locking
   const articleUpdatedAtRef = useRef<string | null>(null);
@@ -681,6 +750,10 @@ export function ArticleEditorWorkspace({
       addToast("error", "You do not have permission to publish articles.");
       return;
     }
+    if (publishDisabledReason) {
+      addToast("error", publishDisabledReason);
+      return;
+    }
     setShowPublishChecklist(true);
   }
 
@@ -688,6 +761,10 @@ export function ArticleEditorWorkspace({
     setShowPublishChecklist(false);
     if (!article || !articlePermissions.canPublish) {
       addToast("error", "You do not have permission to publish articles.");
+      return;
+    }
+    if (publishDisabledReason) {
+      addToast("error", publishDisabledReason);
       return;
     }
 
@@ -711,6 +788,7 @@ export function ArticleEditorWorkspace({
       const refreshedArticle = await fetchArticleForAdmin(result.articleSlug ?? article.slug);
       if (refreshedArticle) {
         applyServerArticleState(refreshedArticle, true);
+        await refreshArticleLifecycleEvents(refreshedArticle.id);
         await syncInstituteArticlePublicationState({
           articleId: refreshedArticle.id,
           articleSlug: refreshedArticle.slug,
@@ -747,6 +825,7 @@ export function ArticleEditorWorkspace({
       const refreshedArticle = await fetchArticleForAdmin(result.articleSlug ?? article.slug);
       if (refreshedArticle) {
         applyServerArticleState(refreshedArticle, true);
+        await refreshArticleLifecycleEvents(refreshedArticle.id);
         await syncInstituteArticlePublicationState({
           articleId: refreshedArticle.id,
           articleSlug: refreshedArticle.slug,
@@ -802,6 +881,7 @@ export function ArticleEditorWorkspace({
       const refreshedArticle = await fetchArticleForAdmin(result.articleSlug ?? article.slug);
       if (refreshedArticle) {
         applyServerArticleState(refreshedArticle, true);
+        await refreshArticleLifecycleEvents(refreshedArticle.id);
       }
 
       if (onSubmittedForReview) {
@@ -921,6 +1001,56 @@ export function ArticleEditorWorkspace({
     addToast("success", "Slug updated. Reloading…");
     setTimeout(() => navigate(`/admin/content/articles/${newSlug}`), 800);
     return true;
+  }
+
+  async function handleReviewDecisionConfirm() {
+    if (!article || !reviewActionModal) return;
+
+    const note = reviewActionNote.trim();
+    if (reviewActionModal === "request_changes" && !note) {
+      addToast("error", "Explain the requested changes before sending this back.");
+      return;
+    }
+
+    setIsReviewActionBusy(true);
+    try {
+      const result =
+        reviewActionModal === "request_changes"
+          ? await requestArticleChanges(article.id, null, note)
+          : await approveArticleVersion(article.id, null, note || null);
+
+      if (!result.ok) {
+        addToast("error", result.error ?? "Review action failed.");
+        return;
+      }
+
+      const refreshedArticle = await fetchArticleForAdmin(result.articleSlug ?? article.slug);
+      if (refreshedArticle) {
+        applyServerArticleState(refreshedArticle, true);
+        await refreshArticleLifecycleEvents(refreshedArticle.id);
+      } else {
+        await refreshArticleLifecycleEvents(article.id);
+      }
+
+      addToast(
+        "success",
+        reviewActionModal === "request_changes" ? "Changes requested." : "Article version approved.",
+      );
+      setReviewActionModal(null);
+      setReviewActionNote("");
+    } finally {
+      setIsReviewActionBusy(false);
+    }
+  }
+
+  function openRequestChanges() {
+    setReviewActionNote("");
+    setReviewActionModal("request_changes");
+  }
+
+  function openApproveVersion() {
+    setReviewActionNote("");
+    setReviewActionModal("approve");
   }
 
   /** Generate a shareable preview link for this article. */
@@ -1050,7 +1180,14 @@ export function ArticleEditorWorkspace({
         onPreview={handlePreview}
         onSubmitForReview={handleSubmitForReview}
         allowSubmitForReview={allowSubmitForReview}
-        submitForReviewLabel={submitForReviewLabel}
+        canSubmitForReview={canSubmitCurrentArticleForReview}
+        canRequestChanges={canRequestArticleChanges}
+        canApproveVersion={canApproveCurrentArticleVersion}
+        reviewActionBusy={isReviewActionBusy}
+        publishDisabledReason={publishDisabledReason}
+        onRequestChanges={openRequestChanges}
+        onApproveVersion={openApproveVersion}
+        submitForReviewLabel={latestReviewAction === "changes_requested" ? "Resubmit for Review" : submitForReviewLabel}
         userCanPublish={articlePermissions.canPublish}
         userCanEditOthers={articlePermissions.canEdit}
         isAdmin={isAdmin}
@@ -1119,6 +1256,15 @@ export function ArticleEditorWorkspace({
             onUnpublish={isInstituteMode ? undefined : handleUnpublish}
             onDelete={isInstituteMode ? undefined : () => setShowDeleteConfirm(true)}
             onStatusChange={isInstituteMode ? undefined : handleStatusChange}
+            onSubmitForReview={handleSubmitForReview}
+            onRequestChanges={openRequestChanges}
+            onApproveVersion={openApproveVersion}
+            canSubmitForReview={canSubmitCurrentArticleForReview}
+            canRequestChanges={canRequestArticleChanges}
+            canApproveVersion={canApproveCurrentArticleVersion}
+            reviewActionBusy={isReviewActionBusy}
+            publishDisabledReason={publishDisabledReason}
+            lifecycleEvents={lifecycleEvents}
             previewUrl={previewUrl}
             isGeneratingPreview={isGeneratingPreview}
             onGeneratePreviewLink={handleGeneratePreviewLink}
@@ -1143,6 +1289,69 @@ export function ArticleEditorWorkspace({
           categories={draft.categories}
           onClose={() => setShowPreview(false)}
         />
+      )}
+
+      {/* Review Decision Modal */}
+      {reviewActionModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+          <div className="w-full max-w-lg mx-4 rounded-2xl border border-wk-border bg-wk-surface p-6 shadow-lg">
+            <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-xl bg-wk-brand-soft text-wk-brand">
+              <WkIcon name={reviewActionModal === "request_changes" ? "Flag" : "Shield"} size={22} />
+            </div>
+            <h3 className="text-[16px] font-bold text-wk-text mb-2">
+              {reviewActionModal === "request_changes" ? "Request Changes" : "Approve Version"}
+            </h3>
+            <p className="text-[13px] text-wk-text-muted mb-4">
+              {reviewActionModal === "request_changes"
+                ? "Tell the writer what needs to change before this article can move forward."
+                : "Approve the submitted immutable version for publication."}
+            </p>
+            <textarea
+              value={reviewActionNote}
+              onChange={(event) => setReviewActionNote(event.target.value)}
+              rows={5}
+              autoFocus
+              placeholder={reviewActionModal === "request_changes" ? "What should change?" : "Optional approval note"}
+              className="w-full rounded-xl border border-wk-border bg-wk-bg-subtle px-3 py-2 text-[13px] text-wk-text outline-none focus:border-wk-brand"
+            />
+            <div className="mt-5 flex justify-end gap-2">
+              <button
+                type="button"
+                onClick={() => {
+                  setReviewActionModal(null);
+                  setReviewActionNote("");
+                }}
+                disabled={isReviewActionBusy}
+                className="wk-button wk-button-secondary wk-button-sm"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleReviewDecisionConfirm}
+                disabled={isReviewActionBusy || (reviewActionModal === "request_changes" && !reviewActionNote.trim())}
+                className="wk-button wk-button-primary wk-button-sm"
+              >
+                {isReviewActionBusy ? (
+                  <>
+                    <WkIcon name="Loader2" size={14} className="animate-spin" />
+                    Saving…
+                  </>
+                ) : reviewActionModal === "request_changes" ? (
+                  <>
+                    <WkIcon name="Flag" size={14} />
+                    Send Changes
+                  </>
+                ) : (
+                  <>
+                    <WkIcon name="Shield" size={14} />
+                    Approve Version
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
       )}
 
       {/* Publish Checklist Modal */}

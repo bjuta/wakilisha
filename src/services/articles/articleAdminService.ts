@@ -605,6 +605,50 @@ export async function saveArticle(
 }
 
 
+export interface ArticleLifecycleEvent {
+  id: string;
+  articleId: string;
+  versionId: string | null;
+  versionNumber: number | null;
+  action: string;
+  priorStatus: string | null;
+  resultingStatus: string | null;
+  note: string | null;
+  metadata: Record<string, unknown>;
+  actorId: string | null;
+  actorLabel: string | null;
+  createdAt: string;
+}
+
+export async function fetchArticleLifecycleEvents(articleId: string): Promise<ArticleLifecycleEvent[]> {
+  const { data, error } = await (supabase as any).rpc("list_article_lifecycle_events", {
+    p_article_id: articleId,
+    p_limit: 50,
+  });
+
+  if (error) {
+    console.error("Failed to load article lifecycle events:", error.message);
+    return [];
+  }
+
+  const rows = Array.isArray(data) ? data : data ? [data] : [];
+
+  return rows.map((row: any) => ({
+    id: row.id,
+    articleId: row.article_id,
+    versionId: row.version_id ?? null,
+    versionNumber: typeof row.version_number === "number" ? row.version_number : row.version_number ? Number(row.version_number) : null,
+    action: row.action,
+    priorStatus: row.prior_status ?? null,
+    resultingStatus: row.resulting_status ?? null,
+    note: row.note ?? null,
+    metadata: row.metadata ?? {},
+    actorId: row.actor_id ?? null,
+    actorLabel: row.actor_label ?? null,
+    createdAt: row.created_at,
+  }));
+}
+
 type ArticleLifecycleRpcName =
   | "submit_article_for_review"
   | "request_article_changes"
