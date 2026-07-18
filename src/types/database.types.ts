@@ -12,6 +12,543 @@ export type Database = {
   __InternalSupabase: {
     PostgrestVersion: "14.5"
   }
+  editorial: {
+    Tables: {
+      article_lifecycle_events: {
+        Row: {
+          action: string
+          actor_id: string | null
+          article_id: string
+          created_at: string
+          id: string
+          metadata: Json
+          note: string | null
+          prior_status: string | null
+          resource_id: string
+          resulting_status: string | null
+          version_id: string | null
+        }
+        Insert: {
+          action: string
+          actor_id?: string | null
+          article_id: string
+          created_at?: string
+          id?: string
+          metadata?: Json
+          note?: string | null
+          prior_status?: string | null
+          resource_id: string
+          resulting_status?: string | null
+          version_id?: string | null
+        }
+        Update: {
+          action?: string
+          actor_id?: string | null
+          article_id?: string
+          created_at?: string
+          id?: string
+          metadata?: Json
+          note?: string | null
+          prior_status?: string | null
+          resource_id?: string
+          resulting_status?: string | null
+          version_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "article_lifecycle_events_resource_id_fkey"
+            columns: ["resource_id"]
+            isOneToOne: false
+            referencedRelation: "resources"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "article_lifecycle_events_version_id_fkey"
+            columns: ["version_id"]
+            isOneToOne: false
+            referencedRelation: "article_versions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      article_resources: {
+        Row: {
+          article_id: string
+          resource_id: string
+          resource_kind: string
+        }
+        Insert: {
+          article_id: string
+          resource_id: string
+          resource_kind?: string
+        }
+        Update: {
+          article_id?: string
+          resource_id?: string
+          resource_kind?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "article_resources_resource_fkey"
+            columns: ["resource_id", "resource_kind"]
+            isOneToOne: false
+            referencedRelation: "resources"
+            referencedColumns: ["id", "resource_kind"]
+          },
+        ]
+      }
+      article_scheduled_publications: {
+        Row: {
+          article_id: string
+          created_at: string
+          created_by: string | null
+          id: string
+          note: string | null
+          resource_id: string
+          run_after: string
+          status: string
+          updated_at: string
+          version_id: string
+        }
+        Insert: {
+          article_id: string
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          note?: string | null
+          resource_id: string
+          run_after: string
+          status?: string
+          updated_at?: string
+          version_id: string
+        }
+        Update: {
+          article_id?: string
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          note?: string | null
+          resource_id?: string
+          run_after?: string
+          status?: string
+          updated_at?: string
+          version_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "article_scheduled_publications_resource_id_fkey"
+            columns: ["resource_id"]
+            isOneToOne: false
+            referencedRelation: "resources"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "article_scheduled_publications_version_id_fkey"
+            columns: ["version_id"]
+            isOneToOne: false
+            referencedRelation: "article_versions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      article_taxonomy_terms: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          resource_id: string
+          taxonomy: string
+          term_id: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          resource_id: string
+          taxonomy: string
+          term_id: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          resource_id?: string
+          taxonomy?: string
+          term_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "article_taxonomy_terms_resource_fkey"
+            columns: ["resource_id"]
+            isOneToOne: false
+            referencedRelation: "resources"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      article_versions: {
+        Row: {
+          article_id: string
+          author_display: string | null
+          category_snapshot: Json
+          content_fingerprint: string
+          content_html: string | null
+          created_at: string
+          created_by: string | null
+          excerpt: string | null
+          hero_image_id: string | null
+          hero_image_url: string | null
+          id: string
+          lifecycle_state: string | null
+          owner_id: string | null
+          published_at: string | null
+          resource_id: string
+          seo: Json
+          slug: string
+          source_draft_version: number
+          tag_snapshot: Json
+          title: string | null
+          version_kind: string
+          version_number: number
+          wp_status: string | null
+        }
+        Insert: {
+          article_id: string
+          author_display?: string | null
+          category_snapshot?: Json
+          content_fingerprint: string
+          content_html?: string | null
+          created_at?: string
+          created_by?: string | null
+          excerpt?: string | null
+          hero_image_id?: string | null
+          hero_image_url?: string | null
+          id?: string
+          lifecycle_state?: string | null
+          owner_id?: string | null
+          published_at?: string | null
+          resource_id: string
+          seo?: Json
+          slug: string
+          source_draft_version: number
+          tag_snapshot?: Json
+          title?: string | null
+          version_kind: string
+          version_number: number
+          wp_status?: string | null
+        }
+        Update: {
+          article_id?: string
+          author_display?: string | null
+          category_snapshot?: Json
+          content_fingerprint?: string
+          content_html?: string | null
+          created_at?: string
+          created_by?: string | null
+          excerpt?: string | null
+          hero_image_id?: string | null
+          hero_image_url?: string | null
+          id?: string
+          lifecycle_state?: string | null
+          owner_id?: string | null
+          published_at?: string | null
+          resource_id?: string
+          seo?: Json
+          slug?: string
+          source_draft_version?: number
+          tag_snapshot?: Json
+          title?: string | null
+          version_kind?: string
+          version_number?: number
+          wp_status?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "article_versions_resource_fkey"
+            columns: ["resource_id"]
+            isOneToOne: false
+            referencedRelation: "resources"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      playlist_resources: {
+        Row: {
+          playlist_id: string
+          resource_id: string
+          resource_kind: string
+        }
+        Insert: {
+          playlist_id: string
+          resource_id: string
+          resource_kind?: string
+        }
+        Update: {
+          playlist_id?: string
+          resource_id?: string
+          resource_kind?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "playlist_resources_resource_fkey"
+            columns: ["resource_id", "resource_kind"]
+            isOneToOne: false
+            referencedRelation: "resources"
+            referencedColumns: ["id", "resource_kind"]
+          },
+        ]
+      }
+      registry_artist_resources: {
+        Row: {
+          artist_id: string
+          resource_id: string
+          resource_kind: string
+        }
+        Insert: {
+          artist_id: string
+          resource_id: string
+          resource_kind?: string
+        }
+        Update: {
+          artist_id?: string
+          resource_id?: string
+          resource_kind?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "registry_artist_resources_resource_fkey"
+            columns: ["resource_id", "resource_kind"]
+            isOneToOne: false
+            referencedRelation: "resources"
+            referencedColumns: ["id", "resource_kind"]
+          },
+        ]
+      }
+      resource_aliases: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          id: string
+          is_canonical: boolean
+          path: string
+          redirect_status: number
+          replacement_alias_id: string | null
+          resource_id: string
+          retired_at: string | null
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          is_canonical?: boolean
+          path: string
+          redirect_status?: number
+          replacement_alias_id?: string | null
+          resource_id: string
+          retired_at?: string | null
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          is_canonical?: boolean
+          path?: string
+          redirect_status?: number
+          replacement_alias_id?: string | null
+          resource_id?: string
+          retired_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "resource_aliases_replacement_fkey"
+            columns: ["replacement_alias_id", "resource_id"]
+            isOneToOne: false
+            referencedRelation: "resource_aliases"
+            referencedColumns: ["id", "resource_id"]
+          },
+          {
+            foreignKeyName: "resource_aliases_resource_fkey"
+            columns: ["resource_id"]
+            isOneToOne: false
+            referencedRelation: "resources"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      resource_kinds: {
+        Row: {
+          created_at: string
+          description: string
+          enabled: boolean
+          kind: string
+          label: string
+        }
+        Insert: {
+          created_at?: string
+          description: string
+          enabled?: boolean
+          kind: string
+          label: string
+        }
+        Update: {
+          created_at?: string
+          description?: string
+          enabled?: boolean
+          kind?: string
+          label?: string
+        }
+        Relationships: []
+      }
+      resources: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          current_approved_version_id: string | null
+          current_published_version_id: string | null
+          current_submitted_version_id: string | null
+          current_working_version_id: string | null
+          id: string
+          lifecycle_state: string
+          owner_id: string | null
+          resource_kind: string
+          updated_at: string
+          visibility: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          current_approved_version_id?: string | null
+          current_published_version_id?: string | null
+          current_submitted_version_id?: string | null
+          current_working_version_id?: string | null
+          id?: string
+          lifecycle_state: string
+          owner_id?: string | null
+          resource_kind: string
+          updated_at?: string
+          visibility: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          current_approved_version_id?: string | null
+          current_published_version_id?: string | null
+          current_submitted_version_id?: string | null
+          current_working_version_id?: string | null
+          id?: string
+          lifecycle_state?: string
+          owner_id?: string | null
+          resource_kind?: string
+          updated_at?: string
+          visibility?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "resources_current_approved_version_id_fkey"
+            columns: ["current_approved_version_id"]
+            isOneToOne: false
+            referencedRelation: "article_versions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "resources_current_published_version_id_fkey"
+            columns: ["current_published_version_id"]
+            isOneToOne: false
+            referencedRelation: "article_versions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "resources_current_submitted_version_fkey"
+            columns: ["current_submitted_version_id"]
+            isOneToOne: false
+            referencedRelation: "article_versions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "resources_current_working_version_fkey"
+            columns: ["current_working_version_id"]
+            isOneToOne: false
+            referencedRelation: "article_versions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "resources_resource_kind_fkey"
+            columns: ["resource_kind"]
+            isOneToOne: false
+            referencedRelation: "resource_kinds"
+            referencedColumns: ["kind"]
+          },
+        ]
+      }
+    }
+    Views: {
+      [_ in never]: never
+    }
+    Functions: {
+      article_snapshot_fingerprint: {
+        Args: {
+          p_author_display: string
+          p_categories: Json
+          p_content_html: string
+          p_excerpt: string
+          p_hero_image_id: string
+          p_hero_image_url: string
+          p_published_at: string
+          p_seo: Json
+          p_slug: string
+          p_tags: Json
+          p_title: string
+          p_wp_status: string
+        }
+        Returns: string
+      }
+      copy_article_lifecycle_version: {
+        Args: {
+          p_lifecycle_state: string
+          p_published_at?: string
+          p_source_version_id: string
+          p_version_kind: string
+          p_wp_status: string
+        }
+        Returns: {
+          version_id: string
+          version_number: number
+        }[]
+      }
+      current_user_can_edit_article: {
+        Args: { p_resource_id: string }
+        Returns: boolean
+      }
+      current_user_can_publish_article: { Args: never; Returns: boolean }
+      insert_article_lifecycle_version_from_article: {
+        Args: {
+          p_article: Database["public"]["Tables"]["wk_articles"]["Row"]
+          p_lifecycle_state: string
+          p_resource: Database["editorial"]["Tables"]["resources"]["Row"]
+          p_version_kind: string
+        }
+        Returns: {
+          version_id: string
+          version_number: number
+        }[]
+      }
+      next_article_version_number: {
+        Args: { p_resource_id: string }
+        Returns: number
+      }
+      publish_article_snapshot: {
+        Args: {
+          p_material_update?: boolean
+          p_published_at: string
+          p_version_id: string
+        }
+        Returns: string
+      }
+    }
+    Enums: {
+      [_ in never]: never
+    }
+    CompositeTypes: {
+      [_ in never]: never
+    }
+  }
   public: {
     Tables: {
       admin_account_recovery_events: {
@@ -10019,6 +10556,95 @@ export type Database = {
           },
         ]
       }
+      wk_article_publication_snapshots: {
+        Row: {
+          article_id: string
+          author: string | null
+          categories: Json
+          content_html: string | null
+          created_at: string
+          excerpt: string | null
+          first_published_at: string | null
+          hero_image_id: string | null
+          hero_image_url: string | null
+          id: string
+          is_active: boolean
+          last_materially_updated_at: string | null
+          modified_at: string | null
+          published_at: string | null
+          published_by: string | null
+          raw_meta: Json
+          resource_id: string
+          seo: Json
+          slug: string
+          tags: Json
+          title: string | null
+          updated_at: string
+          version_id: string
+          wp_status: string
+        }
+        Insert: {
+          article_id: string
+          author?: string | null
+          categories?: Json
+          content_html?: string | null
+          created_at?: string
+          excerpt?: string | null
+          first_published_at?: string | null
+          hero_image_id?: string | null
+          hero_image_url?: string | null
+          id?: string
+          is_active?: boolean
+          last_materially_updated_at?: string | null
+          modified_at?: string | null
+          published_at?: string | null
+          published_by?: string | null
+          raw_meta?: Json
+          resource_id: string
+          seo?: Json
+          slug: string
+          tags?: Json
+          title?: string | null
+          updated_at?: string
+          version_id: string
+          wp_status?: string
+        }
+        Update: {
+          article_id?: string
+          author?: string | null
+          categories?: Json
+          content_html?: string | null
+          created_at?: string
+          excerpt?: string | null
+          first_published_at?: string | null
+          hero_image_id?: string | null
+          hero_image_url?: string | null
+          id?: string
+          is_active?: boolean
+          last_materially_updated_at?: string | null
+          modified_at?: string | null
+          published_at?: string | null
+          published_by?: string | null
+          raw_meta?: Json
+          resource_id?: string
+          seo?: Json
+          slug?: string
+          tags?: Json
+          title?: string | null
+          updated_at?: string
+          version_id?: string
+          wp_status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "wk_article_publication_snapshots_article_id_fkey"
+            columns: ["article_id"]
+            isOneToOne: false
+            referencedRelation: "wk_articles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       wk_article_revisions: {
         Row: {
           article_id: string
@@ -12249,6 +12875,28 @@ export type Database = {
         }
         Returns: Json
       }
+      approve_article_version: {
+        Args: { p_article_id: string; p_note?: string; p_version_id?: string }
+        Returns: {
+          article_id: string
+          article_slug: string
+          draft_version: number
+          lifecycle_status: string
+          version_id: string
+          version_number: number
+        }[]
+      }
+      archive_article: {
+        Args: { p_article_id: string; p_note?: string }
+        Returns: {
+          article_id: string
+          article_slug: string
+          draft_version: number
+          lifecycle_status: string
+          version_id: string
+          version_number: number
+        }[]
+      }
       assign_user_role_admin: {
         Args: {
           assignment_notes?: string
@@ -13998,6 +14646,33 @@ export type Database = {
           slug: string
         }[]
       }
+      publish_article_version: {
+        Args: {
+          p_article_id: string
+          p_note?: string
+          p_published_at?: string
+          p_version_id?: string
+        }
+        Returns: {
+          article_id: string
+          article_slug: string
+          draft_version: number
+          lifecycle_status: string
+          version_id: string
+          version_number: number
+        }[]
+      }
+      publish_due_article_publications: {
+        Args: { p_limit?: number }
+        Returns: {
+          article_id: string
+          article_slug: string
+          published_at: string
+          schedule_id: string
+          status: string
+          version_id: string
+        }[]
+      }
       purge_staging_records: {
         Args: { batch_size?: number; max_batches?: number }
         Returns: number
@@ -14102,6 +14777,17 @@ export type Database = {
         }
         Returns: Json
       }
+      request_article_changes: {
+        Args: { p_article_id: string; p_note?: string; p_version_id?: string }
+        Returns: {
+          article_id: string
+          article_slug: string
+          draft_version: number
+          lifecycle_status: string
+          version_id: string
+          version_number: number
+        }[]
+      }
       resolve_registry_relationship_endpoint: {
         Args: {
           p_endpoint_side: string
@@ -14195,6 +14881,17 @@ export type Database = {
           isOneToOne: true
           isSetofReturn: false
         }
+      }
+      restore_article_from_archive: {
+        Args: { p_article_id: string; p_note?: string }
+        Returns: {
+          article_id: string
+          article_slug: string
+          draft_version: number
+          lifecycle_status: string
+          version_id: string
+          version_number: number
+        }[]
       }
       review_evidence_item: {
         Args: {
@@ -14341,6 +15038,22 @@ export type Database = {
           version_number: number
         }[]
       }
+      schedule_article_publication: {
+        Args: {
+          p_article_id: string
+          p_note?: string
+          p_publish_at?: string
+          p_version_id?: string
+        }
+        Returns: {
+          article_id: string
+          article_slug: string
+          draft_version: number
+          lifecycle_status: string
+          version_id: string
+          version_number: number
+        }[]
+      }
       seed_taxonomy_terms_from_articles: {
         Args: never
         Returns: {
@@ -14363,6 +15076,21 @@ export type Database = {
         Args: never
         Returns: {
           result: Json
+        }[]
+      }
+      submit_article_for_review: {
+        Args: {
+          p_article_id: string
+          p_expected_draft_version: number
+          p_note?: string
+        }
+        Returns: {
+          article_id: string
+          article_slug: string
+          draft_version: number
+          lifecycle_status: string
+          version_id: string
+          version_number: number
         }[]
       }
       submit_resource_reconciliation_command: {
@@ -14398,6 +15126,17 @@ export type Database = {
           p_user_id?: string
         }
         Returns: number
+      }
+      unpublish_article: {
+        Args: { p_article_id: string; p_note?: string }
+        Returns: {
+          article_id: string
+          article_slug: string
+          draft_version: number
+          lifecycle_status: string
+          version_id: string
+          version_number: number
+        }[]
       }
       update_article:
         | { Args: { article_id: string; payload: Json }; Returns: undefined }
@@ -14649,6 +15388,9 @@ export type CompositeTypes<
     : never
 
 export const Constants = {
+  editorial: {
+    Enums: {},
+  },
   public: {
     Enums: {},
   },

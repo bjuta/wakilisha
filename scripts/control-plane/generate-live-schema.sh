@@ -18,7 +18,7 @@ mkdir -p \
 
 npx supabase gen types typescript \
   --project-id "$PROJECT_REF" \
-  --schema public \
+  --schema public,editorial \
   > "$TMP_FILE"
 
 if [ ! -s "$TMP_FILE" ]; then
