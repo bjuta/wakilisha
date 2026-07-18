@@ -24,7 +24,7 @@ fi
 
 npx supabase gen types typescript \
   --project-id "$PROJECT_REF" \
-  --schema public \
+  --schema public,editorial \
   > "$TMP_FILE"
 
 if ! cmp -s "$TYPE_FILE" "$TMP_FILE"; then
