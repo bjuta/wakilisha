@@ -10,6 +10,10 @@ import { useAdminUser } from "@/hooks/useAdminUser";
 import {
   fetchArticleForAdmin,
   saveArticle,
+  submitArticleForReview,
+  publishArticleVersion,
+  scheduleArticlePublication,
+  unpublishArticle,
   createRevision,
   getLatestRevision,
   pruneRevisions,
@@ -682,74 +686,129 @@ export function ArticleEditorWorkspace({
 
   async function handlePublishConfirm() {
     setShowPublishChecklist(false);
-    if (!articlePermissions.canPublish) {
+    if (!article || !articlePermissions.canPublish) {
       addToast("error", "You do not have permission to publish articles.");
       return;
     }
+
     setIsPublishing(true);
-    const isScheduled = draft.publishedAt && new Date(draft.publishedAt) > new Date();
-    const publishDate = draft.publishedAt || new Date().toISOString();
-    const ok = await saveToSupabase({
-      wp_status: isScheduled ? "future" : "publish",
-      published_at: publishDate,
-    });
-    setIsPublishing(false);
-    if (ok) {
+    try {
+      const saved = isDirty ? await saveToSupabase({}) : true;
+      if (!saved) return;
+
+      const isScheduled = draft.publishedAt && new Date(draft.publishedAt) > new Date();
+      const publishDate = draft.publishedAt || new Date().toISOString();
+
+      const result = isScheduled
+        ? await scheduleArticlePublication(article.id, null, publishDate)
+        : await publishArticleVersion(article.id, null, publishDate);
+
+      if (!result.ok) {
+        addToast("error", result.error ?? "Publication failed.");
+        return;
+      }
+
+      const refreshedArticle = await fetchArticleForAdmin(result.articleSlug ?? article.slug);
+      if (refreshedArticle) {
+        applyServerArticleState(refreshedArticle, true);
+        await syncInstituteArticlePublicationState({
+          articleId: refreshedArticle.id,
+          articleSlug: refreshedArticle.slug,
+          wpStatus: refreshedArticle.wpStatus,
+          publishedAt: refreshedArticle.publishedAt,
+        });
+      }
+
       setDraft((prev) => ({ ...prev, publishedAt: publishDate }));
       if (isScheduled) {
         addToast("info", `Article scheduled for ${new Date(publishDate).toLocaleString()}.`);
       } else {
         addToast("success", "Article published!");
       }
+    } finally {
+      setIsPublishing(false);
     }
   }
 
   async function handleUnpublish() {
-    if (!articlePermissions.canPublish) {
+    if (!article || !articlePermissions.canPublish) {
       addToast("error", "You do not have permission to unpublish.");
       return;
     }
+
     setIsSaving(true);
-    const ok = await saveToSupabase({ wp_status: "draft" });
-    setIsSaving(false);
-    if (ok) addToast("info", "Article unpublished — saved as draft.");
+    try {
+      const result = await unpublishArticle(article.id);
+      if (!result.ok) {
+        addToast("error", result.error ?? "Failed to unpublish article.");
+        return;
+      }
+
+      const refreshedArticle = await fetchArticleForAdmin(result.articleSlug ?? article.slug);
+      if (refreshedArticle) {
+        applyServerArticleState(refreshedArticle, true);
+        await syncInstituteArticlePublicationState({
+          articleId: refreshedArticle.id,
+          articleSlug: refreshedArticle.slug,
+          wpStatus: refreshedArticle.wpStatus,
+          publishedAt: refreshedArticle.publishedAt,
+        });
+      }
+
+      addToast("info", "Article unpublished and returned to draft.");
+    } finally {
+      setIsSaving(false);
+    }
   }
 
   async function handleStatusChange(newStatus: string) {
-    if (!articlePermissions.canEdit) {
-      addToast("error", articlePermissions.reason ?? "Permission denied.");
+    if (newStatus === "pending") {
+      await handleSubmitForReview();
       return;
     }
 
-    if (newStatus === "publish" && !articlePermissions.canPublish) {
-      addToast("error", "You do not have permission to publish articles.");
+    if (newStatus === "publish") {
+      await handlePublish();
       return;
     }
 
-    setIsSaving(true);
-    const ok = await saveToSupabase({ wp_status: newStatus });
-    setIsSaving(false);
-
-    if (ok) {
-      const labels: Record<string, string> = { publish: "Published", pending: "Pending Review", draft: "Draft" };
-      addToast("success", `Status changed to ${labels[newStatus] || newStatus}.`);
+    if (newStatus === "draft") {
+      await handleSaveDraft();
+      return;
     }
+
+    addToast("error", `Unsupported lifecycle status: ${newStatus}`);
   }
 
   async function handleSubmitForReview() {
-    if (!articlePermissions.canEdit) {
+    if (!article || !articlePermissions.canEdit) {
       addToast("error", articlePermissions.reason ?? "Permission denied.");
       return;
     }
+
     setIsSaving(true);
-    const ok = await saveToSupabase({ wp_status: "pending" });
-    setIsSaving(false);
-    if (ok) {
-      if (onSubmittedForReview && article) {
+    try {
+      const saved = isDirty ? await saveToSupabase({}) : true;
+      if (!saved) return;
+
+      const expectedDraftVersion = articleDraftVersionRef.current ?? article.draftVersion;
+      const result = await submitArticleForReview(article.id, expectedDraftVersion);
+
+      if (!result.ok) {
+        addToast("error", result.error ?? "Failed to submit for review.");
+        return;
+      }
+
+      const refreshedArticle = await fetchArticleForAdmin(result.articleSlug ?? article.slug);
+      if (refreshedArticle) {
+        applyServerArticleState(refreshedArticle, true);
+      }
+
+      if (onSubmittedForReview) {
         try {
           await onSubmittedForReview({
             articleId: article.id,
-            articleSlug: article.slug,
+            articleSlug: result.articleSlug ?? article.slug,
             title: draft.title,
             excerpt: draft.excerpt,
             contentHtml: draft.content,
@@ -766,6 +825,8 @@ export function ArticleEditorWorkspace({
       }
 
       addToast("success", "Submitted for review.");
+    } finally {
+      setIsSaving(false);
     }
   }
 

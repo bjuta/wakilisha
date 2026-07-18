@@ -910,7 +910,7 @@ Deno.serve(async (req) => {
       if (!author) return jsonResponse({ data: null }, origin, 404);
       const authorName = String(author.name);
       const asn = authorSlugFromName(authorName);
-      const { data: allArticles } = await supabase.from("wk_articles").select("id, slug, title, excerpt, author, published_at, content_html, categories, tags, hero_image_url, seo, raw_meta").eq("wp_status", "publish").order("published_at", { ascending: false }).limit(500);
+      const { data: allArticles } = await supabase.from("wk_article_publication_snapshots").select("id, slug, title, excerpt, author, published_at, content_html, categories, tags, hero_image_url, seo, raw_meta").eq("is_active", true).order("published_at", { ascending: false }).limit(500);
       const matchedArticles = (allArticles ?? []).filter((a: any) => authorSlugFromName(resolveAuthor(a)) === asn);
       const articleList = matchedArticles.map((a: any) => buildArticleResponse(a));
       data = { author: { id: String(author.id), slug: String(author.slug), name: String(author.name), bio: author.bio || null, role: author.role || "Contributor", location: author.location || null, avatarUrl: author.avatar_url || null, coverUrl: author.cover_url || null, socialLinks: author.social_links || [], joinedDate: author.joined_date || null }, articles: articleList, articleCount: articleList.length };
@@ -928,7 +928,7 @@ Deno.serve(async (req) => {
       const limitParam = url.searchParams.get("limit");
       const limit = limitParam ? Math.min(parseInt(limitParam, 10) || 50, 500) : 200;
       const [articleResult, artistResult, releaseResult, chartResult] = await Promise.all([
-        supabase.from("wk_articles").select("id, slug, title, excerpt, author, published_at, content_html, categories, tags, hero_image_url, seo, raw_meta").eq("wp_status", "publish").order("published_at", { ascending: false }).limit(limit),
+        supabase.from("wk_article_publication_snapshots").select("id, slug, title, excerpt, author, published_at, content_html, categories, tags, hero_image_url, seo, raw_meta").eq("is_active", true).order("published_at", { ascending: false }).limit(limit),
         supabase.from("registry_artists").select("id, slug, display_name, origin_iso2, public_image_url, metadata, status").eq("status", "active").order("display_name", { ascending: true }).limit(50),
         supabase.from("registry_releases").select("id, slug, title, release_date, release_type, artwork_url, label_id, description, status").in("status", ["active", "draft"]).order("release_date", { ascending: false }).limit(30),
         supabase.from("wk_chart_entries_v2").select("rank, track_title, track_slug, artist_name, artwork_url, edition_id").order("rank", { ascending: true }).limit(20)
@@ -955,10 +955,9 @@ Deno.serve(async (req) => {
     else if (path.startsWith("/magazine/") && path !== "/magazine" && path !== "/magazine/") {
       const artSlug = path.replace(/^\/magazine\//, "").replace(/\/$/, "");
       const now = new Date().toISOString();
-      const { data: article } = await supabase.from("wk_articles").select("id, slug, title, excerpt, content_html, author, published_at, modified_at, categories, tags, hero_image_url, seo, wp_status, raw_meta").eq("slug", artSlug).maybeSingle();
+      const { data: article } = await supabase.from("wk_article_publication_snapshots").select("id, slug, title, excerpt, content_html, author, published_at, modified_at, categories, tags, hero_image_url, seo, wp_status, raw_meta").eq("is_active", true).eq("slug", artSlug).maybeSingle();
       if (!article) return jsonResponse({ data: null }, origin, 404);
-      if (article.wp_status === "future" && article.published_at && article.published_at <= now) { const { error: updateError } = await supabase.from("wk_articles").update({ wp_status: "publish", updated_at: now }).eq("id", article.id); if (!updateError) article.wp_status = "publish"; }
-      if (article.wp_status !== "publish") return jsonResponse({ data: null }, origin, 404);
+      if (!article) return jsonResponse({ data: null }, origin, 404);
       data = { article: { ...buildArticleResponse(article), contentHtml: String(article.content_html || ""), seo: (article.seo || {}) as Record<string, unknown>, categories: parseCategoryNames(article.categories) } };
     }
 
@@ -966,8 +965,8 @@ Deno.serve(async (req) => {
       const limitParam = url.searchParams.get("limit");
       const limit = limitParam ? Math.min(parseInt(limitParam, 10) || 50, 500) : 500;
       const now = new Date().toISOString();
-      await supabase.from("wk_articles").update({ wp_status: "publish", updated_at: now }).eq("wp_status", "future").lte("published_at", now);
-      const { data: articles } = await supabase.from("wk_articles").select("id, slug, title, excerpt, author, published_at, content_html, categories, tags, hero_image_url, seo, raw_meta").eq("wp_status", "publish").order("published_at", { ascending: false }).limit(limit);
+      await supabase.rpc("publish_due_article_publications", { p_limit: 50 });
+      const { data: articles } = await supabase.from("wk_article_publication_snapshots").select("id, slug, title, excerpt, author, published_at, content_html, categories, tags, hero_image_url, seo, raw_meta").eq("is_active", true).order("published_at", { ascending: false }).limit(limit);
       data = { stories: (articles ?? []).map((a: any) => buildArticleResponse(a)) };
     }
 
