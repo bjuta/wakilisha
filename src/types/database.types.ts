@@ -517,6 +517,7 @@ export type Database = {
         Returns: boolean
       }
       current_user_can_publish_article: { Args: never; Returns: boolean }
+      current_user_can_review_article: { Args: never; Returns: boolean }
       insert_article_lifecycle_version_from_article: {
         Args: {
           p_article: Database["public"]["Tables"]["wk_articles"]["Row"]
@@ -14489,6 +14490,23 @@ export type Database = {
         Args: never
         Returns: {
           result: Json
+        }[]
+      }
+      list_article_lifecycle_events: {
+        Args: { p_article_id: string; p_limit?: number }
+        Returns: {
+          action: string
+          actor_id: string
+          actor_label: string
+          article_id: string
+          created_at: string
+          id: string
+          metadata: Json
+          note: string
+          prior_status: string
+          resulting_status: string
+          version_id: string
+          version_number: number
         }[]
       }
       list_article_versions: {
