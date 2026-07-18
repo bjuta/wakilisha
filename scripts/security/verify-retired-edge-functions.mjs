@@ -37,7 +37,6 @@ const ignoredPrefixes = [
 ];
 
 const ignoredFiles = new Set([
-  "project_plan.md",
   verifierPath,
 ]);
 

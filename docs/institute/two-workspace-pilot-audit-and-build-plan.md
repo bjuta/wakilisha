@@ -15,28 +15,46 @@ All future work on Articles, Playlists, Audio, Video, Media, Registry, Charts, c
 
 ## Programme status
 
-Last updated: 16 July 2026
+Current phase: **Phase 2B: Review and publication lifecycle**.
 
-Current phase: **Phase 2B: Review and publication lifecycle**
+This plan has been reconciled against repository main at:
 
-Completed:
+`180aa4a Merge pull request #470 from bjuta/fix/phase-2b-governed-review-closure`
 
-- **Phase 0A: Security perimeter**, closed through PR #452
-- **Phase 0B: Engineering control plane**, closed through PR #453
-- **Phase 1A: Resource identity and domain boundaries**, closed through PR #457
-- **Phase 1B: Commands, jobs, and outbox**, closed through PR #458 and PR #459
-- **Phase 2A: Durable Article drafts and immutable versions**, closed through PR #460, PR #461, PR #463, and PR #464
+Closed phases:
 
-Active implementation:
+- **Phase 0A: Security perimeter**, closed through PR #452.
+- **Phase 0B: Engineering control plane**, closed through PR #453.
+- **Phase 1A: Resource identity and domain boundaries**, closed through PR #457.
+- **Phase 1B: Commands, jobs, and outbox**, closed through PR #458 and PR #459.
+- **Phase 2A: Durable Article drafts and immutable versions**, closed through PR #460, PR #461, PR #463, and PR #464.
 
-- **PR 2B: Review and publication lifecycle**
+Active phase:
 
-Phase 2A is closed. PR 2B now starts from the production-tested versioned Article editor.
+- **Phase 2B: Review and publication lifecycle**.
 
-Phase 0 established the security and engineering conditions required to
-begin permanent platform-kernel work. The programme must not reopen Phase 0
-scope except for a verified security, migration, data-loss, or critical
-compatibility defect.
+Phase 2B has shipped the backend and public-read foundations, including lifecycle RPCs, publication snapshots, scheduled publication infrastructure, archive and restore infrastructure, version-bound previews, Edge read updates, and production preview rendering through PR #467, PR #469, and PR #470.
+
+Phase 2B is not closed yet.
+
+Remaining Phase 2B closure work:
+
+- restore the missing governed review controls in the current Article Editor
+- show Submit for Review clearly for Draft articles
+- show Request Changes and Approve Version for Pending Review articles
+- prevent Publish from bypassing approval
+- show lifecycle history in the editor
+- prove the full lifecycle with one real Article in production
+- confirm later draft changes do not silently alter the published public page
+- update this plan with the final closure record
+
+Phase 3 must not start until Phase 2B is closed.
+
+See also:
+
+- `docs/institute/phase-reconciliation-audit-20260718.md`
+- `docs/engineering/phase-2b-review-publication-lifecycle-audit.md`
+
 
 ## Decision
 
@@ -1491,7 +1509,7 @@ Completion record, 16 July 2026:
 - production smoke confirmed autosave, Save Draft, reload persistence, and visible revision history on a real Article
 - production changed: schema and frontend
 
-### PR 2B: Review and publication lifecycle (next)
+### PR 2B: Review and publication lifecycle (active)
 
 Build:
 
@@ -1502,15 +1520,41 @@ Build:
 - publication
 - archive and restore
 - publication snapshots
-- meaningful dates
-- cached article read model
+- meaningful published, reviewed, materially updated, and corrected dates
+- cached Article read model
 - exact public preview
+
+Already shipped:
+
+- Article lifecycle events table
+- scheduled publication table
+- publication snapshot table
+- review, approval, schedule, publish, archive, and restore RPC foundations
+- public read paths backed by publication snapshots
+- scheduled publication Edge Function integration
+- version-bound preview links
+- preview nonce resolver
+- production preview rendering for a Pending Review Article
+
+Remaining closure work:
+
+- expose Submit for Review clearly on Draft articles
+- expose Request Changes and Approve Version on Pending Review articles
+- require a reviewer note for requested changes
+- approve the submitted immutable version, not a mutable draft
+- prevent Publish from using working or merely submitted versions when approval is required
+- show lifecycle history with actor, action, note, version, and date
+- verify archive and restore through the current Article workflow
+- run one full real-Article production lifecycle smoke
 
 Exit gate:
 
-- one real article completes the full lifecycle
-- the public page is served from a stable version
+- one real Article completes the full lifecycle
+- the public page is served from a stable published version
 - later draft changes cannot alter the published version silently
+- the editor visibly explains the review history
+- Phase 2B closure is recorded in this plan
+
 
 ## Phase 3: Trust infrastructure
 
@@ -2149,50 +2193,47 @@ After canonical editors and Inquiry Mode are proven:
 
 ## Immediate next implementation
 
-Phase 0 is closed.
+Phase 0, Phase 1, and Phase 2A are closed.
 
-The active implementation is
-**PR 1A: Resource identity and domain boundaries**.
+Phase 2B is active and partially deployed. It is not closed.
 
-Its objective is to give every supported cultural object one stable
-WAKILISHA resource identity without moving typed domain content into a
-generic table.
+The next implementation is:
 
-PR 1A must:
+**Phase 2B governed review closure**.
 
-- define the first permanent domain schemas and their ownership boundaries
-- create the resource-kind registry
-- create `editorial.resources`
-- define canonical pointers and integrity rules
-- define ownership, visibility, and lifecycle fields
-- create resource aliases and redirect-safe identity history
-- establish strict API exposure boundaries
-- generate typed contracts for the new resource layer
-- connect one existing Article, one Playlist, and one Registry record
-- preserve the existing canonical domain tables as the content authorities
-- provide migration verification and forward-repair procedures
-- add tests for identity uniqueness, pointer integrity, permissions, and aliases
+This PR must:
 
-PR 1A must not:
+- restore the missing reviewer-facing workflow in the current Article Editor
+- use the old Institute Article editor as product evidence, not as the new architecture
+- show Submit for Review on Draft articles
+- show Request Changes and Approve Version on Pending Review articles
+- require a reviewer note when requesting changes
+- make approval target the submitted immutable version
+- prevent Publish from bypassing approval
+- show lifecycle history in the editor
+- preserve version-bound preview behavior
+- preserve publication snapshots and public read stability
+- prove the full lifecycle with one real production Article
 
-- begin command, idempotency, job, or outbox work assigned to PR 1B
-- build Sources, Citations, Credits, Corrections, or Provenance from Phase 3
-- redesign Article, Playlist, Registry, Media, Audio, or Video editors
-- move domain content into a universal content table
-- create Inquiry Mode controls or new Institute workspaces
-- migrate more records than required to prove the first vertical slice
-- expose a generic privileged resource mutation API
+This PR must not:
 
-The implementation begins with a focused audit of the current Article,
-Playlist, and Registry identifiers, routes, aliases, ownership fields,
-lifecycle fields, and cross-domain references.
+- begin Phase 3 sources, citations, credits, corrections, or provenance work
+- build Playlist, Audio, Video, Field Capture, or Inquiry Mode
+- redesign public Article presentation
+- rewrite the editor shell
+- alter unrelated Registry, Charts, Media, or Institute code
+- create a duplicate editor
 
-The PR 1A exit gate remains:
+The PR exit gate remains:
 
-- one Article, one Playlist, and one Registry record have stable resource identities
-- shared systems can reference them without polymorphic text guesses
+- one real Article goes through Draft, Submit for Review, Request Changes, revised Draft, Submit for Review, Approve, Publish, later Draft edit, public unchanged verification, Archive, and Restore
+- reviewer decisions are visible to editors
+- public published content remains stable after later draft edits
+- preview links continue to resolve to immutable versions
+- no critical checks regress
 
-Do not begin PR 1B until these conditions are proven in production.
+Do not begin Phase 3 until these conditions are proven in production.
+
 
 ## Production freeze principle
 
@@ -2216,4 +2257,4 @@ New product ideas are recorded without automatically reopening frozen foundation
 - frontend deployment needed: No
 - Readdy Finish update needed: No
 - documentation review needed: Yes
-- next implementation plan: Phase 1A resource identity and domain boundaries
+- next implementation plan: Phase 2B governed review closure
