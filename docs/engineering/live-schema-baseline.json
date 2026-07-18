@@ -2,7 +2,7 @@
   "projectRef": "pgzizndxdyhqmtyywjmt",
   "schema": "public",
   "generatedAt": "2026-07-16T14:54:38Z",
-  "typesSha256": "78bd55ceb03c8773c0abcd2aa6be034cd4df7add7aa4ed4b0ca469e3fca9dc63",
+  "typesSha256": "642651a0e0979b4d2bdc5b09f3dbc2ac37e5be4b247c8240bfc765c84421f938",
   "authoritativeMigrationDirectory": "supabase/migrations",
   "migrationCount": 151,
   "latestMigration": "20260716172500_phase_2a_article_editor_runtime_fix.sql"
