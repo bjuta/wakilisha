@@ -903,40 +903,31 @@ export async function trashArticle(articleId: string): Promise<SaveResult> {
  */
 export async function generatePreviewNonce(articleId: string): Promise<string | null> {
   try {
-    // Generate a UUID v4
-    const uuid = 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
-      const r = (Math.random() * 16) | 0;
-      const v = c === 'x' ? r : (r & 0x3) | 0x8;
-      return v.toString(16);
-    });
-
     const expiresAt = new Date();
     expiresAt.setDate(expiresAt.getDate() + 7);
 
-    const { data, error } = await supabase.rpc("update_article", {
-      article_id: articleId,
-      payload: {
-        preview_nonce: uuid,
-        preview_nonce_expires_at: expiresAt.toISOString(),
-      },
-      expected_updated_at: null,
+    const rpc = supabase.rpc as unknown as (
+      fn: string,
+      args: Record<string, unknown>,
+    ) => Promise<{ data: unknown; error: { message?: string } | null }>;
+
+    const { data, error } = await rpc("create_article_preview_link", {
+      p_article_id: articleId,
+      p_version_id: null,
+      p_expires_at: expiresAt.toISOString(),
     });
 
     if (error) {
-      console.error("Failed to generate preview nonce:", error.message);
+      console.error("Failed to generate version-bound preview nonce:", error.message);
       return null;
     }
 
-    // Fetch back the nonce
-    const { data: article } = await supabase
-      .from("wk_articles")
-      .select("preview_nonce")
-      .eq("id", articleId)
-      .maybeSingle();
+    const rows = Array.isArray(data) ? data : data ? [data] : [];
+    const row = rows[0] as { nonce?: string } | undefined;
 
-    return (article as { preview_nonce?: string } | null)?.preview_nonce ?? null;
+    return row?.nonce ?? null;
   } catch (err) {
-    console.error("Failed to generate preview nonce:", err);
+    console.error("Failed to generate version-bound preview nonce:", err);
     return null;
   }
 }
@@ -946,18 +937,22 @@ export async function generatePreviewNonce(articleId: string): Promise<string | 
  * Works for drafts, pending, and scheduled articles.
  */
 export async function getArticleByPreviewNonce(nonce: string): Promise<AdminArticleDetail | null> {
-  const now = new Date().toISOString();
+  const rpc = supabase.rpc as unknown as (
+    fn: string,
+    args: Record<string, unknown>,
+  ) => Promise<{ data: unknown; error: { message?: string } | null }>;
 
-  const { data, error } = await supabase
-    .from("wk_articles")
-    .select(ARTICLE_SELECT + ", raw_meta")
-    .eq("preview_nonce", nonce)
-    .gt("preview_nonce_expires_at", now)
-    .maybeSingle();
+  const { data, error } = await rpc("resolve_article_preview_nonce", {
+    p_nonce: nonce,
+  });
 
-  if (error || !data) return null;
+  const rows = Array.isArray(data) ? data : data ? [data] : [];
+  const row = rows[0] as (ArticleRow & {
+    raw_meta?: Record<string, unknown>;
+    version_number?: number | null;
+  }) | undefined;
 
-  const row = data as ArticleRow & { raw_meta?: Record<string, unknown> };
+  if (error || !row) return null;
 
   return {
     id: row.id,
@@ -974,8 +969,8 @@ export async function getArticleByPreviewNonce(nonce: string): Promise<AdminArti
     heroImageUrl: row.hero_image_url ?? "",
     createdAt: row.created_at,
     updatedAt: row.updated_at,
-    draftVersion: Number(row.draft_version ?? 1),
-    previewNonce: row.preview_nonce ?? null,
+    draftVersion: Number(row.version_number ?? row.draft_version ?? 1),
+    previewNonce: nonce,
   };
 }
 
