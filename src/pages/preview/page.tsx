@@ -1,3 +1,4 @@
+import { supabase } from "@/lib/supabase";
 import { useEffect, useState } from "react";
 import { useParams, Link } from "react-router-dom";
 
@@ -29,8 +30,16 @@ export default function PreviewPage() {
       setLoading(true);
       try {
         const apiBase = (import.meta.env.VITE_PUBLIC_API_BASE as string | undefined) || "/api/v1";
+        const { data: sessionData } = await supabase.auth.getSession();
+        const accessToken = sessionData.session?.access_token;
+        const anonKey = import.meta.env.VITE_PUBLIC_SUPABASE_ANON_KEY || import.meta.env.VITE_SUPABASE_ANON_KEY;
+
         const response = await fetch(`${apiBase}/preview/${nonce}`, {
-          headers: { Accept: "application/json" },
+          headers: {
+            Accept: "application/json",
+            ...(anonKey ? { apikey: anonKey } : {}),
+            ...(accessToken || anonKey ? { Authorization: `Bearer ${accessToken || anonKey}` } : {}),
+          },
         });
 
         if (!alive) return;

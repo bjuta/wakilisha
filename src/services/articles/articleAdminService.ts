@@ -906,12 +906,7 @@ export async function generatePreviewNonce(articleId: string): Promise<string | 
     const expiresAt = new Date();
     expiresAt.setDate(expiresAt.getDate() + 7);
 
-    const rpc = supabase.rpc as unknown as (
-      fn: string,
-      args: Record<string, unknown>,
-    ) => Promise<{ data: unknown; error: { message?: string } | null }>;
-
-    const { data, error } = await rpc("create_article_preview_link", {
+    const { data, error } = await (supabase as any).rpc("create_article_preview_link", {
       p_article_id: articleId,
       p_version_id: null,
       p_expires_at: expiresAt.toISOString(),
@@ -937,12 +932,7 @@ export async function generatePreviewNonce(articleId: string): Promise<string | 
  * Works for drafts, pending, and scheduled articles.
  */
 export async function getArticleByPreviewNonce(nonce: string): Promise<AdminArticleDetail | null> {
-  const rpc = supabase.rpc as unknown as (
-    fn: string,
-    args: Record<string, unknown>,
-  ) => Promise<{ data: unknown; error: { message?: string } | null }>;
-
-  const { data, error } = await rpc("resolve_article_preview_nonce", {
+  const { data, error } = await (supabase as any).rpc("resolve_article_preview_nonce", {
     p_nonce: nonce,
   });
 
