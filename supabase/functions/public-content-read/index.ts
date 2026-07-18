@@ -918,8 +918,7 @@ Deno.serve(async (req) => {
 
     else if (path.startsWith("/preview/")) {
       const nonce = path.replace(/^\/preview\//, "").replace(/\/$/, "");
-      const now = new Date().toISOString();
-      const { data: article } = await supabase.from("wk_articles").select("id, slug, title, excerpt, content_html, author, published_at, categories, tags, hero_image_url, seo, wp_status, raw_meta").eq("preview_nonce", nonce).gt("preview_nonce_expires_at", now).maybeSingle();
+      const { data: article } = await supabase.rpc("resolve_article_preview_nonce", { p_nonce: nonce }).maybeSingle();
       if (!article) return jsonResponse({ data: null, meta: { reason: "expired_or_invalid" } }, origin, 404);
       data = { article: { ...buildArticleResponse(article), contentHtml: String(article.content_html || ""), seo: (article.seo || {}) as Record<string, unknown>, categories: parseCategoryNames(article.categories), wpStatus: String(article.wp_status || "draft") } };
     }
