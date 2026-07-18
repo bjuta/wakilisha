@@ -161,11 +161,6 @@ begin
 
   perform 1
   from editorial.article_versions version
-  where version.id = approved article version can be published';
-  end if;
-
-  perform 1
-  from editorial.article_versions version
   where version.id = v_source_version_id
     and version.article_id = p_article_id
     and version.kind = 'approved';
