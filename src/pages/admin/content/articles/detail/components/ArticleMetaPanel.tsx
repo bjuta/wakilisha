@@ -19,6 +19,17 @@ interface SeoMeta {
   [key: string]: unknown;
 }
 
+type ArticleLifecyclePanelEvent = {
+  id: string;
+  action: string;
+  priorStatus: string | null;
+  resultingStatus: string | null;
+  note: string | null;
+  actorLabel: string | null;
+  createdAt: string;
+  versionNumber: number | null;
+};
+
 interface Props {
   author: string;
   categories: string[];
@@ -65,6 +76,15 @@ interface Props {
   onUnpublish?: () => void;
   onDelete?: () => void;
   onStatusChange?: (newStatus: string) => void;
+  onSubmitForReview?: () => void;
+  onRequestChanges?: () => void;
+  onApproveVersion?: () => void;
+  canSubmitForReview?: boolean;
+  canRequestChanges?: boolean;
+  canApproveVersion?: boolean;
+  reviewActionBusy?: boolean;
+  publishDisabledReason?: string | null;
+  lifecycleEvents?: ArticleLifecyclePanelEvent[];
   // Preview URL sharing
   previewUrl?: string | null;
   previewNonce?: string | null;
@@ -135,6 +155,15 @@ export function ArticleMetaPanel({
   onUnpublish,
   onDelete,
   onStatusChange,
+  onSubmitForReview,
+  onRequestChanges,
+  onApproveVersion,
+  canSubmitForReview = false,
+  canRequestChanges = false,
+  canApproveVersion = false,
+  reviewActionBusy = false,
+  publishDisabledReason = null,
+  lifecycleEvents = [],
   previewUrl,
   previewNonce,
   isGeneratingPreview = false,
@@ -410,11 +439,16 @@ export function ArticleMetaPanel({
   }
 
   function handlePublishClick() {
+    if (publishDisabledReason) return;
     if (isPublished || isFuture) {
       onPublish?.();
     } else {
       onPublish?.();
     }
+  }
+
+  function formatLifecycleAction(action: string): string {
+    return action.replaceAll("_", " ");
   }
 
   return (
@@ -607,6 +641,52 @@ export function ArticleMetaPanel({
 
           <div className="border-t border-wk-border" />
 
+          {/* Governed review actions */}
+          {(canSubmitForReview || canRequestChanges || canApproveVersion) && (
+            <>
+              <div className="rounded-lg border border-wk-brand/20 bg-wk-brand-soft/60 px-3 py-2 space-y-2">
+                <div className="flex items-center gap-2">
+                  <WkIcon name="Shield" size={13} className="text-wk-brand" />
+                  <span className="text-[11px] font-black uppercase tracking-wider text-wk-brand">Review workflow</span>
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  {canSubmitForReview ? (
+                    <button
+                      onClick={onSubmitForReview}
+                      disabled={isSaving || reviewActionBusy}
+                      className="flex items-center gap-1.5 rounded-md border border-wk-border bg-wk-bg-subtle px-3 py-1.5 text-[11px] font-semibold text-wk-brand hover:bg-wk-brand-soft transition-colors disabled:opacity-50 whitespace-nowrap"
+                    >
+                      <WkIcon name="Send" size={12} />
+                      Submit for Review
+                    </button>
+                  ) : null}
+                  {canRequestChanges ? (
+                    <button
+                      onClick={onRequestChanges}
+                      disabled={isSaving || reviewActionBusy}
+                      className="flex items-center gap-1.5 rounded-md border border-wk-border bg-wk-bg-subtle px-3 py-1.5 text-[11px] font-semibold text-wk-warning hover:bg-wk-warning-soft transition-colors disabled:opacity-50 whitespace-nowrap"
+                    >
+                      <WkIcon name="Flag" size={12} />
+                      Request Changes
+                    </button>
+                  ) : null}
+                  {canApproveVersion ? (
+                    <button
+                      onClick={onApproveVersion}
+                      disabled={isSaving || reviewActionBusy}
+                      className="flex items-center gap-1.5 rounded-md bg-wk-brand px-3 py-1.5 text-[11px] font-bold text-wk-brand-on hover:opacity-90 transition-opacity disabled:opacity-50 whitespace-nowrap"
+                    >
+                      <WkIcon name="Shield" size={12} />
+                      Approve Version
+                    </button>
+                  ) : null}
+                </div>
+              </div>
+
+              <div className="border-t border-wk-border" />
+            </>
+          )}
+
           {/* Main action row */}
           {publishingLocked ? (
             <div className="rounded-lg border border-wk-warning/30 bg-wk-warning-soft px-3 py-2 text-[11px] leading-4 text-wk-text-muted">
@@ -628,17 +708,23 @@ export function ArticleMetaPanel({
                 </span>
               )}
 
-              <button
-                onClick={handlePublishClick}
-                disabled={isSaving || isPublishing}
-                className="flex items-center gap-1.5 rounded-md bg-wk-brand px-4 py-2 text-[13px] font-bold text-wk-brand-on hover:opacity-90 transition-opacity disabled:opacity-50 whitespace-nowrap"
-              >
-                {isPublishing ? (
-                  <><i className="ri-loader-4-line animate-spin text-[14px]" /> {getPublishButtonLabel()}…</>
-                ) : (
-                  <><WkIcon name={isPublished ? "RefreshCw" : "Globe"} size={13} /> {getPublishButtonLabel()}</>
-                )}
-              </button>
+              {publishDisabledReason ? (
+                <div className="max-w-[170px] rounded-lg border border-wk-warning/30 bg-wk-warning-soft px-3 py-2 text-right text-[11px] font-bold leading-4 text-wk-text-muted">
+                  {publishDisabledReason}
+                </div>
+              ) : (
+                <button
+                  onClick={handlePublishClick}
+                  disabled={isSaving || isPublishing}
+                  className="flex items-center gap-1.5 rounded-md bg-wk-brand px-4 py-2 text-[13px] font-bold text-wk-brand-on hover:opacity-90 transition-opacity disabled:opacity-50 whitespace-nowrap"
+                >
+                  {isPublishing ? (
+                    <><i className="ri-loader-4-line animate-spin text-[14px]" /> {getPublishButtonLabel()}…</>
+                  ) : (
+                    <><WkIcon name={isPublished ? "RefreshCw" : "Globe"} size={13} /> {getPublishButtonLabel()}</>
+                  )}
+                </button>
+              )}
             </div>
           )}
         </div>
@@ -1043,6 +1129,31 @@ export function ArticleMetaPanel({
         {timelineOpen && (
           <div className="border-t border-wk-border px-4 py-4">
             <ArticlePublishTimeline status={wpStatus} publishedAt={publishedAt} createdAt={createdAt} updatedAt={updatedAt} isDirty={isDirty} isSaving={isSaving} isPublishing={isPublishing} lastAutosavedAt={lastAutosavedAt} />
+            <div className="mt-4 border-t border-wk-border pt-4">
+              <div className="mb-2 text-[10px] font-black uppercase tracking-[0.16em] text-wk-text-faint">Lifecycle history</div>
+              {lifecycleEvents.length > 0 ? (
+                <div className="space-y-2">
+                  {lifecycleEvents.map((event) => (
+                    <div key={event.id} className="rounded-lg border border-wk-border bg-wk-bg-subtle px-3 py-2">
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="text-[12px] font-black capitalize text-wk-text">{formatLifecycleAction(event.action)}</span>
+                        <span className="text-[10px] text-wk-text-faint">{new Date(event.createdAt).toLocaleString()}</span>
+                      </div>
+                      <div className="mt-1 text-[11px] text-wk-text-muted">
+                        {event.versionNumber ? `Version ${event.versionNumber}` : "No version"} · {event.actorLabel ?? "system"}
+                      </div>
+                      {event.note ? (
+                        <div className="mt-1 text-[11px] leading-4 text-wk-text-soft">{event.note}</div>
+                      ) : null}
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="rounded-lg border border-dashed border-wk-border px-3 py-3 text-[11px] text-wk-text-faint">
+                  No lifecycle events recorded yet.
+                </div>
+              )}
+            </div>
           </div>
         )}
       </WkSurface>
