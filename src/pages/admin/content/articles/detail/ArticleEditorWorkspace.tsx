@@ -648,6 +648,7 @@ export function ArticleEditorWorkspace({
 
     if (refreshedArticle) {
       applyServerArticleState(refreshedArticle, true);
+      setPreviewNonce(null);
 
       if (typeof extraFields.wp_status !== "undefined") {
         await syncInstituteArticlePublicationState({
@@ -677,11 +678,12 @@ export function ArticleEditorWorkspace({
     }
 
     lastAutosavedContentRef.current = currentDraft.content + currentDraft.title + currentDraft.excerpt;
+    setPreviewNonce(null);
     setIsDirty(false);
     return true;
   }
 
-  /** Force overwrite after conflict — reloads the article first then saves. */
+  /** Force overwrite after conflict, then reloads the article first and saves. */
   async function handleConflictOverwrite() {
     if (!article || !slug) return;
     setShowConflict(false);
@@ -702,7 +704,7 @@ export function ArticleEditorWorkspace({
     }
   }
 
-  /** Discard changes — reload the latest article from the server. */
+  /** Discard changes and reload the latest article from the server. */
   async function handleConflictDiscard() {
     if (!slug) return;
     setShowConflict(false);
@@ -961,7 +963,7 @@ export function ArticleEditorWorkspace({
   function handlePreview() {
     if (!article) return;
     setShowPreview(true);
-    addToast("info", "Preview mode — scroll down to see the full article.");
+    addToast("info", "Preview mode. Scroll down to see the full article.");
   }
 
   async function handleSlugChange(newSlug: string): Promise<boolean> {
@@ -1051,6 +1053,11 @@ export function ArticleEditorWorkspace({
     if (!article) return;
     setIsGeneratingPreview(true);
     try {
+      if (isDirty) {
+        const saved = await saveToSupabase({});
+        if (!saved) return;
+      }
+
       const nonce = await generatePreviewNonce(article.id);
       if (nonce) {
         setPreviewNonce(nonce);
@@ -1066,9 +1073,18 @@ export function ArticleEditorWorkspace({
   /** Open the magazine preview in a new tab, generating a nonce on-the-fly if needed. */
   async function handleMagazinePreview() {
     if (!article) return;
-    let nonce = previewNonce;
 
-    // If article isn't published and there's no nonce yet, generate one now
+    const hadDirtyDraft = isDirty;
+
+    if (hadDirtyDraft) {
+      const saved = await saveToSupabase({});
+      if (!saved) return;
+    }
+
+    let nonce = hadDirtyDraft ? null : previewNonce;
+
+    // If article is not published and there is no nonce yet, generate one now.
+    // When this click saved dirty work, force a fresh version-bound nonce.
     if (article.wpStatus !== "publish" && !nonce) {
       setIsGeneratingPreview(true);
       nonce = await generatePreviewNonce(article.id);
@@ -1193,7 +1209,7 @@ export function ArticleEditorWorkspace({
         <WkIcon name="Command" size={11} />
         <span>
           +S to save · Auto-saves every 10s · Last auto-saved:{" "}
-          {lastAutosavedAt ? new Date(lastAutosavedAt).toLocaleTimeString() : "—"}
+          {lastAutosavedAt ? new Date(lastAutosavedAt).toLocaleTimeString() : "Not yet"}
         </span>
       </div>
 
@@ -1400,7 +1416,7 @@ export function ArticleEditorWorkspace({
                 onClick={() => setShowConflict(false)}
                 className="text-[12px] text-wk-text-faint hover:text-wk-text transition-colors py-1 cursor-pointer"
               >
-                Cancel — Keep Editing
+                Cancel and Keep Editing
               </button>
             </div>
           </div>

@@ -8,17 +8,22 @@ import { supabase } from "@/lib/supabase";
 interface Revision {
   id: string;
   revision_number: number;
+  version_kind: string | null;
   created_at: string;
   created_by: string;
   title: string | null;
+  slug: string | null;
   content_html: string | null;
   excerpt: string | null;
   author: string | null;
   categories: string[] | null;
   tags: string[] | null;
+  hero_image_url: string | null;
   seo: Record<string, unknown> | null;
+  lifecycle_state: string | null;
   wp_status: string | null;
   published_at: string | null;
+  content_fingerprint: string | null;
 }
 
 interface RestorePayload {
@@ -98,6 +103,37 @@ function stripHtmlForDiff(html: string | null): string {
   return html.replace(/<[^>]*>/g, " ").replace(/&[a-z]+;/gi, " ").replace(/\s+/g, " ").trim();
 }
 
+function textValue(value: unknown): string {
+  return String(value ?? "").trim();
+}
+
+function seoValue(seo: Record<string, unknown> | null, key: string): string {
+  if (!seo || typeof seo !== "object") return "";
+  return textValue(seo[key]);
+}
+
+function revisionComparisonText(revision: Revision): string {
+  const categories = Array.isArray(revision.categories) ? revision.categories.join(", ") : "";
+  const tags = Array.isArray(revision.tags) ? revision.tags.join(", ") : "";
+
+  return [
+    `Title: ${textValue(revision.title)}`,
+    `Slug: ${textValue(revision.slug)}`,
+    `Excerpt: ${textValue(revision.excerpt)}`,
+    `Author: ${textValue(revision.author)}`,
+    `Hero image: ${textValue(revision.hero_image_url)}`,
+    `Status: ${textValue(revision.wp_status)}`,
+    `Lifecycle: ${textValue(revision.lifecycle_state)}`,
+    `Published: ${textValue(revision.published_at)}`,
+    `Categories: ${categories}`,
+    `Tags: ${tags}`,
+    `SEO title: ${seoValue(revision.seo, "title")}`,
+    `SEO description: ${seoValue(revision.seo, "description")}`,
+    `SEO keywords: ${seoValue(revision.seo, "keywords")}`,
+    `Content: ${stripHtmlForDiff(revision.content_html)}`,
+  ].join("\n");
+}
+
 function normalizeVersionTerms(value: unknown): string[] {
   if (!Array.isArray(value)) return [];
 
@@ -158,17 +194,22 @@ export function ArticleRevisionHistory({ articleId, currentStatus, currentTitle,
         setRevisions(rows.map((row) => ({
           id: String(row.id ?? ""),
           revision_number: Number(row.revision_number ?? 0),
+          version_kind: row.version_kind == null ? null : String(row.version_kind),
           created_at: String(row.created_at ?? ""),
           created_by: String(row.created_by ?? "System"),
           title: row.title == null ? null : String(row.title),
+          slug: row.slug == null ? null : String(row.slug),
           content_html: row.content_html == null ? null : String(row.content_html),
           excerpt: row.excerpt == null ? null : String(row.excerpt),
           author: row.author == null ? null : String(row.author),
           categories: normalizeVersionTerms(row.categories),
           tags: normalizeVersionTerms(row.tags),
+          hero_image_url: row.hero_image_url == null ? null : String(row.hero_image_url),
           seo: (row.seo as Record<string, unknown>) ?? {},
+          lifecycle_state: row.lifecycle_state == null ? null : String(row.lifecycle_state),
           wp_status: row.wp_status == null ? null : String(row.wp_status),
           published_at: row.published_at == null ? null : String(row.published_at),
+          content_fingerprint: row.content_fingerprint == null ? null : String(row.content_fingerprint),
         })));
       }
 
@@ -190,8 +231,8 @@ export function ArticleRevisionHistory({ articleId, currentStatus, currentTitle,
 
   const diffSegments = useMemo(() => {
     if (!leftRevision || !rightRevision) return null;
-    const leftText = stripHtmlForDiff(leftRevision.content_html);
-    const rightText = stripHtmlForDiff(rightRevision.content_html);
+    const leftText = revisionComparisonText(leftRevision);
+    const rightText = revisionComparisonText(rightRevision);
     if (leftText === rightText) return null;
     return wordDiff(leftText, rightText);
   }, [leftRevision, rightRevision]);
@@ -301,7 +342,7 @@ export function ArticleRevisionHistory({ articleId, currentStatus, currentTitle,
       {compareMode && selectedLeft && selectedRight && !diffSegments && (
         <div className="text-center py-3 text-[12px] text-wk-text-faint">
           <WkIcon name="CheckCircle2" size={14} className="inline text-wk-success mr-1" />
-          No changes detected between these versions.
+          No tracked editorial fields changed in this checkpoint.
         </div>
       )}
 
@@ -396,11 +437,15 @@ export function ArticleRevisionHistory({ articleId, currentStatus, currentTitle,
                 <div className="grid grid-cols-2 gap-3 text-[12px]">
                   <div>
                     <span className="text-[11px] font-semibold text-wk-text-muted uppercase">Title</span>
-                    <p className="text-wk-text mt-0.5 truncate">{rev.title || "—"}</p>
+                    <p className="text-wk-text mt-0.5 truncate">{rev.title || "Not set"}</p>
                   </div>
                   <div>
                     <span className="text-[11px] font-semibold text-wk-text-muted uppercase">Author</span>
-                    <p className="text-wk-text mt-0.5">{rev.author || "—"}</p>
+                    <p className="text-wk-text mt-0.5">{rev.author || "Not set"}</p>
+                  </div>
+                  <div>
+                    <span className="text-[11px] font-semibold text-wk-text-muted uppercase">Slug</span>
+                    <p className="text-wk-text mt-0.5 font-mono truncate">{rev.slug || "Not set"}</p>
                   </div>
                   <div>
                     <span className="text-[11px] font-semibold text-wk-text-muted uppercase">Status</span>
@@ -409,14 +454,19 @@ export function ArticleRevisionHistory({ articleId, currentStatus, currentTitle,
                   <div>
                     <span className="text-[11px] font-semibold text-wk-text-muted uppercase">Published</span>
                     <p className="text-wk-text mt-0.5">
-                      {rev.published_at ? new Date(rev.published_at).toLocaleString() : "—"}
+                      {rev.published_at ? new Date(rev.published_at).toLocaleString() : "Not set"}
                     </p>
                   </div>
                 </div>
 
                 <div>
                   <span className="text-[11px] font-semibold text-wk-text-muted uppercase">Excerpt</span>
-                  <p className="text-[12px] text-wk-text mt-0.5">{rev.excerpt || "—"}</p>
+                  <p className="text-[12px] text-wk-text mt-0.5">{rev.excerpt || "Not set"}</p>
+                </div>
+
+                <div>
+                  <span className="text-[11px] font-semibold text-wk-text-muted uppercase">Hero Image</span>
+                  <p className="text-[12px] text-wk-text mt-0.5 break-all">{rev.hero_image_url || "Not set"}</p>
                 </div>
 
                 <div>
@@ -424,7 +474,7 @@ export function ArticleRevisionHistory({ articleId, currentStatus, currentTitle,
                   <div className="mt-1 rounded-lg border border-wk-border bg-wk-bg-subtle p-3 max-h-[200px] overflow-y-auto">
                     <div
                       className="text-[12px] text-wk-text-soft leading-relaxed"
-                      dangerouslySetInnerHTML={{ __html: rev.content_html || "<p>—</p>" }}
+                      dangerouslySetInnerHTML={{ __html: rev.content_html || "<p>Not set</p>" }}
                     />
                   </div>
                 </div>
