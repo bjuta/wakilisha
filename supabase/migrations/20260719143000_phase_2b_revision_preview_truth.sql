@@ -132,7 +132,7 @@ update public.wk_articles article
        limit 1
      ) latest_version
        on true
-     where link.nonce = article.preview_nonce
+     where link.nonce::text = article.preview_nonce::text
        and link.article_id = article.id
        and link.version_id <> latest_version.id
    );
