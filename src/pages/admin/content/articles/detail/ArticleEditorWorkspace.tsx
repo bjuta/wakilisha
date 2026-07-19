@@ -949,6 +949,7 @@ export function ArticleEditorWorkspace({
         setArticle((prev) => (prev ? { ...prev, heroImageUrl: url || "" } : prev));
       }
 
+      setPreviewNonce(null);
       await saveHeroToMediaLibrary(article.slug, draft.title, url);
 
       addToast("success", url ? "Hero image saved." : "Hero image removed.");
@@ -987,6 +988,7 @@ export function ArticleEditorWorkspace({
       return false;
     }
 
+    setPreviewNonce(null);
     await insertSlugRedirect(slug, newSlug, adminUser.name || "system");
 
     addToast("success", "Slug updated. Reloading…");

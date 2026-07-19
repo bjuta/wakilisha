@@ -175,7 +175,7 @@ export function ArticlePreviewModal({
             <img
               src={heroUrl}
               alt={title}
-              className="absolute inset-0 w-full h-full object-cover object-top"
+              className="absolute inset-0 w-full h-full object-contain object-top"
             />
           ) : (
             <div className="absolute inset-0 w-full h-full bg-gradient-to-br from-background-200 to-background-300" />
