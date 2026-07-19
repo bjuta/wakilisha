@@ -742,7 +742,7 @@ export function ArticleMetaPanel({
             <img
               src={heroUrlInput}
               alt="Hero preview"
-              className="h-full w-full object-contain bg-wk-bg-subtle"
+              className="h-full w-full object-cover object-center"
               onError={() => setHeroPreviewError(true)}
             />
             <button
