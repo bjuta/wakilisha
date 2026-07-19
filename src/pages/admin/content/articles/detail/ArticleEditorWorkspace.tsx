@@ -248,13 +248,7 @@ export function ArticleEditorWorkspace({
       latestReviewAction === "approved",
   );
   const publishDisabledReason =
-    article &&
-    articlePermissions.canPublish &&
-    !canPublishApprovedArticleVersion &&
-    !canSubmitCurrentArticleForReview &&
-    !canRequestArticleChanges &&
-    !canApproveCurrentArticleVersion &&
-    !isFuture
+    article && articlePermissions.canPublish && !canPublishApprovedArticleVersion
       ? "Approve the submitted version before publishing."
       : null;
 
@@ -746,15 +740,12 @@ export function ArticleEditorWorkspace({
   }
 
   async function handlePublish() {
-    if (!articlePermissions.canPublish) {
-      addToast("error", "You do not have permission to publish articles.");
+    if (publishDisabledReason || !canPublishApprovedArticleVersion) {
+      addToast("error", publishDisabledReason || "Approve the submitted version before publishing.");
       return;
     }
-    if (publishDisabledReason) {
-      addToast("error", publishDisabledReason);
-      return;
-    }
-    setShowPublishChecklist(true);
+
+    setChecklistOpen(true);
   }
 
   async function handlePublishConfirm() {
@@ -763,8 +754,8 @@ export function ArticleEditorWorkspace({
       addToast("error", "You do not have permission to publish articles.");
       return;
     }
-    if (publishDisabledReason) {
-      addToast("error", publishDisabledReason);
+    if (publishDisabledReason || !canPublishApprovedArticleVersion) {
+      addToast("error", publishDisabledReason || "Approve the submitted version before publishing.");
       return;
     }
 
