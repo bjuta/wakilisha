@@ -14514,14 +14514,18 @@ export type Database = {
         Returns: {
           author: string
           categories: Json
+          content_fingerprint: string
           content_html: string
           created_at: string
           created_by: string
           excerpt: string
+          hero_image_url: string
           id: string
+          lifecycle_state: string
           published_at: string
           revision_number: number
           seo: Json
+          slug: string
           tags: Json
           title: string
           version_kind: string
