@@ -2,6 +2,10 @@ import { useEffect, useState, useCallback, useRef, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import { WkIcon } from "@/components/design-system/Icon";
 import { ArticleEditorHeader } from "./components/ArticleEditorHeader";
+import {
+  ArticleWorkbenchNav,
+  type ArticleWorkbenchMode,
+} from "./components/ArticleWorkbenchNav";
 import { ArticleContentEditor } from "./components/ArticleContentEditor";
 import { ArticleMetaPanel } from "./components/ArticleMetaPanel";
 import { ArticlePreviewModal } from "./components/ArticlePreviewModal";
@@ -25,6 +29,7 @@ import {
   trashArticle,
   generatePreviewNonce,
   fetchArticleLifecycleEvents,
+  fetchArticleVersionFingerprintStatus,
   type AdminArticleDetail,
   type ArticleSavePayload,
   type ArticleLifecycleEvent,
@@ -121,6 +126,8 @@ export function ArticleEditorWorkspace({
   const [loading, setLoading] = useState(true);
   const [notFound, setNotFound] = useState(false);
   const [showPreview, setShowPreview] = useState(false);
+  const [activeWorkbenchMode, setActiveWorkbenchMode] =
+    useState<ArticleWorkbenchMode>("write");
 
   // ── Central permission object ──
   const articlePermissions = useMemo(() => {
@@ -174,6 +181,13 @@ export function ArticleEditorWorkspace({
   const [showRecovery, setShowRecovery] = useState<RecoveryPayload | null>(null);
   const [showPublishChecklist, setShowPublishChecklist] = useState(false);
   const [lifecycleEvents, setLifecycleEvents] = useState<ArticleLifecycleEvent[]>([]);
+  const [approvedVersionFingerprintStatus, setApprovedVersionFingerprintStatus] =
+    useState<{
+      latestVersionNumber: number | null;
+      latestContentFingerprint: string | null;
+      approvedVersionNumber: number | null;
+      approvedContentFingerprint: string | null;
+    } | null>(null);
   const [reviewActionModal, setReviewActionModal] = useState<null | "request_changes" | "approve">(null);
   const [reviewActionNote, setReviewActionNote] = useState("");
   const [isReviewActionBusy, setIsReviewActionBusy] = useState(false);
@@ -218,6 +232,53 @@ export function ArticleEditorWorkspace({
     )?.action ?? null;
   }, [lifecycleEvents]);
 
+  const latestApprovedLifecycleEvent = useMemo(() => {
+    return lifecycleEvents.find((event) => event.action === "approved") ?? null;
+  }, [lifecycleEvents]);
+
+  useEffect(() => {
+    if (!article?.id || !latestApprovedLifecycleEvent?.versionNumber) {
+      setApprovedVersionFingerprintStatus(null);
+      return;
+    }
+
+    let alive = true;
+
+    void (async () => {
+      const status = await fetchArticleVersionFingerprintStatus(
+        article.id,
+        latestApprovedLifecycleEvent.versionNumber,
+      );
+
+      if (alive) {
+        setApprovedVersionFingerprintStatus(status);
+      }
+    })();
+
+    return () => {
+      alive = false;
+    };
+  }, [article?.draftVersion, article?.id, latestApprovedLifecycleEvent?.versionNumber]);
+
+  const hasChangesAfterLatestApproval = useMemo(() => {
+    if (!latestApprovedLifecycleEvent) return false;
+    if (isDirty) return true;
+
+    const approvedVersionNumber = latestApprovedLifecycleEvent.versionNumber;
+    const latestVersionNumber =
+      approvedVersionFingerprintStatus?.latestVersionNumber ?? null;
+
+    if (approvedVersionNumber && latestVersionNumber) {
+      return latestVersionNumber !== approvedVersionNumber;
+    }
+
+    return true;
+  }, [
+    approvedVersionFingerprintStatus,
+    isDirty,
+    latestApprovedLifecycleEvent,
+  ]);
+
   const articleWpStatus = article?.wpStatus ?? "draft";
   const isPendingReview = articleWpStatus === "pending";
   const isLiveOrScheduled = articleWpStatus === "publish" || articleWpStatus === "future";
@@ -227,7 +288,16 @@ export function ArticleEditorWorkspace({
       articlePermissions.canEdit &&
       !isPendingReview &&
       !isLiveOrScheduled &&
-      (articleWpStatus === "draft" || articleWpStatus === "" || latestReviewAction === "changes_requested"),
+      (
+        hasChangesAfterLatestApproval ||
+        latestReviewAction !== "approved"
+      ) &&
+      (
+        articleWpStatus === "draft" ||
+        articleWpStatus === "" ||
+        latestReviewAction === "changes_requested" ||
+        hasChangesAfterLatestApproval
+      ),
   );
   const canManageArticleReview = Boolean(article && (isAdmin || userCanManageReviewQueue));
   const canRequestArticleChanges = Boolean(
@@ -245,12 +315,49 @@ export function ArticleEditorWorkspace({
   const canPublishApprovedArticleVersion = Boolean(
     article &&
       articlePermissions.canPublish &&
-      latestReviewAction === "approved",
+      latestReviewAction === "approved" &&
+      !hasChangesAfterLatestApproval,
   );
   const publishDisabledReason =
-    article && articlePermissions.canPublish && !canPublishApprovedArticleVersion
-      ? "Approve the submitted version before publishing."
-      : null;
+    article && articlePermissions.canPublish && hasChangesAfterLatestApproval
+      ? "Submit this draft for review before publishing."
+      : article && articlePermissions.canPublish && !canPublishApprovedArticleVersion
+        ? "Approve the submitted version before publishing."
+        : null;
+
+  const editorialStatusLabel =
+    articleWpStatus === "publish"
+      ? "Published"
+      : articleWpStatus === "future"
+        ? "Scheduled"
+        : articleWpStatus === "trash"
+          ? "Archived"
+          : hasChangesAfterLatestApproval
+            ? "Changes Need Review"
+            : latestReviewAction === "approved"
+              ? "Approved for Publication"
+              : latestReviewAction === "changes_requested"
+              ? "Changes Requested"
+              : latestReviewAction === "submitted" || articleWpStatus === "pending"
+                ? "Pending Review"
+                : "Draft";
+
+  const editorialStatusColorKey =
+    articleWpStatus === "publish"
+      ? "publish"
+      : articleWpStatus === "future"
+        ? "future"
+        : articleWpStatus === "trash"
+          ? "trash"
+          : hasChangesAfterLatestApproval
+            ? "changes_requested"
+            : latestReviewAction === "approved"
+              ? "approved"
+              : latestReviewAction === "changes_requested"
+              ? "changes_requested"
+              : latestReviewAction === "submitted" || articleWpStatus === "pending"
+                ? "pending"
+                : "draft";
 
   // Refs for optimistic locking
   const articleUpdatedAtRef = useRef<string | null>(null);
@@ -1179,6 +1286,8 @@ export function ArticleEditorWorkspace({
         slug={article.slug}
         title={draft.title}
         status={article.wpStatus}
+        statusLabel={editorialStatusLabel}
+        statusColorKey={editorialStatusColorKey}
         isDirty={isDirty}
         isSaving={isSaving}
         isPublishing={isPublishing}
@@ -1214,24 +1323,52 @@ export function ArticleEditorWorkspace({
         </span>
       </div>
 
-      {/* Editor layout: content left, meta right */}
-      <div className="grid gap-5 lg:grid-cols-[1fr_320px]">
-        {/* Content area */}
-        <div>
-          <ArticleContentEditor
-            title={draft.title}
-            excerpt={draft.excerpt}
-            content={draft.content}
-            onTitleChange={(v) => articlePermissions.canEdit && patchDraft({ title: v })}
-            onExcerptChange={(v) => articlePermissions.canEdit && patchDraft({ excerpt: v })}
-            onContentChange={(v) => articlePermissions.canEdit && patchDraft({ content: v })}
-            readOnly={!articlePermissions.canEdit}
-          />
-        </div>
+      <ArticleWorkbenchNav
+        activeMode={activeWorkbenchMode}
+        status={article.wpStatus}
+        statusLabel={editorialStatusLabel}
+        isDirty={isDirty}
+        onModeChange={setActiveWorkbenchMode}
+      />
 
-        {/* Meta sidebar */}
-        <div>
+      {/* Workbench mode layout */}
+      <div
+        className={
+          activeWorkbenchMode === "write"
+            ? "grid gap-5 xl:grid-cols-[minmax(0,1fr)_360px]"
+            : "grid gap-5"
+        }
+      >
+        {activeWorkbenchMode === "write" ? (
+          <div className="min-w-0">
+            <ArticleContentEditor
+              title={draft.title}
+              excerpt={draft.excerpt}
+              content={draft.content}
+              onTitleChange={(v) =>
+                articlePermissions.canEdit && patchDraft({ title: v })
+              }
+              onExcerptChange={(v) =>
+                articlePermissions.canEdit && patchDraft({ excerpt: v })
+              }
+              onContentChange={(v) =>
+                articlePermissions.canEdit && patchDraft({ content: v })
+              }
+              readOnly={!articlePermissions.canEdit}
+            />
+          </div>
+        ) : null}
+
+        <div
+          className={
+            activeWorkbenchMode === "write"
+              ? "min-w-0"
+              : "w-full max-w-6xl"
+          }
+        >
           <ArticleMetaPanel
+            activeMode={activeWorkbenchMode}
+            hasChangesAfterApproval={hasChangesAfterLatestApproval}
             author={draft.author}
             categories={draft.categories}
             tags={draft.tags}
@@ -1255,7 +1392,9 @@ export function ArticleEditorWorkspace({
             onAuthorChange={(v) => patchDraft({ author: v })}
             onCategoriesChange={(v) => patchDraft({ categories: v })}
             onTagsChange={(v) => patchDraft({ tags: v })}
-            onPublishedAtChange={(v) => !isInstituteMode && patchDraft({ publishedAt: v })}
+            onPublishedAtChange={(v) =>
+              !isInstituteMode && patchDraft({ publishedAt: v })
+            }
             onSeoChange={(v) => patchDraft({ seo: v })}
             onRestoreDraft={handleRestoreDraft}
             onSlugChange={handleSlugChange}
@@ -1264,8 +1403,14 @@ export function ArticleEditorWorkspace({
             onSaveDraft={handleSaveDraft}
             onPublish={isInstituteMode ? undefined : handlePublish}
             onUnpublish={isInstituteMode ? undefined : handleUnpublish}
-            onDelete={isInstituteMode ? undefined : () => setShowDeleteConfirm(true)}
-            onStatusChange={isInstituteMode ? undefined : handleStatusChange}
+            onDelete={
+              isInstituteMode
+                ? undefined
+                : () => setShowDeleteConfirm(true)
+            }
+            onStatusChange={
+              isInstituteMode ? undefined : handleStatusChange
+            }
             onSubmitForReview={handleSubmitForReview}
             onRequestChanges={openRequestChanges}
             onApproveVersion={openApproveVersion}

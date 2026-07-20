@@ -649,6 +649,68 @@ export async function fetchArticleLifecycleEvents(articleId: string): Promise<Ar
   }));
 }
 
+export interface ArticleVersionFingerprintStatus {
+  latestVersionNumber: number | null;
+  latestContentFingerprint: string | null;
+  approvedVersionNumber: number | null;
+  approvedContentFingerprint: string | null;
+}
+
+export async function fetchArticleVersionFingerprintStatus(
+  articleId: string,
+  approvedVersionNumber: number | null,
+): Promise<ArticleVersionFingerprintStatus> {
+  const empty: ArticleVersionFingerprintStatus = {
+    latestVersionNumber: null,
+    latestContentFingerprint: null,
+    approvedVersionNumber,
+    approvedContentFingerprint: null,
+  };
+
+  if (!approvedVersionNumber) return empty;
+
+  const { data, error } = await (supabase as any).rpc("list_article_versions", {
+    p_article_id: articleId,
+    p_limit: 50,
+  });
+
+  if (error) {
+    console.warn("Failed to load article version fingerprints:", error.message);
+    return empty;
+  }
+
+  const rows = Array.isArray(data) ? data : [];
+
+  const versions = rows
+    .map((row: any) => ({
+      versionNumber:
+        typeof row.revision_number === "number"
+          ? row.revision_number
+          : row.revision_number
+            ? Number(row.revision_number)
+            : null,
+      contentFingerprint:
+        row.content_fingerprint == null
+          ? null
+          : String(row.content_fingerprint),
+    }))
+    .filter((row) => row.versionNumber != null);
+
+  const latest = versions
+    .slice()
+    .sort((a, b) => Number(b.versionNumber) - Number(a.versionNumber))[0] ?? null;
+
+  const approved =
+    versions.find((row) => row.versionNumber === approvedVersionNumber) ?? null;
+
+  return {
+    latestVersionNumber: latest?.versionNumber ?? null,
+    latestContentFingerprint: latest?.contentFingerprint ?? null,
+    approvedVersionNumber,
+    approvedContentFingerprint: approved?.contentFingerprint ?? null,
+  };
+}
+
 type ArticleLifecycleRpcName =
   | "submit_article_for_review"
   | "request_article_changes"
