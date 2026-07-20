@@ -747,7 +747,8 @@ export function ArticleEditorWorkspace({
       return;
     }
 
-    setChecklistOpen(true);
+
+    setShowPublishChecklist(true);
   }
 
   async function handlePublishConfirm() {

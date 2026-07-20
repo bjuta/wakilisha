@@ -1,9 +1,9 @@
 {
   "projectRef": "pgzizndxdyhqmtyywjmt",
   "schema": "public",
-  "generatedAt": "2026-07-18T21:02:19Z",
-  "typesSha256": "4cbb745d4cfe3e7fd05b6bd77a68901ccaad39dbc24e96f739be96412793bad9",
+  "generatedAt": "2026-07-20T11:02:01Z",
+  "typesSha256": "648dd07b882c539f860d973f0f8d4969c2a77e784844d59d2d2603b17a978cfa",
   "authoritativeMigrationDirectory": "supabase/migrations",
-  "migrationCount": 156,
-  "latestMigration": "20260718193000_phase_2b_governed_review_closure.sql"
+  "migrationCount": 158,
+  "latestMigration": "20260719143000_phase_2b_revision_preview_truth.sql"
 }
