@@ -5,6 +5,8 @@ interface Props {
   slug: string;
   title: string | null;
   status: string | null;
+  statusLabel?: string;
+  statusColorKey?: string;
   isDirty: boolean;
   isSaving: boolean;
   isPublishing: boolean;
@@ -40,6 +42,8 @@ const STATUS_COLORS: Record<string, string> = {
   publish: "bg-wk-success-soft text-wk-success",
   draft: "bg-wk-warning-soft text-wk-warning",
   pending: "bg-wk-info-soft text-wk-info",
+  approved: "bg-wk-success-soft text-wk-success",
+  changes_requested: "bg-wk-warning-soft text-wk-warning",
   future: "bg-wk-brand-soft text-wk-brand",
   private: "bg-wk-surface-raised text-wk-text-muted",
   trash: "bg-wk-danger-soft text-wk-danger",
@@ -49,6 +53,8 @@ export function ArticleEditorHeader({
   slug,
   title,
   status,
+  statusLabel,
+  statusColorKey,
   isDirty,
   isSaving,
   isPublishing,
@@ -75,7 +81,9 @@ export function ArticleEditorHeader({
   permissions,
 }: Props) {
   const navigate = useNavigate();
-  const statusColor = status ? (STATUS_COLORS[status] ?? STATUS_COLORS.draft) : STATUS_COLORS.draft;
+  const resolvedStatusColorKey = statusColorKey ?? status ?? "draft";
+  const statusColor =
+    STATUS_COLORS[resolvedStatusColorKey] ?? STATUS_COLORS.draft;
   const isPublished = status === "publish";
   const isFuture = status === "future";
   const shouldShowSubmitForReview = !isPublished && !isFuture && canSubmitForReview;
@@ -104,7 +112,7 @@ export function ArticleEditorHeader({
           <span
             className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wide ${statusColor}`}
           >
-            {status || "draft"}
+            {statusLabel ?? status ?? "Draft"}
           </span>
           {isDirty && (
             <span className="inline-flex items-center gap-1 rounded-full bg-wk-warning-soft px-2.5 py-0.5 text-[10px] font-bold text-wk-warning">

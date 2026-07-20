@@ -9,6 +9,7 @@ import { ArticleSeoAnalyzer } from "./ArticleSeoAnalyzer";
 import { ArticleInternalLinks } from "./ArticleInternalLinks";
 import { ArticleRevisionHistory } from "./ArticleRevisionHistory";
 import { ArticleRegistrySearch } from "./ArticleRegistrySearch";
+import type { ArticleWorkbenchMode } from "./ArticleWorkbenchNav";
 import { fetchAllAuthors, bustAuthorCache, type AuthorRow } from "@/services/authorProfiles";
 import { supabase } from "@/lib/supabase";
 
@@ -31,6 +32,8 @@ type ArticleLifecyclePanelEvent = {
 };
 
 interface Props {
+  activeMode?: ArticleWorkbenchMode;
+  hasChangesAfterApproval?: boolean;
   author: string;
   categories: string[];
   tags: string[];
@@ -121,6 +124,8 @@ function formatPublishDate(iso: string): string {
 }
 
 export function ArticleMetaPanel({
+  activeMode = "write",
+  hasChangesAfterApproval = false,
   author,
   categories,
   tags,
@@ -451,9 +456,221 @@ export function ArticleMetaPanel({
     return action.replaceAll("_", " ");
   }
 
+  const reviewEvents = lifecycleEvents
+    .filter((event) =>
+      ["submitted", "changes_requested", "approved"].includes(event.action),
+    )
+    .slice(0, 5);
+
+  const latestReviewAction = reviewEvents[0]?.action ?? null;
+  const hasChangesAfterLatestApproval = hasChangesAfterApproval;
+
+  const reviewStatusLabel =
+    wpStatus === "publish"
+      ? "Published"
+      : wpStatus === "future"
+        ? "Scheduled"
+        : hasChangesAfterLatestApproval
+          ? "Changes Need Review"
+          : latestReviewAction === "approved"
+            ? "Approved for Publication"
+            : latestReviewAction === "changes_requested"
+            ? "Changes Requested"
+            : latestReviewAction === "submitted" || wpStatus === "pending"
+              ? "Pending Review"
+              : getStatusLabel(wpStatus ?? "draft");
+
+  const reviewStateCopy =
+    hasChangesAfterLatestApproval
+      ? "This draft changed or was restored after approval. Send this version back through review."
+      : latestReviewAction === "approved"
+        ? "An editor approved this version. It is ready for publication."
+        : latestReviewAction === "changes_requested"
+        ? "An editor returned this version to the writer with requested changes."
+        : latestReviewAction === "submitted" || wpStatus === "pending"
+          ? "This version is waiting for an editorial decision."
+          : wpStatus === "publish"
+            ? "This article is live."
+            : canSubmitForReview
+              ? "This draft can move into review when the writer is ready."
+              : "Review actions will appear when this version reaches the right state.";
+
+  const unavailableReviewActionCopy =
+    hasChangesAfterLatestApproval
+      ? "Submit this draft for review."
+      : latestReviewAction === "approved"
+        ? onPublish
+          ? "This version is approved. Publish it from Publishing."
+          : "This version is approved and is waiting for a publisher."
+        : latestReviewAction === "changes_requested"
+        ? "The writer must revise and resubmit this version."
+        : "No review action is available for your role at this stage.";
+
+
   return (
     <div className="space-y-4">
 
+      {activeMode === "review" ? (
+        <div className="space-y-4">
+          <WkSurface className="overflow-hidden">
+            <div className="flex flex-col gap-3 border-b border-wk-border bg-wk-surface-raised/40 px-5 py-4 sm:flex-row sm:items-start sm:justify-between">
+              <div>
+                <div className="flex items-center gap-2">
+                  <WkIcon name="Shield" size={15} className="text-wk-brand" />
+                  <h3 className="text-[12px] font-black uppercase tracking-wider text-wk-text-muted">
+                    Editorial Review
+                  </h3>
+                </div>
+                <p className="mt-1 text-[12px] leading-5 text-wk-text-muted">
+                  Decide whether this version moves forward or returns to the writer.
+                </p>
+              </div>
+
+              <span className="w-fit rounded-full border border-wk-border bg-wk-bg-subtle px-3 py-1 text-[11px] font-bold text-wk-text">
+                {reviewStatusLabel}
+              </span>
+            </div>
+
+            <div className="grid gap-4 p-5 lg:grid-cols-[minmax(0,1fr)_minmax(280px,0.7fr)]">
+              <div className="rounded-xl border border-wk-border bg-wk-bg-subtle p-4">
+                <div className="text-[10px] font-black uppercase tracking-[0.16em] text-wk-text-faint">
+                  Current Review State
+                </div>
+
+                <div className="mt-3 flex items-start gap-3">
+                  <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-wk-brand-soft text-wk-brand">
+                    <WkIcon
+                      name={wpStatus === "pending" ? "Clock3" : "FileText"}
+                      size={16}
+                    />
+                  </div>
+
+                  <div>
+                    <div className="text-[14px] font-black text-wk-text">
+                      {reviewStatusLabel}
+                    </div>
+                    <p className="mt-1 text-[12px] leading-5 text-wk-text-muted">
+                      {reviewStateCopy}
+                    </p>
+                  </div>
+                </div>
+
+                {publishDisabledReason ? (
+                  <div className="mt-4 rounded-lg border border-wk-warning/30 bg-wk-warning-soft px-3 py-2">
+                    <div className="text-[10px] font-black uppercase tracking-[0.14em] text-wk-warning">
+                      Publication Gate
+                    </div>
+                    <p className="mt-1 text-[11px] font-bold leading-4 text-wk-text-muted">
+                      {publishDisabledReason}
+                    </p>
+                  </div>
+                ) : null}
+              </div>
+
+              <div className="rounded-xl border border-wk-border bg-wk-surface p-4">
+                <div className="text-[10px] font-black uppercase tracking-[0.16em] text-wk-text-faint">
+                  Available Actions
+                </div>
+
+                <div className="mt-3 flex flex-col gap-2">
+                  {canSubmitForReview ? (
+                    <button
+                      type="button"
+                      onClick={onSubmitForReview}
+                      disabled={isSaving || reviewActionBusy}
+                      className="wk-button wk-button-primary wk-button-sm justify-center"
+                    >
+                      <WkIcon name="Send" size={13} />
+                      Submit for Review
+                    </button>
+                  ) : null}
+
+                  {canRequestChanges ? (
+                    <button
+                      type="button"
+                      onClick={onRequestChanges}
+                      disabled={isSaving || reviewActionBusy}
+                      className="wk-button wk-button-secondary wk-button-sm justify-center text-wk-warning"
+                    >
+                      <WkIcon name="Flag" size={13} />
+                      Request Changes
+                    </button>
+                  ) : null}
+
+                  {canApproveVersion ? (
+                    <button
+                      type="button"
+                      onClick={onApproveVersion}
+                      disabled={isSaving || reviewActionBusy}
+                      className="wk-button wk-button-primary wk-button-sm justify-center"
+                    >
+                      <WkIcon name="ShieldCheck" size={13} />
+                      Approve Version
+                    </button>
+                  ) : null}
+
+                  {!canSubmitForReview &&
+                  !canRequestChanges &&
+                  !canApproveVersion ? (
+                    <div className="rounded-lg border border-dashed border-wk-border px-3 py-4 text-[11px] leading-4 text-wk-text-faint">
+                      {unavailableReviewActionCopy}
+                    </div>
+                  ) : null}
+                </div>
+              </div>
+            </div>
+          </WkSurface>
+
+          <WkSurface className="p-5">
+            <div className="flex items-center gap-2">
+              <WkIcon name="MessageSquareText" size={14} className="text-wk-text-muted" />
+              <h3 className="text-[11px] font-black uppercase tracking-wider text-wk-text-muted">
+                Recent Review Decisions
+              </h3>
+            </div>
+
+            {reviewEvents.length > 0 ? (
+              <div className="mt-4 grid gap-3 lg:grid-cols-2">
+                {reviewEvents.map((event) => (
+                  <div
+                    key={event.id}
+                    className="rounded-xl border border-wk-border bg-wk-bg-subtle px-4 py-3"
+                  >
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="text-[12px] font-black capitalize text-wk-text">
+                        {formatLifecycleAction(event.action)}
+                      </div>
+                      <div className="shrink-0 text-[10px] text-wk-text-faint">
+                        {new Date(event.createdAt).toLocaleString()}
+                      </div>
+                    </div>
+
+                    <div className="mt-1 text-[11px] text-wk-text-muted">
+                      {event.versionNumber
+                        ? `Version ${event.versionNumber}`
+                        : "No version"}{" "}
+                      · {event.actorLabel ?? "System"}
+                    </div>
+
+                    {event.note ? (
+                      <p className="mt-2 text-[11px] leading-4 text-wk-text-soft">
+                        {event.note}
+                      </p>
+                    ) : null}
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="mt-4 rounded-xl border border-dashed border-wk-border px-4 py-5 text-[11px] text-wk-text-faint">
+                No review decisions have been recorded yet.
+              </div>
+            )}
+          </WkSurface>
+        </div>
+      ) : null}
+
+      {activeMode === "publishing" ? (
+        <>
       {/* ══════════════════════════════════
           PUBLISH PANEL (WordPress-style)
           ══════════════════════════════════ */}
@@ -502,7 +719,7 @@ export function ArticleMetaPanel({
             <div className="flex-1">
               <div className="flex items-center gap-1 text-[12px] text-wk-text-soft">
                 <span>Status:</span>
-                <span className="font-bold text-wk-text">{getStatusLabel(wpStatus ?? "draft")}</span>
+                <span className="font-bold text-wk-text">{reviewStatusLabel}</span>
                 {!publishingLocked && !statusEditOpen && (
                   <button onClick={() => setStatusEditOpen(true)} className="text-[11px] text-wk-brand hover:underline ml-1 cursor-pointer">Edit</button>
                 )}
@@ -641,52 +858,6 @@ export function ArticleMetaPanel({
 
           <div className="border-t border-wk-border" />
 
-          {/* Governed review actions */}
-          {(canSubmitForReview || canRequestChanges || canApproveVersion) && (
-            <>
-              <div className="rounded-lg border border-wk-brand/20 bg-wk-brand-soft/60 px-3 py-2 space-y-2">
-                <div className="flex items-center gap-2">
-                  <WkIcon name="Shield" size={13} className="text-wk-brand" />
-                  <span className="text-[11px] font-black uppercase tracking-wider text-wk-brand">Review workflow</span>
-                </div>
-                <div className="flex flex-wrap gap-2">
-                  {canSubmitForReview ? (
-                    <button
-                      onClick={onSubmitForReview}
-                      disabled={isSaving || reviewActionBusy}
-                      className="flex items-center gap-1.5 rounded-md border border-wk-border bg-wk-bg-subtle px-3 py-1.5 text-[11px] font-semibold text-wk-brand hover:bg-wk-brand-soft transition-colors disabled:opacity-50 whitespace-nowrap"
-                    >
-                      <WkIcon name="Send" size={12} />
-                      Submit for Review
-                    </button>
-                  ) : null}
-                  {canRequestChanges ? (
-                    <button
-                      onClick={onRequestChanges}
-                      disabled={isSaving || reviewActionBusy}
-                      className="flex items-center gap-1.5 rounded-md border border-wk-border bg-wk-bg-subtle px-3 py-1.5 text-[11px] font-semibold text-wk-warning hover:bg-wk-warning-soft transition-colors disabled:opacity-50 whitespace-nowrap"
-                    >
-                      <WkIcon name="Flag" size={12} />
-                      Request Changes
-                    </button>
-                  ) : null}
-                  {canApproveVersion ? (
-                    <button
-                      onClick={onApproveVersion}
-                      disabled={isSaving || reviewActionBusy}
-                      className="flex items-center gap-1.5 rounded-md bg-wk-brand px-3 py-1.5 text-[11px] font-bold text-wk-brand-on hover:opacity-90 transition-opacity disabled:opacity-50 whitespace-nowrap"
-                    >
-                      <WkIcon name="Shield" size={12} />
-                      Approve Version
-                    </button>
-                  ) : null}
-                </div>
-              </div>
-
-              <div className="border-t border-wk-border" />
-            </>
-          )}
-
           {/* Main action row */}
           {publishingLocked ? (
             <div className="rounded-lg border border-wk-warning/30 bg-wk-warning-soft px-3 py-2 text-[11px] leading-4 text-wk-text-muted">
@@ -729,7 +900,11 @@ export function ArticleMetaPanel({
           )}
         </div>
       </WkSurface>
+        </>
+      ) : null}
 
+      {activeMode === "media" ? (
+        <>
       {/* Hero Image */}
       <WkSurface className="p-4">
         <h3 className="text-[11px] font-bold uppercase tracking-wider text-wk-text-muted mb-3 flex items-center gap-1.5">
@@ -821,7 +996,11 @@ export function ArticleMetaPanel({
         }}
         title="Media Library"
       />
+        </>
+      ) : null}
 
+      {activeMode === "publishing" ? (
+        <>
       {/* Slug */}
       <WkSurface className="p-4">
         <h3 className="text-[11px] font-bold uppercase tracking-wider text-wk-text-muted mb-3">Permalink</h3>
@@ -863,7 +1042,11 @@ export function ArticleMetaPanel({
           )}
         </div>
       </WkSurface>
+        </>
+      ) : null}
 
+      {activeMode === "write" ? (
+        <>
       {/* Author */}
       <WkSurface className="p-4">
         <h3 className="text-[11px] font-bold uppercase tracking-wider text-wk-text-muted mb-3 flex items-center gap-1.5">
@@ -1074,7 +1257,11 @@ export function ArticleMetaPanel({
         onInsertLink={onInsertLink}
         onEmbedRelease={onEmbedRelease}
       />
+        </>
+      ) : null}
 
+      {activeMode === "seo" ? (
+        <>
       {/* SEO Panel */}
       <WkSurface className="overflow-hidden">
         <button onClick={() => setSeoOpen(!seoOpen)} className="flex w-full items-center justify-between px-4 py-3 text-left hover:bg-wk-surface-raised transition-colors">
@@ -1116,7 +1303,11 @@ export function ArticleMetaPanel({
           </div>
         )}
       </WkSurface>
+        </>
+      ) : null}
 
+      {activeMode === "publishing" || activeMode === "history" ? (
+        <>
       {/* Publishing Timeline */}
       <WkSurface className="overflow-hidden">
         <button onClick={() => setTimelineOpen(!timelineOpen)} className="flex w-full items-center justify-between px-4 py-3 text-left hover:bg-wk-surface-raised transition-colors">
@@ -1157,7 +1348,11 @@ export function ArticleMetaPanel({
           </div>
         )}
       </WkSurface>
+        </>
+      ) : null}
 
+      {activeMode === "seo" ? (
+        <>
       {/* SEO Preview */}
       <WkSurface className="overflow-hidden">
         <button onClick={() => setSeoPreviewOpen(!seoPreviewOpen)} className="flex w-full items-center justify-between px-4 py-3 text-left hover:bg-wk-surface-raised transition-colors">
@@ -1173,7 +1368,11 @@ export function ArticleMetaPanel({
           </div>
         )}
       </WkSurface>
+        </>
+      ) : null}
 
+      {activeMode === "history" || activeMode === "recovery" ? (
+        <>
       {/* Revision History */}
       <WkSurface className="overflow-hidden">
         <button onClick={() => setRevisionsOpen(!revisionsOpen)} className="flex w-full items-center justify-between px-4 py-3 text-left hover:bg-wk-surface-raised transition-colors">
@@ -1196,6 +1395,9 @@ export function ArticleMetaPanel({
           </div>
         )}
       </WkSurface>
+        </>
+      ) : null}
+
     </div>
   );
 }
