@@ -151,16 +151,46 @@ function normalizeVersionTerms(value: unknown): string[] {
     .filter(Boolean);
 }
 
+function formatVersionKind(value: string | null): string {
+  if (!value) return "Version";
+  return value
+    .replace(/_/g, " ")
+    .replace(/\b\w/g, (char) => char.toUpperCase());
+}
+
+function formatLifecycleState(value: string | null): string {
+  if (!value) return "Draft";
+  return value
+    .replace(/_/g, " ")
+    .replace(/\b\w/g, (char) => char.toUpperCase());
+}
+
+function lifecycleTone(value: string | null): string {
+  if (value === "approved" || value === "published") return "bg-wk-success-soft text-wk-success";
+  if (value === "changes_requested" || value === "archived" || value === "trash") return "bg-wk-warning-soft text-wk-warning";
+  if (value === "submitted" || value === "pending") return "bg-wk-info-soft text-wk-info";
+  return "bg-wk-bg-subtle text-wk-text-muted";
+}
+
+function restoreGuidance(revision: Revision, isCurrent: boolean, mode: "history" | "recovery"): string {
+  if (isCurrent) return "This is the current saved version.";
+  if (mode === "recovery") return "Restoring this creates a draft that needs review before publishing.";
+  if (revision.lifecycle_state === "approved") return "This was approved before, but restoring it later creates a draft.";
+  if (revision.lifecycle_state === "published") return "This was published before. Compare it carefully before restoring.";
+  return "This version can be restored into the editor as a draft.";
+}
+
 /* ─── Component ─── */
 
 interface Props {
   articleId: string;
   currentStatus: string | null;
   currentTitle: string;
+  mode?: "history" | "recovery";
   onRestore?: (payload: RestorePayload) => void;
 }
 
-export function ArticleRevisionHistory({ articleId, currentStatus, currentTitle, onRestore }: Props) {
+export function ArticleRevisionHistory({ articleId, currentStatus, currentTitle, mode = "history", onRestore }: Props) {
   const [revisions, setRevisions] = useState<Revision[]>([]);
   const [loading, setLoading] = useState(true);
   const [expandedRev, setExpandedRev] = useState<string | null>(null);
@@ -281,9 +311,57 @@ export function ArticleRevisionHistory({ articleId, currentStatus, currentTitle,
   }
 
   const highestRev = Math.max(...revisions.map((r) => r.revision_number));
+  const currentRevision = revisions.find((r) => r.revision_number === highestRev) ?? revisions[0] ?? null;
+  const approvedCount = revisions.filter((revision) => revision.lifecycle_state === "approved").length;
+  const restoreCandidateCount = revisions.filter((revision) => revision.revision_number !== highestRev).length;
 
   return (
-    <div className="space-y-3">
+    <div className="space-y-4">
+      <WkSurface className="overflow-hidden">
+        <div className="border-b border-wk-border px-5 py-4">
+          <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+            <div>
+              <div className="flex items-center gap-2">
+                <WkIcon name={mode === "recovery" ? "RotateCcw" : "History"} size={16} className="text-wk-brand" />
+                <h3 className="text-[15px] font-black text-wk-text">
+                  {mode === "recovery" ? "Restore Points" : "Revision Ledger"}
+                </h3>
+              </div>
+              <p className="mt-1 max-w-2xl text-[12px] leading-5 text-wk-text-muted">
+                {mode === "recovery"
+                  ? "Choose an earlier checkpoint to restore into the editor. Restored content becomes a draft and must pass review again."
+                  : "Review each saved checkpoint, compare changes, and understand which version is currently active."}
+              </p>
+              <p className="mt-2 text-[11px] text-wk-text-faint">
+                Article: <span className="font-semibold text-wk-text-soft">{currentTitle || "Untitled article"}</span>
+              </p>
+            </div>
+            <div className="grid grid-cols-3 gap-2 text-center">
+              <div className="rounded-xl border border-wk-border bg-wk-bg-subtle px-3 py-2">
+                <div className="text-[16px] font-black text-wk-text">{revisions.length}</div>
+                <div className="text-[10px] font-bold uppercase tracking-[0.14em] text-wk-text-faint">Versions</div>
+              </div>
+              <div className="rounded-xl border border-wk-border bg-wk-bg-subtle px-3 py-2">
+                <div className="text-[16px] font-black text-wk-text">{approvedCount}</div>
+                <div className="text-[10px] font-bold uppercase tracking-[0.14em] text-wk-text-faint">Approved</div>
+              </div>
+              <div className="rounded-xl border border-wk-border bg-wk-bg-subtle px-3 py-2">
+                <div className="text-[16px] font-black text-wk-text">{restoreCandidateCount}</div>
+                <div className="text-[10px] font-bold uppercase tracking-[0.14em] text-wk-text-faint">Restore</div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {currentRevision ? (
+          <div className="px-5 py-3 text-[12px] text-wk-text-muted">
+            Current saved version: <span className="font-black text-wk-text">v{currentRevision.revision_number}</span>
+            {" "}· Storage status: <span className="font-semibold uppercase text-wk-text-soft">{currentStatus || "draft"}</span>
+            {" "}· Editorial snapshot: <span className="font-semibold text-wk-text-soft">{formatLifecycleState(currentRevision.lifecycle_state)}</span>
+          </div>
+        ) : null}
+      </WkSurface>
+
       {/* Compare toggle */}
       <div className="flex items-center justify-between">
         <span className="text-[11px] font-semibold text-wk-text-muted uppercase tracking-wider">
@@ -358,6 +436,8 @@ export function ArticleRevisionHistory({ articleId, currentStatus, currentTitle,
         const isCurrent = rev.revision_number === highestRev;
         const isAutosave = rev.created_by === "System" || rev.created_by === "autosave";
         const isSelected = selectedLeft === rev.id || selectedRight === rev.id;
+        const lifecycleLabel = formatLifecycleState(rev.lifecycle_state);
+        const versionKindLabel = formatVersionKind(rev.version_kind);
 
         return (
           <WkSurface
@@ -417,6 +497,12 @@ export function ArticleRevisionHistory({ articleId, currentStatus, currentTitle,
                       Auto-saved
                     </span>
                   )}
+                  <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-bold ${lifecycleTone(rev.lifecycle_state)}`}>
+                    {lifecycleLabel}
+                  </span>
+                  <span className="inline-flex items-center rounded-full bg-wk-bg-subtle px-2 py-0.5 text-[10px] font-bold text-wk-text-faint">
+                    {versionKindLabel}
+                  </span>
                   <span className="text-[11px] text-wk-text-muted">
                     by {rev.created_by || "System"}
                   </span>
@@ -424,7 +510,9 @@ export function ArticleRevisionHistory({ articleId, currentStatus, currentTitle,
                 <div className="flex items-center gap-2 text-[11px] text-wk-text-faint mt-0.5">
                   <span>{new Date(rev.created_at).toLocaleString()}</span>
                   <span>·</span>
-                  <span className="uppercase">{rev.wp_status || "draft"}</span>
+                  <span className="uppercase">Storage {rev.wp_status || "draft"}</span>
+                  <span>·</span>
+                  <span>{restoreGuidance(rev, isCurrent, mode)}</span>
                 </div>
               </div>
               {!compareMode && (
@@ -448,7 +536,7 @@ export function ArticleRevisionHistory({ articleId, currentStatus, currentTitle,
                     <p className="text-wk-text mt-0.5 font-mono truncate">{rev.slug || "Not set"}</p>
                   </div>
                   <div>
-                    <span className="text-[11px] font-semibold text-wk-text-muted uppercase">Status</span>
+                    <span className="text-[11px] font-semibold text-wk-text-muted uppercase">Storage Status</span>
                     <p className="text-wk-text mt-0.5 uppercase">{rev.wp_status || "draft"}</p>
                   </div>
                   <div>
@@ -456,6 +544,14 @@ export function ArticleRevisionHistory({ articleId, currentStatus, currentTitle,
                     <p className="text-wk-text mt-0.5">
                       {rev.published_at ? new Date(rev.published_at).toLocaleString() : "Not set"}
                     </p>
+                  </div>
+                  <div>
+                    <span className="text-[11px] font-semibold text-wk-text-muted uppercase">Lifecycle</span>
+                    <p className="text-wk-text mt-0.5">{lifecycleLabel}</p>
+                  </div>
+                  <div>
+                    <span className="text-[11px] font-semibold text-wk-text-muted uppercase">Kind</span>
+                    <p className="text-wk-text mt-0.5">{versionKindLabel}</p>
                   </div>
                 </div>
 
@@ -480,13 +576,16 @@ export function ArticleRevisionHistory({ articleId, currentStatus, currentTitle,
                 </div>
 
                 {!isCurrent && (
-                  <div className="flex gap-2">
+                  <div className="flex flex-col gap-2 rounded-xl border border-wk-warning/30 bg-wk-warning-soft/40 px-3 py-3 sm:flex-row sm:items-center sm:justify-between">
+                    <div className="text-[12px] leading-5 text-wk-text-muted">
+                      <span className="font-black text-wk-text">Restore safety:</span> This returns the content as a draft. It does not preserve prior approval.
+                    </div>
                     <button
                       onClick={(e) => { e.stopPropagation(); setShowConfirm(rev); }}
                       className="wk-button wk-button-secondary wk-button-sm whitespace-nowrap"
                     >
                       <WkIcon name="RotateCcw" size={14} />
-                      Restore This Version
+                      Restore as Draft
                     </button>
                   </div>
                 )}
@@ -503,10 +602,13 @@ export function ArticleRevisionHistory({ articleId, currentStatus, currentTitle,
             <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-xl bg-wk-warning-soft text-wk-warning">
               <WkIcon name="RotateCcw" size={22} />
             </div>
-            <h3 className="text-[16px] font-bold text-wk-text mb-2">Restore Version?</h3>
-            <p className="text-[13px] text-wk-text-muted mb-5">
-              This will overwrite the current article with version {showConfirm.revision_number} from{" "}
-              {new Date(showConfirm.created_at).toLocaleString()}.
+            <h3 className="text-[16px] font-bold text-wk-text mb-2">Restore Version as Draft?</h3>
+            <p className="text-[13px] text-wk-text-muted mb-3">
+              This will restore version {showConfirm.revision_number} from{" "}
+              {new Date(showConfirm.created_at).toLocaleString()} into the editor.
+            </p>
+            <p className="mb-5 rounded-lg border border-wk-warning/30 bg-wk-warning-soft px-3 py-2 text-[12px] leading-5 text-wk-warning">
+              Restored content must be saved, submitted, and approved again before it can be published.
             </p>
             <div className="flex gap-3">
               <button
