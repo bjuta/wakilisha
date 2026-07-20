@@ -8,6 +8,7 @@ import { ArticleSeoPreview } from "./ArticleSeoPreview";
 import { ArticleSeoAnalyzer } from "./ArticleSeoAnalyzer";
 import { ArticleInternalLinks } from "./ArticleInternalLinks";
 import { ArticleRevisionHistory } from "./ArticleRevisionHistory";
+import { ArticleLifecycleAuditSurface } from "./ArticleLifecycleAuditSurface";
 import { ArticleRegistrySearch } from "./ArticleRegistrySearch";
 import type { ArticleWorkbenchMode } from "./ArticleWorkbenchNav";
 import { fetchAllAuthors, bustAuthorCache, type AuthorRow } from "@/services/authorProfiles";
@@ -1313,7 +1314,7 @@ export function ArticleMetaPanel({
         <button onClick={() => setTimelineOpen(!timelineOpen)} className="flex w-full items-center justify-between px-4 py-3 text-left hover:bg-wk-surface-raised transition-colors">
           <div className="flex items-center gap-2">
             <WkIcon name="GitBranch" size={14} className="text-wk-text-muted" />
-            <h3 className="text-[11px] font-bold uppercase tracking-wider text-wk-text-muted">Publishing Timeline</h3>
+            <h3 className="text-[11px] font-bold uppercase tracking-wider text-wk-text-muted">{activeMode === "history" ? "Lifecycle Timeline" : "Publishing Timeline"}</h3>
           </div>
           <WkIcon name={timelineOpen ? "ChevronUp" : "ChevronDown"} size={14} className="text-wk-text-faint" />
         </button>
@@ -1321,29 +1322,10 @@ export function ArticleMetaPanel({
           <div className="border-t border-wk-border px-4 py-4">
             <ArticlePublishTimeline status={wpStatus} publishedAt={publishedAt} createdAt={createdAt} updatedAt={updatedAt} isDirty={isDirty} isSaving={isSaving} isPublishing={isPublishing} lastAutosavedAt={lastAutosavedAt} />
             <div className="mt-4 border-t border-wk-border pt-4">
-              <div className="mb-2 text-[10px] font-black uppercase tracking-[0.16em] text-wk-text-faint">Lifecycle history</div>
-              {lifecycleEvents.length > 0 ? (
-                <div className="space-y-2">
-                  {lifecycleEvents.map((event) => (
-                    <div key={event.id} className="rounded-lg border border-wk-border bg-wk-bg-subtle px-3 py-2">
-                      <div className="flex items-center justify-between gap-2">
-                        <span className="text-[12px] font-black capitalize text-wk-text">{formatLifecycleAction(event.action)}</span>
-                        <span className="text-[10px] text-wk-text-faint">{new Date(event.createdAt).toLocaleString()}</span>
-                      </div>
-                      <div className="mt-1 text-[11px] text-wk-text-muted">
-                        {event.versionNumber ? `Version ${event.versionNumber}` : "No version"} · {event.actorLabel ?? "system"}
-                      </div>
-                      {event.note ? (
-                        <div className="mt-1 text-[11px] leading-4 text-wk-text-soft">{event.note}</div>
-                      ) : null}
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                <div className="rounded-lg border border-dashed border-wk-border px-3 py-3 text-[11px] text-wk-text-faint">
-                  No lifecycle events recorded yet.
-                </div>
-              )}
+              <ArticleLifecycleAuditSurface
+                events={lifecycleEvents}
+                variant={activeMode === "history" ? "full" : "compact"}
+              />
             </div>
           </div>
         )}
@@ -1371,6 +1353,41 @@ export function ArticleMetaPanel({
         </>
       ) : null}
 
+      {activeMode === "recovery" ? (
+        <WkSurface className="overflow-hidden border-wk-warning/30">
+          <div className="border-b border-wk-border px-5 py-4">
+            <div className="flex items-start gap-3">
+              <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-wk-warning-soft text-wk-warning">
+                <WkIcon name="RotateCcw" size={16} />
+              </div>
+              <div>
+                <h3 className="text-[15px] font-black text-wk-text">Recovery Decisions</h3>
+                <p className="mt-1 text-[12px] leading-5 text-wk-text-muted">
+                  Restoring an earlier version brings that content back as a draft. It does not bring back an old approval, because the editorial context may have changed.
+                </p>
+              </div>
+            </div>
+          </div>
+          <div className="grid gap-3 px-5 py-4 md:grid-cols-3">
+            <div className="rounded-xl border border-wk-border bg-wk-bg-subtle px-3 py-3">
+              <div className="text-[11px] font-black uppercase tracking-[0.14em] text-wk-text-faint">Step 1</div>
+              <div className="mt-1 text-[12px] font-bold text-wk-text">Compare the version</div>
+              <p className="mt-1 text-[11px] leading-4 text-wk-text-muted">Use compare before restore when the article has moved through review or publishing.</p>
+            </div>
+            <div className="rounded-xl border border-wk-border bg-wk-bg-subtle px-3 py-3">
+              <div className="text-[11px] font-black uppercase tracking-[0.14em] text-wk-text-faint">Step 2</div>
+              <div className="mt-1 text-[12px] font-bold text-wk-text">Restore as draft</div>
+              <p className="mt-1 text-[11px] leading-4 text-wk-text-muted">The restored content is editable and must be saved before review.</p>
+            </div>
+            <div className="rounded-xl border border-wk-border bg-wk-bg-subtle px-3 py-3">
+              <div className="text-[11px] font-black uppercase tracking-[0.14em] text-wk-text-faint">Step 3</div>
+              <div className="mt-1 text-[12px] font-bold text-wk-text">Review again</div>
+              <p className="mt-1 text-[11px] leading-4 text-wk-text-muted">Submit, approve, and publish the restored version as a new editorial decision.</p>
+            </div>
+          </div>
+        </WkSurface>
+      ) : null}
+
       {activeMode === "history" || activeMode === "recovery" ? (
         <>
       {/* Revision History */}
@@ -1378,7 +1395,7 @@ export function ArticleMetaPanel({
         <button onClick={() => setRevisionsOpen(!revisionsOpen)} className="flex w-full items-center justify-between px-4 py-3 text-left hover:bg-wk-surface-raised transition-colors">
           <div className="flex items-center gap-2">
             <WkIcon name="History" size={14} className="text-wk-text-muted" />
-            <h3 className="text-[11px] font-bold uppercase tracking-wider text-wk-text-muted">Revision History</h3>
+            <h3 className="text-[11px] font-bold uppercase tracking-wider text-wk-text-muted">{activeMode === "recovery" ? "Restore Points" : "Revision History"}</h3>
           </div>
           <WkIcon name={revisionsOpen ? "ChevronUp" : "ChevronDown"} size={14} className="text-wk-text-faint" />
         </button>
@@ -1388,6 +1405,7 @@ export function ArticleMetaPanel({
               articleId={articleId}
               currentStatus={wpStatus}
               currentTitle={title}
+              mode={activeMode === "recovery" ? "recovery" : "history"}
               onRestore={(payload) => {
                 onRestoreDraft?.({ title: payload.title, excerpt: payload.excerpt, content: payload.content, author: payload.author, categories: payload.categories, tags: payload.tags, seo: payload.seo as SeoMeta, publishedAt: payload.publishedAt, wpStatus: payload.wpStatus });
               }}
