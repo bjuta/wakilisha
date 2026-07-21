@@ -190,9 +190,31 @@ const PRERENDER_MANIFEST_TIMEOUT_MS = Math.max(
   PRERENDER_FETCH_TIMEOUT_MS,
   Number(
     envValue("SEO_PRERENDER_MANIFEST_TIMEOUT_MS")
-      || 30000,
+      || 60000,
   ),
 );
+
+const PRERENDER_MANIFEST_RETRY_COUNT = Math.max(
+  1,
+  Number(
+    envValue("SEO_PRERENDER_MANIFEST_RETRY_COUNT")
+      || 3,
+  ),
+);
+
+function writeDbMetadataManifest(metadata = {}) {
+  fs.mkdirSync(path.dirname(DB_METADATA_OUTPUT_PATH), { recursive: true });
+  fs.writeFileSync(DB_METADATA_OUTPUT_PATH, JSON.stringify(metadata, null, 2) + "\n");
+}
+
+function mapFromDbMetadata(metadata = {}) {
+  const entries = Object.entries(metadata).map(([routePath, value]) => [cleanPath(routePath), value]);
+  return new Map(entries);
+}
+
+async function sleep(ms) {
+  await new Promise((resolve) => setTimeout(resolve, ms));
+}
 
 async function fetchWithTimeout(
   url,
@@ -222,38 +244,60 @@ async function fetchDbMetadataManifest() {
   const metadataUrl = explicitUrl || (supabaseUrl ? `${supabaseUrl}/functions/v1/seo-sitemap-admin?action=metadata` : "");
 
   if (!metadataUrl) {
+    writeDbMetadataManifest({});
     console.warn("SEO metadata manifest skipped: no SEO_METADATA_MANIFEST_URL or VITE_PUBLIC_SUPABASE_URL.");
     return new Map();
   }
 
-  try {
-    const response = await fetchWithTimeout(
-      metadataUrl,
-      {
-        headers: {
-          Accept: "application/json",
-          ...(anonKey ? { apikey: anonKey, Authorization: `Bearer ${anonKey}` } : {}),
-        },
-      },
-      PRERENDER_MANIFEST_TIMEOUT_MS,
-    );
+  let lastError = null;
 
-    if (!response.ok) {
-      console.warn(`SEO metadata manifest skipped: ${response.status} ${response.statusText}`);
-      return new Map();
+  for (let attempt = 1; attempt <= PRERENDER_MANIFEST_RETRY_COUNT; attempt += 1) {
+    try {
+      const response = await fetchWithTimeout(
+        metadataUrl,
+        {
+          headers: {
+            Accept: "application/json",
+            ...(anonKey ? { apikey: anonKey, Authorization: `Bearer ${anonKey}` } : {}),
+          },
+        },
+        PRERENDER_MANIFEST_TIMEOUT_MS,
+      );
+
+      if (!response.ok) {
+        lastError = new Error(`${response.status} ${response.statusText}`);
+      } else {
+        const payload = await response.json();
+        const metadata = payload?.data?.metadata || payload?.metadata || {};
+        const entries = mapFromDbMetadata(metadata);
+
+        writeDbMetadataManifest(metadata);
+
+        console.log(`SEO metadata manifest loaded: ${entries.size.toLocaleString()} entries.`);
+        return entries;
+      }
+    } catch (error) {
+      lastError = error;
     }
 
-    const payload = await response.json();
-    const metadata = payload?.data?.metadata || payload?.metadata || {};
-    const entries = Object.entries(metadata).map(([routePath, value]) => [cleanPath(routePath), value]);
-    fs.writeFileSync(DB_METADATA_OUTPUT_PATH, JSON.stringify(metadata, null, 2) + "\n");
-
-    console.log(`SEO metadata manifest loaded: ${entries.length.toLocaleString()} entries.`);
-    return new Map(entries);
-  } catch (error) {
-    console.warn(`SEO metadata manifest skipped: ${error instanceof Error ? error.message : String(error)}`);
-    return new Map();
+    if (attempt < PRERENDER_MANIFEST_RETRY_COUNT) {
+      const waitMs = attempt * 1000;
+      console.warn(
+        `SEO metadata manifest retry ${attempt}/${PRERENDER_MANIFEST_RETRY_COUNT} failed: ${
+          lastError instanceof Error ? lastError.message : String(lastError)
+        }`,
+      );
+      await sleep(waitMs);
+    }
   }
+
+  writeDbMetadataManifest({});
+  console.warn(
+    `SEO metadata manifest unavailable after ${PRERENDER_MANIFEST_RETRY_COUNT} attempt(s): ${
+      lastError instanceof Error ? lastError.message : String(lastError)
+    }`,
+  );
+  return new Map();
 }
 
 
