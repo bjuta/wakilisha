@@ -35,6 +35,33 @@ The first supported outputs are:
 
 The trust layer must not become an Institute-only evidence system.
 
+## Article Workspace North Star quality gate
+
+Status: Active.
+
+Phase 3A schema implementation is paused.
+
+The Article Workspace remains the first adopter of Sources, Citations, and Credits, but it cannot guide the wider five-year product programme in its current form.
+
+The product audit confirmed:
+
+- North Star gate failed
+- responsive behaviour scored one out of five
+- large-document usability scored one out of five
+- Review controls workflow but does not yet support the act of reviewing
+- Publishing does not yet communicate the exact governed version clearly enough
+- current identity presentation fragments account, ownership, Author, actor, and future credit concepts
+
+Required sequence:
+
+1. complete the Article Workspace North Star quality pass
+2. verify exact public Preview
+3. verify keyboard, focus, dialog, and narrow-screen behaviour
+4. lock the canonical creditable-person identity contract
+5. resume PR 3A schema and Article integration
+
+This quality gate does not reopen Phase 2 authority.
+
 ## PR 3A: Sources, citations, and credits
 
 Build scope:
