@@ -15,7 +15,7 @@ All future work on Articles, Playlists, Audio, Video, Media, Registry, Charts, c
 
 ## Programme status
 
-Current phase: **Phase 3: Trust infrastructure**.
+Current phase: **Phase 3: Trust infrastructure**, with the **Article Workspace North Star quality gate** active before PR 3A schema work.
 
 This plan has been reconciled against repository main at:
 
@@ -1584,6 +1584,47 @@ Immediate Phase 3 boundary:
 - do not start Playlist, Audio, Video, Media, Field Capture, or Inquiry Mode work in PR 3A
 - prove reuse through Article first, then at least one non-Article target
 - keep public presentation scoped to what the trust records can prove
+
+### Article Workspace North Star quality gate (active)
+
+Phase 3A schema implementation is paused until the Article Workspace passes the North Star gate.
+
+The audit found that the Article authority is durable, but the current workspace is not yet strong enough to serve as the five-year product benchmark.
+
+Confirmed gaps include:
+
+- writing focus
+- workspace hierarchy
+- command hierarchy
+- Review quality
+- Publishing clarity
+- responsive behaviour
+- large-document usability
+- trust readiness
+- identity clarity
+- accessibility validation
+
+The quality gate does not reopen Phase 2 architecture.
+
+Do not alter proven lifecycle, review, approval, publication snapshot, archive, restore, recovery, or preview-security contracts unless a verified defect requires it.
+
+The quality pass is limited to no more than two implementation pull requests:
+
+1. Composition and workspace hierarchy
+2. Review, Publishing, Record, accessibility, and Phase 3A insertion points
+
+PR 3A schema work resumes only after:
+
+- the Article dominates the workspace
+- the primary action is clear
+- exact Preview is authoritative
+- Review supports reading, comparison, comments, tasks, and decisions
+- Publishing identifies the exact approved version
+- responsive behaviour is deliberately designed rather than stacked
+- long Articles have navigation and persistent commands
+- Sources, Citations, and Credits have a coherent workspace home
+- account identity, ownership, credit identity, and byline are clearly separated
+- the North Star acceptance tests pass
 
 ### PR 3A: Sources, citations, and credits
 
