@@ -15,11 +15,11 @@ All future work on Articles, Playlists, Audio, Video, Media, Registry, Charts, c
 
 ## Programme status
 
-Current phase: **Phase 2B: Review and publication lifecycle**.
+Current phase: **Phase 3: Trust infrastructure**.
 
 This plan has been reconciled against repository main at:
 
-`180aa4a Merge pull request #470 from bjuta/fix/phase-2b-governed-review-closure`
+`e2d401b Merge pull request #484 from bjuta/fix/seo-metadata-manifest-abort`
 
 Closed phases:
 
@@ -28,32 +28,29 @@ Closed phases:
 - **Phase 1A: Resource identity and domain boundaries**, closed through PR #457.
 - **Phase 1B: Commands, jobs, and outbox**, closed through PR #458 and PR #459.
 - **Phase 2A: Durable Article drafts and immutable versions**, closed through PR #460, PR #461, PR #463, and PR #464.
+- **Phase 2B: Review and publication lifecycle**, closed through PR #467, PR #469, PR #470, and PR #481.
+- **Phase 2C: Article Editor Workbench**, closed through PR #482 and PR #483.
+
+Supporting build-pipeline fix:
+
+- **SEO metadata manifest abort fallback**, closed through PR #484.
 
 Active phase:
 
-- **Phase 2B: Review and publication lifecycle**.
+- **Phase 3: Trust infrastructure**.
 
-Phase 2B has shipped the backend and public-read foundations, including lifecycle RPCs, publication snapshots, scheduled publication infrastructure, archive and restore infrastructure, version-bound previews, Edge read updates, and production preview rendering through PR #467, PR #469, and PR #470.
+Phase 2 is closed.
 
-Phase 2B is not closed yet.
+Phase 2 proved the Article authority from draft through restoration in production. The completed lifecycle proof covered Draft, Submit for Review, Request Changes, revised Draft, Submit again, Approve, Publish, later Draft edit, public unchanged verification, Archive, and Restore.
 
-Remaining Phase 2B closure work:
-
-- restore the missing governed review controls in the current Article Editor
-- show Submit for Review clearly for Draft articles
-- show Request Changes and Approve Version for Pending Review articles
-- prevent Publish from bypassing approval
-- show lifecycle history in the editor
-- prove the full lifecycle with one real Article in production
-- confirm later draft changes do not silently alter the published public page
-- update this plan with the final closure record
-
-Phase 3 must not start until Phase 2B is closed.
+Phase 3 begins from the closed Article authority baseline. It must not reopen Article lifecycle architecture unless a trust-infrastructure requirement exposes a verified defect.
 
 See also:
 
 - `docs/institute/phase-reconciliation-audit-20260718.md`
 - `docs/engineering/phase-2b-review-publication-lifecycle-audit.md`
+- `docs/engineering/phase-2-article-authority-closure-record.md`
+- `docs/engineering/phase-3-trust-infrastructure-kickoff.md`
 
 
 ## Decision
@@ -1476,7 +1473,7 @@ Completion record, 15 July 2026:
 - production proof command created a command receipt, job, and outbox event
 - production changed: schema only
 
-## Phase 2: Article authority (active)
+## Phase 2: Article authority (complete)
 
 ### PR 2A: Durable drafts and immutable versions (complete)
 
@@ -1509,7 +1506,7 @@ Completion record, 16 July 2026:
 - production smoke confirmed autosave, Save Draft, reload persistence, and visible revision history on a real Article
 - production changed: schema and frontend
 
-### PR 2B: Review and publication lifecycle (active)
+### PR 2B: Review and publication lifecycle (complete)
 
 Build:
 
@@ -1524,39 +1521,69 @@ Build:
 - cached Article read model
 - exact public preview
 
-Already shipped:
+Completion record, 21 July 2026:
 
-- Article lifecycle events table
-- scheduled publication table
-- publication snapshot table
-- review, approval, schedule, publish, archive, and restore RPC foundations
-- public read paths backed by publication snapshots
-- scheduled publication Edge Function integration
-- version-bound preview links
-- preview nonce resolver
-- production preview rendering for a Pending Review Article
-
-Remaining closure work:
-
-- expose Submit for Review clearly on Draft articles
-- expose Request Changes and Approve Version on Pending Review articles
-- require a reviewer note for requested changes
-- approve the submitted immutable version, not a mutable draft
-- prevent Publish from using working or merely submitted versions when approval is required
-- show lifecycle history with actor, action, note, version, and date
-- verify archive and restore through the current Article workflow
-- run one full real-Article production lifecycle smoke
+- closed through PR #467, PR #469, PR #470, and PR #481
+- lifecycle RPCs, publication snapshots, scheduled publication infrastructure, archive and restore infrastructure, version-bound previews, Edge read updates, and preview rendering shipped
+- publish now requires an approved immutable Article version
+- public Article delivery reads stable publication snapshot state
+- Article lifecycle history is visible in the editor
+- production proof completed Draft, Submit for Review, Request Changes, revised Draft, Submit again, Approve, Publish, later Draft edit, public unchanged verification, Archive, and Restore
+- production changed: schema, Edge Functions, and frontend across the Phase 2B implementation
+- final SQL hotfix for approved version publication was recorded on main through PR #481
 
 Exit gate:
 
-- one real Article completes the full lifecycle
-- the public page is served from a stable published version
-- later draft changes cannot alter the published version silently
-- the editor visibly explains the review history
+- one real Article completed the full lifecycle
+- the public page was served from a stable published version
+- later draft changes did not alter the published version silently
+- the editor visibly explains review and lifecycle history
 - Phase 2B closure is recorded in this plan
 
+### PR 2C: Article Editor Workbench (complete)
 
-## Phase 3: Trust infrastructure
+Build:
+
+- Article editor workbench modes
+- primary mode navigation
+- reduced sidebar dependency
+- visible Review, Publishing, History, and Recovery surfaces
+- full-width lifecycle and revision history
+- clearer archive, restore, compare, and recovery guidance
+- preserved Phase 2B governed review behaviour
+- production deployment of the Phase 2C runtime
+
+Completion record, 21 July 2026:
+
+- closed through PR #482 and PR #483
+- deployed frontend runtime from main commit `f951ff9`
+- production editor verified Write, Review, Publishing, History, and Recovery modes
+- History shows Lifecycle Timeline, Lifecycle Audit, Revision Ledger, and version restore context
+- Recovery shows Recovery Decisions and Restore Points
+- no SQL migration was required for Phase 2C
+- no Supabase Edge Function deploy was required for Phase 2C
+- SEO and prerender production artifacts were intentionally left unchanged during the runtime deploy
+
+Exit gate:
+
+- the Article editor no longer depends on the right sidebar for primary editorial work
+- publish, review, archive, restore, revision history, and lifecycle history are visible as core workbench capabilities
+- existing Phase 2B governance behaviour still works
+- user-facing strings touched in Phase 2C were checked for prohibited dash characters
+- production smoke passed
+
+## Phase 3: Trust infrastructure (active)
+
+Phase 3 builds the shared trust layer that Articles, Playlists, Audio, Video, Registry, Charts, and Inquiry will reuse.
+
+Immediate Phase 3 boundary:
+
+- start with Sources, citations, and credits
+- preserve the closed Article lifecycle
+- do not rebuild the Article editor
+- do not start Playlist, Audio, Video, Media, Field Capture, or Inquiry Mode work in PR 3A
+- prove reuse through Article first, then at least one non-Article target
+- keep public presentation scoped to what the trust records can prove
 
 ### PR 3A: Sources, citations, and credits
 
