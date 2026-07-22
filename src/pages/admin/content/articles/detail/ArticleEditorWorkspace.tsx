@@ -8,7 +8,7 @@ import {
 } from "./components/ArticleWorkbenchNav";
 import { ArticleContentEditor } from "./components/ArticleContentEditor";
 import { ArticleMetaPanel } from "./components/ArticleMetaPanel";
-import { ArticlePreviewModal } from "./components/ArticlePreviewModal";
+import { ArticleWriteContextDrawer } from "./components/ArticleWriteContextDrawer";
 import { ArticlePublishChecklist } from "./components/ArticlePublishChecklist";
 import { useAdminUser } from "@/hooks/useAdminUser";
 import {
@@ -36,6 +36,11 @@ import {
 } from "@/services/articles/articleAdminService";
 import { processArticleContent } from "@/services/articles/contentPipeline";
 import { syncInstituteArticlePublicationState } from "@/services/institute/institutePublicationSyncService";
+
+const CANONICAL_PUBLIC_ORIGIN = String(
+  import.meta.env.VITE_PUBLIC_SITE_ORIGIN ||
+    "https://wakilisha.africa",
+).replace(/\/+$/, "");
 
 /* ─── Draft state (UI-layer only) ─── */
 
@@ -125,9 +130,12 @@ export function ArticleEditorWorkspace({
   const [article, setArticle] = useState<AdminArticleDetail | null>(null);
   const [loading, setLoading] = useState(true);
   const [notFound, setNotFound] = useState(false);
-  const [showPreview, setShowPreview] = useState(false);
   const [activeWorkbenchMode, setActiveWorkbenchMode] =
     useState<ArticleWorkbenchMode>("write");
+  const [writeContextOpen, setWriteContextOpen] =
+    useState(false);
+  const [focusMode, setFocusMode] =
+    useState(false);
 
   // ── Central permission object ──
   const articlePermissions = useMemo(() => {
@@ -1068,12 +1076,6 @@ export function ArticleEditorWorkspace({
     }
   }
 
-  function handlePreview() {
-    if (!article) return;
-    setShowPreview(true);
-    addToast("info", "Preview mode. Scroll down to see the full article.");
-  }
-
   async function handleSlugChange(newSlug: string): Promise<boolean> {
     if (!articlePermissions.canEdit) {
       addToast("error", articlePermissions.reason ?? "Permission denied.");
@@ -1178,7 +1180,7 @@ export function ArticleEditorWorkspace({
     }
   }
 
-  /** Open the magazine preview in a new tab, generating a nonce on-the-fly if needed. */
+  /** Open the exact public rendering for the current governed or draft version. */
   async function handleMagazinePreview() {
     if (!article) return;
 
@@ -1189,28 +1191,43 @@ export function ArticleEditorWorkspace({
       if (!saved) return;
     }
 
+    const needsVersionPreview =
+      article.wpStatus !== "publish" ||
+      hadDirtyDraft ||
+      hasChangesAfterLatestApproval;
+
     let nonce = hadDirtyDraft ? null : previewNonce;
 
-    // If article is not published and there is no nonce yet, generate one now.
-    // When this click saved dirty work, force a fresh version-bound nonce.
-    if (article.wpStatus !== "publish" && !nonce) {
+    if (needsVersionPreview && !nonce) {
       setIsGeneratingPreview(true);
       nonce = await generatePreviewNonce(article.id);
-      if (nonce) setPreviewNonce(nonce);
+      if (nonce) {
+        setPreviewNonce(nonce);
+      }
       setIsGeneratingPreview(false);
     }
 
-    const isPublished = article.wpStatus === "publish";
-    const url = isPublished || !nonce
-      ? `/magazine/${article.slug}`
-      : `/magazine/${article.slug}?preview=${nonce}`;
+    if (needsVersionPreview && !nonce) {
+      addToast("error", "Could not prepare the exact Article preview.");
+      return;
+    }
 
-    window.open(url, "_blank", "noopener,noreferrer");
+    const previewPath =
+      needsVersionPreview && nonce
+        ? `/magazine/${encodeURIComponent(article.slug)}?preview=${encodeURIComponent(nonce)}`
+        : `/magazine/${encodeURIComponent(article.slug)}`;
+
+    window.open(
+      `${CANONICAL_PUBLIC_ORIGIN}${previewPath}`,
+      "_blank",
+      "noopener,noreferrer",
+    );
   }
 
-  const previewUrl = previewNonce
-    ? `${window.location.origin}/preview/${previewNonce}`
-    : null;
+  const previewUrl =
+    previewNonce && article?.slug
+      ? `${CANONICAL_PUBLIC_ORIGIN}/magazine/${encodeURIComponent(article.slug)}?preview=${encodeURIComponent(previewNonce)}`
+      : null;
 
   // ════════════════════════════════════════════
   // Store content in seo object as _content for the SEO analyzer
@@ -1240,6 +1257,48 @@ export function ArticleEditorWorkspace({
     return () => window.removeEventListener("keydown", handleKeyDown);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [draft, article]);
+
+
+  useEffect(() => {
+    window.dispatchEvent(
+      new CustomEvent(
+        "wk-admin-focus-mode-change",
+        {
+          detail: {
+            active: focusMode,
+          },
+        },
+      ),
+    );
+  }, [focusMode]);
+
+  useEffect(() => {
+    return () => {
+      window.dispatchEvent(
+        new CustomEvent(
+          "wk-admin-focus-mode-change",
+          {
+            detail: {
+              active: false,
+            },
+          },
+        ),
+      );
+    };
+  }, []);
+
+  function handleCloseArticle() {
+    if (
+      isDirty &&
+      !window.confirm(
+        "Leave this Article with unsaved changes?",
+      )
+    ) {
+      return;
+    }
+
+    navigate("/admin/content/articles");
+  }
 
   /* ─── Render states ─── */
 
@@ -1273,9 +1332,77 @@ export function ArticleEditorWorkspace({
 
   if (!article) return null;
 
+  const articleMetaPanel = (
+    <ArticleMetaPanel
+      activeMode={activeWorkbenchMode}
+      hasChangesAfterApproval={hasChangesAfterLatestApproval}
+      author={draft.author}
+      categories={draft.categories}
+      tags={draft.tags}
+      publishedAt={draft.publishedAt}
+      seo={seoWithContent}
+      slug={article.slug}
+      wpStatus={article.wpStatus}
+      createdAt={article.createdAt}
+      updatedAt={article.updatedAt}
+      articleId={article.id}
+      title={draft.title}
+      excerpt={draft.excerpt}
+      isDirty={isDirty}
+      isSaving={isSaving}
+      isPublishing={isPublishing}
+      publishingLocked={isInstituteMode}
+      lastAutosavedAt={lastAutosavedAt}
+      heroImageUrl={article.heroImageUrl}
+      isSavingHero={isSavingHero}
+      onHeroImageSave={handleSaveHeroImage}
+      onAuthorChange={(v) => patchDraft({ author: v })}
+      onCategoriesChange={(v) => patchDraft({ categories: v })}
+      onTagsChange={(v) => patchDraft({ tags: v })}
+      onPublishedAtChange={(v) =>
+        !isInstituteMode && patchDraft({ publishedAt: v })
+      }
+      onSeoChange={(v) => patchDraft({ seo: v })}
+      onRestoreDraft={handleRestoreDraft}
+      onSlugChange={handleSlugChange}
+      onInsertLink={handleInsertLink}
+      onEmbedRelease={handleEmbedRelease}
+      onSaveDraft={handleSaveDraft}
+      onPublish={isInstituteMode ? undefined : handlePublish}
+      onUnpublish={isInstituteMode ? undefined : handleUnpublish}
+      onDelete={
+        isInstituteMode
+          ? undefined
+          : () => setShowDeleteConfirm(true)
+      }
+      onStatusChange={
+        isInstituteMode ? undefined : handleStatusChange
+      }
+      onSubmitForReview={handleSubmitForReview}
+      onRequestChanges={openRequestChanges}
+      onApproveVersion={openApproveVersion}
+      canSubmitForReview={canSubmitCurrentArticleForReview}
+      canRequestChanges={canRequestArticleChanges}
+      canApproveVersion={canApproveCurrentArticleVersion}
+      reviewActionBusy={isReviewActionBusy}
+      publishDisabledReason={publishDisabledReason}
+      lifecycleEvents={lifecycleEvents}
+      previewUrl={previewUrl}
+      isGeneratingPreview={isGeneratingPreview}
+      onGeneratePreviewLink={handleGeneratePreviewLink}
+      onMagazinePreview={handleMagazinePreview}
+      previewNonce={previewNonce}
+      onCategorySlugMap={setCategorySlugMap}
+      onTagSlugMap={setTagSlugMap}
+    />
+  );
+
   return (
-    <div className="space-y-5">
-      {isInstituteMode ? (
+    <div
+      data-article-focus-mode={focusMode || undefined}
+      className={focusMode ? "space-y-3" : "space-y-5"}
+    >
+      {!focusMode && isInstituteMode ? (
         <div className="rounded-2xl border border-wk-warning/30 bg-wk-warning-soft px-4 py-3 text-[12px] font-bold leading-5 text-wk-text-muted">
           {instituteNotice ?? "Draft, save, preview, then submit."}
         </div>
@@ -1290,13 +1417,21 @@ export function ArticleEditorWorkspace({
         statusColorKey={editorialStatusColorKey}
         isDirty={isDirty}
         isSaving={isSaving}
+        lastAutosavedAt={lastAutosavedAt}
         isPublishing={isPublishing}
-        isPreviewing={false}
+        isPreviewing={isGeneratingPreview}
         onSaveDraft={handleSaveDraft}
         onPublish={handlePublish}
         onUnpublish={handleUnpublish}
         onDelete={() => setShowDeleteConfirm(true)}
-        onPreview={handlePreview}
+        onPreview={handleMagazinePreview}
+        onOpenArticleDetails={() => setWriteContextOpen(true)}
+        showArticleDetails={activeWorkbenchMode === "write"}
+        articleDetailsOpen={writeContextOpen}
+        focusMode={focusMode}
+        onToggleFocusMode={() =>
+          setFocusMode((current) => !current)
+        }
         onSubmitForReview={handleSubmitForReview}
         allowSubmitForReview={allowSubmitForReview}
         canSubmitForReview={canSubmitCurrentArticleForReview}
@@ -1314,31 +1449,22 @@ export function ArticleEditorWorkspace({
         permissions={articlePermissions}
       />
 
-      {/* Keyboard hint */}
-      <div className="flex items-center gap-2 text-[11px] text-[var(--wk-text-faint)]">
-        <WkIcon name="Command" size={11} />
-        <span>
-          +S to save · Auto-saves every 10s · Last auto-saved:{" "}
-          {lastAutosavedAt ? new Date(lastAutosavedAt).toLocaleTimeString() : "Not yet"}
-        </span>
-      </div>
-
+      {!focusMode ? (
       <ArticleWorkbenchNav
-        activeMode={activeWorkbenchMode}
-        status={article.wpStatus}
-        statusLabel={editorialStatusLabel}
-        isDirty={isDirty}
-        onModeChange={setActiveWorkbenchMode}
-      />
+          activeMode={activeWorkbenchMode}
+          onModeChange={(mode) => {
+            setActiveWorkbenchMode(mode);
+
+            if (mode !== "write") {
+              setWriteContextOpen(false);
+              setFocusMode(false);
+            }
+          }}
+        />
+      ) : null}
 
       {/* Workbench mode layout */}
-      <div
-        className={
-          activeWorkbenchMode === "write"
-            ? "grid gap-5 xl:grid-cols-[minmax(0,1fr)_360px]"
-            : "grid gap-5"
-        }
-      >
+      <div className="grid gap-5">
         {activeWorkbenchMode === "write" ? (
           <div className="min-w-0">
             <ArticleContentEditor
@@ -1355,96 +1481,39 @@ export function ArticleEditorWorkspace({
                 articlePermissions.canEdit && patchDraft({ content: v })
               }
               readOnly={!articlePermissions.canEdit}
+              onSaveDraft={handleSaveDraft}
+              onPreviewArticle={handleMagazinePreview}
+              onOpenArticleDetails={() =>
+                setWriteContextOpen(true)
+              }
+              onCloseArticle={handleCloseArticle}
+              focusMode={focusMode}
+              onToggleFocusMode={() =>
+                setFocusMode(
+                  (current) => !current,
+                )
+              }
             />
           </div>
         ) : null}
 
-        <div
-          className={
-            activeWorkbenchMode === "write"
-              ? "min-w-0"
-              : "w-full max-w-6xl"
-          }
-        >
-          <ArticleMetaPanel
-            activeMode={activeWorkbenchMode}
-            hasChangesAfterApproval={hasChangesAfterLatestApproval}
-            author={draft.author}
-            categories={draft.categories}
-            tags={draft.tags}
-            publishedAt={draft.publishedAt}
-            seo={seoWithContent}
-            slug={article.slug}
-            wpStatus={article.wpStatus}
-            createdAt={article.createdAt}
-            updatedAt={article.updatedAt}
-            articleId={article.id}
+        {activeWorkbenchMode === "write" ? (
+          <ArticleWriteContextDrawer
+            open={writeContextOpen}
             title={draft.title}
-            excerpt={draft.excerpt}
-            isDirty={isDirty}
-            isSaving={isSaving}
-            isPublishing={isPublishing}
-            publishingLocked={isInstituteMode}
-            lastAutosavedAt={lastAutosavedAt}
-            heroImageUrl={article.heroImageUrl}
-            isSavingHero={isSavingHero}
-            onHeroImageSave={handleSaveHeroImage}
-            onAuthorChange={(v) => patchDraft({ author: v })}
-            onCategoriesChange={(v) => patchDraft({ categories: v })}
-            onTagsChange={(v) => patchDraft({ tags: v })}
-            onPublishedAtChange={(v) =>
-              !isInstituteMode && patchDraft({ publishedAt: v })
-            }
-            onSeoChange={(v) => patchDraft({ seo: v })}
-            onRestoreDraft={handleRestoreDraft}
-            onSlugChange={handleSlugChange}
-            onInsertLink={handleInsertLink}
-            onEmbedRelease={handleEmbedRelease}
-            onSaveDraft={handleSaveDraft}
-            onPublish={isInstituteMode ? undefined : handlePublish}
-            onUnpublish={isInstituteMode ? undefined : handleUnpublish}
-            onDelete={
-              isInstituteMode
-                ? undefined
-                : () => setShowDeleteConfirm(true)
-            }
-            onStatusChange={
-              isInstituteMode ? undefined : handleStatusChange
-            }
-            onSubmitForReview={handleSubmitForReview}
-            onRequestChanges={openRequestChanges}
-            onApproveVersion={openApproveVersion}
-            canSubmitForReview={canSubmitCurrentArticleForReview}
-            canRequestChanges={canRequestArticleChanges}
-            canApproveVersion={canApproveCurrentArticleVersion}
-            reviewActionBusy={isReviewActionBusy}
-            publishDisabledReason={publishDisabledReason}
-            lifecycleEvents={lifecycleEvents}
-            previewUrl={previewUrl}
-            isGeneratingPreview={isGeneratingPreview}
-            onGeneratePreviewLink={handleGeneratePreviewLink}
-            onMagazinePreview={handleMagazinePreview}
-            previewNonce={previewNonce}
-            onCategorySlugMap={setCategorySlugMap}
-            onTagSlugMap={setTagSlugMap}
-          />
-        </div>
+            content={draft.content}
+            categoryCount={draft.categories.length}
+            tagCount={draft.tags.length}
+            onClose={() => setWriteContextOpen(false)}
+          >
+            {articleMetaPanel}
+          </ArticleWriteContextDrawer>
+        ) : (
+          <div className="w-full max-w-6xl">
+            {articleMetaPanel}
+          </div>
+        )}
       </div>
-
-      {/* Preview Modal */}
-      {showPreview && (
-        <ArticlePreviewModal
-          title={draft.title}
-          excerpt={draft.excerpt}
-          content={draft.content}
-          author={draft.author}
-          heroImageUrl={article.heroImageUrl}
-          publishedAt={draft.publishedAt}
-          tags={draft.tags}
-          categories={draft.categories}
-          onClose={() => setShowPreview(false)}
-        />
-      )}
 
       {/* Review Decision Modal */}
       {reviewActionModal && (

@@ -30,6 +30,7 @@ import { useScrollDepthTracking } from "@/hooks/useScrollDepthTracking";
 import { useAuthUser } from "@/hooks/useAuthUser";
 import { CommunitySection } from "./components/CommunitySection";
 import { CommunityActionSheet } from "@/components/feature/community/CommunityActionSheet";
+import { ArticlePreviewModeBanner } from "./components/ArticlePreviewModeBanner";
 
 /* Remove InlineMediaGallery — captions now render inline alongside their images */
 
@@ -315,6 +316,8 @@ export default function ArticlePage() {
 
   return (
     <main className="min-h-screen bg-[var(--wk-bg)]">
+      {previewNonce ? <ArticlePreviewModeBanner /> : null}
+
       <MetaTags title={article.title} description={article.dek || `Read ${article.title} on WAKILISHA Magazine.`} imageUrl={article.heroUrl} url={typeof window !== "undefined" ? window.location.href : undefined} type="article" />
       <SchemaOrg
         data={{

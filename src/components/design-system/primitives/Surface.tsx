@@ -1,16 +1,26 @@
-import type { ReactNode } from "react";
+import type {
+  ComponentPropsWithoutRef,
+  ReactNode,
+} from "react";
 
-interface WkSurfaceProps {
+interface WkSurfaceProps
+  extends ComponentPropsWithoutRef<"div"> {
   children: ReactNode;
-  className?: string;
-  onClick?: () => void;
 }
 
-export function WkSurface({ children, className = "", onClick }: WkSurfaceProps) {
+export function WkSurface({
+  children,
+  className = "",
+  onClick,
+  ...divProps
+}: WkSurfaceProps) {
   return (
     <div
+      {...divProps}
       onClick={onClick}
-      className={`wk-panel ${className} ${onClick ? "cursor-pointer" : ""}`.trim()}
+      className={`wk-panel ${className} ${
+        onClick ? "cursor-pointer" : ""
+      }`.trim()}
     >
       {children}
     </div>
