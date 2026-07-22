@@ -24,6 +24,7 @@ import { CommunitySection } from "@/pages/magazine/article/components/CommunityS
 import { SchemaOrg } from "@/components/seo/SchemaOrg";
 import { useScrollDepthTracking } from "@/hooks/useScrollDepthTracking";
 import { useAuthUser } from "@/hooks/useAuthUser";
+import { ArticlePreviewModeBanner } from "@/pages/magazine/article/components/ArticlePreviewModeBanner";
 
 function formatReadCount(count: number): string {
   if (count >= 1000) return `${(count / 1000).toFixed(1)}k`;
@@ -225,6 +226,8 @@ export default function MobileArticle() {
 
   return (
     <div className="min-h-screen bg-[var(--wk-bg)]">
+      {previewNonce ? <ArticlePreviewModeBanner /> : null}
+
       {/* Reading progress */}
       <div className="fixed top-0 left-0 right-0 z-50 h-[2px] bg-transparent">
         <div

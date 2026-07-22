@@ -5,6 +5,13 @@ import Underline from "@tiptap/extension-underline";
 import LinkExtension from "@tiptap/extension-link";
 import Placeholder from "@tiptap/extension-placeholder";
 import { WkIcon } from "@/components/design-system/Icon";
+import {
+  EditorialMenuBar,
+  type ResolvedEditorialCommand,
+} from "@/components/design-system/editorial/EditorialMenuBar";
+import type {
+  EditorialCommandId,
+} from "@/components/design-system/editorial/editorCommandRegistry";
 import { MediaPickerModal } from "@/components/admin/MediaPickerModal";
 import { ExtendedImage } from "@/components/admin/editor/ExtendedImage";
 import { FloatingImageToolbar } from "@/components/admin/editor/FloatingImageToolbar";
@@ -70,9 +77,36 @@ interface Props {
   onChange: (html: string) => void;
   placeholder?: string;
   minHeight?: number;
+  readOnly?: boolean;
+  onSaveDraft?: () => void | Promise<void>;
+  onPreviewArticle?: () => void | Promise<void>;
+  onOpenArticleDetails?: () => void;
+  onCloseArticle?: () => void;
+  onOpenFindReplace?: () => void;
+  onShowWritingStats?: () => void;
+  focusMode?: boolean;
+  onToggleFocusMode?: () => void;
+  wordCount?: number;
+  readingMinutes?: number;
 }
 
-export function RichTextEditor({ value, onChange, placeholder, minHeight = 500 }: Props) {
+export function RichTextEditor({
+  value,
+  onChange,
+  placeholder,
+  minHeight = 500,
+  readOnly = false,
+  onSaveDraft,
+  onPreviewArticle,
+  onOpenArticleDetails,
+  onCloseArticle,
+  onOpenFindReplace,
+  onShowWritingStats,
+  focusMode = false,
+  onToggleFocusMode,
+  wordCount = 0,
+  readingMinutes = 1,
+}: Props) {
   const [viewMode, setViewMode] = useState<ViewMode>("visual");
   const [linkPopup, setLinkPopup] = useState<LinkPopupState>({
     visible: false,
@@ -99,6 +133,9 @@ export function RichTextEditor({ value, onChange, placeholder, minHeight = 500 }
   const htmlRef = useRef<HTMLTextAreaElement>(null);
   const isInternalUpdate = useRef(false);
   const toolbarRef = useRef<HTMLDivElement>(null);
+  const [, setSelectionRevision] = useState(0);
+  const readOnlyRef = useRef(readOnly);
+  readOnlyRef.current = readOnly;
 
   const { data: releases, loading: releasesLoading } = useReleaseSearchData();
   const { data: artists, loading: artistsLoading } = useArtistSearchData();
@@ -151,6 +188,7 @@ export function RichTextEditor({ value, onChange, placeholder, minHeight = 500 }
       SlashCommandExtension,
     ],
     content: value || "",
+    editable: !readOnly,
     editorProps: {
       attributes: {
         class:
@@ -166,6 +204,7 @@ export function RichTextEditor({ value, onChange, placeholder, minHeight = 500 }
       },
     },
     onUpdate: ({ editor: ed }) => {
+      if (readOnlyRef.current) return;
       isInternalUpdate.current = true;
       onChange(ed.getHTML());
     },
@@ -175,6 +214,7 @@ export function RichTextEditor({ value, onChange, placeholder, minHeight = 500 }
 
   useEffect(() => {
     const onSlashCommand = (e: Event) => {
+      if (readOnly) return;
       const detail = (e as CustomEvent).detail as { command: string };
       switch (detail.command) {
         case "release":
@@ -190,7 +230,7 @@ export function RichTextEditor({ value, onChange, placeholder, minHeight = 500 }
     };
     window.addEventListener("wk-slash-command", onSlashCommand);
     return () => window.removeEventListener("wk-slash-command", onSlashCommand);
-  }, []);
+  }, [readOnly]);
 
   /* ─── Sync external value changes into editor ─── */
 
@@ -206,6 +246,43 @@ export function RichTextEditor({ value, onChange, placeholder, minHeight = 500 }
       editor.commands.setContent(value || "", false);
     }
   }, [value, editor]);
+
+  useEffect(() => {
+    if (!editor) return;
+    editor.setEditable(!readOnly);
+    editor.view.dom.setAttribute("aria-readonly", String(readOnly));
+  }, [editor, readOnly]);
+
+
+  useEffect(() => {
+    if (!editor) return;
+
+    const refreshSelectionState = () => {
+      setSelectionRevision(
+        (revision) => revision + 1,
+      );
+    };
+
+    editor.on(
+      "selectionUpdate",
+      refreshSelectionState,
+    );
+    editor.on(
+      "transaction",
+      refreshSelectionState,
+    );
+
+    return () => {
+      editor.off(
+        "selectionUpdate",
+        refreshSelectionState,
+      );
+      editor.off(
+        "transaction",
+        refreshSelectionState,
+      );
+    };
+  }, [editor]);
 
   /* ─── Toolbar command dispatcher ─── */
 
@@ -455,23 +532,439 @@ export function RichTextEditor({ value, onChange, placeholder, minHeight = 500 }
 
   const handleHtmlChange = useCallback(
     (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+      if (readOnly) return;
       onChange(e.target.value);
     },
-    [onChange]
+    [onChange, readOnly]
   );
-
-  /* ─── View buttons ─── */
-
-  const VIEW_BUTTONS: { mode: ViewMode; icon: string; label: string }[] = [
-    { mode: "visual", icon: "PenTool", label: "Visual" },
-    { mode: "html", icon: "Code2", label: "HTML" },
-    { mode: "preview", icon: "Eye", label: "Preview" },
-    { mode: "split", icon: "Columns2", label: "Split" },
-  ];
 
   const showEditor = viewMode === "visual" || viewMode === "split";
   const showHtml = viewMode === "html" || viewMode === "split";
   const showPreview = viewMode === "preview";
+
+
+  const hasTextSelection = Boolean(
+    editor && !editor.state.selection.empty,
+  );
+
+  const isListContext = Boolean(
+    editor &&
+      (
+        editor.isActive("bulletList") ||
+        editor.isActive("orderedList")
+      ),
+  );
+
+  const resolveMenuCommand = useCallback(
+    (
+      command: EditorialCommandId,
+    ): ResolvedEditorialCommand => {
+      const unavailable = {
+        onSelect: () => undefined,
+        hidden: true,
+      };
+
+      const editable = Boolean(editor) && !readOnly;
+
+      function runToolbarCommand(
+        toolbarCommand: ToolbarButton,
+      ) {
+        execCommand(toolbarCommand);
+      }
+
+      switch (command) {
+        case "saveDraft":
+          return {
+            onSelect: () => {
+              void onSaveDraft?.();
+            },
+            disabled:
+              !onSaveDraft || readOnly,
+            hidden: !onSaveDraft,
+          };
+
+        case "exactPreview":
+          return {
+            onSelect: () => {
+              void onPreviewArticle?.();
+            },
+            hidden: !onPreviewArticle,
+          };
+
+        case "articleDetails":
+          return {
+            onSelect: () =>
+              onOpenArticleDetails?.(),
+            hidden: !onOpenArticleDetails,
+          };
+
+        case "closeArticle":
+          return {
+            onSelect: () =>
+              onCloseArticle?.(),
+            hidden: !onCloseArticle,
+          };
+
+        case "undo":
+          return {
+            onSelect: () =>
+              runToolbarCommand({
+                command: "undo",
+                icon: "Undo2",
+                label: "Undo",
+              }),
+            disabled: !editable,
+          };
+
+        case "redo":
+          return {
+            onSelect: () =>
+              runToolbarCommand({
+                command: "redo",
+                icon: "Redo2",
+                label: "Redo",
+              }),
+            disabled: !editable,
+          };
+
+        case "findReplace":
+          return {
+            onSelect: () =>
+              onOpenFindReplace?.(),
+            hidden: !onOpenFindReplace,
+          };
+
+        case "selectAll":
+          return {
+            onSelect: () => {
+              editor
+                ?.chain()
+                .focus()
+                .selectAll()
+                .run();
+            },
+            disabled: !editor,
+          };
+
+        case "clearFormatting":
+          return {
+            onSelect: () =>
+              runToolbarCommand({
+                command: "clearMarks",
+                icon: "RemoveFormatting",
+                label: "Clear Formatting",
+              }),
+            disabled: !editable,
+          };
+
+        case "insertImage":
+          return {
+            onSelect: () =>
+              setImagePickerOpen(true),
+            disabled: !editable,
+          };
+
+        case "insertDivider":
+          return {
+            onSelect: () =>
+              runToolbarCommand({
+                command: "horizontalRule",
+                icon: "Minus",
+                label: "Horizontal Divider",
+              }),
+            disabled: !editable,
+          };
+
+        case "insertBlockquote":
+          return {
+            onSelect: () =>
+              runToolbarCommand({
+                command: "blockquote",
+                icon: "Quote",
+                label: "Blockquote",
+              }),
+            active:
+              editor?.isActive(
+                "blockquote",
+              ) ?? false,
+            disabled: !editable,
+          };
+
+        case "insertCodeBlock":
+          return {
+            onSelect: () =>
+              runToolbarCommand({
+                command: "codeBlock",
+                icon: "Code",
+                label: "Code Block",
+              }),
+            active:
+              editor?.isActive(
+                "codeBlock",
+              ) ?? false,
+            disabled: !editable,
+          };
+
+        case "insertRelease":
+          return {
+            onSelect: () =>
+              setReleasePickerOpen(true),
+            disabled: !editable,
+          };
+
+        case "insertArtist":
+          return {
+            onSelect: () =>
+              setArtistPickerOpen(true),
+            disabled: !editable,
+          };
+
+        case "insertTrack":
+          return {
+            onSelect: () =>
+              setTrackPickerOpen(true),
+            disabled: !editable,
+          };
+
+        case "paragraph":
+          return {
+            onSelect: () =>
+              runToolbarCommand({
+                command: "paragraph",
+                icon: "Type",
+                label: "Paragraph",
+              }),
+            active:
+              editor?.isActive(
+                "paragraph",
+              ) ?? false,
+            disabled: !editable,
+          };
+
+        case "heading2":
+          return {
+            onSelect: () =>
+              runToolbarCommand({
+                command: "heading",
+                icon: "Heading2",
+                label: "Heading 2",
+                level: 2,
+              }),
+            active:
+              editor?.isActive(
+                "heading",
+                { level: 2 },
+              ) ?? false,
+            disabled: !editable,
+          };
+
+        case "heading3":
+          return {
+            onSelect: () =>
+              runToolbarCommand({
+                command: "heading",
+                icon: "Heading3",
+                label: "Heading 3",
+                level: 3,
+              }),
+            active:
+              editor?.isActive(
+                "heading",
+                { level: 3 },
+              ) ?? false,
+            disabled: !editable,
+          };
+
+        case "bold":
+        case "italic":
+        case "underline":
+        case "strike": {
+          const definitions: Record<
+            typeof command,
+            ToolbarButton
+          > = {
+            bold: {
+              command: "bold",
+              icon: "Bold",
+              label: "Bold",
+            },
+            italic: {
+              command: "italic",
+              icon: "Italic",
+              label: "Italic",
+            },
+            underline: {
+              command: "underline",
+              icon: "Underline",
+              label: "Underline",
+            },
+            strike: {
+              command: "strike",
+              icon: "Strikethrough",
+              label: "Strikethrough",
+            },
+          };
+
+          return {
+            onSelect: () =>
+              runToolbarCommand(
+                definitions[command],
+              ),
+            active:
+              editor?.isActive(
+                definitions[command]
+                  .command,
+              ) ?? false,
+            disabled: !editable,
+          };
+        }
+
+        case "link":
+          return {
+            onSelect: handleLinkButton,
+            active:
+              editor?.isActive("link") ??
+              false,
+            disabled: !editable,
+          };
+
+        case "unlink":
+          return {
+            onSelect: unlink,
+            disabled:
+              !editable ||
+              !editor?.isActive("link"),
+          };
+
+        case "bulletList":
+          return {
+            onSelect: () =>
+              runToolbarCommand({
+                command: "bulletList",
+                icon: "List",
+                label: "Bulleted List",
+              }),
+            active:
+              editor?.isActive(
+                "bulletList",
+              ) ?? false,
+            disabled: !editable,
+          };
+
+        case "orderedList":
+          return {
+            onSelect: () =>
+              runToolbarCommand({
+                command: "orderedList",
+                icon: "ListOrdered",
+                label: "Numbered List",
+              }),
+            active:
+              editor?.isActive(
+                "orderedList",
+              ) ?? false,
+            disabled: !editable,
+          };
+
+        case "outdent":
+          return {
+            onSelect: () =>
+              runToolbarCommand({
+                command: "liftListItem",
+                icon: "Outdent",
+                label: "Decrease Indent",
+              }),
+            disabled:
+              !editable ||
+              !isListContext,
+          };
+
+        case "indent":
+          return {
+            onSelect: () =>
+              runToolbarCommand({
+                command: "sinkListItem",
+                icon: "Indent",
+                label: "Increase Indent",
+              }),
+            disabled:
+              !editable ||
+              !isListContext,
+          };
+
+        case "writingStats":
+          return {
+            onSelect: () =>
+              onShowWritingStats?.(),
+            label: `${wordCount.toLocaleString()} words, ${readingMinutes} min read`,
+            hidden: !onShowWritingStats,
+          };
+
+        case "focusMode":
+          return {
+            onSelect: () =>
+              onToggleFocusMode?.(),
+            label: focusMode
+              ? "Exit Focus Mode"
+              : "Focus Mode",
+            active: focusMode,
+            hidden: !onToggleFocusMode,
+          };
+
+        case "viewVisual":
+          return {
+            onSelect: () =>
+              setViewMode("visual"),
+            active:
+              viewMode === "visual",
+          };
+
+        case "viewHtml":
+          return {
+            onSelect: () =>
+              setViewMode("html"),
+            active: viewMode === "html",
+          };
+
+        case "viewRendered":
+          return {
+            onSelect: () =>
+              setViewMode("preview"),
+            active:
+              viewMode === "preview",
+          };
+
+        case "viewSplit":
+          return {
+            onSelect: () =>
+              setViewMode("split"),
+            active: viewMode === "split",
+          };
+
+        default:
+          return unavailable;
+      }
+    },
+    [
+      editor,
+      readOnly,
+      execCommand,
+      handleLinkButton,
+      unlink,
+      onSaveDraft,
+      onPreviewArticle,
+      onOpenArticleDetails,
+      onCloseArticle,
+      onOpenFindReplace,
+      onShowWritingStats,
+      focusMode,
+      onToggleFocusMode,
+      wordCount,
+      readingMinutes,
+      isListContext,
+      viewMode,
+    ],
+  );
 
   /* ─── Compute editor min height ─── */
 
@@ -484,12 +977,22 @@ export function RichTextEditor({ value, onChange, placeholder, minHeight = 500 }
         .ProseMirror {
           outline: none !important;
           min-height: ${editorMinHeight}px;
-          padding: 20px;
+          max-width: 820px;
+          margin: 0 auto;
+          padding: 48px 40px 72px;
           font-family: var(--wk-font-body, Georgia, serif);
-          font-size: 15px;
-          line-height: 1.75;
+          font-size: 17px;
+          line-height: 1.82;
           color: var(--wk-text);
-          background: var(--wk-bg-subtle);
+          background: var(--wk-surface);
+        }
+        @media (max-width: 640px) {
+          .ProseMirror {
+            min-height: ${Math.min(editorMinHeight, 520)}px;
+            padding: 28px 20px 48px;
+            font-size: 16px;
+            line-height: 1.75;
+          }
         }
         .ProseMirror p {
           margin-bottom: 1em;
@@ -565,150 +1068,192 @@ export function RichTextEditor({ value, onChange, placeholder, minHeight = 500 }
         }
       `}</style>
 
-      {/* Toolbar */}
-      <div
-        ref={toolbarRef}
-        className="flex flex-wrap items-center gap-2 border-b border-[var(--wk-border)] px-4 py-3 bg-[var(--wk-surface)] sticky top-0 z-10"
-      >
-        {/* View Switcher */}
-        <div className="flex items-center gap-1 rounded-lg border border-[var(--wk-border)] bg-[var(--wk-bg-subtle)] p-1 mr-2">
-          {VIEW_BUTTONS.map((btn) => (
-            <button
-              key={btn.mode}
-              onClick={() => setViewMode(btn.mode)}
-              title={btn.label}
-              className={`flex items-center gap-1.5 rounded-md px-3 py-1.5 text-[12px] font-semibold transition-all whitespace-nowrap ${
-                viewMode === btn.mode
-                  ? "bg-[var(--wk-surface)] text-[var(--wk-text)]"
-                  : "text-[var(--wk-text-muted)] hover:text-[var(--wk-text)]"
-              }`}
-            >
-              <WkIcon name={btn.icon as never} size={13} />
-              <span className="hidden sm:inline">{btn.label}</span>
-            </button>
-          ))}
+      <div className="sticky top-0 z-20 border-b border-wk-border bg-wk-surface">
+        <div className="overflow-x-auto border-b border-wk-border">
+          <EditorialMenuBar
+            resolveCommand={resolveMenuCommand}
+          />
         </div>
 
-        <div className="w-px h-6 bg-[var(--wk-border)] mx-1 hidden sm:block" />
+        <div
+          ref={toolbarRef}
+          aria-label="Contextual formatting"
+          className="flex min-h-11 items-center gap-1 overflow-x-auto px-3 py-2"
+        >
+          {readOnly ? (
+            <span className="px-2 text-[11px] font-bold text-wk-text-faint">
+              Viewing only
+            </span>
+          ) : (
+            <>
+              <ToolbarBtn
+                icon="Undo2"
+                label="Undo"
+                active={false}
+                onClick={() =>
+                  execCommand({
+                    command: "undo",
+                    icon: "Undo2",
+                    label: "Undo",
+                  })
+                }
+              />
 
-        {/* Text Format */}
-        {TEXT_FORMAT.map((btn) => (
-          <ToolbarBtn
-            key={btn.command}
-            icon={btn.icon}
-            label={btn.label}
-            active={isActive(btn)}
-            onClick={() => execCommand(btn)}
-          />
-        ))}
+              <ToolbarBtn
+                icon="Redo2"
+                label="Redo"
+                active={false}
+                onClick={() =>
+                  execCommand({
+                    command: "redo",
+                    icon: "Redo2",
+                    label: "Redo",
+                  })
+                }
+              />
 
-        {/* Link */}
-        <ToolbarBtn
-          icon="Link"
-          label="Link"
-          active={editor?.isActive("link") ?? false}
-          onClick={handleLinkButton}
-        />
-        <ToolbarBtn
-          icon="Unlink"
-          label="Unlink"
-          active={false}
-          onClick={unlink}
-        />
+              <div className="mx-1 h-6 w-px shrink-0 bg-wk-border" />
 
-        <div className="w-px h-6 bg-[var(--wk-border)] mx-1 hidden sm:block" />
+              {hasTextSelection ? (
+                <>
+                  {TEXT_FORMAT.map((button) => (
+                    <ToolbarBtn
+                      key={button.command}
+                      icon={button.icon}
+                      label={button.label}
+                      active={isActive(button)}
+                      onClick={() =>
+                        execCommand(button)
+                      }
+                    />
+                  ))}
 
-        {/* Headings */}
-        {HEADINGS.map((btn) => (
-          <ToolbarBtn
-            key={`${btn.command}-${btn.level ?? "p"}`}
-            icon={btn.icon}
-            label={btn.label}
-            active={isActive(btn)}
-            onClick={() => execCommand(btn)}
-          />
-        ))}
+                  <ToolbarBtn
+                    icon="Link"
+                    label="Add Link"
+                    active={
+                      editor?.isActive(
+                        "link",
+                      ) ?? false
+                    }
+                    onClick={handleLinkButton}
+                  />
 
-        <div className="w-px h-6 bg-[var(--wk-border)] mx-1 hidden sm:block" />
+                  {editor?.isActive("link") ? (
+                    <ToolbarBtn
+                      icon="Unlink"
+                      label="Remove Link"
+                      active={false}
+                      onClick={unlink}
+                    />
+                  ) : null}
 
-        {/* Lists */}
-        {LISTS.map((btn) => (
-          <ToolbarBtn
-            key={btn.command}
-            icon={btn.icon}
-            label={btn.label}
-            active={isActive(btn)}
-            onClick={() => execCommand(btn)}
-          />
-        ))}
+                  <ToolbarBtn
+                    icon="RemoveFormatting"
+                    label="Clear Formatting"
+                    active={false}
+                    onClick={() =>
+                      execCommand({
+                        command: "clearMarks",
+                        icon: "RemoveFormatting",
+                        label: "Clear Formatting",
+                      })
+                    }
+                  />
+                </>
+              ) : (
+                <>
+                  {HEADINGS.filter(
+                    (button) =>
+                      button.command ===
+                        "paragraph" ||
+                      button.level === 2 ||
+                      button.level === 3,
+                  ).map((button) => (
+                    <ToolbarBtn
+                      key={`${button.command}-${button.level ?? "p"}`}
+                      icon={button.icon}
+                      label={button.label}
+                      active={isActive(button)}
+                      onClick={() =>
+                        execCommand(button)
+                      }
+                    />
+                  ))}
 
-        <div className="w-px h-6 bg-[var(--wk-border)] mx-1 hidden sm:block" />
+                  {LISTS.filter(
+                    (button) =>
+                      button.command ===
+                        "bulletList" ||
+                      button.command ===
+                        "orderedList",
+                  ).map((button) => (
+                    <ToolbarBtn
+                      key={button.command}
+                      icon={button.icon}
+                      label={button.label}
+                      active={isActive(button)}
+                      onClick={() =>
+                        execCommand(button)
+                      }
+                    />
+                  ))}
 
-        {/* Insert */}
-        {INSERT.map((btn) => (
-          <ToolbarBtn
-            key={btn.command}
-            icon={btn.icon}
-            label={btn.label}
-            active={isActive(btn)}
-            onClick={() => execCommand(btn)}
-          />
-        ))}
+                  {isListContext ? (
+                    <>
+                      <ToolbarBtn
+                        icon="Outdent"
+                        label="Decrease Indent"
+                        active={false}
+                        onClick={() =>
+                          execCommand({
+                            command:
+                              "liftListItem",
+                            icon: "Outdent",
+                            label:
+                              "Decrease Indent",
+                          })
+                        }
+                      />
 
-        {/* Image Insert */}
-        <ToolbarBtn
-          icon="ImagePlus"
-          label="Insert Image"
-          active={false}
-          onClick={() => setImagePickerOpen(true)}
-        />
+                      <ToolbarBtn
+                        icon="Indent"
+                        label="Increase Indent"
+                        active={false}
+                        onClick={() =>
+                          execCommand({
+                            command:
+                              "sinkListItem",
+                            icon: "Indent",
+                            label:
+                              "Increase Indent",
+                          })
+                        }
+                      />
+                    </>
+                  ) : null}
 
-        {/* Release Shortcode Insert */}
-        <ToolbarBtn
-          icon="Album"
-          label="Insert Release"
-          active={false}
-          onClick={() => setReleasePickerOpen(true)}
-        />
+                  <div className="mx-1 h-6 w-px shrink-0 bg-wk-border" />
 
-        {/* Artist Shortcode Insert */}
-        <ToolbarBtn
-          icon="UserPlus"
-          label="Insert Artist"
-          active={false}
-          onClick={() => setArtistPickerOpen(true)}
-        />
+                  <ToolbarBtn
+                    icon="ImagePlus"
+                    label="Insert Image"
+                    active={false}
+                    onClick={() =>
+                      setImagePickerOpen(true)
+                    }
+                  />
+                </>
+              )}
+            </>
+          )}
 
-        {/* Track Shortcode Insert */}
-        <ToolbarBtn
-          icon="Music"
-          label="Insert Track"
-          active={false}
-          onClick={() => setTrackPickerOpen(true)}
-        />
-
-        <div className="w-px h-6 bg-[var(--wk-border)] mx-1 hidden sm:block" />
-
-        {/* Undo/Redo */}
-        <ToolbarBtn
-          icon="Undo2"
-          label="Undo"
-          active={false}
-          onClick={() => execCommand({ command: "undo", icon: "", label: "" })}
-        />
-        <ToolbarBtn
-          icon="Redo2"
-          label="Redo"
-          active={false}
-          onClick={() => execCommand({ command: "redo", icon: "", label: "" })}
-        />
-
-        <ToolbarBtn
-          icon="RemoveFormatting"
-          label="Clear"
-          active={false}
-          onClick={() => execCommand({ command: "clearMarks", icon: "", label: "" })}
-        />
+          <span className="ml-auto shrink-0 rounded-full bg-wk-bg-subtle px-2.5 py-1 text-[9px] font-black uppercase tracking-[0.12em] text-wk-text-faint">
+            {viewMode === "preview"
+              ? "Rendered"
+              : viewMode}
+          </span>
+        </div>
       </div>
 
       {/* Link Popup */}
@@ -1031,6 +1576,7 @@ export function RichTextEditor({ value, onChange, placeholder, minHeight = 500 }
           <div className={viewMode === "split" ? "" : ""}>
             <textarea
               ref={htmlRef}
+              readOnly={readOnly}
               value={value}
               onChange={handleHtmlChange}
               placeholder="Paste or type HTML content here..."
@@ -1082,7 +1628,7 @@ function ToolbarBtn({
       type="button"
       onClick={onClick}
       title={label}
-      className={`flex items-center justify-center w-8 h-8 rounded-md text-[13px] transition-all whitespace-nowrap ${
+      className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-md text-[13px] transition-all whitespace-nowrap ${
         active
           ? "bg-[var(--wk-brand-soft)] text-[var(--wk-brand)]"
           : "text-[var(--wk-text-muted)] hover:bg-[var(--wk-bg-subtle)] hover:text-[var(--wk-text)]"

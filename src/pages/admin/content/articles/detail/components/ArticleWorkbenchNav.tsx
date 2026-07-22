@@ -1,3 +1,4 @@
+import { useEffect, useRef } from "react";
 import { WkIcon, type WkIconName } from "@/components/design-system/Icon";
 
 export type ArticleWorkbenchMode =
@@ -16,11 +17,13 @@ type WorkbenchModeDefinition = {
   icon: WkIconName;
 };
 
+type WorkbenchGroup = {
+  label: string;
+  modes: ArticleWorkbenchMode[];
+};
+
 interface Props {
   activeMode: ArticleWorkbenchMode;
-  status: string | null;
-  statusLabel?: string;
-  isDirty: boolean;
   onModeChange: (mode: ArticleWorkbenchMode) => void;
 }
 
@@ -28,134 +31,166 @@ const WORKBENCH_MODES: WorkbenchModeDefinition[] = [
   {
     key: "write",
     label: "Write",
-    description: "Draft the story and set its core editorial context.",
+    description: "Compose the title, summary, and Article body.",
     icon: "Pencil",
   },
   {
     key: "media",
     label: "Media",
-    description: "Choose the hero image and work with the media library.",
+    description: "Prepare the hero image and Article media.",
     icon: "Image",
   },
   {
     key: "seo",
     label: "SEO and Social",
-    description: "Prepare search metadata and preview how the article will appear.",
+    description: "Prepare search metadata and sharing previews.",
     icon: "Search",
   },
   {
     key: "review",
     label: "Review",
-    description: "See review controls, decisions, and the article’s governed lifecycle.",
+    description: "Inspect the governed version and review decisions.",
     icon: "Shield",
   },
   {
     key: "publishing",
-    label: "Publishing",
-    description: "Set visibility, scheduling, preview access, and final publishing controls.",
+    label: "Publish",
+    description: "Control visibility, timing, preview access, and publication.",
     icon: "Globe",
   },
   {
     key: "history",
     label: "History",
-    description: "Review versions, lifecycle events, and available restore points.",
+    description: "Inspect lifecycle and revision history.",
     icon: "History",
   },
   {
     key: "recovery",
     label: "Recovery",
-    description: "Find archive context and recover earlier work.",
+    description: "Restore earlier work safely as a draft.",
     icon: "Archive",
   },
 ];
 
-function getStatusLabel(status: string | null): string {
-  if (status === "publish") return "Published";
-  if (status === "future") return "Scheduled";
-  if (status === "pending") return "Pending Review";
-  if (status === "trash") return "Archived";
-  return "Draft";
+const WORKBENCH_GROUPS: WorkbenchGroup[] = [
+  { label: "Compose", modes: ["write", "media"] },
+  { label: "Prepare", modes: ["seo"] },
+  { label: "Workflow", modes: ["review", "publishing"] },
+  { label: "Record", modes: ["history", "recovery"] },
+];
+
+function definitionFor(mode: ArticleWorkbenchMode) {
+  return (
+    WORKBENCH_MODES.find((definition) => definition.key === mode) ??
+    WORKBENCH_MODES[0]
+  );
 }
 
 export function ArticleWorkbenchNav({
   activeMode,
-  status,
-  statusLabel,
-  isDirty,
   onModeChange,
 }: Props) {
-  const activeDefinition =
-    WORKBENCH_MODES.find((mode) => mode.key === activeMode) ??
-    WORKBENCH_MODES[0];
+  const activeTabRef = useRef<HTMLButtonElement>(null);
+  const activeDefinition = definitionFor(activeMode);
+
+  useEffect(() => {
+    activeTabRef.current?.scrollIntoView({
+      behavior: "smooth",
+      block: "nearest",
+      inline: "center",
+    });
+  }, [activeMode]);
 
   return (
-    <section
-      aria-label="Article Workbench"
-      className="overflow-hidden rounded-2xl border border-wk-border bg-wk-surface"
+    <nav
+      aria-label="Article work modes"
+      className="overflow-hidden rounded-xl border border-wk-border bg-wk-surface"
     >
-      <div className="flex flex-col gap-3 border-b border-wk-border px-4 py-4 sm:flex-row sm:items-start sm:justify-between">
-        <div>
-          <div className="text-[10px] font-black uppercase tracking-[0.18em] text-wk-text-faint">
-            Article Workbench
-          </div>
-          <div className="mt-1 flex items-center gap-2">
-            <WkIcon
-              name={activeDefinition.icon}
-              size={17}
-              className="text-wk-brand"
-            />
-            <h2 className="text-[16px] font-black text-wk-text">
-              {activeDefinition.label}
-            </h2>
-          </div>
-          <p className="mt-1 text-[12px] leading-5 text-wk-text-muted">
-            {activeDefinition.description}
-          </p>
-        </div>
+      <div className="p-3 sm:hidden">
+        <label
+          htmlFor="article-work-mode"
+          className="mb-1.5 block text-[10px] font-black uppercase tracking-[0.16em] text-wk-text-faint"
+        >
+          Work Mode
+        </label>
 
-        <div className="flex shrink-0 items-center gap-2">
-          <span className="rounded-full border border-wk-border bg-wk-bg-subtle px-2.5 py-1 text-[10px] font-bold text-wk-text-muted">
-            {statusLabel ?? getStatusLabel(status)}
-          </span>
-          <span
-            className={`rounded-full border px-2.5 py-1 text-[10px] font-bold ${
-              isDirty
-                ? "border-wk-warning/30 bg-wk-warning-soft text-wk-warning"
-                : "border-wk-success/30 bg-wk-success-soft text-wk-success"
-            }`}
+        <div className="relative">
+          <select
+            id="article-work-mode"
+            value={activeMode}
+            onChange={(event) =>
+              onModeChange(event.target.value as ArticleWorkbenchMode)
+            }
+            className="w-full appearance-none rounded-lg border border-wk-border bg-wk-bg-subtle px-3 py-2.5 pr-10 text-[13px] font-bold text-wk-text outline-none focus:border-wk-brand"
           >
-            {isDirty ? "Unsaved Changes" : "All Saved"}
-          </span>
+            {WORKBENCH_GROUPS.map((group) => (
+              <optgroup key={group.label} label={group.label}>
+                {group.modes.map((mode) => {
+                  const definition = definitionFor(mode);
+                  return (
+                    <option key={definition.key} value={definition.key}>
+                      {definition.label}
+                    </option>
+                  );
+                })}
+              </optgroup>
+            ))}
+          </select>
+
+          <WkIcon
+            name="ChevronDown"
+            size={15}
+            className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-wk-text-faint"
+          />
         </div>
+
+        <p className="mt-2 text-[11px] leading-4 text-wk-text-muted">
+          {activeDefinition.description}
+        </p>
       </div>
 
-      <div
-        role="tablist"
-        aria-label="Article work modes"
-        className="flex gap-1 overflow-x-auto px-2 py-2"
-      >
-        {WORKBENCH_MODES.map((mode) => {
-          const isActive = mode.key === activeMode;
+      <div className="hidden items-center gap-1 overflow-x-auto p-2 sm:flex">
+        {WORKBENCH_GROUPS.map((group, groupIndex) => (
+          <div
+            key={group.label}
+            className="flex shrink-0 items-center gap-1"
+          >
+            {groupIndex > 0 ? (
+              <div
+                aria-hidden="true"
+                className="mx-1 h-7 w-px bg-wk-border"
+              />
+            ) : null}
 
-          return (
-            <button
-              key={mode.key}
-              type="button"
-              role="tab"
-              aria-selected={isActive}
-              onClick={() => onModeChange(mode.key)}
-              className={`flex shrink-0 items-center gap-1.5 rounded-lg px-3 py-2 text-[11px] font-bold transition-colors ${
-                isActive
-                  ? "bg-wk-brand text-wk-brand-on"
-                  : "text-wk-text-muted hover:bg-wk-surface-raised hover:text-wk-text"
-              }`}
-            >
-              <WkIcon name={mode.icon} size={13} />
-              {mode.label}
-            </button>
-          );
-        })}
+            <span className="px-2 text-[9px] font-black uppercase tracking-[0.14em] text-wk-text-faint">
+              {group.label}
+            </span>
+
+            {group.modes.map((mode) => {
+              const definition = definitionFor(mode);
+              const active = definition.key === activeMode;
+
+              return (
+                <button
+                  key={definition.key}
+                  ref={active ? activeTabRef : undefined}
+                  type="button"
+                  aria-current={active ? "page" : undefined}
+                  onClick={() => onModeChange(definition.key)}
+                  className={`flex shrink-0 items-center gap-1.5 rounded-lg px-3 py-2 text-[11px] font-bold transition-colors ${
+                    active
+                      ? "bg-wk-brand text-wk-brand-on"
+                      : "text-wk-text-muted hover:bg-wk-surface-raised hover:text-wk-text"
+                  }`}
+                >
+                  <WkIcon name={definition.icon} size={13} />
+                  {definition.label}
+                </button>
+              );
+            })}
+          </div>
+        ))}
       </div>
-    </section>
+    </nav>
   );
 }

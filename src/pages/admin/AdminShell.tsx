@@ -326,6 +326,8 @@ export function AdminShell() {
   const [collapsed, setCollapsed] = useState(() => { if (typeof window === "undefined") return false; return window.localStorage.getItem("wk-admin-sidebar-collapsed") === "true"; });
   const [mobileOpen, setMobileOpen] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
+  const [editorFocusMode, setEditorFocusMode] =
+    useState(false);
   const [openGroups, setOpenGroups] = useState<Record<string, boolean>>(() => {
     if (typeof window === "undefined") return {};
     try {
@@ -343,6 +345,40 @@ export function AdminShell() {
     setOpenGroups((current) => (current[activeGroup.label] ? current : { ...current, [activeGroup.label]: true }));
   }, [location.pathname, location.search]);
   useEffect(() => { setMobileOpen(false); }, [location.pathname]);
+  useEffect(() => {
+    function handleEditorFocusMode(
+      event: Event,
+    ) {
+      const detail = (
+        event as CustomEvent<{
+          active?: boolean;
+        }>
+      ).detail;
+
+      setEditorFocusMode(
+        Boolean(detail?.active),
+      );
+    }
+
+    window.addEventListener(
+      "wk-admin-focus-mode-change",
+      handleEditorFocusMode,
+    );
+
+    return () => {
+      window.removeEventListener(
+        "wk-admin-focus-mode-change",
+        handleEditorFocusMode,
+      );
+    };
+  }, []);
+
+  useEffect(() => {
+    if (editorFocusMode) {
+      setMobileOpen(false);
+    }
+  }, [editorFocusMode]);
+
   useEffect(() => {
     if (user.loading) return;
     if (!user.id) navigate(`/admin/login?next=${encodeURIComponent(location.pathname)}`, { replace: true });
@@ -377,16 +413,38 @@ export function AdminShell() {
 
   const visibleGroups = NAV_GROUPS.filter((group) => group.visible(user.can)).map((group) => ({ ...group, items: group.items.filter((item) => !item.requiredCapability || user.can(item.requiredCapability)) }));
 
+  const sidebarPositionClass =
+    editorFocusMode
+      ? "-translate-x-full"
+      : mobileOpen
+        ? "translate-x-0"
+        : "-translate-x-full lg:translate-x-0";
+
+  const mainOffsetClass = editorFocusMode
+    ? "lg:pl-0"
+    : collapsed
+      ? "lg:pl-16"
+      : "lg:pl-64";
+
+  const mainContentClass = editorFocusMode
+    ? "max-w-none px-3 py-3 sm:px-4 lg:px-6"
+    : "mx-auto max-w-[1600px] px-4 py-6 sm:px-6 lg:px-8";
+
+
   return (
     <div className="min-h-screen bg-wk-bg text-wk-text">
       {/* Mobile menu trigger */}
-      <button onClick={() => setMobileOpen(true)} className="fixed left-4 top-4 z-50 flex h-10 w-10 items-center justify-center rounded-lg border border-wk-border bg-wk-surface shadow-lg lg:hidden"><WkIcon name="Menu" size={20} /></button>
+      {!editorFocusMode ? (
+        <button onClick={() => setMobileOpen(true)} className="fixed left-4 top-4 z-50 flex h-10 w-10 items-center justify-center rounded-lg border border-wk-border bg-wk-surface shadow-lg lg:hidden"><WkIcon name="Menu" size={20} /></button>
+      ) : null}
 
       {/* Mobile overlay */}
-      {mobileOpen && <div className="fixed inset-0 z-40 bg-black/50 lg:hidden" onClick={() => setMobileOpen(false)} />}
+      {!editorFocusMode && mobileOpen ? (
+        <div className="fixed inset-0 z-40 bg-black/50 lg:hidden" onClick={() => setMobileOpen(false)} />
+      ) : null}
 
       {/* Sidebar */}
-      <aside className={`fixed inset-y-0 left-0 z-50 flex flex-col border-r border-wk-border bg-wk-surface transition-all duration-300 ${collapsed ? "w-16" : "w-64"} ${mobileOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0"}`}>
+      <aside className={`fixed inset-y-0 left-0 z-50 flex flex-col border-r border-wk-border bg-wk-surface transition-all duration-300 ${collapsed ? "w-16" : "w-64"} ${sidebarPositionClass}`}>
         {/* Sidebar Header */}
         <div className="flex h-16 items-center gap-3 border-b border-wk-border px-4">
           <button onClick={() => navigate("/admin")} className="flex min-w-0 items-center gap-3">
@@ -462,8 +520,8 @@ export function AdminShell() {
       </aside>
 
       {/* Main */}
-      <main className={`min-h-screen transition-all duration-300 ${collapsed ? "lg:pl-16" : "lg:pl-64"}`}>
-        <div className="mx-auto max-w-[1600px] px-4 py-6 sm:px-6 lg:px-8">
+      <main className={`min-h-screen transition-all duration-300 ${mainOffsetClass}`}>
+        <div className={mainContentClass}>
           <Outlet />
         </div>
       </main>

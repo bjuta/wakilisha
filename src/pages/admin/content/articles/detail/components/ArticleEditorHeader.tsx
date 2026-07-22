@@ -1,3 +1,4 @@
+import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { WkIcon } from "@/components/design-system/Icon";
 
@@ -11,11 +12,17 @@ interface Props {
   isSaving: boolean;
   isPublishing: boolean;
   isPreviewing: boolean;
+  lastAutosavedAt?: string | null;
   onSaveDraft: () => void;
   onPublish: () => void;
   onUnpublish: () => void;
   onDelete: () => void;
-  onPreview: () => void;
+  onPreview: () => void | Promise<void>;
+  onOpenArticleDetails?: () => void;
+  showArticleDetails?: boolean;
+  articleDetailsOpen?: boolean;
+  focusMode?: boolean;
+  onToggleFocusMode?: () => void;
   onSubmitForReview: () => void;
   onRequestChanges?: () => void;
   onApproveVersion?: () => void;
@@ -59,11 +66,17 @@ export function ArticleEditorHeader({
   isSaving,
   isPublishing,
   isPreviewing,
+  lastAutosavedAt = null,
   onSaveDraft,
   onPublish,
   onUnpublish,
   onDelete,
   onPreview,
+  onOpenArticleDetails,
+  showArticleDetails = false,
+  articleDetailsOpen = false,
+  focusMode = false,
+  onToggleFocusMode,
   onSubmitForReview,
   onRequestChanges,
   onApproveVersion,
@@ -75,93 +88,238 @@ export function ArticleEditorHeader({
   publishDisabledReason = null,
   submitForReviewLabel = "Submit for Review",
   userCanPublish = true,
-  userCanEditOthers = true,
   isAdmin = false,
   articleOwner = null,
   permissions,
 }: Props) {
   const navigate = useNavigate();
+  const overflowRef = useRef<HTMLDivElement>(null);
+  const [overflowOpen, setOverflowOpen] = useState(false);
+
   const resolvedStatusColorKey = statusColorKey ?? status ?? "draft";
   const statusColor =
     STATUS_COLORS[resolvedStatusColorKey] ?? STATUS_COLORS.draft;
+
   const isPublished = status === "publish";
   const isFuture = status === "future";
-  const shouldShowSubmitForReview = !isPublished && !isFuture && canSubmitForReview;
+  const shouldShowSubmitForReview =
+    !isPublished && !isFuture && canSubmitForReview;
   const shouldShowPublish = userCanPublish && !publishDisabledReason;
+  const canEdit = !permissions || permissions.canEdit;
 
-  return (
-    <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-      {/* Left: breadcrumb + title */}
-      <div className="min-w-0">
-        <div className="flex items-center gap-2 text-[11px] text-wk-text-faint mb-1.5">
-          <button
-            onClick={() => navigate("/admin/content/articles")}
-            className="text-wk-brand hover:text-wk-brand-hover font-black uppercase tracking-wider transition-colors"
-          >
-            Articles
-          </button>
-          <WkIcon name="ChevronRight" size={12} />
-          <span className="font-semibold uppercase tracking-wider text-wk-text-muted truncate max-w-[200px]">
-            {title || slug}
-          </span>
-        </div>
-        <div className="flex items-center gap-3 flex-wrap">
-          <h1 className="text-[22px] font-black tracking-tight text-wk-text truncate max-w-[480px]">
-            {title || "(Untitled)"}
-          </h1>
-          <span
-            className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wide ${statusColor}`}
-          >
-            {statusLabel ?? status ?? "Draft"}
-          </span>
-          {isDirty && (
-            <span className="inline-flex items-center gap-1 rounded-full bg-wk-warning-soft px-2.5 py-0.5 text-[10px] font-bold text-wk-warning">
-              <WkIcon name="Circle" size={6} />
-              Unsaved
-            </span>
-          )}
-          {isAdmin && (
-            <span className="inline-flex items-center gap-1 rounded-full bg-wk-brand-soft px-2.5 py-0.5 text-[10px] font-bold text-wk-brand">
-              <WkIcon name="Shield" size={10} />
-              Admin
-            </span>
-          )}
-          {permissions && !permissions.canEdit && (
-            <span className="inline-flex items-center gap-1 rounded-full bg-wk-warning-soft px-2.5 py-0.5 text-[10px] font-bold text-wk-warning">
-              <WkIcon name="Eye" size={10} />
-              Read-only
-            </span>
-          )}
-        </div>
-        <div className="mt-1 flex items-center gap-2 text-[12px] text-wk-text-faint">
-          <span className="font-mono">{slug}</span>
-          {isAdmin && articleOwner && (
+  useEffect(() => {
+    function handlePointerDown(event: MouseEvent) {
+      if (
+        overflowRef.current &&
+        !overflowRef.current.contains(event.target as Node)
+      ) {
+        setOverflowOpen(false);
+      }
+    }
+
+    function handleKeyDown(event: KeyboardEvent) {
+      if (event.key === "Escape") {
+        setOverflowOpen(false);
+      }
+    }
+
+    document.addEventListener("mousedown", handlePointerDown);
+    document.addEventListener("keydown", handleKeyDown);
+
+    return () => {
+      document.removeEventListener("mousedown", handlePointerDown);
+      document.removeEventListener("keydown", handleKeyDown);
+    };
+  }, []);
+
+  const saveStateLabel = isSaving
+    ? "Saving"
+    : isDirty
+      ? "Unsaved"
+      : "All Saved";
+
+  const saveStateTone = isSaving
+    ? "border-wk-info/30 bg-wk-info-soft text-wk-info"
+    : isDirty
+      ? "border-wk-warning/30 bg-wk-warning-soft text-wk-warning"
+      : "border-wk-success/30 bg-wk-success-soft text-wk-success";
+
+  function renderPrimaryAction() {
+    if (canApproveVersion) {
+      return (
+        <button
+          type="button"
+          onClick={onApproveVersion}
+          disabled={isSaving || isPublishing || reviewActionBusy}
+          className="wk-button wk-button-primary wk-button-sm whitespace-nowrap"
+        >
+          <WkIcon name="ShieldCheck" size={14} />
+          Approve Version
+        </button>
+      );
+    }
+
+    if (canRequestChanges) {
+      return (
+        <button
+          type="button"
+          onClick={onRequestChanges}
+          disabled={isSaving || isPublishing || reviewActionBusy}
+          className="wk-button wk-button-primary wk-button-sm whitespace-nowrap"
+        >
+          <WkIcon name="Flag" size={14} />
+          Request Changes
+        </button>
+      );
+    }
+
+    if (shouldShowSubmitForReview) {
+      return (
+        <button
+          type="button"
+          onClick={onSubmitForReview}
+          disabled={isSaving || reviewActionBusy}
+          className="wk-button wk-button-primary wk-button-sm whitespace-nowrap"
+        >
+          <WkIcon name="Send" size={14} />
+          {submitForReviewLabel}
+        </button>
+      );
+    }
+
+    if (isFuture) {
+      return (
+        <button
+          type="button"
+          onClick={onUnpublish}
+          disabled={isSaving || isPublishing}
+          className="wk-button wk-button-primary wk-button-sm whitespace-nowrap"
+        >
+          <WkIcon name="CalendarX" size={14} />
+          Unschedule
+        </button>
+      );
+    }
+
+    if (isPublished && shouldShowPublish) {
+      return (
+        <button
+          type="button"
+          onClick={onPublish}
+          disabled={isSaving || isPublishing}
+          className="wk-button wk-button-primary wk-button-sm whitespace-nowrap"
+        >
+          {isPublishing ? (
             <>
-              <span className="text-wk-border">|</span>
-              <span>Owner: {articleOwner}</span>
+              <WkIcon name="Loader2" size={14} className="animate-spin" />
+              Updating
+            </>
+          ) : (
+            <>
+              <WkIcon name="RefreshCw" size={14} />
+              Update
             </>
           )}
+        </button>
+      );
+    }
+
+    if (!isPublished && !isFuture && shouldShowPublish) {
+      return (
+        <button
+          type="button"
+          onClick={onPublish}
+          disabled={isSaving || isPublishing}
+          className="wk-button wk-button-primary wk-button-sm whitespace-nowrap"
+        >
+          {isPublishing ? (
+            <>
+              <WkIcon name="Loader2" size={14} className="animate-spin" />
+              Publishing
+            </>
+          ) : (
+            <>
+              <WkIcon name="Globe" size={14} />
+              Publish
+            </>
+          )}
+        </button>
+      );
+    }
+
+    return null;
+  }
+
+  return (
+    <header className="sticky top-0 z-30 rounded-2xl border border-wk-border bg-wk-surface shadow-sm">
+      <div className="flex flex-col gap-3 px-4 py-3 lg:flex-row lg:items-center lg:justify-between">
+        <div className="min-w-0">
+          <div className="mb-1 flex items-center gap-2 text-[10px] font-bold uppercase tracking-[0.16em] text-wk-text-faint">
+            <button
+              type="button"
+              onClick={() => navigate("/admin/content/articles")}
+              className="text-wk-brand transition-colors hover:text-wk-brand-hover"
+            >
+              Articles
+            </button>
+            <WkIcon name="ChevronRight" size={11} />
+            <span className="truncate">{title || slug}</span>
+          </div>
+
+          <div className="flex min-w-0 flex-wrap items-center gap-2">
+            <h1 className="max-w-full truncate text-[18px] font-black tracking-tight text-wk-text sm:text-[20px] lg:max-w-[520px]">
+              {title || "(Untitled)"}
+            </h1>
+
+            <span
+              className={`inline-flex items-center rounded-full px-2.5 py-1 text-[10px] font-bold uppercase tracking-wide ${statusColor}`}
+            >
+              {statusLabel ?? status ?? "Draft"}
+            </span>
+
+            {isAdmin ? (
+              <span className="inline-flex items-center gap-1 rounded-full bg-wk-brand-soft px-2.5 py-1 text-[10px] font-bold text-wk-brand">
+                <WkIcon name="Shield" size={10} />
+                Admin
+              </span>
+            ) : null}
+
+            {permissions && !permissions.canEdit ? (
+              <span className="inline-flex items-center gap-1 rounded-full bg-wk-warning-soft px-2.5 py-1 text-[10px] font-bold text-wk-warning">
+                <WkIcon name="Eye" size={10} />
+                Read-only
+              </span>
+            ) : null}
+          </div>
+
+          <div className="mt-1 flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1 text-[11px] text-wk-text-faint">
+            <span className="max-w-full truncate font-mono">{slug}</span>
+            {articleOwner ? (
+              <>
+                <span aria-hidden="true">·</span>
+                <span>Owner: {articleOwner}</span>
+              </>
+            ) : null}
+          </div>
         </div>
-      </div>
 
-      {/* Right: action buttons */}
-      <div className="flex items-center gap-2 shrink-0 flex-wrap">
-        {/* View live */}
-        {isPublished && (
-          <a
-            href={`/magazine/${slug}`}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="wk-button wk-button-ghost wk-button-sm whitespace-nowrap"
+        <div className="flex flex-wrap items-center gap-2 lg:justify-end">
+          <span
+            aria-live="polite"
+            className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1.5 text-[10px] font-bold ${saveStateTone}`}
           >
-            <WkIcon name="ExternalLink" size={14} />
-            View Live
-          </a>
-        )}
+            {isSaving ? (
+              <WkIcon name="Loader2" size={11} className="animate-spin" />
+            ) : isDirty ? (
+              <WkIcon name="Circle" size={7} />
+            ) : (
+              <WkIcon name="Check" size={11} />
+            )}
+            {saveStateLabel}
+          </span>
 
-        {/* Preview (for drafts) */}
-        {!isPublished && (
           <button
+            type="button"
             onClick={onPreview}
             disabled={isPreviewing || isSaving}
             className="wk-button wk-button-ghost wk-button-sm whitespace-nowrap"
@@ -169,7 +327,7 @@ export function ArticleEditorHeader({
             {isPreviewing ? (
               <>
                 <WkIcon name="Loader2" size={14} className="animate-spin" />
-                Previewing…
+                Preparing
               </>
             ) : (
               <>
@@ -178,133 +336,147 @@ export function ArticleEditorHeader({
               </>
             )}
           </button>
-        )}
 
-        {/* Delete */}
-        {(!permissions || permissions.canDelete) && (
-        <button
-          onClick={onDelete}
-          className="wk-button wk-button-ghost wk-button-sm whitespace-nowrap text-wk-danger hover:bg-wk-danger-soft hover:border-wk-danger/20"
-        >
-          <WkIcon name="Trash2" size={14} />
-        </button>
-        )}
-
-        {/* Divider */}
-        <div className="h-6 w-px bg-wk-border" />
-
-        {/* Save Draft */}
-        {(!permissions || permissions.canEdit) && (
-        <button
-          onClick={onSaveDraft}
-          disabled={isSaving || isPublishing}
-          className="wk-button wk-button-secondary wk-button-sm whitespace-nowrap"
-        >
-          {isSaving ? (
-            <>
-              <WkIcon name="Loader2" size={14} className="animate-spin" />
-              Saving…
-            </>
-          ) : (
-            <>
+          {canEdit ? (
+            <button
+              type="button"
+              onClick={onSaveDraft}
+              disabled={isSaving || isPublishing}
+              className="wk-button wk-button-secondary wk-button-sm whitespace-nowrap"
+            >
               <WkIcon name="Save" size={14} />
-              Save Draft
-            </>
-          )}
-        </button>
-        )}
+              Save
+            </button>
+          ) : null}
 
-        {/* Review / Publish / Unpublish / Submit */}
-        {canRequestChanges ? (
-          <button
-            onClick={onRequestChanges}
-            disabled={isSaving || isPublishing || reviewActionBusy}
-            className="wk-button wk-button-secondary wk-button-sm whitespace-nowrap"
-          >
-            <WkIcon name="Flag" size={14} />
-            Request Changes
-          </button>
-        ) : null}
+          {focusMode && onToggleFocusMode ? (
+            <button
+              type="button"
+              onClick={onToggleFocusMode}
+              className="wk-button wk-button-ghost wk-button-sm whitespace-nowrap"
+            >
+              <WkIcon name="PanelLeftOpen" size={14} />
+              <span className="hidden sm:inline">
+                Exit Focus
+              </span>
+            </button>
+          ) : null}
 
-        {canApproveVersion ? (
-          <button
-            onClick={onApproveVersion}
-            disabled={isSaving || isPublishing || reviewActionBusy}
-            className="wk-button wk-button-primary wk-button-sm whitespace-nowrap"
-          >
-            <WkIcon name="Shield" size={14} />
-            Approve Version
-          </button>
-        ) : null}
+          {showArticleDetails && onOpenArticleDetails ? (
+            <button
+              type="button"
+              title="Article Details"
+              aria-label="Open Article Details"
+              aria-expanded={articleDetailsOpen}
+              aria-controls="article-write-context-drawer"
+              onClick={onOpenArticleDetails}
+              className="wk-button wk-button-ghost wk-button-sm whitespace-nowrap"
+            >
+              <WkIcon name="PanelRightOpen" size={14} />
+              <span className="hidden sm:inline">
+                Details
+              </span>
+            </button>
+          ) : null}
 
-        {!canRequestChanges && !canApproveVersion && shouldShowSubmitForReview ? (
-          <button
-            onClick={onSubmitForReview}
-            disabled={isSaving || reviewActionBusy}
-            className="wk-button wk-button-secondary wk-button-sm whitespace-nowrap"
-          >
-            <WkIcon name="Send" size={14} />
-            {submitForReviewLabel}
-          </button>
-        ) : null}
+          {canRequestChanges && canApproveVersion ? (
+            <button
+              type="button"
+              onClick={onRequestChanges}
+              disabled={isSaving || isPublishing || reviewActionBusy}
+              className="wk-button wk-button-secondary wk-button-sm whitespace-nowrap"
+            >
+              <WkIcon name="Flag" size={14} />
+              Request Changes
+            </button>
+          ) : null}
 
-        {!canRequestChanges && !canApproveVersion && !shouldShowSubmitForReview && isPublished && shouldShowPublish ? (
-          <button
-            onClick={onPublish}
-            disabled={isSaving || isPublishing}
-            className="wk-button wk-button-primary wk-button-sm whitespace-nowrap"
-          >
-            {isPublishing ? (
-              <>
-                <WkIcon name="Loader2" size={14} className="animate-spin" />
-                Updating…
-              </>
-            ) : (
-              <>
-                <WkIcon name="RefreshCw" size={14} />
-                Update
-              </>
-            )}
-          </button>
-        ) : null}
+          {renderPrimaryAction()}
 
-        {!canRequestChanges && !canApproveVersion && !shouldShowSubmitForReview && isFuture ? (
-          <button
-            onClick={onUnpublish}
-            disabled={isSaving || isPublishing}
-            className="wk-button wk-button-secondary wk-button-sm whitespace-nowrap"
-          >
-            <WkIcon name="EyeOff" size={14} />
-            Unschedule
-          </button>
-        ) : null}
+          <div ref={overflowRef} className="relative">
+            <button
+              type="button"
+              aria-label="More Article actions"
+              aria-haspopup="menu"
+              aria-expanded={overflowOpen}
+              onClick={() => setOverflowOpen((current) => !current)}
+              className="wk-button wk-button-ghost wk-button-sm"
+            >
+              <WkIcon name="Ellipsis" size={16} />
+            </button>
 
-        {!canRequestChanges && !canApproveVersion && !shouldShowSubmitForReview && !isPublished && !isFuture && shouldShowPublish ? (
-          <button
-            onClick={onPublish}
-            disabled={isSaving || isPublishing}
-            className="wk-button wk-button-primary wk-button-sm whitespace-nowrap"
-          >
-            {isPublishing ? (
-              <>
-                <WkIcon name="Loader2" size={14} className="animate-spin" />
-                Publishing…
-              </>
-            ) : (
-              <>
-                <WkIcon name="Globe" size={14} />
-                Publish
-              </>
-            )}
-          </button>
-        ) : null}
+            {overflowOpen ? (
+              <div
+                role="menu"
+                className="absolute right-0 top-full z-50 mt-2 w-52 overflow-hidden rounded-xl border border-wk-border bg-wk-surface p-1.5 shadow-lg"
+              >
+                {isPublished ? (
+                  <a
+                    role="menuitem"
+                    href={`/magazine/${slug}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-[12px] font-semibold text-wk-text-muted hover:bg-wk-surface-raised hover:text-wk-text"
+                  >
+                    <WkIcon name="ExternalLink" size={14} />
+                    View Live
+                  </a>
+                ) : null}
 
-        {!canRequestChanges && !canApproveVersion && !shouldShowSubmitForReview && publishDisabledReason ? (
-          <span className="rounded-lg border border-wk-warning/30 bg-wk-warning-soft px-3 py-2 text-[11px] font-bold text-wk-text-muted">
-            {publishDisabledReason}
-          </span>
-        ) : null}
+                {(isPublished || isFuture) &&
+                (!permissions || permissions.canPublish) ? (
+                  <button
+                    type="button"
+                    role="menuitem"
+                    onClick={() => {
+                      setOverflowOpen(false);
+                      onUnpublish();
+                    }}
+                    className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-[12px] font-semibold text-wk-text-muted hover:bg-wk-surface-raised hover:text-wk-text"
+                  >
+                    <WkIcon name="Undo2" size={14} />
+                    {isFuture ? "Unschedule" : "Return to Draft"}
+                  </button>
+                ) : null}
+
+                {(!permissions || permissions.canDelete) ? (
+                  <>
+                    <div className="my-1 h-px bg-wk-border" />
+                    <button
+                      type="button"
+                      role="menuitem"
+                      onClick={() => {
+                        setOverflowOpen(false);
+                        onDelete();
+                      }}
+                      className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-[12px] font-semibold text-wk-danger hover:bg-wk-danger-soft"
+                    >
+                      <WkIcon name="Trash2" size={14} />
+                      Move to Trash
+                    </button>
+                  </>
+                ) : null}
+              </div>
+            ) : null}
+          </div>
+        </div>
       </div>
-    </div>
+
+      {publishDisabledReason || lastAutosavedAt ? (
+        <div className="flex flex-col gap-1 border-t border-wk-border px-4 py-2 text-[10px] text-wk-text-faint sm:flex-row sm:items-center sm:justify-between">
+          <span>
+            {lastAutosavedAt
+              ? `Last auto-saved ${new Date(lastAutosavedAt).toLocaleTimeString()}`
+              : "Auto-save starts after the first change."}
+          </span>
+
+          {publishDisabledReason ? (
+            <span className="font-semibold text-wk-warning">
+              {publishDisabledReason}
+            </span>
+          ) : null}
+        </div>
+      ) : null}
+    </header>
   );
 }
