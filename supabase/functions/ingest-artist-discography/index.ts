@@ -1,6 +1,11 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.1";
 import { SignJWT } from "npm:jose@5.9.6";
 import { resolveScopedTrackIdentity } from "./trackIdentity.ts";
+import {
+  appleAlbumIdForRelease,
+  resolveExistingAppleRelease,
+  type ExistingAppleRelease,
+} from "./releaseIdentity.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -415,8 +420,8 @@ Deno.serve(async (req: Request) => {
     stage = "load_existing";
     logStage(stage, { mode, artistSlug });
     const [existingReleasesRes, existingTracksRes, artistReleaseIdsRes] = await Promise.all([
-      fetchAllRows<{ id: string; slug: string; title: string; metadata: Record<string, unknown> | null }>((from, to) =>
-        db.from("registry_releases").select("id, slug, title, metadata").eq("status", "active").range(from, to)
+      fetchAllRows<ExistingAppleRelease>((from, to) =>
+        db.from("registry_releases").select("id, slug, title, upc, metadata").eq("status", "active").range(from, to)
       ),
       fetchAllRows<{ id: string; slug: string; isrc: string | null }>((from, to) =>
         db.from("registry_tracks").select("id, slug, isrc").range(from, to)
@@ -459,17 +464,96 @@ Deno.serve(async (req: Request) => {
     }
 
     const artistReleaseIdList = (artistReleaseIdsRes.data ?? []).map((r: { release_id: string }) => r.release_id);
-    let existingArtistReleases: Array<{ id: string; slug: string; title: string; metadata: Record<string, unknown> | null }> = [];
+    let existingArtistReleases: ExistingAppleRelease[] = [];
     if (artistReleaseIdList.length > 0) existingArtistReleases = allActiveReleases.filter((r) => artistReleaseIdList.includes(r.id));
-    const existingArtistReleaseBySlug = new Map(existingArtistReleases.map((r) => [r.slug, r]));
+    const existingArtistReleaseBySlug =
+      new Map(
+        existingArtistReleases.map(
+          (release) => [
+            release.slug,
+            release,
+          ],
+        ),
+      );
 
-    const existingArtistReleaseByTitle = new Map<string, typeof existingArtistReleases[0]>();
-    for (const r of existingArtistReleases) {
-      const key = (r.title as string).toLowerCase().trim();
-      if (!existingArtistReleaseByTitle.has(key)) existingArtistReleaseByTitle.set(key, r);
+    const existingArtistReleaseByTitle =
+      new Map<string, ExistingAppleRelease>();
+
+    const existingArtistReleaseByAppleAlbumId =
+      new Map<string, ExistingAppleRelease>();
+
+    const existingArtistReleaseByUpc =
+      new Map<string, ExistingAppleRelease>();
+
+    for (const release of existingArtistReleases) {
+      const titleKey =
+        release.title
+          .toLowerCase()
+          .trim();
+
+      if (
+        titleKey &&
+        !existingArtistReleaseByTitle.has(
+          titleKey,
+        )
+      ) {
+        existingArtistReleaseByTitle.set(
+          titleKey,
+          release,
+        );
+      }
+
+      const appleAlbumId =
+        appleAlbumIdForRelease(release);
+
+      if (
+        appleAlbumId &&
+        !existingArtistReleaseByAppleAlbumId.has(
+          appleAlbumId,
+        )
+      ) {
+        existingArtistReleaseByAppleAlbumId.set(
+          appleAlbumId,
+          release,
+        );
+      }
+
+      const releaseUpc =
+        String(release.upc ?? "").trim();
+
+      if (
+        releaseUpc &&
+        !existingArtistReleaseByUpc.has(
+          releaseUpc,
+        )
+      ) {
+        existingArtistReleaseByUpc.set(
+          releaseUpc,
+          release,
+        );
+      }
     }
 
-    const existingReleaseSlugs = new Set(existingArtistReleases.map((r: { slug: string }) => r.slug));
+    const existingAppleReleaseMaps = {
+      byAppleAlbumId:
+        existingArtistReleaseByAppleAlbumId,
+
+      byUpc:
+        existingArtistReleaseByUpc,
+
+      bySlug:
+        existingArtistReleaseBySlug,
+
+      byTitle:
+        existingArtistReleaseByTitle,
+    };
+
+    const existingReleaseSlugs =
+      new Set(
+        existingArtistReleases.map(
+          (release) => release.slug,
+        ),
+      );
 
     if (mode === "preview") {
       stage = "search";
@@ -506,8 +590,19 @@ Deno.serve(async (req: Request) => {
         let awUrl: string | null = null;
         if (attrs.artwork?.url) awUrl = artworkUrl(attrs.artwork.url, 800);
 
-        let existingMatch = existingArtistReleaseBySlug.get(rawSlug);
-        if (!existingMatch) existingMatch = existingArtistReleaseByTitle.get(rawTitle.toLowerCase().trim());
+        const existingMatch =
+          resolveExistingAppleRelease(
+            existingAppleReleaseMaps,
+            {
+              appleAlbumId: album.id,
+              upc,
+              rawSlug,
+              normalizedTitle:
+                rawTitle
+                  .toLowerCase()
+                  .trim(),
+            },
+          );
 
         const tracksData = album.relationships?.tracks?.data ?? [];
         const previewTracks: PreviewTrack[] = tracksData.map((track) => {
@@ -641,9 +736,19 @@ Deno.serve(async (req: Request) => {
         let releaseSlug: string;
         let releaseAlreadyExists = false;
 
-        const existingBySlug = existingArtistReleaseBySlug.get(rawSlug);
-        const existingByTitle = existingArtistReleaseByTitle.get(rawTitle.toLowerCase().trim());
-        const existingMatch = existingBySlug || existingByTitle;
+        const existingMatch =
+          resolveExistingAppleRelease(
+            existingAppleReleaseMaps,
+            {
+              appleAlbumId: album.id,
+              upc,
+              rawSlug,
+              normalizedTitle:
+                rawTitle
+                  .toLowerCase()
+                  .trim(),
+            },
+          );
 
         if (action === "merge" || (action === "canonicalize" && existingMatch)) {
           if (existingMatch) {
