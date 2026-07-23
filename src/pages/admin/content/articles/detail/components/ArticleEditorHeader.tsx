@@ -21,6 +21,8 @@ interface Props {
   onOpenArticleDetails?: () => void;
   showArticleDetails?: boolean;
   articleDetailsOpen?: boolean;
+  draftActionsDisabled?: boolean;
+  documentModeLabel?: string | null;
   focusMode?: boolean;
   onToggleFocusMode?: () => void;
   onSubmitForReview: () => void;
@@ -75,6 +77,8 @@ export function ArticleEditorHeader({
   onOpenArticleDetails,
   showArticleDetails = false,
   articleDetailsOpen = false,
+  draftActionsDisabled = false,
+  documentModeLabel = null,
   focusMode = false,
   onToggleFocusMode,
   onSubmitForReview,
@@ -105,7 +109,24 @@ export function ArticleEditorHeader({
   const shouldShowSubmitForReview =
     !isPublished && !isFuture && canSubmitForReview;
   const shouldShowPublish = userCanPublish && !publishDisabledReason;
-  const canEdit = !permissions || permissions.canEdit;
+  const canEdit =
+    (!permissions || permissions.canEdit) &&
+    !draftActionsDisabled;
+  const canManagePublication =
+    !permissions || permissions.canPublish;
+
+  const canDeleteArticle =
+    (!permissions || permissions.canDelete) &&
+    !draftActionsDisabled;
+
+  const hasOverflowActions =
+    isPublished ||
+    (
+      isFuture &&
+      canManagePublication
+    ) ||
+    canDeleteArticle;
+
 
   useEffect(() => {
     function handlePointerDown(event: MouseEvent) {
@@ -143,6 +164,16 @@ export function ArticleEditorHeader({
     : isDirty
       ? "border-wk-warning/30 bg-wk-warning-soft text-wk-warning"
       : "border-wk-success/30 bg-wk-success-soft text-wk-success";
+
+  const displayedSaveStateLabel =
+    draftActionsDisabled
+      ? documentModeLabel || "Submitted Version"
+      : saveStateLabel;
+
+  const displayedSaveStateTone =
+    draftActionsDisabled
+      ? "border-wk-info/30 bg-wk-info-soft text-wk-info"
+      : saveStateTone;
 
   function renderPrimaryAction() {
     if (canApproveVersion) {
@@ -290,6 +321,13 @@ export function ArticleEditorHeader({
                 Read-only
               </span>
             ) : null}
+
+            {draftActionsDisabled &&
+            documentModeLabel ? (
+              <span className="inline-flex items-center rounded-full bg-wk-info-soft px-2.5 py-1 text-[10px] font-bold text-wk-info">
+                {documentModeLabel}
+              </span>
+            ) : null}
           </div>
 
           <div className="mt-1 flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1 text-[11px] text-wk-text-faint">
@@ -306,7 +344,7 @@ export function ArticleEditorHeader({
         <div className="flex flex-wrap items-center gap-2 lg:justify-end">
           <span
             aria-live="polite"
-            className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1.5 text-[10px] font-bold ${saveStateTone}`}
+            className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1.5 text-[10px] font-bold ${displayedSaveStateTone}`}
           >
             {isSaving ? (
               <WkIcon name="Loader2" size={11} className="animate-spin" />
@@ -315,27 +353,33 @@ export function ArticleEditorHeader({
             ) : (
               <WkIcon name="Check" size={11} />
             )}
-            {saveStateLabel}
+            {displayedSaveStateLabel}
           </span>
 
-          <button
-            type="button"
-            onClick={onPreview}
-            disabled={isPreviewing || isSaving}
-            className="wk-button wk-button-ghost wk-button-sm whitespace-nowrap"
-          >
-            {isPreviewing ? (
-              <>
-                <WkIcon name="Loader2" size={14} className="animate-spin" />
-                Preparing
-              </>
-            ) : (
-              <>
-                <WkIcon name="Eye" size={14} />
-                Preview
-              </>
-            )}
-          </button>
+          {!draftActionsDisabled ? (
+            <button
+              type="button"
+              onClick={onPreview}
+              disabled={isPreviewing || isSaving}
+              className="wk-button wk-button-ghost wk-button-sm whitespace-nowrap"
+            >
+              {isPreviewing ? (
+                <>
+                  <WkIcon
+                    name="Loader2"
+                    size={14}
+                    className="animate-spin"
+                  />
+                  Preparing
+                </>
+              ) : (
+                <>
+                  <WkIcon name="Eye" size={14} />
+                  Preview
+                </>
+              )}
+            </button>
+          ) : null}
 
           {canEdit ? (
             <button
@@ -393,7 +437,14 @@ export function ArticleEditorHeader({
 
           {renderPrimaryAction()}
 
-          <div ref={overflowRef} className="relative">
+          <div
+            ref={overflowRef}
+            className={
+              hasOverflowActions
+                ? "relative"
+                : "hidden"
+            }
+          >
             <button
               type="button"
               aria-label="More Article actions"
@@ -424,7 +475,7 @@ export function ArticleEditorHeader({
                 ) : null}
 
                 {(isPublished || isFuture) &&
-                (!permissions || permissions.canPublish) ? (
+                canManagePublication ? (
                   <button
                     type="button"
                     role="menuitem"
@@ -439,7 +490,8 @@ export function ArticleEditorHeader({
                   </button>
                 ) : null}
 
-                {(!permissions || permissions.canDelete) ? (
+                {!draftActionsDisabled &&
+                canDeleteArticle ? (
                   <>
                     <div className="my-1 h-px bg-wk-border" />
                     <button
