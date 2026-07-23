@@ -30,8 +30,8 @@ interface Props {
 const WORKBENCH_MODES: WorkbenchModeDefinition[] = [
   {
     key: "write",
-    label: "Write",
-    description: "Compose the title, summary, and Article body.",
+    label: "Document",
+    description: "Write, suggest, or view the Article document.",
     icon: "Pencil",
   },
   {

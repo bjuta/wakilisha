@@ -438,13 +438,9 @@ export function ArticleEditorWorkspace({
 
   const documentModeLabel =
     documentModeState.mode === "suggest"
-      ? submittedDocument
-        ? `Suggesting on v${submittedDocument.versionNumber}`
-        : "Suggesting"
+      ? "Suggesting"
       : documentModeState.mode === "view"
-        ? submittedDocument
-          ? `Viewing v${submittedDocument.versionNumber}`
-          : "Viewing Submitted"
+        ? "Viewing"
         : null;
 
   useEffect(() => {
@@ -489,12 +485,25 @@ export function ArticleEditorWorkspace({
       latestReviewAction === "approved" &&
       !hasChangesAfterLatestApproval,
   );
+  const submittedReviewLabel =
+    submittedDocument?.versionNumber
+      ? `submitted version ${submittedDocument.versionNumber}`
+      : "the submitted version";
+
   const publishDisabledReason =
-    article && articlePermissions.canPublish && hasChangesAfterLatestApproval
-      ? "Submit this draft for review before publishing."
-      : article && articlePermissions.canPublish && !canPublishApprovedArticleVersion
-        ? "Approve the submitted version before publishing."
-        : null;
+    article &&
+    articlePermissions.canPublish &&
+    isPendingReview
+      ? `Review ${submittedReviewLabel} before approving it or requesting changes.`
+      : article &&
+          articlePermissions.canPublish &&
+          hasChangesAfterLatestApproval
+        ? "Submit this draft for review before publishing."
+        : article &&
+            articlePermissions.canPublish &&
+            !canPublishApprovedArticleVersion
+          ? "Approve the submitted version before publishing."
+          : null;
 
   const editorialStatusLabel =
     articleWpStatus === "publish"

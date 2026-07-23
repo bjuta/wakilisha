@@ -322,12 +322,6 @@ export function ArticleEditorHeader({
               </span>
             ) : null}
 
-            {draftActionsDisabled &&
-            documentModeLabel ? (
-              <span className="inline-flex items-center rounded-full bg-wk-info-soft px-2.5 py-1 text-[10px] font-bold text-wk-info">
-                {documentModeLabel}
-              </span>
-            ) : null}
           </div>
 
           <div className="mt-1 flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1 text-[11px] text-wk-text-faint">
