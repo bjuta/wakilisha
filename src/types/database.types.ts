@@ -522,6 +522,270 @@ export type Database = {
           },
         ]
       }
+      publishing_channels: {
+        Row: {
+          channel_key: string
+          created_at: string
+          description: string
+          enabled: boolean
+          label: string
+          sort_order: number
+          updated_at: string
+        }
+        Insert: {
+          channel_key: string
+          created_at?: string
+          description: string
+          enabled?: boolean
+          label: string
+          sort_order?: number
+          updated_at?: string
+        }
+        Update: {
+          channel_key?: string
+          created_at?: string
+          description?: string
+          enabled?: boolean
+          label?: string
+          sort_order?: number
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      publishing_content_kinds: {
+        Row: {
+          canonical_resource_kind: string | null
+          created_at: string
+          description: string
+          enabled: boolean
+          kind: string
+          label: string
+          sort_order: number
+          updated_at: string
+        }
+        Insert: {
+          canonical_resource_kind?: string | null
+          created_at?: string
+          description: string
+          enabled?: boolean
+          kind: string
+          label: string
+          sort_order?: number
+          updated_at?: string
+        }
+        Update: {
+          canonical_resource_kind?: string | null
+          created_at?: string
+          description?: string
+          enabled?: boolean
+          kind?: string
+          label?: string
+          sort_order?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "publishing_content_kinds_canonical_resource_kind_fkey"
+            columns: ["canonical_resource_kind"]
+            isOneToOne: false
+            referencedRelation: "resource_kinds"
+            referencedColumns: ["kind"]
+          },
+        ]
+      }
+      publishing_item_assignees: {
+        Row: {
+          assigned_by: string | null
+          assignment_role: string
+          created_at: string
+          item_id: string
+          user_id: string
+        }
+        Insert: {
+          assigned_by?: string | null
+          assignment_role: string
+          created_at?: string
+          item_id: string
+          user_id: string
+        }
+        Update: {
+          assigned_by?: string | null
+          assignment_role?: string
+          created_at?: string
+          item_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "publishing_item_assignees_item_id_fkey"
+            columns: ["item_id"]
+            isOneToOne: false
+            referencedRelation: "publishing_items"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      publishing_item_channels: {
+        Row: {
+          channel_key: string
+          created_at: string
+          created_by: string | null
+          is_primary: boolean
+          item_id: string
+        }
+        Insert: {
+          channel_key: string
+          created_at?: string
+          created_by?: string | null
+          is_primary?: boolean
+          item_id: string
+        }
+        Update: {
+          channel_key?: string
+          created_at?: string
+          created_by?: string | null
+          is_primary?: boolean
+          item_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "publishing_item_channels_channel_key_fkey"
+            columns: ["channel_key"]
+            isOneToOne: false
+            referencedRelation: "publishing_channels"
+            referencedColumns: ["channel_key"]
+          },
+          {
+            foreignKeyName: "publishing_item_channels_item_id_fkey"
+            columns: ["item_id"]
+            isOneToOne: false
+            referencedRelation: "publishing_items"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      publishing_item_events: {
+        Row: {
+          action: string
+          actor_id: string | null
+          created_at: string
+          id: string
+          item_id: string
+          metadata: Json
+          note: string | null
+          prior_record_version: number
+          prior_values: Json
+          resulting_record_version: number
+          resulting_values: Json
+        }
+        Insert: {
+          action: string
+          actor_id?: string | null
+          created_at?: string
+          id?: string
+          item_id: string
+          metadata?: Json
+          note?: string | null
+          prior_record_version: number
+          prior_values?: Json
+          resulting_record_version: number
+          resulting_values?: Json
+        }
+        Update: {
+          action?: string
+          actor_id?: string | null
+          created_at?: string
+          id?: string
+          item_id?: string
+          metadata?: Json
+          note?: string | null
+          prior_record_version?: number
+          prior_values?: Json
+          resulting_record_version?: number
+          resulting_values?: Json
+        }
+        Relationships: [
+          {
+            foreignKeyName: "publishing_item_events_item_id_fkey"
+            columns: ["item_id"]
+            isOneToOne: false
+            referencedRelation: "publishing_items"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      publishing_items: {
+        Row: {
+          brief: string | null
+          content_kind: string
+          created_at: string
+          created_by: string | null
+          id: string
+          owner_id: string | null
+          planned_publish_at: string | null
+          planning_state: string
+          priority: string
+          production_deadline: string | null
+          production_stage: string
+          record_version: number
+          resource_id: string | null
+          title: string
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          brief?: string | null
+          content_kind: string
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          owner_id?: string | null
+          planned_publish_at?: string | null
+          planning_state?: string
+          priority?: string
+          production_deadline?: string | null
+          production_stage?: string
+          record_version?: number
+          resource_id?: string | null
+          title: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          brief?: string | null
+          content_kind?: string
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          owner_id?: string | null
+          planned_publish_at?: string | null
+          planning_state?: string
+          priority?: string
+          production_deadline?: string | null
+          production_stage?: string
+          record_version?: number
+          resource_id?: string | null
+          title?: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "publishing_items_content_kind_fkey"
+            columns: ["content_kind"]
+            isOneToOne: false
+            referencedRelation: "publishing_content_kinds"
+            referencedColumns: ["kind"]
+          },
+          {
+            foreignKeyName: "publishing_items_resource_id_fkey"
+            columns: ["resource_id"]
+            isOneToOne: false
+            referencedRelation: "resources"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       registry_artist_resources: {
         Row: {
           artist_id: string
@@ -758,12 +1022,25 @@ export type Database = {
         Args: { p_resource_id: string }
         Returns: boolean
       }
+      current_user_can_manage_publishing: { Args: never; Returns: boolean }
       current_user_can_participate_article_review: {
         Args: { p_resource_id: string }
         Returns: boolean
       }
       current_user_can_publish_article: { Args: never; Returns: boolean }
       current_user_can_review_article: { Args: never; Returns: boolean }
+      current_user_can_view_publishing_item: {
+        Args: { p_item_id: string }
+        Returns: boolean
+      }
+      derive_publishing_editorial_state: {
+        Args: { p_resource_id: string }
+        Returns: string
+      }
+      derive_publishing_publication_state: {
+        Args: { p_item_id: string }
+        Returns: string
+      }
       insert_article_lifecycle_version_from_article: {
         Args: {
           p_article: Database["public"]["Tables"]["wk_articles"]["Row"]
@@ -787,6 +1064,12 @@ export type Database = {
           p_version_id: string
         }
         Returns: string
+      }
+      publishing_item_snapshot: {
+        Args: {
+          p_item: Database["editorial"]["Tables"]["publishing_items"]["Row"]
+        }
+        Returns: Json
       }
     }
     Enums: {
@@ -12990,6 +13273,40 @@ export type Database = {
         }
         Relationships: []
       }
+      wk_publishing_workspace_items: {
+        Row: {
+          assignees: Json | null
+          brief: string | null
+          channels: Json | null
+          content_kind: string | null
+          content_kind_label: string | null
+          created_at: string | null
+          created_by: string | null
+          created_by_label: string | null
+          current_approved_version_id: string | null
+          current_published_version_id: string | null
+          current_submitted_version_id: string | null
+          current_working_version_id: string | null
+          editorial_state: string | null
+          id: string | null
+          owner_id: string | null
+          owner_label: string | null
+          planned_publish_at: string | null
+          planning_state: string | null
+          priority: string | null
+          production_deadline: string | null
+          production_stage: string | null
+          publication_state: string | null
+          record_version: number | null
+          resource_id: string | null
+          resource_kind: string | null
+          title: string | null
+          updated_at: string | null
+          updated_by: string | null
+          updated_by_label: string | null
+        }
+        Relationships: []
+      }
       wk_resource_index: {
         Row: {
           canonical_path: string | null
@@ -13031,6 +13348,32 @@ export type Database = {
           created_at: string
           created_comment_id: string
           thread_id: string
+        }[]
+      }
+      add_publishing_item_assignee: {
+        Args: {
+          p_assignment_role: string
+          p_expected_record_version: number
+          p_item_id: string
+          p_note?: string
+          p_user_id: string
+        }
+        Returns: {
+          item_id: string
+          record_version: number
+        }[]
+      }
+      add_publishing_item_channel: {
+        Args: {
+          p_channel_key: string
+          p_expected_record_version: number
+          p_is_primary?: boolean
+          p_item_id: string
+          p_note?: string
+        }
+        Returns: {
+          item_id: string
+          record_version: number
         }[]
       }
       admin_apply_artist_decouple_decision: {
@@ -14096,6 +14439,24 @@ export type Database = {
         }
         Returns: Json
       }
+      create_publishing_item: {
+        Args: {
+          p_brief?: string
+          p_content_kind: string
+          p_note?: string
+          p_owner_id?: string
+          p_planned_publish_at?: string
+          p_priority?: string
+          p_production_deadline?: string
+          p_production_stage?: string
+          p_resource_id?: string
+          p_title: string
+        }
+        Returns: {
+          item_id: string
+          record_version: number
+        }[]
+      }
       create_registry_cultural_entity: {
         Args: {
           p_canonical_source_id?: string
@@ -14788,6 +15149,18 @@ export type Database = {
           result: Json
         }[]
       }
+      link_publishing_item_resource: {
+        Args: {
+          p_expected_record_version: number
+          p_item_id: string
+          p_note?: string
+          p_resource_id: string
+        }
+        Returns: {
+          item_id: string
+          record_version: number
+        }[]
+      }
       list_article_lifecycle_events: {
         Args: { p_article_id: string; p_limit?: number }
         Returns: {
@@ -15162,6 +15535,31 @@ export type Database = {
           decided_at: string
           decision_status: string
           suggestion_id: string
+        }[]
+      }
+      remove_publishing_item_assignee: {
+        Args: {
+          p_assignment_role: string
+          p_expected_record_version: number
+          p_item_id: string
+          p_note?: string
+          p_user_id: string
+        }
+        Returns: {
+          item_id: string
+          record_version: number
+        }[]
+      }
+      remove_publishing_item_channel: {
+        Args: {
+          p_channel_key: string
+          p_expected_record_version: number
+          p_item_id: string
+          p_note?: string
+        }
+        Returns: {
+          item_id: string
+          record_version: number
         }[]
       }
       request_article_changes: {
@@ -15591,6 +15989,26 @@ export type Database = {
           isOneToOne: false
           isSetofReturn: true
         }
+      }
+      update_publishing_item: {
+        Args: {
+          p_brief: string
+          p_content_kind: string
+          p_expected_record_version: number
+          p_item_id: string
+          p_note?: string
+          p_owner_id: string
+          p_planned_publish_at: string
+          p_planning_state: string
+          p_priority: string
+          p_production_deadline: string
+          p_production_stage: string
+          p_title: string
+        }
+        Returns: {
+          item_id: string
+          record_version: number
+        }[]
       }
       update_taxonomy_term:
         | {
