@@ -97,6 +97,122 @@ export type Database = {
           },
         ]
       }
+      article_review_comments: {
+        Row: {
+          body_text: string
+          created_at: string
+          created_by: string | null
+          deleted_at: string | null
+          edited_at: string | null
+          id: string
+          thread_id: string
+        }
+        Insert: {
+          body_text: string
+          created_at?: string
+          created_by?: string | null
+          deleted_at?: string | null
+          edited_at?: string | null
+          id?: string
+          thread_id: string
+        }
+        Update: {
+          body_text?: string
+          created_at?: string
+          created_by?: string | null
+          deleted_at?: string | null
+          edited_at?: string | null
+          id?: string
+          thread_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "article_review_comments_thread_id_fkey"
+            columns: ["thread_id"]
+            isOneToOne: false
+            referencedRelation: "article_review_threads"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      article_review_threads: {
+        Row: {
+          anchor_from: number | null
+          anchor_kind: string
+          anchor_prefix: string | null
+          anchor_quote: string | null
+          anchor_suffix: string | null
+          anchor_to: number | null
+          article_id: string
+          created_at: string
+          created_by: string | null
+          id: string
+          resolved_at: string | null
+          resolved_by: string | null
+          resource_id: string
+          status: string
+          target_field: string
+          target_version_id: string
+          thread_kind: string
+          updated_at: string
+        }
+        Insert: {
+          anchor_from?: number | null
+          anchor_kind?: string
+          anchor_prefix?: string | null
+          anchor_quote?: string | null
+          anchor_suffix?: string | null
+          anchor_to?: number | null
+          article_id: string
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          resolved_at?: string | null
+          resolved_by?: string | null
+          resource_id: string
+          status?: string
+          target_field?: string
+          target_version_id: string
+          thread_kind: string
+          updated_at?: string
+        }
+        Update: {
+          anchor_from?: number | null
+          anchor_kind?: string
+          anchor_prefix?: string | null
+          anchor_quote?: string | null
+          anchor_suffix?: string | null
+          anchor_to?: number | null
+          article_id?: string
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          resolved_at?: string | null
+          resolved_by?: string | null
+          resource_id?: string
+          status?: string
+          target_field?: string
+          target_version_id?: string
+          thread_kind?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "article_review_threads_resource_id_fkey"
+            columns: ["resource_id"]
+            isOneToOne: false
+            referencedRelation: "resources"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "article_review_threads_target_version_id_fkey"
+            columns: ["target_version_id"]
+            isOneToOne: false
+            referencedRelation: "article_versions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       article_scheduled_publications: {
         Row: {
           article_id: string
@@ -147,6 +263,117 @@ export type Database = {
             columns: ["version_id"]
             isOneToOne: false
             referencedRelation: "article_versions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      article_suggestion_events: {
+        Row: {
+          action: string
+          actor_id: string | null
+          applied_version_id: string | null
+          created_at: string
+          id: string
+          note: string | null
+          suggestion_id: string
+        }
+        Insert: {
+          action: string
+          actor_id?: string | null
+          applied_version_id?: string | null
+          created_at?: string
+          id?: string
+          note?: string | null
+          suggestion_id: string
+        }
+        Update: {
+          action?: string
+          actor_id?: string | null
+          applied_version_id?: string | null
+          created_at?: string
+          id?: string
+          note?: string | null
+          suggestion_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "article_suggestion_events_applied_version_id_fkey"
+            columns: ["applied_version_id"]
+            isOneToOne: false
+            referencedRelation: "article_versions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "article_suggestion_events_suggestion_id_fkey"
+            columns: ["suggestion_id"]
+            isOneToOne: false
+            referencedRelation: "article_suggestions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      article_suggestions: {
+        Row: {
+          applied_version_id: string | null
+          created_at: string
+          decided_at: string | null
+          decided_by: string | null
+          decision_note: string | null
+          id: string
+          operation_kind: string
+          original_text: string
+          proposed_content_html: string
+          replacement_text: string
+          status: string
+          target_version_fingerprint: string
+          thread_id: string
+          updated_at: string
+        }
+        Insert: {
+          applied_version_id?: string | null
+          created_at?: string
+          decided_at?: string | null
+          decided_by?: string | null
+          decision_note?: string | null
+          id?: string
+          operation_kind: string
+          original_text?: string
+          proposed_content_html: string
+          replacement_text?: string
+          status?: string
+          target_version_fingerprint: string
+          thread_id: string
+          updated_at?: string
+        }
+        Update: {
+          applied_version_id?: string | null
+          created_at?: string
+          decided_at?: string | null
+          decided_by?: string | null
+          decision_note?: string | null
+          id?: string
+          operation_kind?: string
+          original_text?: string
+          proposed_content_html?: string
+          replacement_text?: string
+          status?: string
+          target_version_fingerprint?: string
+          thread_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "article_suggestions_applied_version_id_fkey"
+            columns: ["applied_version_id"]
+            isOneToOne: false
+            referencedRelation: "article_versions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "article_suggestions_thread_id_fkey"
+            columns: ["thread_id"]
+            isOneToOne: true
+            referencedRelation: "article_review_threads"
             referencedColumns: ["id"]
           },
         ]
@@ -482,6 +709,21 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      apply_article_review_snapshot: {
+        Args: {
+          p_article_id: string
+          p_content_html: string
+          p_expected_draft_version: number
+          p_resource_id: string
+        }
+        Returns: {
+          article_id: string
+          article_slug: string
+          draft_version: number
+          version_id: string
+          version_number: number
+        }[]
+      }
       article_snapshot_fingerprint: {
         Args: {
           p_author_display: string
@@ -513,6 +755,10 @@ export type Database = {
         }[]
       }
       current_user_can_edit_article: {
+        Args: { p_resource_id: string }
+        Returns: boolean
+      }
+      current_user_can_participate_article_review: {
         Args: { p_resource_id: string }
         Returns: boolean
       }
@@ -12759,9 +13005,33 @@ export type Database = {
       }
     }
     Functions: {
+      accept_article_suggestion: {
+        Args: {
+          p_expected_draft_version: number
+          p_note?: string
+          p_suggestion_id: string
+        }
+        Returns: {
+          applied_version_id: string
+          applied_version_number: number
+          article_id: string
+          article_slug: string
+          decision_status: string
+          draft_version: number
+          suggestion_id: string
+        }[]
+      }
       accept_registry_missing_artist_intake: {
         Args: { p_review_reason: string; p_submission_id: string }
         Returns: Json
+      }
+      add_article_review_comment: {
+        Args: { p_body_text: string; p_thread_id: string }
+        Returns: {
+          created_at: string
+          created_comment_id: string
+          thread_id: string
+        }[]
       }
       admin_apply_artist_decouple_decision: {
         Args: { p_decision_id: string }
@@ -13699,6 +13969,28 @@ export type Database = {
           version_id: string
         }[]
       }
+      create_article_suggestion: {
+        Args: {
+          p_anchor_from: number
+          p_anchor_prefix: string
+          p_anchor_quote: string
+          p_anchor_suffix: string
+          p_anchor_to: number
+          p_article_id: string
+          p_comment?: string
+          p_operation_kind: string
+          p_original_text: string
+          p_proposed_content_html: string
+          p_replacement_text: string
+          p_target_version_fingerprint: string
+          p_target_version_id: string
+        }
+        Returns: {
+          created_at: string
+          created_suggestion_id: string
+          created_thread_id: string
+        }[]
+      }
       create_import_run: {
         Args: {
           p_errors?: string[]
@@ -14136,6 +14428,10 @@ export type Database = {
           isSetofReturn: true
         }
       }
+      get_article_review_workspace: {
+        Args: { p_article_id: string }
+        Returns: Json
+      }
       get_chart_programs: {
         Args: never
         Returns: {
@@ -14532,6 +14828,14 @@ export type Database = {
           wp_status: string
         }[]
       }
+      mark_article_suggestion_stale: {
+        Args: { p_note?: string; p_suggestion_id: string }
+        Returns: {
+          decided_at: string
+          decision_status: string
+          suggestion_id: string
+        }[]
+      }
       merge_registry_relationship_duplicate: {
         Args: {
           p_duplicate_relationship_id: string
@@ -14851,6 +15155,14 @@ export type Database = {
           p_upc?: string
         }
         Returns: Json
+      }
+      reject_article_suggestion: {
+        Args: { p_note?: string; p_suggestion_id: string }
+        Returns: {
+          decided_at: string
+          decision_status: string
+          suggestion_id: string
+        }[]
       }
       request_article_changes: {
         Args: { p_article_id: string; p_note?: string; p_version_id?: string }
@@ -15333,6 +15645,14 @@ export type Database = {
           isOneToOne: true
           isSetofReturn: false
         }
+      }
+      withdraw_article_suggestion: {
+        Args: { p_note?: string; p_suggestion_id: string }
+        Returns: {
+          decided_at: string
+          decision_status: string
+          suggestion_id: string
+        }[]
       }
       wk_first_jsonb_text: {
         Args: { a: Json; b: Json; keys: string[] }

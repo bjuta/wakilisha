@@ -1,4 +1,5 @@
 import { useEffect, useState, useCallback, useRef, useMemo } from "react";
+import { createPortal } from "react-dom";
 import { useNavigate } from "react-router-dom";
 import { WkIcon } from "@/components/design-system/Icon";
 import { ArticleEditorHeader } from "./components/ArticleEditorHeader";
@@ -9,8 +10,13 @@ import {
 import { ArticleContentEditor } from "./components/ArticleContentEditor";
 import { ArticleMetaPanel } from "./components/ArticleMetaPanel";
 import { ArticleWriteContextDrawer } from "./components/ArticleWriteContextDrawer";
+import { ArticleDocumentModeSwitcher } from "./components/ArticleDocumentModeSwitcher";
 import { ArticlePublishChecklist } from "./components/ArticlePublishChecklist";
 import { useAdminUser } from "@/hooks/useAdminUser";
+import { useArticleDocumentModeState } from "./hooks/useArticleDocumentModeState";
+import type {
+  RichTextSelectionSnapshot,
+} from "@/components/design-system/editorial/RichTextEditor";
 import {
   fetchArticleForAdmin,
   saveArticle,
@@ -36,6 +42,12 @@ import {
 } from "@/services/articles/articleAdminService";
 import { processArticleContent } from "@/services/articles/contentPipeline";
 import { syncInstituteArticlePublicationState } from "@/services/institute/institutePublicationSyncService";
+import {
+  acceptArticleSuggestion,
+  createArticleSuggestion,
+  rejectArticleSuggestion,
+  withdrawArticleSuggestion,
+} from "@/services/articles/articleReviewService";
 
 const CANONICAL_PUBLIC_ORIGIN = String(
   import.meta.env.VITE_PUBLIC_SITE_ORIGIN ||
@@ -136,6 +148,68 @@ export function ArticleEditorWorkspace({
     useState(false);
   const [focusMode, setFocusMode] =
     useState(false);
+
+  const [
+    reviewSelection,
+    setReviewSelection,
+  ] = useState<RichTextSelectionSnapshot | null>(
+    null,
+  );
+
+  const [
+    suggestionOperation,
+    setSuggestionOperation,
+  ] = useState<"replace" | "delete">(
+    "replace",
+  );
+
+  const [
+    suggestionReplacement,
+    setSuggestionReplacement,
+  ] = useState("");
+
+  const [
+    suggestionComment,
+    setSuggestionComment,
+  ] = useState("");
+
+  const [
+    isSuggestionSaving,
+    setIsSuggestionSaving,
+  ] = useState(false);
+
+  const [
+    suggestionComposerOpen,
+    setSuggestionComposerOpen,
+  ] = useState(false);
+
+  const [
+    savedSuggestionsOpen,
+    setSavedSuggestionsOpen,
+  ] = useState(false);
+
+  const [
+    suggestionDecision,
+    setSuggestionDecision,
+  ] = useState<{
+    suggestionId: string;
+    action: "accept" | "reject" | "withdraw";
+  } | null>(null);
+
+  const [
+    suggestionDecisionNote,
+    setSuggestionDecisionNote,
+  ] = useState("");
+
+  const [
+    isSuggestionDecisionSaving,
+    setIsSuggestionDecisionSaving,
+  ] = useState(false);
+
+  const [
+    selectionPositionRevision,
+    setSelectionPositionRevision,
+  ] = useState(0);
 
   // ── Central permission object ──
   const articlePermissions = useMemo(() => {
@@ -287,9 +361,98 @@ export function ArticleEditorWorkspace({
     latestApprovedLifecycleEvent,
   ]);
 
-  const articleWpStatus = article?.wpStatus ?? "draft";
-  const isPendingReview = articleWpStatus === "pending";
-  const isLiveOrScheduled = articleWpStatus === "publish" || articleWpStatus === "future";
+  const articleWpStatus =
+    article?.wpStatus ?? "draft";
+
+  const isPendingReview =
+    articleWpStatus === "pending";
+
+  const isLiveOrScheduled =
+    articleWpStatus === "publish" ||
+    articleWpStatus === "future";
+
+  const documentModeState =
+    useArticleDocumentModeState({
+      articleId: article?.id ?? null,
+      wpStatus: article?.wpStatus ?? null,
+      draftVersion:
+        article?.draftVersion ?? null,
+    });
+
+  const submittedDocument =
+    documentModeState.targetVersion;
+
+  const savedSuggestionThreads =
+    useMemo(() => {
+      const threads =
+        documentModeState.reviewWorkspace
+          ?.threads ?? [];
+
+      return threads
+        .filter(
+          (thread) =>
+            thread.threadKind ===
+              "suggestion" &&
+            thread.suggestion !== null,
+        )
+        .slice()
+        .sort((left, right) => {
+          const leftTime = Date.parse(
+            left.suggestion?.createdAt ?? "",
+          );
+
+          const rightTime = Date.parse(
+            right.suggestion?.createdAt ?? "",
+          );
+
+          return rightTime - leftTime;
+        });
+    }, [
+      documentModeState.reviewWorkspace,
+    ]);
+
+
+  const usesSubmittedDocument = Boolean(
+    documentModeState.mode !== "write" &&
+    submittedDocument,
+  );
+
+  const documentTitle =
+    usesSubmittedDocument
+      ? submittedDocument?.title ?? ""
+      : draft.title;
+
+  const documentExcerpt =
+    usesSubmittedDocument
+      ? submittedDocument?.excerpt ?? ""
+      : draft.excerpt;
+
+  const documentContent =
+    usesSubmittedDocument
+      ? submittedDocument?.contentHtml ?? ""
+      : draft.content;
+
+  const documentReadOnly =
+    documentModeState.mode !== "write" ||
+    !articlePermissions.canEdit;
+
+  const documentModeLabel =
+    documentModeState.mode === "suggest"
+      ? submittedDocument
+        ? `Suggesting on v${submittedDocument.versionNumber}`
+        : "Suggesting"
+      : documentModeState.mode === "view"
+        ? submittedDocument
+          ? `Viewing v${submittedDocument.versionNumber}`
+          : "Viewing Submitted"
+        : null;
+
+  useEffect(() => {
+    setReviewSelection(null);
+  }, [
+    documentModeState.mode,
+    submittedDocument?.id,
+  ]);
   const canSubmitCurrentArticleForReview = Boolean(
     article &&
       allowSubmitForReview &&
@@ -392,8 +555,35 @@ export function ArticleEditorWorkspace({
           return;
         }
 
-        articleUpdatedAtRef.current = data.updatedAt ?? null;
-        articleDraftVersionRef.current = data.draftVersion;
+        articleUpdatedAtRef.current =
+          data.updatedAt ?? null;
+
+        articleDraftVersionRef.current =
+          data.draftVersion;
+
+        const nextDraft: Draft = {
+          title: data.title,
+          excerpt: data.excerpt,
+          content: data.contentHtml,
+          author: data.author,
+          categories: data.categories,
+          tags: data.tags,
+          publishedAt: data.publishedAt,
+          seo: data.seo,
+        };
+
+        stateRef.current = {
+          ...stateRef.current,
+          article: data,
+          draft: nextDraft,
+          isDirty: false,
+        };
+
+        lastAutosavedContentRef.current =
+          nextDraft.content +
+          nextDraft.title +
+          nextDraft.excerpt;
+
         setArticle(data);
         setPreviewNonce(data.previewNonce ?? null);
 
@@ -404,16 +594,7 @@ export function ArticleEditorWorkspace({
           }).catch(() => {});
         }
 
-        setDraft({
-          title: data.title,
-          excerpt: data.excerpt,
-          content: data.contentHtml,
-          author: data.author,
-          categories: data.categories,
-          tags: data.tags,
-          publishedAt: data.publishedAt,
-          seo: data.seo,
-        });
+        setDraft(nextDraft);
         setIsDirty(false);
         setLoading(false);
 
@@ -517,10 +698,63 @@ export function ArticleEditorWorkspace({
   }
 
   /* ─── Draft setters ─── */
-  const patchDraft = useCallback((patch: Partial<Draft>) => {
-    setDraft((prev) => ({ ...prev, ...patch }));
-    setIsDirty(true);
-  }, []);
+  const patchDraft = useCallback(
+    (patch: Partial<Draft>) => {
+      const currentDraft =
+        stateRef.current.draft;
+
+      const changed = (
+        Object.keys(patch) as Array<keyof Draft>
+      ).some((key) => {
+        const currentValue =
+          currentDraft[key];
+
+        const nextValue =
+          patch[key];
+
+        if (
+          currentValue !== null &&
+          typeof currentValue === "object"
+        ) {
+          return (
+            JSON.stringify(currentValue) !==
+            JSON.stringify(nextValue)
+          );
+        }
+
+        if (
+          nextValue !== null &&
+          typeof nextValue === "object"
+        ) {
+          return (
+            JSON.stringify(currentValue) !==
+            JSON.stringify(nextValue)
+          );
+        }
+
+        return currentValue !== nextValue;
+      });
+
+      if (!changed) {
+        return;
+      }
+
+      const nextDraft = {
+        ...currentDraft,
+        ...patch,
+      };
+
+      stateRef.current = {
+        ...stateRef.current,
+        draft: nextDraft,
+        isDirty: true,
+      };
+
+      setDraft(nextDraft);
+      setIsDirty(true);
+    },
+    [],
+  );
 
   /* ─── Restore draft ─── */
   const handleRestoreDraft = useCallback(
@@ -646,14 +880,18 @@ export function ArticleEditorWorkspace({
     return articleComparable === draftSaveFingerprint(currentDraft, expectedStatus, expectedPublishedAt);
   }
 
-  function applyServerArticleState(freshArticle: AdminArticleDetail, resetDraft = true) {
-    articleUpdatedAtRef.current = freshArticle.updatedAt ?? null;
-    articleDraftVersionRef.current = freshArticle.draftVersion;
-    setArticle(freshArticle);
-    setPreviewNonce(freshArticle.previewNonce ?? null);
+  function applyServerArticleState(
+    freshArticle: AdminArticleDetail,
+    resetDraft = true,
+  ) {
+    articleUpdatedAtRef.current =
+      freshArticle.updatedAt ?? null;
+
+    articleDraftVersionRef.current =
+      freshArticle.draftVersion;
 
     if (resetDraft) {
-      setDraft({
+      const nextDraft: Draft = {
         title: freshArticle.title,
         excerpt: freshArticle.excerpt,
         content: freshArticle.contentHtml,
@@ -662,8 +900,45 @@ export function ArticleEditorWorkspace({
         tags: freshArticle.tags,
         publishedAt: freshArticle.publishedAt,
         seo: freshArticle.seo,
-      });
+      };
+
+      /*
+       * Interval callbacks read stateRef directly.
+       * Synchronize it before scheduling React state
+       * so stale content cannot be autosaved between
+       * the server response and the next render.
+       */
+      stateRef.current = {
+        ...stateRef.current,
+        article: freshArticle,
+        draft: nextDraft,
+        isDirty: false,
+      };
+
+      lastAutosavedContentRef.current =
+        nextDraft.content +
+        nextDraft.title +
+        nextDraft.excerpt;
+
+      setArticle(freshArticle);
+      setPreviewNonce(
+        freshArticle.previewNonce ?? null,
+      );
+      setDraft(nextDraft);
+      setIsDirty(false);
+
+      return;
     }
+
+    stateRef.current = {
+      ...stateRef.current,
+      article: freshArticle,
+    };
+
+    setArticle(freshArticle);
+    setPreviewNonce(
+      freshArticle.previewNonce ?? null,
+    );
   }
 
   /* ─── Save helpers ─── */
@@ -1300,6 +1575,156 @@ export function ArticleEditorWorkspace({
     navigate("/admin/content/articles");
   }
 
+  useEffect(() => {
+    if (
+      documentModeState.mode === "suggest"
+    ) {
+      return;
+    }
+
+    resetSuggestionComposer();
+  }, [documentModeState.mode]);
+
+  useEffect(() => {
+    setSuggestionComposerOpen(false);
+    setSuggestionOperation("replace");
+    setSuggestionReplacement("");
+    setSuggestionComment("");
+  }, [
+    reviewSelection?.from,
+    reviewSelection?.to,
+  ]);
+
+  const handleReviewSelectionChange =
+    useCallback(
+      (
+        selection:
+          RichTextSelectionSnapshot | null,
+      ) => {
+        if (
+          suggestionComposerOpen &&
+          !selection
+        ) {
+          return;
+        }
+
+        setReviewSelection((current) => {
+          if (!selection) {
+            return current
+              ? null
+              : current;
+          }
+
+          if (
+            current &&
+            current.from === selection.from &&
+            current.to === selection.to &&
+            current.quote ===
+              selection.quote &&
+            current.prefix ===
+              selection.prefix &&
+            current.suffix ===
+              selection.suffix
+          ) {
+            return current;
+          }
+
+          return selection;
+        });
+      },
+      [suggestionComposerOpen],
+    );
+
+  useEffect(() => {
+    if (
+      !reviewSelection ||
+      suggestionComposerOpen
+    ) {
+      return;
+    }
+
+    let animationFrame = 0;
+
+    const refreshSelectionPosition = () => {
+      window.cancelAnimationFrame(
+        animationFrame,
+      );
+
+      animationFrame =
+        window.requestAnimationFrame(() => {
+          setSelectionPositionRevision(
+            (revision) => revision + 1,
+          );
+        });
+    };
+
+    window.addEventListener(
+      "scroll",
+      refreshSelectionPosition,
+      true,
+    );
+
+    window.addEventListener(
+      "resize",
+      refreshSelectionPosition,
+    );
+
+    refreshSelectionPosition();
+
+    return () => {
+      window.cancelAnimationFrame(
+        animationFrame,
+      );
+
+      window.removeEventListener(
+        "scroll",
+        refreshSelectionPosition,
+        true,
+      );
+
+      window.removeEventListener(
+        "resize",
+        refreshSelectionPosition,
+      );
+    };
+  }, [
+    reviewSelection,
+    suggestionComposerOpen,
+  ]);
+
+  useEffect(() => {
+    if (
+      (
+        !suggestionComposerOpen &&
+        !savedSuggestionsOpen
+      ) ||
+      typeof document === "undefined"
+    ) {
+      return;
+    }
+
+    const previousOverflow =
+      document.body.style.overflow;
+
+    document.body.style.overflow =
+      "hidden";
+
+    return () => {
+      document.body.style.overflow =
+        previousOverflow;
+    };
+  }, [
+    savedSuggestionsOpen,
+    suggestionComposerOpen,
+  ]);
+
+  useEffect(() => {
+    if (savedSuggestionsOpen) return;
+
+    setSuggestionDecision(null);
+    setSuggestionDecisionNote("");
+  }, [savedSuggestionsOpen]);
+
   /* ─── Render states ─── */
 
   if (loading) {
@@ -1331,6 +1756,476 @@ export function ArticleEditorWorkspace({
   }
 
   if (!article) return null;
+
+  const suggestionTriggerPosition =
+    reviewSelection?.getViewportRect &&
+    typeof window !== "undefined" &&
+    typeof document !== "undefined"
+      ? (() => {
+          void selectionPositionRevision;
+
+          const rect =
+            reviewSelection.getViewportRect();
+
+          if (!rect) {
+            return null;
+          }
+
+          const viewportGutter = 12;
+          const buttonWidth = 174;
+          const buttonHeight = 40;
+          const selectionGap = 10;
+          const desktopRailBreakpoint = 1100;
+
+          const pointX = Math.min(
+            window.innerWidth - 1,
+            Math.max(
+              0,
+              rect.left,
+            ),
+          );
+
+          const pointY = Math.min(
+            window.innerHeight - 1,
+            Math.max(
+              0,
+              rect.top +
+                Math.max(
+                  rect.height / 2,
+                  1,
+                ),
+            ),
+          );
+
+          const pointElement =
+            document.elementFromPoint(
+              pointX,
+              pointY,
+            );
+
+          const selectionIsVisible = Boolean(
+            pointElement?.closest(
+              "[data-article-editor-canvas] .ProseMirror",
+            ),
+          );
+
+          if (
+            !selectionIsVisible ||
+            rect.bottom < 0 ||
+            rect.top > window.innerHeight
+          ) {
+            return null;
+          }
+
+          const selectionMidY =
+            rect.top +
+            rect.height / 2;
+
+          let top = Math.min(
+            window.innerHeight -
+              buttonHeight -
+              viewportGutter,
+            Math.max(
+              viewportGutter,
+              selectionMidY -
+                buttonHeight / 2,
+            ),
+          );
+
+          let left =
+            window.innerWidth -
+            buttonWidth -
+            viewportGutter;
+
+          const canUseDesktopRail =
+            window.innerWidth >=
+              desktopRailBreakpoint &&
+            rect.right +
+              selectionGap <
+              left;
+
+          if (!canUseDesktopRail) {
+            left = Math.max(
+              viewportGutter,
+              window.innerWidth -
+                112 -
+                viewportGutter,
+            );
+
+            top = Math.max(
+              viewportGutter,
+              window.innerHeight -
+                buttonHeight -
+                viewportGutter,
+            );
+          }
+
+          return {
+            top,
+            left,
+            compact: !canUseDesktopRail,
+          };
+        })()
+      : null;
+
+
+  function resetSuggestionComposer() {
+    setSuggestionComposerOpen(false);
+    setReviewSelection(null);
+    setSuggestionOperation("replace");
+    setSuggestionReplacement("");
+    setSuggestionComment("");
+  }
+
+  function readTargetVersionString(
+    keys: string[],
+  ): string {
+    const targetVersion =
+      documentModeState.targetVersion;
+
+    if (
+      !targetVersion ||
+      typeof targetVersion !== "object"
+    ) {
+      return "";
+    }
+
+    const record =
+      targetVersion as unknown as
+        Record<string, unknown>;
+
+    for (const key of keys) {
+      const value = record[key];
+
+      if (
+        typeof value === "string" &&
+        value.trim()
+      ) {
+        return value;
+      }
+    }
+
+    return "";
+  }
+
+  async function handleCreateArticleSuggestion() {
+    if (!article || !reviewSelection) {
+      addToast(
+        "error",
+        "Select submitted text before creating a suggestion.",
+      );
+      return;
+    }
+
+    const targetVersionId =
+      readTargetVersionString([
+        "id",
+        "versionId",
+        "version_id",
+      ]);
+
+    const targetVersionFingerprint =
+      readTargetVersionString([
+        "contentFingerprint",
+        "versionFingerprint",
+        "fingerprint",
+        "content_fingerprint",
+      ]);
+
+    if (
+      !targetVersionId ||
+      !targetVersionFingerprint
+    ) {
+      addToast(
+        "error",
+        "The submitted version identity is unavailable.",
+      );
+      return;
+    }
+
+    if (
+      suggestionOperation === "replace" &&
+      !suggestionReplacement.trim()
+    ) {
+      addToast(
+        "error",
+        "Add replacement text or choose Delete Text.",
+      );
+      return;
+    }
+
+    const replacementText =
+      suggestionOperation === "delete"
+        ? ""
+        : suggestionReplacement;
+
+    let proposedContentHtml = "";
+
+    try {
+      proposedContentHtml =
+        reviewSelection
+          .buildProposedContentHtml(
+            suggestionOperation,
+            replacementText,
+          );
+    } catch {
+      addToast(
+        "error",
+        "The proposed Article could not be prepared.",
+      );
+      return;
+    }
+
+    setIsSuggestionSaving(true);
+
+    try {
+      const result =
+        await createArticleSuggestion({
+          articleId: article.id,
+          targetVersionId,
+          targetVersionFingerprint,
+          anchorFrom: reviewSelection.from,
+          anchorTo: reviewSelection.to,
+          anchorQuote: reviewSelection.quote,
+          anchorPrefix: reviewSelection.prefix,
+          anchorSuffix: reviewSelection.suffix,
+          operationKind: suggestionOperation,
+          originalText: reviewSelection.quote,
+          replacementText,
+          proposedContentHtml,
+          comment:
+            suggestionComment.trim() || null,
+        });
+
+      if (!result.ok) {
+        addToast(
+          "error",
+          result.error ??
+            "Suggestion creation failed.",
+        );
+        return;
+      }
+
+      documentModeState.refresh();
+
+      addToast(
+        "success",
+        "Suggestion created and added to Suggestions.",
+      );
+
+      resetSuggestionComposer();
+    } finally {
+      setIsSuggestionSaving(false);
+    }
+  }
+
+  function openSuggestionDecision(
+    action: "accept" | "reject" | "withdraw",
+    suggestionId: string,
+  ) {
+    setSuggestionDecision({
+      action,
+      suggestionId,
+    });
+
+    setSuggestionDecisionNote("");
+  }
+
+  function cancelSuggestionDecision() {
+    if (isSuggestionDecisionSaving) return;
+
+    setSuggestionDecision(null);
+    setSuggestionDecisionNote("");
+  }
+
+  async function handleSuggestionDecision() {
+    if (
+      !article ||
+      !suggestionDecision ||
+      isSuggestionDecisionSaving
+    ) {
+      return;
+    }
+
+    const note =
+      suggestionDecisionNote.trim() || null;
+
+    if (
+      suggestionDecision.action === "reject" &&
+      !note
+    ) {
+      addToast(
+        "error",
+        "Add a reason before rejecting this suggestion.",
+      );
+      return;
+    }
+
+    setIsSuggestionDecisionSaving(true);
+
+    try {
+      if (
+        suggestionDecision.action === "accept"
+      ) {
+        if (!canManageArticleReview) {
+          addToast(
+            "error",
+            "You do not have permission to accept suggestions.",
+          );
+          return;
+        }
+
+        const expectedDraftVersion =
+          articleDraftVersionRef.current ??
+          article.draftVersion;
+
+        const result =
+          await acceptArticleSuggestion(
+            suggestionDecision.suggestionId,
+            expectedDraftVersion,
+            note,
+          );
+
+        if (!result.ok) {
+          addToast(
+            "error",
+            result.error ||
+              "Suggestion acceptance failed.",
+          );
+          return;
+        }
+
+        if (result.data.status === "stale") {
+          documentModeState.refresh();
+
+          setSuggestionDecision(null);
+          setSuggestionDecisionNote("");
+
+          addToast(
+            "info",
+            "The submitted version changed. This suggestion is now stale.",
+          );
+          return;
+        }
+
+        const refreshedArticle =
+          await fetchArticleForAdmin(
+            result.data.articleSlug ||
+              article.slug,
+          );
+
+        if (!refreshedArticle) {
+          documentModeState.refresh();
+
+          addToast(
+            "error",
+            "The suggestion was accepted, but the refreshed Article could not be loaded. Refresh before continuing.",
+          );
+
+          return;
+        }
+
+        if (
+          refreshedArticle.wpStatus !==
+          "draft"
+        ) {
+          documentModeState.refresh();
+
+          addToast(
+            "error",
+            "The suggestion was accepted, but the Article did not return in draft state. Refresh before continuing.",
+          );
+
+          return;
+        }
+
+        applyServerArticleState(
+          refreshedArticle,
+          true,
+        );
+
+        documentModeState.setMode("write");
+        documentModeState.refresh();
+
+        setSavedSuggestionsOpen(false);
+        setSuggestionDecision(null);
+        setSuggestionDecisionNote("");
+
+        addToast(
+          "success",
+          "Suggestion accepted. The Article is back in draft with the proposed change applied.",
+        );
+
+        return;
+      }
+
+      if (
+        suggestionDecision.action === "reject"
+      ) {
+        if (!canManageArticleReview) {
+          addToast(
+            "error",
+            "You do not have permission to reject suggestions.",
+          );
+          return;
+        }
+
+        const result =
+          await rejectArticleSuggestion(
+            suggestionDecision.suggestionId,
+            note,
+          );
+
+        if (!result.ok) {
+          addToast(
+            "error",
+            result.error ||
+              "Suggestion rejection failed.",
+          );
+          return;
+        }
+
+        documentModeState.refresh();
+
+        setSuggestionDecision(null);
+        setSuggestionDecisionNote("");
+
+        addToast(
+          "success",
+          "Suggestion rejected.",
+        );
+
+        return;
+      }
+
+      const result =
+        await withdrawArticleSuggestion(
+          suggestionDecision.suggestionId,
+          note,
+        );
+
+      if (!result.ok) {
+        addToast(
+          "error",
+          result.error ||
+            "Suggestion withdrawal failed.",
+        );
+        return;
+      }
+
+      documentModeState.refresh();
+
+      setSuggestionDecision(null);
+      setSuggestionDecisionNote("");
+
+      addToast(
+        "success",
+        "Suggestion withdrawn.",
+      );
+    } finally {
+      setIsSuggestionDecisionSaving(false);
+    }
+  }
 
   const articleMetaPanel = (
     <ArticleMetaPanel
@@ -1411,7 +2306,7 @@ export function ArticleEditorWorkspace({
       {/* Header */}
       <ArticleEditorHeader
         slug={article.slug}
-        title={draft.title}
+        title={documentTitle}
         status={article.wpStatus}
         statusLabel={editorialStatusLabel}
         statusColorKey={editorialStatusColorKey}
@@ -1426,8 +2321,15 @@ export function ArticleEditorWorkspace({
         onDelete={() => setShowDeleteConfirm(true)}
         onPreview={handleMagazinePreview}
         onOpenArticleDetails={() => setWriteContextOpen(true)}
-        showArticleDetails={activeWorkbenchMode === "write"}
+        showArticleDetails={
+          activeWorkbenchMode === "write" &&
+          documentModeState.mode === "write"
+        }
         articleDetailsOpen={writeContextOpen}
+        draftActionsDisabled={
+          documentModeState.mode !== "write"
+        }
+        documentModeLabel={documentModeLabel}
         focusMode={focusMode}
         onToggleFocusMode={() =>
           setFocusMode((current) => !current)
@@ -1466,27 +2368,850 @@ export function ArticleEditorWorkspace({
       {/* Workbench mode layout */}
       <div className="grid gap-5">
         {activeWorkbenchMode === "write" ? (
-          <div className="min-w-0">
+          <div className="min-w-0 space-y-3">
+            {isPendingReview ? (
+              <ArticleDocumentModeSwitcher
+                mode={documentModeState.mode}
+                onModeChange={(nextMode) => {
+                  documentModeState.setMode(
+                    nextMode,
+                  );
+
+                  setReviewSelection(null);
+
+                  if (nextMode !== "write") {
+                    setWriteContextOpen(false);
+                  }
+                }}
+                canSuggest={
+                  documentModeState.canSuggest
+                }
+                canViewSubmitted={
+                  documentModeState.canViewSubmitted
+                }
+                loading={
+                  documentModeState.reviewLoading
+                }
+                errorCode={
+                  documentModeState.reviewErrorCode
+                }
+                targetVersionNumber={
+                  submittedDocument?.versionNumber ??
+                  null
+                }
+                suggestionCount={
+                  savedSuggestionThreads.length
+                }
+                onOpenSuggestions={() =>
+                  setSavedSuggestionsOpen(true)
+                }
+              />
+            ) : null}
+
+
+            {typeof document !==
+              "undefined" &&
+            savedSuggestionsOpen
+              ? createPortal(
+                  <div
+                    data-article-saved-suggestions-drawer
+                    role="dialog"
+                    aria-modal="true"
+                    aria-labelledby="article-saved-suggestions-title"
+                    className="fixed inset-0 z-[125] h-[100dvh] max-h-[100dvh] overflow-hidden bg-black/30"
+                    onMouseDown={(event) => {
+                      if (
+                        event.currentTarget ===
+                        event.target
+                      ) {
+                        setSavedSuggestionsOpen(
+                          false,
+                        );
+                      }
+                    }}
+                  >
+                    <aside className="absolute inset-y-0 right-0 flex h-[100dvh] max-h-[100dvh] w-full max-w-xl flex-col overflow-hidden border-l border-wk-border bg-wk-surface shadow-2xl">
+                      <div className="flex shrink-0 items-start justify-between gap-4 border-b border-wk-border px-5 py-4">
+                        <div>
+                          <div className="text-[10px] font-black uppercase tracking-[0.14em] text-wk-info">
+                            Submitted Version{" "}
+                            {submittedDocument
+                              ?.versionNumber}
+                          </div>
+
+                          <h2
+                            id="article-saved-suggestions-title"
+                            className="mt-1 text-[18px] font-bold text-wk-text"
+                          >
+                            Suggestions
+                          </h2>
+
+                          <p className="mt-1 text-[11px] leading-4 text-wk-text-muted">
+                            {savedSuggestionThreads
+                              .length}{" "}
+                            saved{" "}
+                            {savedSuggestionThreads
+                              .length === 1
+                              ? "proposal"
+                              : "proposals"}{" "}
+                            against this submitted
+                            version.
+                          </p>
+                        </div>
+
+                        <button
+                          type="button"
+                          onClick={() =>
+                            setSavedSuggestionsOpen(
+                              false,
+                            )
+                          }
+                          className="wk-button wk-button-secondary wk-button-sm"
+                        >
+                          Close
+                        </button>
+                      </div>
+
+                      <div className="min-h-0 flex-1 space-y-4 overflow-y-auto overscroll-contain px-5 py-5">
+                        {documentModeState
+                          .reviewLoading ? (
+                          <div className="rounded-xl border border-wk-border bg-wk-bg-subtle px-4 py-5 text-[12px] text-wk-text-muted">
+                            Refreshing suggestions.
+                          </div>
+                        ) : savedSuggestionThreads
+                            .length === 0 ? (
+                          <div className="rounded-xl border border-dashed border-wk-border px-4 py-8 text-center">
+                            <div className="text-[13px] font-bold text-wk-text">
+                              No Saved Suggestions
+                            </div>
+
+                            <p className="mt-1 text-[11px] leading-4 text-wk-text-muted">
+                              Select text in Suggest
+                              mode to create the first
+                              proposal.
+                            </p>
+                          </div>
+                        ) : (
+                          savedSuggestionThreads.map(
+                            (thread) => {
+                              const suggestion =
+                                thread.suggestion;
+
+                              if (!suggestion) {
+                                return null;
+                              }
+
+                              return (
+                                <article
+                                  key={thread.id}
+                                  className="rounded-xl border border-wk-border bg-wk-surface px-4 py-4 shadow-sm"
+                                >
+                                  <div className="flex flex-wrap items-center justify-between gap-2">
+                                    <div className="flex items-center gap-2">
+                                      <span className="rounded-full bg-wk-info-soft px-2 py-1 text-[10px] font-black uppercase tracking-[0.1em] text-wk-info">
+                                        {
+                                          suggestion.operationKind
+                                        }
+                                      </span>
+
+                                      <span className="rounded-full bg-wk-bg-subtle px-2 py-1 text-[10px] font-black capitalize text-wk-text-muted">
+                                        {
+                                          suggestion.status
+                                        }
+                                      </span>
+                                    </div>
+
+                                    <span className="text-[10px] text-wk-text-faint">
+                                      {new Date(
+                                        suggestion.createdAt,
+                                      ).toLocaleString()}
+                                    </span>
+                                  </div>
+
+                                  <div className="mt-4">
+                                    <div className="text-[10px] font-bold uppercase tracking-[0.12em] text-wk-text-faint">
+                                      Selected Text
+                                    </div>
+
+                                    <blockquote className="mt-2 rounded-lg border border-wk-info/20 bg-wk-info-soft px-3 py-3 text-[12px] font-semibold leading-5 text-wk-text">
+                                      “
+                                      {
+                                        thread.anchorQuote
+                                      }
+                                      ”
+                                    </blockquote>
+                                  </div>
+
+                                  <div className="mt-4">
+                                    <div className="text-[10px] font-bold uppercase tracking-[0.12em] text-wk-text-faint">
+                                      Proposed Change
+                                    </div>
+
+                                    {suggestion.operationKind ===
+                                    "delete" ? (
+                                      <p className="mt-2 rounded-lg border border-wk-warning/20 bg-wk-warning-soft px-3 py-3 text-[12px] leading-5 text-wk-text-muted">
+                                        Remove the selected
+                                        text.
+                                      </p>
+                                    ) : (
+                                      <p className="mt-2 rounded-lg border border-wk-border bg-wk-bg-subtle px-3 py-3 text-[12px] font-semibold leading-5 text-wk-text">
+                                        {
+                                          suggestion.replacementText
+                                        }
+                                      </p>
+                                    )}
+                                  </div>
+
+                                  {thread.comments.length >
+                                  0 ? (
+                                    <div className="mt-4">
+                                      <div className="text-[10px] font-bold uppercase tracking-[0.12em] text-wk-text-faint">
+                                        Review Note
+                                      </div>
+
+                                      <div className="mt-2 space-y-2">
+                                        {thread.comments.map(
+                                          (comment) => (
+                                            <div
+                                              key={
+                                                comment.id
+                                              }
+                                              className="rounded-lg border border-wk-border px-3 py-3"
+                                            >
+                                              <p className="text-[12px] leading-5 text-wk-text">
+                                                {
+                                                  comment.bodyText
+                                                }
+                                              </p>
+
+                                              <p className="mt-2 text-[10px] text-wk-text-faint">
+                                                {
+                                                  comment.createdByLabel
+                                                }
+                                              </p>
+                                            </div>
+                                          ),
+                                        )}
+                                      </div>
+                                    </div>
+                                  ) : null}
+
+                                  {suggestion.status ===
+                                  "open" ? (
+                                    <div className="mt-5 border-t border-wk-border pt-4">
+                                      <div className="flex flex-wrap gap-2">
+                                        {canManageArticleReview ? (
+                                          <>
+                                            <button
+                                              type="button"
+                                              onClick={() =>
+                                                openSuggestionDecision(
+                                                  "accept",
+                                                  suggestion.id,
+                                                )
+                                              }
+                                              disabled={
+                                                isSuggestionDecisionSaving
+                                              }
+                                              className="wk-button wk-button-primary wk-button-sm"
+                                            >
+                                              Accept
+                                            </button>
+
+                                            <button
+                                              type="button"
+                                              onClick={() =>
+                                                openSuggestionDecision(
+                                                  "reject",
+                                                  suggestion.id,
+                                                )
+                                              }
+                                              disabled={
+                                                isSuggestionDecisionSaving
+                                              }
+                                              className="wk-button wk-button-secondary wk-button-sm"
+                                            >
+                                              Reject
+                                            </button>
+                                          </>
+                                        ) : null}
+
+                                        {thread.createdBy ===
+                                        adminUser.id ? (
+                                          <button
+                                            type="button"
+                                            onClick={() =>
+                                              openSuggestionDecision(
+                                                "withdraw",
+                                                suggestion.id,
+                                              )
+                                            }
+                                            disabled={
+                                              isSuggestionDecisionSaving
+                                            }
+                                            className="wk-button wk-button-secondary wk-button-sm"
+                                          >
+                                            Withdraw
+                                          </button>
+                                        ) : null}
+                                      </div>
+
+                                      {suggestionDecision
+                                        ?.suggestionId ===
+                                        suggestion.id ? (
+                                        <div className="mt-4 rounded-xl border border-wk-border bg-wk-bg-subtle px-4 py-4">
+                                          <h3 className="text-[13px] font-bold text-wk-text">
+                                            {suggestionDecision
+                                              .action ===
+                                            "accept"
+                                              ? "Accept Suggestion"
+                                              : suggestionDecision
+                                                    .action ===
+                                                  "reject"
+                                                ? "Reject Suggestion"
+                                                : "Withdraw Suggestion"}
+                                          </h3>
+
+                                          <p className="mt-1 text-[11px] leading-4 text-wk-text-muted">
+                                            {suggestionDecision
+                                              .action ===
+                                            "accept"
+                                              ? "This applies the proposed change to a new working draft and closes the current submitted review."
+                                              : suggestionDecision
+                                                    .action ===
+                                                  "reject"
+                                                ? "This closes the proposal without changing the submitted Article."
+                                                : "This removes your proposal from the active review."}
+                                          </p>
+
+                                          <label className="mt-4 block">
+                                            <span className="text-[10px] font-bold uppercase tracking-[0.12em] text-wk-text-faint">
+                                              Decision Note
+                                              {suggestionDecision
+                                                .action ===
+                                              "reject"
+                                                ? " Required"
+                                                : " Optional"}
+                                            </span>
+
+                                            <textarea
+                                              value={
+                                                suggestionDecisionNote
+                                              }
+                                              onChange={(
+                                                event,
+                                              ) =>
+                                                setSuggestionDecisionNote(
+                                                  event
+                                                    .target
+                                                    .value,
+                                                )
+                                              }
+                                              rows={3}
+                                              disabled={
+                                                isSuggestionDecisionSaving
+                                              }
+                                              placeholder={
+                                                suggestionDecision
+                                                  .action ===
+                                                "accept"
+                                                  ? "Record why this change is being accepted."
+                                                  : suggestionDecision
+                                                        .action ===
+                                                      "reject"
+                                                    ? "Explain why this proposal should not be applied."
+                                                    : "Add context for withdrawing this proposal."
+                                              }
+                                              className="mt-2 w-full resize-y rounded-lg border border-wk-border bg-wk-surface px-3 py-3 text-[12px] leading-5 text-wk-text outline-none transition-colors focus:border-wk-brand disabled:opacity-60"
+                                            />
+                                          </label>
+
+                                          <div className="mt-4 flex flex-wrap gap-2">
+                                            <button
+                                              type="button"
+                                              onClick={() =>
+                                                void handleSuggestionDecision()
+                                              }
+                                              disabled={
+                                                isSuggestionDecisionSaving
+                                              }
+                                              className={
+                                                suggestionDecision
+                                                  .action ===
+                                                "accept"
+                                                  ? "wk-button wk-button-primary wk-button-sm"
+                                                  : "wk-button wk-button-secondary wk-button-sm"
+                                              }
+                                            >
+                                              {isSuggestionDecisionSaving
+                                                ? "Saving..."
+                                                : suggestionDecision
+                                                      .action ===
+                                                    "accept"
+                                                  ? "Accept Suggestion"
+                                                  : suggestionDecision
+                                                        .action ===
+                                                      "reject"
+                                                    ? "Reject Suggestion"
+                                                    : "Withdraw Suggestion"}
+                                            </button>
+
+                                            <button
+                                              type="button"
+                                              onClick={
+                                                cancelSuggestionDecision
+                                              }
+                                              disabled={
+                                                isSuggestionDecisionSaving
+                                              }
+                                              className="wk-button wk-button-secondary wk-button-sm"
+                                            >
+                                              Cancel
+                                            </button>
+                                          </div>
+                                        </div>
+                                      ) : null}
+                                    </div>
+                                  ) : null}
+
+                                  <div className="mt-4 border-t border-wk-border pt-3 text-[10px] text-wk-text-faint">
+                                    Suggested by{" "}
+                                    {
+                                      thread.createdByLabel
+                                    }
+                                  </div>
+                                </article>
+                              );
+                            },
+                          )
+                        )}
+                      </div>
+                    </aside>
+                  </div>,
+                  document.body,
+                )
+              : null}
+
+            {typeof document !==
+              "undefined" &&
+            documentModeState.mode ===
+              "suggest" &&
+            reviewSelection &&
+            suggestionTriggerPosition &&
+            !suggestionComposerOpen
+              ? createPortal(
+                  <button
+                    type="button"
+                    data-article-suggestion-floating-trigger
+                    aria-label="Draft a suggestion for the selected text"
+                    onMouseDown={(event) => {
+                      event.preventDefault();
+                    }}
+                    onClick={() =>
+                      setSuggestionComposerOpen(
+                        true,
+                      )
+                    }
+                    style={{
+                      position: "fixed",
+                      top:
+                        suggestionTriggerPosition
+                          .top,
+                      left:
+                        suggestionTriggerPosition
+                          .left,
+                      zIndex: 118,
+                    }}
+                    data-placement={
+                      suggestionTriggerPosition
+                        .compact
+                        ? "mobile-fixed"
+                        : "desktop-rail"
+                    }
+                    className={
+                      suggestionTriggerPosition
+                        .compact
+                        ? "wk-button wk-button-primary wk-button-sm min-w-[100px] shadow-xl"
+                        : "wk-button wk-button-primary wk-button-sm shadow-xl"
+                    }
+                  >
+                    <WkIcon
+                      name="MessageSquarePlus"
+                      size={14}
+                    />
+                    {suggestionTriggerPosition
+                      .compact
+                      ? "Suggest"
+                      : "Draft Suggestion"}
+                  </button>,
+                  document.body,
+                )
+              : null}
+
+            {documentModeState.mode ===
+            "suggest" ? (
+              <div
+                data-article-suggestion-selection
+                data-selection-from={
+                  reviewSelection?.from
+                }
+                data-selection-to={
+                  reviewSelection?.to
+                }
+                className="min-h-[92px] rounded-xl border border-wk-info/30 bg-wk-info-soft px-4 py-3"
+              >
+                <div className="text-[10px] font-black uppercase tracking-[0.14em] text-wk-info">
+                  Suggestion Selection
+                </div>
+
+                {reviewSelection ? (
+                  <div className="mt-2 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                    <div className="min-w-0">
+                      <p className="line-clamp-2 text-[12px] font-semibold leading-5 text-wk-text">
+                        “{reviewSelection.quote}”
+                      </p>
+
+                      <p className="mt-1 text-[10px] text-wk-text-muted">
+                        Positions{" "}
+                        {reviewSelection.from} to{" "}
+                        {reviewSelection.to}. The
+                        submitted Article remains
+                        unchanged.
+                      </p>
+                    </div>
+
+                    {!suggestionTriggerPosition ? (
+                      <button
+                        type="button"
+                        onMouseDown={(event) => {
+                          event.preventDefault();
+                        }}
+                        onClick={() =>
+                          setSuggestionComposerOpen(
+                            true,
+                          )
+                        }
+                        className="wk-button wk-button-primary wk-button-sm shrink-0"
+                      >
+                        <WkIcon
+                          name="MessageSquarePlus"
+                          size={14}
+                        />
+                        Draft Suggestion
+                      </button>
+                    ) : null}
+                  </div>
+                ) : (
+                  <p className="mt-2 text-[11px] leading-4 text-wk-text-muted">
+                    Select text in the submitted
+                    Article. The composer will stay
+                    closed until you choose Draft
+                    Suggestion.
+                  </p>
+                )}
+
+                {typeof document !==
+                  "undefined" &&
+                reviewSelection &&
+                suggestionComposerOpen
+                  ? createPortal(
+                      <div
+                        data-article-suggestion-drawer
+                    role="dialog"
+                    aria-modal="true"
+                    aria-labelledby="article-suggestion-drawer-title"
+                        className="fixed inset-0 z-[120] h-[100dvh] max-h-[100dvh] overflow-hidden bg-black/30"
+                    onMouseDown={(event) => {
+                      if (
+                        event.currentTarget ===
+                        event.target
+                      ) {
+                        setSuggestionComposerOpen(
+                          false,
+                        );
+                      }
+                    }}
+                  >
+                        <aside className="absolute inset-y-0 right-0 flex h-[100dvh] max-h-[100dvh] w-full max-w-xl flex-col overflow-hidden border-l border-wk-border bg-wk-surface shadow-2xl">
+                          <div className="shrink-0 flex items-start justify-between gap-4 border-b border-wk-border px-5 py-4">
+                        <div>
+                          <div className="text-[10px] font-black uppercase tracking-[0.14em] text-wk-info">
+                            Submitted Version{" "}
+                            {submittedDocument
+                              ?.versionNumber}
+                          </div>
+
+                          <h2
+                            id="article-suggestion-drawer-title"
+                            className="mt-1 text-[18px] font-bold text-wk-text"
+                          >
+                            Draft Suggestion
+                          </h2>
+
+                          <p className="mt-1 text-[11px] leading-4 text-wk-text-muted">
+                            The submitted Article will
+                            not change until this
+                            suggestion is accepted.
+                          </p>
+                        </div>
+
+                        <button
+                          type="button"
+                          onClick={() =>
+                            setSuggestionComposerOpen(
+                              false,
+                            )
+                          }
+                          className="wk-button wk-button-secondary wk-button-sm"
+                        >
+                          Close
+                        </button>
+                      </div>
+
+                          <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-5 py-5">
+                        <div className="rounded-xl border border-wk-info/30 bg-wk-info-soft px-4 py-3">
+                          <div className="text-[10px] font-bold uppercase tracking-[0.12em] text-wk-info">
+                            Selected Text
+                          </div>
+
+                          <p className="mt-2 text-[13px] font-semibold leading-5 text-wk-text">
+                            “{reviewSelection.quote}”
+                          </p>
+
+                          <p className="mt-1 text-[10px] text-wk-text-muted">
+                            Positions{" "}
+                            {reviewSelection.from} to{" "}
+                            {reviewSelection.to}
+                          </p>
+                        </div>
+
+                        <div className="mt-5">
+                          <div className="mb-2 text-[10px] font-bold uppercase tracking-[0.12em] text-wk-text-faint">
+                            Proposed Change
+                          </div>
+
+                          <div className="flex flex-wrap gap-2">
+                            <button
+                              type="button"
+                              aria-pressed={
+                                suggestionOperation ===
+                                "replace"
+                              }
+                              onClick={() =>
+                                setSuggestionOperation(
+                                  "replace",
+                                )
+                              }
+                              className={
+                                suggestionOperation ===
+                                "replace"
+                                  ? "wk-button wk-button-primary wk-button-sm"
+                                  : "wk-button wk-button-secondary wk-button-sm"
+                              }
+                            >
+                              Replace Text
+                            </button>
+
+                            <button
+                              type="button"
+                              aria-pressed={
+                                suggestionOperation ===
+                                "delete"
+                              }
+                              onClick={() => {
+                                setSuggestionOperation(
+                                  "delete",
+                                );
+
+                                setSuggestionReplacement(
+                                  "",
+                                );
+                              }}
+                              className={
+                                suggestionOperation ===
+                                "delete"
+                                  ? "wk-button wk-button-primary wk-button-sm"
+                                  : "wk-button wk-button-secondary wk-button-sm"
+                              }
+                            >
+                              Delete Text
+                            </button>
+                          </div>
+                        </div>
+
+                        {suggestionOperation ===
+                        "replace" ? (
+                          <label className="mt-5 block">
+                            <span className="mb-1.5 block text-[10px] font-bold uppercase tracking-[0.12em] text-wk-text-faint">
+                              Replacement Text
+                            </span>
+
+                            <textarea
+                              rows={5}
+                              value={
+                                suggestionReplacement
+                              }
+                              onChange={(event) =>
+                                setSuggestionReplacement(
+                                  event.target.value,
+                                )
+                              }
+                              placeholder="Write the proposed replacement."
+                              className="w-full rounded-xl border border-wk-border bg-wk-surface px-3 py-2 text-[13px] leading-5 text-wk-text outline-none focus:border-wk-brand"
+                            />
+                          </label>
+                        ) : (
+                          <p className="mt-5 rounded-lg border border-wk-warning/20 bg-wk-warning-soft px-3 py-2 text-[11px] leading-4 text-wk-text-muted">
+                            This proposes removing the
+                            selected text.
+                          </p>
+                        )}
+
+                        <label className="mt-5 block">
+                          <span className="mb-1.5 block text-[10px] font-bold uppercase tracking-[0.12em] text-wk-text-faint">
+                            Review Note
+                          </span>
+
+                          <textarea
+                            rows={4}
+                            value={suggestionComment}
+                            onChange={(event) =>
+                              setSuggestionComment(
+                                event.target.value,
+                              )
+                            }
+                            placeholder="Explain why this change helps."
+                            className="w-full rounded-xl border border-wk-border bg-wk-surface px-3 py-2 text-[13px] leading-5 text-wk-text outline-none focus:border-wk-brand"
+                          />
+                        </label>
+                      </div>
+
+                          <div className="shrink-0 flex flex-col-reverse gap-2 border-t border-wk-border px-5 py-4 sm:flex-row sm:justify-end">
+                        <button
+                          type="button"
+                          onClick={
+                            resetSuggestionComposer
+                          }
+                          disabled={
+                            isSuggestionSaving
+                          }
+                          className="wk-button wk-button-secondary wk-button-sm"
+                        >
+                          Cancel Suggestion
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={() =>
+                            void handleCreateArticleSuggestion()
+                          }
+                          disabled={
+                            isSuggestionSaving ||
+                            (
+                              suggestionOperation ===
+                                "replace" &&
+                              !suggestionReplacement
+                                .trim()
+                            )
+                          }
+                          className="wk-button wk-button-primary wk-button-sm"
+                        >
+                          {isSuggestionSaving ? (
+                            <>
+                              <WkIcon
+                                name="Loader2"
+                                size={14}
+                                className="animate-spin"
+                              />
+                              Saving
+                            </>
+                          ) : (
+                            <>
+                              <WkIcon
+                                name="MessageSquarePlus"
+                                size={14}
+                              />
+                              Create Suggestion
+                            </>
+                          )}
+                        </button>
+                      </div>
+                        </aside>
+                      </div>,
+                      document.body,
+                    )
+                  : null}
+              </div>
+            ) : null}
+
             <ArticleContentEditor
-              title={draft.title}
-              excerpt={draft.excerpt}
-              content={draft.content}
-              onTitleChange={(v) =>
-                articlePermissions.canEdit && patchDraft({ title: v })
+
+              title={documentTitle}
+              excerpt={documentExcerpt}
+              content={documentContent}
+              onTitleChange={(value) =>
+                documentModeState.mode ===
+                  "write" &&
+                articlePermissions.canEdit &&
+                patchDraft({
+                  title: value,
+                })
               }
-              onExcerptChange={(v) =>
-                articlePermissions.canEdit && patchDraft({ excerpt: v })
+              onExcerptChange={(value) =>
+                documentModeState.mode ===
+                  "write" &&
+                articlePermissions.canEdit &&
+                patchDraft({
+                  excerpt: value,
+                })
               }
-              onContentChange={(v) =>
-                articlePermissions.canEdit && patchDraft({ content: v })
+              onContentChange={(value) =>
+                documentModeState.mode ===
+                  "write" &&
+                articlePermissions.canEdit &&
+                patchDraft({
+                  content: value,
+                })
               }
-              readOnly={!articlePermissions.canEdit}
-              onSaveDraft={handleSaveDraft}
-              onPreviewArticle={handleMagazinePreview}
-              onOpenArticleDetails={() =>
-                setWriteContextOpen(true)
+              readOnly={documentReadOnly}
+              readOnlyLabel={
+                documentModeState.mode ===
+                "suggest"
+                  ? "Select text to suggest a change"
+                  : documentModeState.mode ===
+                      "view"
+                    ? "Submitted version, viewing only"
+                    : "Viewing only"
               }
-              onCloseArticle={handleCloseArticle}
+              captureTextSelection={
+                documentModeState.mode ===
+                "suggest"
+              }
+              onTextSelectionChange={
+                handleReviewSelectionChange
+              }
+              onSaveDraft={
+                documentModeState.mode ===
+                "write"
+                  ? handleSaveDraft
+                  : undefined
+              }
+              onPreviewArticle={
+                documentModeState.mode ===
+                "write"
+                  ? handleMagazinePreview
+                  : undefined
+              }
+              onOpenArticleDetails={
+                documentModeState.mode ===
+                "write"
+                  ? () =>
+                      setWriteContextOpen(true)
+                  : undefined
+              }
+              onCloseArticle={
+                handleCloseArticle
+              }
               focusMode={focusMode}
               onToggleFocusMode={() =>
                 setFocusMode(
@@ -1723,16 +3448,16 @@ export function ArticleEditorWorkspace({
       )}
 
       {/* Toast Notifications */}
-      <div className="fixed bottom-6 right-6 z-50 flex flex-col gap-2 pointer-events-none">
+      <div className="fixed inset-x-0 top-4 z-[140] mx-auto flex w-full max-w-xl flex-col gap-2 px-4 pointer-events-none sm:top-6">
         {toasts.map((toast) => (
           <div
             key={toast.id}
-            className={`pointer-events-auto flex items-center gap-3 rounded-xl border px-4 py-3 text-[13px] font-semibold shadow-lg transition-all ${
+            className={`pointer-events-auto flex min-h-12 items-center gap-3 rounded-xl border-2 px-4 py-3 text-[13px] font-bold leading-5 text-white shadow-2xl ring-2 ring-black/10 transition-all ${
               toast.type === "success"
-                ? "border-[var(--wk-success)]/20 bg-[var(--wk-success-soft)] text-[var(--wk-success)]"
+                ? "border-[var(--wk-success)] bg-[var(--wk-success)]"
                 : toast.type === "error"
-                  ? "border-[var(--wk-danger)]/20 bg-[var(--wk-danger-soft)] text-[var(--wk-danger)]"
-                  : "border-[var(--wk-info)]/20 bg-[var(--wk-info-soft)] text-[var(--wk-info)]"
+                  ? "border-[var(--wk-danger)] bg-[var(--wk-danger)]"
+                  : "border-[var(--wk-info)] bg-[var(--wk-info)]"
             }`}
           >
             <WkIcon

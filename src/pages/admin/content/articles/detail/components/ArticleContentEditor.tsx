@@ -7,7 +7,10 @@ import {
 } from "react";
 import { WkIcon } from "@/components/design-system/Icon";
 import { WkSurface } from "@/components/design-system/primitives/Surface";
-import { RichTextEditor } from "@/components/design-system/editorial/RichTextEditor";
+import {
+  RichTextEditor,
+  type RichTextSelectionSnapshot,
+} from "@/components/design-system/editorial/RichTextEditor";
 
 interface Props {
   title: string;
@@ -17,6 +20,11 @@ interface Props {
   onExcerptChange: (v: string) => void;
   onContentChange: (v: string) => void;
   readOnly?: boolean;
+  readOnlyLabel?: string;
+  captureTextSelection?: boolean;
+  onTextSelectionChange?: (
+    selection: RichTextSelectionSnapshot | null,
+  ) => void;
   onSaveDraft?: () => void | Promise<void>;
   onPreviewArticle?: () => void | Promise<void>;
   onOpenArticleDetails?: () => void;
@@ -228,6 +236,9 @@ export function ArticleContentEditor({
   onExcerptChange,
   onContentChange,
   readOnly = false,
+  readOnlyLabel,
+  captureTextSelection = false,
+  onTextSelectionChange,
   onSaveDraft,
   onPreviewArticle,
   onOpenArticleDetails,
@@ -647,6 +658,11 @@ export function ArticleContentEditor({
         placeholder="Start writing your Article."
         minHeight={620}
         readOnly={readOnly}
+        readOnlyLabel={readOnlyLabel}
+        captureTextSelection={captureTextSelection}
+        onTextSelectionChange={
+          onTextSelectionChange
+        }
         onSaveDraft={onSaveDraft}
         onPreviewArticle={onPreviewArticle}
         onOpenArticleDetails={onOpenArticleDetails}

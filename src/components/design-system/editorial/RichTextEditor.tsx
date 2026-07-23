@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState, useCallback, useMemo } from "react";
 import { useEditor, EditorContent } from "@tiptap/react";
+import { DOMSerializer } from "@tiptap/pm/model";
 import StarterKit from "@tiptap/starter-kit";
 import Underline from "@tiptap/extension-underline";
 import LinkExtension from "@tiptap/extension-link";
@@ -24,6 +25,34 @@ import { useTrackSearchData } from "@/hooks/useTrackSearchData";
 /* ─── Types ─── */
 
 type ViewMode = "visual" | "html" | "preview" | "split";
+
+export interface RichTextSelectionSnapshot {
+  from: number;
+  to: number;
+  quote: string;
+  prefix: string;
+  suffix: string;
+  viewportRect: {
+    top: number;
+    left: number;
+    right: number;
+    bottom: number;
+    width: number;
+    height: number;
+  } | null;
+  getViewportRect: () => {
+    top: number;
+    left: number;
+    right: number;
+    bottom: number;
+    width: number;
+    height: number;
+  } | null;
+  buildProposedContentHtml: (
+    operationKind: "replace" | "delete",
+    replacementText: string,
+  ) => string;
+}
 
 interface ToolbarButton {
   command: string;
@@ -78,6 +107,11 @@ interface Props {
   placeholder?: string;
   minHeight?: number;
   readOnly?: boolean;
+  readOnlyLabel?: string;
+  captureTextSelection?: boolean;
+  onTextSelectionChange?: (
+    selection: RichTextSelectionSnapshot | null,
+  ) => void;
   onSaveDraft?: () => void | Promise<void>;
   onPreviewArticle?: () => void | Promise<void>;
   onOpenArticleDetails?: () => void;
@@ -96,6 +130,9 @@ export function RichTextEditor({
   placeholder,
   minHeight = 500,
   readOnly = false,
+  readOnlyLabel = "Viewing only",
+  captureTextSelection = false,
+  onTextSelectionChange,
   onSaveDraft,
   onPreviewArticle,
   onOpenArticleDetails,
@@ -131,11 +168,13 @@ export function RichTextEditor({
   const [trackSearch, setTrackSearch] = useState("");
 
   const htmlRef = useRef<HTMLTextAreaElement>(null);
-  const isInternalUpdate = useRef(false);
+  const onChangeRef = useRef(onChange);
+  const hydratedHtmlRef = useRef<string | null>(null);
   const toolbarRef = useRef<HTMLDivElement>(null);
   const [, setSelectionRevision] = useState(0);
   const readOnlyRef = useRef(readOnly);
   readOnlyRef.current = readOnly;
+  onChangeRef.current = onChange;
 
   const { data: releases, loading: releasesLoading } = useReleaseSearchData();
   const { data: artists, loading: artistsLoading } = useArtistSearchData();
@@ -203,10 +242,20 @@ export function RichTextEditor({
         return false;
       },
     },
+    onCreate: ({ editor: ed }) => {
+      hydratedHtmlRef.current = ed.getHTML();
+    },
     onUpdate: ({ editor: ed }) => {
       if (readOnlyRef.current) return;
-      isInternalUpdate.current = true;
-      onChange(ed.getHTML());
+
+      const nextHTML = ed.getHTML();
+
+      if (nextHTML === hydratedHtmlRef.current) {
+        return;
+      }
+
+      hydratedHtmlRef.current = nextHTML;
+      onChangeRef.current(nextHTML);
     },
   });
 
@@ -236,15 +285,24 @@ export function RichTextEditor({
 
   useEffect(() => {
     if (!editor) return;
-    if (isInternalUpdate.current) {
-      isInternalUpdate.current = false;
-      return;
-    }
+
     const currentHTML = editor.getHTML();
-    // Only update if the value actually differs (avoid unnecessary re-renders)
+
+    /*
+     * Normal typing echoes the same HTML back from
+     * the parent and requires no action. A different
+     * value is authoritative external state and must
+     * replace the editor document.
+     */
     if (currentHTML !== value) {
-      editor.commands.setContent(value || "", false);
+      editor.commands.setContent(
+        value || "",
+        false,
+      );
     }
+
+    hydratedHtmlRef.current =
+      editor.getHTML();
   }, [value, editor]);
 
   useEffect(() => {
@@ -254,35 +312,255 @@ export function RichTextEditor({
   }, [editor, readOnly]);
 
 
-  useEffect(() => {
-    if (!editor) return;
+  const emitTextSelection = useCallback(() => {
+    if (!onTextSelectionChange) return;
 
-    const refreshSelectionState = () => {
+    if (!editor || !captureTextSelection) {
+      onTextSelectionChange(null);
+      return;
+    }
+
+    const { from, to, empty } =
+      editor.state.selection;
+
+    if (empty) {
+      onTextSelectionChange(null);
+      return;
+    }
+
+    const documentNode = editor.state.doc;
+    const maximumPosition =
+      documentNode.content.size;
+
+    const quote = documentNode.textBetween(
+      from,
+      to,
+      " ",
+      " ",
+    );
+
+    if (!quote) {
+      onTextSelectionChange(null);
+      return;
+    }
+
+    const prefixStart = Math.max(
+      0,
+      from - 120,
+    );
+
+    const suffixEnd = Math.min(
+      maximumPosition,
+      to + 120,
+    );
+
+    const buildProposedContentHtml = (
+      operationKind: "replace" | "delete",
+      replacementText: string,
+    ): string => {
+      const transaction = editor.state.tr;
+
+      if (operationKind === "delete") {
+        transaction.delete(from, to);
+      } else {
+        transaction.insertText(
+          replacementText,
+          from,
+          to,
+        );
+      }
+
+      const container =
+        document.createElement("div");
+
+      const fragment =
+        DOMSerializer.fromSchema(
+          transaction.doc.type.schema,
+        ).serializeFragment(
+          transaction.doc.content,
+        );
+
+      container.appendChild(fragment);
+
+      return container.innerHTML;
+    };
+
+
+    const browserSelection =
+      window.getSelection();
+
+    const selectionRange =
+      browserSelection &&
+      browserSelection.rangeCount > 0
+        ? browserSelection.getRangeAt(0)
+        : null;
+
+    const clientRects =
+      selectionRange
+        ? Array.from(
+            selectionRange.getClientRects(),
+          )
+        : [];
+
+    const lastClientRect =
+      clientRects.length > 0
+        ? clientRects[
+            clientRects.length - 1
+          ]
+        : selectionRange
+          ? selectionRange.getBoundingClientRect()
+          : null;
+
+    const viewportRect =
+      lastClientRect &&
+      (
+        lastClientRect.width > 0 ||
+        lastClientRect.height > 0
+      )
+        ? {
+            top: lastClientRect.top,
+            left: lastClientRect.left,
+            right: lastClientRect.right,
+            bottom: lastClientRect.bottom,
+            width: lastClientRect.width,
+            height: lastClientRect.height,
+          }
+        : null;
+
+    const getViewportRect = () => {
+      try {
+        const coordinates =
+          editor.view.coordsAtPos(to);
+
+        const width = Math.max(
+          coordinates.right -
+            coordinates.left,
+          1,
+        );
+
+        const height = Math.max(
+          coordinates.bottom -
+            coordinates.top,
+          1,
+        );
+
+        return {
+          top: coordinates.top,
+          left: coordinates.left,
+          right: coordinates.right,
+          bottom: coordinates.bottom,
+          width,
+          height,
+        };
+      } catch {
+        return null;
+      }
+    };
+
+    onTextSelectionChange({
+      from,
+      to,
+      quote,
+      prefix: documentNode.textBetween(
+        prefixStart,
+        from,
+        " ",
+        " ",
+      ),
+      suffix: documentNode.textBetween(
+        to,
+        suffixEnd,
+        " ",
+        " ",
+      ),
+      viewportRect,
+      getViewportRect,
+      buildProposedContentHtml,
+    });
+  }, [
+    captureTextSelection,
+    editor,
+    onTextSelectionChange,
+  ]);
+
+  useEffect(() => {
+    if (!editor) {
+      onTextSelectionChange?.(null);
+      return;
+    }
+
+    const refreshSelectionRevision = () => {
       setSelectionRevision(
         (revision) => revision + 1,
       );
     };
 
+    const commitTextSelection = () => {
+      refreshSelectionRevision();
+      emitTextSelection();
+    };
+
     editor.on(
       "selectionUpdate",
-      refreshSelectionState,
+      refreshSelectionRevision,
     );
+
     editor.on(
       "transaction",
-      refreshSelectionState,
+      refreshSelectionRevision,
     );
+
+    const editorElement =
+      editor.view.dom;
+
+    editorElement.addEventListener(
+      "pointerup",
+      commitTextSelection,
+    );
+
+    editorElement.addEventListener(
+      "touchend",
+      commitTextSelection,
+    );
+
+    editorElement.addEventListener(
+      "keyup",
+      commitTextSelection,
+    );
+
+    emitTextSelection();
 
     return () => {
       editor.off(
         "selectionUpdate",
-        refreshSelectionState,
+        refreshSelectionRevision,
       );
+
       editor.off(
         "transaction",
-        refreshSelectionState,
+        refreshSelectionRevision,
+      );
+
+      editorElement.removeEventListener(
+        "pointerup",
+        commitTextSelection,
+      );
+
+      editorElement.removeEventListener(
+        "touchend",
+        commitTextSelection,
+      );
+
+      editorElement.removeEventListener(
+        "keyup",
+        commitTextSelection,
       );
     };
-  }, [editor]);
+  }, [
+    editor,
+    emitTextSelection,
+    onTextSelectionChange,
+  ]);
 
   /* ─── Toolbar command dispatcher ─── */
 
@@ -971,7 +1249,12 @@ export function RichTextEditor({
   const editorMinHeight = viewMode === "split" ? 600 : minHeight;
 
   return (
-    <div className="relative">
+    <div
+      className="relative"
+      data-review-selection-capture={
+        captureTextSelection || undefined
+      }
+    >
       {/* TipTap ProseMirror base styles */}
       <style>{`
         .ProseMirror {
@@ -1082,7 +1365,7 @@ export function RichTextEditor({
         >
           {readOnly ? (
             <span className="px-2 text-[11px] font-bold text-wk-text-faint">
-              Viewing only
+              {readOnlyLabel}
             </span>
           ) : (
             <>
