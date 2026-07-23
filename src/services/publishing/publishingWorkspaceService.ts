@@ -15,10 +15,10 @@ type PublishingWorkspaceRow =
   Database["public"]["Views"]["wk_publishing_workspace_items"]["Row"];
 
 type PublishingContentKindRow =
-  Database["editorial"]["Tables"]["publishing_content_kinds"]["Row"];
+  Database["public"]["Views"]["wk_publishing_content_kinds"]["Row"];
 
 type PublishingChannelRow =
-  Database["editorial"]["Tables"]["publishing_channels"]["Row"];
+  Database["public"]["Views"]["wk_publishing_channels"]["Row"];
 
 type PublishingMutationRow =
   Database["public"]["Functions"]["create_publishing_item"]["Returns"][number];
@@ -574,8 +574,7 @@ export async function listPublishingContentKinds(
     data,
     error,
   } = await publishingSupabase
-    .schema("editorial")
-    .from("publishing_content_kinds")
+    .from("wk_publishing_content_kinds")
     .select("*")
     .eq("enabled", true)
     .order("sort_order", {
@@ -597,8 +596,7 @@ export async function listPublishingChannels(
     data,
     error,
   } = await publishingSupabase
-    .schema("editorial")
-    .from("publishing_channels")
+    .from("wk_publishing_channels")
     .select("*")
     .eq("enabled", true)
     .order("sort_order", {

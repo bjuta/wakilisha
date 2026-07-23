@@ -13273,6 +13273,57 @@ export type Database = {
         }
         Relationships: []
       }
+      wk_publishing_channels: {
+        Row: {
+          channel_key: string | null
+          description: string | null
+          enabled: boolean | null
+          label: string | null
+          sort_order: number | null
+        }
+        Insert: {
+          channel_key?: string | null
+          description?: string | null
+          enabled?: boolean | null
+          label?: string | null
+          sort_order?: number | null
+        }
+        Update: {
+          channel_key?: string | null
+          description?: string | null
+          enabled?: boolean | null
+          label?: string | null
+          sort_order?: number | null
+        }
+        Relationships: []
+      }
+      wk_publishing_content_kinds: {
+        Row: {
+          canonical_resource_kind: string | null
+          description: string | null
+          enabled: boolean | null
+          kind: string | null
+          label: string | null
+          sort_order: number | null
+        }
+        Insert: {
+          canonical_resource_kind?: string | null
+          description?: string | null
+          enabled?: boolean | null
+          kind?: string | null
+          label?: string | null
+          sort_order?: number | null
+        }
+        Update: {
+          canonical_resource_kind?: string | null
+          description?: string | null
+          enabled?: boolean | null
+          kind?: string | null
+          label?: string | null
+          sort_order?: number | null
+        }
+        Relationships: []
+      }
       wk_publishing_workspace_items: {
         Row: {
           assignees: Json | null
@@ -13305,7 +13356,15 @@ export type Database = {
           updated_by: string | null
           updated_by_label: string | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "publishing_items_content_kind_fkey"
+            columns: ["content_kind"]
+            isOneToOne: false
+            referencedRelation: "wk_publishing_content_kinds"
+            referencedColumns: ["kind"]
+          },
+        ]
       }
       wk_resource_index: {
         Row: {
