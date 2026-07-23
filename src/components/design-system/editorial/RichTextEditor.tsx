@@ -1352,11 +1352,13 @@ export function RichTextEditor({
       `}</style>
 
       <div className="sticky top-0 z-20 border-b border-wk-border bg-wk-surface">
-        <div className="overflow-x-auto border-b border-wk-border">
-          <EditorialMenuBar
-            resolveCommand={resolveMenuCommand}
-          />
-        </div>
+        {!readOnly ? (
+          <div className="overflow-x-auto border-b border-wk-border">
+            <EditorialMenuBar
+              resolveCommand={resolveMenuCommand}
+            />
+          </div>
+        ) : null}
 
         <div
           ref={toolbarRef}
