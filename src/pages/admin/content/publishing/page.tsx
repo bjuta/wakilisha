@@ -1,340 +1,831 @@
-import { useEffect, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useState,
+} from "react";
+import { AdminTable } from "@/components/design-system/admin/AdminTable";
 import { WkIcon } from "@/components/design-system/Icon";
 import { WkSurface } from "@/components/design-system/primitives/Surface";
-import { AdminTable } from "@/components/design-system/admin/AdminTable";
-import { supabase } from "@/lib/supabase";
-import { decodeHtmlEntities } from "@/utils/decodeHtmlEntities";
+import { CreatePublishingItemDrawer } from "@/pages/admin/content/publishing/components/CreatePublishingItemDrawer";
+import { EditPublishingItemDrawer } from "@/pages/admin/content/publishing/components/EditPublishingItemDrawer";
+import { useAdminUser } from "@/hooks/useAdminUser";
+import {
+  PUBLISHING_PLANNING_STATES,
+  PUBLISHING_PRIORITIES,
+  PUBLISHING_PRODUCTION_STAGES,
+  listPublishingChannels,
+  listPublishingContentKinds,
+  listPublishingWorkspaceItems,
+  type PublishingChannel,
+  type PublishingContentKind,
+  type PublishingPlanningState,
+  type PublishingPriority,
+  type PublishingProductionStage,
+  type PublishingWorkspaceItem,
+} from "@/services/publishing/publishingWorkspaceService";
 
-/* ─── Types ─── */
+type PublishingTableRow = PublishingWorkspaceItem &
+  Record<string, unknown>;
 
-interface ContentItem {
-  id: string;
-  slug: string;
-  title: string | null;
-  type: "article" | "guide";
-  status: string | null;
-  wpStatus: string | null;
-  editorialState: string | null;
-  author: string | null;
-  publishedAt: string | null;
-  modifiedAt: string | null;
-  createdAt: string;
+const DATE_FORMATTER = new Intl.DateTimeFormat("en-KE", {
+  day: "numeric",
+  month: "short",
+  year: "numeric",
+});
+
+const DATE_TIME_FORMATTER = new Intl.DateTimeFormat("en-KE", {
+  day: "numeric",
+  month: "short",
+  year: "numeric",
+  hour: "2-digit",
+  minute: "2-digit",
+});
+
+function formatChoice(value: string): string {
+  return value
+    .split("_")
+    .map((part) =>
+      part.length > 0
+        ? `${part[0].toUpperCase()}${part.slice(1)}`
+        : part,
+    )
+    .join(" ");
 }
 
-/* ─── Page ─── */
+function formatDate(value: string | null): string {
+  if (!value) return "Not set";
+  const date = new Date(value);
+  return Number.isNaN(date.getTime())
+    ? "Not set"
+    : DATE_FORMATTER.format(date);
+}
 
-export default function AdminPublishingDashboardPage() {
-  const navigate = useNavigate();
-  const [items, setItems] = useState<ContentItem[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [statusFilter, setStatusFilter] = useState<string>("all");
-  const [typeFilter, setTypeFilter] = useState<string>("all");
+function formatDateTime(value: string): string {
+  const date = new Date(value);
+  return Number.isNaN(date.getTime())
+    ? "Unknown"
+    : DATE_TIME_FORMATTER.format(date);
+}
 
-  useEffect(() => {
-    async function load() {
-      const [articlesRes, guidesRes] = await Promise.all([
-        supabase.from("wk_articles").select("id, slug, title, wp_status, author, published_at, modified_at, created_at").order("created_at", { ascending: false }).limit(100),
-        supabase.from("wk_guides").select("id, slug, title, wp_status, created_at, updated_at").order("created_at", { ascending: false }).limit(50),
-      ]);
-
-      const merged: ContentItem[] = [];
-
-      if (articlesRes.data) {
-        merged.push(...articlesRes.data.map((a) => ({
-          id: a.id,
-          slug: a.slug,
-          title: a.title,
-          type: "article" as const,
-          status: a.wp_status,
-          wpStatus: a.wp_status,
-          editorialState: null,
-          author: a.author,
-          publishedAt: a.published_at,
-          modifiedAt: a.modified_at,
-          createdAt: a.created_at,
-        })));
-      }
-      if (guidesRes.data) {
-        merged.push(...guidesRes.data.map((g) => ({
-          id: g.id,
-          slug: g.slug,
-          title: g.title,
-          type: "guide" as const,
-          status: g.wp_status,
-          wpStatus: g.wp_status,
-          editorialState: null,
-          author: null,
-          publishedAt: null,
-          modifiedAt: g.updated_at,
-          createdAt: g.created_at,
-        })));
-      }
-
-      setItems(merged);
-      setLoading(false);
-    }
-
-    load();
-  }, []);
-
-  const filtered = items.filter((item) => {
-    const matchesStatus = statusFilter === "all" || item.status === statusFilter || item.wpStatus === statusFilter;
-    const matchesType = typeFilter === "all" || item.type === typeFilter;
-    return matchesStatus && matchesType;
-  });
-
-  const counts = {
-    draft: items.filter((i) => i.status === "draft" || i.wpStatus === "draft").length,
-    publish: items.filter((i) => i.status === "publish" || i.wpStatus === "publish").length,
-    trash: items.filter((i) => i.status === "trash" || i.wpStatus === "trash").length,
-    pending: items.filter((i) => i.status === "pending" || i.wpStatus === "pending").length,
-    scheduled: items.filter((i) => {
-      if (i.publishedAt && i.status !== "publish") {
-        return new Date(i.publishedAt) > new Date();
-      }
-      return false;
-    }).length,
-  };
-
-  const statusOptions = [
-    { value: "all", label: "All", count: items.length },
-    { value: "draft", label: "Draft", count: counts.draft },
-    { value: "publish", label: "Published", count: counts.publish },
-    { value: "pending", label: "Pending", count: counts.pending },
-    { value: "trash", label: "Trashed", count: counts.trash },
-  ];
-
-  const typeOptions = [
-    { value: "all", label: "All Types" },
-    { value: "article", label: "Articles" },
-    { value: "guide", label: "Guides" },
-  ];
-
-  function getRoute(item: ContentItem) {
-    if (item.type === "article") return `/admin/content/articles/${item.slug}`;
-    if (item.type === "guide") return `/admin/content/guides/${item.slug}`;
-    return `/admin/content/articles/${item.slug}`;
+function stageTone(stage: PublishingProductionStage): string {
+  if (stage === "ready") {
+    return "bg-wk-success-soft text-wk-success";
   }
+  if (
+    stage === "production_review" ||
+    stage === "revisions"
+  ) {
+    return "bg-wk-warning-soft text-wk-warning";
+  }
+  if (stage === "producing") {
+    return "bg-wk-info-soft text-wk-info";
+  }
+  return "bg-wk-surface-raised text-wk-text-muted";
+}
 
+function priorityTone(priority: PublishingPriority): string {
+  if (priority === "urgent") {
+    return "bg-wk-danger-soft text-wk-danger";
+  }
+  if (priority === "high") {
+    return "bg-wk-warning-soft text-wk-warning";
+  }
+  if (priority === "low") {
+    return "bg-wk-surface-raised text-wk-text-muted";
+  }
+  return "bg-wk-info-soft text-wk-info";
+}
+
+function StatusPill({
+  label,
+  className,
+}: {
+  label: string;
+  className: string;
+}) {
   return (
-    <div className="space-y-6">
-      {/* Header */}
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+    <span
+      className={`inline-flex items-center rounded-full px-2.5 py-1 text-[10px] font-bold ${className}`}
+    >
+      {label}
+    </span>
+  );
+}
+
+function SummaryCard({
+  label,
+  value,
+  helper,
+  icon,
+}: {
+  label: string;
+  value: number;
+  helper: string;
+  icon: string;
+}) {
+  return (
+    <WkSurface className="p-4">
+      <div className="flex items-start justify-between gap-3">
         <div>
-          <div className="mb-1 text-[11px] font-black uppercase tracking-wider text-wk-brand">Content</div>
-          <h1 className="text-[22px] font-black tracking-tight text-wk-text">Publishing</h1>
-          <p className="mt-1 text-[13px] text-wk-text-muted">
-            {items.length} total pieces of content across all types.
+          <div className="text-[10px] font-black uppercase tracking-[0.14em] text-wk-text-faint">
+            {label}
+          </div>
+          <div className="mt-2 text-[26px] font-black text-wk-text">
+            {value}
+          </div>
+          <p className="mt-1 text-[11px] leading-4 text-wk-text-muted">
+            {helper}
           </p>
         </div>
-        <div className="flex items-center gap-2">
-          <button
-            onClick={() => navigate("/admin/content/archive")}
-            className="wk-button wk-button-secondary wk-button-sm whitespace-nowrap"
-          >
-            <WkIcon name="Archive" size={14} />
-            Archive
-          </button>
+        <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-wk-brand-soft text-wk-brand">
+          <WkIcon name={icon as never} size={16} />
         </div>
       </div>
+    </WkSurface>
+  );
+}
 
-      {/* KPI Cards */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-        <KpiCard
-          label="Draft"
-          value={counts.draft}
+export default function AdminPublishingDashboardPage() {
+  const adminUser = useAdminUser();
+  const canManagePublishing =
+    adminUser.can("manage_publishing");
+  const [createOpen, setCreateOpen] = useState(false);
+  const [createNotice, setCreateNotice] =
+    useState<string | null>(null);
+  const [selectedItem, setSelectedItem] =
+    useState<PublishingWorkspaceItem | null>(null);
+
+  const [items, setItems] = useState<
+    PublishingWorkspaceItem[]
+  >([]);
+  const [contentKinds, setContentKinds] = useState<
+    PublishingContentKind[]
+  >([]);
+  const [channels, setChannels] = useState<
+    PublishingChannel[]
+  >([]);
+  const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(
+    null,
+  );
+
+  const [searchQuery, setSearchQuery] = useState("");
+  const [stageFilter, setStageFilter] = useState<
+    PublishingProductionStage | "all"
+  >("all");
+  const [planningFilter, setPlanningFilter] = useState<
+    PublishingPlanningState | "all"
+  >("active");
+  const [contentKindFilter, setContentKindFilter] =
+    useState("all");
+  const [priorityFilter, setPriorityFilter] = useState<
+    PublishingPriority | "all"
+  >("all");
+  const [channelFilter, setChannelFilter] =
+    useState("all");
+  const [ownerFilter, setOwnerFilter] = useState("all");
+
+  const loadWorkspace = useCallback(async () => {
+    setLoading(true);
+    setLoadError(null);
+
+    try {
+      const [nextItems, nextKinds, nextChannels] =
+        await Promise.all([
+          listPublishingWorkspaceItems({ limit: 300 }),
+          listPublishingContentKinds(),
+          listPublishingChannels(),
+        ]);
+
+      setItems(nextItems);
+      setContentKinds(nextKinds);
+      setChannels(nextChannels);
+
+      return nextItems;
+    } catch (error) {
+      setLoadError(
+        error instanceof Error
+          ? error.message
+          : "We could not load Publishing.",
+      );
+
+      return [] as PublishingWorkspaceItem[];
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    void loadWorkspace();
+  }, [loadWorkspace]);
+
+  const ownerOptions = useMemo(() => {
+    const ownerMap = new Map<string, string>();
+
+    items.forEach((item) => {
+      if (item.ownerId) {
+        ownerMap.set(
+          item.ownerId,
+          item.ownerLabel ?? item.ownerId,
+        );
+      }
+    });
+
+    return Array.from(ownerMap.entries())
+      .map(([id, label]) => ({ id, label }))
+      .sort((a, b) => a.label.localeCompare(b.label));
+  }, [items]);
+
+  const stageCountItems = useMemo(
+    () =>
+      items.filter(
+        (item) =>
+          planningFilter === "all" ||
+          item.planningState === planningFilter,
+      ),
+    [items, planningFilter],
+  );
+
+  const stageCounts = useMemo(
+    () =>
+      PUBLISHING_PRODUCTION_STAGES.reduce(
+        (counts, stage) => {
+          counts[stage] = stageCountItems.filter(
+            (item) => item.productionStage === stage,
+          ).length;
+          return counts;
+        },
+        {} as Record<PublishingProductionStage, number>,
+      ),
+    [stageCountItems],
+  );
+
+  const summary = useMemo(() => {
+    const now = Date.now();
+    const sevenDaysFromNow =
+      now + 7 * 24 * 60 * 60 * 1000;
+
+    const activeItems = items.filter(
+      (item) => item.planningState === "active",
+    );
+
+    return {
+      active: activeItems.length,
+      producing: activeItems.filter(
+        (item) => item.productionStage === "producing",
+      ).length,
+      ready: activeItems.filter(
+        (item) => item.productionStage === "ready",
+      ).length,
+      dueSoon: activeItems.filter((item) => {
+        if (
+          !item.productionDeadline ||
+          item.productionStage === "ready"
+        ) {
+          return false;
+        }
+
+        const deadline = new Date(
+          item.productionDeadline,
+        ).getTime();
+
+        return (
+          Number.isFinite(deadline) &&
+          deadline >= now &&
+          deadline <= sevenDaysFromNow
+        );
+      }).length,
+    };
+  }, [items]);
+
+  const filteredItems = useMemo(() => {
+    const query = searchQuery.trim().toLowerCase();
+
+    return items.filter((item) => {
+      const matchesSearch =
+        query.length === 0 ||
+        item.title.toLowerCase().includes(query) ||
+        Boolean(item.brief?.toLowerCase().includes(query));
+      const matchesStage =
+        stageFilter === "all" ||
+        item.productionStage === stageFilter;
+      const matchesPlanning =
+        planningFilter === "all" ||
+        item.planningState === planningFilter;
+      const matchesKind =
+        contentKindFilter === "all" ||
+        item.contentKind === contentKindFilter;
+      const matchesPriority =
+        priorityFilter === "all" ||
+        item.priority === priorityFilter;
+      const matchesChannel =
+        channelFilter === "all" ||
+        item.channels.some(
+          (channel) => channel.key === channelFilter,
+        );
+      const matchesOwner =
+        ownerFilter === "all" ||
+        item.ownerId === ownerFilter;
+
+      return (
+        matchesSearch &&
+        matchesStage &&
+        matchesPlanning &&
+        matchesKind &&
+        matchesPriority &&
+        matchesChannel &&
+        matchesOwner
+      );
+    });
+  }, [
+    channelFilter,
+    contentKindFilter,
+    items,
+    ownerFilter,
+    planningFilter,
+    priorityFilter,
+    searchQuery,
+    stageFilter,
+  ]);
+
+  function openCreateDrawer() {
+    setCreateNotice(null);
+    setSelectedItem(null);
+    setCreateOpen(true);
+  }
+
+  function openEditDrawer(
+    item: PublishingWorkspaceItem,
+  ) {
+    if (!canManagePublishing) return;
+
+    setCreateNotice(null);
+    setCreateOpen(false);
+    setSelectedItem(item);
+  }
+
+  function clearFilters() {
+    setSearchQuery("");
+    setStageFilter("all");
+    setPlanningFilter("active");
+    setContentKindFilter("all");
+    setPriorityFilter("all");
+    setChannelFilter("all");
+    setOwnerFilter("all");
+  }
+
+  const tableRows = filteredItems as PublishingTableRow[];
+
+  return (
+    <div className="space-y-5">
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+        <div className="max-w-3xl">
+        <div className="text-[10px] font-black uppercase tracking-[0.16em] text-wk-brand">
+          Editorial Operations
+        </div>
+        <h1 className="mt-1 text-[26px] font-black tracking-tight text-wk-text">
+          Publishing
+        </h1>
+        <p className="mt-2 text-[13px] leading-5 text-wk-text-muted">
+          Plan production, ownership, deadlines, and channels. Canonical editors still control review, scheduling, and publication.
+        </p>
+        </div>
+
+        {canManagePublishing ? (
+          <button
+            type="button"
+            onClick={openCreateDrawer}
+            disabled={
+              loading ||
+              contentKinds.length === 0
+            }
+            className="wk-button wk-button-primary wk-button-sm shrink-0 justify-center disabled:opacity-50"
+          >
+            <WkIcon name="PlusCircle" size={14} />
+            Create Publishing Item
+          </button>
+        ) : null}
+      </div>
+
+      {createNotice ? (
+        <WkSurface className="border-wk-success/30 bg-wk-success-soft p-3">
+          <div className="flex items-center gap-2">
+            <WkIcon
+              name="CheckCircle"
+              size={15}
+              className="text-wk-success"
+            />
+            <p className="text-[12px] font-semibold text-wk-success">
+              {createNotice}
+            </p>
+          </div>
+        </WkSurface>
+      ) : null}
+
+      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+        <SummaryCard
+          label="Active"
+          value={summary.active}
+          helper="Items still moving through production."
           icon="FileEdit"
-          color="bg-wk-warning-soft text-wk-warning"
-          onClick={() => setStatusFilter("draft")}
         />
-        <KpiCard
-          label="Published"
-          value={counts.publish}
+        <SummaryCard
+          label="Producing"
+          value={summary.producing}
+          helper="Work currently being made."
+          icon="Pencil"
+        />
+        <SummaryCard
+          label="Ready"
+          value={summary.ready}
+          helper="Production work marked ready."
           icon="Globe"
-          color="bg-wk-success-soft text-wk-success"
-          onClick={() => setStatusFilter("publish")}
         />
-        <KpiCard
-          label="Pending"
-          value={counts.pending}
+        <SummaryCard
+          label="Due Soon"
+          value={summary.dueSoon}
+          helper="Active deadlines within seven days."
           icon="Clock"
-          color="bg-wk-info-soft text-wk-info"
-          onClick={() => setStatusFilter("pending")}
-        />
-        <KpiCard
-          label="Trashed"
-          value={counts.trash}
-          icon="Trash2"
-          color="bg-wk-danger-soft text-wk-danger"
-          onClick={() => setStatusFilter("trash")}
         />
       </div>
 
-      {/* Filters */}
-      <WkSurface className="p-4">
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-center flex-wrap">
-          {/* Status pills */}
-          <div className="flex flex-wrap items-center gap-1 rounded-lg border border-wk-border bg-wk-bg-subtle p-1">
-            {statusOptions.map((opt) => (
+      {loadError ? (
+        <WkSurface className="border-wk-danger/30 bg-wk-danger-soft p-4">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <div className="text-[12px] font-black text-wk-danger">
+                Publishing did not load
+              </div>
+              <p className="mt-1 text-[11px] leading-4 text-wk-text-muted">
+                {loadError}
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={() => void loadWorkspace()}
+              className="wk-button wk-button-secondary wk-button-sm"
+            >
+              Retry
+            </button>
+          </div>
+        </WkSurface>
+      ) : null}
+
+      <WkSurface className="overflow-hidden">
+        <div className="border-b border-wk-border px-4 py-3">
+          <div className="flex gap-1 overflow-x-auto">
+            <button
+              type="button"
+              onClick={() => setStageFilter("all")}
+              className={`shrink-0 rounded-lg px-3 py-2 text-[11px] font-bold ${
+                stageFilter === "all"
+                  ? "bg-wk-brand text-wk-brand-on"
+                  : "text-wk-text-muted hover:bg-wk-surface-raised hover:text-wk-text"
+              }`}
+            >
+              All Stages {stageCountItems.length}
+            </button>
+
+            {PUBLISHING_PRODUCTION_STAGES.map((stage) => (
               <button
-                key={opt.value}
-                onClick={() => setStatusFilter(opt.value)}
-                className={`flex items-center gap-1.5 rounded-md px-3 py-1.5 text-[12px] font-semibold transition-all whitespace-nowrap ${
-                  statusFilter === opt.value
-                    ? "bg-wk-surface text-wk-text"
-                    : "text-wk-text-muted hover:text-wk-text"
+                key={stage}
+                type="button"
+                onClick={() => setStageFilter(stage)}
+                className={`shrink-0 rounded-lg px-3 py-2 text-[11px] font-bold ${
+                  stageFilter === stage
+                    ? "bg-wk-brand text-wk-brand-on"
+                    : "text-wk-text-muted hover:bg-wk-surface-raised hover:text-wk-text"
                 }`}
               >
-                {opt.label}
-                <span className="text-[10px] text-wk-text-faint">{opt.count}</span>
+                {formatChoice(stage)} {stageCounts[stage]}
               </button>
             ))}
           </div>
+        </div>
 
-          {/* Type filter */}
+        <div className="grid gap-3 p-4 md:grid-cols-2 xl:grid-cols-6">
+          <label className="xl:col-span-2">
+            <span className="sr-only">Search Publishing</span>
+            <div className="flex items-center gap-2 rounded-xl border border-wk-border bg-wk-surface px-3 py-2">
+              <WkIcon
+                name="Search"
+                size={14}
+                className="text-wk-text-faint"
+              />
+              <input
+                value={searchQuery}
+                onChange={(event) =>
+                  setSearchQuery(event.target.value)
+                }
+                placeholder="Search title or brief"
+                className="min-w-0 flex-1 bg-transparent text-[12px] text-wk-text outline-none placeholder:text-wk-text-faint"
+              />
+            </div>
+          </label>
+
           <select
-            value={typeFilter}
-            onChange={(e) => setTypeFilter(e.target.value)}
-            className="rounded-lg border border-wk-border bg-wk-surface px-3 py-2 text-[13px] text-wk-text outline-none cursor-pointer"
+            aria-label="Planning state"
+            value={planningFilter}
+            onChange={(event) =>
+              setPlanningFilter(
+                event.target.value as
+                  | PublishingPlanningState
+                  | "all",
+              )
+            }
+            className="rounded-xl border border-wk-border bg-wk-surface px-3 py-2 text-[12px] text-wk-text outline-none"
           >
-            {typeOptions.map((opt) => (
-              <option key={opt.value} value={opt.value}>{opt.label}</option>
+            <option value="all">All Planning States</option>
+            {PUBLISHING_PLANNING_STATES.map((state) => (
+              <option key={state} value={state}>
+                {formatChoice(state)}
+              </option>
             ))}
           </select>
 
-          <span className="text-[12px] text-wk-text-muted whitespace-nowrap">
-            {filtered.length} items
-          </span>
+          <select
+            aria-label="Content type"
+            value={contentKindFilter}
+            onChange={(event) =>
+              setContentKindFilter(event.target.value)
+            }
+            className="rounded-xl border border-wk-border bg-wk-surface px-3 py-2 text-[12px] text-wk-text outline-none"
+          >
+            <option value="all">All Content Types</option>
+            {contentKinds.map((kind) => (
+              <option key={kind.key} value={kind.key}>
+                {kind.label}
+              </option>
+            ))}
+          </select>
+
+          <select
+            aria-label="Priority"
+            value={priorityFilter}
+            onChange={(event) =>
+              setPriorityFilter(
+                event.target.value as
+                  | PublishingPriority
+                  | "all",
+              )
+            }
+            className="rounded-xl border border-wk-border bg-wk-surface px-3 py-2 text-[12px] text-wk-text outline-none"
+          >
+            <option value="all">All Priorities</option>
+            {PUBLISHING_PRIORITIES.map((priority) => (
+              <option key={priority} value={priority}>
+                {formatChoice(priority)}
+              </option>
+            ))}
+          </select>
+
+          <select
+            aria-label="Channel"
+            value={channelFilter}
+            onChange={(event) =>
+              setChannelFilter(event.target.value)
+            }
+            className="rounded-xl border border-wk-border bg-wk-surface px-3 py-2 text-[12px] text-wk-text outline-none"
+          >
+            <option value="all">All Channels</option>
+            {channels.map((channel) => (
+              <option key={channel.key} value={channel.key}>
+                {channel.label}
+              </option>
+            ))}
+          </select>
+
+          <select
+            aria-label="Owner"
+            value={ownerFilter}
+            onChange={(event) =>
+              setOwnerFilter(event.target.value)
+            }
+            className="rounded-xl border border-wk-border bg-wk-surface px-3 py-2 text-[12px] text-wk-text outline-none xl:col-start-5"
+          >
+            <option value="all">All Owners</option>
+            {ownerOptions.map((owner) => (
+              <option key={owner.id} value={owner.id}>
+                {owner.label}
+              </option>
+            ))}
+          </select>
+
+          <button
+            type="button"
+            onClick={clearFilters}
+            className="wk-button wk-button-secondary wk-button-sm justify-center"
+          >
+            Clear Filters
+          </button>
         </div>
       </WkSurface>
 
-      {/* Table */}
       {loading ? (
         <div className="space-y-3">
-          {Array.from({ length: 6 }).map((_, i) => (
-            <div key={i} className="animate-pulse rounded-xl border border-wk-border bg-wk-surface p-4">
-              <div className="h-4 w-48 rounded bg-wk-surface-raised mb-2" />
-              <div className="h-3 w-32 rounded bg-wk-surface-raised" />
+          {Array.from({ length: 5 }).map((_, index) => (
+            <div
+              key={index}
+              className="animate-pulse rounded-xl border border-wk-border bg-wk-surface p-4"
+            >
+              <div className="h-4 w-56 rounded bg-wk-surface-raised" />
+              <div className="mt-2 h-3 w-32 rounded bg-wk-surface-raised" />
             </div>
           ))}
         </div>
+      ) : items.length === 0 && !loadError ? (
+        <WkSurface className="px-5 py-12 text-center">
+          <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl bg-wk-brand-soft text-wk-brand">
+            <WkIcon name="Globe" size={20} />
+          </div>
+          <h2 className="mt-4 text-[18px] font-black text-wk-text">
+            No Publishing items yet
+          </h2>
+          <p className="mx-auto mt-2 max-w-xl text-[12px] leading-5 text-wk-text-muted">
+            Add work deliberately when it enters production. Existing content will not appear here automatically.
+          </p>
+          {canManagePublishing ? (
+            <button
+              type="button"
+              onClick={openCreateDrawer}
+              disabled={contentKinds.length === 0}
+              className="wk-button wk-button-primary wk-button-sm mt-5 justify-center disabled:opacity-50"
+            >
+              <WkIcon name="PlusCircle" size={14} />
+              Create Publishing Item
+            </button>
+          ) : null}
+        </WkSurface>
+      ) : filteredItems.length === 0 ? (
+        <WkSurface className="px-5 py-10 text-center">
+          <h2 className="text-[16px] font-black text-wk-text">
+            No items match these filters
+          </h2>
+          <p className="mt-2 text-[12px] text-wk-text-muted">
+            Clear the filters and review the full workspace.
+          </p>
+          <button
+            type="button"
+            onClick={clearFilters}
+            className="wk-button wk-button-secondary wk-button-sm mt-4"
+          >
+            Clear Filters
+          </button>
+        </WkSurface>
       ) : (
         <AdminTable
           columns={[
             {
               key: "title",
-              label: "Title",
+              label: "Work",
               render: (row) => (
-                <div>
-                  <div className="text-[13px] font-semibold text-wk-text">{row.title ? decodeHtmlEntities(row.title) : "(Untitled)"}</div>
-                  <div className="text-[11px] text-wk-text-muted">{row.slug}</div>
+                <div className="min-w-[240px]">
+                  <div className="text-[13px] font-bold text-wk-text">
+                    {row.title}
+                  </div>
+                  <div className="mt-1 line-clamp-1 text-[11px] text-wk-text-muted">
+                    {row.brief || "No brief yet."}
+                  </div>
+                  <div className="mt-1 text-[10px] text-wk-text-faint">
+                    Updated {formatDateTime(row.updatedAt)}
+                  </div>
                 </div>
               ),
             },
             {
-              key: "type",
+              key: "productionStage",
+              label: "Production",
+              width: "140px",
+              render: (row) => (
+                <StatusPill
+                  label={formatChoice(row.productionStage)}
+                  className={stageTone(row.productionStage)}
+                />
+              ),
+            },
+            {
+              key: "contentKindLabel",
               label: "Type",
-              width: "90px",
+              width: "130px",
               render: (row) => (
-                <span className="text-[11px] font-semibold uppercase text-wk-text-muted">
-                  {row.type}
+                <span className="text-[12px] font-semibold text-wk-text-muted">
+                  {row.contentKindLabel}
                 </span>
               ),
             },
             {
-              key: "status",
-              label: "Status",
+              key: "ownerLabel",
+              label: "Owner",
+              width: "150px",
+              render: (row) => (
+                <span className="text-[12px] text-wk-text-muted">
+                  {row.ownerLabel || "Unassigned"}
+                </span>
+              ),
+            },
+            {
+              key: "priority",
+              label: "Priority",
               width: "110px",
-              render: (row) => <StatusBadge status={row.status || row.wpStatus} />,
-            },
-            {
-              key: "author",
-              label: "Author",
-              width: "120px",
               render: (row) => (
-                <span className="text-[12px] text-wk-text-muted">{row.author || "—"}</span>
+                <StatusPill
+                  label={formatChoice(row.priority)}
+                  className={priorityTone(row.priority)}
+                />
               ),
             },
             {
-              key: "publishedAt",
-              label: "Published",
-              width: "140px",
+              key: "productionDeadline",
+              label: "Deadline",
+              width: "130px",
               render: (row) => (
                 <span className="text-[12px] text-wk-text-muted">
-                  {row.publishedAt ? new Date(row.publishedAt).toLocaleDateString() : "—"}
+                  {formatDate(row.productionDeadline)}
                 </span>
               ),
             },
             {
-              key: "modifiedAt",
-              label: "Modified",
-              width: "140px",
+              key: "editorialState",
+              label: "Authority",
+              width: "170px",
               render: (row) => (
-                <span className="text-[12px] text-wk-text-muted">
-                  {row.modifiedAt ? new Date(row.modifiedAt).toLocaleDateString() : "—"}
-                </span>
+                <div className="space-y-1 text-[10px] text-wk-text-muted">
+                  <div>
+                    Editorial: {formatChoice(row.editorialState)}
+                  </div>
+                  <div>
+                    Publication: {formatChoice(row.publicationState)}
+                  </div>
+                </div>
               ),
             },
           ]}
-          rows={filtered}
+          onRowClick={
+            canManagePublishing
+              ? (row) => openEditDrawer(row)
+              : undefined
+          }
+          rows={tableRows}
           keyField="id"
-          emptyMessage="No content found for this filter."
-          onRowClick={(row) => navigate(getRoute(row))}
+          emptyMessage="No Publishing items found."
         />
       )}
+
+      {createOpen && canManagePublishing ? (
+        <CreatePublishingItemDrawer
+          contentKinds={contentKinds}
+          currentUserId={adminUser.id}
+          currentUserName={adminUser.name}
+          onClose={() => setCreateOpen(false)}
+          onCreated={async () => {
+            setCreateOpen(false);
+            setCreateNotice(
+              "We added this work to Publishing.",
+            );
+            setStageFilter("all");
+            setPlanningFilter("active");
+            await loadWorkspace();
+          }}
+        />
+      ) : null}
+
+      {selectedItem && canManagePublishing ? (
+        <EditPublishingItemDrawer
+          item={selectedItem}
+          contentKinds={contentKinds}
+          currentUserId={adminUser.id}
+          currentUserName={adminUser.name}
+          onClose={() => setSelectedItem(null)}
+          onSaved={async (
+            notice,
+            nextPlanningState,
+          ) => {
+            setSelectedItem(null);
+            setCreateNotice(notice);
+
+            if (nextPlanningState === "archived") {
+              setPlanningFilter("active");
+            } else {
+              setPlanningFilter(nextPlanningState);
+            }
+
+            await loadWorkspace();
+          }}
+          onReloadLatest={async (itemId) => {
+            const nextItems =
+              await loadWorkspace();
+
+            const latest =
+              nextItems.find(
+                (candidate) =>
+                  candidate.id === itemId,
+              ) ?? null;
+
+            setSelectedItem(latest);
+          }}
+        />
+      ) : null}
     </div>
-  );
-}
-
-/* ─── Sub-components ─── */
-
-function KpiCard({
-  label,
-  value,
-  icon,
-  color,
-  onClick,
-}: {
-  label: string;
-  value: number;
-  icon: string;
-  color: string;
-  onClick: () => void;
-}) {
-  return (
-    <button
-      onClick={onClick}
-      className="flex items-center gap-3 rounded-xl border border-wk-border bg-wk-surface p-4 text-left hover:bg-wk-surface-raised transition-colors"
-    >
-      <div className={`flex h-10 w-10 items-center justify-center rounded-lg ${color}`}>
-        <WkIcon name={icon as never} size={18} />
-      </div>
-      <div>
-        <div className="text-[22px] font-black text-wk-text">{value}</div>
-        <div className="text-[11px] font-semibold uppercase tracking-wider text-wk-text-muted">{label}</div>
-      </div>
-    </button>
-  );
-}
-
-function StatusBadge({ status }: { status: string | null }) {
-  if (!status) return <span className="text-[11px] text-wk-text-faint">—</span>;
-
-  const color =
-    status === "publish"
-      ? "bg-wk-success-soft text-wk-success"
-      : status === "draft"
-      ? "bg-wk-warning-soft text-wk-warning"
-      : status === "pending"
-      ? "bg-wk-info-soft text-wk-info"
-      : status === "trash"
-      ? "bg-wk-danger-soft text-wk-danger"
-      : "bg-wk-surface-raised text-wk-text-muted";
-
-  return (
-    <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-bold uppercase ${color}`}>
-      {status}
-    </span>
   );
 }

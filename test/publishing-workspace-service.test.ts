@@ -42,15 +42,23 @@ describe("Publishing workspace service", () => {
 
   it("reads controlled Publishing reference data", () => {
     expect(service).toContain(
+      'Database["public"]["Views"]["wk_publishing_content_kinds"]["Row"]',
+    );
+
+    expect(service).toContain(
+      'Database["public"]["Views"]["wk_publishing_channels"]["Row"]',
+    );
+
+    expect(service).toContain(
+      '.from("wk_publishing_content_kinds")',
+    );
+
+    expect(service).toContain(
+      '.from("wk_publishing_channels")',
+    );
+
+    expect(service).not.toContain(
       '.schema("editorial")',
-    );
-
-    expect(service).toContain(
-      '.from("publishing_content_kinds")',
-    );
-
-    expect(service).toContain(
-      '.from("publishing_channels")',
     );
   });
 
