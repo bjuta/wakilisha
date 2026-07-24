@@ -21,6 +21,11 @@ const archiveDialog = fs.readFileSync(
   "utf8",
 );
 
+const relationshipsSection = fs.readFileSync(
+  "src/pages/admin/content/publishing/components/PublishingRelationshipsSection.tsx",
+  "utf8",
+);
+
 const ownerSemanticsMigration = fs.readFileSync(
   "supabase/migrations/20260723205000_publishing_create_owner_null_semantics.sql",
   "utf8",
@@ -235,6 +240,72 @@ describe("Publishing workspace core", () => {
 
     expect(archiveDialog).toContain(
       "disabled:cursor-not-allowed",
+    );
+  });
+
+  it("manages Publishing team assignments through governed RPCs", () => {
+    expect(editDrawer).toContain(
+      "PublishingRelationshipsSection",
+    );
+
+    expect(relationshipsSection).toContain(
+      "listPublishingAssignableUsers",
+    );
+
+    expect(relationshipsSection).toContain(
+      "addPublishingItemAssignee",
+    );
+
+    expect(relationshipsSection).toContain(
+      "removePublishingItemAssignee",
+    );
+
+    expect(relationshipsSection).toContain(
+      'role !== "owner"',
+    );
+
+    expect(relationshipsSection).toContain(
+      "onReloadLatest(item.id)",
+    );
+  });
+
+  it("manages Publishing channels through governed RPCs", () => {
+    expect(relationshipsSection).toContain(
+      "addPublishingItemChannel",
+    );
+
+    expect(relationshipsSection).toContain(
+      "removePublishingItemChannel",
+    );
+
+    expect(relationshipsSection).toContain(
+      "setPublishingItemPrimaryChannel",
+    );
+
+    expect(relationshipsSection).toContain(
+      "Make Primary",
+    );
+
+    expect(page).toContain(
+      "channels={channels}",
+    );
+  });
+
+  it("keeps relationship changes separate from the main save", () => {
+    expect(relationshipsSection).toContain(
+      'type="button"',
+    );
+
+    expect(relationshipsSection).not.toContain(
+      "updatePublishingItem",
+    );
+
+    expect(relationshipsSection).not.toContain(
+      "schedule_article_publication",
+    );
+
+    expect(relationshipsSection).not.toContain(
+      "publish_article_version",
     );
   });
 

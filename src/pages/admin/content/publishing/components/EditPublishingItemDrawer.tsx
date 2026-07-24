@@ -6,11 +6,13 @@ import {
 } from "react";
 import { WkIcon } from "@/components/design-system/Icon";
 import { ArchivePublishingItemDialog } from "@/pages/admin/content/publishing/components/ArchivePublishingItemDialog";
+import { PublishingRelationshipsSection } from "@/pages/admin/content/publishing/components/PublishingRelationshipsSection";
 import {
   PUBLISHING_PLANNING_STATES,
   PUBLISHING_PRIORITIES,
   PUBLISHING_PRODUCTION_STAGES,
   updatePublishingItem,
+  type PublishingChannel,
   type PublishingContentKind,
   type PublishingPlanningState,
   type PublishingPriority,
@@ -21,6 +23,7 @@ import {
 interface EditPublishingItemDrawerProps {
   item: PublishingWorkspaceItem;
   contentKinds: PublishingContentKind[];
+  channels: PublishingChannel[];
   currentUserId: string;
   currentUserName: string;
   onClose: () => void;
@@ -90,6 +93,7 @@ function toDateTimeLocal(value: string | null): string {
 export function EditPublishingItemDrawer({
   item,
   contentKinds,
+  channels,
   currentUserId,
   currentUserName,
   onClose,
@@ -124,6 +128,8 @@ export function EditPublishingItemDrawer({
   const [note, setNote] = useState("");
   const [saving, setSaving] = useState(false);
   const [archiving, setArchiving] = useState(false);
+  const [relationshipBusy, setRelationshipBusy] =
+    useState(false);
   const [archiveOpen, setArchiveOpen] =
     useState(false);
   const [error, setError] = useState<string | null>(
@@ -167,6 +173,7 @@ export function EditPublishingItemDrawer({
         event.key === "Escape" &&
         !saving &&
         !archiving &&
+        !relationshipBusy &&
         !archiveOpen
       ) {
         onClose();
@@ -188,6 +195,7 @@ export function EditPublishingItemDrawer({
     archiveOpen,
     archiving,
     onClose,
+    relationshipBusy,
     saving,
   ]);
 
@@ -379,7 +387,8 @@ export function EditPublishingItemDrawer({
     }
   }
 
-  const busy = saving || archiving;
+  const busy =
+    saving || archiving || relationshipBusy;
 
   return (
     <>
@@ -674,6 +683,14 @@ export function EditPublishingItemDrawer({
               <p className="text-[11px] leading-4 text-wk-text-muted">
                 Planned timing does not schedule or publish canonical content.
               </p>
+
+              <PublishingRelationshipsSection
+                item={item}
+                channels={channels}
+                disabled={busy}
+                onBusyChange={setRelationshipBusy}
+                onReloadLatest={onReloadLatest}
+              />
 
               <div className="rounded-xl border border-wk-border bg-wk-surface-raised p-3">
                 <div className="text-[10px] font-black uppercase tracking-[0.12em] text-wk-text-faint">
