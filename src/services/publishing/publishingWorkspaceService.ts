@@ -20,6 +20,9 @@ type PublishingContentKindRow =
 type PublishingChannelRow =
   Database["public"]["Views"]["wk_publishing_channels"]["Row"];
 
+type PublishingAssignableUserRow =
+  Database["public"]["Functions"]["list_publishing_assignable_users"]["Returns"][number];
+
 type PublishingMutationRow =
   Database["public"]["Functions"]["create_publishing_item"]["Returns"][number];
 
@@ -43,6 +46,9 @@ type AddPublishingItemChannelArgs =
 
 type RemovePublishingItemChannelArgs =
   Database["public"]["Functions"]["remove_publishing_item_channel"]["Args"];
+
+type SetPublishingItemPrimaryChannelArgs =
+  Database["public"]["Functions"]["set_publishing_item_primary_channel"]["Args"];
 
 export const PUBLISHING_PRODUCTION_STAGES = [
   "idea",
@@ -180,6 +186,13 @@ export interface PublishingChannel {
   sortOrder: number;
 }
 
+export interface PublishingAssignableUser {
+  userId: string;
+  label: string;
+  email: string | null;
+  roleLabels: string[];
+}
+
 export interface ListPublishingItemsOptions {
   limit?: number;
   contentKind?: string;
@@ -244,6 +257,13 @@ export interface AddPublishingItemChannelInput {
 }
 
 export interface RemovePublishingItemChannelInput {
+  itemId: string;
+  expectedRecordVersion: number;
+  channelKey: string;
+  note?: string | null;
+}
+
+export interface SetPublishingItemPrimaryChannelInput {
   itemId: string;
   expectedRecordVersion: number;
   channelKey: string;
@@ -479,6 +499,17 @@ function mapChannel(
   };
 }
 
+function mapAssignableUser(
+  row: PublishingAssignableUserRow,
+): PublishingAssignableUser {
+  return {
+    userId: row.user_id,
+    label: row.label,
+    email: row.email ?? null,
+    roleLabels: row.role_labels ?? [],
+  };
+}
+
 export async function listPublishingWorkspaceItems(
   options: ListPublishingItemsOptions = {},
 ): Promise<PublishingWorkspaceItem[]> {
@@ -612,6 +643,24 @@ export async function listPublishingChannels(
   return (data ?? []).map(mapChannel);
 }
 
+export async function listPublishingAssignableUsers(
+): Promise<PublishingAssignableUser[]> {
+  const {
+    data,
+    error,
+  } = await publishingSupabase.rpc(
+    "list_publishing_assignable_users",
+  );
+
+  if (error) {
+    throw new Error(
+      `We could not load the Publishing team: ${error.message}`,
+    );
+  }
+
+  return (data ?? []).map(mapAssignableUser);
+}
+
 export function classifyPublishingMutationError(
   error: PublishingErrorLike,
 ): PublishingMutationErrorCode {
@@ -649,6 +698,7 @@ export function classifyPublishingMutationError(
     code === "23505"
     || message.includes("already exists")
     || message.includes("already attached")
+    || message.includes("already primary")
   ) {
     return "conflict";
   }
@@ -926,6 +976,27 @@ export async function removePublishingItemChannel(
   return executePublishingMutation(
     () => publishingSupabase.rpc(
       "remove_publishing_item_channel",
+      args,
+    ),
+  );
+}
+
+export async function setPublishingItemPrimaryChannel(
+  input: SetPublishingItemPrimaryChannelInput,
+): Promise<PublishingMutationResult> {
+  const args: SetPublishingItemPrimaryChannelArgs = {
+    p_item_id: input.itemId,
+    p_expected_record_version:
+      input.expectedRecordVersion,
+    p_channel_key:
+      input.channelKey,
+    p_note:
+      input.note ?? null,
+  };
+
+  return executePublishingMutation(
+    () => publishingSupabase.rpc(
+      "set_publishing_item_primary_channel",
       args,
     ),
   );

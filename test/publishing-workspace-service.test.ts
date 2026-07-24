@@ -71,6 +71,7 @@ describe("Publishing workspace service", () => {
       "remove_publishing_item_assignee",
       "add_publishing_item_channel",
       "remove_publishing_item_channel",
+      "set_publishing_item_primary_channel",
     ]) {
       expect(service).toContain(
         `"${rpcName}"`,
@@ -87,6 +88,28 @@ describe("Publishing workspace service", () => {
 
     expect(service).not.toMatch(
       /\.delete\s*\(/,
+    );
+  });
+
+  it("reads the controlled Publishing team list", () => {
+    expect(service).toContain(
+      '"list_publishing_assignable_users"',
+    );
+
+    expect(service).toContain(
+      "listPublishingAssignableUsers",
+    );
+
+    expect(service).toContain(
+      "PublishingAssignableUser",
+    );
+
+    expect(service).not.toContain(
+      '.from("user_profiles")',
+    );
+
+    expect(service).not.toContain(
+      '.from("user_role_assignments")',
     );
   });
 

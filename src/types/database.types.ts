@@ -15260,6 +15260,15 @@ export type Database = {
           wp_status: string
         }[]
       }
+      list_publishing_assignable_users: {
+        Args: never
+        Returns: {
+          email: string
+          label: string
+          role_labels: string[]
+          user_id: string
+        }[]
+      }
       mark_article_suggestion_stale: {
         Args: { p_note?: string; p_suggestion_id: string }
         Returns: {
@@ -15929,6 +15938,18 @@ export type Database = {
           taxonomy: string
           term_name: string
           term_slug: string
+        }[]
+      }
+      set_publishing_item_primary_channel: {
+        Args: {
+          p_channel_key: string
+          p_expected_record_version: number
+          p_item_id: string
+          p_note?: string
+        }
+        Returns: {
+          item_id: string
+          record_version: number
         }[]
       }
       show_limit: { Args: never; Returns: number }

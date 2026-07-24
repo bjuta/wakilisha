@@ -794,6 +794,7 @@ export default function AdminPublishingDashboardPage() {
         <EditPublishingItemDrawer
           item={selectedItem}
           contentKinds={contentKinds}
+          channels={channels}
           currentUserId={adminUser.id}
           currentUserName={adminUser.name}
           onClose={() => setSelectedItem(null)}
