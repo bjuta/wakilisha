@@ -15269,6 +15269,39 @@ export type Database = {
           user_id: string
         }[]
       }
+      list_publishing_item_events: {
+        Args: {
+          p_before_created_at?: string
+          p_before_event_id?: string
+          p_item_id: string
+          p_limit?: number
+        }
+        Returns: {
+          action: string
+          actor_id: string
+          actor_label: string
+          assignment_role: string
+          changed_fields: string[]
+          channel_is_primary: boolean
+          channel_key: string
+          channel_label: string
+          created_at: string
+          event_id: string
+          item_id: string
+          note: string
+          previous_primary_channel_key: string
+          previous_primary_channel_label: string
+          prior_planning_state: string
+          prior_production_stage: string
+          prior_record_version: number
+          resource_id: string
+          resulting_planning_state: string
+          resulting_production_stage: string
+          resulting_record_version: number
+          subject_user_id: string
+          subject_user_label: string
+        }[]
+      }
       mark_article_suggestion_stale: {
         Args: { p_note?: string; p_suggestion_id: string }
         Returns: {
