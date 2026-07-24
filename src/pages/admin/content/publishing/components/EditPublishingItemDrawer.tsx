@@ -6,6 +6,7 @@ import {
 } from "react";
 import { WkIcon } from "@/components/design-system/Icon";
 import { ArchivePublishingItemDialog } from "@/pages/admin/content/publishing/components/ArchivePublishingItemDialog";
+import { PublishingOperationalHistorySection } from "@/pages/admin/content/publishing/components/PublishingOperationalHistorySection";
 import { PublishingRelationshipsSection } from "@/pages/admin/content/publishing/components/PublishingRelationshipsSection";
 import {
   PUBLISHING_PLANNING_STATES,
@@ -690,6 +691,10 @@ export function EditPublishingItemDrawer({
                 disabled={busy}
                 onBusyChange={setRelationshipBusy}
                 onReloadLatest={onReloadLatest}
+              />
+
+              <PublishingOperationalHistorySection
+                item={item}
               />
 
               <div className="rounded-xl border border-wk-border bg-wk-surface-raised p-3">

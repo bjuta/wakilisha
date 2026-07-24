@@ -23,6 +23,12 @@ type PublishingChannelRow =
 type PublishingAssignableUserRow =
   Database["public"]["Functions"]["list_publishing_assignable_users"]["Returns"][number];
 
+type PublishingOperationalHistoryRow =
+  Database["public"]["Functions"]["list_publishing_item_events"]["Returns"][number];
+
+type ListPublishingItemEventsArgs =
+  Database["public"]["Functions"]["list_publishing_item_events"]["Args"];
+
 type PublishingMutationRow =
   Database["public"]["Functions"]["create_publishing_item"]["Returns"][number];
 
@@ -135,6 +141,39 @@ export interface PublishingItemChannel {
   label: string;
   isPrimary: boolean;
   createdAt: string | null;
+}
+
+export interface PublishingOperationalHistoryEvent {
+  eventId: string;
+  itemId: string;
+  action: string;
+  priorRecordVersion: number | null;
+  resultingRecordVersion: number | null;
+  note: string | null;
+  actorId: string | null;
+  actorLabel: string;
+  createdAt: string;
+  priorProductionStage: string | null;
+  resultingProductionStage: string | null;
+  priorPlanningState: string | null;
+  resultingPlanningState: string | null;
+  subjectUserId: string | null;
+  subjectUserLabel: string | null;
+  assignmentRole: string | null;
+  channelKey: string | null;
+  channelLabel: string | null;
+  channelIsPrimary: boolean | null;
+  previousPrimaryChannelKey: string | null;
+  previousPrimaryChannelLabel: string | null;
+  resourceId: string | null;
+  changedFields: string[];
+}
+
+export interface ListPublishingOperationalHistoryOptions {
+  itemId: string;
+  beforeCreatedAt?: string | null;
+  beforeEventId?: string | null;
+  limit?: number;
 }
 
 export interface PublishingWorkspaceItem {
@@ -405,6 +444,53 @@ function parseChannels(
   });
 }
 
+function mapPublishingOperationalHistoryRow(
+  row: PublishingOperationalHistoryRow,
+): PublishingOperationalHistoryEvent {
+  return {
+    eventId: row.event_id,
+    itemId: row.item_id,
+    action: row.action,
+    priorRecordVersion:
+      row.prior_record_version ?? null,
+    resultingRecordVersion:
+      row.resulting_record_version ?? null,
+    note: row.note ?? null,
+    actorId: row.actor_id ?? null,
+    actorLabel:
+      row.actor_label ?? "System",
+    createdAt: row.created_at,
+    priorProductionStage:
+      row.prior_production_stage ?? null,
+    resultingProductionStage:
+      row.resulting_production_stage ?? null,
+    priorPlanningState:
+      row.prior_planning_state ?? null,
+    resultingPlanningState:
+      row.resulting_planning_state ?? null,
+    subjectUserId:
+      row.subject_user_id ?? null,
+    subjectUserLabel:
+      row.subject_user_label ?? null,
+    assignmentRole:
+      row.assignment_role ?? null,
+    channelKey:
+      row.channel_key ?? null,
+    channelLabel:
+      row.channel_label ?? null,
+    channelIsPrimary:
+      row.channel_is_primary ?? null,
+    previousPrimaryChannelKey:
+      row.previous_primary_channel_key ?? null,
+    previousPrimaryChannelLabel:
+      row.previous_primary_channel_label ?? null,
+    resourceId:
+      row.resource_id ?? null,
+    changedFields:
+      row.changed_fields ?? [],
+  };
+}
+
 function mapPublishingWorkspaceRow(
   row: PublishingWorkspaceRow,
 ): PublishingWorkspaceItem {
@@ -573,6 +659,37 @@ export async function listPublishingWorkspaceItems(
 
   return (data ?? []).map(
     mapPublishingWorkspaceRow,
+  );
+}
+
+export async function listPublishingOperationalHistory(
+  options: ListPublishingOperationalHistoryOptions,
+): Promise<PublishingOperationalHistoryEvent[]> {
+  const args: ListPublishingItemEventsArgs = {
+    p_item_id: options.itemId,
+    p_before_created_at:
+      options.beforeCreatedAt ?? null,
+    p_before_event_id:
+      options.beforeEventId ?? null,
+    p_limit: options.limit ?? 25,
+  };
+
+  const {
+    data,
+    error,
+  } = await publishingSupabase.rpc(
+    "list_publishing_item_events",
+    args,
+  );
+
+  if (error) {
+    throw new Error(
+      `Failed to load Publishing history: ${error.message}`,
+    );
+  }
+
+  return (data ?? []).map(
+    mapPublishingOperationalHistoryRow,
   );
 }
 
