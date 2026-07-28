@@ -66,6 +66,8 @@ export interface AdminArticleDetail {
 /* ─── Admin List View ─── */
 
 export interface AdminArticleListItem {
+  id: string;
+  resourceId: string | null;
   slug: string;
   title: string;
   excerpt: string;
@@ -279,7 +281,7 @@ function extractAssetIdsFromHtml(html: string): string[] {
 export async function fetchArticlesForAdminList(limit = 200): Promise<AdminArticleListItem[]> {
   const { data, error } = await supabase
     .from("wk_articles")
-    .select("slug, title, excerpt, author, published_at, wp_status, created_at, categories, tags, hero_image_url")
+    .select("id, slug, title, excerpt, author, published_at, wp_status, created_at, categories, tags, hero_image_url")
     .neq("wp_status", "trash")
     .order("created_at", { ascending: false })
     .limit(limit);
@@ -289,7 +291,9 @@ export async function fetchArticlesForAdminList(limit = 200): Promise<AdminArtic
     return [];
   }
 
-  return ((data ?? []) as ArticleRow[]).map((row) => ({
+  const articles = ((data ?? []) as ArticleRow[]).map((row) => ({
+    id: row.id,
+    resourceId: null as string | null,
     slug: row.slug,
     title: processText(row.title),
     excerpt: processText(row.excerpt) || "",
@@ -300,6 +304,44 @@ export async function fetchArticlesForAdminList(limit = 200): Promise<AdminArtic
     categories: normalizeTaxonomyTerms(row.categories).map(processText),
     tags: normalizeTaxonomyTerms(row.tags).map(processText),
     heroImageUrl: row.hero_image_url,
+  }));
+
+  const articleIds = articles.map((article) => article.id);
+
+  if (articleIds.length === 0) {
+    return articles;
+  }
+
+  const { data: resourceData, error: resourceError } = await supabase
+    .from("wk_resource_index")
+    .select("canonical_record_id, resource_id")
+    .eq("resource_kind", "article")
+    .in("canonical_record_id", articleIds);
+
+  if (resourceError) {
+    console.error("Error loading Article resource links:", resourceError);
+    return articles;
+  }
+
+  const resourceIdByArticleId = new Map(
+    ((resourceData ?? []) as Array<{
+      canonical_record_id: string | null;
+      resource_id: string | null;
+    }>)
+      .filter(
+        (resource) =>
+          resource.canonical_record_id !== null &&
+          resource.resource_id !== null,
+      )
+      .map((resource) => [
+        resource.canonical_record_id as string,
+        resource.resource_id as string,
+      ]),
+  );
+
+  return articles.map((article) => ({
+    ...article,
+    resourceId: resourceIdByArticleId.get(article.id) ?? null,
   }));
 }
 

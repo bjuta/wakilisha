@@ -16,6 +16,11 @@ const editDrawer = fs.readFileSync(
   "utf8",
 );
 
+const articleAdminService = fs.readFileSync(
+  "src/services/articles/articleAdminService.ts",
+  "utf8",
+);
+
 const archiveDialog = fs.readFileSync(
   "src/pages/admin/content/publishing/components/ArchivePublishingItemDialog.tsx",
   "utf8",
@@ -111,6 +116,70 @@ describe("Publishing workspace core", () => {
     expect(editDrawer).toContain(
       "These states are read-only here and remain controlled by the canonical editor.",
     );
+
+    expect(editDrawer).not.toContain(
+      "schedule_article_publication",
+    );
+
+    expect(editDrawer).not.toContain(
+      "publish_article_version",
+    );
+  });
+
+  it("links Publishing work to an existing canonical Article through the governed RPC", () => {
+    expect(articleAdminService).toContain(
+      "export interface AdminArticleListItem",
+    );
+
+    expect(articleAdminService).toContain("id: string;");
+
+    expect(articleAdminService).toContain(
+      "resourceId: string | null;",
+    );
+
+    expect(articleAdminService).toContain(
+      '.select("id, slug, title, excerpt, author, published_at, wp_status, created_at, categories, tags, hero_image_url")',
+    );
+
+    expect(editDrawer).toContain(
+      'from "@/services/articles/articleAdminService";',
+    );
+
+    expect(editDrawer).toContain(
+      "fetchArticlesForAdminList(500)",
+    );
+
+    expect(editDrawer).toContain(
+      "linkPublishingItemResource({",
+    );
+
+    expect(editDrawer).toContain(
+      "expectedRecordVersion: item.recordVersion",
+    );
+
+    expect(articleAdminService).toContain(
+      '.from("wk_resource_index")',
+    );
+
+    expect(articleAdminService).toContain(
+      '.eq("resource_kind", "article")',
+    );
+
+    expect(editDrawer).toContain(
+      "resourceId: article.resourceId",
+    );
+
+    expect(editDrawer).toContain(
+      "articleOption.resourceId !== null",
+    );
+
+    expect(editDrawer).not.toContain(
+      "resourceId: article.id",
+    );
+
+    expect(editDrawer).toContain("Linked Article");
+
+    expect(editDrawer).toContain("Link Article");
 
     expect(editDrawer).not.toContain(
       "schedule_article_publication",
