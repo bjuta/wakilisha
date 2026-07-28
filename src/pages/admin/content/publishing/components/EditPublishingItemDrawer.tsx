@@ -5,6 +5,10 @@ import {
   type FormEvent,
 } from "react";
 import { WkIcon } from "@/components/design-system/Icon";
+import {
+  fetchArticlesForAdminList,
+  type AdminArticleListItem,
+} from "@/services/articles/articleAdminService";
 import { ArchivePublishingItemDialog } from "@/pages/admin/content/publishing/components/ArchivePublishingItemDialog";
 import { PublishingOperationalHistorySection } from "@/pages/admin/content/publishing/components/PublishingOperationalHistorySection";
 import { PublishingRelationshipsSection } from "@/pages/admin/content/publishing/components/PublishingRelationshipsSection";
@@ -12,6 +16,7 @@ import {
   PUBLISHING_PLANNING_STATES,
   PUBLISHING_PRIORITIES,
   PUBLISHING_PRODUCTION_STAGES,
+  linkPublishingItemResource,
   updatePublishingItem,
   type PublishingChannel,
   type PublishingContentKind,
@@ -133,6 +138,16 @@ export function EditPublishingItemDrawer({
     useState(false);
   const [archiveOpen, setArchiveOpen] =
     useState(false);
+  const [articleOptions, setArticleOptions] =
+    useState<AdminArticleListItem[]>([]);
+  const [articleSearchQuery, setArticleSearchQuery] =
+    useState("");
+  const [articlesLoading, setArticlesLoading] =
+    useState(false);
+  const [articleLoadError, setArticleLoadError] =
+    useState<string | null>(null);
+  const [articleLinking, setArticleLinking] =
+    useState(false);
   const [error, setError] = useState<string | null>(
     null,
   );
@@ -145,6 +160,42 @@ export function EditPublishingItemDrawer({
   const currentKindAvailable = contentKinds.some(
     (kind) => kind.key === item.contentKind,
   );
+
+  const canLinkCanonicalArticle =
+    selectedContentKind?.canonicalResourceKind === "article";
+
+  const linkedArticle = useMemo(
+    () =>
+      item.resourceId
+        ? articleOptions.find(
+            (articleOption) =>
+              articleOption.resourceId === item.resourceId,
+          ) ?? null
+        : null,
+    [articleOptions, item.resourceId],
+  );
+
+  const articleSearchResults = useMemo(() => {
+    const query = articleSearchQuery.trim().toLowerCase();
+
+    if (!canLinkCanonicalArticle || query.length === 0) {
+      return articleOptions.slice(0, 6);
+    }
+
+    return articleOptions
+      .filter((articleOption) => {
+        return (
+          articleOption.title.toLowerCase().includes(query) ||
+          articleOption.slug.toLowerCase().includes(query) ||
+          articleOption.author.toLowerCase().includes(query)
+        );
+      })
+      .slice(0, 6);
+  }, [
+    articleOptions,
+    articleSearchQuery,
+    canLinkCanonicalArticle,
+  ]);
 
   useEffect(() => {
     setTitle(item.title);
@@ -161,7 +212,50 @@ export function EditPublishingItemDrawer({
       toDateTimeLocal(item.plannedPublishAt),
     );
     setNote("");
+    setArticleSearchQuery("");
+    setArticleLoadError(null);
   }, [item]);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    if (!canLinkCanonicalArticle) {
+      setArticleOptions([]);
+      setArticleLoadError(null);
+      setArticlesLoading(false);
+      return () => {
+        cancelled = true;
+      };
+    }
+
+    setArticlesLoading(true);
+    setArticleLoadError(null);
+
+    fetchArticlesForAdminList(500)
+      .then((articles) => {
+        if (!cancelled) {
+          setArticleOptions(articles);
+        }
+      })
+      .catch((loadError) => {
+        if (!cancelled) {
+          setArticleLoadError(
+            loadError instanceof Error
+              ? loadError.message
+              : "We could not load Articles.",
+          );
+        }
+      })
+      .finally(() => {
+        if (!cancelled) {
+          setArticlesLoading(false);
+        }
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [canLinkCanonicalArticle]);
 
   useEffect(() => {
     const previousOverflow =
@@ -175,6 +269,7 @@ export function EditPublishingItemDrawer({
         !saving &&
         !archiving &&
         !relationshipBusy &&
+        !articleLinking &&
         !archiveOpen
       ) {
         onClose();
@@ -195,6 +290,7 @@ export function EditPublishingItemDrawer({
   }, [
     archiveOpen,
     archiving,
+    articleLinking,
     onClose,
     relationshipBusy,
     saving,
@@ -327,6 +423,59 @@ export function EditPublishingItemDrawer({
     }
   }
 
+  async function handleLinkArticle(
+    article: AdminArticleListItem,
+  ) {
+    if (!article.resourceId) {
+      setError("This Article is missing its canonical resource.");
+      return;
+    }
+
+    if (article.resourceId === item.resourceId) {
+      return;
+    }
+
+    setArticleLinking(true);
+    setError(null);
+
+    try {
+      const result = await linkPublishingItemResource({
+        itemId: item.id,
+        expectedRecordVersion: item.recordVersion,
+        resourceId: article.resourceId,
+        note: `Linked to Article: ${article.title}`,
+      });
+
+      if (!result.ok) {
+        if (result.errorCode === "stale_update") {
+          await handleStale(
+            result.error ??
+              "Someone changed this Publishing item.",
+          );
+        } else {
+          setError(
+            result.error ??
+              "We could not link this Article.",
+          );
+        }
+
+        setArticleLinking(false);
+        return;
+      }
+
+      await onReloadLatest(item.id);
+      setArticleSearchQuery("");
+      setArticleLinking(false);
+    } catch (linkError) {
+      setError(
+        linkError instanceof Error
+          ? linkError.message
+          : "We could not link this Article.",
+      );
+      setArticleLinking(false);
+    }
+  }
+
   async function handleArchive(
     archiveNote: string,
   ) {
@@ -389,7 +538,7 @@ export function EditPublishingItemDrawer({
   }
 
   const busy =
-    saving || archiving || relationshipBusy;
+    saving || archiving || relationshipBusy || articleLinking;
 
   return (
     <>
@@ -713,6 +862,103 @@ export function EditPublishingItemDrawer({
                     )}
                   </div>
                 </div>
+
+                {canLinkCanonicalArticle ? (
+                  <div className="mt-3 rounded-lg border border-wk-border bg-wk-surface p-3">
+                    <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+                      <div>
+                        <div className="text-[11px] font-black text-wk-text">
+                          Linked Article
+                        </div>
+                        <p className="mt-1 text-[10px] leading-4 text-wk-text-muted">
+                          {item.resourceId
+                            ? linkedArticle
+                              ? `Linked to ${linkedArticle.title}.`
+                              : "An Article is linked to this work."
+                            : "No Article is linked yet."}
+                        </p>
+                      </div>
+                    </div>
+
+                    <label className="mt-3 block">
+                      <span className="sr-only">
+                        Search Articles
+                      </span>
+                      <input
+                        value={articleSearchQuery}
+                        onChange={(event) =>
+                          setArticleSearchQuery(
+                            event.target.value,
+                          )
+                        }
+                        disabled={busy}
+                        placeholder="Search Articles by title, slug, or author"
+                        className="w-full rounded-xl border border-wk-border bg-wk-surface px-3 py-2 text-[12px] text-wk-text outline-none placeholder:text-wk-text-faint focus:border-wk-brand disabled:opacity-60"
+                      />
+                    </label>
+
+                    <div className="mt-3 space-y-2">
+                      {articlesLoading ? (
+                        <div className="text-[11px] text-wk-text-muted">
+                          Loading Articles...
+                        </div>
+                      ) : articleLoadError ? (
+                        <div className="text-[11px] text-wk-danger">
+                          {articleLoadError}
+                        </div>
+                      ) : articleSearchResults.length === 0 ? (
+                        <div className="text-[11px] text-wk-text-muted">
+                          No Articles match this search.
+                        </div>
+                      ) : (
+                        articleSearchResults.map(
+                          (articleOption) => {
+                            const alreadyLinked =
+                              articleOption.resourceId !== null &&
+                              articleOption.resourceId === item.resourceId;
+
+                            return (
+                              <button
+                                key={articleOption.id}
+                                type="button"
+                                onClick={() =>
+                                  handleLinkArticle(
+                                    articleOption,
+                                  )
+                                }
+                                disabled={
+                                  busy ||
+                                  alreadyLinked ||
+                                  !articleOption.resourceId
+                                }
+                                className="flex w-full items-start justify-between gap-3 rounded-lg border border-wk-border bg-wk-surface px-3 py-2 text-left hover:border-wk-brand/40 hover:bg-wk-brand-soft disabled:cursor-not-allowed disabled:opacity-60"
+                              >
+                                <span className="min-w-0">
+                                  <span className="block truncate text-[12px] font-bold text-wk-text">
+                                    {articleOption.title}
+                                  </span>
+                                  <span className="mt-0.5 block truncate text-[10px] text-wk-text-muted">
+                                    {articleOption.slug} · {articleOption.author}
+                                  </span>
+                                </span>
+                                <span className="shrink-0 text-[10px] font-black uppercase tracking-[0.1em] text-wk-brand">
+                                  {alreadyLinked
+                                    ? "Linked"
+                                    : !articleOption.resourceId
+                                      ? "No Resource"
+                                      : articleLinking
+                                        ? "Linking"
+                                        : "Link Article"}
+                                </span>
+                              </button>
+                            );
+                          },
+                        )
+                      )}
+                    </div>
+                  </div>
+                ) : null}
+
                 <p className="mt-2 text-[10px] leading-4 text-wk-text-faint">
                   These states are read-only here and remain controlled by the canonical editor.
                 </p>
