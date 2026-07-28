@@ -299,6 +299,20 @@ export default function AdminPublishingDashboardPage() {
     };
   }, [items]);
 
+  const planningCounts = useMemo(
+    () =>
+      PUBLISHING_PLANNING_STATES.reduce(
+        (counts, state) => {
+          counts[state] = items.filter(
+            (item) => item.planningState === state,
+          ).length;
+          return counts;
+        },
+        {} as Record<PublishingPlanningState, number>,
+      ),
+    [items],
+  );
+
   const filteredItems = useMemo(() => {
     const query = searchQuery.trim().toLowerCase();
 
@@ -365,6 +379,13 @@ export default function AdminPublishingDashboardPage() {
     setSelectedItem(item);
   }
 
+  function changePlanningFilter(
+    nextPlanningFilter: PublishingPlanningState | "all",
+  ) {
+    setPlanningFilter(nextPlanningFilter);
+    setStageFilter("all");
+  }
+
   function clearFilters() {
     setSearchQuery("");
     setStageFilter("all");
@@ -388,7 +409,7 @@ export default function AdminPublishingDashboardPage() {
           Publishing
         </h1>
         <p className="mt-2 text-[13px] leading-5 text-wk-text-muted">
-          Plan production, ownership, deadlines, and channels. Canonical editors still control review, scheduling, and publication.
+          Use this as the editorial operations board for work moving across teams and channels. Canonical editors still control review, scheduling, and publication.
         </p>
         </div>
 
@@ -474,6 +495,48 @@ export default function AdminPublishingDashboardPage() {
 
       <WkSurface className="overflow-hidden">
         <div className="border-b border-wk-border px-4 py-3">
+          <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+            <div>
+              <div className="text-[10px] font-black uppercase tracking-[0.14em] text-wk-text-faint">
+                Planning View
+              </div>
+              <p className="mt-1 text-[11px] leading-4 text-wk-text-muted">
+                Switch to Archived when you need closed or restored work.
+              </p>
+            </div>
+
+            <div className="flex gap-1 overflow-x-auto">
+              <button
+                type="button"
+                onClick={() => changePlanningFilter("all")}
+                className={`shrink-0 rounded-lg px-3 py-2 text-[11px] font-bold ${
+                  planningFilter === "all"
+                    ? "bg-wk-brand text-wk-brand-on"
+                    : "text-wk-text-muted hover:bg-wk-surface-raised hover:text-wk-text"
+                }`}
+              >
+                All Work {items.length}
+              </button>
+
+              {PUBLISHING_PLANNING_STATES.map((state) => (
+                <button
+                  key={state}
+                  type="button"
+                  onClick={() => changePlanningFilter(state)}
+                  className={`shrink-0 rounded-lg px-3 py-2 text-[11px] font-bold ${
+                    planningFilter === state
+                      ? "bg-wk-brand text-wk-brand-on"
+                      : "text-wk-text-muted hover:bg-wk-surface-raised hover:text-wk-text"
+                  }`}
+                >
+                  {formatChoice(state)} {planningCounts[state]}
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+
+        <div className="border-b border-wk-border px-4 py-3">
           <div className="flex gap-1 overflow-x-auto">
             <button
               type="button"
@@ -528,7 +591,7 @@ export default function AdminPublishingDashboardPage() {
             aria-label="Planning state"
             value={planningFilter}
             onChange={(event) =>
-              setPlanningFilter(
+              changePlanningFilter(
                 event.target.value as
                   | PublishingPlanningState
                   | "all",
@@ -805,11 +868,8 @@ export default function AdminPublishingDashboardPage() {
             setSelectedItem(null);
             setCreateNotice(notice);
 
-            if (nextPlanningState === "archived") {
-              setPlanningFilter("active");
-            } else {
-              setPlanningFilter(nextPlanningState);
-            }
+            setStageFilter("all");
+            setPlanningFilter(nextPlanningState);
 
             await loadWorkspace();
           }}

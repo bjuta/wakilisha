@@ -205,6 +205,26 @@ describe("Publishing workspace core", () => {
     );
   });
 
+  it("makes archived Publishing work visible as a first-class planning view", () => {
+    expect(page).toContain("Planning View");
+
+    expect(page).toContain("All Work {items.length}");
+
+    expect(page).toContain("planningCounts[state]");
+
+    expect(page).toContain('changePlanningFilter("all")');
+
+    expect(page).toContain("setPlanningFilter(nextPlanningState)");
+
+    expect(page).not.toContain(
+      'nextPlanningState === "archived"',
+    );
+
+    expect(page).not.toContain(
+      'setPlanningFilter("active");\n            } else',
+    );
+  });
+
   it("allows an item to remain unassigned on creation", () => {
     expect(ownerSemanticsMigration).toContain(
       "p_owner_id,",
