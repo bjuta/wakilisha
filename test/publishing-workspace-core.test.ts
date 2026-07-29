@@ -76,6 +76,64 @@ describe("Publishing workspace core", () => {
     );
   });
 
+  it("can link a canonical Article while creating Publishing work", () => {
+    expect(createDrawer).toContain(
+      'from "@/services/articles/articleAdminService";',
+    );
+
+    expect(createDrawer).toContain(
+      "fetchArticlesForAdminList(500)",
+    );
+
+    expect(createDrawer).toContain(
+      "Optional Canonical Article",
+    );
+
+    expect(createDrawer).toContain(
+      "resourceId: selectedArticle?.resourceId ?? null",
+    );
+
+    expect(createDrawer).toContain(
+      "setSelectedArticleResourceId",
+    );
+
+    expect(createDrawer).toContain("No Resource");
+
+    expect(createDrawer).not.toContain(
+      "connect it to a canonical editor later",
+    );
+
+    expect(createDrawer).not.toContain(
+      "schedule_article_publication",
+    );
+
+    expect(createDrawer).not.toContain(
+      "publish_article_version",
+    );
+  });
+
+  it("prevents create-time Article links from reusing a linked canonical resource", () => {
+    expect(page).toContain("const linkedResourceIds = useMemo");
+
+    expect(page).toContain(
+      "linkedResourceIds={linkedResourceIds}",
+    );
+
+    expect(createDrawer).toContain(
+      "linkedResourceIds: Set<string>;",
+    );
+
+    expect(createDrawer).toContain(
+      "linkedResourceIds.has(selectedArticleResourceId)",
+    );
+
+    expect(createDrawer).toContain("Already Linked");
+
+    expect(createDrawer).toContain(
+      "Choose an Article that is not already linked to Publishing.",
+    );
+  });
+
   it("opens existing items from the workspace table", () => {
     expect(page).toContain(
       "onRowClick={",

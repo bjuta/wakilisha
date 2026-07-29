@@ -1,9 +1,14 @@
 import {
   useEffect,
+  useMemo,
   useState,
   type FormEvent,
 } from "react";
 import { WkIcon } from "@/components/design-system/Icon";
+import {
+  fetchArticlesForAdminList,
+  type AdminArticleListItem,
+} from "@/services/articles/articleAdminService";
 import {
   PUBLISHING_PRIORITIES,
   PUBLISHING_PRODUCTION_STAGES,
@@ -17,6 +22,7 @@ interface CreatePublishingItemDrawerProps {
   contentKinds: PublishingContentKind[];
   currentUserId: string;
   currentUserName: string;
+  linkedResourceIds: Set<string>;
   onClose: () => void;
   onCreated: () => Promise<void>;
 }
@@ -48,6 +54,7 @@ export function CreatePublishingItemDrawer({
   contentKinds,
   currentUserId,
   currentUserName,
+  linkedResourceIds,
   onClose,
   onCreated,
 }: CreatePublishingItemDrawerProps) {
@@ -67,6 +74,18 @@ export function CreatePublishingItemDrawer({
   const [plannedPublishAt, setPlannedPublishAt] =
     useState("");
   const [note, setNote] = useState("");
+  const [articleOptions, setArticleOptions] =
+    useState<AdminArticleListItem[]>([]);
+  const [articleSearchQuery, setArticleSearchQuery] =
+    useState("");
+  const [
+    selectedArticleResourceId,
+    setSelectedArticleResourceId,
+  ] = useState<string | null>(null);
+  const [articlesLoading, setArticlesLoading] =
+    useState(false);
+  const [articleLoadError, setArticleLoadError] =
+    useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(
     null,
@@ -76,6 +95,87 @@ export function CreatePublishingItemDrawer({
     contentKinds.find(
       (kind) => kind.key === contentKind,
     ) ?? null;
+
+  const canLinkCanonicalArticle =
+    selectedContentKind?.canonicalResourceKind === "article";
+
+  const selectedArticle = useMemo(
+    () =>
+      selectedArticleResourceId
+        ? articleOptions.find(
+            (articleOption) =>
+              articleOption.resourceId ===
+              selectedArticleResourceId,
+          ) ?? null
+        : null,
+    [articleOptions, selectedArticleResourceId],
+  );
+
+  const articleSearchResults = useMemo(() => {
+    const query = articleSearchQuery.trim().toLowerCase();
+
+    if (!canLinkCanonicalArticle || query.length === 0) {
+      return articleOptions.slice(0, 6);
+    }
+
+    return articleOptions
+      .filter((articleOption) => {
+        return (
+          articleOption.title.toLowerCase().includes(query) ||
+          articleOption.slug.toLowerCase().includes(query) ||
+          articleOption.author.toLowerCase().includes(query)
+        );
+      })
+      .slice(0, 6);
+  }, [
+    articleOptions,
+    articleSearchQuery,
+    canLinkCanonicalArticle,
+  ]);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    if (!canLinkCanonicalArticle) {
+      setArticleOptions([]);
+      setArticleSearchQuery("");
+      setSelectedArticleResourceId(null);
+      setArticleLoadError(null);
+      setArticlesLoading(false);
+
+      return () => {
+        cancelled = true;
+      };
+    }
+
+    setArticlesLoading(true);
+    setArticleLoadError(null);
+
+    fetchArticlesForAdminList(500)
+      .then((articles) => {
+        if (!cancelled) {
+          setArticleOptions(articles);
+        }
+      })
+      .catch((loadError) => {
+        if (!cancelled) {
+          setArticleLoadError(
+            loadError instanceof Error
+              ? loadError.message
+              : "We could not load Articles.",
+          );
+        }
+      })
+      .finally(() => {
+        if (!cancelled) {
+          setArticlesLoading(false);
+        }
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [canLinkCanonicalArticle]);
 
   useEffect(() => {
     const previousOverflow =
@@ -121,6 +221,26 @@ export function CreatePublishingItemDrawer({
       return;
     }
 
+    if (
+      selectedArticleResourceId &&
+      !selectedArticle?.resourceId
+    ) {
+      setError(
+        "Choose an Article with a canonical resource.",
+      );
+      return;
+    }
+
+    if (
+      selectedArticleResourceId &&
+      linkedResourceIds.has(selectedArticleResourceId)
+    ) {
+      setError(
+        "Choose an Article that is not already linked to Publishing.",
+      );
+      return;
+    }
+
     setSaving(true);
     setError(null);
 
@@ -128,6 +248,7 @@ export function CreatePublishingItemDrawer({
       const result = await createPublishingItem({
         title: cleanTitle,
         contentKind,
+        resourceId: selectedArticle?.resourceId ?? null,
         ownerId:
           ownerMode === "me" && currentUserId
             ? currentUserId
@@ -190,7 +311,7 @@ export function CreatePublishingItemDrawer({
               Create Publishing Item
             </h2>
             <p className="mt-1 text-[12px] leading-5 text-wk-text-muted">
-              Add work when it enters production. You can connect it to a canonical editor later.
+              Add work when it enters production. Link an Article now when the canonical record already exists.
             </p>
           </div>
 
@@ -250,6 +371,8 @@ export function CreatePublishingItemDrawer({
                 value={contentKind}
                 onChange={(event) => {
                   setContentKind(event.target.value);
+                  setSelectedArticleResourceId(null);
+                  setArticleSearchQuery("");
                   setError(null);
                 }}
                 disabled={saving}
@@ -270,6 +393,121 @@ export function CreatePublishingItemDrawer({
                 </p>
               ) : null}
             </label>
+
+              {canLinkCanonicalArticle ? (
+                <div className="rounded-xl border border-wk-border bg-wk-surface-raised p-3">
+                  <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+                    <div>
+                      <div className="text-[11px] font-black text-wk-text">
+                        Optional Canonical Article
+                      </div>
+                      <p className="mt-1 text-[10px] leading-4 text-wk-text-muted">
+                        {selectedArticle
+                          ? `This item will be linked to ${selectedArticle.title}.`
+                          : "Create this item unlinked, or choose an Article before adding it to Publishing."}
+                      </p>
+                    </div>
+
+                    {selectedArticle ? (
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setSelectedArticleResourceId(null)
+                        }
+                        disabled={saving}
+                        className="wk-button wk-button-ghost wk-button-sm justify-center disabled:opacity-50"
+                      >
+                        Clear Article
+                      </button>
+                    ) : null}
+                  </div>
+
+                  <label className="mt-3 block">
+                    <span className="sr-only">
+                      Search Articles
+                    </span>
+                    <input
+                      value={articleSearchQuery}
+                      onChange={(event) =>
+                        setArticleSearchQuery(
+                          event.target.value,
+                        )
+                      }
+                      disabled={saving}
+                      placeholder="Search Articles by title, slug, or author"
+                      className="w-full rounded-xl border border-wk-border bg-wk-surface px-3 py-2 text-[12px] text-wk-text outline-none placeholder:text-wk-text-faint focus:border-wk-brand disabled:opacity-60"
+                    />
+                  </label>
+
+                  <div className="mt-3 space-y-2">
+                    {articlesLoading ? (
+                      <div className="text-[11px] text-wk-text-muted">
+                        Loading Articles...
+                      </div>
+                    ) : articleLoadError ? (
+                      <div className="text-[11px] text-wk-danger">
+                        {articleLoadError}
+                      </div>
+                    ) : articleSearchResults.length === 0 ? (
+                      <div className="text-[11px] text-wk-text-muted">
+                        No Articles match this search.
+                      </div>
+                    ) : (
+                      articleSearchResults.map((articleOption) => {
+                        const selected =
+                          articleOption.resourceId !== null &&
+                          articleOption.resourceId ===
+                            selectedArticleResourceId;
+
+                        const alreadyLinked =
+                          articleOption.resourceId !== null &&
+                          linkedResourceIds.has(
+                            articleOption.resourceId,
+                          );
+
+                        return (
+                          <button
+                            key={articleOption.id}
+                            type="button"
+                            onClick={() => {
+                              if (articleOption.resourceId) {
+                                setSelectedArticleResourceId(
+                                  articleOption.resourceId,
+                                );
+                                setError(null);
+                              }
+                            }}
+                            disabled={
+                              saving ||
+                              !articleOption.resourceId ||
+                              alreadyLinked
+                            }
+                            className="flex w-full items-start justify-between gap-3 rounded-lg border border-wk-border bg-wk-surface px-3 py-2 text-left hover:border-wk-brand/40 hover:bg-wk-brand-soft disabled:cursor-not-allowed disabled:opacity-60"
+                          >
+                            <span className="min-w-0">
+                              <span className="block truncate text-[12px] font-bold text-wk-text">
+                                {articleOption.title}
+                              </span>
+                              <span className="mt-0.5 block truncate text-[10px] text-wk-text-muted">
+                                {articleOption.slug} · {articleOption.author}
+                              </span>
+                            </span>
+                            <span className="shrink-0 text-[10px] font-black uppercase tracking-[0.1em] text-wk-brand">
+                              {selected
+                                ? "Selected"
+                                : alreadyLinked
+                                  ? "Already Linked"
+                                  : !articleOption.resourceId
+                                    ? "No Resource"
+                                    : "Use Article"}
+                            </span>
+                          </button>
+                        );
+                      })
+                    )}
+                  </div>
+                </div>
+              ) : null}
 
             <label className="block">
               <span className="text-[12px] font-bold text-wk-text">

@@ -313,6 +313,19 @@ export default function AdminPublishingDashboardPage() {
     [items],
   );
 
+  const linkedResourceIds = useMemo(
+    () =>
+      new Set(
+        items
+          .map((item) => item.resourceId)
+          .filter(
+            (resourceId): resourceId is string =>
+              resourceId !== null,
+          ),
+      ),
+    [items],
+  );
+
   const filteredItems = useMemo(() => {
     const query = searchQuery.trim().toLowerCase();
 
@@ -840,6 +853,7 @@ export default function AdminPublishingDashboardPage() {
           contentKinds={contentKinds}
           currentUserId={adminUser.id}
           currentUserName={adminUser.name}
+          linkedResourceIds={linkedResourceIds}
           onClose={() => setCreateOpen(false)}
           onCreated={async () => {
             setCreateOpen(false);
