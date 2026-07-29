@@ -330,6 +330,42 @@ describe("Publishing workspace core", () => {
     );
   });
 
+  it("keeps archived Publishing work read-only until restored", () => {
+    expect(editDrawer).toContain(
+      'const archivedReadOnly =\n    item.planningState === "archived";',
+    );
+
+    expect(editDrawer).toContain(
+      "const formDisabled = busy || archivedReadOnly;",
+    );
+
+    expect(editDrawer).toContain(
+      "Restore this Publishing item before editing it.",
+    );
+
+    expect(editDrawer).toContain(
+      "Restore this Publishing item before changing its Article link.",
+    );
+
+    expect(editDrawer).toContain(
+      "Archived work is locked. Restore it before editing planning, team, channels, or Article links.",
+    );
+
+    expect(editDrawer).toContain(
+      "disabled={formDisabled}",
+    );
+
+    expect(editDrawer).toContain(
+      "disabled={\n                                  formDisabled ||",
+    );
+
+    expect(editDrawer).toContain(
+      "disabled={\n                  busy ||\n                  archivedReadOnly ||",
+    );
+
+    expect(editDrawer).toContain("Restore Item");
+  });
+
   it("reloads stale records before another save", () => {
     expect(editDrawer).toContain(
       'result.errorCode === "stale_update"',
