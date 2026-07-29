@@ -372,6 +372,13 @@ export function EditPublishingItemDrawer({
       return;
     }
 
+    if (item.planningState === "archived") {
+      setError(
+        "Restore this Publishing item before editing it.",
+      );
+      return;
+    }
+
     if (!hasChanges) {
       setError(
         "Change at least one field before saving.",
@@ -437,6 +444,13 @@ export function EditPublishingItemDrawer({
   async function handleLinkArticle(
     article: AdminArticleListItem,
   ) {
+    if (item.planningState === "archived") {
+      setError(
+        "Restore this Publishing item before changing its Article link.",
+      );
+      return;
+    }
+
     if (!article.resourceId) {
       setError("This Article is missing its canonical resource.");
       return;
@@ -624,6 +638,10 @@ export function EditPublishingItemDrawer({
     relationshipBusy ||
     articleLinking;
 
+  const archivedReadOnly =
+    item.planningState === "archived";
+  const formDisabled = busy || archivedReadOnly;
+
   return (
     <>
       <div
@@ -688,6 +706,14 @@ export function EditPublishingItemDrawer({
                 </div>
               ) : null}
 
+              {archivedReadOnly ? (
+                <div className="rounded-xl border border-wk-border bg-wk-surface-raised p-3">
+                  <p className="text-[12px] leading-5 text-wk-text-muted">
+                    Archived work is locked. Restore it before editing planning, team, channels, or Article links.
+                  </p>
+                </div>
+              ) : null}
+
               <label className="block">
                 <span className="text-[12px] font-bold text-wk-text">
                   Title
@@ -699,7 +725,7 @@ export function EditPublishingItemDrawer({
                     setTitle(event.target.value);
                     setError(null);
                   }}
-                  disabled={busy}
+                  disabled={formDisabled}
                   className="mt-2 w-full rounded-xl border border-wk-border bg-wk-surface px-3 py-2.5 text-[13px] text-wk-text outline-none focus:border-wk-brand disabled:opacity-60"
                 />
               </label>
@@ -714,7 +740,7 @@ export function EditPublishingItemDrawer({
                     setContentKind(event.target.value);
                     setError(null);
                   }}
-                  disabled={busy}
+                  disabled={formDisabled}
                   className="mt-2 w-full rounded-xl border border-wk-border bg-wk-surface px-3 py-2.5 text-[13px] text-wk-text outline-none focus:border-wk-brand disabled:opacity-60"
                 >
                   {!currentKindAvailable ? (
@@ -749,7 +775,7 @@ export function EditPublishingItemDrawer({
                   onChange={(event) =>
                     setBrief(event.target.value)
                   }
-                  disabled={busy}
+                  disabled={formDisabled}
                   rows={4}
                   placeholder="Describe what needs to be made"
                   className="mt-2 w-full resize-y rounded-xl border border-wk-border bg-wk-surface px-3 py-2.5 text-[13px] leading-5 text-wk-text outline-none placeholder:text-wk-text-faint focus:border-wk-brand disabled:opacity-60"
@@ -769,7 +795,7 @@ export function EditPublishingItemDrawer({
                           .value as PublishingProductionStage,
                       )
                     }
-                    disabled={busy}
+                    disabled={formDisabled}
                     className="mt-2 w-full rounded-xl border border-wk-border bg-wk-surface px-3 py-2.5 text-[13px] text-wk-text outline-none focus:border-wk-brand disabled:opacity-60"
                   >
                     {PUBLISHING_PRODUCTION_STAGES.map(
@@ -797,7 +823,7 @@ export function EditPublishingItemDrawer({
                           .value as PublishingPlanningState,
                       )
                     }
-                    disabled={busy}
+                    disabled={formDisabled}
                     className="mt-2 w-full rounded-xl border border-wk-border bg-wk-surface px-3 py-2.5 text-[13px] text-wk-text outline-none focus:border-wk-brand disabled:opacity-60"
                   >
                     {PUBLISHING_PLANNING_STATES
@@ -832,7 +858,7 @@ export function EditPublishingItemDrawer({
                           .value as PublishingPriority,
                       )
                     }
-                    disabled={busy}
+                    disabled={formDisabled}
                     className="mt-2 w-full rounded-xl border border-wk-border bg-wk-surface px-3 py-2.5 text-[13px] text-wk-text outline-none focus:border-wk-brand disabled:opacity-60"
                   >
                     {PUBLISHING_PRIORITIES.map(
@@ -857,7 +883,7 @@ export function EditPublishingItemDrawer({
                     onChange={(event) =>
                       setOwnerId(event.target.value)
                     }
-                    disabled={busy}
+                    disabled={formDisabled}
                     className="mt-2 w-full rounded-xl border border-wk-border bg-wk-surface px-3 py-2.5 text-[13px] text-wk-text outline-none focus:border-wk-brand disabled:opacity-60"
                   >
                     {item.ownerId &&
@@ -891,7 +917,7 @@ export function EditPublishingItemDrawer({
                         event.target.value,
                       )
                     }
-                    disabled={busy}
+                    disabled={formDisabled}
                     className="mt-2 w-full rounded-xl border border-wk-border bg-wk-surface px-3 py-2.5 text-[13px] text-wk-text outline-none focus:border-wk-brand disabled:opacity-60"
                   />
                 </label>
@@ -908,7 +934,7 @@ export function EditPublishingItemDrawer({
                         event.target.value,
                       )
                     }
-                    disabled={busy}
+                    disabled={formDisabled}
                     className="mt-2 w-full rounded-xl border border-wk-border bg-wk-surface px-3 py-2.5 text-[13px] text-wk-text outline-none focus:border-wk-brand disabled:opacity-60"
                   />
                 </label>
@@ -921,7 +947,7 @@ export function EditPublishingItemDrawer({
               <PublishingRelationshipsSection
                 item={item}
                 channels={channels}
-                disabled={busy}
+                disabled={formDisabled}
                 onBusyChange={setRelationshipBusy}
                 onReloadLatest={onReloadLatest}
               />
@@ -975,7 +1001,7 @@ export function EditPublishingItemDrawer({
                             event.target.value,
                           )
                         }
-                        disabled={busy}
+                        disabled={formDisabled}
                         placeholder="Search Articles by title, slug, or author"
                         className="w-full rounded-xl border border-wk-border bg-wk-surface px-3 py-2 text-[12px] text-wk-text outline-none placeholder:text-wk-text-faint focus:border-wk-brand disabled:opacity-60"
                       />
@@ -1016,7 +1042,7 @@ export function EditPublishingItemDrawer({
                                   )
                                 }
                                 disabled={
-                                  busy ||
+                                  formDisabled ||
                                   alreadyLinked ||
                                   retargetLocked ||
                                   !articleOption.resourceId
@@ -1065,7 +1091,7 @@ export function EditPublishingItemDrawer({
                   onChange={(event) =>
                     setNote(event.target.value)
                   }
-                  disabled={busy}
+                  disabled={formDisabled}
                   rows={3}
                   placeholder="Record useful context for this change"
                   className="mt-2 w-full resize-y rounded-xl border border-wk-border bg-wk-surface px-3 py-2.5 text-[13px] leading-5 text-wk-text outline-none placeholder:text-wk-text-faint focus:border-wk-brand disabled:opacity-60"
@@ -1125,6 +1151,7 @@ export function EditPublishingItemDrawer({
                 type="submit"
                 disabled={
                   busy ||
+                  archivedReadOnly ||
                   title.trim().length < 2 ||
                   !contentKind ||
                   !hasChanges
