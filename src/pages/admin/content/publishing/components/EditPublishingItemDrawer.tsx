@@ -134,6 +134,7 @@ export function EditPublishingItemDrawer({
   const [note, setNote] = useState("");
   const [saving, setSaving] = useState(false);
   const [archiving, setArchiving] = useState(false);
+  const [restoring, setRestoring] = useState(false);
   const [relationshipBusy, setRelationshipBusy] =
     useState(false);
   const [archiveOpen, setArchiveOpen] =
@@ -361,6 +362,16 @@ export function EditPublishingItemDrawer({
       return;
     }
 
+    if (
+      item.planningState === "archived" &&
+      planningState !== "archived"
+    ) {
+      setError(
+        "Use Restore Item to return archived work to Active.",
+      );
+      return;
+    }
+
     if (!hasChanges) {
       setError(
         "Change at least one field before saving.",
@@ -547,8 +558,71 @@ export function EditPublishingItemDrawer({
     }
   }
 
+  async function handleRestore() {
+    setRestoring(true);
+    setError(null);
+
+    try {
+      const result = await updatePublishingItem({
+        itemId: item.id,
+        expectedRecordVersion:
+          item.recordVersion,
+        title: item.title,
+        contentKind: item.contentKind,
+        ownerId: item.ownerId,
+        brief: item.brief,
+        productionStage:
+          item.productionStage,
+        planningState: "active",
+        priority: item.priority,
+        productionDeadline:
+          item.productionDeadline,
+        plannedPublishAt:
+          item.plannedPublishAt,
+        note:
+          note.trim() ||
+          "Restored to Active planning.",
+      });
+
+      if (!result.ok) {
+        if (
+          result.errorCode === "stale_update"
+        ) {
+          await handleStale(
+            result.error ??
+              "Someone changed this Publishing item.",
+          );
+        } else {
+          setError(
+            result.error ??
+              "We could not restore this Publishing item.",
+          );
+        }
+
+        setRestoring(false);
+        return;
+      }
+
+      await onSaved(
+        "Publishing item restored.",
+        "active",
+      );
+    } catch (restoreError) {
+      setError(
+        restoreError instanceof Error
+          ? restoreError.message
+          : "We could not restore this Publishing item.",
+      );
+      setRestoring(false);
+    }
+  }
+
   const busy =
-    saving || archiving || relationshipBusy || articleLinking;
+    saving ||
+    archiving ||
+    restoring ||
+    relationshipBusy ||
+    articleLinking;
 
   return (
     <>
@@ -727,11 +801,11 @@ export function EditPublishingItemDrawer({
                     className="mt-2 w-full rounded-xl border border-wk-border bg-wk-surface px-3 py-2.5 text-[13px] text-wk-text outline-none focus:border-wk-brand disabled:opacity-60"
                   >
                     {PUBLISHING_PLANNING_STATES
-                      .filter(
-                        (state) =>
-                          item.planningState ===
-                            "archived" ||
-                          state !== "archived",
+                      .filter((state) =>
+                        item.planningState ===
+                        "archived"
+                          ? state === "archived"
+                          : state !== "archived",
                       )
                       .map((state) => (
                         <option
@@ -1000,7 +1074,30 @@ export function EditPublishingItemDrawer({
             </div>
 
             <div className="mb-0 flex shrink-0 flex-col-reverse gap-2 border-t border-wk-border bg-wk-surface px-5 pt-4 pb-[calc(2.5rem+env(safe-area-inset-bottom))] sm:flex-row sm:items-center sm:justify-end">
-              {item.planningState !== "archived" ? (
+              {item.planningState === "archived" ? (
+                <button
+                  type="button"
+                  onClick={() => void handleRestore()}
+                  disabled={busy}
+                  className="wk-button wk-button-secondary wk-button-sm justify-center disabled:opacity-50 sm:mr-auto"
+                >
+                  {restoring ? (
+                    <WkIcon
+                      name="Loader2"
+                      size={14}
+                      className="animate-spin"
+                    />
+                  ) : (
+                    <WkIcon
+                      name="CheckCircle"
+                      size={14}
+                    />
+                  )}
+                  {restoring
+                    ? "Restoring Item"
+                    : "Restore Item"}
+                </button>
+              ) : (
                 <button
                   type="button"
                   onClick={() => {
@@ -1013,7 +1110,7 @@ export function EditPublishingItemDrawer({
                   <WkIcon name="Archive" size={14} />
                   Archive Item
                 </button>
-              ) : null}
+              )}
 
               <button
                 type="button"

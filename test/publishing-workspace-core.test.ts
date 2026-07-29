@@ -300,6 +300,36 @@ describe("Publishing workspace core", () => {
     );
   });
 
+  it("restores archived work through a first-class restore action", () => {
+    expect(editDrawer).toContain(
+      "async function handleRestore()",
+    );
+
+    expect(editDrawer).toContain(
+      'planningState: "active"',
+    );
+
+    expect(editDrawer).toContain(
+      "Publishing item restored.",
+    );
+
+    expect(editDrawer).toContain("Restore Item");
+
+    expect(editDrawer).toContain("Restoring Item");
+
+    expect(editDrawer).toContain(
+      "Use Restore Item to return archived work to Active.",
+    );
+
+    expect(editDrawer).toContain(
+      'item.planningState ===\n                        "archived"\n                          ? state === "archived"',
+    );
+
+    expect(editDrawer).toContain(
+      "restoring ||",
+    );
+  });
+
   it("reloads stale records before another save", () => {
     expect(editDrawer).toContain(
       'result.errorCode === "stale_update"',
