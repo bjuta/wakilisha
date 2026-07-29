@@ -15,11 +15,13 @@ All future work on Articles, Playlists, Audio, Video, Media, Registry, Charts, c
 
 ## Programme status
 
-Current phase: **Phase 3: Trust infrastructure**, with the **Article Workspace North Star quality gate** active before PR 3A schema work.
+Current phase: **Phase 3: Trust infrastructure**.
+
+The Article Workspace North Star implementation pass and QPR4 Publishing operations workspace are complete. PR 3A schema implementation has not started.
 
 This plan has been reconciled against repository main at:
 
-`e2d401b Merge pull request #484 from bjuta/fix/seo-metadata-manifest-abort`
+`6b2979b Finish QPR4 Publishing operations board`
 
 Closed phases:
 
@@ -30,6 +32,15 @@ Closed phases:
 - **Phase 2A: Durable Article drafts and immutable versions**, closed through PR #460, PR #461, PR #463, and PR #464.
 - **Phase 2B: Review and publication lifecycle**, closed through PR #467, PR #469, PR #470, and PR #481.
 - **Phase 2C: Article Editor Workbench**, closed through PR #482 and PR #483.
+
+Completed Phase 3 readiness work:
+
+- **Article Workspace North Star audit**, locked through PR #487.
+- **Article composition and workspace hierarchy**, completed through PR #488.
+- **Article review modes and suggestion decisions**, completed through PR #490 and PR #491.
+- **Governed Publishing workspace foundation and core**, completed through PR #492 and PR #493.
+- **Publishing teams, channels, operational history, Article linking, archive and restore, Board View, and Table View**, completed through PR #494 to PR #504.
+- **QPR4 Publishing production deployment**, completed from main commit `6b2979b`.
 
 Supporting build-pipeline fix:
 
@@ -43,7 +54,9 @@ Phase 2 is closed.
 
 Phase 2 proved the Article authority from draft through restoration in production. The completed lifecycle proof covered Draft, Submit for Review, Request Changes, revised Draft, Submit again, Approve, Publish, later Draft edit, public unchanged verification, Archive, and Restore.
 
-Phase 3 begins from the closed Article authority baseline. It must not reopen Article lifecycle architecture unless a trust-infrastructure requirement exposes a verified defect.
+The North Star implementation work made the Article a stronger writing and review workspace without reopening the closed lifecycle authority. QPR4 established Publishing as a separate governed editorial operations workspace without duplicating canonical review, scheduling, or publication authority.
+
+Phase 3 continues from these closed authority and operations baselines. It must not reopen Article lifecycle architecture or turn Publishing into a second canonical editor unless a verified defect requires it.
 
 See also:
 
@@ -1585,46 +1598,57 @@ Immediate Phase 3 boundary:
 - prove reuse through Article first, then at least one non-Article target
 - keep public presentation scoped to what the trust records can prove
 
-### Article Workspace North Star quality gate (active)
+### Article Workspace North Star quality gate (closure reconciliation active)
 
-Phase 3A schema implementation is paused until the Article Workspace passes the North Star gate.
+The implementation work required by the North Star audit is complete.
 
-The audit found that the Article authority is durable, but the current workspace is not yet strong enough to serve as the five-year product benchmark.
+Completed work includes:
 
-Confirmed gaps include:
+- PR #487 locked the North Star audit and quality boundary
+- PR #488 rebuilt composition and workspace hierarchy
+- PR #490 added Write, Suggest, and View review modes with durable review decisions
+- PR #491 completed review-mode presentation and interaction polish
+- PR #492 and PR #493 established the governed Publishing workspace foundation and core
+- PR #494 to PR #504 completed Publishing assignments, channels, operational history, canonical Article linking, archive and restore clarity, operation lenses, Board View, Table View, and commercial-grade drawer behaviour
 
-- writing focus
-- workspace hierarchy
-- command hierarchy
-- Review quality
-- Publishing clarity
-- responsive behaviour
-- large-document usability
-- trust readiness
-- identity clarity
-- accessibility validation
+Production proof confirms:
+
+- the Article Workspace supports focused composition, exact Preview, long-document navigation, and responsive drawer behaviour
+- review supports immutable submitted-version reading, durable suggestions, decisions, withdrawal, and rejection
+- Publishing identifies and preserves canonical Article authority without becoming the reviewer, scheduler, or publisher
+- Publishing drawers render through the shared document-body Portal without page jumps or clipping
+- Board View and Table View are live in production
 
 The quality gate does not reopen Phase 2 architecture.
 
-Do not alter proven lifecycle, review, approval, publication snapshot, archive, restore, recovery, or preview-security contracts unless a verified defect requires it.
+Do not alter proven lifecycle, review, approval, publication snapshot, archive, restore, recovery, preview-security, or canonical Publishing authority contracts unless a verified defect requires it.
 
-The quality pass is limited to no more than two implementation pull requests:
+One final closure reconciliation remains before PR 3A schema implementation:
 
-1. Composition and workspace hierarchy
-2. Review, Publishing, Record, accessibility, and Phase 3A insertion points
+- verify the North Star acceptance list against the shipped production workspace
+- record any still-open accessibility or identity presentation obligations as bounded Phase 3 requirements
+- confirm the Sources, Citations, and Credits insertion points
+- record the quality gate as closed
+- start PR 3A without another Article or Publishing rebuild
 
-PR 3A schema work resumes only after:
+### Immediate next implementation
 
-- the Article dominates the workspace
-- the primary action is clear
-- exact Preview is authoritative
-- Review supports reading, comparison, comments, tasks, and decisions
-- Publishing identifies the exact approved version
-- responsive behaviour is deliberately designed rather than stacked
-- long Articles have navigation and persistent commands
-- Sources, Citations, and Credits have a coherent workspace home
-- account identity, ownership, credit identity, and byline are clearly separated
-- the North Star acceptance tests pass
+**Article Workspace North Star closure reconciliation, followed by PR 3A Sources, citations, and credits.**
+
+The closure reconciliation must be documentation and acceptance proof, not another product rebuild.
+
+PR 3A then begins the reusable trust authority for:
+
+- Sources
+- Citations
+- Credits
+- external contributors
+- source versions and withdrawals
+- Registry entity links
+- inline Article citations
+- public source and credit presentation
+
+Do not begin Playlist, Audio, Video, Media, Field Capture, Corrections, Provenance, or Inquiry Mode in the first PR 3A implementation slice.
 
 ### PR 3A: Sources, citations, and credits
 
