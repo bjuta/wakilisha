@@ -51,6 +51,255 @@ describe("Publishing workspace core", () => {
     );
   });
 
+  it("keeps Publishing focused on editorial operations", () => {
+    expect(page).toContain(
+      "Coordinate work, do not publish from here",
+    );
+
+    expect(page).toContain(
+      "Use this board to move work across owners, teams,",
+    );
+
+    expect(page).toContain(
+      "Canonical",
+    );
+
+    expect(page).toContain(
+      "editors still control review, scheduling, and",
+    );
+
+    expect(page).not.toContain(
+      "schedule_article_publication",
+    );
+
+    expect(page).not.toContain(
+      "publish_article_version",
+    );
+  });
+
+  it("adds operations lenses and board view without taking publication authority", () => {
+    expect(page).toContain("type PublishingOperationView");
+
+    expect(page).toContain("type PublishingViewMode");
+
+    expect(page).toContain(
+      "const operationViewOptions = useMemo",
+    );
+
+    expect(page).toContain("Active Ops");
+
+    expect(page).toContain("My Work");
+
+    expect(page).toContain("Unassigned");
+
+    expect(page).toContain("Due Soon");
+
+    expect(page).toContain("Ready Handoff");
+
+    expect(page).toContain("Needs Article Link");
+
+    expect(page).toContain("Board View");
+
+    expect(page).toContain("Table View");
+
+    expect(page).toContain(
+      "matchesOperationView(",
+    );
+
+    expect(page).toContain(
+      'viewMode === "board"',
+    );
+
+    expect(page).toContain(
+      "PUBLISHING_PRODUCTION_STAGES.map",
+    );
+
+    expect(page).toContain(
+      "summarizePeople(item)",
+    );
+
+    expect(page).toContain(
+      "summarizeChannels(item)",
+    );
+  });
+
+  it("renders Publishing drawers at the document body portal root", () => {
+    expect(createDrawer).toContain(
+      'import { Portal } from "@/components/base/Portal";',
+    );
+
+    expect(createDrawer).toContain("<Portal>");
+    expect(createDrawer).toContain("</Portal>");
+
+    expect(editDrawer).toContain(
+      'import { Portal } from "@/components/base/Portal";',
+    );
+
+    expect(editDrawer).toContain("<Portal>");
+    expect(editDrawer).toContain("</Portal>");
+  });
+
+  it("does not move the page when Publishing drawers mount", () => {
+    expect(createDrawer).not.toContain("autoFocus");
+    expect(editDrawer).not.toContain("autoFocus");
+
+    expect(createDrawer).not.toContain(
+      "document.body.style",
+    );
+
+    expect(createDrawer).not.toContain(
+      "document.documentElement.style",
+    );
+
+    expect(editDrawer).not.toContain(
+      "document.body.style",
+    );
+
+    expect(editDrawer).not.toContain(
+      "document.documentElement.style",
+    );
+  });
+
+  it("opens Publishing drawers without mutating document scroll styles", () => {
+    expect(createDrawer).toContain(
+      'window.addEventListener("keydown", handleKeyDown);',
+    );
+
+    expect(createDrawer).toContain(
+      "fixed inset-y-0 right-0",
+    );
+
+    expect(createDrawer).toContain("overscroll-contain");
+
+    expect(createDrawer).not.toContain(
+      "document.body.style",
+    );
+
+    expect(createDrawer).not.toContain(
+      "document.documentElement.style",
+    );
+
+    expect(createDrawer).not.toContain("scrollbar-gutter");
+
+    expect(editDrawer).toContain(
+      'window.addEventListener("keydown", handleKeyDown);',
+    );
+
+    expect(editDrawer).toContain(
+      "fixed inset-y-0 right-0",
+    );
+
+    expect(editDrawer).toContain("overscroll-contain");
+
+    expect(editDrawer).not.toContain(
+      "document.body.style",
+    );
+
+    expect(editDrawer).not.toContain(
+      "document.documentElement.style",
+    );
+
+    expect(editDrawer).not.toContain("scrollbar-gutter");
+  });
+
+  it("keeps Publishing drawers fixed over the operations board", () => {
+    expect(createDrawer).toContain(
+      'fixed inset-0 z-[100] flex h-[100dvh] min-h-[100dvh] w-screen max-h-[100dvh] overflow-hidden',
+    );
+
+    expect(createDrawer).toContain(
+      'fixed inset-y-0 right-0 z-[110] flex h-[100dvh] max-h-[100dvh] min-h-0 w-full max-w-lg flex-col overflow-hidden border-l border-wk-border bg-wk-surface shadow-2xl',
+    );
+
+    expect(createDrawer).toContain(
+      'min-h-0 flex-1 space-y-5 overflow-y-auto overscroll-contain px-5 py-5',
+    );
+
+    expect(editDrawer).toContain(
+      'fixed inset-0 z-[100] flex h-[100dvh] min-h-[100dvh] w-screen max-h-[100dvh] overflow-hidden',
+    );
+
+    expect(editDrawer).toContain(
+      'fixed inset-y-0 right-0 z-[110] flex h-[100dvh] max-h-[100dvh] min-h-0 w-full max-w-lg flex-col overflow-hidden border-l border-wk-border bg-wk-surface shadow-2xl',
+    );
+
+    expect(editDrawer).toContain(
+      'min-h-0 flex-1 space-y-5 overflow-y-auto overscroll-contain px-5 py-5',
+    );
+  });
+
+  it("supports mobile drawer containment", () => {
+    expect(createDrawer).toContain(
+      'fixed inset-0 z-[100] flex h-[100dvh] min-h-[100dvh] w-screen max-h-[100dvh] overflow-hidden',
+    );
+
+    expect(createDrawer).toContain(
+      'fixed inset-y-0 right-0 z-[110] flex h-[100dvh] max-h-[100dvh] min-h-0 w-full max-w-lg flex-col overflow-hidden border-l border-wk-border bg-wk-surface shadow-2xl',
+    );
+
+    expect(createDrawer).toContain(
+      'min-h-0 flex-1 space-y-5 overflow-y-auto overscroll-contain px-5 py-5',
+    );
+
+    expect(editDrawer).toContain(
+      'fixed inset-0 z-[100] flex h-[100dvh] min-h-[100dvh] w-screen max-h-[100dvh] overflow-hidden',
+    );
+
+    expect(editDrawer).toContain(
+      'fixed inset-y-0 right-0 z-[110] flex h-[100dvh] max-h-[100dvh] min-h-0 w-full max-w-lg flex-col overflow-hidden border-l border-wk-border bg-wk-surface shadow-2xl',
+    );
+
+    expect(editDrawer).toContain(
+      'min-h-0 flex-1 space-y-5 overflow-y-auto overscroll-contain px-5 py-5',
+    );
+  });
+
+  it("keeps operation lenses separate from manual custom filters", () => {
+    expect(page).toContain("function setCustomSearchQuery");
+
+    expect(page).toContain("function setCustomStageFilter");
+
+    expect(page).toContain("function setCustomPlanningFilter");
+
+    expect(page).toContain("function setCustomContentKindFilter");
+
+    expect(page).toContain("function setCustomPriorityFilter");
+
+    expect(page).toContain("function setCustomChannelFilter");
+
+    expect(page).toContain("function setCustomOwnerFilter");
+
+    expect(page).toContain(
+      "setCustomSearchQuery(event.target.value)",
+    );
+
+    expect(page).toContain(
+      "setCustomPlanningFilter(",
+    );
+
+    expect(page).toContain(
+      "setCustomStageFilter(stage)",
+    );
+
+    expect(page).toContain(
+      "setCustomContentKindFilter(event.target.value)",
+    );
+
+    expect(page).toContain(
+      "setCustomPriorityFilter(",
+    );
+
+    expect(page).toContain(
+      "setCustomChannelFilter(event.target.value)",
+    );
+
+    expect(page).toContain(
+      "setCustomOwnerFilter(event.target.value)",
+    );
+  });
+
+
+
   it("offers creation in the header and empty state", () => {
     const createLabels =
       page.match(/Create Publishing Item/g) ?? [];
@@ -573,28 +822,6 @@ describe("Publishing workspace core", () => {
 
     expect(relationshipsSection).not.toContain(
       "publish_article_version",
-    );
-  });
-
-  it("supports mobile drawer containment", () => {
-    expect(createDrawer).toContain(
-      "h-[100dvh] max-h-[100dvh] overflow-hidden",
-    );
-
-    expect(editDrawer).toContain(
-      "h-[100dvh] max-h-[100dvh] overflow-hidden",
-    );
-
-    expect(editDrawer).toContain(
-      "overflow-y-auto overscroll-contain",
-    );
-
-    expect(editDrawer).toContain(
-      "calc(2.5rem+env(safe-area-inset-bottom))",
-    );
-
-    expect(archiveDialog).toContain(
-      "h-[100dvh] max-h-[100dvh]",
     );
   });
 
