@@ -248,6 +248,24 @@ describe("Publishing workspace core", () => {
     );
   });
 
+  it("locks edit-time Article retargeting after a canonical Article is linked", () => {
+    expect(editDrawer).toContain(
+      "This Publishing item already has a canonical Article.",
+    );
+
+    expect(editDrawer).toContain("const retargetLocked =");
+
+    expect(editDrawer).toContain(
+      "item.resourceId !== null &&",
+    );
+
+    expect(editDrawer).toContain(
+      "article.resourceId !== item.resourceId",
+    );
+
+    expect(editDrawer).toContain("Locked");
+  });
+
   it("archives only through the confirmed archive action", () => {
     expect(editDrawer).toContain(
       'planningState: "archived"',
