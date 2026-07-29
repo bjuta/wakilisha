@@ -435,6 +435,16 @@ export function EditPublishingItemDrawer({
       return;
     }
 
+    if (
+      item.resourceId !== null &&
+      article.resourceId !== item.resourceId
+    ) {
+      setError(
+        "This Publishing item already has a canonical Article.",
+      );
+      return;
+    }
+
     setArticleLinking(true);
     setError(null);
 
@@ -917,6 +927,11 @@ export function EditPublishingItemDrawer({
                               articleOption.resourceId !== null &&
                               articleOption.resourceId === item.resourceId;
 
+                            const retargetLocked =
+                              articleOption.resourceId !== null &&
+                              item.resourceId !== null &&
+                              !alreadyLinked;
+
                             return (
                               <button
                                 key={articleOption.id}
@@ -929,6 +944,7 @@ export function EditPublishingItemDrawer({
                                 disabled={
                                   busy ||
                                   alreadyLinked ||
+                                  retargetLocked ||
                                   !articleOption.resourceId
                                 }
                                 className="flex w-full items-start justify-between gap-3 rounded-lg border border-wk-border bg-wk-surface px-3 py-2 text-left hover:border-wk-brand/40 hover:bg-wk-brand-soft disabled:cursor-not-allowed disabled:opacity-60"
@@ -946,9 +962,11 @@ export function EditPublishingItemDrawer({
                                     ? "Linked"
                                     : !articleOption.resourceId
                                       ? "No Resource"
-                                      : articleLinking
-                                        ? "Linking"
-                                        : "Link Article"}
+                                      : retargetLocked
+                                        ? "Locked"
+                                        : articleLinking
+                                          ? "Linking"
+                                          : "Link Article"}
                                 </span>
                               </button>
                             );
