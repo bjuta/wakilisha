@@ -4,6 +4,7 @@ import {
   useState,
   type FormEvent,
 } from "react";
+import { Portal } from "@/components/base/Portal";
 import { WkIcon } from "@/components/design-system/Icon";
 import {
   fetchArticlesForAdminList,
@@ -178,11 +179,6 @@ export function CreatePublishingItemDrawer({
   }, [canLinkCanonicalArticle]);
 
   useEffect(() => {
-    const previousOverflow =
-      document.body.style.overflow;
-
-    document.body.style.overflow = "hidden";
-
     function handleKeyDown(event: KeyboardEvent) {
       if (event.key === "Escape" && !saving) {
         onClose();
@@ -192,9 +188,6 @@ export function CreatePublishingItemDrawer({
     window.addEventListener("keydown", handleKeyDown);
 
     return () => {
-      document.body.style.overflow =
-        previousOverflow;
-
       window.removeEventListener(
         "keydown",
         handleKeyDown,
@@ -284,8 +277,9 @@ export function CreatePublishingItemDrawer({
   }
 
   return (
-    <div
-      className="fixed inset-0 z-50 flex h-[100dvh] max-h-[100dvh] overflow-hidden"
+    <Portal>
+      <div
+        className="fixed inset-0 z-[100] flex h-[100dvh] min-h-[100dvh] w-screen max-h-[100dvh] overflow-hidden"
       role="dialog"
       aria-modal="true"
       aria-labelledby="create-publishing-title"
@@ -295,10 +289,10 @@ export function CreatePublishingItemDrawer({
         aria-label="Close Create Publishing Item"
         onClick={onClose}
         disabled={saving}
-        className="absolute inset-0 cursor-default bg-black/45 backdrop-blur-sm disabled:cursor-wait"
+        className="fixed inset-0 cursor-default bg-black/45 backdrop-blur-sm disabled:cursor-wait"
       />
 
-      <aside className="relative ml-auto flex h-full max-h-[100dvh] min-h-0 w-full max-w-lg flex-col overflow-hidden border-l border-wk-border bg-wk-surface shadow-2xl">
+      <aside className="fixed inset-y-0 right-0 z-[110] flex h-[100dvh] max-h-[100dvh] min-h-0 w-full max-w-lg flex-col overflow-hidden border-l border-wk-border bg-wk-surface shadow-2xl">
         <div className="flex shrink-0 items-start justify-between gap-4 border-b border-wk-border px-5 py-4">
           <div>
             <div className="text-[10px] font-black uppercase tracking-[0.14em] text-wk-brand">
@@ -351,7 +345,6 @@ export function CreatePublishingItemDrawer({
                 Title
               </span>
               <input
-                autoFocus
                 value={title}
                 onChange={(event) => {
                   setTitle(event.target.value);
@@ -695,6 +688,7 @@ export function CreatePublishingItemDrawer({
           </div>
         </form>
       </aside>
-    </div>
+      </div>
+    </Portal>
   );
 }
