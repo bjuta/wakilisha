@@ -261,7 +261,14 @@ export function EditPublishingItemDrawer({
 
   useEffect(() => {
     function handleKeyDown(event: KeyboardEvent) {
-      if (event.key === "Escape" && !saving) {
+      if (
+        event.key === "Escape" &&
+        !saving &&
+        !archiving &&
+        !relationshipBusy &&
+        !articleLinking &&
+        !archiveOpen
+      ) {
         onClose();
       }
     }
@@ -274,7 +281,14 @@ export function EditPublishingItemDrawer({
         handleKeyDown,
       );
     };
-  }, [onClose, saving]);
+  }, [
+    archiveOpen,
+    archiving,
+    articleLinking,
+    onClose,
+    relationshipBusy,
+    saving,
+  ]);
 
   const hasChanges = useMemo(() => {
     return (

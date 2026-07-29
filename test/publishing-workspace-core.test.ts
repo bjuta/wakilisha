@@ -123,6 +123,21 @@ describe("Publishing workspace core", () => {
     );
   });
 
+  it("keeps Edit drawer open while governed actions are busy", () => {
+    expect(editDrawer).toContain("!archiving");
+    expect(editDrawer).toContain("!relationshipBusy");
+    expect(editDrawer).toContain("!articleLinking");
+    expect(editDrawer).toContain("!archiveOpen");
+
+    expect(editDrawer).toContain(
+      "archiveOpen,\n    archiving,\n    articleLinking,",
+    );
+
+    expect(editDrawer).toContain(
+      "onClose,\n    relationshipBusy,\n    saving,",
+    );
+  });
+
   it("renders Publishing drawers at the document body portal root", () => {
     expect(createDrawer).toContain(
       'import { Portal } from "@/components/base/Portal";',
