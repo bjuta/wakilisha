@@ -7,6 +7,10 @@ import {
 import { AdminTable } from "@/components/design-system/admin/AdminTable";
 import { WkIcon } from "@/components/design-system/Icon";
 import { WkSurface } from "@/components/design-system/primitives/Surface";
+import {
+  fetchArticlesForAdminList,
+  type AdminArticleListItem,
+} from "@/services/articles/articleAdminService";
 import { CreatePublishingItemDrawer } from "@/pages/admin/content/publishing/components/CreatePublishingItemDrawer";
 import { EditPublishingItemDrawer } from "@/pages/admin/content/publishing/components/EditPublishingItemDrawer";
 import { useAdminUser } from "@/hooks/useAdminUser";
@@ -165,6 +169,9 @@ export default function AdminPublishingDashboardPage() {
   const [channels, setChannels] = useState<
     PublishingChannel[]
   >([]);
+  const [articleOptions, setArticleOptions] = useState<
+    AdminArticleListItem[]
+  >([]);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(
     null,
@@ -191,16 +198,22 @@ export default function AdminPublishingDashboardPage() {
     setLoadError(null);
 
     try {
-      const [nextItems, nextKinds, nextChannels] =
-        await Promise.all([
-          listPublishingWorkspaceItems({ limit: 300 }),
-          listPublishingContentKinds(),
-          listPublishingChannels(),
-        ]);
+      const [
+        nextItems,
+        nextKinds,
+        nextChannels,
+        nextArticles,
+      ] = await Promise.all([
+        listPublishingWorkspaceItems({ limit: 300 }),
+        listPublishingContentKinds(),
+        listPublishingChannels(),
+        fetchArticlesForAdminList(500),
+      ]);
 
       setItems(nextItems);
       setContentKinds(nextKinds);
       setChannels(nextChannels);
+      setArticleOptions(nextArticles);
 
       return nextItems;
     } catch (error) {
@@ -325,6 +338,21 @@ export default function AdminPublishingDashboardPage() {
       ),
     [items],
   );
+
+  const linkedArticleByResourceId = useMemo(() => {
+    const articleMap = new Map<
+      string,
+      AdminArticleListItem
+    >();
+
+    articleOptions.forEach((article) => {
+      if (article.resourceId) {
+        articleMap.set(article.resourceId, article);
+      }
+    });
+
+    return articleMap;
+  }, [articleOptions]);
 
   const filteredItems = useMemo(() => {
     const query = searchQuery.trim().toLowerCase();
@@ -825,16 +853,31 @@ export default function AdminPublishingDashboardPage() {
               key: "editorialState",
               label: "Authority",
               width: "170px",
-              render: (row) => (
-                <div className="space-y-1 text-[10px] text-wk-text-muted">
-                  <div>
-                    Editorial: {formatChoice(row.editorialState)}
+              render: (row) => {
+                const linkedArticle = row.resourceId
+                  ? linkedArticleByResourceId.get(row.resourceId)
+                  : null;
+
+                return (
+                  <div className="space-y-1 text-[10px] text-wk-text-muted">
+                    <div>
+                      Editorial: {formatChoice(row.editorialState)}
+                    </div>
+                    <div>
+                      Publication: {formatChoice(row.publicationState)}
+                    </div>
+                    <div
+                      className="line-clamp-1 text-wk-text"
+                      title={linkedArticle?.title ?? undefined}
+                    >
+                      Article:{" "}
+                      {row.resourceId
+                        ? linkedArticle?.title ?? "Linked"
+                        : "Not Linked"}
+                    </div>
                   </div>
-                  <div>
-                    Publication: {formatChoice(row.publicationState)}
-                  </div>
-                </div>
-              ),
+                );
+              },
             },
           ]}
           onRowClick={

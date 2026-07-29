@@ -134,6 +134,42 @@ describe("Publishing workspace core", () => {
     );
   });
 
+  it("surfaces linked Article authority in the workspace table", () => {
+    expect(page).toContain(
+      'from "@/services/articles/articleAdminService";',
+    );
+
+    expect(page).toContain(
+      "fetchArticlesForAdminList(500)",
+    );
+
+    expect(page).toContain(
+      "const linkedArticleByResourceId = useMemo",
+    );
+
+    expect(page).toContain(
+      "articleMap.set(article.resourceId, article)",
+    );
+
+    expect(page).toContain(
+      "const linkedArticle = row.resourceId",
+    );
+
+    expect(page).toContain("Article:{\" \"}");
+
+    expect(page).toContain(
+      'linkedArticle?.title ?? "Linked"',
+    );
+
+    expect(page).toContain(
+      ': "Not Linked"',
+    );
+
+    expect(page).toContain(
+      "title={linkedArticle?.title ?? undefined}",
+    );
+  });
+
   it("opens existing items from the workspace table", () => {
     expect(page).toContain(
       "onRowClick={",
