@@ -13372,6 +13372,7 @@ export type Database = {
           canonical_record_id: string | null
           created_at: string | null
           lifecycle_state: string | null
+          owner_id: string | null
           resource_id: string | null
           resource_kind: string | null
           updated_at: string | null

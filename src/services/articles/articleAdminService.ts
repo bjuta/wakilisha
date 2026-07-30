@@ -46,6 +46,8 @@ export interface ArticleRow {
 
 export interface AdminArticleDetail {
   id: string;
+  resourceId: string | null;
+  ownerId: string | null;
   slug: string;
   title: string;
   excerpt: string;
@@ -68,6 +70,7 @@ export interface AdminArticleDetail {
 export interface AdminArticleListItem {
   id: string;
   resourceId: string | null;
+  ownerId: string | null;
   slug: string;
   title: string;
   excerpt: string;
@@ -207,6 +210,28 @@ export async function fetchArticleForAdmin(slug: string): Promise<AdminArticleDe
 
   const row = data as ArticleRow & { raw_meta?: Record<string, unknown> };
 
+  const {
+    data: resourceIdentity,
+    error: resourceIdentityError,
+  } = await supabase
+    .from("wk_resource_index")
+    .select("resource_id, owner_id")
+    .eq("resource_kind", "article")
+    .eq("canonical_record_id", row.id)
+    .maybeSingle();
+
+  if (resourceIdentityError) {
+    console.error(
+      "Failed to load Article resource identity:",
+      resourceIdentityError,
+    );
+  }
+
+  const canonicalIdentity = resourceIdentity as {
+    resource_id: string | null;
+    owner_id: string | null;
+  } | null;
+
   let contentHtml = processArticleContentForEditor(row.content_html);
 
   // Inject captions from media assets for images with data-asset-id
@@ -242,6 +267,8 @@ export async function fetchArticleForAdmin(slug: string): Promise<AdminArticleDe
 
   return {
     id: row.id,
+    resourceId: canonicalIdentity?.resource_id ?? null,
+    ownerId: canonicalIdentity?.owner_id ?? null,
     slug: row.slug,
     title: processText(row.title),
     excerpt: processText(row.excerpt) || generateExcerpt(row.content_html),
@@ -294,6 +321,7 @@ export async function fetchArticlesForAdminList(limit = 200): Promise<AdminArtic
   const articles = ((data ?? []) as ArticleRow[]).map((row) => ({
     id: row.id,
     resourceId: null as string | null,
+    ownerId: null as string | null,
     slug: row.slug,
     title: processText(row.title),
     excerpt: processText(row.excerpt) || "",
@@ -314,7 +342,7 @@ export async function fetchArticlesForAdminList(limit = 200): Promise<AdminArtic
 
   const { data: resourceData, error: resourceError } = await supabase
     .from("wk_resource_index")
-    .select("canonical_record_id, resource_id")
+    .select("canonical_record_id, resource_id, owner_id")
     .eq("resource_kind", "article")
     .in("canonical_record_id", articleIds);
 
@@ -323,26 +351,34 @@ export async function fetchArticlesForAdminList(limit = 200): Promise<AdminArtic
     return articles;
   }
 
-  const resourceIdByArticleId = new Map(
+  const identityByArticleId = new Map(
     ((resourceData ?? []) as Array<{
       canonical_record_id: string | null;
       resource_id: string | null;
+      owner_id: string | null;
     }>)
       .filter(
         (resource) =>
-          resource.canonical_record_id !== null &&
-          resource.resource_id !== null,
+          resource.canonical_record_id !== null,
       )
       .map((resource) => [
         resource.canonical_record_id as string,
-        resource.resource_id as string,
+        {
+          resourceId: resource.resource_id,
+          ownerId: resource.owner_id,
+        },
       ]),
   );
 
-  return articles.map((article) => ({
-    ...article,
-    resourceId: resourceIdByArticleId.get(article.id) ?? null,
-  }));
+  return articles.map((article) => {
+    const identity = identityByArticleId.get(article.id);
+
+    return {
+      ...article,
+      resourceId: identity?.resourceId ?? null,
+      ownerId: identity?.ownerId ?? null,
+    };
+  });
 }
 
 /**

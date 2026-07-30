@@ -1,9 +1,9 @@
 {
   "projectRef": "pgzizndxdyhqmtyywjmt",
   "schema": "public",
-  "generatedAt": "2026-07-24T15:03:47Z",
-  "typesSha256": "1953401543a46d5390407cb16d4e60985089cf2a14a7d2bfaa97ddf550d41a82",
+  "generatedAt": "2026-07-30T13:59:49Z",
+  "typesSha256": "ab24d2ae6d51a2f26af67272af7b412959ed777594c2b60dc86f72d2cf2e2442",
   "authoritativeMigrationDirectory": "supabase/migrations",
-  "migrationCount": 170,
-  "latestMigration": "20260724163000_publishing_operational_history_read.sql"
+  "migrationCount": 171,
+  "latestMigration": "20260730152000_add_owner_to_resource_index.sql"
 }
