@@ -496,6 +496,206 @@ export type Database = {
           },
         ]
       }
+      citation_locator_types: {
+        Row: {
+          created_at: string
+          description: string
+          enabled: boolean
+          label: string
+          locator_type: string
+          sort_order: number
+        }
+        Insert: {
+          created_at?: string
+          description: string
+          enabled?: boolean
+          label: string
+          locator_type: string
+          sort_order?: number
+        }
+        Update: {
+          created_at?: string
+          description?: string
+          enabled?: boolean
+          label?: string
+          locator_type?: string
+          sort_order?: number
+        }
+        Relationships: []
+      }
+      credit_governance: {
+        Row: {
+          credit_id: string
+          credit_state: string
+          governance_revision: number
+          public_safe: boolean
+          reason: string | null
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          credit_id: string
+          credit_state?: string
+          governance_revision?: number
+          public_safe?: boolean
+          reason?: string | null
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          credit_id?: string
+          credit_state?: string
+          governance_revision?: number
+          public_safe?: boolean
+          reason?: string | null
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "credit_governance_credit_id_fkey"
+            columns: ["credit_id"]
+            isOneToOne: true
+            referencedRelation: "credits"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      credit_roles: {
+        Row: {
+          created_at: string
+          credit_role: string
+          description: string
+          enabled: boolean
+          label: string
+          sort_order: number
+        }
+        Insert: {
+          created_at?: string
+          credit_role: string
+          description: string
+          enabled?: boolean
+          label: string
+          sort_order?: number
+        }
+        Update: {
+          created_at?: string
+          credit_role?: string
+          description?: string
+          enabled?: boolean
+          label?: string
+          sort_order?: number
+        }
+        Relationships: []
+      }
+      credits: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          credit_note: string | null
+          credit_role: string
+          display_name_snapshot: string
+          external_contributor_id: string | null
+          id: string
+          registry_author_id: string | null
+          role_label_snapshot: string | null
+          user_id: string | null
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          credit_note?: string | null
+          credit_role: string
+          display_name_snapshot: string
+          external_contributor_id?: string | null
+          id?: string
+          registry_author_id?: string | null
+          role_label_snapshot?: string | null
+          user_id?: string | null
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          credit_note?: string | null
+          credit_role?: string
+          display_name_snapshot?: string
+          external_contributor_id?: string | null
+          id?: string
+          registry_author_id?: string | null
+          role_label_snapshot?: string | null
+          user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "credits_credit_role_fkey"
+            columns: ["credit_role"]
+            isOneToOne: false
+            referencedRelation: "credit_roles"
+            referencedColumns: ["credit_role"]
+          },
+          {
+            foreignKeyName: "credits_external_contributor_id_fkey"
+            columns: ["external_contributor_id"]
+            isOneToOne: false
+            referencedRelation: "external_contributors"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      external_contributors: {
+        Row: {
+          consent_status: string
+          contact_email: string | null
+          contact_phone: string | null
+          contributor_state: string
+          created_at: string
+          created_by: string | null
+          display_name: string
+          id: string
+          internal_notes: string | null
+          location_text: string | null
+          public_role: string | null
+          public_safe: boolean
+          public_url: string | null
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          consent_status?: string
+          contact_email?: string | null
+          contact_phone?: string | null
+          contributor_state?: string
+          created_at?: string
+          created_by?: string | null
+          display_name: string
+          id?: string
+          internal_notes?: string | null
+          location_text?: string | null
+          public_role?: string | null
+          public_safe?: boolean
+          public_url?: string | null
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          consent_status?: string
+          contact_email?: string | null
+          contact_phone?: string | null
+          contributor_state?: string
+          created_at?: string
+          created_by?: string | null
+          display_name?: string
+          id?: string
+          internal_notes?: string | null
+          location_text?: string | null
+          public_role?: string | null
+          public_safe?: boolean
+          public_url?: string | null
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: []
+      }
       playlist_resources: {
         Row: {
           playlist_id: string
@@ -968,6 +1168,347 @@ export type Database = {
           },
         ]
       }
+      source_review_events: {
+        Row: {
+          action: string
+          actor_id: string | null
+          correlation_id: string | null
+          created_at: string
+          id: string
+          prior_exposure_class: string | null
+          prior_review_status: string | null
+          prior_source_state: string | null
+          reason: string | null
+          resulting_exposure_class: string | null
+          resulting_review_status: string | null
+          resulting_source_state: string | null
+          source_id: string
+          source_version_id: string | null
+        }
+        Insert: {
+          action: string
+          actor_id?: string | null
+          correlation_id?: string | null
+          created_at?: string
+          id?: string
+          prior_exposure_class?: string | null
+          prior_review_status?: string | null
+          prior_source_state?: string | null
+          reason?: string | null
+          resulting_exposure_class?: string | null
+          resulting_review_status?: string | null
+          resulting_source_state?: string | null
+          source_id: string
+          source_version_id?: string | null
+        }
+        Update: {
+          action?: string
+          actor_id?: string | null
+          correlation_id?: string | null
+          created_at?: string
+          id?: string
+          prior_exposure_class?: string | null
+          prior_review_status?: string | null
+          prior_source_state?: string | null
+          reason?: string | null
+          resulting_exposure_class?: string | null
+          resulting_review_status?: string | null
+          resulting_source_state?: string | null
+          source_id?: string
+          source_version_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "source_review_events_source_id_fkey"
+            columns: ["source_id"]
+            isOneToOne: false
+            referencedRelation: "sources"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "source_review_events_source_version_id_fkey"
+            columns: ["source_version_id"]
+            isOneToOne: false
+            referencedRelation: "source_versions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      source_types: {
+        Row: {
+          created_at: string
+          description: string
+          enabled: boolean
+          label: string
+          sort_order: number
+          source_type: string
+        }
+        Insert: {
+          created_at?: string
+          description: string
+          enabled?: boolean
+          label: string
+          sort_order?: number
+          source_type: string
+        }
+        Update: {
+          created_at?: string
+          description?: string
+          enabled?: boolean
+          label?: string
+          sort_order?: number
+          source_type?: string
+        }
+        Relationships: []
+      }
+      source_versions: {
+        Row: {
+          archive_identifier: string | null
+          capture_date: string | null
+          consent_status: string
+          content_fingerprint: string
+          country_code: string | null
+          created_at: string
+          created_by: string | null
+          creator_display: string | null
+          credit_line: string | null
+          id: string
+          internal_notes: string | null
+          language_code: string | null
+          media_asset_id: string | null
+          place_text: string | null
+          publication_date: string | null
+          publisher_display: string | null
+          reliability_note: string | null
+          retrieval_date: string | null
+          rights_status: string
+          sensitivity: string
+          source_id: string
+          source_type: string
+          source_url: string | null
+          title: string
+          version_number: number
+        }
+        Insert: {
+          archive_identifier?: string | null
+          capture_date?: string | null
+          consent_status: string
+          content_fingerprint: string
+          country_code?: string | null
+          created_at?: string
+          created_by?: string | null
+          creator_display?: string | null
+          credit_line?: string | null
+          id?: string
+          internal_notes?: string | null
+          language_code?: string | null
+          media_asset_id?: string | null
+          place_text?: string | null
+          publication_date?: string | null
+          publisher_display?: string | null
+          reliability_note?: string | null
+          retrieval_date?: string | null
+          rights_status: string
+          sensitivity: string
+          source_id: string
+          source_type: string
+          source_url?: string | null
+          title: string
+          version_number: number
+        }
+        Update: {
+          archive_identifier?: string | null
+          capture_date?: string | null
+          consent_status?: string
+          content_fingerprint?: string
+          country_code?: string | null
+          created_at?: string
+          created_by?: string | null
+          creator_display?: string | null
+          credit_line?: string | null
+          id?: string
+          internal_notes?: string | null
+          language_code?: string | null
+          media_asset_id?: string | null
+          place_text?: string | null
+          publication_date?: string | null
+          publisher_display?: string | null
+          reliability_note?: string | null
+          retrieval_date?: string | null
+          rights_status?: string
+          sensitivity?: string
+          source_id?: string
+          source_type?: string
+          source_url?: string | null
+          title?: string
+          version_number?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "source_versions_source_id_fkey"
+            columns: ["source_id"]
+            isOneToOne: false
+            referencedRelation: "sources"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "source_versions_source_type_fkey"
+            columns: ["source_type"]
+            isOneToOne: false
+            referencedRelation: "source_types"
+            referencedColumns: ["source_type"]
+          },
+        ]
+      }
+      sources: {
+        Row: {
+          archive_identifier: string | null
+          capture_date: string | null
+          consent_status: string
+          country_code: string | null
+          created_at: string
+          created_by: string | null
+          creator_display: string | null
+          credit_line: string | null
+          current_approved_version_id: string | null
+          current_submitted_version_id: string | null
+          current_working_version_id: string | null
+          exposure_class: string
+          id: string
+          internal_notes: string | null
+          language_code: string | null
+          media_asset_id: string | null
+          place_text: string | null
+          publication_date: string | null
+          publisher_display: string | null
+          reliability_note: string | null
+          retrieval_date: string | null
+          review_status: string
+          reviewed_at: string | null
+          reviewed_by: string | null
+          rights_status: string
+          sensitivity: string
+          source_state: string
+          source_type: string
+          source_url: string | null
+          title: string
+          updated_at: string
+          updated_by: string | null
+          withdrawal_public_mode: string
+          withdrawal_reason: string | null
+          withdrawn_at: string | null
+          withdrawn_by: string | null
+          working_revision: number
+        }
+        Insert: {
+          archive_identifier?: string | null
+          capture_date?: string | null
+          consent_status?: string
+          country_code?: string | null
+          created_at?: string
+          created_by?: string | null
+          creator_display?: string | null
+          credit_line?: string | null
+          current_approved_version_id?: string | null
+          current_submitted_version_id?: string | null
+          current_working_version_id?: string | null
+          exposure_class?: string
+          id?: string
+          internal_notes?: string | null
+          language_code?: string | null
+          media_asset_id?: string | null
+          place_text?: string | null
+          publication_date?: string | null
+          publisher_display?: string | null
+          reliability_note?: string | null
+          retrieval_date?: string | null
+          review_status?: string
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          rights_status?: string
+          sensitivity?: string
+          source_state?: string
+          source_type: string
+          source_url?: string | null
+          title: string
+          updated_at?: string
+          updated_by?: string | null
+          withdrawal_public_mode?: string
+          withdrawal_reason?: string | null
+          withdrawn_at?: string | null
+          withdrawn_by?: string | null
+          working_revision?: number
+        }
+        Update: {
+          archive_identifier?: string | null
+          capture_date?: string | null
+          consent_status?: string
+          country_code?: string | null
+          created_at?: string
+          created_by?: string | null
+          creator_display?: string | null
+          credit_line?: string | null
+          current_approved_version_id?: string | null
+          current_submitted_version_id?: string | null
+          current_working_version_id?: string | null
+          exposure_class?: string
+          id?: string
+          internal_notes?: string | null
+          language_code?: string | null
+          media_asset_id?: string | null
+          place_text?: string | null
+          publication_date?: string | null
+          publisher_display?: string | null
+          reliability_note?: string | null
+          retrieval_date?: string | null
+          review_status?: string
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          rights_status?: string
+          sensitivity?: string
+          source_state?: string
+          source_type?: string
+          source_url?: string | null
+          title?: string
+          updated_at?: string
+          updated_by?: string | null
+          withdrawal_public_mode?: string
+          withdrawal_reason?: string | null
+          withdrawn_at?: string | null
+          withdrawn_by?: string | null
+          working_revision?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "sources_current_approved_version_fkey"
+            columns: ["current_approved_version_id"]
+            isOneToOne: false
+            referencedRelation: "source_versions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "sources_current_submitted_version_fkey"
+            columns: ["current_submitted_version_id"]
+            isOneToOne: false
+            referencedRelation: "source_versions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "sources_current_working_version_fkey"
+            columns: ["current_working_version_id"]
+            isOneToOne: false
+            referencedRelation: "source_versions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "sources_source_type_fkey"
+            columns: ["source_type"]
+            isOneToOne: false
+            referencedRelation: "source_types"
+            referencedColumns: ["source_type"]
+          },
+        ]
+      }
     }
     Views: {
       [_ in never]: never
@@ -1070,6 +1611,30 @@ export type Database = {
           p_item: Database["editorial"]["Tables"]["publishing_items"]["Row"]
         }
         Returns: Json
+      }
+      source_snapshot_fingerprint: {
+        Args: {
+          p_archive_identifier: string
+          p_capture_date: string
+          p_consent_status: string
+          p_country_code: string
+          p_creator_display: string
+          p_credit_line: string
+          p_internal_notes: string
+          p_language_code: string
+          p_media_asset_id: string
+          p_place_text: string
+          p_publication_date: string
+          p_publisher_display: string
+          p_reliability_note: string
+          p_retrieval_date: string
+          p_rights_status: string
+          p_sensitivity: string
+          p_source_type: string
+          p_source_url: string
+          p_title: string
+        }
+        Returns: string
       }
     }
     Enums: {
