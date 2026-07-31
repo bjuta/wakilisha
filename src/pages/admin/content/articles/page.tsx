@@ -31,14 +31,12 @@ export default function AdminArticlesPage() {
     load();
   }, []);
 
-  // For authors/writers: only show own articles
+  // Writers only see Articles owned by their account.
   const visibleArticles = canEditOthers
     ? articles
-    : articles.filter((a) => {
-        const currentUserName = adminUser.name?.toLowerCase();
-        const articleAuthor = a.author?.toLowerCase() ?? "";
-        return articleAuthor === currentUserName || articleAuthor.includes(currentUserName);
-      });
+    : articles.filter(
+        (article) => article.ownerId === adminUser.id,
+      );
 
   const filtered = visibleArticles.filter((a) => {
     const matchesSearch =

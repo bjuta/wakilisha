@@ -134,6 +134,7 @@ export function ArticleEditorWorkspace({
   const isInstituteMode = mode === "institute";
 
   const userCanPublish = adminUser.can("publish_articles");
+  const userCanEditOwn = adminUser.can("edit_own_articles");
   const userCanEditOthers = adminUser.can("edit_others_articles");
   const userCanManageReviewQueue = adminUser.can("manage_review_queue");
   const isAdmin = adminUser.role === "administrator" || adminUser.can("admin_god_mode");
@@ -213,28 +214,43 @@ export function ArticleEditorWorkspace({
 
   // ── Central permission object ──
   const articlePermissions = useMemo(() => {
-    const articleAuthor = (article?.author ?? "").toLowerCase();
-    const currentUserName = adminUser.name?.toLowerCase() ?? "";
     const isOwner =
-      !articleAuthor || !currentUserName
-        ? true
-        : articleAuthor === currentUserName ||
-          articleAuthor.includes(currentUserName) ||
-          currentUserName.includes(articleAuthor);
+      article?.ownerId !== null &&
+      article?.ownerId === adminUser.id;
 
     const canView = true;
-    const canEdit = isAdmin || isOwner || userCanEditOthers;
-    const canDelete = !isInstituteMode && (isAdmin || (isOwner && userCanEditOthers));
-    const canPublish = !isInstituteMode && (isAdmin || (isOwner && userCanPublish));
+    const canEdit =
+      isAdmin ||
+      userCanEditOthers ||
+      (userCanEditOwn && isOwner);
+    const canDelete =
+      !isInstituteMode &&
+      (isAdmin || (isOwner && userCanEditOthers));
+    const canPublish =
+      !isInstituteMode &&
+      (isAdmin || (isOwner && userCanPublish));
     const canAutosave = canEdit;
     const reason = !canEdit
-      ? "You can only edit your own articles. This article is owned by " +
-        (article?.author || "another author") +
-        "."
+      ? "You do not have permission to edit this Article."
       : null;
 
-    return { canView, canEdit, canDelete, canPublish, canAutosave, reason };
-  }, [article, adminUser, isAdmin, isInstituteMode, userCanEditOthers, userCanPublish]);
+    return {
+      canView,
+      canEdit,
+      canDelete,
+      canPublish,
+      canAutosave,
+      reason,
+    };
+  }, [
+    article?.ownerId,
+    adminUser.id,
+    isAdmin,
+    isInstituteMode,
+    userCanEditOwn,
+    userCanEditOthers,
+    userCanPublish,
+  ]);
 
   // ── Taxonomy slug maps (from ArticleMetaPanel) ──
   const [categorySlugMap, setCategorySlugMap] = useState<Record<string, string>>();

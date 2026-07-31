@@ -13379,6 +13379,15 @@ export type Database = {
         }
         Relationships: []
       }
+      wk_resource_owner_index: {
+        Row: {
+          canonical_record_id: string | null
+          owner_id: string | null
+          resource_id: string | null
+          resource_kind: string | null
+        }
+        Relationships: []
+      }
     }
     Functions: {
       accept_article_suggestion: {
