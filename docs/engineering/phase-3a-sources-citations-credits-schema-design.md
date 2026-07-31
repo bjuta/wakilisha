@@ -1009,9 +1009,9 @@ Immutable typed contribution identity with one explicit credited-party authority
 ### Foreign keys
 
 - `credit_role` references `editorial.credit_roles(credit_role)`
-- `user_id` references `auth.users(id)` with `on delete set null`
-- `registry_author_id` references `public.registry_authors(id)` with `on delete set null`
-- `external_contributor_id` references `editorial.external_contributors(id)` with `on delete set null`
+- `user_id` references `auth.users(id)` with `on delete restrict`
+- `registry_author_id` references `public.registry_authors(id)` with `on delete restrict`
+- `external_contributor_id` references `editorial.external_contributors(id)` with `on delete restrict`
 - `created_by` references `auth.users(id)` with `on delete set null`
 
 ### Exactly-one credited-party constraint
