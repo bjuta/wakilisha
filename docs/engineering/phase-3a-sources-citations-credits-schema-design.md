@@ -254,7 +254,8 @@ Mutable Source rows hold:
 
 - `source_type` references `editorial.source_types(source_type)`
 - `media_asset_id` references `public.registry_media_assets(id)` with `on delete set null`
-- actor columns reference `auth.users(id)` with `on delete set null`
+- `created_by` and `updated_by` reference `auth.users(id)` with `on delete set null`
+- `reviewed_by` and `withdrawn_by` are historical actor UUID snapshots without foreign keys
 - Source-version pointers reference `editorial.source_versions(id)` after both tables exist
 
 ### Constraints
@@ -403,8 +404,8 @@ Approval is represented by `editorial.sources.current_approved_version_id`.
 
 - `source_id` references `editorial.sources(id)` with `on delete restrict`
 - `source_type` references `editorial.source_types(source_type)`
-- `media_asset_id` references `public.registry_media_assets(id)` with `on delete set null`
-- `created_by` references `auth.users(id)` with `on delete set null`
+- `media_asset_id` references `public.registry_media_assets(id)` with `on delete restrict`
+- `created_by` is a historical actor UUID snapshot without a foreign key
 
 ### Constraints
 
@@ -1001,8 +1002,6 @@ Immutable typed contribution identity with one explicit credited-party authority
 - `display_name_snapshot text not null`
 - `role_label_snapshot text`
 - `credit_note text`
-- `public_safe boolean not null default false`
-- `credit_state text not null default 'active'`
 - `created_by uuid`
 - `created_at timestamptz not null default now()`
 
@@ -1012,7 +1011,7 @@ Immutable typed contribution identity with one explicit credited-party authority
 - `user_id` references `auth.users(id)` with `on delete restrict`
 - `registry_author_id` references `public.registry_authors(id)` with `on delete restrict`
 - `external_contributor_id` references `editorial.external_contributors(id)` with `on delete restrict`
-- `created_by` references `auth.users(id)` with `on delete set null`
+- `created_by` is a historical actor UUID snapshot without a foreign key
 
 ### Exactly-one credited-party constraint
 
@@ -1038,6 +1037,31 @@ A manual boolean-sum expression may be used if required.
 - role label snapshot may preserve publication wording
 - Credit note is separate from the controlled role
 
+## Credit governance
+
+### Table
+
+`editorial.credit_governance`
+
+### Purpose
+
+Mutable lifecycle and public-safety authority for one immutable Credit.
+
+### Columns
+
+- `credit_id uuid primary key`
+- `public_safe boolean not null default false`
+- `credit_state text not null default 'active'`
+- `governance_revision bigint not null default 1`
+- `reason text`
+- `updated_by uuid`
+- `updated_at timestamptz not null default now()`
+
+### Foreign keys
+
+- `credit_id` references `editorial.credits(id)` with `on delete restrict`
+- `updated_by` references `auth.users(id)` with `on delete set null`
+
 ### Credit state
 
 Supported values:
@@ -1045,6 +1069,13 @@ Supported values:
 - `active`
 - `withdrawn`
 - `archived`
+
+### Constraints
+
+- `governance_revision >= 1`
+- public-safe Credits must be active
+- withdrawn and archived Credits cannot be public-safe
+- reason is required when state is withdrawn or archived
 
 ### Public-safety rules
 
@@ -1065,6 +1096,18 @@ For an external-contributor Credit:
 - contributor must be public-safe
 - consent must permit public display
 
+### Mutation boundary
+
+Only trusted Credit commands may update Credit governance.
+
+Credit-governance updates must:
+
+- lock the governance row
+- verify expected governance revision
+- validate credited-party public safety
+- increment governance revision exactly once
+- preserve immutable Credit identity and snapshots
+
 ### Immutability
 
 Credits are immutable after creation.
@@ -1073,7 +1116,7 @@ Corrections create:
 
 - a replacement Credit
 - a replacement attachment
-- an archived or withdrawn previous Credit where appropriate
+- an archived or withdrawn previous Credit-governance row where appropriate
 
 Direct update and delete are blocked.
 
@@ -1127,7 +1170,7 @@ Resource-level Credits require a later migration after a real cross-version use 
 
 - `display_order >= 0`
 - public-safe attachment requires public-safe Credit
-- withdrawn or archived Credits cannot receive new public-safe attachments
+- withdrawn or archived Credit-governance rows cannot receive new public-safe attachments
 - duplicate Credit attachment to the same Article version is rejected
 - direct authenticated mutation is denied
 
@@ -1329,7 +1372,7 @@ Append-only history of Source review decisions and withdrawal actions.
 
 - `source_id` references `editorial.sources(id)` with `on delete restrict`
 - `source_version_id` references `editorial.source_versions(id)` with `on delete restrict`
-- `actor_id` references `auth.users(id)` with `on delete set null`
+- `actor_id` is a historical actor UUID snapshot without a foreign key
 
 ### Supported actions
 
@@ -1806,7 +1849,8 @@ Required behaviour:
 - store authenticated-user username snapshot internally where applicable
 - validate public-safety rules
 - create immutable Credit
-- return Credit ID
+- create its Credit-governance row
+- return Credit ID and governance revision
 
 Identity resolution:
 
@@ -1817,6 +1861,35 @@ Identity resolution:
 No fallback name matching is allowed.
 
 Authenticated-user Credits do not expose a public profile route in PR 3A.
+
+### `public.set_credit_governance`
+
+Purpose:
+
+Govern lifecycle and public-safety state for one immutable Credit.
+
+Inputs:
+
+- Credit ID
+- requested Credit state
+- requested public-safe state
+- expected governance revision
+- reason
+
+Required capability:
+
+- `manage_credits`
+
+Required behaviour:
+
+1. lock the Credit-governance row
+2. verify expected governance revision
+3. require a reason for withdrawal or archival
+4. reject public-safe state for withdrawn or archived Credits
+5. validate external-contributor consent and public safety
+6. preserve immutable Credit identity and snapshots
+7. increment governance revision exactly once
+8. return Credit ID, state, public-safe state, and resulting revision
 
 ### `public.attach_article_version_credit`
 
@@ -2416,14 +2489,26 @@ This preserves:
 - immutable Credit identity
 - historical display snapshots
 
-Operational actor fields may use `on delete set null`, including:
+Mutable operational actor fields may use `on delete set null`.
+
+Historical actor identifiers on immutable or state-defining trust records are stored as UUID snapshots without foreign keys. This applies to:
+
+- `editorial.source_versions.created_by`
+- `editorial.source_review_events.actor_id`
+- `editorial.credits.created_by`
+- `editorial.sources.reviewed_by`
+- `editorial.sources.withdrawn_by`
+
+These UUID snapshots may outlive the corresponding authenticated account.
+
+Operational actor fields that may use `on delete set null` include:
 
 - `created_by`
 - `updated_by`
 - `reviewed_by`
 - `withdrawn_by`
 
-Media references may use `on delete set null` where the historical Source snapshot still preserves enough descriptive identity.
+Mutable Source Media references may use `on delete set null`. Immutable Source-version Media references use `on delete restrict` because the Media identity participates in the historical snapshot and fingerprint.
 
 ## Schema verification
 
