@@ -214,7 +214,7 @@ export async function fetchArticleForAdmin(slug: string): Promise<AdminArticleDe
     data: resourceIdentity,
     error: resourceIdentityError,
   } = await supabase
-    .from("wk_resource_index")
+    .from("wk_resource_owner_index")
     .select("resource_id, owner_id")
     .eq("resource_kind", "article")
     .eq("canonical_record_id", row.id)
@@ -341,7 +341,7 @@ export async function fetchArticlesForAdminList(limit = 200): Promise<AdminArtic
   }
 
   const { data: resourceData, error: resourceError } = await supabase
-    .from("wk_resource_index")
+    .from("wk_resource_owner_index")
     .select("canonical_record_id, resource_id, owner_id")
     .eq("resource_kind", "article")
     .in("canonical_record_id", articleIds);

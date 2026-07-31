@@ -36,18 +36,34 @@ const migration = fs.readFileSync(
   "utf8",
 );
 
+const correctiveMigration = fs.readFileSync(
+  path.join(
+    root,
+    "supabase/migrations/20260731100000_restore_resource_index_privacy.sql",
+  ),
+  "utf8",
+);
+
 describe("Article owner authority", () => {
-  it("exposes canonical ownership through the resource index", () => {
+  it("keeps ownership out of the anonymous resource index", () => {
     expect(migration).toContain(
       "resources.owner_id",
     );
 
-    expect(migration).toContain(
-      "create or replace view public.wk_resource_index",
+    expect(correctiveMigration).toContain(
+      "drop view public.wk_resource_index",
     );
 
-    expect(migration).toContain(
-      "security_invoker = true",
+    expect(correctiveMigration).toContain(
+      "create view public.wk_resource_owner_index",
+    );
+
+    expect(correctiveMigration).toContain(
+      "from public, anon, authenticated",
+    );
+
+    expect(correctiveMigration).toContain(
+      "to authenticated, service_role",
     );
   });
 
@@ -58,6 +74,14 @@ describe("Article owner authority", () => {
 
     expect(service).toContain(
       '.select("resource_id, owner_id")',
+    );
+
+    expect(service).toContain(
+      '.from("wk_resource_owner_index")',
+    );
+
+    expect(service).not.toContain(
+      '.from("wk_resource_index")',
     );
 
     expect(service).toContain(

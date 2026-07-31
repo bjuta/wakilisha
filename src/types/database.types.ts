@@ -13372,11 +13372,19 @@ export type Database = {
           canonical_record_id: string | null
           created_at: string | null
           lifecycle_state: string | null
-          owner_id: string | null
           resource_id: string | null
           resource_kind: string | null
           updated_at: string | null
           visibility: string | null
+        }
+        Relationships: []
+      }
+      wk_resource_owner_index: {
+        Row: {
+          canonical_record_id: string | null
+          owner_id: string | null
+          resource_id: string | null
+          resource_kind: string | null
         }
         Relationships: []
       }
