@@ -5,6 +5,7 @@ export type ArticleWorkbenchMode =
   | "write"
   | "media"
   | "seo"
+  | "trust"
   | "review"
   | "publishing"
   | "history"
@@ -47,6 +48,12 @@ const WORKBENCH_MODES: WorkbenchModeDefinition[] = [
     icon: "Search",
   },
   {
+    key: "trust",
+    label: "Sources & Credits",
+    description: "Inspect Sources, Citations, Credits, and public eligibility.",
+    icon: "BookOpenCheck",
+  },
+  {
     key: "review",
     label: "Review",
     description: "Inspect the governed version and review decisions.",
@@ -74,7 +81,7 @@ const WORKBENCH_MODES: WorkbenchModeDefinition[] = [
 
 const WORKBENCH_GROUPS: WorkbenchGroup[] = [
   { label: "Compose", modes: ["write", "media"] },
-  { label: "Prepare", modes: ["seo"] },
+  { label: "Prepare", modes: ["seo", "trust"] },
   { label: "Workflow", modes: ["review", "publishing"] },
   { label: "Record", modes: ["history", "recovery"] },
 ];

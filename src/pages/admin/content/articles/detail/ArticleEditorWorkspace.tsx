@@ -12,6 +12,8 @@ import { ArticleMetaPanel } from "./components/ArticleMetaPanel";
 import { ArticleWriteContextDrawer } from "./components/ArticleWriteContextDrawer";
 import { ArticleDocumentModeSwitcher } from "./components/ArticleDocumentModeSwitcher";
 import { ArticlePublishChecklist } from "./components/ArticlePublishChecklist";
+import { ArticleTrustPanel } from "./components/ArticleTrustPanel";
+import { useArticleTrustWorkspace } from "./hooks/useArticleTrustWorkspace";
 import { useAdminUser } from "@/hooks/useAdminUser";
 import { useArticleDocumentModeState } from "./hooks/useArticleDocumentModeState";
 import type {
@@ -393,6 +395,15 @@ export function ArticleEditorWorkspace({
       wpStatus: article?.wpStatus ?? null,
       draftVersion:
         article?.draftVersion ?? null,
+    });
+
+  const articleTrustState =
+    useArticleTrustWorkspace({
+      articleId: article?.id ?? null,
+      draftVersion:
+        article?.draftVersion ?? null,
+      enabled:
+        activeWorkbenchMode === "trust",
     });
 
   const submittedDocument =
@@ -3258,6 +3269,10 @@ export function ArticleEditorWorkspace({
           >
             {articleMetaPanel}
           </ArticleWriteContextDrawer>
+        ) : activeWorkbenchMode === "trust" ? (
+          <ArticleTrustPanel
+            state={articleTrustState}
+          />
         ) : (
           <div className="w-full max-w-6xl">
             {articleMetaPanel}

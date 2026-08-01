@@ -128,6 +128,16 @@ export interface ArticleTrustWorkspace {
   credits: ArticleTrustCredit[];
 }
 
+export interface ArticleWorkingVersionIdentity {
+  articleId: string;
+  resourceId: string;
+  workingVersionId: string;
+  workingVersionNumber: number;
+  workingVersionKind: string;
+  sourceDraftVersion: number;
+  articleDraftVersion: number;
+}
+
 function record(value: unknown): JsonRecord {
   return value && typeof value === "object" && !Array.isArray(value)
     ? (value as JsonRecord)
@@ -267,6 +277,30 @@ function normalizeCredit(value: unknown): ArticleTrustCredit {
   };
 }
 
+export function normalizeArticleWorkingVersionIdentity(
+  value: unknown,
+): ArticleWorkingVersionIdentity {
+  const row = record(value);
+
+  return {
+    articleId: text(row.article_id),
+    resourceId: text(row.resource_id),
+    workingVersionId: text(row.working_version_id),
+    workingVersionNumber: number(
+      row.working_version_number,
+    ),
+    workingVersionKind: text(
+      row.working_version_kind,
+    ),
+    sourceDraftVersion: number(
+      row.source_draft_version,
+    ),
+    articleDraftVersion: number(
+      row.article_draft_version,
+    ),
+  };
+}
+
 export function normalizeArticleTrustWorkspace(
   value: unknown,
 ): ArticleTrustWorkspace {
@@ -329,6 +363,56 @@ function throwTrustError(
     classifyArticleTrustError(error.message, code),
     code,
   );
+}
+
+export async function fetchArticleWorkingVersionIdentity(
+  articleId: string,
+): Promise<ArticleWorkingVersionIdentity> {
+  const normalizedId = articleId.trim();
+
+  if (!normalizedId) {
+    throw new ArticleTrustServiceError(
+      "Article id is required",
+      "validation",
+    );
+  }
+
+  const { data, error } = await supabase.rpc(
+    "get_article_working_version_identity",
+    { p_article_id: normalizedId },
+  );
+
+  if (error) {
+    throwTrustError(
+      "Failed to load Article working version identity",
+      error,
+    );
+  }
+
+  const identity =
+    normalizeArticleWorkingVersionIdentity(data);
+
+  if (!identity.workingVersionId) {
+    throw new ArticleTrustServiceError(
+      "Article working version identity is unavailable",
+      "unknown",
+    );
+  }
+
+  if (
+    identity.articleId &&
+    identity.articleId !== normalizedId
+  ) {
+    throw new ArticleTrustServiceError(
+      "Article working version identity returned a different Article",
+      "unknown",
+    );
+  }
+
+  return {
+    ...identity,
+    articleId: identity.articleId || normalizedId,
+  };
 }
 
 export async function fetchArticleVersionTrustWorkspace(
