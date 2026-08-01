@@ -1647,6 +1647,7 @@ PR 3A then begins the reusable trust authority for:
 - Registry entity links
 - inline Article citations
 - public source and credit presentation
+- preservation of future research publishing and licensed machine-use compatibility without placing commerce inside Citation or Credit records
 
 Do not begin Playlist, Audio, Video, Media, Field Capture, Corrections, Provenance, or Inquiry Mode in the first PR 3A implementation slice.
 
@@ -2350,3 +2351,24 @@ New product ideas are recorded without automatically reopening frozen foundation
 - Readdy Finish update needed: No
 - documentation review needed: Yes
 - next implementation plan: Phase 2B governed review closure
+
+
+## Research publishing and knowledge licensing
+
+WAKILISHA may later support first-class research works, datasets, and structured knowledge products created by human researchers and knowledge workers.
+
+These works may be published for human use and licensed for authorised machine use.
+
+Trust, publication, rights and access, commercial offers, usage metering, revenue allocation, and payouts must remain separate authorities.
+
+A Citation records provenance and use. It does not grant permission.
+
+A Credit records contribution. It does not determine payout.
+
+Public-safe presentation does not mean unrestricted reuse or machine-training permission.
+
+Article-specific trust attachments are the first adoption path and must not become the permanent universal Citation API.
+
+See `docs/engineering/research-publishing-and-knowledge-licensing-future-contract.md`.
+
+This direction does not add marketplace, payment, licensing, metering, or payout implementation to Phase 3A.

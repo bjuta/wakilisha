@@ -84,6 +84,26 @@ Acceptance proof:
 - credits can represent authenticated users, Registry authors, and named external contributors
 - public presentation does not expose private or sensitive source material
 
+## Research and machine-use compatibility
+
+Sources, Citations, Credits, and contributor identities are permanent shared trust infrastructure.
+
+Their identity and versioning contracts must support future research publications, datasets, machine-readable knowledge products, agent retrieval, model evaluation, and licensed AI use.
+
+Citation records describe provenance and use. They do not grant permission.
+
+Credit records describe contribution. They do not determine commercial allocation or payout.
+
+Public-safe presentation does not imply permission to download, reproduce, embed, train on, redistribute, or use commercially.
+
+Licensing, entitlements, usage metering, revenue allocation, and payouts must be separate authorities attached to stable resource and version identities.
+
+Article-specific attachment commands are the first adoption path. They are not the final cross-resource Citation or Credit API.
+
+See `docs/engineering/research-publishing-and-knowledge-licensing-future-contract.md`.
+
+This future direction does not expand the current Phase 3A implementation scope.
+
 ## PR 3B: Corrections and provenance
 
 Build scope:
