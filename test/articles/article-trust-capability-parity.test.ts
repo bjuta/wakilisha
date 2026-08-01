@@ -53,7 +53,7 @@ describe("Article trust capability parity", () => {
     }
   });
 
-  it("reads role capabilities from the database authority", () => {
+  it("reads role capabilities from the database authority and falls back only on read failure", () => {
     const source = read(
       "src/services/userRoles.ts",
     );
@@ -65,7 +65,16 @@ describe("Article trust capability parity", () => {
       "await fetchRoleCapabilities(roles)",
     );
     expect(source).toContain(
+      "if (error || !data)",
+    );
+    expect(source).toContain(
       "return uniqueCapabilities(roles)",
+    );
+    expect(source).toContain(
+      "return capabilities;",
+    );
+    expect(source).not.toContain(
+      "return capabilities.length",
     );
   });
 

@@ -171,9 +171,7 @@ async function fetchRoleCapabilities(
     ),
   ) as Capability[];
 
-  return capabilities.length
-    ? capabilities
-    : uniqueCapabilities(roles);
+  return capabilities;
 }
 
 export async function fetchUserRole(userId: string): Promise<UserRoleRecord | null> {
