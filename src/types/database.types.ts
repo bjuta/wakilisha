@@ -410,6 +410,38 @@ export type Database = {
           },
         ]
       }
+      article_version_trust_revisions: {
+        Row: {
+          article_version_id: string
+          citation_revision: number
+          credit_revision: number
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          article_version_id: string
+          citation_revision?: number
+          credit_revision?: number
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          article_version_id?: string
+          citation_revision?: number
+          credit_revision?: number
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "article_version_trust_revisions_version_fkey"
+            columns: ["article_version_id"]
+            isOneToOne: true
+            referencedRelation: "article_versions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       article_versions: {
         Row: {
           article_id: string
@@ -522,6 +554,73 @@ export type Database = {
           sort_order?: number
         }
         Relationships: []
+      }
+      citations: {
+        Row: {
+          citation_state: string
+          created_at: string
+          created_by: string | null
+          editor_note: string | null
+          id: string
+          locator_data: Json
+          locator_type: string
+          public_label: string | null
+          public_safe: boolean
+          quotation: string | null
+          source_id: string
+          source_version_id: string
+        }
+        Insert: {
+          citation_state?: string
+          created_at?: string
+          created_by?: string | null
+          editor_note?: string | null
+          id?: string
+          locator_data?: Json
+          locator_type: string
+          public_label?: string | null
+          public_safe?: boolean
+          quotation?: string | null
+          source_id: string
+          source_version_id: string
+        }
+        Update: {
+          citation_state?: string
+          created_at?: string
+          created_by?: string | null
+          editor_note?: string | null
+          id?: string
+          locator_data?: Json
+          locator_type?: string
+          public_label?: string | null
+          public_safe?: boolean
+          quotation?: string | null
+          source_id?: string
+          source_version_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "citations_locator_type_fkey"
+            columns: ["locator_type"]
+            isOneToOne: false
+            referencedRelation: "citation_locator_types"
+            referencedColumns: ["locator_type"]
+          },
+          {
+            foreignKeyName: "citations_source_fkey"
+            columns: ["source_id"]
+            isOneToOne: false
+            referencedRelation: "sources"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "citations_source_version_fkey"
+            columns: ["source_version_id"]
+            isOneToOne: false
+            referencedRelation: "source_versions"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       credit_governance: {
         Row: {
@@ -1063,6 +1162,126 @@ export type Database = {
           },
         ]
       }
+      resource_citations: {
+        Row: {
+          citation_id: string
+          citation_purpose: string
+          created_at: string
+          created_by: string | null
+          display_order: number
+          id: string
+          public_safe: boolean
+          resource_id: string
+          resource_kind: string
+          target_anchor_data: Json
+          target_anchor_type: string
+          target_version_id: string
+          target_version_type: string
+        }
+        Insert: {
+          citation_id: string
+          citation_purpose?: string
+          created_at?: string
+          created_by?: string | null
+          display_order?: number
+          id?: string
+          public_safe?: boolean
+          resource_id: string
+          resource_kind: string
+          target_anchor_data?: Json
+          target_anchor_type?: string
+          target_version_id: string
+          target_version_type: string
+        }
+        Update: {
+          citation_id?: string
+          citation_purpose?: string
+          created_at?: string
+          created_by?: string | null
+          display_order?: number
+          id?: string
+          public_safe?: boolean
+          resource_id?: string
+          resource_kind?: string
+          target_anchor_data?: Json
+          target_anchor_type?: string
+          target_version_id?: string
+          target_version_type?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "resource_citations_citation_fkey"
+            columns: ["citation_id"]
+            isOneToOne: false
+            referencedRelation: "citations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "resource_citations_resource_fkey"
+            columns: ["resource_id", "resource_kind"]
+            isOneToOne: false
+            referencedRelation: "resources"
+            referencedColumns: ["id", "resource_kind"]
+          },
+        ]
+      }
+      resource_credits: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          credit_id: string
+          display_order: number
+          id: string
+          is_primary: boolean
+          public_safe: boolean
+          resource_id: string
+          resource_kind: string
+          target_version_id: string
+          target_version_type: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          credit_id: string
+          display_order?: number
+          id?: string
+          is_primary?: boolean
+          public_safe?: boolean
+          resource_id: string
+          resource_kind: string
+          target_version_id: string
+          target_version_type: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          credit_id?: string
+          display_order?: number
+          id?: string
+          is_primary?: boolean
+          public_safe?: boolean
+          resource_id?: string
+          resource_kind?: string
+          target_version_id?: string
+          target_version_type?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "resource_credits_credit_fkey"
+            columns: ["credit_id"]
+            isOneToOne: false
+            referencedRelation: "credits"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "resource_credits_resource_fkey"
+            columns: ["resource_id", "resource_kind"]
+            isOneToOne: false
+            referencedRelation: "resources"
+            referencedColumns: ["id", "resource_kind"]
+          },
+        ]
+      }
       resource_kinds: {
         Row: {
           created_at: string
@@ -1165,6 +1384,51 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "resource_kinds"
             referencedColumns: ["kind"]
+          },
+        ]
+      }
+      source_registry_links: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          registry_entity_id: string
+          registry_entity_type: string
+          relationship_role: string
+          source_id: string
+          source_version_id: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          registry_entity_id: string
+          registry_entity_type: string
+          relationship_role?: string
+          source_id: string
+          source_version_id: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          registry_entity_id?: string
+          registry_entity_type?: string
+          relationship_role?: string
+          source_id?: string
+          source_version_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "source_registry_links_source_fkey"
+            columns: ["source_id"]
+            isOneToOne: false
+            referencedRelation: "sources"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "source_registry_links_source_version_fkey"
+            columns: ["source_version_id"]
+            isOneToOne: false
+            referencedRelation: "source_versions"
+            referencedColumns: ["id"]
           },
         ]
       }
@@ -1635,6 +1899,14 @@ export type Database = {
           p_title: string
         }
         Returns: string
+      }
+      validate_citation_locator: {
+        Args: { p_locator_data: Json; p_locator_type: string }
+        Returns: undefined
+      }
+      validate_citation_target_anchor: {
+        Args: { p_anchor_data: Json; p_anchor_type: string }
+        Returns: undefined
       }
     }
     Enums: {
