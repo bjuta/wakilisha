@@ -71,6 +71,7 @@ export type Capability =
   | "view_dashboard" | "edit_own_articles" | "edit_others_articles" | "publish_articles" | "delete_articles" | "edit_guides" | "edit_pages" | "view_publishing_dashboard" | "manage_publishing" | "view_archive" | "manage_categories" | "manage_tags"
   | "upload_media" | "manage_media_library" | "view_missing_images" | "view_broken_links" | "view_charts_admin" | "manage_charts" | "manage_ingest" | "publish_charts" | "view_registry" | "manage_registry"
   | "view_relationships" | "manage_relationships" | "view_review_queue" | "manage_review_queue" | "view_imports" | "manage_imports" | "view_settings" | "manage_settings" | "manage_integrations" | "manage_appearance"
+  | "view_trust_records" | "manage_sources" | "review_sources" | "withdraw_sources" | "manage_citations" | "manage_credits"
   | "manage_users" | "view_media_migration" | "view_admin_readonly" | "view_public_account" | "manage_own_profile" | "manage_public_profile" | "manage_own_preferences" | "receive_notifications"
   | "save_content" | "follow_entities" | "follow_artists" | "follow_charts" | "contribute_lyrics" | "comment_public" | "moderate_community" | "view_gated_content" | "view_premium_content" | "manage_subscription"
   | "view_customer_orders" | "manage_customer_orders" | "submit_artist_claim" | "manage_claimed_artist_profile" | "submit_artist_media" | "submit_label_updates" | "view_partner_reports" | "submit_chart_data"
@@ -104,14 +105,14 @@ export interface UserRoleRecord {
 const SUBSCRIBER_CAPABILITIES: Capability[] = ["view_public_account", "manage_own_profile", "manage_public_profile", "manage_own_preferences", "receive_notifications", "save_content", "follow_entities", "follow_artists", "follow_charts", "contribute_lyrics", "view_gated_content"];
 
 const CAPABILITY_MATRIX: Record<UserRole, Capability[]> = {
-  administrator: ["view_dashboard", "edit_own_articles", "edit_others_articles", "publish_articles", "delete_articles", "edit_guides", "edit_pages", "view_publishing_dashboard", "manage_publishing", "view_archive", "manage_categories", "manage_tags", "upload_media", "manage_media_library", "view_missing_images", "view_broken_links", "view_charts_admin", "manage_charts", "manage_ingest", "publish_charts", "view_registry", "manage_registry", "view_relationships", "manage_relationships", "view_review_queue", "manage_review_queue", "view_imports", "manage_imports", "view_settings", "manage_settings", "manage_integrations", "manage_appearance", "manage_users", "view_media_migration", "view_admin_readonly", ...SUBSCRIBER_CAPABILITIES, "comment_public", "moderate_community", "view_premium_content", "manage_subscription", "view_customer_orders", "manage_customer_orders", "submit_artist_claim", "manage_claimed_artist_profile", "submit_artist_media", "submit_label_updates", "view_partner_reports", "submit_chart_data", "view_research_exports", "export_research_data", "view_analytics", "view_support_console", "manage_support_cases", "view_developer_tools", "manage_developer_tools"],
+  administrator: ["view_dashboard", "edit_own_articles", "edit_others_articles", "publish_articles", "delete_articles", "edit_guides", "edit_pages", "view_publishing_dashboard", "manage_publishing", "view_archive", "manage_categories", "manage_tags", "upload_media", "manage_media_library", "view_missing_images", "view_broken_links", "view_charts_admin", "manage_charts", "manage_ingest", "publish_charts", "view_registry", "manage_registry", "view_relationships", "manage_relationships", "view_review_queue", "manage_review_queue", "view_imports", "manage_imports", "view_settings", "manage_settings", "manage_integrations", "manage_appearance", "view_trust_records", "manage_sources", "review_sources", "withdraw_sources", "manage_citations", "manage_credits", "manage_users", "view_media_migration", "view_admin_readonly", ...SUBSCRIBER_CAPABILITIES, "comment_public", "moderate_community", "view_premium_content", "manage_subscription", "view_customer_orders", "manage_customer_orders", "submit_artist_claim", "manage_claimed_artist_profile", "submit_artist_media", "submit_label_updates", "view_partner_reports", "submit_chart_data", "view_research_exports", "export_research_data", "view_analytics", "view_support_console", "manage_support_cases", "view_developer_tools", "manage_developer_tools"],
   developer: ["view_dashboard", "view_developer_tools", "manage_developer_tools", "view_settings", "manage_integrations", "view_imports", "view_charts_admin", "view_admin_readonly"],
-  editor: ["view_dashboard", "edit_own_articles", "edit_others_articles", "publish_articles", "delete_articles", "edit_guides", "edit_pages", "view_publishing_dashboard", "manage_publishing", "view_archive", "manage_categories", "manage_tags", "upload_media", "manage_media_library", "view_missing_images", "view_broken_links", "view_review_queue", "manage_review_queue", "view_media_migration", "view_admin_readonly"],
+  editor: ["view_dashboard", "edit_own_articles", "edit_others_articles", "publish_articles", "delete_articles", "edit_guides", "edit_pages", "view_publishing_dashboard", "manage_publishing", "view_archive", "manage_categories", "manage_tags", "upload_media", "manage_media_library", "view_missing_images", "view_broken_links", "view_review_queue", "manage_review_queue", "view_trust_records", "manage_sources", "manage_citations", "manage_credits", "view_media_migration", "view_admin_readonly"],
   chart_editor_global: ["view_dashboard", "view_charts_admin", "manage_charts", "manage_ingest", "publish_charts", "view_review_queue", "view_admin_readonly"],
   chart_editor_regional: ["view_dashboard", "view_charts_admin", "manage_charts", "publish_charts", "view_review_queue", "view_admin_readonly"],
-  registry_editor: ["view_dashboard", "view_registry", "manage_registry", "view_relationships", "manage_relationships", "view_review_queue", "manage_review_queue", "upload_media", "manage_media_library", "view_admin_readonly"],
+  registry_editor: ["view_dashboard", "view_registry", "manage_registry", "view_relationships", "manage_relationships", "view_review_queue", "manage_review_queue", "view_trust_records", "manage_sources", "manage_citations", "upload_media", "manage_media_library", "view_admin_readonly"],
   media_editor: ["view_dashboard", "upload_media", "manage_media_library", "view_missing_images", "view_broken_links", "view_media_migration", "view_review_queue", "view_admin_readonly"],
-  reviewer: ["view_dashboard", "view_review_queue", "manage_review_queue", "view_missing_images", "view_broken_links", "view_admin_readonly"],
+  reviewer: ["view_dashboard", "view_review_queue", "manage_review_queue", "view_trust_records", "review_sources", "view_missing_images", "view_broken_links", "view_admin_readonly"],
   moderator: ["view_dashboard", "view_review_queue", "manage_review_queue", "moderate_community", "view_admin_readonly"],
   support_agent: ["view_dashboard", "view_support_console", "manage_support_cases", "view_admin_readonly"],
   author: ["view_dashboard", "edit_own_articles", "publish_articles", "upload_media", "manage_media_library", "view_admin_readonly"],
@@ -148,14 +149,40 @@ export function userCanAll(role: UserRole, capabilities: Capability[]): boolean 
 export function roleCanAccessAdmin(role: UserRole | null): boolean { return role ? userCan(role, "view_dashboard") || userCan(role, "view_admin_readonly") : false; }
 export function roleIsPublicOnly(role: UserRole | null): boolean { return !roleCanAccessAdmin(role); }
 
+async function fetchRoleCapabilities(
+  roles: UserRole[],
+): Promise<Capability[]> {
+  const { data, error } = await supabase
+    .from("role_capabilities")
+    .select("capability_key")
+    .in("role_key", roles);
+
+  if (error || !data) {
+    return uniqueCapabilities(roles);
+  }
+
+  const capabilities = Array.from(
+    new Set(
+      data
+        .map((row) =>
+          String(row.capability_key ?? "").trim(),
+        )
+        .filter(Boolean),
+    ),
+  ) as Capability[];
+
+  return capabilities;
+}
+
 export async function fetchUserRole(userId: string): Promise<UserRoleRecord | null> {
   const { data: profile } = await supabase.from("user_profiles").select("user_id, display_name, bio, status, created_at, updated_at").eq("user_id", userId).maybeSingle();
   const { data: assignments, error: assignmentError } = await supabase.from("user_role_assignments").select("id, role_key, status, created_at, updated_at").eq("user_id", userId).eq("status", "active");
   if (!assignmentError && assignments && assignments.length > 0) {
     const roles = assignments.map((row) => normalizeRole(row.role_key as string));
     const role = primaryRole(roles);
+    const capabilities = await fetchRoleCapabilities(roles);
     const { data: scopes } = await supabase.from("user_access_scopes").select("id, role_key, scope_type, scope_value, can_view, can_edit, can_publish, status").eq("user_id", userId).eq("status", "active");
-    return { id: String(assignments[0].id), user_id: userId, role, roles, capabilities: uniqueCapabilities(roles), scopes: (scopes ?? []) as AccessScope[], display_name: (profile?.display_name as string | null | undefined) ?? null, bio: (profile?.bio as string | null | undefined) ?? null, status: (profile?.status as string | null | undefined) ?? "active", created_at: String(profile?.created_at ?? assignments[0].created_at ?? new Date().toISOString()), updated_at: String(profile?.updated_at ?? assignments[0].updated_at ?? new Date().toISOString()) };
+    return { id: String(assignments[0].id), user_id: userId, role, roles, capabilities, scopes: (scopes ?? []) as AccessScope[], display_name: (profile?.display_name as string | null | undefined) ?? null, bio: (profile?.bio as string | null | undefined) ?? null, status: (profile?.status as string | null | undefined) ?? "active", created_at: String(profile?.created_at ?? assignments[0].created_at ?? new Date().toISOString()), updated_at: String(profile?.updated_at ?? assignments[0].updated_at ?? new Date().toISOString()) };
   }
 
   if (assignmentError) console.warn("Durable role lookup failed; defaulting to subscriber:", assignmentError);
