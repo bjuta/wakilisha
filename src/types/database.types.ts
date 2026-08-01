@@ -697,8 +697,10 @@ export type Database = {
           external_contributor_id: string | null
           id: string
           registry_author_id: string | null
+          registry_author_slug_snapshot: string | null
           role_label_snapshot: string | null
           user_id: string | null
+          user_username_snapshot: string | null
         }
         Insert: {
           created_at?: string
@@ -709,8 +711,10 @@ export type Database = {
           external_contributor_id?: string | null
           id?: string
           registry_author_id?: string | null
+          registry_author_slug_snapshot?: string | null
           role_label_snapshot?: string | null
           user_id?: string | null
+          user_username_snapshot?: string | null
         }
         Update: {
           created_at?: string
@@ -721,8 +725,10 @@ export type Database = {
           external_contributor_id?: string | null
           id?: string
           registry_author_id?: string | null
+          registry_author_slug_snapshot?: string | null
           role_label_snapshot?: string | null
           user_id?: string | null
+          user_username_snapshot?: string | null
         }
         Relationships: [
           {
@@ -1810,6 +1816,12 @@ export type Database = {
         }
         Returns: string
       }
+      assert_citation_command_actor: { Args: never; Returns: string }
+      assert_credit_command_actor: { Args: never; Returns: string }
+      assert_source_command_actor: {
+        Args: { p_capability: string }
+        Returns: string
+      }
       copy_article_lifecycle_version: {
         Args: {
           p_lifecycle_state: string
@@ -1858,9 +1870,23 @@ export type Database = {
           version_number: number
         }[]
       }
+      insert_source_registry_links: {
+        Args: {
+          p_actor_id: string
+          p_registry_links: Json
+          p_source_id: string
+          p_source_version_id: string
+        }
+        Returns: undefined
+      }
       next_article_version_number: {
         Args: { p_resource_id: string }
         Returns: number
+      }
+      normalize_source_metadata: { Args: { p_metadata: Json }; Returns: Json }
+      normalize_source_registry_links: {
+        Args: { p_registry_links: Json }
+        Returns: Json
       }
       publish_article_snapshot: {
         Args: {
@@ -1875,6 +1901,10 @@ export type Database = {
           p_item: Database["editorial"]["Tables"]["publishing_items"]["Row"]
         }
         Returns: Json
+      }
+      source_content_fingerprint: {
+        Args: { p_metadata: Json; p_registry_links: Json }
+        Returns: string
       }
       source_snapshot_fingerprint: {
         Args: {
@@ -14484,6 +14514,30 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      attach_article_version_citation: {
+        Args: {
+          p_article_version_id: string
+          p_citation_id: string
+          p_citation_purpose: string
+          p_display_order: number
+          p_expected_citation_revision: number
+          p_public_safe: boolean
+          p_target_anchor_data: Json
+          p_target_anchor_type: string
+        }
+        Returns: Json
+      }
+      attach_article_version_credit: {
+        Args: {
+          p_article_version_id: string
+          p_credit_id: string
+          p_display_order: number
+          p_expected_credit_revision: number
+          p_is_primary: boolean
+          p_public_safe: boolean
+        }
+        Returns: Json
+      }
       briefing_cron_generate: { Args: never; Returns: undefined }
       bulk_delete_taxonomy_terms: {
         Args: { p_term_ids: string[] }
@@ -15239,6 +15293,45 @@ export type Database = {
           created_thread_id: string
         }[]
       }
+      create_citation: {
+        Args: {
+          p_editor_note?: string
+          p_locator_data: Json
+          p_locator_type: string
+          p_public_label?: string
+          p_public_safe?: boolean
+          p_quotation?: string
+          p_source_id: string
+          p_source_version_id: string
+        }
+        Returns: Json
+      }
+      create_credit: {
+        Args: {
+          p_credit_note?: string
+          p_credit_role: string
+          p_external_contributor_id?: string
+          p_public_safe?: boolean
+          p_registry_author_id?: string
+          p_role_label_override?: string
+          p_user_id?: string
+        }
+        Returns: Json
+      }
+      create_external_contributor: {
+        Args: {
+          p_consent_status?: string
+          p_contact_email?: string
+          p_contact_phone?: string
+          p_display_name: string
+          p_internal_notes?: string
+          p_location_text?: string
+          p_public_role?: string
+          p_public_safe?: boolean
+          p_public_url?: string
+        }
+        Returns: Json
+      }
       create_import_run: {
         Args: {
           p_errors?: string[]
@@ -15491,6 +15584,14 @@ export type Database = {
           isOneToOne: true
           isSetofReturn: false
         }
+      }
+      create_source: {
+        Args: {
+          p_correlation_id?: string
+          p_metadata: Json
+          p_registry_links?: Json
+        }
+        Returns: Json
       }
       create_taxonomy_term:
         | {
@@ -16509,6 +16610,24 @@ export type Database = {
           record_version: number
         }[]
       }
+      replace_article_version_citations: {
+        Args: {
+          p_article_version_id: string
+          p_attachments: Json
+          p_correlation_id?: string
+          p_expected_citation_revision: number
+        }
+        Returns: Json
+      }
+      replace_article_version_credits: {
+        Args: {
+          p_article_version_id: string
+          p_attachments: Json
+          p_correlation_id?: string
+          p_expected_credit_revision: number
+        }
+        Returns: Json
+      }
       request_article_changes: {
         Args: { p_article_id: string; p_note?: string; p_version_id?: string }
         Returns: {
@@ -16649,6 +16768,14 @@ export type Database = {
           version_number: number
         }[]
       }
+      restore_source: {
+        Args: {
+          p_correlation_id?: string
+          p_reason: string
+          p_source_id: string
+        }
+        Returns: Json
+      }
       review_evidence_item: {
         Args: {
           p_decision: string
@@ -16766,6 +16893,17 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      review_source_version: {
+        Args: {
+          p_correlation_id?: string
+          p_decision: string
+          p_exposure_class?: string
+          p_reason?: string
+          p_source_id: string
+          p_source_version_id: string
+        }
+        Returns: Json
+      }
       revoke_user_role_admin: {
         Args: { target_role_key: string; target_user_id: string }
         Returns: boolean
@@ -16794,6 +16932,17 @@ export type Database = {
           version_number: number
         }[]
       }
+      save_source_version: {
+        Args: {
+          p_correlation_id?: string
+          p_expected_working_revision: number
+          p_metadata: Json
+          p_reason?: string
+          p_registry_links?: Json
+          p_source_id: string
+        }
+        Returns: Json
+      }
       schedule_article_publication: {
         Args: {
           p_article_id: string
@@ -16818,6 +16967,16 @@ export type Database = {
           term_name: string
           term_slug: string
         }[]
+      }
+      set_credit_governance: {
+        Args: {
+          p_credit_id: string
+          p_credit_state: string
+          p_expected_governance_revision: number
+          p_public_safe: boolean
+          p_reason?: string
+        }
+        Returns: Json
       }
       set_publishing_item_primary_channel: {
         Args: {
@@ -16876,6 +17035,16 @@ export type Database = {
           receipt_status: string
         }[]
       }
+      submit_source_version_for_review: {
+        Args: {
+          p_correlation_id?: string
+          p_expected_working_revision: number
+          p_reason?: string
+          p_source_id: string
+          p_source_version_id: string
+        }
+        Returns: Json
+      }
       suspend_user_access_admin: {
         Args: { reason?: string; target_user_id: string }
         Returns: boolean
@@ -16919,6 +17088,22 @@ export type Database = {
       update_article_hero_image: {
         Args: { article_id: string; hero_url: string }
         Returns: undefined
+      }
+      update_external_contributor: {
+        Args: {
+          p_consent_status?: string
+          p_contact_email?: string
+          p_contact_phone?: string
+          p_contributor_state?: string
+          p_display_name: string
+          p_external_contributor_id: string
+          p_internal_notes?: string
+          p_location_text?: string
+          p_public_role?: string
+          p_public_safe?: boolean
+          p_public_url?: string
+        }
+        Returns: Json
       }
       update_import_run: {
         Args: {
@@ -17030,6 +17215,15 @@ export type Database = {
           decision_status: string
           suggestion_id: string
         }[]
+      }
+      withdraw_source: {
+        Args: {
+          p_correlation_id?: string
+          p_reason: string
+          p_source_id: string
+          p_withdrawal_public_mode?: string
+        }
+        Returns: Json
       }
       wk_first_jsonb_text: {
         Args: { a: Json; b: Json; keys: string[] }
