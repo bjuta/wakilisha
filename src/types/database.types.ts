@@ -15803,6 +15803,10 @@ export type Database = {
         Args: { p_article_version_id: string }
         Returns: Json
       }
+      get_article_working_version_identity: {
+        Args: { p_article_id: string }
+        Returns: Json
+      }
       get_chart_programs: {
         Args: never
         Returns: {
