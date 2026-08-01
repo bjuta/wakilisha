@@ -15799,6 +15799,10 @@ export type Database = {
         Args: { p_article_id: string }
         Returns: Json
       }
+      get_article_version_trust_workspace: {
+        Args: { p_article_version_id: string }
+        Returns: Json
+      }
       get_chart_programs: {
         Args: never
         Returns: {
@@ -16384,6 +16388,10 @@ export type Database = {
       promote_slug_repaired_chart_entry_links: { Args: never; Returns: Json }
       promote_wp_relationships_article_genre_holds: {
         Args: never
+        Returns: Json
+      }
+      public_get_article_trust: {
+        Args: { p_article_slug: string }
         Returns: Json
       }
       public_get_articles_by_term: {
