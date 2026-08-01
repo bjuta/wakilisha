@@ -1,5 +1,5 @@
-// ── Public Content Read Gateway v17 — public API, no JWT required ──
-// v17: Track detail release-context enrichment without registry_releases.track_count assumption
+// ── Public Content Read Gateway v18 — public API, no JWT required ──
+// v18: Published Article trust enrichment through the server-owned read contract
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
@@ -236,6 +236,27 @@ const WP_AUTHOR_MAP: Record<string, string> = { "1": "Wakilisha Staff", "37": "M
 function resolveAuthor(article: Record<string, unknown>): string { const storedAuthor = String(article.author || "").trim(); if (storedAuthor && storedAuthor !== "Wakilisha") return storedAuthor; const rawMeta = (article.raw_meta || {}) as Record<string, unknown>; const wpAuthorId = rawMeta.post_author ? String(rawMeta.post_author) : ""; if (wpAuthorId && WP_AUTHOR_MAP[wpAuthorId]) return WP_AUTHOR_MAP[wpAuthorId]; return "Wakilisha Staff"; }
 function authorSlugFromName(name: string): string { return name.trim().toLowerCase().replace(/[\s_-]+/g, "-").replace(/[^a-z0-9-]/g, ""); }
 function buildArticleResponse(a: any) { const catNames = parseCategoryNames(a.categories); const section = catNames.length > 0 ? catNames[0] : "Music"; const contentText = stripHtml(String(a.content_html || "")); const tagNames = parseTagNames(a.tags); const dek = resolveDek(a, 280); let heroUrl = String(a.hero_image_url || ""); if (!heroUrl && a.content_html) heroUrl = extractFirstImgSrc(String(a.content_html)); const authorName = resolveAuthor(a); return { id: String(a.id), slug: String(a.slug), title: String(a.title), section, dek, author: authorName, authorSlug: authorSlugFromName(authorName), date: a.published_at ? String(a.published_at).split("T")[0] : "", readingTime: Math.max(1, Math.ceil(contentText.length / 1500)), heroUrl, tags: tagNames }; }
+
+type PublicArticleTrust = {
+  sources: unknown[];
+  credits: unknown[];
+};
+
+function emptyPublicArticleTrust(): PublicArticleTrust {
+  return { sources: [], credits: [] };
+}
+
+function normalizePublicArticleTrust(value: unknown): PublicArticleTrust {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    return emptyPublicArticleTrust();
+  }
+
+  const row = value as Record<string, unknown>;
+  return {
+    sources: Array.isArray(row.sources) ? row.sources : [],
+    credits: Array.isArray(row.credits) ? row.credits : [],
+  };
+}
 
 type ReleaseEntry = { slug: string; title: string; releaseType: string; year: string; releaseDate: string; trackCount: number; artworkUrl: string; labelName?: string; genres?: string[]; tracks: Array<{ title: string; duration: string; previewUrl?: string }> };
 interface TrackOut { title: string; duration: string; artists?: string; previewUrl?: string; }
@@ -920,7 +941,16 @@ Deno.serve(async (req) => {
       const nonce = path.replace(/^\/preview\//, "").replace(/\/$/, "");
       const { data: article } = await supabase.rpc("resolve_article_preview_nonce", { p_nonce: nonce }).maybeSingle();
       if (!article) return jsonResponse({ data: null, meta: { reason: "expired_or_invalid" } }, origin, 404);
-      data = { article: { ...buildArticleResponse(article), contentHtml: String(article.content_html || ""), seo: (article.seo || {}) as Record<string, unknown>, categories: parseCategoryNames(article.categories), wpStatus: String(article.wp_status || "draft") } };
+      data = {
+        article: {
+          ...buildArticleResponse(article),
+          contentHtml: String(article.content_html || ""),
+          seo: (article.seo || {}) as Record<string, unknown>,
+          categories: parseCategoryNames(article.categories),
+          wpStatus: String(article.wp_status || "draft"),
+          trust: emptyPublicArticleTrust(),
+        },
+      };
     }
 
     else if (path === "/magazine/site-content" || path === "/magazine/site-content/") {
@@ -953,11 +983,29 @@ Deno.serve(async (req) => {
 
     else if (path.startsWith("/magazine/") && path !== "/magazine" && path !== "/magazine/") {
       const artSlug = path.replace(/^\/magazine\//, "").replace(/\/$/, "");
-      const now = new Date().toISOString();
       const { data: article } = await supabase.from("wk_article_publication_snapshots").select("id, slug, title, excerpt, content_html, author, published_at, modified_at, categories, tags, hero_image_url, seo, wp_status, raw_meta").eq("is_active", true).eq("slug", artSlug).maybeSingle();
       if (!article) return jsonResponse({ data: null }, origin, 404);
-      if (!article) return jsonResponse({ data: null }, origin, 404);
-      data = { article: { ...buildArticleResponse(article), contentHtml: String(article.content_html || ""), seo: (article.seo || {}) as Record<string, unknown>, categories: parseCategoryNames(article.categories) } };
+
+      const { data: trust, error: trustError } = await supabase.rpc(
+        "public_get_article_trust",
+        { p_article_slug: artSlug },
+      );
+
+      if (trustError) {
+        console.error("Failed to load public Article trust:", trustError.message);
+      }
+
+      data = {
+        article: {
+          ...buildArticleResponse(article),
+          contentHtml: String(article.content_html || ""),
+          seo: (article.seo || {}) as Record<string, unknown>,
+          categories: parseCategoryNames(article.categories),
+          trust: trustError
+            ? emptyPublicArticleTrust()
+            : normalizePublicArticleTrust(trust),
+        },
+      };
     }
 
     else if (path === "/magazine" || path === "/magazine/") {

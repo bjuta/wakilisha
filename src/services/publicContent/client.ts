@@ -5,6 +5,10 @@ import { supabase } from "@/lib/supabase";
 import { releaseUrl, slugify } from "@/utils/releaseUrl";
 import { normalizeGenres } from "@/services/publicContent/genreNormalization";
 import {
+  normalizePublicArticleTrust,
+  type PublicArticleTrust,
+} from "@/services/publicContent/articleTrust";
+import {
   enrichArtistMedia,
   enrichArtistsMedia,
   enrichReleaseMedia,
@@ -108,6 +112,7 @@ export type PublicArticleDetail = PublicStory & {
   tags: string[];
   seo?: Record<string, unknown>;
   categories: string[];
+  trust: PublicArticleTrust;
 };
 
 export type PublicArtistVideo = {
@@ -1154,6 +1159,7 @@ export async function getArticle(slug: string, previewNonce?: string | null): Pr
   if (!result.article) return null;
   const mapped = {
     ...result.article,
+    trust: normalizePublicArticleTrust(result.article.trust),
     heroUrl: image(result.article.heroUrl, { id: result.article.id, slug: result.article.slug, name: result.article.title, type: "article" }),
   };
   return await enrichArticleMedia(mapped) as PublicArticleDetail;
