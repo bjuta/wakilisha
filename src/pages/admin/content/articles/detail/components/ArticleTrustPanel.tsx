@@ -1,4 +1,7 @@
+import { useState } from "react";
 import { WkIcon } from "@/components/design-system/Icon";
+import { useAdminUser } from "@/hooks/useAdminUser";
+import { ArticleCreditForm } from "./ArticleCreditForm";
 import type {
   ArticleTrustCitation,
   ArticleTrustCredit,
@@ -369,6 +372,18 @@ export function ArticleTrustPanel({
     refresh,
   } = state;
 
+  const adminUser = useAdminUser();
+  const [creditFormOpen, setCreditFormOpen] =
+    useState(false);
+  const canManageCredits =
+    adminUser.can("manage_credits");
+  const hasPrimaryAuthor =
+    workspace?.credits.some(
+      (credit) =>
+        credit.isPrimary &&
+        credit.creditRole === "author",
+    ) ?? false;
+
   return (
     <div
       data-article-trust-panel
@@ -394,19 +409,41 @@ export function ArticleTrustPanel({
           </p>
         </div>
 
-        <button
-          type="button"
-          onClick={refresh}
-          disabled={loading}
-          className="wk-button wk-button-secondary wk-button-sm shrink-0"
-        >
-          <WkIcon
-            name="RefreshCw"
-            size={14}
-            className={loading ? "animate-spin" : undefined}
-          />
-          Refresh
-        </button>
+        <div className="flex shrink-0 flex-wrap gap-2">
+          {canManageCredits &&
+          identity &&
+          workspace ? (
+            <button
+              type="button"
+              onClick={() =>
+                setCreditFormOpen(true)
+              }
+              disabled={loading}
+              className="wk-button wk-button-primary wk-button-sm"
+            >
+              <WkIcon name="Plus" size={14} />
+              Add Credit
+            </button>
+          ) : null}
+
+          <button
+            type="button"
+            onClick={refresh}
+            disabled={loading}
+            className="wk-button wk-button-secondary wk-button-sm"
+          >
+            <WkIcon
+              name="RefreshCw"
+              size={14}
+              className={
+                loading
+                  ? "animate-spin"
+                  : undefined
+              }
+            />
+            Refresh
+          </button>
+        </div>
       </header>
 
       {loading ? (
@@ -538,6 +575,33 @@ export function ArticleTrustPanel({
             )}
           </section>
         </>
+      ) : null}
+
+      {creditFormOpen &&
+      identity &&
+      workspace ? (
+        <ArticleCreditForm
+          articleVersionId={
+            identity.workingVersionId
+          }
+          expectedCreditRevision={
+            workspace.creditRevision
+          }
+          nextDisplayOrder={
+            workspace.credits.length
+          }
+          hasPrimaryAuthor={
+            hasPrimaryAuthor
+          }
+          onClose={() =>
+            setCreditFormOpen(false)
+          }
+          onAttached={() => {
+            setCreditFormOpen(false);
+            refresh();
+          }}
+          onConcurrency={refresh}
+        />
       ) : null}
     </div>
   );
