@@ -75,9 +75,24 @@ export function useArticleTrustWorkspace({
             nextIdentity.workingVersionId,
           );
 
+        const confirmedIdentity =
+          await fetchArticleWorkingVersionIdentity(
+            articleId,
+          );
+
+        if (
+          confirmedIdentity.workingVersionId !==
+          nextIdentity.workingVersionId
+        ) {
+          throw new ArticleTrustServiceError(
+            "Article working version changed while trust was loading",
+            "concurrency",
+          );
+        }
+
         if (!active) return;
 
-        setIdentity(nextIdentity);
+        setIdentity(confirmedIdentity);
         setWorkspace(nextWorkspace);
         setLoading(false);
       } catch (error) {

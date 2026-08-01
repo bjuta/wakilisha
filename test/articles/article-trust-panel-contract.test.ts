@@ -50,6 +50,10 @@ describe("Article trust panel contract", () => {
 
     expect(hook).toContain("draftVersion,");
     expect(hook).toContain("workingVersionId");
+    expect(hook).toContain("confirmedIdentity");
+    expect(hook).toContain(
+      "Article working version changed while trust was loading",
+    );
     expect(hook).toContain("refreshRevision");
   });
 
@@ -95,7 +99,27 @@ describe("Article trust panel contract", () => {
       "Credit does not determine payment or payout rights.",
     );
     expect(panel).toContain("Publicly Eligible");
-    expect(panel).toContain("Internal Only");
+    expect(panel).toContain(
+      "Not Publicly Eligible",
+    );
+  });
+
+  it("opens only HTTP or HTTPS Source links", () => {
+    const panel = read(
+      "src/pages/admin/content/articles/detail/components/ArticleTrustPanel.tsx",
+    );
+
+    expect(panel).toContain("new URL(value)");
+    expect(panel).toContain(
+      'parsed.protocol !== "http:"',
+    );
+    expect(panel).toContain(
+      'parsed.protocol !== "https:"',
+    );
+    expect(panel).toContain("href={sourceHref}");
+    expect(panel).not.toContain(
+      "href={citation.sourceUrl}",
+    );
   });
 
   it("retains the legacy byline fallback", () => {

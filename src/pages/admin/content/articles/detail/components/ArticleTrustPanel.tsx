@@ -19,6 +19,27 @@ function humanize(value: string): string {
     );
 }
 
+function externalHttpUrl(
+  value: string | null,
+): string | null {
+  if (!value) return null;
+
+  try {
+    const parsed = new URL(value);
+
+    if (
+      parsed.protocol !== "http:" &&
+      parsed.protocol !== "https:"
+    ) {
+      return null;
+    }
+
+    return parsed.toString();
+  } catch {
+    return null;
+  }
+}
+
 function citationEligibilityExplanation(
   citation: ArticleTrustCitation,
 ): string {
@@ -120,7 +141,7 @@ function EligibilityBadge({
       />
       {eligible
         ? "Publicly Eligible"
-        : "Internal Only"}
+        : "Not Publicly Eligible"}
     </span>
   );
 }
@@ -187,6 +208,10 @@ function CitationCard({
 }: {
   citation: ArticleTrustCitation;
 }) {
+  const sourceHref = externalHttpUrl(
+    citation.sourceUrl,
+  );
+
   return (
     <article className="rounded-xl border border-wk-border bg-wk-surface p-4 shadow-sm">
       <div className="flex flex-wrap items-start justify-between gap-3">
@@ -257,9 +282,9 @@ function CitationCard({
         </div>
       </div>
 
-      {citation.sourceUrl ? (
+      {sourceHref ? (
         <a
-          href={citation.sourceUrl}
+          href={sourceHref}
           target="_blank"
           rel="noreferrer"
           className="mt-4 inline-flex items-center gap-1.5 text-[11px] font-bold text-wk-brand hover:underline"
