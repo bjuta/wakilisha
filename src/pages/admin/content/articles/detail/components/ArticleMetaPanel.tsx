@@ -185,6 +185,10 @@ export function ArticleMetaPanel({
   const [tagPickerOpen, setTagPickerOpen] = useState(false);
   const [categorySearch, setCategorySearch] = useState("");
   const [tagSearch, setTagSearch] = useState("");
+  const [taxonomyCreationError, setTaxonomyCreationError] = useState<{
+    taxonomy: "category" | "post_tag";
+    message: string;
+  } | null>(null);
   const categoryPickerRef = useRef<HTMLDivElement>(null);
   const tagPickerRef = useRef<HTMLDivElement>(null);
 
@@ -262,11 +266,16 @@ export function ArticleMetaPanel({
     const slug = slugify(name);
     if (!slug) return null;
 
+    setTaxonomyCreationError(null);
+
     const { data, error } = await supabase.rpc("create_taxonomy_term", {
       p_taxonomy: taxonomy,
       p_slug: slug,
       p_name: name,
       p_description: null,
+      p_seo_title: null,
+      p_seo_description: null,
+      p_seo_keywords: null,
     });
 
     if (error) {
@@ -278,6 +287,10 @@ export function ArticleMetaPanel({
         return existing ?? null;
       }
       console.error(`Failed to create ${taxonomy} term:`, error);
+      setTaxonomyCreationError({
+        taxonomy,
+        message: `The ${taxonomy === "category" ? "category" : "tag"} "${name}" was not added because registry creation failed.`,
+      });
       return null;
     }
 
@@ -326,12 +339,9 @@ export function ArticleMetaPanel({
     }
     // Not in registry — create it
     const created = await createTaxonomyTerm(name, "category");
-    if (created) {
-      onCategoriesChange([...categories, created.name]);
-    } else {
-      // Fallback: add as plain string even if creation failed
-      onCategoriesChange([...categories, name]);
-    }
+    if (!created) return;
+
+    onCategoriesChange([...categories, created.name]);
     setCategorySearch("");
     setCategoryPickerOpen(false);
   }, [categories, onCategoriesChange, categoryTermOptions, createTaxonomyTerm]);
@@ -351,11 +361,9 @@ export function ArticleMetaPanel({
       return;
     }
     const created = await createTaxonomyTerm(name, "post_tag");
-    if (created) {
-      onTagsChange([...tags, created.name]);
-    } else {
-      onTagsChange([...tags, name]);
-    }
+    if (!created) return;
+
+    onTagsChange([...tags, created.name]);
     setTagSearch("");
     setTagPickerOpen(false);
   }, [tags, onTagsChange, tagTermOptions, createTaxonomyTerm]);
@@ -1159,7 +1167,13 @@ export function ArticleMetaPanel({
               <input
                 type="text"
                 value={categorySearch}
-                onChange={(e) => { setCategorySearch(e.target.value); if (!categoryPickerOpen) setCategoryPickerOpen(true); }}
+                onChange={(e) => {
+                  setCategorySearch(e.target.value);
+                  if (taxonomyCreationError?.taxonomy === "category") {
+                    setTaxonomyCreationError(null);
+                  }
+                  if (!categoryPickerOpen) setCategoryPickerOpen(true);
+                }}
                 onFocus={() => setCategoryPickerOpen(true)}
                 onKeyDown={(e) => { if (e.key === "Enter" && categorySearch.trim()) { e.preventDefault(); selectCategory(categorySearch.trim()); } if (e.key === "Escape") { setCategoryPickerOpen(false); setCategorySearch(""); } }}
                 placeholder="Search or type a category…"
@@ -1169,6 +1183,12 @@ export function ArticleMetaPanel({
                 <WkIcon name={categoryPickerOpen ? "ChevronUp" : "ChevronDown"} size={13} />
               </button>
             </div>
+            {taxonomyCreationError?.taxonomy === "category" && (
+              <div className="mt-2 flex items-start gap-2 rounded-lg border border-wk-danger/30 bg-wk-danger/10 px-3 py-2 text-[11px] text-wk-danger">
+                <WkIcon name="AlertTriangle" size={13} className="mt-0.5 shrink-0" />
+                <span>{taxonomyCreationError.message}</span>
+              </div>
+            )}
             {categoryPickerOpen && (
               <div className="absolute z-30 left-0 right-0 top-full mt-1 max-h-[220px] overflow-y-auto rounded-lg border border-wk-border bg-wk-surface shadow-lg">
                 {categorySearch.trim() && !categoryTermOptions.some((c) => c.name.toLowerCase() === categorySearch.trim().toLowerCase()) && (
@@ -1214,7 +1234,13 @@ export function ArticleMetaPanel({
               <input
                 type="text"
                 value={tagSearch}
-                onChange={(e) => { setTagSearch(e.target.value); if (!tagPickerOpen) setTagPickerOpen(true); }}
+                onChange={(e) => {
+                  setTagSearch(e.target.value);
+                  if (taxonomyCreationError?.taxonomy === "post_tag") {
+                    setTaxonomyCreationError(null);
+                  }
+                  if (!tagPickerOpen) setTagPickerOpen(true);
+                }}
                 onFocus={() => setTagPickerOpen(true)}
                 onKeyDown={(e) => { if (e.key === "Enter" && tagSearch.trim()) { e.preventDefault(); selectTag(tagSearch.trim()); } if (e.key === "Escape") { setTagPickerOpen(false); setTagSearch(""); } }}
                 placeholder="Search or type a tag…"
@@ -1224,6 +1250,12 @@ export function ArticleMetaPanel({
                 <WkIcon name={tagPickerOpen ? "ChevronUp" : "ChevronDown"} size={13} />
               </button>
             </div>
+            {taxonomyCreationError?.taxonomy === "post_tag" && (
+              <div className="mt-2 flex items-start gap-2 rounded-lg border border-wk-danger/30 bg-wk-danger/10 px-3 py-2 text-[11px] text-wk-danger">
+                <WkIcon name="AlertTriangle" size={13} className="mt-0.5 shrink-0" />
+                <span>{taxonomyCreationError.message}</span>
+              </div>
+            )}
             {tagPickerOpen && (
               <div className="absolute z-30 left-0 right-0 top-full mt-1 max-h-[220px] overflow-y-auto rounded-lg border border-wk-border bg-wk-surface shadow-lg">
                 {tagSearch.trim() && !tagTermOptions.some((t) => t.name.toLowerCase() === tagSearch.trim().toLowerCase()) && (
