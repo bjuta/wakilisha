@@ -1162,9 +1162,16 @@ export function ArticleEditorWorkspace({
       return;
     }
     setIsSaving(true);
-    const ok = await saveToSupabase({ wp_status: "draft" });
+    const ok = await saveToSupabase({});
     setIsSaving(false);
-    if (ok) addToast("success", "Saved as draft.");
+    if (ok) {
+      addToast(
+        "success",
+        isLiveOrScheduled
+          ? "Working draft saved. Published version remains live."
+          : "Draft saved.",
+      );
+    }
   }
 
   async function handlePublish() {
@@ -1272,7 +1279,11 @@ export function ArticleEditorWorkspace({
     }
 
     if (newStatus === "draft") {
-      await handleSaveDraft();
+      if (isLiveOrScheduled) {
+        await handleUnpublish();
+      } else {
+        await handleSaveDraft();
+      }
       return;
     }
 
