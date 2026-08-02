@@ -15593,44 +15593,29 @@ export type Database = {
         }
         Returns: Json
       }
-      create_taxonomy_term:
-        | {
-            Args: {
-              p_description?: string
-              p_name: string
-              p_slug: string
-              p_taxonomy: string
-            }
-            Returns: {
-              id: string
-              name: string
-              slug: string
-              taxonomy: string
-            }[]
-          }
-        | {
-            Args: {
-              p_description?: string
-              p_name: string
-              p_seo_description?: string
-              p_seo_keywords?: string
-              p_seo_title?: string
-              p_slug: string
-              p_taxonomy: string
-            }
-            Returns: {
-              created_at: string
-              description: string
-              id: string
-              name: string
-              seo_description: string
-              seo_keywords: string
-              seo_title: string
-              slug: string
-              source_kind: string
-              updated_at: string
-            }[]
-          }
+      create_taxonomy_term: {
+        Args: {
+          p_description?: string
+          p_name: string
+          p_seo_description?: string
+          p_seo_keywords?: string
+          p_seo_title?: string
+          p_slug: string
+          p_taxonomy: string
+        }
+        Returns: {
+          created_at: string
+          description: string
+          id: string
+          name: string
+          seo_description: string
+          seo_keywords: string
+          seo_title: string
+          slug: string
+          source_kind: string
+          updated_at: string
+        }[]
+      }
       current_user_has_capability: {
         Args: { required_capability: string }
         Returns: boolean
