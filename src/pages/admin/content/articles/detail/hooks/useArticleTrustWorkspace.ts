@@ -15,6 +15,7 @@ import {
 export interface ArticleTrustWorkspaceState {
   identity: ArticleWorkingVersionIdentity | null;
   workspace: ArticleTrustWorkspace | null;
+  publishedWorkspace: ArticleTrustWorkspace | null;
   loading: boolean;
   errorMessage: string | null;
   errorKind: ArticleTrustErrorKind | null;
@@ -36,6 +37,8 @@ export function useArticleTrustWorkspace({
     useState<ArticleWorkingVersionIdentity | null>(null);
   const [workspace, setWorkspace] =
     useState<ArticleTrustWorkspace | null>(null);
+  const [publishedWorkspace, setPublishedWorkspace] =
+    useState<ArticleTrustWorkspace | null>(null);
   const [loading, setLoading] = useState(false);
   const [errorMessage, setErrorMessage] =
     useState<string | null>(null);
@@ -50,6 +53,7 @@ export function useArticleTrustWorkspace({
     if (!enabled || !articleId) {
       setIdentity(null);
       setWorkspace(null);
+      setPublishedWorkspace(null);
       setLoading(false);
       setErrorMessage(null);
       setErrorKind(null);
@@ -70,10 +74,27 @@ export function useArticleTrustWorkspace({
             articleId,
           );
 
-        const nextWorkspace =
-          await fetchArticleVersionTrustWorkspace(
+        const nextWorkspacePromise =
+          fetchArticleVersionTrustWorkspace(
             nextIdentity.workingVersionId,
           );
+
+        const nextPublishedWorkspacePromise =
+          nextIdentity.publishedVersionId &&
+          nextIdentity.publishedVersionId !==
+            nextIdentity.workingVersionId
+            ? fetchArticleVersionTrustWorkspace(
+                nextIdentity.publishedVersionId,
+              )
+            : Promise.resolve(null);
+
+        const [
+          nextWorkspace,
+          nextPublishedWorkspace,
+        ] = await Promise.all([
+          nextWorkspacePromise,
+          nextPublishedWorkspacePromise,
+        ]);
 
         const confirmedIdentity =
           await fetchArticleWorkingVersionIdentity(
@@ -82,7 +103,9 @@ export function useArticleTrustWorkspace({
 
         if (
           confirmedIdentity.workingVersionId !==
-          nextIdentity.workingVersionId
+            nextIdentity.workingVersionId ||
+          confirmedIdentity.publishedVersionId !==
+            nextIdentity.publishedVersionId
         ) {
           throw new ArticleTrustServiceError(
             "Article working version changed while trust was loading",
@@ -94,12 +117,16 @@ export function useArticleTrustWorkspace({
 
         setIdentity(confirmedIdentity);
         setWorkspace(nextWorkspace);
+        setPublishedWorkspace(
+          nextPublishedWorkspace,
+        );
         setLoading(false);
       } catch (error) {
         if (!active) return;
 
         setIdentity(null);
         setWorkspace(null);
+        setPublishedWorkspace(null);
         setLoading(false);
 
         if (error instanceof ArticleTrustServiceError) {
@@ -136,6 +163,7 @@ export function useArticleTrustWorkspace({
   return {
     identity,
     workspace,
+    publishedWorkspace,
     loading,
     errorMessage,
     errorKind,

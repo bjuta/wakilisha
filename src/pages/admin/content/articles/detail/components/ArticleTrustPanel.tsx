@@ -7,6 +7,7 @@ import { WkIcon } from "@/components/design-system/Icon";
 import { useAdminUser } from "@/hooks/useAdminUser";
 import { ArticleCitationForm } from "./ArticleCitationForm";
 import { ArticleCreditForm } from "./ArticleCreditForm";
+import { ArticleCreditGovernanceForm } from "./ArticleCreditGovernanceForm";
 import { ArticleSourceForm } from "./ArticleSourceForm";
 import {
   ArticleSourceLifecycleForm,
@@ -172,13 +173,22 @@ function VersionContext({
   if (!identity || !workspace) return null;
 
   return (
-    <section className="grid gap-3 rounded-xl border border-wk-border bg-wk-bg-subtle p-4 sm:grid-cols-2 lg:grid-cols-5">
+    <section className="grid gap-3 rounded-xl border border-wk-border bg-wk-bg-subtle p-4 sm:grid-cols-2 lg:grid-cols-6">
       <div>
         <div className="text-[9px] font-black uppercase tracking-[0.14em] text-wk-text-faint">
           Working Version
         </div>
         <div className="mt-1 text-[14px] font-bold text-wk-text">
           {identity.workingVersionNumber}
+        </div>
+      </div>
+
+      <div>
+        <div className="text-[9px] font-black uppercase tracking-[0.14em] text-wk-text-faint">
+          Published Version
+        </div>
+        <div className="mt-1 text-[14px] font-bold text-wk-text">
+          {identity.publishedVersionNumber ?? "None"}
         </div>
       </div>
 
@@ -323,8 +333,14 @@ function CitationCard({
 
 function CreditCard({
   credit,
+  versionLabel,
+  canManage,
+  onGovernance,
 }: {
   credit: ArticleTrustCredit;
+  versionLabel: string;
+  canManage: boolean;
+  onGovernance: () => void;
 }) {
   const primaryAuthor =
     credit.isPrimary &&
@@ -334,7 +350,10 @@ function CreditCard({
     <article className="rounded-xl border border-wk-border bg-wk-surface p-4 shadow-sm">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="min-w-0">
-          <div className="flex flex-wrap items-center gap-2">
+          <div className="text-[9px] font-black uppercase tracking-[0.1em] text-wk-info">
+            {versionLabel} Credit
+          </div>
+          <div className="mt-1 flex flex-wrap items-center gap-2">
             <h3 className="text-[14px] font-bold text-wk-text">
               {credit.displayNameSnapshot ||
                 "Unnamed Contributor"}
@@ -360,10 +379,52 @@ function CreditCard({
         />
       </div>
 
+      <div className="mt-4 grid gap-3 text-[10px] sm:grid-cols-3">
+        <div>
+          <div className="font-bold text-wk-text-faint">
+            Governance State
+          </div>
+          <div className="mt-1 text-wk-text">
+            {humanize(credit.creditState)}
+          </div>
+        </div>
+
+        <div>
+          <div className="font-bold text-wk-text-faint">
+            Public-safe
+          </div>
+          <div className="mt-1 text-wk-text">
+            {credit.governancePublicSafe
+              ? "Yes"
+              : "No"}
+          </div>
+        </div>
+
+        <div>
+          <div className="font-bold text-wk-text-faint">
+            Governance Revision
+          </div>
+          <div className="mt-1 text-wk-text">
+            {credit.governanceRevision}
+          </div>
+        </div>
+      </div>
+
       {credit.creditNote ? (
         <p className="mt-3 text-[11px] leading-5 text-wk-text-muted">
           {credit.creditNote}
         </p>
+      ) : null}
+
+      {canManage ? (
+        <button
+          type="button"
+          onClick={onGovernance}
+          className="wk-button wk-button-secondary wk-button-sm mt-4"
+        >
+          <WkIcon name="ShieldCheck" size={12} />
+          Manage Governance
+        </button>
       ) : null}
 
       <p className="mt-4 rounded-lg bg-wk-bg-subtle px-3 py-2 text-[10px] leading-4 text-wk-text-muted">
@@ -550,6 +611,7 @@ export function ArticleTrustPanel({
   const {
     identity,
     workspace,
+    publishedWorkspace,
     loading,
     errorMessage,
     errorKind,
@@ -559,6 +621,11 @@ export function ArticleTrustPanel({
   const adminUser = useAdminUser();
   const [creditFormOpen, setCreditFormOpen] =
     useState(false);
+  const [creditGovernance, setCreditGovernance] =
+    useState<{
+      credit: ArticleTrustCredit;
+      versionLabel: string;
+    } | null>(null);
   const [sourceFormOpen, setSourceFormOpen] =
     useState(false);
   const [citationFormOpen, setCitationFormOpen] =
@@ -1078,11 +1145,10 @@ export function ArticleTrustPanel({
             <div className="mb-3 flex items-end justify-between gap-3">
               <div>
                 <h2 className="text-[15px] font-bold text-wk-text">
-                  Credits
+                  Working-version Credits
                 </h2>
                 <p className="mt-1 text-[10px] text-wk-text-muted">
-                  {workspace.credits.length} attached to this
-                  working version
+                  {workspace.credits.length} attached to the current working version
                 </p>
               </div>
             </div>
@@ -1095,11 +1161,10 @@ export function ArticleTrustPanel({
                   className="mx-auto text-wk-text-faint"
                 />
                 <p className="mt-3 text-[12px] font-bold text-wk-text">
-                  No Governed Credits
+                  No Working-version Credits
                 </p>
                 <p className="mt-1 text-[10px] text-wk-text-muted">
-                  The legacy Article byline remains the fallback
-                  until governed Credits are attached.
+                  The legacy Article byline remains the fallback for the working version until governed Credits are attached. This working version is isolated from Credits attached to the published version.
                 </p>
               </div>
             ) : (
@@ -1108,11 +1173,70 @@ export function ArticleTrustPanel({
                   <CreditCard
                     key={credit.attachmentId}
                     credit={credit}
+                    versionLabel="Working Version"
+                    canManage={canManageCredits}
+                    onGovernance={() =>
+                      setCreditGovernance({
+                        credit,
+                        versionLabel: "Working Version",
+                      })
+                    }
                   />
                 ))}
               </div>
             )}
           </section>
+
+          {publishedWorkspace ? (
+            <section>
+              <div className="mb-3 flex items-end justify-between gap-3">
+                <div>
+                  <h2 className="text-[15px] font-bold text-wk-text">
+                    Published-version Credits
+                  </h2>
+                  <p className="mt-1 text-[10px] text-wk-text-muted">
+                    {publishedWorkspace.credits.length} attached to published version {identity.publishedVersionNumber}
+                  </p>
+                </div>
+              </div>
+
+              <p className="mb-3 rounded-lg bg-wk-bg-subtle px-3 py-2 text-[10px] leading-4 text-wk-text-muted">
+                Governance changes affect current public eligibility without rewriting the published attachment set or Article Credit revision.
+              </p>
+
+              {publishedWorkspace.credits.length === 0 ? (
+                <div className="rounded-xl border border-dashed border-wk-border bg-wk-surface px-5 py-8 text-center">
+                  <WkIcon
+                    name="UsersRound"
+                    size={22}
+                    className="mx-auto text-wk-text-faint"
+                  />
+                  <p className="mt-3 text-[12px] font-bold text-wk-text">
+                    No Published-version Credits
+                  </p>
+                </div>
+              ) : (
+                <div className="grid gap-3 lg:grid-cols-2">
+                  {publishedWorkspace.credits.map(
+                    (credit) => (
+                      <CreditCard
+                        key={credit.attachmentId}
+                        credit={credit}
+                        versionLabel="Published Version"
+                        canManage={canManageCredits}
+                        onGovernance={() =>
+                          setCreditGovernance({
+                            credit,
+                            versionLabel: "Published Version",
+                          })
+                        }
+                      />
+                    ),
+                  )}
+                </div>
+              )}
+            </section>
+          ) : null}
         </>
       ) : null}
 
@@ -1172,6 +1296,26 @@ export function ArticleTrustPanel({
           onCreated={() => {
             setSourceFormOpen(false);
             void loadSources();
+          }}
+        />
+      ) : null}
+
+      {creditGovernance ? (
+        <ArticleCreditGovernanceForm
+          credit={creditGovernance.credit}
+          versionLabel={
+            creditGovernance.versionLabel
+          }
+          onClose={() =>
+            setCreditGovernance(null)
+          }
+          onChanged={() => {
+            setCreditGovernance(null);
+            refreshAll();
+          }}
+          onConcurrency={() => {
+            setCreditGovernance(null);
+            refreshAll();
           }}
         />
       ) : null}

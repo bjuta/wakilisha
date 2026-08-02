@@ -134,6 +134,9 @@ export interface ArticleWorkingVersionIdentity {
   workingVersionId: string;
   workingVersionNumber: number;
   workingVersionKind: string;
+  publishedVersionId: string | null;
+  publishedVersionNumber: number | null;
+  publishedVersionKind: string | null;
   sourceDraftVersion: number;
   articleDraftVersion: number;
 }
@@ -570,6 +573,17 @@ export function normalizeArticleWorkingVersionIdentity(
     ),
     workingVersionKind: text(
       row.working_version_kind,
+    ),
+    publishedVersionId: nullableText(
+      row.published_version_id,
+    ),
+    publishedVersionNumber:
+      row.published_version_number === null ||
+      row.published_version_number === undefined
+        ? null
+        : number(row.published_version_number),
+    publishedVersionKind: nullableText(
+      row.published_version_kind,
     ),
     sourceDraftVersion: number(
       row.source_draft_version,
