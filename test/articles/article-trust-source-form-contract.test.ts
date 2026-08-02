@@ -180,6 +180,32 @@ describe("Article trust Source intake contract", () => {
     );
   });
 
+  it("does not claim that Source approval alone makes a Citation public", () => {
+    const form = read(
+      "src/pages/admin/content/articles/detail/components/ArticleSourceForm.tsx",
+    );
+    const panel = read(
+      "src/pages/admin/content/articles/detail/components/ArticleTrustPanel.tsx",
+    );
+    const normalizedForm =
+      form.replace(/\s+/g, " ");
+    const normalizedPanel =
+      panel.replace(/\s+/g, " ");
+
+    expect(normalizedForm).toContain(
+      "Approval is one requirement for a future Citation to appear publicly.",
+    );
+    expect(normalizedForm).not.toContain(
+      "Approval controls whether a future Citation can appear publicly.",
+    );
+    expect(normalizedPanel).toContain(
+      "Approved for Public Reference",
+    );
+    expect(normalizedPanel).not.toContain(
+      "Ready for Public Citation",
+    );
+  });
+
   it("gates Source creation and review through verified capabilities", () => {
     const panel = read(
       "src/pages/admin/content/articles/detail/components/ArticleTrustPanel.tsx",

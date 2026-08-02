@@ -537,8 +537,8 @@ export function ArticleSourceForm({
             </h2>
             <p className="mt-1 max-w-2xl text-[11px] leading-5 text-wk-text-muted">
               Create one reusable Source. Approval
-              controls whether a future Citation can
-              appear publicly.
+              is one requirement for a future Citation
+              to appear publicly.
             </p>
           </div>
 

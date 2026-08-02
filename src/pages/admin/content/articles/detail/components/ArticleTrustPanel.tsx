@@ -376,7 +376,7 @@ function SourceCard({
   const sourceHref = externalHttpUrl(
     source.sourceUrl,
   );
-  const readyForPublicCitation =
+  const approvedForPublicReference =
     source.sourceState === "active" &&
     source.reviewStatus === "approved" &&
     source.currentApprovedVersionId !== null &&
@@ -407,21 +407,21 @@ function SourceCard({
 
         <span
           className={
-            readyForPublicCitation
+            approvedForPublicReference
               ? "inline-flex items-center gap-1 rounded-full bg-wk-success-soft px-2 py-1 text-[9px] font-black uppercase tracking-[0.08em] text-wk-success"
               : "inline-flex items-center gap-1 rounded-full bg-wk-bg-subtle px-2 py-1 text-[9px] font-black uppercase tracking-[0.08em] text-wk-text-muted"
           }
         >
           <WkIcon
             name={
-              readyForPublicCitation
+              approvedForPublicReference
                 ? "ShieldCheck"
                 : "Library"
             }
             size={11}
           />
-          {readyForPublicCitation
-            ? "Ready for Public Citation"
+          {approvedForPublicReference
+            ? "Approved for Public Reference"
             : "Internal Source"}
         </span>
       </div>
