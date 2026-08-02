@@ -9,6 +9,10 @@ import { ArticleCitationForm } from "./ArticleCitationForm";
 import { ArticleCreditForm } from "./ArticleCreditForm";
 import { ArticleSourceForm } from "./ArticleSourceForm";
 import {
+  ArticleSourceLifecycleForm,
+  type ArticleSourceLifecycleMode,
+} from "./ArticleSourceLifecycleForm";
+import {
   fetchArticleTrustCitationIntakeOptions,
   fetchArticleTrustSourceLibrary,
   type ArticleTrustCitation,
@@ -371,10 +375,19 @@ function CreditCard({
   );
 }
 
+interface SourceLifecycleAction {
+  mode: ArticleSourceLifecycleMode;
+  label: string;
+}
+
 function SourceCard({
   source,
+  lifecycleAction,
+  onLifecycle,
 }: {
   source: ArticleTrustSourceSummary;
+  lifecycleAction: SourceLifecycleAction | null;
+  onLifecycle: () => void;
 }) {
   const sourceHref = externalHttpUrl(
     source.sourceUrl,
@@ -388,6 +401,13 @@ function SourceCard({
       source.exposureClass ===
         "public_redacted"
     );
+  const withdrawn =
+    source.sourceState === "withdrawn";
+  const sourceBadgeLabel = withdrawn
+    ? "Withdrawn Source"
+    : approvedForPublicReference
+      ? "Approved for Public Reference"
+      : "Internal Source";
 
   return (
     <article className="rounded-xl border border-wk-border bg-wk-surface p-4 shadow-sm">
@@ -410,22 +430,24 @@ function SourceCard({
 
         <span
           className={
-            approvedForPublicReference
-              ? "inline-flex items-center gap-1 rounded-full bg-wk-success-soft px-2 py-1 text-[9px] font-black uppercase tracking-[0.08em] text-wk-success"
-              : "inline-flex items-center gap-1 rounded-full bg-wk-bg-subtle px-2 py-1 text-[9px] font-black uppercase tracking-[0.08em] text-wk-text-muted"
+            withdrawn
+              ? "inline-flex items-center gap-1 rounded-full bg-wk-warning-soft px-2 py-1 text-[9px] font-black uppercase tracking-[0.08em] text-wk-warning"
+              : approvedForPublicReference
+                ? "inline-flex items-center gap-1 rounded-full bg-wk-success-soft px-2 py-1 text-[9px] font-black uppercase tracking-[0.08em] text-wk-success"
+                : "inline-flex items-center gap-1 rounded-full bg-wk-bg-subtle px-2 py-1 text-[9px] font-black uppercase tracking-[0.08em] text-wk-text-muted"
           }
         >
           <WkIcon
             name={
-              approvedForPublicReference
-                ? "ShieldCheck"
-                : "Library"
+              withdrawn
+                ? "TriangleAlert"
+                : approvedForPublicReference
+                  ? "ShieldCheck"
+                  : "Library"
             }
             size={11}
           />
-          {approvedForPublicReference
-            ? "Approved for Public Reference"
-            : "Internal Source"}
+          {sourceBadgeLabel}
         </span>
       </div>
 
@@ -469,19 +491,43 @@ function SourceCard({
         </div>
       </div>
 
-      {sourceHref ? (
-        <a
-          href={sourceHref}
-          target="_blank"
-          rel="noreferrer"
-          className="mt-4 inline-flex items-center gap-1.5 text-[11px] font-bold text-wk-brand hover:underline"
-        >
-          <WkIcon
-            name="ExternalLink"
-            size={12}
-          />
-          Open Source
-        </a>
+      {sourceHref || lifecycleAction ? (
+        <div className="mt-4 flex flex-wrap gap-2">
+          {sourceHref ? (
+            <a
+              href={sourceHref}
+              target="_blank"
+              rel="noreferrer"
+              className="wk-button wk-button-secondary wk-button-sm"
+            >
+              <WkIcon
+                name="ExternalLink"
+                size={12}
+              />
+              Open Source
+            </a>
+          ) : null}
+
+          {lifecycleAction ? (
+            <button
+              type="button"
+              onClick={onLifecycle}
+              className="wk-button wk-button-secondary wk-button-sm"
+            >
+              <WkIcon
+                name={
+                  lifecycleAction.mode === "withdraw"
+                    ? "TriangleAlert"
+                    : lifecycleAction.mode === "review"
+                      ? "ShieldCheck"
+                      : "RefreshCw"
+                }
+                size={12}
+              />
+              {lifecycleAction.label}
+            </button>
+          ) : null}
+        </div>
       ) : null}
 
       <p className="mt-4 rounded-lg bg-wk-bg-subtle px-3 py-2 text-[10px] leading-4 text-wk-text-muted">
@@ -517,6 +563,13 @@ export function ArticleTrustPanel({
     useState(false);
   const [citationFormOpen, setCitationFormOpen] =
     useState(false);
+  const [
+    sourceLifecycle,
+    setSourceLifecycle,
+  ] = useState<{
+    source: ArticleTrustSourceSummary;
+    mode: ArticleSourceLifecycleMode;
+  } | null>(null);
   const [sourceTypes, setSourceTypes] =
     useState<ArticleTrustSourceType[]>([]);
   const [sourceLibrary, setSourceLibrary] =
@@ -547,6 +600,8 @@ export function ArticleTrustPanel({
     adminUser.can("view_trust_records") ||
     canManageSources ||
     canReviewSources ||
+    adminUser.can("withdraw_sources");
+  const canWithdrawSources =
     adminUser.can("withdraw_sources");
   const canManageCitations =
     adminUser.can("manage_citations");
@@ -627,6 +682,64 @@ export function ArticleTrustPanel({
     refresh();
     void loadSources();
     void loadCitationOptions();
+  }
+
+  function sourceLifecycleAction(
+    source: ArticleTrustSourceSummary,
+  ): SourceLifecycleAction | null {
+    if (
+      source.sourceState === "withdrawn" &&
+      canWithdrawSources
+    ) {
+      return {
+        mode: "restore",
+        label: "Restore Source",
+      };
+    }
+
+    if (source.sourceState !== "active") {
+      return null;
+    }
+
+    if (
+      source.reviewStatus === "approved" &&
+      canWithdrawSources
+    ) {
+      return {
+        mode: "withdraw",
+        label: "Withdraw Source",
+      };
+    }
+
+    if (
+      (
+        source.reviewStatus === "draft" ||
+        source.reviewStatus === "changes_requested"
+      ) &&
+      source.currentWorkingVersionId &&
+      canManageSources
+    ) {
+      return {
+        mode: "submit",
+        label: "Submit for Review",
+      };
+    }
+
+    if (
+      (
+        source.reviewStatus === "ready_for_review" ||
+        source.reviewStatus === "in_review"
+      ) &&
+      source.currentSubmittedVersionId &&
+      canReviewSources
+    ) {
+      return {
+        mode: "review",
+        label: "Review Source",
+      };
+    }
+
+    return null;
   }
 
   const hasApprovedCitationSource =
@@ -870,12 +983,33 @@ export function ArticleTrustPanel({
               ) : (
                 <div className="grid gap-3 lg:grid-cols-2">
                   {sourceLibrary.map(
-                    (source) => (
-                      <SourceCard
-                        key={source.id}
-                        source={source}
-                      />
-                    ),
+                    (source) => {
+                      const lifecycleAction =
+                        sourceLifecycleAction(
+                          source,
+                        );
+
+                      return (
+                        <SourceCard
+                          key={source.id}
+                          source={source}
+                          lifecycleAction={
+                            lifecycleAction
+                          }
+                          onLifecycle={() => {
+                            if (!lifecycleAction) {
+                              return;
+                            }
+
+                            setSourceLifecycle({
+                              source,
+                              mode:
+                                lifecycleAction.mode,
+                            });
+                          }}
+                        />
+                      );
+                    },
                   )}
                 </div>
               )}
@@ -1006,6 +1140,24 @@ export function ArticleTrustPanel({
             refreshAll();
           }}
           onConcurrency={refreshAll}
+        />
+      ) : null}
+
+      {sourceLifecycle ? (
+        <ArticleSourceLifecycleForm
+          source={sourceLifecycle.source}
+          mode={sourceLifecycle.mode}
+          onClose={() =>
+            setSourceLifecycle(null)
+          }
+          onChanged={() => {
+            setSourceLifecycle(null);
+            refreshAll();
+          }}
+          onStale={() => {
+            setSourceLifecycle(null);
+            refreshAll();
+          }}
         />
       ) : null}
 
