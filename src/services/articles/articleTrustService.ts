@@ -179,6 +179,26 @@ export interface ArticleTrustSourceLibrary {
   sources: ArticleTrustSourceSummary[];
 }
 
+export interface ArticleTrustCitationLocatorType {
+  locatorType: string;
+  label: string;
+  description: string;
+  sortOrder: number;
+}
+
+export interface ArticleTrustVocabularyOption {
+  value: string;
+  label: string;
+  description: string;
+  sortOrder: number;
+}
+
+export interface ArticleTrustCitationIntakeOptions {
+  locatorTypes: ArticleTrustCitationLocatorType[];
+  citationPurposes: ArticleTrustVocabularyOption[];
+  targetAnchorTypes: ArticleTrustVocabularyOption[];
+}
+
 function record(value: unknown): JsonRecord {
   return value && typeof value === "object" && !Array.isArray(value)
     ? (value as JsonRecord)
@@ -452,6 +472,90 @@ export function normalizeArticleTrustSourceLibrary(
   };
 }
 
+function normalizeCitationLocatorType(
+  value: unknown,
+): ArticleTrustCitationLocatorType {
+  const row = record(value);
+
+  return {
+    locatorType: text(row.locator_type),
+    label: text(row.label),
+    description: text(row.description),
+    sortOrder: number(row.sort_order, 100),
+  };
+}
+
+function normalizeTrustVocabularyOption(
+  value: unknown,
+): ArticleTrustVocabularyOption {
+  const row = record(value);
+
+  return {
+    value: text(row.value),
+    label: text(row.label),
+    description: text(row.description),
+    sortOrder: number(row.sort_order, 100),
+  };
+}
+
+export function normalizeArticleTrustCitationIntakeOptions(
+  value: unknown,
+): ArticleTrustCitationIntakeOptions {
+  const row = record(value);
+
+  const locatorTypes =
+    Array.isArray(row.locator_types)
+      ? row.locator_types
+          .map(normalizeCitationLocatorType)
+          .filter(
+            (option) =>
+              option.locatorType &&
+              option.label,
+          )
+          .sort(
+            (left, right) =>
+              left.sortOrder -
+                right.sortOrder ||
+              left.locatorType.localeCompare(
+                right.locatorType,
+              ),
+          )
+      : [];
+
+  const normalizeOptions = (
+    candidate: unknown,
+  ): ArticleTrustVocabularyOption[] =>
+    Array.isArray(candidate)
+      ? candidate
+          .map(normalizeTrustVocabularyOption)
+          .filter(
+            (option) =>
+              option.value &&
+              option.label,
+          )
+          .sort(
+            (left, right) =>
+              left.sortOrder -
+                right.sortOrder ||
+              left.value.localeCompare(
+                right.value,
+              ),
+          )
+      : [];
+
+  return {
+    locatorTypes,
+    citationPurposes:
+      normalizeOptions(
+        row.citation_purposes,
+      ),
+    targetAnchorTypes:
+      normalizeOptions(
+        row.target_anchor_types,
+      ),
+  };
+}
+
 export function normalizeArticleWorkingVersionIdentity(
   value: unknown,
 ): ArticleWorkingVersionIdentity {
@@ -573,6 +677,37 @@ export async function fetchArticleTrustSourceLibrary(
   return normalizeArticleTrustSourceLibrary(
     data,
   );
+}
+
+export async function fetchArticleTrustCitationIntakeOptions(): Promise<ArticleTrustCitationIntakeOptions> {
+  const { data, error } = await supabase.rpc(
+    "get_article_trust_citation_intake_options",
+  );
+
+  if (error) {
+    throwTrustError(
+      "Failed to load Article Citation intake options",
+      error,
+    );
+  }
+
+  const options =
+    normalizeArticleTrustCitationIntakeOptions(
+      data,
+    );
+
+  if (
+    options.locatorTypes.length === 0 ||
+    options.citationPurposes.length === 0 ||
+    options.targetAnchorTypes.length === 0
+  ) {
+    throw new ArticleTrustServiceError(
+      "Article Citation intake options are incomplete",
+      "unknown",
+    );
+  }
+
+  return options;
 }
 
 export async function fetchArticleWorkingVersionIdentity(
