@@ -1,9 +1,9 @@
 {
   "projectRef": "pgzizndxdyhqmtyywjmt",
   "schema": "public",
-  "generatedAt": "2026-08-02T18:28:05Z",
+  "generatedAt": "2026-08-02T19:35:12Z",
   "typesSha256": "a9cb70da7f81cab98eff86bb1384a8becbb663dd257a44b32424b379623bcca1",
   "authoritativeMigrationDirectory": "supabase/migrations",
-  "migrationCount": 181,
-  "latestMigration": "20260802180500_taxonomy_term_function_body_repair.sql"
+  "migrationCount": 182,
+  "latestMigration": "20260802202500_preserve_published_article_on_working_save.sql"
 }
