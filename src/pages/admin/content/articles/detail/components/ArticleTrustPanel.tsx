@@ -1,10 +1,18 @@
-import { useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useState,
+} from "react";
 import { WkIcon } from "@/components/design-system/Icon";
 import { useAdminUser } from "@/hooks/useAdminUser";
 import { ArticleCreditForm } from "./ArticleCreditForm";
-import type {
-  ArticleTrustCitation,
-  ArticleTrustCredit,
+import { ArticleSourceForm } from "./ArticleSourceForm";
+import {
+  fetchArticleTrustSourceLibrary,
+  type ArticleTrustCitation,
+  type ArticleTrustCredit,
+  type ArticleTrustSourceSummary,
+  type ArticleTrustSourceType,
 } from "@/services/articles/articleTrustService";
 import type {
   ArticleTrustWorkspaceState,
@@ -360,6 +368,133 @@ function CreditCard({
   );
 }
 
+function SourceCard({
+  source,
+}: {
+  source: ArticleTrustSourceSummary;
+}) {
+  const sourceHref = externalHttpUrl(
+    source.sourceUrl,
+  );
+  const readyForPublicCitation =
+    source.sourceState === "active" &&
+    source.reviewStatus === "approved" &&
+    source.currentApprovedVersionId !== null &&
+    (
+      source.exposureClass === "public" ||
+      source.exposureClass ===
+        "public_redacted"
+    );
+
+  return (
+    <article className="rounded-xl border border-wk-border bg-wk-surface p-4 shadow-sm">
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div className="min-w-0">
+          <div className="text-[10px] font-black uppercase tracking-[0.12em] text-wk-info">
+            {humanize(
+              source.sourceType || "Source",
+            )}
+          </div>
+          <h3 className="mt-1 text-[14px] font-bold leading-5 text-wk-text">
+            {source.title || "Untitled Source"}
+          </h3>
+          <p className="mt-1 text-[11px] text-wk-text-muted">
+            {source.creatorDisplay ||
+              source.publisherDisplay ||
+              "Creator not recorded"}
+          </p>
+        </div>
+
+        <span
+          className={
+            readyForPublicCitation
+              ? "inline-flex items-center gap-1 rounded-full bg-wk-success-soft px-2 py-1 text-[9px] font-black uppercase tracking-[0.08em] text-wk-success"
+              : "inline-flex items-center gap-1 rounded-full bg-wk-bg-subtle px-2 py-1 text-[9px] font-black uppercase tracking-[0.08em] text-wk-text-muted"
+          }
+        >
+          <WkIcon
+            name={
+              readyForPublicCitation
+                ? "ShieldCheck"
+                : "Library"
+            }
+            size={11}
+          />
+          {readyForPublicCitation
+            ? "Ready for Public Citation"
+            : "Internal Source"}
+        </span>
+      </div>
+
+      <div className="mt-4 grid gap-3 text-[10px] sm:grid-cols-2">
+        <div>
+          <div className="font-bold text-wk-text-faint">
+            Review
+          </div>
+          <div className="mt-1 text-wk-text">
+            {humanize(source.reviewStatus)}
+            {" · "}
+            {humanize(source.exposureClass)}
+          </div>
+        </div>
+
+        <div>
+          <div className="font-bold text-wk-text-faint">
+            State
+          </div>
+          <div className="mt-1 text-wk-text">
+            {humanize(source.sourceState)}
+          </div>
+        </div>
+
+        <div>
+          <div className="font-bold text-wk-text-faint">
+            Rights
+          </div>
+          <div className="mt-1 text-wk-text">
+            {humanize(source.rightsStatus)}
+          </div>
+        </div>
+
+        <div>
+          <div className="font-bold text-wk-text-faint">
+            Consent
+          </div>
+          <div className="mt-1 text-wk-text">
+            {humanize(source.consentStatus)}
+          </div>
+        </div>
+      </div>
+
+      {sourceHref ? (
+        <a
+          href={sourceHref}
+          target="_blank"
+          rel="noreferrer"
+          className="mt-4 inline-flex items-center gap-1.5 text-[11px] font-bold text-wk-brand hover:underline"
+        >
+          <WkIcon
+            name="ExternalLink"
+            size={12}
+          />
+          Open Source
+        </a>
+      ) : null}
+
+      <p className="mt-4 rounded-lg bg-wk-bg-subtle px-3 py-2 text-[10px] leading-4 text-wk-text-muted">
+        Source version:{" "}
+        <span className="break-all font-mono">
+          {source.currentApprovedVersionId ||
+            source.currentWorkingVersionId ||
+            "Unavailable"}
+        </span>
+        {". "}
+        Approval does not grant reuse permission.
+      </p>
+    </article>
+  );
+}
+
 export function ArticleTrustPanel({
   state,
 }: Props) {
@@ -375,8 +510,69 @@ export function ArticleTrustPanel({
   const adminUser = useAdminUser();
   const [creditFormOpen, setCreditFormOpen] =
     useState(false);
+  const [sourceFormOpen, setSourceFormOpen] =
+    useState(false);
+  const [sourceTypes, setSourceTypes] =
+    useState<ArticleTrustSourceType[]>([]);
+  const [sourceLibrary, setSourceLibrary] =
+    useState<ArticleTrustSourceSummary[]>([]);
+  const [sourceLoading, setSourceLoading] =
+    useState(false);
+  const [sourceError, setSourceError] =
+    useState<string | null>(null);
+  const canManageSources =
+    adminUser.can("manage_sources");
+  const canReviewSources =
+    adminUser.can("review_sources");
+  const canViewSources =
+    adminUser.can("view_trust_records") ||
+    canManageSources ||
+    canReviewSources ||
+    adminUser.can("withdraw_sources");
   const canManageCredits =
     adminUser.can("manage_credits");
+
+  const loadSources = useCallback(async () => {
+    if (!canViewSources) {
+      setSourceTypes([]);
+      setSourceLibrary([]);
+      setSourceError(null);
+      return;
+    }
+
+    setSourceLoading(true);
+    setSourceError(null);
+
+    try {
+      const library =
+        await fetchArticleTrustSourceLibrary(
+          50,
+        );
+
+      setSourceTypes(library.sourceTypes);
+      setSourceLibrary(library.sources);
+    } catch (error) {
+      setSourceError(
+        error instanceof Error
+          ? error.message
+          : "The Source Library could not be loaded.",
+      );
+    } finally {
+      setSourceLoading(false);
+    }
+  }, [canViewSources]);
+
+  useEffect(() => {
+    if (!adminUser.loading) {
+      void loadSources();
+    }
+  }, [adminUser.loading, loadSources]);
+
+  function refreshAll() {
+    refresh();
+    void loadSources();
+  }
+
   const hasPrimaryAuthor =
     workspace?.credits.some(
       (credit) =>
@@ -410,6 +606,26 @@ export function ArticleTrustPanel({
         </div>
 
         <div className="flex shrink-0 flex-wrap gap-2">
+          {canManageSources &&
+          sourceTypes.length > 0 ? (
+            <button
+              type="button"
+              onClick={() =>
+                setSourceFormOpen(true)
+              }
+              disabled={
+                loading || sourceLoading
+              }
+              className="wk-button wk-button-secondary wk-button-sm"
+            >
+              <WkIcon
+                name="Plus"
+                size={14}
+              />
+              Add Source
+            </button>
+          ) : null}
+
           {canManageCredits &&
           identity &&
           workspace ? (
@@ -428,8 +644,10 @@ export function ArticleTrustPanel({
 
           <button
             type="button"
-            onClick={refresh}
-            disabled={loading}
+            onClick={refreshAll}
+            disabled={
+              loading || sourceLoading
+            }
             className="wk-button wk-button-secondary wk-button-sm"
           >
             <WkIcon
@@ -494,6 +712,84 @@ export function ArticleTrustPanel({
       workspace ? (
         <>
           <VersionContext state={state} />
+
+          {canViewSources ? (
+            <section>
+              <div className="mb-3 flex items-end justify-between gap-3">
+                <div>
+                  <h2 className="text-[15px] font-bold text-wk-text">
+                    Source Library
+                  </h2>
+                  <p className="mt-1 text-[10px] text-wk-text-muted">
+                    {sourceLibrary.length} reusable
+                    Sources available to authorized
+                    editors
+                  </p>
+                </div>
+              </div>
+
+              <p className="mb-3 rounded-lg bg-wk-bg-subtle px-3 py-2 text-[10px] leading-4 text-wk-text-muted">
+                Sources are reusable trust records.
+                They do not become Article Citations
+                until an editor creates and attaches
+                a Citation.
+              </p>
+
+              {sourceLoading ? (
+                <div className="rounded-xl border border-wk-border bg-wk-surface px-5 py-8 text-center">
+                  <WkIcon
+                    name="Loader2"
+                    size={18}
+                    className="mx-auto animate-spin text-wk-brand"
+                  />
+                  <p className="mt-2 text-[11px] font-bold text-wk-text">
+                    Loading Source Library
+                  </p>
+                </div>
+              ) : sourceError ? (
+                <div className="rounded-xl border border-wk-warning/30 bg-wk-warning-soft px-4 py-4">
+                  <p className="text-[11px] leading-5 text-wk-text">
+                    {sourceError}
+                  </p>
+                  <button
+                    type="button"
+                    onClick={() =>
+                      void loadSources()
+                    }
+                    className="wk-button wk-button-secondary wk-button-sm mt-3"
+                  >
+                    Retry Source Library
+                  </button>
+                </div>
+              ) : sourceLibrary.length === 0 ? (
+                <div className="rounded-xl border border-dashed border-wk-border bg-wk-surface px-5 py-8 text-center">
+                  <WkIcon
+                    name="Library"
+                    size={22}
+                    className="mx-auto text-wk-text-faint"
+                  />
+                  <p className="mt-3 text-[12px] font-bold text-wk-text">
+                    No Governed Sources
+                  </p>
+                  <p className="mt-1 text-[10px] text-wk-text-muted">
+                    Create the first reusable Source
+                    before adding a Citation.
+                  </p>
+                </div>
+              ) : (
+                <div className="grid gap-3 lg:grid-cols-2">
+                  {sourceLibrary.map(
+                    (source) => (
+                      <SourceCard
+                        key={source.id}
+                        source={source}
+                      />
+                    ),
+                  )}
+                </div>
+              )}
+            </section>
+          ) : null}
 
           <section>
             <div className="mb-3 flex items-end justify-between gap-3">
@@ -577,6 +873,21 @@ export function ArticleTrustPanel({
         </>
       ) : null}
 
+      {sourceFormOpen &&
+      sourceTypes.length > 0 ? (
+        <ArticleSourceForm
+          sourceTypes={sourceTypes}
+          canReview={canReviewSources}
+          onClose={() =>
+            setSourceFormOpen(false)
+          }
+          onCreated={() => {
+            setSourceFormOpen(false);
+            void loadSources();
+          }}
+        />
+      ) : null}
+
       {creditFormOpen &&
       identity &&
       workspace ? (
@@ -598,9 +909,9 @@ export function ArticleTrustPanel({
           }
           onAttached={() => {
             setCreditFormOpen(false);
-            refresh();
+            refreshAll();
           }}
-          onConcurrency={refresh}
+          onConcurrency={refreshAll}
         />
       ) : null}
     </div>

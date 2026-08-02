@@ -111,7 +111,21 @@ describe("Article trust service", () => {
       .map((file) => fs.readFileSync(file, "utf8"))
       .join("\n");
 
-    expect(pages).not.toContain("get_article_version_trust_workspace");
-    commands.forEach((command) => expect(pages).not.toContain(command));
+    const directRpcNames = Array.from(
+      pages.matchAll(
+        /\.rpc\(\s*["']([^"']+)["']/g,
+      ),
+      (match) => match[1],
+    );
+
+    expect(directRpcNames).not.toContain(
+      "get_article_version_trust_workspace",
+    );
+
+    commands.forEach((command) => {
+      expect(directRpcNames).not.toContain(
+        command,
+      );
+    });
   });
 });

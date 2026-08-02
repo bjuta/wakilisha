@@ -138,6 +138,47 @@ export interface ArticleWorkingVersionIdentity {
   articleDraftVersion: number;
 }
 
+export interface ArticleTrustSourceType {
+  sourceType: string;
+  label: string;
+  description: string;
+  sortOrder: number;
+}
+
+export interface ArticleTrustSourceSummary {
+  id: string;
+  sourceType: string;
+  title: string;
+  creatorDisplay: string | null;
+  publisherDisplay: string | null;
+  sourceUrl: string | null;
+  archiveIdentifier: string | null;
+  publicationDate: string | null;
+  captureDate: string | null;
+  retrievalDate: string | null;
+  languageCode: string | null;
+  countryCode: string | null;
+  placeText: string | null;
+  rightsStatus: string;
+  consentStatus: string;
+  sensitivity: string;
+  reliabilityNote: string | null;
+  creditLine: string | null;
+  reviewStatus: string;
+  exposureClass: string;
+  sourceState: string;
+  currentWorkingVersionId: string | null;
+  currentSubmittedVersionId: string | null;
+  currentApprovedVersionId: string | null;
+  workingRevision: number;
+  updatedAt: string;
+}
+
+export interface ArticleTrustSourceLibrary {
+  sourceTypes: ArticleTrustSourceType[];
+  sources: ArticleTrustSourceSummary[];
+}
+
 function record(value: unknown): JsonRecord {
   return value && typeof value === "object" && !Array.isArray(value)
     ? (value as JsonRecord)
@@ -277,6 +318,140 @@ function normalizeCredit(value: unknown): ArticleTrustCredit {
   };
 }
 
+function normalizeSourceType(
+  value: unknown,
+): ArticleTrustSourceType {
+  const row = record(value);
+
+  return {
+    sourceType: text(row.source_type),
+    label: text(row.label),
+    description: text(row.description),
+    sortOrder: number(row.sort_order, 100),
+  };
+}
+
+function normalizeSourceSummary(
+  value: unknown,
+): ArticleTrustSourceSummary {
+  const row = record(value);
+
+  return {
+    id: text(row.id),
+    sourceType: text(row.source_type),
+    title: text(row.title),
+    creatorDisplay: nullableText(
+      row.creator_display,
+    ),
+    publisherDisplay: nullableText(
+      row.publisher_display,
+    ),
+    sourceUrl: nullableText(row.source_url),
+    archiveIdentifier: nullableText(
+      row.archive_identifier,
+    ),
+    publicationDate: nullableText(
+      row.publication_date,
+    ),
+    captureDate: nullableText(
+      row.capture_date,
+    ),
+    retrievalDate: nullableText(
+      row.retrieval_date,
+    ),
+    languageCode: nullableText(
+      row.language_code,
+    ),
+    countryCode: nullableText(
+      row.country_code,
+    ),
+    placeText: nullableText(
+      row.place_text,
+    ),
+    rightsStatus: text(
+      row.rights_status,
+      "unknown",
+    ),
+    consentStatus: text(
+      row.consent_status,
+      "unknown",
+    ),
+    sensitivity: text(
+      row.sensitivity,
+      "none",
+    ),
+    reliabilityNote: nullableText(
+      row.reliability_note,
+    ),
+    creditLine: nullableText(
+      row.credit_line,
+    ),
+    reviewStatus: text(
+      row.review_status,
+      "draft",
+    ),
+    exposureClass: text(
+      row.exposure_class,
+      "internal",
+    ),
+    sourceState: text(
+      row.source_state,
+      "active",
+    ),
+    currentWorkingVersionId: nullableText(
+      row.current_working_version_id,
+    ),
+    currentSubmittedVersionId: nullableText(
+      row.current_submitted_version_id,
+    ),
+    currentApprovedVersionId: nullableText(
+      row.current_approved_version_id,
+    ),
+    workingRevision: Math.max(
+      1,
+      number(row.working_revision, 1),
+    ),
+    updatedAt: text(row.updated_at),
+  };
+}
+
+export function normalizeArticleTrustSourceLibrary(
+  value: unknown,
+): ArticleTrustSourceLibrary {
+  const row = record(value);
+
+  const sourceTypes =
+    Array.isArray(row.source_types)
+      ? row.source_types
+          .map(normalizeSourceType)
+          .filter(
+            (item) =>
+              item.sourceType &&
+              item.label,
+          )
+          .sort(
+            (left, right) =>
+              left.sortOrder -
+                right.sortOrder ||
+              left.sourceType.localeCompare(
+                right.sourceType,
+              ),
+          )
+      : [];
+
+  const sources =
+    Array.isArray(row.sources)
+      ? row.sources
+          .map(normalizeSourceSummary)
+          .filter((item) => item.id)
+      : [];
+
+  return {
+    sourceTypes,
+    sources,
+  };
+}
+
 export function normalizeArticleWorkingVersionIdentity(
   value: unknown,
 ): ArticleWorkingVersionIdentity {
@@ -362,6 +537,41 @@ function throwTrustError(
     `${context}: ${error.message}`,
     classifyArticleTrustError(error.message, code),
     code,
+  );
+}
+
+export async function fetchArticleTrustSourceLibrary(
+  limit = 50,
+): Promise<ArticleTrustSourceLibrary> {
+  const normalizedLimit = Math.trunc(limit);
+
+  if (
+    !Number.isFinite(limit) ||
+    normalizedLimit < 1 ||
+    normalizedLimit > 100
+  ) {
+    throw new ArticleTrustServiceError(
+      "Source Library limit must be between 1 and 100",
+      "validation",
+    );
+  }
+
+  const { data, error } = await supabase.rpc(
+    "list_article_trust_sources",
+    {
+      p_limit: normalizedLimit,
+    },
+  );
+
+  if (error) {
+    throwTrustError(
+      "Failed to load Article Source Library",
+      error,
+    );
+  }
+
+  return normalizeArticleTrustSourceLibrary(
+    data,
   );
 }
 
