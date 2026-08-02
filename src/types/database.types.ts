@@ -16192,6 +16192,7 @@ export type Database = {
           version_number: number
         }[]
       }
+      list_article_trust_sources: { Args: { p_limit?: number }; Returns: Json }
       list_article_versions: {
         Args: { p_article_id: string; p_limit?: number }
         Returns: {
