@@ -629,6 +629,14 @@ export function ArticleTrustPanel({
     void loadCitationOptions();
   }
 
+  const hasApprovedCitationSource =
+    sourceLibrary.some(
+      (source) =>
+        source.sourceState === "active" &&
+        source.reviewStatus === "approved" &&
+        source.currentApprovedVersionId !== null,
+    );
+
   const hasPrimaryAuthor =
     workspace?.credits.some(
       (credit) =>
@@ -686,7 +694,7 @@ export function ArticleTrustPanel({
           identity &&
           workspace &&
           citationOptions &&
-          sourceLibrary.length > 0 ? (
+          hasApprovedCitationSource ? (
             <button
               type="button"
               onClick={() =>

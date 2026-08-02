@@ -132,9 +132,9 @@ export function ArticleCitationForm({
       sources.filter(
         (source) =>
           source.sourceState === "active" &&
+          source.reviewStatus === "approved" &&
           Boolean(
-            source.currentApprovedVersionId ||
-              source.currentWorkingVersionId,
+            source.currentApprovedVersionId,
           ),
       ),
     [sources],
@@ -251,7 +251,6 @@ export function ArticleCitationForm({
 
   const selectedSourceVersionId =
     selectedSource?.currentApprovedVersionId ||
-    selectedSource?.currentWorkingVersionId ||
     null;
 
   const selectedSourcePublic =
@@ -562,16 +561,20 @@ export function ArticleCitationForm({
     }
 
     if (
-      !selectedSource ||
-      !selectedSourceVersionId
+      !createdCitationId &&
+      (
+        !selectedSource ||
+        !selectedSourceVersionId
+      )
     ) {
       setErrorMessage(
-        "Choose a Source with an available Source version.",
+        "Choose an active approved Source version.",
       );
       return;
     }
 
     if (
+      !createdCitationId &&
       publicPresentation &&
       !selectedSourcePublic
     ) {
@@ -604,8 +607,6 @@ export function ArticleCitationForm({
     setSubmitting(true);
 
     try {
-      const locatorData =
-        buildLocatorData();
       const targetAnchorData =
         buildTargetAnchorData();
 
@@ -613,6 +614,9 @@ export function ArticleCitationForm({
         createdCitationId;
 
       if (!citationId) {
+        const locatorData =
+          buildLocatorData();
+
         const result = await createCitation({
           p_source_id: selectedSource.id,
           p_source_version_id:
@@ -699,8 +703,12 @@ export function ArticleCitationForm({
       type?: "text" | "number";
       min?: number;
       placeholder?: string;
+      lockAfterCitation?: boolean;
     },
   ): ReactNode {
+    const lockAfterCitation =
+      options?.lockAfterCitation ?? true;
+
     return (
       <label>
         <span className="wk-label">
@@ -714,7 +722,11 @@ export function ArticleCitationForm({
             setValue(event.target.value)
           }
           disabled={
-            citationLocked || submitting
+            submitting ||
+            (
+              lockAfterCitation &&
+              citationLocked
+            )
           }
           className="wk-input mt-1 w-full"
           placeholder={options?.placeholder}
@@ -916,6 +928,9 @@ export function ArticleCitationForm({
           "Block ID",
           blockId,
           setBlockId,
+          {
+            lockAfterCitation: false,
+          },
         );
 
       case "heading_id":
@@ -923,6 +938,9 @@ export function ArticleCitationForm({
           "Heading ID",
           headingId,
           setHeadingId,
+          {
+            lockAfterCitation: false,
+          },
         );
 
       case "paragraph_id":
@@ -930,6 +948,9 @@ export function ArticleCitationForm({
           "Paragraph ID",
           paragraphId,
           setParagraphId,
+          {
+            lockAfterCitation: false,
+          },
         );
 
       case "character_range":
@@ -942,6 +963,7 @@ export function ArticleCitationForm({
               {
                 type: "number",
                 min: 0,
+                lockAfterCitation: false,
               },
             )}
             {field(
@@ -951,6 +973,7 @@ export function ArticleCitationForm({
               {
                 type: "number",
                 min: 0,
+                lockAfterCitation: false,
               },
             )}
           </>
@@ -961,6 +984,9 @@ export function ArticleCitationForm({
           "Structured Node ID",
           nodeId,
           setNodeId,
+          {
+            lockAfterCitation: false,
+          },
         );
 
       default:
@@ -1042,8 +1068,8 @@ export function ArticleCitationForm({
                 Source Version
               </legend>
               <p className="mt-1 text-[10px] text-wk-text-muted">
-                Choose the exact governed Source
-                version this Citation points to.
+                Choose the exact active approved
+                Source version this Citation points to.
               </p>
 
               <label className="mt-4 block">

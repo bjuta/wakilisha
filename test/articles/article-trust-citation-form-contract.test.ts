@@ -189,6 +189,61 @@ describe("Article Citation intake contract", () => {
     );
   });
 
+  it("offers only active approved Source versions for Citation creation", () => {
+    const form = read(
+      "src/pages/admin/content/articles/detail/components/ArticleCitationForm.tsx",
+    );
+    const panel = read(
+      "src/pages/admin/content/articles/detail/components/ArticleTrustPanel.tsx",
+    );
+
+    expect(form).toContain(
+      'source.reviewStatus === "approved"',
+    );
+    expect(form).toContain(
+      "Boolean(\n            source.currentApprovedVersionId,",
+    );
+    expect(form).not.toContain(
+      "source.currentApprovedVersionId ||\n              source.currentWorkingVersionId",
+    );
+    expect(form).toContain(
+      "Choose an active approved Source version.",
+    );
+    expect(panel).toContain(
+      "hasApprovedCitationSource",
+    );
+  });
+
+  it("keeps Article attachment anchors editable after Citation creation", () => {
+    const form = read(
+      "src/pages/admin/content/articles/detail/components/ArticleCitationForm.tsx",
+    );
+
+    expect(form).toContain(
+      "lockAfterCitation?: boolean",
+    );
+    expect(form).toContain(
+      "lockAfterCitation &&\n              citationLocked",
+    );
+    expect(
+      form.match(
+        /lockAfterCitation: false/g,
+      )?.length,
+    ).toBe(6);
+    expect(form).toContain(
+      "!createdCitationId &&",
+    );
+    expect(
+      form.indexOf(
+        "const locatorData =",
+      ),
+    ).toBeGreaterThan(
+      form.indexOf(
+        "if (!citationId) {",
+      ),
+    );
+  });
+
   it("requires the exact approved Source version for public presentation", () => {
     const form = read(
       "src/pages/admin/content/articles/detail/components/ArticleCitationForm.tsx",
