@@ -5,11 +5,14 @@ import {
 } from "react";
 import { WkIcon } from "@/components/design-system/Icon";
 import { useAdminUser } from "@/hooks/useAdminUser";
+import { ArticleCitationForm } from "./ArticleCitationForm";
 import { ArticleCreditForm } from "./ArticleCreditForm";
 import { ArticleSourceForm } from "./ArticleSourceForm";
 import {
+  fetchArticleTrustCitationIntakeOptions,
   fetchArticleTrustSourceLibrary,
   type ArticleTrustCitation,
+  type ArticleTrustCitationIntakeOptions,
   type ArticleTrustCredit,
   type ArticleTrustSourceSummary,
   type ArticleTrustSourceType,
@@ -512,6 +515,8 @@ export function ArticleTrustPanel({
     useState(false);
   const [sourceFormOpen, setSourceFormOpen] =
     useState(false);
+  const [citationFormOpen, setCitationFormOpen] =
+    useState(false);
   const [sourceTypes, setSourceTypes] =
     useState<ArticleTrustSourceType[]>([]);
   const [sourceLibrary, setSourceLibrary] =
@@ -520,6 +525,20 @@ export function ArticleTrustPanel({
     useState(false);
   const [sourceError, setSourceError] =
     useState<string | null>(null);
+  const [
+    citationOptions,
+    setCitationOptions,
+  ] = useState<ArticleTrustCitationIntakeOptions | null>(
+    null,
+  );
+  const [
+    citationOptionsLoading,
+    setCitationOptionsLoading,
+  ] = useState(false);
+  const [
+    citationOptionsError,
+    setCitationOptionsError,
+  ] = useState<string | null>(null);
   const canManageSources =
     adminUser.can("manage_sources");
   const canReviewSources =
@@ -529,6 +548,11 @@ export function ArticleTrustPanel({
     canManageSources ||
     canReviewSources ||
     adminUser.can("withdraw_sources");
+  const canManageCitations =
+    adminUser.can("manage_citations");
+  const canViewCitationOptions =
+    canManageCitations ||
+    adminUser.can("view_trust_records");
   const canManageCredits =
     adminUser.can("manage_credits");
 
@@ -562,15 +586,47 @@ export function ArticleTrustPanel({
     }
   }, [canViewSources]);
 
+  const loadCitationOptions =
+    useCallback(async () => {
+      if (!canViewCitationOptions) {
+        setCitationOptions(null);
+        setCitationOptionsError(null);
+        return;
+      }
+
+      setCitationOptionsLoading(true);
+      setCitationOptionsError(null);
+
+      try {
+        setCitationOptions(
+          await fetchArticleTrustCitationIntakeOptions(),
+        );
+      } catch (error) {
+        setCitationOptionsError(
+          error instanceof Error
+            ? error.message
+            : "Citation intake options could not be loaded.",
+        );
+      } finally {
+        setCitationOptionsLoading(false);
+      }
+    }, [canViewCitationOptions]);
+
   useEffect(() => {
     if (!adminUser.loading) {
       void loadSources();
+      void loadCitationOptions();
     }
-  }, [adminUser.loading, loadSources]);
+  }, [
+    adminUser.loading,
+    loadCitationOptions,
+    loadSources,
+  ]);
 
   function refreshAll() {
     refresh();
     void loadSources();
+    void loadCitationOptions();
   }
 
   const hasPrimaryAuthor =
@@ -626,6 +682,31 @@ export function ArticleTrustPanel({
             </button>
           ) : null}
 
+          {canManageCitations &&
+          identity &&
+          workspace &&
+          citationOptions &&
+          sourceLibrary.length > 0 ? (
+            <button
+              type="button"
+              onClick={() =>
+                setCitationFormOpen(true)
+              }
+              disabled={
+                loading ||
+                sourceLoading ||
+                citationOptionsLoading
+              }
+              className="wk-button wk-button-secondary wk-button-sm"
+            >
+              <WkIcon
+                name="Plus"
+                size={14}
+              />
+              Add Citation
+            </button>
+          ) : null}
+
           {canManageCredits &&
           identity &&
           workspace ? (
@@ -646,7 +727,9 @@ export function ArticleTrustPanel({
             type="button"
             onClick={refreshAll}
             disabled={
-              loading || sourceLoading
+              loading ||
+              sourceLoading ||
+              citationOptionsLoading
             }
             className="wk-button wk-button-secondary wk-button-sm"
           >
@@ -804,6 +887,24 @@ export function ArticleTrustPanel({
               </div>
             </div>
 
+            {canManageCitations &&
+            citationOptionsError ? (
+              <div className="mb-3 rounded-xl border border-wk-warning/30 bg-wk-warning-soft px-4 py-3">
+                <p className="text-[11px] leading-5 text-wk-text">
+                  {citationOptionsError}
+                </p>
+                <button
+                  type="button"
+                  onClick={() =>
+                    void loadCitationOptions()
+                  }
+                  className="wk-button wk-button-secondary wk-button-sm mt-3"
+                >
+                  Retry Citation Options
+                </button>
+              </div>
+            ) : null}
+
             {workspace.citations.length === 0 ? (
               <div className="rounded-xl border border-dashed border-wk-border bg-wk-surface px-5 py-8 text-center">
                 <WkIcon
@@ -871,6 +972,33 @@ export function ArticleTrustPanel({
             )}
           </section>
         </>
+      ) : null}
+
+      {citationFormOpen &&
+      identity &&
+      workspace &&
+      citationOptions ? (
+        <ArticleCitationForm
+          articleVersionId={
+            identity.workingVersionId
+          }
+          expectedCitationRevision={
+            workspace.citationRevision
+          }
+          nextDisplayOrder={
+            workspace.citations.length
+          }
+          sources={sourceLibrary}
+          options={citationOptions}
+          onClose={() =>
+            setCitationFormOpen(false)
+          }
+          onAttached={() => {
+            setCitationFormOpen(false);
+            refreshAll();
+          }}
+          onConcurrency={refreshAll}
+        />
       ) : null}
 
       {sourceFormOpen &&
