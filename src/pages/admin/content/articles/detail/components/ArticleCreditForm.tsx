@@ -4,6 +4,7 @@ import {
   type FormEvent,
 } from "react";
 import { WkIcon } from "@/components/design-system/Icon";
+import { useAdminUser } from "@/hooks/useAdminUser";
 import {
   ArticleTrustServiceError,
   attachArticleVersionCredit,
@@ -39,6 +40,10 @@ const CONSENT_STATUSES = [
   ["declined", "Declined"],
   ["withdrawn", "Withdrawn"],
 ] as const;
+
+type CreditedPartyKind =
+  | "current_user"
+  | "external_contributor";
 
 interface Props {
   articleVersionId: string;
@@ -101,6 +106,9 @@ export function ArticleCreditForm({
   onAttached,
   onConcurrency,
 }: Props) {
+  const adminUser = useAdminUser();
+  const [partyKind, setPartyKind] =
+    useState<CreditedPartyKind>("current_user");
   const [displayName, setDisplayName] =
     useState("");
   const [publicRole, setPublicRole] =
@@ -136,11 +144,18 @@ export function ArticleCreditForm({
   const [errorMessage, setErrorMessage] =
     useState<string | null>(null);
 
+  const externalParty =
+    partyKind === "external_contributor";
   const contributorLocked =
     createdContributorId !== null;
   const creditLocked =
     createdCreditId !== null;
+  const partyLocked =
+    contributorLocked || creditLocked;
+  const currentUserDisplayName =
+    adminUser.roleRecord?.display_name?.trim() ?? "";
   const publicConsentAllowed =
+    !externalParty ||
     consentStatus === "granted" ||
     consentStatus === "not_required";
 
@@ -182,14 +197,34 @@ export function ArticleCreditForm({
       return;
     }
 
-    if (!createdContributorId && !displayName.trim()) {
+    if (partyKind === "current_user") {
+      if (!adminUser.id.trim()) {
+        setErrorMessage(
+          "The signed-in WAKILISHA user is unavailable.",
+        );
+        return;
+      }
+
+      if (!currentUserDisplayName) {
+        setErrorMessage(
+          "Your WAKILISHA profile needs a display name before it can receive a Credit.",
+        );
+        return;
+      }
+    }
+
+    if (
+      externalParty &&
+      !createdContributorId &&
+      !displayName.trim()
+    ) {
       setErrorMessage(
         "External contributor display name is required.",
       );
       return;
     }
 
-    if (!isHttpUrl(publicUrl)) {
+    if (externalParty && !isHttpUrl(publicUrl)) {
       setErrorMessage(
         "Public URL must use HTTP or HTTPS.",
       );
@@ -211,6 +246,7 @@ export function ArticleCreditForm({
     }
 
     if (
+      externalParty &&
       publicPresentation &&
       !publicConsentAllowed
     ) {
@@ -225,7 +261,7 @@ export function ArticleCreditForm({
     try {
       let contributorId = createdContributorId;
 
-      if (!contributorId) {
+      if (externalParty && !contributorId) {
         const contributorResult =
           await createExternalContributor({
             p_display_name: displayName.trim(),
@@ -283,9 +319,15 @@ export function ArticleCreditForm({
       if (!creditId) {
         const creditResult = await createCredit({
           p_credit_role: creditRole,
-          p_external_contributor_id:
-            contributorId,
           p_public_safe: publicPresentation,
+          ...(partyKind === "current_user"
+            ? {
+                p_user_id: adminUser.id,
+              }
+            : {
+                p_external_contributor_id:
+                  contributorId as string,
+              }),
           ...(roleLabelOverride.trim()
             ? {
                 p_role_label_override:
@@ -344,7 +386,7 @@ export function ArticleCreditForm({
 
   const submitLabel = createdCreditId
     ? "Attach Created Credit"
-    : createdContributorId
+    : externalParty && createdContributorId
       ? "Create Credit and Attach"
       : "Create and Attach Credit";
 
@@ -365,12 +407,12 @@ export function ArticleCreditForm({
               id="article-credit-form-title"
               className="mt-1 text-[18px] font-bold text-wk-text"
             >
-              Add an External Contributor Credit
+              Add a Governed Credit
             </h2>
             <p className="mt-1 max-w-2xl text-[11px] leading-5 text-wk-text-muted">
-              This first mutation flow creates an external
-              contributor, creates one immutable Credit, and
-              attaches it to the current working Article version.
+              Credit the signed-in WAKILISHA user or create an
+              external contributor, then attach one immutable
+              Credit to the current working Article version.
             </p>
           </div>
 
@@ -410,193 +452,283 @@ export function ArticleCreditForm({
               </div>
             ) : null}
 
-            <section>
-              <div className="mb-3">
+            <fieldset
+              disabled={partyLocked || submitting}
+            >
+              <legend className="text-[13px] font-bold text-wk-text">
+                Credited party
+              </legend>
+              <p className="mt-1 text-[10px] text-wk-text-muted">
+                Choose the identity that should own this Credit.
+              </p>
+
+              <div className="mt-3 grid gap-3 sm:grid-cols-2">
+                <label className="flex cursor-pointer items-start gap-3 rounded-xl border border-wk-border bg-wk-bg-subtle p-4">
+                  <input
+                    type="radio"
+                    name="credited-party"
+                    value="current_user"
+                    checked={
+                      partyKind === "current_user"
+                    }
+                    onChange={() =>
+                      setPartyKind("current_user")
+                    }
+                    className="mt-0.5"
+                  />
+                  <span>
+                    <span className="block text-[11px] font-bold text-wk-text">
+                      My WAKILISHA account
+                    </span>
+                    <span className="mt-1 block text-[10px] leading-4 text-wk-text-muted">
+                      {currentUserDisplayName ||
+                        adminUser.name ||
+                        "Signed-in user"}
+                    </span>
+                  </span>
+                </label>
+
+                <label className="flex cursor-pointer items-start gap-3 rounded-xl border border-wk-border bg-wk-bg-subtle p-4">
+                  <input
+                    type="radio"
+                    name="credited-party"
+                    value="external_contributor"
+                    checked={externalParty}
+                    onChange={() =>
+                      setPartyKind(
+                        "external_contributor",
+                      )
+                    }
+                    className="mt-0.5"
+                  />
+                  <span>
+                    <span className="block text-[11px] font-bold text-wk-text">
+                      External contributor
+                    </span>
+                    <span className="mt-1 block text-[10px] leading-4 text-wk-text-muted">
+                      Create a governed identity for someone
+                      outside WAKILISHA accounts and the Registry.
+                    </span>
+                  </span>
+                </label>
+              </div>
+            </fieldset>
+
+            {partyKind === "current_user" ? (
+              <section className="rounded-xl border border-wk-border bg-wk-bg-subtle p-4">
                 <h3 className="text-[13px] font-bold text-wk-text">
-                  Contributor identity
+                  WAKILISHA user
                 </h3>
-                <p className="mt-1 text-[10px] text-wk-text-muted">
-                  Contact details and internal notes stay inside
-                  the editorial Workspace.
+                <p className="mt-1 text-[10px] leading-4 text-wk-text-muted">
+                  The Credit will use the active profile display
+                  name for the signed-in account. Use this only
+                  when this account genuinely contributed.
                 </p>
-              </div>
 
-              <div className="grid gap-4 sm:grid-cols-2">
-                <label className="sm:col-span-2">
-                  <span className="wk-label">
-                    Display name
-                  </span>
-                  <input
-                    value={displayName}
-                    onChange={(event) =>
-                      setDisplayName(
-                        event.target.value,
-                      )
-                    }
-                    disabled={
-                      contributorLocked ||
-                      submitting
-                    }
-                    required={!contributorLocked}
-                    className="wk-input mt-1 w-full"
-                    placeholder="Contributor name"
-                  />
-                </label>
+                <div className="mt-3">
+                  <div className="text-[10px] font-black uppercase tracking-[0.1em] text-wk-text-faint">
+                    Profile display name
+                  </div>
+                  <div className="mt-1 text-[12px] font-bold text-wk-text">
+                    {adminUser.loading
+                      ? "Loading profile"
+                      : currentUserDisplayName ||
+                        "Display name missing"}
+                  </div>
+                </div>
+              </section>
+            ) : (
+              <section>
+                <div className="mb-3">
+                  <h3 className="text-[13px] font-bold text-wk-text">
+                    External contributor identity
+                  </h3>
+                  <p className="mt-1 text-[10px] text-wk-text-muted">
+                    Contact details and internal notes stay inside
+                    the editorial Workspace.
+                  </p>
+                </div>
 
-                <label>
-                  <span className="wk-label">
-                    Public role
-                  </span>
-                  <input
-                    value={publicRole}
-                    onChange={(event) =>
-                      setPublicRole(
-                        event.target.value,
-                      )
-                    }
-                    disabled={
-                      contributorLocked ||
-                      submitting
-                    }
-                    className="wk-input mt-1 w-full"
-                    placeholder="Writer, photographer, guest"
-                  />
-                </label>
+                <div className="grid gap-4 sm:grid-cols-2">
+                  <label className="sm:col-span-2">
+                    <span className="wk-label">
+                      Display name
+                    </span>
+                    <input
+                      value={displayName}
+                      onChange={(event) =>
+                        setDisplayName(
+                          event.target.value,
+                        )
+                      }
+                      disabled={
+                        contributorLocked ||
+                        submitting
+                      }
+                      required={
+                        externalParty &&
+                        !contributorLocked
+                      }
+                      className="wk-input mt-1 w-full"
+                      placeholder="Contributor name"
+                    />
+                  </label>
 
-                <label>
-                  <span className="wk-label">
-                    Location
-                  </span>
-                  <input
-                    value={locationText}
-                    onChange={(event) =>
-                      setLocationText(
-                        event.target.value,
-                      )
-                    }
-                    disabled={
-                      contributorLocked ||
-                      submitting
-                    }
-                    className="wk-input mt-1 w-full"
-                    placeholder="Nairobi, Kenya"
-                  />
-                </label>
+                  <label>
+                    <span className="wk-label">
+                      Public role
+                    </span>
+                    <input
+                      value={publicRole}
+                      onChange={(event) =>
+                        setPublicRole(
+                          event.target.value,
+                        )
+                      }
+                      disabled={
+                        contributorLocked ||
+                        submitting
+                      }
+                      className="wk-input mt-1 w-full"
+                      placeholder="Writer, photographer, guest"
+                    />
+                  </label>
 
-                <label className="sm:col-span-2">
-                  <span className="wk-label">
-                    Public URL
-                  </span>
-                  <input
-                    type="url"
-                    value={publicUrl}
-                    onChange={(event) =>
-                      setPublicUrl(
-                        event.target.value,
-                      )
-                    }
-                    disabled={
-                      contributorLocked ||
-                      submitting
-                    }
-                    className="wk-input mt-1 w-full"
-                    placeholder="https://"
-                  />
-                </label>
+                  <label>
+                    <span className="wk-label">
+                      Location
+                    </span>
+                    <input
+                      value={locationText}
+                      onChange={(event) =>
+                        setLocationText(
+                          event.target.value,
+                        )
+                      }
+                      disabled={
+                        contributorLocked ||
+                        submitting
+                      }
+                      className="wk-input mt-1 w-full"
+                      placeholder="Nairobi, Kenya"
+                    />
+                  </label>
 
-                <label>
-                  <span className="wk-label">
-                    Contact email
-                  </span>
-                  <input
-                    type="email"
-                    value={contactEmail}
-                    onChange={(event) =>
-                      setContactEmail(
-                        event.target.value,
-                      )
-                    }
-                    disabled={
-                      contributorLocked ||
-                      submitting
-                    }
-                    className="wk-input mt-1 w-full"
-                    placeholder="Internal only"
-                  />
-                </label>
+                  <label className="sm:col-span-2">
+                    <span className="wk-label">
+                      Public URL
+                    </span>
+                    <input
+                      type="url"
+                      value={publicUrl}
+                      onChange={(event) =>
+                        setPublicUrl(
+                          event.target.value,
+                        )
+                      }
+                      disabled={
+                        contributorLocked ||
+                        submitting
+                      }
+                      className="wk-input mt-1 w-full"
+                      placeholder="https://"
+                    />
+                  </label>
 
-                <label>
-                  <span className="wk-label">
-                    Contact phone
-                  </span>
-                  <input
-                    value={contactPhone}
-                    onChange={(event) =>
-                      setContactPhone(
-                        event.target.value,
-                      )
-                    }
-                    disabled={
-                      contributorLocked ||
-                      submitting
-                    }
-                    className="wk-input mt-1 w-full"
-                    placeholder="Internal only"
-                  />
-                </label>
+                  <label>
+                    <span className="wk-label">
+                      Contact email
+                    </span>
+                    <input
+                      type="email"
+                      value={contactEmail}
+                      onChange={(event) =>
+                        setContactEmail(
+                          event.target.value,
+                        )
+                      }
+                      disabled={
+                        contributorLocked ||
+                        submitting
+                      }
+                      className="wk-input mt-1 w-full"
+                      placeholder="Internal only"
+                    />
+                  </label>
 
-                <label>
-                  <span className="wk-label">
-                    Consent status
-                  </span>
-                  <select
-                    value={consentStatus}
-                    onChange={(event) =>
-                      setConsentStatus(
-                        event.target.value,
-                      )
-                    }
-                    disabled={
-                      contributorLocked ||
-                      submitting
-                    }
-                    className="wk-input mt-1 w-full"
-                  >
-                    {CONSENT_STATUSES.map(
-                      ([value, label]) => (
-                        <option
-                          key={value}
-                          value={value}
-                        >
-                          {label}
-                        </option>
-                      ),
-                    )}
-                  </select>
-                </label>
+                  <label>
+                    <span className="wk-label">
+                      Contact phone
+                    </span>
+                    <input
+                      value={contactPhone}
+                      onChange={(event) =>
+                        setContactPhone(
+                          event.target.value,
+                        )
+                      }
+                      disabled={
+                        contributorLocked ||
+                        submitting
+                      }
+                      className="wk-input mt-1 w-full"
+                      placeholder="Internal only"
+                    />
+                  </label>
 
-                <label className="sm:col-span-2">
-                  <span className="wk-label">
-                    Internal notes
-                  </span>
-                  <textarea
-                    value={internalNotes}
-                    onChange={(event) =>
-                      setInternalNotes(
-                        event.target.value,
-                      )
-                    }
-                    disabled={
-                      contributorLocked ||
-                      submitting
-                    }
-                    rows={3}
-                    className="wk-input mt-1 w-full resize-y"
-                    placeholder="Private editorial context"
-                  />
-                </label>
-              </div>
-            </section>
+                  <label>
+                    <span className="wk-label">
+                      Consent status
+                    </span>
+                    <select
+                      value={consentStatus}
+                      onChange={(event) =>
+                        setConsentStatus(
+                          event.target.value,
+                        )
+                      }
+                      disabled={
+                        contributorLocked ||
+                        submitting
+                      }
+                      className="wk-input mt-1 w-full"
+                    >
+                      {CONSENT_STATUSES.map(
+                        ([value, label]) => (
+                          <option
+                            key={value}
+                            value={value}
+                          >
+                            {label}
+                          </option>
+                        ),
+                      )}
+                    </select>
+                  </label>
+
+                  <label className="sm:col-span-2">
+                    <span className="wk-label">
+                      Internal notes
+                    </span>
+                    <textarea
+                      value={internalNotes}
+                      onChange={(event) =>
+                        setInternalNotes(
+                          event.target.value,
+                        )
+                      }
+                      disabled={
+                        contributorLocked ||
+                        submitting
+                      }
+                      rows={3}
+                      className="wk-input mt-1 w-full resize-y"
+                      placeholder="Private editorial context"
+                    />
+                  </label>
+                </div>
+              </section>
+            )}
 
             <section className="border-t border-wk-border pt-5">
               <div className="mb-3">
@@ -692,10 +824,11 @@ export function ArticleCreditForm({
                       )
                     }
                     disabled={
-                      contributorLocked ||
                       creditLocked ||
                       submitting ||
-                      !publicConsentAllowed
+                      !publicConsentAllowed ||
+                      (externalParty &&
+                        contributorLocked)
                     }
                     className="mt-0.5"
                   />
@@ -704,8 +837,10 @@ export function ArticleCreditForm({
                       Allow public presentation
                     </span>
                     <span className="mt-1 block text-[10px] leading-4 text-wk-text-muted">
-                      Requires granted or not-required consent.
-                      The choice locks after contributor creation.
+                      {externalParty
+                        ? "Requires granted or not-required consent. The choice locks after contributor creation."
+                        : "Uses the signed-in WAKILISHA profile identity."}
+                      {" "}
                       This does not create payment rights.
                     </span>
                   </span>
@@ -784,7 +919,11 @@ export function ArticleCreditForm({
 
             <button
               type="submit"
-              disabled={submitting}
+              disabled={
+                submitting ||
+                (partyKind === "current_user" &&
+                  adminUser.loading)
+              }
               className="wk-button wk-button-primary"
             >
               <WkIcon

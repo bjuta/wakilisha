@@ -11,6 +11,12 @@ function read(relativePath: string): string {
   );
 }
 
+function normalizeWhitespace(
+  value: string,
+): string {
+  return value.replace(/\s+/g, " ").trim();
+}
+
 describe("Article trust Credit form contract", () => {
   it("uses the dedicated trust service without direct RPC calls", () => {
     const form = read(
@@ -25,6 +31,60 @@ describe("Article trust Credit form contract", () => {
       "attachArticleVersionCredit",
     );
     expect(form).not.toContain(".rpc(");
+  });
+
+  it("supports the signed-in WAKILISHA user without creating an external contributor", () => {
+    const form = read(
+      "src/pages/admin/content/articles/detail/components/ArticleCreditForm.tsx",
+    );
+
+    expect(form).toContain("useAdminUser");
+    expect(form).toContain(
+      'useState<CreditedPartyKind>("current_user")',
+    );
+    expect(form).toContain(
+      "p_user_id: adminUser.id",
+    );
+    expect(form).toContain(
+      'partyKind === "current_user"',
+    );
+    expect(
+      normalizeWhitespace(form),
+    ).toContain(
+      "Use this only when this account genuinely contributed.",
+    );
+  });
+
+  it("keeps the external contributor path available and distinct", () => {
+    const form = read(
+      "src/pages/admin/content/articles/detail/components/ArticleCreditForm.tsx",
+    );
+
+    expect(form).toContain(
+      'partyKind === "external_contributor"',
+    );
+    expect(form).toContain(
+      "p_external_contributor_id:",
+    );
+    expect(form).toContain(
+      "await createExternalContributor({",
+    );
+    expect(form).toContain(
+      "External contributor identity",
+    );
+  });
+
+  it("locks the credited party after partial progress", () => {
+    const form = read(
+      "src/pages/admin/content/articles/detail/components/ArticleCreditForm.tsx",
+    );
+
+    expect(form).toContain(
+      "const partyLocked =",
+    );
+    expect(form).toContain(
+      "disabled={partyLocked || submitting}",
+    );
   });
 
   it("attaches to the current working version with only the Credit revision", () => {
@@ -91,7 +151,10 @@ describe("Article trust Credit form contract", () => {
     );
 
     expect(form).toContain(
-      "contributorLocked ||",
+      "externalParty &&",
+    );
+    expect(form).toContain(
+      "contributorLocked",
     );
     expect(form).toContain(
       "The choice locks after contributor creation.",
