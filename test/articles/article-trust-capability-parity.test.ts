@@ -78,6 +78,22 @@ describe("Article trust capability parity", () => {
     );
   });
 
+  it("preserves successful empty capability grants in the browser hook", () => {
+    const hook = read(
+      "src/hooks/useAdminUser.ts",
+    );
+
+    expect(hook).toContain(
+      "roleRecord?.capabilities ?? []",
+    );
+    expect(hook).not.toContain(
+      "roleRecord?.capabilities?.length",
+    );
+    expect(hook).not.toContain(
+      "getUserCapabilities",
+    );
+  });
+
   it("matches the Phase 3A seeded trust grants", () => {
     const source = read(
       "src/services/userRoles.ts",

@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
-import { fetchUserRole, type UserRole, type UserRoleRecord, type Capability, getUserCapabilities } from "@/services/userRoles";
+import { fetchUserRole, type UserRole, type UserRoleRecord, type Capability } from "@/services/userRoles";
 
 export interface AdminUser {
   id: string;
@@ -36,7 +36,7 @@ export function useAdminUser(): AdminUser & {
 
       try {
         const roleRecord = await fetchUserRole(authUserId);
-        const capabilities = roleRecord?.capabilities?.length ? roleRecord.capabilities : roleRecord ? getUserCapabilities(roleRecord.role) : [];
+        const capabilities = roleRecord?.capabilities ?? [];
         const name = roleRecord?.display_name || metadata?.name || metadata?.full_name || fallbackName;
         if (!cancelled) {
           setUser({
