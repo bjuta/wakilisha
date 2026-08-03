@@ -12,8 +12,6 @@ Migration 1 implementation is unblocked after the schema-design PR is accepted a
 
 No migration has been written or applied.
 
-No migration has been written or applied.
-
 Production has not changed.
 
 ## Purpose

@@ -16,8 +16,6 @@ Migration 1 implementation is unblocked after the schema-design PR is accepted a
 
 No Phase 3B migration has been written or applied.
 
-No Phase 3B schema migration has been written or applied.
-
 Production has not changed.
 
 ## Starting baseline
