@@ -8,7 +8,11 @@ Authority boundary defined.
 
 Live reused-authority verification is complete.
 
-Correction lifecycle and capability design is unblocked.
+Correction lifecycle and capability design is defined in `phase-3b-correction-lifecycle-capability-design.md`.
+
+Schema design is unblocked.
+
+Schema implementation remains blocked until the schema design is accepted.
 
 No Phase 3B schema migration has been written or applied.
 
