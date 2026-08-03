@@ -10,11 +10,11 @@ Live reused-authority verification is complete.
 
 Correction lifecycle and capability design is defined in `phase-3b-correction-lifecycle-capability-design.md`.
 
-Schema design is unblocked.
+Correction schema and command design is defined in `phase-3b-correction-schema-command-design.md`.
 
-Schema implementation remains blocked until the schema design is accepted.
+Migration 1 implementation is unblocked after the schema-design PR is accepted and merged.
 
-No Phase 3B schema migration has been written or applied.
+No Phase 3B migration has been written or applied.
 
 Production has not changed.
 
