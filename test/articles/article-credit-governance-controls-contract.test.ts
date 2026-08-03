@@ -110,6 +110,33 @@ describe("Article Credit governance controls", () => {
     );
   });
 
+  it("prevents non-active Credits from remaining public-safe", () => {
+    expect(form).toContain(
+      "const publicSafeAllowed =",
+    );
+    expect(form).toContain(
+      'creditState === "active"',
+    );
+    expect(form).toContain(
+      "const effectivePublicSafe =",
+    );
+    expect(form).toContain(
+      'if (nextState !== "active")',
+    );
+    expect(form).toContain(
+      "setPublicSafe(false)",
+    );
+    expect(form).toContain(
+      "p_public_safe: effectivePublicSafe",
+    );
+    expect(form).toContain(
+      "submitting || !publicSafeAllowed",
+    );
+    expect(form).toContain(
+      "Only active Credits can be governed as public-safe.",
+    );
+  });
+
   it("preserves the trust and commerce boundary", () => {
     expect(form).toContain(
       "Credit does not determine payment or payout rights.",

@@ -59,6 +59,21 @@ export function ArticleCreditGovernanceForm({
   const reasonRequired =
     creditState === "withdrawn" ||
     creditState === "archived";
+  const publicSafeAllowed =
+    creditState === "active";
+  const effectivePublicSafe =
+    publicSafeAllowed && publicSafe;
+
+  function handleCreditStateChange(
+    nextState: CreditState,
+  ) {
+    setErrorMessage(null);
+    setCreditState(nextState);
+
+    if (nextState !== "active") {
+      setPublicSafe(false);
+    }
+  }
 
   async function handleSubmit(
     event: FormEvent<HTMLFormElement>,
@@ -79,7 +94,7 @@ export function ArticleCreditGovernanceForm({
       await setCreditGovernance({
         p_credit_id: credit.creditId,
         p_credit_state: creditState,
-        p_public_safe: publicSafe,
+        p_public_safe: effectivePublicSafe,
         p_expected_governance_revision:
           credit.governanceRevision,
         ...(reason.trim()
@@ -172,7 +187,7 @@ export function ArticleCreditGovernanceForm({
                 id="credit-governance-state"
                 value={creditState}
                 onChange={(event) =>
-                  setCreditState(
+                  handleCreditStateChange(
                     event.target.value as CreditState,
                   )
                 }
@@ -198,11 +213,13 @@ export function ArticleCreditGovernanceForm({
             <label className="flex items-start gap-3 rounded-xl border border-wk-border bg-wk-bg-subtle p-4">
               <input
                 type="checkbox"
-                checked={publicSafe}
+                checked={effectivePublicSafe}
                 onChange={(event) =>
                   setPublicSafe(event.target.checked)
                 }
-                disabled={submitting}
+                disabled={
+                  submitting || !publicSafeAllowed
+                }
                 className="mt-0.5"
               />
               <span>
@@ -210,7 +227,7 @@ export function ArticleCreditGovernanceForm({
                   Governed as public-safe
                 </span>
                 <span className="mt-1 block text-[10px] leading-4 text-wk-text-muted">
-                  Public-safe governance is necessary but not sufficient. The Credit attachment, state and contributor must also remain eligible.
+                  Only active Credits can be governed as public-safe. Withdrawal or archival clears this setting. The Credit attachment and contributor must also remain eligible.
                 </span>
               </span>
             </label>
