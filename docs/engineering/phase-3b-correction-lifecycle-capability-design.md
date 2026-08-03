@@ -6,9 +6,11 @@ Date: 3 August 2026
 
 Lifecycle and capability design defined.
 
-Schema design is unblocked.
+Correction schema and command design is defined in `phase-3b-correction-schema-command-design.md`.
 
-Schema implementation remains blocked until the schema design is accepted.
+Migration 1 implementation is unblocked after the schema-design PR is accepted and merged.
+
+No migration has been written or applied.
 
 No migration has been written or applied.
 
