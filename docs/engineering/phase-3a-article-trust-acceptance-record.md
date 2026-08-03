@@ -2,13 +2,13 @@
 
 ## Status
 
-Acceptance is in progress.
+Acceptance is complete.
 
-Article adoption, Source lifecycle acceptance, and explicit working-versus-published isolation are complete.
+Article adoption, Source lifecycle acceptance, explicit working-versus-published isolation, visible Credit governance acceptance and final restoration are complete.
 
-Credit governance acceptance and final recorded Phase 3A closure remain.
+Phase 3A is closed.
 
-PR 3B remains blocked until the remaining acceptance items are completed and recorded.
+PR 3B is unblocked and may proceed from this accepted baseline.
 
 ## Acceptance Article
 
@@ -155,6 +155,85 @@ Final cleanup verified:
 - published trust remains unchanged
 - public trust returns one Source and one Credit
 
+## Credit governance acceptance proof
+
+The published-version Credit governance controls were delivered through:
+
+- PR #539, Add Article Credit governance controls
+- migration `20260802231000_article_trust_published_version_context.sql`
+- frontend release `20260803085711-5aa2909c`
+- PR #540, Reconcile Article Credit governance schema baseline
+
+The visible Article Trust workspace established that:
+
+- working-version Credits and published-version Credits are presented separately
+- the current working version has zero Credits
+- the published version has two Credits
+- Muiruri Beautah is the primary Author Credit
+- WAKILISHA is an internal Editor Credit
+- governance state, public-safe status, reason and revision are visible
+- Credit governance does not determine payment or payout rights
+
+The first withdrawal attempt exposed a frontend validation defect. The form allowed `withdrawn` and public-safe to be submitted together.
+
+The governed SQL command correctly rejected that invalid combination with:
+
+`Only active Credits can be public-safe`
+
+No production governance mutation was accepted by that failed attempt.
+
+The frontend defect was repaired through:
+
+- PR #541, Prevent invalid Credit governance states
+- frontend release `20260803114102-45114c6b`
+
+The repair established that:
+
+- changing a Credit to Withdrawn or Archived clears public-safe
+- public-safe is disabled for non-active Credits
+- a reason remains required for withdrawal or archival
+- the submitted command defensively sends public-safe as false for non-active states
+
+The Muiruri Beautah Author Credit then completed the visible governance lifecycle.
+
+Withdrawal used this reason:
+
+`Acceptance test: temporarily withdrawn to verify public Credit eligibility controls.`
+
+Withdrawal verified:
+
+- governance state became Withdrawn
+- public-safe became false
+- governance revision advanced from 1 to 2
+- the Author Credit became not publicly eligible
+- the public Article trust payload dropped from one Credit to zero Credits
+- both published Credit attachments remained intact
+- the working version remained at zero Credits
+- the public Source count remained one
+- Article Credit revision remained 3
+
+Restoration used this reason:
+
+`Acceptance test: restored to active and public-safe after withdrawal verification.`
+
+Restoration verified:
+
+- governance state returned to Active
+- public-safe returned to true
+- governance revision advanced from 2 to 3
+- the Author Credit became publicly eligible again
+- the public Article trust payload returned to one Credit
+- both published Credit attachments remained intact
+- the working version remained at zero Credits
+- the public Source count remained one
+- Article Credit revision remained 3
+- the WAKILISHA Editor Credit remained not publicly eligible
+
+The final live Credit state is:
+
+- Muiruri Beautah: Active, public-safe, publicly eligible, governance revision 3
+- WAKILISHA: Active, not public-safe, not publicly eligible, governance revision 1
+
 ## Completed acceptance items
 
 - two real Sources
@@ -175,10 +254,20 @@ Final cleanup verified:
 - working-save publication isolation repair
 - temporary acceptance-marker cleanup
 - restoration of the affected public Article gate without pointer mutation
+- visible working-version and published-version Credit separation
+- visible governed Credit state and public-safe controls
+- required withdrawal and archival reasons
+- enforcement that only Active Credits can be public-safe
+- Author Credit withdrawal and public-eligibility removal
+- Author Credit restoration and public-eligibility return
+- Credit governance revision advancing independently
+- Article Credit revision remaining unchanged through governance mutations
+- final restoration of the accepted public trust state
 
 ## Remaining acceptance items
 
-- visible Credit governance behavior
-- final recorded Phase 3A closure
+None.
 
-PR 3B remains blocked.
+Phase 3A is complete.
+
+PR 3B is unblocked.
