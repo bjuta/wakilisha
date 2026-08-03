@@ -6,7 +6,11 @@ Date: 3 August 2026
 
 Authority boundary defined.
 
-Schema design has not started.
+Live reused-authority verification is complete.
+
+Correction lifecycle and capability design is unblocked.
+
+No Phase 3B schema migration has been written or applied.
 
 Production has not changed.
 
@@ -58,6 +62,81 @@ The audit found no authoritative:
 - affected-resource review records
 
 The only `apply_correction` occurrence is a programme contract example. No implemented command exists.
+
+## Live reused-authority verification
+
+A read-only production verification completed successfully on 3 August 2026.
+
+The verification confirmed the existence and required boundaries of:
+
+- `platform_private.command_types`
+- `platform_private.command_receipts`
+- `platform_private.jobs`
+- `platform_private.outbox_events`
+- `public.community_contributions`
+- `public.community_notifications`
+- `public.admin_audit_events`
+- `public.registry_provenance_links`
+- `public.registry_canonical_write_events`
+- `editorial.resources`
+- `editorial.article_resources`
+- `editorial.article_versions`
+- `editorial.article_suggestion_events`
+- `editorial.publishing_item_events`
+- `editorial.sources`
+- `editorial.source_versions`
+- `editorial.source_review_events`
+- `editorial.citations`
+- `editorial.resource_citations`
+- `editorial.credits`
+- `editorial.credit_governance`
+- `editorial.resource_credits`
+
+The live security verification confirmed:
+
+- browser roles cannot use the private orchestration schema
+- browser roles cannot read command receipts, jobs, or outbox events
+- anonymous users cannot submit platform commands
+- authenticated users and the service role retain the intended command grant
+- Article versions remain protected by their immutability trigger
+- Source versions remain protected by their immutability trigger
+- Source review events remain append-only
+- Publishing item events remain append-only
+
+The observed live counts were:
+
+- controlled command types: 1
+- command receipts: 1
+- durable jobs: 1
+- outbox events: 1
+- community contributions: 1
+- community notifications: 0
+- Sources: 2
+- Source versions: 2
+- Citations: 2
+- Article-version Citation attachments: 2
+- Registry provenance links: 6,332
+- Registry canonical-write events: 0
+
+The final verification result was:
+
+`Phase 3B reused foundations verified`
+
+The correction-case authority was:
+
+`ABSENT AS EXPECTED`
+
+No correction-case table, correction-target table, correction-event table, correction-notification-job table, public correction-note table, affected-resource flag table, `apply_correction` command, or public correction-note publication command exists in production.
+
+The empty community notification count is not a missing authority. The notification table and read functions exist, but no live notification rows were present during verification.
+
+The empty Registry canonical-write-event count does not block the first Article correction slice. The later Registry correction adapter must include a production proof that creates or references an authoritative Registry canonical-write event.
+
+This live proof closes the reused-authority verification gate.
+
+Correction lifecycle and capability design may now proceed.
+
+Schema implementation remains blocked until that design is accepted.
 
 ## Authority conclusion
 
