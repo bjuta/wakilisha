@@ -15,13 +15,13 @@ All future work on Articles, Playlists, Audio, Video, Media, Registry, Charts, c
 
 ## Programme status
 
-Current phase: **Phase 3: Trust infrastructure**.
+Current phase: **Phase 4: Media platform**.
 
-The Article Workspace North Star implementation pass and QPR4 Publishing operations workspace are complete. PR 3A schema implementation has not started.
+Phase 3 Trust infrastructure is complete. PR 4A Media authority redesign is the next implementation.
 
 This plan has been reconciled against repository main at:
 
-`6b2979b Finish QPR4 Publishing operations board`
+`cdeaf364 Record Phase 3B Migration 4 live schema (#557)`
 
 Closed phases:
 
@@ -32,8 +32,10 @@ Closed phases:
 - **Phase 2A: Durable Article drafts and immutable versions**, closed through PR #460, PR #461, PR #463, and PR #464.
 - **Phase 2B: Review and publication lifecycle**, closed through PR #467, PR #469, PR #470, and PR #481.
 - **Phase 2C: Article Editor Workbench**, closed through PR #482 and PR #483.
+- **Phase 3A: Sources, Citations, and Credits**, closed through PR #542.
+- **Phase 3B: Corrections and provenance**, closed through PR #557.
 
-Completed Phase 3 readiness work:
+Completed Phase 3 work:
 
 - **Article Workspace North Star audit**, locked through PR #487.
 - **Article composition and workspace hierarchy**, completed through PR #488.
@@ -41,6 +43,8 @@ Completed Phase 3 readiness work:
 - **Governed Publishing workspace foundation and core**, completed through PR #492 and PR #493.
 - **Publishing teams, channels, operational history, Article linking, archive and restore, Board View, and Table View**, completed through PR #494 to PR #504.
 - **QPR4 Publishing production deployment**, completed from main commit `6b2979b`.
+- **Sources, Citations, Credits, source withdrawal, public trust reads, and Credit governance**, completed through PR #542.
+- **Correction identity, evidence, decisions, Article application, public notes, contributor follow-up, and live-schema reconciliation**, completed through PR #543 to PR #557.
 
 Supporting build-pipeline fix:
 
@@ -48,15 +52,17 @@ Supporting build-pipeline fix:
 
 Active phase:
 
-- **Phase 3: Trust infrastructure**.
+- **Phase 4: Media platform**.
 
-Phase 2 is closed.
+Phase 2 and Phase 3 are closed.
 
 Phase 2 proved the Article authority from draft through restoration in production. The completed lifecycle proof covered Draft, Submit for Review, Request Changes, revised Draft, Submit again, Approve, Publish, later Draft edit, public unchanged verification, Archive, and Restore.
 
 The North Star implementation work made the Article a stronger writing and review workspace without reopening the closed lifecycle authority. QPR4 established Publishing as a separate governed editorial operations workspace without duplicating canonical review, scheduling, or publication authority.
 
-Phase 3 continues from these closed authority and operations baselines. It must not reopen Article lifecycle architecture or turn Publishing into a second canonical editor unless a verified defect requires it.
+Phase 3 completed the shared Sources, Citations, Credits, Corrections, and provenance foundations without reopening Article lifecycle or duplicating Publishing authority.
+
+Phase 4 now begins with the Media authority redesign defined in this plan.
 
 See also:
 
@@ -1585,7 +1591,7 @@ Exit gate:
 - user-facing strings touched in Phase 2C were checked for prohibited dash characters
 - production smoke passed
 
-## Phase 3: Trust infrastructure (active)
+## Phase 3: Trust infrastructure (complete)
 
 Phase 3 builds the shared trust layer that Articles, Playlists, Audio, Video, Registry, Charts, and Inquiry will reuse.
 
@@ -1598,7 +1604,7 @@ Immediate Phase 3 boundary:
 - prove reuse through Article first, then at least one non-Article target
 - keep public presentation scoped to what the trust records can prove
 
-### Article Workspace North Star quality gate (closure reconciliation active)
+### Article Workspace North Star quality gate (complete)
 
 The implementation work required by the North Star audit is complete.
 
@@ -1623,33 +1629,9 @@ The quality gate does not reopen Phase 2 architecture.
 
 Do not alter proven lifecycle, review, approval, publication snapshot, archive, restore, recovery, preview-security, or canonical Publishing authority contracts unless a verified defect requires it.
 
-One final closure reconciliation remains before PR 3A schema implementation:
+The quality gate is closed.
 
-- verify the North Star acceptance list against the shipped production workspace
-- record any still-open accessibility or identity presentation obligations as bounded Phase 3 requirements
-- confirm the Sources, Citations, and Credits insertion points
-- record the quality gate as closed
-- start PR 3A without another Article or Publishing rebuild
-
-### Immediate next implementation
-
-**Article Workspace North Star closure reconciliation, followed by PR 3A Sources, citations, and credits.**
-
-The closure reconciliation must be documentation and acceptance proof, not another product rebuild.
-
-PR 3A then begins the reusable trust authority for:
-
-- Sources
-- Citations
-- Credits
-- external contributors
-- source versions and withdrawals
-- Registry entity links
-- inline Article citations
-- public source and credit presentation
-- preservation of future research publishing and licensed machine-use compatibility without placing commerce inside Citation or Credit records
-
-Do not begin Playlist, Audio, Video, Media, Field Capture, Corrections, Provenance, or Inquiry Mode in the first PR 3A implementation slice.
+The completed workspace remains the Article reference implementation for shared trust adoption. Phase 4 must not reopen Article lifecycle, review, publication snapshot, archive, restore, recovery, preview security, or canonical Publishing authority unless a verified defect requires it.
 
 ### PR 3A: Sources, citations, and credits
 
@@ -1671,6 +1653,15 @@ Exit gate:
 - one source can be reused by an Article, Registry change, and later Playlist note
 - citations remain stable when display formatting changes
 
+Completion record, 3 August 2026:
+
+- closed through PR #542
+- reusable Sources, source versions, typed locators, Citations, Credits, external contributors, and Article-version attachments are live
+- public Source and Credit reads preserve working-versus-published version boundaries
+- Source withdrawal and restoration were verified
+- Credit withdrawal, restoration, public-safe governance, and published-version presentation were verified
+- Phase 3A completed without placing licensing, payouts, or commercial allocation inside Citation or Credit authority
+
 ### PR 3B: Corrections and provenance
 
 Build:
@@ -1691,6 +1682,23 @@ Exit gate:
 - a submitted correction becomes a case
 - a reviewed correction creates a new resource version
 - the public history explains what changed and why
+
+Completion record, 4 August 2026:
+
+- closed through PR #557
+- production migrations `20260803183000_phase_3b_correction_identity_foundation.sql`, `20260804090000_phase_3b_correction_evidence_decision_authority.sql`, `20260804123000_phase_3b_article_correction_application.sql`, and `20260804163000_phase_3b_public_notes_contributor_follow_up.sql` were applied
+- correction cases, targets, evidence, decisions, related-resource review, Article correction application, public correction notes, contributor follow-up, closure, and reopening authority are live
+- the correction command registry contains 17 governed correction commands
+- production correction workflow rows remain empty
+- live database types and the 187-migration schema baseline match production
+- PR #556 and PR #557 completed implementation and live-schema reconciliation
+- no Supabase Edge Function or frontend deployment was required for Migration 4
+
+### Immediate next implementation
+
+**PR 4A: Media authority redesign.**
+
+Begin with the existing Media estate audit and authority boundary. Do not start the upload and processing pipeline until logical assets, immutable file objects, variants, usage links, rights, preservation, and migration boundaries are locked.
 
 ## Phase 4: Media platform
 
@@ -2284,48 +2292,43 @@ After canonical editors and Inquiry Mode are proven:
 - make legacy routes read-only
 - remove obsolete interface and schema through a guarded retirement programme
 
-## Immediate next implementation
+## Current implementation boundary
 
-Phase 0, Phase 1, and Phase 2A are closed.
+Phase 0 through Phase 3 are closed.
 
-Phase 2B is active and partially deployed. It is not closed.
+The current phase is Phase 4: Media platform.
 
 The next implementation is:
 
-**Phase 2B governed review closure**.
+**PR 4A: Media authority redesign**.
 
 This PR must:
 
-- restore the missing reviewer-facing workflow in the current Article Editor
-- use the old Institute Article editor as product evidence, not as the new architecture
-- show Submit for Review on Draft articles
-- show Request Changes and Approve Version on Pending Review articles
-- require a reviewer note when requesting changes
-- make approval target the submitted immutable version
-- prevent Publish from bypassing approval
-- show lifecycle history in the editor
-- preserve version-bound preview behavior
-- preserve publication snapshots and public read stability
-- prove the full lifecycle with one real production Article
+- audit the existing Media estate and storage relationships
+- define logical assets, immutable file objects, and variants
+- define usage links between Media and canonical resources
+- define checksums, technical metadata, and preservation state
+- define rights, consent, sensitivity, embargo, and source protection
+- define replacement history and retention state
+- preserve existing Media usability through an explicit migration bridge
+- lock the authority boundary and migration sequence before schema implementation
 
 This PR must not:
 
-- begin Phase 3 sources, citations, credits, corrections, or provenance work
-- build Playlist, Audio, Video, Field Capture, or Inquiry Mode
-- redesign public Article presentation
-- rewrite the editor shell
-- alter unrelated Registry, Charts, Media, or Institute code
-- create a duplicate editor
+- begin the upload and processing pipeline
+- delete or overwrite existing Media records or files
+- make editors depend directly on mutable storage URLs
+- reopen Article lifecycle, Publishing, Sources, Citations, Credits, or Corrections
+- begin Playlist, Audio, Video, Field Capture, or Inquiry Mode implementation
+- create a second Media authority
 
-The PR exit gate remains:
+The PR 4A exit gate remains:
 
-- one real Article goes through Draft, Submit for Review, Request Changes, revised Draft, Submit for Review, Approve, Publish, later Draft edit, public unchanged verification, Archive, and Restore
-- reviewer decisions are visible to editors
-- public published content remains stable after later draft edits
-- preview links continue to resolve to immutable versions
-- no critical checks regress
-
-Do not begin Phase 3 until these conditions are proven in production.
+- existing Media assets remain usable
+- one logical asset can safely hold an original and several derivatives
+- no editor depends directly on a mutable storage URL
+- the migration bridge and rollback boundary are explicit
+- the authority design is accepted before implementation begins
 
 
 ## Production freeze principle
@@ -2350,7 +2353,7 @@ New product ideas are recorded without automatically reopening frozen foundation
 - frontend deployment needed: No
 - Readdy Finish update needed: No
 - documentation review needed: Yes
-- next implementation plan: Phase 2B governed review closure
+- next implementation plan: PR 4A Media authority redesign
 
 
 ## Research publishing and knowledge licensing
