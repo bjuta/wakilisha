@@ -622,6 +622,123 @@ export type Database = {
           },
         ]
       }
+      correction_applications: {
+        Row: {
+          adapter_type: string
+          application_summary: string
+          applied_at: string
+          applied_by: string
+          case_resource_id: string
+          challenged_version_id: string
+          command_receipt_id: string
+          command_type: string
+          correlation_id: string
+          decision_id: string
+          expected_published_version_id: string
+          expected_working_fingerprint: string | null
+          expected_working_version_id: string | null
+          id: string
+          resulting_version_id: string
+          target_id: string
+          target_resource_id: string
+        }
+        Insert: {
+          adapter_type?: string
+          application_summary: string
+          applied_at?: string
+          applied_by: string
+          case_resource_id: string
+          challenged_version_id: string
+          command_receipt_id: string
+          command_type?: string
+          correlation_id: string
+          decision_id: string
+          expected_published_version_id: string
+          expected_working_fingerprint?: string | null
+          expected_working_version_id?: string | null
+          id?: string
+          resulting_version_id: string
+          target_id: string
+          target_resource_id: string
+        }
+        Update: {
+          adapter_type?: string
+          application_summary?: string
+          applied_at?: string
+          applied_by?: string
+          case_resource_id?: string
+          challenged_version_id?: string
+          command_receipt_id?: string
+          command_type?: string
+          correlation_id?: string
+          decision_id?: string
+          expected_published_version_id?: string
+          expected_working_fingerprint?: string | null
+          expected_working_version_id?: string | null
+          id?: string
+          resulting_version_id?: string
+          target_id?: string
+          target_resource_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "correction_applications_case_fkey"
+            columns: ["case_resource_id"]
+            isOneToOne: false
+            referencedRelation: "correction_cases"
+            referencedColumns: ["resource_id"]
+          },
+          {
+            foreignKeyName: "correction_applications_challenged_version_fkey"
+            columns: ["challenged_version_id"]
+            isOneToOne: false
+            referencedRelation: "article_versions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "correction_applications_decision_fkey"
+            columns: ["decision_id"]
+            isOneToOne: true
+            referencedRelation: "correction_decisions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "correction_applications_expected_published_version_fkey"
+            columns: ["expected_published_version_id"]
+            isOneToOne: false
+            referencedRelation: "article_versions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "correction_applications_expected_working_version_fkey"
+            columns: ["expected_working_version_id"]
+            isOneToOne: false
+            referencedRelation: "article_versions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "correction_applications_resource_fkey"
+            columns: ["target_resource_id"]
+            isOneToOne: false
+            referencedRelation: "resources"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "correction_applications_resulting_version_fkey"
+            columns: ["resulting_version_id"]
+            isOneToOne: false
+            referencedRelation: "article_versions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "correction_applications_target_fkey"
+            columns: ["target_id"]
+            isOneToOne: false
+            referencedRelation: "correction_targets"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       correction_cases: {
         Row: {
           assigned_at: string | null
@@ -635,6 +752,7 @@ export type Database = {
           correction_kind: string
           created_at: string
           created_by: string | null
+          current_application_id: string | null
           current_decision_id: string | null
           current_revision: number
           evidence_ready: boolean
@@ -671,6 +789,7 @@ export type Database = {
           correction_kind: string
           created_at?: string
           created_by?: string | null
+          current_application_id?: string | null
           current_decision_id?: string | null
           current_revision?: number
           evidence_ready?: boolean
@@ -707,6 +826,7 @@ export type Database = {
           correction_kind?: string
           created_at?: string
           created_by?: string | null
+          current_application_id?: string | null
           current_decision_id?: string | null
           current_revision?: number
           evidence_ready?: boolean
@@ -738,6 +858,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "correction_kinds"
             referencedColumns: ["correction_kind"]
+          },
+          {
+            foreignKeyName: "correction_cases_current_application_fkey"
+            columns: ["current_application_id"]
+            isOneToOne: false
+            referencedRelation: "correction_applications"
+            referencedColumns: ["id"]
           },
           {
             foreignKeyName: "correction_cases_current_decision_fkey"
@@ -926,6 +1053,13 @@ export type Database = {
           target_id?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "correction_events_application_fkey"
+            columns: ["application_id"]
+            isOneToOne: false
+            referencedRelation: "correction_applications"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "correction_events_case_fkey"
             columns: ["case_resource_id"]
@@ -15120,6 +15254,31 @@ export type Database = {
           p_selected_artists?: Json
         }
         Returns: Json
+      }
+      apply_article_correction: {
+        Args: {
+          p_application_summary: string
+          p_case_resource_id: string
+          p_challenged_article_version_id: string
+          p_corrected_payload: Json
+          p_correlation_id: string
+          p_expected_case_revision: number
+          p_expected_current_decision_id: string
+          p_expected_published_article_version_id: string
+          p_expected_working_article_version_id: string
+          p_expected_working_fingerprint: string
+          p_idempotency_key: string
+          p_primary_target_id: string
+          p_taxonomy_term_ids: string[]
+        }
+        Returns: {
+          case_resource_id: string
+          case_revision: number
+          command_receipt_id: string
+          idempotent_replay: boolean
+          receipt_status: string
+          result_payload: Json
+        }[]
       }
       approve_article_version: {
         Args: { p_article_id: string; p_note?: string; p_version_id?: string }
