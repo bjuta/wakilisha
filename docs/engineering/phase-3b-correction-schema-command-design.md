@@ -12,6 +12,18 @@ No migration may be written until this schema contract is reviewed, merged, and 
 
 Production has not changed.
 
+## Migration 2 contract lock
+
+Migration 2 implementation is governed by
+`phase-3b-migration-2-evidence-decision-contract-lock.md`.
+
+That lock resolves sequencing for case creation, command receipts,
+non-correction closure, current-decision integrity, evidence unlink
+history, related-resource closure, and decision supersession.
+
+Where the lock narrows or corrects this document's Migration 2 sequence,
+the lock controls Migration 2 implementation.
+
 ## Locked inputs
 
 This design is constrained by:
