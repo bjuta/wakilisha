@@ -622,6 +622,371 @@ export type Database = {
           },
         ]
       }
+      correction_cases: {
+        Row: {
+          assigned_at: string | null
+          assigned_investigator_id: string | null
+          assignment_reason: string | null
+          case_number: number
+          case_state: string
+          closed_at: string | null
+          closed_by: string | null
+          closed_reason: string | null
+          correction_kind: string
+          created_at: string
+          created_by: string | null
+          current_revision: number
+          evidence_ready: boolean
+          investigation_summary: string | null
+          investigator_recommendation: string | null
+          origin_contribution_id: string | null
+          origin_submitted_at: string | null
+          origin_submitter_user_id: string | null
+          origin_summary_snapshot: string
+          origin_type: string
+          origin_type_snapshot: string | null
+          priority: string
+          public_note_disposition: string | null
+          public_note_no_note_reason: string | null
+          resource_id: string
+          resource_kind: string
+          submitted_for_decision_at: string | null
+          submitted_for_decision_by: string | null
+          triage_reason: string | null
+          triaged_at: string | null
+          triaged_by: string | null
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          assigned_at?: string | null
+          assigned_investigator_id?: string | null
+          assignment_reason?: string | null
+          case_number?: never
+          case_state?: string
+          closed_at?: string | null
+          closed_by?: string | null
+          closed_reason?: string | null
+          correction_kind: string
+          created_at?: string
+          created_by?: string | null
+          current_revision?: number
+          evidence_ready?: boolean
+          investigation_summary?: string | null
+          investigator_recommendation?: string | null
+          origin_contribution_id?: string | null
+          origin_submitted_at?: string | null
+          origin_submitter_user_id?: string | null
+          origin_summary_snapshot: string
+          origin_type: string
+          origin_type_snapshot?: string | null
+          priority?: string
+          public_note_disposition?: string | null
+          public_note_no_note_reason?: string | null
+          resource_id: string
+          resource_kind?: string
+          submitted_for_decision_at?: string | null
+          submitted_for_decision_by?: string | null
+          triage_reason?: string | null
+          triaged_at?: string | null
+          triaged_by?: string | null
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          assigned_at?: string | null
+          assigned_investigator_id?: string | null
+          assignment_reason?: string | null
+          case_number?: never
+          case_state?: string
+          closed_at?: string | null
+          closed_by?: string | null
+          closed_reason?: string | null
+          correction_kind?: string
+          created_at?: string
+          created_by?: string | null
+          current_revision?: number
+          evidence_ready?: boolean
+          investigation_summary?: string | null
+          investigator_recommendation?: string | null
+          origin_contribution_id?: string | null
+          origin_submitted_at?: string | null
+          origin_submitter_user_id?: string | null
+          origin_summary_snapshot?: string
+          origin_type?: string
+          origin_type_snapshot?: string | null
+          priority?: string
+          public_note_disposition?: string | null
+          public_note_no_note_reason?: string | null
+          resource_id?: string
+          resource_kind?: string
+          submitted_for_decision_at?: string | null
+          submitted_for_decision_by?: string | null
+          triage_reason?: string | null
+          triaged_at?: string | null
+          triaged_by?: string | null
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "correction_cases_correction_kind_fkey"
+            columns: ["correction_kind"]
+            isOneToOne: false
+            referencedRelation: "correction_kinds"
+            referencedColumns: ["correction_kind"]
+          },
+          {
+            foreignKeyName: "correction_cases_resource_fkey"
+            columns: ["resource_id", "resource_kind"]
+            isOneToOne: false
+            referencedRelation: "resources"
+            referencedColumns: ["id", "resource_kind"]
+          },
+        ]
+      }
+      correction_event_types: {
+        Row: {
+          created_at: string
+          description: string
+          enabled: boolean
+          event_type: string
+          label: string
+          public_eligible: boolean
+          sort_order: number
+        }
+        Insert: {
+          created_at?: string
+          description: string
+          enabled?: boolean
+          event_type: string
+          label: string
+          public_eligible?: boolean
+          sort_order?: number
+        }
+        Update: {
+          created_at?: string
+          description?: string
+          enabled?: boolean
+          event_type?: string
+          label?: string
+          public_eligible?: boolean
+          sort_order?: number
+        }
+        Relationships: []
+      }
+      correction_events: {
+        Row: {
+          actor_id: string | null
+          application_id: string | null
+          case_resource_id: string
+          case_revision_after: number
+          case_revision_before: number
+          command_receipt_id: string | null
+          correlation_id: string | null
+          created_at: string
+          decision_id: string | null
+          event_number: number
+          event_type: string
+          evidence_link_id: string | null
+          id: string
+          metadata: Json
+          prior_state: string | null
+          public_note_id: string | null
+          reason: string | null
+          related_resource_review_id: string | null
+          resulting_state: string | null
+          target_id: string | null
+        }
+        Insert: {
+          actor_id?: string | null
+          application_id?: string | null
+          case_resource_id: string
+          case_revision_after: number
+          case_revision_before: number
+          command_receipt_id?: string | null
+          correlation_id?: string | null
+          created_at?: string
+          decision_id?: string | null
+          event_number: number
+          event_type: string
+          evidence_link_id?: string | null
+          id?: string
+          metadata?: Json
+          prior_state?: string | null
+          public_note_id?: string | null
+          reason?: string | null
+          related_resource_review_id?: string | null
+          resulting_state?: string | null
+          target_id?: string | null
+        }
+        Update: {
+          actor_id?: string | null
+          application_id?: string | null
+          case_resource_id?: string
+          case_revision_after?: number
+          case_revision_before?: number
+          command_receipt_id?: string | null
+          correlation_id?: string | null
+          created_at?: string
+          decision_id?: string | null
+          event_number?: number
+          event_type?: string
+          evidence_link_id?: string | null
+          id?: string
+          metadata?: Json
+          prior_state?: string | null
+          public_note_id?: string | null
+          reason?: string | null
+          related_resource_review_id?: string | null
+          resulting_state?: string | null
+          target_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "correction_events_case_fkey"
+            columns: ["case_resource_id"]
+            isOneToOne: false
+            referencedRelation: "correction_cases"
+            referencedColumns: ["resource_id"]
+          },
+          {
+            foreignKeyName: "correction_events_event_type_fkey"
+            columns: ["event_type"]
+            isOneToOne: false
+            referencedRelation: "correction_event_types"
+            referencedColumns: ["event_type"]
+          },
+          {
+            foreignKeyName: "correction_events_target_fkey"
+            columns: ["target_id"]
+            isOneToOne: false
+            referencedRelation: "correction_targets"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      correction_evidence_roles: {
+        Row: {
+          created_at: string
+          description: string
+          enabled: boolean
+          evidence_role: string
+          label: string
+          sort_order: number
+        }
+        Insert: {
+          created_at?: string
+          description: string
+          enabled?: boolean
+          evidence_role: string
+          label: string
+          sort_order?: number
+        }
+        Update: {
+          created_at?: string
+          description?: string
+          enabled?: boolean
+          evidence_role?: string
+          label?: string
+          sort_order?: number
+        }
+        Relationships: []
+      }
+      correction_kinds: {
+        Row: {
+          correction_kind: string
+          created_at: string
+          description: string
+          enabled: boolean
+          label: string
+          sort_order: number
+        }
+        Insert: {
+          correction_kind: string
+          created_at?: string
+          description: string
+          enabled?: boolean
+          label: string
+          sort_order?: number
+        }
+        Update: {
+          correction_kind?: string
+          created_at?: string
+          description?: string
+          enabled?: boolean
+          label?: string
+          sort_order?: number
+        }
+        Relationships: []
+      }
+      correction_targets: {
+        Row: {
+          case_resource_id: string
+          created_at: string
+          created_by: string | null
+          id: string
+          observed_content_fingerprint: string | null
+          observed_resource_revision: number | null
+          target_resource_id: string
+          target_resource_kind: string
+          target_role: string
+          target_summary: string | null
+          target_version_id: string
+          target_version_type: string
+        }
+        Insert: {
+          case_resource_id: string
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          observed_content_fingerprint?: string | null
+          observed_resource_revision?: number | null
+          target_resource_id: string
+          target_resource_kind: string
+          target_role?: string
+          target_summary?: string | null
+          target_version_id: string
+          target_version_type: string
+        }
+        Update: {
+          case_resource_id?: string
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          observed_content_fingerprint?: string | null
+          observed_resource_revision?: number | null
+          target_resource_id?: string
+          target_resource_kind?: string
+          target_role?: string
+          target_summary?: string | null
+          target_version_id?: string
+          target_version_type?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "correction_targets_case_fkey"
+            columns: ["case_resource_id"]
+            isOneToOne: false
+            referencedRelation: "correction_cases"
+            referencedColumns: ["resource_id"]
+          },
+          {
+            foreignKeyName: "correction_targets_resource_fkey"
+            columns: ["target_resource_id", "target_resource_kind"]
+            isOneToOne: false
+            referencedRelation: "resources"
+            referencedColumns: ["id", "resource_kind"]
+          },
+          {
+            foreignKeyName: "correction_targets_version_fkey"
+            columns: ["target_version_id"]
+            isOneToOne: false
+            referencedRelation: "article_versions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       credit_governance: {
         Row: {
           credit_id: string
@@ -1835,8 +2200,20 @@ export type Database = {
           version_number: number
         }[]
       }
+      current_user_can_apply_correction: {
+        Args: { p_case_resource_id: string }
+        Returns: boolean
+      }
+      current_user_can_decide_correction: {
+        Args: { p_case_resource_id: string }
+        Returns: boolean
+      }
       current_user_can_edit_article: {
         Args: { p_resource_id: string }
+        Returns: boolean
+      }
+      current_user_can_investigate_correction: {
+        Args: { p_case_resource_id: string }
         Returns: boolean
       }
       current_user_can_manage_publishing: { Args: never; Returns: boolean }
@@ -1845,7 +2222,19 @@ export type Database = {
         Returns: boolean
       }
       current_user_can_publish_article: { Args: never; Returns: boolean }
+      current_user_can_publish_correction_note: {
+        Args: { p_case_resource_id: string }
+        Returns: boolean
+      }
       current_user_can_review_article: { Args: never; Returns: boolean }
+      current_user_can_triage_correction: {
+        Args: { p_case_resource_id: string }
+        Returns: boolean
+      }
+      current_user_can_view_correction: {
+        Args: { p_case_resource_id: string }
+        Returns: boolean
+      }
       current_user_can_view_publishing_item: {
         Args: { p_item_id: string }
         Returns: boolean
@@ -1936,6 +2325,10 @@ export type Database = {
       }
       validate_citation_target_anchor: {
         Args: { p_anchor_data: Json; p_anchor_type: string }
+        Returns: undefined
+      }
+      validate_correction_case_history: {
+        Args: { p_case_resource_id: string }
         Returns: undefined
       }
     }
