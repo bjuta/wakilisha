@@ -4,6 +4,8 @@
 
 Accepted implementation contract for Phase 3B Migration 4.
 
+Amended before SQL implementation to preserve the existing Article lifecycle contract: Migration 3 creates an immutable `correction` working version, while normal Article review and publication create later immutable `submitted`, `approved`, and `published` lifecycle versions.
+
 This document resolves the remaining public-note, no-note, contributor follow-up, public-read, and correction-required closure boundaries before SQL implementation.
 
 No Migration 4 SQL may be written until this contract is merged.
@@ -90,9 +92,19 @@ The successful application must belong to the same case and affected resource.
 
 The challenged version must equal the application challenged version.
 
-The corrected version must equal the application resulting version.
+The application resulting version remains the immutable `correction` version created by Migration 3.
 
-The corrected version must be the current published version when the note is published.
+The corrected version is the later immutable `published` lifecycle version created by the normal Article review and publication authority.
+
+The corrected version must:
+
+- belong to the same Article resource and Article as the application result
+- have the same canonical content fingerprint as the application result
+- be the resource current published version
+- be the active Article publication snapshot version
+- have a governed `published` lifecycle event
+
+This distinction preserves normal Article publication authority. Migration 4 must never move the published pointer directly to the application result.
 
 Publisher identity is a historical UUID snapshot and may become null through account deletion only if the accepted user foreign-key pattern requires it.
 
@@ -185,12 +197,14 @@ Required gates:
 8. current decision outcome is `correction_required`
 9. application target is the affected Article resource
 10. application challenged version matches the note
-11. application resulting version matches the note corrected version
-12. resulting version completed normal Article review
-13. resulting version is the current published version
-14. note text is non-blank, bounded, and contains no private payload fields
-15. superseded note identity is exact where supplied
-16. contributor follow-up contract is satisfied for a community-contribution origin
+11. note corrected version belongs to the application Article resource
+12. note corrected version has the same canonical content fingerprint as the application resulting version
+13. note corrected version is an immutable `published` lifecycle version
+14. note corrected version is the current published version and active publication snapshot
+15. a governed Article `published` lifecycle event identifies the corrected version
+16. note text is non-blank, bounded, and contains no private payload fields
+17. superseded note identity is exact where supplied
+18. contributor follow-up contract is satisfied for a community-contribution origin
 
 Successful publication:
 
@@ -210,16 +224,22 @@ Publishing a note does not close the case.
 
 Migration 4 does not publish the corrected Article.
 
-The accepted proof is:
+The accepted proof distinguishes the Migration 3 application version from the later published lifecycle version:
 
 - the case current application is valid
 - the application resulting version belongs to the affected Article resource
-- the Article resource current published version ID equals the application resulting version ID
-- the published Article row and immutable resulting version have the same canonical content fingerprint
-- the Article publication authority has already completed successfully
+- the application resulting version retains `version_kind = 'correction'`
+- the Article resource current published version belongs to the same Article resource and Article
+- the current published version retains `version_kind = 'published'`
+- the current published version has the same canonical content fingerprint as the application resulting version
+- the active Article publication snapshot identifies the current published version
+- a governed Article lifecycle event records `published` for the current published version
+- the public Article row has the same canonical content fingerprint as the current published version
 - the application challenged version remains identifiable
 
-A note or correction-required closure fails stale when the current published version no longer equals the application resulting version.
+The normal Article authority may create submitted, approved, and published lifecycle copies after application. Migration 4 accepts that chain only when the final published version preserves the application-result fingerprint.
+
+A note or correction-required closure fails stale when the current published version no longer proves this exact application lineage.
 
 ## Lock 6: Contributor follow-up state
 
@@ -326,17 +346,18 @@ For `correction_required`, closure requires:
 2. case state is `applied`
 3. current decision belongs to the case and remains `correction_required`
 4. current application belongs to the case and current decision
-5. application resulting version is the current published Article version
-6. public note disposition is `published` with a current unsuperseded note, or the close command records `not_required` with a reason
-7. every related-resource review is resolved
-8. a community-contribution origin has contributor follow-up disposition `requested`, `unavailable`, or `unsafe`
-9. `requested` has a durable queued or later-state job
-10. `unavailable` or `unsafe` has a recorded reason
-11. internal-origin cases have no contributor follow-up fields
-12. closure reason is non-blank
-13. one case revision increment occurs
-14. one ordered `case_closed` event is appended
-15. command receipt and accepted and succeeded outbox events complete atomically
+5. the current published Article version is an immutable `published` lifecycle copy with the same canonical content fingerprint as the application resulting `correction` version
+6. the active publication snapshot and governed `published` lifecycle event identify that current published version
+7. public note disposition is `published` with a current unsuperseded note, or the close command records `not_required` with a reason
+8. every related-resource review is resolved
+9. a community-contribution origin has contributor follow-up disposition `requested`, `unavailable`, or `unsafe`
+10. `requested` has a durable queued or later-state job
+11. `unavailable` or `unsafe` has a recorded reason
+12. internal-origin cases have no contributor follow-up fields
+13. closure reason is non-blank
+14. one case revision increment occurs
+15. one ordered `case_closed` event is appended
+16. command receipt and accepted and succeeded outbox events complete atomically
 
 The no-note disposition and contributor follow-up exception or request may be established atomically by the close command.
 
@@ -376,7 +397,9 @@ A row is public only when:
 - the note is immutable and published
 - the note is the latest unsuperseded note
 - the note case, application, and version identities are valid
-- the application resulting version remains the current active published version
+- the note corrected version is the current active published version
+- the note corrected version has the same canonical content fingerprint as the application resulting `correction` version
+- the active publication snapshot and governed `published` lifecycle event identify the note corrected version
 
 The function must not expose:
 
@@ -451,7 +474,7 @@ It must prove:
 13. community-origin note publication creates one child receipt, job, outbox event, and correction event
 14. internal-origin note publication creates no contributor job
 15. no-note correction-required closure records disposition and reason atomically
-16. correction-required closure fails before corrected publication proof
+16. correction-required closure fails before the final published lifecycle version proves the application-result fingerprint lineage
 17. correction-required closure fails with pending related-resource reviews
 18. correction-required closure fails without contributor follow-up proof where required
 19. valid correction-required closure succeeds once
