@@ -749,6 +749,10 @@ export type Database = {
           closed_at: string | null
           closed_by: string | null
           closed_reason: string | null
+          contributor_follow_up_disposition: string | null
+          contributor_follow_up_job_id: string | null
+          contributor_follow_up_reason: string | null
+          contributor_follow_up_requested_at: string | null
           correction_kind: string
           created_at: string
           created_by: string | null
@@ -786,6 +790,10 @@ export type Database = {
           closed_at?: string | null
           closed_by?: string | null
           closed_reason?: string | null
+          contributor_follow_up_disposition?: string | null
+          contributor_follow_up_job_id?: string | null
+          contributor_follow_up_reason?: string | null
+          contributor_follow_up_requested_at?: string | null
           correction_kind: string
           created_at?: string
           created_by?: string | null
@@ -823,6 +831,10 @@ export type Database = {
           closed_at?: string | null
           closed_by?: string | null
           closed_reason?: string | null
+          contributor_follow_up_disposition?: string | null
+          contributor_follow_up_job_id?: string | null
+          contributor_follow_up_reason?: string | null
+          contributor_follow_up_requested_at?: string | null
           correction_kind?: string
           created_at?: string
           created_by?: string | null
@@ -1082,6 +1094,13 @@ export type Database = {
             referencedColumns: ["event_type"]
           },
           {
+            foreignKeyName: "correction_events_public_note_fkey"
+            columns: ["public_note_id"]
+            isOneToOne: false
+            referencedRelation: "correction_public_notes"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "correction_events_related_review_fkey"
             columns: ["related_resource_review_id"]
             isOneToOne: false
@@ -1222,6 +1241,94 @@ export type Database = {
           sort_order?: number
         }
         Relationships: []
+      }
+      correction_public_notes: {
+        Row: {
+          affected_resource_id: string
+          affected_resource_kind: string
+          application_id: string
+          case_resource_id: string
+          challenged_version_id: string
+          corrected_version_id: string
+          id: string
+          note_fingerprint: string
+          note_text: string
+          published_at: string
+          published_by: string | null
+          supersedes_note_id: string | null
+        }
+        Insert: {
+          affected_resource_id: string
+          affected_resource_kind: string
+          application_id: string
+          case_resource_id: string
+          challenged_version_id: string
+          corrected_version_id: string
+          id?: string
+          note_fingerprint: string
+          note_text: string
+          published_at?: string
+          published_by?: string | null
+          supersedes_note_id?: string | null
+        }
+        Update: {
+          affected_resource_id?: string
+          affected_resource_kind?: string
+          application_id?: string
+          case_resource_id?: string
+          challenged_version_id?: string
+          corrected_version_id?: string
+          id?: string
+          note_fingerprint?: string
+          note_text?: string
+          published_at?: string
+          published_by?: string | null
+          supersedes_note_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "correction_public_notes_application_fkey"
+            columns: ["application_id"]
+            isOneToOne: false
+            referencedRelation: "correction_applications"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "correction_public_notes_case_fkey"
+            columns: ["case_resource_id"]
+            isOneToOne: false
+            referencedRelation: "correction_cases"
+            referencedColumns: ["resource_id"]
+          },
+          {
+            foreignKeyName: "correction_public_notes_challenged_version_fkey"
+            columns: ["challenged_version_id"]
+            isOneToOne: false
+            referencedRelation: "article_versions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "correction_public_notes_corrected_version_fkey"
+            columns: ["corrected_version_id"]
+            isOneToOne: false
+            referencedRelation: "article_versions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "correction_public_notes_resource_fkey"
+            columns: ["affected_resource_id", "affected_resource_kind"]
+            isOneToOne: false
+            referencedRelation: "resources"
+            referencedColumns: ["id", "resource_kind"]
+          },
+          {
+            foreignKeyName: "correction_public_notes_supersedes_fkey"
+            columns: ["supersedes_note_id"]
+            isOneToOne: true
+            referencedRelation: "correction_public_notes"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       correction_related_resource_reviews: {
         Row: {
@@ -2578,6 +2685,31 @@ export type Database = {
           version_id: string
           version_number: number
         }[]
+      }
+      correction_article_publication_proof: {
+        Args: { p_application_id: string }
+        Returns: {
+          affected_resource_id: string
+          application_id: string
+          application_resulting_version_id: string
+          article_id: string
+          article_slug: string
+          case_resource_id: string
+          challenged_version_id: string
+          content_fingerprint: string
+          corrected_version_id: string
+        }[]
+      }
+      correction_public_note_fingerprint: {
+        Args: {
+          p_affected_resource_id: string
+          p_application_id: string
+          p_case_resource_id: string
+          p_challenged_version_id: string
+          p_corrected_version_id: string
+          p_note_text: string
+        }
+        Returns: string
       }
       current_user_can_apply_correction: {
         Args: { p_case_resource_id: string }
@@ -15514,9 +15646,13 @@ export type Database = {
       close_correction_case: {
         Args: {
           p_case_resource_id: string
+          p_contributor_follow_up_disposition?: string
+          p_contributor_follow_up_reason?: string
           p_correlation_id: string
           p_expected_case_revision: number
           p_idempotency_key: string
+          p_public_note_disposition?: string
+          p_public_note_no_note_reason?: string
           p_reason: string
         }
         Returns: {
@@ -17341,6 +17477,19 @@ export type Database = {
         Args: never
         Returns: Json
       }
+      public_get_article_correction_notes: {
+        Args: { p_slug: string }
+        Returns: {
+          article_id: string
+          article_resource_id: string
+          case_reference: string
+          challenged_version_id: string
+          corrected_version_id: string
+          correction_note_id: string
+          note_published_at: string
+          note_text: string
+        }[]
+      }
       public_get_article_trust: {
         Args: { p_article_slug: string }
         Returns: Json
@@ -17419,6 +17568,28 @@ export type Database = {
           lifecycle_status: string
           version_id: string
           version_number: number
+        }[]
+      }
+      publish_correction_note: {
+        Args: {
+          p_case_resource_id: string
+          p_contributor_follow_up_disposition: string
+          p_contributor_follow_up_reason: string
+          p_correlation_id: string
+          p_expected_case_revision: number
+          p_expected_current_application_id: string
+          p_expected_current_published_article_version_id: string
+          p_idempotency_key: string
+          p_note_text: string
+          p_supersedes_note_id: string
+        }
+        Returns: {
+          case_resource_id: string
+          case_revision: number
+          command_receipt_id: string
+          idempotent_replay: boolean
+          receipt_status: string
+          result_payload: Json
         }[]
       }
       publish_due_article_publications: {
