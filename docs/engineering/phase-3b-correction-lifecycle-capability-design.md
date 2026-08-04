@@ -14,6 +14,15 @@ No migration has been written or applied.
 
 Production has not changed.
 
+## Migration 2 contract lock
+
+Migration 2 sequencing is governed by
+`phase-3b-migration-2-evidence-decision-contract-lock.md`.
+
+The accepted lifecycle remains unchanged. The lock adds temporary
+migration gates, including non-correction-only closure until application,
+public-note, and contributor-follow-up authority exists.
+
 ## Purpose
 
 This document defines the correction case lifecycle, decision outcomes, capabilities, role assignments, concurrency rules, Article application gates, public-note gates, closure rules, and first acceptance proof.
