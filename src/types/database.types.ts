@@ -635,6 +635,7 @@ export type Database = {
           correction_kind: string
           created_at: string
           created_by: string | null
+          current_decision_id: string | null
           current_revision: number
           evidence_ready: boolean
           investigation_summary: string | null
@@ -670,6 +671,7 @@ export type Database = {
           correction_kind: string
           created_at?: string
           created_by?: string | null
+          current_decision_id?: string | null
           current_revision?: number
           evidence_ready?: boolean
           investigation_summary?: string | null
@@ -705,6 +707,7 @@ export type Database = {
           correction_kind?: string
           created_at?: string
           created_by?: string | null
+          current_decision_id?: string | null
           current_revision?: number
           evidence_ready?: boolean
           investigation_summary?: string | null
@@ -737,11 +740,91 @@ export type Database = {
             referencedColumns: ["correction_kind"]
           },
           {
+            foreignKeyName: "correction_cases_current_decision_fkey"
+            columns: ["current_decision_id"]
+            isOneToOne: false
+            referencedRelation: "correction_decisions"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "correction_cases_resource_fkey"
             columns: ["resource_id", "resource_kind"]
             isOneToOne: false
             referencedRelation: "resources"
             referencedColumns: ["id", "resource_kind"]
+          },
+        ]
+      }
+      correction_decisions: {
+        Row: {
+          case_resource_id: string
+          case_revision_observed: number
+          correlation_id: string | null
+          created_at: string
+          decided_by: string
+          decision_number: number
+          duplicate_of_case_resource_id: string | null
+          id: string
+          outcome: string
+          private_analysis: string | null
+          public_safe_explanation: string | null
+          reason: string
+          supersedes_decision_id: string | null
+          target_state_observed: Json
+        }
+        Insert: {
+          case_resource_id: string
+          case_revision_observed: number
+          correlation_id?: string | null
+          created_at?: string
+          decided_by: string
+          decision_number: number
+          duplicate_of_case_resource_id?: string | null
+          id?: string
+          outcome: string
+          private_analysis?: string | null
+          public_safe_explanation?: string | null
+          reason: string
+          supersedes_decision_id?: string | null
+          target_state_observed?: Json
+        }
+        Update: {
+          case_resource_id?: string
+          case_revision_observed?: number
+          correlation_id?: string | null
+          created_at?: string
+          decided_by?: string
+          decision_number?: number
+          duplicate_of_case_resource_id?: string | null
+          id?: string
+          outcome?: string
+          private_analysis?: string | null
+          public_safe_explanation?: string | null
+          reason?: string
+          supersedes_decision_id?: string | null
+          target_state_observed?: Json
+        }
+        Relationships: [
+          {
+            foreignKeyName: "correction_decisions_case_fkey"
+            columns: ["case_resource_id"]
+            isOneToOne: false
+            referencedRelation: "correction_cases"
+            referencedColumns: ["resource_id"]
+          },
+          {
+            foreignKeyName: "correction_decisions_duplicate_case_fkey"
+            columns: ["duplicate_of_case_resource_id"]
+            isOneToOne: false
+            referencedRelation: "correction_cases"
+            referencedColumns: ["resource_id"]
+          },
+          {
+            foreignKeyName: "correction_decisions_supersedes_fkey"
+            columns: ["supersedes_decision_id"]
+            isOneToOne: false
+            referencedRelation: "correction_decisions"
+            referencedColumns: ["id"]
           },
         ]
       }
@@ -851,6 +934,13 @@ export type Database = {
             referencedColumns: ["resource_id"]
           },
           {
+            foreignKeyName: "correction_events_decision_fkey"
+            columns: ["decision_id"]
+            isOneToOne: false
+            referencedRelation: "correction_decisions"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "correction_events_event_type_fkey"
             columns: ["event_type"]
             isOneToOne: false
@@ -858,10 +948,89 @@ export type Database = {
             referencedColumns: ["event_type"]
           },
           {
+            foreignKeyName: "correction_events_related_review_fkey"
+            columns: ["related_resource_review_id"]
+            isOneToOne: false
+            referencedRelation: "correction_related_resource_reviews"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "correction_events_target_fkey"
             columns: ["target_id"]
             isOneToOne: false
             referencedRelation: "correction_targets"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      correction_evidence_links: {
+        Row: {
+          case_resource_id: string
+          citation_id: string | null
+          created_at: string
+          created_by: string | null
+          evidence_role: string
+          id: string
+          internal_note: string | null
+          source_id: string
+          source_version_id: string
+        }
+        Insert: {
+          case_resource_id: string
+          citation_id?: string | null
+          created_at?: string
+          created_by?: string | null
+          evidence_role: string
+          id?: string
+          internal_note?: string | null
+          source_id: string
+          source_version_id: string
+        }
+        Update: {
+          case_resource_id?: string
+          citation_id?: string | null
+          created_at?: string
+          created_by?: string | null
+          evidence_role?: string
+          id?: string
+          internal_note?: string | null
+          source_id?: string
+          source_version_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "correction_evidence_links_case_fkey"
+            columns: ["case_resource_id"]
+            isOneToOne: false
+            referencedRelation: "correction_cases"
+            referencedColumns: ["resource_id"]
+          },
+          {
+            foreignKeyName: "correction_evidence_links_citation_fkey"
+            columns: ["citation_id"]
+            isOneToOne: false
+            referencedRelation: "citations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "correction_evidence_links_role_fkey"
+            columns: ["evidence_role"]
+            isOneToOne: false
+            referencedRelation: "correction_evidence_roles"
+            referencedColumns: ["evidence_role"]
+          },
+          {
+            foreignKeyName: "correction_evidence_links_source_fkey"
+            columns: ["source_id"]
+            isOneToOne: false
+            referencedRelation: "sources"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "correction_evidence_links_source_version_fkey"
+            columns: ["source_version_id"]
+            isOneToOne: false
+            referencedRelation: "source_versions"
             referencedColumns: ["id"]
           },
         ]
@@ -919,6 +1088,82 @@ export type Database = {
           sort_order?: number
         }
         Relationships: []
+      }
+      correction_related_resource_reviews: {
+        Row: {
+          case_resource_id: string
+          created_at: string
+          created_by: string | null
+          disposition: string | null
+          id: string
+          linked_correction_case_resource_id: string | null
+          reason: string | null
+          related_resource_id: string
+          related_resource_kind: string
+          resolved_at: string | null
+          resolved_by: string | null
+          review_revision: number
+          review_state: string
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          case_resource_id: string
+          created_at?: string
+          created_by?: string | null
+          disposition?: string | null
+          id?: string
+          linked_correction_case_resource_id?: string | null
+          reason?: string | null
+          related_resource_id: string
+          related_resource_kind: string
+          resolved_at?: string | null
+          resolved_by?: string | null
+          review_revision?: number
+          review_state?: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          case_resource_id?: string
+          created_at?: string
+          created_by?: string | null
+          disposition?: string | null
+          id?: string
+          linked_correction_case_resource_id?: string | null
+          reason?: string | null
+          related_resource_id?: string
+          related_resource_kind?: string
+          resolved_at?: string | null
+          resolved_by?: string | null
+          review_revision?: number
+          review_state?: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "correction_related_reviews_case_fkey"
+            columns: ["case_resource_id"]
+            isOneToOne: false
+            referencedRelation: "correction_cases"
+            referencedColumns: ["resource_id"]
+          },
+          {
+            foreignKeyName: "correction_related_reviews_linked_case_fkey"
+            columns: ["linked_correction_case_resource_id"]
+            isOneToOne: false
+            referencedRelation: "correction_cases"
+            referencedColumns: ["resource_id"]
+          },
+          {
+            foreignKeyName: "correction_related_reviews_resource_fkey"
+            columns: ["related_resource_id", "related_resource_kind"]
+            isOneToOne: false
+            referencedRelation: "resources"
+            referencedColumns: ["id", "resource_kind"]
+          },
+        ]
       }
       correction_targets: {
         Row: {
@@ -14704,6 +14949,24 @@ export type Database = {
           record_version: number
         }[]
       }
+      add_related_resource_review: {
+        Args: {
+          p_case_resource_id: string
+          p_correlation_id: string
+          p_expected_case_revision: number
+          p_idempotency_key: string
+          p_reason: string
+          p_related_resource_id: string
+        }
+        Returns: {
+          case_resource_id: string
+          case_revision: number
+          command_receipt_id: string
+          idempotent_replay: boolean
+          receipt_status: string
+          result_payload: Json
+        }[]
+      }
       admin_apply_artist_decouple_decision: {
         Args: { p_decision_id: string }
         Returns: Json
@@ -14878,6 +15141,24 @@ export type Database = {
           lifecycle_status: string
           version_id: string
           version_number: number
+        }[]
+      }
+      assign_correction_case: {
+        Args: {
+          p_case_resource_id: string
+          p_correlation_id: string
+          p_expected_case_revision: number
+          p_idempotency_key: string
+          p_investigator_id: string
+          p_reason: string
+        }
+        Returns: {
+          case_resource_id: string
+          case_revision: number
+          command_receipt_id: string
+          idempotent_replay: boolean
+          receipt_status: string
+          result_payload: Json
         }[]
       }
       assign_user_role_admin: {
@@ -15070,6 +15351,23 @@ export type Database = {
           p_family_id: string
         }
         Returns: Json
+      }
+      close_correction_case: {
+        Args: {
+          p_case_resource_id: string
+          p_correlation_id: string
+          p_expected_case_revision: number
+          p_idempotency_key: string
+          p_reason: string
+        }
+        Returns: {
+          case_resource_id: string
+          case_revision: number
+          command_receipt_id: string
+          idempotent_replay: boolean
+          receipt_status: string
+          result_payload: Json
+        }[]
       }
       community_create_comment: {
         Args: {
@@ -15699,6 +15997,23 @@ export type Database = {
         }
         Returns: Json
       }
+      create_correction_case_from_contribution: {
+        Args: {
+          p_contribution_id: string
+          p_correction_kind: string
+          p_correlation_id: string
+          p_idempotency_key: string
+          p_origin_summary: string
+        }
+        Returns: {
+          case_resource_id: string
+          case_revision: number
+          command_receipt_id: string
+          idempotent_replay: boolean
+          receipt_status: string
+          result_payload: Json
+        }[]
+      }
       create_credit: {
         Args: {
           p_credit_note?: string
@@ -15815,6 +16130,23 @@ export type Database = {
           playlist_id: string
           playlist_slug: string
           work_product_link_id: string
+        }[]
+      }
+      create_internal_correction_case: {
+        Args: {
+          p_correction_kind: string
+          p_correlation_id: string
+          p_idempotency_key: string
+          p_origin_summary: string
+          p_priority: string
+        }
+        Returns: {
+          case_resource_id: string
+          case_revision: number
+          command_receipt_id: string
+          idempotent_replay: boolean
+          receipt_status: string
+          result_payload: Json
         }[]
       }
       create_magazine_issue: {
@@ -16208,6 +16540,10 @@ export type Database = {
           isSetofReturn: true
         }
       }
+      get_correction_case_workspace: {
+        Args: { p_case_resource_id: string }
+        Returns: Json
+      }
       get_import_run_by_id: {
         Args: { p_id: string }
         Returns: {
@@ -16536,6 +16872,28 @@ export type Database = {
         }[]
       }
       is_current_user_administrator: { Args: never; Returns: boolean }
+      link_correction_evidence: {
+        Args: {
+          p_case_resource_id: string
+          p_citation_id: string
+          p_correlation_id: string
+          p_evidence_role: string
+          p_expected_case_revision: number
+          p_idempotency_key: string
+          p_internal_note: string
+          p_reason: string
+          p_source_id: string
+          p_source_version_id: string
+        }
+        Returns: {
+          case_resource_id: string
+          case_revision: number
+          command_receipt_id: string
+          idempotent_replay: boolean
+          receipt_status: string
+          result_payload: Json
+        }[]
+      }
       link_orphan_release_artists: {
         Args: never
         Returns: {
@@ -16593,6 +16951,56 @@ export type Database = {
           title: string
           version_kind: string
           wp_status: string
+        }[]
+      }
+      list_correction_case_events: {
+        Args: {
+          p_after_event_number?: number
+          p_case_resource_id: string
+          p_limit?: number
+        }
+        Returns: {
+          actor_id: string
+          case_revision_after: number
+          case_revision_before: number
+          command_receipt_id: string
+          correlation_id: string
+          created_at: string
+          decision_id: string
+          event_id: string
+          event_number: number
+          event_type: string
+          evidence_link_id: string
+          metadata: Json
+          prior_state: string
+          reason: string
+          related_resource_review_id: string
+          resulting_state: string
+          target_id: string
+        }[]
+      }
+      list_correction_cases: {
+        Args: {
+          p_assigned_investigator_id?: string
+          p_case_state?: string
+          p_limit?: number
+          p_offset?: number
+        }
+        Returns: {
+          assigned_investigator_id: string
+          case_reference: string
+          case_resource_id: string
+          case_state: string
+          closed_at: string
+          correction_kind: string
+          created_at: string
+          current_decision_outcome: string
+          current_revision: number
+          origin_type: string
+          primary_target_resource_kind: string
+          primary_target_summary: string
+          priority: string
+          updated_at: string
         }[]
       }
       list_publishing_assignable_users: {
@@ -16881,6 +17289,28 @@ export type Database = {
         }
         Returns: string
       }
+      record_correction_decision: {
+        Args: {
+          p_case_resource_id: string
+          p_correlation_id: string
+          p_duplicate_of_case_resource_id: string
+          p_expected_case_revision: number
+          p_idempotency_key: string
+          p_outcome: string
+          p_private_analysis: string
+          p_public_safe_explanation: string
+          p_reason: string
+          p_target_state_observed: Json
+        }
+        Returns: {
+          case_resource_id: string
+          case_revision: number
+          command_receipt_id: string
+          idempotent_replay: boolean
+          receipt_status: string
+          result_payload: Json
+        }[]
+      }
       record_password_reset_admin: {
         Args: {
           delivery_status?: string
@@ -17000,6 +17430,23 @@ export type Database = {
         Returns: {
           item_id: string
           record_version: number
+        }[]
+      }
+      reopen_correction_case: {
+        Args: {
+          p_case_resource_id: string
+          p_correlation_id: string
+          p_expected_case_revision: number
+          p_idempotency_key: string
+          p_reason: string
+        }
+        Returns: {
+          case_resource_id: string
+          case_revision: number
+          command_receipt_id: string
+          idempotent_replay: boolean
+          receipt_status: string
+          result_payload: Json
         }[]
       }
       replace_article_version_citations: {
@@ -17167,6 +17614,23 @@ export type Database = {
           p_source_id: string
         }
         Returns: Json
+      }
+      return_correction_to_investigation: {
+        Args: {
+          p_case_resource_id: string
+          p_correlation_id: string
+          p_expected_case_revision: number
+          p_idempotency_key: string
+          p_reason: string
+        }
+        Returns: {
+          case_resource_id: string
+          case_revision: number
+          command_receipt_id: string
+          idempotent_replay: boolean
+          receipt_status: string
+          result_payload: Json
+        }[]
       }
       review_evidence_item: {
         Args: {
@@ -17382,6 +17846,27 @@ export type Database = {
           record_version: number
         }[]
       }
+      set_related_resource_disposition: {
+        Args: {
+          p_case_resource_id: string
+          p_correlation_id: string
+          p_disposition: string
+          p_expected_case_revision: number
+          p_expected_review_revision: number
+          p_idempotency_key: string
+          p_linked_correction_case_resource_id: string
+          p_reason: string
+          p_related_resource_review_id: string
+        }
+        Returns: {
+          case_resource_id: string
+          case_revision: number
+          command_receipt_id: string
+          idempotent_replay: boolean
+          receipt_status: string
+          result_payload: Json
+        }[]
+      }
       show_limit: { Args: never; Returns: number }
       show_trgm: { Args: { "": string }; Returns: string[] }
       signal_os_label_for_score: { Args: { p_score: number }; Returns: string }
@@ -17410,6 +17895,23 @@ export type Database = {
           lifecycle_status: string
           version_id: string
           version_number: number
+        }[]
+      }
+      submit_correction_for_decision: {
+        Args: {
+          p_case_resource_id: string
+          p_correlation_id: string
+          p_expected_case_revision: number
+          p_idempotency_key: string
+          p_reason: string
+        }
+        Returns: {
+          case_resource_id: string
+          case_revision: number
+          command_receipt_id: string
+          idempotent_replay: boolean
+          receipt_status: string
+          result_payload: Json
         }[]
       }
       submit_resource_reconciliation_command: {
@@ -17456,6 +17958,46 @@ export type Database = {
         }
         Returns: number
       }
+      triage_correction_case: {
+        Args: {
+          p_case_resource_id: string
+          p_correction_kind: string
+          p_correlation_id: string
+          p_expected_case_revision: number
+          p_idempotency_key: string
+          p_priority: string
+          p_reason: string
+          p_target_resource_id: string
+          p_target_summary: string
+          p_target_version_id: string
+        }
+        Returns: {
+          case_resource_id: string
+          case_revision: number
+          command_receipt_id: string
+          idempotent_replay: boolean
+          receipt_status: string
+          result_payload: Json
+        }[]
+      }
+      unlink_correction_evidence: {
+        Args: {
+          p_case_resource_id: string
+          p_correlation_id: string
+          p_evidence_link_id: string
+          p_expected_case_revision: number
+          p_idempotency_key: string
+          p_reason: string
+        }
+        Returns: {
+          case_resource_id: string
+          case_revision: number
+          command_receipt_id: string
+          idempotent_replay: boolean
+          receipt_status: string
+          result_payload: Json
+        }[]
+      }
       unpublish_article: {
         Args: { p_article_id: string; p_note?: string }
         Returns: {
@@ -17480,6 +18022,26 @@ export type Database = {
       update_article_hero_image: {
         Args: { article_id: string; hero_url: string }
         Returns: undefined
+      }
+      update_correction_investigation: {
+        Args: {
+          p_case_resource_id: string
+          p_correlation_id: string
+          p_evidence_ready: boolean
+          p_expected_case_revision: number
+          p_idempotency_key: string
+          p_investigation_summary: string
+          p_investigator_recommendation: string
+          p_reason: string
+        }
+        Returns: {
+          case_resource_id: string
+          case_revision: number
+          command_receipt_id: string
+          idempotent_replay: boolean
+          receipt_status: string
+          result_payload: Json
+        }[]
       }
       update_external_contributor: {
         Args: {
