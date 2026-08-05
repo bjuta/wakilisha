@@ -727,13 +727,13 @@ begin
   end if;
 
   select
-    coalesce(max(revision_number), 0) + 1,
+    coalesce(max(revision_row.revision_number), 0) + 1,
     v_asset.current_revision_id
   into
     v_revision_number,
     v_previous_revision_id
-  from media.asset_revisions
-  where asset_id = p_asset_id;
+  from media.asset_revisions revision_row
+  where revision_row.asset_id = p_asset_id;
 
   insert into media.asset_revisions (
     id,
@@ -754,13 +754,13 @@ begin
     v_actor_id
   );
 
-  update media.assets
+  update media.assets as asset_row
   set
     current_revision_id = v_revision_id,
-    authority_revision = authority_revision + 1,
+    authority_revision = asset_row.authority_revision + 1,
     updated_by = v_actor_id,
     updated_at = now()
-  where id = p_asset_id;
+  where asset_row.id = p_asset_id;
 
   insert into media.events (
     asset_id,
@@ -1017,16 +1017,18 @@ begin
         v_existing.selection_revision;
     end if;
 
-    update media.variant_selections
+    update media.variant_selections as selection_row
     set
       variant_id = p_variant_id,
-      selection_revision = selection_revision + 1,
+      selection_revision =
+        selection_row.selection_revision + 1,
       selected_by = v_actor_id,
       selected_at = now(),
       updated_at = now()
-    where asset_revision_id = p_asset_revision_id
-      and variant_role = p_variant_role
-    returning selection_revision
+    where selection_row.asset_revision_id =
+        p_asset_revision_id
+      and selection_row.variant_role = p_variant_role
+    returning selection_row.selection_revision
     into v_new_revision;
   else
     if p_expected_selection_revision <> 0 then
@@ -1192,10 +1194,11 @@ begin
       v_asset.authority_revision;
   end if;
 
-  select coalesce(max(version_number), 0) + 1
+  select
+    coalesce(max(governance_row.version_number), 0) + 1
   into v_version_number
-  from media.asset_governance_versions
-  where asset_id = p_asset_id;
+  from media.asset_governance_versions governance_row
+  where governance_row.asset_id = p_asset_id;
 
   insert into media.asset_governance_versions (
     id,
@@ -1261,13 +1264,13 @@ begin
     v_actor_id
   );
 
-  update media.assets
+  update media.assets as asset_row
   set
     current_governance_version_id = v_governance_id,
-    authority_revision = authority_revision + 1,
+    authority_revision = asset_row.authority_revision + 1,
     updated_by = v_actor_id,
     updated_at = now()
-  where id = p_asset_id;
+  where asset_row.id = p_asset_id;
 
   insert into media.events (
     asset_id,
@@ -1365,16 +1368,16 @@ begin
     raise exception 'Only active Media assets may be archived';
   end if;
 
-  update media.assets
+  update media.assets as asset_row
   set
     lifecycle_state = 'archived',
-    authority_revision = authority_revision + 1,
+    authority_revision = asset_row.authority_revision + 1,
     archived_by = v_actor_id,
     archived_at = now(),
     archive_reason = btrim(p_reason),
     updated_by = v_actor_id,
     updated_at = now()
-  where id = p_asset_id;
+  where asset_row.id = p_asset_id;
 
   insert into media.events (
     asset_id,
@@ -1465,16 +1468,16 @@ begin
     raise exception 'Only archived Media assets may be restored';
   end if;
 
-  update media.assets
+  update media.assets as asset_row
   set
     lifecycle_state = 'active',
-    authority_revision = authority_revision + 1,
+    authority_revision = asset_row.authority_revision + 1,
     archived_by = null,
     archived_at = null,
     archive_reason = null,
     updated_by = v_actor_id,
     updated_at = now()
-  where id = p_asset_id;
+  where asset_row.id = p_asset_id;
 
   insert into media.events (
     asset_id,
