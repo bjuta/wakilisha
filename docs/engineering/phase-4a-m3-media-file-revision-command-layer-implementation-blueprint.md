@@ -93,5 +93,9 @@ Migration 3 requires:
 - anonymous execution is absent
 - canonical direct writes remain denied
 - the file-object immutable trigger has only the narrow verification transition
+- all nine commands execute in one transactional acceptance scenario
+- stale authority and selection revisions are rejected
+- immutable-row mutation attempts are rejected
+- acceptance rows and events are rolled back before commit
 - compatibility rows and foreign keys remain unchanged
 - canonical production counts remain unchanged until a command is deliberately exercised
