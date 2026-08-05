@@ -1672,6 +1672,7 @@ select jsonb_build_object(
     compatibility_policy_fingerprint,
   'migration_scope',
     'schema_only'
-) as phase_4a_m1_media_authority_foundation;
+) as phase_4a_m1_media_authority_foundation
+from metrics;
 
 rollback;
