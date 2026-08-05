@@ -18028,6 +18028,22 @@ export type Database = {
           wp_status: string
         }[]
       }
+      resolve_legacy_media_asset_lite_batch: {
+        Args: { p_asset_ids?: string[]; p_urls?: string[] }
+        Returns: {
+          id: string
+          media_kind: string
+          metadata: Json
+          mime_type: string
+          requested_asset_id: string
+          requested_url: string
+          resolved_mode: string
+          slug: string
+          title: string
+          url: string
+          usage_link_id: string
+        }[]
+      }
       resolve_media_asset_delivery: {
         Args: {
           p_asset_id: string
