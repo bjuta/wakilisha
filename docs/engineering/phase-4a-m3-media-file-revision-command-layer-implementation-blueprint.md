@@ -95,6 +95,8 @@ Migration 3 requires:
 - the file-object immutable trigger has only the narrow verification transition
 - all nine commands execute in one transactional acceptance scenario
 - stale authority and selection revisions are rejected
+- governance commands require every core governance state explicitly
+- retention request and approval states cannot bypass dedicated retention commands
 - immutable-row mutation attempts are rejected
 - acceptance rows and events are rolled back before commit
 - compatibility rows and foreign keys remain unchanged

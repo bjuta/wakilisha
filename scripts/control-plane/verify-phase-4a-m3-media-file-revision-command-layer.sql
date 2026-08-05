@@ -146,6 +146,30 @@ begin
 end;
 $phase_4a_m3_verify$;
 
+do $phase_4a_m3_governance_contract$
+declare
+  v_definition text;
+begin
+  select pg_get_functiondef(
+    'public.create_media_governance_version(uuid,bigint,jsonb,text,uuid)'::regprocedure
+  )
+  into v_definition;
+
+  if position(
+       'Complete Media governance state payload is required'
+       in v_definition
+     ) = 0
+     or position(
+       'Media retention actions require dedicated retention commands'
+       in v_definition
+     ) = 0
+  then
+    raise exception
+      'STOP: Media governance completeness or retention boundary is missing';
+  end if;
+end;
+$phase_4a_m3_governance_contract$;
+
 savepoint phase_4a_m3_runtime_acceptance;
 
 do $phase_4a_m3_actor_collision$
@@ -496,6 +520,74 @@ begin
 
   if not v_rejected then
     raise exception 'STOP: Stale selection revision was accepted';
+  end if;
+
+  v_rejected := false;
+  begin
+    perform 1
+    from public.create_media_governance_version(
+      v_asset_id,
+      2,
+      jsonb_build_object(
+        'rights_status',
+        'owned'
+      ),
+      'Incomplete verifier governance',
+      gen_random_uuid()
+    );
+  exception
+    when others then
+      v_rejected :=
+        position(
+          'complete media governance state payload is required'
+          in lower(sqlerrm)
+        ) > 0;
+  end;
+
+  if not v_rejected then
+    raise exception
+      'STOP: Incomplete governance payload was accepted';
+  end if;
+
+  v_rejected := false;
+  begin
+    perform 1
+    from public.create_media_governance_version(
+      v_asset_id,
+      2,
+      jsonb_build_object(
+        'rights_status',
+        'owned',
+        'consent_status',
+        'not_required',
+        'sensitivity',
+        'none',
+        'embargo_state',
+        'none',
+        'source_protection_class',
+        'internal',
+        'preservation_state',
+        'working_copy',
+        'retention_state',
+        'purge_approved',
+        'public_safety_state',
+        'internal'
+      ),
+      'Illegal verifier retention approval',
+      gen_random_uuid()
+    );
+  exception
+    when others then
+      v_rejected :=
+        position(
+          'media retention actions require dedicated retention commands'
+          in lower(sqlerrm)
+        ) > 0;
+  end;
+
+  if not v_rejected then
+    raise exception
+      'STOP: Governance command bypassed retention authority';
   end if;
 
   select *
