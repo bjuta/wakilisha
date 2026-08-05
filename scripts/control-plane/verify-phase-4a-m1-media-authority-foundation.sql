@@ -1212,11 +1212,16 @@ begin
   select count(*)
   into v_count
   from pg_constraint constraint_row
+  join pg_class source_table
+    on source_table.oid = constraint_row.conrelid
+  join pg_namespace source_namespace
+    on source_namespace.oid = source_table.relnamespace
   join pg_class referenced_table
     on referenced_table.oid = constraint_row.confrelid
   join pg_namespace referenced_namespace
     on referenced_namespace.oid = referenced_table.relnamespace
   where constraint_row.contype = 'f'
+    and source_namespace.nspname <> 'media'
     and referenced_namespace.nspname = 'public'
     and referenced_table.relname = 'registry_media_assets';
 
@@ -1259,6 +1264,7 @@ begin
   join pg_namespace referenced_namespace
     on referenced_namespace.oid = referenced_table.relnamespace
   where constraint_row.contype = 'f'
+    and source_namespace.nspname <> 'media'
     and referenced_namespace.nspname = 'public'
     and referenced_table.relname = 'registry_media_assets';
 

@@ -279,11 +279,13 @@ Compatibility policy fingerprint:
 
 `9f56b431209ef2b152e7f701240cca4a`
 
-Direct foreign-key count:
+Direct compatibility foreign-key count:
 
-- 14
+- 14 existing foreign keys from schemas outside `media` that reference `public.registry_media_assets`
 
-Direct foreign-key fingerprint:
+The canonical `media.legacy_asset_links` foreign key created by Migration 1 is excluded from this compatibility baseline.
+
+Direct compatibility foreign-key fingerprint:
 
 `54274ae6a613d38c257c543ccf7050cc`
 
