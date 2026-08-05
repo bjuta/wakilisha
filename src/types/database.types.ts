@@ -15181,6 +15181,21 @@ export type Database = {
         Args: { p_review_reason: string; p_submission_id: string }
         Returns: Json
       }
+      activate_media_variant: {
+        Args: {
+          p_asset_revision_id: string
+          p_correlation_id?: string
+          p_expected_selection_revision: number
+          p_reason: string
+          p_variant_id: string
+          p_variant_role: string
+        }
+        Returns: {
+          correlation_id: string
+          selection_revision: number
+          variant_id: string
+        }[]
+      }
       add_article_review_comment: {
         Args: { p_body_text: string; p_thread_id: string }
         Returns: {
@@ -15432,6 +15447,20 @@ export type Database = {
           lifecycle_status: string
           version_id: string
           version_number: number
+        }[]
+      }
+      archive_media_asset: {
+        Args: {
+          p_asset_id: string
+          p_correlation_id?: string
+          p_expected_authority_revision: number
+          p_reason: string
+        }
+        Returns: {
+          asset_id: string
+          authority_revision: number
+          correlation_id: string
+          lifecycle_state: string
         }[]
       }
       assign_correction_case: {
@@ -16456,6 +16485,51 @@ export type Database = {
           p_title: string
         }
         Returns: Json
+      }
+      create_media_asset: {
+        Args: {
+          p_asset_kind: string
+          p_asset_purpose: string
+          p_compatibility_folder_id?: string
+          p_correlation_id?: string
+          p_title: string
+        }
+        Returns: {
+          asset_id: string
+          authority_revision: number
+          correlation_id: string
+          governance_version_id: string
+        }[]
+      }
+      create_media_asset_revision: {
+        Args: {
+          p_asset_id: string
+          p_correlation_id?: string
+          p_expected_authority_revision: number
+          p_file_object_id: string
+          p_replacement_reason: string
+        }
+        Returns: {
+          asset_revision_id: string
+          authority_revision: number
+          correlation_id: string
+          revision_number: number
+        }[]
+      }
+      create_media_governance_version: {
+        Args: {
+          p_asset_id: string
+          p_correlation_id?: string
+          p_expected_authority_revision: number
+          p_governance: Json
+          p_reason: string
+        }
+        Returns: {
+          authority_revision: number
+          correlation_id: string
+          governance_version_id: string
+          version_number: number
+        }[]
       }
       create_publishing_item: {
         Args: {
@@ -17651,6 +17725,42 @@ export type Database = {
         }
         Returns: string
       }
+      register_media_file_object: {
+        Args: {
+          p_byte_size?: number
+          p_correlation_id?: string
+          p_delivery_url: string
+          p_mime_type?: string
+          p_original_filename: string
+          p_storage_namespace: string
+          p_storage_path: string
+          p_storage_provider: string
+          p_technical_metadata?: Json
+        }
+        Returns: {
+          correlation_id: string
+          file_object_id: string
+          verification_state: string
+        }[]
+      }
+      register_media_variant: {
+        Args: {
+          p_asset_id: string
+          p_asset_revision_id: string
+          p_correlation_id?: string
+          p_derived_file_object_id: string
+          p_generator_name?: string
+          p_generator_version?: string
+          p_source_file_object_id: string
+          p_technical_metadata?: Json
+          p_transformation_spec?: Json
+          p_variant_role: string
+        }
+        Returns: {
+          correlation_id: string
+          variant_id: string
+        }[]
+      }
       registry_get_public_track_playback_providers: {
         Args: { p_provider_key?: string; p_track_ids: string[] }
         Returns: {
@@ -17935,6 +18045,20 @@ export type Database = {
           lifecycle_status: string
           version_id: string
           version_number: number
+        }[]
+      }
+      restore_media_asset: {
+        Args: {
+          p_asset_id: string
+          p_correlation_id?: string
+          p_expected_authority_revision: number
+          p_reason: string
+        }
+        Returns: {
+          asset_id: string
+          authority_revision: number
+          correlation_id: string
+          lifecycle_state: string
         }[]
       }
       restore_source: {
@@ -18491,6 +18615,23 @@ export type Database = {
           isOneToOne: true
           isSetofReturn: false
         }
+      }
+      verify_media_file_object: {
+        Args: {
+          p_byte_size?: number
+          p_correlation_id?: string
+          p_failure_detail?: string
+          p_file_object_id: string
+          p_mime_type?: string
+          p_result_state: string
+          p_sha256?: string
+          p_technical_metadata?: Json
+        }
+        Returns: {
+          correlation_id: string
+          file_object_id: string
+          verification_state: string
+        }[]
       }
       withdraw_article_suggestion: {
         Args: { p_note?: string; p_suggestion_id: string }
