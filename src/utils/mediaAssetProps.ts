@@ -1,14 +1,15 @@
 /**
- * Media Asset Image Props — shared utility for rendering <img> tags
- * enriched with registry_media_assets metadata.
+ * Media Asset Image Props - shared utility for rendering <img> tags
+ * enriched through the governed Media delivery adapter.
  *
  * Every public-facing <img> should use getMediaImageProps() or
  * the useMediaImage() hook to get proper alt text, loading="lazy",
- * and width/height hints from the canonical media registry.
+ * and width/height hints from governed Media metadata.
  */
 
 import { useState, useEffect } from "react";
 import { supabase } from "@/lib/supabase";
+import type { Database } from "@/types/database.types";
 
 // ─── Types ────────────────────────────────────────────────────
 
@@ -30,6 +31,23 @@ export interface MediaAssetLite {
   mime_type: string | null;
   media_kind: string | null;
   metadata: Record<string, unknown> | null;
+}
+
+type GovernedMediaAssetLiteRow =
+  Database["public"]["Functions"]["resolve_legacy_media_asset_lite_batch"]["Returns"][number];
+
+function toMediaAssetLite(
+  row: GovernedMediaAssetLiteRow,
+): MediaAssetLite {
+  return {
+    id: row.id,
+    slug: row.slug ?? null,
+    title: row.title ?? null,
+    url: row.url,
+    mime_type: row.mime_type ?? null,
+    media_kind: row.media_kind ?? null,
+    metadata: row.metadata as Record<string, unknown> | null,
+  };
 }
 
 // ─── In-memory cache ──────────────────────────────────────────
@@ -67,21 +85,22 @@ export async function batchGetMediaAssetsByUrl(urls: string[]): Promise<Map<stri
 
   for (const chunk of chunks) {
     try {
-      const { data, error } = await supabase
-        .from("registry_media_assets")
-        .select("id, slug, title, url, mime_type, media_kind, metadata")
-        .in("url", chunk)
-        .eq("status", "active")
-        .eq("media_kind", "image");
+      const { data, error } = await supabase.rpc(
+        "resolve_legacy_media_asset_lite_batch",
+        { p_urls: chunk },
+      );
 
       if (error) {
-        console.warn("WAKILISHA media asset lookup error:", error.message);
+        console.warn(
+          "WAKILISHA governed media asset lookup error:",
+          error.message,
+        );
         // Cache misses as null for this chunk
         for (const u of chunk) urlCache.set(u, null);
         continue;
       }
 
-      const rows = (data ?? []) as MediaAssetLite[];
+      const rows = (data ?? []).map(toMediaAssetLite);
       const byUrl = new Map<string, MediaAssetLite>();
       for (const row of rows) {
         if (row.url) byUrl.set(row.url, row);
@@ -124,19 +143,21 @@ export async function batchGetMediaAssetsById(ids: string[]): Promise<Map<string
 
   for (const chunk of chunks) {
     try {
-      const { data, error } = await supabase
-        .from("registry_media_assets")
-        .select("id, slug, title, url, mime_type, media_kind, metadata")
-        .in("id", chunk)
-        .eq("status", "active");
+      const { data, error } = await supabase.rpc(
+        "resolve_legacy_media_asset_lite_batch",
+        { p_asset_ids: chunk },
+      );
 
       if (error) {
-        console.warn("WAKILISHA media asset ID lookup error:", error.message);
+        console.warn(
+          "WAKILISHA governed media asset ID lookup error:",
+          error.message,
+        );
         for (const i of chunk) idCache.set(i, null);
         continue;
       }
 
-      const rows = (data ?? []) as MediaAssetLite[];
+      const rows = (data ?? []).map(toMediaAssetLite);
       for (const row of rows) {
         idCache.set(row.id, row);
         result.set(row.id, row);
@@ -206,8 +227,7 @@ export function getImagePropsFromUrl(
 
 /**
  * Hook: given an image URL and fallback alt text, returns
- * enriched <img> props. Automatically looks up the media asset
- * from registry_media_assets by URL.
+ * enriched <img> props through the governed batch adapter.
  */
 export function useMediaImage(
   url: string | undefined | null,
@@ -228,19 +248,10 @@ export function useMediaImage(
       return;
     }
 
-    // Fetch from Supabase
-    supabase
-      .from("registry_media_assets")
-      .select("id, slug, title, url, mime_type, media_kind, metadata")
-      .eq("url", url)
-      .eq("status", "active")
-      .eq("media_kind", "image")
-      .maybeSingle()
-      .then(({ data }) => {
+    void batchGetMediaAssetsByUrl([url])
+      .then((assets) => {
         if (!alive) return;
-        const row = (data as MediaAssetLite) ?? null;
-        urlCache.set(url, row);
-        setAsset(row);
+        setAsset(assets.get(url) ?? null);
       })
       .catch(() => {
         if (!alive) return;
