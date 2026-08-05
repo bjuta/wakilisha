@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { listMagazineStories, getArticle, getInlineMagazineFallbackStories, type PublicStory } from '@/services/publicContent/client';
 import { processArticleContent, generateExcerpt } from '@/services/articles/contentPipeline';
 import { fetchAllSiteContent, type SiteContentResponse, type MagazineSiteArtist, type MagazineSiteRelease } from '@/services/magazineSiteContent';
-import { supabase } from '@/lib/supabase';
+import { batchGetMediaAssetsById } from '@/utils/mediaAssetProps';
 
 export type MediaAsset = {
   id: string;
@@ -113,8 +113,8 @@ export async function getMagazineArticleBySlug(
 
 /**
  * Scans article HTML content for <img data-asset-id="..."> tags,
- * looks up the corresponding registry_media_assets rows, and returns
- * enriched MediaAsset objects with caption, alt, title metadata.
+ * resolves the corresponding governed Media assets, and returns
+ * caption, alt and title metadata for approved rows.
  */
 async function resolveInlineMediaAssets(contentHtml: string): Promise<MediaAsset[]> {
   if (!contentHtml) return [];
@@ -132,32 +132,29 @@ async function resolveInlineMediaAssets(contentHtml: string): Promise<MediaAsset
   if (assetIds.length === 0) return [];
 
   try {
-    const { data, error } = await supabase
-      .from("registry_media_assets")
-      .select("id, slug, title, url, media_kind, source_kind, metadata")
-      .in("id", assetIds);
+    const assetsById = await batchGetMediaAssetsById(assetIds);
 
-    if (error || !data) return [];
+    return assetIds.flatMap((assetId) => {
+      const asset = assetsById.get(assetId);
+      if (!asset) return [];
 
-    return (data as Array<{
-      id: string;
-      slug: string;
-      title: string | null;
-      url: string;
-      media_kind: string | null;
-      source_kind: string | null;
-      metadata: Record<string, unknown> | null;
-    }>).map((row) => ({
-      id: row.id,
-      entityType: "media",
-      entitySlug: row.slug,
-      role: "inline",
-      url: row.url,
-      altText: (row.metadata?.alt_text as string) || row.title || null,
-      caption: (row.metadata?.caption as string) || null,
-      title: row.title || null,
-      source: row.source_kind || null,
-    }));
+      return [{
+        id: asset.id,
+        entityType: "media",
+        entitySlug: asset.slug ?? "",
+        role: "inline",
+        url: asset.url,
+        altText:
+          (asset.metadata?.alt_text as string) ||
+          asset.title ||
+          null,
+        caption:
+          (asset.metadata?.caption as string) ||
+          null,
+        title: asset.title || null,
+        source: null,
+      }];
+    });
   } catch {
     return [];
   }
