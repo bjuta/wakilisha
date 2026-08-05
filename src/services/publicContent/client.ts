@@ -297,19 +297,6 @@ type MediaIdentity = {
 
 type GenericRow = Record<string, unknown>;
 
-type RegistryMediaAsset = {
-  id: string;
-  slug: string;
-  title: string | null;
-  url: string;
-  mime_type: string | null;
-  media_kind: string | null;
-  status: string | null;
-  source_kind: string | null;
-  source_entity: string | null;
-  metadata: Record<string, unknown> | null;
-};
-
 async function apiGet<T>(path: string): Promise<T> {
   const base = API_BASE.replace(/\/$/, "");
   const url = `${base}${path.startsWith("/") ? path : `/${path}`}`;
@@ -635,59 +622,6 @@ async function resolvePrimaryArtistsForReleases(
   return artistsByRelease;
 }
 
-function mediaCandidates(slug: string, title: string): string[] {
-  const normalizedSlug = slugify(slug || title);
-  const normalizedTitle = slugify(title || slug);
-  return Array.from(new Set([normalizedSlug, normalizedTitle].filter(Boolean)));
-}
-
-function preferMediaAsset(rows: RegistryMediaAsset[]): RegistryMediaAsset | null {
-  const activeImages = rows.filter((asset) => asset.status === "active" && asset.media_kind === "image" && asset.url);
-  if (!activeImages.length) return null;
-  return activeImages.find((asset) => asset.source_kind === "wordpress_database") || activeImages[0];
-}
-
-async function getRegistryMediaBySlugs(slugs: string[]): Promise<Map<string, RegistryMediaAsset>> {
-  const uniqueSlugs = Array.from(new Set(slugs.filter(Boolean)));
-  if (!uniqueSlugs.length) return new Map();
-
-  const { data, error } = await supabase
-    .from("registry_media_assets")
-    .select("id, slug, title, url, mime_type, media_kind, status, source_kind, source_entity, metadata")
-    .eq("status", "active")
-    .eq("media_kind", "image")
-    .in("slug", uniqueSlugs);
-
-  if (error) {
-    console.warn(`WAKILISHA registry media lookup failed: ${error.message}`);
-    return new Map();
-  }
-
-  const decoded = deepDecode((data || []) as RegistryMediaAsset[]);
-
-  const grouped = new Map<string, RegistryMediaAsset[]>();
-  for (const asset of decoded) {
-    const list = grouped.get(asset.slug) || [];
-    list.push(asset);
-    grouped.set(asset.slug, list);
-  }
-
-  const selected = new Map<string, RegistryMediaAsset>();
-  for (const [slug, assets] of grouped) {
-    const preferred = preferMediaAsset(assets);
-    if (preferred) selected.set(slug, preferred);
-  }
-  return selected;
-}
-
-function mediaUrlFor(candidates: string[], mediaBySlug: Map<string, RegistryMediaAsset>): string {
-  for (const candidate of candidates) {
-    const asset = mediaBySlug.get(candidate);
-    if (asset?.url) return asset.url;
-  }
-  return "";
-}
-
 async function getRegistryTracklist(releaseId: string, fallbackArtist: string): Promise<PublicReleaseDetail["tracks"]> {
   const { data: relationshipRows, error: relationshipError } = await supabase
     .from("registry_release_tracks")
@@ -757,22 +691,12 @@ async function getRegistryTracklist(releaseId: string, fallbackArtist: string): 
     fallbackArtist = UNKNOWN_ARTIST_NAME;
   }
 
-  const mediaSlugs: string[] = [];
-  for (const relationship of relationships) {
-    const track = tracksById.get(relationship.trackId) || {};
-    const title = textValue(track, ["title", "name", "display_title", "normalized_title", "slug"], "");
-    const slug = textValue(track, ["slug", "normalized_slug"], relationship.trackId);
-    mediaSlugs.push(...mediaCandidates(slug, title));
-  }
-  const mediaBySlug = await getRegistryMediaBySlugs(mediaSlugs);
-
   return relationships
     .sort((a, b) => a.position - b.position || a.index - b.index)
     .map((relationship, index) => {
       const track = tracksById.get(relationship.trackId) || {};
       const title = textValue(track, ["title", "name", "display_title", "normalized_title", "slug"], "");
       const slug = textValue(track, ["slug", "normalized_slug"], relationship.trackId);
-      const mediaUrl = mediaUrlFor(mediaCandidates(slug, title), mediaBySlug);
       const directArtwork = textValue(track, ["artwork_url", "cover_image_url", "image_url", "thumbnail_url"]);
 
       // Build artist string with featured artists
@@ -793,7 +717,7 @@ async function getRegistryTracklist(releaseId: string, fallbackArtist: string): 
         artist: artistStr,
         duration: numberValue(track, ["duration", "duration_seconds", "length_seconds"], 0),
         trackNumber: relationship.position || index + 1,
-        artworkUrl: mediaUrl || image(directArtwork, {
+        artworkUrl: image(directArtwork, {
           id: relationship.trackId,
           slug,
           name: title,
