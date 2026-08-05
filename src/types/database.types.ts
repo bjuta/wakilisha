@@ -15463,6 +15463,20 @@ export type Database = {
           lifecycle_state: string
         }[]
       }
+      archive_media_usage: {
+        Args: {
+          p_correlation_id?: string
+          p_expected_usage_revision: number
+          p_reason: string
+          p_usage_link_id: string
+        }
+        Returns: {
+          correlation_id: string
+          usage_link_id: string
+          usage_revision: number
+          usage_state: string
+        }[]
+      }
       assign_correction_case: {
         Args: {
           p_case_resource_id: string
@@ -15531,6 +15545,30 @@ export type Database = {
           p_public_safe: boolean
         }
         Returns: Json
+      }
+      attach_media_usage: {
+        Args: {
+          p_alt_text_snapshot?: string
+          p_asset_id: string
+          p_asset_revision_id?: string
+          p_caption_snapshot?: string
+          p_correlation_id?: string
+          p_credit_snapshot?: string
+          p_display_order?: number
+          p_placement_data?: Json
+          p_resolution_mode: string
+          p_target_authority: string
+          p_target_id: string
+          p_target_kind: string
+          p_target_version_id?: string
+          p_target_version_kind?: string
+          p_usage_role: string
+        }
+        Returns: {
+          correlation_id: string
+          usage_link_id: string
+          usage_revision: number
+        }[]
       }
       briefing_cron_generate: { Args: never; Returns: undefined }
       bulk_delete_taxonomy_terms: {
@@ -16721,6 +16759,20 @@ export type Database = {
         Returns: number
       }
       delete_taxonomy_term: { Args: { p_term_id: string }; Returns: undefined }
+      detach_media_usage: {
+        Args: {
+          p_correlation_id?: string
+          p_expected_usage_revision: number
+          p_reason: string
+          p_usage_link_id: string
+        }
+        Returns: {
+          correlation_id: string
+          usage_link_id: string
+          usage_revision: number
+          usage_state: string
+        }[]
+      }
       discover_unknown_artist_slugs: {
         Args: never
         Returns: {
@@ -16952,6 +17004,7 @@ export type Database = {
           version_number: number
         }[]
       }
+      get_media_asset_v2: { Args: { p_asset_id: string }; Returns: Json }
       get_public_artist_relationships: {
         Args: { p_artist_id: string }
         Returns: {
@@ -17369,6 +17422,39 @@ export type Database = {
           primary_target_resource_kind: string
           primary_target_summary: string
           priority: string
+          updated_at: string
+        }[]
+      }
+      list_media_assets_v2: {
+        Args: {
+          p_asset_kind?: string
+          p_asset_purpose?: string
+          p_lifecycle_state?: string
+          p_limit?: number
+          p_offset?: number
+          p_search?: string
+        }
+        Returns: {
+          active_usage_count: number
+          asset_id: string
+          asset_kind: string
+          asset_purpose: string
+          authority_revision: number
+          consent_status: string
+          created_at: string
+          current_file_object_id: string
+          current_file_verification_state: string
+          current_mime_type: string
+          current_revision_id: string
+          current_revision_number: number
+          governance_version_id: string
+          internal_reason: string
+          legacy_asset_id: string
+          lifecycle_state: string
+          public_safety_state: string
+          rights_status: string
+          sensitivity: string
+          title: string
           updated_at: string
         }[]
       }
@@ -17940,6 +18026,28 @@ export type Database = {
           version_id: string
           version_number: number
           wp_status: string
+        }[]
+      }
+      resolve_media_asset_delivery: {
+        Args: {
+          p_asset_id: string
+          p_exact_asset_revision_id?: string
+          p_requested_variant_role?: string
+          p_usage_link_id?: string
+        }
+        Returns: {
+          approved_alt_text: string
+          approved_caption: string
+          approved_credit: string
+          duration_seconds: number
+          height: number
+          logical_asset_id: string
+          resolved_asset_revision_id: string
+          resolved_file_object_id: string
+          resolved_mime_type: string
+          resolved_mode: string
+          safe_delivery_url: string
+          width: number
         }[]
       }
       resolve_registry_relationship_endpoint: {
