@@ -17,11 +17,13 @@ All future work on Articles, Playlists, Audio, Video, Media, Registry, Charts, c
 
 Current phase: **Phase 4: Media platform**.
 
-Phase 3 Trust infrastructure is complete. PR 4A Media authority redesign is the next implementation.
+Phase 3 Trust infrastructure is complete. PR 4A Media authority redesign is active.
+
+The Phase 4A public application Media read lane is accepted and closed. Administrative and write authority, immutable file and derivative proof, mutable overwrite removal, and compatibility policy hardening remain open.
 
 This plan has been reconciled against repository main at:
 
-`cdeaf364 Record Phase 3B Migration 4 live schema (#557)`
+`cdbb4389 Retire dead track artwork Media lookup (#575)`
 
 Closed phases:
 
@@ -46,6 +48,16 @@ Completed Phase 3 work:
 - **Sources, Citations, Credits, source withdrawal, public trust reads, and Credit governance**, completed through PR #542.
 - **Correction identity, evidence, decisions, Article application, public notes, contributor follow-up, and live-schema reconciliation**, completed through PR #543 to PR #557.
 
+Completed Phase 4 work:
+
+- **Media authority boundary and schema contract**, locked before implementation.
+- **Logical Media identity, governance and compatibility bridge**, completed in production.
+- **Immutable file, revision and variant command authority**, completed with no invented legacy file metadata.
+- **Media usage authority and governed read models**, completed in production.
+- **Legacy compatibility delivery resolver and governed batch adapter**, completed through PR #570 to PR #572.
+- **Shared public Media reads, Article inline Media reads and dead track-artwork lookup retirement**, completed through PR #573 to PR #575.
+- **Public application Media read lane acceptance**, recorded at main `cdbb4389`.
+
 Supporting build-pipeline fix:
 
 - **SEO metadata manifest abort fallback**, closed through PR #484.
@@ -62,7 +74,9 @@ The North Star implementation work made the Article a stronger writing and revie
 
 Phase 3 completed the shared Sources, Citations, Credits, Corrections, and provenance foundations without reopening Article lifecycle or duplicating Publishing authority.
 
-Phase 4 now begins with the Media authority redesign defined in this plan.
+Phase 4 is active through the Media authority redesign defined in this plan.
+
+The public application Media read lane is complete. Phase 4A remains open until Media Library and editor writes use governed authority, in-place overwrite is removed, one logical asset proves an immutable original and several derivatives, and compatibility policy hardening has a verified replacement and rollback path.
 
 See also:
 
@@ -1696,9 +1710,13 @@ Completion record, 4 August 2026:
 
 ### Immediate next implementation
 
-**PR 4A: Media authority redesign.**
+**Continue PR 4A: Media authority redesign.**
 
-Begin with the existing Media estate audit and authority boundary. Do not start the upload and processing pipeline until logical assets, immutable file objects, variants, usage links, rights, preservation, and migration boundaries are locked.
+The public application Media read lane is accepted and closed.
+
+Continue with the administrative and write-authority perimeter, Media Library command cutover, editor usage authority, immutable original and derivative proof, in-place overwrite removal, and then compatibility policy and grant hardening.
+
+Do not start the Phase 4B upload and processing pipeline until the PR 4A exit gate is satisfied.
 
 ## Phase 4: Media platform
 
