@@ -18,6 +18,7 @@ import {
   normalizeTaxonomyTerms,
 } from "@/services/articles/contentPipeline";
 import { injectMediaCaptions, buildAssetCaptionMap } from "@/utils/injectMediaCaptions";
+import { getAdminMediaAssetsByIds } from "@/services/adminMediaReadService";
 
 /* ─── Raw Supabase Row ─── */
 
@@ -239,25 +240,32 @@ export async function fetchArticleForAdmin(slug: string): Promise<AdminArticleDe
     const assetIds = extractAssetIdsFromHtml(row.content_html);
     if (assetIds.length > 0) {
       try {
-        const { data: assets } = await supabase
-          .from("registry_media_assets")
-          .select("id, title, metadata")
-          .in("id", assetIds);
+        const assetsById =
+          await getAdminMediaAssetsByIds(assetIds);
 
-        if (assets && assets.length > 0) {
-          const captionEntries = (assets as Array<{
-            id: string;
-            title: string | null;
-            metadata: Record<string, unknown> | null;
-          }>).map((a) => ({
-            id: a.id,
-            caption: (a.metadata?.caption as string) || null,
-            altText: (a.metadata?.alt_text as string) || a.title || null,
-            title: a.title || null,
-          }));
+        if (assetsById.size > 0) {
+          const captionEntries = assetIds.flatMap((assetId) => {
+            const asset = assetsById.get(assetId);
+            if (!asset) return [];
 
-          const assetMap = buildAssetCaptionMap(captionEntries);
-          contentHtml = injectMediaCaptions(contentHtml, assetMap);
+            const metadata = asset.metadata ?? {};
+
+            return [{
+              id: asset.id,
+              caption:
+                (metadata.caption as string) || null,
+              altText:
+                (metadata.alt_text as string)
+                || asset.title
+                || null,
+              title: asset.title || null,
+            }];
+          });
+
+          const assetMap =
+            buildAssetCaptionMap(captionEntries);
+          contentHtml =
+            injectMediaCaptions(contentHtml, assetMap);
         }
       } catch {
         // Non-blocking — captions are a nice-to-have

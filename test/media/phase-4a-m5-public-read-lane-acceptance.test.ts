@@ -110,8 +110,8 @@ describe(
       );
 
       expect(publicCalls).toEqual([]);
-      expect(calls).toHaveLength(28);
-      expect(new Set(calls.map(({ file }) => file)).size).toBe(6);
+      expect(calls).toHaveLength(17);
+      expect(new Set(calls.map(({ file }) => file)).size).toBe(4);
     });
 
     it("preserves the accepted remaining consumer classification", () => {
@@ -122,9 +122,9 @@ describe(
           (call) => call.category === category,
         ).length;
 
-      expect(count("admin_ui")).toBe(7);
-      expect(count("admin_service")).toBe(1);
-      expect(count("compatibility_service")).toBe(11);
+      expect(count("admin_ui")).toBe(3);
+      expect(count("admin_service")).toBe(0);
+      expect(count("compatibility_service")).toBe(5);
       expect(count("legacy_import")).toBe(9);
     });
 
