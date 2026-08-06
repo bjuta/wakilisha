@@ -17767,6 +17767,7 @@ export type Database = {
         Args: { batch_size?: number; max_batches?: number }
         Returns: number
       }
+      read_media_assets_admin_v2: { Args: { p_query?: Json }; Returns: Json }
       rebuild_discography_from_metadata: { Args: never; Returns: string }
       record_admin_audit: {
         Args: {

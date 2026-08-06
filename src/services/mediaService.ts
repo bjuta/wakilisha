@@ -17,6 +17,11 @@
  */
 
 import { supabase } from "@/lib/supabase";
+import {
+  getAdminMediaAssetById,
+  getAdminMediaAssetByUrl,
+  listAdminMediaAssets,
+} from "@/services/adminMediaReadService";
 
 // ─── Types ────────────────────────────────────────────────────
 
@@ -166,24 +171,6 @@ export interface DeleteResult {
   success: boolean;
   references: ReferencedEntity[];
 }
-
-// ─── FK Reference Map ────────────────────────────────────────
-// All 11 foreign key columns that reference registry_media_assets.
-// Used for reference checking before delete.
-
-const FK_REFERENCE_MAP: Array<{ table: string; column: string; id_column: string; label_column?: string }> = [
-  { table: "wk_articles", column: "hero_image_id", id_column: "id", label_column: "title" },
-  { table: "registry_artists", column: "public_image_id", id_column: "id", label_column: "name" },
-  { table: "registry_releases", column: "artwork_image_id", id_column: "id", label_column: "title" },
-  { table: "registry_tracks", column: "artwork_image_id", id_column: "id", label_column: "title" },
-  { table: "registry_authors", column: "cover_image_id", id_column: "id", label_column: "name" },
-  { table: "registry_authors", column: "avatar_image_id", id_column: "id", label_column: "name" },
-  { table: "guide_pages", column: "hero_image_id", id_column: "id", label_column: "title" },
-  { table: "guides", column: "hero_image_id", id_column: "id", label_column: "title" },
-  { table: "registry_artist_highlights", column: "artwork_image_id", id_column: "id", label_column: "title" },
-  { table: "chart_entries", column: "artwork_image_id", id_column: "id", label_column: "title" },
-  { table: "wk_chart_entries_v2", column: "artwork_image_id", id_column: "id", label_column: "title" },
-];
 
 const LEGACY_STORAGE_BUCKET = "article-media";
 const LIGHTSAIL_STORAGE_BUCKET = "lightsail-media";
@@ -392,14 +379,11 @@ export const mediaService = {
     blob: Blob,
     newDimensions?: { width: number; height: number }
   ): Promise<MediaAsset> {
-    // 1. Fetch the existing asset to get its storage_path
-    const { data: existing, error: fetchError } = await supabase
-      .from("registry_media_assets")
-      .select("id, url, storage_bucket, storage_path, metadata")
-      .eq("id", assetId)
-      .single();
+    // 1. Read the existing asset through Media authority.
+    const existing =
+      await getAdminMediaAssetById(assetId);
 
-    if (fetchError || !existing) {
+    if (!existing) {
       throw new Error(`Asset not found: ${assetId}`);
     }
 
@@ -464,12 +448,9 @@ export const mediaService = {
     // 1. Check references
     const references = await this.getReferences(assetId);
 
-    // 2. Fetch the asset to get storage path for cleanup
-    const { data: asset } = await supabase
-      .from("registry_media_assets")
-      .select("id, url, storage_bucket, storage_path")
-      .eq("id", assetId)
-      .single();
+    // 2. Read the asset through Media authority.
+    const asset =
+      await getAdminMediaAssetById(assetId);
 
     // 3. Delete from database
     const { error: dbError } = await supabase
@@ -506,26 +487,16 @@ export const mediaService = {
   // READ
   // ════════════════════════════════════════════════════════════
 
-  async getById(assetId: string): Promise<MediaAsset | null> {
-    const { data, error } = await supabase
-      .from("registry_media_assets")
-      .select(MEDIA_ASSET_SELECT)
-      .eq("id", assetId)
-      .single();
-
-    if (error || !data) return null;
-    return data as MediaAsset;
+  async getById(
+    assetId: string,
+  ): Promise<MediaAsset | null> {
+    return getAdminMediaAssetById(assetId);
   },
 
-  async getByUrl(url: string): Promise<MediaAsset | null> {
-    const { data, error } = await supabase
-      .from("registry_media_assets")
-      .select(MEDIA_ASSET_SELECT)
-      .eq("url", url)
-      .maybeSingle();
-
-    if (error || !data) return null;
-    return data as MediaAsset;
+  async getByUrl(
+    url: string,
+  ): Promise<MediaAsset | null> {
+    return getAdminMediaAssetByUrl(url);
   },
 
   async listFolders(): Promise<MediaFolder[]> {
@@ -546,60 +517,10 @@ export const mediaService = {
   // LIST
   // ════════════════════════════════════════════════════════════
 
-  async list(options: ListOptions = {}): Promise<ListResult> {
-    const {
-      search = "",
-      mediaKind = "all",
-      fileKind = "all",
-      assetPurpose = "all",
-      folderId = "all",
-      rightsStatus = "all",
-      sourceKind = "all",
-      status = "all",
-      missingAltOnly = false,
-      uploadedFrom = "",
-      uploadedTo = "",
-      contentFrom = "",
-      contentTo = "",
-      page = 0,
-      pageSize = 60,
-      orderBy = "created_at",
-      ascending = false,
-    } = options;
-
-    let query = supabase
-      .from("registry_media_assets")
-      .select(MEDIA_ASSET_SELECT, { count: "exact" });
-
-    if (search) {
-      query = query.or(`title.ilike.%${search}%,slug.ilike.%${search}%,url.ilike.%${search}%,source_record_id.ilike.%${search}%,display_filename.ilike.%${search}%,original_filename.ilike.%${search}%,file_extension.ilike.%${search}%`);
-    }
-    if (mediaKind !== "all") query = query.eq("media_kind", mediaKind);
-    if (fileKind !== "all") query = query.eq("file_kind", fileKind);
-    if (assetPurpose !== "all") query = query.eq("asset_purpose", assetPurpose);
-    if (folderId === "none") query = query.is("folder_id", null);
-    else if (folderId !== "all") query = query.eq("folder_id", folderId);
-    if (rightsStatus !== "all") query = query.eq("rights_status", rightsStatus);
-    if (sourceKind !== "all") query = query.eq("source_kind", sourceKind);
-    if (status !== "all") query = query.eq("status", status);
-    if (uploadedFrom) query = query.gte("created_at", `${uploadedFrom}T00:00:00.000Z`);
-    if (uploadedTo) query = query.lte("created_at", `${uploadedTo}T23:59:59.999Z`);
-    if (contentFrom) query = query.gte("content_date", contentFrom);
-    if (contentTo) query = query.lte("content_date", contentTo);
-    if (missingAltOnly) query = query.or("metadata.is.null,metadata->>alt_text.is.null");
-
-    query = query
-      .order(orderBy, { ascending })
-      .range(page * pageSize, (page + 1) * pageSize - 1);
-
-    const { data, error, count } = await query;
-
-    if (error) throw new Error(`Failed to list media assets: ${error.message}`);
-
-    return {
-      assets: (data ?? []) as MediaAsset[],
-      total: count ?? 0,
-    };
+  async list(
+    options: ListOptions = {},
+  ): Promise<ListResult> {
+    return listAdminMediaAssets(options);
   },
 
   // ════════════════════════════════════════════════════════════
@@ -610,37 +531,16 @@ export const mediaService = {
    * Check all 11 FK tables and return every entity that references
    * this media asset. Used before deletion to warn the admin.
    */
-  async getReferences(assetId: string): Promise<ReferencedEntity[]> {
-    const results: ReferencedEntity[] = [];
+  async getReferences(
+    assetId: string,
+  ): Promise<ReferencedEntity[]> {
+    const asset =
+      await getAdminMediaAssetById(
+        assetId,
+        true,
+      );
 
-    for (const ref of FK_REFERENCE_MAP) {
-      try {
-        const selectCols = ref.label_column
-          ? `${ref.id_column}, ${ref.label_column}`
-          : ref.id_column;
-
-        const { data, error } = await supabase
-          .from(ref.table)
-          .select(selectCols)
-          .eq(ref.column, assetId);
-
-        if (error) continue;
-
-        for (const row of (data ?? []) as Record<string, unknown>[]) {
-          results.push({
-            table: ref.table,
-            column: ref.column,
-            entity_id: String(row[ref.id_column] ?? ""),
-            label: ref.label_column ? String(row[ref.label_column] ?? "") : undefined,
-          });
-        }
-      } catch {
-        // Skip tables that might not exist or be inaccessible
-        continue;
-      }
-    }
-
-    return results;
+    return asset?.references ?? [];
   },
 
   // ════════════════════════════════════════════════════════════
@@ -691,14 +591,14 @@ export const mediaService = {
     if (updates.internalNotes !== undefined) payload.internal_notes = updates.internalNotes || null;
 
     if (updates.metadata !== undefined) {
-      // Merge with existing metadata
-      const { data: existing } = await supabase
-        .from("registry_media_assets")
-        .select("metadata")
-        .eq("id", assetId)
-        .single();
+      // Merge with metadata read through Media authority.
+      const existing =
+        await getAdminMediaAssetById(assetId);
 
-      const existingMeta = (existing?.metadata ?? {}) as MediaAssetMetadata;
+      const existingMeta = (
+        existing?.metadata ?? {}
+      ) as MediaAssetMetadata;
+
       payload.metadata = { ...existingMeta, ...updates.metadata };
     }
 

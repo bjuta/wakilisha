@@ -2,6 +2,10 @@ import { useEffect, useState, useCallback, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { WkIcon } from "@/components/design-system/Icon";
 import { supabase } from "@/lib/supabase";
+import {
+  getAdminMediaAssetById,
+  readAdminMediaAssets,
+} from "@/services/adminMediaReadService";
 
 interface BrokenLinkItem {
   id: string;
@@ -20,20 +24,6 @@ interface BrokenLinkItem {
 }
 
 const PAGE_SIZE = 50;
-
-const FK_REFERENCE_MAP: Array<{ table: string; column: string }> = [
-  { table: "wk_articles", column: "hero_image_id" },
-  { table: "registry_artists", column: "public_image_id" },
-  { table: "registry_releases", column: "artwork_image_id" },
-  { table: "registry_tracks", column: "artwork_image_id" },
-  { table: "registry_authors", column: "cover_image_id" },
-  { table: "registry_authors", column: "avatar_image_id" },
-  { table: "guide_pages", column: "hero_image_id" },
-  { table: "guides", column: "hero_image_id" },
-  { table: "registry_artist_highlights", column: "artwork_image_id" },
-  { table: "chart_entries", column: "artwork_image_id" },
-  { table: "wk_chart_entries_v2", column: "artwork_image_id" },
-];
 
 export default function AdminBrokenLinksPage() {
   const navigate = useNavigate();
@@ -61,69 +51,53 @@ export default function AdminBrokenLinksPage() {
     setLoadError(null);
 
     try {
-      const from = page * PAGE_SIZE;
-      const to = from + PAGE_SIZE - 1;
-
-      const { count, data, error } = await supabase
-        .from("registry_media_assets")
-        .select("id, slug, title, url, mime_type, source_kind, source_entity, source_record_id, metadata", { count: "exact" })
-        .eq("media_kind", "image")
-        .order("created_at", { ascending: false })
-        .range(from, to);
-
-      if (error) throw error;
-
-      setTotalCount(count ?? 0);
-
-      // Build items, reading check status from metadata
-      const mapped: BrokenLinkItem[] = (data ?? []).map((row: Record<string, unknown>) => {
-        const meta = (row.metadata as Record<string, unknown>) ?? {};
-        const linkCheck = (meta.link_check as Record<string, unknown>) ?? {};
-        return {
-          id: row.id as string,
-          slug: row.slug as string,
-          url: row.url as string,
-          title: row.title as string | null,
-          source_kind: row.source_kind as string | null,
-          source_entity: row.source_entity as string | null,
-          source_record_id: row.source_record_id as string | null,
-          mime_type: row.mime_type as string | null,
-          checkStatus: (linkCheck.status as BrokenLinkItem["checkStatus"]) ?? "unchecked",
-          checkError: (linkCheck.error as string) ?? null,
-          checkedAt: (linkCheck.checked_at as string) ?? null,
-          refCount: 0,
-          refEntities: [],
-        };
+      const result = await readAdminMediaAssets({
+        mediaKind: "image",
+        orderBy: "created_at",
+        ascending: false,
+        limit: PAGE_SIZE,
+        offset: page * PAGE_SIZE,
+        includeReferences: true,
       });
 
-      // Batch fetch reference counts (non-blocking — slow queries run in parallel)
-      const refResults = await Promise.allSettled(
-        mapped.map(async (item) => {
-          const results: string[] = [];
-          for (const ref of FK_REFERENCE_MAP) {
-            const { count: refCount } = await supabase
-              .from(ref.table)
-              .select("*", { count: "exact", head: true })
-              .eq(ref.column, item.id);
-            if (refCount && refCount > 0) {
-              results.push(ref.table.replace("registry_", "").replace("wk_", ""));
-            }
-          }
-          return { id: item.id, refEntities: results, refCount: results.length };
-        })
-      );
+      setTotalCount(result.total);
 
-      // Merge ref counts back
-      refResults.forEach((result) => {
-        if (result.status === "fulfilled") {
-          const { id, refEntities, refCount } = result.value;
-          const idx = mapped.findIndex((m) => m.id === id);
-          if (idx !== -1) {
-            mapped[idx].refEntities = refEntities;
-            mapped[idx].refCount = refCount;
-          }
-        }
-      });
+      const mapped: BrokenLinkItem[] =
+        result.assets.map((asset) => {
+          const meta = asset.metadata ?? {};
+          const linkCheck =
+            (meta.link_check as Record<string, unknown>)
+            ?? {};
+          const refEntities = [
+            ...new Set(
+              asset.references.map((reference) =>
+                reference.table
+                  .replace("registry_", "")
+                  .replace("wk_", "")
+              ),
+            ),
+          ];
+
+          return {
+            id: asset.id,
+            slug: asset.slug ?? "",
+            url: asset.url ?? "",
+            title: asset.title,
+            source_kind: asset.source_kind,
+            source_entity: asset.source_entity,
+            source_record_id: asset.source_record_id,
+            mime_type: asset.mime_type,
+            checkStatus: (
+              linkCheck.status ?? "unchecked"
+            ) as BrokenLinkItem["checkStatus"],
+            checkError:
+              (linkCheck.error as string) ?? null,
+            checkedAt:
+              (linkCheck.checked_at as string) ?? null,
+            refCount: refEntities.length,
+            refEntities,
+          };
+        });
 
       setItems(mapped);
     } catch (err) {
@@ -168,14 +142,14 @@ export default function AdminBrokenLinksPage() {
   const persistCheckResult = useCallback(
     async (itemId: string, status: "ok" | "broken", error: string | null) => {
       try {
-        // Read current metadata first
-        const { data: current } = await supabase
-          .from("registry_media_assets")
-          .select("metadata")
-          .eq("id", itemId)
-          .single();
+        // Read current metadata through Media authority first.
+        const current =
+          await getAdminMediaAssetById(itemId);
 
-        const existingMeta = (current?.metadata ?? {}) as Record<string, unknown>;
+        const existingMeta = (
+          current?.metadata ?? {}
+        ) as Record<string, unknown>;
+
         const newMeta = {
           ...existingMeta,
           link_check: {

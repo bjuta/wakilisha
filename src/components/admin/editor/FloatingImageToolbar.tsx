@@ -4,7 +4,10 @@ import { WkIcon } from "@/components/design-system/Icon";
 import { MediaPickerModal } from "@/components/admin/MediaPickerModal";
 import { ImageEditDialog } from "./ImageEditDialog";
 import { MediaEditModal, type MediaAsset } from "@/components/admin/media/MediaEditModal";
-import { supabase } from "@/lib/supabase";
+import {
+  getAdminMediaAssetById,
+  getAdminMediaAssetByUrl,
+} from "@/services/adminMediaReadService";
 
 interface ImageMeta {
   src: string;
@@ -221,40 +224,25 @@ export function FloatingImageToolbar({ editor }: Props) {
 
     // Try by asset-id first
     if (assetId) {
-      const { data, error } = await supabase
-        .from("registry_media_assets")
-        .select(
-          "id, slug, title, url, mime_type, media_kind, status, source_kind, source_entity, source_record_id, source_staging_record_id, metadata, created_at, updated_at"
-        )
-        .eq("id", assetId)
-        .maybeSingle();
-      if (!error && data) {
-        resolvedAsset = data as unknown as MediaAsset;
-      }
+      resolvedAsset =
+        await getAdminMediaAssetById(assetId);
     }
 
     // Fallback: look up by URL if asset-id missing or stale
     if (!resolvedAsset && src) {
-      const { data, error } = await supabase
-        .from("registry_media_assets")
-        .select(
-          "id, slug, title, url, mime_type, media_kind, status, source_kind, source_entity, source_record_id, source_staging_record_id, metadata, created_at, updated_at"
-        )
-        .eq("url", src)
-        .maybeSingle();
-      if (!error && data) {
-        resolvedAsset = data as unknown as MediaAsset;
-        // Backfill data-asset-id on the TipTap node so next lookup is instant
-        if (editor) {
-          editor
-            .chain()
-            .focus()
-            .setNodeSelection(selectedImage.pos)
-            .updateAttributes("image", {
-              "data-asset-id": data.id,
-            })
-            .run();
-        }
+      resolvedAsset =
+        await getAdminMediaAssetByUrl(src);
+
+      if (resolvedAsset && editor) {
+        // Backfill data-asset-id on the TipTap node.
+        editor
+          .chain()
+          .focus()
+          .setNodeSelection(selectedImage.pos)
+          .updateAttributes("image", {
+            "data-asset-id": resolvedAsset.id,
+          })
+          .run();
       }
     }
 
