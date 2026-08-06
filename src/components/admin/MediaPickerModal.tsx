@@ -71,7 +71,7 @@ export function MediaPickerModal({ open, onClose, onSelect, title = "Select Medi
 
     const asset = await mediaService.registerFromUrl(url, {
       title,
-      sourceKind: "wordpress_database",
+      sourceKind: "admin_upload",
       sourceEntity: "storage_register",
     });
 

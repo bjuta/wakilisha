@@ -57,7 +57,6 @@ export const ADMIN_SEARCH_INDEX: AdminSearchItem[] = [
   { id: "media-library", label: "Media Library", description: "Browse and manage all uploaded media assets", path: "/admin/media/library", icon: "Image", group: "Media", keywords: ["images", "photos", "uploads", "assets", "files"] },
   { id: "media-missing", label: "Missing Images", description: "Track records with missing or broken hero images", path: "/admin/media/missing", icon: "ImageOff", group: "Media", keywords: ["broken images", "missing artwork", "empty", "no image"] },
   { id: "media-broken", label: "Broken Links", description: "Detect and fix broken media links across the platform", path: "/admin/media/broken", icon: "LinkBreak", group: "Media", keywords: ["dead links", "404", "fix links", "link checker"] },
-  { id: "media-migrate", label: "Migrate Images", description: "Migrate images from WordPress or external sources", path: "/admin/media/migrate", icon: "Download", group: "Media", keywords: ["wordpress images", "import media", "transfer", "batch"] },
 
   // ── Review & Quality ──
   { id: "review-queue", label: "Review Queue", description: "Global review queue — flagged entities, relationships, and content", path: "/admin/review/queue", icon: "GitPullRequest", group: "Review & Quality", keywords: ["flagged", "pending review", "quality check", "approval"] },
@@ -65,7 +64,6 @@ export const ADMIN_SEARCH_INDEX: AdminSearchItem[] = [
   { id: "duplicates", label: "Duplicate Merge", description: "Find and merge duplicate entities in the registry", path: "/admin/relationships/duplicates", icon: "Copy", group: "Review & Quality", keywords: ["deduplicate", "merge entities", "duplicate detection", "clean up"] },
 
   // ── Data Import ──
-  { id: "imports", label: "WordPress Import", description: "Import content and data from legacy WordPress installation", path: "/admin/imports", icon: "Download", group: "Data Import", keywords: ["wp", "wordpress", "legacy", "migration", "old site"] },
   { id: "imports-jobs", label: "Import Jobs", description: "Track status and history of all data import jobs", path: "/admin/imports/jobs", icon: "Upload", group: "Data Import", keywords: ["batch", "history", "status", "migration jobs"] },
 
   // ── Settings ──

@@ -2,57 +2,6 @@ import { useEffect, useState, useMemo, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { WkIcon } from "@/components/design-system/Icon";
 import { fetchAllAuthors, type AuthorRow } from "@/services/authorProfiles";
-import { supabase } from "@/lib/supabase";
-
-// ═══════════════════════════════════════════════════
-// WordPress username → Registry slug mapping
-// ═══════════════════════════════════════════════════
-const WP_USER_MAP: Record<string, string> = {
-  frank: "frank-njugi",
-  gatwiri_c: "gatwiri-c",
-  hafare: "hafare-segelan",
-  james: "muiruri-beautah",
-  kiuta: "kiuta-faith",
-  k_matiri: "kambura-matiri",
-  mary: "mary-gathoni",
-  Michael: "michael-mburu",
-  swambi: "sarah-wambi",
-  timo: "timothy-muiruri",
-  vicmuia: "victor-muia",
-  wangari: "wangari-karume",
-};
-
-interface WpUser {
-  id: number;
-  name: string;
-  slug: string;
-  description: string;
-  avatar_urls?: Record<string, string>;
-}
-
-// Call the existing wp-connect-proxy edge function (no new function needed)
-async function fetchWpUsers(siteUrl: string): Promise<WpUser[]> {
-  const { data, error } = await supabase.functions.invoke("wp-connect-proxy", {
-    body: { action: "proxy", siteUrl, path: "/wp-json/wp/v2/users?per_page=100" },
-  });
-  if (error) {
-    throw new Error(error.message);
-  }
-  if (Array.isArray(data)) {
-    return data as WpUser[];
-  }
-  if (data && typeof data === "object" && "error" in data) {
-    throw new Error(String((data as Record<string, unknown>).error || "WP proxy failed"));
-  }
-  throw new Error("Unexpected response from WordPress");
-}
-
-// Strip HTML tags from WP description
-function stripHtml(html: string): string {
-  const tmp = document.createElement("div");
-  tmp.innerHTML = html;
-  return tmp.textContent || tmp.innerText || "";
-}
 
 type SortMode = "recent" | "name" | "role";
 
@@ -64,9 +13,6 @@ export default function AuthorsPage() {
   const [sortMode, setSortMode] = useState<SortMode>("recent");
   const [error, setError] = useState<string | null>(null);
 
-  const [scrapeState, setScrapeState] = useState<"idle" | "fetching" | "mapping" | "done" | "error">("idle");
-  const [scrapeLog, setScrapeLog] = useState<string[]>([]);
-  const [scrapeError, setScrapeError] = useState<string | null>(null);
 
   const loadAuthors = useCallback(async () => {
     setLoading(true);
@@ -82,81 +28,6 @@ export default function AuthorsPage() {
   }, []);
 
   useEffect(() => { loadAuthors(); }, [loadAuthors]);
-
-  const handleScrape = useCallback(async () => {
-    setScrapeState("fetching");
-    setScrapeLog(["Connecting to wakilisha.africa..."]);
-    setScrapeError(null);
-
-    try {
-      const wpUsers = await fetchWpUsers("https://wakilisha.africa");
-      setScrapeLog((prev) => [...prev, `Found ${wpUsers.length} WordPress users`]);
-
-      const mapped: { wp: WpUser; registrySlug: string }[] = [];
-      const skipped: WpUser[] = [];
-      for (const wp of wpUsers) {
-        const registrySlug = WP_USER_MAP[wp.slug];
-        if (registrySlug) {
-          mapped.push({ wp, registrySlug });
-        } else {
-          skipped.push(wp);
-        }
-      }
-      setScrapeLog((prev) => [...prev, `Mapped ${mapped.length} users to registry authors`]);
-      if (skipped.length > 0) {
-        setScrapeLog((prev) => [...prev, `Skipped ${skipped.length} unmapped WP users: ${skipped.map((u) => u.slug).join(", ")}`]);
-      }
-
-      setScrapeState("mapping");
-      const updated: string[] = [];
-      const failed: string[] = [];
-
-      for (const { wp, registrySlug } of mapped) {
-        const bio = stripHtml(wp.description || "").trim();
-        const avatarUrl = wp.avatar_urls?.["96"] || wp.avatar_urls?.["48"] || wp.avatar_urls?.["24"] || null;
-
-        const patch: Record<string, unknown> = {};
-        if (bio) patch.bio = bio;
-        if (avatarUrl) patch.avatar_url = avatarUrl;
-        if (wp.name && wp.name.trim()) patch.name = wp.name.trim();
-
-        if (Object.keys(patch).length === 0) {
-          setScrapeLog((prev) => [...prev, `Skipping ${registrySlug} — no data to update`]);
-          continue;
-        }
-
-        const { error: updateError } = await supabase
-          .from("registry_authors")
-          .update(patch)
-          .eq("slug", registrySlug);
-
-        if (updateError) {
-          failed.push(registrySlug);
-          setScrapeLog((prev) => [...prev, `Failed to update ${registrySlug}: ${updateError.message}`]);
-        } else {
-          updated.push(registrySlug);
-          const updates: string[] = [];
-          if (bio) updates.push("bio");
-          if (avatarUrl) updates.push("avatar");
-          if (wp.name) updates.push("name");
-          setScrapeLog((prev) => [...prev, `Updated ${registrySlug}: ${updates.join(", ")}`]);
-        }
-      }
-
-      setScrapeLog((prev) => [
-        ...prev,
-        `Done. ${updated.length} updated, ${failed.length} failed.`,
-      ]);
-      setScrapeState("done");
-      // Refresh the list so user sees changes
-      await loadAuthors();
-    } catch (err) {
-      const msg = err instanceof Error ? err.message : "Scrape failed";
-      setScrapeError(msg);
-      setScrapeLog((prev) => [...prev, `Error: ${msg}`]);
-      setScrapeState("error");
-    }
-  }, [loadAuthors]);
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -199,67 +70,6 @@ export default function AuthorsPage() {
             </div>
           </div>
         </header>
-
-        {/* Scrape panel */}
-        <section className="mb-4 rounded-2xl border border-[var(--wk-border)] bg-[var(--wk-surface)] p-4">
-          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-            <div>
-              <h2 className="text-sm font-black text-[var(--wk-text)]">WordPress Author Sync</h2>
-              <p className="mt-1 text-xs text-[var(--wk-text-muted)]">
-                Pull bios and avatars from the old wakilisha.africa WordPress site into the registry.
-                Uses the existing WP Connect Proxy — no new function needed.
-              </p>
-            </div>
-            <div className="flex items-center gap-2">
-              {scrapeState === "done" && (
-                <span className="inline-flex items-center gap-1 rounded-full bg-[var(--wk-success-soft)] px-3 py-1.5 text-[11px] font-bold text-[var(--wk-success)]">
-                  <WkIcon name="CheckCircle2" size={12} /> Sync complete
-                </span>
-              )}
-              <button
-                onClick={handleScrape}
-                disabled={scrapeState === "fetching" || scrapeState === "mapping"}
-                className="inline-flex items-center gap-2 rounded-xl border border-[var(--wk-brand)] bg-[var(--wk-brand)] px-4 py-2 text-xs font-bold text-white hover:bg-[var(--wk-brand-hover)] transition-colors disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer whitespace-nowrap"
-              >
-                {scrapeState === "fetching" || scrapeState === "mapping" ? (
-                  <>
-                    <WkIcon name="Loader2" size={13} className="animate-spin" />
-                    {scrapeState === "fetching" ? "Fetching WP users..." : "Updating profiles..."}
-                  </>
-                ) : (
-                  <>
-                    <WkIcon name="Download" size={13} />
-                    Scrape bios & avatars
-                  </>
-                )}
-              </button>
-            </div>
-          </div>
-
-          {scrapeLog.length > 0 && (
-            <div className="mt-3 rounded-xl border border-[var(--wk-border)] bg-[var(--wk-bg-subtle)] p-3 max-h-48 overflow-auto">
-              <div className="space-y-1">
-                {scrapeLog.map((line, i) => (
-                  <div key={i} className="text-[11px] font-mono text-[var(--wk-text-muted)] leading-4">
-                    {line.startsWith("Error:") || line.startsWith("Failed") ? (
-                      <span className="text-[var(--wk-danger)]">{line}</span>
-                    ) : line.startsWith("Updated") ? (
-                      <span className="text-[var(--wk-success)]">{line}</span>
-                    ) : (
-                      line
-                    )}
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {scrapeError && (
-            <div className="mt-3 rounded-lg border border-[var(--wk-danger)]/20 bg-[var(--wk-danger-soft)] p-3 text-[11px] text-[var(--wk-danger)]">
-              {scrapeError}
-            </div>
-          )}
-        </section>
 
         <section className="mb-4 grid gap-3 md:grid-cols-2 xl:grid-cols-5">
           {[

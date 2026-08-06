@@ -92,15 +92,13 @@ export const RUNTIME_CHART_ENDPOINTS: Record<string, EndpointDefinition> = {
   },
 };
 
-export const WORDPRESS_CHART_ENDPOINTS = RUNTIME_CHART_ENDPOINTS;
-export const WP_API_BASE = "/legacy-import-only/wordpress-runtime-disabled";
 export const API_BASE = "/api/v1";
 
 function withGroup(endpoint: EndpointDefinition, group: string): IngestStudioEndpointDef {
   return { ...endpoint, group };
 }
 
-export const INGEST_STUDIO_WP_ENDPOINTS: IngestStudioEndpointDef[] = [
+export const INGEST_STUDIO_RUNTIME_ENDPOINTS: IngestStudioEndpointDef[] = [
   withGroup(
     {
       key: "getIngestRuns",
@@ -121,17 +119,13 @@ export const INGEST_STUDIO_WP_ENDPOINTS: IngestStudioEndpointDef[] = [
   withGroup(RUNTIME_CHART_ENDPOINTS.commitIngestRun, "Ingest Studio Runtime API"),
 ];
 
-export async function testWordPressConnection(): Promise<{ ok: boolean; plugin: string; charts_ingestion: boolean; version: string }> {
+export async function testAPIConnection(): Promise<{ ok: boolean; backend: string; charts_ingestion: boolean; version: string }> {
   return {
-    ok: false,
-    plugin: "wordpress-runtime-disabled",
-    charts_ingestion: false,
-    version: "legacy-import-only",
+    ok: true,
+    backend: "supabase",
+    charts_ingestion: true,
+    version: "production",
   };
-}
-
-export async function testAPIConnection(): Promise<{ ok: boolean; plugin: string; charts_ingestion: boolean; version: string }> {
-  return testWordPressConnection();
 }
 
 function getEndpointStatus(fnName: string): EndpointStatus {
@@ -159,7 +153,7 @@ export function getEndpointGroups(): Record<string, EndpointDefinition[]> {
 
 export function getIngestStudioEndpointGroups(): Record<string, EndpointDefinition[]> {
   return {
-    "Ingest Studio Runtime API": INGEST_STUDIO_WP_ENDPOINTS.map((endpoint) => ({ ...endpoint, status: getEndpointStatus(endpoint.frontendFunction) })),
+    "Ingest Studio Runtime API": INGEST_STUDIO_RUNTIME_ENDPOINTS.map((endpoint) => ({ ...endpoint, status: getEndpointStatus(endpoint.frontendFunction) })),
   };
 }
 

@@ -19,7 +19,7 @@ Current phase: **Phase 4: Media platform**.
 
 Phase 3 Trust infrastructure is complete. PR 4A Media authority redesign is active.
 
-The Phase 4A public application Media read lane and the administrative and write-authority lane are accepted. Media Library command cutover, immutable original and derivative proof, in-place overwrite removal, and browser editor CORS are complete. Phase 4A remains open for the WordPress Media migration dependency and compatibility policy and grant hardening.
+The Phase 4A public application Media read lane and the administrative and write-authority lane are accepted. Media Library command cutover, immutable original and derivative proof, in-place overwrite removal, and browser editor CORS are complete. Phase 4A remains open for the WordPress runtime retirement, source-schema neutralization, and compatibility policy and grant hardening.
 
 This plan has been reconciled against repository main at:
 
@@ -79,7 +79,7 @@ Phase 3 completed the shared Sources, Citations, Credits, Corrections, and prove
 
 Phase 4 is active through the Media authority redesign defined in this plan.
 
-The public application Media read lane and Media Library write authority are complete. Phase 4A remains open until the WordPress Media migration dependency is decided or replaced and compatibility policy and grant hardening has a verified replacement and rollback path.
+The public application Media read lane and Media Library write authority are complete. Phase 4A remains open until the WordPress runtime retirement and source-schema neutralization are complete and compatibility policy and grant hardening has a verified replacement and rollback path.
 
 See also:
 

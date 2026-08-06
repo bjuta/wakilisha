@@ -214,7 +214,7 @@ export default function AdminSettingsIntegrations() {
           <h1 className="text-[20px] font-black tracking-tight text-[var(--wk-text)]">Integrations</h1>
         </div>
         <p className="text-[13px] text-[var(--wk-text-muted)]">
-          Platform-level provider credentials. Each provider exposes the exact fields its function requires; WordPress is import-only, not a runtime API mode.
+          Platform-level provider credentials. Each provider exposes the exact fields required by its WAKILISHA runtime function.
         </p>
       </div>
 

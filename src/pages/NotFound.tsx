@@ -18,8 +18,6 @@ function routeGuess(pathname: string): string {
   if (pathname.startsWith("/artist/")) return "legacy_artist";
   if (pathname.startsWith("/release/")) return "legacy_release";
   if (pathname.startsWith("/track/")) return "legacy_track";
-  if (pathname.startsWith("/wp-content/")) return "legacy_wordpress_asset";
-  if (pathname.startsWith("/wp-admin/")) return "wordpress_admin_probe";
   return "unknown";
 }
 

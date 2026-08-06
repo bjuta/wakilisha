@@ -178,24 +178,6 @@ export const AdminGuidesPage = lazy(() =>
   import("../pages/admin/content/guides/page"),
 );
 
-export const AdminImportsJobDetailPage = lazy(() =>
-  import("../pages/admin/imports/jobs/detail/page"),
-);
-
-export const AdminImportsJobsPage = lazy(() =>
-  import("../pages/admin/imports/jobs/page"),
-);
-
-export const AdminImportsLayout = lazy(() =>
-  import("@/components/admin/AdminSectionLayouts").then((module) => ({
-    default: module.AdminImportsLayout,
-  })),
-);
-
-export const AdminImportsPage = lazy(() =>
-  import("../pages/admin/imports/page"),
-);
-
 export const AdminInquiryInterfacePage = lazy(() =>
   import("../pages/admin/institute/inquiry-interface/page"),
 );
@@ -224,10 +206,6 @@ export const AdminMediaLayout = lazy(() =>
 
 export const AdminMediaLibraryPage = lazy(() =>
   import("../pages/admin/media/library/page"),
-);
-
-export const AdminMediaMigratePage = lazy(() =>
-  import("../pages/admin/media/migrate/page"),
 );
 
 export const AdminMissingImagesPage = lazy(() =>
@@ -282,10 +260,6 @@ export const AdminReviewLayout = lazy(() =>
 
 export const AdminReviewQueuePage = lazy(() =>
   import("../pages/admin/review/queue/page"),
-);
-
-export const AdminScraperPage = lazy(() =>
-  import("../pages/admin/imports/scraper/page"),
 );
 
 export const AdminSettingsAirplay = lazy(() =>

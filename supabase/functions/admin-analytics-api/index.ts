@@ -1294,9 +1294,6 @@ function brokenRouteGuess(path: string): string {
   if (path.startsWith("/artist/")) return "legacy_artist";
   if (path.startsWith("/release/")) return "legacy_release";
   if (path.startsWith("/track/")) return "legacy_track";
-  if (path.startsWith("/wp-content/")) return "legacy_wordpress_asset";
-  if (path.startsWith("/wp-admin/")) return "wordpress_admin_probe";
-  if (path.startsWith("/xmlrpc.php")) return "wordpress_probe";
   return "unknown";
 }
 
