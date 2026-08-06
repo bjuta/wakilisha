@@ -43,3 +43,19 @@ Verified 640-pixel derivative:
 - 640 × 360
 - 156,486 bytes
 - `X-Wakilisha-Image-Width: 640`
+
+## Browser editor CORS
+
+The production application loads public Media from a separate origin. Original
+uploads and every fixed-width derivative location must therefore include:
+
+`/etc/nginx/snippets/wakilisha-media-cors-headers.conf`
+
+The source-controlled contract is:
+
+`ops/nginx/wakilisha-media-cors-headers.conf`
+
+The header is deliberately limited to `https://wakilisha.africa`. It does not
+enable credentialed CORS, grant filesystem access, or change Media authority.
+Any production edit must retain a timestamped backup, pass `nginx -t`, reload
+Nginx, and verify both an original upload and a responsive derivative.
