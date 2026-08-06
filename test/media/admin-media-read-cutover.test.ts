@@ -75,6 +75,10 @@ describe("Phase 4A administrative Media read cutover", () => {
       "listAdminMediaAssets",
     );
     expect(helper).not.toMatch(directCompatibility);
+    expect(helper).toContain("return client.rpc(");
+    expect(helper).not.toContain(
+      "const rpc = supabase.rpc",
+    );
   });
 
   it("cuts over Article admin captions", () => {
@@ -105,21 +109,18 @@ describe("Phase 4A administrative Media read cutover", () => {
       .toHaveLength(2);
   });
 
-  it("cuts over broken-link reads while preserving its write", () => {
+  it("keeps broken-link reads and governs its metadata write", () => {
     expect(broken).toContain(
       "readAdminMediaAssets",
     );
     expect(broken).toContain(
-      "getAdminMediaAssetById",
+      "mediaService.updateMetadata",
     );
     expect(broken.match(directCompatibility) ?? [])
-      .toHaveLength(1);
-    expect(broken).toContain(
-      ".update({ metadata: newMeta",
-    );
+      .toHaveLength(0);
   });
 
-  it("cuts over Media Service reads while preserving writes", () => {
+  it("cuts over Media Service reads and operational writes", () => {
     expect(mediaService).toContain(
       "listAdminMediaAssets",
     );
@@ -130,21 +131,33 @@ describe("Phase 4A administrative Media read cutover", () => {
       "getAdminMediaAssetByUrl",
     );
     expect(mediaService.match(directCompatibility) ?? [])
-      .toHaveLength(5);
+      .toHaveLength(0);
+    expect(mediaService).toContain(
+      '"create_media_asset_write_v2"',
+    );
+    expect(mediaService).toContain(
+      '"replace_media_asset_file_v2"',
+    );
+    expect(mediaService).toContain(
+      '"update_media_asset_record_v2"',
+    );
+    expect(mediaService).toContain(
+      '"update_media_asset_status_batch_v2"',
+    );
   });
 
-  it("records the new seventeen-call boundary", () => {
+  it("records the remaining eleven-call boundary", () => {
     expect(acceptance).toContain(
-      "expect(calls).toHaveLength(17)",
+      "expect(calls).toHaveLength(11)",
     );
     expect(acceptance).toContain(
-      'expect(count("admin_ui")).toBe(3)',
+      'expect(count("admin_ui")).toBe(2)',
     );
     expect(acceptance).toContain(
       'expect(count("admin_service")).toBe(0)',
     );
     expect(acceptance).toContain(
-      'expect(count("compatibility_service")).toBe(5)',
+      'expect(count("compatibility_service")).toBe(0)',
     );
     expect(acceptance).toContain(
       'expect(count("legacy_import")).toBe(9)',

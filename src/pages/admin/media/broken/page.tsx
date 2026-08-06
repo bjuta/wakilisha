@@ -1,11 +1,10 @@
 import { useEffect, useState, useCallback, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { WkIcon } from "@/components/design-system/Icon";
-import { supabase } from "@/lib/supabase";
 import {
-  getAdminMediaAssetById,
   readAdminMediaAssets,
 } from "@/services/adminMediaReadService";
+import { mediaService } from "@/services/mediaService";
 
 interface BrokenLinkItem {
   id: string;
@@ -142,27 +141,15 @@ export default function AdminBrokenLinksPage() {
   const persistCheckResult = useCallback(
     async (itemId: string, status: "ok" | "broken", error: string | null) => {
       try {
-        // Read current metadata through Media authority first.
-        const current =
-          await getAdminMediaAssetById(itemId);
-
-        const existingMeta = (
-          current?.metadata ?? {}
-        ) as Record<string, unknown>;
-
-        const newMeta = {
-          ...existingMeta,
-          link_check: {
-            status,
-            error,
-            checked_at: new Date().toISOString(),
+        await mediaService.updateMetadata(itemId, {
+          metadata: {
+            link_check: {
+              status,
+              error,
+              checked_at: new Date().toISOString(),
+            },
           },
-        };
-
-        await supabase
-          .from("registry_media_assets")
-          .update({ metadata: newMeta, updated_at: new Date().toISOString() })
-          .eq("id", itemId);
+        });
       } catch {
         // Best effort — UI state is already updated
       }

@@ -5,9 +5,9 @@
  * MediaLibrary page, article editor, settings pages) delegates to this service.
  *
  * ── Capabilities ──
- * upload()       → creates registry_media_assets row + uploads to Lightsail media origin
- * editImage()    → re-uploads edited Blob to same Lightsail path, updates registry_media_assets row
- * deleteAsset()  → checks all 11 FK references, returns affected entities, then deletes
+ * upload()       → creates canonical Media identity and immutable original revision
+ * editImage()    → uploads a new immutable object and activates a replacement revision
+ * archiveAsset() → preserves identity, history, storage objects, and references
  * getById()      → fetches full asset with metadata and dimensions
  * getByUrl()     → fetches asset by public URL
  * list()         → paginated, filterable asset list
@@ -21,6 +21,7 @@ import {
   getAdminMediaAssetById,
   getAdminMediaAssetByUrl,
   listAdminMediaAssets,
+  type AdminMediaAsset,
 } from "@/services/adminMediaReadService";
 
 // ─── Types ────────────────────────────────────────────────────
@@ -172,9 +173,7 @@ export interface DeleteResult {
   references: ReferencedEntity[];
 }
 
-const LEGACY_STORAGE_BUCKET = "article-media";
 const LIGHTSAIL_STORAGE_BUCKET = "lightsail-media";
-const MEDIA_ASSET_SELECT = "id, slug, title, url, mime_type, media_kind, status, source_kind, source_entity, source_record_id, source_staging_record_id, storage_bucket, storage_path, folder_id, file_kind, asset_purpose, display_filename, original_filename, file_extension, file_size_bytes, content_date, rights_status, credit_text, country_code, language_code, tags, internal_notes, metadata, created_at, updated_at";
 
 // ─── Helpers ──────────────────────────────────────────────────
 
@@ -182,15 +181,6 @@ function generateSlug(): string {
   const ts = Date.now().toString(36);
   const rand = Math.random().toString(36).slice(2, 8);
   return `media-${ts}-${rand}`;
-}
-
-function buildStoragePath(folder: string, fileName: string): string {
-  const clean = folder.replace(/^\/+|\/+$/g, "");
-  const safe = fileName.replace(/[^a-zA-Z0-9._-]/g, "-").toLowerCase();
-  const ts = Date.now();
-  const ext = safe.split(".").pop() ?? "bin";
-  const base = safe.replace(/\.[^.]+$/, "").slice(0, 40);
-  return clean ? `${clean}/${ts}-${base}.${ext}` : `${ts}-${base}.${ext}`;
 }
 
 function getFileExtension(fileName: string): string | null {
@@ -216,41 +206,37 @@ function isImageFileKind(fileKind: MediaFileKind): boolean {
   return fileKind === "image";
 }
 
-function parseStoragePathFromUrl(url: string): string | null {
-  try {
-    const parsed = new URL(url);
-
-    const legacyPrefix = `/storage/v1/object/public/${LEGACY_STORAGE_BUCKET}/`;
-    const legacyIdx = parsed.pathname.indexOf(legacyPrefix);
-    if (legacyIdx !== -1) return parsed.pathname.slice(legacyIdx + legacyPrefix.length);
-
-    if (parsed.hostname === "media.wakilisha.africa") {
-      const cleanPath = parsed.pathname.replace(/^\/+/, "");
-      if (cleanPath.startsWith("uploads/")) return cleanPath;
-    }
-
-    return null;
-  } catch {
-    return null;
-  }
-}
-
 async function uploadToLightsailMedia(
   file: File | Blob,
-  options: { folder?: string; storagePath?: string; fileName?: string } = {},
-): Promise<{ url: string; storagePath: string; storageBucket: string; mimeType: string; size: number }> {
+  options: { folder?: string; fileName?: string } = {},
+): Promise<{
+  url: string;
+  storagePath: string;
+  storageBucket: string;
+  mimeType: string;
+  size: number;
+  sha256: string;
+  variant: Record<string, unknown> | null;
+}> {
   const form = new FormData();
 
-  const fileName = options.fileName || (file instanceof File ? file.name : "edited-image.png");
-  const uploadFile = file instanceof File ? file : new File([file], fileName, { type: file.type || "image/png" });
+  const fileName = options.fileName
+    || (file instanceof File ? file.name : "edited-image.png");
+  const uploadFile = file instanceof File
+    ? file
+    : new File(
+        [file],
+        fileName,
+        { type: file.type || "image/png" },
+      );
 
   form.append("file", uploadFile);
   form.append("folder", options.folder || "uploads");
-  if (options.storagePath) form.append("storage_path", options.storagePath);
 
-  const { data, error } = await supabase.functions.invoke("media-upload-api", {
-    body: form,
-  });
+  const { data, error } = await supabase.functions.invoke(
+    "media-upload-api",
+    { body: form },
+  );
 
   if (error) {
     throw new Error(`Lightsail upload failed: ${error.message}`);
@@ -263,19 +249,141 @@ async function uploadToLightsailMedia(
     storage_bucket?: string;
     mime_type?: string;
     size?: number;
+    sha256?: string;
+    responsive_derivative?: Record<string, unknown> | null;
     error?: string;
   } | null;
 
-  if (!payload?.ok || !payload.url || !payload.storage_path) {
+  if (
+    !payload?.ok
+    || !payload.url
+    || !payload.storage_path
+    || !payload.sha256
+    || !/^[0-9a-f]{64}$/.test(payload.sha256)
+  ) {
     throw new Error(payload?.error || "Lightsail upload failed.");
   }
 
   return {
     url: payload.url,
     storagePath: payload.storage_path,
-    storageBucket: payload.storage_bucket || LIGHTSAIL_STORAGE_BUCKET,
-    mimeType: payload.mime_type || uploadFile.type || "application/octet-stream",
+    storageBucket:
+      payload.storage_bucket || LIGHTSAIL_STORAGE_BUCKET,
+    mimeType:
+      payload.mime_type
+      || uploadFile.type
+      || "application/octet-stream",
     size: payload.size || uploadFile.size,
+    sha256: payload.sha256,
+    variant: objectValue(payload.responsive_derivative),
+  };
+}
+
+type MediaWriteRpcError = {
+  message: string;
+};
+
+type MediaWriteRpcResponse = {
+  data: unknown;
+  error: MediaWriteRpcError | null;
+};
+
+function objectValue(
+  value: unknown,
+): Record<string, unknown> | null {
+  if (
+    !value
+    || typeof value !== "object"
+    || Array.isArray(value)
+  ) {
+    return null;
+  }
+
+  return value as Record<string, unknown>;
+}
+
+async function invokeMediaWrite(
+  functionName: string,
+  args: Record<string, unknown>,
+): Promise<Record<string, unknown>> {
+  const client = supabase as unknown as {
+    rpc: (
+      name: string,
+      payload: Record<string, unknown>,
+    ) => PromiseLike<MediaWriteRpcResponse>;
+  };
+
+  const { data, error } = await client.rpc(
+    functionName,
+    args,
+  );
+
+  if (error) {
+    throw new Error(
+      `We could not save this file: ${error.message}`,
+    );
+  }
+
+  const result = objectValue(data);
+  if (!result) {
+    throw new Error(
+      "We could not confirm the file update. Refresh and try again.",
+    );
+  }
+
+  return result;
+}
+
+function requireAuthorityRevision(
+  asset: AdminMediaAsset,
+): number {
+  const revision = asset.authority_revision;
+
+  if (
+    typeof revision !== "number"
+    || !Number.isInteger(revision)
+    || revision < 1
+  ) {
+    throw new Error(
+      "This file is missing its current version. Refresh and try again.",
+    );
+  }
+
+  return revision;
+}
+
+async function requireAdminAsset(
+  assetId: string,
+): Promise<AdminMediaAsset> {
+  const asset = await getAdminMediaAssetById(assetId);
+  if (!asset) {
+    throw new Error(`File not found: ${assetId}`);
+  }
+  return asset;
+}
+
+function immutableFilePayload(
+  uploaded: {
+    url: string;
+    storagePath: string;
+    storageBucket: string;
+    mimeType: string;
+    size: number;
+    sha256: string;
+  },
+  originalFilename: string,
+  technicalMetadata: Record<string, unknown>,
+): Record<string, unknown> {
+  return {
+    storage_provider: "lightsail_media",
+    storage_namespace: uploaded.storageBucket,
+    storage_path: uploaded.storagePath,
+    delivery_url: uploaded.url,
+    original_filename: originalFilename,
+    mime_type: uploaded.mimeType,
+    byte_size: uploaded.size,
+    sha256: uploaded.sha256,
+    technical_metadata: technicalMetadata,
   };
 }
 
@@ -287,81 +395,91 @@ export const mediaService = {
   // ════════════════════════════════════════════════════════════
 
   /**
-   * Upload a file to Lightsail media origin and create a registry_media_assets row.
-   * Returns the complete MediaAsset with its generated ID.
+   * Upload a new immutable file and create its canonical Media identity,
+   * first revision, compatibility projection, and bridge atomically.
    */
-  async upload(file: File, options: UploadOptions = {}): Promise<MediaAsset> {
+  async upload(
+    file: File,
+    options: UploadOptions = {},
+  ): Promise<MediaAsset> {
     const fileKind = options.fileKind ?? inferFileKind(file);
-    const assetPurpose = options.assetPurpose ?? defaultAssetPurpose(fileKind);
-    const folder = options.folder ?? (fileKind === "document" ? "uploads/downloads" : "uploads");
+    const assetPurpose =
+      options.assetPurpose ?? defaultAssetPurpose(fileKind);
+    const folder = options.folder
+      ?? (
+        fileKind === "document"
+          ? "uploads/downloads"
+          : "uploads"
+      );
 
-    // 1. Upload to Lightsail media origin
     const uploaded = await uploadToLightsailMedia(file, { folder });
-    const publicUrl = uploaded.url;
 
-    // 2. Get image dimensions when the file is an image
     let width = 0;
     let height = 0;
     if (isImageFileKind(fileKind)) {
       try {
-        const dims = await getImageDimensions(file);
-        width = dims.width;
-        height = dims.height;
+        const dimensions = await getImageDimensions(file);
+        width = dimensions.width;
+        height = dimensions.height;
       } catch {
-        // Non-blocking — dimensions are best-effort
+        // Dimensions remain optional technical metadata.
       }
     }
 
-    // 3. Insert into registry_media_assets
     const slug = options.slug ?? generateSlug();
-    const fileExtension = getFileExtension(file.name);
+    const title = options.title ?? file.name;
     const metadata: MediaAssetMetadata = {
-      ...(fileKind === "image" ? { alt_text: options.altText ?? file.name } : {}),
+      ...(fileKind === "image"
+        ? { alt_text: options.altText ?? file.name }
+        : {}),
       caption: options.caption ?? null,
       description: options.description ?? null,
       file_name: file.name,
-      file_size: uploaded.size || file.size,
+      file_size: uploaded.size,
       width,
       height,
       file_kind: fileKind,
       asset_purpose: assetPurpose,
     };
 
-    const { data: inserted, error: insertError } = await supabase
-      .from("registry_media_assets")
-      .insert({
-        slug,
-        title: options.title ?? file.name,
-        url: publicUrl,
-        mime_type: uploaded.mimeType || file.type,
-        media_kind: fileKind,
-        status: "active",
-        source_kind: options.sourceKind ?? "editor_upload",
-        source_entity: options.sourceEntity ?? null,
-        source_record_id: options.sourceRecordId ?? null,
-        storage_bucket: uploaded.storageBucket,
-        storage_path: uploaded.storagePath,
-        folder_id: options.folderId ?? null,
-        file_kind: fileKind,
-        asset_purpose: assetPurpose,
-        display_filename: options.title ?? file.name,
-        original_filename: file.name,
-        file_extension: fileExtension,
-        file_size_bytes: uploaded.size || file.size,
-        metadata,
-      })
-      .select(MEDIA_ASSET_SELECT)
-      .single();
+    const result = await invokeMediaWrite(
+      "create_media_asset_write_v2",
+      {
+        p_asset: {
+          slug,
+          title,
+          asset_kind: fileKind,
+          media_kind: fileKind,
+          file_kind: fileKind,
+          asset_purpose: assetPurpose,
+          status: "active",
+          source_kind:
+            options.sourceKind ?? "editor_upload",
+          source_entity: options.sourceEntity ?? null,
+          source_record_id: options.sourceRecordId ?? null,
+          storage_bucket: uploaded.storageBucket,
+          folder_id: options.folderId ?? null,
+          display_filename: title,
+          metadata,
+        },
+        p_file: immutableFilePayload(
+          uploaded,
+          file.name,
+          { width, height },
+        ),
+        p_variant: uploaded.variant,
+        p_reason:
+          "Create Media asset from the Media Library upload flow",
+        p_correlation_id: crypto.randomUUID(),
+      },
+    );
 
-    if (insertError || !inserted) {
-      // Best-effort cleanup: remove the uploaded file if DB insert fails
-      try {
-        // Lightsail cleanup is handled separately. Do not delete through Supabase Storage here.
-      } catch { /* best effort */ }
-      throw new Error(`Failed to create media asset: ${insertError?.message ?? "Unknown error"}`);
+    const assetId = String(result.asset_id ?? "");
+    if (!assetId) {
+      throw new Error("The upload completed, but the file record was not created.");
     }
 
-    return inserted as MediaAsset;
+    return requireAdminAsset(assetId);
   },
 
   // ════════════════════════════════════════════════════════════
@@ -369,118 +487,94 @@ export const mediaService = {
   // ════════════════════════════════════════════════════════════
 
   /**
-   * Replace the image file for an existing media asset.
-   * Re-uploads to the SAME storage path (keeps the URL stable).
-   * Updates dimensions and updated_at on the registry_media_assets row.
-   * The asset ID stays the same — all entity references remain valid.
+   * Upload an edited image to a new immutable path and activate a new
+   * revision for the existing logical Media asset.
    */
   async editImage(
     assetId: string,
     blob: Blob,
-    newDimensions?: { width: number; height: number }
+    newDimensions?: { width: number; height: number },
   ): Promise<MediaAsset> {
-    // 1. Read the existing asset through Media authority.
-    const existing =
-      await getAdminMediaAssetById(assetId);
+    const existing = await requireAdminAsset(assetId);
+    const authorityRevision = requireAuthorityRevision(existing);
 
-    if (!existing) {
-      throw new Error(`Asset not found: ${assetId}`);
-    }
+    const folder = existing.storage_path
+      ?.split("/")
+      .slice(0, -1)
+      .join("/")
+      || "uploads";
+    const fileName =
+      existing.original_filename
+      || existing.display_filename
+      || "edited-image.png";
 
-    let storagePath = existing.storage_path;
-    const bucket = existing.storage_bucket ?? LIGHTSAIL_STORAGE_BUCKET;
+    const uploaded = await uploadToLightsailMedia(
+      blob,
+      { folder, fileName },
+    );
 
-    // If storage_path is missing (legacy data), try to derive from URL
-    if (!storagePath && existing.url) {
-      storagePath = parseStoragePathFromUrl(existing.url);
-    }
+    await invokeMediaWrite(
+      "replace_media_asset_file_v2",
+      {
+        p_asset_id: assetId,
+        p_expected_authority_revision: authorityRevision,
+        p_file: immutableFilePayload(
+          uploaded,
+          fileName,
+          {
+            width:
+              newDimensions?.width
+              ?? existing.metadata?.width
+              ?? null,
+            height:
+              newDimensions?.height
+              ?? existing.metadata?.height
+              ?? null,
+          },
+        ),
+        p_variant: uploaded.variant,
+        p_reason:
+          "Replace Media image through the immutable editor flow",
+        p_correlation_id: crypto.randomUUID(),
+      },
+    );
 
-    if (!storagePath) {
-      throw new Error("Cannot determine storage path for this asset. Re-upload as a new asset instead.");
-    }
-
-    // 2. Re-upload to the same Lightsail path.
-    // The public URL stays stable and all entity references keep working.
-    await uploadToLightsailMedia(blob, {
-      folder: storagePath.split("/").slice(0, -1).join("/") || "uploads",
-      storagePath,
-      fileName: storagePath.split("/").pop() || "edited-image.png",
-    });
-
-    // 3. Update metadata in registry_media_assets
-    const existingMeta = (existing.metadata ?? {}) as MediaAssetMetadata;
-    const updatedMeta: MediaAssetMetadata = {
-      ...existingMeta,
-      width: newDimensions?.width ?? existingMeta.width,
-      height: newDimensions?.height ?? existingMeta.height,
-    };
-
-    const { data: updated, error: updateError } = await supabase
-      .from("registry_media_assets")
-      .update({
-        metadata: updatedMeta,
-        updated_at: new Date().toISOString(),
-      })
-      .eq("id", assetId)
-      .select(MEDIA_ASSET_SELECT)
-      .single();
-
-    if (updateError || !updated) {
-      throw new Error(`Failed to update asset metadata: ${updateError?.message ?? "Unknown error"}`);
-    }
-
-    return updated as MediaAsset;
+    return requireAdminAsset(assetId);
   },
 
   // ════════════════════════════════════════════════════════════
-  // DELETE
+  // ARCHIVE
   // ════════════════════════════════════════════════════════════
 
   /**
-   * Check what entities reference this media asset, then delete it.
-   * Because all FKs use ON DELETE SET NULL, entity references are
-   * automatically cleared when the asset row is deleted.
-   *
-   * Returns the list of referencing entities BEFORE deletion,
-   * so the caller can show a warning to the admin.
+   * Archive the logical Media asset while preserving files, revisions,
+   * compatibility identity, and entity references.
    */
-  async deleteAsset(assetId: string): Promise<DeleteResult> {
-    // 1. Check references
+  async archiveAsset(assetId: string): Promise<DeleteResult> {
     const references = await this.getReferences(assetId);
+    const existing = await requireAdminAsset(assetId);
 
-    // 2. Read the asset through Media authority.
-    const asset =
-      await getAdminMediaAssetById(assetId);
-
-    // 3. Delete from database
-    const { error: dbError } = await supabase
-      .from("registry_media_assets")
-      .delete()
-      .eq("id", assetId);
-
-    if (dbError) {
-      throw new Error(`Delete failed: ${dbError.message}`);
-    }
-
-    // 4. Best-effort storage cleanup
-    if (asset) {
-      let storagePath = asset.storage_path;
-      const bucket = asset.storage_bucket ?? LIGHTSAIL_STORAGE_BUCKET;
-
-      if (!storagePath && asset.url) {
-        storagePath = parseStoragePathFromUrl(asset.url);
-      }
-
-      if (storagePath && bucket !== LIGHTSAIL_STORAGE_BUCKET) {
-        try {
-          await supabase.storage.from(bucket).remove([storagePath]);
-        } catch {
-          // Best effort — the DB row is already gone
-        }
-      }
-    }
+    await invokeMediaWrite(
+      "update_media_asset_record_v2",
+      {
+        p_asset_id: assetId,
+        p_expected_authority_revision:
+          requireAuthorityRevision(existing),
+        p_patch: { status: "archived" },
+        p_reason: "Archive Media asset from the Media Library",
+        p_correlation_id: crypto.randomUUID(),
+      },
+    );
 
     return { success: true, references };
+  },
+
+  /**
+   * Compatibility alias for callers that have not yet renamed their action.
+   * This no longer performs a hard delete.
+   */
+  async deleteAsset(assetId: string): Promise<DeleteResult> {
+    return this.archiveAsset(assetId);
   },
 
   // ════════════════════════════════════════════════════════════
@@ -548,8 +642,8 @@ export const mediaService = {
   // ════════════════════════════════════════════════════════════
 
   /**
-   * Patch the metadata and status fields on a media asset.
-   * Used by MediaEditModal when saving title, alt_text, caption, etc.
+   * Patch Media metadata, compatibility fields, and lifecycle through
+   * canonical write authority with optimistic concurrency.
    */
   async updateMetadata(
     assetId: string,
@@ -569,69 +663,85 @@ export const mediaService = {
       languageCode?: string | null;
       tags?: string[];
       internalNotes?: string | null;
-    }
+    },
   ): Promise<MediaAsset> {
-    const payload: Record<string, unknown> = {
-      updated_at: new Date().toISOString(),
-    };
+    const existing = await requireAdminAsset(assetId);
+    const patch: Record<string, unknown> = {};
 
-    if (updates.title !== undefined) payload.title = updates.title;
-    if (updates.status !== undefined) payload.status = updates.status;
-    if (updates.folderId !== undefined) payload.folder_id = updates.folderId || null;
-    if (updates.fileKind !== undefined) payload.file_kind = updates.fileKind || null;
-    if (updates.assetPurpose !== undefined) payload.asset_purpose = updates.assetPurpose || null;
-    if (updates.displayFilename !== undefined) payload.display_filename = updates.displayFilename || null;
-    if (updates.originalFilename !== undefined) payload.original_filename = updates.originalFilename || null;
-    if (updates.contentDate !== undefined) payload.content_date = updates.contentDate || null;
-    if (updates.rightsStatus !== undefined) payload.rights_status = updates.rightsStatus || "unknown";
-    if (updates.creditText !== undefined) payload.credit_text = updates.creditText || null;
-    if (updates.countryCode !== undefined) payload.country_code = updates.countryCode || null;
-    if (updates.languageCode !== undefined) payload.language_code = updates.languageCode || null;
-    if (updates.tags !== undefined) payload.tags = updates.tags;
-    if (updates.internalNotes !== undefined) payload.internal_notes = updates.internalNotes || null;
-
+    if (updates.title !== undefined) patch.title = updates.title;
     if (updates.metadata !== undefined) {
-      // Merge with metadata read through Media authority.
-      const existing =
-        await getAdminMediaAssetById(assetId);
-
-      const existingMeta = (
-        existing?.metadata ?? {}
-      ) as MediaAssetMetadata;
-
-      payload.metadata = { ...existingMeta, ...updates.metadata };
+      patch.metadata = updates.metadata;
+    }
+    if (updates.status !== undefined) patch.status = updates.status;
+    if (updates.folderId !== undefined) {
+      patch.folder_id = updates.folderId || null;
+    }
+    if (updates.fileKind !== undefined) {
+      patch.file_kind = updates.fileKind || null;
+    }
+    if (updates.assetPurpose !== undefined) {
+      patch.asset_purpose = updates.assetPurpose || null;
+    }
+    if (updates.displayFilename !== undefined) {
+      patch.display_filename = updates.displayFilename || null;
+    }
+    if (updates.originalFilename !== undefined) {
+      patch.original_filename = updates.originalFilename || null;
+    }
+    if (updates.contentDate !== undefined) {
+      patch.content_date = updates.contentDate || null;
+    }
+    if (updates.rightsStatus !== undefined) {
+      patch.rights_status = updates.rightsStatus || "unknown";
+    }
+    if (updates.creditText !== undefined) {
+      patch.credit_text = updates.creditText || null;
+    }
+    if (updates.countryCode !== undefined) {
+      patch.country_code = updates.countryCode || null;
+    }
+    if (updates.languageCode !== undefined) {
+      patch.language_code = updates.languageCode || null;
+    }
+    if (updates.tags !== undefined) patch.tags = updates.tags;
+    if (updates.internalNotes !== undefined) {
+      patch.internal_notes = updates.internalNotes || null;
     }
 
-    const { data, error } = await supabase
-      .from("registry_media_assets")
-      .update(payload)
-      .eq("id", assetId)
-      .select(MEDIA_ASSET_SELECT)
-      .single();
+    await invokeMediaWrite(
+      "update_media_asset_record_v2",
+      {
+        p_asset_id: assetId,
+        p_expected_authority_revision:
+          requireAuthorityRevision(existing),
+        p_patch: patch,
+        p_reason: "Update Media metadata from the Media Library",
+        p_correlation_id: crypto.randomUUID(),
+      },
+    );
 
-    if (error || !data) {
-      throw new Error(`Failed to update metadata: ${error?.message ?? "Unknown error"}`);
-    }
-
-    return data as MediaAsset;
+    return requireAdminAsset(assetId);
   },
 
   // ════════════════════════════════════════════════════════════
   // BULK STATUS UPDATE
   // ════════════════════════════════════════════════════════════
 
-  async updateStatusBatch(assetIds: string[], newStatus: string): Promise<void> {
-    const { error } = await supabase
-      .from("registry_media_assets")
-      .update({
-        status: newStatus,
-        updated_at: new Date().toISOString(),
-      })
-      .in("id", assetIds);
+  async updateStatusBatch(
+    assetIds: string[],
+    newStatus: string,
+  ): Promise<void> {
+    if (!assetIds.length) return;
 
-    if (error) {
-      throw new Error(`Bulk status update failed: ${error.message}`);
-    }
+    await invokeMediaWrite(
+      "update_media_asset_status_batch_v2",
+      {
+        p_asset_ids: [...new Set(assetIds)],
+        p_status: newStatus,
+        p_reason: "Update Media status from the Media Library",
+        p_correlation_id: crypto.randomUUID(),
+      },
+    );
   },
 
   // ════════════════════════════════════════════════════════════

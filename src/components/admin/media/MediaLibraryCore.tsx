@@ -30,7 +30,7 @@ export interface MediaLibraryCoreProps {
   onSelectionChange?: (assetId: string | null, url: string, asset?: MediaAsset | null) => void;
   /** Called when an asset is saved/updated via edit modal */
   onAssetUpdated?: (asset: MediaAsset) => void;
-  /** Called when an asset is deleted via edit modal */
+  /** Called when an asset is archived via edit modal */
   onAssetDeleted?: (id: string) => void;
   /** External refresh trigger — increment to force a reload */
   refreshKey?: number;
@@ -314,7 +314,7 @@ export function MediaLibraryCore({
     if (selectedAssetId === id) selectItem(null, "");
     setEditingAsset(null);
     onAssetDeleted?.(id);
-    showToast("success", "Deleted.");
+    showToast("success", "Archived.");
   };
 
   // ── Copy URL

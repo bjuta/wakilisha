@@ -16554,6 +16554,16 @@ export type Database = {
           revision_number: number
         }[]
       }
+      create_media_asset_write_v2: {
+        Args: {
+          p_asset: Json
+          p_correlation_id?: string
+          p_file: Json
+          p_reason?: string
+          p_variant?: Json
+        }
+        Returns: Json
+      }
       create_media_governance_version: {
         Args: {
           p_asset_id: string
@@ -17994,6 +18004,17 @@ export type Database = {
         }
         Returns: Json
       }
+      replace_media_asset_file_v2: {
+        Args: {
+          p_asset_id: string
+          p_correlation_id?: string
+          p_expected_authority_revision: number
+          p_file: Json
+          p_reason?: string
+          p_variant?: Json
+        }
+        Returns: Json
+      }
       request_article_changes: {
         Args: { p_article_id: string; p_note?: string; p_version_id?: string }
         Returns: {
@@ -18666,6 +18687,25 @@ export type Database = {
           isOneToOne: false
           isSetofReturn: true
         }
+      }
+      update_media_asset_record_v2: {
+        Args: {
+          p_asset_id: string
+          p_correlation_id?: string
+          p_expected_authority_revision: number
+          p_patch: Json
+          p_reason: string
+        }
+        Returns: Json
+      }
+      update_media_asset_status_batch_v2: {
+        Args: {
+          p_asset_ids: string[]
+          p_correlation_id?: string
+          p_reason: string
+          p_status: string
+        }
+        Returns: Json
       }
       update_publishing_item: {
         Args: {
