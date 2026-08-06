@@ -256,10 +256,10 @@ export function MediaEditModal({
   const handleDelete = async () => {
     setDeleting(true);
     try {
-      const result = await mediaService.deleteAsset(asset.id);
+      const result = await mediaService.archiveAsset(asset.id);
       if (result.success) {
         onDelete(asset.id);
-        showToast("success", "Asset deleted.");
+        showToast("success", "File archived.");
         onClose();
       }
     } catch (err) {
@@ -825,7 +825,7 @@ export function MediaEditModal({
                 {/* Danger Zone */}
                 <section className="pt-4 border-t border-wk-border">
                   <h4 className="text-[10px] font-black uppercase tracking-wider text-wk-danger mb-3">
-                    Danger Zone
+                    Archive
                   </h4>
                   {deleteConfirm ? (
                     <div className="rounded-lg border border-wk-danger/20 bg-wk-danger-soft p-3 space-y-3">
@@ -837,11 +837,11 @@ export function MediaEditModal({
                         />
                         <div>
                           <p className="text-[12px] font-bold text-wk-danger">
-                            Delete this asset permanently?
+                            Archive this file?
                           </p>
                           <p className="text-[11px] text-wk-text-muted mt-0.5">
-                            This will remove the database record and attempt to delete the
-                            file from storage. This action cannot be undone.
+                            This keeps the file, its edit history, and every place it appears.
+                            It will not appear publicly while archived.
                           </p>
                         </div>
                       </div>
@@ -873,13 +873,13 @@ export function MediaEditModal({
                             )}
                           </div>
                           <p className="text-[10px] text-wk-text-muted">
-                            Deleting will set these references to NULL. The entities will remain but lose their image.
+                            Archiving keeps these links intact. Restore the file when you want it to appear again.
                           </p>
                         </div>
                       ) : (
                         <div className="flex items-center gap-2 text-[11px] text-wk-success">
                           <WkIcon name="CheckCircle2" size={13} />
-                          No entities reference this image. Safe to delete.
+                          This file is not currently in use. Its history will still be kept.
                         </div>
                       )}
 
@@ -892,11 +892,11 @@ export function MediaEditModal({
                           {deleting ? (
                             <>
                               <i className="ri-loader-2-line animate-spin text-[12px]" />{" "}
-                              Deleting...
+                              Archiving...
                             </>
                           ) : (
                             <>
-                              <WkIcon name="Trash2" size={13} /> Yes, Delete Forever
+                              <WkIcon name="Archive" size={13} /> Archive File
                             </>
                           )}
                         </button>
@@ -914,8 +914,8 @@ export function MediaEditModal({
                       onClick={handleDeleteClick}
                       className="w-full flex items-center justify-center gap-1.5 rounded-lg border border-wk-danger/20 bg-wk-surface px-3 py-2 text-[12px] font-semibold text-wk-danger hover:bg-wk-danger-soft transition-all cursor-pointer whitespace-nowrap"
                     >
-                      <WkIcon name="Trash2" size={13} />
-                      Delete Permanently
+                      <WkIcon name="Archive" size={13} />
+                      Archive File
                     </button>
                   )}
                 </section>

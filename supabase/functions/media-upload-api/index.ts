@@ -105,6 +105,13 @@ function contentTypeForUpload(file: File, kind: UploadKind) {
   return "application/octet-stream";
 }
 
+async function sha256Hex(bytes: ArrayBuffer) {
+  const digest = await crypto.subtle.digest("SHA-256", bytes);
+  return Array.from(new Uint8Array(digest))
+    .map((value) => value.toString(16).padStart(2, "0"))
+    .join("");
+}
+
 function buildStoragePath(folder: string, fileName: string) {
   const ext = extensionFromName(fileName);
   if (!ext || !ALLOWED_EXTENSIONS.has(ext)) {
@@ -123,23 +130,6 @@ function buildStoragePath(folder: string, fileName: string) {
   const rand = crypto.randomUUID().slice(0, 8);
 
   return `${safeFolder}/${Date.now()}-${rand}-${baseName}.${ext}`;
-}
-
-function validateExistingPath(path: string) {
-  const cleaned = String(path || "").trim().replace(/\\/g, "/").replace(/^\/+/, "");
-  if (!cleaned.startsWith("uploads/")) {
-    throw Object.assign(new Error("Existing storage path must start with uploads/."), { status: 400 });
-  }
-  if (cleaned.includes("../") || cleaned.includes("/..") || cleaned === "..") {
-    throw Object.assign(new Error("Invalid storage path."), { status: 400 });
-  }
-
-  const ext = extensionFromName(cleaned);
-  if (!ext || !ALLOWED_EXTENSIONS.has(ext)) {
-    throw Object.assign(new Error(`Unsupported file extension: ${ext || "none"}`), { status: 400 });
-  }
-
-  return cleaned;
 }
 
 serve(async (req) => {
@@ -168,9 +158,16 @@ serve(async (req) => {
     const folder = String(form.get("folder") ?? "uploads");
     const existingPath = String(form.get("storage_path") ?? "").trim();
 
-    const storagePath = existingPath
-      ? validateExistingPath(existingPath)
-      : buildStoragePath(folder, fileValue.name || "upload.png");
+    if (existingPath) {
+      return json(409, {
+        error: "This file path is already in use. Upload the file to a new path.",
+      });
+    }
+
+    const storagePath = buildStoragePath(
+      folder,
+      fileValue.name || "upload.png",
+    );
 
     if (!isAdmin) {
       if (!isOwnProfileMediaPath(storagePath, actor.id)) {
@@ -188,13 +185,16 @@ serve(async (req) => {
     const uploadUrl = new URL(receiverUrl);
     uploadUrl.searchParams.set("path", storagePath);
 
+    const fileBytes = await fileValue.arrayBuffer();
+    const sha256 = await sha256Hex(fileBytes);
+
     const response = await fetch(uploadUrl.toString(), {
       method: "PUT",
       headers: {
         Authorization: `Bearer ${receiverSecret}`,
         "Content-Type": contentTypeForUpload(fileValue, uploadKind),
       },
-      body: await fileValue.arrayBuffer(),
+      body: fileBytes,
     });
 
     const payload = await response.json().catch(() => ({}));
@@ -213,6 +213,7 @@ serve(async (req) => {
       storage_bucket: "lightsail-media",
       mime_type: contentTypeForUpload(fileValue, uploadKind),
       size: fileValue.size,
+      sha256,
       file_kind: uploadKind,
       uploaded_by: actor.id,
     });
