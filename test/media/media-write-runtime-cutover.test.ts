@@ -48,6 +48,20 @@ describe("Phase 4A Media write runtime cutover", () => {
     expect(mediaService).toContain("sha256: uploaded.sha256");
   });
 
+  it("registers verified Nginx responsive derivatives", () => {
+    expect(uploadEdge).toContain("__image/w${RESPONSIVE_DERIVATIVE_WIDTH}");
+    expect(uploadEdge).toContain('variant_role: "responsive_width"');
+    expect(uploadEdge).toContain('generator_name: "nginx-image-filter"');
+    expect(uploadEdge).toContain(
+      "responsive_derivative: responsiveDerivative",
+    );
+    expect(uploadEdge).not.toContain("createImageBitmap");
+    expect(uploadEdge).not.toContain("OffscreenCanvas");
+    expect(mediaService.match(/p_variant: uploaded\.variant/g) ?? [])
+      .toHaveLength(2);
+    expect(mediaService).not.toContain("p_variant: null");
+  });
+
   it("rejects caller-supplied existing storage paths", () => {
     expect(uploadEdge).toContain("This file path is already in use");
     expect(uploadEdge).not.toContain("validateExistingPath");

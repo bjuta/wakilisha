@@ -216,6 +216,7 @@ async function uploadToLightsailMedia(
   mimeType: string;
   size: number;
   sha256: string;
+  variant: Record<string, unknown> | null;
 }> {
   const form = new FormData();
 
@@ -249,6 +250,7 @@ async function uploadToLightsailMedia(
     mime_type?: string;
     size?: number;
     sha256?: string;
+    responsive_derivative?: Record<string, unknown> | null;
     error?: string;
   } | null;
 
@@ -273,6 +275,7 @@ async function uploadToLightsailMedia(
       || "application/octet-stream",
     size: payload.size || uploadFile.size,
     sha256: payload.sha256,
+    variant: objectValue(payload.responsive_derivative),
   };
 }
 
@@ -459,7 +462,7 @@ export const mediaService = {
           file.name,
           { width, height },
         ),
-        p_variant: null,
+        p_variant: uploaded.variant,
         p_reason:
           "Create Media asset from the Media Library upload flow",
         p_correlation_id: crypto.randomUUID(),
@@ -524,7 +527,7 @@ export const mediaService = {
               ?? null,
           },
         ),
-        p_variant: null,
+        p_variant: uploaded.variant,
         p_reason:
           "Replace Media image through the immutable editor flow",
         p_correlation_id: crypto.randomUUID(),

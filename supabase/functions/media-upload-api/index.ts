@@ -19,6 +19,14 @@ const MAX_UPLOAD_BYTES = 25 * 1024 * 1024;
 const ALLOWED_IMAGE_EXTENSIONS = new Set(["jpg", "jpeg", "png", "gif", "webp", "svg", "avif", "ico"]);
 const ALLOWED_DOCUMENT_EXTENSIONS = new Set(["pdf"]);
 const ALLOWED_EXTENSIONS = new Set([...ALLOWED_IMAGE_EXTENSIONS, ...ALLOWED_DOCUMENT_EXTENSIONS]);
+const RESPONSIVE_DERIVATIVE_WIDTH = 640;
+const RESPONSIVE_DERIVATIVE_EXTENSIONS = new Set([
+  "jpg",
+  "jpeg",
+  "png",
+  "gif",
+  "webp",
+]);
 
 type UploadKind = "image" | "document";
 
@@ -132,6 +140,91 @@ function buildStoragePath(folder: string, fileName: string) {
   return `${safeFolder}/${Date.now()}-${rand}-${baseName}.${ext}`;
 }
 
+async function verifyResponsiveDerivative(
+  originalUrl: string,
+  storagePath: string,
+  fileName: string,
+  fileExtension: string,
+): Promise<Record<string, unknown> | null> {
+  if (!RESPONSIVE_DERIVATIVE_EXTENSIONS.has(fileExtension)) {
+    return null;
+  }
+
+  const cleanStoragePath = storagePath.replace(/^\/+/, "");
+  const derivativeStoragePath =
+    `__image/w${RESPONSIVE_DERIVATIVE_WIDTH}/${cleanStoragePath}`;
+  const derivativeUrl = new URL(originalUrl);
+
+  derivativeUrl.pathname = `/${derivativeStoragePath}`;
+  derivativeUrl.search = "";
+
+  for (let attempt = 0; attempt < 4; attempt += 1) {
+    const response = await fetch(
+      derivativeUrl.toString(),
+      {
+        headers: {
+          "Cache-Control": "no-cache",
+        },
+      },
+    );
+
+    if (response.ok) {
+      const mimeType = (
+        response.headers
+          .get("content-type")
+          ?.split(";")[0]
+          ?.trim()
+        || ""
+      );
+
+      if (!mimeType.startsWith("image/")) {
+        return null;
+      }
+
+      const bytes = await response.arrayBuffer();
+      const sha256 = await sha256Hex(bytes);
+
+      return {
+        variant_role: "responsive_width",
+        file: {
+          storage_provider: "lightsail_media",
+          storage_namespace: "lightsail-media",
+          storage_path: derivativeStoragePath,
+          delivery_url: derivativeUrl.toString(),
+          original_filename:
+            `w${RESPONSIVE_DERIVATIVE_WIDTH}-${fileName}`,
+          mime_type: mimeType,
+          byte_size: bytes.byteLength,
+          sha256,
+          technical_metadata: {
+            width: RESPONSIVE_DERIVATIVE_WIDTH,
+            source_storage_path: cleanStoragePath,
+            delivery_kind: "nginx_responsive_derivative",
+          },
+        },
+        transformation_spec: {
+          operation: "resize_width",
+          width: RESPONSIVE_DERIVATIVE_WIDTH,
+        },
+        technical_metadata: {
+          width: RESPONSIVE_DERIVATIVE_WIDTH,
+          source_storage_path: cleanStoragePath,
+        },
+        generator_name: "nginx-image-filter",
+        generator_version: "production",
+      };
+    }
+
+    if (attempt < 3) {
+      await new Promise((resolve) =>
+        setTimeout(resolve, 250 * (attempt + 1))
+      );
+    }
+  }
+
+  return null;
+}
+
 serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
   if (req.method !== "POST") return json(405, { error: "Only POST is supported." });
@@ -206,15 +299,30 @@ serve(async (req) => {
       return json(response.status, { error: message });
     }
 
+    const publicUrl =
+      payload.url
+      || `https://media.wakilisha.africa/${storagePath}`;
+
+    const responsiveDerivative =
+      uploadKind === "image"
+        ? await verifyResponsiveDerivative(
+            publicUrl,
+            storagePath,
+            fileValue.name || "upload.png",
+            fileExtension,
+          )
+        : null;
+
     return json(200, {
       ok: true,
-      url: payload.url || `https://media.wakilisha.africa/${storagePath}`,
+      url: publicUrl,
       storage_path: payload.storage_path || storagePath,
       storage_bucket: "lightsail-media",
       mime_type: contentTypeForUpload(fileValue, uploadKind),
       size: fileValue.size,
       sha256,
       file_kind: uploadKind,
+      responsive_derivative: responsiveDerivative,
       uploaded_by: actor.id,
     });
   } catch (error) {

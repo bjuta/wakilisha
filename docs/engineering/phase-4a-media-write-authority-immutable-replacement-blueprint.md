@@ -50,7 +50,7 @@ The next checkpoint will:
 
 - reject caller-supplied existing storage paths in `media-upload-api`;
 - return upload checksum evidence;
-- generate a thumbnail derivative for supported image uploads;
+- verify and hash the existing 640-pixel Nginx derivative for supported image uploads;
 - route upload, replacement, metadata, status, archive, restore, and broken-link repair through the new commands;
 - remove all non-legacy direct compatibility writes;
 - change permanent-delete UI language and behavior to archive.
@@ -60,9 +60,9 @@ The next checkpoint will:
 After SQL, Edge Function, and frontend deployment, one unused real image candidate will establish:
 
 - one immutable original file object;
-- one verified thumbnail derivative;
+- one verified 640-pixel responsive derivative;
 - one asset revision;
-- one active thumbnail selection;
+- one active responsive-width selection;
 - exact delivery hash evidence;
 - preserved compatibility identity.
 
@@ -90,7 +90,9 @@ The runtime checkpoint:
 - routes metadata and status changes through governed write commands;
 - turns the ordinary delete action into archive while preserving references;
 - routes broken-link metadata writes through Media authority;
-- computes SHA-256 in `media-upload-api`;
+- computes SHA-256 for original uploads in `media-upload-api`;
+- verifies and hashes the Nginx 640-pixel responsive derivative;
+- registers that derivative through the optional variant command;
 - rejects caller-supplied existing storage paths;
 - uploads every replacement to a new immutable path.
 
