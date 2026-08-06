@@ -1,6 +1,5 @@
 import { deepDecode } from "@/utils/decodeHtmlEntities";
 import { withPlaceholderImage } from "@/utils/imagePlaceholders";
-import { rewriteWpImageUrl } from "@/services/wpImageRewrite";
 import { supabase } from "@/lib/supabase";
 import { releaseUrl, slugify } from "@/utils/releaseUrl";
 import { normalizeGenres } from "@/services/publicContent/genreNormalization";
@@ -378,8 +377,6 @@ function uuidFromRow(row: GenericRow, keys: string[]): string {
 }
 
 function image(url: string | null | undefined, identity: MediaIdentity): string {
-  const rewritten = rewriteWpImageUrl(url || "");
-  if (rewritten && rewritten.startsWith("http")) return rewritten;
   // Guard against non-URL values (like genre names injected by bad CSV data)
   const cleaned = String(url || "").trim();
   if (cleaned.length > 0 && cleaned.startsWith("http")) return cleaned;

@@ -2,7 +2,6 @@ import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { supabase } from "@/lib/supabase";
 import { useScrollReveal } from "@/hooks/useScrollReveal";
-import { rewriteWpImageUrl } from "@/services/wpImageRewrite";
 import { Chapter19FallbackImage } from "@/components/media/Chapter19FallbackImage";
 
 interface TaggedArticleRow {
@@ -70,7 +69,7 @@ export function ArtistTaggedArticles({ artistName, artistSlug }: ArtistTaggedArt
             rows.map((r) => ({
               slug: r.slug,
               title: r.title,
-              heroImageUrl: rewriteWpImageUrl(r.hero_image_url || ""),
+              heroImageUrl: r.hero_image_url || "",
               excerpt: r.excerpt ? stripHtml(r.excerpt) : "",
               publishedAt: r.published_at || "",
               author: r.author || "Wakilisha Staff",
