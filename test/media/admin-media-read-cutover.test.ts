@@ -75,6 +75,10 @@ describe("Phase 4A administrative Media read cutover", () => {
       "listAdminMediaAssets",
     );
     expect(helper).not.toMatch(directCompatibility);
+    expect(helper).toContain("return client.rpc(");
+    expect(helper).not.toContain(
+      "const rpc = supabase.rpc",
+    );
   });
 
   it("cuts over Article admin captions", () => {

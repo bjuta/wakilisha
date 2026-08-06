@@ -32,6 +32,12 @@ describe("Phase 4A Media write runtime cutover", () => {
     expect(mediaService).toContain("replace_media_asset_file_v2");
     expect(mediaService).toContain("update_media_asset_record_v2");
     expect(mediaService).toContain("update_media_asset_status_batch_v2");
+    expect(mediaService).toContain(
+      "const { data, error } = await client.rpc(",
+    );
+    expect(mediaService).not.toContain(
+      "const rpc = supabase.rpc",
+    );
   });
 
   it("removes direct compatibility writes from ordinary frontend runtime", () => {
@@ -91,9 +97,14 @@ describe("Phase 4A Media write runtime cutover", () => {
 
   it("records the current deployment boundary", () => {
     expect(blueprint).toContain("## Runtime cutover checkpoint");
-    expect(blueprint).toContain("The SQL migration is deployed and verified in production");
     expect(blueprint).toContain(
-      "Edge Function and frontend remain undeployed",
+      "The SQL migration, Edge Function version 18, and paired frontend runtime are deployed in production",
+    );
+    expect(blueprint).toContain(
+      "Edge Function version 18, and paired frontend runtime are deployed",
+    );
+    expect(blueprint).toContain(
+      "live upload and immutable replacement proof remains pending",
     );
     expect(blueprint).toContain("does not change the frozen Institute");
   });

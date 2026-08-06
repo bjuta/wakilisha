@@ -306,12 +306,17 @@ async function invokeMediaWrite(
   functionName: string,
   args: Record<string, unknown>,
 ): Promise<Record<string, unknown>> {
-  const rpc = supabase.rpc as unknown as (
-    name: string,
-    payload: Record<string, unknown>,
-  ) => PromiseLike<MediaWriteRpcResponse>;
+  const client = supabase as unknown as {
+    rpc: (
+      name: string,
+      payload: Record<string, unknown>,
+    ) => PromiseLike<MediaWriteRpcResponse>;
+  };
 
-  const { data, error } = await rpc(functionName, args);
+  const { data, error } = await client.rpc(
+    functionName,
+    args,
+  );
 
   if (error) {
     throw new Error(

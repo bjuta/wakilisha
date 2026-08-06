@@ -96,4 +96,4 @@ The runtime checkpoint:
 - rejects caller-supplied existing storage paths;
 - uploads every replacement to a new immutable path.
 
-The SQL migration is deployed and verified in production. The Edge Function and frontend remain undeployed. This checkpoint does not change the frozen Institute or the WordPress migration function.
+The SQL migration, Edge Function version 18, and paired frontend runtime are deployed in production. The live upload and immutable replacement proof remains pending. This checkpoint does not change the frozen Institute or the WordPress migration function.

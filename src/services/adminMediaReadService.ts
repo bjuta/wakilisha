@@ -217,12 +217,14 @@ function buildPayload(
 async function invokeAdminRead(
   payload: Record<string, Json>,
 ): Promise<RpcResponse> {
-  const rpc = supabase.rpc as unknown as (
-    functionName: string,
-    args: Record<string, Json>,
-  ) => PromiseLike<RpcResponse>;
+  const client = supabase as unknown as {
+    rpc: (
+      functionName: string,
+      args: Record<string, Json>,
+    ) => PromiseLike<RpcResponse>;
+  };
 
-  return rpc(
+  return client.rpc(
     "read_media_assets_admin_v2",
     {
       p_query: payload,
