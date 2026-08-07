@@ -15577,6 +15577,10 @@ export type Database = {
           deleted_count: number
         }[]
       }
+      cancel_media_upload_session_v1: {
+        Args: { p_reason?: string; p_session_id: string }
+        Returns: Json
+      }
       chart_assert_committable_run: {
         Args: { p_run_id: string }
         Returns: Json
@@ -16579,6 +16583,18 @@ export type Database = {
           version_number: number
         }[]
       }
+      create_media_upload_session_v1: {
+        Args: {
+          p_correlation_id?: string
+          p_expected_byte_size: number
+          p_expected_sha256: string
+          p_idempotency_key: string
+          p_mime_type: string
+          p_original_filename: string
+          p_ttl_seconds?: number
+        }
+        Returns: Json
+      }
       create_publishing_item: {
         Args: {
           p_brief?: string
@@ -16805,6 +16821,14 @@ export type Database = {
       dmetaphone: { Args: { "": string }; Returns: string }
       dmetaphone_alt: { Args: { "": string }; Returns: string }
       exec_sql: { Args: { query: string }; Returns: undefined }
+      expire_media_upload_session_v1: {
+        Args: { p_reason?: string; p_session_id: string }
+        Returns: Json
+      }
+      fail_media_upload_session_v1: {
+        Args: { p_error: string; p_session_id: string }
+        Returns: Json
+      }
       finalize_step_cf_chunk: {
         Args: { p_limit: number; p_min_id?: string; p_run_id: string }
         Returns: Json
@@ -17014,6 +17038,10 @@ export type Database = {
         }[]
       }
       get_media_asset_v2: { Args: { p_asset_id: string }; Returns: Json }
+      get_media_upload_session_v1: {
+        Args: { p_session_id: string }
+        Returns: Json
+      }
       get_public_artist_relationships: {
         Args: { p_artist_id: string }
         Returns: {
@@ -18764,6 +18792,16 @@ export type Database = {
           file_object_id: string
           verification_state: string
         }[]
+      }
+      verify_media_upload_session_v1: {
+        Args: {
+          p_byte_size: number
+          p_correlation_id?: string
+          p_session_id: string
+          p_sha256: string
+          p_storage_path: string
+        }
+        Returns: Json
       }
       withdraw_article_suggestion: {
         Args: { p_note?: string; p_suggestion_id: string }
