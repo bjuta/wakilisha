@@ -17118,6 +17118,10 @@ export type Database = {
         }[]
       }
       get_media_asset_v2: { Args: { p_asset_id: string }; Returns: Json }
+      get_media_private_delivery_target_v1: {
+        Args: { p_file_object_id: string }
+        Returns: Json
+      }
       get_media_upload_session_v1: {
         Args: { p_session_id: string }
         Returns: Json
@@ -17853,6 +17857,7 @@ export type Database = {
         Returns: number
       }
       read_media_assets_admin_v2: { Args: { p_query?: Json }; Returns: Json }
+      read_media_maintenance_manifest_v1: { Args: never; Returns: Json }
       rebuild_discography_from_metadata: { Args: never; Returns: string }
       record_admin_audit: {
         Args: {

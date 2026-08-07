@@ -52,6 +52,7 @@ const ACCEPTED_UPLOAD_TYPES = [
   "image/*", "application/pdf", ".pdf",
   "audio/*", ".mp3", ".m4a", ".aac", ".wav", ".flac", ".ogg", ".oga",
   "video/*", ".mp4", ".mov", ".m4v", ".webm", ".mkv",
+  "text/plain", ".txt", "text/vtt", ".vtt", ".srt",
 ].join(",");
 
 type UploadQueueStage =
@@ -71,6 +72,8 @@ function inferUploadFileKind(file: File): MediaFileKind {
   if (file.type === "application/pdf" || ext === "pdf") return "document";
   if (file.type.startsWith("audio/") || ["mp3", "m4a", "aac", "wav", "flac", "ogg", "oga"].includes(ext)) return "audio";
   if (file.type.startsWith("video/") || ["mp4", "mov", "m4v", "webm", "mkv"].includes(ext)) return "video";
+  if (ext === "txt") return "transcript";
+  if (ext === "vtt" || ext === "srt") return "caption";
   return "other";
 }
 
@@ -92,10 +95,14 @@ function fileBadge(asset: MediaAsset): string {
 }
 
 function fileIconClass(asset: MediaAsset): string {
-  return assetFileKind(asset) === "document" ? "ri-file-pdf-2-line" : "ri-file-line";
+  const kind = assetFileKind(asset);
+  if (kind === "document") return "ri-file-pdf-2-line";
+  if (kind === "transcript") return "ri-file-text-line";
+  if (kind === "caption") return "ri-file-list-3-line";
+  return "ri-file-line";
 }
 
-function assetPurposeForFolder(folder: MediaFolder | null, fileKind: "image" | "document" | "other"): string {
+function assetPurposeForFolder(folder: MediaFolder | null, fileKind: MediaFileKind): string {
   if (folder?.purpose === "downloads") return "downloadable";
   if (folder?.purpose === "press_kits") return "press_kit";
   if (folder?.purpose === "brand_assets") return "brand_asset";
@@ -460,7 +467,7 @@ export function MediaLibraryCore({
     if (rejected > 0) {
       showToast(
         "error",
-        `${rejected} unsupported file${rejected === 1 ? "" : "s"} skipped. Use an allowed image, PDF, audio, or video format.`,
+        `${rejected} unsupported file${rejected === 1 ? "" : "s"} skipped. Use an allowed image, PDF, audio, video, transcript, or caption format.`,
       );
     }
     if (arr.length === 0) return;
@@ -706,6 +713,8 @@ export function MediaLibraryCore({
               <option value="document">Documents</option>
               <option value="audio">Audio</option>
               <option value="video">Video</option>
+              <option value="transcript">Transcripts</option>
+              <option value="caption">Captions</option>
               <option value="archive">Archives</option>
               <option value="other">Other</option>
             </select>

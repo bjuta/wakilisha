@@ -1,0 +1,21 @@
+[Unit]
+Description=WAKILISHA Media Reconciliation and Cleanup
+After=network-online.target wakilisha-media-receiver.service wakilisha-media-processor.service
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+EnvironmentFile=/etc/wakilisha-media-processor.env
+ExecStart=/usr/bin/python3 /opt/wakilisha-media-maintenance/maintenance.py --apply
+User=www-data
+Group=www-data
+WorkingDirectory=/opt/wakilisha-media-maintenance
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=full
+ReadWritePaths=/opt/wakilisha-media /opt/wakilisha-media-upload-sessions /opt/wakilisha-media-processing
+MemoryMax=256M
+CPUQuota=50%
+TasksMax=32
+Nice=15
+UMask=0027

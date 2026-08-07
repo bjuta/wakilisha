@@ -7,6 +7,7 @@
 // - SUPABASE_SERVICE_ROLE_KEY
 // - MEDIA_UPLOAD_RECEIVER_URL
 // - MEDIA_UPLOAD_RECEIVER_SECRET
+// - MEDIA_PRIVATE_DELIVERY_SECRET
 
 import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.57.4";
@@ -20,7 +21,14 @@ const corsHeaders = {
 const MAX_UPLOAD_BYTES = 25 * 1024 * 1024;
 const ALLOWED_IMAGE_EXTENSIONS = new Set(["jpg", "jpeg", "png", "gif", "webp", "svg", "avif", "ico"]);
 const ALLOWED_DOCUMENT_EXTENSIONS = new Set(["pdf"]);
-const ALLOWED_EXTENSIONS = new Set([...ALLOWED_IMAGE_EXTENSIONS, ...ALLOWED_DOCUMENT_EXTENSIONS]);
+const ALLOWED_TRANSCRIPT_EXTENSIONS = new Set(["txt"]);
+const ALLOWED_CAPTION_EXTENSIONS = new Set(["vtt", "srt"]);
+const ALLOWED_EXTENSIONS = new Set([
+  ...ALLOWED_IMAGE_EXTENSIONS,
+  ...ALLOWED_DOCUMENT_EXTENSIONS,
+  ...ALLOWED_TRANSCRIPT_EXTENSIONS,
+  ...ALLOWED_CAPTION_EXTENSIONS,
+]);
 const RESPONSIVE_DERIVATIVE_WIDTH = 640;
 const RESPONSIVE_DERIVATIVE_EXTENSIONS = new Set([
   "jpg",
@@ -30,7 +38,7 @@ const RESPONSIVE_DERIVATIVE_EXTENSIONS = new Set([
   "webp",
 ]);
 
-type UploadKind = "image" | "document";
+type UploadKind = "image" | "document" | "transcript" | "caption";
 type JsonObject = Record<string, unknown>;
 
 function json(status: number, body: unknown) {
@@ -95,6 +103,105 @@ function stringValue(value: unknown) {
 
 function numberValue(value: unknown) {
   return typeof value === "number" && Number.isFinite(value) ? value : Number.NaN;
+}
+
+async function hmacSha256Hex(secret: string, message: string) {
+  const key = await crypto.subtle.importKey(
+    "raw",
+    new TextEncoder().encode(secret),
+    { name: "HMAC", hash: "SHA-256" },
+    false,
+    ["sign"],
+  );
+  const signature = await crypto.subtle.sign(
+    "HMAC",
+    key,
+    new TextEncoder().encode(message),
+  );
+  return Array.from(new Uint8Array(signature))
+    .map((value) => value.toString(16).padStart(2, "0"))
+    .join("");
+}
+
+function privateStoragePath(value: unknown) {
+  const path = stringValue(value).replace(/^\/+/, "");
+  if (
+    !(
+      path.startsWith("masters/audio/")
+      || path.startsWith("masters/video/")
+      || path.startsWith("derived-objects/")
+      || path.startsWith("private-files/transcripts/")
+      || path.startsWith("private-files/captions/")
+    )
+    || path.includes("..")
+  ) {
+    throw Object.assign(
+      new Error("Private Media storage path is invalid."),
+      { status: 500 },
+    );
+  }
+  return path;
+}
+
+function encodeStoragePath(path: string) {
+  return path
+    .split("/")
+    .map((part) => encodeURIComponent(part))
+    .join("/");
+}
+
+async function createPrivateDelivery(
+  authHeader: string,
+  body: JsonObject,
+) {
+  const fileObjectId = stringValue(body.file_object_id);
+  const ttlCandidate = numberValue(body.ttl_seconds);
+  const ttlSeconds = Number.isInteger(ttlCandidate)
+    ? Math.min(900, Math.max(30, ttlCandidate))
+    : 300;
+
+  if (!fileObjectId) {
+    throw Object.assign(
+      new Error("file_object_id is required."),
+      { status: 400 },
+    );
+  }
+
+  const target = await userRpc(
+    authHeader,
+    "get_media_private_delivery_target_v1",
+    { p_file_object_id: fileObjectId },
+  );
+
+  const storagePath = privateStoragePath(
+    target.storage_path,
+  );
+
+  const expires = Math.floor(Date.now() / 1000) + ttlSeconds;
+  const token = await hmacSha256Hex(
+    env("MEDIA_PRIVATE_DELIVERY_SECRET"),
+    `${expires}\n${storagePath}`,
+  );
+
+  const url = new URL(
+    `https://media.wakilisha.africa/__private/media-file/${encodeStoragePath(storagePath)}`,
+  );
+  url.searchParams.set(
+    "expires",
+    String(expires),
+  );
+  url.searchParams.set(
+    "token",
+    token,
+  );
+
+  return {
+    ok: true,
+    file_object_id: fileObjectId,
+    url: url.toString(),
+    expires_at: new Date(expires * 1000).toISOString(),
+    ttl_seconds: ttlSeconds,
+  };
 }
 
 function randomCapability() {
@@ -398,6 +505,26 @@ function classifyUploadKind(file: File, ext: string): UploadKind {
     return "document";
   }
 
+  if (
+    ALLOWED_TRANSCRIPT_EXTENSIONS.has(ext)
+    && (mimeType === "text/plain" || mimeType === "" || mimeType === "application/octet-stream")
+  ) {
+    return "transcript";
+  }
+
+  if (
+    ALLOWED_CAPTION_EXTENSIONS.has(ext)
+    && (
+      mimeType === "text/vtt"
+      || mimeType === "application/x-subrip"
+      || mimeType === "text/plain"
+      || mimeType === ""
+      || mimeType === "application/octet-stream"
+    )
+  ) {
+    return "caption";
+  }
+
   throw Object.assign(
     new Error(`Unsupported file type: ${mimeType || ext || "unknown"}`),
     { status: 415 },
@@ -407,6 +534,12 @@ function classifyUploadKind(file: File, ext: string): UploadKind {
 function contentTypeForUpload(file: File, kind: UploadKind) {
   if (file.type) return file.type;
   if (kind === "document") return "application/pdf";
+  if (kind === "transcript") return "text/plain";
+  if (kind === "caption") {
+    return extensionFromName(file.name) === "vtt"
+      ? "text/vtt"
+      : "application/x-subrip";
+  }
   return "application/octet-stream";
 }
 
@@ -417,7 +550,11 @@ async function sha256Hex(bytes: ArrayBuffer) {
     .join("");
 }
 
-function buildStoragePath(folder: string, fileName: string) {
+function buildStoragePath(
+  folder: string,
+  fileName: string,
+  kind: UploadKind,
+) {
   const ext = extensionFromName(fileName);
   if (!ext || !ALLOWED_EXTENSIONS.has(ext)) {
     throw Object.assign(new Error(`Unsupported file extension: ${ext || "none"}`), { status: 400 });
@@ -430,7 +567,13 @@ function buildStoragePath(folder: string, fileName: string) {
     .map((part) => slugPart(part))
     .join("/");
 
-  const safeFolder = cleanFolder.startsWith("uploads") ? cleanFolder : `uploads/${cleanFolder || "admin"}`;
+  const safeFolder = kind === "transcript"
+    ? "private-files/transcripts"
+    : kind === "caption"
+      ? "private-files/captions"
+      : cleanFolder.startsWith("uploads")
+        ? cleanFolder
+        : `uploads/${cleanFolder || "admin"}`;
   const baseName = slugPart(fileName.replace(/\.[^.]+$/, ""), "media").slice(0, 44);
   const rand = crypto.randomUUID().slice(0, 8);
 
@@ -559,8 +702,11 @@ serve(async (req) => {
       if (action === "cancel_resumable_session") {
         return json(200, await cancelResumableSession(authHeader, body));
       }
+      if (action === "create_private_delivery") {
+        return json(200, await createPrivateDelivery(authHeader, body));
+      }
 
-      return json(400, { error: "Unsupported resumable upload action." });
+      return json(400, { error: "Unsupported Media control action." });
     }
 
     const form = await req.formData();
@@ -588,6 +734,7 @@ serve(async (req) => {
     const storagePath = buildStoragePath(
       folder,
       fileValue.name || "upload.png",
+      uploadKind,
     );
 
     if (!isAdmin) {

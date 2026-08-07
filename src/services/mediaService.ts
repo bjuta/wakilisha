@@ -30,7 +30,15 @@ import {
 
 // ─── Types ────────────────────────────────────────────────────
 
-export type MediaFileKind = "image" | "document" | "audio" | "video" | "archive" | "other";
+export type MediaFileKind =
+  | "image"
+  | "document"
+  | "audio"
+  | "video"
+  | "archive"
+  | "transcript"
+  | "caption"
+  | "other";
 export type MediaAssetPurpose =
   | "general"
   | "article_hero"
@@ -267,6 +275,8 @@ function inferFileKind(file: File): MediaFileKind {
   if (file.type === "application/pdf" || ext === "pdf") return "document";
   if (file.type.startsWith("audio/")) return "audio";
   if (file.type.startsWith("video/")) return "video";
+  if (ext === "txt") return "transcript";
+  if (ext === "vtt" || ext === "srt") return "caption";
   if (ext === "zip") return "archive";
   return "other";
 }
@@ -797,6 +807,28 @@ export const mediaService = {
     });
 
     return requireAdminAsset(assetId);
+  },
+
+  async createPrivateDeliveryUrl(
+    fileObjectId: string,
+    ttlSeconds = 300,
+  ): Promise<string> {
+    const payload = await invokeMediaUploadControl({
+      action: "create_private_delivery",
+      file_object_id: fileObjectId,
+      ttl_seconds: ttlSeconds,
+    });
+
+    const url = String(payload.url ?? "");
+    if (!url.startsWith(
+      "https://media.wakilisha.africa/__private/media-file/",
+    )) {
+      throw new Error(
+        "Private file access returned an invalid URL.",
+      );
+    }
+
+    return url;
   },
 
   async cancelResumableMaster(
