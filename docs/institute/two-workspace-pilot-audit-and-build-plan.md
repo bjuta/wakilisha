@@ -23,9 +23,13 @@ Phase 4A is closed in production. The Media authority, public and administrative
 
 Historical WordPress-named provenance columns and indexes and the remaining frozen Institute compatibility read surface are preserved intentionally. They are not active Media integration authority. Their later evidence-led neutralization and compatibility policy or grant contraction are separate preservation and hardening work and do not reopen Phase 4A or block PR 4B.
 
-This plan has been reconciled against repository main at:
+This plan has been reconciled against repository paperwork main at:
 
-`f6800cb5 Remove stale retired admin import links (#580)`
+`85e12da3 Close Phase 4A and open PR 4B (#581)`
+
+The Phase 4A runtime code baseline remains `f6800cb5`. A later read-only
+infrastructure audit discovered and corrected host-managed Nginx Media fallback
+residue without changing repository runtime code.
 
 Closed phases:
 
@@ -69,6 +73,8 @@ Completed Phase 4 work:
 - **Dedicated WordPress and one-time backfill Edge Function retirement**, completed with 13 retired production functions removed.
 - **Final stale Admin Import navigation cleanup and production retirement acceptance**, completed through PR #580 and production main `f6800cb5`.
 - **Phase 4A final production frontend**, deployed from `f6800cb5` with entry `assets/index-kj620d2B.js` and exact-build verification.
+- **Phase 4A Media filesystem normalization and Nginx runtime retirement**, completed on 7 August 2026 through release `phase4a-nginx-media-retirement-20260807T091124Z`: 4,822 Media files and 407,479,887 bytes promoted into canonical `/uploads`, zero canonical overwrites, old WordPress-host proxy removed, Media-origin `wp-content` fallback removed, historical public redirects preserved, and rollback mirror retained.
+- **PR 4B upload and processing authority audit**, completed read-only on 7 August 2026. The next implementation is PR 4B M1: upload ingress authority and resumable-session proof.
 
 Supporting build-pipeline fix:
 
@@ -78,6 +84,7 @@ Active phase:
 
 - **Phase 4: Media platform**.
 - **Active slice: PR 4B Upload and processing pipeline**.
+- **Immediate implementation: PR 4B M1 Upload ingress authority and resumable-session proof**.
 
 Phase 2, Phase 3, and Phase 4A are closed.
 
@@ -91,6 +98,8 @@ Phase 4 remains active. PR 4A established and proved the Media authority and is 
 
 PR 4B now extends that closed authority into resumable upload and durable processing. It must reuse the canonical Media object model, shared jobs and outbox, immutable file and revision contracts, governed usage authority, and public delivery rules already accepted in Phase 4A.
 
+The PR 4B authority and failure-mode audit is complete. It confirmed that the current bridge is a 25 MiB whole-file transfer through `media-upload-api`, while the durable jobs, outbox, idempotency, immutable file-object, revision, and variant authorities already exist. M1 will prove direct resumable ingest for one large audio master without replacing those authorities.
+
 Historical WordPress-named preservation fields, frozen Institute compatibility reads, and later compatibility policy or grant contraction are not PR 4B upload-pipeline scope. They must be handled by separate evidence-led preservation or hardening work without restoring WordPress runtime authority.
 
 See also:
@@ -100,7 +109,9 @@ See also:
 - `docs/engineering/phase-2-article-authority-closure-record.md`
 - `docs/engineering/phase-3-trust-infrastructure-kickoff.md`
 - `docs/engineering/phase-4a-media-authority-closure-record.md`
+- `docs/engineering/phase-4a-nginx-media-runtime-retirement-acceptance-record.md`
 - `docs/engineering/phase-4b-upload-processing-kickoff.md`
+- `docs/engineering/phase-4b-upload-processing-authority-audit.md`
 
 
 ## Decision

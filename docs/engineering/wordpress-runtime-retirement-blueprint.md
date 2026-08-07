@@ -94,3 +94,27 @@ runtime, connector, fallback, migration path, or administrative surface.
 Phase 4A closure is recorded in:
 
 `docs/engineering/phase-4a-media-authority-closure-record.md`
+
+## Infrastructure completion addendum - 7 August 2026
+
+The first PR 4B infrastructure audit found two host-managed retirement residues:
+
+- Media-origin fallback into the copied local `wp-content/uploads` tree
+- an unused `/__legacy-wp-media/` proxy to the former WordPress host
+
+Production release
+`phase4a-nginx-media-retirement-20260807T091124Z` promoted 4,822 Media files
+and 407,479,887 bytes into canonical `/uploads`, verified all promoted bytes by
+SHA-256, overwrote zero canonical files, and preserved all canonical
+collisions.
+
+The old host proxy and Media-origin `wp-content` fallback are now removed.
+
+The historical main-site `/wp-content/uploads/*` redirect remains because it
+protects old links while resolving to canonical Media without consulting
+WordPress.
+
+The 5,717-file local mirror remains rollback evidence only.
+
+See
+`docs/engineering/phase-4a-nginx-media-runtime-retirement-acceptance-record.md`.

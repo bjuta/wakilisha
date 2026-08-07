@@ -179,6 +179,28 @@ backfill Edge Functions:
 
 All 13 were verified absent after deletion.
 
+## Final infrastructure retirement correction
+
+The first PR 4B infrastructure audit found one remaining production-only
+compatibility layer: Media-origin Nginx still consulted the copied local
+`wp-content/uploads` mirror and local/staging Nginx retained an unused proxy to
+the former WordPress host.
+
+Production release
+`phase4a-nginx-media-retirement-20260807T091124Z` corrected this by:
+
+- promoting 4,822 Media files and 407,479,887 bytes into canonical `/uploads`
+- verifying all promoted bytes by SHA-256
+- overwriting zero canonical files
+- preserving three differing canonical collisions
+- removing the old WordPress-host proxy
+- removing Media-origin `wp-content` fallback
+- preserving the historical public `/wp-content/uploads/*` redirect
+- retaining the complete 5,717-file mirror for rollback
+
+See
+`docs/engineering/phase-4a-nginx-media-runtime-retirement-acceptance-record.md`.
+
 ## Active legacy Media URL cutover
 
 The accepted production cutover reported:
@@ -258,6 +280,9 @@ Passed.
 - Active legacy Media URLs were cut over without erasing accepted historical
   evidence.
 - WordPress runtime execution surfaces are retired.
+- The Media origin no longer consults the WordPress filesystem namespace.
+- The old WordPress-host proxy is absent from active Nginx configuration.
+- Historical `/wp-content/uploads/*` requests redirect to canonical Media.
 - The final frontend build is live and production-smoked.
 
 ## Residual historical compatibility boundary

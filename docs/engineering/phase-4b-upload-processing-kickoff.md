@@ -4,7 +4,7 @@ Date: 7 August 2026
 
 ## Status
 
-Ready to start.
+Authority audit complete. First implementation slice ready.
 
 ## Starting baseline
 
@@ -22,6 +22,11 @@ Accepted repository baseline:
 - 13 retired WordPress and one-time backfill Edge Functions absent
 
 Phase 4B must not reopen Phase 4A authority.
+
+Final infrastructure retirement acceptance also includes production
+release `phase4a-nginx-media-retirement-20260807T091124Z`, which removed the
+old WordPress-host proxy and Media-origin `wp-content` fallback while
+preserving historical public URL redirects.
 
 ## Inherited Media authority
 
@@ -215,7 +220,7 @@ audio or video masters.
 
 ## First engineering move
 
-Begin with a read-only authority and failure-mode audit.
+The required read-only authority and failure-mode audit is complete.
 
 The audit must inventory:
 
@@ -238,8 +243,17 @@ The audit must inventory:
 17. minimum end-to-end video proof
 18. rollback and recovery requirements
 
-No implementation migration or new upload runtime should be written until this
-audit locks the authority boundary and the first narrow proof.
+The audit has locked the authority boundary and first narrow proof.
+
+See
+`docs/engineering/phase-4b-upload-processing-authority-audit.md`.
+
+The next implementation slice is **PR 4B M1: upload ingress authority and
+resumable-session proof**.
+
+Before changing production Nginx or the receiver, M1 must establish a
+repository-owned or repository-verifiable deployment and drift contract for
+those host-managed runtime surfaces.
 
 ## Immediate non-goals
 
@@ -258,6 +272,9 @@ Do not use PR 4B to:
 
 ## Handoff
 
-Phase 4A is closed.
+Phase 4A is closed, including final Nginx and Media filesystem normalization.
 
-The next engineering slice is the PR 4B upload and processing authority audit.
+The PR 4B authority audit is complete.
+
+The next engineering slice is PR 4B M1: upload ingress authority and
+resumable-session proof.

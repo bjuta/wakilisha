@@ -1,5 +1,24 @@
 # Lightsail Media Mirror Plan
 
+## Status update - 7 August 2026
+
+Historical migration plan. Completed and superseded.
+
+The local WordPress upload mirror successfully served as an intermediate
+migration safety layer.
+
+Production release
+`phase4a-nginx-media-retirement-20260807T091124Z` promoted 4,822 Media files
+and 407,479,887 bytes into canonical `/opt/wakilisha-media/uploads`.
+
+Active Media delivery no longer consults the local `wp-content/uploads` mirror,
+and the old WordPress-host proxy has been removed.
+
+Historical `/wp-content/uploads/*` URLs remain supported only by redirecting to
+`https://media.wakilisha.africa/uploads/*`.
+
+The local mirror remains rollback evidence only.
+
 ## Goal
 
 Move WordPress upload media dependency away from the old WordPress server without breaking existing WAKILISHA images.
