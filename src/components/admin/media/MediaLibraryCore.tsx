@@ -539,7 +539,6 @@ export function MediaLibraryCore({
             <select value={sourceKindFilter} onChange={(e) => { setSourceKindFilter(e.target.value); setPage(0); }}
               className="rounded-lg border border-wk-border bg-wk-surface px-2.5 py-2 text-[12px] text-wk-text outline-none cursor-pointer">
               <option value="all">All sources</option>
-              <option value="wordpress_database">WordPress</option>
               <option value="editor_upload">Uploaded</option>
               <option value="external_artist_image_postmeta">Artist postmeta</option>
               <option value="external_chart_entry_artwork">Chart artwork</option>

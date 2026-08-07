@@ -1,11 +1,11 @@
 import { useState, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import {
-  testWordPressConnection,
-  WP_API_BASE,
+  testAPIConnection,
+  API_BASE,
   getIngestionMode,
-  INGEST_STUDIO_WP_ENDPOINTS,
-  WORDPRESS_CHART_ENDPOINTS,
+  INGEST_STUDIO_RUNTIME_ENDPOINTS,
+  RUNTIME_CHART_ENDPOINTS,
 } from "@/services/chartsIngestion/client";
 import type { IngestStudioEndpointDef } from "@/services/chartsIngestion/client";
 import { WkSurface } from "@/components/design-system/primitives/Surface";
@@ -16,7 +16,7 @@ import { getProviderCredentialHealth } from "@/services/adminSettings/providerCr
 import type { ProviderCredentialHealth } from "@/services/adminSettings/providerCredentialReader";
 
 type TestStatus = "idle" | "running" | "ok" | "error";
-interface HealthResult { ok: boolean; plugin: string; charts_ingestion: boolean; version: string; }
+interface HealthResult { ok: boolean; backend: string; charts_ingestion: boolean; version: string; }
 interface EndpointTestResult {
   key: string;
   status: "untested" | "ok" | "not_implemented" | "error";
@@ -36,7 +36,7 @@ const METHOD_COLOR_MAP: Record<string, string> = {
 export default function AdminChartsIngestHealth() {
   const navigate = useNavigate();
   const mode = getIngestionMode();
-  const apiBase = WP_API_BASE;
+  const apiBase = API_BASE;
 
   const [testStatus, setTestStatus] = useState<TestStatus>("idle");
   const [healthResult, setHealthResult] = useState<HealthResult | null>(null);
@@ -51,7 +51,7 @@ export default function AdminChartsIngestHealth() {
     setHealthError(null);
     const t0 = Date.now();
     try {
-      const result = await testWordPressConnection();
+      const result = await testAPIConnection();
       setHealthResult(result);
       setTestStatus("ok");
       setHealthDuration(Date.now() - t0);
@@ -89,8 +89,8 @@ export default function AdminChartsIngestHealth() {
   const probeAll = useCallback(async () => {
     setProbingAll(true);
     const allEndpoints = [
-      ...INGEST_STUDIO_WP_ENDPOINTS.map((e) => ({ key: e.key, path: e.path, method: e.method })),
-      ...Object.values(WORDPRESS_CHART_ENDPOINTS).map((e) => ({ key: e.key, path: e.path, method: e.method })),
+      ...INGEST_STUDIO_RUNTIME_ENDPOINTS.map((e) => ({ key: e.key, path: e.path, method: e.method })),
+      ...Object.values(RUNTIME_CHART_ENDPOINTS).map((e) => ({ key: e.key, path: e.path, method: e.method })),
     ];
     for (const ep of allEndpoints) {
       await probeEndpoint(ep.path, ep.method, ep.key);
@@ -99,12 +99,12 @@ export default function AdminChartsIngestHealth() {
     setProbingAll(false);
   }, [probeEndpoint]);
 
-  const ingestStudioGroups = INGEST_STUDIO_WP_ENDPOINTS.reduce<Record<string, IngestStudioEndpointDef[]>>((acc, ep) => {
+  const ingestStudioGroups = INGEST_STUDIO_RUNTIME_ENDPOINTS.reduce<Record<string, IngestStudioEndpointDef[]>>((acc, ep) => {
     acc[ep.group] = acc[ep.group] ? [...acc[ep.group], ep] : [ep];
     return acc;
   }, {});
 
-  const allEndpointCount = INGEST_STUDIO_WP_ENDPOINTS.length + Object.keys(WORDPRESS_CHART_ENDPOINTS).length;
+  const allEndpointCount = INGEST_STUDIO_RUNTIME_ENDPOINTS.length + Object.keys(RUNTIME_CHART_ENDPOINTS).length;
   const testedCount = Object.keys(endpointResults).length;
   const okCount = Object.values(endpointResults).filter((r) => r.status === "ok").length;
   const notImplCount = Object.values(endpointResults).filter((r) => r.status === "not_implemented").length;
@@ -125,7 +125,7 @@ export default function AdminChartsIngestHealth() {
           <i className={testStatus === "running" ? "ri-loader-4-line animate-spin" : "ri-heart-pulse-line"} />
           {testStatus === "running" ? "Testing…" : "Health Check"}
         </button>
-        {mode === "wordpress" && (
+        {mode === "production" && (
           <button
             onClick={probeAll}
             disabled={probingAll}
@@ -144,8 +144,8 @@ export default function AdminChartsIngestHealth() {
           <div>
             <p className="text-[11px] font-bold uppercase tracking-wider text-wk-text-faint mb-1">Ingestion Mode</p>
             <div className="flex items-center gap-2">
-              <AdminChartsStatusBadge status={mode === "wordpress" ? "ready" : "mocked"} />
-              <span className="text-[13px] font-semibold text-wk-text">{mode === "wordpress" ? "WordPress" : "Mock (Dev)"}</span>
+              <AdminChartsStatusBadge status={mode === "production" ? "ready" : "not_configured"} />
+              <span className="text-[13px] font-semibold text-wk-text">{mode === "production" ? "Production" : "Unavailable"}</span>
             </div>
           </div>
           <div>
@@ -153,16 +153,8 @@ export default function AdminChartsIngestHealth() {
             <p className="font-mono text-[12px] text-wk-text-soft break-all">{apiBase}</p>
           </div>
           <div>
-            <p className="text-[11px] font-bold uppercase tracking-wider text-wk-text-faint mb-1">REST Nonce</p>
-            <p className={`font-mono text-[12px] ${
-              typeof window !== "undefined" && (window as Record<string, string>).WAKILISHA_REST_NONCE
-                ? "text-wk-success"
-                : "text-wk-danger"
-            }`}>
-              {typeof window !== "undefined" && (window as Record<string, string>).WAKILISHA_REST_NONCE
-                ? "Injected"
-                : "Missing — auth will fail (VITE_WAKILISHA_WP_NONCE or wp_localize_script required)"}
-            </p>
+            <p className="text-[11px] font-bold uppercase tracking-wider text-wk-text-faint mb-1">Authority</p>
+            <p className="font-mono text-[12px] text-wk-success">Supabase runtime</p>
           </div>
         </div>
       </WkSurface>
@@ -191,7 +183,7 @@ export default function AdminChartsIngestHealth() {
           {healthResult && (
             <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
               {[
-                { label: "Plugin", value: healthResult.plugin || "—" },
+                { label: "Backend", value: healthResult.backend || "—" },
                 { label: "Version", value: healthResult.version || "—" },
                 { label: "Charts Ingestion", value: healthResult.charts_ingestion ? "Enabled" : "Disabled", error: !healthResult.charts_ingestion },
                 { label: "Status", value: "OK", success: true },
@@ -209,9 +201,9 @@ export default function AdminChartsIngestHealth() {
             <div className="mt-2 rounded bg-wk-danger-soft p-3">
               <p className="font-mono text-[12px] text-wk-danger">{healthError}</p>
               <div className="mt-2 text-[11px] text-wk-text-muted space-y-1">
-                <p><strong>Check:</strong> VITE_WAKILISHA_WP_API_BASE is set correctly</p>
-                <p><strong>Check:</strong> WordPress site is reachable from this origin</p>
-                <p><strong>Check:</strong> CORS allows this domain in the WP plugin settings</p>
+                <p><strong>Check:</strong> VITE_WAKILISHA_API_BASE is set correctly</p>
+                <p><strong>Check:</strong> the current session has chart access</p>
+                <p><strong>Check:</strong> provider credentials are configured</p>
               </div>
             </div>
           )}
@@ -312,7 +304,7 @@ export default function AdminChartsIngestHealth() {
         </div>
         <table className="w-full text-left text-[13px]">
           <tbody>
-            {Object.values(WORDPRESS_CHART_ENDPOINTS).map((ep) => (
+            {Object.values(RUNTIME_CHART_ENDPOINTS).map((ep) => (
               <EndpointRow
                 key={ep.key}
                 method={ep.method}
@@ -333,7 +325,7 @@ export default function AdminChartsIngestHealth() {
         <div className="space-y-3 text-[13px] text-wk-text-soft">
           <div className="rounded-lg border border-wk-border bg-wk-surface-raised p-3">
             <p className="font-semibold text-wk-text mb-1">Authentication</p>
-            <p className="text-[12px]">All endpoints require WP auth. Frontend sends <code>X-WP-Nonce</code> from <code>window.WAKILISHA_REST_NONCE</code>. Inject via <code>wp_localize_script</code>.</p>
+            <p className="text-[12px]">All endpoints require an authenticated Supabase session and the relevant chart capability.</p>
           </div>
           <div className="rounded-lg border border-wk-border bg-wk-surface-raised p-3">
             <p className="font-semibold text-wk-text mb-1">Error Shape (required)</p>

@@ -59,16 +59,11 @@ const NAV_GROUPS: NavGroup[] = [
     { path: "/admin/media/library", label: "Media Library", icon: "Image", requiredCapability: "manage_media_library" },
     { path: "/admin/media/missing", label: "Missing Images", icon: "ImageOff", badgeKey: "missingImages", requiredCapability: "view_missing_images" },
     { path: "/admin/media/broken", label: "Broken Links", icon: "LinkBreak", badgeKey: "brokenLinks", requiredCapability: "view_broken_links" },
-    { path: "/admin/media/migrate", label: "Migrate Images", icon: "Download", requiredCapability: "manage_media_library" },
   ] },
   { label: "Review & Quality", icon: "GitPullRequest", visible: (can) => can("view_review_queue") || can("view_relationships"), items: [
     { path: "/admin/review/queue", label: "Review Queue", icon: "GitPullRequest", badgeKey: "reviewQueue", requiredCapability: "view_review_queue" },
     { path: "/admin/relationships/viewer", label: "Entity Relationships", icon: "Network", requiredCapability: "view_relationships" },
     { path: "/admin/relationships/duplicates", label: "Duplicate Merge", icon: "Copy", requiredCapability: "manage_relationships" },
-  ] },
-  { label: "Data Import", icon: "Download", visible: (can) => can("view_imports"), items: [
-    { path: "/admin/imports", label: "WordPress Import", icon: "Download", requiredCapability: "view_imports" },
-    { path: "/admin/imports/jobs", label: "Import Jobs", icon: "Upload", requiredCapability: "view_imports" },
   ] },
   { label: "Settings", icon: "Settings", visible: (can) => can("view_settings"), items: [
     { path: "/admin/settings", label: "Settings Hub", icon: "Settings", requiredCapability: "view_settings" },

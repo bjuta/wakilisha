@@ -768,7 +768,7 @@ export const mediaService = {
 
     // 2. Derive a filename from the URL path
     let fileName = imageUrl.split("/").pop()?.split("?")[0] || "untitled.png";
-    // Clean up common WordPress patterns
+    // Clean up common generated image-size suffix patterns
     fileName = fileName.replace(/-\d+x\d+(?=\.\w+$)/, ""); // strip -300x200 suffix
     if (!fileName.includes(".")) fileName += ".png";
 
@@ -778,7 +778,7 @@ export const mediaService = {
     // 4. Upload via standard upload pipeline
     return this.upload(file, {
       ...options,
-      sourceKind: options.sourceKind ?? "wordpress_database",
+      sourceKind: options.sourceKind ?? "admin_upload",
       sourceEntity: options.sourceEntity ?? "storage_register",
     });
   },

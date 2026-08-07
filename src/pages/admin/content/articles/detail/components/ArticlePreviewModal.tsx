@@ -1,6 +1,5 @@
 import { useState, useEffect, useRef, useMemo } from "react";
 import { WkIcon } from "@/components/design-system/Icon";
-import { rewriteWpImageUrl } from "@/services/wpImageRewrite";
 import { useScrollLock } from "@/hooks/useScrollLock";
 import { transformReleaseShortcodes } from "@/utils/transformReleaseShortcodes";
 import { transformArtistShortcodes } from "@/utils/transformArtistShortcodes";
@@ -48,7 +47,7 @@ export function ArticlePreviewModal({
   // Lock background scroll while preview is open
   useScrollLock(true);
 
-  const heroUrl = rewriteWpImageUrl(heroImageUrl);
+  const heroUrl = heroImageUrl;
 
   // Resolve embed markers from shortcodes
   useEffect(() => {

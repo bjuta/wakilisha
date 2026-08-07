@@ -44,10 +44,6 @@ import {
   AdminGenresPage,
   AdminGuideDetailPage,
   AdminGuidesPage,
-  AdminImportsJobDetailPage,
-  AdminImportsJobsPage,
-  AdminImportsLayout,
-  AdminImportsPage,
   AdminInquiryInterfacePage,
   AdminLabelDetailPage,
   AdminLabelsPage,
@@ -55,7 +51,6 @@ import {
   AdminLyricsPage,
   AdminMediaLayout,
   AdminMediaLibraryPage,
-  AdminMediaMigratePage,
   AdminMissingImagesPage,
   AdminNewArticlePage,
   AdminPagesPage,
@@ -68,7 +63,6 @@ import {
   AdminReleasesPage,
   AdminReviewLayout,
   AdminReviewQueuePage,
-  AdminScraperPage,
   AdminSettingsAirplay,
   AdminSettingsAudience,
   AdminSettingsAudit,
@@ -151,7 +145,7 @@ import { ResponsivePage } from "@/components/mobile/ResponsivePage";
 
 // Author profiles
 
-// Admin Shell — WordPress-like production engine
+// Admin Studio production engine
 
 // Section-level admin guards
 
@@ -352,7 +346,6 @@ const routes: RouteObject[] = [
           { path: "library", element: <AdminMediaLibraryPage /> },
           { path: "missing", element: <AdminMissingImagesPage /> },
           { path: "broken", element: <AdminBrokenLinksPage /> },
-          { path: "migrate", element: <AdminMediaMigratePage /> },
         ],
       },
       {
@@ -360,16 +353,6 @@ const routes: RouteObject[] = [
         element: <AdminReviewLayout />,
         children: [
           { path: "queue", element: <AdminReviewQueuePage /> },
-        ],
-      },
-      {
-        path: "imports",
-        element: <AdminImportsLayout />,
-        children: [
-          { index: true, element: <AdminImportsPage /> },
-          { path: "jobs", element: <AdminImportsJobsPage /> },
-          { path: "jobs/:id", element: <AdminImportsJobDetailPage /> },
-          { path: "scraper", element: <AdminScraperPage /> },
         ],
       },
       { path: "charts", element: <AdminChartsLayout />, children: [

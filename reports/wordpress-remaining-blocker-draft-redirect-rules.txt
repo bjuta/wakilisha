@@ -1,4 +1,0 @@
-# Draft remaining blocker redirects
-# Do not apply before final cutover rehearsal.
-# Use 302 first. Do not use 301 yet.
-

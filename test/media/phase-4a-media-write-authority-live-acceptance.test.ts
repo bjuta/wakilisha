@@ -107,7 +107,7 @@ describe(
         "in-place overwrite removal",
       );
       expect(plan).toContain(
-        "WordPress Media migration dependency",
+        "WordPress runtime retirement",
       );
       expect(plan).toContain(
         "compatibility policy and grant hardening",

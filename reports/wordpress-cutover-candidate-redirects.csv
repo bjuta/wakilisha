@@ -1,3 +1,0 @@
-source,target,status,decision,confidence,title,notes
-/artist/dj-mura/,/artists/dj-mura,302,redirect_candidate,medium,DJ Mura | WAKILISHA,Legacy singular /artist/ route should map to React plural /artists/ route.
-/category/music/,/music,302,redirect_candidate,medium,Music | WAKILISHA,Legacy WordPress category archive should map to equivalent top-level React section where available.

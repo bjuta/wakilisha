@@ -251,9 +251,26 @@ const routePaths = [
   ),
 ].map((match) => match[1]);
 
-if (routePaths.length !== 149) {
+/*
+ * Commit af3dda15 established 147 public route paths.
+ * Commit d5c81f32 added two release-scoped track routes,
+ * bringing the authority to 149.
+ *
+ * Commit 6b1388f4 intentionally retired five WordPress
+ * runtime paths:
+ * - migrate
+ * - imports
+ * - jobs
+ * - jobs/:id
+ * - scraper
+ *
+ * The post-retirement authority is therefore 144 paths.
+ */
+const expectedRoutePathCount = 144;
+
+if (routePaths.length !== expectedRoutePathCount) {
   fail(
-    `expected 149 route paths, found ${routePaths.length}`,
+    `expected ${expectedRoutePathCount} route paths, found ${routePaths.length}`,
   );
 }
 
@@ -266,7 +283,7 @@ const routeChecksum = crypto
   .digest("hex");
 
 const expectedRouteChecksum =
-  "1eada3188aed314c87069d43a5a80c760d539b3af1997dc708ccca722bf44fa4";
+  "45938301385ad405fa672c09e8f61d0385971c0e7cb225427e7c1be716910b2c";
 
 if (
   routeChecksum !==
@@ -308,5 +325,5 @@ if (
 
 console.log(
   "Public route splitting audit passed: " +
-  "49 lazy imports, 149 route paths preserved.",
+  `49 lazy imports, ${expectedRoutePathCount} route paths preserved.`,
 );

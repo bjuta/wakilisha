@@ -11,7 +11,7 @@ The lane is closed.
 
 Phase 4A is not closed.
 
-The remaining Phase 4A boundary is the WordPress Media migration dependency,
+The remaining Phase 4A boundary is WordPress runtime retirement and source-schema neutralization,
 followed by compatibility policy and grant hardening with an exact replacement
 and rollback proof.
 
@@ -213,7 +213,7 @@ This acceptance closes:
 
 Phase 4A remains active for:
 
-1. deciding, replacing or formally retiring the WordPress Media migration path
+1. removing the retired WordPress runtime and neutralizing WordPress-specific source schema
 2. removing the final legacy-import compatibility calls when a proved
    replacement exists
 3. compatibility policy and grant hardening
@@ -228,7 +228,7 @@ This acceptance does not:
 - change compatibility foreign keys
 - invent file metadata for legacy URL-only records
 - modify the frozen Institute boundary
-- change the WordPress migration function
+- rewrite applied migration history
 - physically purge registered revision files
 - redeploy the Edge Function
 - redeploy the frontend

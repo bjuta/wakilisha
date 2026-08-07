@@ -5,11 +5,10 @@
  * Used by admin editor, admin preview, public article page, and the API.
  * Every code path that touches article content MUST go through this module.
  *
- * Pipeline order: sanitize → rewrite images → embed media
+ * Pipeline order: sanitize → decode entities → embed media
  */
 
 import { sanitizeVcShortcodes } from "@/utils/sanitizeVcShortcodes";
-import { rewriteWpImageUrls } from "@/services/wpImageRewrite";
 import { embedRichMedia } from "@/utils/embedRichMedia";
 import { decodeHtmlEntities } from "@/utils/decodeHtmlEntities";
 import { generateExcerpt as generateExcerptUtil } from "@/utils/generateExcerpt";
@@ -19,14 +18,13 @@ import { transformTrackShortcodes, stripTrackShortcodes } from "@/utils/transfor
 
 /**
  * Full content processing pipeline for article body HTML.
- * Applies: WP shortcode sanitization → entity decode → image URL rewrite → rich media embedding.
+ * Applies: WP shortcode sanitization → entity decode → rich media embedding.
  */
 export function processArticleContent(rawHtml: string | null | undefined): string {
   if (!rawHtml) return "";
   let html = rawHtml;
   html = sanitizeVcShortcodes(html);
   html = decodeHtmlEntities(html);
-  html = rewriteWpImageUrls(html);
   html = transformReleaseShortcodes(html);
   html = transformArtistShortcodes(html);
   html = transformTrackShortcodes(html);
@@ -37,14 +35,13 @@ export function processArticleContent(rawHtml: string | null | undefined): strin
 /**
  * Light content processing for admin editor display.
  * Skips embedRichMedia so embedded players don't clutter the editing UI.
- * Applies: WP shortcode sanitization → entity decode → image URL rewrite.
+ * Applies: WP shortcode sanitization → entity decode.
  */
 export function processArticleContentForEditor(rawHtml: string | null | undefined): string {
   if (!rawHtml) return "";
   let html = rawHtml;
   html = sanitizeVcShortcodes(html);
   html = decodeHtmlEntities(html);
-  html = rewriteWpImageUrls(html);
   return html;
 }
 

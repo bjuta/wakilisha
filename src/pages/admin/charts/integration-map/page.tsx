@@ -7,7 +7,7 @@ import {
   getEndpointGroups,
   getIngestStudioEndpointGroups,
   getIngestionMode,
-  testWordPressConnection,
+  testAPIConnection,
 } from "@/services/chartsIngestion/client";
 import { PUBLIC_MODE, PUBLIC_API_BASE } from "@/services/chartsPublic/client";
 import { PUBLIC_V2_API_BASE } from "@/services/chartsPublic/v2Adapter";
@@ -36,7 +36,7 @@ export default function AdminChartsIntegrationMap() {
   const [filter, setFilter] = useState("");
   const [testStatus, setTestStatus] = useState<"idle" | "loading" | "success" | "error">("idle");
   const [testError, setTestError] = useState<string | null>(null);
-  const [testResult, setTestResult] = useState<{ ok: boolean; plugin: string; charts_ingestion: boolean; version: string } | null>(null);
+  const [testResult, setTestResult] = useState<{ ok: boolean; backend: string; charts_ingestion: boolean; version: string } | null>(null);
   const navigate = useNavigate();
   const mode = getIngestionMode();
   const groups = getEndpointGroups();
@@ -54,7 +54,7 @@ export default function AdminChartsIntegrationMap() {
     setTestError(null);
     setTestResult(null);
     try {
-      const result = await testWordPressConnection();
+      const result = await testAPIConnection();
       setTestResult(result);
       setTestStatus("success");
     } catch (err) {
@@ -252,7 +252,7 @@ export default function AdminChartsIntegrationMap() {
         </div>
         {testStatus === "success" && testResult && (
           <div className="mt-3 rounded-md bg-wk-success-soft p-3 text-[12px] text-wk-success">
-            API probe completed: {testResult.plugin} · {testResult.version}
+            API probe completed: {testResult.backend} · {testResult.version}
           </div>
         )}
         {testStatus === "error" && testError && (

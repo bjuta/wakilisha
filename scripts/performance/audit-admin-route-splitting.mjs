@@ -43,10 +43,43 @@ const lazyImportCount = (
   ) ?? []
 ).length;
 
-if (lazyImportCount !== 93) {
+/*
+ * PR #423 introduced 93 lazy Admin Studio imports.
+ *
+ * Commit 6b1388f4 intentionally retired six WordPress runtime routes:
+ * - AdminImportsJobDetailPage
+ * - AdminImportsJobsPage
+ * - AdminImportsLayout
+ * - AdminImportsPage
+ * - AdminMediaMigratePage
+ * - AdminScraperPage
+ *
+ * The post-retirement authority is therefore 87 lazy imports.
+ */
+const expectedLazyImportCount = 87;
+
+if (lazyImportCount !== expectedLazyImportCount) {
   fail(
-    `expected 93 lazy Admin Studio imports, found ${lazyImportCount}`,
+    `expected ${expectedLazyImportCount} lazy Admin Studio imports, found ${lazyImportCount}`,
   );
+}
+
+for (const retiredMarker of [
+  "AdminImportsJobDetailPage",
+  "AdminImportsJobsPage",
+  "AdminImportsLayout",
+  "AdminImportsPage",
+  "AdminMediaMigratePage",
+  "AdminScraperPage",
+]) {
+  if (
+    lazyAdmin.includes(`export const ${retiredMarker}`) ||
+    config.includes(retiredMarker)
+  ) {
+    fail(
+      `retired WordPress runtime route returned: ${retiredMarker}`,
+    );
+  }
 }
 
 for (const marker of [

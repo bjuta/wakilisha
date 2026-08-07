@@ -161,7 +161,7 @@ export async function setApiMode(mode: "backend" | "local" | "v2" | "wp" | "mock
   pushAuditEvent({
     domain: "integrations",
     action: "api_mode_changed",
-    details: `API mode changed to ${runtimeMode}. WordPress and mock are not runtime modes; WordPress is import-only and local is preview-only.`,
+    details: `API mode changed to ${runtimeMode}. Backend is the production mode and local is preview-only.`,
     severity: "info",
   });
 }

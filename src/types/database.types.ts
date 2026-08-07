@@ -16882,7 +16882,6 @@ export type Database = {
       }
       finalize_step_media: { Args: { p_run_id: string }; Returns: Json }
       finalize_step_review: { Args: { p_run_id: string }; Returns: Json }
-      finalize_wp_staging: { Args: { p_run_id: string }; Returns: Json }
       find_similar_artists:
         | {
             Args: {
@@ -17613,38 +17612,6 @@ export type Database = {
       }
       promote_artist_split_relationship: {
         Args: { p_staging_record_id: string }
-        Returns: Json
-      }
-      promote_manual_wkcharts_artist_genre_relationships: {
-        Args: never
-        Returns: Json
-      }
-      promote_ready_artist_relationships: { Args: never; Returns: Json }
-      promote_ready_chart_entry_links: { Args: never; Returns: Json }
-      promote_ready_wkcharts_artist_genre_relationships: {
-        Args: never
-        Returns: Json
-      }
-      promote_ready_wkcharts_entity_relationships: {
-        Args: never
-        Returns: Json
-      }
-      promote_ready_wkcharts_release_chart_entry_relationships: {
-        Args: never
-        Returns: Json
-      }
-      promote_ready_wkcharts_track_chart_entry_relationships: {
-        Args: never
-        Returns: Json
-      }
-      promote_ready_wkcharts_track_release_relationships: {
-        Args: never
-        Returns: Json
-      }
-      promote_ready_wp_relationships_safe: { Args: never; Returns: Json }
-      promote_slug_repaired_chart_entry_links: { Args: never; Returns: Json }
-      promote_wp_relationships_article_genre_holds: {
-        Args: never
         Returns: Json
       }
       public_get_article_correction_notes: {
