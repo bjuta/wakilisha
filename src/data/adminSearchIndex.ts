@@ -64,7 +64,6 @@ export const ADMIN_SEARCH_INDEX: AdminSearchItem[] = [
   { id: "duplicates", label: "Duplicate Merge", description: "Find and merge duplicate entities in the registry", path: "/admin/relationships/duplicates", icon: "Copy", group: "Review & Quality", keywords: ["deduplicate", "merge entities", "duplicate detection", "clean up"] },
 
   // ── Data Import ──
-  { id: "imports-jobs", label: "Import Jobs", description: "Track status and history of all data import jobs", path: "/admin/imports/jobs", icon: "Upload", group: "Data Import", keywords: ["batch", "history", "status", "migration jobs"] },
 
   // ── Settings ──
   { id: "settings-hub", label: "Settings Hub", description: "Central overview of all platform settings domains", path: "/admin/settings", icon: "Settings", group: "Settings", keywords: ["configuration", "preferences", "all settings"] },
