@@ -36,6 +36,9 @@ ALLOWED_EXTENSIONS = {
 ALLOWED_AUDIO_EXTENSIONS = {
     ".mp3", ".m4a", ".aac", ".wav", ".flac", ".ogg", ".oga",
 }
+ALLOWED_VIDEO_EXTENSIONS = {
+    ".mp4", ".mov", ".m4v", ".webm", ".mkv",
+}
 ALLOWED_ORIGINS = {
     value.strip()
     for value in os.environ.get(
@@ -144,19 +147,28 @@ def clean_master_path(raw_path):
     if normalized in ("", ".") or normalized.startswith("../") or normalized == "..":
         raise ValueError("Invalid master path.")
 
-    if not normalized.startswith("masters/audio/"):
-        raise ValueError("Audio master path must start with masters/audio/.")
+    if normalized.startswith("masters/audio/"):
+        allowed_extensions = ALLOWED_AUDIO_EXTENSIONS
+        master_kind = "audio"
+    elif normalized.startswith("masters/video/"):
+        allowed_extensions = ALLOWED_VIDEO_EXTENSIONS
+        master_kind = "video"
+    else:
+        raise ValueError(
+            "Media master path must start with masters/audio/ or masters/video/."
+        )
 
     ext = Path(normalized).suffix.lower()
-    if ext not in ALLOWED_AUDIO_EXTENSIONS:
-        raise ValueError(f"Unsupported audio master extension: {ext}")
+    if ext not in allowed_extensions:
+        raise ValueError(
+            f"Unsupported {master_kind} master extension: {ext}"
+        )
 
     target = (MEDIA_ROOT / normalized).resolve()
     if not str(target).startswith(str(MEDIA_ROOT) + os.sep):
         raise ValueError("Master path escapes media root.")
 
     return normalized, target
-
 
 def normalize_session_id(value):
     parsed = uuid.UUID(str(value or ""))
@@ -382,7 +394,7 @@ def expiry_sweeper_loop():
 
 
 class Handler(BaseHTTPRequestHandler):
-    server_version = "WakilishaMediaReceiver/2.0"
+    server_version = "WakilishaMediaReceiver/2.1"
 
     def log_message(self, fmt, *args):
         print("%s - %s" % (self.address_string(), fmt % args), flush=True)
@@ -462,21 +474,40 @@ class Handler(BaseHTTPRequestHandler):
         except (ValueError, TypeError, KeyError) as exc:
             return json_response(self, 400, {"error": str(exc)})
 
-        if expected_byte_size <= MAX_UPLOAD_BYTES or expected_byte_size > MAX_MASTER_BYTES:
-            return json_response(self, 400, {"error": "Master byte size is outside the M1 resumable range."})
+        if expected_byte_size <= 0 or expected_byte_size > MAX_MASTER_BYTES:
+            return json_response(self, 400, {"error": "Media master byte size is outside the M3 resumable range."})
         if not re.fullmatch(r"[0-9a-f]{64}", expected_sha256):
             return json_response(self, 400, {"error": "Expected SHA-256 is invalid."})
         if part_size_bytes != PART_SIZE_BYTES:
             return json_response(self, 400, {"error": "Unexpected part size."})
         expected_total_parts = (expected_byte_size + part_size_bytes - 1) // part_size_bytes
-        if total_parts != expected_total_parts or total_parts < 2:
+        if total_parts != expected_total_parts or total_parts < 1:
             return json_response(self, 400, {"error": "Unexpected part count."})
         if expires_at <= utc_now():
             return json_response(self, 400, {"error": "Upload session is already expired."})
         if len(capability_token) < 32:
             return json_response(self, 400, {"error": "Upload capability is invalid."})
-        if not mime_type.startswith("audio/"):
-            return json_response(self, 400, {"error": "Audio MIME type is required."})
+        if not (
+            mime_type.startswith("audio/")
+            or mime_type.startswith("video/")
+        ):
+            return json_response(
+                self,
+                400,
+                {"error": "Audio or video MIME type is required."},
+            )
+        if storage_path.startswith("masters/audio/") and not mime_type.startswith("audio/"):
+            return json_response(
+                self,
+                400,
+                {"error": "Audio master path requires an audio MIME type."},
+            )
+        if storage_path.startswith("masters/video/") and not mime_type.startswith("video/"):
+            return json_response(
+                self,
+                400,
+                {"error": "Video master path requires a video MIME type."},
+            )
         if not original_filename:
             return json_response(self, 400, {"error": "Original filename is required."})
         lock = get_session_lock(session_id)

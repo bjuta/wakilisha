@@ -5,9 +5,14 @@
  * Handles registered media assets and unmanaged URLs.
  */
 
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { WkIcon } from "@/components/design-system/Icon";
-import { type MediaAsset } from "@/services/mediaService";
+import {
+  getMediaAssetDeliveryUrl,
+  mediaService,
+  type MediaAsset,
+  type MediaDerivative,
+} from "@/services/mediaService";
 import { MediaEditModal } from "@/components/admin/media/MediaEditModal";
 
 function assetFileKind(asset: MediaAsset): string {
@@ -19,7 +24,18 @@ function isImageAsset(asset: MediaAsset): boolean {
 }
 
 function fileIconClass(asset: MediaAsset | null): string {
-  return asset && assetFileKind(asset) === "document" ? "ri-file-pdf-2-line" : "ri-file-line";
+  const kind = asset ? assetFileKind(asset) : "other";
+  if (kind === "document") return "ri-file-pdf-2-line";
+  if (kind === "audio") return "ri-music-2-line";
+  if (kind === "video") return "ri-video-line";
+  return "ri-file-line";
+}
+
+function derivative(
+  asset: MediaAsset | null,
+  role: string,
+): MediaDerivative | null {
+  return asset?.selected_derivatives?.[role] ?? null;
 }
 
 interface Props {
@@ -61,7 +77,53 @@ export function MediaLibraryPreviewPanel({
   const [editFocus, setEditFocus] = useState<"view" | "edit">("view");
   const [previewError, setPreviewError] = useState(false);
   const [copied, setCopied] = useState(false);
+  const [waveformPeaks, setWaveformPeaks] = useState<number[]>([]);
+  const [retryingProcessing, setRetryingProcessing] = useState(false);
   const isUnmanagedUrl = !selectedAsset && !!selectedUrl;
+
+  const selectedKind = selectedAsset ? assetFileKind(selectedAsset) : "";
+  const audioPreview = derivative(selectedAsset, "audio_preview");
+  const waveform = derivative(selectedAsset, "waveform_data");
+  const videoTranscode = derivative(selectedAsset, "video_transcode");
+  const posterFrame = derivative(selectedAsset, "poster_frame");
+  const thumbnail = derivative(selectedAsset, "thumbnail");
+  const effectiveSelectedUrl = selectedAsset
+    ? getMediaAssetDeliveryUrl(selectedAsset)
+    : selectedUrl;
+
+  useEffect(() => {
+    let alive = true;
+    if (!waveform?.url) {
+      setWaveformPeaks([]);
+      return () => { alive = false; };
+    }
+    fetch(waveform.url)
+      .then((response) => {
+        if (!response.ok) throw new Error("Waveform request failed.");
+        return response.json();
+      })
+      .then((payload) => {
+        if (alive && Array.isArray(payload?.peaks)) {
+          setWaveformPeaks(
+            payload.peaks.map(Number).filter(Number.isFinite).slice(0, 1000),
+          );
+        }
+      })
+      .catch(() => { if (alive) setWaveformPeaks([]); });
+    return () => { alive = false; };
+  }, [waveform?.url]);
+
+  const waveformPoints = useMemo(() => {
+    if (!waveformPeaks.length) return "";
+    return waveformPeaks.map((peak, index) => {
+      const x = waveformPeaks.length > 1
+        ? (index / (waveformPeaks.length - 1)) * 100
+        : 50;
+      const normalized = Math.max(-1, Math.min(1, peak));
+      const y = 50 - normalized * 42;
+      return `${x},${y}`;
+    }).join(" ");
+  }, [waveformPeaks]);
 
   const metadata = selectedAsset?.metadata ?? {};
   const altText = typeof metadata.alt_text === "string" ? metadata.alt_text : undefined;
@@ -76,11 +138,22 @@ export function MediaLibraryPreviewPanel({
   const displayFileName = selectedAsset?.original_filename ?? selectedAsset?.display_filename ?? fileName;
 
   const handleCopy = () => {
-    if (selectedUrl) {
-      navigator.clipboard.writeText(selectedUrl);
+    if (effectiveSelectedUrl) {
+      navigator.clipboard.writeText(effectiveSelectedUrl);
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
-      onCopy?.(selectedUrl);
+      onCopy?.(effectiveSelectedUrl);
+    }
+  };
+
+  const handleRetryProcessing = async () => {
+    if (!selectedAsset) return;
+    setRetryingProcessing(true);
+    try {
+      const updated = await mediaService.retryProcessing(selectedAsset.id);
+      onAssetUpdated?.(updated);
+    } finally {
+      setRetryingProcessing(false);
     }
   };
 
@@ -123,22 +196,53 @@ export function MediaLibraryPreviewPanel({
       <div className="flex-1 overflow-y-auto p-4 space-y-4">
         <p className="text-[11px] font-bold uppercase tracking-wider text-wk-text-muted">Preview</p>
 
-        {selectedUrl ? (
+        {selectedAsset || selectedUrl ? (
           <>
             {/* Preview */}
-            {isImagePreview ? (
+            {selectedKind === "audio" ? (
+              <div className="space-y-3">
+                <div className="rounded-xl border border-wk-border bg-wk-surface-raised p-3">
+                  {audioPreview?.url ? (
+                    <audio controls preload="metadata" src={audioPreview.url} className="w-full" />
+                  ) : (
+                    <div className="flex items-center gap-3 py-5">
+                      <i className="ri-music-2-line text-[28px] text-wk-brand" />
+                      <div>
+                        <p className="text-[12px] font-bold text-wk-text">Audio master protected</p>
+                        <p className="text-[11px] text-wk-text-muted">Preview becomes available when processing succeeds.</p>
+                      </div>
+                    </div>
+                  )}
+                </div>
+                {waveformPoints && (
+                  <div className="rounded-xl border border-wk-border bg-wk-bg p-2">
+                    <svg viewBox="0 0 100 100" preserveAspectRatio="none" className="h-20 w-full" aria-label="Audio waveform">
+                      <polyline points={waveformPoints} fill="none" stroke="currentColor" strokeWidth="1" className="text-wk-brand" />
+                    </svg>
+                  </div>
+                )}
+              </div>
+            ) : selectedKind === "video" ? (
+              <div className="space-y-3">
+                {videoTranscode?.url ? (
+                  <video controls preload="metadata" poster={posterFrame?.url ?? thumbnail?.url ?? undefined} src={videoTranscode.url} className="w-full rounded-xl border border-wk-border bg-black" />
+                ) : (
+                  <div className="flex flex-col items-center justify-center gap-3 rounded-xl border border-wk-border bg-wk-surface-raised px-4 py-10 text-center">
+                    {posterFrame?.url || thumbnail?.url ? (
+                      <img src={posterFrame?.url ?? thumbnail?.url ?? ""} alt="" className="w-full rounded-lg" />
+                    ) : (
+                      <i className="ri-video-line text-[32px] text-wk-brand" />
+                    )}
+                    <p className="text-[11px] text-wk-text-muted">Video playback becomes available when processing succeeds.</p>
+                  </div>
+                )}
+              </div>
+            ) : isImagePreview ? (
               <>
                 <div className="overflow-hidden rounded-xl border border-wk-border bg-wk-surface-raised">
-                  <img
-                    src={selectedUrl}
-                    alt={altText || "Preview"}
-                    className="w-full"
-                    onError={() => setPreviewError(true)}
-                  />
+                  <img src={effectiveSelectedUrl} alt={altText || "Preview"} className="w-full" onError={() => setPreviewError(true)} />
                 </div>
-                {previewError && (
-                  <p className="text-[11px] text-wk-danger">Failed to load preview.</p>
-                )}
+                {previewError && <p className="text-[11px] text-wk-danger">Failed to load preview.</p>}
               </>
             ) : (
               <div className="flex flex-col items-center justify-center gap-3 rounded-xl border border-wk-border bg-wk-surface-raised px-4 py-10 text-center">
@@ -155,6 +259,39 @@ export function MediaLibraryPreviewPanel({
             {/* ── Registered asset metadata ── */}
             {selectedAsset ? (
               <div className="space-y-2.5">
+                {(selectedKind === "audio" || selectedKind === "video") && (
+                  <div className="rounded-lg border border-wk-border bg-wk-surface p-2.5 space-y-1.5">
+                    <p className="text-[10px] font-black uppercase tracking-wider text-wk-text-faint">Processing</p>
+                    <div className="flex items-center justify-between text-[11px]">
+                      <span className="text-wk-text-faint">State</span>
+                      <span className="font-semibold text-wk-text">
+                        {selectedAsset.delivery_ready
+                          ? "ready"
+                          : selectedAsset.processing_job_status
+                            ?? selectedAsset.upload_session_state
+                            ?? "waiting"}
+                      </span>
+                    </div>
+                    {selectedAsset.processing_attempt_count !== null && selectedAsset.processing_attempt_count !== undefined && (
+                      <div className="flex items-center justify-between text-[11px]">
+                        <span className="text-wk-text-faint">Attempt</span>
+                        <span className="font-mono text-wk-text">
+                          {selectedAsset.processing_attempt_count}
+                          {selectedAsset.processing_max_attempts ? ` / ${selectedAsset.processing_max_attempts}` : ""}
+                        </span>
+                      </div>
+                    )}
+                    {selectedAsset.processing_last_error && (
+                      <p className="text-[11px] leading-relaxed text-wk-danger">{selectedAsset.processing_last_error}</p>
+                    )}
+                    {selectedAsset.processing_job_status === "dead_letter" && (
+                      <button type="button" disabled={retryingProcessing} onClick={() => void handleRetryProcessing()} className="mt-1 rounded-lg bg-wk-brand px-2.5 py-1.5 text-[11px] font-bold text-wk-brand-on disabled:opacity-50">
+                        {retryingProcessing ? "Retrying…" : "Retry processing"}
+                      </button>
+                    )}
+                  </div>
+                )}
+
                 {/* Title */}
                 <div className="rounded-lg border border-wk-border bg-wk-surface p-2.5">
                   <p className="text-[10px] font-black uppercase tracking-wider text-wk-text-faint mb-1">Title</p>

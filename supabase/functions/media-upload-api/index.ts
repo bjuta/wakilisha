@@ -140,7 +140,11 @@ async function serviceRpc(functionName: string, args: JsonObject) {
   return objectValue(data);
 }
 
-async function createResumableSession(authHeader: string, body: JsonObject) {
+async function createResumableSession(
+  authHeader: string,
+  body: JsonObject,
+  version: "v1" | "v2" = "v1",
+) {
   const idempotencyKey = stringValue(body.idempotency_key);
   const originalFilename = stringValue(body.original_filename);
   const mimeType = stringValue(body.mime_type).toLowerCase();
@@ -156,7 +160,9 @@ async function createResumableSession(authHeader: string, body: JsonObject) {
 
   const session = await userRpc(
     authHeader,
-    "create_media_upload_session_v1",
+    version === "v2"
+      ? "create_media_upload_session_v2"
+      : "create_media_upload_session_v1",
     {
       p_idempotency_key: idempotencyKey,
       p_original_filename: originalFilename,
@@ -200,7 +206,10 @@ async function createResumableSession(authHeader: string, body: JsonObject) {
 
   return {
     ok: true,
-    mode: "resumable_audio_master",
+    mode:
+      version === "v2"
+        ? "resumable_media_master"
+        : "resumable_audio_master",
     session: {
       ...session,
       receiver_state: payload.state,
@@ -530,7 +539,16 @@ serve(async (req) => {
       const action = stringValue(body.action);
 
       if (action === "create_resumable_session") {
-        return json(200, await createResumableSession(authHeader, body));
+        return json(
+          200,
+          await createResumableSession(authHeader, body, "v1"),
+        );
+      }
+      if (action === "create_resumable_session_v2") {
+        return json(
+          200,
+          await createResumableSession(authHeader, body, "v2"),
+        );
       }
       if (action === "resumable_session_status") {
         return json(200, await resumableSessionStatus(authHeader, body));

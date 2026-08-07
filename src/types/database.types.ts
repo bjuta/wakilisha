@@ -15428,6 +15428,16 @@ export type Database = {
         }
         Returns: Json
       }
+      adopt_verified_media_upload_session_v1: {
+        Args: {
+          p_asset_purpose?: string
+          p_correlation_id?: string
+          p_folder_id?: string
+          p_session_id: string
+          p_title?: string
+        }
+        Returns: Json
+      }
       apply_article_correction: {
         Args: {
           p_application_summary: string
@@ -16632,6 +16642,18 @@ export type Database = {
         }[]
       }
       create_media_upload_session_v1: {
+        Args: {
+          p_correlation_id?: string
+          p_expected_byte_size: number
+          p_expected_sha256: string
+          p_idempotency_key: string
+          p_mime_type: string
+          p_original_filename: string
+          p_ttl_seconds?: number
+        }
+        Returns: Json
+      }
+      create_media_upload_session_v2: {
         Args: {
           p_correlation_id?: string
           p_expected_byte_size: number
