@@ -1,0 +1,27 @@
+[Unit]
+Description=WAKILISHA Durable Media Processor
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+EnvironmentFile=/etc/wakilisha-media-processor.env
+ExecStart=/usr/bin/python3 /opt/wakilisha-media-processor/worker.py
+Restart=always
+RestartSec=5
+User=www-data
+Group=www-data
+WorkingDirectory=/opt/wakilisha-media-processor
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=full
+ReadWritePaths=/opt/wakilisha-media /opt/wakilisha-media-processing
+MemoryMax=768M
+CPUQuota=90%
+TasksMax=64
+Nice=10
+UMask=0027
+TimeoutStopSec=30
+
+[Install]
+WantedBy=multi-user.target

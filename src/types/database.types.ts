@@ -1652,6 +1652,32 @@ export type Database = {
         }
         Relationships: []
       }
+      media_asset_resources: {
+        Row: {
+          asset_id: string
+          resource_id: string
+          resource_kind: string
+        }
+        Insert: {
+          asset_id: string
+          resource_id: string
+          resource_kind?: string
+        }
+        Update: {
+          asset_id?: string
+          resource_id?: string
+          resource_kind?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "media_asset_resources_resource_fkey"
+            columns: ["resource_id", "resource_kind"]
+            isOneToOne: false
+            referencedRelation: "resources"
+            referencedColumns: ["id", "resource_kind"]
+          },
+        ]
+      }
       playlist_resources: {
         Row: {
           playlist_id: string
@@ -15714,6 +15740,24 @@ export type Database = {
         }
         Returns: Json
       }
+      claim_media_processing_jobs_v1: {
+        Args: {
+          p_lease_seconds?: number
+          p_limit?: number
+          p_worker_id: string
+        }
+        Returns: {
+          attempt_count: number
+          command_receipt_id: string
+          command_type: string
+          input_payload: Json
+          job_id: string
+          job_type: string
+          lease_expires_at: string
+          max_attempts: number
+          resource_id: string
+        }[]
+      }
       close_correction_case: {
         Args: {
           p_case_resource_id: string
@@ -16222,6 +16266,10 @@ export type Database = {
       community_username_seed: { Args: { p_seed: string }; Returns: string }
       community_vote_comment: {
         Args: { p_comment_id: string; p_vote_value: number }
+        Returns: Json
+      }
+      complete_media_processing_job_v1: {
+        Args: { p_job_id: string; p_result?: Json; p_worker_id: string }
         Returns: Json
       }
       complete_registry_relationship_review: {
@@ -16823,6 +16871,16 @@ export type Database = {
       exec_sql: { Args: { query: string }; Returns: undefined }
       expire_media_upload_session_v1: {
         Args: { p_reason?: string; p_session_id: string }
+        Returns: Json
+      }
+      fail_media_processing_job_v1: {
+        Args: {
+          p_error: string
+          p_job_id: string
+          p_retry_delay_seconds?: number
+          p_retryable?: boolean
+          p_worker_id: string
+        }
         Returns: Json
       }
       fail_media_upload_session_v1: {
@@ -17817,6 +17875,10 @@ export type Database = {
         }
         Returns: string
       }
+      recover_expired_media_processing_jobs_v1: {
+        Args: { p_limit?: number; p_retry_delay_seconds?: number }
+        Returns: number
+      }
       register_media_file_object: {
         Args: {
           p_byte_size?: number
@@ -17834,6 +17896,10 @@ export type Database = {
           file_object_id: string
           verification_state: string
         }[]
+      }
+      register_media_processing_outputs_v1: {
+        Args: { p_job_id: string; p_outputs: Json; p_worker_id: string }
+        Returns: Json
       }
       register_media_variant: {
         Args: {
@@ -17963,6 +18029,14 @@ export type Database = {
           item_id: string
           record_version: number
         }[]
+      }
+      renew_media_processing_lease_v1: {
+        Args: {
+          p_job_id: string
+          p_lease_seconds?: number
+          p_worker_id: string
+        }
+        Returns: string
       }
       reopen_correction_case: {
         Args: {
@@ -18507,6 +18581,22 @@ export type Database = {
           idempotent_replay: boolean
           receipt_status: string
           result_payload: Json
+        }[]
+      }
+      submit_media_processing_command_v1: {
+        Args: {
+          p_asset_id: string
+          p_asset_revision_id: string
+          p_correlation_id?: string
+          p_idempotency_key: string
+          p_profile_version: string
+        }
+        Returns: {
+          accepted_event_id: string
+          command_receipt_id: string
+          idempotent_replay: boolean
+          job_id: string
+          receipt_status: string
         }[]
       }
       submit_resource_reconciliation_command: {
