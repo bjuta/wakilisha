@@ -56,3 +56,41 @@ The final retirement acceptance requires:
 - no WordPress-specific production schema contract
 - no ordinary Media compatibility-table write
 - canonical WAKILISHA content and public URLs preserved
+
+## Completion record - 7 August 2026
+
+The retirement is complete.
+
+Repository closure:
+
+- PR #579 retired the WordPress runtime and Media URL compatibility surfaces
+- PR #580 removed the final stale Admin Import navigation references
+- final production main is `f6800cb5`
+
+Production completion:
+
+- migration `20260806162000_retire_wordpress_runtime.sql` is applied
+- migration `20260806184500_hard_delete_unrecoverable_guides.sql` is applied
+- migration `20260806192259_media_url_cutover.sql` is applied
+- all twelve retired staging and promotion database functions are absent
+- the raw WordPress item table is absent
+- thirteen dedicated WordPress or one-time backfill Edge Functions are absent
+- retired Admin Import routes and navigation are absent from the live frontend
+- frontend WordPress Media rewrite compatibility is absent
+- active legacy Media URL rows are zero
+- the migration ledger is current
+- generated database types match production
+- the final frontend is deployed from `f6800cb5`
+- core public production smoke passed
+
+Historical WordPress-named provenance columns and indexes remain intentionally
+preserved under the data-preservation checkpoint described above.
+
+They are not an active WordPress runtime contract.
+
+Any later neutralization must be evidence-led and must not reopen WordPress as a
+runtime, connector, fallback, migration path, or administrative surface.
+
+Phase 4A closure is recorded in:
+
+`docs/engineering/phase-4a-media-authority-closure-record.md`

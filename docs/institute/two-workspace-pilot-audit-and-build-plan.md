@@ -17,13 +17,15 @@ All future work on Articles, Playlists, Audio, Video, Media, Registry, Charts, c
 
 Current phase: **Phase 4: Media platform**.
 
-Phase 3 Trust infrastructure is complete. PR 4A Media authority redesign is active.
+Phase 3 Trust infrastructure is complete. PR 4A Media authority redesign is closed. PR 4B Upload and processing pipeline is the immediate next implementation.
 
-The Phase 4A public application Media read lane and the administrative and write-authority lane are accepted. Media Library command cutover, immutable original and derivative proof, in-place overwrite removal, and browser editor CORS are complete. Phase 4A remains open for the WordPress runtime retirement, source-schema neutralization, and compatibility policy and grant hardening.
+Phase 4A is closed in production. The Media authority, public and administrative read cutovers, governed writes, immutable replacement, browser delivery, WordPress runtime retirement, active legacy Media URL cutover, and final frontend retirement acceptance are complete.
+
+Historical WordPress-named provenance columns and indexes and the remaining frozen Institute compatibility read surface are preserved intentionally. They are not active Media integration authority. Their later evidence-led neutralization and compatibility policy or grant contraction are separate preservation and hardening work and do not reopen Phase 4A or block PR 4B.
 
 This plan has been reconciled against repository main at:
 
-`cdbb4389 Retire dead track artwork Media lookup (#575)`
+`f6800cb5 Remove stale retired admin import links (#580)`
 
 Closed phases:
 
@@ -36,6 +38,7 @@ Closed phases:
 - **Phase 2C: Article Editor Workbench**, closed through PR #482 and PR #483.
 - **Phase 3A: Sources, Citations, and Credits**, closed through PR #542.
 - **Phase 3B: Corrections and provenance**, closed through PR #557.
+- **Phase 4A: Media authority redesign**, closed through PR #580.
 
 Completed Phase 3 work:
 
@@ -60,6 +63,12 @@ Completed Phase 4 work:
 - **Administrative Media reads and Media Library command cutover**, completed in production.
 - **Immutable original and derivative proof, immutable replacement and in-place overwrite removal**, completed in production.
 - **Browser editor Media CORS**, completed with one original-upload include and seven fixed-width derivative includes.
+- **Administrative Media read cutover and governed Media writes**, completed through PR #577 and PR #578.
+- **WordPress runtime, migration tooling, import surfaces, and legacy frontend Media rewrite retirement**, completed through PR #579.
+- **Active legacy Media URL cutover**, completed with zero active legacy Media URL rows while preserving accepted analytics, archived tombstones, external documents, and provenance.
+- **Dedicated WordPress and one-time backfill Edge Function retirement**, completed with 13 retired production functions removed.
+- **Final stale Admin Import navigation cleanup and production retirement acceptance**, completed through PR #580 and production main `f6800cb5`.
+- **Phase 4A final production frontend**, deployed from `f6800cb5` with entry `assets/index-kj620d2B.js` and exact-build verification.
 
 Supporting build-pipeline fix:
 
@@ -68,8 +77,9 @@ Supporting build-pipeline fix:
 Active phase:
 
 - **Phase 4: Media platform**.
+- **Active slice: PR 4B Upload and processing pipeline**.
 
-Phase 2 and Phase 3 are closed.
+Phase 2, Phase 3, and Phase 4A are closed.
 
 Phase 2 proved the Article authority from draft through restoration in production. The completed lifecycle proof covered Draft, Submit for Review, Request Changes, revised Draft, Submit again, Approve, Publish, later Draft edit, public unchanged verification, Archive, and Restore.
 
@@ -77,9 +87,11 @@ The North Star implementation work made the Article a stronger writing and revie
 
 Phase 3 completed the shared Sources, Citations, Credits, Corrections, and provenance foundations without reopening Article lifecycle or duplicating Publishing authority.
 
-Phase 4 is active through the Media authority redesign defined in this plan.
+Phase 4 remains active. PR 4A established and proved the Media authority and is closed.
 
-The public application Media read lane and Media Library write authority are complete. Phase 4A remains open until the WordPress runtime retirement and source-schema neutralization are complete and compatibility policy and grant hardening has a verified replacement and rollback path.
+PR 4B now extends that closed authority into resumable upload and durable processing. It must reuse the canonical Media object model, shared jobs and outbox, immutable file and revision contracts, governed usage authority, and public delivery rules already accepted in Phase 4A.
+
+Historical WordPress-named preservation fields, frozen Institute compatibility reads, and later compatibility policy or grant contraction are not PR 4B upload-pipeline scope. They must be handled by separate evidence-led preservation or hardening work without restoring WordPress runtime authority.
 
 See also:
 
@@ -87,6 +99,8 @@ See also:
 - `docs/engineering/phase-2b-review-publication-lifecycle-audit.md`
 - `docs/engineering/phase-2-article-authority-closure-record.md`
 - `docs/engineering/phase-3-trust-infrastructure-kickoff.md`
+- `docs/engineering/phase-4a-media-authority-closure-record.md`
+- `docs/engineering/phase-4b-upload-processing-kickoff.md`
 
 
 ## Decision
@@ -1713,13 +1727,15 @@ Completion record, 4 August 2026:
 
 ### Immediate next implementation
 
-**Continue PR 4A: Media authority redesign.**
+**Begin PR 4B: Upload and processing pipeline.**
 
-The public application Media read lane is accepted and closed.
+PR 4A Media authority redesign is closed through PR #580 and production main `f6800cb5`.
 
-Continue with the administrative and write-authority perimeter, Media Library command cutover, editor usage authority, immutable original and derivative proof, in-place overwrite removal, and then compatibility policy and grant hardening.
+The first PR 4B move is an authority and failure-mode audit of the current upload path, Lightsail Media origin, `media-upload-api`, shared job and outbox substrate, object-transfer limits, checksum completion, derivative generation, retry behavior, cancellation, storage reconciliation, and recovery.
 
-Do not start the Phase 4B upload and processing pipeline until the PR 4A exit gate is satisfied.
+No PR 4B implementation should create a second Media authority, hidden queue, mutable master overwrite path, or WordPress compatibility dependency.
+
+See `docs/engineering/phase-4b-upload-processing-kickoff.md`.
 
 ## Phase 4: Media platform
 
@@ -1748,6 +1764,24 @@ Exit gate:
 - existing assets remain usable
 - one logical asset can safely hold an original and several derivatives
 - no editor depends directly on a mutable storage URL
+
+Completion record, 7 August 2026:
+
+- closed through PR #580
+- production main is `f6800cb5`
+- authoritative migration count is 199
+- latest migration is `20260806192259_media_url_cutover.sql`
+- logical Media identity, governance, immutable file objects, revisions, variants, selections, usage links, read models, and governed writes are live
+- the accepted immutable proof contains two preserved originals, two responsive derivatives, two asset revisions, two variants, and two selections
+- ordinary public and administrative Media presentation no longer depends on direct compatibility-table reads
+- ordinary Media writes no longer use compatibility-table mutation as their authority
+- WordPress runtime routes, import services, package commands, staging and promotion functions, raw staging table, and frontend rewrite compatibility are retired
+- 13 dedicated WordPress and one-time backfill Edge Functions are absent from production
+- active legacy Media URL rows are zero after the accepted cutover
+- the final production frontend is deployed from `f6800cb5`
+- core public routes and exact frontend build hashes passed production smoke acceptance
+- historical WordPress-named preservation fields and the frozen Institute compatibility read surface remain intentionally preserved outside the active Media runtime contract
+- later evidence-led source-field neutralization and compatibility grant or policy contraction are separate preservation and hardening work and do not reopen PR 4A
 
 ### PR 4B: Upload and processing pipeline
 
