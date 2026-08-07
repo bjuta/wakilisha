@@ -28,6 +28,8 @@ function fileIconClass(asset: MediaAsset | null): string {
   if (kind === "document") return "ri-file-pdf-2-line";
   if (kind === "audio") return "ri-music-2-line";
   if (kind === "video") return "ri-video-line";
+  if (kind === "transcript") return "ri-file-text-line";
+  if (kind === "caption") return "ri-file-list-3-line";
   return "ri-file-line";
 }
 
@@ -79,6 +81,7 @@ export function MediaLibraryPreviewPanel({
   const [copied, setCopied] = useState(false);
   const [waveformPeaks, setWaveformPeaks] = useState<number[]>([]);
   const [retryingProcessing, setRetryingProcessing] = useState(false);
+  const [openingProtectedFile, setOpeningProtectedFile] = useState(false);
   const isUnmanagedUrl = !selectedAsset && !!selectedUrl;
 
   const selectedKind = selectedAsset ? assetFileKind(selectedAsset) : "";
@@ -154,6 +157,25 @@ export function MediaLibraryPreviewPanel({
       onAssetUpdated?.(updated);
     } finally {
       setRetryingProcessing(false);
+    }
+  };
+
+  const handleOpenProtectedFile = async () => {
+    const fileObjectId = selectedAsset?.current_file_object_id;
+    if (!fileObjectId) return;
+
+    setOpeningProtectedFile(true);
+    try {
+      const url = await mediaService.createPrivateDeliveryUrl(
+        fileObjectId,
+      );
+      window.open(
+        url,
+        "_blank",
+        "noopener,noreferrer",
+      );
+    } finally {
+      setOpeningProtectedFile(false);
     }
   };
 
@@ -411,6 +433,21 @@ export function MediaLibraryPreviewPanel({
 
       {/* ── Action buttons ── */}
       <div className="shrink-0 p-4 space-y-2 border-t border-wk-border">
+        {mode === "library"
+          && selectedAsset?.current_file_object_id
+          && ["audio", "video", "transcript", "caption"].includes(selectedKind)
+          && (
+            <button
+              type="button"
+              disabled={openingProtectedFile}
+              onClick={() => void handleOpenProtectedFile()}
+              className="w-full flex items-center justify-center gap-2 rounded-lg bg-wk-brand px-4 py-2.5 text-[12px] font-bold text-wk-brand-on disabled:opacity-50 transition-all hover:opacity-90 cursor-pointer disabled:cursor-not-allowed"
+            >
+              <i className="ri-lock-unlock-line text-[13px]" />
+              {openingProtectedFile ? "Opening…" : "Open Protected Original"}
+            </button>
+          )}
+
         {/* Picker / Library: Edit & Details */}
         {selectedAsset && (
           <div className="flex gap-2">

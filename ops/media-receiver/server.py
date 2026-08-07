@@ -23,6 +23,7 @@ SESSION_ROOT = Path(
     )
 ).resolve()
 SECRET = os.environ.get("MEDIA_UPLOAD_RECEIVER_SECRET", "")
+PRIVATE_DELIVERY_SECRET = os.environ.get("MEDIA_PRIVATE_DELIVERY_SECRET", "")
 PORT = int(os.environ.get("PORT", "4017"))
 MAX_UPLOAD_BYTES = int(os.environ.get("MAX_UPLOAD_BYTES", str(25 * 1024 * 1024)))
 MAX_MASTER_BYTES = 2 * 1024 * 1024 * 1024
@@ -33,6 +34,8 @@ EXPIRY_SWEEP_SECONDS = int(os.environ.get("MEDIA_UPLOAD_EXPIRY_SWEEP_SECONDS", "
 ALLOWED_EXTENSIONS = {
     ".jpg", ".jpeg", ".png", ".gif", ".webp", ".svg", ".avif", ".ico", ".pdf",
 }
+ALLOWED_TRANSCRIPT_EXTENSIONS = {".txt"}
+ALLOWED_CAPTION_EXTENSIONS = {".vtt", ".srt"}
 ALLOWED_AUDIO_EXTENSIONS = {
     ".mp3", ".m4a", ".aac", ".wav", ".flac", ".ogg", ".oga",
 }
@@ -124,12 +127,22 @@ def clean_storage_path(raw_path):
     if normalized in ("", ".") or normalized.startswith("../") or normalized == "..":
         raise ValueError("Invalid upload path.")
 
-    if not normalized.startswith("uploads/"):
-        raise ValueError("Upload path must start with uploads/.")
-
     ext = Path(normalized).suffix.lower()
-    if ext not in ALLOWED_EXTENSIONS:
-        raise ValueError(f"Unsupported file extension: {ext}")
+
+    if normalized.startswith("uploads/"):
+        if ext not in ALLOWED_EXTENSIONS:
+            raise ValueError(f"Unsupported file extension: {ext}")
+    elif normalized.startswith("private-files/transcripts/"):
+        if ext not in ALLOWED_TRANSCRIPT_EXTENSIONS:
+            raise ValueError(f"Unsupported transcript extension: {ext}")
+    elif normalized.startswith("private-files/captions/"):
+        if ext not in ALLOWED_CAPTION_EXTENSIONS:
+            raise ValueError(f"Unsupported caption extension: {ext}")
+    else:
+        raise ValueError(
+            "Upload path must start with uploads/, private-files/transcripts/, "
+            "or private-files/captions/."
+        )
 
     target = (MEDIA_ROOT / normalized).resolve()
     if not str(target).startswith(str(MEDIA_ROOT) + os.sep):
@@ -224,6 +237,85 @@ def write_manifest(session_id, payload):
 
 def capability_hash(token):
     return hashlib.sha256(str(token or "").encode("utf-8")).hexdigest()
+
+
+def private_delivery_authorized(raw_uri):
+    if not PRIVATE_DELIVERY_SECRET:
+        return False
+
+    try:
+        parsed = urllib.parse.urlparse(str(raw_uri or ""))
+        prefix = "/__private/media-file/"
+
+        if not parsed.path.startswith(prefix):
+            return False
+
+        storage_path = urllib.parse.unquote(
+            parsed.path[len(prefix):]
+        ).lstrip("/")
+
+        normalized = posixpath.normpath(
+            storage_path.replace("\\", "/")
+        )
+
+        if (
+            normalized in ("", ".")
+            or normalized == ".."
+            or normalized.startswith("../")
+            or not normalized.startswith(
+                (
+                    "masters/audio/",
+                    "masters/video/",
+                    "derived-objects/",
+                    "private-files/transcripts/",
+                    "private-files/captions/",
+                )
+            )
+        ):
+            return False
+
+        query = urllib.parse.parse_qs(
+            parsed.query
+        )
+        expires_text = (
+            query.get("expires")
+            or [""]
+        )[0]
+        token = (
+            query.get("token")
+            or [""]
+        )[0].lower()
+
+        expires = int(expires_text)
+
+        now = int(time.time())
+
+        if (
+            expires <= now
+            or expires > now + 900
+            or not re.fullmatch(
+                r"[0-9a-f]{64}",
+                token,
+            )
+        ):
+            return False
+
+        expected = hmac.new(
+            PRIVATE_DELIVERY_SECRET.encode("utf-8"),
+            f"{expires}\n{normalized}".encode("utf-8"),
+            hashlib.sha256,
+        ).hexdigest()
+
+        return hmac.compare_digest(
+            token,
+            expected,
+        )
+    except (
+        TypeError,
+        ValueError,
+        OverflowError,
+    ):
+        return False
 
 
 def shared_secret_authorized(handler):
@@ -414,6 +506,14 @@ class Handler(BaseHTTPRequestHandler):
         parsed = urllib.parse.urlparse(self.path)
         if parsed.path == "/healthz":
             return json_response(self, 200, {"ok": True})
+
+        if parsed.path == "/authorize-private-file":
+            raw_uri = self.headers.get("X-Original-URI", "")
+            if private_delivery_authorized(raw_uri):
+                self.send_response(204)
+                self.end_headers()
+                return
+            return json_response(self, 403, {"error": "Private Media delivery authorization failed."})
 
         match = re.fullmatch(r"/sessions/([0-9a-fA-F-]{36})", parsed.path)
         if match:
@@ -859,7 +959,36 @@ class Handler(BaseHTTPRequestHandler):
             return json_response(self, 413, {"error": "Upload too large."})
 
         content_type = self.headers.get("Content-Type", "")
-        if content_type and not (
+        is_transcript = storage_path.startswith("private-files/transcripts/")
+        is_caption = storage_path.startswith("private-files/captions/")
+
+        if is_transcript:
+            allowed_content_types = {
+                "",
+                "text/plain",
+                "application/octet-stream",
+            }
+            if content_type not in allowed_content_types:
+                return json_response(
+                    self,
+                    415,
+                    {"error": f"Unsupported transcript content type: {content_type}"},
+                )
+        elif is_caption:
+            allowed_content_types = {
+                "",
+                "text/plain",
+                "text/vtt",
+                "application/x-subrip",
+                "application/octet-stream",
+            }
+            if content_type not in allowed_content_types:
+                return json_response(
+                    self,
+                    415,
+                    {"error": f"Unsupported caption content type: {content_type}"},
+                )
+        elif content_type and not (
             content_type.startswith("image/")
             or content_type == "application/octet-stream"
             or content_type == "application/pdf"
@@ -913,6 +1042,8 @@ class Handler(BaseHTTPRequestHandler):
 if __name__ == "__main__":
     if not SECRET:
         raise SystemExit("MEDIA_UPLOAD_RECEIVER_SECRET is required.")
+    if not PRIVATE_DELIVERY_SECRET:
+        raise SystemExit("MEDIA_PRIVATE_DELIVERY_SECRET is required.")
     MEDIA_ROOT.mkdir(parents=True, exist_ok=True)
     SESSION_ROOT.mkdir(parents=True, exist_ok=True)
     os.chmod(SESSION_ROOT, 0o700)

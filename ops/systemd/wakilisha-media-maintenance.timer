@@ -1,0 +1,11 @@
+[Unit]
+Description=Daily WAKILISHA Media Reconciliation and Cleanup
+
+[Timer]
+OnCalendar=*-*-* 03:25:00 UTC
+Persistent=true
+RandomizedDelaySec=10m
+Unit=wakilisha-media-maintenance.service
+
+[Install]
+WantedBy=timers.target
