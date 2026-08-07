@@ -2,6 +2,19 @@
 
 Date: 6 August 2026
 
+## Programme status update - 7 August 2026
+
+This is a time-scoped acceptance record for the public Media read lane as it
+stood on 6 August 2026.
+
+Its statements that Phase 4A was still open were correct at that checkpoint.
+
+Phase 4A later closed through PR #580 and production main `f6800cb5`.
+
+The authoritative final status is recorded in:
+
+`docs/engineering/phase-4a-media-authority-closure-record.md`
+
 ## Status
 
 Acceptance is complete for the Phase 4A public application Media read lane.
