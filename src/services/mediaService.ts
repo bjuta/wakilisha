@@ -23,6 +23,10 @@ import {
   listAdminMediaAssets,
   type AdminMediaAsset,
 } from "@/services/adminMediaReadService";
+import {
+  hashBlobSha256,
+  hashFileSha256,
+} from "@/services/mediaHash";
 
 // ─── Types ────────────────────────────────────────────────────
 
@@ -98,6 +102,31 @@ export interface MediaAsset {
   metadata: MediaAssetMetadata | null;
   created_at: string | null;
   updated_at: string | null;
+  current_file_object_id?: string | null;
+  upload_session_id?: string | null;
+  upload_session_state?: string | null;
+  processing_job_id?: string | null;
+  processing_job_status?: string | null;
+  processing_attempt_count?: number | null;
+  processing_max_attempts?: number | null;
+  processing_last_error?: string | null;
+  processing_profile_version?: string | null;
+  selected_derivatives?: Record<string, MediaDerivative>;
+  primary_delivery_url?: string | null;
+  delivery_ready?: boolean;
+}
+
+export interface MediaDerivative {
+  variant_id: string | null;
+  file_object_id: string | null;
+  url: string | null;
+  mime_type: string | null;
+  byte_size: number | null;
+  variant_role: string;
+  selection_revision: number | null;
+  generator_name: string | null;
+  generator_version: string | null;
+  technical_metadata: Record<string, unknown> | null;
 }
 
 export interface MediaAssetMetadata {
@@ -141,6 +170,50 @@ export interface UploadOptions {
   altText?: string;
   caption?: string;
   description?: string;
+}
+
+export type ResumableMasterKind = "audio" | "video";
+
+export type MediaUploadStage =
+  | "hashing"
+  | "creating_session"
+  | "uploading"
+  | "paused"
+  | "verifying"
+  | "processing"
+  | "ready"
+  | "retry_wait"
+  | "failed"
+  | "cancelled";
+
+export interface ResumableMasterContext {
+  sessionId: string;
+  masterKind: ResumableMasterKind;
+  capabilityToken: string;
+  partUploadBaseUrl: string;
+  expectedSha256: string;
+  expectedByteSize: number;
+  partSizeBytes: number;
+  totalParts: number;
+  uploadedParts: number;
+  uploadedBytes: number;
+}
+
+export interface ResumableMasterProgress {
+  stage: MediaUploadStage;
+  progress: number;
+  processedBytes: number;
+  totalBytes: number;
+  uploadedParts: number;
+  totalParts: number;
+  message: string;
+}
+
+export interface ResumableMasterUploadOptions extends UploadOptions {
+  signal?: AbortSignal;
+  resumeContext?: ResumableMasterContext | null;
+  onSession?: (context: ResumableMasterContext) => void;
+  onProgress?: (progress: ResumableMasterProgress) => void;
 }
 
 export interface ListOptions {
@@ -387,9 +460,402 @@ function immutableFilePayload(
   };
 }
 
+type MediaUploadControlResponse = {
+  data: unknown;
+  error: MediaWriteRpcError | null;
+};
+
+function nullableStringValue(value: unknown): string | null {
+  return value === null || value === undefined ? null : String(value);
+}
+
+function numericValue(value: unknown, fallback = 0): number {
+  const number = Number(value);
+  return Number.isFinite(number) ? number : fallback;
+}
+
+function throwIfUploadAborted(signal?: AbortSignal) {
+  if (!signal?.aborted) return;
+  throw new DOMException("Media upload was paused.", "AbortError");
+}
+
+async function invokeMediaUploadControl(
+  body: Record<string, unknown>,
+): Promise<Record<string, unknown>> {
+  const { data, error } = await supabase.functions.invoke(
+    "media-upload-api",
+    { body },
+  ) as MediaUploadControlResponse;
+  if (error) {
+    throw new Error(`Media upload control failed: ${error.message}`);
+  }
+  const result = objectValue(data);
+  if (!result) {
+    throw new Error("Media upload control returned an invalid response.");
+  }
+  return result;
+}
+
+async function invokeMediaTableWrite(
+  functionName: string,
+  args: Record<string, unknown>,
+): Promise<Record<string, unknown>> {
+  const client = supabase as unknown as {
+    rpc: (
+      name: string,
+      payload: Record<string, unknown>,
+    ) => PromiseLike<MediaWriteRpcResponse>;
+  };
+  const { data, error } = await client.rpc(functionName, args);
+  if (error) {
+    throw new Error(`Media workflow command failed: ${error.message}`);
+  }
+  const value = Array.isArray(data) ? data[0] : data;
+  const result = objectValue(value);
+  if (!result) {
+    throw new Error("Media workflow command returned an invalid response.");
+  }
+  return result;
+}
+
+function requireString(value: unknown, label: string): string {
+  const string = nullableStringValue(value)?.trim();
+  if (!string) {
+    throw new Error(`Media workflow response is missing ${label}.`);
+  }
+  return string;
+}
+
+function masterKindForFile(file: File): ResumableMasterKind {
+  const kind = inferFileKind(file);
+  if (kind !== "audio" && kind !== "video") {
+    throw new Error("Resumable Media masters must be audio or video.");
+  }
+  return kind;
+}
+
+function profileForMasterKind(
+  kind: ResumableMasterKind,
+): "audio-v1" | "video-v1" {
+  return kind === "audio" ? "audio-v1" : "video-v1";
+}
+
+function masterIdempotencyKey(
+  kind: ResumableMasterKind,
+  sha256: string,
+  byteSize: number,
+): string {
+  return ["m3", kind, sha256, byteSize].join(".");
+}
+
+function reportUploadProgress(
+  options: ResumableMasterUploadOptions,
+  progress: ResumableMasterProgress,
+) {
+  options.onProgress?.(progress);
+}
+
+export function getMediaAssetDeliveryUrl(
+  asset: MediaAsset | null | undefined,
+): string {
+  if (!asset) return "";
+  const kind = asset.file_kind || asset.media_kind || "";
+  if (kind === "audio") {
+    return asset.selected_derivatives?.audio_preview?.url
+      || asset.primary_delivery_url
+      || "";
+  }
+  if (kind === "video") {
+    return asset.selected_derivatives?.video_transcode?.url
+      || asset.primary_delivery_url
+      || "";
+  }
+  return asset.primary_delivery_url || asset.url || "";
+}
+
 // ─── Service ──────────────────────────────────────────────────
 
 export const mediaService = {
+  // ════════════════════════════════════════════════════════════
+  // RESUMABLE AUDIO / VIDEO MASTER WORKFLOW
+  // ════════════════════════════════════════════════════════════
+
+  async uploadResumableMaster(
+    file: File,
+    options: ResumableMasterUploadOptions = {},
+  ): Promise<MediaAsset> {
+    const masterKind = masterKindForFile(file);
+    if (file.size <= 0) throw new Error("The Media master is empty.");
+    if (file.size > 2 * 1024 * 1024 * 1024) {
+      throw new Error("Media masters cannot exceed 2 GiB.");
+    }
+
+    let context = options.resumeContext ?? null;
+    if (
+      context
+      && (context.masterKind !== masterKind || context.expectedByteSize !== file.size)
+    ) {
+      throw new Error("The paused upload belongs to a different file.");
+    }
+
+    if (!context) {
+      reportUploadProgress(options, {
+        stage: "hashing",
+        progress: 0,
+        processedBytes: 0,
+        totalBytes: file.size,
+        uploadedParts: 0,
+        totalParts: 0,
+        message: "Calculating master checksum…",
+      });
+
+      const expectedSha256 = await hashFileSha256(file, {
+        signal: options.signal,
+        onProgress: (progress) => reportUploadProgress(options, {
+          stage: "hashing",
+          progress: progress.progress,
+          processedBytes: progress.processedBytes,
+          totalBytes: progress.totalBytes,
+          uploadedParts: 0,
+          totalParts: 0,
+          message: "Calculating master checksum…",
+        }),
+      });
+
+      throwIfUploadAborted(options.signal);
+      reportUploadProgress(options, {
+        stage: "creating_session",
+        progress: 0,
+        processedBytes: 0,
+        totalBytes: file.size,
+        uploadedParts: 0,
+        totalParts: 0,
+        message: "Creating resumable upload session…",
+      });
+
+      const created = await invokeMediaUploadControl({
+        action: "create_resumable_session_v2",
+        idempotency_key: masterIdempotencyKey(
+          masterKind,
+          expectedSha256,
+          file.size,
+        ),
+        original_filename: file.name,
+        mime_type: file.type,
+        expected_byte_size: file.size,
+        expected_sha256: expectedSha256,
+        ttl_seconds: 86400,
+        correlation_id: crypto.randomUUID(),
+      });
+      const session = objectValue(created.session);
+      if (!session) {
+        throw new Error("Resumable upload session was not returned.");
+      }
+
+      context = {
+        sessionId: requireString(session.session_id, "session_id"),
+        masterKind,
+        capabilityToken: requireString(created.capability_token, "capability_token"),
+        partUploadBaseUrl: requireString(created.part_upload_base_url, "part_upload_base_url"),
+        expectedSha256,
+        expectedByteSize: file.size,
+        partSizeBytes: numericValue(session.part_size_bytes),
+        totalParts: numericValue(session.total_parts),
+        uploadedParts: numericValue(session.uploaded_parts),
+        uploadedBytes: numericValue(session.uploaded_bytes),
+      };
+      if (context.partSizeBytes <= 0 || context.totalParts <= 0) {
+        throw new Error("Resumable upload session has an invalid part contract.");
+      }
+      options.onSession?.(context);
+    } else {
+      const status = await invokeMediaUploadControl({
+        action: "resumable_session_status",
+        session_id: context.sessionId,
+      });
+      const receiver = objectValue(status.receiver);
+      context = {
+        ...context,
+        uploadedParts: numericValue(receiver?.uploaded_parts, context.uploadedParts),
+        uploadedBytes: numericValue(receiver?.uploaded_bytes, context.uploadedBytes),
+      };
+      options.onSession?.(context);
+    }
+
+    throwIfUploadAborted(options.signal);
+
+    for (
+      let partNumber = context.uploadedParts;
+      partNumber < context.totalParts;
+      partNumber += 1
+    ) {
+      throwIfUploadAborted(options.signal);
+      const start = partNumber * context.partSizeBytes;
+      const end = Math.min(start + context.partSizeBytes, file.size);
+      const part = file.slice(start, end);
+      const partSha256 = await hashBlobSha256(part, {
+        chunkSizeBytes: 1024 * 1024,
+        signal: options.signal,
+      });
+      throwIfUploadAborted(options.signal);
+
+      const response = await fetch(
+        `${context.partUploadBaseUrl}/${partNumber}`,
+        {
+          method: "PUT",
+          headers: {
+            Authorization: `Bearer ${context.capabilityToken}`,
+            "Content-Type": "application/octet-stream",
+            "X-Part-SHA256": partSha256,
+          },
+          body: part,
+          signal: options.signal,
+        },
+      );
+      const payload = objectValue(await response.json().catch(() => null));
+      if (!response.ok) {
+        throw new Error(
+          nullableStringValue(payload?.error)
+          || `Upload part ${partNumber + 1} failed.`,
+        );
+      }
+
+      context = {
+        ...context,
+        uploadedParts: numericValue(payload?.uploaded_parts, partNumber + 1),
+        uploadedBytes: numericValue(payload?.uploaded_bytes, end),
+      };
+      options.onSession?.(context);
+      reportUploadProgress(options, {
+        stage: "uploading",
+        progress: context.uploadedBytes / context.expectedByteSize,
+        processedBytes: context.uploadedBytes,
+        totalBytes: context.expectedByteSize,
+        uploadedParts: context.uploadedParts,
+        totalParts: context.totalParts,
+        message: `Uploaded ${context.uploadedParts} of ${context.totalParts} parts`,
+      });
+    }
+
+    throwIfUploadAborted(options.signal);
+    reportUploadProgress(options, {
+      stage: "verifying",
+      progress: 1,
+      processedBytes: context.expectedByteSize,
+      totalBytes: context.expectedByteSize,
+      uploadedParts: context.totalParts,
+      totalParts: context.totalParts,
+      message: "Verifying immutable master…",
+    });
+
+    const finalized = await invokeMediaUploadControl({
+      action: "finalize_resumable_session",
+      session_id: context.sessionId,
+    });
+    const verified = objectValue(finalized.session);
+    const fileObjectId = requireString(
+      verified?.file_object_id,
+      "verified file_object_id",
+    );
+
+    const adoption = await invokeMediaWrite(
+      "adopt_verified_media_upload_session_v1",
+      {
+        p_session_id: context.sessionId,
+        p_title: options.title
+          ?? file.name.replace(/\.[^.]+$/, "").replace(/[-_]/g, " "),
+        p_asset_purpose: options.assetPurpose ?? "general",
+        p_folder_id: options.folderId ?? null,
+        p_correlation_id: crypto.randomUUID(),
+      },
+    );
+    const assetId = requireString(adoption.asset_id, "asset_id");
+    const revisionId = requireString(adoption.asset_revision_id, "asset_revision_id");
+    if (requireString(adoption.file_object_id, "adopted file_object_id") !== fileObjectId) {
+      throw new Error("Adopted Media revision does not reference the verified master.");
+    }
+
+    await invokeMediaTableWrite(
+      "submit_media_processing_command_v1",
+      {
+        p_asset_id: assetId,
+        p_asset_revision_id: revisionId,
+        p_idempotency_key: `m3.process.${context.sessionId}`,
+        p_profile_version: profileForMasterKind(masterKind),
+        p_correlation_id: crypto.randomUUID(),
+      },
+    );
+
+    reportUploadProgress(options, {
+      stage: "processing",
+      progress: 1,
+      processedBytes: context.expectedByteSize,
+      totalBytes: context.expectedByteSize,
+      uploadedParts: context.totalParts,
+      totalParts: context.totalParts,
+      message: "Master verified. Processing derivatives…",
+    });
+
+    return requireAdminAsset(assetId);
+  },
+
+  async cancelResumableMaster(
+    context: ResumableMasterContext,
+  ): Promise<void> {
+    await invokeMediaUploadControl({
+      action: "cancel_resumable_session",
+      session_id: context.sessionId,
+      reason: "Cancel Media Library resumable master upload",
+    });
+  },
+
+  async waitForProcessingReady(
+    assetId: string,
+    options: {
+      timeoutMs?: number;
+      intervalMs?: number;
+      onUpdate?: (asset: MediaAsset) => void;
+    } = {},
+  ): Promise<MediaAsset> {
+    const timeoutMs = options.timeoutMs ?? 120000;
+    const intervalMs = options.intervalMs ?? 1500;
+    const deadline = Date.now() + timeoutMs;
+    while (true) {
+      const asset = await requireAdminAsset(assetId);
+      options.onUpdate?.(asset);
+      if (
+        asset.delivery_ready
+        || asset.processing_job_status === "dead_letter"
+        || asset.processing_job_status === "cancelled"
+      ) return asset;
+      if (Date.now() >= deadline) return asset;
+      await new Promise((resolve) => setTimeout(resolve, intervalMs));
+    }
+  },
+
+  async retryProcessing(assetId: string): Promise<MediaAsset> {
+    const asset = await requireAdminAsset(assetId);
+    const revisionId = asset.current_revision_id;
+    if (!revisionId) {
+      throw new Error("This Media asset is missing its current revision.");
+    }
+    const kind = asset.file_kind || asset.media_kind;
+    if (kind !== "audio" && kind !== "video") {
+      throw new Error("Only audio and video assets use durable Media processing.");
+    }
+    await invokeMediaTableWrite(
+      "submit_media_processing_command_v1",
+      {
+        p_asset_id: assetId,
+        p_asset_revision_id: revisionId,
+        p_idempotency_key: `m3.retry.${assetId}.${crypto.randomUUID()}`,
+        p_profile_version: profileForMasterKind(kind),
+        p_correlation_id: crypto.randomUUID(),
+      },
+    );
+    return requireAdminAsset(assetId);
+  },
+
   // ════════════════════════════════════════════════════════════
   // UPLOAD
   // ════════════════════════════════════════════════════════════

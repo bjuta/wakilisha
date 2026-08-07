@@ -4,6 +4,7 @@ import type {
   ListOptions,
   ListResult,
   MediaAsset,
+  MediaDerivative,
   ReferencedEntity,
 } from "@/services/mediaService";
 
@@ -89,6 +90,31 @@ function stringArray(value: unknown): string[] | null {
   return value.map(String);
 }
 
+function derivativesFrom(
+  value: unknown,
+): Record<string, MediaDerivative> {
+  const object = objectValue(value);
+  if (!object) return {};
+  return Object.fromEntries(
+    Object.entries(object).flatMap(([role, raw]) => {
+      const row = objectValue(raw);
+      if (!row) return [];
+      return [[role, {
+        variant_id: nullableString(row.variant_id),
+        file_object_id: nullableString(row.file_object_id),
+        url: nullableString(row.url),
+        mime_type: nullableString(row.mime_type),
+        byte_size: nullableNumber(row.byte_size),
+        variant_role: nullableString(row.variant_role) ?? role,
+        selection_revision: nullableNumber(row.selection_revision),
+        generator_name: nullableString(row.generator_name),
+        generator_version: nullableString(row.generator_version),
+        technical_metadata: objectValue(row.technical_metadata),
+      } satisfies MediaDerivative]];
+    }),
+  );
+}
+
 function referencesFrom(
   value: unknown,
 ): ReferencedEntity[] {
@@ -171,6 +197,18 @@ function toAdminMediaAsset(
       nullableString(row.public_safety_state),
     active_usage_count:
       nullableNumber(row.active_usage_count) ?? 0,
+    current_file_object_id: nullableString(row.current_file_object_id),
+    upload_session_id: nullableString(row.upload_session_id),
+    upload_session_state: nullableString(row.upload_session_state),
+    processing_job_id: nullableString(row.processing_job_id),
+    processing_job_status: nullableString(row.processing_job_status),
+    processing_attempt_count: nullableNumber(row.processing_attempt_count),
+    processing_max_attempts: nullableNumber(row.processing_max_attempts),
+    processing_last_error: nullableString(row.processing_last_error),
+    processing_profile_version: nullableString(row.processing_profile_version),
+    selected_derivatives: derivativesFrom(row.selected_derivatives),
+    primary_delivery_url: nullableString(row.primary_delivery_url),
+    delivery_ready: row.delivery_ready === true,
     references: referencesFrom(row.references),
   };
 }

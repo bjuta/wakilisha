@@ -10,7 +10,11 @@ import { useState, useEffect, useRef } from "react";
 import { WkIcon } from "@/components/design-system/Icon";
 import { MediaLibraryCore } from "@/components/admin/media/MediaLibraryCore";
 import { MediaLibraryPreviewPanel } from "@/components/admin/media/MediaLibraryPreviewPanel";
-import { type MediaAsset, mediaService } from "@/services/mediaService";
+import {
+  type MediaAsset,
+  type MediaFileKind,
+  mediaService,
+} from "@/services/mediaService";
 
 export interface MediaPickerSelection {
   assetId: string | null;
@@ -25,9 +29,18 @@ interface Props {
   title?: string;
   /** When provided, pre-selects this image and shows "Replace" button text */
   currentUrl?: string;
+  /** Existing consumers default to images/documents. Audio/video are opt-in. */
+  allowedKinds?: MediaFileKind[];
 }
 
-export function MediaPickerModal({ open, onClose, onSelect, title = "Select Media", currentUrl }: Props) {
+export function MediaPickerModal({
+  open,
+  onClose,
+  onSelect,
+  title = "Select Media",
+  currentUrl,
+  allowedKinds = ["image", "document"],
+}: Props) {
   const [selectedUrl, setSelectedUrl] = useState(currentUrl ?? "");
   const [selectedAssetId, setSelectedAssetId] = useState<string | null>(null);
   const [resolvedAsset, setResolvedAsset] = useState<MediaAsset | null>(null);
@@ -120,6 +133,7 @@ export function MediaPickerModal({ open, onClose, onSelect, title = "Select Medi
               mode="picker"
               currentUrl={currentUrl}
               refreshKey={refreshCounter}
+              allowedKinds={allowedKinds}
               onSelectionChange={(id, url, asset) => {
                 setSelectedAssetId(id);
                 setSelectedUrl(url);

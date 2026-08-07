@@ -11,7 +11,14 @@
 
 import { useEffect, useState, useCallback, useRef } from "react";
 import { WkIcon } from "@/components/design-system/Icon";
-import { mediaService, type MediaAsset, type MediaFolder } from "@/services/mediaService";
+import {
+  getMediaAssetDeliveryUrl,
+  mediaService,
+  type MediaAsset,
+  type MediaFileKind,
+  type MediaFolder,
+  type ResumableMasterContext,
+} from "@/services/mediaService";
 import { MediaEditModal } from "@/components/admin/media/MediaEditModal";
 import { MediaLibraryPreviewPanel } from "@/components/admin/media/MediaLibraryPreviewPanel";
 
@@ -36,14 +43,34 @@ export interface MediaLibraryCoreProps {
   refreshKey?: number;
   /** Show upload tab by default */
   defaultTab?: Tab;
+  /** Picker mode: file kinds the consumer explicitly accepts. */
+  allowedKinds?: MediaFileKind[];
 }
 
 const PAGE_SIZE = 60;
-const ACCEPTED_UPLOAD_TYPES = "image/*,application/pdf,.pdf";
+const ACCEPTED_UPLOAD_TYPES = [
+  "image/*", "application/pdf", ".pdf",
+  "audio/*", ".mp3", ".m4a", ".aac", ".wav", ".flac", ".ogg", ".oga",
+  "video/*", ".mp4", ".mov", ".m4v", ".webm", ".mkv",
+].join(",");
 
-function inferUploadFileKind(file: File): "image" | "document" | "other" {
+type UploadQueueStage =
+  | "pending" | "hashing" | "creating_session" | "uploading"
+  | "paused" | "verifying" | "processing" | "done"
+  | "error" | "cancelled";
+
+interface UploadQueueItem {
+  stage: UploadQueueStage;
+  progress: number;
+  message: string;
+}
+
+function inferUploadFileKind(file: File): MediaFileKind {
+  const ext = file.name.toLowerCase().split(".").pop() ?? "";
   if (file.type.startsWith("image/")) return "image";
-  if (file.type === "application/pdf" || file.name.toLowerCase().endsWith(".pdf")) return "document";
+  if (file.type === "application/pdf" || ext === "pdf") return "document";
+  if (file.type.startsWith("audio/") || ["mp3", "m4a", "aac", "wav", "flac", "ogg", "oga"].includes(ext)) return "audio";
+  if (file.type.startsWith("video/") || ["mp4", "mov", "m4v", "webm", "mkv"].includes(ext)) return "video";
   return "other";
 }
 
@@ -87,6 +114,7 @@ export function MediaLibraryCore({
   onAssetDeleted,
   refreshKey = 0,
   defaultTab = "assets",
+  allowedKinds,
 }: MediaLibraryCoreProps) {
   // ── View state
   const [tab, setTab] = useState<Tab>(defaultTab);
@@ -130,16 +158,23 @@ export function MediaLibraryCore({
 
   // ── Upload
   const [uploadFiles, setUploadFiles] = useState<File[]>([]);
-  const [uploadProgress, setUploadProgress] = useState<Record<string, "pending" | "uploading" | "done" | "error">>({});
+  const [uploadProgress, setUploadProgress] = useState<Record<string, UploadQueueItem>>({});
   const [uploadedItems, setUploadedItems] = useState<{ name: string; url: string; assetId?: string }[]>([]);
   const [isDragging, setIsDragging] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const masterContextsRef = useRef<Record<string, ResumableMasterContext>>({});
+  const masterControllersRef = useRef<Record<string, AbortController>>({});
 
   // ── Toast
   const [toast, setToast] = useState<{ type: "success" | "error"; msg: string } | null>(null);
   const [copied, setCopied] = useState<string | null>(null);
 
   const isPickerMode = mode === "picker";
+  const pickerAllowedKinds = allowedKinds ?? ["image", "document"];
+  const isPickerKindAllowed = (asset: MediaAsset) => (
+    !isPickerMode
+    || pickerAllowedKinds.includes(assetFileKind(asset) as MediaFileKind)
+  );
 
   const showToast = (type: "success" | "error", msg: string) => {
     setToast({ type, msg });
@@ -194,8 +229,11 @@ export function MediaLibraryCore({
         orderBy: "created_at",
         ascending: false,
       });
-      setAssets(result.assets);
-      setTotal(result.total);
+      const visibleAssets = isPickerMode
+        ? result.assets.filter(isPickerKindAllowed)
+        : result.assets;
+      setAssets(visibleAssets);
+      setTotal(isPickerMode ? visibleAssets.length : result.total);
     } catch (err) {
       setLoadError(err instanceof Error ? err.message : "Failed to load media assets.");
     } finally {
@@ -220,14 +258,126 @@ export function MediaLibraryCore({
 
 
   // ── Upload
+  const setUploadState = useCallback((fileName: string, state: UploadQueueItem) => {
+    setUploadProgress((previous) => ({ ...previous, [fileName]: state }));
+  }, []);
+
   const uploadFile = useCallback(async (file: File) => {
-    setUploadProgress((p) => ({ ...p, [file.name]: "uploading" }));
+    const fileKind = inferUploadFileKind(file);
+    const label = file.name.replace(/\.[^.]+$/, "").replace(/[-_]/g, " ");
+    const activeFolder = folderIdFilter !== "all" && folderIdFilter !== "none"
+      ? folders.find((folder) => folder.id === folderIdFilter) ?? null
+      : null;
+
+    if (isPickerMode && !pickerAllowedKinds.includes(fileKind)) {
+      setUploadState(file.name, {
+        stage: "error",
+        progress: 0,
+        message: `This picker does not accept ${fileKind} files.`,
+      });
+      return;
+    }
+
+    if (fileKind === "audio" || fileKind === "video") {
+      const controller = new AbortController();
+      masterControllersRef.current[file.name] = controller;
+      try {
+        let asset = await mediaService.uploadResumableMaster(file, {
+          title: label,
+          folderId: activeFolder?.id ?? null,
+          assetPurpose: assetPurposeForFolder(activeFolder, fileKind),
+          fileKind,
+          sourceKind: "editor_upload",
+          sourceEntity: "admin_upload",
+          signal: controller.signal,
+          resumeContext: masterContextsRef.current[file.name] ?? null,
+          onSession: (context) => {
+            masterContextsRef.current[file.name] = context;
+          },
+          onProgress: (progress) => {
+            setUploadState(file.name, {
+              stage: progress.stage === "ready"
+                ? "done"
+                : progress.stage === "failed"
+                  ? "error"
+                  : progress.stage,
+              progress: progress.progress,
+              message: progress.message,
+            });
+          },
+        });
+
+        setUploadState(file.name, {
+          stage: "processing",
+          progress: 1,
+          message: "Processing governed derivatives…",
+        });
+
+        asset = await mediaService.waitForProcessingReady(asset.id, {
+          onUpdate: (updated) => {
+            const status = updated.processing_job_status;
+            setUploadState(file.name, {
+              stage: updated.delivery_ready
+                ? "done"
+                : status === "dead_letter"
+                  ? "error"
+                  : "processing",
+              progress: 1,
+              message: updated.delivery_ready
+                ? "Ready"
+                : status === "retry_wait"
+                  ? "Processing retry scheduled…"
+                  : status === "dead_letter"
+                    ? (updated.processing_last_error || "Processing failed. The master is preserved.")
+                    : "Processing governed derivatives…",
+            });
+          },
+        });
+
+        const deliveryUrl = getMediaAssetDeliveryUrl(asset);
+        if (!asset.delivery_ready) {
+          throw new Error(
+            asset.processing_last_error
+            || "Processing did not reach a ready derivative state.",
+          );
+        }
+
+        setUploadState(file.name, {
+          stage: "done",
+          progress: 1,
+          message: "Added to Media Library",
+        });
+        setUploadedItems((previous) => [
+          ...previous.filter((item) => item.name !== file.name),
+          { name: file.name, url: deliveryUrl, assetId: asset.id },
+        ]);
+        selectItem(asset.id, deliveryUrl, asset);
+        delete masterContextsRef.current[file.name];
+        fetchAssets();
+      } catch (error) {
+        if (error instanceof DOMException && error.name === "AbortError") {
+          setUploadState(file.name, {
+            stage: "paused",
+            progress: uploadProgress[file.name]?.progress ?? 0,
+            message: "Paused. Resume continues from accepted parts.",
+          });
+        } else {
+          setUploadState(file.name, {
+            stage: "error",
+            progress: uploadProgress[file.name]?.progress ?? 0,
+            message: error instanceof Error
+              ? error.message
+              : "Upload failed. The master is preserved if verification completed.",
+          });
+        }
+      } finally {
+        delete masterControllersRef.current[file.name];
+      }
+      return;
+    }
+
+    setUploadState(file.name, { stage: "uploading", progress: 0, message: "Uploading…" });
     try {
-      const fileKind = inferUploadFileKind(file);
-      const label = file.name.replace(/\.[^.]+$/, "").replace(/[-_]/g, " ");
-      const activeFolder = folderIdFilter !== "all" && folderIdFilter !== "none"
-        ? folders.find((folder) => folder.id === folderIdFilter) ?? null
-        : null;
       const folderPath = activeFolder?.path
         ? `uploads/${activeFolder.path}`
         : fileKind === "document" ? "uploads/downloads" : "uploads";
@@ -240,31 +390,90 @@ export function MediaLibraryCore({
         fileKind,
         assetPurpose: assetPurposeForFolder(activeFolder, fileKind),
       });
-      setUploadProgress((p) => ({ ...p, [file.name]: "done" }));
-      setUploadedItems((prev) => [...prev, { name: file.name, url: asset.url!, assetId: asset.id }]);
-      // Auto-select the uploaded item, passing the full asset so the parent previews it
-      selectItem(asset.id, asset.url!, asset);
-      // Refresh assets list
+      const deliveryUrl = getMediaAssetDeliveryUrl(asset);
+      setUploadState(file.name, { stage: "done", progress: 1, message: "Added to Media Library" });
+      setUploadedItems((previous) => [
+        ...previous,
+        { name: file.name, url: deliveryUrl, assetId: asset.id },
+      ]);
+      selectItem(asset.id, deliveryUrl, asset);
       fetchAssets();
-    } catch {
-      setUploadProgress((p) => ({ ...p, [file.name]: "error" }));
+    } catch (error) {
+      setUploadState(file.name, {
+        stage: "error",
+        progress: 0,
+        message: error instanceof Error ? error.message : "Upload failed.",
+      });
     }
-  }, [fetchAssets, selectItem, folderIdFilter, folders]);
+  }, [
+    fetchAssets,
+    selectItem,
+    folderIdFilter,
+    folders,
+    isPickerMode,
+    pickerAllowedKinds,
+    setUploadState,
+    uploadProgress,
+  ]);
+
+  const pauseUpload = useCallback((fileName: string) => {
+    masterControllersRef.current[fileName]?.abort();
+  }, []);
+
+  const resumeUpload = useCallback((file: File) => {
+    const context = masterContextsRef.current[file.name];
+    setUploadState(file.name, {
+      stage: "uploading",
+      progress: context && context.expectedByteSize > 0
+        ? context.uploadedBytes / context.expectedByteSize
+        : 0,
+      message: context
+        ? `Resuming from ${context.uploadedParts} of ${context.totalParts} accepted parts...`
+        : "Resuming upload...",
+    });
+    void uploadFile(file);
+  }, [setUploadState, uploadFile]);
+
+  const cancelUpload = useCallback(async (file: File) => {
+    masterControllersRef.current[file.name]?.abort();
+    const context = masterContextsRef.current[file.name];
+    try {
+      if (context) await mediaService.cancelResumableMaster(context);
+    } finally {
+      delete masterContextsRef.current[file.name];
+      setUploadState(file.name, {
+        stage: "cancelled",
+        progress: 0,
+        message: "Upload cancelled and partial parts cleaned up.",
+      });
+    }
+  }, [setUploadState]);
 
   const handleFilesAdded = useCallback((files: FileList | File[]) => {
     const incoming = Array.from(files);
-    const arr = incoming.filter(isSupportedUploadFile);
+    const arr = incoming.filter((file) => {
+      if (!isSupportedUploadFile(file)) return false;
+      if (!isPickerMode) return true;
+      return pickerAllowedKinds.includes(inferUploadFileKind(file));
+    });
     const rejected = incoming.length - arr.length;
-
     if (rejected > 0) {
-      showToast("error", `${rejected} unsupported file${rejected === 1 ? "" : "s"} skipped. Use images or PDFs.`);
+      showToast(
+        "error",
+        `${rejected} unsupported file${rejected === 1 ? "" : "s"} skipped. Use an allowed image, PDF, audio, or video format.`,
+      );
     }
-
     if (arr.length === 0) return;
-
-    setUploadFiles((prev) => [...prev, ...arr]);
-    arr.forEach(uploadFile);
-  }, [uploadFile]);
+    setUploadFiles((previous) => [...previous, ...arr]);
+    arr.forEach((file) => {
+      setUploadState(file.name, {
+        stage: "pending",
+        progress: 0,
+        message: `${(file.size / 1024 / 1024).toFixed(1)} MB`,
+      });
+      void uploadFile(file);
+    });
+  }, [isPickerMode, pickerAllowedKinds, setUploadState, uploadFile]);
 
   const handleDrop = useCallback((e: React.DragEvent) => {
     e.preventDefault();
@@ -649,7 +858,7 @@ export function MediaLibraryCore({
                     <div
                       key={asset.id}
                       onClick={() => {
-                        selectItem(asset.id, asset.url ?? "");
+                        selectItem(asset.id, getMediaAssetDeliveryUrl(asset));
                       }}
                       className={`group relative aspect-square overflow-hidden rounded-xl border cursor-pointer transition-all ${
                         isSelected ? "ring-2 ring-wk-brand border-wk-brand" :
@@ -705,7 +914,7 @@ export function MediaLibraryCore({
                       {!isPickerMode && (
                         <div className="absolute top-1.5 right-1.5 opacity-0 group-hover:opacity-100 transition-opacity flex gap-1">
                           <button
-                            onClick={(e) => { e.stopPropagation(); asset.url && handleCopy(asset.url); }}
+                            onClick={(e) => { e.stopPropagation(); getMediaAssetDeliveryUrl(asset) && handleCopy(getMediaAssetDeliveryUrl(asset)); }}
                             title="Copy URL"
                             className="flex h-6 w-6 items-center justify-center rounded-md bg-black/50 text-white hover:bg-black/70 cursor-pointer"
                           >
@@ -748,7 +957,7 @@ export function MediaLibraryCore({
                             <input type="checkbox" checked={bulkSelected.has(asset.id)} onChange={() => toggleBulk(asset.id)} className="rounded w-3 h-3" />
                           </td>
                           <td className="px-3 py-2.5">
-                            <div className="h-9 w-9 overflow-hidden rounded-lg bg-wk-surface-raised cursor-pointer" onClick={() => selectItem(asset.id, asset.url ?? "")}>
+                            <div className="h-9 w-9 overflow-hidden rounded-lg bg-wk-surface-raised cursor-pointer" onClick={() => selectItem(asset.id, getMediaAssetDeliveryUrl(asset))}>
                               {asset.url && isImageAsset(asset) ? (
                                 <img src={asset.url} alt="" className="h-full w-full object-cover object-top" loading="lazy" onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }} />
                               ) : (
@@ -757,7 +966,7 @@ export function MediaLibraryCore({
                             </div>
                           </td>
                           <td className="px-3 py-2.5">
-                            <button onClick={() => selectItem(asset.id, asset.url ?? "")} className="text-left cursor-pointer hover:text-wk-brand">
+                            <button onClick={() => selectItem(asset.id, getMediaAssetDeliveryUrl(asset))} className="text-left cursor-pointer hover:text-wk-brand">
                               <div className="font-semibold text-wk-text truncate max-w-[200px]">{asset.title || "(no title)"}</div>
                               <div className="text-wk-text-faint font-mono text-[10px] truncate max-w-[200px]">{asset.slug}</div>
                             </button>
@@ -775,7 +984,7 @@ export function MediaLibraryCore({
                           </td>
                           <td className="px-3 py-2.5">
                             <div className="flex items-center justify-end gap-1">
-                              <button onClick={() => asset.url && handleCopy(asset.url)} title="Copy URL"
+                              <button onClick={() => getMediaAssetDeliveryUrl(asset) && handleCopy(getMediaAssetDeliveryUrl(asset))} title="Copy URL"
                                 className="rounded-md p-1.5 text-wk-text-muted hover:bg-wk-surface-raised hover:text-wk-brand cursor-pointer">
                                 <WkIcon name={copied === asset.url ? "Check" : "Copy"} size={12} />
                               </button>
@@ -855,7 +1064,7 @@ export function MediaLibraryCore({
               </div>
               <div className="text-center">
                 <p className="text-[15px] font-bold text-wk-text">{isDragging ? "Drop files here" : "Drag & drop or click to upload"}</p>
-                <p className="mt-1 text-[12px] text-wk-text-muted">PNG, JPG, GIF, WebP, SVG, PDF · Uploads to Lightsail + media registry</p>
+                <p className="mt-1 text-[12px] text-wk-text-muted">Images and PDFs use the existing direct lane. Audio and video use resumable protected masters + durable processing.</p>
               </div>
               <input ref={fileInputRef} type="file" accept={ACCEPTED_UPLOAD_TYPES} multiple className="hidden"
                 onChange={(e) => e.target.files && handleFilesAdded(e.target.files)} />
@@ -865,43 +1074,81 @@ export function MediaLibraryCore({
               <div className="space-y-2">
                 <p className="text-[11px] font-bold uppercase tracking-wider text-wk-text-muted">Upload Queue</p>
                 {uploadFiles.map((file) => {
-                  const status = uploadProgress[file.name] ?? "pending";
-                  const uploaded = uploadedItems.find((u) => u.name === file.name);
+                  const queue = uploadProgress[file.name] ?? {
+                    stage: "pending" as const,
+                    progress: 0,
+                    message: `${(file.size / 1024 / 1024).toFixed(1)} MB`,
+                  };
+                  const uploaded = uploadedItems.find((item) => item.name === file.name);
+                  const fileKind = inferUploadFileKind(file);
+                  const isMaster = fileKind === "audio" || fileKind === "video";
+                  const active = [
+                    "hashing", "creating_session", "uploading", "verifying", "processing",
+                  ].includes(queue.stage);
+
                   return (
-                    <div key={file.name}
-                      onClick={() => { if (status === "done" && uploaded) selectItem(uploaded.assetId ?? null, uploaded.url); }}
-                      className={`flex items-center gap-3 rounded-lg border px-3 py-2.5 transition-all ${
-                        status === "done" ? "border-wk-success/30 bg-wk-success/5 cursor-pointer" :
-                        status === "error" ? "border-wk-danger/30 bg-wk-danger/5" :
-                        "border-wk-border bg-wk-surface"
-                      }`}>
-                      <div className="shrink-0">
-                        {status === "uploading" && <div className="h-5 w-5 animate-spin rounded-full border-2 border-wk-brand border-t-transparent" />}
-                        {status === "done" && <div className="flex h-5 w-5 items-center justify-center rounded-full bg-wk-success"><WkIcon name="Check" size={10} className="text-white" /></div>}
-                        {status === "error" && <div className="flex h-5 w-5 items-center justify-center rounded-full bg-wk-danger"><WkIcon name="X" size={10} className="text-white" /></div>}
-                        {status === "pending" && <div className="h-5 w-5 rounded-full border-2 border-wk-border-2" />}
+                    <div
+                      key={file.name}
+                      onClick={() => {
+                        if (queue.stage === "done" && uploaded) {
+                          selectItem(uploaded.assetId ?? null, uploaded.url);
+                        }
+                      }}
+                      className={`rounded-lg border px-3 py-2.5 transition-all ${
+                        queue.stage === "done"
+                          ? "border-wk-success/30 bg-wk-success/5 cursor-pointer"
+                          : queue.stage === "error"
+                            ? "border-wk-danger/30 bg-wk-danger/5"
+                            : queue.stage === "paused"
+                              ? "border-wk-warning/30 bg-wk-warning/5"
+                              : "border-wk-border bg-wk-surface"
+                      }`}
+                    >
+                      <div className="flex items-center gap-3">
+                        <div className="shrink-0">
+                          {active && <div className="h-5 w-5 animate-spin rounded-full border-2 border-wk-brand border-t-transparent" />}
+                          {queue.stage === "done" && <div className="flex h-5 w-5 items-center justify-center rounded-full bg-wk-success"><WkIcon name="Check" size={10} className="text-white" /></div>}
+                          {queue.stage === "error" && <div className="flex h-5 w-5 items-center justify-center rounded-full bg-wk-danger"><WkIcon name="X" size={10} className="text-white" /></div>}
+                          {queue.stage === "paused" && <div className="flex h-5 w-5 items-center justify-center rounded-full bg-wk-warning"><i className="ri-pause-line text-[11px] text-white" /></div>}
+                          {["pending", "cancelled"].includes(queue.stage) && <div className="h-5 w-5 rounded-full border-2 border-wk-border-2" />}
+                        </div>
+
+                        <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-wk-surface-raised text-wk-text-faint">
+                          <i className={`${
+                            fileKind === "image" ? "ri-image-line"
+                              : fileKind === "document" ? "ri-file-pdf-2-line"
+                                : fileKind === "audio" ? "ri-music-2-line"
+                                  : fileKind === "video" ? "ri-video-line"
+                                    : "ri-file-line"
+                          } text-[17px]`} />
+                        </div>
+
+                        <div className="min-w-0 flex-1">
+                          <p className="truncate text-[12px] font-semibold text-wk-text">{file.name}</p>
+                          <p className="text-[11px] text-wk-text-muted">{queue.message}</p>
+                          {active && (
+                            <div className="mt-1.5 h-1.5 overflow-hidden rounded-full bg-wk-surface-raised">
+                              <div
+                                className="h-full rounded-full bg-wk-brand transition-all"
+                                style={{ width: `${Math.max(2, Math.min(100, queue.progress * 100))}%` }}
+                              />
+                            </div>
+                          )}
+                        </div>
+
+                        {isMaster && active && (
+                          <button type="button" onClick={(event) => { event.stopPropagation(); pauseUpload(file.name); }} className="rounded-lg border border-wk-border px-2 py-1 text-[10px] font-bold text-wk-text-soft hover:bg-wk-surface-raised">Pause</button>
+                        )}
+                        {isMaster && queue.stage === "paused" && (
+                          <button type="button" onClick={(event) => { event.stopPropagation(); resumeUpload(file); }} className="rounded-lg bg-wk-brand px-2 py-1 text-[10px] font-bold text-wk-brand-on">Resume</button>
+                        )}
+                        {isMaster && ["paused", "error"].includes(queue.stage) && masterContextsRef.current[file.name] && (
+                          <button type="button" onClick={(event) => { event.stopPropagation(); void cancelUpload(file); }} className="rounded-lg border border-wk-danger/30 px-2 py-1 text-[10px] font-bold text-wk-danger">Cancel</button>
+                        )}
+                        {queue.stage === "done" && uploaded && selectedUrl === uploaded.url && (
+                          <span className="shrink-0 text-[11px] font-bold text-wk-brand">Selected</span>
+                        )}
                       </div>
-                      {status === "done" && uploaded && (
-                        file.type.startsWith("image/") ? (
-                          <img src={uploaded.url} alt="" className="h-8 w-8 shrink-0 rounded-lg object-cover" />
-                        ) : (
-                          <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-wk-surface-raised text-wk-text-faint">
-                            <i className="ri-file-pdf-2-line text-[17px]" />
-                          </div>
-                        )
-                      )}
-                      <div className="min-w-0 flex-1">
-                        <p className="truncate text-[12px] font-semibold text-wk-text">{file.name}</p>
-                        <p className="text-[11px] text-wk-text-muted">
-                          {status === "uploading" && "Uploading…"}
-                          {status === "done" && "Added to registry — click to select"}
-                          {status === "error" && "Upload failed"}
-                          {status === "pending" && `${(file.size / 1024).toFixed(0)} KB`}
-                        </p>
-                      </div>
-                      {status === "done" && uploaded && selectedUrl === uploaded.url && (
-                        <span className="shrink-0 text-[11px] font-bold text-wk-brand">Selected</span>
-                      )}
                     </div>
                   );
                 })}
@@ -932,7 +1179,7 @@ export function MediaLibraryCore({
       )}
       </div>
       {/* ── Preview panel (library mode only) ── */}
-      {!isPickerMode && selectedUrl && (
+      {!isPickerMode && selectedAssetId && (
         <MediaLibraryPreviewPanel
           selectedAsset={selectedAsset}
           selectedUrl={selectedUrl}
