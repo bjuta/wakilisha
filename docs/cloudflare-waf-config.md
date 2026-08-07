@@ -180,17 +180,25 @@ If you need changes to the Cloudflare config and can't access the dashboard:
 
 This section replaces the older broad `wp-*` shutdown thinking with a safer staged plan.
 
-### 12.1 Do not block media yet
+### 12.1 Historical upload URL compatibility
 
-Do not block or redirect `/wp-content/uploads/*` until the media migration is complete.
+The Media migration is complete.
 
-Reason: imported and legacy article or track artwork may still depend on old WordPress upload URLs until the Lightsail-backed media origin is live and verified.
+Historical `/wp-content/uploads/*` requests remain redirected to:
 
-Media phase target:
+`https://media.wakilisha.africa/uploads/*`
 
-`/wp-content/uploads/*` to Lightsail-backed media origin.
+This protects old search indexes, social links, and external backlinks.
 
-Do not route long-term media storage through Supabase Storage. Supabase storage is constrained and should not be the permanent media bucket for imported and future WAKILISHA assets.
+It is URL compatibility only. It must not proxy to WordPress or consult the
+retained local `wp-content` mirror for ordinary Media delivery.
+
+The old WordPress-host proxy and Media-origin `wp-content` fallback were
+retired on 7 August 2026.
+
+Do not route long-term media storage through Supabase Storage. Supabase storage
+is constrained and should not be the permanent media bucket for imported and
+future WAKILISHA assets.
 
 ### 12.2 Block WordPress attack surfaces
 
