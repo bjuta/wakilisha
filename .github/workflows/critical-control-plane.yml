@@ -47,7 +47,7 @@ jobs:
 
       - name: Resolve public RLS test credentials
         run: |
-          npx supabase projects api-keys \
+          npx --yes supabase@2.107.0 projects api-keys \
             --project-ref "$SUPABASE_PROJECT_REF" \
             -o json \
             > /tmp/supabase-api-keys.json
