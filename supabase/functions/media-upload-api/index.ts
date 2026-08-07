@@ -1,8 +1,10 @@
 // WAKILISHA media upload bridge.
-// Browser/admin UI -> this authenticated Edge Function -> protected Lightsail receiver.
+// Browser/admin UI -> authenticated Edge Function -> protected Lightsail receiver.
+// Large audio masters use a control-plane session plus direct resumable parts.
 // Requires Supabase secrets:
 // - SUPABASE_URL
 // - SUPABASE_ANON_KEY
+// - SUPABASE_SERVICE_ROLE_KEY
 // - MEDIA_UPLOAD_RECEIVER_URL
 // - MEDIA_UPLOAD_RECEIVER_SECRET
 
@@ -29,6 +31,7 @@ const RESPONSIVE_DERIVATIVE_EXTENSIONS = new Set([
 ]);
 
 type UploadKind = "image" | "document";
+type JsonObject = Record<string, unknown>;
 
 function json(status: number, body: unknown) {
   return new Response(JSON.stringify(body), {
@@ -50,6 +53,12 @@ function userClient(authHeader: string) {
   });
 }
 
+function serviceClient() {
+  return createClient(env("SUPABASE_URL"), env("SUPABASE_SERVICE_ROLE_KEY"), {
+    auth: { persistSession: false },
+  });
+}
+
 async function requireAuthenticatedUser(authHeader: string) {
   const client = userClient(authHeader);
   const { data: userData, error: userError } = await client.auth.getUser();
@@ -63,6 +72,285 @@ async function requireAuthenticatedUser(authHeader: string) {
     user: userData.user,
     isAdmin: isAdmin === true,
   };
+}
+
+function requireAdmin(isAdmin: boolean) {
+  if (!isAdmin) {
+    throw Object.assign(
+      new Error("Administrator access is required for resumable master uploads."),
+      { status: 403 },
+    );
+  }
+}
+
+function objectValue(value: unknown): JsonObject {
+  return value && typeof value === "object" && !Array.isArray(value)
+    ? value as JsonObject
+    : {};
+}
+
+function stringValue(value: unknown) {
+  return typeof value === "string" ? value.trim() : "";
+}
+
+function numberValue(value: unknown) {
+  return typeof value === "number" && Number.isFinite(value) ? value : Number.NaN;
+}
+
+function randomCapability() {
+  return `${crypto.randomUUID().replaceAll("-", "")}${crypto.randomUUID().replaceAll("-", "")}`;
+}
+
+function receiverSessionBaseUrl() {
+  const legacyReceiverUrl = new URL(env("MEDIA_UPLOAD_RECEIVER_URL"));
+  return `${legacyReceiverUrl.origin}/__admin/media-upload-session`;
+}
+
+async function receiverAdminFetch(path: string, init: RequestInit = {}) {
+  const headers = new Headers(init.headers);
+  headers.set(
+    "Authorization",
+    `Bearer ${env("MEDIA_UPLOAD_RECEIVER_SECRET")}`,
+  );
+  const response = await fetch(`${receiverSessionBaseUrl()}${path}`, {
+    ...init,
+    headers,
+  });
+  const payload = await response.json().catch(() => ({}));
+  return { response, payload: objectValue(payload) };
+}
+
+async function userRpc(
+  authHeader: string,
+  functionName: string,
+  args: JsonObject,
+) {
+  const { data, error } = await userClient(authHeader).rpc(functionName, args);
+  if (error) {
+    throw Object.assign(new Error(error.message), { status: 400 });
+  }
+  return objectValue(data);
+}
+
+async function serviceRpc(functionName: string, args: JsonObject) {
+  const { data, error } = await serviceClient().rpc(functionName, args);
+  if (error) {
+    throw Object.assign(new Error(error.message), { status: 500 });
+  }
+  return objectValue(data);
+}
+
+async function createResumableSession(authHeader: string, body: JsonObject) {
+  const idempotencyKey = stringValue(body.idempotency_key);
+  const originalFilename = stringValue(body.original_filename);
+  const mimeType = stringValue(body.mime_type).toLowerCase();
+  const expectedByteSize = numberValue(body.expected_byte_size);
+  const expectedSha256 = stringValue(body.expected_sha256).toLowerCase();
+  const ttlCandidate = numberValue(body.ttl_seconds);
+  const ttlSeconds = Number.isInteger(ttlCandidate) ? ttlCandidate : 86400;
+  const correlationId = stringValue(body.correlation_id) || crypto.randomUUID();
+
+  if (!idempotencyKey || !originalFilename || !mimeType || !Number.isInteger(expectedByteSize) || !expectedSha256) {
+    throw Object.assign(new Error("Complete resumable upload metadata is required."), { status: 400 });
+  }
+
+  const session = await userRpc(
+    authHeader,
+    "create_media_upload_session_v1",
+    {
+      p_idempotency_key: idempotencyKey,
+      p_original_filename: originalFilename,
+      p_mime_type: mimeType,
+      p_expected_byte_size: expectedByteSize,
+      p_expected_sha256: expectedSha256,
+      p_ttl_seconds: ttlSeconds,
+      p_correlation_id: correlationId,
+    },
+  );
+
+  const sessionId = stringValue(session.session_id);
+  const capabilityToken = randomCapability();
+  if (!sessionId) {
+    throw Object.assign(new Error("Upload session was not created."), { status: 500 });
+  }
+
+  const { response, payload } = await receiverAdminFetch("/sessions", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      session_id: sessionId,
+      storage_path: session.storage_path,
+      expected_byte_size: session.expected_byte_size,
+      expected_sha256: session.expected_sha256,
+      part_size_bytes: session.part_size_bytes,
+      total_parts: session.total_parts,
+      expires_at: session.expires_at,
+      capability_token: capabilityToken,
+      mime_type: session.mime_type,
+      original_filename: session.original_filename,
+    }),
+  });
+
+  if (!response.ok) {
+    throw Object.assign(
+      new Error(stringValue(payload.error) || `Media receiver session creation failed with ${response.status}.`),
+      { status: response.status },
+    );
+  }
+
+  return {
+    ok: true,
+    mode: "resumable_audio_master",
+    session: {
+      ...session,
+      receiver_state: payload.state,
+      uploaded_parts: payload.uploaded_parts,
+      uploaded_bytes: payload.uploaded_bytes,
+    },
+    capability_token: capabilityToken,
+    part_upload_base_url: `${receiverSessionBaseUrl()}/sessions/${sessionId}/parts`,
+  };
+}
+
+async function resumableSessionStatus(authHeader: string, body: JsonObject) {
+  const sessionId = stringValue(body.session_id);
+  if (!sessionId) {
+    throw Object.assign(new Error("session_id is required."), { status: 400 });
+  }
+
+  const session = await userRpc(
+    authHeader,
+    "get_media_upload_session_v1",
+    { p_session_id: sessionId },
+  );
+
+  const { response, payload } = await receiverAdminFetch(`/sessions/${sessionId}`);
+  let durableSession = session;
+  if (
+    response.ok
+    && stringValue(payload.state) === "expired"
+    && stringValue(session.state) === "created"
+  ) {
+    durableSession = await serviceRpc(
+      "expire_media_upload_session_v1",
+      {
+        p_session_id: sessionId,
+        p_reason: "Receiver confirmed upload-session expiry and partial cleanup",
+      },
+    );
+  }
+  if (!response.ok && response.status !== 404) {
+    throw Object.assign(
+      new Error(stringValue(payload.error) || `Media receiver status failed with ${response.status}.`),
+      { status: response.status },
+    );
+  }
+
+  return {
+    ok: true,
+    session: durableSession,
+    receiver: response.ok ? payload : { state: "missing" },
+  };
+}
+
+async function finalizeResumableSession(authHeader: string, body: JsonObject) {
+  const sessionId = stringValue(body.session_id);
+  if (!sessionId) {
+    throw Object.assign(new Error("session_id is required."), { status: 400 });
+  }
+
+  const session = await userRpc(
+    authHeader,
+    "get_media_upload_session_v1",
+    { p_session_id: sessionId },
+  );
+
+  if (stringValue(session.state) === "verified" && stringValue(session.file_object_id)) {
+    return { ok: true, idempotent: true, session };
+  }
+
+  const { response, payload } = await receiverAdminFetch(`/sessions/${sessionId}/complete`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: "{}",
+  });
+
+  if (!response.ok) {
+    if (response.status === 410) {
+      await serviceRpc(
+        "expire_media_upload_session_v1",
+        {
+          p_session_id: sessionId,
+          p_reason: "Receiver confirmed upload-session expiry and partial cleanup",
+        },
+      );
+    } else if (payload.terminal === true) {
+      await serviceRpc(
+        "fail_media_upload_session_v1",
+        {
+          p_session_id: sessionId,
+          p_error: stringValue(payload.error) || "Receiver finalization failed.",
+        },
+      );
+    }
+    throw Object.assign(
+      new Error(stringValue(payload.error) || `Media receiver finalization failed with ${response.status}.`),
+      { status: response.status },
+    );
+  }
+
+  const verified = await serviceRpc(
+    "verify_media_upload_session_v1",
+    {
+      p_session_id: sessionId,
+      p_storage_path: payload.storage_path,
+      p_byte_size: payload.byte_size,
+      p_sha256: payload.sha256,
+      p_correlation_id: stringValue(session.correlation_id) || crypto.randomUUID(),
+    },
+  );
+
+  return {
+    ok: true,
+    idempotent: false,
+    session: verified,
+    receiver: payload,
+  };
+}
+
+async function cancelResumableSession(authHeader: string, body: JsonObject) {
+  const sessionId = stringValue(body.session_id);
+  const reason = stringValue(body.reason) || "Cancel resumable Media upload session";
+  if (!sessionId) {
+    throw Object.assign(new Error("session_id is required."), { status: 400 });
+  }
+
+  await userRpc(
+    authHeader,
+    "get_media_upload_session_v1",
+    { p_session_id: sessionId },
+  );
+
+  const { response, payload } = await receiverAdminFetch(`/sessions/${sessionId}`, {
+    method: "DELETE",
+  });
+  if (!response.ok) {
+    throw Object.assign(
+      new Error(stringValue(payload.error) || `Media receiver cancellation failed with ${response.status}.`),
+      { status: response.status },
+    );
+  }
+
+  const session = await userRpc(
+    authHeader,
+    "cancel_media_upload_session_v1",
+    {
+      p_session_id: sessionId,
+      p_reason: reason,
+    },
+  );
+
+  return { ok: true, session, receiver: payload };
 }
 
 function isOwnProfileMediaPath(storagePath: string, userId: string) {
@@ -234,6 +522,28 @@ serve(async (req) => {
     if (!authHeader.startsWith("Bearer ")) return json(401, { error: "Missing bearer token." });
 
     const { user: actor, isAdmin } = await requireAuthenticatedUser(authHeader);
+    const requestContentType = req.headers.get("Content-Type") ?? "";
+
+    if (requestContentType.toLowerCase().includes("application/json")) {
+      requireAdmin(isAdmin);
+      const body = objectValue(await req.json());
+      const action = stringValue(body.action);
+
+      if (action === "create_resumable_session") {
+        return json(200, await createResumableSession(authHeader, body));
+      }
+      if (action === "resumable_session_status") {
+        return json(200, await resumableSessionStatus(authHeader, body));
+      }
+      if (action === "finalize_resumable_session") {
+        return json(200, await finalizeResumableSession(authHeader, body));
+      }
+      if (action === "cancel_resumable_session") {
+        return json(200, await cancelResumableSession(authHeader, body));
+      }
+
+      return json(400, { error: "Unsupported resumable upload action." });
+    }
 
     const form = await req.formData();
     const fileValue = form.get("file");

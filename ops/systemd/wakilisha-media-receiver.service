@@ -1,0 +1,20 @@
+[Unit]
+Description=WAKILISHA Lightsail Media Upload Receiver
+After=network.target
+
+[Service]
+Type=simple
+EnvironmentFile=/etc/wakilisha-media-upload.env
+ExecStart=/usr/bin/python3 /opt/wakilisha-media-receiver/server.py
+Restart=always
+RestartSec=3
+User=www-data
+Group=www-data
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=full
+ReadWritePaths=/opt/wakilisha-media /opt/wakilisha-media-upload-sessions
+WorkingDirectory=/opt/wakilisha-media-receiver
+
+[Install]
+WantedBy=multi-user.target
