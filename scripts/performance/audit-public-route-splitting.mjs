@@ -264,9 +264,17 @@ const routePaths = [
  * - jobs/:id
  * - scraper
  *
- * The post-retirement authority is therefore 144 paths.
+ * The post-retirement authority was therefore 144 paths.
+ *
+ * Phase 5A adds three canonical Playlist Admin Studio paths:
+ * - playlists
+ * - playlists/new
+ * - playlists/:playlistId
+ *
+ * Removing those three paths reproduces the accepted 144-path
+ * baseline checksum exactly. The current authority is 147 paths.
  */
-const expectedRoutePathCount = 144;
+const expectedRoutePathCount = 148;
 
 if (routePaths.length !== expectedRoutePathCount) {
   fail(
@@ -283,7 +291,7 @@ const routeChecksum = crypto
   .digest("hex");
 
 const expectedRouteChecksum =
-  "45938301385ad405fa672c09e8f61d0385971c0e7cb225427e7c1be716910b2c";
+  "09e9c42e4a0aa4d16c978d61ca8556e607f54c34a55ee5108fb126c2207a9d25";
 
 if (
   routeChecksum !==

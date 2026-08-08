@@ -14,6 +14,73 @@ interface ASHit { id: string; type: string; attributes?: { name?: string; artist
 function aUrl(aw: AArt|undefined|null, w: number): string|null { if(!aw?.url) return null; return aw.url.replace("{w}",String(w)).replace("{h}",String(w)); }
 const TS = ["canonicalized","rejected"];
 
+async function getSpotifyAccessToken(
+  db: ReturnType<typeof createClient>,
+): Promise<{ token: string; market: string } | { error: string }> {
+  const clientId = await rCred(
+    "SPOTIFY_CLIENT_ID",
+    "spotify_client_id",
+    db,
+  );
+  const clientSecret = await rCred(
+    "SPOTIFY_CLIENT_SECRET",
+    "spotify_client_secret",
+    db,
+  );
+  const market =
+    (
+      await rCred(
+        "SPOTIFY_MARKET",
+        "spotify_market",
+        db,
+      )
+    ) || "KE";
+
+  if (!clientId || !clientSecret) {
+    return { error: "Spotify credentials not configured." };
+  }
+
+  const encoded = btoa(`${clientId}:${clientSecret}`);
+  const response = await fetch(
+    "https://accounts.spotify.com/api/token",
+    {
+      method: "POST",
+      headers: {
+        Authorization: `Basic ${encoded}`,
+        "Content-Type": "application/x-www-form-urlencoded",
+      },
+      body: "grant_type=client_credentials",
+    },
+  );
+
+  const payload = await response.json().catch(() => ({})) as {
+    access_token?: string;
+  };
+
+  if (!response.ok || !payload.access_token) {
+    return {
+      error: `Spotify token request failed (${response.status}).`,
+    };
+  }
+
+  return {
+    token: payload.access_token,
+    market: String(market).toUpperCase(),
+  };
+}
+
+function spotifyArtwork(
+  images: Array<{ url?: string; width?: number; height?: number }> | undefined,
+): string | null {
+  if (!Array.isArray(images) || images.length === 0) return null;
+  return (
+    [...images]
+      .sort((a, b) => Number(b.width ?? 0) - Number(a.width ?? 0))
+      .map((image) => String(image.url ?? "").trim())
+      .find(Boolean) ?? null
+  );
+}
+
 async function getAC(db:ReturnType<typeof createClient>):Promise<{token:string}|{error:string}>{
   const pk=await rCred("APPLE_MUSIC_PRIVATE_KEY","apple_music_private_key",db);
   const tid=await rCred("APPLE_MUSIC_TEAM_ID","apple_music_team_id",db);
@@ -54,35 +121,631 @@ Deno.serve(async (req) => {
   const now = new Date().toISOString();
 
   try {
-    if (route === "search") {
-      const sf=(body.storefront as string)||"ke"; const q=(body.query as string)||(body.q as string)||""; const et=(body.entityType as string)||"all"; const lim=Math.min(Number(body.limit)||25,50);
-      if(!q.trim()) return jRaw({error:"Missing query parameter"},cors,400);
-      const creds=await getAC(db); if("error" in creds) return jRaw({provider:"apple_music",query:q,storefrontOrMarket:sf,groups:{artists:[],releases:[],tracks:[],labels:[]},rawResultCount:0,normalizedResultCount:0,error:creds.error},cors);
-      const types=et==="all"?["artists","albums","songs"]:et==="release"?["albums"]:et==="track"?["songs"]:et==="artist"?["artists"]:[et];
-      const api="https://api.music.apple.com/v1/catalog/"+sf+"/search?term="+encodeURIComponent(q)+"&types="+types.join(",")+"&limit="+lim;
-      const res=await fetch(api,{headers:{Authorization:"Bearer "+creds.token}});
-      if(!res.ok){const t=await res.text();return jRaw({provider:"apple_music",query:q,storefrontOrMarket:sf,groups:{artists:[],releases:[],tracks:[],labels:[]},rawResultCount:0,normalizedResultCount:0,error:"Apple Music API "+res.status},cors);}
-      const data=await res.json() as {results?:Record<string,{data:ASHit[]}>}; const rg=data.results||{};
-      const fmtHit=(h:ASHit)=>({provider:"apple_music",providerEntityId:h.id,title:h.attributes?.name||"",artistDisplayName:h.attributes?.artistName||null,artworkUrl:aUrl(h.attributes?.artwork,300),confidenceScore:0.95});
-      return jRaw({provider:"apple_music",query:q,storefrontOrMarket:sf,groups:{artists:(rg.artists?.data||[]).map(fmtHit),releases:(rg.albums?.data||[]).map(fmtHit),tracks:(rg.songs?.data||[]).map(fmtHit),labels:[]},rawResultCount:(rg.artists?.data||[]).length+(rg.albums?.data||[]).length+(rg.songs?.data||[]).length},cors);
+if (route === "search") {
+  const provider =
+    String(body.provider ?? "apple_music")
+      .trim()
+      .toLowerCase();
+  const q =
+    String(body.query ?? body.q ?? "").trim();
+  const entityType =
+    String(body.entityType ?? "all")
+      .trim()
+      .toLowerCase();
+  const limit = Math.min(Number(body.limit) || 25, 50);
+
+  if (!q) {
+    return jRaw({ error: "Missing query parameter" }, cors, 400);
+  }
+
+  if (provider === "spotify") {
+    const creds = await getSpotifyAccessToken(db);
+    if ("error" in creds) {
+      return jRaw(
+        {
+          provider: "spotify",
+          query: q,
+          groups: { artists: [], releases: [], tracks: [], labels: [] },
+          error: creds.error,
+        },
+        cors,
+      );
     }
-    if (route === "inspect") {
-      const pet=(body.providerEntityType as string)||"release"; const pid=(body.providerEntityId as string)||""; const sf=(body.storefront as string)||"ke";
-      if(!pid) return jRaw({error:"Missing providerEntityId"},cors,400);
-      const creds=await getAC(db); if("error" in creds) return jRaw({error:creds.error},cors,400);
-      const at=pet==="release"?"albums":"songs";
-      const api="https://api.music.apple.com/v1/catalog/"+sf+"/"+at+"/"+pid+"?include=artists,tracks";
-      const res=await fetch(api,{headers:{Authorization:"Bearer "+creds.token}});
-      if(!res.ok){const t=await res.text();return jRaw({error:"Apple Music API "+res.status+": "+t.slice(0,300)},cors,500);}
-      const raw=await res.json() as {data:ASHit[]}; const md=raw.data?.[0]; if(!md) return jRaw({error:"Entity not found"},cors,404);
-      const attrs=md.attributes || {}; const title=attrs.name||""; const ad=attrs.artistName||null; const aw=aUrl(attrs.artwork,600);
-      const rs={provider:"apple_music",providerEntityType:pet,providerEntityId:pid,title,artistDisplayName:ad,artworkUrl:aw,confidenceScore:0.95,source:{storefrontOrMarket:sf,fetchedAt:now}};
-      const tr=(md.relationships?.tracks?.data||[]).map(r=>({providerEntityType:"track",providerEntityId:r.id,title:(r.attributes?.name as string)||"Unknown",artistDisplayName:(r.attributes?.artistName as string)||null,artworkUrl:aUrl(r.attributes?.artwork as AArt|undefined,300),isrc:(r.attributes?.isrc as string)||null,previewUrl:((r.attributes?.previews as Array<{url:string}>|undefined)?.[0]?.url)||null}));
-      const {data:sl}=await db.from("provider_entity_links").select("registry_entity_id").eq("provider","apple_music").eq("provider_entity_id",pid).eq("registry_entity_type",pet);
-      const sids=(sl||[]).map(l=>l.registry_entity_id as string);
-      const {data:shs}=sids.length>0?await db.from("registry_release_shells").select("id,slug,title,status").in("id",sids):{data:[]};
-      return jRaw({result:rs,tracks:tr,existingShells:(shs||[]).map(s=>({shellKey:s.id,title:s.title,status:s.status}))},cors);
+
+    const spotifyType =
+      entityType === "release"
+        ? "album"
+        : entityType === "artist"
+          ? "artist"
+          : "track";
+
+    const api = new URL("https://api.spotify.com/v1/search");
+    api.searchParams.set("q", q);
+    api.searchParams.set("type", spotifyType);
+    api.searchParams.set("limit", String(limit));
+    api.searchParams.set("market", creds.market);
+
+    const response = await fetch(api, {
+      headers: {
+        Authorization: `Bearer ${creds.token}`,
+        Accept: "application/json",
+      },
+    });
+
+    const payload = await response.json().catch(() => ({})) as Record<string, any>;
+    if (!response.ok) {
+      return jRaw(
+        {
+          provider: "spotify",
+          query: q,
+          groups: { artists: [], releases: [], tracks: [], labels: [] },
+          error: `Spotify API ${response.status}`,
+        },
+        cors,
+      );
     }
+
+    const tracks = Array.isArray(payload.tracks?.items)
+      ? payload.tracks.items
+      : [];
+    const albums = Array.isArray(payload.albums?.items)
+      ? payload.albums.items
+      : [];
+    const artists = Array.isArray(payload.artists?.items)
+      ? payload.artists.items
+      : [];
+
+    const trackHits = tracks.map((track: any) => ({
+      provider: "spotify",
+      providerEntityId: String(track.id ?? ""),
+      title: String(track.name ?? ""),
+      artistDisplayName: Array.isArray(track.artists)
+        ? track.artists
+            .map((artist: any) => String(artist.name ?? ""))
+            .filter(Boolean)
+            .join(", ")
+        : null,
+      artworkUrl: spotifyArtwork(track.album?.images),
+      confidenceScore: 0.95,
+    }));
+
+    const releaseHits = albums.map((album: any) => ({
+      provider: "spotify",
+      providerEntityId: String(album.id ?? ""),
+      title: String(album.name ?? ""),
+      artistDisplayName: Array.isArray(album.artists)
+        ? album.artists
+            .map((artist: any) => String(artist.name ?? ""))
+            .filter(Boolean)
+            .join(", ")
+        : null,
+      artworkUrl: spotifyArtwork(album.images),
+      confidenceScore: 0.95,
+    }));
+
+    const artistHits = artists.map((artist: any) => ({
+      provider: "spotify",
+      providerEntityId: String(artist.id ?? ""),
+      title: String(artist.name ?? ""),
+      artistDisplayName: String(artist.name ?? ""),
+      artworkUrl: spotifyArtwork(artist.images),
+      confidenceScore: 0.95,
+    }));
+
+    return jRaw(
+      {
+        provider: "spotify",
+        query: q,
+        storefrontOrMarket: creds.market,
+        groups: {
+          artists: artistHits,
+          releases: releaseHits,
+          tracks: trackHits,
+          labels: [],
+        },
+        rawResultCount:
+          trackHits.length +
+          releaseHits.length +
+          artistHits.length,
+      },
+      cors,
+    );
+  }
+
+  const storefront =
+    String(body.storefront ?? "ke").trim().toLowerCase();
+  const creds = await getAC(db);
+  if ("error" in creds) {
+    return jRaw(
+      {
+        provider: "apple_music",
+        query: q,
+        storefrontOrMarket: storefront,
+        groups: { artists: [], releases: [], tracks: [], labels: [] },
+        rawResultCount: 0,
+        normalizedResultCount: 0,
+        error: creds.error,
+      },
+      cors,
+    );
+  }
+
+  const types =
+    entityType === "all"
+      ? ["artists", "albums", "songs"]
+      : entityType === "release"
+        ? ["albums"]
+        : entityType === "artist"
+          ? ["artists"]
+          : ["songs"];
+
+  const api =
+    "https://api.music.apple.com/v1/catalog/" +
+    storefront +
+    "/search?term=" +
+    encodeURIComponent(q) +
+    "&types=" +
+    types.join(",") +
+    "&limit=" +
+    limit;
+
+  const response = await fetch(api, {
+    headers: { Authorization: "Bearer " + creds.token },
+  });
+
+  if (!response.ok) {
+    return jRaw(
+      {
+        provider: "apple_music",
+        query: q,
+        storefrontOrMarket: storefront,
+        groups: { artists: [], releases: [], tracks: [], labels: [] },
+        rawResultCount: 0,
+        normalizedResultCount: 0,
+        error: "Apple Music API " + response.status,
+      },
+      cors,
+    );
+  }
+
+  const data = await response.json() as {
+    results?: Record<string, { data: ASHit[] }>;
+  };
+  const groups = data.results || {};
+  const formatHit = (hit: ASHit) => ({
+    provider: "apple_music",
+    providerEntityId: hit.id,
+    title: hit.attributes?.name || "",
+    artistDisplayName:
+      hit.attributes?.artistName || null,
+    artworkUrl: aUrl(hit.attributes?.artwork, 300),
+    confidenceScore: 0.95,
+  });
+
+  return jRaw(
+    {
+      provider: "apple_music",
+      query: q,
+      storefrontOrMarket: storefront,
+      groups: {
+        artists: (groups.artists?.data || []).map(formatHit),
+        releases: (groups.albums?.data || []).map(formatHit),
+        tracks: (groups.songs?.data || []).map(formatHit),
+        labels: [],
+      },
+      rawResultCount:
+        (groups.artists?.data || []).length +
+        (groups.albums?.data || []).length +
+        (groups.songs?.data || []).length,
+    },
+    cors,
+  );
+}
+
+if (route === "inspect") {
+  const provider =
+    String(body.provider ?? "apple_music")
+      .trim()
+      .toLowerCase();
+  const providerEntityType =
+    String(body.providerEntityType ?? "release")
+      .trim()
+      .toLowerCase();
+  const providerEntityId =
+    String(body.providerEntityId ?? "").trim();
+
+  if (!providerEntityId) {
+    return jRaw(
+      { error: "Missing providerEntityId" },
+      cors,
+      400,
+    );
+  }
+
+  if (provider === "spotify") {
+    const creds = await getSpotifyAccessToken(db);
+    if ("error" in creds) {
+      return jRaw({ error: creds.error }, cors, 400);
+    }
+
+    if (providerEntityType !== "track") {
+      return jRaw(
+        { error: "Track Intake Spotify inspection requires a track." },
+        cors,
+        400,
+      );
+    }
+
+    const trackResponse = await fetch(
+      `https://api.spotify.com/v1/tracks/${encodeURIComponent(providerEntityId)}?market=${encodeURIComponent(creds.market)}`,
+      {
+        headers: {
+          Authorization: `Bearer ${creds.token}`,
+          Accept: "application/json",
+        },
+      },
+    );
+
+    const track = await trackResponse
+      .json()
+      .catch(() => ({})) as any;
+
+    if (!trackResponse.ok || !track?.id) {
+      return jRaw(
+        {
+          error:
+            `Spotify track inspection failed (${trackResponse.status}).`,
+        },
+        cors,
+        400,
+      );
+    }
+
+    let album: any = track.album ?? {};
+    if (track.album?.id) {
+      const albumResponse = await fetch(
+        `https://api.spotify.com/v1/albums/${encodeURIComponent(track.album.id)}?market=${encodeURIComponent(creds.market)}`,
+        {
+          headers: {
+            Authorization: `Bearer ${creds.token}`,
+            Accept: "application/json",
+          },
+        },
+      );
+      if (albumResponse.ok) {
+        album = await albumResponse.json().catch(() => album);
+      }
+    }
+
+    const artistNames = Array.isArray(track.artists)
+      ? track.artists
+          .map((artist: any) => String(artist.name ?? ""))
+          .filter(Boolean)
+      : [];
+
+    const rawReleaseDate = String(
+      album?.release_date ?? track.album?.release_date ?? "",
+    ).trim();
+    const releaseDatePrecision =
+      String(
+        album?.release_date_precision ??
+          track.album?.release_date_precision ??
+          "",
+      ).trim() || null;
+    let canonicalReleaseDate: string | null = null;
+    if (/^\d{4}-\d{2}-\d{2}$/.test(rawReleaseDate)) {
+      canonicalReleaseDate = rawReleaseDate;
+    } else if (/^\d{4}-\d{2}$/.test(rawReleaseDate)) {
+      canonicalReleaseDate = `${rawReleaseDate}-01`;
+    } else if (/^\d{4}$/.test(rawReleaseDate)) {
+      canonicalReleaseDate = `${rawReleaseDate}-01-01`;
+    }
+
+    const fields = {
+      title: String(track.name ?? "") || null,
+      artist_names: artistNames,
+      release_title:
+        String(album?.name ?? track.album?.name ?? "") || null,
+      isrc:
+        String(track.external_ids?.isrc ?? "") || null,
+      duration_ms:
+        Number.isFinite(Number(track.duration_ms))
+          ? Number(track.duration_ms)
+          : null,
+      track_artwork_url:
+        spotifyArtwork(track.album?.images),
+      release_artwork_url:
+        spotifyArtwork(album?.images ?? track.album?.images),
+      preview_url:
+        String(track.preview_url ?? "") || null,
+      release_date: canonicalReleaseDate,
+      release_date_precision: releaseDatePrecision,
+      label_name:
+        String(album?.label ?? "") || null,
+      imprint_name: null,
+      genre:
+        Array.isArray(album?.genres) && album.genres.length
+          ? String(album.genres[0])
+          : null,
+      track_number:
+        Number.isFinite(Number(track.track_number))
+          ? Number(track.track_number)
+          : null,
+      disc_number:
+        Number.isFinite(Number(track.disc_number))
+          ? Number(track.disc_number)
+          : null,
+      explicit:
+        typeof track.explicit === "boolean"
+          ? track.explicit
+          : null,
+      provider_url:
+        String(track.external_urls?.spotify ?? "") || null,
+      upc:
+        String(album?.external_ids?.upc ?? "") || null,
+      copyright_text:
+        Array.isArray(album?.copyrights)
+          ? album.copyrights
+              .map((entry: any) => String(entry.text ?? ""))
+              .filter(Boolean)
+              .join(" | ") || null
+          : null,
+    };
+
+    return jRaw(
+      {
+        result: {
+          provider: "spotify",
+          providerEntityType: "track",
+          providerEntityId,
+          title: fields.title,
+          artistDisplayName:
+            artistNames.join(", ") || null,
+          artworkUrl: fields.track_artwork_url,
+          confidenceScore: 0.95,
+          providerUrl: fields.provider_url,
+          enrichment: fields,
+          source: {
+            storefrontOrMarket: creds.market,
+            fetchedAt: now,
+          },
+        },
+        raw: {
+          track,
+          album,
+        },
+      },
+      cors,
+    );
+  }
+
+  const storefront =
+    String(body.storefront ?? "ke").trim().toLowerCase();
+  const creds = await getAC(db);
+  if ("error" in creds) {
+    return jRaw({ error: creds.error }, cors, 400);
+  }
+
+  const endpointType =
+    providerEntityType === "release"
+      ? "albums"
+      : "songs";
+  const include =
+    providerEntityType === "release"
+      ? "artists,tracks"
+      : "artists,albums";
+
+  const api =
+    "https://api.music.apple.com/v1/catalog/" +
+    storefront +
+    "/" +
+    endpointType +
+    "/" +
+    providerEntityId +
+    "?include=" +
+    include;
+
+  const response = await fetch(api, {
+    headers: { Authorization: "Bearer " + creds.token },
+  });
+
+  if (!response.ok) {
+    const bodyText = await response.text();
+    return jRaw(
+      {
+        error:
+          "Apple Music API " +
+          response.status +
+          ": " +
+          bodyText.slice(0, 300),
+      },
+      cors,
+      500,
+    );
+  }
+
+  const raw = await response.json() as {
+    data: Array<any>;
+    included?: Array<any>;
+  };
+  const media = raw.data?.[0];
+  if (!media) {
+    return jRaw({ error: "Entity not found" }, cors, 404);
+  }
+
+  const attributes = media.attributes || {};
+
+  if (providerEntityType === "release") {
+    const result = {
+      provider: "apple_music",
+      providerEntityType: "release",
+      providerEntityId,
+      title: String(attributes.name ?? ""),
+      artistDisplayName:
+        String(attributes.artistName ?? "") || null,
+      artworkUrl: aUrl(attributes.artwork, 600),
+      confidenceScore: 0.95,
+      source: {
+        storefrontOrMarket: storefront,
+        fetchedAt: now,
+      },
+    };
+
+    const tracks = (media.relationships?.tracks?.data || []).map(
+      (track: any) => ({
+        providerEntityType: "track",
+        providerEntityId: String(track.id ?? ""),
+        title: String(track.attributes?.name ?? "") || "Unknown",
+        artistDisplayName:
+          String(track.attributes?.artistName ?? "") || null,
+        artworkUrl: aUrl(track.attributes?.artwork, 300),
+        isrc: String(track.attributes?.isrc ?? "") || null,
+        previewUrl:
+          Array.isArray(track.attributes?.previews) &&
+          track.attributes.previews[0]?.url
+            ? String(track.attributes.previews[0].url)
+            : null,
+      }),
+    );
+
+    const { data: providerLinks } = await db
+      .from("provider_entity_links")
+      .select("registry_entity_id")
+      .eq("provider", "apple_music")
+      .eq("provider_entity_id", providerEntityId)
+      .eq("registry_entity_type", "release");
+
+    const shellIds = (providerLinks || []).map(
+      (link) => link.registry_entity_id as string,
+    );
+
+    const { data: shells } =
+      shellIds.length > 0
+        ? await db
+            .from("registry_release_shells")
+            .select("id,slug,title,status")
+            .in("id", shellIds)
+        : { data: [] };
+
+    return jRaw(
+      {
+        result,
+        tracks,
+        existingShells: (shells || []).map((shell) => ({
+          shellKey: shell.id,
+          title: shell.title,
+          status: shell.status,
+        })),
+      },
+      cors,
+    );
+  }
+
+  const included = Array.isArray(raw.included)
+    ? raw.included
+    : [];
+  const album =
+    providerEntityType === "track"
+      ? included.find((entry: any) => entry.type === "albums")
+      : media;
+  const albumAttributes = album?.attributes || {};
+
+  const previewUrl =
+    Array.isArray(attributes.previews) &&
+    attributes.previews[0]?.url
+      ? String(attributes.previews[0].url)
+      : null;
+
+  const fields = {
+    title: String(attributes.name ?? "") || null,
+    artist_names:
+      String(attributes.artistName ?? "")
+        ? [String(attributes.artistName)]
+        : [],
+    release_title:
+      String(
+        attributes.albumName ??
+        albumAttributes.name ??
+        "",
+      ) || null,
+    isrc:
+      String(attributes.isrc ?? "") || null,
+    duration_ms:
+      Number.isFinite(Number(attributes.durationInMillis))
+        ? Number(attributes.durationInMillis)
+        : null,
+    track_artwork_url:
+      aUrl(attributes.artwork, 600),
+    release_artwork_url:
+      aUrl(albumAttributes.artwork, 600) ||
+      aUrl(attributes.artwork, 600),
+    preview_url: previewUrl,
+    release_date:
+      String(
+        albumAttributes.releaseDate ??
+        attributes.releaseDate ??
+        "",
+      ) || null,
+    release_date_precision: "day",
+    label_name:
+      String(
+        albumAttributes.recordLabel ??
+        attributes.recordLabel ??
+        "",
+      ) || null,
+    imprint_name: null,
+    genre:
+      Array.isArray(attributes.genreNames) &&
+      attributes.genreNames.length
+        ? String(attributes.genreNames[0])
+        : Array.isArray(albumAttributes.genreNames) &&
+            albumAttributes.genreNames.length
+          ? String(albumAttributes.genreNames[0])
+          : null,
+    track_number:
+      Number.isFinite(Number(attributes.trackNumber))
+        ? Number(attributes.trackNumber)
+        : null,
+    disc_number:
+      Number.isFinite(Number(attributes.discNumber))
+        ? Number(attributes.discNumber)
+        : null,
+    explicit:
+      String(attributes.contentRating ?? "").toLowerCase() === "explicit"
+        ? true
+        : null,
+    provider_url:
+      String(attributes.url ?? "") || null,
+    upc:
+      String(albumAttributes.upc ?? "") || null,
+    copyright_text:
+      String(albumAttributes.copyright ?? "") || null,
+  };
+
+  return jRaw(
+    {
+      result: {
+        provider: "apple_music",
+        providerEntityType,
+        providerEntityId,
+        title: fields.title,
+        artistDisplayName:
+          fields.artist_names.join(", ") || null,
+        artworkUrl: fields.track_artwork_url,
+        confidenceScore: 0.95,
+        providerUrl: fields.provider_url,
+        enrichment: fields,
+        source: {
+          storefrontOrMarket: storefront,
+          fetchedAt: now,
+        },
+      },
+      raw,
+    },
+    cors,
+  );
+}
+
     if (route === "test-connection") {
       const creds=await getAC(db);
       if("error" in creds) return jRaw({provider:"apple_music",storefront:(body.storefront as string)||"ke",status:"failed",error:creds.error,testedAt:now},cors);

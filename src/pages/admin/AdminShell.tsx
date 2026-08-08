@@ -20,8 +20,9 @@ const NAV_GROUPS: NavGroup[] = [
   { label: "Community", icon: "MessageSquare", visible: (can) => can("moderate_community"), items: [
     { path: "/admin/community", label: "Moderation", icon: "MessageSquare", requiredCapability: "moderate_community", badgeKey: "pendingReports" },
   ] },
-  { label: "Content & Editorial", icon: "FileText", visible: (can) => can("edit_own_articles"), items: [
+  { label: "Content & Editorial", icon: "FileText", visible: (can) => can("edit_own_articles") || can("edit_own_playlists") || can("view_playlists"), items: [
     { path: "/admin/content/articles", label: "Articles", icon: "FileText", requiredCapability: "edit_own_articles" },
+    { path: "/admin/content/playlists", label: "Playlists", icon: "ListMusic", requiredCapability: "edit_own_playlists" },
     { path: "/admin/content/guides", label: "Guides", icon: "BookOpen", requiredCapability: "edit_guides" },
     { path: "/admin/content/pages", label: "Pages", icon: "Layout", requiredCapability: "edit_pages" },
     { path: "/admin/content/lyrics", label: "Lyrics", icon: "Mic2", requiredCapability: "edit_own_articles" },
@@ -39,6 +40,7 @@ const NAV_GROUPS: NavGroup[] = [
     { path: "/admin/registry/artists", label: "Artists", icon: "Mic2", requiredCapability: "view_registry" },
     { path: "/admin/registry/artists/intake", label: "Artist Intake", icon: "Upload", requiredCapability: "manage_registry" },
     { path: "/admin/registry/tracks", label: "Tracks", icon: "Music", requiredCapability: "view_registry" },
+    { path: "/admin/registry/tracks/intake", label: "Track Intake", icon: "ListChecks", requiredCapability: "manage_registry", badgeKey: "registryTrackIntake" },
     { path: "/admin/registry/releases", label: "Releases", icon: "Disc", requiredCapability: "view_registry" },
     { path: "/admin/registry/labels", label: "Labels", icon: "Building2", requiredCapability: "view_registry" },
     { path: "/admin/registry/genres", label: "Genres", icon: "Tags", requiredCapability: "view_registry" },
@@ -93,6 +95,7 @@ function getNavBadge(key: string, counts: ReturnType<typeof useAdminBadgeCounts>
     case "reviewQueue": return counts.reviewQueue > 0 ? counts.reviewQueue : undefined;
     case "failedImports": return counts.failedImports > 0 ? counts.failedImports : undefined;
     case "pendingReports": return counts.pendingReports > 0 ? counts.pendingReports : undefined;
+    case "registryTrackIntake": return counts.registryTrackIntake > 0 ? counts.registryTrackIntake : undefined;
     default: return undefined;
   }
 }

@@ -34,6 +34,15 @@ describe("Phase 4B M3 browser CSP contract", () => {
     expect(scriptSrc).not.toContain("'unsafe-eval'");
   });
 
+  it("permits the official YouTube IFrame Player probe without enabling general eval", () => {
+    const scriptSrc = directiveTokens("script-src");
+    const frameSrc = directiveTokens("frame-src");
+
+    expect(scriptSrc).toContain("https://www.youtube.com");
+    expect(scriptSrc).not.toContain("'unsafe-eval'");
+    expect(frameSrc).toContain("https://www.youtube.com");
+  });
+
   it("permits governed Media derivative fetches", () => {
     const connectSrc = directiveTokens("connect-src");
 
