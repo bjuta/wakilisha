@@ -1,9 +1,9 @@
 {
   "projectRef": "pgzizndxdyhqmtyywjmt",
   "schema": "public",
-  "generatedAt": "2026-08-08T06:36:49Z",
-  "typesSha256": "e1682fdf1d368a06d549e51013ebc96c6dedcc04c313b9d787bd885ac7ddf56e",
+  "generatedAt": "2026-08-08T09:20:53Z",
+  "typesSha256": "1e8926942b876e0e28bab505d513f2c9c2d3170a4aac93166fa06660bc7ccf88",
   "authoritativeMigrationDirectory": "supabase/migrations",
-  "migrationCount": 210,
-  "latestMigration": "20260808063500_phase_5a_playlist_authenticated_read_policy_repair.sql"
+  "migrationCount": 211,
+  "latestMigration": "20260808070000_phase_5a_playlist_review_version_lifecycle.sql"
 }
