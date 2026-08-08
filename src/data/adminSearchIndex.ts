@@ -10,14 +10,14 @@ export interface AdminSearchItem {
 
 export const ADMIN_SEARCH_INDEX: AdminSearchItem[] = [
   // ── Dashboard ──
-  { id: "dashboard", label: "Dashboard Overview", description: "Command center — KPIs, operational stats, recent activity, system health", path: "/admin", icon: "LayoutDashboard", group: "Dashboard", keywords: ["home", "kpi", "stats", "overview", "health"] },
+  { id: "dashboard", label: "Dashboard Overview", description: "KPIs, operational stats, recent activity, and system health", path: "/admin", icon: "LayoutDashboard", group: "Dashboard", keywords: ["home", "kpi", "stats", "overview", "health"] },
   { id: "analytics", label: "Analytics", description: "Share analytics, page views, scroll depth, and audience metrics", path: "/admin/analytics", icon: "BarChart3", group: "Dashboard", keywords: ["metrics", "shares", "views", "tracking", "audience data"] },
 
   // ── Content & Editorial ──
-  { id: "articles", label: "Articles", description: "Manage magazine articles — edit, publish, schedule, and trash", path: "/admin/content/articles", icon: "FileText", group: "Content & Editorial", keywords: ["posts", "magazine", "blog", "writing", "editorial"] },
+  { id: "articles", label: "Articles", description: "Manage magazine articles. Edit, publish, schedule, and trash.", path: "/admin/content/articles", icon: "FileText", group: "Content & Editorial", keywords: ["posts", "magazine", "blog", "writing", "editorial"] },
   { id: "articles-new", label: "New Article", description: "Create a new magazine article with the rich text editor", path: "/admin/content/articles/new", icon: "Plus", group: "Content & Editorial", keywords: ["create", "write", "compose", "draft"] },
   { id: "articles-trash", label: "Article Trash", description: "Review and restore or permanently delete trashed articles", path: "/admin/content/articles/trash", icon: "Trash2", group: "Content & Editorial", keywords: ["deleted", "bin", "restore", "removed"] },
-  { id: "guides", label: "Guides", description: "Manage culture guides — Dakar, Venice, Reading editions", path: "/admin/content/guides", icon: "BookOpen", group: "Content & Editorial", keywords: ["culture", "travel", "curated", "dakar", "venice"] },
+  { id: "guides", label: "Guides", description: "Manage culture guides for Dakar, Venice, and Reading editions", path: "/admin/content/guides", icon: "BookOpen", group: "Content & Editorial", keywords: ["culture", "travel", "curated", "dakar", "venice"] },
   { id: "pages", label: "Pages", description: "Manage static pages like About, Contact, FAQs, Privacy, Terms", path: "/admin/content/pages", icon: "Layout", group: "Content & Editorial", keywords: ["static", "about", "contact", "legal", "faq"] },
   { id: "lyrics", label: "Lyrics", description: "Manage and review user-contributed lyrics", path: "/admin/content/lyrics", icon: "Mic2", group: "Content & Editorial", keywords: ["words", "song text", "contributions", "review lyrics"] },
   { id: "featured-artists", label: "Featured Artists", description: "Curate featured artists for the magazine homepage", path: "/admin/content/magazine/featured-artists", icon: "Star", group: "Content & Editorial", keywords: ["spotlight", "magazine", "curation", "highlight"] },
@@ -28,10 +28,11 @@ export const ADMIN_SEARCH_INDEX: AdminSearchItem[] = [
   { id: "archive", label: "Content Archive", description: "Browse and manage archived content across all types", path: "/admin/content/archive", icon: "Archive", group: "Content & Editorial", keywords: ["history", "old", "past content", "browse"] },
 
   // ── Music Registry ──
-  { id: "registry", label: "Registry Overview", description: "Master entity registry — artists, tracks, releases, labels, genres", path: "/admin/registry", icon: "LayoutDashboard", group: "Music Registry", keywords: ["entities", "master", "database", "all"] },
+  { id: "registry", label: "Registry Overview", description: "Manage artists, tracks, releases, labels, and genres", path: "/admin/registry", icon: "LayoutDashboard", group: "Music Registry", keywords: ["entities", "master", "database", "all"] },
   { id: "registry-artists", label: "Artists", description: "Browse and manage all artist entities in the registry", path: "/admin/registry/artists", icon: "Mic2", group: "Music Registry", keywords: ["musicians", "performers", "singers", "bands"] },
   { id: "registry-artist-intake", label: "Artist Intake", description: "Ingest new artists from external providers into the registry", path: "/admin/registry/artists/intake", icon: "Upload", group: "Music Registry", keywords: ["import", "new artist", "provider", "add artist"] },
   { id: "registry-tracks", label: "Tracks", description: "Browse and manage all track entities in the registry", path: "/admin/registry/tracks", icon: "Music", group: "Music Registry", keywords: ["songs", "recordings", "audio"] },
+  { id: "registry-track-intake", label: "Track Intake", description: "Review provider-backed tracks sent from Playlists to Music Registry", path: "/admin/registry/tracks/intake", icon: "ListChecks", group: "Music Registry", keywords: ["playlist intake", "pending tracks", "registry review", "provider evidence", "unresolved tracks"] },
   { id: "registry-releases", label: "Releases", description: "Browse and manage all release entities (albums, EPs, singles)", path: "/admin/registry/releases", icon: "Disc", group: "Music Registry", keywords: ["albums", "eps", "singles", "mixtapes"] },
   { id: "registry-labels", label: "Labels", description: "Browse and manage record label entities", path: "/admin/registry/labels", icon: "Building2", group: "Music Registry", keywords: ["record labels", "imprints", "companies", "publishers"] },
   { id: "registry-genres", label: "Genres", description: "Browse and manage music genre taxonomy", path: "/admin/registry/genres", icon: "Tags", group: "Music Registry", keywords: ["styles", "categories", "music types", "sounds"] },
@@ -40,7 +41,7 @@ export const ADMIN_SEARCH_INDEX: AdminSearchItem[] = [
 
   // ── Charts Engine ──
   { id: "charts-dashboard", label: "Charts Dashboard", description: "Overview of chart operations, recent editions, and system health", path: "/admin/charts/dashboard", icon: "LayoutDashboard", group: "Charts Engine", keywords: ["charts home", "overview", "charts stats"] },
-  { id: "charts-ingest", label: "Ingest Studio", description: "Import chart data from providers — Spotify, Apple Music, ACRCloud, YouTube", path: "/admin/charts/ingest", icon: "Database", group: "Charts Engine", keywords: ["import", "data", "provider", "spotify", "apple music", "fetch"] },
+  { id: "charts-ingest", label: "Ingest Studio", description: "Import chart data from Spotify, Apple Music, ACRCloud, and YouTube", path: "/admin/charts/ingest", icon: "Database", group: "Charts Engine", keywords: ["import", "data", "provider", "spotify", "apple music", "fetch"] },
   { id: "charts-ingest-runs", label: "Ingest Runs", description: "History and status of all chart data ingestion runs", path: "/admin/charts/ingest-runs", icon: "ListChecks", group: "Charts Engine", keywords: ["history", "past imports", "ingestion log", "runs list"] },
   { id: "charts-editions", label: "Chart Editions", description: "Browse and manage published chart editions", path: "/admin/charts/editions", icon: "Layers", group: "Charts Engine", keywords: ["published", "rankings", "weekly charts", "chart history"] },
   { id: "charts-scoring", label: "Scoring Runs", description: "View chart scoring computation history and results", path: "/admin/charts/scoring-runs", icon: "Rocket", group: "Charts Engine", keywords: ["compute", "rankings calculation", "methodology", "algorithm"] },
@@ -59,7 +60,7 @@ export const ADMIN_SEARCH_INDEX: AdminSearchItem[] = [
   { id: "media-broken", label: "Broken Links", description: "Detect and fix broken media links across the platform", path: "/admin/media/broken", icon: "LinkBreak", group: "Media", keywords: ["dead links", "404", "fix links", "link checker"] },
 
   // ── Review & Quality ──
-  { id: "review-queue", label: "Review Queue", description: "Global review queue — flagged entities, relationships, and content", path: "/admin/review/queue", icon: "GitPullRequest", group: "Review & Quality", keywords: ["flagged", "pending review", "quality check", "approval"] },
+  { id: "review-queue", label: "Review Queue", description: "Review flagged records, relationships, and content", path: "/admin/review/queue", icon: "GitPullRequest", group: "Review & Quality", keywords: ["flagged", "pending review", "quality check", "approval"] },
   { id: "relationships", label: "Entity Relationships", description: "Visual graph viewer for entity relationships across the registry", path: "/admin/relationships/viewer", icon: "Network", group: "Review & Quality", keywords: ["graph", "connections", "linked", "network view", "entity graph"] },
   { id: "duplicates", label: "Duplicate Merge", description: "Find and merge duplicate entities in the registry", path: "/admin/relationships/duplicates", icon: "Copy", group: "Review & Quality", keywords: ["deduplicate", "merge entities", "duplicate detection", "clean up"] },
 
@@ -67,7 +68,7 @@ export const ADMIN_SEARCH_INDEX: AdminSearchItem[] = [
 
   // ── Settings ──
   { id: "settings-hub", label: "Settings Hub", description: "Central overview of all platform settings domains", path: "/admin/settings", icon: "Settings", group: "Settings", keywords: ["configuration", "preferences", "all settings"] },
-  { id: "settings-site-identity", label: "Site Identity", description: "Logo, site name, tagline, favicon — the face of WAKILISHA", path: "/admin/settings/site-identity", icon: "Fingerprint", group: "Settings", keywords: ["branding", "logo", "name", "brand", "identity"] },
+  { id: "settings-site-identity", label: "Site Identity", description: "Manage the logo, site name, tagline, and favicon", path: "/admin/settings/site-identity", icon: "Fingerprint", group: "Settings", keywords: ["branding", "logo", "name", "brand", "identity"] },
   { id: "settings-appearance", label: "Frontend Appearance", description: "Accent colors, theme defaults, hero fallbacks, route appearance", path: "/admin/settings/frontend-appearance", icon: "Palette", group: "Settings", keywords: ["colors", "theme", "styling", "visual", "design tokens"] },
   { id: "settings-navigation", label: "Navigation Settings", description: "Admin nav structure, public nav labels, visibility toggles", path: "/admin/settings/navigation", icon: "Compass", group: "Settings", keywords: ["menus", "links", "nav bar", "structure"] },
   { id: "settings-design-system", label: "Design System", description: "Design tokens, component specimens, theme browser, visual QA gates", path: "/admin/settings/design-system", icon: "PanelTop", group: "Settings", keywords: ["tokens", "components", "specimens", "visual bible", "ui kit"] },

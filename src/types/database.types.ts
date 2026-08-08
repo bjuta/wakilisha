@@ -3174,6 +3174,10 @@ export type Database = {
         Args: { p_item_id: string }
         Returns: string
       }
+      ensure_playlist_registry_intake_item: {
+        Args: { p_suggestion_id: string }
+        Returns: string
+      }
       insert_article_lifecycle_version_from_article: {
         Args: {
           p_article: Database["public"]["Tables"]["wk_articles"]["Row"]
@@ -3212,6 +3216,10 @@ export type Database = {
       }
       next_article_version_number: {
         Args: { p_resource_id: string }
+        Returns: number
+      }
+      next_playlist_position_with_registry_intake: {
+        Args: { p_exclude_item_id?: string; p_playlist_id: string }
         Returns: number
       }
       normalize_source_metadata: { Args: { p_metadata: Json }; Returns: Json }
@@ -3260,6 +3268,14 @@ export type Database = {
           p_item: Database["editorial"]["Tables"]["publishing_items"]["Row"]
         }
         Returns: Json
+      }
+      resequence_playlist_with_registry_intake: {
+        Args: { p_playlist_id: string }
+        Returns: undefined
+      }
+      seed_registry_track_intake_provider_observations: {
+        Args: { p_suggestion_id: string }
+        Returns: undefined
       }
       source_content_fingerprint: {
         Args: { p_metadata: Json; p_registry_links: Json }
@@ -10870,6 +10886,171 @@ export type Database = {
         }
         Relationships: []
       }
+      registry_provider_track_suggestion_artists: {
+        Row: {
+          created_at: string
+          credit_order: number
+          credit_role: string
+          id: string
+          observed_name: string
+          registry_artist_id: string | null
+          resolution_mode: string
+          suggestion_id: string
+        }
+        Insert: {
+          created_at?: string
+          credit_order: number
+          credit_role: string
+          id?: string
+          observed_name: string
+          registry_artist_id?: string | null
+          resolution_mode: string
+          suggestion_id: string
+        }
+        Update: {
+          created_at?: string
+          credit_order?: number
+          credit_role?: string
+          id?: string
+          observed_name?: string
+          registry_artist_id?: string | null
+          resolution_mode?: string
+          suggestion_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "registry_provider_track_suggestion_artists_artist_fkey"
+            columns: ["registry_artist_id"]
+            isOneToOne: false
+            referencedRelation: "registry_artists"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "registry_provider_track_suggestion_artists_suggestion_fkey"
+            columns: ["suggestion_id"]
+            isOneToOne: false
+            referencedRelation: "registry_provider_track_suggestions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      registry_provider_track_suggestions: {
+        Row: {
+          artist_resolution_mode: string
+          canonical_track_id: string | null
+          canonicalized_track_id: string | null
+          created_at: string
+          id: string
+          playback_kind: string
+          playlist_note: string | null
+          provider_artist_names: string[]
+          provider_key: string
+          provider_object_id: string
+          provider_release_title: string | null
+          provider_title: string | null
+          provider_url: string
+          registry_artist_id: string | null
+          requested_by: string | null
+          reserved_position: number | null
+          review_note: string | null
+          reviewed_at: string | null
+          reviewed_by: string | null
+          source_playlist_id: string
+          source_playlist_item_id: string | null
+          status: string
+          updated_at: string
+          validation_snapshot: Json
+        }
+        Insert: {
+          artist_resolution_mode?: string
+          canonical_track_id?: string | null
+          canonicalized_track_id?: string | null
+          created_at?: string
+          id?: string
+          playback_kind: string
+          playlist_note?: string | null
+          provider_artist_names?: string[]
+          provider_key: string
+          provider_object_id: string
+          provider_release_title?: string | null
+          provider_title?: string | null
+          provider_url: string
+          registry_artist_id?: string | null
+          requested_by?: string | null
+          reserved_position?: number | null
+          review_note?: string | null
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          source_playlist_id: string
+          source_playlist_item_id?: string | null
+          status?: string
+          updated_at?: string
+          validation_snapshot?: Json
+        }
+        Update: {
+          artist_resolution_mode?: string
+          canonical_track_id?: string | null
+          canonicalized_track_id?: string | null
+          created_at?: string
+          id?: string
+          playback_kind?: string
+          playlist_note?: string | null
+          provider_artist_names?: string[]
+          provider_key?: string
+          provider_object_id?: string
+          provider_release_title?: string | null
+          provider_title?: string | null
+          provider_url?: string
+          registry_artist_id?: string | null
+          requested_by?: string | null
+          reserved_position?: number | null
+          review_note?: string | null
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          source_playlist_id?: string
+          source_playlist_item_id?: string | null
+          status?: string
+          updated_at?: string
+          validation_snapshot?: Json
+        }
+        Relationships: [
+          {
+            foreignKeyName: "registry_provider_track_suggestions_artist_fkey"
+            columns: ["registry_artist_id"]
+            isOneToOne: false
+            referencedRelation: "registry_artists"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "registry_provider_track_suggestions_canonicalized_track_fkey"
+            columns: ["canonicalized_track_id"]
+            isOneToOne: false
+            referencedRelation: "registry_tracks"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "registry_provider_track_suggestions_item_fkey"
+            columns: ["source_playlist_item_id"]
+            isOneToOne: false
+            referencedRelation: "wk_playlist_items"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "registry_provider_track_suggestions_playlist_fkey"
+            columns: ["source_playlist_id"]
+            isOneToOne: false
+            referencedRelation: "wk_playlists"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "registry_provider_track_suggestions_track_fkey"
+            columns: ["canonical_track_id"]
+            isOneToOne: false
+            referencedRelation: "registry_tracks"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       registry_relationship_evidence: {
         Row: {
           created_at: string
@@ -15700,6 +15881,38 @@ export type Database = {
           result_payload: Json
         }[]
       }
+      add_playlist_registry_track_with_intake_slots: {
+        Args: {
+          p_correlation_id?: string
+          p_expected_authority_revision: number
+          p_idempotency_key: string
+          p_playlist_id: string
+          p_registry_track_id: string
+        }
+        Returns: Json
+      }
+      add_playlist_validated_provider_track: {
+        Args: {
+          p_correlation_id?: string
+          p_expected_authority_revision: number
+          p_idempotency_key: string
+          p_playlist_id: string
+          p_registry_track_id: string
+          p_validation_id: string
+        }
+        Returns: Json
+      }
+      add_playlist_validated_provider_track_with_intake_slots: {
+        Args: {
+          p_correlation_id?: string
+          p_expected_authority_revision: number
+          p_idempotency_key: string
+          p_playlist_id: string
+          p_registry_track_id: string
+          p_validation_id: string
+        }
+        Returns: Json
+      }
       add_publishing_item_assignee: {
         Args: {
           p_assignment_role: string
@@ -15770,6 +15983,14 @@ export type Database = {
         }
         Returns: Json
       }
+      admin_create_registry_track_from_intake_enriched: {
+        Args: {
+          p_review_note?: string
+          p_suggestion_id: string
+          p_title: string
+        }
+        Returns: Json
+      }
       admin_decouple_registry_artist: {
         Args: {
           p_archive_source?: boolean
@@ -15804,6 +16025,20 @@ export type Database = {
         Args: { p_include_low_confidence?: boolean; p_limit?: number }
         Returns: Json
       }
+      admin_get_registry_track_intake_enrichment: {
+        Args: { p_suggestion_id: string }
+        Returns: Json
+      }
+      admin_get_registry_track_intake_queue: {
+        Args: {
+          p_limit?: number
+          p_offset?: number
+          p_playlist_item_id?: string
+          p_status?: string
+          p_suggestion_id?: string
+        }
+        Returns: Json
+      }
       admin_log_artist_resolution_event: {
         Args: {
           p_action: string
@@ -15833,8 +16068,24 @@ export type Database = {
         Args: { p_canonical_track_id: string; p_duplicate_track_ids: string[] }
         Returns: Json
       }
+      admin_record_registry_track_intake_provider_evidence: {
+        Args: {
+          p_confidence?: number
+          p_fields: Json
+          p_provider: string
+          p_provider_entity_id: string
+          p_provider_url: string
+          p_raw_payload?: Json
+          p_suggestion_id: string
+        }
+        Returns: Json
+      }
       admin_refresh_signal_os_rollups: {
         Args: { p_end_date?: string; p_start_date?: string }
+        Returns: Json
+      }
+      admin_reject_registry_track_intake: {
+        Args: { p_review_note: string; p_suggestion_id: string }
         Returns: Json
       }
       admin_resolve_chart_artist_alias: {
@@ -15846,6 +16097,23 @@ export type Database = {
         }
         Returns: Json
       }
+      admin_resolve_registry_track_intake: {
+        Args: {
+          p_registry_track_id: string
+          p_review_note?: string
+          p_suggestion_id: string
+        }
+        Returns: Json
+      }
+      admin_resolve_registry_track_intake_enriched: {
+        Args: {
+          p_allow_overwrite?: boolean
+          p_registry_track_id: string
+          p_review_note?: string
+          p_suggestion_id: string
+        }
+        Returns: Json
+      }
       admin_safe_merge_registry_artists: {
         Args: {
           p_archive_source?: boolean
@@ -15854,6 +16122,10 @@ export type Database = {
           p_note?: string
           p_source_artist_id: string
         }
+        Returns: Json
+      }
+      admin_save_registry_track_intake_enrichment: {
+        Args: { p_fields: Json; p_reason?: string; p_suggestion_id: string }
         Returns: Json
       }
       admin_search_registry_artists: {
@@ -16807,6 +17079,15 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      confirm_playlist_playback_validation: {
+        Args: {
+          p_playlist_id: string
+          p_probe_metadata?: Json
+          p_requested_by: string
+          p_validation_id: string
+        }
+        Returns: Json
+      }
       count_all_import_runs: { Args: never; Returns: number }
       count_import_runs_with_errors: { Args: never; Returns: number }
       create_article: {
@@ -17303,6 +17584,15 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      create_registry_track_intake_suggestion: {
+        Args: {
+          p_artist_resolution_mode: string
+          p_playlist_id: string
+          p_registry_artist_id?: string
+          p_validation_id: string
+        }
+        Returns: Json
+      }
       create_source: {
         Args: {
           p_correlation_id?: string
@@ -17333,6 +17623,10 @@ export type Database = {
           source_kind: string
           updated_at: string
         }[]
+      }
+      current_user_can_edit_playlist_id: {
+        Args: { p_playlist_id: string }
+        Returns: boolean
       }
       current_user_has_capability: {
         Args: { required_capability: string }
@@ -17614,6 +17908,22 @@ export type Database = {
       }
       get_media_upload_session_v1: {
         Args: { p_session_id: string }
+        Returns: Json
+      }
+      get_playlist_cover_source: {
+        Args: { p_asset_id: string; p_playlist_id: string }
+        Returns: Json
+      }
+      get_playlist_current_cover: {
+        Args: { p_playlist_id: string }
+        Returns: Json
+      }
+      get_playlist_pending_registry_intake: {
+        Args: { p_playlist_id: string }
+        Returns: Json
+      }
+      get_playlist_pending_registry_intake_editorial: {
+        Args: { p_playlist_id: string }
         Returns: Json
       }
       get_playlist_review_workspace: {
@@ -18169,6 +18479,17 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      move_playlist_pending_registry_intake: {
+        Args: {
+          p_correlation_id?: string
+          p_direction: string
+          p_expected_authority_revision: number
+          p_idempotency_key: string
+          p_playlist_id: string
+          p_suggestion_id: string
+        }
+        Returns: Json
+      }
       normalize_registry_relationship_vocabulary: {
         Args: {
           p_reason?: string
@@ -18396,6 +18717,46 @@ export type Database = {
         }
         Returns: string
       }
+      record_playlist_playback_probe_candidate: {
+        Args: {
+          p_artist_names_hint: string[]
+          p_artwork_url: string
+          p_canonical_url: string
+          p_correlation_id: string
+          p_embed_url: string
+          p_expires_at: string
+          p_playback_kind: string
+          p_playlist_id: string
+          p_provider_key: string
+          p_provider_metadata: Json
+          p_provider_object_id: string
+          p_provider_url: string
+          p_requested_by: string
+          p_title_hint: string
+        }
+        Returns: string
+      }
+      record_playlist_playback_validation: {
+        Args: {
+          p_artist_names_hint: string[]
+          p_artwork_url: string
+          p_canonical_url: string
+          p_correlation_id: string
+          p_embed_url: string
+          p_expires_at: string
+          p_playback_kind: string
+          p_playlist_id: string
+          p_preview_url: string
+          p_provider_key: string
+          p_provider_metadata: Json
+          p_provider_object_id: string
+          p_provider_url: string
+          p_release_title_hint: string
+          p_requested_by: string
+          p_title_hint: string
+        }
+        Returns: string
+      }
       recover_expired_media_processing_jobs_v1: {
         Args: { p_limit?: number; p_retry_delay_seconds?: number }
         Returns: number
@@ -18545,6 +18906,16 @@ export type Database = {
           result_payload: Json
         }[]
       }
+      remove_playlist_item_with_intake_slots: {
+        Args: {
+          p_correlation_id?: string
+          p_expected_authority_revision: number
+          p_idempotency_key: string
+          p_playlist_id: string
+          p_playlist_item_id: string
+        }
+        Returns: Json
+      }
       remove_publishing_item_assignee: {
         Args: {
           p_assignment_role: string
@@ -18612,6 +18983,16 @@ export type Database = {
           resource_id: string
           result_payload: Json
         }[]
+      }
+      reorder_playlist_items_with_intake_slots: {
+        Args: {
+          p_correlation_id?: string
+          p_expected_authority_revision: number
+          p_idempotency_key: string
+          p_ordered_item_ids: string[]
+          p_playlist_id: string
+        }
+        Returns: Json
       }
       replace_article_version_citations: {
         Args: {
@@ -19100,6 +19481,17 @@ export type Database = {
           result_payload: Json
         }[]
       }
+      save_playlist_pending_registry_note: {
+        Args: {
+          p_correlation_id?: string
+          p_expected_authority_revision: number
+          p_idempotency_key: string
+          p_note: string
+          p_playlist_id: string
+          p_suggestion_id: string
+        }
+        Returns: Json
+      }
       save_source_version: {
         Args: {
           p_correlation_id?: string
@@ -19145,6 +19537,32 @@ export type Database = {
           p_reason?: string
         }
         Returns: Json
+      }
+      set_playlist_cover: {
+        Args: {
+          p_alt_text_snapshot?: string
+          p_asset_id: string
+          p_caption_snapshot?: string
+          p_correlation_id?: string
+          p_credit_snapshot?: string
+          p_expected_authority_revision: number
+          p_idempotency_key: string
+          p_placement_data?: Json
+          p_playlist_id: string
+        }
+        Returns: {
+          authority_revision: number
+          command_receipt_id: string
+          cover_asset_id: string
+          cover_asset_revision_id: string
+          cover_url: string
+          cover_usage_link_id: string
+          idempotent_replay: boolean
+          playlist_id: string
+          receipt_status: string
+          resource_id: string
+          result_payload: Json
+        }[]
       }
       set_publishing_item_primary_channel: {
         Args: {
@@ -19282,6 +19700,17 @@ export type Database = {
           version_id: string
           version_number: number
         }[]
+      }
+      submit_playlist_registry_intake: {
+        Args: {
+          p_artist_credits: Json
+          p_correlation_id?: string
+          p_expected_authority_revision: number
+          p_idempotency_key: string
+          p_playlist_id: string
+          p_validation_id: string
+        }
+        Returns: Json
       }
       submit_resource_reconciliation_command: {
         Args: {

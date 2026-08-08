@@ -54,9 +54,16 @@ const lazyImportCount = (
  * - AdminMediaMigratePage
  * - AdminScraperPage
  *
- * The post-retirement authority is therefore 87 lazy imports.
+ * The post-retirement authority was therefore 87 lazy imports.
+ *
+ * Phase 5A adds three canonical Playlist Admin Studio routes:
+ * - AdminPlaylistsPage
+ * - AdminNewPlaylistPage
+ * - AdminPlaylistDetailPage
+ *
+ * The current authority is therefore 90 lazy imports.
  */
-const expectedLazyImportCount = 87;
+const expectedLazyImportCount = 91;
 
 if (lazyImportCount !== expectedLazyImportCount) {
   fail(
@@ -86,6 +93,9 @@ for (const marker of [
   "AdminShell",
   "AdminLoginPage",
   "AdminInquiryInterfacePage",
+  "AdminPlaylistsPage",
+  "AdminNewPlaylistPage",
+  "AdminPlaylistDetailPage",
   "AdminChartsLayout",
   "AdminSettingsLayout",
   "AdminApiDocsPage",
@@ -95,6 +105,10 @@ for (const marker of [
       `lazy Admin Studio module is missing ${marker}`,
     );
   }
+}
+
+if (!lazyAdmin.includes("export const AdminTrackIntakePage")) {
+  fail("lazy Admin Studio module is missing AdminTrackIntakePage");
 }
 
 if (

@@ -18,6 +18,18 @@ export const AdminArticlesPage = lazy(() =>
   import("../pages/admin/content/articles/page"),
 );
 
+export const AdminPlaylistsPage = lazy(() =>
+  import("../pages/admin/content/playlists/page"),
+);
+
+export const AdminNewPlaylistPage = lazy(() =>
+  import("../pages/admin/content/playlists/new/page"),
+);
+
+export const AdminPlaylistDetailPage = lazy(() =>
+  import("../pages/admin/content/playlists/detail/page"),
+);
+
 export const AdminArtistAliasesPage = lazy(() =>
   import("../pages/admin/registry/artist-aliases/page"),
 );
@@ -348,6 +360,10 @@ export const AdminTagsPage = lazy(() =>
 
 export const AdminTrackDetailPage = lazy(() =>
   import("../pages/admin/registry/tracks/detail/page"),
+);
+
+export const AdminTrackIntakePage = lazy(() =>
+  import("../pages/admin/registry/tracks/intake/page"),
 );
 
 export const AdminTracksPage = lazy(() =>

@@ -1,5 +1,5 @@
 /**
- * MediaPickerModal — thin wrapper around the unified MediaLibrary.
+ * MediaPickerModal: thin wrapper around the unified MediaLibrary.
  *
  * Renders MediaLibraryCore (tabs, grid, filters, upload, storage) in the left
  * panel and MediaLibraryPreviewPanel in the right panel for a single, consistent
@@ -7,6 +7,7 @@
  */
 
 import { useState, useEffect, useRef } from "react";
+import { createPortal } from "react-dom";
 import { WkIcon } from "@/components/design-system/Icon";
 import { MediaLibraryCore } from "@/components/admin/media/MediaLibraryCore";
 import { MediaLibraryPreviewPanel } from "@/components/admin/media/MediaLibraryPreviewPanel";
@@ -78,6 +79,17 @@ export function MediaPickerModal({
     }
   }, [open, onClose]);
 
+  // Keep the picker anchored to the current viewport and stop the document
+  // behind it from scrolling while the picker is open.
+  useEffect(() => {
+    if (!open) return;
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.body.style.overflow = previousOverflow;
+    };
+  }, [open]);
+
   const handleRegisterFromStorage = async (url: string): Promise<MediaAsset> => {
     const fileName = url.split("/").pop()?.split("?")[0]?.replace(/\.[^.]+$/, "") || "registered-image";
     const title = fileName.replace(/[-_]/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
@@ -101,96 +113,97 @@ export function MediaPickerModal({
 
   if (!open) return null;
 
-  return (
+  return createPortal(
     <div
-      ref={modalRef}
-      className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 p-2 sm:p-4"
-    >
-      <div className="flex h-[90vh] w-full max-w-[1280px] flex-col rounded-2xl border border-wk-border bg-wk-surface shadow-2xl overflow-hidden">
+          ref={modalRef}
+          className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 p-2 sm:p-4"
+        >
+          <div className="flex h-[90vh] w-full max-w-[1280px] flex-col rounded-2xl border border-wk-border bg-wk-surface shadow-2xl overflow-hidden">
 
-        {/* Header */}
-        <div className="flex items-center justify-between border-b border-wk-border px-5 py-3 shrink-0">
-          <div className="flex items-center gap-3">
-            <h3 className="text-[15px] font-bold text-wk-text">{title}</h3>
-            <div className="flex items-center gap-1 rounded-lg border border-wk-border bg-wk-bg px-2 py-1 text-[11px] text-wk-text-muted">
-              <i className="ri-database-2-line text-[10px]" />
-              Unified Media Library
+            {/* Header */}
+            <div className="flex items-center justify-between border-b border-wk-border px-5 py-3 shrink-0">
+              <div className="flex items-center gap-3">
+                <h3 className="text-[15px] font-bold text-wk-text">{title}</h3>
+                <div className="flex items-center gap-1 rounded-lg border border-wk-border bg-wk-bg px-2 py-1 text-[11px] text-wk-text-muted">
+                  <i className="ri-database-2-line text-[10px]" />
+                  Unified Media Library
+                </div>
+              </div>
+              <button
+                onClick={onClose}
+                className="flex h-8 w-8 items-center justify-center rounded-md text-wk-text-muted hover:bg-wk-surface-raised hover:text-wk-text transition-colors cursor-pointer"
+              >
+                <WkIcon name="X" size={16} />
+              </button>
             </div>
-          </div>
-          <button
-            onClick={onClose}
-            className="flex h-8 w-8 items-center justify-center rounded-md text-wk-text-muted hover:bg-wk-surface-raised hover:text-wk-text transition-colors cursor-pointer"
-          >
-            <WkIcon name="X" size={16} />
-          </button>
-        </div>
 
-        {/* Body — two columns */}
-        <div className="flex-1 flex min-h-0 overflow-hidden">
-          {/* Left: unified library browser */}
-          <div className="flex-1 min-w-0 overflow-y-auto">
-            <MediaLibraryCore
-              mode="picker"
-              currentUrl={currentUrl}
-              refreshKey={refreshCounter}
-              allowedKinds={allowedKinds}
-              onSelectionChange={(id, url, asset) => {
-                setSelectedAssetId(id);
-                setSelectedUrl(url);
-                if (asset) setResolvedAsset(asset);
-                else if (!id && url) setResolvedAsset(null);
-              }}
-              onAssetUpdated={(asset: MediaAsset) => {
-                if (selectedAssetId === asset.id) {
+            {/* Body: two columns */}
+            <div className="flex-1 flex min-h-0 overflow-hidden">
+              {/* Left: unified library browser */}
+              <div className="flex-1 min-w-0 overflow-y-auto">
+                <MediaLibraryCore
+                  mode="picker"
+                  currentUrl={currentUrl}
+                  refreshKey={refreshCounter}
+                  allowedKinds={allowedKinds}
+                  onSelectionChange={(id, url, asset) => {
+                    setSelectedAssetId(id);
+                    setSelectedUrl(url);
+                    if (asset) setResolvedAsset(asset);
+                    else if (!id && url) setResolvedAsset(null);
+                  }}
+                  onAssetUpdated={(asset: MediaAsset) => {
+                    if (selectedAssetId === asset.id) {
+                      setResolvedAsset(asset);
+                      setSelectedUrl(asset.url ?? "");
+                    }
+                  }}
+                  onAssetDeleted={(id: string) => {
+                    if (selectedAssetId === id) {
+                      setSelectedAssetId(null);
+                      setSelectedUrl("");
+                      setResolvedAsset(null);
+                    }
+                  }}
+                />
+              </div>
+
+              {/* Right: preview + actions */}
+              <MediaLibraryPreviewPanel
+                mode="picker"
+                selectedAsset={resolvedAsset}
+                selectedUrl={selectedUrl}
+                isReplaceMode={isReplaceMode}
+                onSelect={() => {
+                  if (selectedUrl) {
+                    onSelect(selectedAssetId, selectedUrl);
+                  }
+                }}
+                onClose={onClose}
+                onAssetUpdated={(asset: MediaAsset) => {
                   setResolvedAsset(asset);
                   setSelectedUrl(asset.url ?? "");
-                }
-              }}
-              onAssetDeleted={(id: string) => {
-                if (selectedAssetId === id) {
-                  setSelectedAssetId(null);
-                  setSelectedUrl("");
-                  setResolvedAsset(null);
-                }
-              }}
-            />
+                }}
+                onAssetDeleted={(id: string) => {
+                  if (selectedAssetId === id) {
+                    setSelectedAssetId(null);
+                    setSelectedUrl("");
+                    setResolvedAsset(null);
+                  }
+                }}
+                onRegisterFromStorage={handleRegisterFromStorage}
+              />
+            </div>
           </div>
 
-          {/* Right: preview + actions */}
-          <MediaLibraryPreviewPanel
-            mode="picker"
-            selectedAsset={resolvedAsset}
-            selectedUrl={selectedUrl}
-            isReplaceMode={isReplaceMode}
-            onSelect={() => {
-              if (selectedUrl) {
-                onSelect(selectedAssetId, selectedUrl);
-              }
-            }}
-            onClose={onClose}
-            onAssetUpdated={(asset: MediaAsset) => {
-              setResolvedAsset(asset);
-              setSelectedUrl(asset.url ?? "");
-            }}
-            onAssetDeleted={(id: string) => {
-              if (selectedAssetId === id) {
-                setSelectedAssetId(null);
-                setSelectedUrl("");
-                setResolvedAsset(null);
-              }
-            }}
-            onRegisterFromStorage={handleRegisterFromStorage}
-          />
-        </div>
-      </div>
-
-      {/* Register toast */}
-      {registerToast && (
-        <div className="absolute bottom-6 left-1/2 -translate-x-1/2 z-[999] flex items-center gap-2 rounded-xl border px-4 py-3 text-[13px] font-semibold shadow-lg border-wk-success/20 bg-wk-success-soft text-wk-success">
-          <WkIcon name="CheckCircle2" size={16} />
-          {registerToast.msg}
-        </div>
-      )}
-    </div>
+          {/* Register toast */}
+          {registerToast && (
+            <div className="absolute bottom-6 left-1/2 -translate-x-1/2 z-[999] flex items-center gap-2 rounded-xl border px-4 py-3 text-[13px] font-semibold shadow-lg border-wk-success/20 bg-wk-success-soft text-wk-success">
+              <WkIcon name="CheckCircle2" size={16} />
+              {registerToast.msg}
+            </div>
+          )}
+        </div>,
+    document.body,
   );
 }
