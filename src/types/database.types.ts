@@ -1678,29 +1678,260 @@ export type Database = {
           },
         ]
       }
+      playlist_item_resources: {
+        Row: {
+          playlist_item_id: string
+          resource_id: string
+          resource_kind: string
+        }
+        Insert: {
+          playlist_item_id: string
+          resource_id: string
+          resource_kind?: string
+        }
+        Update: {
+          playlist_item_id?: string
+          resource_id?: string
+          resource_kind?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "playlist_item_resources_resource_fkey"
+            columns: ["resource_id", "resource_kind"]
+            isOneToOne: false
+            referencedRelation: "resources"
+            referencedColumns: ["id", "resource_kind"]
+          },
+        ]
+      }
       playlist_resources: {
         Row: {
+          current_approved_version_id: string | null
+          current_published_version_id: string | null
+          current_submitted_version_id: string | null
+          current_working_version_id: string | null
           playlist_id: string
           resource_id: string
           resource_kind: string
         }
         Insert: {
+          current_approved_version_id?: string | null
+          current_published_version_id?: string | null
+          current_submitted_version_id?: string | null
+          current_working_version_id?: string | null
           playlist_id: string
           resource_id: string
           resource_kind?: string
         }
         Update: {
+          current_approved_version_id?: string | null
+          current_published_version_id?: string | null
+          current_submitted_version_id?: string | null
+          current_working_version_id?: string | null
           playlist_id?: string
           resource_id?: string
           resource_kind?: string
         }
         Relationships: [
           {
+            foreignKeyName: "playlist_resources_approved_version_fkey"
+            columns: [
+              "current_approved_version_id",
+              "resource_id",
+              "playlist_id",
+            ]
+            isOneToOne: false
+            referencedRelation: "playlist_versions"
+            referencedColumns: ["id", "resource_id", "playlist_id"]
+          },
+          {
+            foreignKeyName: "playlist_resources_published_version_fkey"
+            columns: [
+              "current_published_version_id",
+              "resource_id",
+              "playlist_id",
+            ]
+            isOneToOne: false
+            referencedRelation: "playlist_versions"
+            referencedColumns: ["id", "resource_id", "playlist_id"]
+          },
+          {
             foreignKeyName: "playlist_resources_resource_fkey"
             columns: ["resource_id", "resource_kind"]
             isOneToOne: false
             referencedRelation: "resources"
             referencedColumns: ["id", "resource_kind"]
+          },
+          {
+            foreignKeyName: "playlist_resources_submitted_version_fkey"
+            columns: [
+              "current_submitted_version_id",
+              "resource_id",
+              "playlist_id",
+            ]
+            isOneToOne: false
+            referencedRelation: "playlist_versions"
+            referencedColumns: ["id", "resource_id", "playlist_id"]
+          },
+          {
+            foreignKeyName: "playlist_resources_working_version_fkey"
+            columns: [
+              "current_working_version_id",
+              "resource_id",
+              "playlist_id",
+            ]
+            isOneToOne: false
+            referencedRelation: "playlist_versions"
+            referencedColumns: ["id", "resource_id", "playlist_id"]
+          },
+        ]
+      }
+      playlist_version_items: {
+        Row: {
+          artist_names: string[]
+          artwork_url: string | null
+          duration_ms: number | null
+          isrc: string | null
+          match_confidence: number | null
+          match_status: string
+          normalization_payload: Json
+          notes: string | null
+          playlist_item_id: string
+          playlist_item_resource_id: string
+          playlist_version_id: string
+          position: number
+          preview_url: string | null
+          provider_key: string | null
+          provider_track_id: string | null
+          provider_url: string | null
+          registry_release_id: string | null
+          registry_track_id: string | null
+          release_title: string | null
+          title: string | null
+        }
+        Insert: {
+          artist_names?: string[]
+          artwork_url?: string | null
+          duration_ms?: number | null
+          isrc?: string | null
+          match_confidence?: number | null
+          match_status: string
+          normalization_payload?: Json
+          notes?: string | null
+          playlist_item_id: string
+          playlist_item_resource_id: string
+          playlist_version_id: string
+          position: number
+          preview_url?: string | null
+          provider_key?: string | null
+          provider_track_id?: string | null
+          provider_url?: string | null
+          registry_release_id?: string | null
+          registry_track_id?: string | null
+          release_title?: string | null
+          title?: string | null
+        }
+        Update: {
+          artist_names?: string[]
+          artwork_url?: string | null
+          duration_ms?: number | null
+          isrc?: string | null
+          match_confidence?: number | null
+          match_status?: string
+          normalization_payload?: Json
+          notes?: string | null
+          playlist_item_id?: string
+          playlist_item_resource_id?: string
+          playlist_version_id?: string
+          position?: number
+          preview_url?: string | null
+          provider_key?: string | null
+          provider_track_id?: string | null
+          provider_url?: string | null
+          registry_release_id?: string | null
+          registry_track_id?: string | null
+          release_title?: string | null
+          title?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "playlist_version_items_item_identity_fkey"
+            columns: ["playlist_item_resource_id", "playlist_item_id"]
+            isOneToOne: false
+            referencedRelation: "playlist_item_resources"
+            referencedColumns: ["resource_id", "playlist_item_id"]
+          },
+          {
+            foreignKeyName: "playlist_version_items_version_fkey"
+            columns: ["playlist_version_id"]
+            isOneToOne: false
+            referencedRelation: "playlist_versions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      playlist_versions: {
+        Row: {
+          content_fingerprint: string
+          created_at: string
+          created_by: string | null
+          curator_label: string | null
+          description: string | null
+          id: string
+          item_count: number
+          metadata: Json
+          playlist_id: string
+          resource_id: string
+          slug: string
+          source_authority_revision: number
+          status: string
+          title: string
+          version_kind: string
+          version_number: number
+        }
+        Insert: {
+          content_fingerprint: string
+          created_at?: string
+          created_by?: string | null
+          curator_label?: string | null
+          description?: string | null
+          id?: string
+          item_count: number
+          metadata?: Json
+          playlist_id: string
+          resource_id: string
+          slug: string
+          source_authority_revision: number
+          status: string
+          title: string
+          version_kind: string
+          version_number: number
+        }
+        Update: {
+          content_fingerprint?: string
+          created_at?: string
+          created_by?: string | null
+          curator_label?: string | null
+          description?: string | null
+          id?: string
+          item_count?: number
+          metadata?: Json
+          playlist_id?: string
+          resource_id?: string
+          slug?: string
+          source_authority_revision?: number
+          status?: string
+          title?: string
+          version_kind?: string
+          version_number?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "playlist_versions_resource_playlist_fkey"
+            columns: ["resource_id", "playlist_id"]
+            isOneToOne: false
+            referencedRelation: "playlist_resources"
+            referencedColumns: ["resource_id", "playlist_id"]
           },
         ]
       }
@@ -14432,12 +14663,13 @@ export type Database = {
           duration_ms: number | null
           id: string
           isrc: string | null
+          lifecycle_state: string
           match_confidence: number | null
           match_status: string
           normalization_payload: Json
           notes: string | null
           playlist_id: string
-          position: number
+          position: number | null
           preview_url: string | null
           provider_key: string | null
           provider_track_id: string | null
@@ -14445,6 +14677,8 @@ export type Database = {
           registry_release_id: string | null
           registry_track_id: string | null
           release_title: string | null
+          removed_at: string | null
+          removed_by: string | null
           title: string | null
           updated_at: string
         }
@@ -14456,12 +14690,13 @@ export type Database = {
           duration_ms?: number | null
           id?: string
           isrc?: string | null
+          lifecycle_state?: string
           match_confidence?: number | null
           match_status?: string
           normalization_payload?: Json
           notes?: string | null
           playlist_id: string
-          position: number
+          position?: number | null
           preview_url?: string | null
           provider_key?: string | null
           provider_track_id?: string | null
@@ -14469,6 +14704,8 @@ export type Database = {
           registry_release_id?: string | null
           registry_track_id?: string | null
           release_title?: string | null
+          removed_at?: string | null
+          removed_by?: string | null
           title?: string | null
           updated_at?: string
         }
@@ -14480,12 +14717,13 @@ export type Database = {
           duration_ms?: number | null
           id?: string
           isrc?: string | null
+          lifecycle_state?: string
           match_confidence?: number | null
           match_status?: string
           normalization_payload?: Json
           notes?: string | null
           playlist_id?: string
-          position?: number
+          position?: number | null
           preview_url?: string | null
           provider_key?: string | null
           provider_track_id?: string | null
@@ -14493,6 +14731,8 @@ export type Database = {
           registry_release_id?: string | null
           registry_track_id?: string | null
           release_title?: string | null
+          removed_at?: string | null
+          removed_by?: string | null
           title?: string | null
           updated_at?: string
         }
@@ -14522,6 +14762,7 @@ export type Database = {
       }
       wk_playlists: {
         Row: {
+          authority_revision: number
           canonical_url: string | null
           cover_image_url: string | null
           created_at: string
@@ -14539,6 +14780,7 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          authority_revision?: number
           canonical_url?: string | null
           cover_image_url?: string | null
           created_at?: string
@@ -14556,6 +14798,7 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          authority_revision?: number
           canonical_url?: string | null
           cover_image_url?: string | null
           created_at?: string
