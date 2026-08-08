@@ -15,21 +15,24 @@ All future work on Articles, Playlists, Audio, Video, Media, Registry, Charts, c
 
 ## Programme status
 
-Current phase: **Phase 4: Media platform**.
+Current phase: **Phase 5: Playlist**.
 
-Phase 3 Trust infrastructure is complete. PR 4A Media authority redesign is closed. PR 4B Upload and processing pipeline is the immediate next implementation.
+Phase 4 Media platform is complete. PR 4A Media authority redesign and PR 4B Upload and processing pipeline are closed in production.
 
-Phase 4A is closed in production. The Media authority, public and administrative read cutovers, governed writes, immutable replacement, browser delivery, WordPress runtime retirement, active legacy Media URL cutover, and final frontend retirement acceptance are complete.
+Phase 5A Canonical Playlist authority is complete. The canonical Playlist domain, governed lifecycle, Registry-first intake, Playlist admin product, Track Intake review surface, cover authority, playback validation, capabilities, and supporting verification are live and accepted.
 
-Historical WordPress-named provenance columns and indexes and the remaining frozen Institute compatibility read surface are preserved intentionally. They are not active Media integration authority. Their later evidence-led neutralization and compatibility policy or grant contraction are separate preservation and hardening work and do not reopen Phase 4A or block PR 4B.
+The immediate next implementation is **PR 5B: Public Playlist product**.
 
-This plan has been reconciled against repository paperwork main at:
+This plan has been reconciled against repository main at:
 
-`85e12da3 Close Phase 4A and open PR 4B (#581)`
+`14a37730 Complete Phase 5A Playlist admin product (#588)`
 
-The Phase 4A runtime code baseline remains `f6800cb5`. A later read-only
-infrastructure audit discovered and corrected host-managed Nginx Media fallback
-residue without changing repository runtime code.
+Current production schema authority:
+
+- 217 authoritative migrations
+- latest migration `20260808204500_phase_5a_track_intake_canonical_creation.sql`
+- committed public-schema types match production
+- production migration queue is up to date
 
 Closed phases:
 
@@ -43,75 +46,28 @@ Closed phases:
 - **Phase 3A: Sources, Citations, and Credits**, closed through PR #542.
 - **Phase 3B: Corrections and provenance**, closed through PR #557.
 - **Phase 4A: Media authority redesign**, closed through PR #580.
+- **Phase 4B: Upload and processing pipeline**, closed through PR #586.
+- **Phase 5A: Canonical Playlist authority**, closed through PR #587 and PR #588.
 
-Completed Phase 3 work:
+Completed Phase 4 work includes resumable large-master ingest, durable Media processing, Media Library workflow and delivery, transcript and caption Media kinds, signed protected delivery, maintenance and reconciliation, and Cloudflare public-CDN activation.
 
-- **Article Workspace North Star audit**, locked through PR #487.
-- **Article composition and workspace hierarchy**, completed through PR #488.
-- **Article review modes and suggestion decisions**, completed through PR #490 and PR #491.
-- **Governed Publishing workspace foundation and core**, completed through PR #492 and PR #493.
-- **Publishing teams, channels, operational history, Article linking, archive and restore, Board View, and Table View**, completed through PR #494 to PR #504.
-- **QPR4 Publishing production deployment**, completed from main commit `6b2979b`.
-- **Sources, Citations, Credits, source withdrawal, public trust reads, and Credit governance**, completed through PR #542.
-- **Correction identity, evidence, decisions, Article application, public notes, contributor follow-up, and live-schema reconciliation**, completed through PR #543 to PR #557.
+Completed Phase 5A work includes canonical Playlist Resource identity, command authority, immutable Playlist versions, review lifecycle, atomic ordering, Registry and provider matching, Trust attachments, Playlist cover governance, Registry-first Track Intake, provider playback validation, pending-intake unification, canonical Track creation through reviewed Track Intake, and the canonical Playlist admin workspace.
 
-Completed Phase 4 work:
+Production acceptance for Phase 5A includes:
 
-- **Media authority boundary and schema contract**, locked before implementation.
-- **Logical Media identity, governance and compatibility bridge**, completed in production.
-- **Immutable file, revision and variant command authority**, completed with no invented legacy file metadata.
-- **Media usage authority and governed read models**, completed in production.
-- **Legacy compatibility delivery resolver and governed batch adapter**, completed through PR #570 to PR #572.
-- **Shared public Media reads, Article inline Media reads and dead track-artwork lookup retirement**, completed through PR #573 to PR #575.
-- **Public application Media read lane acceptance**, recorded at main `cdbb4389`.
-- **Administrative Media reads and Media Library command cutover**, completed in production.
-- **Immutable original and derivative proof, immutable replacement and in-place overwrite removal**, completed in production.
-- **Browser editor Media CORS**, completed with one original-upload include and seven fixed-width derivative includes.
-- **Administrative Media read cutover and governed Media writes**, completed through PR #577 and PR #578.
-- **WordPress runtime, migration tooling, import surfaces, and legacy frontend Media rewrite retirement**, completed through PR #579.
-- **Active legacy Media URL cutover**, completed with zero active legacy Media URL rows while preserving accepted analytics, archived tombstones, external documents, and provenance.
-- **Dedicated WordPress and one-time backfill Edge Function retirement**, completed with 13 retired production functions removed.
-- **Final stale Admin Import navigation cleanup and production retirement acceptance**, completed through PR #580 and production main `f6800cb5`.
-- **Phase 4A final production frontend**, deployed from `f6800cb5` with entry `assets/index-kj620d2B.js` and exact-build verification.
-- **Phase 4A Media filesystem normalization and Nginx runtime retirement**, completed on 7 August 2026 through release `phase4a-nginx-media-retirement-20260807T091124Z`: 4,822 Media files and 407,479,887 bytes promoted into canonical `/uploads`, zero canonical overwrites, old WordPress-host proxy removed, Media-origin `wp-content` fallback removed, historical public redirects preserved, and rollback mirror retained.
-- **PR 4B upload and processing authority audit**, completed read-only on 7 August 2026. The next implementation is PR 4B M1: upload ingress authority and resumable-session proof.
+- live V217 canonical Track Intake creation verification
+- Playlist contract suite: 29 of 29 passed
+- Critical Control Plane regression suite: 102 of 102 passed
+- full production build: passed
+- browser CSP contract: 3 of 3 passed
+- language gate: passed
+- live-schema verification: passed
+- production migration drift: zero
+- GitHub Critical Control Plane: passed
 
-Supporting build-pipeline fix:
+Phase 5 remains active.
 
-- **SEO metadata manifest abort fallback**, closed through PR #484.
-
-Active phase:
-
-- **Phase 4: Media platform**.
-- **Active slice: PR 4B Upload and processing pipeline**.
-- **Immediate implementation: PR 4B M1 Upload ingress authority and resumable-session proof**.
-
-Phase 2, Phase 3, and Phase 4A are closed.
-
-Phase 2 proved the Article authority from draft through restoration in production. The completed lifecycle proof covered Draft, Submit for Review, Request Changes, revised Draft, Submit again, Approve, Publish, later Draft edit, public unchanged verification, Archive, and Restore.
-
-The North Star implementation work made the Article a stronger writing and review workspace without reopening the closed lifecycle authority. QPR4 established Publishing as a separate governed editorial operations workspace without duplicating canonical review, scheduling, or publication authority.
-
-Phase 3 completed the shared Sources, Citations, Credits, Corrections, and provenance foundations without reopening Article lifecycle or duplicating Publishing authority.
-
-Phase 4 remains active. PR 4A established and proved the Media authority and is closed.
-
-PR 4B now extends that closed authority into resumable upload and durable processing. It must reuse the canonical Media object model, shared jobs and outbox, immutable file and revision contracts, governed usage authority, and public delivery rules already accepted in Phase 4A.
-
-The PR 4B authority and failure-mode audit is complete. It confirmed that the current bridge is a 25 MiB whole-file transfer through `media-upload-api`, while the durable jobs, outbox, idempotency, immutable file-object, revision, and variant authorities already exist. M1 will prove direct resumable ingest for one large audio master without replacing those authorities.
-
-Historical WordPress-named preservation fields, frozen Institute compatibility reads, and later compatibility policy or grant contraction are not PR 4B upload-pipeline scope. They must be handled by separate evidence-led preservation or hardening work without restoring WordPress runtime authority.
-
-See also:
-
-- `docs/institute/phase-reconciliation-audit-20260718.md`
-- `docs/engineering/phase-2b-review-publication-lifecycle-audit.md`
-- `docs/engineering/phase-2-article-authority-closure-record.md`
-- `docs/engineering/phase-3-trust-infrastructure-kickoff.md`
-- `docs/engineering/phase-4a-media-authority-closure-record.md`
-- `docs/engineering/phase-4a-nginx-media-runtime-retirement-acceptance-record.md`
-- `docs/engineering/phase-4b-upload-processing-kickoff.md`
-- `docs/engineering/phase-4b-upload-processing-authority-audit.md`
+PR 5B now owns the public Playlist product. It must reuse the closed Phase 5A authority rather than creating another Playlist lifecycle, Registry intake path, Trust system, Media authority, or playback-validation authority.
 
 
 ## Decision
@@ -1738,19 +1694,20 @@ Completion record, 4 August 2026:
 
 ### Immediate next implementation
 
-**Begin PR 4B: Upload and processing pipeline.**
+**Begin PR 5B: Public Playlist product.**
 
-PR 4A Media authority redesign is closed through PR #580 and production main `f6800cb5`.
+Phase 4B Upload and processing pipeline is closed through PR #586.
 
-The first PR 4B move is an authority and failure-mode audit of the current upload path, Lightsail Media origin, `media-upload-api`, shared job and outbox substrate, object-transfer limits, checksum completion, derivative generation, retry behavior, cancellation, storage reconciliation, and recovery.
+Phase 5A Canonical Playlist authority is closed through PR #587 and PR #588.
 
-No PR 4B implementation should create a second Media authority, hidden queue, mutable master overwrite path, or WordPress compatibility dependency.
+PR 5B must build on the accepted Playlist authority and deliver the public product without reopening canonical Playlist identity, Registry Track Intake authority, Media authority, shared Trust infrastructure, or the Playlist review lifecycle.
 
-See `docs/engineering/phase-4b-upload-processing-kickoff.md`.
+The PR 5B acceptance target is one real editorial Playlist reviewed and published end to end, with public playback, Registry links, provenance, corrections, scheduling, SEO, and responsive behaviour verified.
 
-## Phase 4: Media platform
 
-### PR 4A: Media authority redesign
+## Phase 4: Media platform (complete)
+
+### PR 4A: Media authority redesign (complete)
 
 Build:
 
@@ -1794,7 +1751,7 @@ Completion record, 7 August 2026:
 - historical WordPress-named preservation fields and the frozen Institute compatibility read surface remain intentionally preserved outside the active Media runtime contract
 - later evidence-led source-field neutralization and compatibility grant or policy contraction are separate preservation and hardening work and do not reopen PR 4A
 
-### PR 4B: Upload and processing pipeline
+### PR 4B: Upload and processing pipeline (complete)
 
 Build:
 
@@ -1823,9 +1780,21 @@ Exit gate:
 - public derivatives play
 - processing can be retried without another master upload
 
-## Phase 5: Playlist
+Completion record, 8 August 2026:
 
-### PR 5A: Canonical Playlist authority
+- closed through PR #583, PR #584, PR #585, and PR #586
+- resumable audio and video master ingest is live
+- durable processing, retry, lease recovery, and dead-letter behaviour are accepted
+- Media Library upload, pause, resume, cancellation, and derivative rendering are accepted
+- transcript and caption are canonical Media asset kinds
+- protected Media supports short-lived signed delivery
+- daily Media maintenance and reconciliation are active
+- public immutable Media is delivered through Cloudflare
+- Phase 4B live acceptance completed without reopening Phase 4A Media identity authority
+
+## Phase 5: Playlist (active)
+
+### PR 5A: Canonical Playlist authority (complete)
 
 Build:
 
@@ -1847,6 +1816,22 @@ Exit gate:
 
 - a Playlist can be created and reviewed without Institute involvement
 - concurrent ordering cannot corrupt positions
+
+Completion record, 9 August 2026:
+
+- closed through PR #587 and PR #588
+- production migrations 208 through 217 are live
+- canonical Playlist identity, command authority, versions, review, ordering, Registry matching, Trust attachments, and capabilities are live
+- the canonical Playlist list, create, and editor routes are shipped
+- pending Registry intake remains part of the ordinary Playlist item workflow
+- Registry Track Intake supports reviewed creation of missing canonical Tracks
+- Playlist cover mutation is governed without broadening global Media authority
+- provider-backed playback is validated before Playlist intake
+- Apple Music, Spotify, and YouTube provider paths are covered by the accepted product contract
+- live V217 authority verification passed
+- Playlist contract suite passed 29 of 29 tests
+- Critical Control Plane regression suite passed 102 of 102 tests
+- full production build, CSP contract, language gate, schema verification, and production migration drift checks passed
 
 ### PR 5B: Public Playlist product
 
@@ -2360,41 +2345,40 @@ After canonical editors and Inquiry Mode are proven:
 
 ## Current implementation boundary
 
-Phase 0 through Phase 3 are closed.
+Phase 0 through Phase 4 are closed.
 
-The current phase is Phase 4: Media platform.
+Phase 5 Playlist is active.
+
+Phase 5A Canonical Playlist authority is closed through PR #587 and PR #588.
 
 The next implementation is:
 
-**PR 4A: Media authority redesign**.
+**PR 5B: Public Playlist product**.
 
-This PR must:
+PR 5B must execute the public Playlist scope and exit gate defined in Phase 5 of this plan.
 
-- audit the existing Media estate and storage relationships
-- define logical assets, immutable file objects, and variants
-- define usage links between Media and canonical resources
-- define checksums, technical metadata, and preservation state
-- define rights, consent, sensitivity, embargo, and source protection
-- define replacement history and retention state
-- preserve existing Media usability through an explicit migration bridge
-- lock the authority boundary and migration sequence before schema implementation
+It must build on the accepted Phase 5A authority rather than reopening or duplicating:
 
-This PR must not:
+- canonical Playlist identity
+- Playlist command and concurrency authority
+- immutable Playlist versions
+- review lifecycle
+- atomic ordering
+- Registry Track Intake
+- provider playback validation
+- Media cover authority
+- shared Sources, Citations, Credits, Corrections, and provenance
+- Registry canonical identity authority
 
-- begin the upload and processing pipeline
-- delete or overwrite existing Media records or files
-- make editors depend directly on mutable storage URLs
-- reopen Article lifecycle, Publishing, Sources, Citations, Credits, or Corrections
-- begin Playlist, Audio, Video, Field Capture, or Inquiry Mode implementation
-- create a second Media authority
+PR 5B must not begin Audio, Video, Field Capture, or Inquiry Mode implementation.
 
-The PR 4A exit gate remains:
+The PR 5B exit gate remains:
 
-- existing Media assets remain usable
-- one logical asset can safely hold an original and several derivatives
-- no editor depends directly on a mutable storage URL
-- the migration bridge and rollback boundary are explicit
-- the authority design is accepted before implementation begins
+- one real editorial Playlist is reviewed and published end to end
+- the public Playlist is served through stable collection and detail routes
+- responsive playback works on desktop and mobile
+- matched Registry records link correctly
+- public credits, citations, provenance, corrections, scheduling, SEO, and sharing behaviour are verified
 
 
 ## Production freeze principle
@@ -2419,7 +2403,7 @@ New product ideas are recorded without automatically reopening frozen foundation
 - frontend deployment needed: No
 - Readdy Finish update needed: No
 - documentation review needed: Yes
-- next implementation plan: PR 4A Media authority redesign
+- next implementation plan: PR 5B Public Playlist product
 
 
 ## Research publishing and knowledge licensing
