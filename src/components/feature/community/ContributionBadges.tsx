@@ -8,6 +8,7 @@ import type { CommunityContribution } from "@/services/community";
 const TYPE_CONFIG: Record<string, { icon: string; label: string }> = {
   correction: { icon: "ri-edit-line", label: "Correction" },
   missing_credit: { icon: "ri-user-add-line", label: "Credit" },
+  missing_track: { icon: "ri-play-list-add-line", label: "Track suggestion" },
   genre_fix: { icon: "ri-price-tag-3-line", label: "Genre" },
   bio_correction: { icon: "ri-file-text-line", label: "Bio" },
   lyrics_correction: { icon: "ri-music-2-line", label: "Lyrics" },

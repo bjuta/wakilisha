@@ -11047,23 +11047,26 @@ export type Database = {
           canonicalized_track_id: string | null
           created_at: string
           id: string
-          playback_kind: string
+          intake_origin: string
+          playback_kind: string | null
           playlist_note: string | null
           provider_artist_names: string[]
-          provider_key: string
-          provider_object_id: string
+          provider_key: string | null
+          provider_object_id: string | null
           provider_release_title: string | null
           provider_title: string | null
-          provider_url: string
+          provider_url: string | null
           registry_artist_id: string | null
           requested_by: string | null
           reserved_position: number | null
           review_note: string | null
           reviewed_at: string | null
           reviewed_by: string | null
+          source_contribution_id: string | null
           source_playlist_id: string
           source_playlist_item_id: string | null
           status: string
+          submitted_track_title: string | null
           updated_at: string
           validation_snapshot: Json
         }
@@ -11073,23 +11076,26 @@ export type Database = {
           canonicalized_track_id?: string | null
           created_at?: string
           id?: string
-          playback_kind: string
+          intake_origin?: string
+          playback_kind?: string | null
           playlist_note?: string | null
           provider_artist_names?: string[]
-          provider_key: string
-          provider_object_id: string
+          provider_key?: string | null
+          provider_object_id?: string | null
           provider_release_title?: string | null
           provider_title?: string | null
-          provider_url: string
+          provider_url?: string | null
           registry_artist_id?: string | null
           requested_by?: string | null
           reserved_position?: number | null
           review_note?: string | null
           reviewed_at?: string | null
           reviewed_by?: string | null
+          source_contribution_id?: string | null
           source_playlist_id: string
           source_playlist_item_id?: string | null
           status?: string
+          submitted_track_title?: string | null
           updated_at?: string
           validation_snapshot?: Json
         }
@@ -11099,23 +11105,26 @@ export type Database = {
           canonicalized_track_id?: string | null
           created_at?: string
           id?: string
-          playback_kind?: string
+          intake_origin?: string
+          playback_kind?: string | null
           playlist_note?: string | null
           provider_artist_names?: string[]
-          provider_key?: string
-          provider_object_id?: string
+          provider_key?: string | null
+          provider_object_id?: string | null
           provider_release_title?: string | null
           provider_title?: string | null
-          provider_url?: string
+          provider_url?: string | null
           registry_artist_id?: string | null
           requested_by?: string | null
           reserved_position?: number | null
           review_note?: string | null
           reviewed_at?: string | null
           reviewed_by?: string | null
+          source_contribution_id?: string | null
           source_playlist_id?: string
           source_playlist_item_id?: string | null
           status?: string
+          submitted_track_title?: string | null
           updated_at?: string
           validation_snapshot?: Json
         }
@@ -11146,6 +11155,13 @@ export type Database = {
             columns: ["source_playlist_id"]
             isOneToOne: false
             referencedRelation: "wk_playlists"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "registry_provider_track_suggestions_source_contribution_fkey"
+            columns: ["source_contribution_id"]
+            isOneToOne: false
+            referencedRelation: "community_contributions"
             referencedColumns: ["id"]
           },
           {
@@ -16247,6 +16263,17 @@ export type Database = {
           track_credit_count: number
         }[]
       }
+      admin_update_registry_track_intake_artist_credit: {
+        Args: {
+          p_credit_order: number
+          p_credit_role: string
+          p_observed_name?: string
+          p_registry_artist_id?: string
+          p_resolution_mode: string
+          p_suggestion_id: string
+        }
+        Returns: Json
+      }
       admin_upsert_artist_decouple_decision: {
         Args: {
           p_chart_primary_artist_id?: string
@@ -17563,6 +17590,19 @@ export type Database = {
           resource_id: string
           result_payload: Json
         }[]
+      }
+      create_public_playlist_missing_track_submission: {
+        Args: {
+          p_artist_names: string[]
+          p_details?: string
+          p_idempotency_key?: string
+          p_playlist_id: string
+          p_playlist_slug: string
+          p_provider?: Json
+          p_track_title: string
+          p_user_id: string
+        }
+        Returns: Json
       }
       create_publishing_item: {
         Args: {

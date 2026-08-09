@@ -41,6 +41,9 @@ import {
   type ContextAnchorTarget,
 } from "@/components/feature/community/ContextAnchorCommentDrawer";
 import {
+  ContributionSheet,
+} from "@/components/feature/community/ContributionSheet";
+import {
   CommunitySection,
 } from "@/pages/magazine/article/components/CommunitySection";
 import {
@@ -60,6 +63,12 @@ import {
   getUserFollows,
   getUserSaves,
 } from "@/services/community";
+import {
+  buildCommunityAuthUrl,
+} from "@/services/community/authIntent";
+import {
+  buildVerifyEmailUrl,
+} from "@/services/auth/accountVerification";
 import {
   toPlayerQueue,
   type PublicPlaylist,
@@ -1148,6 +1157,14 @@ export default function PublicPlaylistDetailPage() {
     );
 
   const [
+    missingTrackSuggestionOpen,
+    setMissingTrackSuggestionOpen,
+  ] =
+    useState(
+      false,
+    );
+
+  const [
     playlistSaved,
     setPlaylistSaved,
   ] =
@@ -1214,6 +1231,50 @@ export default function PublicPlaylistDetailPage() {
     togglePlay,
   } =
     usePlayer();
+
+  const openMissingTrackSuggestion =
+    useCallback(
+      () => {
+        if (
+          user.loading
+        ) {
+          return;
+        }
+
+        if (
+          !user.id
+        ) {
+          window.location.assign(
+            buildCommunityAuthUrl(),
+          );
+
+          return;
+        }
+
+        if (
+          !user.isEmailVerified
+        ) {
+          window.location.assign(
+            buildVerifyEmailUrl(
+              undefined,
+              user.email,
+            ),
+          );
+
+          return;
+        }
+
+        setMissingTrackSuggestionOpen(
+          true,
+        );
+      },
+      [
+        user.loading,
+        user.id,
+        user.isEmailVerified,
+        user.email,
+      ],
+    );
 
   const load =
     useCallback(
@@ -2505,6 +2566,28 @@ export default function PublicPlaylistDetailPage() {
                 )
               }
             </div>
+
+            <div className="mt-4 flex justify-end">
+              <button
+                type="button"
+                onClick={
+                  openMissingTrackSuggestion
+                }
+                disabled={
+                  user.loading
+                }
+                aria-haspopup="dialog"
+                className="inline-flex items-center gap-2 rounded-full border border-[var(--wk-border)] bg-[var(--wk-surface)] px-4 py-2.5 text-[12px] font-extrabold text-[var(--wk-text-soft)] transition-colors hover:border-[var(--wk-brand)] hover:text-[var(--wk-brand)] disabled:cursor-wait disabled:opacity-50"
+              >
+                <WkIcon
+                  name="ListPlus"
+                  size={
+                    14
+                  }
+                />
+                Suggest a missing track
+              </button>
+            </div>
           </section>
         </div>
 
@@ -2580,6 +2663,40 @@ export default function PublicPlaylistDetailPage() {
           user={
             user
           }
+        />
+
+        <ContributionSheet
+          entity={
+            communityEntity
+          }
+          open={
+            missingTrackSuggestionOpen
+          }
+          onClose={
+            () =>
+              setMissingTrackSuggestionOpen(
+                false,
+              )
+          }
+          userId={
+            user.id ||
+            undefined
+          }
+          initialType="missing_track"
+          allowedTypes={[
+            "missing_track",
+          ]}
+          title="Suggest a missing track"
+          submitLabel="Submit suggestion"
+          descriptionLabel="Anything else we should know?"
+          descriptionPlaceholder="Optional context about why this track belongs here."
+          reviewNote="Suggestions are reviewed by our editorial team."
+          playlistSubmission={{
+            playlistId:
+              playlist.playlistId,
+            playlistSlug:
+              playlist.slug,
+          }}
         />
 
         <ContextAnchorCommentDrawer
