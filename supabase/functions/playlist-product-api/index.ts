@@ -469,6 +469,644 @@ async function validateSoundCloud(url: URL) {
   };
 }
 
+async function resolvePublicTrackMetadataUrl(
+  rawUrl: string,
+) {
+  let url: URL;
+
+  try {
+    url = new URL(
+      rawUrl,
+    );
+  } catch {
+    throw Object.assign(
+      new Error(
+        "Enter a valid music link.",
+      ),
+      {
+        status:
+          400,
+      },
+    );
+  }
+
+  if (
+    ![
+      "http:",
+      "https:",
+    ].includes(
+      url.protocol,
+    )
+  ) {
+    throw Object.assign(
+      new Error(
+        "Music links must use HTTPS or HTTP.",
+      ),
+      {
+        status:
+          400,
+      },
+    );
+  }
+
+  const youtubeId =
+    youtubeIdentity(
+      url,
+    );
+
+  if (
+    youtubeId
+  ) {
+    const canonicalUrl =
+      `https://www.youtube.com/watch?v=${youtubeId}`;
+
+    const apiKey =
+      await readProviderCredential(
+        "YOUTUBE_API_KEY",
+      ) ??
+      "";
+
+    if (
+      apiKey
+    ) {
+      const endpoint =
+        new URL(
+          "https://www.googleapis.com/youtube/v3/videos",
+        );
+
+      endpoint.searchParams.set(
+        "part",
+        "snippet",
+      );
+      endpoint.searchParams.set(
+        "id",
+        youtubeId,
+      );
+      endpoint.searchParams.set(
+        "key",
+        apiKey,
+      );
+
+      const response =
+        await fetch(
+          endpoint,
+        );
+
+      const payload =
+        objectValue(
+          await response
+            .json()
+            .catch(
+              () =>
+                ({}),
+            ),
+        );
+
+      const items =
+        Array.isArray(
+          payload.items,
+        )
+          ? payload.items
+          : [];
+
+      const item =
+        objectValue(
+          items[0],
+        );
+
+      const snippet =
+        objectValue(
+          item.snippet,
+        );
+
+      if (
+        response.ok &&
+        item.id
+      ) {
+        const channel =
+          stringValue(
+            snippet.channelTitle,
+          );
+
+        return {
+          providerKey:
+            "youtube",
+          providerObjectId:
+            youtubeId,
+          providerUrl:
+            url.toString(),
+          canonicalUrl,
+          playbackKind:
+            "video",
+          titleHint:
+            stringValue(
+              snippet.title,
+            ) ||
+            null,
+          artistNamesHint:
+            channel
+              ? [
+                  channel,
+                ]
+              : [],
+          releaseTitleHint:
+            null,
+          artworkUrl:
+            `https://i.ytimg.com/vi/${youtubeId}/hqdefault.jpg`,
+          previewUrl:
+            null,
+          providerMetadata: {
+            validation_mode:
+              "youtube_public_metadata",
+            channel_id:
+              snippet.channelId ??
+              null,
+            published_at:
+              snippet.publishedAt ??
+              null,
+          },
+        };
+      }
+    }
+
+    const oembed =
+      new URL(
+        "https://www.youtube.com/oembed",
+      );
+
+    oembed.searchParams.set(
+      "url",
+      canonicalUrl,
+    );
+    oembed.searchParams.set(
+      "format",
+      "json",
+    );
+
+    const response =
+      await fetch(
+        oembed,
+        {
+          headers: {
+            Accept:
+              "application/json",
+          },
+        },
+      );
+
+    const payload =
+      objectValue(
+        await response
+          .json()
+          .catch(
+            () =>
+              ({}),
+          ),
+      );
+
+    if (
+      !response.ok ||
+      !stringValue(
+        payload.title,
+      )
+    ) {
+      throw Object.assign(
+        new Error(
+          "That YouTube link could not be read.",
+        ),
+        {
+          status:
+            400,
+        },
+      );
+    }
+
+    const author =
+      stringValue(
+        payload.author_name,
+      );
+
+    return {
+      providerKey:
+        "youtube",
+      providerObjectId:
+        youtubeId,
+      providerUrl:
+        url.toString(),
+      canonicalUrl,
+      playbackKind:
+        "video",
+      titleHint:
+        stringValue(
+          payload.title,
+        ) ||
+        null,
+      artistNamesHint:
+        author
+          ? [
+              author,
+            ]
+          : [],
+      releaseTitleHint:
+        null,
+      artworkUrl:
+        stringValue(
+          payload.thumbnail_url,
+        ) ||
+        null,
+      previewUrl:
+        null,
+      providerMetadata: {
+        validation_mode:
+          "youtube_oembed_metadata",
+        author_url:
+          payload.author_url ??
+          null,
+      },
+    };
+  }
+
+  const spotifyId =
+    spotifyTrackIdentity(
+      url,
+    );
+
+  if (
+    spotifyId
+  ) {
+    const canonicalUrl =
+      `https://open.spotify.com/track/${spotifyId}`;
+
+    const response =
+      await fetch(
+        `https://open.spotify.com/oembed?url=${encodeURIComponent(canonicalUrl)}`,
+        {
+          headers: {
+            Accept:
+              "application/json",
+          },
+        },
+      );
+
+    const payload =
+      objectValue(
+        await response
+          .json()
+          .catch(
+            () =>
+              ({}),
+          ),
+      );
+
+    if (
+      !response.ok ||
+      !stringValue(
+        payload.title,
+      )
+    ) {
+      throw Object.assign(
+        new Error(
+          "That Spotify track could not be read.",
+        ),
+        {
+          status:
+            400,
+        },
+      );
+    }
+
+    const author =
+      stringValue(
+        payload.author_name,
+      );
+
+    return {
+      providerKey:
+        "spotify",
+      providerObjectId:
+        spotifyId,
+      providerUrl:
+        url.toString(),
+      canonicalUrl,
+      playbackKind:
+        "audio",
+      titleHint:
+        stringValue(
+          payload.title,
+        ) ||
+        null,
+      artistNamesHint:
+        author
+          ? [
+              author,
+            ]
+          : [],
+      releaseTitleHint:
+        null,
+      artworkUrl:
+        stringValue(
+          payload.thumbnail_url,
+        ) ||
+        null,
+      previewUrl:
+        null,
+      providerMetadata: {
+        validation_mode:
+          "spotify_oembed_metadata",
+        provider_name:
+          payload.provider_name ??
+          "Spotify",
+      },
+    };
+  }
+
+  const appleId =
+    appleSongIdentity(
+      url,
+    );
+
+  if (
+    appleId
+  ) {
+    const parts =
+      url.pathname
+        .split(
+          "/",
+        )
+        .filter(
+          Boolean,
+        );
+
+    const storefront =
+      /^[a-z]{2}$/i.test(
+        parts[0] ??
+        "",
+      )
+        ? String(
+            parts[0],
+          ).toLowerCase()
+        : "us";
+
+    const lookup =
+      new URL(
+        "https://itunes.apple.com/lookup",
+      );
+
+    lookup.searchParams.set(
+      "id",
+      appleId,
+    );
+    lookup.searchParams.set(
+      "entity",
+      "song",
+    );
+    lookup.searchParams.set(
+      "country",
+      storefront.toUpperCase(),
+    );
+
+    const response =
+      await fetch(
+        lookup,
+        {
+          headers: {
+            Accept:
+              "application/json",
+            "User-Agent":
+              "WAKILISHA-Public-Track-Metadata/1.0",
+          },
+          redirect:
+            "follow",
+        },
+      );
+
+    const payload =
+      objectValue(
+        await response
+          .json()
+          .catch(
+            () =>
+              ({}),
+          ),
+      );
+
+    const results =
+      Array.isArray(
+        payload.results,
+      )
+        ? payload.results
+        : [];
+
+    const track =
+      results
+        .map(
+          (
+            value,
+          ) =>
+            objectValue(
+              value,
+            ),
+        )
+        .find(
+          (
+            value,
+          ) =>
+            String(
+              value.trackId ??
+              "",
+            ) ===
+            appleId,
+        );
+
+    if (
+      !response.ok ||
+      !track
+    ) {
+      throw Object.assign(
+        new Error(
+          "That Apple Music song could not be read.",
+        ),
+        {
+          status:
+            400,
+        },
+      );
+    }
+
+    const artistName =
+      stringValue(
+        track.artistName,
+      );
+
+    const artwork =
+      stringValue(
+        track.artworkUrl100,
+      );
+
+    return {
+      providerKey:
+        "apple_music",
+      providerObjectId:
+        appleId,
+      providerUrl:
+        url.toString(),
+      canonicalUrl:
+        url.toString(),
+      playbackKind:
+        "audio",
+      titleHint:
+        stringValue(
+          track.trackName,
+        ) ||
+        null,
+      artistNamesHint:
+        artistName
+          ? [
+              artistName,
+            ]
+          : [],
+      releaseTitleHint:
+        stringValue(
+          track.collectionName,
+        ) ||
+        null,
+      artworkUrl:
+        artwork
+          ? artwork.replace(
+              /100x100bb/i,
+              "600x600bb",
+            )
+          : null,
+      previewUrl:
+        stringValue(
+          track.previewUrl,
+        ) ||
+        null,
+      providerMetadata: {
+        validation_mode:
+          "itunes_public_metadata",
+        storefront,
+        artist_id:
+          track.artistId ??
+          null,
+        collection_id:
+          track.collectionId ??
+          null,
+        primary_genre_name:
+          track.primaryGenreName ??
+          null,
+        release_date:
+          track.releaseDate ??
+          null,
+        track_time_millis:
+          track.trackTimeMillis ??
+          null,
+      },
+    };
+  }
+
+  if (
+    isSoundCloud(
+      url,
+    )
+  ) {
+    const canonicalUrl =
+      url.toString();
+
+    const response =
+      await fetch(
+        `https://soundcloud.com/oembed?format=json&url=${encodeURIComponent(canonicalUrl)}`,
+        {
+          headers: {
+            Accept:
+              "application/json",
+          },
+        },
+      );
+
+    const payload =
+      objectValue(
+        await response
+          .json()
+          .catch(
+            () =>
+              ({}),
+          ),
+      );
+
+    if (
+      !response.ok ||
+      !stringValue(
+        payload.title,
+      )
+    ) {
+      throw Object.assign(
+        new Error(
+          "That SoundCloud track could not be read.",
+        ),
+        {
+          status:
+            400,
+        },
+      );
+    }
+
+    const author =
+      stringValue(
+        payload.author_name,
+      );
+
+    return {
+      providerKey:
+        "soundcloud",
+      providerObjectId:
+        canonicalUrl,
+      providerUrl:
+        canonicalUrl,
+      canonicalUrl,
+      playbackKind:
+        "audio",
+      titleHint:
+        stringValue(
+          payload.title,
+        ) ||
+        null,
+      artistNamesHint:
+        author
+          ? [
+              author,
+            ]
+          : [],
+      releaseTitleHint:
+        null,
+      artworkUrl:
+        stringValue(
+          payload.thumbnail_url,
+        ) ||
+        null,
+      previewUrl:
+        null,
+      providerMetadata: {
+        validation_mode:
+          "soundcloud_oembed_metadata",
+        author_url:
+          payload.author_url ??
+          null,
+      },
+    };
+  }
+
+  throw Object.assign(
+    new Error(
+      "Use a Spotify, Apple Music, YouTube, or SoundCloud track link.",
+    ),
+    {
+      status:
+        400,
+    },
+  );
+}
+
 async function validatePlaybackUrl(rawUrl: string) {
   let url: URL;
   try {
@@ -518,6 +1156,278 @@ serve(async (req) => {
     const { client, user } = await requireUser(req);
     const body = objectValue(await req.json());
     const action = stringValue(body.action);
+
+    if (
+      action ===
+      "resolve_public_track"
+    ) {
+      const rawUrl =
+        stringValue(
+          body.url,
+        );
+
+      if (
+        !rawUrl
+      ) {
+        return json(
+          400,
+          {
+            error:
+              "A music link is required.",
+          },
+        );
+      }
+
+      const resolved =
+        await resolvePublicTrackMetadataUrl(
+          rawUrl,
+        );
+
+      return json(
+        200,
+        {
+          ok:
+            true,
+          provider_key:
+            resolved.providerKey,
+          provider_object_id:
+            resolved.providerObjectId,
+          canonical_url:
+            resolved.canonicalUrl,
+          title:
+            resolved.titleHint,
+          artist_names:
+            resolved.artistNamesHint,
+          release_title:
+            resolved.releaseTitleHint,
+          artwork_url:
+            resolved.artworkUrl,
+        },
+      );
+    }
+
+    if (
+      action ===
+      "submit_public_missing_track"
+    ) {
+      if (
+        !user.email_confirmed_at
+      ) {
+        return json(
+          403,
+          {
+            error:
+              "Verify your email before submitting a track.",
+          },
+        );
+      }
+
+      const playlistId =
+        stringValue(
+          body.playlist_id,
+        );
+
+      const playlistSlug =
+        stringValue(
+          body.playlist_slug,
+        );
+
+      const trackTitle =
+        stringValue(
+          body.track_title,
+        );
+
+      const artistNames =
+        Array.isArray(
+          body.artist_names,
+        )
+          ? body.artist_names
+              .map(
+                (
+                  value,
+                ) =>
+                  stringValue(
+                    value,
+                  ),
+              )
+              .filter(
+                Boolean,
+              )
+          : [];
+
+      const details =
+        stringValue(
+          body.details,
+        );
+
+      const rawUrl =
+        stringValue(
+          body.url,
+        );
+
+      const idempotencyKey =
+        stringValue(
+          body.idempotency_key,
+        );
+
+      if (
+        !playlistId ||
+        !playlistSlug
+      ) {
+        return json(
+          400,
+          {
+            error:
+              "Playlist context is required.",
+          },
+        );
+      }
+
+      if (
+        !trackTitle
+      ) {
+        return json(
+          400,
+          {
+            error:
+              "Track title is required.",
+          },
+        );
+      }
+
+      if (
+        artistNames.length <
+        1
+      ) {
+        return json(
+          400,
+          {
+            error:
+              "Add at least one artist.",
+          },
+        );
+      }
+
+      if (
+        !idempotencyKey
+      ) {
+        return json(
+          400,
+          {
+            error:
+              "Submission identity is required.",
+          },
+        );
+      }
+
+      const resolved =
+        rawUrl
+          ? await resolvePublicTrackMetadataUrl(
+              rawUrl,
+            )
+          : null;
+
+      const provider =
+        resolved
+          ? {
+              provider_key:
+                resolved.providerKey,
+              provider_object_id:
+                resolved.providerObjectId,
+              provider_url:
+                resolved.providerUrl,
+              canonical_url:
+                resolved.canonicalUrl,
+              provider_title:
+                resolved.titleHint,
+              provider_artist_names:
+                resolved.artistNamesHint,
+              provider_release_title:
+                resolved.releaseTitleHint,
+              playback_kind:
+                resolved.playbackKind,
+              artwork_url:
+                resolved.artworkUrl,
+              preview_url:
+                resolved.previewUrl,
+              provider_metadata:
+                resolved.providerMetadata,
+              checked_at:
+                new Date()
+                  .toISOString(),
+            }
+          : null;
+
+      const service =
+        serviceClient();
+
+      const {
+        data,
+        error,
+      } =
+        await service.rpc(
+          "create_public_playlist_missing_track_submission",
+          {
+            p_user_id:
+              user.id,
+            p_playlist_id:
+              playlistId,
+            p_playlist_slug:
+              playlistSlug,
+            p_track_title:
+              trackTitle,
+            p_artist_names:
+              artistNames,
+            p_details:
+              details ||
+              null,
+            p_provider:
+              provider,
+            p_idempotency_key:
+              idempotencyKey,
+          },
+        );
+
+      if (
+        error
+      ) {
+        throw Object.assign(
+          new Error(
+            error.message,
+          ),
+          {
+            status:
+              400,
+          },
+        );
+      }
+
+      const result =
+        objectValue(
+          data,
+        );
+
+      return json(
+        200,
+        {
+          ok:
+            true,
+          contribution_id:
+            result.contribution_id ??
+            null,
+          registry_suggestion_id:
+            result.registry_suggestion_id ??
+            null,
+          registry_queued:
+            result.registry_queued ===
+            true,
+          created:
+            result.created ===
+            true,
+        },
+      );
+    }
+
     const playlistId = stringValue(body.playlist_id);
 
     if (!playlistId) {

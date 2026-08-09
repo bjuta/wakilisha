@@ -13,28 +13,41 @@ type ProviderKey = "apple_music" | "spotify";
 
 interface ArtistCredit {
   credit_order: number;
-  credit_role: "primary" | "featured";
+  credit_role: "primary" | "featured" | "unresolved";
   resolution_mode: string;
   registry_artist_id: string | null;
   observed_name: string;
   display_name: string;
 }
 
+interface RegistryArtistHit {
+  id: string;
+  display_name: string;
+  slug: string | null;
+  public_image_url: string | null;
+  status: string;
+}
+
 interface IntakeRow {
   suggestion_id: string;
   status: string;
+  intake_origin: "playlist_editor" | "public_contribution";
+  source_contribution_id: string | null;
+  contribution_status: string | null;
+  contribution_payload: Record<string, unknown>;
+  submitted_track_title: string | null;
   playlist_id: string;
   playlist_title: string | null;
   playlist_item_id: string | null;
   playlist_position: number | null;
   playlist_note: string | null;
-  provider_key: string;
-  provider_object_id: string;
-  provider_url: string;
+  provider_key: string | null;
+  provider_object_id: string | null;
+  provider_url: string | null;
   provider_title: string | null;
   provider_release_title: string | null;
   provider_artist_names: string[];
-  playback_kind: "audio" | "video";
+  playback_kind: "audio" | "video" | null;
   artwork_url: string | null;
   preview_url: string | null;
   requested_by: string | null;
@@ -220,6 +233,21 @@ export default function TrackIntakePage() {
   const [reviewNotes, setReviewNotes] =
     useState<Record<string, string>>({});
 
+  const [artistQuery, setArtistQuery] =
+    useState<Record<string, string>>({});
+  const [artistHits, setArtistHits] =
+    useState<Record<string, RegistryArtistHit[]>>({});
+  const [artistSearching, setArtistSearching] =
+    useState<Record<string, boolean>>({});
+  const [artistSearchAttempted, setArtistSearchAttempted] =
+    useState<Record<string, boolean>>({});
+  const [selectedArtist, setSelectedArtist] =
+    useState<Record<string, RegistryArtistHit | null>>({});
+  const [artistRole, setArtistRole] =
+    useState<Record<string, "primary" | "featured" | "">>({});
+  const artistSearchSequence =
+    useRef<Record<string, number>>({});
+
   const [providerChoice, setProviderChoice] =
     useState<Record<string, ProviderKey>>({});
   const [providerQuery, setProviderQuery] =
@@ -283,6 +311,7 @@ export default function TrackIntakePage() {
 
     return queue.rows.filter((row) => {
       const haystack = [
+        row.submitted_track_title,
         row.provider_title,
         row.provider_release_title,
         row.provider_key,
@@ -494,6 +523,291 @@ export default function TrackIntakePage() {
     }
   }
 
+  function artistCreditKey(
+    suggestionId: string,
+    creditOrder: number,
+  ) {
+    return `${suggestionId}:${creditOrder}`;
+  }
+
+  function effectiveArtistRole(
+    credit: ArtistCredit,
+  ): "primary" | "featured" | "" {
+    if (
+      credit.credit_role ===
+        "primary" ||
+      credit.credit_role ===
+        "featured"
+    ) {
+      return credit.credit_role;
+    }
+
+    return "";
+  }
+
+  async function searchRegistryArtists(
+    suggestionId: string,
+    creditOrder: number,
+    value: string,
+  ) {
+    const key =
+      artistCreditKey(
+        suggestionId,
+        creditOrder,
+      );
+
+    const requestId =
+      (artistSearchSequence.current[key] ?? 0) + 1;
+
+    artistSearchSequence.current[key] =
+      requestId;
+
+    const trimmed =
+      value.trim();
+
+    setArtistQuery((current) => ({
+      ...current,
+      [key]:
+        value,
+    }));
+
+    setSelectedArtist((current) => ({
+      ...current,
+      [key]:
+        null,
+    }));
+
+    if (
+      trimmed.length < 2
+    ) {
+      setArtistHits((current) => ({
+        ...current,
+        [key]:
+          [],
+      }));
+
+      setArtistSearchAttempted((current) => ({
+        ...current,
+        [key]:
+          false,
+      }));
+
+      return;
+    }
+
+    setArtistSearching((current) => ({
+      ...current,
+      [key]:
+        true,
+    }));
+
+    setArtistSearchAttempted((current) => ({
+      ...current,
+      [key]:
+        false,
+    }));
+
+    setError(
+      null,
+    );
+
+    try {
+      const pattern =
+        `%${escapeLike(trimmed)}%`;
+
+      const {
+        data,
+        error:
+          searchError,
+      } =
+        await supabase
+          .from("registry_artists")
+          .select(
+            "id,display_name,slug,public_image_url,status",
+          )
+          .eq(
+            "status",
+            "active",
+          )
+          .ilike(
+            "display_name",
+            pattern,
+          )
+          .order(
+            "display_name",
+          )
+          .limit(
+            15,
+          );
+
+      if (
+        searchError
+      ) {
+        throw searchError;
+      }
+
+      if (
+        artistSearchSequence.current[key] !==
+        requestId
+      ) {
+        return;
+      }
+
+      setArtistHits((current) => ({
+        ...current,
+        [key]:
+          (data ?? []) as RegistryArtistHit[],
+      }));
+
+      setArtistSearchAttempted((current) => ({
+        ...current,
+        [key]:
+          true,
+      }));
+    } catch (reason) {
+      if (
+        artistSearchSequence.current[key] !==
+        requestId
+      ) {
+        return;
+      }
+
+      setArtistHits((current) => ({
+        ...current,
+        [key]:
+          [],
+      }));
+
+      setArtistSearchAttempted((current) => ({
+        ...current,
+        [key]:
+          true,
+      }));
+
+      setError(
+        reason instanceof Error
+          ? reason.message
+          : "Artist search failed.",
+      );
+    } finally {
+      if (
+        artistSearchSequence.current[key] ===
+        requestId
+      ) {
+        setArtistSearching((current) => ({
+          ...current,
+          [key]:
+            false,
+        }));
+      }
+    }
+  }
+
+  async function saveArtistResolution(
+    row: IntakeRow,
+    credit: ArtistCredit,
+    mode: "existing_artist" | "new_artist",
+  ) {
+    const key =
+      artistCreditKey(
+        row.suggestion_id,
+        credit.credit_order,
+      );
+
+    const role =
+      artistRole[key] ??
+      effectiveArtistRole(
+        credit,
+      );
+
+    const artist =
+      selectedArtist[key] ??
+      null;
+
+    if (
+      !role
+    ) {
+      setError(
+        "Choose whether this artist is Primary or Featured.",
+      );
+      return;
+    }
+
+    if (
+      mode ===
+        "existing_artist" &&
+      !artist
+    ) {
+      setError(
+        "Select the matching Registry artist first.",
+      );
+      return;
+    }
+
+    setBusy(
+      `artist-resolution:${key}`,
+    );
+
+    setError(
+      null,
+    );
+
+    try {
+      await untypedRpc(
+        "admin_update_registry_track_intake_artist_credit",
+        {
+          p_suggestion_id:
+            row.suggestion_id,
+          p_credit_order:
+            credit.credit_order,
+          p_credit_role:
+            role,
+          p_resolution_mode:
+            mode,
+          p_registry_artist_id:
+            mode ===
+              "existing_artist"
+              ? artist?.id ??
+                null
+              : null,
+          p_observed_name:
+            credit.observed_name ||
+            credit.display_name,
+        },
+      );
+
+      setSelectedArtist((current) => ({
+        ...current,
+        [key]:
+          null,
+      }));
+
+      setArtistHits((current) => ({
+        ...current,
+        [key]:
+          [],
+      }));
+
+      setArtistSearchAttempted((current) => ({
+        ...current,
+        [key]:
+          false,
+      }));
+
+      await loadQueue();
+    } catch (reason) {
+      setError(
+        reason instanceof Error
+          ? reason.message
+          : "Artist identity could not be saved.",
+      );
+    } finally {
+      setBusy(
+        null,
+      );
+    }
+  }
+
   async function searchProvider(row: IntakeRow) {
     const suggestionId = row.suggestion_id;
     const provider =
@@ -502,6 +816,7 @@ export default function TrackIntakePage() {
       (
         providerQuery[suggestionId] ??
         [
+          row.submitted_track_title,
           row.provider_title,
           ...(row.artist_credits ?? []).map(
             (credit) => credit.display_name,
@@ -681,7 +996,11 @@ export default function TrackIntakePage() {
   async function createCanonicalTrack(row: IntakeRow) {
     const suggestionId = row.suggestion_id;
     const observedTitle =
-      preferredObservedTrackTitle(suggestionId);
+      preferredObservedTrackTitle(
+        suggestionId,
+      ) ??
+      row.submitted_track_title ??
+      row.provider_title;
     const title =
       (
         newCanonicalTitle[suggestionId] ??
@@ -962,8 +1281,8 @@ export default function TrackIntakePage() {
               Nothing waiting here
             </h2>
             <p className="mt-1 text-sm text-wk-text-muted">
-              Track Intake items appear when a Playlist sends playable
-              provider evidence to the Music Registry.
+              Track Intake items appear when Playlist editors or
+              Community suggestions send music to the Registry for review.
             </p>
           </div>
         ) : (
@@ -999,11 +1318,28 @@ export default function TrackIntakePage() {
               const observedCanonicalTitle =
                 preferredObservedTrackTitle(
                   suggestionId,
-                );
+                ) ??
+                row.submitted_track_title ??
+                row.provider_title;
               const canonicalTitle =
                 newCanonicalTitle[suggestionId] ??
                 observedCanonicalTitle ??
                 "";
+
+              const isPublicContribution =
+                row.intake_origin ===
+                "public_contribution";
+
+              const contributionDetails =
+                typeof row.contribution_payload?.details ===
+                  "string"
+                  ? row.contribution_payload.details.trim()
+                  : "";
+
+              const displayTrackTitle =
+                row.submitted_track_title ??
+                row.provider_title ??
+                "Untitled track";
 
               return (
                 <article
@@ -1034,18 +1370,37 @@ export default function TrackIntakePage() {
                             <span className="rounded-full bg-wk-warning-soft px-2 py-1 text-[9px] font-black uppercase text-wk-warning">
                               {humanize(row.status)}
                             </span>
-                            <span className="rounded-full bg-wk-surface-raised px-2 py-1 text-[9px] font-bold uppercase text-wk-text-muted">
-                              {humanize(row.provider_key)}
-                            </span>
-                            <span className="rounded-full bg-wk-surface-raised px-2 py-1 text-[9px] font-bold uppercase text-wk-text-muted">
-                              {row.playback_kind}
-                            </span>
+                            {isPublicContribution ? (
+                              <span className="rounded-full bg-wk-brand-soft px-2 py-1 text-[9px] font-black uppercase text-wk-brand">
+                                Community suggestion
+                              </span>
+                            ) : null}
+
+                            {row.provider_key ? (
+                              <span className="rounded-full bg-wk-surface-raised px-2 py-1 text-[9px] font-bold uppercase text-wk-text-muted">
+                                {humanize(row.provider_key)}
+                              </span>
+                            ) : null}
+
+                            {row.playback_kind ? (
+                              <span className="rounded-full bg-wk-surface-raised px-2 py-1 text-[9px] font-bold uppercase text-wk-text-muted">
+                                {row.playback_kind}
+                              </span>
+                            ) : null}
                           </div>
 
                           <h2 className="mt-2 text-xl font-black">
-                            {row.provider_title ||
-                              "Untitled provider track"}
+                            {displayTrackTitle}
                           </h2>
+
+                          {isPublicContribution &&
+                          row.provider_title &&
+                          row.provider_title !==
+                            row.submitted_track_title ? (
+                            <p className="mt-1 text-xs text-wk-text-muted">
+                              Provider observed: {row.provider_title}
+                            </p>
+                          ) : null}
 
                           <div className="mt-2 flex flex-wrap gap-x-4 gap-y-2 text-xs text-wk-text-muted">
                             {(row.artist_credits ?? []).map(
@@ -1070,33 +1425,73 @@ export default function TrackIntakePage() {
                         </div>
                       </div>
 
-                      <div className="grid gap-3 md:grid-cols-2">
-                        <div className="rounded-xl bg-wk-surface-raised p-3">
-                          <div className="text-[10px] font-black uppercase tracking-wide text-wk-text-faint">
-                            Originating Playlist
-                          </div>
-                          <a
-                            href={`/admin/content/playlists/${row.playlist_id}`}
-                            className="mt-1 block font-bold text-wk-brand"
-                          >
-                            {row.playlist_title || "Open Playlist"}
-                          </a>
-                          <div className="mt-1 text-xs text-wk-text-muted">
-                            Track position{" "}
-                            {row.playlist_position ?? "Not set"}
-                          </div>
-                        </div>
+                      {isPublicContribution ? (
+                        <div className="grid gap-3 md:grid-cols-2">
+                          <div className="rounded-xl bg-wk-surface-raised p-3">
+                            <div className="text-[10px] font-black uppercase tracking-wide text-wk-text-faint">
+                              Suggested for Playlist
+                            </div>
 
-                        <div className="rounded-xl bg-wk-surface-raised p-3">
-                          <div className="text-[10px] font-black uppercase tracking-wide text-wk-text-faint">
-                            Playlist curator note
+                            <a
+                              href={`/admin/content/playlists/${row.playlist_id}`}
+                              className="mt-1 block font-bold text-wk-brand"
+                            >
+                              {row.playlist_title || "Open Playlist"}
+                            </a>
+
+                            <div className="mt-2 text-xs text-wk-text-muted">
+                              Submitted by{" "}
+                              <strong className="text-wk-text">
+                                {row.requested_by_name ||
+                                  "WAKILISHA contributor"}
+                              </strong>
+                            </div>
+
+                            <div className="mt-1 text-[10px] text-wk-text-faint">
+                              {new Date(row.created_at).toLocaleString()}
+                            </div>
                           </div>
-                          <div className="mt-1 text-sm text-wk-text">
-                            {row.playlist_note ||
-                              "No curator note"}
+
+                          <div className="rounded-xl bg-wk-surface-raised p-3">
+                            <div className="text-[10px] font-black uppercase tracking-wide text-wk-text-faint">
+                              Contributor context
+                            </div>
+
+                            <div className="mt-1 text-sm leading-6 text-wk-text">
+                              {contributionDetails ||
+                                "No additional context supplied."}
+                            </div>
                           </div>
                         </div>
-                      </div>
+                      ) : (
+                        <div className="grid gap-3 md:grid-cols-2">
+                          <div className="rounded-xl bg-wk-surface-raised p-3">
+                            <div className="text-[10px] font-black uppercase tracking-wide text-wk-text-faint">
+                              Originating Playlist
+                            </div>
+                            <a
+                              href={`/admin/content/playlists/${row.playlist_id}`}
+                              className="mt-1 block font-bold text-wk-brand"
+                            >
+                              {row.playlist_title || "Open Playlist"}
+                            </a>
+                            <div className="mt-1 text-xs text-wk-text-muted">
+                              Track position{" "}
+                              {row.playlist_position ?? "Not set"}
+                            </div>
+                          </div>
+
+                          <div className="rounded-xl bg-wk-surface-raised p-3">
+                            <div className="text-[10px] font-black uppercase tracking-wide text-wk-text-faint">
+                              Playlist curator note
+                            </div>
+                            <div className="mt-1 text-sm text-wk-text">
+                              {row.playlist_note ||
+                                "No curator note"}
+                            </div>
+                          </div>
+                        </div>
+                      )}
 
                       <div className="rounded-xl border border-wk-border p-4">
                         <div className="flex flex-wrap items-start justify-between gap-3">
@@ -1437,18 +1832,20 @@ export default function TrackIntakePage() {
                       </div>
 
                       <div className="flex flex-wrap gap-2">
-                        <a
-                          href={row.provider_url}
-                          target="_blank"
-                          rel="noreferrer"
-                          className="wk-button wk-button-ghost wk-button-sm"
-                        >
-                          <WkIcon
-                            name="ExternalLink"
-                            size={14}
-                          />
-                          Open provider evidence
-                        </a>
+                        {row.provider_url ? (
+                          <a
+                            href={row.provider_url}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="wk-button wk-button-ghost wk-button-sm"
+                          >
+                            <WkIcon
+                              name="ExternalLink"
+                              size={14}
+                            />
+                            Open provider evidence
+                          </a>
+                        ) : null}
                         <a
                           href={`/admin/content/playlists/${row.playlist_id}`}
                           className="wk-button wk-button-ghost wk-button-sm"
@@ -1462,6 +1859,351 @@ export default function TrackIntakePage() {
                     <div className="rounded-xl border border-wk-border bg-wk-surface-raised p-4">
                       {row.status === "needs_review" ? (
                         <>
+                          <div className="mb-4 rounded-xl border border-wk-border bg-wk-surface p-3">
+                            <div className="flex flex-wrap items-start justify-between gap-2">
+                              <div>
+                                <div className="text-sm font-black">
+                                  Artist identity review
+                                </div>
+                                <p className="mt-1 text-xs leading-5 text-wk-text-muted">
+                                  Match every submitted artist to Registry identity and confirm the credit role. Mark genuinely new artists for follow-up instead of forcing a merge.
+                                </p>
+                              </div>
+
+                              <a
+                                href="/admin/registry/artists"
+                                target="_blank"
+                                rel="noreferrer"
+                                className="wk-button wk-button-ghost wk-button-sm"
+                              >
+                                <WkIcon
+                                  name="Users"
+                                  size={13}
+                                />
+                                Artist Registry
+                              </a>
+                            </div>
+
+                            <div className="mt-3 space-y-3">
+                              {(row.artist_credits ?? []).map(
+                                (credit) => {
+                                  const key =
+                                    artistCreditKey(
+                                      suggestionId,
+                                      credit.credit_order,
+                                    );
+
+                                  const role =
+                                    artistRole[key] ??
+                                    effectiveArtistRole(
+                                      credit,
+                                    );
+
+                                  const queryValue =
+                                    artistQuery[key] ??
+                                    credit.display_name ??
+                                    credit.observed_name ??
+                                    "";
+
+                                  const hits =
+                                    artistHits[key] ??
+                                    [];
+
+                                  const selected =
+                                    selectedArtist[key] ??
+                                    null;
+
+                                  const savingArtist =
+                                    busy ===
+                                    `artist-resolution:${key}`;
+
+                                  return (
+                                    <div
+                                      key={`${suggestionId}:artist-review:${credit.credit_order}`}
+                                      className="rounded-lg border border-wk-border bg-wk-bg p-3"
+                                    >
+                                      <div className="flex flex-wrap items-start justify-between gap-2">
+                                        <div>
+                                          <div className="text-[10px] font-black uppercase tracking-wide text-wk-text-faint">
+                                            Submitted artist {credit.credit_order}
+                                          </div>
+
+                                          <div className="mt-1 text-sm font-black text-wk-text">
+                                            {credit.display_name ||
+                                              credit.observed_name ||
+                                              "Unnamed artist"}
+                                          </div>
+                                        </div>
+
+                                        <span
+                                          className={`rounded-full px-2 py-1 text-[9px] font-black uppercase ${
+                                            credit.resolution_mode ===
+                                              "existing_artist"
+                                              ? "bg-wk-brand-soft text-wk-brand"
+                                              : credit.resolution_mode ===
+                                                  "new_artist"
+                                                ? "bg-wk-warning-soft text-wk-warning"
+                                                : "bg-wk-surface-raised text-wk-text-muted"
+                                          }`}
+                                        >
+                                          {credit.resolution_mode ===
+                                          "existing_artist"
+                                            ? "Registry artist resolved"
+                                            : credit.resolution_mode ===
+                                                "new_artist"
+                                              ? "New artist follow-up"
+                                              : "Identity unresolved"}
+                                        </span>
+                                      </div>
+
+                                      <div className="mt-3 grid gap-2 sm:grid-cols-[130px_minmax(0,1fr)_auto]">
+                                        <select
+                                          value={role}
+                                          onChange={(event) =>
+                                            setArtistRole(
+                                              (current) => ({
+                                                ...current,
+                                                [key]:
+                                                  event.target.value as
+                                                    | "primary"
+                                                    | "featured",
+                                              }),
+                                            )
+                                          }
+                                          className="h-10 rounded-lg border border-wk-border bg-wk-surface px-3 text-xs outline-none focus:border-wk-brand"
+                                        >
+                                          <option value="">
+                                            Choose role
+                                          </option>
+                                          <option value="primary">
+                                            Primary
+                                          </option>
+                                          <option value="featured">
+                                            Featured
+                                          </option>
+                                        </select>
+
+                                        <input
+                                          value={queryValue}
+                                          onChange={(event) => {
+                                            setArtistQuery(
+                                              (current) => ({
+                                                ...current,
+                                                [key]:
+                                                  event.target.value,
+                                              }),
+                                            );
+
+                                            setSelectedArtist(
+                                              (current) => ({
+                                                ...current,
+                                                [key]:
+                                                  null,
+                                              }),
+                                            );
+                                          }}
+                                          onKeyDown={(event) => {
+                                            if (
+                                              event.key ===
+                                              "Enter"
+                                            ) {
+                                              event.preventDefault();
+                                              void searchRegistryArtists(
+                                                suggestionId,
+                                                credit.credit_order,
+                                                queryValue,
+                                              );
+                                            }
+                                          }}
+                                          placeholder="Search Registry artist"
+                                          className="h-10 min-w-0 rounded-lg border border-wk-border bg-wk-surface px-3 text-xs outline-none focus:border-wk-brand"
+                                        />
+
+                                        <button
+                                          type="button"
+                                          onClick={() =>
+                                            void searchRegistryArtists(
+                                              suggestionId,
+                                              credit.credit_order,
+                                              queryValue,
+                                            )
+                                          }
+                                          disabled={
+                                            busy !== null ||
+                                            queryValue.trim().length <
+                                              2
+                                          }
+                                          className="wk-button wk-button-ghost wk-button-sm disabled:opacity-40"
+                                        >
+                                          <WkIcon
+                                            name="Search"
+                                            size={13}
+                                          />
+                                          Search
+                                        </button>
+                                      </div>
+
+                                      {artistSearching[key] ? (
+                                        <div className="mt-2 flex items-center gap-2 text-xs text-wk-text-muted">
+                                          <WkIcon
+                                            name="Loader2"
+                                            size={13}
+                                            className="animate-spin"
+                                          />
+                                          Searching Artist Registry...
+                                        </div>
+                                      ) : null}
+
+                                      {hits.length > 0 ? (
+                                        <div className="mt-2 max-h-48 overflow-y-auto rounded-lg border border-wk-border bg-wk-surface p-1">
+                                          {hits.map(
+                                            (artist) => (
+                                              <button
+                                                key={artist.id}
+                                                type="button"
+                                                onClick={() =>
+                                                  setSelectedArtist(
+                                                    (current) => ({
+                                                      ...current,
+                                                      [key]:
+                                                        artist,
+                                                    }),
+                                                  )
+                                                }
+                                                className={`flex w-full items-center gap-3 rounded-lg p-2 text-left ${
+                                                  selected?.id ===
+                                                  artist.id
+                                                    ? "bg-wk-brand-soft"
+                                                    : "hover:bg-wk-surface-raised"
+                                                }`}
+                                              >
+                                                {artist.public_image_url ? (
+                                                  <img
+                                                    src={
+                                                      artist.public_image_url
+                                                    }
+                                                    alt=""
+                                                    className="h-9 w-9 rounded-full object-cover"
+                                                  />
+                                                ) : (
+                                                  <div className="flex h-9 w-9 items-center justify-center rounded-full bg-wk-surface-raised">
+                                                    <WkIcon
+                                                      name="Mic2"
+                                                      size={14}
+                                                      className="text-wk-text-faint"
+                                                    />
+                                                  </div>
+                                                )}
+
+                                                <div className="min-w-0 flex-1">
+                                                  <div className="truncate text-xs font-bold text-wk-text">
+                                                    {artist.display_name}
+                                                  </div>
+                                                  <div className="truncate text-[10px] text-wk-text-faint">
+                                                    {artist.slug ||
+                                                      artist.id}
+                                                  </div>
+                                                </div>
+
+                                                {selected?.id ===
+                                                artist.id ? (
+                                                  <WkIcon
+                                                    name="Check"
+                                                    size={14}
+                                                    className="text-wk-brand"
+                                                  />
+                                                ) : null}
+                                              </button>
+                                            ),
+                                          )}
+                                        </div>
+                                      ) : null}
+
+                                      {!artistSearching[key] &&
+                                      artistSearchAttempted[key] &&
+                                      hits.length === 0 ? (
+                                        <div className="mt-2 rounded-lg border border-wk-warning/20 bg-wk-warning-soft p-2 text-xs leading-5 text-wk-warning">
+                                          No active Registry artist matched this search. Mark this as a new artist only after checking aliases and likely spelling variants.
+                                        </div>
+                                      ) : null}
+
+                                      {selected ? (
+                                        <div className="mt-2 rounded-lg border border-wk-brand/20 bg-wk-brand-soft p-2 text-xs">
+                                          Selected{" "}
+                                          <strong>
+                                            {selected.display_name}
+                                          </strong>
+                                        </div>
+                                      ) : null}
+
+                                      <div className="mt-3 flex flex-wrap gap-2">
+                                        <button
+                                          type="button"
+                                          onClick={() =>
+                                            void saveArtistResolution(
+                                              row,
+                                              credit,
+                                              "existing_artist",
+                                            )
+                                          }
+                                          disabled={
+                                            busy !== null ||
+                                            !selected ||
+                                            !role
+                                          }
+                                          className="wk-button wk-button-primary wk-button-sm disabled:opacity-40"
+                                        >
+                                          {savingArtist ? (
+                                            <WkIcon
+                                              name="Loader2"
+                                              size={13}
+                                              className="animate-spin"
+                                            />
+                                          ) : (
+                                            <WkIcon
+                                              name="Check"
+                                              size={13}
+                                            />
+                                          )}
+                                          Resolve artist
+                                        </button>
+
+                                        <button
+                                          type="button"
+                                          onClick={() =>
+                                            void saveArtistResolution(
+                                              row,
+                                              credit,
+                                              "new_artist",
+                                            )
+                                          }
+                                          disabled={
+                                            busy !== null ||
+                                            !role
+                                          }
+                                          className="wk-button wk-button-ghost wk-button-sm disabled:opacity-40"
+                                        >
+                                          <WkIcon
+                                            name="UserPlus"
+                                            size={13}
+                                          />
+                                          Mark as new artist
+                                        </button>
+                                      </div>
+
+                                      {credit.resolution_mode ===
+                                      "new_artist" ? (
+                                        <p className="mt-2 text-[10px] leading-4 text-wk-warning">
+                                          Create or review this artist in the Artist Registry, then return here and resolve this credit to the canonical artist before creating the track.
+                                        </p>
+                                      ) : null}
+                                    </div>
+                                  );
+                                },
+                              )}
+                            </div>
+                          </div>
+
                           <div className="text-sm font-black">
                             Canonical Registry identity
                           </div>
@@ -1485,6 +2227,7 @@ export default function TrackIntakePage() {
                               </div>
                               <div className="mt-2 text-sm font-bold text-wk-text">
                                 {row.canonical_track_title ||
+                                  row.submitted_track_title ||
                                   row.provider_title ||
                                   row.canonical_track_id}
                               </div>
@@ -1505,6 +2248,7 @@ export default function TrackIntakePage() {
                             <input
                               value={
                                 trackQuery[suggestionId] ??
+                                row.submitted_track_title ??
                                 row.provider_title ??
                                 ""
                               }

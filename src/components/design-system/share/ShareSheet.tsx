@@ -175,6 +175,28 @@ function parseShareTarget(rawUrl: string, fallbackType: ShareObject["type"] | un
       return { targetUrl: parsed.toString(), targetPath: parsed.pathname, entityType: "chart", entitySlug: parts.slice(1).join("/") || "charts", artistSlug: "" };
     }
 
+    if (first === "playlists" && parts[1]) {
+      const anchoredTrack =
+        parsed.hash.startsWith(
+          "#track-",
+        );
+
+      return {
+        targetUrl:
+          parsed.toString(),
+        targetPath:
+          `${parsed.pathname}${parsed.hash}`,
+        entityType:
+          anchoredTrack
+            ? "playlist_track"
+            : "playlist",
+        entitySlug:
+          parts[1],
+        artistSlug:
+          "",
+      };
+    }
+
     if (first === "genres" && parts[1]) {
       return { targetUrl: parsed.toString(), targetPath: parsed.pathname, entityType: "genre", entitySlug: parts[1], artistSlug: "" };
     }

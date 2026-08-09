@@ -64,6 +64,14 @@ export function parseProviderTrackUrl(
       };
     }
 
+    if (host.replace(/^www\./, "") === "soundcloud.com") {
+      return {
+        providerKey: "soundcloud",
+        providerTrackId: null,
+        providerUrl: url.toString(),
+      };
+    }
+
     return {
       providerKey: null,
       providerTrackId: null,

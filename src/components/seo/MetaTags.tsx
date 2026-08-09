@@ -5,7 +5,7 @@ export interface MetaTagsProps {
   description: string;
   imageUrl?: string;
   url?: string;
-  type?: "website" | "article" | "music.song" | "music.album";
+  type?: "website" | "article" | "music.song" | "music.album" | "music.playlist";
   artistName?: string;
   releaseDate?: string;
 }

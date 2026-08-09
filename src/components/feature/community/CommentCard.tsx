@@ -1,5 +1,13 @@
-import { useState, useCallback, useRef } from "react";
+import {
+  useState,
+  useCallback,
+  useRef,
+} from "react";
 import type { CommunityComment, CommunityProfile, ReactionType } from "@/services/community";
+import {
+  CommunityReactionPicker,
+  getReactionGlyph,
+} from "./CommunityReactionPicker";
 
 interface CommentCardProps {
   comment: CommunityComment;
@@ -11,14 +19,6 @@ interface CommentCardProps {
   onSuggestCorrection?: (commentId: string) => void;
   depth?: number;
 }
-
-const REACTIONS: { type: ReactionType; icon: string; label: string }[] = [
-  { type: "signal", icon: "ri-flashlight-line", label: "Signal" },
-  { type: "memory", icon: "ri-time-line", label: "Memory" },
-  { type: "context", icon: "ri-lightbulb-line", label: "Context" },
-  { type: "fire", icon: "ri-fire-line", label: "Fire" },
-  { type: "agree", icon: "ri-thumb-up-line", label: "Agree" },
-];
 
 function timeAgo(dateStr: string): string {
   const now = Date.now();
@@ -96,16 +96,82 @@ export function CommentCard({
   const [replyText, setReplyText] = useState("");
   const [posting, setPosting] = useState(false);
   const [showReactions, setShowReactions] = useState(false);
+
+  const reactionTriggerRef =
+    useRef<HTMLButtonElement | null>(
+      null,
+    );
   const [expandedReplies, setExpandedReplies] = useState(false);
   const [loadingReplies, setLoadingReplies] = useState(false);
   const [optimisticVote, setOptimisticVote] = useState<number | null>(null);
-  const [optimisticReactions, setOptimisticReactions] = useState<string[]>([]);
+  const [optimisticReactionState, setOptimisticReactionState] =
+    useState<Partial<Record<ReactionType, boolean>>>({});
   const replyRef = useRef<HTMLTextAreaElement>(null);
 
   const author = comment.author;
   const userVote = optimisticVote ?? comment.userVote;
   const voteScore = comment.upvoteCount - comment.downvoteCount + (optimisticVote !== null ? optimisticVote - (comment.userVote ?? 0) : 0);
-  const activeReactions = [...new Set([...comment.userReactions, ...optimisticReactions])];
+  const serverUserReactions =
+    comment.userReactions ?? [];
+
+  const optimisticReactionKeys =
+    Object.keys(
+      optimisticReactionState,
+    ) as ReactionType[];
+
+  const reactionCandidates = [
+    ...new Set([
+      ...serverUserReactions,
+      ...optimisticReactionKeys,
+    ]),
+  ];
+
+  const activeReactions =
+    reactionCandidates.filter(
+      (type) =>
+        Object.prototype.hasOwnProperty.call(
+          optimisticReactionState,
+          type,
+        )
+          ? optimisticReactionState[type] === true
+          : serverUserReactions.includes(type),
+    );
+
+  const reactionDelta =
+    reactionCandidates.reduce(
+      (delta, type) => {
+        const serverHasReaction =
+          serverUserReactions.includes(type);
+
+        const currentHasReaction =
+          activeReactions.includes(type);
+
+        if (
+          serverHasReaction
+          === currentHasReaction
+        ) {
+          return delta;
+        }
+
+        return (
+          delta
+          + (
+            currentHasReaction
+              ? 1
+              : -1
+          )
+        );
+      },
+      0,
+    );
+
+  const visibleReactionCount =
+    Math.max(
+      0,
+      comment.reactionCount
+      + reactionDelta,
+    );
+
   const anchorBadge = getCommentAnchorBadge(comment);
 
   const handleVote = useCallback(
@@ -126,14 +192,25 @@ export function CommentCard({
     async (type: ReactionType) => {
       if (!currentUserId) return;
       const hasReacted = activeReactions.includes(type);
-      setOptimisticReactions((prev) =>
-        hasReacted ? prev.filter((r) => r !== type) : [...prev, type]
-      );
+      setOptimisticReactionState((previous) => ({
+        ...previous,
+        [type]: !hasReacted,
+      }));
+
       setShowReactions(false);
+
       try {
         await onReact(comment.id, type);
       } catch {
-        setOptimisticReactions([]);
+        setOptimisticReactionState((previous) => {
+          const next = {
+            ...previous,
+          };
+
+          delete next[type];
+
+          return next;
+        });
       }
     },
     [currentUserId, comment.id, activeReactions, onReact]
@@ -264,40 +341,90 @@ export function CommentCard({
                 Reply
               </button>
 
-              {/* Reactions toggle */}
+              {/* Reactions */}
               <div className="relative">
                 <button
-                  onClick={() => setShowReactions(!showReactions)}
+                  ref={reactionTriggerRef}
+                  type="button"
+                  onClick={() =>
+                    setShowReactions(
+                      !showReactions,
+                    )
+                  }
                   disabled={!currentUserId}
-                  className={`flex items-center gap-1 px-2 py-1 rounded-md text-[11px] font-semibold transition-colors cursor-pointer whitespace-nowrap ${
+                  className={`flex min-h-7 items-center gap-1 rounded-md px-2 py-1 text-[11px] font-semibold transition-colors ${
                     !currentUserId
-                      ? "text-[var(--wk-text-faint)] cursor-not-allowed"
-                      : "text-[var(--wk-text-muted)] hover:text-[var(--wk-text)] hover:bg-[var(--wk-surface)]"
+                      ? "cursor-not-allowed text-[var(--wk-text-faint)]"
+                      : activeReactions.length > 0
+                        ? "text-[var(--wk-brand)] hover:bg-[var(--wk-brand-soft)]"
+                        : "text-[var(--wk-text-muted)] hover:bg-[var(--wk-surface)] hover:text-[var(--wk-text)]"
                   }`}
+                  aria-label={
+                    activeReactions.length > 0
+                      ? `${visibleReactionCount} reactions`
+                      : "Add reaction"
+                  }
+                  aria-expanded={
+                    showReactions
+                  }
                 >
-                  <i className={`${activeReactions.length > 0 ? "ri-emotion-happy-fill text-[var(--wk-brand)]" : "ri-emotion-happy-line"} text-[13px]`} />
-                  {activeReactions.length > 0 && (
-                    <span className="text-[11px] font-bold text-[var(--wk-brand)]">{activeReactions.length}</span>
+                  {activeReactions.length > 0 ? (
+                    <span
+                      className="flex max-w-[16rem] flex-wrap items-center gap-x-0.5 gap-y-0.5"
+                      aria-hidden="true"
+                    >
+                      {activeReactions.map(
+                          (type) => (
+                            <span
+                              key={
+                                type
+                              }
+                              className="text-[16px] leading-none"
+                            >
+                              {
+                                getReactionGlyph(
+                                  type,
+                                )
+                              }
+                            </span>
+                          ),
+                        )}
+                    </span>
+                  ) : (
+                    <i
+                      className="ri-emotion-happy-line text-[14px]"
+                      aria-hidden="true"
+                    />
+                  )}
+
+                  {visibleReactionCount > 0 && (
+                    <span className="font-bold tabular-nums">
+                      {
+                        formatCount(
+                          visibleReactionCount,
+                        )
+                      }
+                    </span>
                   )}
                 </button>
+
                 {showReactions && (
-                  <div className="absolute top-full left-0 mt-1 bg-[var(--wk-surface)] border border-[var(--wk-border-2)] rounded-xl p-1.5 flex gap-0.5 shadow-lg z-30 max-w-full flex-wrap">
-                    {REACTIONS.map((r) => (
-                      <button
-                        key={r.type}
-                        onClick={() => handleReact(r.type)}
-                        className={`flex items-center gap-1 px-2 py-1.5 rounded-lg text-[11px] font-semibold transition-all cursor-pointer whitespace-nowrap ${
-                          activeReactions.includes(r.type)
-                            ? "bg-[var(--wk-brand-soft)] text-[var(--wk-brand)]"
-                            : "text-[var(--wk-text-muted)] hover:bg-[var(--wk-surface-raised)] hover:text-[var(--wk-text)]"
-                        }`}
-                        title={r.label}
-                      >
-                        <i className={`${r.icon} text-[13px]`} />
-                        {r.label}
-                      </button>
-                    ))}
-                  </div>
+                  <CommunityReactionPicker
+                    activeReactions={
+                      activeReactions
+                    }
+                    anchorRef={
+                      reactionTriggerRef
+                    }
+                    onSelect={
+                      handleReact
+                    }
+                    onClose={() =>
+                      setShowReactions(
+                        false,
+                      )
+                    }
+                  />
                 )}
               </div>
 
@@ -315,32 +442,6 @@ export function CommentCard({
                 </button>
               )}
             </div>
-
-            {/* Active reactions display */}
-            {comment.reactionCount > 0 && (
-              <div className="flex items-center gap-2 mt-1.5">
-                {Object.entries(
-                  (() => {
-                    // We approximate from the user reactions since we don't have full breakdown
-                    const map: Record<string, number> = {};
-                    comment.userReactions?.forEach((r) => { map[r] = 1; });
-                    return map;
-                  })()
-                ).length > 0 && (
-                  <div className="flex items-center gap-1">
-                    {[...new Set(comment.userReactions || [])].slice(0, 3).map((r) => {
-                      const def = REACTIONS.find((x) => x.type === r);
-                      return def ? (
-                        <span key={r} className="text-[11px] text-[var(--wk-text-muted)]">
-                          <i className={`${def.icon} text-[12px]`} />
-                        </span>
-                      ) : null;
-                    })}
-                    <span className="text-[11px] text-[var(--wk-text-faint)]">{comment.reactionCount}</span>
-                  </div>
-                )}
-              </div>
-            )}
 
             {/* Reply composer */}
             {showReplyBox && (

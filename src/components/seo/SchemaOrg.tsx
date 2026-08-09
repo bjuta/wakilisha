@@ -22,6 +22,32 @@ export interface MusicAlbumSchema {
   track?: Array<{ "@type": "MusicRecording"; name: string; duration?: string; position?: number }>;
 }
 
+export interface MusicPlaylistSchema {
+  "@type": "MusicPlaylist";
+  name: string;
+  description?: string;
+  image?: string;
+  numTracks?: number;
+  url?: string;
+  creator?: {
+    "@type": "Organization" | "Person";
+    name: string;
+    url?: string;
+  };
+  track?: Array<{
+    "@type": "MusicRecording";
+    name: string;
+    position?: number;
+    duration?: string;
+    url?: string;
+    byArtist?: {
+      "@type": "MusicGroup";
+      name: string;
+      url?: string;
+    };
+  }>;
+}
+
 export interface MusicRecordingSchema {
   "@type": "MusicRecording";
   name: string;
@@ -74,6 +100,7 @@ export interface WebPageSchema {
 export type SchemaData =
   | MusicGroupSchema
   | MusicAlbumSchema
+  | MusicPlaylistSchema
   | MusicRecordingSchema
   | OrganizationSchema
   | ArticleSchema
@@ -124,6 +151,58 @@ function buildJsonLd(data: SchemaData | SchemaData[]): Record<string, unknown> {
         if (d.track) schema.track = d.track;
         break;
       }
+      case "MusicPlaylist": {
+        const d =
+          item as MusicPlaylistSchema;
+
+        schema.name =
+          d.name;
+
+        if (
+          d.description
+        ) {
+          schema.description =
+            d.description;
+        }
+
+        if (
+          d.image
+        ) {
+          schema.image =
+            d.image;
+        }
+
+        if (
+          d.numTracks
+        ) {
+          schema.numTracks =
+            d.numTracks;
+        }
+
+        if (
+          d.url
+        ) {
+          schema.url =
+            d.url;
+        }
+
+        if (
+          d.creator
+        ) {
+          schema.creator =
+            d.creator;
+        }
+
+        if (
+          d.track
+        ) {
+          schema.track =
+            d.track;
+        }
+
+        break;
+      }
+
       case "MusicRecording": {
         const d = item as MusicRecordingSchema;
         schema.name = d.name;

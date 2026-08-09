@@ -106,10 +106,16 @@ export function recordListeningEvent(track: PlayerTrack, input: ListeningEventIn
   const duration = Math.max(0, input.duration || track.duration || existing?.duration || 0);
   const currentTime = Math.max(0, Math.min(input.currentTime || 0, duration || input.currentTime || 0));
   const progress = duration > 0 ? Math.max(0, Math.min(1, currentTime / duration)) : existing?.progress || 0;
-  const isFullPlayback = input.backend === "apple";
+  const isFullPlayback =
+    input.backend !== "audio";
+
   const shouldCountFullPlay =
     isFullPlayback &&
-    (input.kind === "start" || existing?.backend !== "apple");
+    (
+      input.kind === "start" ||
+      existing?.backend !==
+        input.backend
+    );
 
   const next: ListeningHistoryItem = {
     id: existing?.id || `${trackKey(track)}:${Date.now()}`,

@@ -1,0 +1,118 @@
+#wk-provider-playback-root {
+  pointer-events: none;
+}
+
+.wk-provider-playback-canvas {
+  display: none;
+}
+
+.wk-provider-playback-canvas.is-active {
+  display: block;
+  position: fixed;
+  z-index: 95;
+  overflow: hidden;
+  background: #000;
+  pointer-events: auto;
+}
+
+.wk-provider-playback-canvas.is-collapsed {
+  right: 20px;
+  bottom:
+    calc(
+      var(--wk-player-dock-h, 72px) +
+      18px
+    );
+  width:
+    min(
+      356px,
+      calc(100vw - 32px)
+    );
+  min-width: 200px;
+  height: 200px;
+  min-height: 200px;
+  border: 1px solid var(--wk-border);
+  border-radius: 18px;
+  box-shadow:
+    0 20px 60px
+    rgb(0 0 0 / 0.28);
+}
+
+.wk-provider-playback-canvas.is-full-player {
+  min-width: 200px;
+  min-height: 200px;
+  border: 0;
+  border-radius: 18px;
+  box-shadow: none;
+}
+
+.wk-provider-playback-canvas.is-awaiting-host {
+  top: 0;
+  left: 0;
+  width: 200px;
+  height: 200px;
+  min-width: 200px;
+  min-height: 200px;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.wk-provider-playback-frame,
+.wk-provider-engine,
+.wk-provider-engine-target,
+#wk-youtube-player-target,
+#wk-soundcloud-player {
+  width: 100%;
+  height: 100%;
+}
+
+.wk-provider-engine[hidden] {
+  display: none;
+}
+
+.wk-provider-engine-target {
+  display: block;
+  border: 0;
+}
+
+.wk-provider-playback-badge {
+  position: absolute;
+  z-index: 2;
+  top: 10px;
+  left: 10px;
+  pointer-events: none;
+  border-radius: 999px;
+  background:
+    rgb(0 0 0 / 0.68);
+  padding: 5px 9px;
+  color: #fff;
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.05em;
+}
+
+.wk-provider-playback-badge[hidden] {
+  display: none;
+}
+
+@media (
+  max-width: 767px
+) {
+  .wk-provider-playback-canvas.is-collapsed {
+    right: 12px;
+    bottom:
+      calc(
+        128px +
+        max(
+          env(
+            safe-area-inset-bottom
+          ),
+          8px
+        )
+      );
+    width:
+      min(
+        356px,
+        calc(100vw - 24px)
+      );
+  }
+}

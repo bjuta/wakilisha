@@ -1704,6 +1704,90 @@ export type Database = {
           },
         ]
       }
+      playlist_publication_snapshots: {
+        Row: {
+          command_receipt_id: string
+          content_fingerprint: string
+          cover_alt_text: string | null
+          cover_caption: string | null
+          cover_credit: string | null
+          cover_url: string | null
+          created_at: string
+          curator_label: string | null
+          description: string | null
+          first_published_at: string
+          id: string
+          item_count: number
+          payload: Json
+          playlist_id: string
+          published_at: string
+          published_by: string | null
+          resource_id: string
+          slug: string
+          title: string
+          version_id: string
+        }
+        Insert: {
+          command_receipt_id: string
+          content_fingerprint: string
+          cover_alt_text?: string | null
+          cover_caption?: string | null
+          cover_credit?: string | null
+          cover_url?: string | null
+          created_at?: string
+          curator_label?: string | null
+          description?: string | null
+          first_published_at: string
+          id?: string
+          item_count: number
+          payload: Json
+          playlist_id: string
+          published_at: string
+          published_by?: string | null
+          resource_id: string
+          slug: string
+          title: string
+          version_id: string
+        }
+        Update: {
+          command_receipt_id?: string
+          content_fingerprint?: string
+          cover_alt_text?: string | null
+          cover_caption?: string | null
+          cover_credit?: string | null
+          cover_url?: string | null
+          created_at?: string
+          curator_label?: string | null
+          description?: string | null
+          first_published_at?: string
+          id?: string
+          item_count?: number
+          payload?: Json
+          playlist_id?: string
+          published_at?: string
+          published_by?: string | null
+          resource_id?: string
+          slug?: string
+          title?: string
+          version_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "playlist_publication_snapshots_binding_fkey"
+            columns: ["resource_id", "playlist_id"]
+            isOneToOne: false
+            referencedRelation: "playlist_resources"
+            referencedColumns: ["resource_id", "playlist_id"]
+          },
+          {
+            foreignKeyName: "playlist_publication_snapshots_version_fkey"
+            columns: ["version_id", "resource_id", "playlist_id"]
+            isOneToOne: false
+            referencedRelation: "playlist_versions"
+            referencedColumns: ["id", "resource_id", "playlist_id"]
+          },
+        ]
+      }
       playlist_resources: {
         Row: {
           current_approved_version_id: string | null
@@ -3069,6 +3153,15 @@ export type Database = {
           version_number: number
         }[]
       }
+      copy_playlist_published_version: {
+        Args: { p_actor_id: string; p_source_version_id: string }
+        Returns: {
+          content_fingerprint: string
+          item_count: number
+          version_id: string
+          version_number: number
+        }[]
+      }
       copy_playlist_version_snapshot: {
         Args: { p_actor_id: string; p_source_version_id: string }
         Returns: {
@@ -3145,6 +3238,10 @@ export type Database = {
         Args: { p_case_resource_id: string }
         Returns: boolean
       }
+      current_user_can_publish_playlist: {
+        Args: { p_resource_id: string }
+        Returns: boolean
+      }
       current_user_can_review_article: { Args: never; Returns: boolean }
       current_user_can_triage_correction: {
         Args: { p_case_resource_id: string }
@@ -3213,6 +3310,15 @@ export type Database = {
           p_source_version_id: string
         }
         Returns: undefined
+      }
+      materialize_playlist_publication_snapshot: {
+        Args: {
+          p_command_receipt_id: string
+          p_published_at: string
+          p_published_by: string
+          p_version_id: string
+        }
+        Returns: string
       }
       next_article_version_number: {
         Args: { p_resource_id: string }
@@ -10941,23 +11047,26 @@ export type Database = {
           canonicalized_track_id: string | null
           created_at: string
           id: string
-          playback_kind: string
+          intake_origin: string
+          playback_kind: string | null
           playlist_note: string | null
           provider_artist_names: string[]
-          provider_key: string
-          provider_object_id: string
+          provider_key: string | null
+          provider_object_id: string | null
           provider_release_title: string | null
           provider_title: string | null
-          provider_url: string
+          provider_url: string | null
           registry_artist_id: string | null
           requested_by: string | null
           reserved_position: number | null
           review_note: string | null
           reviewed_at: string | null
           reviewed_by: string | null
+          source_contribution_id: string | null
           source_playlist_id: string
           source_playlist_item_id: string | null
           status: string
+          submitted_track_title: string | null
           updated_at: string
           validation_snapshot: Json
         }
@@ -10967,23 +11076,26 @@ export type Database = {
           canonicalized_track_id?: string | null
           created_at?: string
           id?: string
-          playback_kind: string
+          intake_origin?: string
+          playback_kind?: string | null
           playlist_note?: string | null
           provider_artist_names?: string[]
-          provider_key: string
-          provider_object_id: string
+          provider_key?: string | null
+          provider_object_id?: string | null
           provider_release_title?: string | null
           provider_title?: string | null
-          provider_url: string
+          provider_url?: string | null
           registry_artist_id?: string | null
           requested_by?: string | null
           reserved_position?: number | null
           review_note?: string | null
           reviewed_at?: string | null
           reviewed_by?: string | null
+          source_contribution_id?: string | null
           source_playlist_id: string
           source_playlist_item_id?: string | null
           status?: string
+          submitted_track_title?: string | null
           updated_at?: string
           validation_snapshot?: Json
         }
@@ -10993,23 +11105,26 @@ export type Database = {
           canonicalized_track_id?: string | null
           created_at?: string
           id?: string
-          playback_kind?: string
+          intake_origin?: string
+          playback_kind?: string | null
           playlist_note?: string | null
           provider_artist_names?: string[]
-          provider_key?: string
-          provider_object_id?: string
+          provider_key?: string | null
+          provider_object_id?: string | null
           provider_release_title?: string | null
           provider_title?: string | null
-          provider_url?: string
+          provider_url?: string | null
           registry_artist_id?: string | null
           requested_by?: string | null
           reserved_position?: number | null
           review_note?: string | null
           reviewed_at?: string | null
           reviewed_by?: string | null
+          source_contribution_id?: string | null
           source_playlist_id?: string
           source_playlist_item_id?: string | null
           status?: string
+          submitted_track_title?: string | null
           updated_at?: string
           validation_snapshot?: Json
         }
@@ -11040,6 +11155,13 @@ export type Database = {
             columns: ["source_playlist_id"]
             isOneToOne: false
             referencedRelation: "wk_playlists"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "registry_provider_track_suggestions_source_contribution_fkey"
+            columns: ["source_contribution_id"]
+            isOneToOne: false
+            referencedRelation: "community_contributions"
             referencedColumns: ["id"]
           },
           {
@@ -16141,6 +16263,17 @@ export type Database = {
           track_credit_count: number
         }[]
       }
+      admin_update_registry_track_intake_artist_credit: {
+        Args: {
+          p_credit_order: number
+          p_credit_role: string
+          p_observed_name?: string
+          p_registry_artist_id?: string
+          p_resolution_mode: string
+          p_suggestion_id: string
+        }
+        Returns: Json
+      }
       admin_upsert_artist_decouple_decision: {
         Args: {
           p_chart_primary_artist_id?: string
@@ -16947,6 +17080,28 @@ export type Database = {
         }
         Returns: Json
       }
+      community_set_follow_state: {
+        Args: {
+          p_followed: boolean
+          p_target_id: string
+          p_target_slug: string
+          p_target_type: string
+        }
+        Returns: Json
+      }
+      community_set_saved_state: {
+        Args: {
+          p_entity_id: string
+          p_entity_slug: string
+          p_entity_type: string
+          p_entity_url: string
+          p_image_url: string
+          p_saved: boolean
+          p_subtitle: string
+          p_title: string
+        }
+        Returns: Json
+      }
       community_soft_delete_comment: {
         Args: { p_comment_id: string }
         Returns: Json
@@ -17435,6 +17590,19 @@ export type Database = {
           resource_id: string
           result_payload: Json
         }[]
+      }
+      create_public_playlist_missing_track_submission: {
+        Args: {
+          p_artist_names: string[]
+          p_details?: string
+          p_idempotency_key?: string
+          p_playlist_id: string
+          p_playlist_slug: string
+          p_provider?: Json
+          p_track_title: string
+          p_user_id: string
+        }
+        Returns: Json
       }
       create_publishing_item: {
         Args: {
@@ -17965,6 +18133,7 @@ export type Database = {
           updated_at: string
         }[]
       }
+      get_public_playlist: { Args: { p_slug: string }; Returns: Json }
       get_release_artists_for_anon: {
         Args: { p_artist_slug: string }
         Returns: {
@@ -18383,6 +18552,28 @@ export type Database = {
           updated_at: string
         }[]
       }
+      list_public_playlists: {
+        Args: {
+          p_before_published_at?: string
+          p_before_snapshot_id?: string
+          p_limit?: number
+        }
+        Returns: {
+          cover_alt_text: string
+          cover_url: string
+          curator_label: string
+          description: string
+          first_published_at: string
+          item_count: number
+          playlist_id: string
+          published_at: string
+          resource_id: string
+          slug: string
+          snapshot_id: string
+          title: string
+          version_id: string
+        }[]
+      }
       list_publishing_assignable_users: {
         Args: never
         Returns: {
@@ -18665,6 +18856,28 @@ export type Database = {
           schedule_id: string
           status: string
           version_id: string
+        }[]
+      }
+      publish_playlist_version: {
+        Args: {
+          p_approved_version_id: string
+          p_correlation_id?: string
+          p_expected_authority_revision: number
+          p_idempotency_key: string
+          p_note?: string
+          p_playlist_id: string
+        }
+        Returns: {
+          authority_revision: number
+          command_receipt_id: string
+          idempotent_replay: boolean
+          lifecycle_status: string
+          playlist_id: string
+          receipt_status: string
+          resource_id: string
+          result_payload: Json
+          version_id: string
+          version_number: number
         }[]
       }
       purge_staging_records: {

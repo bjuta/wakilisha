@@ -138,6 +138,11 @@ export default function DesktopPlayerPage() {
   const remainingCount = queue.length - queueIndex - 1;
   const upcoming = queue.slice(queueIndex + 1);
   const hasQueue = queue.length > 1;
+  const usesProviderMedia =
+    playbackBackend ===
+      "youtube" ||
+    playbackBackend ===
+      "soundcloud";
 
   return (
     <main className="relative flex h-screen overflow-hidden bg-[var(--wk-bg)]">
@@ -190,7 +195,12 @@ export default function DesktopPlayerPage() {
           {/* Artwork + track info column */}
           <div className="flex flex-col items-center">
             <div className="relative w-[320px] h-[320px] overflow-hidden rounded-2xl bg-[var(--wk-surface-raised)] shadow-2xl lg:w-[420px] lg:h-[420px] xl:w-[480px] xl:h-[480px]">
-              {currentTrack.artworkUrl ? (
+              {usesProviderMedia ? (
+                <div
+                  data-wk-provider-media-host="desktop"
+                  className="h-full w-full"
+                />
+              ) : currentTrack.artworkUrl ? (
                 <img
                   src={currentTrack.artworkUrl}
                   alt={currentTrack.title}
@@ -202,7 +212,7 @@ export default function DesktopPlayerPage() {
                 </div>
               )}
               {/* Playing indicator */}
-              {isPlaying && (
+              {!usesProviderMedia && isPlaying && (
                 <div className="absolute right-4 top-4 flex items-center gap-1 rounded-full bg-black/50 px-3 py-1.5 backdrop-blur-md">
                   <span className="h-2 w-2 animate-pulse rounded-full bg-[var(--wk-brand)]" />
                   <span className="text-[10px] font-bold uppercase tracking-wider text-white">Playing</span>
@@ -245,7 +255,7 @@ export default function DesktopPlayerPage() {
                 onMouseMove={handleScrubMove}
               >
                 <div
-                  className="absolute left-0 top-0 h-full rounded-full bg-[var(--wk-brand)] transition-all duration-100"
+                  className="absolute left-0 top-0 h-full rounded-full bg-[var(--wk-brand)]"
                   style={{ width: `${pct * 100}%` }}
                 />
                 <div

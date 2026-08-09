@@ -234,10 +234,18 @@ export function MobileFullPlayer() {
     `${Math.floor(seconds / 60)}:${Math.floor(seconds % 60).toString().padStart(2, "0")}`;
   const activeSourceLabel = playbackSourceLabel || currentTrack.source || null;
   const activeSourceIcon = playbackBackend === "apple" ? "Music2" : "Radio";
-  const playbackEyebrow = playbackBackend === "apple" ? "Now playing" : "Preview";
+  const playbackEyebrow =
+    playbackBackend === "audio"
+      ? "Preview"
+      : "Now playing";
   const hasAppleCatalog = Boolean(currentTrack.appleMusicCatalogId || currentTrack.appleMusicId);
   const showFullTrackUnlock = hasAppleCatalog && playbackBackend !== "apple" && !appleConnected;
   const pct = Math.max(0, Math.min(1, progress || 0));
+  const usesProviderMedia =
+    playbackBackend ===
+      "youtube" ||
+    playbackBackend ===
+      "soundcloud";
 
   const activeQueueIndex = queueIndex >= 0
     ? queueIndex
@@ -302,15 +310,22 @@ export function MobileFullPlayer() {
             }}
           />
           <div className="fp-art-card">
-            {currentTrack.artworkUrl ? (
+            {usesProviderMedia ? (
+              <div
+                data-wk-provider-media-host="mobile"
+                className="h-full w-full"
+              />
+            ) : currentTrack.artworkUrl ? (
               <img src={currentTrack.artworkUrl} alt={currentTrack.title} />
             ) : (
               <div className="fp-art-placeholder">
                 <WkIcon name="Music2" size={40} />
               </div>
             )}
-            <div className="fp-art-shine" />
-            {isPlaying && (
+            {!usesProviderMedia && (
+              <div className="fp-art-shine" />
+            )}
+            {!usesProviderMedia && isPlaying && (
               <div className="fp-art-badges">
                 <span className="fp-live-pill">
                   <span /> Live

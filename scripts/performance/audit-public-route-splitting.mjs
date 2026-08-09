@@ -144,9 +144,9 @@ const directLazyImports = [
   ),
 ].map((match) => match[1]);
 
-if (directLazyImports.length !== 48) {
+if (directLazyImports.length !== 50) {
   fail(
-    `expected 48 direct lazy imports, found ${directLazyImports.length}`,
+    `expected 50 direct lazy imports, found ${directLazyImports.length}`,
   );
 }
 
@@ -201,6 +201,8 @@ for (const homepageModule of expectedEagerModules) {
 }
 
 for (const requiredModule of [
+  "../pages/playlists/page",
+  "../pages/playlists/detail/page",
   "../pages/artists/detail/page",
   "../pages/charts/edition/page",
   "../pages/magazine/article/page",
@@ -272,9 +274,16 @@ const routePaths = [
  * - playlists/:playlistId
  *
  * Removing those three paths reproduces the accepted 144-path
- * baseline checksum exactly. The current authority is 147 paths.
+ * baseline checksum exactly.
+ *
+ * The accepted pre-Phase-5B authority is 148 paths.
+ * Phase 5B adds two public Playlist routes:
+ * - /playlists
+ * - /playlists/:slug
+ *
+ * The current authority is therefore 150 paths.
  */
-const expectedRoutePathCount = 148;
+const expectedRoutePathCount = 150;
 
 if (routePaths.length !== expectedRoutePathCount) {
   fail(
@@ -291,7 +300,7 @@ const routeChecksum = crypto
   .digest("hex");
 
 const expectedRouteChecksum =
-  "09e9c42e4a0aa4d16c978d61ca8556e607f54c34a55ee5108fb126c2207a9d25";
+  "ffc3e3e82d9ca0720a245eaccaaaec13435bcca41a292e79a6ae37d0fa201cc2";
 
 if (
   routeChecksum !==
@@ -333,5 +342,5 @@ if (
 
 console.log(
   "Public route splitting audit passed: " +
-  `49 lazy imports, ${expectedRoutePathCount} route paths preserved.`,
+  `${directLazyImports.length} lazy imports, ${expectedRoutePathCount} route paths preserved.`,
 );

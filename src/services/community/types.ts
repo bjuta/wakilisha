@@ -11,6 +11,7 @@ export type CommunityEntityType =
   | 'chart_edition'
   | 'field_guide'
   | 'profile'
+  | 'playlist'
   | 'comment';
 
 export interface CommunityEntity {
@@ -28,14 +29,15 @@ export type CommentStatus = 'visible' | 'pending' | 'hidden' | 'deleted' | 'remo
 export type ThreadStatus = 'open' | 'locked' | 'archived' | 'hidden';
 export type ContributionStatus = 'pending' | 'approved' | 'rejected' | 'merged';
 export type ReportReason = 'spam' | 'harassment' | 'hate_or_abuse' | 'misinformation' | 'privacy' | 'copyright' | 'off_topic' | 'other';
-export type ReactionType = 'signal' | 'memory' | 'context' | 'fire' | 'agree';
+export type ReactionType = string;
 export type SortMode = 'best' | 'newest' | 'oldest' | 'most_replied' | 'editor_picks';
 export type CommentAnchorType =
   | 'whole_entity'
   | 'timestamp'
   | 'time_range'
   | 'release_track'
-  | 'chart_entry';
+  | 'chart_entry'
+  | 'playlist_track';
 
 export interface CommunityProfile {
   userId: string;
@@ -256,7 +258,7 @@ export interface CreateContextAnchorCommentInput {
   bodyMarkdown: string;
   bodyPlain?: string;
   bodyHtml?: string;
-  anchorType: Extract<CommentAnchorType, 'release_track' | 'chart_entry'>;
+  anchorType: Extract<CommentAnchorType, 'release_track' | 'chart_entry' | 'playlist_track'>;
   contextEntityType: string;
   contextEntityId?: string | null;
   contextEntitySlug?: string | null;
@@ -266,7 +268,7 @@ export interface CreateContextAnchorCommentInput {
 
 export interface ContextAnchorCommentQuery {
   threadId: string;
-  anchorType: Extract<CommentAnchorType, 'release_track' | 'chart_entry'>;
+  anchorType: Extract<CommentAnchorType, 'release_track' | 'chart_entry' | 'playlist_track'>;
   contextEntityType?: string | null;
   contextEntityId?: string | null;
   contextEntitySlug?: string | null;
@@ -274,7 +276,7 @@ export interface ContextAnchorCommentQuery {
 }
 
 export interface ContextAnchorSummaryItem {
-  anchorType: Extract<CommentAnchorType, 'release_track' | 'chart_entry'>;
+  anchorType: Extract<CommentAnchorType, 'release_track' | 'chart_entry' | 'playlist_track'>;
   contextEntityType: string | null;
   contextEntityId: string | null;
   contextEntitySlug: string | null;
@@ -309,6 +311,11 @@ export interface FollowInput {
   targetSlug?: string;
 }
 
+export interface SetFollowStateInput
+  extends FollowInput {
+  followed: boolean;
+}
+
 export interface SaveEntityInput {
   entityType: CommunityEntityType;
   entityId?: string;
@@ -317,6 +324,12 @@ export interface SaveEntityInput {
   title: string;
   subtitle?: string;
   imageUrl?: string;
+}
+
+export interface SetSavedStateInput
+  extends SaveEntityInput {
+  entityId: string;
+  saved: boolean;
 }
 
 export interface CreateContributionInput {

@@ -44,6 +44,14 @@ export const BriefingIssuePage = lazy(
   () => import("../pages/briefing/issue/page"),
 );
 
+export const PublicPlaylistsPage = lazy(
+  () => import("../pages/playlists/page"),
+);
+
+export const PublicPlaylistDetailPage = lazy(
+  () => import("../pages/playlists/detail/page"),
+);
+
 export const ChartsDirectory = lazy(
   () => import("../pages/charts/directory/page"),
 );
