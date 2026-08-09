@@ -130,6 +130,7 @@ interface ProviderInspection {
 const TRACK_INTAKE_PAGE_SIZE = 10;
 
 const enrichmentFieldOrder = [
+  "title",
   "isrc",
   "duration_ms",
   "track_artwork_url",
@@ -975,6 +976,13 @@ export default function TrackIntakePage() {
         throw new Error("Provider returned no track evidence.");
       }
 
+      const inspectionFields = {
+        ...(inspection.enrichment ?? {}),
+        ...(inspection.title?.trim()
+          ? { title: inspection.title.trim() }
+          : {}),
+      };
+
       await untypedRpc(
         "admin_record_registry_track_intake_provider_evidence",
         {
@@ -984,7 +992,7 @@ export default function TrackIntakePage() {
             inspection.providerEntityId,
           p_provider_url:
             inspection.providerUrl ?? null,
-          p_fields: inspection.enrichment ?? {},
+          p_fields: inspectionFields,
           p_raw_payload: data?.raw ?? {},
           p_confidence:
             Number(inspection.confidenceScore ?? 0.95),
@@ -997,7 +1005,7 @@ export default function TrackIntakePage() {
       }));
 
       const usefulFields = Object.fromEntries(
-        Object.entries(inspection.enrichment ?? {})
+        Object.entries(inspectionFields)
           .filter(([field, value]) =>
             enrichmentFieldOrder.includes(
               field as (typeof enrichmentFieldOrder)[number],
