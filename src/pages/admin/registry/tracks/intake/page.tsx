@@ -127,6 +127,8 @@ interface ProviderInspection {
   };
 }
 
+const TRACK_INTAKE_PAGE_SIZE = 10;
+
 const enrichmentFieldOrder = [
   "isrc",
   "duration_ms",
@@ -216,6 +218,7 @@ export default function TrackIntakePage() {
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [query, setQuery] = useState("");
+  const [page, setPage] = useState(0);
 
   const [trackQuery, setTrackQuery] =
     useState<Record<string, string>>({});
@@ -328,6 +331,72 @@ export default function TrackIntakePage() {
       return haystack.includes(needle);
     });
   }, [queue.rows, query]);
+
+  const totalPages = Math.max(
+    1,
+    Math.ceil(
+      filtered.length /
+        TRACK_INTAKE_PAGE_SIZE,
+    ),
+  );
+
+  const safePage = Math.min(
+    page,
+    totalPages - 1,
+  );
+
+  const visible = useMemo(() => {
+    if (
+      deepSuggestion ||
+      deepPlaylistItem
+    ) {
+      return filtered;
+    }
+
+    const start =
+      safePage *
+      TRACK_INTAKE_PAGE_SIZE;
+
+    return filtered.slice(
+      start,
+      start +
+        TRACK_INTAKE_PAGE_SIZE,
+    );
+  }, [
+    deepSuggestion,
+    deepPlaylistItem,
+    filtered,
+    safePage,
+  ]);
+
+  const visibleStart =
+    filtered.length === 0
+      ? 0
+      : safePage *
+          TRACK_INTAKE_PAGE_SIZE +
+        1;
+
+  const visibleEnd = Math.min(
+    filtered.length,
+    (safePage + 1) *
+      TRACK_INTAKE_PAGE_SIZE,
+  );
+
+  useEffect(() => {
+    setPage(0);
+  }, [
+    query,
+    status,
+  ]);
+
+  useEffect(() => {
+    if (page !== safePage) {
+      setPage(safePage);
+    }
+  }, [
+    page,
+    safePage,
+  ]);
 
   async function loadEnrichment(suggestionId: string) {
     const data = await untypedRpc(
@@ -1259,7 +1328,11 @@ export default function TrackIntakePage() {
             {queue.total} intake item
             {queue.total === 1 ? "" : "s"}
           </span>
-          <span>{filtered.length} shown</span>
+          <span>
+            {deepSuggestion || deepPlaylistItem
+              ? `${filtered.length} shown`
+              : `Showing ${visibleStart}-${visibleEnd} of ${filtered.length}`}
+          </span>
         </div>
 
         {loading ? (
@@ -1287,7 +1360,7 @@ export default function TrackIntakePage() {
           </div>
         ) : (
           <div className="space-y-5">
-            {filtered.map((row) => {
+            {visible.map((row) => {
               const suggestionId = row.suggestion_id;
               const chosenProvider =
                 providerChoice[suggestionId] ?? "apple_music";
@@ -2513,6 +2586,61 @@ export default function TrackIntakePage() {
                 </article>
               );
             })}
+
+            {!deepSuggestion &&
+            !deepPlaylistItem &&
+            filtered.length >
+              TRACK_INTAKE_PAGE_SIZE ? (
+              <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-wk-border bg-wk-surface px-4 py-3">
+                <button
+                  type="button"
+                  onClick={() =>
+                    setPage(
+                      Math.max(
+                        0,
+                        safePage - 1,
+                      ),
+                    )
+                  }
+                  disabled={safePage === 0}
+                  className="wk-button wk-button-ghost wk-button-sm disabled:opacity-40"
+                >
+                  <WkIcon
+                    name="ChevronLeft"
+                    size={13}
+                  />
+                  Previous
+                </button>
+
+                <span className="text-xs font-bold text-wk-text-muted">
+                  Page {safePage + 1} of{" "}
+                  {totalPages}
+                </span>
+
+                <button
+                  type="button"
+                  onClick={() =>
+                    setPage(
+                      Math.min(
+                        totalPages - 1,
+                        safePage + 1,
+                      ),
+                    )
+                  }
+                  disabled={
+                    safePage >=
+                    totalPages - 1
+                  }
+                  className="wk-button wk-button-ghost wk-button-sm disabled:opacity-40"
+                >
+                  Next
+                  <WkIcon
+                    name="ChevronRight"
+                    size={13}
+                  />
+                </button>
+              </div>
+            ) : null}
           </div>
         )}
       </div>
