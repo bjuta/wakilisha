@@ -311,6 +311,11 @@ export interface FollowInput {
   targetSlug?: string;
 }
 
+export interface SetFollowStateInput
+  extends FollowInput {
+  followed: boolean;
+}
+
 export interface SaveEntityInput {
   entityType: CommunityEntityType;
   entityId?: string;
@@ -319,6 +324,12 @@ export interface SaveEntityInput {
   title: string;
   subtitle?: string;
   imageUrl?: string;
+}
+
+export interface SetSavedStateInput
+  extends SaveEntityInput {
+  entityId: string;
+  saved: boolean;
 }
 
 export interface CreateContributionInput {

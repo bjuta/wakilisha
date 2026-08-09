@@ -30,6 +30,10 @@ import {
   AnchorNavigator,
 } from "@/components/design-system/navigation/AnchorNavigator";
 import {
+  MusicArtistDiscovery,
+  type MusicArtistDiscoveryArtist,
+} from "@/components/design-system/music/MusicArtistDiscovery";
+import {
   ContextAnchorCommentDrawer,
   type ContextAnchorTarget,
 } from "@/components/feature/community/ContextAnchorCommentDrawer";
@@ -40,12 +44,19 @@ import {
   useAuthUser,
 } from "@/hooks/useAuthUser";
 import {
+  useEntityActions,
+} from "@/hooks/useCommunityActions";
+import {
   usePlayer,
   type PlayerTrack,
 } from "@/context/PlayerContext";
 import {
   getPublicPlaylist,
 } from "@/services/playlists/playlistPublicService";
+import {
+  getUserFollows,
+  getUserSaves,
+} from "@/services/community";
 import {
   toPlayerQueue,
   type PublicPlaylist,
@@ -175,6 +186,181 @@ function trackAnchorId(
   return `track-${track.playlistItemResourceId}`;
 }
 
+function PlaylistTrackArtistLinks({
+  track,
+}: {
+  track: PublicPlaylistTrack;
+}) {
+  if (
+    track.artists.length === 0
+  ) {
+    return (
+      <>
+        {
+          trackArtistLabel(
+            track,
+          )
+        }
+      </>
+    );
+  }
+
+  return (
+    <>
+      {
+        track.artists.map(
+          (
+            artist,
+            index,
+          ) => (
+            <span
+              key={
+                artist.artistId
+              }
+            >
+              {
+                index > 0
+                  ? ", "
+                  : ""
+              }
+              {
+                artist.artistSlug
+                  ? (
+                      <Link
+                        to={
+                          `/artists/${artist.artistSlug}`
+                        }
+                        className="transition-colors hover:text-[var(--wk-brand)] hover:underline"
+                      >
+                        {
+                          artist.name
+                        }
+                      </Link>
+                    )
+                  : artist.name
+              }
+            </span>
+          ),
+        )
+      }
+    </>
+  );
+}
+
+function buildPlaylistArtistDiscovery(
+  playlist: PublicPlaylist,
+): MusicArtistDiscoveryArtist[] {
+  const artists =
+    new Map<
+      string,
+      MusicArtistDiscoveryArtist
+    >();
+
+  for (
+    const track
+    of playlist.tracks
+  ) {
+    for (
+      const artist
+      of track.artists
+    ) {
+      let summary =
+        artists.get(
+          artist.artistId,
+        );
+
+      if (!summary) {
+        summary = {
+          artistId:
+            artist.artistId,
+          slug:
+            artist.artistSlug,
+          name:
+            artist.name,
+          imageUrl:
+            artist.imageUrl,
+          tracks:
+            [],
+        };
+
+        artists.set(
+          artist.artistId,
+          summary,
+        );
+      }
+
+      if (
+        !summary.tracks.some(
+          (
+            item,
+          ) =>
+            item.id ===
+            track.playlistItemResourceId,
+        )
+      ) {
+        summary.tracks.push({
+          id:
+            track.playlistItemResourceId,
+          title:
+            track.title,
+          position:
+            track.position,
+          anchorId:
+            trackAnchorId(
+              track,
+            ),
+          artworkUrl:
+            track.artworkUrl,
+        });
+      }
+    }
+  }
+
+  return Array.from(
+    artists.values(),
+  )
+    .map(
+      (
+        artist,
+      ) => ({
+        ...artist,
+        tracks:
+          [...artist.tracks].sort(
+            (
+              left,
+              right,
+            ) =>
+              left.position -
+              right.position,
+          ),
+      }),
+    )
+    .sort(
+      (
+        left,
+        right,
+      ) => {
+        const leftPosition =
+          left.tracks[0]
+            ?.position ??
+          Number.MAX_SAFE_INTEGER;
+
+        const rightPosition =
+          right.tracks[0]
+            ?.position ??
+          Number.MAX_SAFE_INTEGER;
+
+        return (
+          leftPosition -
+            rightPosition ||
+          left.name.localeCompare(
+            right.name,
+          )
+        );
+      },
+    );
+}
+
 function PlaylistCover({
   playlist,
 }: {
@@ -216,8 +402,11 @@ function PlaylistTrackRow({
   currentTrackId,
   isPlaying,
   expanded,
+  saved,
+  savePending,
   onPlay,
   onToggle,
+  onSave,
   onDiscuss,
   shareUrl,
 }: {
@@ -227,8 +416,11 @@ function PlaylistTrackRow({
   currentTrackId: string | undefined;
   isPlaying: boolean;
   expanded: boolean;
+  saved: boolean;
+  savePending: boolean;
   onPlay: () => void;
   onToggle: () => void;
+  onSave: () => void;
   onDiscuss: () => void;
   shareUrl: string;
 }) {
@@ -354,9 +546,11 @@ function PlaylistTrackRow({
           }
 
           <div className="mt-0.5 truncate text-[11px] font-semibold text-[var(--wk-text-muted)]">
-            {
-              artist
-            }
+            <PlaylistTrackArtistLinks
+              track={
+                track
+              }
+            />
           </div>
         </div>
 
@@ -480,9 +674,11 @@ function PlaylistTrackRow({
                   ? (
                       <div className="mt-5 flex flex-wrap items-center gap-x-4 gap-y-2 border-t border-[var(--wk-border)] pt-4 text-[12px] font-semibold text-[var(--wk-text-muted)]">
                         <span>
-                          {
-                            artist
-                          }
+                          <PlaylistTrackArtistLinks
+                            track={
+                              track
+                            }
+                          />
                         </span>
 
                         {
@@ -544,6 +740,40 @@ function PlaylistTrackRow({
               }
 
               <div className="mt-5 flex flex-wrap items-center gap-3">
+                {
+                  track.registry?.trackId
+                    ? (
+                        <button
+                          type="button"
+                          onClick={
+                            onSave
+                          }
+                          disabled={
+                            savePending
+                          }
+                          aria-pressed={
+                            saved
+                          }
+                          className="wk-button wk-button-soft"
+                        >
+                          <WkIcon
+                            name="Bookmark"
+                            size={
+                              14
+                            }
+                          />
+                          {
+                            savePending
+                              ? "Updating..."
+                              : saved
+                                ? "Saved"
+                                : "Save track"
+                          }
+                        </button>
+                      )
+                    : null
+                }
+
                 <button
                   type="button"
                   onClick={
@@ -642,6 +872,65 @@ export default function PublicPlaylistDetailPage() {
       null,
     );
 
+  const [
+    playlistSaved,
+    setPlaylistSaved,
+  ] =
+    useState(
+      false,
+    );
+
+  const [
+    savedTrackIds,
+    setSavedTrackIds,
+  ] =
+    useState<Set<string>>(
+      () =>
+        new Set(),
+    );
+
+  const [
+    followedArtistIds,
+    setFollowedArtistIds,
+  ] =
+    useState<Set<string>>(
+      () =>
+        new Set(),
+    );
+
+  const [
+    playlistSavePending,
+    setPlaylistSavePending,
+  ] =
+    useState(
+      false,
+    );
+
+  const [
+    trackSavePendingId,
+    setTrackSavePendingId,
+  ] =
+    useState<string | null>(
+      null,
+    );
+
+  const [
+    followPendingArtistId,
+    setFollowPendingArtistId,
+  ] =
+    useState<string | null>(
+      null,
+    );
+
+  const {
+    setFollow,
+    setSaved,
+  } =
+    useEntityActions(
+      user.id ||
+      undefined,
+    );
+
   const {
     currentTrack,
     isPlaying,
@@ -711,6 +1000,209 @@ export default function PublicPlaylistDetailPage() {
         playlist,
       ],
     );
+
+  const playlistArtists =
+    useMemo(
+      () =>
+        playlist
+          ? buildPlaylistArtistDiscovery(
+              playlist,
+            )
+          : [],
+      [
+        playlist,
+      ],
+    );
+
+  useEffect(
+    () => {
+      let cancelled =
+        false;
+
+      if (
+        !playlist ||
+        !user.id
+      ) {
+        setPlaylistSaved(
+          false,
+        );
+
+        setSavedTrackIds(
+          new Set(),
+        );
+
+        setFollowedArtistIds(
+          new Set(),
+        );
+
+        return;
+      }
+
+      void Promise.all([
+        getUserSaves(
+          user.id,
+        ),
+        getUserFollows(
+          user.id,
+        ),
+      ])
+        .then(
+          ([
+            saves,
+            follows,
+          ]) => {
+            if (
+              cancelled
+            ) {
+              return;
+            }
+
+            const saveRows =
+              saves.filter(
+                (
+                  row,
+                ): row is Record<string, unknown> =>
+                  Boolean(
+                    row &&
+                    typeof row ===
+                      "object",
+                  ),
+              );
+
+            const followRows =
+              follows.filter(
+                (
+                  row,
+                ): row is Record<string, unknown> =>
+                  Boolean(
+                    row &&
+                    typeof row ===
+                      "object",
+                  ),
+              );
+
+            setPlaylistSaved(
+              saveRows.some(
+                (
+                  row,
+                ) =>
+                  row.entity_type ===
+                    "playlist" &&
+                  row.entity_id ===
+                    playlist.resourceId,
+              ),
+            );
+
+            const registryTrackIds =
+              new Set(
+                playlist.tracks
+                  .map(
+                    (
+                      track,
+                    ) =>
+                      track.registry
+                        ?.trackId,
+                  )
+                  .filter(
+                    (
+                      value,
+                    ): value is string =>
+                      Boolean(
+                        value,
+                      ),
+                  ),
+              );
+
+            setSavedTrackIds(
+              new Set(
+                saveRows
+                  .filter(
+                    (
+                      row,
+                    ) =>
+                      row.entity_type ===
+                        "track" &&
+                      typeof row.entity_id ===
+                        "string" &&
+                      registryTrackIds.has(
+                        row.entity_id,
+                      ),
+                  )
+                  .map(
+                    (
+                      row,
+                    ) =>
+                      row.entity_id as string,
+                  ),
+              ),
+            );
+
+            const playlistArtistIds =
+              new Set(
+                playlistArtists.map(
+                  (
+                    artist,
+                  ) =>
+                    artist.artistId,
+                ),
+              );
+
+            setFollowedArtistIds(
+              new Set(
+                followRows
+                  .filter(
+                    (
+                      row,
+                    ) =>
+                      row.target_type ===
+                        "artist" &&
+                      typeof row.target_id ===
+                        "string" &&
+                      playlistArtistIds.has(
+                        row.target_id,
+                      ),
+                  )
+                  .map(
+                    (
+                      row,
+                    ) =>
+                      row.target_id as string,
+                  ),
+              ),
+            );
+          },
+        )
+        .catch(
+          () => {
+            if (
+              !cancelled
+            ) {
+              setPlaylistSaved(
+                false,
+              );
+
+              setSavedTrackIds(
+                new Set(),
+              );
+
+              setFollowedArtistIds(
+                new Set(),
+              );
+            }
+          },
+        );
+
+      return () => {
+        cancelled =
+          true;
+      };
+    },
+    [
+      playlist,
+      playlistArtists,
+      user.id,
+    ],
+  );
 
   const firstPlayableIndex =
     useMemo(
@@ -1063,6 +1555,214 @@ export default function PublicPlaylistDetailPage() {
       null,
   };
 
+  const handlePlaylistSave =
+    async () => {
+      if (
+        playlistSavePending
+      ) {
+        return;
+      }
+
+      const desired =
+        !playlistSaved;
+
+      setPlaylistSavePending(
+        true,
+      );
+
+      try {
+        const result =
+          await setSaved(
+            {
+              entityType:
+                "playlist",
+              entityId:
+                playlist.resourceId,
+              entitySlug:
+                playlist.slug,
+              entityUrl:
+                canonicalUrl,
+              title:
+                playlist.title,
+              subtitle:
+                playlist.curatorLabel ??
+                "WAKILISHA",
+              imageUrl:
+                playlist.cover?.url ??
+                undefined,
+            },
+            desired,
+          );
+
+        if (
+          result
+        ) {
+          setPlaylistSaved(
+            result.saved,
+          );
+        }
+      } finally {
+        setPlaylistSavePending(
+          false,
+        );
+      }
+    };
+
+  const handleTrackSave =
+    async (
+      track: PublicPlaylistTrack,
+    ) => {
+      const trackId =
+        track.registry
+          ?.trackId;
+
+      if (
+        !trackId ||
+        trackSavePendingId
+      ) {
+        return;
+      }
+
+      const desired =
+        !savedTrackIds.has(
+          trackId,
+        );
+
+      setTrackSavePendingId(
+        trackId,
+      );
+
+      try {
+        const result =
+          await setSaved(
+            {
+              entityType:
+                "track",
+              entityId:
+                trackId,
+              entitySlug:
+                track.registry
+                  ?.trackSlug ??
+                undefined,
+              entityUrl:
+                track.registry
+                  ?.trackPath
+                  ? `https://wakilisha.africa${track.registry.trackPath}`
+                  : `${canonicalUrl}#${trackAnchorId(
+                      track,
+                    )}`,
+              title:
+                track.title,
+              subtitle:
+                trackArtistLabel(
+                  track,
+                ),
+              imageUrl:
+                track.artworkUrl ??
+                undefined,
+            },
+            desired,
+          );
+
+        if (
+          result
+        ) {
+          setSavedTrackIds(
+            (
+              current,
+            ) => {
+              const next =
+                new Set(
+                  current,
+                );
+
+              if (
+                result.saved
+              ) {
+                next.add(
+                  trackId,
+                );
+              } else {
+                next.delete(
+                  trackId,
+                );
+              }
+
+              return next;
+            },
+          );
+        }
+      } finally {
+        setTrackSavePendingId(
+          null,
+        );
+      }
+    };
+
+  const handleArtistFollow =
+    async (
+      artist: MusicArtistDiscoveryArtist,
+    ) => {
+      if (
+        followPendingArtistId
+      ) {
+        return;
+      }
+
+      const desired =
+        !followedArtistIds.has(
+          artist.artistId,
+        );
+
+      setFollowPendingArtistId(
+        artist.artistId,
+      );
+
+      try {
+        const result =
+          await setFollow(
+            "artist",
+            artist.artistId,
+            artist.slug ??
+              undefined,
+            desired,
+          );
+
+        if (
+          result
+        ) {
+          setFollowedArtistIds(
+            (
+              current,
+            ) => {
+              const next =
+                new Set(
+                  current,
+                );
+
+              if (
+                result.followed
+              ) {
+                next.add(
+                  artist.artistId,
+                );
+              } else {
+                next.delete(
+                  artist.artistId,
+                );
+              }
+
+              return next;
+            },
+          );
+        }
+      } finally {
+        setFollowPendingArtistId(
+          null,
+        );
+      }
+    };
+
   const openTrackDiscussion =
     (
       track: PublicPlaylistTrack,
@@ -1293,8 +1993,34 @@ export default function PublicPlaylistDetailPage() {
                     </WkButton>
 
                     <div
-                      className="[--wk-text:#ffffff] [--wk-border-2:rgba(255,255,255,0.34)] [&_.wk-button]:bg-white/10 [&_.wk-button:hover]:bg-white/15"
+                      className="flex flex-wrap items-center gap-3 [--wk-text:#ffffff] [--wk-border-2:rgba(255,255,255,0.34)] [&_.wk-button]:bg-white/10 [&_.wk-button:hover]:bg-white/15"
                     >
+                      <WkButton
+                        variant="soft"
+                        onClick={
+                          () => {
+                            void handlePlaylistSave();
+                          }
+                        }
+                        disabled={
+                          playlistSavePending
+                        }
+                      >
+                        <WkIcon
+                          name="Bookmark"
+                          size={
+                            15
+                          }
+                        />
+                        {
+                          playlistSavePending
+                            ? "Updating..."
+                            : playlistSaved
+                              ? "Saved"
+                              : "Save Playlist"
+                        }
+                      </WkButton>
+
                       <ShareButton
                         item={{
                           title:
@@ -1433,6 +2159,23 @@ export default function PublicPlaylistDetailPage() {
                         expandedTrackId ===
                         track.playlistItemResourceId
                       }
+                      saved={
+                        Boolean(
+                          track.registry
+                            ?.trackId &&
+                          savedTrackIds.has(
+                            track.registry.trackId,
+                          ),
+                        )
+                      }
+                      savePending={
+                        Boolean(
+                          track.registry
+                            ?.trackId &&
+                          trackSavePendingId ===
+                            track.registry.trackId,
+                        )
+                      }
                       onPlay={
                         () =>
                           handleTrackPlay(
@@ -1450,6 +2193,13 @@ export default function PublicPlaylistDetailPage() {
                                 ? null
                                 : track.playlistItemResourceId,
                           )
+                      }
+                      onSave={
+                        () => {
+                          void handleTrackSave(
+                            track,
+                          );
+                        }
                       }
                       onDiscuss={
                         () =>
@@ -1469,6 +2219,41 @@ export default function PublicPlaylistDetailPage() {
             </div>
           </section>
         </div>
+
+        <MusicArtistDiscovery
+          heading="Artists in this Playlist"
+          contextLabel={
+            playlist.title
+          }
+          artists={
+            playlistArtists.map(
+              (
+                artist,
+              ) => ({
+                ...artist,
+                followed:
+                  followedArtistIds.has(
+                    artist.artistId,
+                  ),
+                followPending:
+                  followPendingArtistId ===
+                  artist.artistId,
+              }),
+            )
+          }
+          onJumpTo={
+            jumpToTrack
+          }
+          onFollow={
+            (
+              artist,
+            ) => {
+              void handleArtistFollow(
+                artist,
+              );
+            }
+          }
+        />
 
         <CommunitySection
           entity={

@@ -5,7 +5,9 @@ import {
   reactToTarget,
   reportComment,
   followTarget,
+  setFollowState,
   saveEntity,
+  setSavedState,
   createContribution,
 } from '@/services/community';
 import { useAuthUser } from '@/hooks/useAuthUser';
@@ -183,6 +185,168 @@ export function useEntityActions(userId?: string) {
     [effectiveUserId, requireVerified]
   );
 
+  const setFollow = useCallback(
+    async (
+      targetType: string,
+      targetId: string,
+      targetSlug: string | undefined,
+      followed: boolean
+    ) => {
+      const pendingEntity: CommunityEntity = {
+        type:
+          targetType as CommunityEntity['type'],
+        id:
+          targetId,
+        slug:
+          targetSlug,
+        url:
+          typeof window !== 'undefined'
+            ? window.location.href
+            : '/',
+        title:
+          targetSlug || targetId,
+      };
+
+      if (!effectiveUserId) {
+        if (followed) {
+          stashPendingCommunityAction({
+            action: 'follow',
+            entity: pendingEntity,
+          });
+        }
+
+        redirectTo(
+          buildCommunityAuthUrl()
+        );
+
+        return null;
+      }
+
+      if (
+        !requireVerified(
+          followed
+            ? {
+                action: 'follow',
+                entity: pendingEntity,
+              }
+            : undefined
+        )
+      ) {
+        return null;
+      }
+
+      setLoading(true);
+
+      try {
+        return await setFollowState({
+          targetType,
+          targetId,
+          targetSlug,
+          followed,
+        });
+      } finally {
+        setLoading(false);
+      }
+    },
+    [
+      effectiveUserId,
+      requireVerified,
+    ]
+  );
+
+  const setSaved = useCallback(
+    async (
+      entity: {
+        entityType: string;
+        entityId: string;
+        entitySlug?: string;
+        entityUrl?: string;
+        title: string;
+        subtitle?: string;
+        imageUrl?: string;
+      },
+      saved: boolean
+    ) => {
+      const pendingEntity: CommunityEntity = {
+        type:
+          entity.entityType as CommunityEntity['type'],
+        id:
+          entity.entityId,
+        slug:
+          entity.entitySlug,
+        url:
+          entity.entityUrl ||
+          (
+            typeof window !== 'undefined'
+              ? window.location.href
+              : '/'
+          ),
+        title:
+          entity.title,
+        subtitle:
+          entity.subtitle,
+        imageUrl:
+          entity.imageUrl,
+      };
+
+      if (!effectiveUserId) {
+        if (saved) {
+          stashPendingCommunityAction({
+            action: 'save',
+            entity: pendingEntity,
+          });
+        }
+
+        redirectTo(
+          buildCommunityAuthUrl()
+        );
+
+        return null;
+      }
+
+      if (
+        !requireVerified(
+          saved
+            ? {
+                action: 'save',
+                entity: pendingEntity,
+              }
+            : undefined
+        )
+      ) {
+        return null;
+      }
+
+      setLoading(true);
+
+      try {
+        return await setSavedState({
+          entityType:
+            entity.entityType as CommunityEntity['type'],
+          entityId:
+            entity.entityId,
+          entitySlug:
+            entity.entitySlug,
+          entityUrl:
+            entity.entityUrl,
+          title:
+            entity.title,
+          subtitle:
+            entity.subtitle,
+          imageUrl:
+            entity.imageUrl,
+          saved,
+        });
+      } finally {
+        setLoading(false);
+      }
+    },
+    [
+      effectiveUserId,
+      requireVerified,
+    ]
+  );
+
   const contribute = useCallback(
     async (input: {
       sourceCommentId?: string;
@@ -219,7 +383,9 @@ export function useEntityActions(userId?: string) {
 
   return {
     follow,
+    setFollow,
     save,
+    setSaved,
     contribute,
     loading,
   };

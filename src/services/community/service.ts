@@ -16,7 +16,9 @@ import type {
   ReactInput,
   ReportInput,
   FollowInput,
+  SetFollowStateInput,
   SaveEntityInput,
+  SetSavedStateInput,
   CreateContributionInput,
   CommentSortOptions,
   ThreadResult,
@@ -263,6 +265,58 @@ export async function reportComment(input: ReportInput): Promise<{ report: unkno
   });
   if (error) throw error;
   return { report: data.report };
+}
+
+export async function setFollowState(
+  input: SetFollowStateInput
+): Promise<{ followed: boolean }> {
+  const { data, error } = await supabase.rpc(
+    'community_set_follow_state',
+    {
+      p_target_type: input.targetType,
+      p_target_id: input.targetId,
+      p_target_slug: input.targetSlug || '',
+      p_followed: input.followed,
+    }
+  );
+
+  if (error) throw error;
+
+  return {
+    followed:
+      Boolean(
+        (data as { followed?: boolean } | null)
+          ?.followed
+      ),
+  };
+}
+
+export async function setSavedState(
+  input: SetSavedStateInput
+): Promise<{ saved: boolean }> {
+  const { data, error } = await supabase.rpc(
+    'community_set_saved_state',
+    {
+      p_entity_type: input.entityType,
+      p_entity_id: input.entityId,
+      p_entity_slug: input.entitySlug || '',
+      p_entity_url: input.entityUrl || '',
+      p_title: input.title,
+      p_subtitle: input.subtitle || '',
+      p_image_url: input.imageUrl || '',
+      p_saved: input.saved,
+    }
+  );
+
+  if (error) throw error;
+
+  return {
+    saved:
+      Boolean(
+        (data as { saved?: boolean } | null)
+          ?.saved
+      ),
+  };
 }
 
 export async function followTarget(input: FollowInput): Promise<{ followed: boolean }> {
