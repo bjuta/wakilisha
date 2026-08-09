@@ -17,6 +17,18 @@ export interface PublicPlaylistPlayback {
   appleMusicCatalogId: string | null;
 }
 
+export interface PublicPlaylistArtist {
+  artistId: string;
+  artistSlug: string | null;
+  name: string;
+  imageUrl: string | null;
+  role: string | null;
+  isPrimary: boolean;
+  isFeatured: boolean;
+  creditOrder: number | null;
+  displayCredit: string | null;
+}
+
 export interface PublicPlaylistRegistryLink {
   trackId: string;
   trackSlug: string | null;
@@ -35,6 +47,7 @@ export interface PublicPlaylistTrack {
   position: number;
   title: string;
   artistNames: string[];
+  artists: PublicPlaylistArtist[];
   releaseTitle: string | null;
   artworkUrl: string | null;
   durationMs: number | null;
@@ -211,6 +224,44 @@ function decodeRegistry(
   };
 }
 
+function decodeArtist(
+  value: unknown,
+): PublicPlaylistArtist | null {
+  const input = record(value);
+
+  const artistId =
+    stringValue(input.artist_id);
+
+  const name =
+    stringValue(input.name);
+
+  if (
+    !artistId ||
+    !name
+  ) {
+    return null;
+  }
+
+  return {
+    artistId,
+    artistSlug:
+      nullableString(input.artist_slug),
+    name,
+    imageUrl:
+      nullableString(input.image_url),
+    role:
+      nullableString(input.role),
+    isPrimary:
+      input.is_primary === true,
+    isFeatured:
+      input.is_featured === true,
+    creditOrder:
+      nullableNumber(input.credit_order),
+    displayCredit:
+      nullableString(input.display_credit),
+  };
+}
+
 function decodeTrack(
   value: unknown,
 ): PublicPlaylistTrack | null {
@@ -236,6 +287,15 @@ function decodeTrack(
       "Untitled track",
     artistNames:
       stringArray(input.artist_names),
+    artists:
+      array(input.artists)
+        .map(decodeArtist)
+        .filter(
+          (
+            artist,
+          ): artist is PublicPlaylistArtist =>
+            artist !== null,
+        ),
     releaseTitle:
       nullableString(input.release_title),
     artworkUrl:

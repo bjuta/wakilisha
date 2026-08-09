@@ -1,9 +1,9 @@
 {
   "projectRef": "pgzizndxdyhqmtyywjmt",
   "schema": "public",
-  "generatedAt": "2026-08-09T14:02:01Z",
+  "generatedAt": "2026-08-09T15:06:24Z",
   "typesSha256": "ff411155224a520f4090aa6861b1e12b8a108afd9901a4545cca80f00c823a4c",
   "authoritativeMigrationDirectory": "supabase/migrations",
-  "migrationCount": 222,
-  "latestMigration": "20260809132712_phase_5b_community_emoji_reactions.sql"
+  "migrationCount": 223,
+  "latestMigration": "20260809145028_phase_5b_playlist_artist_identity_snapshot.sql"
 }
