@@ -17053,6 +17053,28 @@ export type Database = {
         }
         Returns: Json
       }
+      community_set_follow_state: {
+        Args: {
+          p_followed: boolean
+          p_target_id: string
+          p_target_slug: string
+          p_target_type: string
+        }
+        Returns: Json
+      }
+      community_set_saved_state: {
+        Args: {
+          p_entity_id: string
+          p_entity_slug: string
+          p_entity_type: string
+          p_entity_url: string
+          p_image_url: string
+          p_saved: boolean
+          p_subtitle: string
+          p_title: string
+        }
+        Returns: Json
+      }
       community_soft_delete_comment: {
         Args: { p_comment_id: string }
         Returns: Json

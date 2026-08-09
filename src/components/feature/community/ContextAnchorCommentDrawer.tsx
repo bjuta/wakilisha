@@ -20,7 +20,10 @@ import { CommentCard } from "@/components/feature/community/CommentCard";
 import { CommentComposer, LoginToComment } from "@/components/feature/community/CommentComposer";
 import { WkIcon } from "@/components/design-system/Icon";
 
-type SupportedAnchor = Extract<CommentAnchorType, "release_track" | "chart_entry">;
+type SupportedAnchor = Extract<
+  CommentAnchorType,
+  "release_track" | "chart_entry" | "playlist_track"
+>;
 
 export interface ContextAnchorTarget {
   anchorType: SupportedAnchor;
@@ -165,7 +168,26 @@ export function ContextAnchorCommentDrawer({
 
   if (!open || !target) return null;
 
-  const eyebrow = target.anchorType === "release_track" ? "Release track discussion" : "Chart entry discussion";
+  const eyebrow =
+    target.anchorType === "release_track"
+      ? "Release track discussion"
+      : target.anchorType === "playlist_track"
+        ? "Discussion"
+        : "Chart entry discussion";
+
+  const anchorIcon =
+    target.anchorType === "release_track"
+      ? "Disc3"
+      : target.anchorType === "playlist_track"
+        ? "ListMusic"
+        : "BarChart3";
+
+  const emptyDiscussionCopy =
+    target.anchorType === "release_track"
+      ? "Start a focused thread around this track on the release."
+      : target.anchorType === "playlist_track"
+        ? "Be the first to say something about this track here."
+        : "Start a focused thread around this chart entry.";
 
   if (typeof document === "undefined") return null;
 
@@ -192,7 +214,7 @@ export function ContextAnchorCommentDrawer({
                   <img src={target.imageUrl} alt="" className="h-full w-full object-cover" />
                 ) : (
                   <div className="flex h-full w-full items-center justify-center text-[var(--wk-brand)]">
-                    <WkIcon name={target.anchorType === "release_track" ? "Disc3" : "BarChart3"} size={22} />
+                    <WkIcon name={anchorIcon} size={22} />
                   </div>
                 )}
               </div>
@@ -258,7 +280,7 @@ export function ContextAnchorCommentDrawer({
               </div>
               <p className="text-[14px] font-black text-[var(--wk-text)]">No discussion here yet</p>
               <p className="mx-auto mt-1 max-w-[280px] text-[12px] leading-relaxed text-[var(--wk-text-muted)]">
-                Start a focused thread around this exact release track or chart entry.
+                {emptyDiscussionCopy}
               </p>
             </div>
           ) : (

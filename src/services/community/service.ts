@@ -180,7 +180,7 @@ export async function getContextAnchorComments(input: ContextAnchorCommentQuery)
 
 export async function getContextAnchorSummary(
   threadId: string,
-  anchorType?: 'release_track' | 'chart_entry' | null,
+  anchorType?: 'release_track' | 'chart_entry' | 'playlist_track' | null,
   limit: number = 8
 ): Promise<ContextAnchorSummaryItem[]> {
   const { data, error } = await supabase.rpc('community_get_context_anchor_summary', {

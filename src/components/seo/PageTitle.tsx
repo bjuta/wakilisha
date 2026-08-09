@@ -16,6 +16,7 @@ type SeoKind =
   | "artist"
   | "track"
   | "release"
+  | "playlist"
   | "chart"
   | "guide"
   | "profile"
@@ -28,7 +29,7 @@ interface SeoModel {
   description: string;
   canonicalPath: string;
   robots: SeoRobots;
-  ogType: "website" | "article" | "profile" | "music.song" | "music.album";
+  ogType: "website" | "article" | "profile" | "music.song" | "music.album" | "music.playlist";
   kind: SeoKind;
   image?: string;
   entityName?: string;
@@ -46,6 +47,13 @@ const STATIC_ROUTES: Record<string, Omit<SeoModel, "canonicalPath" | "jsonLd">> 
   "/charts": {
     title: "African music charts",
     description: "Explore WAKILISHA charts across African music scenes, markets, artists, tracks, and releases.",
+    robots: "index, follow",
+    ogType: "website",
+    kind: "collection",
+  },
+  "/playlists": {
+    title: "Playlists",
+    description: "Curated music from WAKILISHA, including new releases, deep cuts, scenes, moods, and moments worth hearing.",
     robots: "index, follow",
     ogType: "website",
     kind: "collection",
@@ -247,6 +255,7 @@ function pageSchema(model: SeoModel, url: string): Record<string, unknown> {
   if (model.kind === "artist") return { ...base, "@type": "ProfilePage", about: { "@type": "MusicGroup", name: entityName } };
   if (model.kind === "track") return { ...base, about: { "@type": "MusicRecording", name: entityName } };
   if (model.kind === "release") return { ...base, about: { "@type": "MusicAlbum", name: entityName } };
+  if (model.kind === "playlist") return { ...base, about: { "@type": "MusicPlaylist", name: entityName } };
   if (model.kind === "chart" || model.kind === "collection") return { ...base, "@type": "CollectionPage" };
   if (model.kind === "profile") return { ...base, "@type": "ProfilePage", about: { "@type": "Person", name: entityName } };
 
@@ -388,6 +397,31 @@ function modelFromPath(pathname: string): SeoModel {
       ogType: "music.album",
       kind: "release",
       jsonLd: [],
+    };
+  }
+
+  if (section === "playlists" && parts[1]) {
+    const title =
+      titleCase(
+        parts[1],
+      );
+
+    return {
+      title,
+      description:
+        firstSentence(
+          `${title}, a curated WAKILISHA Playlist.`,
+        ),
+      canonicalPath:
+        path,
+      robots:
+        "index, follow",
+      ogType:
+        "music.playlist",
+      kind:
+        "playlist",
+      jsonLd:
+        [],
     };
   }
 
