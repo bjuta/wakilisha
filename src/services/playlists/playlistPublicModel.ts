@@ -69,6 +69,64 @@ export interface PublicPlaylistCover {
   credit: string | null;
 }
 
+export interface PublicPlaylistProvenance {
+  versionNumber: number;
+  contentFingerprint: string | null;
+  sourceAuthorityRevision: number | null;
+  publishedAt: string | null;
+  firstPublishedAt: string | null;
+  publishedBy: string | null;
+  commandReceiptId: string | null;
+}
+
+export interface PublicPlaylistCredit {
+  resourceId: string;
+  resourceKind: string;
+  displayOrder: number;
+  isPrimary: boolean;
+  creditId: string;
+  role: string;
+  roleLabel: string | null;
+  displayName: string;
+  note: string | null;
+  authorSlug: string | null;
+  username: string | null;
+}
+
+export interface PublicPlaylistCitationSource {
+  sourceId: string;
+  sourceVersionId: string;
+  type: string;
+  title: string;
+  creator: string | null;
+  publisher: string | null;
+  url: string | null;
+  publicationDate: string | null;
+  creditLine: string | null;
+}
+
+export interface PublicPlaylistCitation {
+  resourceId: string;
+  resourceKind: string;
+  displayOrder: number;
+  purpose: string;
+  anchorType: string;
+  anchor: Record<string, unknown>;
+  citationId: string;
+  publicLabel: string | null;
+  locatorType: string;
+  locator: Record<string, unknown>;
+  source: PublicPlaylistCitationSource;
+}
+
+export interface PublicPlaylistCorrection {
+  id: string;
+  resourceId: string;
+  resourceKind: string;
+  note: string;
+  publishedAt: string | null;
+}
+
 export interface PublicPlaylist {
   playlistId: string;
   resourceId: string;
@@ -81,10 +139,10 @@ export interface PublicPlaylist {
   cover: PublicPlaylistCover | null;
   itemCount: number;
   tracks: PublicPlaylistTrack[];
-  provenance: UnknownRecord;
-  credits: unknown[];
-  citations: unknown[];
-  corrections: unknown[];
+  provenance: PublicPlaylistProvenance;
+  credits: PublicPlaylistCredit[];
+  citations: PublicPlaylistCitation[];
+  corrections: PublicPlaylistCorrection[];
 }
 
 export interface PublicPlaylistListItem {
@@ -342,6 +400,287 @@ function decodeCover(
   };
 }
 
+function decodeProvenance(
+  value: unknown,
+): PublicPlaylistProvenance {
+  const input =
+    record(
+      value,
+    );
+
+  return {
+    versionNumber:
+      numberValue(
+        input.version_number,
+      ),
+    contentFingerprint:
+      nullableString(
+        input.content_fingerprint,
+      ),
+    sourceAuthorityRevision:
+      nullableNumber(
+        input.source_authority_revision,
+      ),
+    publishedAt:
+      nullableString(
+        input.published_at,
+      ),
+    firstPublishedAt:
+      nullableString(
+        input.first_published_at,
+      ),
+    publishedBy:
+      nullableString(
+        input.published_by,
+      ),
+    commandReceiptId:
+      nullableString(
+        input.command_receipt_id,
+      ),
+  };
+}
+
+function decodeCredit(
+  value: unknown,
+): PublicPlaylistCredit | null {
+  const input =
+    record(
+      value,
+    );
+
+  const creditId =
+    stringValue(
+      input.credit_id,
+    );
+
+  const displayName =
+    stringValue(
+      input.display_name,
+    );
+
+  if (
+    !creditId ||
+    !displayName
+  ) {
+    return null;
+  }
+
+  return {
+    resourceId:
+      stringValue(
+        input.resource_id,
+      ),
+    resourceKind:
+      stringValue(
+        input.resource_kind,
+      ),
+    displayOrder:
+      numberValue(
+        input.display_order,
+      ),
+    isPrimary:
+      input.is_primary ===
+      true,
+    creditId,
+    role:
+      stringValue(
+        input.role,
+      ),
+    roleLabel:
+      nullableString(
+        input.role_label,
+      ),
+    displayName,
+    note:
+      nullableString(
+        input.note,
+      ),
+    authorSlug:
+      nullableString(
+        input.author_slug,
+      ),
+    username:
+      nullableString(
+        input.username,
+      ),
+  };
+}
+
+function decodeCitationSource(
+  value: unknown,
+): PublicPlaylistCitationSource | null {
+  const input =
+    record(
+      value,
+    );
+
+  const sourceId =
+    stringValue(
+      input.source_id,
+    );
+
+  const sourceVersionId =
+    stringValue(
+      input.source_version_id,
+    );
+
+  const title =
+    stringValue(
+      input.title,
+    );
+
+  if (
+    !sourceId ||
+    !sourceVersionId ||
+    !title
+  ) {
+    return null;
+  }
+
+  return {
+    sourceId,
+    sourceVersionId,
+    type:
+      stringValue(
+        input.type,
+      ),
+    title,
+    creator:
+      nullableString(
+        input.creator,
+      ),
+    publisher:
+      nullableString(
+        input.publisher,
+      ),
+    url:
+      nullableString(
+        input.url,
+      ),
+    publicationDate:
+      nullableString(
+        input.publication_date,
+      ),
+    creditLine:
+      nullableString(
+        input.credit_line,
+      ),
+  };
+}
+
+function decodeCitation(
+  value: unknown,
+): PublicPlaylistCitation | null {
+  const input =
+    record(
+      value,
+    );
+
+  const citationId =
+    stringValue(
+      input.citation_id,
+    );
+
+  const resourceId =
+    stringValue(
+      input.resource_id,
+    );
+
+  const source =
+    decodeCitationSource(
+      input.source,
+    );
+
+  if (
+    !citationId ||
+    !resourceId ||
+    !source
+  ) {
+    return null;
+  }
+
+  return {
+    resourceId,
+    resourceKind:
+      stringValue(
+        input.resource_kind,
+      ),
+    displayOrder:
+      numberValue(
+        input.display_order,
+      ),
+    purpose:
+      stringValue(
+        input.purpose,
+      ),
+    anchorType:
+      stringValue(
+        input.anchor_type,
+      ),
+    anchor:
+      record(
+        input.anchor,
+      ),
+    citationId,
+    publicLabel:
+      nullableString(
+        input.public_label,
+      ),
+    locatorType:
+      stringValue(
+        input.locator_type,
+      ),
+    locator:
+      record(
+        input.locator,
+      ),
+    source,
+  };
+}
+
+function decodeCorrection(
+  value: unknown,
+): PublicPlaylistCorrection | null {
+  const input =
+    record(
+      value,
+    );
+
+  const id =
+    stringValue(
+      input.id,
+    );
+
+  const note =
+    stringValue(
+      input.note,
+    );
+
+  if (
+    !id ||
+    !note
+  ) {
+    return null;
+  }
+
+  return {
+    id,
+    resourceId:
+      stringValue(
+        input.resource_id,
+      ),
+    resourceKind:
+      stringValue(
+        input.resource_kind,
+      ),
+    note,
+    publishedAt:
+      nullableString(
+        input.published_at,
+      ),
+  };
+}
+
 export function decodePublicPlaylist(
   value: unknown,
 ): PublicPlaylist | null {
@@ -400,13 +739,42 @@ export function decodePublicPlaylist(
             a.position - b.position,
         ),
     provenance:
-      record(input.provenance),
+      decodeProvenance(
+        input.provenance,
+      ),
     credits:
-      array(input.credits),
+      array(input.credits)
+        .map(
+          decodeCredit,
+        )
+        .filter(
+          (
+            credit,
+          ): credit is PublicPlaylistCredit =>
+            credit !== null,
+        ),
     citations:
-      array(input.citations),
+      array(input.citations)
+        .map(
+          decodeCitation,
+        )
+        .filter(
+          (
+            citation,
+          ): citation is PublicPlaylistCitation =>
+            citation !== null,
+        ),
     corrections:
-      array(input.corrections),
+      array(input.corrections)
+        .map(
+          decodeCorrection,
+        )
+        .filter(
+          (
+            correction,
+          ): correction is PublicPlaylistCorrection =>
+            correction !== null,
+        ),
   };
 }
 

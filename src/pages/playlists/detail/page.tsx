@@ -34,6 +34,9 @@ import {
   type MusicArtistDiscoveryArtist,
 } from "@/components/design-system/music/MusicArtistDiscovery";
 import {
+  PublicTrustSummary,
+} from "@/components/design-system/trust/PublicTrustSummary";
+import {
   ContextAnchorCommentDrawer,
   type ContextAnchorTarget,
 } from "@/components/feature/community/ContextAnchorCommentDrawer";
@@ -60,6 +63,7 @@ import {
 import {
   toPlayerQueue,
   type PublicPlaylist,
+  type PublicPlaylistCitation,
   type PublicPlaylistTrack,
 } from "@/services/playlists/playlistPublicModel";
 
@@ -184,6 +188,277 @@ function trackAnchorId(
   track: PublicPlaylistTrack,
 ): string {
   return `track-${track.playlistItemResourceId}`;
+}
+
+function humanizeTrustToken(
+  value: string,
+): string {
+  const normalized =
+    value
+      .trim()
+      .replace(
+        /[_-]+/g,
+        " ",
+      );
+
+  if (!normalized) {
+    return "";
+  }
+
+  return normalized
+    .split(
+      /\s+/,
+    )
+    .map(
+      (
+        word,
+      ) =>
+        word.charAt(
+          0,
+        ).toUpperCase() +
+        word.slice(
+          1,
+        ),
+    )
+    .join(
+      " ",
+    );
+}
+
+function locatorScalar(
+  value: unknown,
+): string | null {
+  if (
+    typeof value ===
+      "string" &&
+    value.trim()
+  ) {
+    return value.trim();
+  }
+
+  if (
+    typeof value ===
+      "number" &&
+    Number.isFinite(
+      value,
+    )
+  ) {
+    return String(
+      value,
+    );
+  }
+
+  return null;
+}
+
+function citationLocatorLabel(
+  citation: PublicPlaylistCitation,
+): string | null {
+  const locator =
+    citation.locator;
+
+  const startPage =
+    locatorScalar(
+      locator.start_page,
+    );
+
+  const endPage =
+    locatorScalar(
+      locator.end_page,
+    );
+
+  if (
+    startPage &&
+    endPage
+  ) {
+    return `Pages ${startPage} to ${endPage}`;
+  }
+
+  const page =
+    locatorScalar(
+      locator.page,
+    );
+
+  if (page) {
+    return `Page ${page}`;
+  }
+
+  const paragraph =
+    locatorScalar(
+      locator.paragraph,
+    );
+
+  if (paragraph) {
+    return `Paragraph ${paragraph}`;
+  }
+
+  const chapter =
+    locatorScalar(
+      locator.chapter,
+    );
+
+  if (chapter) {
+    return `Chapter ${chapter}`;
+  }
+
+  const section =
+    locatorScalar(
+      locator.section_heading,
+    );
+
+  if (section) {
+    return section;
+  }
+
+  const milliseconds =
+    typeof locator.milliseconds ===
+      "number"
+      ? locator.milliseconds
+      : null;
+
+  if (
+    milliseconds !==
+      null &&
+    Number.isFinite(
+      milliseconds,
+    )
+  ) {
+    return `Timestamp ${formatDuration(
+      milliseconds,
+    )}`;
+  }
+
+  if (
+    citation.locatorType ===
+      "whole_source" ||
+    !citation.locatorType
+  ) {
+    return null;
+  }
+
+  return humanizeTrustToken(
+    citation.locatorType,
+  );
+}
+
+function playlistTrustContextLabel(
+  playlist: PublicPlaylist,
+  resourceId: string,
+): string | null {
+  if (
+    resourceId ===
+    playlist.resourceId
+  ) {
+    return "Playlist";
+  }
+
+  const track =
+    playlist.tracks.find(
+      (
+        item,
+      ) =>
+        item.playlistItemResourceId ===
+        resourceId,
+    );
+
+  if (!track) {
+    return null;
+  }
+
+  return `Track ${String(
+    track.position,
+  ).padStart(
+    2,
+    "0",
+  )} · ${track.title}`;
+}
+
+function buildPlaylistTrustPresentation(
+  playlist: PublicPlaylist,
+) {
+  return {
+    credits:
+      playlist.credits.map(
+        (
+          credit,
+        ) => ({
+          id:
+            credit.creditId,
+          displayName:
+            credit.displayName,
+          roleLabel:
+            credit.roleLabel ??
+            humanizeTrustToken(
+              credit.role,
+            ) ??
+            "Contributor",
+          note:
+            credit.note,
+          href:
+            credit.authorSlug
+              ? `/authors/${credit.authorSlug}`
+              : credit.username
+                ? `/u/${credit.username}`
+                : null,
+          contextLabel:
+            playlistTrustContextLabel(
+              playlist,
+              credit.resourceId,
+            ),
+        }),
+      ),
+    sources:
+      playlist.citations.map(
+        (
+          citation,
+        ) => ({
+          id:
+            citation.citationId,
+          label:
+            citation.publicLabel ??
+            citation.source.title,
+          title:
+            citation.source.title,
+          creator:
+            citation.source.creator,
+          publisher:
+            citation.source.publisher,
+          url:
+            citation.source.url,
+          publicationDate:
+            citation.source.publicationDate,
+          creditLine:
+            citation.source.creditLine,
+          locatorLabel:
+            citationLocatorLabel(
+              citation,
+            ),
+          contextLabel:
+            playlistTrustContextLabel(
+              playlist,
+              citation.resourceId,
+            ),
+        }),
+      ),
+    corrections:
+      playlist.corrections.map(
+        (
+          correction,
+        ) => ({
+          id:
+            correction.id,
+          note:
+            correction.note,
+          publishedAt:
+            correction.publishedAt,
+          contextLabel:
+            playlistTrustContextLabel(
+              playlist,
+              correction.resourceId,
+            ),
+        }),
+      ),
+  };
 }
 
 function PlaylistTrackArtistLinks({
@@ -1009,6 +1284,19 @@ export default function PublicPlaylistDetailPage() {
               playlist,
             )
           : [],
+      [
+        playlist,
+      ],
+    );
+
+  const playlistTrust =
+    useMemo(
+      () =>
+        playlist
+          ? buildPlaylistTrustPresentation(
+              playlist,
+            )
+          : null,
       [
         playlist,
       ],
@@ -2254,6 +2542,36 @@ export default function PublicPlaylistDetailPage() {
             }
           }
         />
+
+        {
+          playlistTrust
+            ? (
+                <PublicTrustSummary
+                  provenance={{
+                    firstPublishedAt:
+                      playlist.provenance
+                        .firstPublishedAt,
+                    publishedAt:
+                      playlist.provenance
+                        .publishedAt,
+                    versionNumber:
+                      playlist.provenance
+                        .versionNumber ||
+                      playlist.versionNumber,
+                  }}
+                  credits={
+                    playlistTrust.credits
+                  }
+                  sources={
+                    playlistTrust.sources
+                  }
+                  corrections={
+                    playlistTrust.corrections
+                  }
+                />
+              )
+            : null
+        }
 
         <CommunitySection
           entity={
