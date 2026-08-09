@@ -1,9 +1,9 @@
 {
   "projectRef": "pgzizndxdyhqmtyywjmt",
   "schema": "public",
-  "generatedAt": "2026-08-09T05:54:26Z",
+  "generatedAt": "2026-08-09T08:41:44Z",
   "typesSha256": "21e54d9ab4d6c3f78cdb55f1d797113afacced6a87e82b6b3d265226c9aaec46",
   "authoritativeMigrationDirectory": "supabase/migrations",
-  "migrationCount": 218,
-  "latestMigration": "20260809052707_phase_5b_playlist_publication_read_model.sql"
+  "migrationCount": 219,
+  "latestMigration": "20260809083837_phase_5b_playlist_registry_apple_playback_identity.sql"
 }

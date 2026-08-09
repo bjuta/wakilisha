@@ -89,6 +89,52 @@ The global player remains responsible for:
 - desktop PlayerDock
 - MobileFullPlayer
 
+## Provider playback canvas
+
+The global player may use provider SDKs and embedded playback engines, but
+provider playback does not create a second WAKILISHA player.
+
+WAKILISHA remains responsible for:
+
+- queue state
+- current track state
+- play and pause controls
+- seeking
+- next and previous
+- volume
+- repeat and shuffle
+- persistent playback
+- listening history
+- analytics
+
+Provider rendering requirements are respected inside a global provider canvas.
+
+For YouTube, the provider canvas must retain a compliant visible player viewport.
+It must not use an invisible or zero-sized iframe. WAKILISHA controls remain the
+primary playback controls.
+
+When the full player is open, the provider canvas occupies the media presentation
+area normally used by artwork.
+
+When the global player is collapsed, provider playback that requires a visible
+viewport must remain visibly represented without creating independent playback
+state or provider-specific queue controls.
+
+SoundCloud playback is controlled through its Widget API behind the same global
+player state.
+
+The provider canvas must remain part of the persistent player layer so route
+navigation does not create a new playback session.
+
+Phase 5B does not create a video-native WAKILISHA player. YouTube playback
+uses the existing global player's media slot only because the provider requires
+a visible embedded player. WAKILISHA continues to own queue state, transport,
+seeking, volume, repeat, shuffle, listening history, and navigation persistence.
+
+Video-specific presentation, video-native controls, picture-in-picture,
+orientation behavior, and other dedicated video product work remain outside
+Phase 5B and belong to the later Video phase.
+
 ## Normalized playback descriptor
 
 The public Playlist read model exposes one normalized playback descriptor per
@@ -224,3 +270,11 @@ M218 passes when:
 11. public correction notes reuse shared Corrections
 12. mixed provider items receive normalized global-player descriptors
 13. no provider-specific user-facing player is introduced
+
+## Playback acceptance checkpoint
+
+Phase 5B playback runtime acceptance proved one global WAKILISHA player across preview audio, Apple Music, YouTube, and SoundCloud-backed Playlist items. Provider switching is exclusive, seeking is synchronized with WAKILISHA state, full-player expansion preserves playback, and navigation preserves the active queue and position.
+
+Registry-backed tracks may carry Apple Music catalog identity independently of their primary Playlist playback engine. When Apple Music is connected, full Apple playback takes precedence over preview audio. Siaka was accepted as the real production-backed proof of this behavior through Registry Apple Music song identity `1882060090`.
+
+The collapsed mobile player seek interaction remains deferred to dedicated player UI work. Full-player mobile seeking and playback correctness are accepted. Phase 5B does not add further interaction complexity to the collapsed mobile dock.

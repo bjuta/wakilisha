@@ -12,6 +12,9 @@ export function PlayerDock() {
     next,
     prev,
     progress,
+    currentTime,
+    duration,
+    seek,
     canGoNext,
     canGoPrev,
     isFullPlayerOpen,
@@ -22,7 +25,53 @@ export function PlayerDock() {
 
   const activeSourceLabel = playbackSourceLabel || currentTrack.source || null;
   const hasAppleCatalog = Boolean(currentTrack.appleMusicCatalogId || currentTrack.appleMusicId);
-  const isPlayable = currentTrack.isPlayable !== false && (!!currentTrack.previewUrl || hasAppleCatalog);
+  const hasProviderPlayback =
+    currentTrack.playbackEngine ===
+      "youtube" ||
+    currentTrack.playbackEngine ===
+      "soundcloud";
+
+  const isPlayable =
+    currentTrack.isPlayable !== false &&
+    (
+      !!currentTrack.previewUrl ||
+      hasAppleCatalog ||
+      hasProviderPlayback
+    );
+
+  const seekFromClientX = (
+    clientX: number,
+    element: HTMLDivElement,
+  ) => {
+    if (
+      !duration ||
+      duration <= 0
+    ) {
+      return;
+    }
+
+    const rect =
+      element
+        .getBoundingClientRect();
+
+    const ratio =
+      Math.max(
+        0,
+        Math.min(
+          1,
+          (
+            clientX -
+            rect.left
+          ) /
+            rect.width,
+        ),
+      );
+
+    seek(
+      ratio *
+        duration,
+    );
+  };
 
   const handleExpandToggle = () => {
     if (isFullPlayerOpen) {
@@ -34,16 +83,140 @@ export function PlayerDock() {
 
   return (
     <div className={`sticky bottom-0 border-t border-[var(--wk-border)] bg-[var(--wk-surface)] ${isFullPlayerOpen ? 'z-[100]' : 'z-[80]'}`}>
-      {/* Progress bar */}
-      <div className="h-1 w-full bg-[var(--wk-surface-raised)]">
-        <div
-          className="h-full bg-[var(--wk-brand)] transition-all duration-1000 ease-linear"
-          style={{ width: `${progress * 100}%` }}
-        />
+      {/* Universal seek bar */}
+      <div
+        role="slider"
+        tabIndex={
+          duration > 0
+            ? 0
+            : -1
+        }
+        aria-label={`Seek ${currentTrack.title}`}
+        aria-valuemin={0}
+        aria-valuemax={
+          Math.max(
+            0,
+            Math.round(
+              duration || 0,
+            ),
+          )
+        }
+        aria-valuenow={
+          Math.max(
+            0,
+            Math.round(
+              currentTime || 0,
+            ),
+          )
+        }
+        className={[
+          "group relative h-8 w-full touch-none md:h-3",
+          duration > 0
+            ? "cursor-pointer"
+            : "cursor-default",
+        ].join(" ")}
+        onPointerDown={(event) => {
+          if (
+            !duration ||
+            duration <= 0
+          ) {
+            return;
+          }
+
+          event.currentTarget
+            .setPointerCapture(
+              event.pointerId,
+            );
+
+          seekFromClientX(
+            event.clientX,
+            event.currentTarget,
+          );
+        }}
+        onPointerMove={(event) => {
+          if (
+            !event.currentTarget
+              .hasPointerCapture(
+                event.pointerId,
+              )
+          ) {
+            return;
+          }
+
+          seekFromClientX(
+            event.clientX,
+            event.currentTarget,
+          );
+        }}
+        onPointerUp={(event) => {
+          if (
+            event.currentTarget
+              .hasPointerCapture(
+                event.pointerId,
+              )
+          ) {
+            event.currentTarget
+              .releasePointerCapture(
+                event.pointerId,
+              );
+          }
+        }}
+        onPointerCancel={(event) => {
+          if (
+            event.currentTarget
+              .hasPointerCapture(
+                event.pointerId,
+              )
+          ) {
+            event.currentTarget
+              .releasePointerCapture(
+                event.pointerId,
+              );
+          }
+        }}
+        onKeyDown={(event) => {
+          if (
+            event.key ===
+            "ArrowLeft"
+          ) {
+            event.preventDefault();
+            seek(
+              Math.max(
+                0,
+                currentTime -
+                  5,
+              ),
+            );
+          }
+
+          if (
+            event.key ===
+            "ArrowRight"
+          ) {
+            event.preventDefault();
+            seek(
+              Math.min(
+                duration,
+                currentTime +
+                  5,
+              ),
+            );
+          }
+        }}
+      >
+        <div className="absolute inset-x-0 top-1 h-1 bg-[var(--wk-surface-raised)]">
+          <div
+            className="h-full bg-[var(--wk-brand)]"
+            style={{
+              width:
+                `${progress * 100}%`,
+            }}
+          />
+        </div>
       </div>
 
       <div className="flex h-[var(--wk-player-dock-h)] items-center gap-3 px-4">
-        {/* Track info — clickable */}
+        {/* Track info. Clickable. */}
         <button
           onClick={() => {
             if (!isFullPlayerOpen) openFullPlayer();
