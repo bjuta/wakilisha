@@ -70,6 +70,7 @@ import {
   buildVerifyEmailUrl,
 } from "@/services/auth/accountVerification";
 import {
+  publicPlaylistTrackArtistLabel,
   toPlayerQueue,
   type PublicPlaylist,
   type PublicPlaylistCitation,
@@ -102,24 +103,6 @@ function formatDuration(
     2,
     "0",
   )}`;
-}
-
-function trackArtistLabel(
-  track: PublicPlaylistTrack,
-): string {
-  if (
-    track.artistNames.length > 0
-  ) {
-    return track.artistNames.join(
-      ", ",
-    );
-  }
-
-  return (
-    track.registry
-      ?.primaryArtistName ??
-    "Unknown artist"
-  );
 }
 
 function playlistSummary(
@@ -481,7 +464,7 @@ function PlaylistTrackArtistLinks({
     return (
       <>
         {
-          trackArtistLabel(
+          publicPlaylistTrackArtistLabel(
             track,
           )
         }
@@ -731,7 +714,7 @@ function PlaylistTrackRow({
     );
 
   const artist =
-    trackArtistLabel(
+    publicPlaylistTrackArtistLabel(
       track,
     );
 
@@ -2003,7 +1986,7 @@ export default function PublicPlaylistDetailPage() {
               title:
                 track.title,
               subtitle:
-                trackArtistLabel(
+                publicPlaylistTrackArtistLabel(
                   track,
                 ),
               imageUrl:
@@ -2117,7 +2100,7 @@ export default function PublicPlaylistDetailPage() {
       track: PublicPlaylistTrack,
     ) => {
       const artist =
-        trackArtistLabel(
+        publicPlaylistTrackArtistLabel(
           track,
         );
 
@@ -2214,7 +2197,7 @@ export default function PublicPlaylistDetailPage() {
                   "@type":
                     "MusicGroup" as const,
                   name:
-                    trackArtistLabel(
+                    publicPlaylistTrackArtistLabel(
                       track,
                     ),
                   url:
@@ -2451,14 +2434,14 @@ export default function PublicPlaylistDetailPage() {
                     label:
                       track.title,
                     meta:
-                      trackArtistLabel(
+                      publicPlaylistTrackArtistLabel(
                         track,
                       ),
                     searchText:
                       [
                         track.position,
                         track.title,
-                        trackArtistLabel(
+                        publicPlaylistTrackArtistLabel(
                           track,
                         ),
                       ].join(
