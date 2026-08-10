@@ -16263,6 +16263,15 @@ export type Database = {
           track_credit_count: number
         }[]
       }
+      admin_select_registry_track_intake_provider_evidence: {
+        Args: {
+          p_provider: string
+          p_provider_entity_id: string
+          p_reason?: string
+          p_suggestion_id: string
+        }
+        Returns: Json
+      }
       admin_update_registry_track_intake_artist_credit: {
         Args: {
           p_credit_order: number
