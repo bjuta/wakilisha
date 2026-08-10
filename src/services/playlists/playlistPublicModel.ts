@@ -848,6 +848,49 @@ export function decodePublicPlaylistCollection(
     );
 }
 
+export function publicPlaylistTrackArtistNames(
+  track: PublicPlaylistTrack,
+): string[] {
+  const canonicalNames =
+    track.artists
+      .map(
+        (artist) =>
+          artist.name.trim(),
+      )
+      .filter(Boolean);
+
+  if (
+    canonicalNames.length > 0
+  ) {
+    return canonicalNames;
+  }
+
+  if (
+    track.artistNames.length > 0
+  ) {
+    return track.artistNames;
+  }
+
+  const primaryArtistName =
+    track.registry
+      ?.primaryArtistName
+      ?.trim();
+
+  return primaryArtistName
+    ? [primaryArtistName]
+    : ["Unknown artist"];
+}
+
+export function publicPlaylistTrackArtistLabel(
+  track: PublicPlaylistTrack,
+): string {
+  return publicPlaylistTrackArtistNames(
+    track,
+  ).join(
+    ", ",
+  );
+}
+
 function playbackSourceLabel(
   track: PublicPlaylistTrack,
 ): string | undefined {
@@ -895,9 +938,9 @@ export function toPlayerTrack(
     title:
       track.title,
     artist:
-      track.artistNames.join(", ") ||
-      track.registry?.primaryArtistName ||
-      "Unknown artist",
+      publicPlaylistTrackArtistLabel(
+        track,
+      ),
     artworkUrl:
       track.artworkUrl ?? undefined,
     album:
