@@ -19954,6 +19954,10 @@ export type Database = {
         Args: { reason?: string; target_user_id: string }
         Returns: boolean
       }
+      sync_registry_track_intake_artist_credits: {
+        Args: { p_registry_track_id: string; p_suggestion_id: string }
+        Returns: Json
+      }
       text_soundex: { Args: { "": string }; Returns: string }
       track_analytics_event: {
         Args: {
