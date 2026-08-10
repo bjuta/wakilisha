@@ -108,6 +108,11 @@ interface EnrichmentEnvelope {
     provider: string;
     provider_entity_id: string;
     provider_url: string | null;
+    match_status:
+      | "candidate"
+      | "confirmed"
+      | "superseded"
+      | "rejected";
     confidence_score: number | null;
   }>;
 }
@@ -1004,32 +1009,47 @@ export default function TrackIntakePage() {
         [suggestionId]: inspection,
       }));
 
-      const usefulFields = Object.fromEntries(
-        Object.entries(inspectionFields)
-          .filter(([field, value]) =>
-            enrichmentFieldOrder.includes(
-              field as (typeof enrichmentFieldOrder)[number],
-            ) &&
-            value !== null &&
-            value !== undefined &&
-            value !== "",
-          ),
-      );
-
-      setAcceptedFields((current) => ({
-        ...current,
-        [suggestionId]: {
-          ...(current[suggestionId] ?? {}),
-          ...usefulFields,
-        },
-      }));
-
       await loadEnrichment(suggestionId);
     } catch (reason) {
       setError(
         reason instanceof Error
           ? reason.message
           : "Provider inspection failed.",
+      );
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  async function selectProviderIdentity(
+    row: IntakeRow,
+    inspection: ProviderInspection,
+  ) {
+    const suggestionId = row.suggestion_id;
+
+    setBusy(`provider-select:${suggestionId}`);
+    setError(null);
+
+    try {
+      await untypedRpc(
+        "admin_select_registry_track_intake_provider_evidence",
+        {
+          p_suggestion_id: suggestionId,
+          p_provider: inspection.provider,
+          p_provider_entity_id:
+            inspection.providerEntityId,
+          p_reason:
+            reviewNotes[suggestionId] ||
+            "Selected during Track Intake review.",
+        },
+      );
+
+      await loadEnrichment(suggestionId);
+    } catch (reason) {
+      setError(
+        reason instanceof Error
+          ? reason.message
+          : "Provider identity could not be selected.",
       );
     } finally {
       setBusy(null);
@@ -1374,6 +1394,22 @@ export default function TrackIntakePage() {
                 providerChoice[suggestionId] ?? "apple_music";
               const inspection =
                 providerInspection[suggestionId] ?? null;
+              const providerLinks =
+                enrichment[suggestionId]?.provider_links ?? [];
+              const inspectionProviderLink =
+                inspection
+                  ? providerLinks.find(
+                      (link) =>
+                        link.provider === inspection.provider &&
+                        link.provider_entity_id ===
+                          inspection.providerEntityId,
+                    ) ?? null
+                  : null;
+              const inspectionSelected =
+                inspectionProviderLink?.match_status ===
+                "confirmed";
+              const selectingProvider =
+                busy === `provider-select:${suggestionId}`;
               const accepted =
                 acceptedFields[suggestionId] ?? {};
               const persistedAccepted =
@@ -1705,6 +1741,59 @@ export default function TrackIntakePage() {
                               </span>
                             </div>
 
+                            <div className="mb-3 flex flex-wrap items-center justify-between gap-3 rounded-lg border border-wk-border bg-wk-bg p-3">
+                              <div>
+                                <div className="text-[10px] font-black uppercase tracking-wide text-wk-text-faint">
+                                  Provider identity
+                                </div>
+                                <p className="mt-1 text-xs leading-5 text-wk-text-muted">
+                                  Inspecting stages evidence only. It does not select a provider identity or accept fields.
+                                </p>
+                              </div>
+                              <button
+                                onClick={() =>
+                                  inspection
+                                    ? void selectProviderIdentity(
+                                        row,
+                                        inspection,
+                                      )
+                                    : undefined
+                                }
+                                disabled={
+                                  busy !== null ||
+                                  inspectionSelected
+                                }
+                                className="wk-button wk-button-primary wk-button-sm disabled:opacity-40"
+                              >
+                                {selectingProvider ? (
+                                  <>
+                                    <WkIcon
+                                      name="Loader2"
+                                      size={13}
+                                      className="animate-spin"
+                                    />
+                                    Selecting...
+                                  </>
+                                ) : inspectionSelected ? (
+                                  <>
+                                    <WkIcon
+                                      name="CheckCircle2"
+                                      size={13}
+                                    />
+                                    Provider match selected
+                                  </>
+                                ) : (
+                                  <>
+                                    <WkIcon
+                                      name="Link"
+                                      size={13}
+                                    />
+                                    Use as provider match
+                                  </>
+                                )}
+                              </button>
+                            </div>
+
                             <div className="grid gap-2 sm:grid-cols-2">
                               {enrichmentFieldOrder.map(
                                 (field) => {
@@ -1724,7 +1813,9 @@ export default function TrackIntakePage() {
                                     Object.prototype.hasOwnProperty.call(
                                       accepted,
                                       field,
-                                    );
+                                    ) &&
+                                    String(accepted[field] ?? "") ===
+                                      String(value ?? "");
 
                                   return (
                                     <label
@@ -1788,6 +1879,24 @@ export default function TrackIntakePage() {
                             <div className="text-[10px] font-black uppercase tracking-wide text-wk-text-faint">
                               Evidence already staged
                             </div>
+
+                            {providerLinks.length > 0 ? (
+                              <div className="mt-2 flex flex-wrap gap-2">
+                                {providerLinks.map((link) => (
+                                  <span
+                                    key={`${link.provider}:${link.provider_entity_id}`}
+                                    className="rounded-full bg-wk-surface px-2 py-1 text-[9px] font-bold text-wk-text-muted"
+                                  >
+                                    {humanize(link.provider)}{" "}
+                                    {link.provider_entity_id}{" "}
+                                    <strong className="text-wk-text">
+                                      {humanize(link.match_status)}
+                                    </strong>
+                                  </span>
+                                ))}
+                              </div>
+                            ) : null}
+
                             <div className="mt-2 grid gap-2 sm:grid-cols-2">
                               {enrichmentFieldOrder.map(
                                 (field) => {
