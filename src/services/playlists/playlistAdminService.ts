@@ -45,6 +45,7 @@ export interface PlaylistRecord {
   title: string;
   slug: string;
   description: string | null;
+  curatorCreditId: string | null;
   curatorLabel: string | null;
   status: string;
   authorityRevision: number;
@@ -79,17 +80,63 @@ export interface PlaylistReviewEvent {
   result_version_id?: string | null;
 }
 
+export interface PlaylistCuratorIdentity {
+  creditId: string;
+  role: string;
+  displayName: string;
+  authorSlug: string | null;
+  username: string | null;
+  registryAuthorId: string | null;
+  userId: string | null;
+  publicSafe: boolean;
+  creditState: string;
+  governanceRevision: number;
+}
+
+export interface PlaylistSchedule {
+  id: string;
+  versionId: string;
+  runAfter: string;
+  status: string;
+  note: string | null;
+  createdBy: string | null;
+  createdAt: string;
+  updatedAt: string;
+  publishedAt: string | null;
+  failureReason: string | null;
+}
+
+export interface PlaylistLifecycleEvent {
+  id: string;
+  eventNumber: number;
+  versionId: string | null;
+  action: string;
+  priorStatus: string | null;
+  resultingStatus: string;
+  note: string | null;
+  metadata: AnyObject;
+  actorId: string | null;
+  commandReceiptId: string | null;
+  createdAt: string;
+}
+
 export interface PlaylistReviewWorkspace {
   resourceId: string;
   currentWorkingVersionId: string | null;
   currentSubmittedVersionId: string | null;
   currentApprovedVersionId: string | null;
+  currentPublishedVersionId: string | null;
   workingVersion: AnyObject | null;
   submittedVersion: AnyObject | null;
   approvedVersion: AnyObject | null;
+  publishedVersion: AnyObject | null;
+  curator: PlaylistCuratorIdentity | null;
+  schedule: PlaylistSchedule | null;
   reviewEvents: PlaylistReviewEvent[];
+  lifecycleEvents: PlaylistLifecycleEvent[];
   canEdit: boolean;
   canManageReview: boolean;
+  canPublish: boolean;
 }
 
 export interface PlaylistPendingRegistryArtistCredit {
@@ -177,6 +224,36 @@ export interface PlaylistCommandResult {
   playlistItemId?: string;
   lifecycleStatus?: string;
   versionId?: string;
+  versionNumber?: number;
+  resultPayload?: AnyObject;
+}
+
+export type PlaylistCuratorSelection =
+  | {
+      kind: "registry_author";
+      registryAuthorId: string;
+    }
+  | {
+      kind: "user";
+      userId: string;
+    }
+  | {
+      kind: "none";
+    };
+
+export interface PlaylistPreviewLink {
+  nonce: string;
+  expiresAt: string;
+  versionId: string;
+}
+
+export interface PlaylistCuratorCandidate {
+  kind: "registry_author" | "user";
+  id: string;
+  displayName: string;
+  slug: string | null;
+  username: string | null;
+  avatarUrl: string | null;
 }
 
 function objectValue(value: unknown): AnyObject {
@@ -241,6 +318,14 @@ function commandResult(row: AnyObject): PlaylistCommandResult {
     versionId:
       nullableString(row.version_id ?? payload.version_id) ??
       undefined,
+    versionNumber:
+      row.version_number === null &&
+      payload.version_number === undefined
+        ? undefined
+        : numberValue(
+            row.version_number ?? payload.version_number,
+          ),
+    resultPayload: payload,
   };
 }
 
@@ -301,6 +386,7 @@ function playlistFromWorkspace(
     title: String(row.title ?? ""),
     slug: String(row.slug ?? ""),
     description: nullableString(row.description),
+    curatorCreditId: nullableString(row.curator_credit_id),
     curatorLabel: nullableString(row.curator_label),
     status: String(row.status ?? "draft"),
     authorityRevision: numberValue(row.authority_revision, 1),
@@ -341,6 +427,72 @@ function reviewWorkspaceFrom(value: unknown): PlaylistReviewWorkspace | null {
   const row = objectValue(value);
   if (!row.resource_id) return null;
 
+  const curatorRow = objectValue(row.curator);
+  const scheduleRow = objectValue(row.schedule);
+
+  const curator: PlaylistCuratorIdentity | null =
+    curatorRow.credit_id
+      ? {
+          creditId: String(curatorRow.credit_id),
+          role: String(curatorRow.role ?? "curator"),
+          displayName: String(curatorRow.display_name ?? ""),
+          authorSlug: nullableString(curatorRow.author_slug),
+          username: nullableString(curatorRow.username),
+          registryAuthorId:
+            nullableString(curatorRow.registry_author_id),
+          userId: nullableString(curatorRow.user_id),
+          publicSafe: curatorRow.public_safe === true,
+          creditState: String(
+            curatorRow.credit_state ?? "active",
+          ),
+          governanceRevision: numberValue(
+            curatorRow.governance_revision,
+            1,
+          ),
+        }
+      : null;
+
+  const schedule: PlaylistSchedule | null =
+    scheduleRow.id
+      ? {
+          id: String(scheduleRow.id),
+          versionId: String(scheduleRow.version_id ?? ""),
+          runAfter: String(scheduleRow.run_after ?? ""),
+          status: String(scheduleRow.status ?? ""),
+          note: nullableString(scheduleRow.note),
+          createdBy: nullableString(scheduleRow.created_by),
+          createdAt: String(scheduleRow.created_at ?? ""),
+          updatedAt: String(scheduleRow.updated_at ?? ""),
+          publishedAt: nullableString(scheduleRow.published_at),
+          failureReason:
+            nullableString(scheduleRow.failure_reason),
+        }
+      : null;
+
+  const lifecycleEvents: PlaylistLifecycleEvent[] =
+    Array.isArray(row.lifecycle_events)
+      ? row.lifecycle_events.map((eventValue) => {
+          const event = objectValue(eventValue);
+          return {
+            id: String(event.id ?? ""),
+            eventNumber: numberValue(event.event_number),
+            versionId: nullableString(event.version_id),
+            action: String(event.action ?? ""),
+            priorStatus:
+              nullableString(event.prior_status),
+            resultingStatus: String(
+              event.resulting_status ?? "",
+            ),
+            note: nullableString(event.note),
+            metadata: objectValue(event.metadata),
+            actorId: nullableString(event.actor_id),
+            commandReceiptId:
+              nullableString(event.command_receipt_id),
+            createdAt: String(event.created_at ?? ""),
+          };
+        })
+      : [];
+
   return {
     resourceId: String(row.resource_id),
     currentWorkingVersionId:
@@ -349,17 +501,25 @@ function reviewWorkspaceFrom(value: unknown): PlaylistReviewWorkspace | null {
       nullableString(row.current_submitted_version_id),
     currentApprovedVersionId:
       nullableString(row.current_approved_version_id),
+    currentPublishedVersionId:
+      nullableString(row.current_published_version_id),
     workingVersion:
       row.working_version ? objectValue(row.working_version) : null,
     submittedVersion:
       row.submitted_version ? objectValue(row.submitted_version) : null,
     approvedVersion:
       row.approved_version ? objectValue(row.approved_version) : null,
+    publishedVersion:
+      row.published_version ? objectValue(row.published_version) : null,
+    curator,
+    schedule,
     reviewEvents: Array.isArray(row.review_events)
       ? (row.review_events as PlaylistReviewEvent[])
       : [],
+    lifecycleEvents,
     canEdit: row.can_edit === true,
     canManageReview: row.can_manage_review === true,
+    canPublish: row.can_publish === true,
   };
 }
 
@@ -492,13 +652,11 @@ export async function createPlaylist(input: {
   title: string;
   slug: string;
   description?: string;
-  curatorLabel?: string;
 }): Promise<{ playlistId: string; resourceId: string }> {
   const { data, error } = await supabase.rpc("create_playlist", {
     p_title: input.title.trim(),
     p_slug: input.slug.trim(),
     p_description: input.description?.trim() || null,
-    p_curator_label: input.curatorLabel?.trim() || null,
     p_metadata: {},
     p_idempotency_key: idempotencyKey("create"),
     p_correlation_id: correlationId(),
@@ -520,7 +678,6 @@ export async function updatePlaylistMetadata(
     title: string;
     slug: string;
     description: string | null;
-    curator_label: string | null;
   },
 ): Promise<PlaylistCommandResult> {
   const { data, error } = await supabase.rpc(
@@ -1024,6 +1181,68 @@ export async function movePlaylistPendingRegistryIntake(
 }
 
 
+export async function searchPlaylistCuratorCandidates(
+  query: string,
+): Promise<PlaylistCuratorCandidate[]> {
+  const normalized = query.trim();
+  if (normalized.length < 2) return [];
+
+  const pattern = `%${escapeLike(normalized)}%`;
+
+  const [authorResponse, userResponse] = await Promise.all([
+    supabase
+      .from("registry_authors")
+      .select("id,name,slug,avatar_url")
+      .ilike("name", pattern)
+      .order("name", { ascending: true })
+      .limit(12),
+    supabase
+      .from("user_profiles")
+      .select(
+        "user_id,display_name,username,avatar_url,status,is_public",
+      )
+      .eq("status", "active")
+      .eq("is_public", true)
+      .ilike("display_name", pattern)
+      .order("display_name", { ascending: true })
+      .limit(12),
+  ]);
+
+  if (authorResponse.error) {
+    throw authorResponse.error;
+  }
+
+  const authors: PlaylistCuratorCandidate[] =
+    (authorResponse.data ?? []).map((author) => ({
+      kind: "registry_author",
+      id: author.id,
+      displayName: author.name,
+      slug: author.slug,
+      username: null,
+      avatarUrl: author.avatar_url,
+    }));
+
+  const users: PlaylistCuratorCandidate[] =
+    userResponse.error
+      ? []
+      : (userResponse.data ?? [])
+          .filter((profile) =>
+            Boolean(profile.display_name?.trim()),
+          )
+          .map((profile) => ({
+            kind: "user",
+            id: profile.user_id,
+            displayName: profile.display_name?.trim() ?? "",
+            slug: null,
+            username: profile.username,
+            avatarUrl: profile.avatar_url,
+          }));
+
+  return [...authors, ...users].sort((left, right) =>
+    left.displayName.localeCompare(right.displayName),
+  );
+}
+
 export async function searchRegistryArtists(
   query: string,
 ): Promise<RegistryArtistSearchResult[]> {
@@ -1255,6 +1474,210 @@ export async function resolvePlaylistItemMatch(
   );
   if (error) throw error;
   return commandResult(firstRpcRow(data, "Match Playlist track"));
+}
+
+export async function setPlaylistCurator(
+  playlistId: string,
+  expectedRevision: number,
+  selection: PlaylistCuratorSelection,
+): Promise<PlaylistCommandResult> {
+  const data = await invokeUntypedRpc(
+    "set_playlist_curator",
+    {
+      p_playlist_id: playlistId,
+      p_expected_authority_revision: expectedRevision,
+      p_registry_author_id:
+        selection.kind === "registry_author"
+          ? selection.registryAuthorId
+          : null,
+      p_user_id:
+        selection.kind === "user"
+          ? selection.userId
+          : null,
+      p_idempotency_key:
+        idempotencyKey("curator-set"),
+      p_correlation_id: correlationId(),
+    },
+  );
+
+  return commandResult(
+    firstRpcRow(data, "Set Playlist Curator"),
+  );
+}
+
+export async function createPlaylistPreviewLink(
+  playlistId: string,
+  versionId?: string | null,
+  expiresAt?: string | null,
+): Promise<PlaylistPreviewLink> {
+  const { data, error } = await supabase.rpc(
+    "create_playlist_preview_link",
+    {
+      p_playlist_id: playlistId,
+      ...(versionId
+        ? { p_version_id: versionId }
+        : {}),
+      ...(expiresAt
+        ? { p_expires_at: expiresAt }
+        : {}),
+    },
+  );
+
+  if (error) throw error;
+  const row = firstRpcRow(
+    data,
+    "Create Playlist Preview",
+  );
+
+  return {
+    nonce: String(row.nonce),
+    expiresAt: String(row.expires_at),
+    versionId: String(row.version_id),
+  };
+}
+
+export async function schedulePlaylistPublication(
+  playlistId: string,
+  expectedRevision: number,
+  approvedVersionId: string,
+  publishAt: string,
+  note?: string,
+): Promise<PlaylistCommandResult> {
+  const { data, error } = await supabase.rpc(
+    "schedule_playlist_publication",
+    {
+      p_playlist_id: playlistId,
+      p_expected_authority_revision: expectedRevision,
+      p_approved_version_id: approvedVersionId,
+      p_publish_at: publishAt,
+      p_idempotency_key:
+        idempotencyKey("schedule"),
+      p_note: note?.trim() || null,
+      p_correlation_id: correlationId(),
+    },
+  );
+
+  if (error) throw error;
+  return commandResult(
+    firstRpcRow(data, "Schedule Playlist"),
+  );
+}
+
+export async function publishPlaylistVersion(
+  playlistId: string,
+  expectedRevision: number,
+  approvedVersionId: string,
+  note?: string,
+): Promise<PlaylistCommandResult> {
+  const { data, error } = await supabase.rpc(
+    "publish_playlist_version",
+    {
+      p_playlist_id: playlistId,
+      p_expected_authority_revision: expectedRevision,
+      p_approved_version_id: approvedVersionId,
+      p_idempotency_key:
+        idempotencyKey("publish"),
+      p_note: note?.trim() || null,
+      p_correlation_id: correlationId(),
+    },
+  );
+
+  if (error) throw error;
+  return commandResult(
+    firstRpcRow(data, "Publish Playlist"),
+  );
+}
+
+export async function unschedulePlaylistPublication(
+  playlistId: string,
+  expectedRevision: number,
+  note?: string,
+): Promise<PlaylistCommandResult> {
+  const { data, error } = await supabase.rpc(
+    "unschedule_playlist_publication",
+    {
+      p_playlist_id: playlistId,
+      p_expected_authority_revision: expectedRevision,
+      p_idempotency_key:
+        idempotencyKey("unschedule"),
+      p_note: note?.trim() || null,
+      p_correlation_id: correlationId(),
+    },
+  );
+
+  if (error) throw error;
+  return commandResult(
+    firstRpcRow(data, "Unschedule Playlist"),
+  );
+}
+
+export async function unpublishPlaylist(
+  playlistId: string,
+  expectedRevision: number,
+  note?: string,
+): Promise<PlaylistCommandResult> {
+  const { data, error } = await supabase.rpc(
+    "unpublish_playlist",
+    {
+      p_playlist_id: playlistId,
+      p_expected_authority_revision: expectedRevision,
+      p_idempotency_key:
+        idempotencyKey("unpublish"),
+      p_note: note?.trim() || null,
+      p_correlation_id: correlationId(),
+    },
+  );
+
+  if (error) throw error;
+  return commandResult(
+    firstRpcRow(data, "Unpublish Playlist"),
+  );
+}
+
+export async function archivePlaylist(
+  playlistId: string,
+  expectedRevision: number,
+  note?: string,
+): Promise<PlaylistCommandResult> {
+  const { data, error } = await supabase.rpc(
+    "archive_playlist",
+    {
+      p_playlist_id: playlistId,
+      p_expected_authority_revision: expectedRevision,
+      p_idempotency_key:
+        idempotencyKey("archive"),
+      p_note: note?.trim() || null,
+      p_correlation_id: correlationId(),
+    },
+  );
+
+  if (error) throw error;
+  return commandResult(
+    firstRpcRow(data, "Archive Playlist"),
+  );
+}
+
+export async function restorePlaylistFromArchive(
+  playlistId: string,
+  expectedRevision: number,
+  note?: string,
+): Promise<PlaylistCommandResult> {
+  const { data, error } = await supabase.rpc(
+    "restore_playlist_from_archive",
+    {
+      p_playlist_id: playlistId,
+      p_expected_authority_revision: expectedRevision,
+      p_idempotency_key:
+        idempotencyKey("restore"),
+      p_note: note?.trim() || null,
+      p_correlation_id: correlationId(),
+    },
+  );
+
+  if (error) throw error;
+  return commandResult(
+    firstRpcRow(data, "Restore Playlist"),
+  );
 }
 
 export async function snapshotPlaylistWorkingVersion(

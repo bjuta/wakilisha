@@ -24,6 +24,18 @@ const page =
     "utf8",
   );
 
+const metaTags =
+  readFileSync(
+    "src/components/seo/MetaTags.tsx",
+    "utf8",
+  );
+
+const artistDiscovery =
+  readFileSync(
+    "src/components/design-system/music/MusicArtistDiscovery.tsx",
+    "utf8",
+  );
+
 const decoded =
   decodePublicPlaylist({
     playlist_id:
@@ -424,5 +436,65 @@ describe(
           );
       },
     );
+    it(
+      "keeps version-bound Preview observational and non-indexable",
+      () => {
+        expect(page)
+          .toContain(
+            "showPublicActions={",
+          );
+
+        expect(page)
+          .toContain(
+            '"noindex, nofollow, noarchive"',
+          );
+
+        expect(page)
+          .toContain(
+            'mode={\n                    previewNonce',
+          );
+
+        expect(page)
+          .toContain(
+            'previewNonce\n              ? undefined',
+          );
+
+        expect(metaTags)
+          .toContain(
+            "robots?: string",
+          );
+
+        expect(metaTags)
+          .toContain(
+            'setMetaTag("robots", robots)',
+          );
+
+        expect(artistDiscovery)
+          .toContain(
+            "onFollow?:",
+          );
+
+        expect(component)
+          .toContain(
+            '"Preview record"',
+          );
+
+        expect(component)
+          .toContain(
+            "This version is not published.",
+          );
+
+        expect(component)
+          .toContain(
+            '"Previously published "',
+          );
+
+        expect(component)
+          .toContain(
+            '"Preview Version "',
+          );
+      },
+    );
+
   },
 );

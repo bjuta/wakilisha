@@ -3512,6 +3512,10 @@ export type Database = {
         }
         Returns: string[]
       }
+      playlist_version_public_presentation_json: {
+        Args: { p_version_id: string }
+        Returns: Json
+      }
       playlist_version_snapshot_json: {
         Args: { p_version_id: string }
         Returns: Json

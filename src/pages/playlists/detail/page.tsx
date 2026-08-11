@@ -7,6 +7,7 @@ import {
 import {
   Link,
   useParams,
+  useSearchParams,
 } from "react-router-dom";
 import {
   WkIcon,
@@ -58,6 +59,7 @@ import {
 } from "@/context/PlayerContext";
 import {
   getPublicPlaylist,
+  getPublicPlaylistPreview,
 } from "@/services/playlists/playlistPublicService";
 import {
   getUserFollows,
@@ -76,6 +78,9 @@ import {
   type PublicPlaylistCitation,
   type PublicPlaylistTrack,
 } from "@/services/playlists/playlistPublicModel";
+import {
+  PlaylistPreviewModeBanner,
+} from "./components/PlaylistPreviewModeBanner";
 
 function formatDuration(
   milliseconds: number | null,
@@ -669,6 +674,7 @@ function PlaylistTrackRow({
   currentTrackId,
   isPlaying,
   expanded,
+  showPublicActions,
   saved,
   savePending,
   onPlay,
@@ -683,6 +689,7 @@ function PlaylistTrackRow({
   currentTrackId: string | undefined;
   isPlaying: boolean;
   expanded: boolean;
+  showPublicActions: boolean;
   saved: boolean;
   savePending: boolean;
   onPlay: () => void;
@@ -1006,80 +1013,86 @@ function PlaylistTrackRow({
                   : null
               }
 
-              <div className="mt-5 flex flex-wrap items-center gap-3">
-                {
-                  track.registry?.trackId
-                    ? (
+              {
+                showPublicActions
+                  ? (
+                      <div className="mt-5 flex flex-wrap items-center gap-3">
+                        {
+                          track.registry?.trackId
+                            ? (
+                                <button
+                                  type="button"
+                                  onClick={
+                                    onSave
+                                  }
+                                  disabled={
+                                    savePending
+                                  }
+                                  aria-pressed={
+                                    saved
+                                  }
+                                  className="wk-button wk-button-soft"
+                                >
+                                  <WkIcon
+                                    name="Bookmark"
+                                    size={
+                                      14
+                                    }
+                                  />
+                                  {
+                                    savePending
+                                      ? "Updating..."
+                                      : saved
+                                        ? "Saved"
+                                        : "Save track"
+                                  }
+                                </button>
+                              )
+                            : null
+                        }
+
                         <button
                           type="button"
                           onClick={
-                            onSave
-                          }
-                          disabled={
-                            savePending
-                          }
-                          aria-pressed={
-                            saved
+                            onDiscuss
                           }
                           className="wk-button wk-button-soft"
                         >
                           <WkIcon
-                            name="Bookmark"
+                            name="MessageCircle"
                             size={
                               14
                             }
                           />
-                          {
-                            savePending
-                              ? "Updating..."
-                              : saved
-                                ? "Saved"
-                                : "Save track"
-                          }
+                          Discuss this track
                         </button>
-                      )
-                    : null
-                }
 
-                <button
-                  type="button"
-                  onClick={
-                    onDiscuss
-                  }
-                  className="wk-button wk-button-soft"
-                >
-                  <WkIcon
-                    name="MessageCircle"
-                    size={
-                      14
-                    }
-                  />
-                  Discuss this track
-                </button>
-
-                <ShareButton
-                  item={{
-                    title:
-                      `${track.title} by ${artist}`,
-                    subtitle:
-                      `Track ${track.position} · ${playlist.title}`,
-                    description:
-                      track.notes ??
-                      undefined,
-                    imageUrl:
-                      track.artworkUrl ??
-                      playlist.cover?.url ??
-                      undefined,
-                    url:
-                      shareUrl,
-                    type:
-                      "track",
-                  }}
-                  size="label"
-                  variant="light"
-                  label="Share"
-                />
-              </div>
+                        <ShareButton
+                          item={{
+                            title:
+                              `${track.title} by ${artist}`,
+                            subtitle:
+                              `Track ${track.position} · ${playlist.title}`,
+                            description:
+                              track.notes ??
+                              undefined,
+                            imageUrl:
+                              track.artworkUrl ??
+                              playlist.cover?.url ??
+                              undefined,
+                            url:
+                              shareUrl,
+                            type:
+                              "track",
+                          }}
+                          size="label"
+                          variant="light"
+                          label="Share"
+                        />
+                      </div>
+                    )
+                  : null
+              }
             </div>
           </div>
         </div>
@@ -1095,6 +1108,15 @@ export default function PublicPlaylistDetailPage() {
     useParams<{
       slug: string;
     }>();
+
+  const [searchParams] =
+    useSearchParams();
+
+  const previewNonce =
+    searchParams
+      .get("preview")
+      ?.trim() ||
+    null;
 
   const user =
     useAuthUser();
@@ -1272,9 +1294,14 @@ export default function PublicPlaylistDetailPage() {
 
         try {
           const result =
-            await getPublicPlaylist(
-              slug,
-            );
+            previewNonce
+              ? await getPublicPlaylistPreview(
+                  slug,
+                  previewNonce,
+                )
+              : await getPublicPlaylist(
+                  slug,
+                );
 
           setPlaylist(
             result,
@@ -1295,6 +1322,7 @@ export default function PublicPlaylistDetailPage() {
       },
       [
         slug,
+        previewNonce,
       ],
     );
 
@@ -1353,7 +1381,8 @@ export default function PublicPlaylistDetailPage() {
 
       if (
         !playlist ||
-        !user.id
+        !user.id ||
+        previewNonce
       ) {
         setPlaylistSaved(
           false,
@@ -1532,6 +1561,7 @@ export default function PublicPlaylistDetailPage() {
     [
       playlist,
       playlistArtists,
+      previewNonce,
       user.id,
     ],
   );
@@ -2132,6 +2162,10 @@ export default function PublicPlaylistDetailPage() {
 
   return (
     <>
+      {previewNonce ? (
+        <PlaylistPreviewModeBanner />
+      ) : null}
+
       <MetaTags
         title={
           playlist.title
@@ -2147,6 +2181,11 @@ export default function PublicPlaylistDetailPage() {
           canonicalUrl
         }
         type="music.playlist"
+        robots={
+          previewNonce
+            ? "noindex, nofollow, noarchive"
+            : undefined
+        }
       />
 
       <SchemaOrg
@@ -2324,53 +2363,59 @@ export default function PublicPlaylistDetailPage() {
                       }
                     </WkButton>
 
-                    <div
-                      className="flex flex-wrap items-center gap-3 [--wk-text:#ffffff] [--wk-border-2:rgba(255,255,255,0.34)] [&_.wk-button]:bg-white/10 [&_.wk-button:hover]:bg-white/15"
-                    >
-                      <WkButton
-                        variant="soft"
-                        onClick={
-                          () => {
-                            void handlePlaylistSave();
-                          }
-                        }
-                        disabled={
-                          playlistSavePending
-                        }
-                      >
-                        <WkIcon
-                          name="Bookmark"
-                          size={
-                            15
-                          }
-                        />
-                        {
-                          playlistSavePending
-                            ? "Updating..."
-                            : playlistSaved
-                              ? "Saved"
-                              : "Save Playlist"
-                        }
-                      </WkButton>
+                    {
+                      !previewNonce
+                        ? (
+                            <div
+                              className="flex flex-wrap items-center gap-3 [--wk-text:#ffffff] [--wk-border-2:rgba(255,255,255,0.34)] [&_.wk-button]:bg-white/10 [&_.wk-button:hover]:bg-white/15"
+                            >
+                              <WkButton
+                                variant="soft"
+                                onClick={
+                                  () => {
+                                    void handlePlaylistSave();
+                                  }
+                                }
+                                disabled={
+                                  playlistSavePending
+                                }
+                              >
+                                <WkIcon
+                                  name="Bookmark"
+                                  size={
+                                    15
+                                  }
+                                />
+                                {
+                                  playlistSavePending
+                                    ? "Updating..."
+                                    : playlistSaved
+                                      ? "Saved"
+                                      : "Save Playlist"
+                                }
+                              </WkButton>
 
-                      <ShareButton
-                        item={{
-                          title:
-                            playlist.title,
-                          subtitle:
-                            playlist.curatorLabel ??
-                            "WAKILISHA",
-                          description,
-                          imageUrl:
-                            playlist.cover?.url ??
-                            undefined,
-                          url:
-                            shareBaseUrl,
-                          type:
-                            "playlist",
-                        }}
-                      />
-                    </div>
+                              <ShareButton
+                                item={{
+                                  title:
+                                    playlist.title,
+                                  subtitle:
+                                    playlist.curatorLabel ??
+                                    "WAKILISHA",
+                                  description,
+                                  imageUrl:
+                                    playlist.cover?.url ??
+                                    undefined,
+                                  url:
+                                    shareBaseUrl,
+                                  type:
+                                    "playlist",
+                                }}
+                              />
+                            </div>
+                          )
+                        : null
+                    }
                   </div>
                 </div>
               </div>
@@ -2491,6 +2536,9 @@ export default function PublicPlaylistDetailPage() {
                         expandedTrackId ===
                         track.playlistItemResourceId
                       }
+                      showPublicActions={
+                        !previewNonce
+                      }
                       saved={
                         Boolean(
                           track.registry
@@ -2550,27 +2598,33 @@ export default function PublicPlaylistDetailPage() {
               }
             </div>
 
-            <div className="mt-4 flex justify-end">
-              <button
-                type="button"
-                onClick={
-                  openMissingTrackSuggestion
-                }
-                disabled={
-                  user.loading
-                }
-                aria-haspopup="dialog"
-                className="inline-flex items-center gap-2 rounded-full border border-[var(--wk-border)] bg-[var(--wk-surface)] px-4 py-2.5 text-[12px] font-extrabold text-[var(--wk-text-soft)] transition-colors hover:border-[var(--wk-brand)] hover:text-[var(--wk-brand)] disabled:cursor-wait disabled:opacity-50"
-              >
-                <WkIcon
-                  name="ListPlus"
-                  size={
-                    14
-                  }
-                />
-                Suggest a missing track
-              </button>
-            </div>
+            {
+              !previewNonce
+                ? (
+                    <div className="mt-4 flex justify-end">
+                      <button
+                        type="button"
+                        onClick={
+                          openMissingTrackSuggestion
+                        }
+                        disabled={
+                          user.loading
+                        }
+                        aria-haspopup="dialog"
+                        className="inline-flex items-center gap-2 rounded-full border border-[var(--wk-border)] bg-[var(--wk-surface)] px-4 py-2.5 text-[12px] font-extrabold text-[var(--wk-text-soft)] transition-colors hover:border-[var(--wk-brand)] hover:text-[var(--wk-brand)] disabled:cursor-wait disabled:opacity-50"
+                      >
+                        <WkIcon
+                          name="ListPlus"
+                          size={
+                            14
+                          }
+                        />
+                        Suggest a missing track
+                      </button>
+                    </div>
+                  )
+                : null
+            }
           </section>
         </div>
 
@@ -2599,13 +2653,15 @@ export default function PublicPlaylistDetailPage() {
             jumpToTrack
           }
           onFollow={
-            (
-              artist,
-            ) => {
-              void handleArtistFollow(
-                artist,
-              );
-            }
+            previewNonce
+              ? undefined
+              : (
+                  artist,
+                ) => {
+                  void handleArtistFollow(
+                    artist,
+                  );
+                }
           }
         />
 
@@ -2613,6 +2669,11 @@ export default function PublicPlaylistDetailPage() {
           playlistTrust
             ? (
                 <PublicTrustSummary
+                  mode={
+                    previewNonce
+                      ? "preview"
+                      : "public"
+                  }
                   provenance={{
                     firstPublishedAt:
                       playlist.provenance
@@ -2639,68 +2700,76 @@ export default function PublicPlaylistDetailPage() {
             : null
         }
 
-        <CommunitySection
-          entity={
-            communityEntity
-          }
-          user={
-            user
-          }
-        />
+        {
+          !previewNonce
+            ? (
+                <>
+                  <CommunitySection
+                    entity={
+                      communityEntity
+                    }
+                    user={
+                      user
+                    }
+                  />
 
-        <ContributionSheet
-          entity={
-            communityEntity
-          }
-          open={
-            missingTrackSuggestionOpen
-          }
-          onClose={
-            () =>
-              setMissingTrackSuggestionOpen(
-                false,
-              )
-          }
-          userId={
-            user.id ||
-            undefined
-          }
-          initialType="missing_track"
-          allowedTypes={[
-            "missing_track",
-          ]}
-          title="Suggest a missing track"
-          submitLabel="Submit suggestion"
-          descriptionLabel="Anything else we should know?"
-          descriptionPlaceholder="Optional context about why this track belongs here."
-          reviewNote="Suggestions are reviewed by our editorial team."
-          playlistSubmission={{
-            playlistId:
-              playlist.playlistId,
-            playlistSlug:
-              playlist.slug,
-          }}
-        />
+                  <ContributionSheet
+                    entity={
+                      communityEntity
+                    }
+                    open={
+                      missingTrackSuggestionOpen
+                    }
+                    onClose={
+                      () =>
+                        setMissingTrackSuggestionOpen(
+                          false,
+                        )
+                    }
+                    userId={
+                      user.id ||
+                      undefined
+                    }
+                    initialType="missing_track"
+                    allowedTypes={[
+                      "missing_track",
+                    ]}
+                    title="Suggest a missing track"
+                    submitLabel="Submit suggestion"
+                    descriptionLabel="Anything else we should know?"
+                    descriptionPlaceholder="Optional context about why this track belongs here."
+                    reviewNote="Suggestions are reviewed by our editorial team."
+                    playlistSubmission={{
+                      playlistId:
+                        playlist.playlistId,
+                      playlistSlug:
+                        playlist.slug,
+                    }}
+                  />
 
-        <ContextAnchorCommentDrawer
-          open={
-            Boolean(
-              selectedAnchor,
-            )
-          }
-          onClose={
-            () =>
-              setSelectedAnchor(
-                null,
+                  <ContextAnchorCommentDrawer
+                    open={
+                      Boolean(
+                        selectedAnchor,
+                      )
+                    }
+                    onClose={
+                      () =>
+                        setSelectedAnchor(
+                          null,
+                        )
+                    }
+                    entity={
+                      communityEntity
+                    }
+                    target={
+                      selectedAnchor
+                    }
+                  />
+                </>
               )
-          }
-          entity={
-            communityEntity
-          }
-          target={
-            selectedAnchor
-          }
-        />
+            : null
+        }
       </main>
     </>
   );

@@ -60,6 +60,14 @@ describe("Phase 5A Playlist admin product", () => {
       "submit_playlist_for_review",
       "review_playlist",
       "get_playlist_review_workspace",
+      "set_playlist_curator",
+      "create_playlist_preview_link",
+      "schedule_playlist_publication",
+      "publish_playlist_version",
+      "unschedule_playlist_publication",
+      "unpublish_playlist",
+      "archive_playlist",
+      "restore_playlist_from_archive",
     ]) {
       expect(service).toContain(rpc);
     }
@@ -77,6 +85,182 @@ describe("Phase 5A Playlist admin product", () => {
     ]) {
       expect(service).not.toContain(retiredRpc);
     }
+  });
+
+  it("consumes the M232 Playlist lifecycle workspace without direct lifecycle table reads", () => {
+    const service = source(
+      "src/services/playlists/playlistAdminService.ts",
+    );
+
+    for (const field of [
+      "currentPublishedVersionId",
+      "publishedVersion",
+      "curator",
+      "schedule",
+      "lifecycleEvents",
+      "canPublish",
+    ]) {
+      expect(service).toContain(field);
+    }
+
+    expect(service).not.toContain(
+      '.from("playlist_scheduled_publications")',
+    );
+    expect(service).not.toContain(
+      '.from("playlist_lifecycle_events")',
+    );
+    expect(service).not.toContain(
+      '.from("playlist_versions")',
+    );
+  });
+
+  it("retires free-text Curator writes in favor of set_playlist_curator", () => {
+    const service = source(
+      "src/services/playlists/playlistAdminService.ts",
+    );
+    const workspace = source(
+      "src/pages/admin/content/playlists/detail/PlaylistEditorWorkspace.tsx",
+    );
+    const newPage = source(
+      "src/pages/admin/content/playlists/new/page.tsx",
+    );
+
+    const createBlock = service.slice(
+      service.indexOf("export async function createPlaylist"),
+      service.indexOf("export async function updatePlaylistMetadata"),
+    );
+    const metadataBlock = service.slice(
+      service.indexOf("export async function updatePlaylistMetadata"),
+      service.indexOf("export async function setPlaylistCover"),
+    );
+
+    expect(service).toContain("set_playlist_curator");
+    expect(createBlock).not.toContain("curatorLabel");
+    expect(createBlock).not.toContain("p_curator_label");
+    expect(metadataBlock).not.toContain("curator_label");
+    expect(workspace).not.toContain("setCuratorLabel");
+    expect(workspace).not.toContain(
+      "curator_label: curatorLabel",
+    );
+    expect(newPage).not.toContain("setCuratorLabel");
+    expect(newPage).not.toContain("curatorLabel,");
+  });
+
+  it("uses a sticky Playlist editorial shell with autosave and explicit immutable Save", () => {
+    const workspace = source(
+      "src/pages/admin/content/playlists/detail/PlaylistEditorWorkspace.tsx",
+    );
+    const header = source(
+      "src/pages/admin/content/playlists/detail/components/PlaylistEditorHeader.tsx",
+    );
+
+    expect(workspace).toContain("PlaylistEditorHeader");
+    expect(workspace).toContain('setBusy("autosave:metadata")');
+    expect(workspace).toContain("autosave:note:");
+    expect(workspace).toContain(
+      "snapshotPlaylistWorkingVersion",
+    );
+    expect(workspace).toContain(
+      "Save the Playlist before submitting for Review.",
+    );
+    expect(workspace).not.toContain("Save details");
+    expect(workspace).not.toContain("Save note");
+    expect(workspace).not.toContain(">Snapshot<");
+
+    expect(header).toContain("sticky top-0");
+    expect(header).toContain("Saving");
+    expect(header).toContain("Unsaved");
+    expect(header).toContain("All Saved");
+    expect(header).toContain("Save");
+    expect(header).toContain("Details");
+  });
+
+  it("moves Playlist details into a governed drawer with Curator discovery", () => {
+    const workspace = source(
+      "src/pages/admin/content/playlists/detail/PlaylistEditorWorkspace.tsx",
+    );
+    const drawer = source(
+      "src/pages/admin/content/playlists/detail/components/PlaylistDetailsDrawer.tsx",
+    );
+    const service = source(
+      "src/services/playlists/playlistAdminService.ts",
+    );
+
+    expect(workspace).toContain("PlaylistDetailsDrawer");
+    expect(drawer).toContain("createPortal");
+    expect(drawer).toContain("document.body");
+    expect(drawer).toContain("Registry Author");
+    expect(drawer).toContain("WAKILISHA user");
+
+    expect(service).toContain(
+      "searchPlaylistCuratorCandidates",
+    );
+    expect(service).toContain('.from("registry_authors")');
+    expect(service).toContain('.from("user_profiles")');
+    expect(service).toContain('.eq("status", "active")');
+    expect(service).toContain('.eq("is_public", true)');
+    expect(service).toContain("set_playlist_curator");
+  });
+
+  it("surfaces the complete governed Playlist publication lifecycle in the editor shell", () => {
+    const workspace = source(
+      "src/pages/admin/content/playlists/detail/PlaylistEditorWorkspace.tsx",
+    );
+    const service = source(
+      "src/services/playlists/playlistAdminService.ts",
+    );
+
+    for (const rpc of [
+      "publish_playlist_version",
+      "schedule_playlist_publication",
+      "unschedule_playlist_publication",
+      "unpublish_playlist",
+      "archive_playlist",
+      "restore_playlist_from_archive",
+    ]) {
+      expect(service).toContain(rpc);
+    }
+
+    for (const action of [
+      "Submit for Review",
+      "Start Review",
+      "Request changes",
+      "Approve",
+      "Schedule",
+      "Publish",
+      "Unschedule",
+      "Unpublish",
+      "Archive",
+      "Restore",
+    ]) {
+      expect(workspace).toContain(action);
+    }
+  });
+
+  it("keeps Editor's Notes collapsed and autosaved instead of snapshotting on a timer", () => {
+    const workspace = source(
+      "src/pages/admin/content/playlists/detail/PlaylistEditorWorkspace.tsx",
+    );
+
+    expect(workspace).toContain("Editor’s Note");
+    expect(workspace).toContain(
+      "Editor’s Notes save automatically.",
+    );
+
+    const autosaveBlock = workspace.slice(
+      workspace.indexOf("const metadataDirty"),
+      workspace.indexOf("const legacyUnresolvedRegistryCount"),
+    );
+
+    expect(autosaveBlock).toContain(
+      "updatePlaylistMetadata",
+    );
+    expect(autosaveBlock).toContain(
+      "savePlaylistItemNote",
+    );
+    expect(autosaveBlock).not.toContain(
+      "snapshotPlaylistWorkingVersion",
+    );
   });
 
   it("ships list, create, and editor routes in Admin Content", () => {
@@ -668,4 +852,129 @@ describe("Phase 5A Playlist admin product", () => {
       expect(source(file)).not.toContain("—");
     }
   });
+  it("renders Playlist Preview through the exact public Playlist page", () => {
+    const workspace = source(
+      "src/pages/admin/content/playlists/detail/PlaylistEditorWorkspace.tsx",
+    );
+    const adminService = source(
+      "src/services/playlists/playlistAdminService.ts",
+    );
+    const publicService = source(
+      "src/services/playlists/playlistPublicService.ts",
+    );
+    const publicPage = source(
+      "src/pages/playlists/detail/page.tsx",
+    );
+    const previewBanner = source(
+      "src/pages/playlists/detail/components/PlaylistPreviewModeBanner.tsx",
+    );
+    const generatedTypes = source(
+      "src/types/database.types.ts",
+    );
+
+    expect(adminService).toContain(
+      "create_playlist_preview_link",
+    );
+    expect(workspace).toContain(
+      "createPlaylistPreviewLink",
+    );
+    expect(workspace).toContain(
+      "snapshotPlaylistWorkingVersion",
+    );
+    expect(workspace).toContain(
+      "?preview=${encodeURIComponent(",
+    );
+
+    expect(publicService).toContain(
+      "resolve_playlist_preview_nonce",
+    );
+    expect(publicService).toContain(
+      "decodePublicPlaylist(data)",
+    );
+    expect(publicPage).toContain(
+      "useSearchParams",
+    );
+    expect(publicPage).toContain(
+      "getPublicPlaylistPreview",
+    );
+    expect(publicPage).toContain(
+      "<PlaylistPreviewModeBanner />",
+    );
+    expect(previewBanner).toContain(
+      "Version-bound",
+    );
+
+    expect(generatedTypes).toContain(
+      "resolve_playlist_preview_nonce",
+    );
+
+    expect(workspace).not.toContain(
+      "resolvePlaylistPreviewNonce",
+    );
+  });
+
+  it("snapshots published and scheduled moving state before exact Preview", () => {
+    const workspace = source(
+      "src/pages/admin/content/playlists/detail/PlaylistEditorWorkspace.tsx",
+    );
+
+    expect(workspace).toContain(
+      'detail.playlist.status === "scheduled"',
+    );
+    expect(workspace).toContain(
+      'detail.playlist.status === "published"',
+    );
+    expect(workspace).toContain(
+      "snapshotPlaylistWorkingVersion",
+    );
+    expect(workspace).toContain(
+      "shouldSnapshotMovingState",
+    );
+  });
+
+  it("uses the existing autosave state through the correct header prop", () => {
+    const workspace = source(
+      "src/pages/admin/content/playlists/detail/PlaylistEditorWorkspace.tsx",
+    );
+
+    expect(workspace).toContain(
+      'const isAutosaving = busy?.startsWith("autosave:") === true;',
+    );
+    expect(workspace).toContain(
+      "if (isDirty || isAutosaving)",
+    );
+    expect(workspace).toContain(
+      "isSaving={isAutosaving}",
+    );
+    expect(workspace).not.toContain(
+      "isAutosaving={isAutosaving}",
+    );
+    expect(workspace).not.toContain(
+      "if (isDirty || isSaving)",
+    );
+  });
+
+  it("imports Playlist Preview from the Playlist admin service", () => {
+    const workspace = source(
+      "src/pages/admin/content/playlists/detail/PlaylistEditorWorkspace.tsx",
+    );
+
+    const reactImport =
+      workspace.match(
+        /import\s*\{([^}]*)\}\s*from\s*"react";/s,
+      )?.[1] ?? "";
+
+    const serviceImport =
+      workspace.match(
+        /import\s*\{([^}]*)\}\s*from\s*"@\/services\/playlists\/playlistAdminService";/s,
+      )?.[1] ?? "";
+
+    expect(reactImport).not.toContain(
+      "createPlaylistPreviewLink",
+    );
+    expect(serviceImport).toContain(
+      "createPlaylistPreviewLink",
+    );
+  });
+
 });
