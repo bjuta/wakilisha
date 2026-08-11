@@ -977,4 +977,32 @@ describe("Phase 5A Playlist admin product", () => {
     );
   });
 
+  it(
+    "keeps the current published edition live while a saved update re-enters Review",
+    () => {
+      const workspace = source(
+        "src/pages/admin/content/playlists/detail/PlaylistEditorWorkspace.tsx",
+      );
+
+      expect(workspace).toContain(
+        "publishedUpdateReadyForReview",
+      );
+      expect(workspace).toContain(
+        "workingVersion?.content_fingerprint",
+      );
+      expect(workspace).toContain(
+        "publishedVersion?.content_fingerprint",
+      );
+      expect(workspace).toContain(
+        '"Submit Update for Review"',
+      );
+      expect(workspace).toContain(
+        '"Submit this saved update for Review while the current published edition stays live."',
+      );
+      expect(workspace).toContain(
+        'label: "View live"',
+      );
+    },
+  );
+
 });

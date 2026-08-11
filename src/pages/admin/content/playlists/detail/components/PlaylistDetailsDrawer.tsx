@@ -7,8 +7,17 @@ import { createPortal } from "react-dom";
 import { MediaPickerButton } from "@/components/admin/MediaPickerButton";
 import { WkIcon } from "@/components/design-system/Icon";
 import {
+  PlaylistCoverPresentation,
+} from "@/components/media/PlaylistCoverPresentation";
+import {
+  approvePlaylistCoverForPublicUse,
+  fetchPlaylistCoverGovernance,
   searchPlaylistCuratorCandidates,
   type PlaylistCover,
+  type PlaylistCoverConsentStatus,
+  type PlaylistCoverGovernance,
+  type PlaylistCoverPresentationInput,
+  type PlaylistCoverRightsStatus,
   type PlaylistCuratorCandidate,
   type PlaylistCuratorIdentity,
   type PlaylistLifecycleEvent,
@@ -47,6 +56,7 @@ export function PlaylistDetailsDrawer({
   cover,
   coverFallbackUrl,
   onCoverSelect,
+  onCoverPresentationSave,
   onClearCover,
   busy,
   status,
@@ -76,7 +86,13 @@ export function PlaylistDetailsDrawer({
   onClearCurator: () => void;
   cover: PlaylistCover | null;
   coverFallbackUrl: string | null;
-  onCoverSelect: (assetId: string) => void;
+  onCoverSelect: (
+    assetId: string,
+    presentation: PlaylistCoverPresentationInput,
+  ) => void;
+  onCoverPresentationSave: (
+    presentation: PlaylistCoverPresentationInput,
+  ) => void;
   onClearCover: () => void;
   busy: boolean;
   status: string;
@@ -99,6 +115,107 @@ export function PlaylistDetailsDrawer({
   );
   const [scheduleAt, setScheduleAt] = useState("");
   const [scheduleNote, setScheduleNote] = useState("");
+  const [coverAltText, setCoverAltText] = useState("");
+  const [coverCaption, setCoverCaption] = useState("");
+  const [
+    coverGovernance,
+    setCoverGovernance,
+  ] = useState<PlaylistCoverGovernance | null>(null);
+  const [
+    coverGovernanceLoading,
+    setCoverGovernanceLoading,
+  ] = useState(false);
+  const [
+    coverGovernanceSaving,
+    setCoverGovernanceSaving,
+  ] = useState(false);
+  const [
+    coverGovernanceError,
+    setCoverGovernanceError,
+  ] = useState<string | null>(null);
+  const [
+    coverRightsStatus,
+    setCoverRightsStatus,
+  ] = useState<PlaylistCoverRightsStatus | "">("");
+  const [
+    coverConsentStatus,
+    setCoverConsentStatus,
+  ] = useState<PlaylistCoverConsentStatus | "">("");
+  const [
+    coverRightsBasis,
+    setCoverRightsBasis,
+  ] = useState("");
+  const [
+    coverRightsHolder,
+    setCoverRightsHolder,
+  ] = useState("");
+  const [
+    coverApprovalReason,
+    setCoverApprovalReason,
+  ] = useState("");
+
+  useEffect(() => {
+    if (!open) return;
+
+    setCoverAltText(
+      cover?.altText ?? "",
+    );
+    setCoverCaption(
+      cover?.caption ?? "",
+    );
+  }, [
+    cover?.altText,
+    cover?.caption,
+    cover?.usageLinkId,
+    open,
+  ]);
+
+  useEffect(() => {
+    if (!open || !cover?.assetId) {
+      setCoverGovernance(null);
+      setCoverGovernanceError(null);
+      return;
+    }
+
+    let alive = true;
+
+    setCoverGovernanceLoading(true);
+    setCoverGovernanceError(null);
+
+    fetchPlaylistCoverGovernance(
+      cover.assetId,
+    )
+      .then((governance) => {
+        if (!alive) return;
+        setCoverGovernance(
+          governance,
+        );
+      })
+      .catch((reason) => {
+        if (!alive) return;
+        setCoverGovernance(null);
+        setCoverGovernanceError(
+          reason instanceof Error
+            ? reason.message
+            : "Could not read cover governance.",
+        );
+      })
+      .finally(() => {
+        if (alive) {
+          setCoverGovernanceLoading(
+            false,
+          );
+        }
+      });
+
+    return () => {
+      alive = false;
+    };
+  }, [
+    cover?.assetId,
+    cover?.usageLinkId,
+    open,
+  ]);
 
   useEffect(() => {
     if (!open) return;
@@ -397,10 +514,19 @@ export function PlaylistDetailsDrawer({
 
             <div className="aspect-square max-w-[220px] overflow-hidden rounded-xl border border-wk-border bg-wk-bg-subtle">
               {coverUrl ? (
-                <img
+                <PlaylistCoverPresentation
                   src={coverUrl}
-                  alt=""
-                  className="h-full w-full object-cover"
+                  altText={
+                    coverAltText ||
+                    cover?.altText ||
+                    null
+                  }
+                  slug={slug}
+                  title={title}
+                  caption={
+                    coverCaption ||
+                    null
+                  }
                 />
               ) : (
                 <div className="flex h-full flex-col items-center justify-center gap-2 text-wk-text-faint">
@@ -412,6 +538,286 @@ export function PlaylistDetailsDrawer({
               )}
             </div>
 
+            <label className="block">
+              <span className="mb-1 block text-[10px] font-bold text-wk-text-muted">
+                Alt text
+              </span>
+              <input
+                value={coverAltText}
+                onChange={(event) =>
+                  setCoverAltText(
+                    event.target.value,
+                  )
+                }
+                disabled={!canEdit}
+                placeholder="Describe the cover artwork"
+                className="w-full rounded-lg border border-wk-border bg-wk-bg px-3 py-2 text-[11px] text-wk-text outline-none focus:border-wk-brand disabled:opacity-60"
+              />
+            </label>
+
+            <label className="block">
+              <span className="mb-1 block text-[10px] font-bold text-wk-text-muted">
+                Subject label
+              </span>
+              <input
+                value={coverCaption}
+                onChange={(event) =>
+                  setCoverCaption(
+                    event.target.value,
+                  )
+                }
+                disabled={!canEdit}
+                placeholder="Lilac-breasted Roller"
+                className="w-full rounded-lg border border-wk-border bg-wk-bg px-3 py-2 text-[11px] text-wk-text outline-none focus:border-wk-brand disabled:opacity-60"
+              />
+              <span className="mt-1 block text-[9px] leading-4 text-wk-text-faint">
+                This appears below the Playlist title on the cover.
+              </span>
+            </label>
+
+            {cover ? (
+              <div className="rounded-xl border border-wk-border bg-wk-bg-subtle p-3">
+                <div className="flex items-start justify-between gap-3">
+                  <div>
+                    <div className="text-[10px] font-black uppercase tracking-[0.14em] text-wk-text-muted">
+                      Public use
+                    </div>
+                    <p className="mt-1 text-[10px] leading-4 text-wk-text-faint">
+                      Preview and publication use the exact frozen image revision, but Media governance can still block delivery.
+                    </p>
+                  </div>
+
+                  {coverGovernance?.isApprovedPublic ? (
+                    <span className="rounded-full bg-wk-success-soft px-2 py-1 text-[9px] font-black uppercase text-wk-success">
+                      Approved
+                    </span>
+                  ) : (
+                    <span className="rounded-full bg-wk-warning-soft px-2 py-1 text-[9px] font-black uppercase text-wk-warning">
+                      Approval required
+                    </span>
+                  )}
+                </div>
+
+                {coverGovernanceLoading ? (
+                  <div className="mt-3 text-[10px] text-wk-text-faint">
+                    Checking Media governance...
+                  </div>
+                ) : null}
+
+                {coverGovernanceError ? (
+                  <div className="mt-3 rounded-lg bg-wk-danger-soft px-3 py-2 text-[10px] text-wk-danger">
+                    {coverGovernanceError}
+                  </div>
+                ) : null}
+
+                {coverGovernance?.isApprovedPublic ? (
+                  <div className="mt-3 grid grid-cols-2 gap-2 text-[9px] text-wk-text-muted">
+                    <div>
+                      Rights:{" "}
+                      <strong className="text-wk-text">
+                        {humanize(
+                          coverGovernance.rightsStatus,
+                        )}
+                      </strong>
+                    </div>
+                    <div>
+                      Consent:{" "}
+                      <strong className="text-wk-text">
+                        {humanize(
+                          coverGovernance.consentStatus,
+                        )}
+                      </strong>
+                    </div>
+                  </div>
+                ) : canEdit ? (
+                  <div className="mt-3 space-y-3">
+                    <div className="grid gap-3 sm:grid-cols-2">
+                      <label className="block">
+                        <span className="mb-1 block text-[9px] font-bold text-wk-text-muted">
+                          Rights status
+                        </span>
+                        <select
+                          value={coverRightsStatus}
+                          onChange={(event) =>
+                            setCoverRightsStatus(
+                              event.target.value as
+                                PlaylistCoverRightsStatus | "",
+                            )
+                          }
+                          disabled={coverGovernanceSaving}
+                          className="w-full rounded-lg border border-wk-border bg-wk-bg px-3 py-2 text-[10px] text-wk-text outline-none focus:border-wk-brand disabled:opacity-60"
+                        >
+                          <option value="">
+                            Select rights status
+                          </option>
+                          <option value="owned">
+                            Owned
+                          </option>
+                          <option value="licensed">
+                            Licensed
+                          </option>
+                          <option value="public_domain">
+                            Public domain
+                          </option>
+                          <option value="fair_use">
+                            Fair use
+                          </option>
+                        </select>
+                      </label>
+
+                      <label className="block">
+                        <span className="mb-1 block text-[9px] font-bold text-wk-text-muted">
+                          Consent
+                        </span>
+                        <select
+                          value={coverConsentStatus}
+                          onChange={(event) =>
+                            setCoverConsentStatus(
+                              event.target.value as
+                                PlaylistCoverConsentStatus | "",
+                            )
+                          }
+                          disabled={coverGovernanceSaving}
+                          className="w-full rounded-lg border border-wk-border bg-wk-bg px-3 py-2 text-[10px] text-wk-text outline-none focus:border-wk-brand disabled:opacity-60"
+                        >
+                          <option value="">
+                            Select consent status
+                          </option>
+                          <option value="not_required">
+                            Not required
+                          </option>
+                          <option value="granted">
+                            Granted
+                          </option>
+                        </select>
+                      </label>
+                    </div>
+
+                    <label className="block">
+                      <span className="mb-1 block text-[9px] font-bold text-wk-text-muted">
+                        Rights basis
+                      </span>
+                      <input
+                        value={coverRightsBasis}
+                        onChange={(event) =>
+                          setCoverRightsBasis(
+                            event.target.value,
+                          )
+                        }
+                        disabled={coverGovernanceSaving}
+                        placeholder="Why WAKILISHA may publish this artwork"
+                        className="w-full rounded-lg border border-wk-border bg-wk-bg px-3 py-2 text-[10px] text-wk-text outline-none focus:border-wk-brand disabled:opacity-60"
+                      />
+                    </label>
+
+                    <label className="block">
+                      <span className="mb-1 block text-[9px] font-bold text-wk-text-muted">
+                        Rights holder
+                      </span>
+                      <input
+                        value={coverRightsHolder}
+                        onChange={(event) =>
+                          setCoverRightsHolder(
+                            event.target.value,
+                          )
+                        }
+                        disabled={coverGovernanceSaving}
+                        placeholder="Optional"
+                        className="w-full rounded-lg border border-wk-border bg-wk-bg px-3 py-2 text-[10px] text-wk-text outline-none focus:border-wk-brand disabled:opacity-60"
+                      />
+                    </label>
+
+                    <label className="block">
+                      <span className="mb-1 block text-[9px] font-bold text-wk-text-muted">
+                        Approval reason
+                      </span>
+                      <input
+                        value={coverApprovalReason}
+                        onChange={(event) =>
+                          setCoverApprovalReason(
+                            event.target.value,
+                          )
+                        }
+                        disabled={coverGovernanceSaving}
+                        placeholder="Why this cover is approved for public use"
+                        className="w-full rounded-lg border border-wk-border bg-wk-bg px-3 py-2 text-[10px] text-wk-text outline-none focus:border-wk-brand disabled:opacity-60"
+                      />
+                    </label>
+
+                    <button
+                      type="button"
+                      disabled={
+                        busy ||
+                        coverGovernanceSaving ||
+                        !coverRightsStatus ||
+                        !coverConsentStatus ||
+                        !coverRightsBasis.trim() ||
+                        !coverApprovalReason.trim()
+                      }
+                      onClick={async () => {
+                        if (
+                          !coverRightsStatus ||
+                          !coverConsentStatus
+                        ) {
+                          return;
+                        }
+
+                        setCoverGovernanceSaving(
+                          true,
+                        );
+                        setCoverGovernanceError(
+                          null,
+                        );
+
+                        try {
+                          const updated =
+                            await approvePlaylistCoverForPublicUse(
+                              cover.assetId,
+                              {
+                                rightsStatus:
+                                  coverRightsStatus,
+                                rightsBasis:
+                                  coverRightsBasis,
+                                rightsHolder:
+                                  coverRightsHolder ||
+                                  null,
+                                consentStatus:
+                                  coverConsentStatus,
+                                reason:
+                                  coverApprovalReason,
+                              },
+                            );
+
+                          setCoverGovernance(
+                            updated,
+                          );
+                        } catch (reason) {
+                          setCoverGovernanceError(
+                            reason instanceof Error
+                              ? reason.message
+                              : "Could not approve cover for public use.",
+                          );
+                        } finally {
+                          setCoverGovernanceSaving(
+                            false,
+                          );
+                        }
+                      }}
+                      className="wk-button wk-button-primary wk-button-sm disabled:opacity-40"
+                    >
+                      {coverGovernanceSaving
+                        ? "Approving..."
+                        : "Approve for public use"}
+                    </button>
+
+                    <p className="text-[9px] leading-4 text-wk-text-faint">
+                      This creates a new immutable Media governance version. It does not alter the cover image.
+                    </p>
+                  </div>
+                ) : null}
+              </div>
+            ) : null}
+
             {canEdit ? (
               <div className="flex flex-wrap gap-2">
                 <MediaPickerButton
@@ -419,9 +825,50 @@ export function PlaylistDetailsDrawer({
                   label={cover ? "Replace cover" : "Choose cover"}
                   title="Select Playlist Cover"
                   onSelect={(assetId) => {
-                    if (assetId) onCoverSelect(assetId);
+                    if (!assetId) return;
+
+                    onCoverSelect(
+                      assetId,
+                      {
+                        altText:
+                          coverAltText.trim() ||
+                          null,
+                        caption:
+                          coverCaption.trim() ||
+                          null,
+                      },
+                    );
                   }}
                 />
+
+                {cover ? (
+                  <button
+                    type="button"
+                    onClick={() =>
+                      onCoverPresentationSave({
+                        altText:
+                          coverAltText.trim() ||
+                          null,
+                        caption:
+                          coverCaption.trim() ||
+                          null,
+                      })
+                    }
+                    disabled={
+                      busy ||
+                      (
+                        coverAltText.trim() ===
+                          (cover.altText ?? "").trim() &&
+                        coverCaption.trim() ===
+                          (cover.caption ?? "").trim()
+                      )
+                    }
+                    className="wk-button wk-button-ghost wk-button-sm disabled:opacity-40"
+                  >
+                    Save Cover Text
+                  </button>
+                ) : null}
+
                 {cover ? (
                   <button
                     type="button"

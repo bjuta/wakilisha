@@ -1,4 +1,7 @@
 import { supabase } from "@/lib/supabase";
+import {
+  getAdminMediaAssetById,
+} from "@/services/adminMediaReadService";
 import { mediaService } from "@/services/mediaService";
 import type { Json } from "@/types/database.types";
 import { parseProviderTrackUrl } from "./playlistAdminUtils";
@@ -694,10 +697,181 @@ export async function updatePlaylistMetadata(
   return commandResult(firstRpcRow(data, "Update Playlist"));
 }
 
+export interface PlaylistCoverPresentationInput {
+  altText?: string | null;
+  caption?: string | null;
+  credit?: string | null;
+}
+
+export type PlaylistCoverRightsStatus =
+  | "owned"
+  | "licensed"
+  | "public_domain"
+  | "fair_use";
+
+export type PlaylistCoverConsentStatus =
+  | "not_required"
+  | "granted";
+
+export interface PlaylistCoverGovernance {
+  authorityRevision: number;
+  rightsStatus: string;
+  consentStatus: string;
+  sensitivity: string;
+  publicSafetyState: string;
+  isApprovedPublic: boolean;
+}
+
+export interface PlaylistCoverPublicUseApproval {
+  rightsStatus: PlaylistCoverRightsStatus;
+  rightsBasis: string;
+  rightsHolder?: string | null;
+  consentStatus: PlaylistCoverConsentStatus;
+  reason: string;
+}
+
+export async function fetchPlaylistCoverGovernance(
+  assetId: string,
+): Promise<PlaylistCoverGovernance> {
+  const asset =
+    await getAdminMediaAssetById(
+      assetId,
+    );
+
+  if (!asset) {
+    throw new Error(
+      "Playlist cover Media asset was not found.",
+    );
+  }
+
+  if (
+    asset.authority_revision === null ||
+    asset.authority_revision === undefined
+  ) {
+    throw new Error(
+      "Playlist cover Media authority revision is unavailable.",
+    );
+  }
+
+  const rightsStatus =
+    asset.rights_status ?? "unknown";
+  const consentStatus =
+    asset.consent_status ?? "unknown";
+  const sensitivity =
+    asset.sensitivity ?? "none";
+  const publicSafetyState =
+    asset.public_safety_state ??
+    "internal";
+
+  return {
+    authorityRevision:
+      asset.authority_revision,
+    rightsStatus,
+    consentStatus,
+    sensitivity,
+    publicSafetyState,
+    isApprovedPublic:
+      publicSafetyState ===
+        "approved_public" &&
+      [
+        "owned",
+        "licensed",
+        "public_domain",
+        "fair_use",
+      ].includes(
+        rightsStatus,
+      ) &&
+      [
+        "granted",
+        "not_required",
+      ].includes(
+        consentStatus,
+      ),
+  };
+}
+
+export async function approvePlaylistCoverForPublicUse(
+  assetId: string,
+  approval: PlaylistCoverPublicUseApproval,
+): Promise<PlaylistCoverGovernance> {
+  const rightsBasis =
+    approval.rightsBasis.trim();
+  const reason =
+    approval.reason.trim();
+
+  if (!rightsBasis) {
+    throw new Error(
+      "Rights basis is required before public-use approval.",
+    );
+  }
+
+  if (!reason) {
+    throw new Error(
+      "Approval reason is required before public-use approval.",
+    );
+  }
+
+  const current =
+    await fetchPlaylistCoverGovernance(
+      assetId,
+    );
+
+  await invokeUntypedRpc(
+    "create_media_governance_version",
+    {
+      p_asset_id: assetId,
+      p_expected_authority_revision:
+        current.authorityRevision,
+      p_governance: {
+        rights_status:
+          approval.rightsStatus,
+        rights_basis: rightsBasis,
+        rights_holder:
+          approval.rightsHolder?.trim() ||
+          null,
+        consent_status:
+          approval.consentStatus,
+        consent_scope:
+          approval.consentStatus ===
+          "granted"
+            ? "Public Playlist cover display"
+            : null,
+        sensitivity: "none",
+        embargo_state: "none",
+        embargo_until: null,
+        source_protection_class:
+          "public",
+        preservation_state:
+          "preserved",
+        retention_state: "retain",
+        public_safety_state:
+          "approved_public",
+      },
+      p_reason: reason,
+      p_correlation_id:
+        correlationId(),
+    },
+  );
+
+  const updated =
+    await fetchPlaylistCoverGovernance(
+      assetId,
+    );
+
+  if (!updated.isApprovedPublic) {
+    throw new Error(
+      "Playlist cover governance was saved but did not become public-safe.",
+    );
+  }
+
+  return updated;
+}
+
 export async function setPlaylistCover(
   playlistId: string,
   expectedRevision: number,
   assetId: string | null,
+  presentation: PlaylistCoverPresentationInput = {},
 ): Promise<PlaylistCommandResult> {
   const { data, error } = await supabase.rpc(
     "set_playlist_cover",
@@ -707,9 +881,12 @@ export async function setPlaylistCover(
       p_asset_id: assetId,
       p_idempotency_key: idempotencyKey("cover"),
       p_placement_data: {},
-      p_alt_text_snapshot: null,
-      p_caption_snapshot: null,
-      p_credit_snapshot: null,
+      p_alt_text_snapshot:
+        presentation.altText?.trim() || null,
+      p_caption_snapshot:
+        presentation.caption?.trim() || null,
+      p_credit_snapshot:
+        presentation.credit?.trim() || null,
       p_correlation_id: correlationId(),
     },
   );

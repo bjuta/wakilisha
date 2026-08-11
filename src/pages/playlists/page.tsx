@@ -13,8 +13,8 @@ import {
   WkButton,
 } from "@/components/design-system/primitives/Button";
 import {
-  Ch19GradientImage,
-} from "@/components/media/Ch19GradientImage";
+  PlaylistCoverPresentation,
+} from "@/components/media/PlaylistCoverPresentation";
 import {
   MetaTags,
 } from "@/components/seo/MetaTags";
@@ -26,41 +26,6 @@ import type {
 } from "@/services/playlists/playlistPublicModel";
 
 const PAGE_SIZE = 20;
-
-function PlaylistArtwork({
-  playlist,
-}: {
-  playlist: PublicPlaylistListItem;
-}) {
-  if (
-    playlist.coverUrl
-  ) {
-    return (
-      <img
-        src={
-          playlist.coverUrl
-        }
-        alt={
-          playlist.coverAltText ??
-          playlist.title
-        }
-        loading="lazy"
-        className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-[1.02]"
-      />
-    );
-  }
-
-  return (
-    <Ch19GradientImage
-      slug={
-        playlist.slug
-      }
-      name={
-        playlist.title
-      }
-    />
-  );
-}
 
 function PlaylistCard({
   playlist,
@@ -75,10 +40,21 @@ function PlaylistCard({
       className="group block min-w-0"
     >
       <div className="aspect-square overflow-hidden rounded-xl bg-[var(--wk-surface-raised)]">
-        <PlaylistArtwork
-          playlist={
-            playlist
+        <PlaylistCoverPresentation
+          src={
+            playlist.coverUrl
           }
+          altText={
+            playlist.coverAltText
+          }
+          slug={
+            playlist.slug
+          }
+          title={
+            playlist.title
+          }
+          loading="lazy"
+          imageClassName="transition-transform duration-500 group-hover:scale-[1.02]"
         />
       </div>
 
