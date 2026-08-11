@@ -13,7 +13,6 @@ export default function AdminNewPlaylistPage() {
   const [slug, setSlug] = useState("");
   const [slugTouched, setSlugTouched] = useState(false);
   const [description, setDescription] = useState("");
-  const [curatorLabel, setCuratorLabel] = useState("");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -37,7 +36,6 @@ export default function AdminNewPlaylistPage() {
         title,
         slug: finalSlug,
         description,
-        curatorLabel,
       });
       navigate(`/admin/content/playlists/${created.playlistId}`, {
         replace: true,
@@ -110,17 +108,14 @@ export default function AdminNewPlaylistPage() {
           />
         </label>
 
-        <label className="block">
-          <span className="mb-1.5 block text-[11px] font-black uppercase tracking-wider text-wk-text-muted">
+        <div className="rounded-xl border border-wk-border bg-wk-bg-subtle px-4 py-3">
+          <div className="text-[11px] font-black uppercase tracking-wider text-wk-text-muted">
             Curator
-          </span>
-          <input
-            value={curatorLabel}
-            onChange={(event) => setCuratorLabel(event.target.value)}
-            className="w-full rounded-xl border border-wk-border bg-wk-bg px-4 py-3 text-[13px] text-wk-text outline-none focus:border-wk-brand"
-            placeholder="Displayed curator name"
-          />
-        </label>
+          </div>
+          <p className="mt-1 text-[11px] leading-5 text-wk-text-muted">
+            Create the Playlist first, then choose its governed Curator in the editor.
+          </p>
+        </div>
 
         <label className="block">
           <span className="mb-1.5 block text-[11px] font-black uppercase tracking-wider text-wk-text-muted">

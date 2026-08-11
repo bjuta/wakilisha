@@ -7,9 +7,14 @@ import {
 import { useNavigate } from "react-router-dom";
 import { WkIcon } from "@/components/design-system/Icon";
 import { WkSurface } from "@/components/design-system/primitives/Surface";
-import { MediaPickerButton } from "@/components/admin/MediaPickerButton";
+import {
+  PlaylistEditorHeader,
+  type PlaylistEditorHeaderAction,
+} from "./components/PlaylistEditorHeader";
+import { PlaylistDetailsDrawer } from "./components/PlaylistDetailsDrawer";
 import { useAdminUser } from "@/hooks/useAdminUser";
 import {
+  createPlaylistPreviewLink,
   addRegistryTrack,
   addValidatedPlaybackTrack,
   submitPlaylistRegistryIntake,
@@ -18,16 +23,24 @@ import {
   removePlaylistItem,
   reorderPlaylistItems,
   resolvePlaylistItemMatch,
+  archivePlaylist,
+  publishPlaylistVersion,
+  restorePlaylistFromArchive,
   reviewPlaylist,
   savePlaylistItemNote,
+  schedulePlaylistPublication,
   searchRegistryArtists,
   searchRegistryTracks,
   setPlaylistCover,
+  setPlaylistCurator,
+  unpublishPlaylist,
+  unschedulePlaylistPublication,
   slugifyPlaylistTitle,
   validatePlaylistPlaybackUrl,
   snapshotPlaylistWorkingVersion,
   submitPlaylistForReview,
   updatePlaylistMetadata,
+  type PlaylistCuratorCandidate,
   type PlaylistDetail,
   type PlaylistItem,
   type PlaylistPlaybackValidation,
@@ -94,7 +107,6 @@ export function PlaylistEditorWorkspace({
   const [title, setTitle] = useState("");
   const [slug, setSlug] = useState("");
   const [description, setDescription] = useState("");
-  const [curatorLabel, setCuratorLabel] = useState("");
 
   const [trackQuery, setTrackQuery] = useState("");
   const [trackResults, setTrackResults] = useState<
@@ -130,6 +142,12 @@ export function PlaylistEditorWorkspace({
   const [noteDrafts, setNoteDrafts] = useState<Record<string, string>>({});
   const [matchingItemId, setMatchingItemId] = useState<string | null>(null);
   const [reviewNote, setReviewNote] = useState("");
+  const [detailsOpen, setDetailsOpen] = useState(false);
+  const [lastAutosavedAt, setLastAutosavedAt] =
+    useState<string | null>(null);
+  const [expandedNoteIds, setExpandedNoteIds] = useState<
+    Set<string>
+  >(() => new Set());
   const [draggedItemId, setDraggedItemId] = useState<string | null>(null);
   const [dragTarget, setDragTarget] = useState<{
     itemId: string;
@@ -140,15 +158,6 @@ export function PlaylistEditorWorkspace({
     if (!playlistId) return;
     const next = await fetchPlaylistDetail(playlistId);
     setDetail(next);
-    setTitle(next.playlist.title);
-    setSlug(next.playlist.slug);
-    setDescription(next.playlist.description ?? "");
-    setCuratorLabel(next.playlist.curatorLabel ?? "");
-    setNoteDrafts(
-      Object.fromEntries(
-        next.items.map((item) => [item.id, item.notes ?? ""]),
-      ),
-    );
   }, [playlistId]);
 
   useEffect(() => {
@@ -165,7 +174,6 @@ export function PlaylistEditorWorkspace({
         setTitle(next.playlist.title);
         setSlug(next.playlist.slug);
         setDescription(next.playlist.description ?? "");
-        setCuratorLabel(next.playlist.curatorLabel ?? "");
         setNoteDrafts(
           Object.fromEntries(
             next.items.map((item) => [item.id, item.notes ?? ""]),
@@ -223,6 +231,11 @@ export function PlaylistEditorWorkspace({
   const canManageReview =
     detail?.review?.canManageReview ??
     adminUser.can("manage_review_queue");
+  const canPublish =
+    detail?.review?.canPublish ??
+    adminUser.can("publish_playlists");
+  const canArchive =
+    adminUser.can("delete_playlists");
 
   const submittedVersionId =
     detail?.review?.currentSubmittedVersionId ?? null;
@@ -231,6 +244,131 @@ export function PlaylistEditorWorkspace({
     () => detail?.items.map((item) => item.id) ?? [],
     [detail?.items],
   );
+
+  const metadataDirty = useMemo(() => {
+    if (!detail) return false;
+
+    return (
+      title.trim() !== detail.playlist.title ||
+      slugifyPlaylistTitle(slug) !== detail.playlist.slug ||
+      description.trim() !==
+        (detail.playlist.description ?? "")
+    );
+  }, [description, detail, slug, title]);
+
+  const dirtyNoteItemId = useMemo(() => {
+    if (!detail) return null;
+
+    return (
+      detail.items.find((item) => {
+        const local = (noteDrafts[item.id] ?? "").trim();
+        const saved = (item.notes ?? "").trim();
+        return local !== saved;
+      })?.id ?? null
+    );
+  }, [detail, noteDrafts]);
+
+  const isDirty = metadataDirty || dirtyNoteItemId !== null;
+  const isAutosaving = busy?.startsWith("autosave:") === true;
+
+  useEffect(() => {
+    if (
+      !detail ||
+      !canEdit ||
+      busy !== null ||
+      (!metadataDirty && !dirtyNoteItemId)
+    ) {
+      return;
+    }
+
+    const cleanTitle = title.trim();
+    const cleanSlug = slugifyPlaylistTitle(slug);
+
+    if (metadataDirty && (!cleanTitle || !cleanSlug)) {
+      return;
+    }
+
+    const timeout = window.setTimeout(() => {
+      void (async () => {
+        const current = detail;
+
+        if (metadataDirty) {
+          setBusy("autosave:metadata");
+
+          try {
+            await updatePlaylistMetadata(
+              current.playlist.id,
+              current.playlist.authorityRevision,
+              {
+                title: cleanTitle,
+                slug: cleanSlug,
+                description: description.trim() || null,
+              },
+            );
+
+            const next = await fetchPlaylistDetail(
+              current.playlist.id,
+            );
+            setDetail(next);
+            setLastAutosavedAt(new Date().toISOString());
+          } catch (reason) {
+            setMessage({
+              type: "error",
+              text: errorText(reason),
+            });
+          } finally {
+            setBusy(null);
+          }
+
+          return;
+        }
+
+        const item = current.items.find(
+          (candidate) => candidate.id === dirtyNoteItemId,
+        );
+
+        if (!item) return;
+
+        setBusy(`autosave:note:${item.id}`);
+
+        try {
+          await savePlaylistItemNote(
+            current.playlist.id,
+            item.id,
+            current.playlist.authorityRevision,
+            noteDrafts[item.id] ?? "",
+          );
+
+          const next = await fetchPlaylistDetail(
+            current.playlist.id,
+          );
+          setDetail(next);
+          setLastAutosavedAt(new Date().toISOString());
+        } catch (reason) {
+          setMessage({
+            type: "error",
+            text: errorText(reason),
+          });
+        } finally {
+          setBusy(null);
+        }
+      })();
+    }, 700);
+
+    return () => {
+      window.clearTimeout(timeout);
+    };
+  }, [
+    busy,
+    canEdit,
+    description,
+    detail,
+    dirtyNoteItemId,
+    metadataDirty,
+    noteDrafts,
+    slug,
+    title,
+  ]);
 
   const legacyUnresolvedRegistryCount =
     detail?.items.filter(
@@ -287,31 +425,285 @@ export function PlaylistEditorWorkspace({
 
   const { playlist, items, cover, review } = detail;
 
-  async function handleMetadataSave() {
-    const cleanTitle = title.trim();
-    const cleanSlug = slugifyPlaylistTitle(slug);
-    if (!cleanTitle || !cleanSlug) {
+  const workingSnapshotSourceRevision =
+    Number(
+      detail.review?.workingVersion?.source_authority_revision ??
+        0,
+    );
+
+  const workingSnapshotExact =
+    Boolean(detail.review?.currentWorkingVersionId) &&
+    workingSnapshotSourceRevision ===
+      detail.playlist.authorityRevision;
+
+  async function handleExplicitSave() {
+    if (isDirty || busy !== null) {
       setMessage({
-        type: "error",
-        text: "Title and slug are required.",
+        type: "warning",
+        text: "Wait for moving changes to finish saving first.",
       });
       return;
     }
 
     await runAction(
-      "metadata",
+      "version-save",
       () =>
-        updatePlaylistMetadata(
+        snapshotPlaylistWorkingVersion(
           playlist.id,
           playlist.authorityRevision,
-          {
-            title: cleanTitle,
-            slug: cleanSlug,
-            description: description.trim() || null,
-            curator_label: curatorLabel.trim() || null,
-          },
         ),
-      "Playlist details saved.",
+      "Working version saved.",
+    );
+  }
+
+  async function handleCuratorSelect(
+    candidate: PlaylistCuratorCandidate,
+  ) {
+    await runAction(
+      `curator:${candidate.kind}:${candidate.id}`,
+      () =>
+        setPlaylistCurator(
+          playlist.id,
+          playlist.authorityRevision,
+          candidate.kind === "registry_author"
+            ? {
+                kind: "registry_author",
+                registryAuthorId: candidate.id,
+              }
+            : {
+                kind: "user",
+                userId: candidate.id,
+              },
+        ),
+      "Curator updated.",
+    );
+  }
+
+  async function handleCuratorClear() {
+    await runAction(
+      "curator-clear",
+      () =>
+        setPlaylistCurator(
+          playlist.id,
+          playlist.authorityRevision,
+          { kind: "none" },
+        ),
+      "Curator cleared.",
+    );
+  }
+
+  async function handleSubmitForReview() {
+    if (isDirty || busy !== null) {
+      setMessage({
+        type: "warning",
+        text: "Wait for moving changes to finish saving first.",
+      });
+      return;
+    }
+
+    if (!workingSnapshotExact) {
+      setMessage({
+        type: "warning",
+        text: "Save the Playlist before submitting for Review.",
+      });
+      return;
+    }
+
+    await runAction(
+      "submit",
+      () =>
+        submitPlaylistForReview(
+          playlist.id,
+          playlist.authorityRevision,
+          reviewNote,
+        ),
+      "Playlist submitted for Review.",
+    );
+  }
+
+  async function handleStartReview() {
+    if (!submittedVersionId) return;
+
+    await runAction(
+      "review-start",
+      () =>
+        reviewPlaylist(
+          playlist.id,
+          submittedVersionId,
+          playlist.authorityRevision,
+          "start_review",
+          reviewNote,
+        ),
+      "Review started.",
+    );
+  }
+
+  async function handleRequestChanges() {
+    if (!submittedVersionId) return;
+
+    if (!reviewNote.trim()) {
+      setDetailsOpen(true);
+      setMessage({
+        type: "warning",
+        text: "Add a Review note explaining what needs to change.",
+      });
+      return;
+    }
+
+    await runAction(
+      "review-changes",
+      () =>
+        reviewPlaylist(
+          playlist.id,
+          submittedVersionId,
+          playlist.authorityRevision,
+          "request_changes",
+          reviewNote,
+        ),
+      "Changes requested.",
+    );
+  }
+
+  async function handleApprove() {
+    if (!submittedVersionId) return;
+
+    await runAction(
+      "review-approve",
+      () =>
+        reviewPlaylist(
+          playlist.id,
+          submittedVersionId,
+          playlist.authorityRevision,
+          "approve",
+          reviewNote,
+        ),
+      "Playlist approved.",
+    );
+  }
+
+  async function handlePublish() {
+    const approvedVersionId =
+      review?.currentApprovedVersionId;
+
+    if (!approvedVersionId) {
+      setMessage({
+        type: "error",
+        text: "The current approved Playlist version is missing.",
+      });
+      return;
+    }
+
+    if (!window.confirm("Publish this approved Playlist now?")) {
+      return;
+    }
+
+    await runAction(
+      "publish",
+      () =>
+        publishPlaylistVersion(
+          playlist.id,
+          playlist.authorityRevision,
+          approvedVersionId,
+          reviewNote,
+        ),
+      "Playlist published.",
+    );
+  }
+
+  async function handleSchedule(
+    publishAt: string,
+    note: string,
+  ) {
+    const approvedVersionId =
+      review?.currentApprovedVersionId;
+
+    if (!approvedVersionId) {
+      setMessage({
+        type: "error",
+        text: "The current approved Playlist version is missing.",
+      });
+      return;
+    }
+
+    await runAction(
+      "schedule",
+      () =>
+        schedulePlaylistPublication(
+          playlist.id,
+          playlist.authorityRevision,
+          approvedVersionId,
+          publishAt,
+          note,
+        ),
+      "Playlist scheduled.",
+    );
+  }
+
+  async function handleUnschedule() {
+    await runAction(
+      "unschedule",
+      () =>
+        unschedulePlaylistPublication(
+          playlist.id,
+          playlist.authorityRevision,
+          reviewNote,
+        ),
+      "Publication schedule removed.",
+    );
+  }
+
+  async function handleUnpublish() {
+    if (
+      !window.confirm(
+        "Unpublish this Playlist and hide its public page?",
+      )
+    ) {
+      return;
+    }
+
+    await runAction(
+      "unpublish",
+      () =>
+        unpublishPlaylist(
+          playlist.id,
+          playlist.authorityRevision,
+          reviewNote,
+        ),
+      "Playlist unpublished.",
+    );
+  }
+
+  async function handleArchive() {
+    if (
+      !window.confirm(
+        "Archive this Playlist? Published content will be hidden.",
+      )
+    ) {
+      return;
+    }
+
+    await runAction(
+      "archive",
+      () =>
+        archivePlaylist(
+          playlist.id,
+          playlist.authorityRevision,
+          reviewNote,
+        ),
+      "Playlist archived.",
+    );
+  }
+
+  async function handleRestore() {
+    await runAction(
+      "restore",
+      () =>
+        restorePlaylistFromArchive(
+          playlist.id,
+          playlist.authorityRevision,
+          reviewNote,
+        ),
+      "Playlist restored to draft.",
     );
   }
 
@@ -781,33 +1173,269 @@ export function PlaylistEditorWorkspace({
     setDragTarget(null);
   }
 
+  async function handlePreview() {
+    if (!playlistId || !detail) return;
+
+    if (isDirty || isAutosaving) {
+      setMessage({
+        type: "warning",
+        text: "Wait for current changes to finish saving before opening Preview.",
+      });
+      return;
+    }
+
+    setBusy("preview");
+
+    try {
+      let versionId =
+        detail.review?.currentSubmittedVersionId ??
+        detail.review?.currentApprovedVersionId ??
+        detail.review?.currentWorkingVersionId ??
+        null;
+
+      const shouldSnapshotMovingState =
+        detail.review?.canEdit === true &&
+        (
+          detail.playlist.status === "draft" ||
+          detail.playlist.status === "changes_requested" ||
+          detail.playlist.status === "scheduled" ||
+          detail.playlist.status === "published"
+        );
+
+      if (shouldSnapshotMovingState) {
+        const snapshot =
+          await snapshotPlaylistWorkingVersion(
+            playlistId,
+            detail.playlist.authorityRevision,
+          );
+
+        if (!snapshot.versionId) {
+          throw new Error(
+            "Playlist Preview could not create an immutable version.",
+          );
+        }
+
+        versionId =
+          snapshot.versionId;
+      }
+
+      const preview =
+        await createPlaylistPreviewLink(
+          playlistId,
+          versionId,
+        );
+
+      const previewUrl =
+        `${window.location.origin}/playlists/${encodeURIComponent(
+          slug,
+        )}?preview=${encodeURIComponent(
+          preview.nonce,
+        )}`;
+
+      const previewWindow =
+        window.open(
+          previewUrl,
+          "_blank",
+          "noopener,noreferrer",
+        );
+
+      if (!previewWindow) {
+        try {
+          await navigator.clipboard.writeText(
+            previewUrl,
+          );
+
+          setMessage({
+            type: "warning",
+            text: "The browser blocked the Preview tab. The exact Preview link was copied to your clipboard.",
+          });
+        } catch {
+          setMessage({
+            type: "warning",
+            text: "The browser blocked the Preview tab. Allow pop-ups for WAKILISHA and try Preview again.",
+          });
+        }
+      } else {
+        setMessage({
+          type: "success",
+          text: "Exact version-bound Preview opened.",
+        });
+      }
+
+      if (shouldSnapshotMovingState) {
+        await reload();
+      }
+    } catch (reason) {
+      setMessage({
+        type: "error",
+        text: errorText(reason),
+      });
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  const headerSecondaryActions: PlaylistEditorHeaderAction[] = [];
+
+  headerSecondaryActions.push({
+    label: "Preview",
+    icon: "Eye",
+    onClick: () => {
+      void handlePreview();
+    },
+    disabled:
+      isDirty ||
+      isAutosaving ||
+      busy !== null,
+    title:
+      isDirty || isAutosaving
+        ? "Wait for moving changes to finish saving first."
+        : "Open the exact public Playlist renderer from an immutable version.",
+  });
+  let headerPrimaryAction: PlaylistEditorHeaderAction | null = null;
+
+  if (
+    canEdit &&
+    ["draft", "changes_requested"].includes(playlist.status)
+  ) {
+    headerPrimaryAction = {
+      label: "Submit for Review",
+      icon: "Send",
+      tone: "primary",
+      onClick: () => void handleSubmitForReview(),
+      disabled:
+        busy !== null ||
+        items.length === 0 ||
+        isDirty ||
+        !workingSnapshotExact,
+      title: !workingSnapshotExact
+        ? "Save the Playlist before submitting for Review."
+        : undefined,
+    };
+  } else if (
+    canManageReview &&
+    playlist.status === "ready_for_review" &&
+    submittedVersionId
+  ) {
+    headerPrimaryAction = {
+      label: "Start Review",
+      icon: "ScanText",
+      tone: "primary",
+      onClick: () => void handleStartReview(),
+      disabled: busy !== null,
+    };
+  } else if (
+    canManageReview &&
+    playlist.status === "in_review" &&
+    submittedVersionId
+  ) {
+    headerSecondaryActions.push({
+      label: "Request changes",
+      icon: "MessageSquareWarning",
+      onClick: () => void handleRequestChanges(),
+      disabled: busy !== null,
+    });
+
+    headerPrimaryAction = {
+      label: "Approve",
+      icon: "CheckCircle2",
+      tone: "primary",
+      onClick: () => void handleApprove(),
+      disabled: busy !== null,
+    };
+  } else if (
+    canPublish &&
+    playlist.status === "approved" &&
+    review?.currentApprovedVersionId
+  ) {
+    headerSecondaryActions.push({
+      label: "Schedule",
+      icon: "CalendarClock",
+      onClick: () => setDetailsOpen(true),
+      disabled: busy !== null,
+    });
+
+    headerPrimaryAction = {
+      label: "Publish",
+      icon: "CloudUpload",
+      tone: "primary",
+      onClick: () => void handlePublish(),
+      disabled: busy !== null,
+    };
+  } else if (
+    canPublish &&
+    playlist.status === "scheduled"
+  ) {
+    headerPrimaryAction = {
+      label: "Unschedule",
+      icon: "CalendarX2",
+      tone: "primary",
+      onClick: () => void handleUnschedule(),
+      disabled: busy !== null,
+    };
+  } else if (playlist.status === "published") {
+    headerPrimaryAction = {
+      label: "View live",
+      icon: "ExternalLink",
+      tone: "primary",
+      href: `/playlists/${encodeURIComponent(playlist.slug)}`,
+    };
+
+    if (canPublish) {
+      headerSecondaryActions.push({
+        label: "Unpublish",
+        icon: "EyeOff",
+        onClick: () => void handleUnpublish(),
+        disabled: busy !== null,
+      });
+    }
+  } else if (
+    canEdit &&
+    playlist.status === "archived"
+  ) {
+    headerPrimaryAction = {
+      label: "Restore",
+      icon: "ArchiveRestore",
+      tone: "primary",
+      onClick: () => void handleRestore(),
+      disabled: busy !== null,
+    };
+  }
+
+  if (
+    canArchive &&
+    playlist.status !== "archived" &&
+    headerSecondaryActions.length < 2
+  ) {
+    headerSecondaryActions.push({
+      label: "Archive",
+      icon: "Archive",
+      tone: "danger",
+      onClick: () => void handleArchive(),
+      disabled: busy !== null,
+    });
+  }
+
   return (
     <div className="space-y-5">
-      <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
-        <div className="min-w-0">
-          <button
-            onClick={() => navigate("/admin/content/playlists")}
-            className="mb-2 inline-flex items-center gap-1.5 text-[11px] font-bold text-wk-text-muted hover:text-wk-text"
-          >
-            <WkIcon name="ArrowLeft" size={13} />
-            Playlists
-          </button>
-          <div className="flex flex-wrap items-center gap-2">
-            <h1 className="truncate text-[24px] font-black tracking-tight text-wk-text">
-              {playlist.title || "Untitled Playlist"}
-            </h1>
-            <span
-              className={`inline-flex rounded-full px-2 py-1 text-[10px] font-black uppercase tracking-[0.08em] ${statusClass(playlist.status)}`}
-            >
-              {humanize(playlist.status)}
-            </span>
-          </div>
-          <p className="mt-1 text-[12px] text-wk-text-muted">
-            Revision {playlist.authorityRevision} · {items.length}{" "}
-            {items.length === 1 ? "track" : "tracks"}
-          </p>
-        </div>
-      </div>
+      <PlaylistEditorHeader
+        title={playlist.title}
+        slug={playlist.slug}
+        status={playlist.status}
+        revision={playlist.authorityRevision}
+        trackCount={items.length}
+        isDirty={isDirty}
+        isSaving={isAutosaving}
+        detailsOpen={detailsOpen}
+        canEdit={canEdit}
+        onBack={() => navigate("/admin/content/playlists")}
+        onSave={() => void handleExplicitSave()}
+        onToggleDetails={() =>
+          setDetailsOpen((value) => !value)
+        }
+        primaryAction={headerPrimaryAction}
+        secondaryActions={headerSecondaryActions}
+      />
 
       {message ? (
         <div
@@ -823,6 +1451,12 @@ export function PlaylistEditorWorkspace({
         </div>
       ) : null}
 
+      {lastAutosavedAt && !message ? (
+        <div className="text-[10px] text-wk-text-faint">
+          Last saved {new Date(lastAutosavedAt).toLocaleTimeString()}
+        </div>
+      ) : null}
+
       {!canEdit ? (
         <div className="rounded-xl border border-wk-info/20 bg-wk-info-soft px-4 py-3 text-[12px] text-wk-info">
           You can review this Playlist, but its working content is read-only for
@@ -830,7 +1464,7 @@ export function PlaylistEditorWorkspace({
         </div>
       ) : null}
 
-      <div className="grid gap-5 xl:grid-cols-[minmax(0,1.65fr)_minmax(320px,0.75fr)]">
+      <div className="space-y-5">
         <div className="space-y-5">
           <WkSurface className="p-5">
             <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
@@ -1516,43 +2150,60 @@ export function PlaylistEditorWorkspace({
                       ) : null}
                     </div>
 
-                    <div className="mt-3 flex gap-2 pl-11 sm:pl-[92px]">
-                      <textarea
-                        value={noteDrafts[item.id] ?? ""}
-                        onChange={(event) =>
-                          setNoteDrafts((current) => ({
-                            ...current,
-                            [item.id]: event.target.value,
-                          }))
+                    <div className="mt-2 pl-11 sm:pl-[92px]">
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setExpandedNoteIds((current) => {
+                            const next = new Set(current);
+                            if (next.has(item.id)) {
+                              next.delete(item.id);
+                            } else {
+                              next.add(item.id);
+                            }
+                            return next;
+                          })
                         }
-                        disabled={!canEdit}
-                        rows={2}
-                        placeholder="Optional curator note"
-                        className="min-w-0 flex-1 resize-y rounded-lg border border-wk-border bg-wk-surface px-3 py-2 text-[11px] leading-5 text-wk-text outline-none focus:border-wk-brand disabled:opacity-60"
-                      />
-                      {canEdit ? (
-                        <button
-                          onClick={() =>
-                            void runAction(
-                              `note:${item.id}`,
-                              () =>
-                                savePlaylistItemNote(
-                                  playlist.id,
-                                  item.id,
-                                  playlist.authorityRevision,
-                                  noteDrafts[item.id] ?? "",
-                                ),
-                              "Track note saved.",
-                            )
+                        className="inline-flex items-center gap-1.5 text-[10px] font-bold text-wk-text-muted hover:text-wk-text"
+                        aria-expanded={expandedNoteIds.has(item.id)}
+                      >
+                        <WkIcon
+                          name={
+                            expandedNoteIds.has(item.id)
+                              ? "ChevronDown"
+                              : "ChevronRight"
                           }
-                          disabled={
-                            busy !== null ||
-                            (noteDrafts[item.id] ?? "") === (item.notes ?? "")
-                          }
-                          className="wk-button wk-button-ghost wk-button-sm self-end disabled:opacity-40"
-                        >
-                          Save note
-                        </button>
+                          size={12}
+                        />
+                        Editor’s Note
+                        {(item.notes ?? "").trim() ? (
+                          <span className="rounded-full bg-wk-brand-soft px-1.5 py-0.5 text-[8px] font-black uppercase text-wk-brand">
+                            Added
+                          </span>
+                        ) : null}
+                      </button>
+
+                      {expandedNoteIds.has(item.id) ? (
+                        <div className="mt-2">
+                          <textarea
+                            value={noteDrafts[item.id] ?? ""}
+                            onChange={(event) =>
+                              setNoteDrafts((current) => ({
+                                ...current,
+                                [item.id]: event.target.value,
+                              }))
+                            }
+                            disabled={!canEdit}
+                            rows={3}
+                            placeholder="Add context for this track"
+                            className="w-full resize-y rounded-lg border border-wk-border bg-wk-surface px-3 py-2 text-[11px] leading-5 text-wk-text outline-none focus:border-wk-brand disabled:opacity-60"
+                          />
+                          {canEdit ? (
+                            <div className="mt-1 text-[9px] text-wk-text-faint">
+                              Editor’s Notes save automatically.
+                            </div>
+                          ) : null}
+                        </div>
                       ) : null}
                     </div>
                   </div>
@@ -1562,356 +2213,58 @@ export function PlaylistEditorWorkspace({
           </WkSurface>
         </div>
 
-        <div className="space-y-5">
-          <WkSurface className="space-y-4 p-5">
-            <div>
-              <h2 className="text-[15px] font-black text-wk-text">
-                Playlist details
-              </h2>
-              <p className="mt-1 text-[11px] text-wk-text-muted">
-                The idea, public identity, and curator presentation.
-              </p>
-            </div>
-
-            <label className="block">
-              <span className="mb-1 block text-[10px] font-black uppercase tracking-wider text-wk-text-faint">
-                Title
-              </span>
-              <input
-                value={title}
-                onChange={(event) => setTitle(event.target.value)}
-                disabled={!canEdit}
-                className="w-full rounded-lg border border-wk-border bg-wk-bg px-3 py-2 text-[12px] font-semibold text-wk-text outline-none focus:border-wk-brand disabled:opacity-60"
-              />
-            </label>
-
-            <label className="block">
-              <span className="mb-1 block text-[10px] font-black uppercase tracking-wider text-wk-text-faint">
-                Slug
-              </span>
-              <input
-                value={slug}
-                onChange={(event) =>
-                  setSlug(slugifyPlaylistTitle(event.target.value))
-                }
-                disabled={!canEdit}
-                className="w-full rounded-lg border border-wk-border bg-wk-bg px-3 py-2 text-[12px] text-wk-text outline-none focus:border-wk-brand disabled:opacity-60"
-              />
-            </label>
-
-            <label className="block">
-              <span className="mb-1 block text-[10px] font-black uppercase tracking-wider text-wk-text-faint">
-                Curator
-              </span>
-              <input
-                value={curatorLabel}
-                onChange={(event) => setCuratorLabel(event.target.value)}
-                disabled={!canEdit}
-                className="w-full rounded-lg border border-wk-border bg-wk-bg px-3 py-2 text-[12px] text-wk-text outline-none focus:border-wk-brand disabled:opacity-60"
-                placeholder="Displayed curator name"
-              />
-            </label>
-
-            <label className="block">
-              <span className="mb-1 block text-[10px] font-black uppercase tracking-wider text-wk-text-faint">
-                Description
-              </span>
-              <textarea
-                value={description}
-                onChange={(event) => setDescription(event.target.value)}
-                disabled={!canEdit}
-                rows={6}
-                className="w-full resize-y rounded-lg border border-wk-border bg-wk-bg px-3 py-2 text-[12px] leading-5 text-wk-text outline-none focus:border-wk-brand disabled:opacity-60"
-              />
-            </label>
-
-            {canEdit ? (
-              <button
-                onClick={() => void handleMetadataSave()}
-                disabled={busy !== null}
-                className="wk-button wk-button-primary wk-button-sm w-full disabled:opacity-50"
-              >
-                <WkIcon name="Save" size={14} />
-                Save details
-              </button>
-            ) : null}
-          </WkSurface>
-
-          <WkSurface className="space-y-4 p-5">
-            <div>
-              <h2 className="text-[15px] font-black text-wk-text">
-                Cover
-              </h2>
-              <p className="mt-1 text-[11px] text-wk-text-muted">
-                Choose any canonical Media image. WAKILISHA prepares a square
-                Playlist-cover variant and keeps the source image untouched.
-              </p>
-            </div>
-
-            <div className="aspect-square overflow-hidden rounded-xl border border-wk-border bg-wk-bg-subtle">
-              {cover?.url || playlist.coverImageUrl ? (
-                <img
-                  src={cover?.url || playlist.coverImageUrl || ""}
-                  alt=""
-                  className="h-full w-full object-cover"
-                />
-              ) : (
-                <div className="flex h-full flex-col items-center justify-center gap-2 text-wk-text-faint">
-                  <WkIcon name="Image" size={28} />
-                  <span className="text-[11px] font-semibold">
-                    No cover selected
-                  </span>
-                </div>
-              )}
-            </div>
-
-            {canEdit ? (
-              <div className="flex flex-wrap gap-2">
-                <MediaPickerButton
-                  currentUrl={cover?.url || playlist.coverImageUrl || undefined}
-                  label={cover ? "Replace cover" : "Choose cover"}
-                  title="Select Playlist Cover"
-                  onSelect={(assetId) => {
-                    if (!assetId) {
-                      setMessage({
-                        type: "warning",
-                        text: "Register this image in Media Library before using it as a Playlist cover.",
-                      });
-                      return;
-                    }
-                    void handleCoverSelection(assetId);
-                  }}
-                />
-                {cover ? (
-                  <button
-                    onClick={() =>
-                      void runAction(
-                        "cover-clear",
-                        () =>
-                          setPlaylistCover(
-                            playlist.id,
-                            playlist.authorityRevision,
-                            null,
-                          ),
-                        "Playlist cover cleared.",
-                      )
-                    }
-                    className="wk-button wk-button-ghost wk-button-sm text-wk-danger"
-                  >
-                    Clear
-                  </button>
-                ) : null}
-              </div>
-            ) : null}
-          </WkSurface>
-
-          <WkSurface className="space-y-4 p-5">
-            <div>
-              <h2 className="text-[15px] font-black text-wk-text">
-                Review
-              </h2>
-              <p className="mt-1 text-[11px] text-wk-text-muted">
-                Review is anchored to an immutable Playlist version, not the
-                moving draft.
-              </p>
-            </div>
-
-            <div className="grid grid-cols-2 gap-2 text-[11px]">
-              <div className="rounded-lg bg-wk-bg-subtle p-3">
-                <div className="font-black uppercase tracking-wider text-wk-text-faint">
-                  Submitted
-                </div>
-                <div className="mt-1 font-bold text-wk-text">
-                  {review?.currentSubmittedVersionId ? "Ready" : "None"}
-                </div>
-              </div>
-              <div className="rounded-lg bg-wk-bg-subtle p-3">
-                <div className="font-black uppercase tracking-wider text-wk-text-faint">
-                  Approved
-                </div>
-                <div className="mt-1 font-bold text-wk-text">
-                  {review?.currentApprovedVersionId ? "Yes" : "No"}
-                </div>
-              </div>
-            </div>
-
-            {(canEdit || canManageReview) ? (
-              <textarea
-                value={reviewNote}
-                onChange={(event) => setReviewNote(event.target.value)}
-                rows={3}
-                placeholder="Review note, optional unless requesting changes"
-                className="w-full resize-y rounded-lg border border-wk-border bg-wk-bg px-3 py-2 text-[11px] leading-5 text-wk-text outline-none focus:border-wk-brand"
-              />
-            ) : null}
-
-            <div className="flex flex-wrap gap-2">
-              {canEdit ? (
-                <button
-                  onClick={() =>
-                    void runAction(
-                      "snapshot",
-                      () =>
-                        snapshotPlaylistWorkingVersion(
-                          playlist.id,
-                          playlist.authorityRevision,
-                        ),
-                      "Working snapshot refreshed.",
-                    )
-                  }
-                  disabled={busy !== null}
-                  className="wk-button wk-button-ghost wk-button-sm disabled:opacity-50"
-                >
-                  Snapshot
-                </button>
-              ) : null}
-
-              {canEdit &&
-              ["draft", "changes_requested"].includes(playlist.status) ? (
-                <button
-                  onClick={() =>
-                    void runAction(
-                      "submit",
-                      () =>
-                        submitPlaylistForReview(
-                          playlist.id,
-                          playlist.authorityRevision,
-                          reviewNote,
-                        ),
-                      "Playlist submitted for review.",
-                    )
-                  }
-                  disabled={busy !== null || items.length === 0}
-                  className="wk-button wk-button-primary wk-button-sm disabled:opacity-50"
-                >
-                  <WkIcon name="Send" size={13} />
-                  Submit
-                </button>
-              ) : null}
-
-              {canManageReview &&
-              playlist.status === "ready_for_review" &&
-              submittedVersionId ? (
-                <button
-                  onClick={() =>
-                    void runAction(
-                      "review-start",
-                      () =>
-                        reviewPlaylist(
-                          playlist.id,
-                          submittedVersionId,
-                          playlist.authorityRevision,
-                          "start_review",
-                          reviewNote,
-                        ),
-                      "Review started.",
-                    )
-                  }
-                  disabled={busy !== null}
-                  className="wk-button wk-button-primary wk-button-sm disabled:opacity-50"
-                >
-                  Start review
-                </button>
-              ) : null}
-
-              {canManageReview &&
-              playlist.status === "in_review" &&
-              submittedVersionId ? (
-                <>
-                  <button
-                    onClick={() => {
-                      if (!reviewNote.trim()) {
-                        setMessage({
-                          type: "error",
-                          text: "Explain what needs to change.",
-                        });
-                        return;
-                      }
-                      void runAction(
-                        "review-changes",
-                        () =>
-                          reviewPlaylist(
-                            playlist.id,
-                            submittedVersionId,
-                            playlist.authorityRevision,
-                            "request_changes",
-                            reviewNote,
-                          ),
-                        "Changes requested.",
-                      );
-                    }}
-                    disabled={busy !== null}
-                    className="wk-button wk-button-ghost wk-button-sm disabled:opacity-50"
-                  >
-                    Request changes
-                  </button>
-                  <button
-                    onClick={() =>
-                      void runAction(
-                        "review-approve",
-                        () =>
-                          reviewPlaylist(
-                            playlist.id,
-                            submittedVersionId,
-                            playlist.authorityRevision,
-                            "approve",
-                            reviewNote,
-                          ),
-                        "Playlist approved.",
-                      )
-                    }
-                    disabled={busy !== null}
-                    className="wk-button wk-button-primary wk-button-sm disabled:opacity-50"
-                  >
-                    <WkIcon name="CheckCircle2" size={13} />
-                    Approve
-                  </button>
-                </>
-              ) : null}
-            </div>
-
-            {review?.reviewEvents.length ? (
-              <div className="border-t border-wk-border pt-4">
-                <div className="mb-2 text-[10px] font-black uppercase tracking-wider text-wk-text-faint">
-                  Review history
-                </div>
-                <div className="space-y-2">
-                  {[...review.reviewEvents]
-                    .sort(
-                      (a, b) =>
-                        Number(b.event_number ?? 0) -
-                        Number(a.event_number ?? 0),
-                    )
-                    .slice(0, 8)
-                    .map((event, index) => (
-                      <div
-                        key={event.id ?? `${event.action}-${index}`}
-                        className="rounded-lg bg-wk-bg-subtle px-3 py-2"
-                      >
-                        <div className="text-[11px] font-bold text-wk-text">
-                          {humanize(event.action ?? "Review event")}
-                        </div>
-                        <div className="mt-0.5 text-[10px] text-wk-text-muted">
-                          {humanize(event.prior_status ?? "")}
-                          {" → "}
-                          {humanize(event.resulting_status ?? "")}
-                          {event.created_at
-                            ? ` · ${new Date(event.created_at).toLocaleString()}`
-                            : ""}
-                        </div>
-                        {event.reason ? (
-                          <div className="mt-1 text-[10px] leading-4 text-wk-text-muted">
-                            {event.reason}
-                          </div>
-                        ) : null}
-                      </div>
-                    ))}
-                </div>
-              </div>
-            ) : null}
-          </WkSurface>
-        </div>
       </div>
+
+      <PlaylistDetailsDrawer
+        open={detailsOpen}
+        onClose={() => setDetailsOpen(false)}
+        title={title}
+        slug={slug}
+        description={description}
+        onTitleChange={setTitle}
+        onSlugChange={(value) =>
+          setSlug(slugifyPlaylistTitle(value))
+        }
+        onDescriptionChange={setDescription}
+        canEdit={canEdit}
+        curator={review?.curator ?? null}
+        curatorLabel={playlist.curatorLabel}
+        onSelectCurator={(candidate) =>
+          void handleCuratorSelect(candidate)
+        }
+        onClearCurator={() => void handleCuratorClear()}
+        cover={cover}
+        coverFallbackUrl={playlist.coverImageUrl}
+        onCoverSelect={(assetId) =>
+          void handleCoverSelection(assetId)
+        }
+        onClearCover={() =>
+          void runAction(
+            "cover-clear",
+            () =>
+              setPlaylistCover(
+                playlist.id,
+                playlist.authorityRevision,
+                null,
+              ),
+            "Playlist cover cleared.",
+          )
+        }
+        busy={busy !== null}
+        status={playlist.status}
+        canPublish={canPublish}
+        approvedVersionId={
+          review?.currentApprovedVersionId ?? null
+        }
+        schedule={review?.schedule ?? null}
+        onSchedule={(publishAt, note) =>
+          void handleSchedule(publishAt, note)
+        }
+        reviewNote={reviewNote}
+        onReviewNoteChange={setReviewNote}
+        reviewEvents={review?.reviewEvents ?? []}
+        lifecycleEvents={review?.lifecycleEvents ?? []}
+      />
     </div>
   );
 }

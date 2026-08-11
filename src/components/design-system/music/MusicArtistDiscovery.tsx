@@ -39,7 +39,7 @@ interface MusicArtistDiscoveryProps {
   onJumpTo: (
     anchorId: string,
   ) => void;
-  onFollow: (
+  onFollow?: (
     artist: MusicArtistDiscoveryArtist,
   ) => void;
 }
@@ -342,47 +342,53 @@ export function MusicArtistDiscovery({
                         </div>
 
                         <div className="flex shrink-0 items-center gap-2">
-                          <button
-                            type="button"
-                            onClick={
-                              () =>
-                                onFollow(
-                                  selected,
+                          {
+                            onFollow
+                              ? (
+                                  <button
+                                    type="button"
+                                    onClick={
+                                      () =>
+                                        onFollow(
+                                          selected,
+                                        )
+                                    }
+                                    disabled={
+                                      selected.followPending
+                                    }
+                                    aria-pressed={
+                                      selected.followed
+                                    }
+                                    className={[
+                                      "wk-button",
+                                      selected.followed
+                                        ? "wk-button-soft"
+                                        : "wk-button-primary",
+                                    ].join(
+                                      " ",
+                                    )}
+                                  >
+                                    <WkIcon
+                                      name={
+                                        selected.followed
+                                          ? "UserCheck"
+                                          : "UserPlus"
+                                      }
+                                      size={
+                                        14
+                                      }
+                                    />
+                                    {
+                                      selected.followPending
+                                        ? "Updating..."
+                                        : selected.followed
+                                          ? "Following"
+                                          : "Follow"
+                                    }
+                                  </button>
                                 )
-                            }
-                            disabled={
-                              selected.followPending
-                            }
-                            aria-pressed={
-                              selected.followed
-                            }
-                            className={[
-                              "wk-button",
-                              selected.followed
-                                ? "wk-button-soft"
-                                : "wk-button-primary",
-                            ].join(
-                              " ",
-                            )}
-                          >
-                            <WkIcon
-                              name={
-                                selected.followed
-                                  ? "UserCheck"
-                                  : "UserPlus"
-                              }
-                              size={
-                                14
-                              }
-                            />
-                            {
-                              selected.followPending
-                                ? "Updating..."
-                                : selected.followed
-                                  ? "Following"
-                                  : "Follow"
-                            }
-                          </button>
+                              : null
+                          }
 
                           {
                             selected.slug

@@ -42,6 +42,7 @@ export interface PublicTrustProvenance {
 }
 
 interface PublicTrustSummaryProps {
+  mode?: "public" | "preview";
   provenance: PublicTrustProvenance;
   credits: PublicTrustCreditItem[];
   sources: PublicTrustSourceItem[];
@@ -115,11 +116,15 @@ function CreditName({
 }
 
 export function PublicTrustSummary({
+  mode = "public",
   provenance,
   credits,
   sources,
   corrections,
 }: PublicTrustSummaryProps) {
+  const isPreview =
+    mode === "preview";
+
   const firstPublished =
     formatPublicDate(
       provenance.firstPublishedAt,
@@ -169,15 +174,33 @@ export function PublicTrustSummary({
               </div>
 
               <h2 className="text-[20px] font-black tracking-[-0.02em] text-[var(--wk-text)]">
-                Publication record
+                {
+                  isPreview
+                    ? "Preview record"
+                    : "Publication record"
+                }
               </h2>
+
+              {
+                isPreview
+                  ? (
+                      <p className="mt-1 max-w-xl text-[11px] leading-5 text-[var(--wk-text-muted)]">
+                        This version is not published. Publication dates below refer to earlier public editions.
+                      </p>
+                    )
+                  : null
+              }
 
               <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-[12px] text-[var(--wk-text-muted)]">
                 {
                   firstPublished
                     ? (
                         <span>
-                          Published{" "}
+                          {
+                            isPreview
+                              ? "Previously published "
+                              : "Published "
+                          }
                           <strong className="font-bold text-[var(--wk-text-soft)]">
                             {
                               firstPublished
@@ -188,7 +211,11 @@ export function PublicTrustSummary({
                     : currentPublished
                       ? (
                           <span>
-                            Published{" "}
+                            {
+                              isPreview
+                                ? "Latest public edition "
+                                : "Published "
+                            }
                             <strong className="font-bold text-[var(--wk-text-soft)]">
                               {
                                 currentPublished
@@ -203,7 +230,11 @@ export function PublicTrustSummary({
                   hasDifferentCurrentEdition
                     ? (
                         <span>
-                          Current edition{" "}
+                          {
+                            isPreview
+                              ? "Latest public edition "
+                              : "Current edition "
+                          }
                           <strong className="font-bold text-[var(--wk-text-soft)]">
                             {
                               currentPublished
@@ -221,7 +252,11 @@ export function PublicTrustSummary({
                 0
                 ? (
                     <div className="inline-flex w-fit items-center rounded-full border border-[var(--wk-border)] bg-[var(--wk-surface-raised)] px-3 py-1.5 text-[11px] font-bold text-[var(--wk-text-muted)]">
-                      Version{" "}
+                      {
+                        isPreview
+                          ? "Preview Version "
+                          : "Version "
+                      }
                       {
                         provenance.versionNumber
                       }

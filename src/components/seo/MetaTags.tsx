@@ -8,6 +8,7 @@ export interface MetaTagsProps {
   type?: "website" | "article" | "music.song" | "music.album" | "music.playlist";
   artistName?: string;
   releaseDate?: string;
+  robots?: string;
 }
 
 const SITE_NAME = "WAKILISHA";
@@ -41,6 +42,7 @@ export function MetaTags({
   type = "website",
   artistName,
   releaseDate,
+  robots,
 }: MetaTagsProps) {
   useEffect(() => {
     const fullTitle = `${title} | ${SITE_NAME}`;
@@ -80,6 +82,10 @@ export function MetaTags({
 
     setMetaTag("description", description);
 
+    if (robots) {
+      setMetaTag("robots", robots);
+    }
+
     return () => {
       const tags = [
         "og:title", "og:description", "og:type", "og:site_name", "og:url",
@@ -88,12 +94,13 @@ export function MetaTags({
         "twitter:image", "twitter:image:alt",
         "music:musician", "music:release_date",
         "description",
+        "robots",
       ];
       for (const tag of tags) {
         removeMetaTag(tag);
       }
     };
-  }, [title, description, imageUrl, url, type, artistName, releaseDate]);
+  }, [title, description, imageUrl, url, type, artistName, releaseDate, robots]);
 
   return null;
 }
