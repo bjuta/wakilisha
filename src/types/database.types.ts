@@ -3864,6 +3864,14 @@ export type Database = {
         Returns: undefined
       }
       resolve_credit_person: { Args: { p_credit_id: string }; Returns: string }
+      resolve_person_follow_target: {
+        Args: { p_person_resource_id: string }
+        Returns: {
+          canonical_path: string
+          followable: boolean
+          person_resource_id: string
+        }[]
+      }
       resolve_person_presentation: {
         Args: { p_person_resource_id: string }
         Returns: Json
@@ -17411,6 +17419,10 @@ export type Database = {
         }
         Returns: Json
       }
+      community_get_person_follow_state: {
+        Args: { p_person_resource_id: string }
+        Returns: Json
+      }
       community_get_profile_by_username: {
         Args: { p_username: string }
         Returns: Json
@@ -18722,6 +18734,10 @@ export type Database = {
         }[]
       }
       get_public_person: { Args: { p_slug: string }; Returns: Json }
+      get_public_person_social_summary: {
+        Args: { p_person_resource_id: string }
+        Returns: Json
+      }
       get_public_playlist: { Args: { p_slug: string }; Returns: Json }
       get_release_artists_for_anon: {
         Args: { p_artist_slug: string }
