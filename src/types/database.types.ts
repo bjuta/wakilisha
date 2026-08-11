@@ -1704,6 +1704,69 @@ export type Database = {
           },
         ]
       }
+      playlist_lifecycle_events: {
+        Row: {
+          action: string
+          actor_id: string | null
+          command_receipt_id: string
+          created_at: string
+          event_number: number
+          id: string
+          metadata: Json
+          note: string | null
+          playlist_id: string
+          prior_status: string | null
+          resource_id: string
+          resulting_status: string
+          version_id: string | null
+        }
+        Insert: {
+          action: string
+          actor_id?: string | null
+          command_receipt_id: string
+          created_at?: string
+          event_number: number
+          id?: string
+          metadata?: Json
+          note?: string | null
+          playlist_id: string
+          prior_status?: string | null
+          resource_id: string
+          resulting_status: string
+          version_id?: string | null
+        }
+        Update: {
+          action?: string
+          actor_id?: string | null
+          command_receipt_id?: string
+          created_at?: string
+          event_number?: number
+          id?: string
+          metadata?: Json
+          note?: string | null
+          playlist_id?: string
+          prior_status?: string | null
+          resource_id?: string
+          resulting_status?: string
+          version_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "playlist_lifecycle_events_binding_fkey"
+            columns: ["resource_id", "playlist_id"]
+            isOneToOne: false
+            referencedRelation: "playlist_resources"
+            referencedColumns: ["resource_id", "playlist_id"]
+          },
+          {
+            foreignKeyName: "playlist_lifecycle_events_version_fkey"
+            columns: ["version_id", "resource_id", "playlist_id"]
+            isOneToOne: false
+            referencedRelation: "playlist_versions"
+            referencedColumns: ["id", "resource_id", "playlist_id"]
+          },
+        ]
+      }
       playlist_publication_snapshots: {
         Row: {
           command_receipt_id: string
@@ -1937,6 +2000,69 @@ export type Database = {
           {
             foreignKeyName: "playlist_review_events_target_version_fkey"
             columns: ["target_version_id", "resource_id", "playlist_id"]
+            isOneToOne: false
+            referencedRelation: "playlist_versions"
+            referencedColumns: ["id", "resource_id", "playlist_id"]
+          },
+        ]
+      }
+      playlist_scheduled_publications: {
+        Row: {
+          command_receipt_id: string
+          created_at: string
+          created_by: string | null
+          failure_reason: string | null
+          id: string
+          note: string | null
+          playlist_id: string
+          published_at: string | null
+          resource_id: string
+          run_after: string
+          status: string
+          updated_at: string
+          version_id: string
+        }
+        Insert: {
+          command_receipt_id: string
+          created_at?: string
+          created_by?: string | null
+          failure_reason?: string | null
+          id?: string
+          note?: string | null
+          playlist_id: string
+          published_at?: string | null
+          resource_id: string
+          run_after: string
+          status?: string
+          updated_at?: string
+          version_id: string
+        }
+        Update: {
+          command_receipt_id?: string
+          created_at?: string
+          created_by?: string | null
+          failure_reason?: string | null
+          id?: string
+          note?: string | null
+          playlist_id?: string
+          published_at?: string | null
+          resource_id?: string
+          run_after?: string
+          status?: string
+          updated_at?: string
+          version_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "playlist_scheduled_publications_binding_fkey"
+            columns: ["resource_id", "playlist_id"]
+            isOneToOne: false
+            referencedRelation: "playlist_resources"
+            referencedColumns: ["resource_id", "playlist_id"]
+          },
+          {
+            foreignKeyName: "playlist_scheduled_publications_version_fkey"
+            columns: ["version_id", "resource_id", "playlist_id"]
             isOneToOne: false
             referencedRelation: "playlist_versions"
             referencedColumns: ["id", "resource_id", "playlist_id"]
@@ -3102,6 +3228,21 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      append_playlist_lifecycle_event: {
+        Args: {
+          p_action: string
+          p_actor_id: string
+          p_command_receipt_id: string
+          p_metadata?: Json
+          p_note: string
+          p_playlist_id: string
+          p_prior_status: string
+          p_resource_id: string
+          p_resulting_status: string
+          p_version_id: string
+        }
+        Returns: string
+      }
       apply_article_review_snapshot: {
         Args: {
           p_article_id: string
@@ -3136,6 +3277,15 @@ export type Database = {
       }
       assert_citation_command_actor: { Args: never; Returns: string }
       assert_credit_command_actor: { Args: never; Returns: string }
+      assert_playlist_curator_credit: {
+        Args: { p_credit_id: string }
+        Returns: {
+          credit_id: string
+          display_name: string
+          registry_author_slug: string
+          user_username: string
+        }[]
+      }
       assert_source_command_actor: {
         Args: { p_capability: string }
         Returns: string
@@ -3149,6 +3299,19 @@ export type Database = {
           p_wp_status: string
         }
         Returns: {
+          version_id: string
+          version_number: number
+        }[]
+      }
+      copy_playlist_lifecycle_version: {
+        Args: {
+          p_actor_id: string
+          p_source_version_id: string
+          p_target_version_kind: string
+        }
+        Returns: {
+          content_fingerprint: string
+          item_count: number
           version_id: string
           version_number: number
         }[]
@@ -3378,6 +3541,19 @@ export type Database = {
       resequence_playlist_with_registry_intake: {
         Args: { p_playlist_id: string }
         Returns: undefined
+      }
+      resolve_playlist_curator_credit: {
+        Args: {
+          p_actor_id: string
+          p_registry_author_id: string
+          p_user_id: string
+        }
+        Returns: {
+          credit_id: string
+          display_name: string
+          registry_author_slug: string
+          user_username: string
+        }[]
       }
       seed_registry_track_intake_provider_observations: {
         Args: { p_suggestion_id: string }
@@ -15265,6 +15441,47 @@ export type Database = {
           },
         ]
       }
+      wk_playlist_preview_links: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          expires_at: string
+          id: string
+          nonce: string
+          playlist_id: string
+          revoked_at: string | null
+          version_id: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          expires_at: string
+          id?: string
+          nonce?: string
+          playlist_id: string
+          revoked_at?: string | null
+          version_id: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          expires_at?: string
+          id?: string
+          nonce?: string
+          playlist_id?: string
+          revoked_at?: string | null
+          version_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "wk_playlist_preview_links_playlist_id_fkey"
+            columns: ["playlist_id"]
+            isOneToOne: false
+            referencedRelation: "wk_playlists"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       wk_playlists: {
         Row: {
           authority_revision: number
@@ -15272,6 +15489,7 @@ export type Database = {
           cover_image_url: string | null
           created_at: string
           created_by: string | null
+          curator_credit_id: string | null
           curator_label: string | null
           description: string | null
           id: string
@@ -15290,6 +15508,7 @@ export type Database = {
           cover_image_url?: string | null
           created_at?: string
           created_by?: string | null
+          curator_credit_id?: string | null
           curator_label?: string | null
           description?: string | null
           id?: string
@@ -15308,6 +15527,7 @@ export type Database = {
           cover_image_url?: string | null
           created_at?: string
           created_by?: string | null
+          curator_credit_id?: string | null
           curator_label?: string | null
           description?: string | null
           id?: string
@@ -16395,6 +16615,27 @@ export type Database = {
           usage_link_id: string
           usage_revision: number
           usage_state: string
+        }[]
+      }
+      archive_playlist: {
+        Args: {
+          p_correlation_id?: string
+          p_expected_authority_revision: number
+          p_idempotency_key: string
+          p_note?: string
+          p_playlist_id: string
+        }
+        Returns: {
+          authority_revision: number
+          command_receipt_id: string
+          idempotent_replay: boolean
+          lifecycle_status: string
+          playlist_id: string
+          receipt_status: string
+          resource_id: string
+          result_payload: Json
+          version_id: string
+          version_number: number
         }[]
       }
       assign_correction_case: {
@@ -17598,6 +17839,18 @@ export type Database = {
           receipt_status: string
           resource_id: string
           result_payload: Json
+        }[]
+      }
+      create_playlist_preview_link: {
+        Args: {
+          p_expires_at?: string
+          p_playlist_id: string
+          p_version_id?: string
+        }
+        Returns: {
+          expires_at: string
+          nonce: string
+          version_id: string
         }[]
       }
       create_public_playlist_missing_track_submission: {
@@ -18867,6 +19120,17 @@ export type Database = {
           version_id: string
         }[]
       }
+      publish_due_playlist_publications: {
+        Args: { p_limit?: number }
+        Returns: {
+          playlist_id: string
+          playlist_slug: string
+          published_at: string
+          schedule_id: string
+          status: string
+          version_id: string
+        }[]
+      }
       publish_playlist_version: {
         Args: {
           p_approved_version_id: string
@@ -19360,6 +19624,10 @@ export type Database = {
           result_payload: Json
         }[]
       }
+      resolve_playlist_preview_nonce: {
+        Args: { p_nonce: string }
+        Returns: Json
+      }
       resolve_registry_relationship_endpoint: {
         Args: {
           p_endpoint_side: string
@@ -19477,6 +19745,27 @@ export type Database = {
           authority_revision: number
           correlation_id: string
           lifecycle_state: string
+        }[]
+      }
+      restore_playlist_from_archive: {
+        Args: {
+          p_correlation_id?: string
+          p_expected_authority_revision: number
+          p_idempotency_key: string
+          p_note?: string
+          p_playlist_id: string
+        }
+        Returns: {
+          authority_revision: number
+          command_receipt_id: string
+          idempotent_replay: boolean
+          lifecycle_status: string
+          playlist_id: string
+          receipt_status: string
+          resource_id: string
+          result_payload: Json
+          version_id: string
+          version_number: number
         }[]
       }
       restore_source: {
@@ -19741,6 +20030,29 @@ export type Database = {
           version_number: number
         }[]
       }
+      schedule_playlist_publication: {
+        Args: {
+          p_approved_version_id: string
+          p_correlation_id?: string
+          p_expected_authority_revision: number
+          p_idempotency_key: string
+          p_note?: string
+          p_playlist_id: string
+          p_publish_at: string
+        }
+        Returns: {
+          authority_revision: number
+          command_receipt_id: string
+          idempotent_replay: boolean
+          lifecycle_status: string
+          playlist_id: string
+          receipt_status: string
+          resource_id: string
+          result_payload: Json
+          version_id: string
+          version_number: number
+        }[]
+      }
       seed_taxonomy_terms_from_articles: {
         Args: never
         Returns: {
@@ -19780,6 +20092,28 @@ export type Database = {
           cover_url: string
           cover_usage_link_id: string
           idempotent_replay: boolean
+          playlist_id: string
+          receipt_status: string
+          resource_id: string
+          result_payload: Json
+        }[]
+      }
+      set_playlist_curator: {
+        Args: {
+          p_correlation_id?: string
+          p_expected_authority_revision: number
+          p_idempotency_key: string
+          p_playlist_id: string
+          p_registry_author_id: string
+          p_user_id: string
+        }
+        Returns: {
+          authority_revision: number
+          command_receipt_id: string
+          curator_credit_id: string
+          curator_label: string
+          idempotent_replay: boolean
+          lifecycle_status: string
           playlist_id: string
           receipt_status: string
           resource_id: string
@@ -20029,6 +20363,48 @@ export type Database = {
           article_slug: string
           draft_version: number
           lifecycle_status: string
+          version_id: string
+          version_number: number
+        }[]
+      }
+      unpublish_playlist: {
+        Args: {
+          p_correlation_id?: string
+          p_expected_authority_revision: number
+          p_idempotency_key: string
+          p_note?: string
+          p_playlist_id: string
+        }
+        Returns: {
+          authority_revision: number
+          command_receipt_id: string
+          idempotent_replay: boolean
+          lifecycle_status: string
+          playlist_id: string
+          receipt_status: string
+          resource_id: string
+          result_payload: Json
+          version_id: string
+          version_number: number
+        }[]
+      }
+      unschedule_playlist_publication: {
+        Args: {
+          p_correlation_id?: string
+          p_expected_authority_revision: number
+          p_idempotency_key: string
+          p_note?: string
+          p_playlist_id: string
+        }
+        Returns: {
+          authority_revision: number
+          command_receipt_id: string
+          idempotent_replay: boolean
+          lifecycle_status: string
+          playlist_id: string
+          receipt_status: string
+          resource_id: string
+          result_payload: Json
           version_id: string
           version_number: number
         }[]
