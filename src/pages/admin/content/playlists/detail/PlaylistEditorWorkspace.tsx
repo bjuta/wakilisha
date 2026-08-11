@@ -45,6 +45,7 @@ import {
   type PlaylistItem,
   type PlaylistPlaybackValidation,
   type PlaylistPendingRegistryIntake,
+  type PlaylistCoverPresentationInput,
   type RegistryArtistSearchResult,
   type RegistryIntakeArtistCreditInput,
   type RegistryTrackSearchResult,
@@ -435,6 +436,29 @@ export function PlaylistEditorWorkspace({
     Boolean(detail.review?.currentWorkingVersionId) &&
     workingSnapshotSourceRevision ===
       detail.playlist.authorityRevision;
+
+  const workingSnapshotFingerprint =
+    typeof detail.review?.workingVersion?.content_fingerprint ===
+    "string"
+      ? detail.review.workingVersion.content_fingerprint
+      : null;
+
+  const publishedSnapshotFingerprint =
+    typeof detail.review?.publishedVersion?.content_fingerprint ===
+    "string"
+      ? detail.review.publishedVersion.content_fingerprint
+      : null;
+
+  const publishedUpdateReadyForReview =
+    detail.playlist.status === "published" &&
+    workingSnapshotExact &&
+    Boolean(
+      detail.review?.currentPublishedVersionId,
+    ) &&
+    workingSnapshotFingerprint !== null &&
+    publishedSnapshotFingerprint !== null &&
+    workingSnapshotFingerprint !==
+      publishedSnapshotFingerprint;
 
   async function handleExplicitSave() {
     if (isDirty || busy !== null) {
@@ -1013,7 +1037,10 @@ export function PlaylistEditorWorkspace({
 
 
 
-  async function handleCoverSelection(assetId: string) {
+  async function handleCoverSelection(
+    assetId: string,
+    presentation: PlaylistCoverPresentationInput,
+  ) {
     setBusy("cover");
     setMessage(null);
     try {
@@ -1025,6 +1052,7 @@ export function PlaylistEditorWorkspace({
         playlist.id,
         playlist.authorityRevision,
         prepared.assetId,
+        presentation,
       );
       await reload();
       setMessage({
@@ -1037,6 +1065,24 @@ export function PlaylistEditorWorkspace({
     } finally {
       setBusy(null);
     }
+  }
+
+  async function handleCoverPresentationSave(
+    presentation: PlaylistCoverPresentationInput,
+  ) {
+    if (!cover) return;
+
+    await runAction(
+      "cover-presentation",
+      () =>
+        setPlaylistCover(
+          playlist.id,
+          playlist.authorityRevision,
+          cover.assetId,
+          presentation,
+        ),
+      "Cover text saved.",
+    );
   }
 
   function applyLocalOrder(nextIds: string[]) {
@@ -1296,13 +1342,45 @@ export function PlaylistEditorWorkspace({
 
   if (
     canEdit &&
-    ["draft", "changes_requested"].includes(playlist.status)
+    (
+      ["draft", "changes_requested"].includes(
+        playlist.status,
+      ) ||
+      publishedUpdateReadyForReview
+    )
   ) {
+    const isPublishedUpdate =
+      playlist.status === "published";
+
+    if (isPublishedUpdate) {
+      headerSecondaryActions.push({
+        label: "View live",
+        icon: "ExternalLink",
+        href: `/playlists/${encodeURIComponent(
+          playlist.slug,
+        )}`,
+      });
+
+      if (canPublish) {
+        headerSecondaryActions.push({
+          label: "Unpublish",
+          icon: "EyeOff",
+          tone: "danger",
+          onClick: () =>
+            void handleUnpublish(),
+          disabled: busy !== null,
+        });
+      }
+    }
+
     headerPrimaryAction = {
-      label: "Submit for Review",
+      label: isPublishedUpdate
+        ? "Submit Update for Review"
+        : "Submit for Review",
       icon: "Send",
       tone: "primary",
-      onClick: () => void handleSubmitForReview(),
+      onClick: () =>
+        void handleSubmitForReview(),
       disabled:
         busy !== null ||
         items.length === 0 ||
@@ -1310,7 +1388,9 @@ export function PlaylistEditorWorkspace({
         !workingSnapshotExact,
       title: !workingSnapshotExact
         ? "Save the Playlist before submitting for Review."
-        : undefined,
+        : isPublishedUpdate
+          ? "Submit this saved update for Review while the current published edition stays live."
+          : undefined,
     };
   } else if (
     canManageReview &&
@@ -2235,8 +2315,16 @@ export function PlaylistEditorWorkspace({
         onClearCurator={() => void handleCuratorClear()}
         cover={cover}
         coverFallbackUrl={playlist.coverImageUrl}
-        onCoverSelect={(assetId) =>
-          void handleCoverSelection(assetId)
+        onCoverSelect={(assetId, presentation) =>
+          void handleCoverSelection(
+            assetId,
+            presentation,
+          )
+        }
+        onCoverPresentationSave={(presentation) =>
+          void handleCoverPresentationSave(
+            presentation,
+          )
         }
         onClearCover={() =>
           void runAction(

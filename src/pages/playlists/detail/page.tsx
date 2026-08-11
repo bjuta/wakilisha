@@ -19,8 +19,8 @@ import {
   ShareButton,
 } from "@/components/design-system/share/ShareSheet";
 import {
-  Ch19GradientImage,
-} from "@/components/media/Ch19GradientImage";
+  PlaylistCoverPresentation,
+} from "@/components/media/PlaylistCoverPresentation";
 import {
   MetaTags,
 } from "@/components/seo/MetaTags";
@@ -631,40 +631,6 @@ function buildPlaylistArtistDiscovery(
         );
       },
     );
-}
-
-function PlaylistCover({
-  playlist,
-}: {
-  playlist: PublicPlaylist;
-}) {
-  if (
-    playlist.cover?.url
-  ) {
-    return (
-      <img
-        src={
-          playlist.cover.url
-        }
-        alt={
-          playlist.cover.altText ??
-          playlist.title
-        }
-        className="h-full w-full object-cover"
-      />
-    );
-  }
-
-  return (
-    <Ch19GradientImage
-      slug={
-        playlist.slug
-      }
-      name={
-        playlist.title
-      }
-    />
-  );
 }
 
 function PlaylistTrackRow({
@@ -2280,9 +2246,24 @@ export default function PublicPlaylistDetailPage() {
             <div className="wk-container-wide w-full px-5 pb-10 pt-14 md:px-6 md:pb-14">
               <div className="grid items-end gap-6 md:grid-cols-[170px_minmax(0,1fr)] md:gap-8">
                 <div className="aspect-square w-[132px] overflow-hidden rounded-2xl border border-white/15 bg-black/20 shadow-2xl md:w-[170px]">
-                  <PlaylistCover
-                    playlist={
-                      playlist
+                  <PlaylistCoverPresentation
+                    src={
+                      playlist.cover?.url ??
+                      null
+                    }
+                    altText={
+                      playlist.cover?.altText ??
+                      null
+                    }
+                    slug={
+                      playlist.slug
+                    }
+                    title={
+                      playlist.title
+                    }
+                    caption={
+                      playlist.cover?.caption ??
+                      null
                     }
                   />
                 </div>
