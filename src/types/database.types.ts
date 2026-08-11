@@ -1739,6 +1739,70 @@ export type Database = {
           },
         ]
       }
+      person_follow_merge_transfers: {
+        Row: {
+          created_at: string
+          id: string
+          merge_event_id: string
+          source_follow_created_at: string
+          source_follow_id: string
+          source_person_resource_id: string
+          target_follow_id: string
+          target_follow_preexisted: boolean
+          target_person_resource_id: string
+          transfer_mode: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          merge_event_id: string
+          source_follow_created_at: string
+          source_follow_id: string
+          source_person_resource_id: string
+          target_follow_id: string
+          target_follow_preexisted: boolean
+          target_person_resource_id: string
+          transfer_mode: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          merge_event_id?: string
+          source_follow_created_at?: string
+          source_follow_id?: string
+          source_person_resource_id?: string
+          target_follow_id?: string
+          target_follow_preexisted?: boolean
+          target_person_resource_id?: string
+          transfer_mode?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "person_follow_merge_transfers_merge_event_fkey"
+            columns: ["merge_event_id"]
+            isOneToOne: false
+            referencedRelation: "person_identity_events"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "person_follow_merge_transfers_source_person_fkey"
+            columns: ["source_person_resource_id"]
+            isOneToOne: false
+            referencedRelation: "people"
+            referencedColumns: ["resource_id"]
+          },
+          {
+            foreignKeyName: "person_follow_merge_transfers_target_person_fkey"
+            columns: ["target_person_resource_id"]
+            isOneToOne: false
+            referencedRelation: "people"
+            referencedColumns: ["resource_id"]
+          },
+        ]
+      }
       person_identity_events: {
         Row: {
           actor_id: string | null
@@ -3708,6 +3772,20 @@ export type Database = {
         }
         Returns: undefined
       }
+      list_current_public_person_work: {
+        Args: { p_person_resource_id: string }
+        Returns: {
+          canonical_path: string
+          image_url: string
+          is_primary: boolean
+          published_at: string
+          resource_id: string
+          resource_kind: string
+          roles: Json
+          summary: string
+          title: string
+        }[]
+      }
       materialize_playlist_publication_snapshot: {
         Args: {
           p_command_receipt_id: string
@@ -3785,6 +3863,7 @@ export type Database = {
         Args: { p_playlist_id: string }
         Returns: undefined
       }
+      resolve_credit_person: { Args: { p_credit_id: string }; Returns: string }
       resolve_person_presentation: {
         Args: { p_person_resource_id: string }
         Returns: Json
@@ -18926,6 +19005,28 @@ export type Database = {
           result: Json
         }[]
       }
+      link_person_identity: {
+        Args: {
+          p_correlation_id?: string
+          p_expected_identity_revision: number
+          p_external_contributor_id: string
+          p_idempotency_key: string
+          p_link_method: string
+          p_person_resource_id: string
+          p_reason: string
+          p_registry_author_id: string
+          p_user_id: string
+        }
+        Returns: {
+          command_receipt_id: string
+          idempotent_replay: boolean
+          identity_link_id: string
+          identity_revision: number
+          person_resource_id: string
+          receipt_status: string
+          result_payload: Json
+        }[]
+      }
       link_publishing_item_resource: {
         Args: {
           p_expected_record_version: number
@@ -19062,6 +19163,25 @@ export type Database = {
           updated_at: string
         }[]
       }
+      list_public_person_work: {
+        Args: {
+          p_before_published_at?: string
+          p_before_resource_id?: string
+          p_limit?: number
+          p_person_resource_id: string
+        }
+        Returns: {
+          canonical_path: string
+          image_url: string
+          is_primary: boolean
+          published_at: string
+          resource_id: string
+          resource_kind: string
+          roles: Json
+          summary: string
+          title: string
+        }[]
+      }
       list_public_playlists: {
         Args: {
           p_before_published_at?: string
@@ -19132,6 +19252,28 @@ export type Database = {
           decided_at: string
           decision_status: string
           suggestion_id: string
+        }[]
+      }
+      merge_people: {
+        Args: {
+          p_correlation_id?: string
+          p_expected_source_identity_revision: number
+          p_expected_target_identity_revision: number
+          p_idempotency_key: string
+          p_reason: string
+          p_source_person_resource_id: string
+          p_target_person_resource_id: string
+        }
+        Returns: {
+          command_receipt_id: string
+          idempotent_replay: boolean
+          merge_event_id: string
+          receipt_status: string
+          result_payload: Json
+          source_identity_revision: number
+          source_person_resource_id: string
+          target_identity_revision: number
+          target_person_resource_id: string
         }[]
       }
       merge_registry_relationship_duplicate: {
@@ -20600,6 +20742,25 @@ export type Database = {
           case_revision: number
           command_receipt_id: string
           idempotent_replay: boolean
+          receipt_status: string
+          result_payload: Json
+        }[]
+      }
+      unlink_person_identity: {
+        Args: {
+          p_correlation_id?: string
+          p_expected_identity_revision: number
+          p_idempotency_key: string
+          p_identity_link_id: string
+          p_person_resource_id: string
+          p_reason: string
+        }
+        Returns: {
+          command_receipt_id: string
+          idempotent_replay: boolean
+          identity_link_id: string
+          identity_revision: number
+          person_resource_id: string
           receipt_status: string
           result_payload: Json
         }[]

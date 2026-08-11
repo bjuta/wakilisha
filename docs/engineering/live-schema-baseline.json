@@ -1,9 +1,9 @@
 {
   "projectRef": "pgzizndxdyhqmtyywjmt",
   "schema": "public",
-  "generatedAt": "2026-08-11T18:39:30Z",
-  "typesSha256": "d88340e5806287c468f9b5eb35755b1e7e71b6b6a2d9ccf0f667ca346aeb7ec5",
+  "generatedAt": "2026-08-11T21:10:23Z",
+  "typesSha256": "af14cd2422581c868d9402bdbc4875c22e33f5248facb1a926bd80f716351ead",
   "authoritativeMigrationDirectory": "supabase/migrations",
-  "migrationCount": 236,
-  "latestMigration": "20260811173000_people_person_identity_foundation.sql"
+  "migrationCount": 237,
+  "latestMigration": "20260811190000_people_person_reconciliation_body_of_work.sql"
 }
