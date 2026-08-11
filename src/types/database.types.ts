@@ -1678,6 +1678,217 @@ export type Database = {
           },
         ]
       }
+      people: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          identity_revision: number
+          merged_into_person_resource_id: string | null
+          person_state: string
+          preferred_identity_link_id: string | null
+          resource_id: string
+          resource_kind: string
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          identity_revision?: number
+          merged_into_person_resource_id?: string | null
+          person_state?: string
+          preferred_identity_link_id?: string | null
+          resource_id: string
+          resource_kind?: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          identity_revision?: number
+          merged_into_person_resource_id?: string | null
+          person_state?: string
+          preferred_identity_link_id?: string | null
+          resource_id?: string
+          resource_kind?: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "people_merged_into_fkey"
+            columns: ["merged_into_person_resource_id"]
+            isOneToOne: false
+            referencedRelation: "people"
+            referencedColumns: ["resource_id"]
+          },
+          {
+            foreignKeyName: "people_preferred_identity_link_fkey"
+            columns: ["preferred_identity_link_id", "resource_id"]
+            isOneToOne: false
+            referencedRelation: "person_identity_links"
+            referencedColumns: ["id", "person_resource_id"]
+          },
+          {
+            foreignKeyName: "people_resource_fkey"
+            columns: ["resource_id", "resource_kind"]
+            isOneToOne: true
+            referencedRelation: "resources"
+            referencedColumns: ["id", "resource_kind"]
+          },
+        ]
+      }
+      person_identity_events: {
+        Row: {
+          actor_id: string | null
+          correlation_id: string | null
+          created_at: string
+          event_type: string
+          id: string
+          identity_link_id: string | null
+          person_resource_id: string
+          prior_identity_revision: number | null
+          reason: string | null
+          related_person_resource_id: string | null
+          resulting_identity_revision: number
+        }
+        Insert: {
+          actor_id?: string | null
+          correlation_id?: string | null
+          created_at?: string
+          event_type: string
+          id?: string
+          identity_link_id?: string | null
+          person_resource_id: string
+          prior_identity_revision?: number | null
+          reason?: string | null
+          related_person_resource_id?: string | null
+          resulting_identity_revision: number
+        }
+        Update: {
+          actor_id?: string | null
+          correlation_id?: string | null
+          created_at?: string
+          event_type?: string
+          id?: string
+          identity_link_id?: string | null
+          person_resource_id?: string
+          prior_identity_revision?: number | null
+          reason?: string | null
+          related_person_resource_id?: string | null
+          resulting_identity_revision?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "person_identity_events_link_fkey"
+            columns: ["identity_link_id"]
+            isOneToOne: false
+            referencedRelation: "person_identity_links"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "person_identity_events_person_fkey"
+            columns: ["person_resource_id"]
+            isOneToOne: false
+            referencedRelation: "people"
+            referencedColumns: ["resource_id"]
+          },
+          {
+            foreignKeyName: "person_identity_events_related_person_fkey"
+            columns: ["related_person_resource_id"]
+            isOneToOne: false
+            referencedRelation: "people"
+            referencedColumns: ["resource_id"]
+          },
+        ]
+      }
+      person_identity_links: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          external_contributor_id: string | null
+          id: string
+          link_method: string
+          link_reason: string
+          link_state: string
+          person_resource_id: string
+          person_resource_kind: string
+          registry_author_id: string | null
+          retired_at: string | null
+          retired_by: string | null
+          retired_reason: string | null
+          superseded_by_link_id: string | null
+          supersedes_link_id: string | null
+          user_id: string | null
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          external_contributor_id?: string | null
+          id?: string
+          link_method: string
+          link_reason: string
+          link_state?: string
+          person_resource_id: string
+          person_resource_kind?: string
+          registry_author_id?: string | null
+          retired_at?: string | null
+          retired_by?: string | null
+          retired_reason?: string | null
+          superseded_by_link_id?: string | null
+          supersedes_link_id?: string | null
+          user_id?: string | null
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          external_contributor_id?: string | null
+          id?: string
+          link_method?: string
+          link_reason?: string
+          link_state?: string
+          person_resource_id?: string
+          person_resource_kind?: string
+          registry_author_id?: string | null
+          retired_at?: string | null
+          retired_by?: string | null
+          retired_reason?: string | null
+          superseded_by_link_id?: string | null
+          supersedes_link_id?: string | null
+          user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "person_identity_links_external_contributor_fkey"
+            columns: ["external_contributor_id"]
+            isOneToOne: false
+            referencedRelation: "external_contributors"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "person_identity_links_person_fkey"
+            columns: ["person_resource_id", "person_resource_kind"]
+            isOneToOne: false
+            referencedRelation: "people"
+            referencedColumns: ["resource_id", "resource_kind"]
+          },
+          {
+            foreignKeyName: "person_identity_links_superseded_by_fkey"
+            columns: ["superseded_by_link_id"]
+            isOneToOne: false
+            referencedRelation: "person_identity_links"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "person_identity_links_supersedes_fkey"
+            columns: ["supersedes_link_id"]
+            isOneToOne: false
+            referencedRelation: "person_identity_links"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       playlist_item_resources: {
         Row: {
           playlist_item_id: string
@@ -3228,6 +3439,10 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      allocate_person_path: {
+        Args: { p_person_resource_id: string; p_seed: string }
+        Returns: string
+      }
       append_playlist_lifecycle_event: {
         Args: {
           p_action: string
@@ -3367,6 +3582,16 @@ export type Database = {
         }
         Returns: string
       }
+      create_person_for_identity: {
+        Args: {
+          p_external_contributor_id: string
+          p_link_method: string
+          p_link_reason: string
+          p_registry_author_id: string
+          p_user_id: string
+        }
+        Returns: string
+      }
       current_user_can_apply_correction: {
         Args: { p_case_resource_id: string }
         Returns: boolean
@@ -3434,6 +3659,15 @@ export type Database = {
         Args: { p_item_id: string }
         Returns: string
       }
+      ensure_person_for_external_contributor: {
+        Args: { p_external_contributor_id: string }
+        Returns: string
+      }
+      ensure_person_for_registry_author: {
+        Args: { p_registry_author_id: string }
+        Returns: string
+      }
+      ensure_person_for_user: { Args: { p_user_id: string }; Returns: string }
       ensure_playlist_registry_intake_item: {
         Args: { p_suggestion_id: string }
         Returns: string
@@ -3491,6 +3725,7 @@ export type Database = {
         Args: { p_exclude_item_id?: string; p_playlist_id: string }
         Returns: number
       }
+      normalize_person_slug: { Args: { p_seed: string }; Returns: string }
       normalize_source_metadata: { Args: { p_metadata: Json }; Returns: Json }
       normalize_source_registry_links: {
         Args: { p_registry_links: Json }
@@ -3542,9 +3777,17 @@ export type Database = {
         }
         Returns: Json
       }
+      refresh_person_visibility: {
+        Args: { p_person_resource_id: string }
+        Returns: undefined
+      }
       resequence_playlist_with_registry_intake: {
         Args: { p_playlist_id: string }
         Returns: undefined
+      }
+      resolve_person_presentation: {
+        Args: { p_person_resource_id: string }
+        Returns: Json
       }
       resolve_playlist_curator_credit: {
         Args: {
@@ -18399,6 +18642,7 @@ export type Database = {
           updated_at: string
         }[]
       }
+      get_public_person: { Args: { p_slug: string }; Returns: Json }
       get_public_playlist: { Args: { p_slug: string }; Returns: Json }
       get_release_artists_for_anon: {
         Args: { p_artist_slug: string }
