@@ -107,7 +107,7 @@
     "control-plane:verify": "node scripts/control-plane/verify-phase-0b-engineering-control-plane.mjs && node scripts/control-plane/verify-frozen-institute.mjs",
     "schema:generate": "bash scripts/control-plane/generate-live-schema.sh",
     "schema:verify": "bash scripts/control-plane/verify-live-schema.sh",
-    "test:critical": "npm run control-plane:verify && npx vitest run test/control-plane/request-context.test.ts test/security/rls-policies.test.ts test/institute/assistant-jobs.test.ts test/institute/evidence-reader.test.ts test/institute/how-this-learned.test.ts test/institute/question-clinic.test.ts test/institute/relationship-mapper.test.ts test/ingest-track-slug-reuse.test.ts test/release-scoped-track-route.test.ts test/playlists/playlist-track-intake-provider-selection.test.ts test/playlists/playlist-canonical-artist-presentation.test.ts"
+    "test:critical": "npm run control-plane:verify && npx vitest run test/control-plane/request-context.test.ts test/security/rls-policies.test.ts test/institute/assistant-jobs.test.ts test/institute/evidence-reader.test.ts test/institute/how-this-learned.test.ts test/institute/question-clinic.test.ts test/institute/relationship-mapper.test.ts test/ingest-track-slug-reuse.test.ts test/release-scoped-track-route.test.ts test/playlists/playlist-track-intake-provider-selection.test.ts test/playlists/playlist-canonical-artist-presentation.test.ts test/people/person-public-surface.test.ts"
   },
   "type": "module",
   "version": "0.1.0"

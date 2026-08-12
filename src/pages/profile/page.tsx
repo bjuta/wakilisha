@@ -47,7 +47,7 @@ function entityLabel(type: string): string {
     article: "Article", artist: "Artist", track: "Track", release: "Release",
     label: "Label", genre: "Genre", chart: "Chart", chart_edition: "Chart Edition",
     field_guide: "Guide", magazine_issue: "Issue", briefing_issue: "Briefing",
-    profile: "Profile", comment: "Comment",
+    profile: "Profile", person: "Person", comment: "Comment",
   };
   return map[type] || type;
 }

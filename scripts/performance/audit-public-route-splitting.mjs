@@ -144,9 +144,9 @@ const directLazyImports = [
   ),
 ].map((match) => match[1]);
 
-if (directLazyImports.length !== 50) {
+if (directLazyImports.length !== 51) {
   fail(
-    `expected 50 direct lazy imports, found ${directLazyImports.length}`,
+    `expected 51 direct lazy imports, found ${directLazyImports.length}`,
   );
 }
 
@@ -203,6 +203,7 @@ for (const homepageModule of expectedEagerModules) {
 for (const requiredModule of [
   "../pages/playlists/page",
   "../pages/playlists/detail/page",
+  "../pages/people/detail/page",
   "../pages/artists/detail/page",
   "../pages/charts/edition/page",
   "../pages/magazine/article/page",
@@ -281,9 +282,14 @@ const routePaths = [
  * - /playlists
  * - /playlists/:slug
  *
- * The current authority is therefore 150 paths.
+ * The current pre-People frontend authority is therefore 150 paths.
+ *
+ * Person frontend M1 adds one canonical role-neutral public route:
+ * - /people/:slug
+ *
+ * The current authority is therefore 151 paths.
  */
-const expectedRoutePathCount = 150;
+const expectedRoutePathCount = 151;
 
 if (routePaths.length !== expectedRoutePathCount) {
   fail(
@@ -300,7 +306,7 @@ const routeChecksum = crypto
   .digest("hex");
 
 const expectedRouteChecksum =
-  "ffc3e3e82d9ca0720a245eaccaaaec13435bcca41a292e79a6ae37d0fa201cc2";
+  "9795190e632f20040ebcf98663a7c6915829bfa3eb1c80dd15eae4875b6bbf56";
 
 if (
   routeChecksum !==
