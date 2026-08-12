@@ -17443,6 +17443,10 @@ export type Database = {
         Args: { p_user_ids: string[] }
         Returns: Json
       }
+      community_get_reaction_state_for_public_targets: {
+        Args: { p_targets: Json }
+        Returns: Json
+      }
       community_get_thread_by_entity: {
         Args: {
           p_entity_id?: string
