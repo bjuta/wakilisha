@@ -15,7 +15,14 @@ import {
   getApplePlaybackPrefsSnapshot,
 } from "@/services/appleMusicConnection";
 
-const PRIMARY_NAV = [
+type MobileNavItem = {
+  label: string;
+  to: string;
+  icon: string;
+  pip?: boolean;
+};
+
+const PRIMARY_NAV: MobileNavItem[] = [
   { label: "Home", to: "/", icon: "Home" },
   { label: "Charts", to: "/charts", icon: "BarChart3", pip: true },
   { label: "Search", to: "/search", icon: "Search" },
@@ -152,6 +159,13 @@ function MobileBottomNav() {
   const { theme, toggle } = useTheme();
   const isLoggedIn = !authUser.loading && authUser.id.length > 0;
   const navVisible = useScrollDirection();
+  const navItems: MobileNavItem[] = isLoggedIn
+    ? [
+        PRIMARY_NAV[0],
+        { label: "Following", to: "/following", icon: "UserPlus" },
+        ...PRIMARY_NAV.slice(1),
+      ]
+    : PRIMARY_NAV;
   const isActive = (path: string) => path === "/" ? location.pathname === "/" : location.pathname.startsWith(path);
 
   useEffect(() => {
@@ -177,7 +191,7 @@ function MobileBottomNav() {
         transition: "opacity 0.28s cubic-bezier(.16,1,.3,1), transform 0.28s cubic-bezier(.16,1,.3,1), visibility 0.28s",
       }}
     >
-      {PRIMARY_NAV.map((item) => {
+      {navItems.map((item) => {
         const active = isActive(item.to);
         return (
           <Link key={item.to} to={item.to} className={`phn-nav-tab ${active ? "on" : ""} ${item.pip ? "has-pip" : ""}`}>

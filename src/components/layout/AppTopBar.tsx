@@ -159,6 +159,16 @@ export function AppTopBar() {
         </nav>
 
         <div className="flex items-center gap-1.5">
+          {authUser.id && (
+            <Link
+              to="/following"
+              aria-label="Following"
+              className={`flex h-9 items-center justify-center gap-1.5 rounded-full px-2.5 transition-all duration-200 ${isActive("/following") ? "text-[var(--wk-brand)] bg-[var(--wk-brand-soft)]" : iconColor}`}
+            >
+              <i className="ri-user-follow-line text-[17px]" />
+              <span className="hidden text-[12px] font-bold xl:inline">Following</span>
+            </Link>
+          )}
           <Link to="/search" aria-label="Search" className={`flex h-9 w-9 items-center justify-center rounded-full transition-all duration-200 ${isActive("/search") ? "text-[var(--wk-brand)] bg-[var(--wk-brand-soft)]" : iconColor}`}>
             <i className="ri-search-line text-[17px]" />
           </Link>
