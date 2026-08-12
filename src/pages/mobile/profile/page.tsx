@@ -7,13 +7,18 @@ import {
   getUserComments,
   getUserReplies,
   getUserSaves,
-  getUserFollows,
+  getUserFollowing,
   getUserProfileWithStats,
   hydrateCommentsWithUserState,
   softDeleteComment,
   updateComment,
 } from "@/services/community";
 import type { CommunityComment, CommunityProfile } from "@/services/community";
+import {
+  followingTargetIcon,
+  followingTargetLabel,
+  type FollowingPresentationItem,
+} from "@/services/community/followingPresentation";
 import {
   formatListeningProgress,
   getListeningHistory,
@@ -151,60 +156,6 @@ function entityCreatedAt(row: ProfileEntityRecord): string {
   return recordText(row, ["created_at", "createdAt"]);
 }
 
-function followUrl(row: ProfileEntityRecord): string {
-  const type = recordText(row, ["target_type"]);
-  const slug = recordText(row, ["target_slug"]);
-  const urlMap: Record<string, string> = {
-    article: `/magazine/${slug}`,
-    artist: `/artists/${slug}`,
-    track: `/tracks/${slug}`,
-    release: `/releases/${slug}`,
-    label: `/labels/${slug}`,
-    genre: `/genres/${slug}`,
-    chart: `/charts/${slug}`,
-    chart_edition: `/charts/${slug}`,
-    field_guide: `/guides/${slug}`,
-    magazine_issue: `/magazine/issue/${slug}`,
-  };
-  return urlMap[type] || "#";
-}
-
-async function enrichFollowEntities(rows: ProfileEntityRecord[]): Promise<ProfileEntityRecord[]> {
-  const artistSlugs = Array.from(new Set(
-    rows
-      .filter((row) => recordText(row, ["target_type"]) === "artist")
-      .map((row) => recordText(row, ["target_slug"]))
-      .filter(Boolean)
-  ));
-
-  if (artistSlugs.length === 0) return rows;
-
-  const { data, error } = await supabase
-    .from("registry_artists")
-    .select("slug, display_name, public_image_url")
-    .eq("status", "active")
-    .in("slug", artistSlugs);
-
-  if (error || !data) return rows;
-
-  const artistBySlug = new Map(
-    (data as Array<{ slug: string; display_name: string | null; public_image_url: string | null }>)
-      .map((artist) => [artist.slug, artist])
-  );
-
-  return rows.map((row) => {
-    const slug = recordText(row, ["target_slug"]);
-    const artist = artistBySlug.get(slug);
-    if (!artist) return row;
-
-    return {
-      ...row,
-      target_title: recordText(row, ["target_title"]) || artist.display_name || titleFromSlug(slug),
-      target_image_url: entityImage(row) || artist.public_image_url || "",
-    };
-  });
-}
-
 function getCoverColor(): string {
   try {
     return localStorage.getItem("wk-cover-color") || "#1a3a0a";
@@ -243,7 +194,7 @@ export default function MobileProfilePage() {
   const [comments, setComments] = useState<CommunityComment[]>([]);
   const [replies, setReplies] = useState<CommunityComment[]>([]);
   const [saves, setSaves] = useState<Record<string, unknown>[]>([]);
-  const [follows, setFollows] = useState<Record<string, unknown>[]>([]);
+  const [follows, setFollows] = useState<FollowingPresentationItem[]>([]);
   const [listeningHistory, setListeningHistory] = useState<ListeningHistoryItem[]>(() => getListeningHistory());
   const [tabLoading, setTabLoading] = useState(false);
   const [tabError, setTabError] = useState<string | null>(null);
@@ -274,13 +225,12 @@ export default function MobileProfilePage() {
 
     Promise.all([
       getUserSaves(userId).catch(() => []),
-      getUserFollows(userId)
-        .then((rows) => enrichFollowEntities(rows as ProfileEntityRecord[]))
+      getUserFollowing(userId)
         .catch(() => []),
     ]).then(([saveRows, followRows]) => {
       if (!alive) return;
       setSaves(saveRows as ProfileEntityRecord[]);
-      setFollows(followRows as ProfileEntityRecord[]);
+      setFollows(followRows);
     });
 
     return () => {
@@ -318,9 +268,8 @@ export default function MobileProfilePage() {
             break;
           }
           case "Following": {
-            const data = await getUserFollows(userId);
-            const enriched = await enrichFollowEntities(data as ProfileEntityRecord[]);
-            setFollows(enriched);
+            const data = await getUserFollowing(userId);
+            setFollows(data);
             break;
           }
         }
@@ -1137,11 +1086,15 @@ function MobileEntityArtwork({
   title,
   type,
   tall = false,
+  iconName,
+  typeLabel,
 }: {
   imageUrl: string;
   title: string;
   type: string;
   tall?: boolean;
+  iconName?: string;
+  typeLabel?: string;
 }) {
   const initials = title
     .split(/\s+/)
@@ -1162,13 +1115,13 @@ function MobileEntityArtwork({
             color: "var(--wk-brand)",
           }}
         >
-          <i className={`${iconForTargetType(type)} text-3xl`} />
+          <i className={`${iconName ?? iconForTargetType(type)} text-3xl`} />
           <span className="text-2xl font-black tracking-[-0.04em]">{initials}</span>
         </div>
       )}
       <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/18 to-transparent" />
       <div className="absolute left-3 top-3 rounded-full bg-black/35 px-2 py-1 text-[9px] font-black uppercase tracking-[0.12em] text-white/85 backdrop-blur-md">
-        {entityLabel(type)}
+        {typeLabel ?? entityLabel(type)}
       </div>
     </div>
   );
@@ -1251,7 +1204,7 @@ function MobileSavesTab({
 /* ─── Following Tab (Mobile — image-first people/entities) ─── */
 function MobileFollowingTab({
   follows, loading, error, onRetry,
-}: { follows: Record<string, unknown>[]; loading: boolean; error: string | null; onRetry: () => void }) {
+}: { follows: FollowingPresentationItem[]; loading: boolean; error: string | null; onRetry: () => void }) {
   if (loading) {
     return (
       <div className="grid grid-cols-2 gap-3">
@@ -1267,40 +1220,42 @@ function MobileFollowingTab({
       <MobileEmptyState
         icon="ri-user-add-line"
         title="Not following yet"
-        subtitle="Follow artists, labels, charts, and scenes to shape your WAKILISHA feed."
+        subtitle="Follow people, artists, genres, labels, and charts to shape what WAKILISHA remembers for you."
         action={{ label: "Find artists", to: "/artists" }}
       />
     );
   }
 
-  const [lead, ...rest] = follows as ProfileEntityRecord[];
+  const [lead, ...rest] = follows;
 
-  const renderFollowCard = (follow: ProfileEntityRecord, featured = false) => {
-    const targetType = recordText(follow, ["target_type"]);
-    const targetSlug = recordText(follow, ["target_slug"]);
-    const createdAt = entityCreatedAt(follow);
-    const title = entityTitle(follow, "target_slug") || titleFromSlug(targetSlug);
-    const imageUrl = entityImage(follow);
-    const url = followUrl(follow);
+  const renderFollowCard = (follow: FollowingPresentationItem, featured = false) => {
+    const typeLabel = followingTargetLabel(follow.targetType);
 
     return (
       <Link
-        key={String(follow.id)}
-        to={url}
+        key={follow.followId}
+        to={follow.canonicalPath}
         className={`group block min-w-0 cursor-pointer ${featured ? "col-span-2" : ""}`}
       >
         <div className="relative">
-          <MobileEntityArtwork imageUrl={imageUrl} title={title} type={targetType} tall={featured} />
+          <MobileEntityArtwork
+            imageUrl={follow.imageUrl ?? ""}
+            title={follow.title}
+            type={follow.targetType}
+            tall={featured}
+            iconName={followingTargetIcon(follow.targetType)}
+            typeLabel={typeLabel}
+          />
           {featured && (
             <div className="absolute bottom-4 left-4 right-4">
               <p className="text-[10px] font-black uppercase tracking-[0.16em] text-white/65">
                 Recently followed
               </p>
               <h3 className="mt-1 text-2xl font-black tracking-[-0.05em] leading-none text-white">
-                {title}
+                {follow.title}
               </h3>
               <p className="mt-2 text-[11px] font-bold uppercase tracking-[0.12em] text-white/65">
-                {entityLabel(targetType)}{createdAt ? ` · ${timeAgo(createdAt)}` : ""}
+                {typeLabel}{follow.createdAt ? ` · ${timeAgo(follow.createdAt)}` : ""}
               </p>
             </div>
           )}
@@ -1309,14 +1264,14 @@ function MobileFollowingTab({
         {!featured && (
           <div className="pt-2 px-1">
             <div className="text-[13px] font-black leading-tight line-clamp-2" style={{ color: "var(--wk-text)" }}>
-              {title}
+              {follow.title}
             </div>
             <div className="mt-1 flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-[0.08em]" style={{ color: "var(--wk-text-faint)" }}>
-              <span>{entityLabel(targetType)}</span>
-              {createdAt && (
+              <span>{typeLabel}</span>
+              {follow.createdAt && (
                 <>
                   <span>·</span>
-                  <span>{timeAgo(createdAt)}</span>
+                  <span>{timeAgo(follow.createdAt)}</span>
                 </>
               )}
             </div>
@@ -1333,7 +1288,7 @@ function MobileFollowingTab({
           Your circle
         </p>
         <p className="text-[12px] leading-relaxed" style={{ color: "var(--wk-text-muted)" }}>
-          Artists and culture threads you want WAKILISHA to remember.
+          People, artists, genres, labels, and charts you want WAKILISHA to remember.
         </p>
       </div>
 
