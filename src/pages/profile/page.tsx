@@ -673,14 +673,31 @@ function FollowingTab({
         <WkIcon name="UserPlus" size={32} className="mx-auto mb-4 text-[var(--wk-text-faint)]" />
         <p className="font-bold text-sm text-[var(--wk-text-muted)] mb-3">Not following anything yet</p>
         <p className="text-xs text-[var(--wk-text-faint)] max-w-xs mx-auto">
-          Follow people, artists, genres, labels, and charts to keep your culture close.
+          Follow people and artists to build your circle. Their recent work will appear in Following.
         </p>
       </div>
     );
   }
 
   return (
-    <div className="space-y-1">
+    <div className="space-y-4">
+      <div className="flex items-center justify-between gap-3">
+        <div>
+          <div className="text-[10px] font-black uppercase tracking-[0.14em] text-[var(--wk-brand)]">
+            Your circle
+          </div>
+          <p className="mt-1 text-[12px] text-[var(--wk-text-muted)]">
+            People and artists you follow shape your Following feed.
+          </p>
+        </div>
+        <Link
+          to="/following"
+          className="shrink-0 rounded-full border border-[var(--wk-border)] px-3 py-2 text-[11px] font-black text-[var(--wk-text)] hover:border-[var(--wk-border-2)]"
+        >
+          Open feed
+        </Link>
+      </div>
+      <div className="space-y-1">
       {follows.map((follow) => (
         <Link
           key={follow.followId}
@@ -711,6 +728,7 @@ function FollowingTab({
           <i className="ri-arrow-right-s-line text-[var(--wk-text-faint)]" />
         </Link>
       ))}
+      </div>
     </div>
   );
 }

@@ -120,6 +120,10 @@ export const ProfilePage = lazy(
   () => import("../pages/profile/page"),
 );
 
+export const FollowingPage = lazy(
+  () => import("../pages/following/page"),
+);
+
 export const MobileProfilePage = lazy(
   () => import("../pages/mobile/profile/page"),
 );

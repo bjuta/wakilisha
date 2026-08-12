@@ -1237,7 +1237,7 @@ function MobileFollowingTab({
       <MobileEmptyState
         icon="ri-user-add-line"
         title="Not following yet"
-        subtitle="Follow people, artists, genres, labels, and charts to shape what WAKILISHA remembers for you."
+        subtitle="Follow people and artists to build your circle and your Following feed."
         action={{ label: "Find artists", to: "/artists" }}
       />
     );
@@ -1300,13 +1300,22 @@ function MobileFollowingTab({
 
   return (
     <div className="space-y-4">
-      <div>
-        <p className="text-[10px] font-black uppercase tracking-[0.16em] mb-1" style={{ color: "var(--wk-brand)" }}>
-          Your circle
-        </p>
-        <p className="text-[12px] leading-relaxed" style={{ color: "var(--wk-text-muted)" }}>
-          People, artists, genres, labels, and charts you want WAKILISHA to remember.
-        </p>
+      <div className="flex items-end justify-between gap-3">
+        <div>
+          <p className="text-[10px] font-black uppercase tracking-[0.16em] mb-1" style={{ color: "var(--wk-brand)" }}>
+            Your circle
+          </p>
+          <p className="text-[12px] leading-relaxed" style={{ color: "var(--wk-text-muted)" }}>
+            People and artists you follow shape your Following feed. Your full relationship list stays here.
+          </p>
+        </div>
+        <Link
+          to="/following"
+          className="shrink-0 rounded-full border px-3 py-2 text-[10px] font-black"
+          style={{ borderColor: "var(--wk-border)", color: "var(--wk-text)" }}
+        >
+          Open feed
+        </Link>
       </div>
 
       <div className="grid grid-cols-2 gap-3">

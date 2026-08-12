@@ -73,6 +73,30 @@ const communityTypes =
     "utf8",
   );
 
+const followingFeedService =
+  readFileSync(
+    "src/services/community/followingFeed.ts",
+    "utf8",
+  );
+
+const followingFeedPage =
+  readFileSync(
+    "src/pages/following/page.tsx",
+    "utf8",
+  );
+
+const appTopBar =
+  readFileSync(
+    "src/components/layout/AppTopBar.tsx",
+    "utf8",
+  );
+
+const mobileAppLayout =
+  readFileSync(
+    "src/components/mobile/MobileAppLayout.tsx",
+    "utf8",
+  );
+
 const profileCss =
   readFileSync(
     "src/styles/wakilisha-profile-48.css",
@@ -744,6 +768,311 @@ describe(
               route,
             );
         }
+      },
+    );
+
+    it(
+      "gives signed-in Following a first-class feed destination separate from the relationship list",
+      () => {
+        expect(router)
+          .toContain(
+            'path: "/following"',
+          );
+
+        expect(router)
+          .toContain(
+            "FollowingPage",
+          );
+
+        expect(lazyPublic)
+          .toContain(
+            "../pages/following/page",
+          );
+
+        expect(followingFeedService)
+          .toContain(
+            '"community_get_following_feed"',
+          );
+
+        expect(followingFeedService)
+          .toContain(
+            '| "person"',
+          );
+
+        expect(followingFeedService)
+          .toContain(
+            '| "artist"',
+          );
+
+        expect(followingFeedService)
+          .not.toContain(
+            "p_user_id",
+          );
+
+        expect(followingFeedPage)
+          .toContain(
+            "getFollowingFeed",
+          );
+
+        expect(followingFeedPage)
+          .toContain(
+            "getUserFollowing",
+          );
+
+        expect(followingFeedPage)
+          .toContain(
+            'buildCommunityAuthUrl("/following")',
+          );
+
+        expect(appTopBar)
+          .toContain(
+            'to="/following"',
+          );
+
+        expect(mobileAppLayout)
+          .toContain(
+            '{ label: "Following", to: "/following", icon: "UserPlus" }',
+          );
+      },
+    );
+
+    it(
+      "makes Following an actor-led visual activity stream without pretending anyone posted",
+      () => {
+        expect(followingFeedService)
+          .toContain(
+            'mode: "current_interest"',
+          );
+
+        expect(followingFeedService)
+          .toContain(
+            "recentWindowDays !== 180",
+          );
+
+        expect(followingFeedService)
+          .toContain(
+            "perSubjectRecentLimit !== 3",
+          );
+
+        expect(followingFeedPage)
+          .toContain(
+            "data-following-activity",
+          );
+
+        expect(followingFeedPage)
+          .toContain(
+            "ActivitySubjectAvatar",
+          );
+
+        expect(followingFeedPage)
+          .toContain(
+            "ActivityMedia",
+          );
+
+        expect(followingFeedPage)
+          .toContain(
+            "WAKILISHA Article",
+          );
+
+        expect(followingFeedPage)
+          .toContain(
+            "WAKILISHA Playlist",
+          );
+
+        expect(followingFeedPage)
+          .toContain(
+            'return "Release";',
+          );
+
+        expect(followingFeedPage)
+          .toContain(
+            "What’s moving through your circle.",
+          );
+
+        expect(followingFeedPage)
+          .not.toContain(
+            "newest first",
+          );
+
+        expect(followingFeedPage)
+          .not.toContain(
+            "posted",
+          );
+
+        expect(followingFeedPage)
+          .not.toContain(
+            "reposted",
+          );
+
+        expect(followingFeedPage)
+          .not.toContain(
+            "CommunityDigest",
+          );
+
+        expect(followingFeedPage)
+          .not.toContain(
+            "grid-cols-[104px_minmax",
+          );
+
+        expect(followingFeedPage)
+          .toContain(
+            "getUserSaves",
+          );
+
+        expect(followingFeedPage)
+          .toContain(
+            "setSavedState",
+          );
+
+        expect(followingFeedPage)
+          .toContain(
+            "navigator.share",
+          );
+
+        expect(followingFeedPage)
+          .toContain(
+            'data-following-reaction-slot="reserved"',
+          );
+
+        expect(followingFeedPage)
+          .not.toContain(
+            "CommunityReactionPicker",
+          );
+
+        expect(followingFeedService)
+          .not.toContain(
+            '"genre"',
+          );
+
+        expect(followingFeedService)
+          .not.toContain(
+            '"label"',
+          );
+
+        expect(followingFeedService)
+          .not.toContain(
+            '"chart_program"',
+          );
+
+        expect(ownerProfilePage)
+          .not.toContain(
+            "Follow people, artists, genres, labels, and charts",
+          );
+
+        expect(mobileOwnerProfilePage)
+          .not.toContain(
+            "People, artists, genres, labels, and charts",
+          );
+
+        expect(ownerProfilePage)
+          .toContain(
+            'to="/following"',
+          );
+
+        expect(mobileOwnerProfilePage)
+          .toContain(
+            'to="/following"',
+          );
+      },
+    );
+
+    it(
+      "uses current feed contributors as Activity Anchors instead of a decorative hero",
+      () => {
+        expect(followingFeedPage)
+          .toContain(
+            "data-following-activity-anchors",
+          );
+
+        expect(followingFeedPage)
+          .toContain(
+            "ActivityAnchorAvatar",
+          );
+
+        expect(followingFeedPage)
+          .toContain(
+            "activityAnchors",
+          );
+
+        expect(followingFeedPage)
+          .toContain(
+            "scrollToAnchor",
+          );
+
+        expect(followingFeedPage)
+          .toContain(
+            "IntersectionObserver",
+          );
+
+        expect(followingFeedPage)
+          .toContain(
+            "data-following-subjects",
+          );
+
+        expect(followingFeedPage)
+          .toContain(
+            "aria-current",
+          );
+
+        expect(followingFeedPage)
+          .not.toContain(
+            "Your WAKILISHA",
+          );
+
+        expect(followingFeedPage)
+          .not.toContain(
+            "What’s happening around the people and artists you follow.",
+          );
+
+        expect(followingFeedPage)
+          .not.toContain(
+            "story ring",
+          );
+
+        expect(followingFeedPage)
+          .not.toContain(
+            "unread",
+          );
+      },
+    );
+
+    it(
+      "renders feed output from canonical backend paths without rebuilding content identity in the client",
+      () => {
+        expect(followingFeedPage)
+          .toContain(
+            "item.canonicalPath",
+          );
+
+        expect(followingFeedPage)
+          .toContain(
+            "PlaylistCoverPresentation",
+          );
+
+        expect(followingFeedPage)
+          .toContain(
+            'item.itemType === "playlist"',
+          );
+
+        expect(followingFeedPage)
+          .toContain(
+            "matchedFollows",
+          );
+
+        expect(followingFeedPage)
+          .toContain(
+            "presentation.canonicalPath",
+          );
+
+        expect(followingFeedPage)
+          .not.toContain(
+            "releaseUrl(",
+          );
+
+        expect(followingFeedPage)
+          .not.toContain(
+            "getCommunityDigest",
+          );
       },
     );
 
