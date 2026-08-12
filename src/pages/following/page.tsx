@@ -2,21 +2,35 @@ import {
   useCallback,
   useEffect,
   useMemo,
+  useRef,
   useState,
 } from "react";
 import { Link } from "react-router-dom";
 import { MetaTags } from "@/components/seo/MetaTags";
 import { PlaylistCoverPresentation } from "@/components/media/PlaylistCoverPresentation";
 import { Ch19GradientImage } from "@/components/media/Ch19GradientImage";
+import {
+  CommunityReactionPicker,
+  getReactionGlyph,
+} from "@/components/feature/community/CommunityReactionPicker";
+import {
+  SharePopover,
+  ShareSheet,
+  type ShareObject,
+} from "@/components/design-system/share/ShareSheet";
 import { useAuthUser } from "@/hooks/useAuthUser";
 import {
   followingFeedCursorFrom,
   getFollowingFeed,
+  getReactionStateForPublicTargets,
   getUserFollowing,
   getUserSaves,
+  reactToTarget,
   setSavedState,
+  type CommunityPublicReactionState,
   type FollowingFeedItem,
   type FollowingFeedReason,
+  type ReactionType,
 } from "@/services/community";
 import {
   buildCommunityAuthUrl,
@@ -85,6 +99,73 @@ function itemKey(
   item: FollowingFeedItem,
 ): string {
   return `${item.itemType}:${item.itemId}`;
+}
+
+function toggleReactionState(
+  state: CommunityPublicReactionState,
+  reactionType: ReactionType,
+): CommunityPublicReactionState {
+  const existing =
+    state.reactions.find(
+      (reaction) =>
+        reaction.reactionType === reactionType,
+    );
+
+  const nextViewerReacted =
+    !existing?.viewerReacted;
+
+  const delta =
+    nextViewerReacted
+      ? 1
+      : -1;
+
+  const nextReactions =
+    existing
+      ? state.reactions.map(
+          (reaction) =>
+            reaction.reactionType === reactionType
+              ? {
+                  ...reaction,
+                  count:
+                    Math.max(
+                      0,
+                      reaction.count + delta,
+                    ),
+                  viewerReacted:
+                    nextViewerReacted,
+                }
+              : reaction,
+        )
+      : [
+          ...state.reactions,
+          {
+            reactionType,
+            count: 1,
+            viewerReacted: true,
+          },
+        ];
+
+  return {
+    ...state,
+    reactionCount:
+      Math.max(
+        0,
+        state.reactionCount + delta,
+      ),
+    reactions:
+      nextReactions
+        .filter(
+          (reaction) =>
+            reaction.count > 0,
+        )
+        .sort(
+          (left, right) =>
+            right.count - left.count
+            || left.reactionType.localeCompare(
+              right.reactionType,
+            ),
+        ),
+  };
 }
 
 function itemSlug(
@@ -384,26 +465,257 @@ function ActivityAction({
   );
 }
 
+function FollowingShareAction({
+  item,
+  subject,
+}: {
+  item: FollowingFeedItem;
+  subject: ActivitySubject;
+}) {
+  const [
+    popoverOpen,
+    setPopoverOpen,
+  ] = useState(false);
+
+  const [
+    sheetOpen,
+    setSheetOpen,
+  ] = useState(false);
+
+  const triggerRef =
+    useRef<HTMLButtonElement | null>(
+      null,
+    );
+
+  const shareItem =
+    useMemo<ShareObject>(
+      () => ({
+        title:
+          item.title,
+        subtitle:
+          subject.title,
+        description:
+          item.summary || undefined,
+        imageUrl:
+          item.imageUrl,
+        url:
+          new URL(
+            item.canonicalPath,
+            PUBLIC_ORIGIN,
+          ).toString(),
+        type:
+          item.itemType === "release"
+            ? "album"
+            : item.itemType,
+      }),
+      [
+        item,
+        subject.title,
+      ],
+    );
+
+  const openShare = () => {
+    if (
+      typeof window !== "undefined" &&
+      window.matchMedia(
+        "(max-width: 767px)",
+      ).matches
+    ) {
+      setPopoverOpen(false);
+      setSheetOpen(true);
+      return;
+    }
+
+    setSheetOpen(false);
+    setPopoverOpen(true);
+  };
+
+  return (
+    <>
+      <button
+        ref={triggerRef}
+        type="button"
+        onClick={openShare}
+        className="inline-flex min-h-10 items-center gap-2 rounded-full px-3 text-[12px] font-bold text-[var(--wk-text-muted)] transition-colors hover:bg-[var(--wk-surface-raised)] hover:text-[var(--wk-text)]"
+        aria-label={`Share ${item.title}`}
+        aria-expanded={
+          popoverOpen ||
+          sheetOpen
+        }
+      >
+        <i
+          className="ri-share-forward-line text-[17px]"
+          aria-hidden="true"
+        />
+        <span>Share</span>
+      </button>
+
+      <SharePopover
+        open={popoverOpen}
+        onClose={() =>
+          setPopoverOpen(false)
+        }
+        item={shareItem}
+        triggerRef={triggerRef}
+      />
+
+      <ShareSheet
+        open={sheetOpen}
+        onClose={() =>
+          setSheetOpen(false)
+        }
+        item={shareItem}
+      />
+    </>
+  );
+}
+
+function FollowingReactionAction({
+  state,
+  reacting,
+  onSelect,
+}: {
+  state:
+    CommunityPublicReactionState | undefined;
+  reacting: boolean;
+  onSelect: (
+    reactionType: ReactionType,
+  ) => void;
+}) {
+  const [
+    showPicker,
+    setShowPicker,
+  ] = useState(false);
+
+  const triggerRef =
+    useRef<HTMLButtonElement | null>(
+      null,
+    );
+
+  const activeReactions =
+    state?.reactions
+      .filter(
+        (reaction) =>
+          reaction.viewerReacted,
+      )
+      .map(
+        (reaction) =>
+          reaction.reactionType,
+      ) ?? [];
+
+  const visibleReactions =
+    state?.reactions
+      .filter(
+        (reaction) =>
+          reaction.count > 0,
+      )
+      .slice(0, 3) ?? [];
+
+  const reactionCount =
+    state?.reactionCount ?? 0;
+
+  const active =
+    activeReactions.length > 0;
+
+  return (
+    <div
+      data-following-reaction-slot="live"
+      className="relative"
+    >
+      <button
+        ref={triggerRef}
+        type="button"
+        disabled={!state || reacting}
+        onClick={() =>
+          setShowPicker(
+            (current) => !current,
+          )
+        }
+        className={`inline-flex min-h-10 items-center gap-2 rounded-full px-3 text-[12px] font-bold transition-colors ${
+          active
+            ? "bg-[var(--wk-brand-soft)] text-[var(--wk-brand)]"
+            : "text-[var(--wk-text-muted)] hover:bg-[var(--wk-surface-raised)] hover:text-[var(--wk-text)]"
+        } disabled:cursor-wait disabled:opacity-55`}
+        aria-label={
+          reactionCount > 0
+            ? `${reactionCount} reactions. Add or remove a reaction.`
+            : "Add reaction"
+        }
+        aria-expanded={showPicker}
+      >
+        {visibleReactions.length > 0 ? (
+          <span
+            className="inline-flex items-center gap-0.5"
+            aria-hidden="true"
+          >
+            {visibleReactions.map(
+              (reaction) => (
+                <span
+                  key={reaction.reactionType}
+                  className="text-[16px] leading-none"
+                >
+                  {getReactionGlyph(
+                    reaction.reactionType,
+                  )}
+                </span>
+              ),
+            )}
+          </span>
+        ) : (
+          <i
+            className="ri-emotion-happy-line text-[17px]"
+            aria-hidden="true"
+          />
+        )}
+
+        <span>
+          {reactionCount > 0
+            ? reactionCount
+            : "React"}
+        </span>
+      </button>
+
+      {showPicker && state && (
+        <CommunityReactionPicker
+          activeReactions={activeReactions}
+          anchorRef={triggerRef}
+          onSelect={(reactionType) => {
+            setShowPicker(false);
+            onSelect(reactionType);
+          }}
+          onClose={() =>
+            setShowPicker(false)
+          }
+        />
+      )}
+    </div>
+  );
+}
+
 function FollowingActivity({
   item,
   subjectLookup,
   saved,
   saving,
-  shared,
+  reactionState,
+  reacting,
   onToggleSave,
-  onShare,
+  onReact,
 }: {
   item: FollowingFeedItem;
   subjectLookup: Map<string, MatureFollow>;
   saved: boolean;
   saving: boolean;
-  shared: boolean;
+  reactionState:
+    CommunityPublicReactionState | undefined;
+  reacting: boolean;
   onToggleSave: (
     item: FollowingFeedItem,
     subject: ActivitySubject,
   ) => void;
-  onShare: (
+  onReact: (
     item: FollowingFeedItem,
+    reactionType: ReactionType,
   ) => void;
 }) {
   const subjects =
@@ -559,27 +871,20 @@ function FollowingActivity({
             }
           />
 
-          <ActivityAction
-            icon={
-              shared
-                ? "ri-check-line"
-                : "ri-share-forward-line"
-            }
-            label={
-              shared
-                ? "Copied"
-                : "Share"
-            }
-            active={shared}
-            onClick={() =>
-              onShare(item)
-            }
+          <FollowingShareAction
+            item={item}
+            subject={primarySubject}
           />
 
-          <span
-            data-following-reaction-slot="reserved"
-            className="sr-only"
-            aria-hidden="true"
+          <FollowingReactionAction
+            state={reactionState}
+            reacting={reacting}
+            onSelect={(reactionType) =>
+              onReact(
+                item,
+                reactionType,
+              )
+            }
           />
         </div>
       </div>
@@ -635,8 +940,21 @@ export default function FollowingPage() {
       () => new Set(),
     );
 
-  const [sharedKey, setSharedKey] =
-    useState<string | null>(null);
+  const [
+    reactionStates,
+    setReactionStates,
+  ] = useState<
+    Map<string, CommunityPublicReactionState>
+  >(
+    () => new Map(),
+  );
+
+  const [
+    reactingKeys,
+    setReactingKeys,
+  ] = useState<Set<string>>(
+    () => new Set(),
+  );
 
   const [loading, setLoading] =
     useState(true);
@@ -676,6 +994,8 @@ export default function FollowingPage() {
       setItems([]);
       setFollows([]);
       setSavedKeys(new Set());
+      setReactionStates(new Map());
+      setReactingKeys(new Set());
       setError(null);
       setActionError(null);
       setHasMore(false);
@@ -745,6 +1065,68 @@ export default function FollowingPage() {
     authUser.loading,
     authUser.id,
     reloadKey,
+  ]);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    if (
+      !authUser.id
+      || items.length === 0
+    ) {
+      setReactionStates(
+        new Map(),
+      );
+
+      return () => {
+        cancelled = true;
+      };
+    }
+
+    getReactionStateForPublicTargets(
+      items.map(
+        (item) => ({
+          targetType:
+            item.itemType,
+          targetId:
+            item.itemId,
+        }),
+      ),
+    )
+      .then((states) => {
+        if (cancelled) {
+          return;
+        }
+
+        setReactionStates(
+          new Map(
+            states.map(
+              (state) => [
+                `${state.targetType}:${state.targetId}`,
+                state,
+              ],
+            ),
+          ),
+        );
+      })
+      .catch((nextError) => {
+        if (cancelled) {
+          return;
+        }
+
+        setActionError(
+          nextError instanceof Error
+            ? nextError.message
+            : "Reactions are unavailable right now.",
+        );
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [
+    authUser.id,
+    items,
   ]);
 
   const matureFollows =
@@ -1061,67 +1443,121 @@ export default function FollowingPage() {
       ],
     );
 
-  const shareItem =
+  const toggleReaction =
     useCallback(
       async (
         item: FollowingFeedItem,
+        reactionType: ReactionType,
       ) => {
+        const key =
+          itemKey(item);
+
         if (
-          typeof window === "undefined"
+          reactingKeys.has(key)
         ) {
           return;
         }
 
-        const url =
-          new URL(
-            item.canonicalPath,
-            PUBLIC_ORIGIN,
-          ).toString();
+        const currentState =
+          reactionStates.get(key);
+
+        if (!currentState) {
+          return;
+        }
 
         setActionError(null);
 
+        setReactingKeys(
+          (current) => {
+            const next =
+              new Set(current);
+            next.add(key);
+            return next;
+          },
+        );
+
+        setReactionStates(
+          (current) => {
+            const next =
+              new Map(current);
+
+            next.set(
+              key,
+              toggleReactionState(
+                currentState,
+                reactionType,
+              ),
+            );
+
+            return next;
+          },
+        );
+
         try {
-          if (navigator.share) {
-            await navigator.share({
-              title: item.title,
-              url,
-            });
-            return;
+          await reactToTarget({
+            targetType:
+              item.itemType,
+            targetId:
+              item.itemId,
+            reactionType,
+          });
+
+          const [freshState] =
+            await getReactionStateForPublicTargets([
+              {
+                targetType:
+                  item.itemType,
+                targetId:
+                  item.itemId,
+              },
+            ]);
+
+          if (freshState) {
+            setReactionStates(
+              (current) => {
+                const next =
+                  new Map(current);
+                next.set(
+                  key,
+                  freshState,
+                );
+                return next;
+              },
+            );
           }
-
-          await navigator.clipboard.writeText(
-            url,
-          );
-
-          setSharedKey(
-            item.itemKey,
-          );
-
-          window.setTimeout(
-            () => {
-              setSharedKey(
-                (current) =>
-                  current === item.itemKey
-                    ? null
-                    : current,
-              );
-            },
-            1800,
-          );
         } catch (nextError) {
-          if (
-            nextError instanceof DOMException &&
-            nextError.name === "AbortError"
-          ) {
-            return;
-          }
+          setReactionStates(
+            (current) => {
+              const next =
+                new Map(current);
+              next.set(
+                key,
+                currentState,
+              );
+              return next;
+            },
+          );
 
           setActionError(
-            "Could not share this link.",
+            nextError instanceof Error
+              ? nextError.message
+              : "Could not update this reaction.",
+          );
+        } finally {
+          setReactingKeys(
+            (current) => {
+              const next =
+                new Set(current);
+              next.delete(key);
+              return next;
+            },
           );
         }
       },
-      [],
+      [
+        reactingKeys,
+        reactionStates,
+      ],
     );
 
   const loadMore = async () => {
@@ -1387,11 +1823,14 @@ export default function FollowingPage() {
                     saving={
                       savingKeys.has(key)
                     }
-                    shared={
-                      sharedKey === item.itemKey
+                    reactionState={
+                      reactionStates.get(key)
+                    }
+                    reacting={
+                      reactingKeys.has(key)
                     }
                     onToggleSave={toggleSave}
-                    onShare={shareItem}
+                    onReact={toggleReaction}
                   />
                 );
               })}

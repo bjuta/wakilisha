@@ -31,6 +31,30 @@ export type ThreadStatus = 'open' | 'locked' | 'archived' | 'hidden';
 export type ContributionStatus = 'pending' | 'approved' | 'rejected' | 'merged';
 export type ReportReason = 'spam' | 'harassment' | 'hate_or_abuse' | 'misinformation' | 'privacy' | 'copyright' | 'off_topic' | 'other';
 export type ReactionType = string;
+
+export type CommunityPublicReactionTargetType =
+  | 'article'
+  | 'playlist'
+  | 'release';
+
+export interface CommunityPublicReactionTarget {
+  targetType: CommunityPublicReactionTargetType;
+  targetId: string;
+}
+
+export interface CommunityPublicReactionBreakdown {
+  reactionType: ReactionType;
+  count: number;
+  viewerReacted: boolean;
+}
+
+export interface CommunityPublicReactionState {
+  targetType: CommunityPublicReactionTargetType;
+  targetId: string;
+  reactionCount: number;
+  reactions: CommunityPublicReactionBreakdown[];
+}
+
 export type SortMode = 'best' | 'newest' | 'oldest' | 'most_replied' | 'editor_picks';
 export type CommentAnchorType =
   | 'whole_entity'
