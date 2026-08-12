@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback, useRef } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useAuthUser } from "@/hooks/useAuthUser";
 import { WkIcon } from "@/components/design-system/Icon";
+import { PlaylistCoverPresentation } from "@/components/media/PlaylistCoverPresentation";
 import { supabase } from "@/lib/supabase";
 import {
   getUserComments,
@@ -1168,6 +1169,7 @@ function MobileSavesTab({
           const save = raw as ProfileEntityRecord;
           const entityUrl = recordText(save, ["entity_url"], "#");
           const entityType = recordText(save, ["entity_type"]);
+          const entitySlug = recordText(save, ["entity_slug"]);
           const title = entityTitle(save);
           const imageUrl = entityImage(save);
           const createdAt = entityCreatedAt(save);
@@ -1178,7 +1180,22 @@ function MobileSavesTab({
               to={entityUrl || "#"}
               className="group block min-w-0 cursor-pointer"
             >
-              <MobileEntityArtwork imageUrl={imageUrl} title={title} type={entityType} />
+              {entityType === "playlist" && entitySlug ? (
+                <div
+                  className="aspect-square overflow-hidden rounded-[22px]"
+                  style={{ background: "var(--wk-surface-raised)" }}
+                >
+                  <PlaylistCoverPresentation
+                    src={imageUrl || null}
+                    altText={title}
+                    slug={entitySlug}
+                    title={title}
+                    loading="lazy"
+                  />
+                </div>
+              ) : (
+                <MobileEntityArtwork imageUrl={imageUrl} title={title} type={entityType} />
+              )}
               <div className="pt-2 px-1">
                 <div className="text-[13px] font-black leading-tight line-clamp-2" style={{ color: "var(--wk-text)" }}>
                   {title}

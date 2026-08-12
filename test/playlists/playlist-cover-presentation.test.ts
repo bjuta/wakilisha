@@ -48,7 +48,17 @@ describe(
 
         expect(component)
           .toContain(
-            'left-[7.5%] top-[7.5%] w-[61%]',
+            'z-10 left-[7.5%] top-[7.5%] w-[61%]',
+          );
+
+        expect(component)
+          .toContain(
+            '"relative z-0 h-full w-full object-cover"',
+          );
+
+        expect(component)
+          .toContain(
+            'className="relative isolate h-full w-full overflow-hidden"',
           );
 
         expect(component)
@@ -149,7 +159,7 @@ describe(
     );
 
     it(
-      "uses one shared presentation component in Admin, Preview, detail, and cards",
+      "uses one shared presentation component in Admin, detail, index cards, and saved Playlist covers",
       () => {
         const drawer =
           source(
@@ -166,12 +176,24 @@ describe(
             "src/pages/playlists/page.tsx",
           );
 
+        const desktopProfile =
+          source(
+            "src/pages/profile/page.tsx",
+          );
+
+        const mobileProfile =
+          source(
+            "src/pages/mobile/profile/page.tsx",
+          );
+
         for (
           const page
           of [
             drawer,
             detail,
             list,
+            desktopProfile,
+            mobileProfile,
           ]
         ) {
           expect(page)
@@ -179,6 +201,66 @@ describe(
               "PlaylistCoverPresentation",
             );
         }
+
+        expect(desktopProfile)
+          .toContain(
+            'entityType === "playlist"',
+          );
+
+        expect(desktopProfile)
+          .toContain(
+            "entitySlug",
+          );
+
+        expect(mobileProfile)
+          .toContain(
+            'entityType === "playlist"',
+          );
+
+        expect(mobileProfile)
+          .toContain(
+            "entitySlug",
+          );
+      },
+    );
+
+    it(
+      "puts the mobile Playlist eyebrow above the cover and links governed curator identity to Person",
+      () => {
+        const detail =
+          source(
+            "src/pages/playlists/detail/page.tsx",
+          );
+
+        expect(detail)
+          .toContain(
+            "playlistCreditHref",
+          );
+
+        expect(detail)
+          .toContain(
+            "`/people/${authorSlug}`",
+          );
+
+        expect(detail)
+          .not.toContain(
+            "`/authors/${credit.authorSlug}`",
+          );
+
+        expect(detail)
+          .toContain(
+            "md:hidden",
+          );
+
+        expect(detail)
+          .toContain(
+            "hidden items-center gap-2",
+          );
+
+        expect(detail)
+          .toContain(
+            "curatorHref",
+          );
       },
     );
     it(

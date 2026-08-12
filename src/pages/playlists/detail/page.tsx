@@ -76,6 +76,7 @@ import {
   toPlayerQueue,
   type PublicPlaylist,
   type PublicPlaylistCitation,
+  type PublicPlaylistCredit,
   type PublicPlaylistTrack,
 } from "@/services/playlists/playlistPublicModel";
 import {
@@ -370,6 +371,53 @@ function playlistTrustContextLabel(
   )} · ${track.title}`;
 }
 
+function playlistCreditHref(
+  credit: PublicPlaylistCredit,
+): string | null {
+  const authorSlug =
+    credit.authorSlug
+      ?.trim();
+
+  if (authorSlug) {
+    return `/people/${authorSlug}`;
+  }
+
+  const username =
+    credit.username
+      ?.trim();
+
+  return username
+    ? `/u/${username}`
+    : null;
+}
+
+function playlistCuratorCredit(
+  playlist: PublicPlaylist,
+): PublicPlaylistCredit | null {
+  return (
+    playlist.credits.find(
+      (credit) =>
+        credit.resourceId ===
+          playlist.resourceId &&
+        credit.role
+          .trim()
+          .toLowerCase() ===
+          "curator" &&
+        credit.isPrimary,
+    ) ??
+    playlist.credits.find(
+      (credit) =>
+        credit.resourceId ===
+          playlist.resourceId &&
+        credit.role
+          .trim()
+          .toLowerCase() ===
+          "curator",
+    ) ??
+    null
+  );
+}
+
 function buildPlaylistTrustPresentation(
   playlist: PublicPlaylist,
 ) {
@@ -392,11 +440,9 @@ function buildPlaylistTrustPresentation(
           note:
             credit.note,
           href:
-            credit.authorSlug
-              ? `/authors/${credit.authorSlug}`
-              : credit.username
-                ? `/u/${credit.username}`
-                : null,
+            playlistCreditHref(
+              credit,
+            ),
           contextLabel:
             playlistTrustContextLabel(
               playlist,
@@ -1852,6 +1898,18 @@ export default function PublicPlaylistDetailPage() {
       playlist.description,
     );
 
+  const curatorCredit =
+    playlistCuratorCredit(
+      playlist,
+    );
+
+  const curatorHref =
+    curatorCredit
+      ? playlistCreditHref(
+          curatorCredit,
+        )
+      : null;
+
   const heroButtonLabel =
     isThisPlaylistQueue
       ? (
@@ -2244,6 +2302,16 @@ export default function PublicPlaylistDetailPage() {
 
           <div className="relative z-10 flex min-h-[410px] items-end md:min-h-[460px]">
             <div className="wk-container-wide w-full px-5 pb-10 pt-14 md:px-6 md:pb-14">
+              <div className="mb-4 flex items-center gap-2 text-[10px] font-extrabold uppercase tracking-[0.22em] text-[#b9ee78] md:hidden">
+                <WkIcon
+                  name="ListMusic"
+                  size={
+                    12
+                  }
+                />
+                Playlist
+              </div>
+
               <div className="grid items-end gap-6 md:grid-cols-[170px_minmax(0,1fr)] md:gap-8">
                 <div className="aspect-square w-[132px] overflow-hidden rounded-2xl border border-white/15 bg-black/20 shadow-2xl md:w-[170px]">
                   <PlaylistCoverPresentation
@@ -2269,7 +2337,7 @@ export default function PublicPlaylistDetailPage() {
                 </div>
 
                 <div className="min-w-0">
-                  <div className="mb-3 flex items-center gap-2 text-[10px] font-extrabold uppercase tracking-[0.22em] text-[#b9ee78]">
+                  <div className="mb-3 hidden items-center gap-2 text-[10px] font-extrabold uppercase tracking-[0.22em] text-[#b9ee78] md:flex">
                     <WkIcon
                       name="ListMusic"
                       size={
@@ -2293,12 +2361,30 @@ export default function PublicPlaylistDetailPage() {
 
                   <div className="mt-3 text-[13px] font-bold text-white/75 md:text-[15px]">
                     Curated by{" "}
-                    <span className="text-white">
-                      {
-                        playlist.curatorLabel ??
-                        "WAKILISHA"
-                      }
-                    </span>
+                    {
+                      curatorHref
+                        ? (
+                            <Link
+                              to={
+                                curatorHref
+                              }
+                              className="text-white underline-offset-4 transition-colors hover:text-[#b9ee78] hover:underline"
+                            >
+                              {
+                                playlist.curatorLabel ??
+                                "WAKILISHA"
+                              }
+                            </Link>
+                          )
+                        : (
+                            <span className="text-white">
+                              {
+                                playlist.curatorLabel ??
+                                "WAKILISHA"
+                              }
+                            </span>
+                          )
+                    }
                     <span className="mx-2 text-white/40">
                       ·
                     </span>
