@@ -33,7 +33,7 @@ export function PlaylistCoverPresentation({
 
   return (
     <div
-      className="relative h-full w-full overflow-hidden"
+      className="relative isolate h-full w-full overflow-hidden"
       style={{
         containerType:
           "inline-size",
@@ -47,14 +47,14 @@ export function PlaylistCoverPresentation({
         }
         loading={loading}
         className={[
-          "h-full w-full object-cover",
+          "relative z-0 h-full w-full object-cover",
           imageClassName,
         ].join(" ")}
       />
 
       <div
         aria-hidden="true"
-        className="pointer-events-none absolute left-[7.5%] top-[7.5%] w-[61%] text-[#0C0D0A]"
+        className="pointer-events-none absolute z-10 left-[7.5%] top-[7.5%] w-[61%] text-[#0C0D0A]"
       >
         <div
           className="font-black tracking-[-0.055em]"

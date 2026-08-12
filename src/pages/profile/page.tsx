@@ -3,6 +3,7 @@ import { Link, useNavigate } from "react-router-dom";
 import { useAuthUser } from "@/hooks/useAuthUser";
 import { useTheme } from "@/components/design-system/theme/ThemeProvider";
 import { WkIcon } from "@/components/design-system/Icon";
+import { PlaylistCoverPresentation } from "@/components/media/PlaylistCoverPresentation";
 import { supabase } from "@/lib/supabase";
 import {
   getUserComments,
@@ -571,6 +572,7 @@ function SavesTab({
       {saves.map((s) => {
         const save = s as Record<string, unknown>;
         const entityUrl = String(save.entity_url || "");
+        const entitySlug = String(save.entity_slug || "");
         const title = String(save.title || "Untitled");
         const subtitle = save.subtitle ? String(save.subtitle) : null;
         const imageUrl = save.image_url ? String(save.image_url) : null;
@@ -583,8 +585,22 @@ function SavesTab({
             to={entityUrl || "#"}
             className="block border border-[var(--wk-border)] rounded-xl overflow-hidden bg-[var(--wk-surface)] hover:border-[var(--wk-border-2)] hover:translate-y-[-2px] transition-all"
           >
-            <div className="aspect-[16/10] overflow-hidden bg-[var(--wk-surface-raised)]">
-              {imageUrl ? (
+            <div
+              className={`overflow-hidden bg-[var(--wk-surface-raised)] ${
+                entityType === "playlist"
+                  ? "aspect-square"
+                  : "aspect-[16/10]"
+              }`}
+            >
+              {entityType === "playlist" && entitySlug ? (
+                <PlaylistCoverPresentation
+                  src={imageUrl}
+                  altText={title}
+                  slug={entitySlug}
+                  title={title}
+                  loading="lazy"
+                />
+              ) : imageUrl ? (
                 <img src={imageUrl} alt="" className="w-full h-full object-cover" />
               ) : (
                 <div className="w-full h-full flex items-center justify-center text-[var(--wk-text-faint)]">
