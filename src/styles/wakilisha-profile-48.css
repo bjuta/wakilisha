@@ -1406,36 +1406,91 @@
   }
 }
 
+/* People/Profile mobile compact profile override */
 @media (max-width: 768px) {
   .profile-dt-cover {
     height: 220px;
   }
   .profile-dt-content {
-    padding: 0 20px 40px;
+    padding: 0 16px 40px;
   }
   .profile-dt-header {
-    margin-top: -50px;
-    gap: 16px;
+    display: block;
+    margin-top: -48px;
+    padding-bottom: 18px;
+    border-bottom: 0;
+  }
+  .profile-dt-avatar-wrap {
+    width: 96px;
+    z-index: 2;
   }
   .profile-dt-avatar {
     width: 96px;
     height: 96px;
   }
   .profile-dt-header-main {
-    padding-top: 50px;
+    padding-top: 10px;
   }
   .profile-dt-header-top {
-    flex-direction: column;
-    gap: 12px;
+    display: block;
+    margin-bottom: 14px;
+  }
+  .profile-dt-header-info {
+    width: 100%;
+  }
+  .profile-dt-header-actions {
+    position: absolute;
+    top: 58px;
+    right: 0;
+    max-width: calc(100% - 108px);
+    gap: 6px;
+    padding-top: 0;
+    justify-content: flex-end;
+  }
+  .profile-dt-header-actions .profile-dt-btn-edit,
+  .profile-dt-header-actions .profile-dt-btn-ghost {
+    height: 34px;
+    padding: 0 10px;
+    gap: 5px;
+    border-radius: 999px;
+    font-size: 12px;
+  }
+  .profile-dt-header-actions svg {
+    width: 13px;
+    height: 13px;
   }
   .profile-dt-name {
     font-size: 28px;
   }
+  .profile-dt-bio {
+    max-width: none;
+  }
   .profile-dt-stats {
-    gap: 20px;
+    gap: 8px 18px;
+    padding-top: 4px;
+  }
+  .profile-dt-stat {
+    flex-direction: row;
+    align-items: baseline;
+    gap: 4px;
   }
   .profile-dt-stat-val {
-    font-size: 18px;
+    font-size: 16px;
+  }
+  .profile-dt-stat-lbl {
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0;
+    text-transform: none;
+  }
+  .profile-dt-tabbar {
+    margin: 0 -16px 24px;
+    padding: 0 16px;
+  }
+  .profile-dt-tab {
+    flex: 0 0 auto;
+    padding: 15px 0 13px;
+    margin-right: 24px;
   }
   .profile-dt-likes-grid {
     grid-template-columns: repeat(3, 1fr);
@@ -3005,5 +3060,55 @@
   }
   .author-profile-divider {
     margin: 36px 0 24px;
+  }
+}
+/* People mobile article filter rail */
+@media (max-width: 768px) {
+  .person-article-filter-bar {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: center;
+    gap: 10px;
+    padding: 4px 0 12px;
+    margin-bottom: 18px;
+  }
+
+  .person-article-filter-pills {
+    display: flex;
+    flex-wrap: nowrap;
+    min-width: 0;
+    gap: 8px;
+    overflow-x: auto;
+    overflow-y: hidden;
+    padding: 2px 0 5px;
+    overscroll-behavior-inline: contain;
+    scroll-snap-type: x proximity;
+    scrollbar-width: none;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .person-article-filter-pills::-webkit-scrollbar {
+    display: none;
+  }
+
+  .person-article-filter-pills .author-profile-filter-pill {
+    flex: 0 0 auto;
+    min-height: 34px;
+    scroll-snap-align: start;
+  }
+
+  .person-article-sort-wrap {
+    align-self: stretch;
+    display: flex;
+    align-items: flex-start;
+    padding-top: 2px;
+  }
+
+  .person-article-sort-wrap .author-profile-sort-trigger {
+    height: 34px;
+    padding-inline: 12px;
+    border-radius: 999px;
+    background: var(--wk-surface);
+    white-space: nowrap;
   }
 }

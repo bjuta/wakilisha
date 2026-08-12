@@ -3921,6 +3921,10 @@ export type Database = {
         }
         Returns: string
       }
+      sync_account_person_handle: {
+        Args: { p_user_id: string }
+        Returns: string
+      }
       validate_citation_locator: {
         Args: { p_locator_data: Json; p_locator_type: string }
         Returns: undefined
@@ -19177,6 +19181,51 @@ export type Database = {
           sensitivity: string
           title: string
           updated_at: string
+        }[]
+      }
+      list_public_person_community_activity: {
+        Args: {
+          p_activity_kind?: string
+          p_limit?: number
+          p_person_resource_id: string
+        }
+        Returns: {
+          anchor_end_time_ms: number
+          anchor_label: string
+          anchor_time_ms: number
+          anchor_type: string
+          author_id: string
+          body_html: string
+          body_markdown: string
+          body_plain: string
+          context_entity_id: string
+          context_entity_slug: string
+          context_entity_type: string
+          context_label: string
+          created_at: string
+          deleted_at: string
+          depth: number
+          downvote_count: number
+          edited_at: string
+          id: string
+          is_editor_pick: boolean
+          is_pinned: boolean
+          parent_id: string
+          path: string
+          reaction_count: number
+          reply_count: number
+          report_count: number
+          root_id: string
+          score: number
+          status: string
+          thread_entity_id: string
+          thread_entity_slug: string
+          thread_entity_type: string
+          thread_entity_url: string
+          thread_id: string
+          thread_title: string
+          updated_at: string
+          upvote_count: number
         }[]
       }
       list_public_person_work: {

@@ -476,6 +476,31 @@ export async function getUserReplies(userId: string, limit: number = 20): Promis
   return (data || []).map((row: any) => mapComment(row));
 }
 
+export async function getPublicPersonCommunityActivity(
+  personResourceId: string,
+  activityKind: 'comment' | 'reply',
+  limit: number = 20,
+): Promise<CommunityComment[]> {
+  const { data, error } = await supabase.rpc(
+    'list_public_person_community_activity',
+    {
+      p_person_resource_id: personResourceId,
+      p_activity_kind: activityKind,
+      p_limit: Math.min(Math.max(limit, 1), 50),
+    },
+  );
+
+  if (error) {
+    throw new Error(
+      `Failed to load public Person community activity: ${error.message}`,
+    );
+  }
+
+  return (data || []).map(
+    (row: any) => mapComment(row),
+  );
+}
+
 export async function getUserProfileWithStats(userId: string): Promise<CommunityProfile | null> {
   const profile = await getUserProfile(userId);
   if (!profile) return null;

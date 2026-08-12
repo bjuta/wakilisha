@@ -11,6 +11,7 @@ export type CommunityEntityType =
   | 'chart_edition'
   | 'field_guide'
   | 'profile'
+  | 'person'
   | 'playlist'
   | 'comment';
 
