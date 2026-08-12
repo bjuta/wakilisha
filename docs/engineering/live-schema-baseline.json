@@ -1,9 +1,9 @@
 {
   "projectRef": "pgzizndxdyhqmtyywjmt",
   "schema": "public",
-  "generatedAt": "2026-08-12T09:29:26Z",
+  "generatedAt": "2026-08-12T14:08:12Z",
   "typesSha256": "170c5335c41031808ede410e0d65e2bdfd2b29d790d059c5a1bc6565f0dcb5e9",
   "authoritativeMigrationDirectory": "supabase/migrations",
-  "migrationCount": 242,
-  "latestMigration": "20260812090500_people_public_person_social_following_count.sql"
+  "migrationCount": 243,
+  "latestMigration": "20260812103000_follow_save_capability_authority.sql"
 }
