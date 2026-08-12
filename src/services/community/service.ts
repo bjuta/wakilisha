@@ -27,6 +27,9 @@ import type {
   ReactionResult,
   CommunityNotification,
   ReactionType,
+  CommunityPublicReactionTarget,
+  CommunityPublicReactionTargetType,
+  CommunityPublicReactionState,
 } from './types';
 import {
   hydrateFollowingPresentation,
@@ -260,6 +263,214 @@ export async function reactToTarget(input: ReactInput): Promise<ReactionResult> 
     created: data.created,
     reactionType: data.reaction_type as ReactionType,
   };
+}
+
+function isCommunityPublicReactionTargetType(
+  value: string,
+): value is CommunityPublicReactionTargetType {
+  return (
+    value === 'article'
+    || value === 'playlist'
+    || value === 'release'
+  );
+}
+
+function decodeCommunityPublicReactionState(
+  value: unknown,
+): CommunityPublicReactionState {
+  if (
+    !value
+    || typeof value !== 'object'
+    || Array.isArray(value)
+  ) {
+    throw new Error(
+      'Reaction state returned an invalid target.',
+    );
+  }
+
+  const record =
+    value as Record<string, unknown>;
+
+  const targetType =
+    typeof record.target_type === 'string'
+      ? record.target_type
+      : '';
+
+  const targetId =
+    typeof record.target_id === 'string'
+      ? record.target_id
+      : '';
+
+  const reactionCount =
+    typeof record.reaction_count === 'number'
+    && Number.isFinite(record.reaction_count)
+      ? Math.max(
+          0,
+          Math.floor(record.reaction_count),
+        )
+      : null;
+
+  if (
+    !isCommunityPublicReactionTargetType(
+      targetType,
+    )
+    || !targetId
+    || reactionCount === null
+    || !Array.isArray(record.reactions)
+  ) {
+    throw new Error(
+      'Reaction state returned an invalid target.',
+    );
+  }
+
+  const reactions =
+    record.reactions.map(
+      (reaction): CommunityPublicReactionState['reactions'][number] => {
+        if (
+          !reaction
+          || typeof reaction !== 'object'
+          || Array.isArray(reaction)
+        ) {
+          throw new Error(
+            'Reaction state returned an invalid reaction.',
+          );
+        }
+
+        const reactionRecord =
+          reaction as Record<string, unknown>;
+
+        const reactionType =
+          typeof reactionRecord.reaction_type === 'string'
+            ? reactionRecord.reaction_type
+            : '';
+
+        const count =
+          typeof reactionRecord.count === 'number'
+          && Number.isFinite(reactionRecord.count)
+            ? Math.max(
+                0,
+                Math.floor(reactionRecord.count),
+              )
+            : null;
+
+        const viewerReacted =
+          reactionRecord.viewer_reacted;
+
+        if (
+          !reactionType
+          || count === null
+          || typeof viewerReacted !== 'boolean'
+        ) {
+          throw new Error(
+            'Reaction state returned an invalid reaction.',
+          );
+        }
+
+        return {
+          reactionType,
+          count,
+          viewerReacted,
+        };
+      },
+    );
+
+  return {
+    targetType,
+    targetId,
+    reactionCount,
+    reactions,
+  };
+}
+
+export async function getReactionStateForPublicTargets(
+  targets: CommunityPublicReactionTarget[],
+): Promise<CommunityPublicReactionState[]> {
+  if (targets.length === 0) {
+    return [];
+  }
+
+  const uniqueTargets =
+    Array.from(
+      new Map(
+        targets.map(
+          (target) => [
+            `${target.targetType}:${target.targetId}`,
+            target,
+          ],
+        ),
+      ).values(),
+    );
+
+  const states:
+    CommunityPublicReactionState[] = [];
+
+  for (
+    let offset = 0;
+    offset < uniqueTargets.length;
+    offset += 100
+  ) {
+    const batch =
+      uniqueTargets.slice(
+        offset,
+        offset + 100,
+      );
+
+    const { data, error } =
+      await supabase.rpc(
+        'community_get_reaction_state_for_public_targets',
+        {
+          p_targets:
+            batch.map(
+              (target) => ({
+                target_type:
+                  target.targetType,
+                target_id:
+                  target.targetId,
+              }),
+            ),
+        },
+      );
+
+    if (error) {
+      throw error;
+    }
+
+    if (
+      !data
+      || typeof data !== 'object'
+      || Array.isArray(data)
+      || !Array.isArray(
+        (
+          data as Record<string, unknown>
+        ).targets,
+      )
+    ) {
+      throw new Error(
+        'Reaction state returned an invalid response.',
+      );
+    }
+
+    const decoded =
+      (
+        data as {
+          targets: unknown[];
+        }
+      ).targets.map(
+        decodeCommunityPublicReactionState,
+      );
+
+    if (decoded.length !== batch.length) {
+      throw new Error(
+        'Reaction state returned an incomplete response.',
+      );
+    }
+
+    states.push(
+      ...decoded,
+    );
+  }
+
+  return states;
 }
 
 export async function reportComment(input: ReportInput): Promise<{ report: unknown }> {

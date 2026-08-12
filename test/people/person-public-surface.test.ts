@@ -85,6 +85,12 @@ const followingFeedPage =
     "utf8",
   );
 
+const shareInfrastructure =
+  readFileSync(
+    "src/components/design-system/share/ShareSheet.tsx",
+    "utf8",
+  );
+
 const appTopBar =
   readFileSync(
     "src/components/layout/AppTopBar.tsx",
@@ -926,16 +932,31 @@ describe(
 
         expect(followingFeedPage)
           .toContain(
-            "navigator.share",
+            "SharePopover",
           );
 
         expect(followingFeedPage)
           .toContain(
-            'data-following-reaction-slot="reserved"',
+            "ShareSheet",
           );
 
         expect(followingFeedPage)
           .not.toContain(
+            "navigator.share",
+          );
+
+        expect(followingFeedPage)
+          .not.toContain(
+            "navigator.clipboard.writeText",
+          );
+
+        expect(followingFeedPage)
+          .toContain(
+            'data-following-reaction-slot="live"',
+          );
+
+        expect(followingFeedPage)
+          .toContain(
             "CommunityReactionPicker",
           );
 
@@ -972,6 +993,166 @@ describe(
         expect(mobileOwnerProfilePage)
           .toContain(
             'to="/following"',
+          );
+      },
+    );
+
+    it(
+      "keeps the shared desktop share popover portaled and inside the viewport",
+      () => {
+        expect(shareInfrastructure)
+          .toContain(
+            "useLayoutEffect",
+          );
+
+        expect(shareInfrastructure)
+          .toContain(
+            "panelRef.current.getBoundingClientRect()",
+          );
+
+        expect(shareInfrastructure)
+          .toContain(
+            "const viewportPadding = 16;",
+          );
+
+        expect(shareInfrastructure)
+          .toContain(
+            "const fitsBelow =",
+          );
+
+        expect(shareInfrastructure)
+          .toContain(
+            "const fitsAbove =",
+          );
+
+        expect(shareInfrastructure)
+          .toContain(
+            "new ResizeObserver(",
+          );
+
+        expect(shareInfrastructure)
+          .toContain(
+            "return (\n    <Portal>\n      <>",
+          );
+
+        expect(shareInfrastructure)
+          .toContain(
+            'max-h-[calc(100vh-32px)]',
+          );
+
+        expect(shareInfrastructure)
+          .not.toContain(
+            "top + 520",
+          );
+
+        expect(shareInfrastructure)
+          .not.toContain(
+            "trigger.top - 520",
+          );
+      },
+    );
+
+    it(
+      "uses the unified WAKILISHA share infrastructure on Following",
+      () => {
+        expect(followingFeedPage)
+          .toContain(
+            '@/components/design-system/share/ShareSheet',
+          );
+
+        expect(followingFeedPage)
+          .toContain(
+            "FollowingShareAction",
+          );
+
+        expect(followingFeedPage)
+          .toContain(
+            "SharePopover",
+          );
+
+        expect(followingFeedPage)
+          .toContain(
+            "ShareSheet",
+          );
+
+        expect(followingFeedPage)
+          .toContain(
+            "PUBLIC_ORIGIN",
+          );
+
+        expect(followingFeedPage)
+          .not.toContain(
+            "navigator.share",
+          );
+
+        expect(followingFeedPage)
+          .not.toContain(
+            "navigator.clipboard.writeText",
+          );
+      },
+    );
+
+    it(
+      "hydrates and toggles Following reactions through the dedicated self-only state reader",
+      () => {
+        expect(communityService)
+          .toContain(
+            "'community_get_reaction_state_for_public_targets'",
+          );
+
+        expect(communityService)
+          .toContain(
+            "getReactionStateForPublicTargets",
+          );
+
+        expect(communityService)
+          .toContain(
+            "offset += 100",
+          );
+
+        expect(followingFeedPage)
+          .toContain(
+            "getReactionStateForPublicTargets",
+          );
+
+        expect(followingFeedPage)
+          .toContain(
+            "reactToTarget",
+          );
+
+        expect(followingFeedPage)
+          .toContain(
+            "CommunityReactionPicker",
+          );
+
+        expect(followingFeedPage)
+          .toContain(
+            "getReactionGlyph",
+          );
+
+        expect(followingFeedPage)
+          .toContain(
+            "viewerReacted",
+          );
+
+        expect(followingFeedPage)
+          .toContain(
+            "reactionCount",
+          );
+
+        expect(followingFeedPage)
+          .toContain(
+            'data-following-reaction-slot="live"',
+          );
+
+        expect(followingFeedPage)
+          .not.toContain(
+            "getUserReactions",
+          );
+
+        expect(followingFeedPage)
+          .not.toContain(
+            "community_get_user_reactions",
           );
       },
     );

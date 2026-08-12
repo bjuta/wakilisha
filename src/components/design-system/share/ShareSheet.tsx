@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, useCallback, useMemo } from "react";
+import { useEffect, useLayoutEffect, useRef, useState, useCallback, useMemo } from "react";
 import { useScrollLock } from "@/hooks/useScrollLock";
 import { incrementShareCount, getShareCounts, getTotalShareCount } from "@/services/shareTracking";
 import { trackEvent } from "@/services/analytics";
@@ -447,23 +447,187 @@ export function SharePopover({
     }));
   }, [open, baseUrl, item, shareTarget]);
 
-  // Position
-  useEffect(() => {
-    if (!open || !triggerRef.current || !panelRef.current) return;
-    const trigger = triggerRef.current.getBoundingClientRect();
-    const panelWidth = 380;
-    const gap = 8;
-
-    let left = trigger.left + trigger.width / 2 - panelWidth / 2;
-    if (left < 16) left = 16;
-    if (left + panelWidth > window.innerWidth - 16) left = window.innerWidth - panelWidth - 16;
-
-    let top = trigger.bottom + gap;
-    if (top + 520 > window.innerHeight) {
-      top = trigger.top - 520 - gap;
+  const updatePosition = useCallback(() => {
+    if (
+      !open
+      || !triggerRef.current
+      || !panelRef.current
+    ) {
+      return;
     }
-    setPosition({ top, left });
-  }, [open, triggerRef]);
+
+    const trigger =
+      triggerRef.current.getBoundingClientRect();
+
+    const panel =
+      panelRef.current.getBoundingClientRect();
+
+    const panelWidth =
+      panel.width || 380;
+
+    const panelHeight =
+      panel.height || 1;
+
+    const gap = 8;
+    const viewportPadding = 16;
+
+    const preferredLeft =
+      trigger.left
+      + trigger.width / 2
+      - panelWidth / 2;
+
+    const maxLeft =
+      Math.max(
+        viewportPadding,
+        window.innerWidth
+        - panelWidth
+        - viewportPadding,
+      );
+
+    const left =
+      Math.min(
+        Math.max(
+          preferredLeft,
+          viewportPadding,
+        ),
+        maxLeft,
+      );
+
+    const belowTop =
+      trigger.bottom + gap;
+
+    const aboveTop =
+      trigger.top
+      - panelHeight
+      - gap;
+
+    const fitsBelow =
+      belowTop + panelHeight
+      <= window.innerHeight
+        - viewportPadding;
+
+    const fitsAbove =
+      aboveTop
+      >= viewportPadding;
+
+    let preferredTop =
+      belowTop;
+
+    if (
+      !fitsBelow
+      && fitsAbove
+    ) {
+      preferredTop =
+        aboveTop;
+    } else if (
+      !fitsBelow
+      && !fitsAbove
+    ) {
+      const roomBelow =
+        window.innerHeight
+        - trigger.bottom;
+
+      const roomAbove =
+        trigger.top;
+
+      preferredTop =
+        roomAbove > roomBelow
+          ? aboveTop
+          : belowTop;
+    }
+
+    const maxTop =
+      Math.max(
+        viewportPadding,
+        window.innerHeight
+        - panelHeight
+        - viewportPadding,
+      );
+
+    const top =
+      Math.min(
+        Math.max(
+          preferredTop,
+          viewportPadding,
+        ),
+        maxTop,
+      );
+
+    setPosition({
+      top,
+      left,
+    });
+  }, [
+    open,
+    triggerRef,
+  ]);
+
+  useLayoutEffect(() => {
+    if (!open) {
+      return;
+    }
+
+    updatePosition();
+
+    const frame =
+      window.requestAnimationFrame(
+        updatePosition,
+      );
+
+    const handleViewportChange = () => {
+      updatePosition();
+    };
+
+    window.addEventListener(
+      "resize",
+      handleViewportChange,
+    );
+
+    window.addEventListener(
+      "scroll",
+      handleViewportChange,
+      true,
+    );
+
+    const resizeObserver =
+      typeof ResizeObserver !== "undefined"
+        && panelRef.current
+        ? new ResizeObserver(
+            updatePosition,
+          )
+        : null;
+
+    if (
+      resizeObserver
+      && panelRef.current
+    ) {
+      resizeObserver.observe(
+        panelRef.current,
+      );
+    }
+
+    return () => {
+      window.cancelAnimationFrame(
+        frame,
+      );
+
+      window.removeEventListener(
+        "resize",
+        handleViewportChange,
+      );
+
+      window.removeEventListener(
+        "scroll",
+        handleViewportChange,
+        true,
+      );
+
+      resizeObserver?.disconnect();
+    };
+  }, [
+    open,
+    updatePosition,
+  ]);
 
   // ESC
   useEffect(() => {
@@ -534,11 +698,12 @@ export function SharePopover({
   if (!open) return null;
 
   return (
-    <>
-      <div className="fixed inset-0 z-[55]" onClick={onClose} />
-      <div
-        ref={panelRef}
-        className="fixed z-[56] w-[380px] rounded-2xl border border-[var(--wk-border)] bg-white shadow-[0_8px_40px_-8px_rgba(0,0,0,0.18),0_0_0_1px_rgba(0,0,0,0.04)] overflow-hidden"
+    <Portal>
+      <>
+        <div className="fixed inset-0 z-[55]" onClick={onClose} />
+        <div
+          ref={panelRef}
+          className="fixed z-[56] w-[380px] max-w-[calc(100vw-32px)] max-h-[calc(100vh-32px)] overflow-y-auto rounded-2xl border border-[var(--wk-border)] bg-white shadow-[0_8px_40px_-8px_rgba(0,0,0,0.18),0_0_0_1px_rgba(0,0,0,0.04)]"
         style={{ top: position.top, left: position.left }}
         onClick={(e) => e.stopPropagation()}
       >
@@ -607,8 +772,9 @@ export function SharePopover({
             size="sm"
           />
         </div>
-      </div>
-    </>
+        </div>
+      </>
+    </Portal>
   );
 }
 
