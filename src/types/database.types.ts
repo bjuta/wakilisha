@@ -17401,6 +17401,14 @@ export type Database = {
         }
         Returns: Json
       }
+      community_get_following_feed: {
+        Args: {
+          p_before_item_key?: string
+          p_before_published_at?: string
+          p_limit?: number
+        }
+        Returns: Json
+      }
       community_get_most_discussed: {
         Args: { p_limit?: number }
         Returns: Json
