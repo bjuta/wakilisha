@@ -28,6 +28,11 @@ import type {
   CommunityNotification,
   ReactionType,
 } from './types';
+import {
+  hydrateFollowingPresentation,
+  mapCommunityFollowRows,
+  type FollowingPresentationItem,
+} from './followingPresentation';
 
 function isDuplicateThreadConflict(error: unknown): boolean {
   const err = error as { code?: string; message?: string; details?: string } | null;
@@ -519,6 +524,20 @@ export async function getUserFollows(userId: string): Promise<unknown[]> {
   });
   if (error) throw error;
   return data || [];
+}
+
+export async function getUserFollowing(
+  userId: string
+): Promise<FollowingPresentationItem[]> {
+  const rows = mapCommunityFollowRows(
+    await getUserFollows(
+      userId
+    )
+  );
+
+  return hydrateFollowingPresentation(
+    rows
+  );
 }
 
 export async function getUserSaves(userId: string): Promise<unknown[]> {

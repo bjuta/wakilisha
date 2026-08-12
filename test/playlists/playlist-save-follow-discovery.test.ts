@@ -156,6 +156,41 @@ describe(
     );
 
     it(
+      "keeps the raw self-only Follow reader compatible with Playlist artist discovery",
+      () => {
+        expect(service)
+          .toContain(
+            "export async function getUserFollows(userId: string): Promise<unknown[]>",
+          );
+
+        expect(service)
+          .toContain(
+            "return data || [];",
+          );
+
+        expect(service)
+          .toContain(
+            "mapCommunityFollowRows(",
+          );
+
+        expect(service)
+          .toContain(
+            "getUserFollowing",
+          );
+
+        expect(page)
+          .toContain(
+            "row.target_type",
+          );
+
+        expect(page)
+          .toContain(
+            "row.target_id",
+          );
+      },
+    );
+
+    it(
       "builds discovery from every credited Playlist artist",
       () => {
         expect(page)

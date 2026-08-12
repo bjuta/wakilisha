@@ -49,6 +49,18 @@ const ownerProfilePage =
     "utf8",
   );
 
+const mobileOwnerProfilePage =
+  readFileSync(
+    "src/pages/mobile/profile/page.tsx",
+    "utf8",
+  );
+
+const followingPresentation =
+  readFileSync(
+    "src/services/community/followingPresentation.ts",
+    "utf8",
+  );
+
 const communityService =
   readFileSync(
     "src/services/community/service.ts",
@@ -641,6 +653,97 @@ describe(
           .toContain(
             "People mobile article filter rail",
           );
+      },
+    );
+
+
+    it(
+      "uses one canonical signed-in Following presentation model for every M1 target type",
+      () => {
+        for (
+          const targetType of [
+            "person",
+            "artist",
+            "genre",
+            "label",
+            "chart_program",
+          ]
+        ) {
+          expect(followingPresentation)
+            .toContain(
+              `"${targetType}"`,
+            );
+        }
+
+        expect(communityService)
+          .toContain(
+            "mapCommunityFollowRows",
+          );
+
+        expect(communityService)
+          .toContain(
+            "hydrateFollowingPresentation",
+          );
+
+        expect(communityService)
+          .toContain(
+            "getUserFollowing",
+          );
+
+        expect(ownerProfilePage)
+          .toContain(
+            "getUserFollowing",
+          );
+
+        expect(mobileOwnerProfilePage)
+          .toContain(
+            "getUserFollowing",
+          );
+
+        expect(mobileOwnerProfilePage)
+          .not.toContain(
+            "enrichFollowEntities",
+          );
+
+        expect(followingPresentation)
+          .toContain(
+            "getPublicPerson",
+          );
+
+        expect(followingPresentation)
+          .toContain(
+            '.from("registry_artists")',
+          );
+
+        expect(followingPresentation)
+          .toContain(
+            '.from("registry_genres")',
+          );
+
+        expect(followingPresentation)
+          .toContain(
+            '.from("registry_labels")',
+          );
+
+        expect(followingPresentation)
+          .toContain(
+            '.from("wk_chart_programs_v2")',
+          );
+
+        for (
+          const route of [
+            "/people/",
+            "/artists/",
+            "/genres/",
+            "/labels/",
+            "getCanonicalChartPathFromSlugs",
+          ]
+        ) {
+          expect(followingPresentation)
+            .toContain(
+              route,
+            );
+        }
       },
     );
 

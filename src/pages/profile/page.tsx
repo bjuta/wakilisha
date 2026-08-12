@@ -8,11 +8,16 @@ import {
   getUserComments,
   getUserReplies,
   getUserSaves,
-  getUserFollows,
+  getUserFollowing,
   getUserProfileWithStats,
   hydrateCommentsWithUserState,
 } from "@/services/community";
 import type { CommunityComment, CommunityProfile } from "@/services/community";
+import {
+  followingTargetIcon,
+  followingTargetLabel,
+  type FollowingPresentationItem,
+} from "@/services/community/followingPresentation";
 
 function getCoverColor(): string {
   try { return localStorage.getItem("wk-cover-color") || "#1a3a0a"; } catch { return "#1a3a0a"; }
@@ -72,7 +77,7 @@ export default function ProfilePage() {
   const [comments, setComments] = useState<CommunityComment[]>([]);
   const [replies, setReplies] = useState<CommunityComment[]>([]);
   const [saves, setSaves] = useState<Record<string, unknown>[]>([]);
-  const [follows, setFollows] = useState<Record<string, unknown>[]>([]);
+  const [follows, setFollows] = useState<FollowingPresentationItem[]>([]);
   const [tabLoading, setTabLoading] = useState(false);
   const [tabError, setTabError] = useState<string | null>(null);
 
@@ -118,7 +123,7 @@ export default function ProfilePage() {
             break;
           }
           case "Following": {
-            const data = await getUserFollows(userId);
+            const data = await getUserFollowing(userId);
             setFollows(data);
             break;
           }
@@ -613,7 +618,7 @@ function FollowingTab({
   error,
   onRetry,
 }: {
-  follows: Record<string, unknown>[];
+  follows: FollowingPresentationItem[];
   loading: boolean;
   error: string | null;
   onRetry: () => void;
@@ -652,7 +657,7 @@ function FollowingTab({
         <WkIcon name="UserPlus" size={32} className="mx-auto mb-4 text-[var(--wk-text-faint)]" />
         <p className="font-bold text-sm text-[var(--wk-text-muted)] mb-3">Not following anything yet</p>
         <p className="text-xs text-[var(--wk-text-faint)] max-w-xs mx-auto">
-          Follow articles, artists, and charts to stay updated.
+          Follow people, artists, genres, labels, and charts to keep your culture close.
         </p>
       </div>
     );
@@ -660,66 +665,38 @@ function FollowingTab({
 
   return (
     <div className="space-y-1">
-      {follows.map((f) => {
-        const follow = f as Record<string, unknown>;
-        const targetType = String(follow.target_type || "");
-        const targetSlug = String(follow.target_slug || "");
-        const createdAt = String(follow.created_at || "");
-        const urlMap: Record<string, string> = {
-          article: `/magazine/${targetSlug}`,
-          artist: `/artists/${targetSlug}`,
-          track: `/tracks/${targetSlug}`,
-          release: `/releases/${targetSlug}`,
-          label: `/labels/${targetSlug}`,
-          genre: `/genres/${targetSlug}`,
-          chart: `/charts/${targetSlug}`,
-          chart_edition: `/charts/${targetSlug}`,
-          field_guide: `/guides/${targetSlug}`,
-          magazine_issue: `/magazine/issue/${targetSlug}`,
-        };
-
-        return (
-          <Link
-            key={String(follow.id)}
-            to={urlMap[targetType] || "#"}
-            className="flex items-center gap-3 border border-[var(--wk-border)] rounded-xl p-4 hover:border-[var(--wk-border-2)] transition-colors"
-          >
-            <div className="w-10 h-10 rounded-lg bg-[var(--wk-surface-raised)] flex items-center justify-center shrink-0">
-              <i className={`${iconForTargetType(targetType)} text-[16px] text-[var(--wk-text-muted)]`} />
+      {follows.map((follow) => (
+        <Link
+          key={follow.followId}
+          to={follow.canonicalPath}
+          className="flex items-center gap-3 border border-[var(--wk-border)] rounded-xl p-4 hover:border-[var(--wk-border-2)] transition-colors"
+        >
+          <div className="w-10 h-10 rounded-lg overflow-hidden bg-[var(--wk-surface-raised)] flex items-center justify-center shrink-0">
+            {follow.imageUrl ? (
+              <img
+                src={follow.imageUrl}
+                alt=""
+                className="w-full h-full object-cover"
+              />
+            ) : (
+              <i className={`${followingTargetIcon(follow.targetType)} text-[16px] text-[var(--wk-text-muted)]`} />
+            )}
+          </div>
+          <div className="flex-1 min-w-0">
+            <div className="font-bold text-[13px] text-[var(--wk-text)] truncate">
+              {follow.title}
             </div>
-            <div className="flex-1 min-w-0">
-              <div className="font-bold text-[13px] text-[var(--wk-text)] truncate">
-                {targetSlug.replace(/-/g, " ").replace(/\b\w/g, (c) => c.toUpperCase())}
-              </div>
-              <div className="flex items-center gap-2 text-[11px] text-[var(--wk-text-muted)]">
-                <span>{entityLabel(targetType)}</span>
-                <span>·</span>
-                <span>{timeAgo(createdAt)}</span>
-              </div>
+            <div className="flex items-center gap-2 text-[11px] text-[var(--wk-text-muted)]">
+              <span>{followingTargetLabel(follow.targetType)}</span>
+              <span>·</span>
+              <span>{timeAgo(follow.createdAt)}</span>
             </div>
-            <i className="ri-arrow-right-s-line text-[var(--wk-text-faint)]" />
-          </Link>
-        );
-      })}
+          </div>
+          <i className="ri-arrow-right-s-line text-[var(--wk-text-faint)]" />
+        </Link>
+      ))}
     </div>
   );
-}
-
-function iconForTargetType(type: string): string {
-  const map: Record<string, string> = {
-    article: "ri-article-line",
-    artist: "ri-mic-line",
-    track: "ri-music-line",
-    release: "ri-disc-line",
-    label: "ri-building-line",
-    genre: "ri-price-tag-3-line",
-    chart: "ri-bar-chart-line",
-    chart_edition: "ri-bar-chart-line",
-    field_guide: "ri-book-open-line",
-    magazine_issue: "ri-pages-line",
-    profile: "ri-user-line",
-  };
-  return map[type] || "ri-link";
 }
 
 /* ─── Account Tab ─── */
