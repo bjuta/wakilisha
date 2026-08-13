@@ -62,6 +62,20 @@ function hasRealImage(a: PublicArtist): boolean {
   return Boolean(a.imageUrl && String(a.imageUrl).startsWith("http"));
 }
 
+function hasRealChartPosition(
+  artist: PublicArtist,
+): artist is PublicArtist & {
+  topChartPosition: number;
+} {
+  return (
+    typeof artist.topChartPosition === "number"
+    && Number.isFinite(
+      artist.topChartPosition,
+    )
+    && artist.topChartPosition > 0
+  );
+}
+
 /* Discovery signal: chart presence, momentum, completeness, and activity.
    Keeps low-signal artists searchable but off page one of the default view. */
 function signalScore(a: PublicArtist): number {
@@ -149,7 +163,23 @@ export default function ArtistsPageContent() {
   }, []);
 
   const enriched = useMemo(() => artists.map(enrichArtist), [artists]);
-  const chartArtists = useMemo(() => enriched.filter((a) => a.isChartArtist).sort((a, b) => (a.topChartPosition || 999) - (b.topChartPosition || 999)), [enriched]);
+  const chartArtists = useMemo(
+    () =>
+      enriched
+        .filter(
+          (artist) =>
+            artist.isChartArtist
+            && hasRealChartPosition(
+              artist,
+            ),
+        )
+        .sort(
+          (a, b) =>
+            a.topChartPosition
+            - b.topChartPosition,
+        ),
+    [enriched],
+  );
   const risingArtists = useMemo(() => enriched.filter((a) => a.isRising).slice(0, 12), [enriched]);
   /* Featured spotlight is image-led — favor chart leaders with portraits so the cover card lands */
   const featured = useMemo(() => {
@@ -300,7 +330,7 @@ export default function ArtistsPageContent() {
           imageUrl: a.imageUrl || undefined,
           genres: a.genres,
           monthlyStreams: a.monthlyStreams,
-          topChartPosition: a.topChartPosition || 99,
+          topChartPosition: a.topChartPosition,
           spotlightBio: a.spotlightBio,
           trackCount: a.trackCount,
           country: a.country,
@@ -317,7 +347,7 @@ export default function ArtistsPageContent() {
           trackCount: a.trackCount,
           releaseCount: a.releaseCount,
           monthlyStreams: a.monthlyStreams,
-          topChartPosition: a.topChartPosition || 99,
+          topChartPosition: a.topChartPosition,
         }))}
       />
 

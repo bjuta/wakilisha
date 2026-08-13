@@ -1,6 +1,5 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
-import { WkTag } from "@/components/design-system/primitives/Tag";
 import { usePlayer, type PlaySource } from "@/context/PlayerContext";
 import { Ch19GradientImage } from "@/components/media/Ch19GradientImage";
 import { ChartRowExpandedPanel } from "@/components/design-system/music/ChartRowExpandedPanel";
@@ -21,6 +20,7 @@ export interface ChartRowProps {
   isPlayable?: boolean;
   source?: string;
   onPlay?: () => void;
+  onDiscuss?: () => void;
   isPlaying?: boolean;
   genre?: string;
   label?: string;
@@ -56,6 +56,7 @@ export function ChartRow({
   isPlayable,
   source,
   onPlay,
+  onDiscuss,
   genre,
   label,
   previousWeek,
@@ -146,10 +147,10 @@ export function ChartRow({
       {/* Row */}
       <div
         onClick={toggleExpand}
-        className="flex cursor-pointer items-center gap-3 px-3 py-3 select-none"
+        className="flex cursor-pointer items-center gap-2 px-3 py-3 select-none md:gap-3"
       >
         {/* Rank */}
-        <div className="flex w-12 shrink-0 flex-col items-center">
+        <div className="flex w-10 shrink-0 flex-col items-center md:w-12">
           <span
             className="text-[22px] font-black leading-none"
             style={{ color: RANK_COLORS[rank] || "var(--wk-text-muted)" }}
@@ -186,26 +187,32 @@ export function ChartRow({
           ) : (
             <Ch19GradientImage slug={slug || trackId} name={title} />
           )}
+
+          {playable && (
+            <button
+              type="button"
+              onClick={handlePlay}
+              aria-label={isCurrentTrack && isPlaying ? `Pause ${title}` : `Play ${title}`}
+              className="absolute bottom-1 right-1 flex h-7 w-7 items-center justify-center rounded-full bg-black/70 text-white shadow-sm backdrop-blur-sm transition-transform active:scale-95 md:hidden"
+            >
+              <i className={`text-[12px] ${isCurrentTrack && isPlaying ? "ri-pause-fill" : "ri-play-fill"}`} />
+            </button>
+          )}
         </div>
 
         {/* Info */}
         <div className="min-w-0 flex-1">
-          <div className="mb-0.5 flex items-center gap-2">
+          <div className="mb-0.5 flex min-w-0 items-start gap-2">
             {slug ? (
               <Link
                 to={trackUrl(slug, artistSlugs)}
                 onClick={(e) => e.stopPropagation()}
-                className="truncate text-[14px] font-bold text-[var(--wk-text)] hover:underline"
+                className="min-w-0 flex-1 line-clamp-2 text-[14px] font-bold leading-tight text-[var(--wk-text)] hover:underline md:line-clamp-1"
               >
                 {title}
               </Link>
             ) : (
-              <span className="truncate text-[14px] font-bold text-[var(--wk-text)]">{title}</span>
-            )}
-            {peakPosition !== undefined && peakPosition === rank && (
-              <span className="shrink-0 rounded-full border border-[var(--wk-brand)]/30 bg-[var(--wk-brand-soft)] px-2 py-0.5 text-[10px] font-bold text-[var(--wk-brand)]">
-                PEAK
-              </span>
+              <span className="min-w-0 flex-1 line-clamp-2 text-[14px] font-bold leading-tight text-[var(--wk-text)] md:line-clamp-1">{title}</span>
             )}
             {!playable && (
               <span className="shrink-0 rounded-full border border-[var(--wk-border)] bg-[var(--wk-surface-raised)] px-2 py-0.5 text-[10px] font-bold text-[var(--wk-text-faint)]">
@@ -213,26 +220,26 @@ export function ChartRow({
               </span>
             )}
           </div>
-          <div className="flex min-w-0 flex-wrap items-center gap-x-1 text-[12px] text-[var(--wk-text-muted)]">
+          <div className="min-w-0 line-clamp-2 text-[12px] leading-[1.35] text-[var(--wk-text-muted)] md:line-clamp-1">
             {resolvedArtistLinks.length > 0 ? (
               resolvedArtistLinks.map((item, index) => (
-                <span key={`${item.slug || item.name}-${index}`} className="inline-flex min-w-0 items-center">
+                <span key={`${item.slug || item.name}-${index}`} className="inline">
                   {index > 0 && <span className="mr-1 text-[var(--wk-text-faint)]">,</span>}
                   {item.slug ? (
                     <Link
                       to={`/artists/${item.slug}`}
                       onClick={(event) => event.stopPropagation()}
-                      className="truncate hover:text-[var(--wk-brand)] hover:underline"
+                      className="hover:text-[var(--wk-brand)] hover:underline"
                     >
                       {item.name}
                     </Link>
                   ) : (
-                    <span className="truncate">{item.name}</span>
+                    <span>{item.name}</span>
                   )}
                 </span>
               ))
             ) : (
-              <span className="truncate">{artist}</span>
+              <span>{artist}</span>
             )}
           </div>
           {(genre || label || previousWeek !== undefined) && (
@@ -250,24 +257,12 @@ export function ChartRow({
           )}
         </div>
 
-        {/* Meta */}
-        <div className="hidden shrink-0 flex-col items-end gap-1 md:flex">
-          {weeksOnChart !== undefined && (
-            <WkTag>{weeksOnChart} wk{weeksOnChart !== 1 ? "s" : ""}</WkTag>
-          )}
-          {peakPosition !== undefined && (
-            <span className="text-[11px] text-[var(--wk-text-faint)]">
-              Peak #{peakPosition}
-            </span>
-          )}
-        </div>
-
         {/* Play button */}
         <button
           onClick={handlePlay}
           disabled={!playable}
           aria-label={isCurrentTrack && isPlaying ? "Pause" : "Play"}
-          className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[var(--wk-brand)] text-[var(--wk-brand-on)] transition-all duration-150 disabled:cursor-not-allowed disabled:opacity-40 ${isCurrentTrack ? "opacity-100" : "opacity-0 group-hover:opacity-100"}`}
+          className={`hidden h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[var(--wk-brand)] text-[var(--wk-brand-on)] transition-all duration-150 disabled:cursor-not-allowed disabled:opacity-40 md:flex ${isCurrentTrack ? "opacity-100" : "opacity-0 group-hover:opacity-100"}`}
         >
           <i className={`text-sm ${isCurrentTrack && isPlaying ? "ri-pause-fill" : "ri-play-mini-fill"}`} />
         </button>
@@ -301,6 +296,7 @@ export function ChartRow({
           duration={duration}
           genre={genre}
           score={score}
+          onDiscuss={onDiscuss}
         />
       </div>
     </div>

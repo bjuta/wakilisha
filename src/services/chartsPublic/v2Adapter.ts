@@ -207,6 +207,13 @@ async function v2GetWithLegacy<T>(primaryPath: string, legacyPath?: string): Pro
   }
 }
 
+function hasPublicEdition(program: V2Program): boolean {
+  return (
+    Boolean(program.latestEdition)
+    || (program.archive?.length ?? 0) > 0
+  );
+}
+
 function toFamily(program: V2Program): ChartFamily {
   const period = program.periodType ?? "weekly";
   return {
@@ -285,7 +292,7 @@ export async function getV2ChartFamilies(): Promise<{ families: ChartFamily[]; e
   const data = unwrap<V2ProgramListData>(await v2Get<ApiEnvelope<V2ProgramListData> | V2ProgramListData>("/charts"));
   const families: ChartFamily[] = [];
   const editions: ChartEdition[] = [];
-  for (const program of (data.programs ?? [])) {
+  for (const program of (data.programs ?? []).filter(hasPublicEdition)) {
     const family = toFamily(program);
     families.push(family);
     if (program.archive) {

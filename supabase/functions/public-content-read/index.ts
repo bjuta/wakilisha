@@ -1127,15 +1127,43 @@ Deno.serve(async (req) => {
         const chartRows = await fetchAllRows((from, to) =>
           supabase
             .from("wk_chart_entries_v2")
-            .select("artist_slug")
+            .select("artist_slug, rank")
             .range(from, to)
         );
 
-        const chartArtistSet = new Set(
-          chartRows
-            .map((e: any) => String(e.artist_slug || ""))
-            .filter((slug: string) => artistSlugSet.has(slug))
-        );
+        const topChartPositionByArtistSlug =
+          new Map<string, number>();
+
+        for (const row of chartRows) {
+          const chartArtistSlug =
+            String(row.artist_slug || "");
+
+          const chartRank =
+            Number(row.rank);
+
+          if (
+            !artistSlugSet.has(chartArtistSlug)
+            || !Number.isFinite(chartRank)
+            || chartRank <= 0
+          ) {
+            continue;
+          }
+
+          const currentBest =
+            topChartPositionByArtistSlug.get(
+              chartArtistSlug,
+            );
+
+          if (
+            currentBest === undefined
+            || chartRank < currentBest
+          ) {
+            topChartPositionByArtistSlug.set(
+              chartArtistSlug,
+              chartRank,
+            );
+          }
+        }
 
         data = {
           artists: artists.map((a: any) => {
@@ -1153,6 +1181,11 @@ Deno.serve(async (req) => {
               releaseCountByArtistSlug.get(aSlug)?.size || 0,
             );
 
+            const topChartPosition =
+              topChartPositionByArtistSlug.get(
+                aSlug,
+              ) ?? null;
+
             return {
               id: aid,
               slug: aSlug,
@@ -1162,9 +1195,10 @@ Deno.serve(async (req) => {
               genres: ag,
               trackCount,
               releaseCount,
-              isChartArtist: chartArtistSet.has(aSlug),
+              isChartArtist:
+                topChartPosition !== null,
               isRising: false,
-              topChartPosition: null,
+              topChartPosition,
             };
           }),
         };

@@ -203,9 +203,9 @@ export function ChartHighlights({ entries, onJumpTo }: ChartHighlightsProps) {
           <div className="mb-7 flex items-end justify-between gap-4">
             <div>
               <div className="wk-eyebrow mb-2">Fresh arrivals</div>
-              <h2 className="wk-h-section leading-none">New this week</h2>
+              <h2 className="wk-h-section leading-none">New in the Latest Editions</h2>
               <p className="mt-2 max-w-[480px] text-[13px] leading-relaxed text-[var(--wk-text-muted)]">
-                Songs landing in the chart for the first time — debuts and
+                Songs landing in the latest chart editions for the first time. Debuts and
                 returns that moved fast enough to break in.
               </p>
             </div>
@@ -238,8 +238,8 @@ export function ChartHighlights({ entries, onJumpTo }: ChartHighlightsProps) {
               <div className="wk-eyebrow mb-2">Built to last</div>
               <h2 className="wk-h-section leading-none">Long-running tracks</h2>
               <p className="mt-2 max-w-[480px] text-[13px] leading-relaxed text-[var(--wk-text-muted)]">
-                These tracks refuse to leave. Every week on the chart is a
-                statement — and they're making theirs loud.
+                These tracks refuse to leave. Every chart appearance is a
+                statement, and they're making theirs loud.
               </p>
             </div>
             <div className="flex shrink-0 items-center gap-2">

@@ -103,6 +103,90 @@ const mobileAppLayout =
     "utf8",
   );
 
+const mobileChromeCss =
+  readFileSync(
+    "src/styles/wakilisha-mobile-ch53-75.css",
+    "utf8",
+  );
+
+const desktopMagazine =
+  readFileSync(
+    "src/pages/magazine/page.tsx",
+    "utf8",
+  );
+
+const mobileMagazine =
+  readFileSync(
+    "src/pages/mobile/magazine/page.tsx",
+    "utf8",
+  );
+
+const magazineCard =
+  readFileSync(
+    "src/pages/magazine/components/MagazineCard.tsx",
+    "utf8",
+  );
+
+const chartsDirectory =
+  readFileSync(
+    "src/pages/charts/directory/page.tsx",
+    "utf8",
+  );
+
+const chartHighlights =
+  readFileSync(
+    "src/pages/charts/directory/components/ChartHighlights.tsx",
+    "utf8",
+  );
+
+const chartEdition =
+  readFileSync(
+    "src/pages/charts/edition/page.tsx",
+    "utf8",
+  );
+
+const chartRow =
+  readFileSync(
+    "src/components/design-system/music/ChartRow.tsx",
+    "utf8",
+  );
+
+const artistRolodex =
+  readFileSync(
+    "src/pages/charts/directory/components/ArtistRolodex.tsx",
+    "utf8",
+  );
+
+const mobileChartEdition =
+  readFileSync(
+    "src/pages/mobile/charts/edition/page.tsx",
+    "utf8",
+  );
+
+const artistsPage =
+  readFileSync(
+    "src/pages/artists/components/ArtistsPageContent.tsx",
+    "utf8",
+  );
+
+const artistChartList =
+  readFileSync(
+    "src/pages/artists/components/ChartList.tsx",
+    "utf8",
+  );
+
+const artistCoverStories =
+  readFileSync(
+    "src/pages/artists/components/CoverStories.tsx",
+    "utf8",
+  );
+
+const publicContentRead =
+  readFileSync(
+    "supabase/functions/public-content-read/index.ts",
+    "utf8",
+  );
+
 const profileCss =
   readFileSync(
     "src/styles/wakilisha-profile-48.css",
@@ -1258,6 +1342,277 @@ describe(
     );
 
     it(
+      "keeps secondary public destinations globally reachable on mobile",
+      () => {
+        expect(mobileAppLayout)
+          .toContain(
+            "const MORE_LINKS",
+          );
+
+        for (
+          const route of [
+            "/genres",
+            "/labels",
+            "/guides",
+            "/about",
+            "/contact",
+            "/faqs",
+            "/privacy",
+            "/terms",
+          ]
+        ) {
+          expect(mobileAppLayout)
+            .toContain(
+              `to: "${route}"`,
+            );
+        }
+
+        expect(mobileAppLayout)
+          .toContain(
+            'aria-label="More"',
+          );
+
+        expect(mobileAppLayout)
+          .toContain(
+            "useScrollLock(moreOpen)",
+          );
+
+        expect(mobileAppLayout)
+          .toContain(
+            "Appearance",
+          );
+
+        expect(mobileAppLayout)
+          .toContain(
+            "SIGNED_IN_NAV",
+          );
+
+        expect(mobileAppLayout)
+          .toContain(
+            "SIGNED_OUT_NAV",
+          );
+
+        expect(mobileAppLayout)
+          .toContain(
+            "prominent: true",
+          );
+
+        expect(mobileAppLayout)
+          .toContain(
+            'className="phn-nav phn-nav--compact"',
+          );
+
+        expect(mobileAppLayout)
+          .toContain(
+            "NotificationBell",
+          );
+
+        expect(mobileChromeCss)
+          .toContain(
+            "compact five-slot mobile nav",
+          );
+
+        expect(mobileChromeCss)
+          .toContain(
+            ".phn-nav-primary-core",
+          );
+      },
+    );
+
+    it(
+      "keeps homepage story pools distinct and category blocks substantial",
+      () => {
+        expect(mobileMagazine)
+          .toContain(
+            "const latest = stories.slice(4, 10);",
+          );
+
+        expect(mobileMagazine)
+          .toContain(
+            "const sectionBlockStories = stories.slice(10);",
+          );
+
+        expect(mobileMagazine)
+          .toContain(
+            "filteredLatest",
+          );
+
+        expect(mobileMagazine)
+          .toContain(
+            "Filter Stories",
+          );
+
+        expect(mobileMagazine)
+          .toContain(
+            "MIN_HOMEPAGE_SECTION_STORIES = 3",
+          );
+
+        expect(desktopMagazine)
+          .toContain(
+            "MIN_HOMEPAGE_SECTION_STORIES = 3",
+          );
+
+        expect(mobileMagazine)
+          .not.toContain(
+            "African creative life, starting with music",
+          );
+
+        expect(desktopMagazine)
+          .not.toContain(
+            "African creative life, starting with music",
+          );
+
+        expect(magazineCard)
+          .toContain(
+            'className="line-clamp-3 text-[14px] font-bold',
+          );
+
+        expect(magazineCard)
+          .toContain(
+            'className="line-clamp-3 text-[15px] font-black',
+          );
+      },
+    );
+
+    it(
+      "keeps public chart recency claims edition-scoped",
+      () => {
+        const chartCopy = [
+          chartsDirectory,
+          chartHighlights,
+          chartEdition,
+          mobileChartEdition,
+          artistRolodex,
+        ].join("\n");
+
+        expect(chartCopy)
+          .not.toMatch(
+            /\b(?:this week|in one week)\b/i,
+          );
+
+        expect(chartsDirectory)
+          .toContain(
+            "Latest Edition",
+          );
+
+        expect(chartsDirectory)
+          .toContain(
+            "New in This Edition",
+          );
+
+        expect(chartHighlights)
+          .toContain(
+            "New in the Latest Editions",
+          );
+
+        expect(mobileChartEdition)
+          .toContain(
+            "Edition #1",
+          );
+
+        expect(chartEdition)
+          .toContain(
+            "Top 3 in This Edition",
+          );
+
+        expect(chartEdition)
+          .toContain(
+            "Biggest Movers in This Edition",
+          );
+      },
+    );
+
+    it(
+      "uses real chart positions on Artists and never fabricates rank 99",
+      () => {
+        expect(publicContentRead)
+          .toContain(
+            '.select("artist_slug, rank")',
+          );
+
+        expect(publicContentRead)
+          .toContain(
+            "topChartPositionByArtistSlug",
+          );
+
+        expect(artistsPage)
+          .toContain(
+            "hasRealChartPosition",
+          );
+
+        expect(artistsPage)
+          .not.toContain(
+            "topChartPosition || 99",
+          );
+
+        expect(artistChartList)
+          .toContain(
+            "artist.trackCount > 0",
+          );
+
+        expect(artistChartList)
+          .toContain(
+            'artist.trackCount === 1 ? "track" : "tracks"',
+          );
+
+        expect(artistCoverStories)
+          .toContain(
+            "hero.trackCount > 0",
+          );
+
+        expect(artistChartList)
+          .not.toContain(
+            "String(idx + 1)",
+          );
+
+        expect(artistChartList)
+          .not.toContain(
+            "String(index + 4)",
+          );
+
+        expect(artistChartList)
+          .toContain(
+            "Peak #{artist.topChartPosition}",
+          );
+      },
+    );
+
+    it(
+      "keeps chart discussion in expanded details and suppresses unknown genre fiction",
+      () => {
+        expect(chartRow)
+          .toContain(
+            "onDiscuss?: () => void",
+          );
+
+        expect(chartRow)
+          .not.toContain(
+            'title="Discuss entry"',
+          );
+
+        expect(chartEdition)
+          .toContain(
+            "onDiscuss={() =>",
+          );
+
+        expect(chartEdition)
+          .not.toContain(
+            'entry.genre || "Unknown"',
+          );
+
+        expect(chartEdition)
+          .toContain(
+            "genreBreakdown.length > 0",
+          );
+
+        expect(artistRolodex)
+          .toContain(
+            "artists in this edition",
+          );
+      },
+    );
+
+    it(
       "keeps engineering authority language out of public profile copy",
       () => {
         expect(personPage)
@@ -1278,3 +1633,319 @@ describe(
     );
   },
 );
+
+describe("public discovery final refinement regressions", () => {
+  const desktopChartEdition =
+    readFileSync(
+      "src/pages/charts/edition/page.tsx",
+      "utf8",
+    );
+
+  const mobileChartEdition =
+    readFileSync(
+      "src/pages/mobile/charts/edition/page.tsx",
+      "utf8",
+    );
+
+  const mobileAppLayoutFinal =
+    readFileSync(
+      "src/components/mobile/MobileAppLayout.tsx",
+      "utf8",
+    );
+
+  const chartRowFinal =
+    readFileSync(
+      "src/components/design-system/music/ChartRow.tsx",
+      "utf8",
+    );
+
+  const chartRowExpandedPanel =
+    readFileSync(
+      "src/components/design-system/music/ChartRowExpandedPanel.tsx",
+      "utf8",
+    );
+
+  it(
+    "keeps failed desktop chart loads out of the Apple playback TDZ",
+    () => {
+      const capabilityIndex =
+        desktopChartEdition.indexOf(
+          "const hasApplePlaybackTracks",
+        );
+
+      const errorIndex =
+        desktopChartEdition.indexOf(
+          'if (state.status === "error")',
+        );
+
+      expect(capabilityIndex)
+        .toBeGreaterThanOrEqual(0);
+
+      expect(errorIndex)
+        .toBeGreaterThanOrEqual(0);
+
+      expect(capabilityIndex)
+        .toBeLessThan(
+          errorIndex,
+        );
+    },
+  );
+
+  it(
+    "does not manufacture Unknown genre coverage on mobile",
+    () => {
+      expect(mobileChartEdition)
+        .not.toContain(
+          'e.genre || "Unknown"',
+        );
+
+      expect(mobileChartEdition)
+        .toContain(
+          "genreBreakdownTotal",
+        );
+    },
+  );
+
+  it(
+    "keeps chart discussion out of collapsed rows and prominent when expanded",
+    () => {
+      expect(chartRowFinal)
+        .not.toContain(
+          'title="Discuss entry"',
+        );
+
+      expect(chartRowFinal)
+        .toContain(
+          "onDiscuss={onDiscuss}",
+        );
+
+      expect(chartRowExpandedPanel)
+        .toContain(
+          "Add context, reactions, or perspective to this chart position.",
+        );
+
+      expect(chartRowExpandedPanel)
+        .toContain(
+          "Discuss Entry",
+        );
+
+      expect(mobileChartEdition)
+        .toContain(
+          "ContextAnchorCommentDrawer",
+        );
+    },
+  );
+
+  it(
+    "keeps Home central while reusing the existing WAKILISHA thunderbolt",
+    () => {
+      const followingIndex =
+        mobileAppLayoutFinal.indexOf(
+          '{ label: "Following", to: "/following", icon: "UserPlus" }',
+        );
+
+      const chartsIndex =
+        mobileAppLayoutFinal.indexOf(
+          '{ label: "Charts", to: "/charts", icon: "BarChart3" }',
+        );
+
+      const homeIndex =
+        mobileAppLayoutFinal.indexOf(
+          '{ label: "Home", to: "/", icon: "Home", prominent: true }',
+        );
+
+      const artistsIndex =
+        mobileAppLayoutFinal.indexOf(
+          '{ label: "Artists", to: "/artists", icon: "Mic2" }',
+        );
+
+      expect(followingIndex)
+        .toBeGreaterThanOrEqual(0);
+
+      expect(followingIndex)
+        .toBeLessThan(
+          chartsIndex,
+        );
+
+      expect(chartsIndex)
+        .toBeLessThan(
+          homeIndex,
+        );
+
+      expect(homeIndex)
+        .toBeLessThan(
+          artistsIndex,
+        );
+
+      expect(mobileAppLayoutFinal)
+        .toContain(
+          "wakilisha-thunderbolt.png",
+        );
+    },
+  );
+});
+
+describe("public charts empty-program discovery regression", () => {
+  const publicChartsV2Adapter =
+    readFileSync(
+      "src/services/chartsPublic/v2Adapter.ts",
+      "utf8",
+    );
+
+  it(
+    "does not probe latest editions for chart program shells with no public edition",
+    () => {
+      expect(publicChartsV2Adapter)
+        .toContain(
+          "function hasPublicEdition(program: V2Program): boolean",
+        );
+
+      expect(publicChartsV2Adapter)
+        .toContain(
+          "Boolean(program.latestEdition)",
+        );
+
+      expect(publicChartsV2Adapter)
+        .toContain(
+          "(program.archive?.length ?? 0) > 0",
+        );
+
+      expect(publicChartsV2Adapter)
+        .toContain(
+          "(data.programs ?? []).filter(hasPublicEdition)",
+        );
+    },
+  );
+});
+
+describe("chart edition row information density regression", () => {
+  const chartRowInformationDensity =
+    readFileSync(
+      "src/components/design-system/music/ChartRow.tsx",
+      "utf8",
+    );
+
+  it(
+    "uses mobile width for chart identity instead of an invisible playback slot",
+    () => {
+      expect(chartRowInformationDensity)
+        .toContain(
+          "line-clamp-2 text-[14px]",
+        );
+
+      expect(chartRowInformationDensity)
+        .toContain(
+          "line-clamp-2 text-[12px]",
+        );
+
+      expect(chartRowInformationDensity)
+        .toContain(
+          "bg-black/70 text-white shadow-sm",
+        );
+
+      expect(chartRowInformationDensity)
+        .toContain(
+          "active:scale-95 md:hidden",
+        );
+
+      expect(chartRowInformationDensity)
+        .toContain(
+          "hidden h-9 w-9",
+        );
+    },
+  );
+});
+
+describe("chart edition collapsed-versus-expanded hierarchy regression", () => {
+  const collapsedChartRow =
+    readFileSync(
+      "src/components/design-system/music/ChartRow.tsx",
+      "utf8",
+    );
+
+  const expandedChartRow =
+    readFileSync(
+      "src/components/design-system/music/ChartRowExpandedPanel.tsx",
+      "utf8",
+    );
+
+  it(
+    "keeps collapsed rows focused on music identity and playback",
+    () => {
+      expect(collapsedChartRow)
+        .not.toContain(
+          'title="Discuss entry"',
+        );
+
+      expect(collapsedChartRow)
+        .not.toContain(
+          "ri-chat-1-line",
+        );
+
+      expect(collapsedChartRow)
+        .not.toContain(
+          ">PEAK<",
+        );
+
+      expect(collapsedChartRow)
+        .not.toContain(
+          "Peak #{peakPosition}",
+        );
+
+      expect(collapsedChartRow)
+        .not.toContain(
+          "WkTag",
+        );
+
+      expect(collapsedChartRow)
+        .toContain(
+          "onDiscuss={onDiscuss}",
+        );
+    },
+  );
+
+  it(
+    "moves chart performance and Community into expanded details",
+    () => {
+      expect(expandedChartRow)
+        .toContain(
+          "Chart Performance",
+        );
+
+      expect(expandedChartRow)
+        .toContain(
+          "Current Position",
+        );
+
+      expect(expandedChartRow)
+        .toContain(
+          "Best Position",
+        );
+
+      expect(expandedChartRow)
+        .toContain(
+          "Highest position reached on this chart.",
+        );
+
+      expect(expandedChartRow)
+        .toContain(
+          "Weeks On Chart",
+        );
+
+      expect(expandedChartRow)
+        .toContain(
+          "Previous Position",
+        );
+
+      expect(expandedChartRow)
+        .toContain(
+          "Community",
+        );
+
+      expect(expandedChartRow)
+        .toContain(
+          "Discuss Entry",
+        );
+    },
+  );
+});

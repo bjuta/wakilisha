@@ -61,6 +61,8 @@ function computeIssueInfo(articles: MagazineArticle[]) {
   };
 }
 
+const MIN_HOMEPAGE_SECTION_STORIES = 3;
+
 /* ── Section header ── */
 function SectionLabel({ children, count, href }: { children: string; count?: number; href?: string }) {
   return (
@@ -193,7 +195,19 @@ export default function Magazine() {
   }, [sectionBlockStories]);
 
   const topSections = useMemo(
-    () => Object.entries(sectionMap).sort((a, b) => b[1].length - a[1].length).slice(0, 3).map(([n]) => n),
+    () =>
+      Object.entries(sectionMap)
+        .filter(
+          ([, sectionStories]) =>
+            sectionStories.length
+            >= MIN_HOMEPAGE_SECTION_STORIES,
+        )
+        .sort(
+          (a, b) =>
+            b[1].length - a[1].length,
+        )
+        .slice(0, 3)
+        .map(([name]) => name),
     [sectionMap],
   );
 

@@ -251,6 +251,14 @@ export default function ChartEdition() {
     [loadedState?.entries]
   );
 
+  const hasApplePlaybackTracks = chartTracks.some(
+    (track) =>
+      Boolean(
+        track.appleMusicCatalogId
+        || track.appleMusicId,
+      ),
+  );
+
   const newEntries = useMemo(
     () => loadedState?.entries.filter((e) => e.movement === "new").slice(0, 5) ?? [],
     [loadedState?.entries]
@@ -265,16 +273,50 @@ export default function ChartEdition() {
   );
 
   const genreBreakdown = useMemo(() => {
-    const counts = (loadedState?.entries ?? []).reduce<Record<string, number>>((acc, entry) => {
-      const genre = entry.genre || "Unknown";
-      acc[genre] = (acc[genre] || 0) + 1;
-      return acc;
-    }, {});
+    const counts = (loadedState?.entries ?? []).reduce<Record<string, number>>(
+      (acc, entry) => {
+        const genre = String(
+          entry.genre || "",
+        ).trim();
+
+        if (
+          !genre
+          || genre.toLowerCase() === "unknown"
+        ) {
+          return acc;
+        }
+
+        acc[genre] =
+          (acc[genre] || 0) + 1;
+
+        return acc;
+      },
+      {},
+    );
+
     return Object.entries(counts)
-      .sort((a, b) => b[1] - a[1])
+      .sort(
+        (a, b) =>
+          b[1] - a[1],
+      )
       .slice(0, 6)
-      .map(([genre, count]) => ({ genre, count }));
+      .map(
+        ([genre, count]) => ({
+          genre,
+          count,
+        }),
+      );
   }, [loadedState?.entries]);
+
+  const genreBreakdownTotal = useMemo(
+    () =>
+      genreBreakdown.reduce(
+        (sum, item) =>
+          sum + item.count,
+        0,
+      ),
+    [genreBreakdown],
+  );
 
   const biggestUpMover = useMemo(() => {
     const upMovers = (loadedState?.entries ?? []).filter(
@@ -479,7 +521,6 @@ export default function ChartEdition() {
   // ─── Loaded state ───
   const { edition, entries, familyLabel, familySlug, publicSlug, marketSlug, archive, meta, requestedSlug, canonicalized, sourceFamilySlug } = state;
   const topTrack = entries[0];
-  const hasApplePlaybackTracks = chartTracks.some((track) => Boolean(track.appleMusicCatalogId || track.appleMusicId));
   const top3 = entries.slice(0, 3);
   const rows = entries.slice(3);
   const INITIAL_DISPLAY_COUNT = 20;
@@ -569,7 +610,7 @@ export default function ChartEdition() {
           <h1 className="chart-hero-v2-title">{edition.publicLabel}</h1>
 
           <p className="chart-hero-v2-sub">
-            {edition.label}. {edition.totalEntries} ranked positions across {edition.totalArtists} artists, with {edition.newEntries} new entries this week.
+            {edition.label}. {edition.totalEntries} ranked positions across {edition.totalArtists} artists, with {edition.newEntries} new entries in this edition.
           </p>
 
           {/* Metadata pills */}
@@ -736,7 +777,7 @@ export default function ChartEdition() {
         <section className="chart-reveal">
           <div className="chart-section-header">
             <div className="chart-section-eyebrow">Podium</div>
-            <h2 className="chart-section-title">Top 3 this week</h2>
+            <h2 className="chart-section-title">Top 3 in This Edition</h2>
           </div>
           <div className="chart-podium-v2">
             {top3.map((entry, idx) => (
@@ -778,9 +819,9 @@ export default function ChartEdition() {
         <section className="chart-reveal">
           <div className="chart-section-header">
             <div className="chart-section-eyebrow">Movement radar</div>
-            <h2 className="chart-section-title">Biggest movers this week</h2>
+            <h2 className="chart-section-title">Biggest Movers in This Edition</h2>
             {hasMovementData ? (
-              <p className="chart-section-sub">The tracks with the biggest rank changes this week. One moved up, one moved down.</p>
+              <p className="chart-section-sub">The tracks with the biggest rank changes in this edition. One moved up, one moved down.</p>
             ) : (
               <p className="chart-section-sub">This is the earliest edition available. Movement data will appear once a second edition is published.</p>
             )}
@@ -822,10 +863,10 @@ export default function ChartEdition() {
 
                       <p className="chart-mover-card-story">
                         {biggestUpMover.rank <= 10
-                          ? `This track climbed ${biggestUpMover.movementAmount ?? 0} positions into the top 10. No other entry moved up further this week.`
+                          ? `This track climbed ${biggestUpMover.movementAmount ?? 0} positions into the top 10. No other entry moved up further in this edition.`
                           : biggestUpMover.rank <= 20
-                          ? `This track climbed ${biggestUpMover.movementAmount ?? 0} positions in one week. No other entry gained more ground this edition.`
-                          : `Biggest climb this week: ${biggestUpMover.movementAmount ?? 0} positions gained. This track made the strongest upward move in the edition.`}
+                          ? `This track climbed ${biggestUpMover.movementAmount ?? 0} positions between editions. No other entry gained more ground in this edition.`
+                          : `Biggest climb in this edition: ${biggestUpMover.movementAmount ?? 0} positions gained. This track made the strongest upward move in the edition.`}
                       </p>
 
                       <div className="chart-mover-card-context">
@@ -842,7 +883,7 @@ export default function ChartEdition() {
                     <span>No climbers</span>
                   </div>
                   <p className="text-[14px] text-[var(--wk-text-muted)] text-center py-8">
-                    No tracks moved up this week.
+                    No tracks moved up in this edition.
                   </p>
                 </div>
               )}
@@ -881,10 +922,10 @@ export default function ChartEdition() {
 
                       <p className="chart-mover-card-story">
                         {biggestDownMover.previousRank !== null && biggestDownMover.previousRank <= 10
-                          ? `This track dropped ${biggestDownMover.movementAmount ?? 0} positions from the top 10. No other entry fell further this week.`
+                          ? `This track dropped ${biggestDownMover.movementAmount ?? 0} positions from the top 10. No other entry fell further in this edition.`
                           : biggestDownMover.previousRank !== null && biggestDownMover.previousRank <= 20
                           ? `This track slipped ${biggestDownMover.movementAmount ?? 0} positions. That is the largest downward move in this edition.`
-                          : `Biggest drop this week: down ${biggestDownMover.movementAmount ?? 0} positions. No other entry lost more ground in this edition.`}
+                          : `Biggest drop in this edition: down ${biggestDownMover.movementAmount ?? 0} positions. No other entry lost more ground in this edition.`}
                       </p>
 
                       <div className="chart-mover-card-context">
@@ -901,7 +942,7 @@ export default function ChartEdition() {
                     <span>No drops</span>
                   </div>
                   <p className="text-[14px] text-[var(--wk-text-muted)] text-center py-8">
-                    No tracks dropped this week.
+                    No tracks dropped in this edition.
                   </p>
                 </div>
               )}
@@ -944,17 +985,13 @@ export default function ChartEdition() {
                     score={entry.score}
                     duration={entry.duration}
                     onPlay={() => playAt(idx + 3)}
+                    onDiscuss={() =>
+                      openChartEntryDiscussion(
+                        entry,
+                        edition.publicLabel,
+                      )
+                    }
                   />
-                  <div className="flex justify-end px-2 pb-2">
-                    <button
-                      type="button"
-                      onClick={() => openChartEntryDiscussion(entry, edition.publicLabel)}
-                      className="inline-flex items-center gap-1.5 rounded-full border border-[var(--wk-border)] bg-[var(--wk-bg)] px-3 py-1.5 text-[10px] font-black uppercase tracking-[0.12em] text-[var(--wk-text-muted)] transition-colors hover:border-[var(--wk-brand)]/35 hover:text-[var(--wk-brand)]"
-                    >
-                      <WkIcon name="MessageCircle" size={11} />
-                      Discuss entry
-                    </button>
-                  </div>
                 </div>
               ))}
             </div>
@@ -982,7 +1019,7 @@ export default function ChartEdition() {
                   </Link>
                 ))}
                 {newEntries.length === 0 && (
-                  <p className="text-[12px] text-[var(--wk-text-faint)] py-2">No new entries this week.</p>
+                  <p className="text-[12px] text-[var(--wk-text-faint)] py-2">No new entries in this edition.</p>
                 )}
               </div>
 
@@ -1016,28 +1053,38 @@ export default function ChartEdition() {
                   </Link>
                 ))}
                 {climbers.length === 0 && (
-                  <p className="text-[12px] text-[var(--wk-text-faint)] py-2">No climbers this week.</p>
+                  <p className="text-[12px] text-[var(--wk-text-faint)] py-2">No climbers in this edition.</p>
                 )}
               </div>
 
-              {/* Genre breakdown */}
-              <div className="chart-sidebox-v2">
-                <div className="chart-sidebox-v2-title">Genre breakdown</div>
-                {genreBreakdown.map((g) => {
-                  const pct = entries.length ? Math.round((g.count / entries.length) * 100) : 0;
-                  return (
-                    <div key={g.genre} className="chart-sidebox-v2-genre-row">
-                      <div className="chart-sidebox-v2-genre-label">
-                        <span>{g.genre}</span>
-                        <span className="chart-sidebox-v2-genre-pct">{pct}%</span>
+              {genreBreakdown.length > 0 && (
+                <div className="chart-sidebox-v2">
+                  <div className="chart-sidebox-v2-title">Genre breakdown</div>
+                  {genreBreakdown.map((g) => {
+                    const pct =
+                      genreBreakdownTotal > 0
+                        ? Math.round(
+                            (
+                              g.count
+                              / genreBreakdownTotal
+                            ) * 100,
+                          )
+                        : 0;
+
+                    return (
+                      <div key={g.genre} className="chart-sidebox-v2-genre-row">
+                        <div className="chart-sidebox-v2-genre-label">
+                          <span>{g.genre}</span>
+                          <span className="chart-sidebox-v2-genre-pct">{pct}%</span>
+                        </div>
+                        <div className="chart-sidebox-v2-genre-bar">
+                          <div className="chart-sidebox-v2-genre-fill" style={{ width: `${pct}%` }} />
+                        </div>
                       </div>
-                      <div className="chart-sidebox-v2-genre-bar">
-                        <div className="chart-sidebox-v2-genre-fill" style={{ width: `${pct}%` }} />
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
+                    );
+                  })}
+                </div>
+              )}
 
               {/* Quick links */}
               <div className="chart-sidebox-v2">
