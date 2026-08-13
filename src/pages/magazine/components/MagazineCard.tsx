@@ -186,7 +186,7 @@ export function MagazineCard({ story, variant = "standard", rank }: MagazineCard
           <span className="text-[9px] font-black uppercase tracking-[0.16em] text-[var(--wk-brand)]">
             {story.section}
           </span>
-          <h4 className="line-clamp-2 text-[14px] font-bold leading-snug tracking-[-0.02em] text-[var(--wk-text)] transition-colors group-hover:text-[var(--wk-brand)]">
+          <h4 className="line-clamp-3 text-[14px] font-bold leading-snug tracking-[-0.02em] text-[var(--wk-text)] transition-colors group-hover:text-[var(--wk-brand)]">
             {story.title}
           </h4>
           <span className="hidden text-[10px] font-bold text-[var(--wk-brand)] opacity-0 transition-opacity duration-300 group-hover:opacity-100 group-focus-visible:opacity-100 sm:inline">
@@ -265,7 +265,7 @@ export function MagazineCard({ story, variant = "standard", rank }: MagazineCard
             </span>
           )}
         </div>
-        <h3 className="line-clamp-2 text-[15px] font-black leading-snug tracking-[-0.02em] text-[var(--wk-text)] transition-colors group-hover:text-[var(--wk-brand)] lg:text-[16px]">
+        <h3 className="line-clamp-3 text-[15px] font-black leading-snug tracking-[-0.02em] text-[var(--wk-text)] transition-colors group-hover:text-[var(--wk-brand)] lg:text-[16px]">
           {story.title}
         </h3>
         <p className="hidden text-[12px] leading-relaxed text-[var(--wk-text-soft)] line-clamp-2 lg:block">

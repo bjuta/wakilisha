@@ -338,7 +338,7 @@ function SidebarCard({
           ))}
         </div>
       ) : (
-        <div className="py-3 text-center text-[12px] text-[var(--wk-text-faint)]">{emptyLabel ?? "None this week."}</div>
+        <div className="py-3 text-center text-[12px] text-[var(--wk-text-faint)]">{emptyLabel ?? "None in this edition."}</div>
       )}
     </div>
   );
@@ -806,7 +806,7 @@ export default function ChartsDirectory() {
             </span>
             {newEntries.length > 0 && (
               <span className="inline-flex items-center gap-1.5 rounded-full border border-[var(--wk-border)] bg-[var(--wk-surface)]/70 backdrop-blur-sm px-3 py-1.5 text-[11px] text-[var(--wk-text)]">
-                <span className="font-black text-[var(--wk-brand)]">{newEntries.length}</span> new this week
+                <span className="font-black text-[var(--wk-brand)]">{newEntries.length}</span> new in this edition
               </span>
             )}
           </div>
@@ -911,7 +911,7 @@ export default function ChartsDirectory() {
       <section className="wk-container px-4 py-8 md:px-6 md:py-12">
         <div className="mb-5 flex items-end justify-between gap-4">
           <div>
-            <div className="wk-eyebrow mb-2">This Week</div>
+            <div className="wk-eyebrow mb-2">Latest Edition</div>
             <h2 className="wk-h-section">Top {previewCount}</h2>
             <p className="mt-1 text-[13px] text-[var(--wk-text-muted)]">
               {activeEdition?.date ?? ""} · {activeFamily?.marketLabel ?? ""} · Showing {previewCount} of {entryCount} positions
@@ -1033,10 +1033,10 @@ export default function ChartsDirectory() {
 
             {/* New entries */}
             <SidebarCard
-              title="New this week"
+              title="New in This Edition"
               entries={newEntries}
               badge="New"
-              emptyLabel="No debuts this week"
+              emptyLabel="No debuts in this edition"
             />
 
             {/* Biggest climbers */}
@@ -1044,7 +1044,7 @@ export default function ChartsDirectory() {
               title="Biggest climbers"
               entries={climbers}
               badge="↑"
-              emptyLabel="No big moves this week"
+              emptyLabel="No big moves in this edition"
             />
           </div>
         </div>

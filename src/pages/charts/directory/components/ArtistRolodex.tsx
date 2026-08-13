@@ -235,7 +235,7 @@ export function ArtistRolodex({ entries, onJumpTo, familyLabel }: ArtistRolodexP
           <div className="wk-eyebrow mb-1.5">Browse by artist</div>
           <h2 className="wk-h-section">Who's on the charts</h2>
           <p className="mt-1 text-[13px] text-[var(--wk-text-muted)]">
-            {artists.length} artists charting this week
+            {artists.length} artists in this edition
           </p>
         </div>
         {selected && (

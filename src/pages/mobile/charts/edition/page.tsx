@@ -31,6 +31,10 @@ import { Ch19GradientImage } from "@/components/media/Ch19GradientImage";
 import { trackUrl } from "@/utils/trackUrl";
 import { enrichChartEntriesWithPlaybackData } from "@/services/chartsPublic/playbackEnrichment";
 import { PlaybackAccessNotice } from "@/components/playback/PlaybackAccessNotice";
+import {
+  ContextAnchorCommentDrawer,
+  type ContextAnchorTarget,
+} from "@/components/feature/community/ContextAnchorCommentDrawer";
 
 // ─── Constants ───
 const INITIAL_COUNT = 15;
@@ -193,6 +197,8 @@ export default function MobileChartEdition() {
   const [latestEditionSlug, setLatestEditionSlug] = useState<string | undefined>(undefined);
   const [archive, setArchive] = useState<ChartArchiveViewModel | null>(null);
   const [meta, setMeta] = useState<{ dataSource: "wordpress" | "cache"; fetchedAt: string; isStale: boolean } | null>(null);
+  const [selectedChartAnchor, setSelectedChartAnchor] =
+    useState<ContextAnchorTarget | null>(null);
 
   // Progressive loading
   const [displayedCount, setDisplayedCount] = useState(INITIAL_COUNT);
@@ -284,9 +290,81 @@ export default function MobileChartEdition() {
 
   const genreBreakdown = useMemo(() => {
     const counts: Record<string, number> = {};
-    entries.forEach((e) => { const g = e.genre || "Unknown"; counts[g] = (counts[g] || 0) + 1; });
-    return Object.entries(counts).sort((a, b) => b[1] - a[1]).slice(0, 5).map(([genre, count]) => ({ genre, count }));
+
+    entries.forEach((entry) => {
+      const genre = String(
+        entry.genre || "",
+      ).trim();
+
+      if (
+        !genre
+        || genre.toLowerCase() === "unknown"
+      ) {
+        return;
+      }
+
+      counts[genre] =
+        (counts[genre] || 0) + 1;
+    });
+
+    return Object.entries(counts)
+      .sort(
+        (a, b) =>
+          b[1] - a[1],
+      )
+      .slice(0, 5)
+      .map(
+        ([genre, count]) => ({
+          genre,
+          count,
+        }),
+      );
   }, [entries]);
+
+  const genreBreakdownTotal = useMemo(
+    () =>
+      genreBreakdown.reduce(
+        (sum, item) =>
+          sum + item.count,
+        0,
+      ),
+    [genreBreakdown],
+  );
+
+  const openChartEntryDiscussion = useCallback(
+    (
+      entry: ChartEntryRowViewModel,
+    ) => {
+      const movement =
+        entry.movement === "new"
+          ? "New entry"
+          : entry.movement === "up"
+            ? `Up ${entry.movementAmount ?? 0}`
+            : entry.movement === "down"
+              ? `Down ${entry.movementAmount ?? 0}`
+              : "Holding";
+
+      setSelectedChartAnchor({
+        anchorType: "chart_entry",
+        contextEntityType: "chart_entry",
+        contextEntityId: `${editionSlug || "latest"}:${entry.rank}:${entry.slug}`,
+        contextEntitySlug: `${editionSlug || "latest"}-${entry.slug}`,
+        contextLabel: `#${entry.rank} · ${entry.title}`,
+        anchorLabel: `#${entry.rank}`,
+        title: `${entry.title} at #${entry.rank}`,
+        subtitle: `${edition?.publicLabel || familyLabel} · ${entry.artist} · ${movement}`,
+        imageUrl:
+          entry.artworkUrl
+          || undefined,
+        placeholder: `Talk about why ${entry.title} is #${entry.rank}...`,
+      });
+    },
+    [
+      editionSlug,
+      edition?.publicLabel,
+      familyLabel,
+    ],
+  );
 
   const handleJumpTo = useCallback((slug: string) => {
     const idx = leaderboardRows.findIndex((e) => e.slug === slug);
@@ -365,6 +443,19 @@ export default function MobileChartEdition() {
   const topTrack = entries[0];
   const hasApplePlaybackTracks = chartTracks.some((track) => Boolean(track.appleMusicCatalogId || track.appleMusicId));
 
+  const chartCommunityEntity = {
+    type: "chart_edition" as const,
+    id: edition.slug,
+    slug: edition.slug,
+    url:
+      typeof window !== "undefined"
+        ? window.location.href
+        : "",
+    title: edition.publicLabel,
+    subtitle: edition.label,
+    imageUrl: topTrack.artworkUrl,
+  };
+
   return (
     <div className="min-h-screen pb-28">
 
@@ -432,7 +523,7 @@ export default function MobileChartEdition() {
           <div className="mt-5 rounded-2xl border border-[var(--wk-border)] bg-[var(--wk-surface)]/80 backdrop-blur-sm p-3.5">
             <div className="mb-2 flex items-center gap-1.5">
               <div className="flex h-5 w-5 items-center justify-center rounded-full bg-[var(--wk-brand)] text-[9px] font-black text-[var(--wk-brand-on)]">1</div>
-              <span className="text-[9px] font-black uppercase tracking-wider text-[var(--wk-brand)]">This week's #1</span>
+              <span className="text-[9px] font-black uppercase tracking-wider text-[var(--wk-brand)]">Edition #1</span>
             </div>
             <div className="flex items-center gap-3">
               <div className="h-12 w-12 shrink-0 overflow-hidden rounded-xl">
@@ -591,7 +682,7 @@ export default function MobileChartEdition() {
           <div className="px-5 mb-3 flex items-center justify-between">
             <div>
               <div className="text-[9px] font-black uppercase tracking-widest text-[var(--wk-text-faint)]">Fresh arrivals</div>
-              <div className="text-[15px] font-black text-[var(--wk-text)]">New this week</div>
+              <div className="text-[15px] font-black text-[var(--wk-text)]">New in This Edition</div>
             </div>
             <span className="flex h-7 w-7 items-center justify-center rounded-full text-[var(--wk-brand-on)] text-[11px] font-black" style={{ background: "var(--wk-brand)" }}>
               {freshArrivals.length}
@@ -644,6 +735,11 @@ export default function MobileChartEdition() {
                   score={entry.score}
                   duration={entry.duration}
                   onPlay={() => { const t = chartTracks[idx + 3]; if (t) playTrack(t, chartTracks, { pageType: "charts_edition", entitySlug: editionSlug, entityType: "chart_edition", sourceSection: "leaderboard" }); }}
+                  onDiscuss={() =>
+                    openChartEntryDiscussion(
+                      entry,
+                    )
+                  }
                 />
               </div>
             ))}
@@ -673,7 +769,13 @@ export default function MobileChartEdition() {
           <div className="mb-3 text-[9px] font-black uppercase tracking-widest text-[var(--wk-text-faint)]">Genre breakdown</div>
           <div className="overflow-hidden rounded-2xl border border-[var(--wk-border)] bg-[var(--wk-surface)] p-4 space-y-3">
             {genreBreakdown.map((g) => {
-              const pct = edition.totalEntries ? (g.count / edition.totalEntries) * 100 : 0;
+              const pct =
+                genreBreakdownTotal > 0
+                  ? (
+                      g.count
+                      / genreBreakdownTotal
+                    ) * 100
+                  : 0;
               return (
                 <div key={g.genre}>
                   <div className="mb-1 flex items-center justify-between">
@@ -698,6 +800,15 @@ export default function MobileChartEdition() {
         </span>
         <ChartRefreshButton onRefresh={load} size="sm" />
       </div>
+
+      <ContextAnchorCommentDrawer
+        open={Boolean(selectedChartAnchor)}
+        onClose={() =>
+          setSelectedChartAnchor(null)
+        }
+        entity={chartCommunityEntity}
+        target={selectedChartAnchor}
+      />
     </div>
   );
 }

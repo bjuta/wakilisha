@@ -83,8 +83,14 @@ export function CoverStories({ artists }: CoverStoriesProps) {
                     <span>{hero.country}</span>
                   </>
                 )}
-                <span>·</span>
-                <span>{hero.trackCount} tracks</span>
+                {hero.trackCount > 0 && (
+                  <>
+                    <span>·</span>
+                    <span>
+                      {hero.trackCount} {hero.trackCount === 1 ? "track" : "tracks"}
+                    </span>
+                  </>
+                )}
               </div>
             </div>
           </Link>

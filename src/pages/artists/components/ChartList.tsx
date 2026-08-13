@@ -37,26 +37,13 @@ export function ChartList({ artists }: ChartListProps) {
 
         {/* PODIUM — Top 3 cards in a dramatic horizontal layout */}
         <div className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-3 sm:gap-5">
-          {podium.map((artist, idx) => {
-            const isFirst = idx === 0;
-            const medalColors = ["text-yellow-400", "text-slate-300", "text-amber-600"];
-            const borderColors = [
-              "border-yellow-400/30 hover:border-yellow-400/60",
-              "border-slate-400/20 hover:border-slate-400/50",
-              "border-amber-600/30 hover:border-amber-600/60",
-            ];
-
+          {podium.map((artist) => {
             return (
               <Link
                 key={artist.slug}
                 to={`/artists/${artist.slug}`}
-                className={`group relative flex flex-col overflow-hidden rounded-2xl border bg-[var(--wk-surface)] transition-all duration-[var(--wk-d-standard)] hover:-translate-y-2 ${borderColors[idx]} ${isFirst ? "sm:-mt-4 sm:min-h-[380px]" : "sm:min-h-[340px]"}`}
+                className="group relative flex min-h-[340px] flex-col overflow-hidden rounded-2xl border border-[var(--wk-border)] bg-[var(--wk-surface)] transition-all duration-[var(--wk-d-standard)] hover:-translate-y-2 hover:border-[var(--wk-brand)]/35"
               >
-                {/* Rank number — huge, behind content */}
-                <div className="absolute -right-4 -top-6 select-none font-black text-[120px] leading-none tracking-[-0.07em] text-[var(--wk-border)] opacity-40">
-                  {String(idx + 1).padStart(2, "0")}
-                </div>
-
                 {/* Image */}
                 <div className="relative aspect-[4/5] overflow-hidden bg-[var(--wk-surface-raised)]">
                   {artist.imageUrl ? (
@@ -68,9 +55,11 @@ export function ChartList({ artists }: ChartListProps) {
                   ) : (
                     <Ch19GradientImage slug={artist.slug} name={artist.name} />
                   )}
-                  {/* Medal badge */}
-                  <div className="absolute left-3 top-3 flex h-10 w-10 items-center justify-center rounded-full bg-black/60 backdrop-blur-md">
-                    <span className={`font-black text-xl ${medalColors[idx]}`}>#{idx + 1}</span>
+                  <div className="absolute left-3 top-3 inline-flex items-center gap-1.5 rounded-full bg-black/65 px-2.5 py-1.5 text-white backdrop-blur-md">
+                    <i className="ri-bar-chart-line text-[11px]" />
+                    <span className="text-[10px] font-black uppercase tracking-[0.08em]">
+                      Peak #{artist.topChartPosition}
+                    </span>
                   </div>
                 </div>
 
@@ -80,11 +69,23 @@ export function ChartList({ artists }: ChartListProps) {
                     <h4 className="text-[18px] font-extrabold leading-tight tracking-[-0.02em] text-[var(--wk-text)] transition-colors group-hover:text-[var(--wk-brand)] md:text-[20px]">
                       {artist.name}
                     </h4>
-                    <div className="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1 text-[12px] text-[var(--wk-text-muted)]">
-                      <span>{artist.trackCount} tracks</span>
-                      <span className="opacity-40">·</span>
-                      <span>{artist.releaseCount} releases</span>
-                    </div>
+                    {(artist.trackCount > 0 || artist.releaseCount > 0) && (
+                      <div className="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1 text-[12px] text-[var(--wk-text-muted)]">
+                        {artist.trackCount > 0 && (
+                          <span>
+                            {artist.trackCount} {artist.trackCount === 1 ? "track" : "tracks"}
+                          </span>
+                        )}
+                        {artist.trackCount > 0 && artist.releaseCount > 0 && (
+                          <span className="opacity-40">·</span>
+                        )}
+                        {artist.releaseCount > 0 && (
+                          <span>
+                            {artist.releaseCount} {artist.releaseCount === 1 ? "release" : "releases"}
+                          </span>
+                        )}
+                      </div>
+                    )}
                   </div>
                   <div className="mt-3 flex flex-wrap items-center gap-2">
                     <span className="inline-flex items-center gap-1.5 rounded-full bg-[var(--wk-brand-soft)] px-3 py-1.5 text-[11px] font-bold text-[var(--wk-brand)]">
@@ -101,16 +102,18 @@ export function ChartList({ artists }: ChartListProps) {
         {/* REST OF CHART — clean bordered list */}
         {rest.length > 0 && (
           <div className="overflow-hidden rounded-xl border border-[var(--wk-border)] bg-[var(--wk-surface)]">
-            {rest.map((artist, index) => (
+            {rest.map((artist) => (
               <Link
                 key={artist.slug}
                 to={`/artists/${artist.slug}`}
                 className="group flex items-center gap-4 px-5 py-4 transition-colors hover:bg-[var(--wk-bg-subtle)] md:gap-6 md:px-6 md:py-5 border-b border-[var(--wk-divider)] last:border-b-0"
               >
-                {/* Rank */}
-                <div className="w-9 shrink-0 text-right">
-                  <span className="font-black text-[24px] leading-none tracking-[-0.04em] text-[var(--wk-text-faint)] md:text-[28px]">
-                    {String(index + 4).padStart(2, "0")}
+                <div className="w-12 shrink-0 text-center">
+                  <span className="block font-black text-[20px] leading-none tracking-[-0.04em] text-[var(--wk-text)] md:text-[22px]">
+                    #{artist.topChartPosition}
+                  </span>
+                  <span className="mt-1 block text-[8px] font-black uppercase tracking-[0.12em] text-[var(--wk-text-faint)]">
+                    Peak
                   </span>
                 </div>
 
@@ -128,11 +131,23 @@ export function ChartList({ artists }: ChartListProps) {
                   <h4 className="text-[15px] font-bold text-[var(--wk-text)] transition-colors group-hover:text-[var(--wk-brand)] md:text-[16px]">
                     {artist.name}
                   </h4>
-                  <div className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[12px] text-[var(--wk-text-muted)]">
-                    <span>{artist.trackCount} tracks</span>
-                    <span className="opacity-40">·</span>
-                    <span>{artist.releaseCount} releases</span>
-                  </div>
+                  {(artist.trackCount > 0 || artist.releaseCount > 0) && (
+                    <div className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[12px] text-[var(--wk-text-muted)]">
+                      {artist.trackCount > 0 && (
+                        <span>
+                          {artist.trackCount} {artist.trackCount === 1 ? "track" : "tracks"}
+                        </span>
+                      )}
+                      {artist.trackCount > 0 && artist.releaseCount > 0 && (
+                        <span className="opacity-40">·</span>
+                      )}
+                      {artist.releaseCount > 0 && (
+                        <span>
+                          {artist.releaseCount} {artist.releaseCount === 1 ? "release" : "releases"}
+                        </span>
+                      )}
+                    </div>
+                  )}
                 </div>
 
                 {/* Genres — desktop */}
@@ -142,14 +157,6 @@ export function ChartList({ artists }: ChartListProps) {
                       {g}
                     </span>
                   ))}
-                </div>
-
-                {/* Peak badge */}
-                <div className="hidden shrink-0 md:block">
-                  <span className="inline-flex items-center gap-1.5 rounded-full bg-[var(--wk-brand-soft)] px-3 py-1.5 text-[11px] font-bold text-[var(--wk-brand)]">
-                    <i className="ri-bar-chart-line text-[11px]" />
-                    #{artist.topChartPosition}
-                  </span>
                 </div>
 
                 <div className="shrink-0 text-[var(--wk-text-faint)] transition-all group-hover:translate-x-1 group-hover:text-[var(--wk-brand)]">

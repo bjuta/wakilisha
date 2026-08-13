@@ -38,6 +38,8 @@ function computeIssueInfo(articles: MagazineArticle[]) {
   return { number: Math.max(1, (year - 2024) * 12 + month), date: safe.toLocaleDateString("en", { month: "long", year: "numeric" }) };
 }
 
+const MIN_HOMEPAGE_SECTION_STORIES = 3;
+
 function MobileSectionLabel({ children, count, href }: { children: string; count?: number; href?: string }) {
   return (
     <div className="flex items-end justify-between mb-5 gap-3">
@@ -108,13 +110,23 @@ export default function MobileMagazine() {
 
   const heroStory = stories[0];
   const picks = stories.slice(1, 4);
-  const sectionBlockStories = stories.slice(4);
+  const latest = stories.slice(4, 10);
+  const sectionBlockStories = stories.slice(10);
 
   // ── Filter content based on active section tab ──
   const filteredPicks = useMemo(() => {
     if (activeSection === "All") return picks;
     return picks.filter((s) => (s.section || "Article") === activeSection);
   }, [picks, activeSection]);
+
+  const filteredLatest = useMemo(() => {
+    if (activeSection === "All") return latest;
+    return latest.filter(
+      (story) =>
+        (story.section || "Article")
+        === activeSection,
+    );
+  }, [latest, activeSection]);
 
   const filteredSectionBlockStories = useMemo(() => {
     if (activeSection === "All") return sectionBlockStories;
@@ -132,7 +144,19 @@ export default function MobileMagazine() {
   }, [sectionBlockStories]);
 
   const topSections = useMemo(
-    () => Object.entries(sectionMap).sort((a, b) => b[1].length - a[1].length).slice(0, 4).map(([n]) => n),
+    () =>
+      Object.entries(sectionMap)
+        .filter(
+          ([, sectionStories]) =>
+            sectionStories.length
+            >= MIN_HOMEPAGE_SECTION_STORIES,
+        )
+        .sort(
+          (a, b) =>
+            b[1].length - a[1].length,
+        )
+        .slice(0, 4)
+        .map(([name]) => name),
     [sectionMap],
   );
 
@@ -240,8 +264,11 @@ export default function MobileMagazine() {
 
       {/* ═══════════════════════ STICKY SECTION NAV ═══════════════════════ */}
       <div className="sticky top-0 z-40 border-b border-[var(--wk-border)] bg-[color-mix(in_srgb,var(--wk-surface)_92%,transparent)] backdrop-blur-[20px]" style={{ WebkitBackdropFilter: "blur(20px)" }}>
+        <div className="px-4 pt-2.5 text-[10px] font-black uppercase tracking-[0.16em] text-[var(--wk-text-faint)]">
+          Filter Stories
+        </div>
         <div
-          className="px-4 flex items-center gap-1.5 overflow-x-auto scrollbar-none py-3"
+          className="px-4 flex items-center gap-1.5 overflow-x-auto scrollbar-none pb-3 pt-2"
           style={{ scrollbarWidth: "none", msOverflowStyle: "none", WebkitOverflowScrolling: "touch" }}
         >
           {sectionNames.map((sec) => (
@@ -277,11 +304,11 @@ export default function MobileMagazine() {
         )}
 
         {/* ── Latest Stories ── */}
-        {filteredSectionBlockStories.length > 0 && (
+        {filteredLatest.length > 0 && (
           <section className="mag-reveal">
             <MobileSectionLabel href="/magazine">Latest Stories</MobileSectionLabel>
             <div className="grid grid-cols-2 gap-3">
-              {filteredSectionBlockStories.slice(0, 6).map((story, i) => (
+              {filteredLatest.map((story) => (
                 <Link
                   key={story.slug}
                   to={`/magazine/${story.slug}`}
@@ -307,7 +334,7 @@ export default function MobileMagazine() {
                     )}
                   </div>
                   <div className="p-2.5 flex flex-col gap-1 flex-1">
-                    <h3 className="text-[12px] sm:text-[13px] font-black tracking-[-0.015em] leading-snug text-[var(--wk-text)] group-hover:text-[var(--wk-brand)] transition-colors line-clamp-2">
+                    <h3 className="text-[12px] sm:text-[13px] font-black tracking-[-0.015em] leading-snug text-[var(--wk-text)] group-hover:text-[var(--wk-brand)] transition-colors line-clamp-3">
                       {story.title}
                     </h3>
                     <div className="flex items-center gap-1.5 text-[10px] text-[var(--wk-text-faint)] mt-auto">
@@ -379,7 +406,7 @@ export default function MobileMagazine() {
                           <i className="ri-bookmark-line text-[13px]" />
                         </div>
                         <div className="absolute bottom-0 left-0 right-0 z-10 p-4 pb-5">
-                          <h3 className="text-[15px] sm:text-[16px] font-black tracking-[-0.025em] leading-snug text-white group-hover:text-white/90 transition-colors line-clamp-2 mb-2">
+                          <h3 className="text-[15px] sm:text-[16px] font-black tracking-[-0.025em] leading-snug text-white group-hover:text-white/90 transition-colors line-clamp-3 mb-2">
                             {story.title}
                           </h3>
                           {story.dek && (
@@ -459,7 +486,7 @@ export default function MobileMagazine() {
                           </span>
                         </div>
                         <div className="absolute bottom-0 left-0 right-0 z-10 p-4 pb-5">
-                          <h3 className="text-[16px] sm:text-[18px] font-black tracking-[-0.03em] leading-snug text-white group-hover:text-white/90 transition-colors line-clamp-2 mb-1.5">
+                          <h3 className="text-[16px] sm:text-[18px] font-black tracking-[-0.03em] leading-snug text-white group-hover:text-white/90 transition-colors line-clamp-3 mb-1.5">
                             {story.title}
                           </h3>
                           <div className="flex items-center gap-2 text-[11px] text-white/40">
@@ -611,7 +638,7 @@ export default function MobileMagazine() {
                         <span className="text-[9px] font-black uppercase tracking-[0.16em] text-[var(--wk-brand)]">
                           {story.section}
                         </span>
-                        <h3 className="text-[14px] font-bold tracking-[-0.02em] leading-snug text-[var(--wk-text)] group-hover:text-[var(--wk-brand)] transition-colors line-clamp-2">
+                        <h3 className="text-[14px] font-bold tracking-[-0.02em] leading-snug text-[var(--wk-text)] group-hover:text-[var(--wk-brand)] transition-colors line-clamp-3">
                           {story.title}
                         </h3>
                         <div className="flex items-center gap-1.5 text-[10px] text-[var(--wk-text-faint)]">
