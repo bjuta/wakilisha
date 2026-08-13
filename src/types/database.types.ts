@@ -17252,6 +17252,14 @@ export type Database = {
           result_payload: Json
         }[]
       }
+      community_admin_get_registry_onboarding_artists: {
+        Args: never
+        Returns: Json
+      }
+      community_admin_set_registry_onboarding_artists: {
+        Args: { p_artist_slugs: string[]; p_fallback_enabled?: boolean }
+        Returns: Json
+      }
       community_create_comment: {
         Args: {
           p_body_html: string
@@ -17451,6 +17459,11 @@ export type Database = {
         Args: { p_targets: Json }
         Returns: Json
       }
+      community_get_registry_onboarding_artists: {
+        Args: { p_limit?: number }
+        Returns: Json
+      }
+      community_get_registry_onboarding_state: { Args: never; Returns: Json }
       community_get_thread_by_entity: {
         Args: {
           p_entity_id?: string
@@ -17695,6 +17708,10 @@ export type Database = {
           p_target_slug: string
           p_target_type: string
         }
+        Returns: Json
+      }
+      community_set_registry_onboarding_state: {
+        Args: { p_status: string }
         Returns: Json
       }
       community_set_saved_state: {
