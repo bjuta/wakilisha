@@ -1054,13 +1054,123 @@ Deno.serve(async (req) => {
       if (chartEntries.length === 0 && displayName) { const { data: chartEntriesByName } = await supabase.from("wk_chart_entries_v2").select("rank, track_title, track_slug, movement, previous_rank, artwork_url, edition_id, artist_name").ilike("artist_name", displayName).order("rank", { ascending: true }).limit(50); chartEntries = chartEntriesByName ?? []; }
       const chartEntryList = chartEntries.map((e: any) => { const prev = Number(e.previous_rank || 0); const curr = Number(e.rank || 0); let movement: string = String(e.movement || "same"); let movementAmount = 0; if (prev > 0 && curr > 0) { if (curr < prev) { movement = "up"; movementAmount = prev - curr; } else if (curr > prev) { movement = "down"; movementAmount = curr - prev; } } return { rank: curr, title: String(e.track_title || ""), artist: String(e.artist_name || ""), slug: String(e.track_slug || ""), movement, movementAmount, peakPosition: curr, weeksOnChart: 1, artworkUrl: e.artwork_url || "" }; });
       const relatedArtistsMap = new Map<string, any>();
-      const { data: entityArtistRels } = await supabase.from("registry_entity_relationships").select("source_slug, target_slug, relationship_type, relationship_role, confidence, metadata").or(`source_slug.eq.${slug},target_slug.eq.${slug}`).eq("source_entity_type", "artist").eq("target_entity_type", "artist").eq("relationship_status", "active");
-      for (const rel of (entityArtistRels ?? [])) { const isSource = String(rel.source_slug) === slug; const relatedSlug = isSource ? String(rel.target_slug) : String(rel.source_slug); if (relatedSlug === slug) continue; const confidence = Number(rel.confidence || 1); const relMeta = (rel.metadata || {}) as Record<string, unknown>; const relType = String(rel.relationship_type || ""); if (!relatedArtistsMap.has(relatedSlug)) { relatedArtistsMap.set(relatedSlug, { slug: relatedSlug, name: "", imageUrl: "", score: 0, sharedTracksAll: 0, sharedChartTracks: 0, featuresThem: 0, theyFeature: 0, sharedTitles: [] }); } const entry = relatedArtistsMap.get(relatedSlug)!; entry.score += confidence; if (relType === "featured_on" || relType === "features") { if (isSource) entry.featuresThem++; else entry.theyFeature++; } if (relMeta.shared_track_count) entry.sharedTracksAll += Number(relMeta.shared_track_count); if (relMeta.shared_chart_count) entry.sharedChartTracks += Number(relMeta.shared_chart_count); if (Array.isArray(relMeta.shared_titles)) { for (const t of relMeta.shared_titles as string[]) { if (!entry.sharedTitles.includes(String(t))) entry.sharedTitles.push(String(t)); } } }
-      const { data: artistPairs } = await supabase.from("registry_artist_relationships").select("artist_a_slug, artist_b_slug, relationship_type, confidence, metadata").or(`artist_a_slug.eq.${slug},artist_b_slug.eq.${slug}`).eq("relationship_status", "active");
-      for (const pair of (artistPairs ?? [])) { const relatedSlug = String(pair.artist_a_slug) === slug ? String(pair.artist_b_slug) : String(pair.artist_a_slug); if (relatedSlug === slug) continue; const confidence = Number(pair.confidence || 1); const pairMeta = (pair.metadata || {}) as Record<string, unknown>; if (!relatedArtistsMap.has(relatedSlug)) { relatedArtistsMap.set(relatedSlug, { slug: relatedSlug, name: "", imageUrl: "", score: 0, sharedTracksAll: 0, sharedChartTracks: 0, featuresThem: 0, theyFeature: 0, sharedTitles: [] }); } const entry = relatedArtistsMap.get(relatedSlug)!; entry.score += confidence; if (pairMeta.shared_track_count) entry.sharedTracksAll += Number(pairMeta.shared_track_count); if (pairMeta.shared_chart_count) entry.sharedChartTracks += Number(pairMeta.shared_chart_count); }
-      const relatedSlugs = Array.from(relatedArtistsMap.keys());
-      let relatedArtists: any[] = [];
-      if (relatedSlugs.length > 0) { const { data: relatedRows } = await supabase.from("registry_artists").select("slug, display_name, public_image_url").in("slug", relatedSlugs).eq("status", "active"); const artistLookup2 = new Map((relatedRows ?? []).map((r: any) => [String(r.slug), r])); relatedArtists = Array.from(relatedArtistsMap.values()).map((entry) => { const row = artistLookup2.get(entry.slug); return { slug: entry.slug, name: row ? String(row.display_name) : entry.slug, imageUrl: row?.public_image_url || "", score: Math.round(entry.score * 10), sharedTracksAll: entry.sharedTracksAll, sharedChartTracks: entry.sharedChartTracks, featuresThem: entry.featuresThem, theyFeature: entry.theyFeature, sharedTitles: entry.sharedTitles.slice(0, 5) }; }).sort((a, b) => (b.score || 0) - (a.score || 0)).slice(0, 8); }
+
+      const {
+        data: proximityRows,
+        error: proximityError,
+      } = await supabase.rpc(
+        "get_public_artist_structural_proximity",
+        {
+          p_artist_id: artist.id,
+        },
+      );
+
+      if (proximityError) {
+        console.warn(
+          "get_public_artist_structural_proximity failed:",
+          proximityError.message,
+        );
+      }
+
+      for (const row of (proximityRows ?? [])) {
+        const relatedSlug =
+          String(
+            row.related_artist_slug
+            || "",
+          ).trim();
+
+        if (
+          !relatedSlug
+          || relatedSlug === slug
+        ) {
+          continue;
+        }
+
+        relatedArtistsMap.set(
+          relatedSlug,
+          {
+            slug: relatedSlug,
+            name:
+              String(
+                row.related_artist_name
+                || relatedSlug,
+              ),
+            imageUrl:
+              String(
+                row.related_artist_image_url
+                || "",
+              ),
+            score:
+              Number(
+                row.proximity_score
+                || 0,
+              ),
+            sharedTracksAll:
+              Number(
+                row.shared_track_count
+                || 0,
+              ),
+            sharedChartTracks:
+              0,
+            featuresThem:
+              Number(
+                row.features_them
+                || 0,
+              ),
+            theyFeature:
+              Number(
+                row.they_feature
+                || 0,
+              ),
+            sharedTitles:
+              Array.isArray(
+                row.shared_titles,
+              )
+                ? row.shared_titles
+                    .map(String)
+                    .filter(Boolean)
+                    .slice(0, 5)
+                : [],
+          },
+        );
+      }
+
+      const relatedArtists =
+        Array.from(
+          relatedArtistsMap.values(),
+        )
+          .sort(
+            (left, right) => {
+              const scoreDifference =
+                Number(
+                  right.score
+                  || 0,
+                )
+                - Number(
+                    left.score
+                    || 0,
+                  );
+
+              if (scoreDifference !== 0) {
+                return scoreDifference;
+              }
+
+              return String(
+                left.name
+                || "",
+              ).localeCompare(
+                String(
+                  right.name
+                  || "",
+                ),
+              );
+            },
+          )
+          .slice(
+            0,
+            8,
+          );
+
       const followerCount = meta.spotify_followers ? Number(meta.spotify_followers) : 0;
       const popularity = meta.spotify_popularity ? Number(meta.spotify_popularity) : 0;
       const country = String(meta.country || artist.origin_iso2 || "");
