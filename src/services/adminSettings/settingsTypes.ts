@@ -6,6 +6,7 @@ export type AdminSettingsDomain =
   | "gscData"
   | "siteIdentity"
   | "frontendAppearance"
+  | "onboarding"
   | "playerPlayback"
   | "registry"
   | "airplay"
@@ -82,6 +83,15 @@ export const SETTINGS_DOMAINS: SettingsDomainMeta[] = [
     route: "/admin/settings/frontend-appearance",
     health: "healthy",
     primaryAction: "Customize appearance",
+  },
+  {
+    key: "onboarding",
+    label: "Onboarding",
+    description: "Choose the Artists who welcome people into WAKILISHA and decide whether WAKILISHA fills open spaces",
+    icon: "Users",
+    route: "/admin/settings/onboarding",
+    health: "healthy",
+    primaryAction: "Choose Artists",
   },
   {
     key: "playerPlayback",

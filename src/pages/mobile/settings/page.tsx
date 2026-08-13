@@ -238,6 +238,28 @@ export default function MobileSettingsPage() {
         </p>
       </div>
 
+      {isSignedIn && (
+        <div className="px-5 mb-4">
+          <Link
+            to="/start?edit=1"
+            className="flex items-center gap-3 rounded-2xl border border-[var(--wk-border)] bg-[var(--wk-surface)] px-4 py-3.5"
+          >
+            <span className="flex h-10 w-10 items-center justify-center rounded-full bg-[var(--wk-brand-soft)] text-[var(--wk-brand)]">
+              <i className="ri-group-line text-lg" />
+            </span>
+            <span className="min-w-0 flex-1">
+              <span className="block text-[13px] font-black text-[var(--wk-text)]">
+                Your People
+              </span>
+              <span className="mt-0.5 block text-[11px] text-[var(--wk-text-muted)]">
+                Change the Artists you keep close.
+              </span>
+            </span>
+            <i className="ri-arrow-right-s-line text-lg text-[var(--wk-text-faint)]" />
+          </Link>
+        </div>
+      )}
+
       {/* Scrollable tab bar */}
       <div className="px-5 mb-5">
         <div className="flex gap-2 overflow-x-auto scrollbar-none">

@@ -79,6 +79,7 @@ import {
   AdminSettingsIntegrations,
   AdminSettingsLayout,
   AdminSettingsMaintenance,
+  AdminSettingsOnboarding,
   AdminSettingsNavigation,
   AdminSettingsPlayerPlayback,
   AdminSettingsRegistry,
@@ -125,6 +126,7 @@ import {
   LyricContribution,
   ProfilePage,
   FollowingPage,
+  RegistryOnboardingPage,
   MobileProfilePage,
   SettingsPage,
   MobileSettingsPage,
@@ -222,6 +224,7 @@ function LegacyEntityRedirect({ base }: { base: "/artists" | "/releases" | "/tra
 const routes: RouteObject[] = [
     { path: "/admin/login", element: <AdminLoginPage /> },
   { path: "/auth/reset-password", element: <ResetPasswordPage /> },
+  { path: "/start", element: <RegistryOnboardingPage /> },
   {
     element: <ResponsiveAppLayout />,
     children: [
@@ -409,6 +412,7 @@ const routes: RouteObject[] = [
         { path: "audience", element: <AdminSettingsAudience /> },
         { path: "email-briefings", element: <AdminSettingsEmailBriefings /> },
         { path: "maintenance", element: <AdminSettingsMaintenance /> },
+        { path: "onboarding", element: <AdminSettingsOnboarding /> },
         { path: "seo", element: <AdminSettingsSeo /> },
         { path: "navigation", element: <AdminSettingsNavigation /> },
         { path: "audit", element: <AdminSettingsAudit /> },
