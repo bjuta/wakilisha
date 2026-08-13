@@ -328,6 +328,10 @@ export const AdminSettingsMaintenance = lazy(() =>
   import("../pages/admin/settings/maintenance/page"),
 );
 
+export const AdminSettingsOnboarding = lazy(() =>
+  import("../pages/admin/settings/onboarding/page"),
+);
+
 export const AdminSettingsNavigation = lazy(() =>
   import("../pages/admin/settings/navigation/page"),
 );

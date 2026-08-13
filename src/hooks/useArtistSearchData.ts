@@ -4,6 +4,7 @@ import { buildArtistSearchSnippet } from "@/services/cultureContext/artistAdapte
 import { normalizeCountry } from "@/services/cultureContext/formatters";
 
 export interface ArtistSearchItem {
+  id: string;
   slug: string;
   name: string;
   imageUrl?: string;
@@ -24,7 +25,7 @@ export function useArtistSearchData() {
       try {
         const { data: artists, error: err } = await supabase
           .from("registry_artists")
-          .select("slug, display_name, public_image_url, metadata")
+          .select("id, slug, display_name, public_image_url, metadata")
           .eq("status", "active")
           .order("display_name");
 
@@ -40,6 +41,7 @@ export function useArtistSearchData() {
           const genres = Array.isArray(meta.genres) ? (meta.genres as string[]) : [];
           const country = typeof meta.country === "string" ? normalizeCountry(meta.country) : undefined;
           const item = {
+            id: a.id,
             slug: a.slug,
             name: a.display_name,
             imageUrl: a.public_image_url || undefined,

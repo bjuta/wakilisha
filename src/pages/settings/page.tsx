@@ -196,6 +196,17 @@ export default function SettingsPage() {
           {/* Sidebar nav */}
           <nav className="settings49-nav" aria-label="Settings sections">
             <div className="mb-3 px-2">{profilePreview()}</div>
+            {isSignedIn && (
+              <Link
+                to="/start?edit=1"
+                className="settings49-nav-item mb-2"
+              >
+                <span className="settings49-nav-icon">
+                  <i className="ri-group-line text-[15px]" />
+                </span>
+                Your People
+              </Link>
+            )}
             {tabs.map((tab) => (
               <button
                 key={tab.key}
