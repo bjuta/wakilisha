@@ -144,9 +144,20 @@ const directLazyImports = [
   ),
 ].map((match) => match[1]);
 
-if (directLazyImports.length !== 51) {
+/*
+ * The accepted authority was 51 direct lazy public imports.
+ * Following added one direct lazy public import.
+ * Registry-led onboarding adds one more direct lazy public import.
+ * The current authority is therefore 53 direct lazy imports.
+ */
+const expectedDirectLazyImportCount = 53;
+
+if (
+  directLazyImports.length !==
+  expectedDirectLazyImportCount
+) {
   fail(
-    `expected 51 direct lazy imports, found ${directLazyImports.length}`,
+    `expected ${expectedDirectLazyImportCount} direct lazy imports, found ${directLazyImports.length}`,
   );
 }
 
@@ -210,6 +221,8 @@ for (const requiredModule of [
   "../pages/mobile/magazine/article/page",
   "../pages/releases/detail/page",
   "../pages/mobile/releases/detail/page",
+  "../pages/following/page",
+  "../pages/start/page",
   "../pages/settings/page",
   "../pages/mobile/settings/page",
   "../pages/api-docs/page",
@@ -287,9 +300,18 @@ const routePaths = [
  * Person frontend M1 adds one canonical role-neutral public route:
  * - /people/:slug
  *
- * The current authority is therefore 151 paths.
+ * That established 151 paths.
+ *
+ * Following adds one canonical signed-in route:
+ * - /following
+ *
+ * Registry-led onboarding adds two route paths:
+ * - /start
+ * - Admin Settings onboarding
+ *
+ * The current authority is therefore 154 paths.
  */
-const expectedRoutePathCount = 151;
+const expectedRoutePathCount = 154;
 
 if (routePaths.length !== expectedRoutePathCount) {
   fail(
@@ -306,7 +328,7 @@ const routeChecksum = crypto
   .digest("hex");
 
 const expectedRouteChecksum =
-  "9795190e632f20040ebcf98663a7c6915829bfa3eb1c80dd15eae4875b6bbf56";
+  "f5a21b1a2013b16559d992e03c838568db1050db4da7d8872463269323a354e1";
 
 if (
   routeChecksum !==
