@@ -61,9 +61,14 @@ const lazyImportCount = (
  * - AdminNewPlaylistPage
  * - AdminPlaylistDetailPage
  *
- * The current authority is therefore 90 lazy imports.
+ * Subsequent accepted Admin Studio routes brought the baseline to 91.
+ *
+ * Registry-led onboarding adds one lazy Admin Settings route:
+ * - AdminSettingsOnboarding
+ *
+ * The current authority is therefore 92 lazy imports.
  */
-const expectedLazyImportCount = 91;
+const expectedLazyImportCount = 92;
 
 if (lazyImportCount !== expectedLazyImportCount) {
   fail(
