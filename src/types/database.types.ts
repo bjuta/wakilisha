@@ -18753,6 +18753,21 @@ export type Database = {
           reviewed_at: string
         }[]
       }
+      get_public_artist_structural_proximity: {
+        Args: { p_artist_id: string }
+        Returns: {
+          features_them: number
+          proximity_score: number
+          related_artist_id: string
+          related_artist_image_url: string
+          related_artist_name: string
+          related_artist_slug: string
+          shared_release_count: number
+          shared_titles: string[]
+          shared_track_count: number
+          they_feature: number
+        }[]
+      }
       get_public_living_memory: {
         Args: {
           p_entity_id?: string
