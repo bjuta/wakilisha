@@ -17401,6 +17401,10 @@ export type Database = {
         }
         Returns: Json
       }
+      community_get_follow_suggestions: {
+        Args: { p_artist_limit?: number; p_people_limit?: number }
+        Returns: Json
+      }
       community_get_following_feed: {
         Args: {
           p_before_item_key?: string
