@@ -5,7 +5,7 @@ const SITE_NAME = "WAKILISHA";
 const SITE_URL = "https://wakilisha.africa";
 const DEFAULT_IMAGE = `${SITE_URL}/assets/logos/wakilisha-logo-dark.svg`;
 const DEFAULT_DESCRIPTION =
-  "WAKILISHA maps African music culture through charts, artists, releases, guides, and stories from the continent and diaspora.";
+  "WAKILISHA maps African music culture through charts, artists, releases, Playlists, guides, and stories from the continent and diaspora.";
 
 const DIST_DIR = path.resolve("dist");
 const INDEX_PATH = path.join(DIST_DIR, "index.html");
@@ -57,6 +57,13 @@ const STATIC_ROUTES = {
   "/releases": {
     title: "African music releases",
     description: "Browse albums, EPs, singles, and releases from artists across African music culture.",
+    robots: "index, follow",
+    ogType: "website",
+    kind: "collection",
+  },
+  "/playlists": {
+    title: "Playlists",
+    description: "Curated Playlists from WAKILISHA. New releases, deep cuts, scenes, moods, and moments worth hearing.",
     robots: "index, follow",
     ogType: "website",
     kind: "collection",
@@ -1106,6 +1113,105 @@ function pageSchema(model, url) {
       mainEntity: album,
     });
   }
+  if (model.kind === "playlist") {
+    const image =
+      socialImageForModel(
+        model,
+      );
+
+    const playlist =
+      compactSchema({
+        "@type":
+          "MusicPlaylist",
+        "@id":
+          `${url}#playlist`,
+        name:
+          firstNonEmpty(
+            model.entityName,
+            model.title,
+            entityName,
+          ),
+        url,
+        description:
+          model.description,
+        image:
+          image ||
+          undefined,
+        numTracks:
+          Number.isFinite(
+            Number(
+              model.itemCount,
+            ),
+          )
+            ? Number(
+                model.itemCount,
+              )
+            : undefined,
+        creator:
+          firstNonEmpty(
+            model.curatorLabel,
+          )
+            ? {
+                "@type":
+                  "Organization",
+                name:
+                  model.curatorLabel,
+              }
+            : undefined,
+      });
+
+    return compactSchema({
+      ...base,
+      image:
+        image ||
+        undefined,
+      about:
+        playlist,
+      mainEntity:
+        playlist,
+    });
+  }
+
+  if (model.kind === "person") {
+    const image =
+      socialImageForModel(
+        model,
+      );
+
+    const person =
+      compactSchema({
+        "@type":
+          "Person",
+        "@id":
+          `${url}#person`,
+        name:
+          firstNonEmpty(
+            model.entityName,
+            model.title,
+            entityName,
+          ),
+        url,
+        description:
+          model.description,
+        image:
+          image ||
+          undefined,
+      });
+
+    return compactSchema({
+      ...base,
+      "@type":
+        "ProfilePage",
+      image:
+        image ||
+        undefined,
+      about:
+        person,
+      mainEntity:
+        person,
+    });
+  }
+
   if (model.kind === "chart" || model.kind === "collection") {
     const chartMeta = CHART_METADATA_BY_PATH.get(cleanPath(model.canonicalPath)) || {};
     const entries = Array.isArray(chartMeta.entries) ? chartMeta.entries : [];
@@ -1265,6 +1371,60 @@ function modelFromPath(pagePath) {
       robots: "index, follow",
       ogType: "music.album",
       kind: "release",
+    };
+  }
+
+  if (
+    section ===
+      "playlists" &&
+    parts[1]
+  ) {
+    const title =
+      titleCase(
+        parts[1],
+      );
+
+    return {
+      title,
+      description:
+        firstSentence(
+          `Listen to ${title} on WAKILISHA.`,
+        ),
+      canonicalPath:
+        page,
+      robots:
+        "index, follow",
+      ogType:
+        "music.playlist",
+      kind:
+        "playlist",
+    };
+  }
+
+  if (
+    section ===
+      "people" &&
+    parts[1]
+  ) {
+    const title =
+      titleCase(
+        parts[1],
+      );
+
+    return {
+      title,
+      description:
+        firstSentence(
+          `Read work by ${title} on WAKILISHA.`,
+        ),
+      canonicalPath:
+        page,
+      robots:
+        "index, follow",
+      ogType:
+        "profile",
+      kind:
+        "person",
     };
   }
 
@@ -1429,6 +1589,33 @@ async function main() {
   }
 
   DB_METADATA_BY_PATH = await fetchDbMetadataManifest();
+
+  const playlistMetadataCount =
+    [...DB_METADATA_BY_PATH.values()]
+      .filter(
+        (entry) =>
+          entry?.kind ===
+            "playlist",
+      )
+      .length;
+
+  const personMetadataCount =
+    [...DB_METADATA_BY_PATH.values()]
+      .filter(
+        (entry) =>
+          entry?.kind ===
+            "person",
+      )
+      .length;
+
+  console.log(
+    `Playlist metadata manifest loaded: ${playlistMetadataCount.toLocaleString()} playlist rows.`,
+  );
+
+  console.log(
+    `Person metadata manifest loaded: ${personMetadataCount.toLocaleString()} Person rows.`,
+  );
+
   ARTICLE_IMAGE_BY_PATH = await fetchArticleImageManifest();
   ARTICLE_METADATA_BY_PATH = await fetchArticleMetadataManifest();
   ARTIST_METADATA_BY_PATH = await fetchArtistMetadataManifest();

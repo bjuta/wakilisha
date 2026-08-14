@@ -111,6 +111,7 @@ type SitemapItem = {
   url_type: string;
   source_table?: string;
   source_id?: string;
+  source_row?: Record<string, unknown>;
 };
 
 function uniqByLoc(items: SitemapItem[]) {
@@ -189,12 +190,272 @@ async function fetchAllPages(
   return { data: rows };
 }
 
+async function fetchPublishedPlaylists(
+  db: ReturnType<typeof createClient>,
+) {
+  const rows: Record<string, unknown>[] = [];
+  let beforePublishedAt = "";
+  let beforeSnapshotId = "";
+
+  for (;;) {
+    const args: Record<string, unknown> = {
+      p_limit: 50,
+    };
+
+    if (beforePublishedAt && beforeSnapshotId) {
+      args.p_before_published_at =
+        beforePublishedAt;
+      args.p_before_snapshot_id =
+        beforeSnapshotId;
+    }
+
+    const { data, error } =
+      await db.rpc(
+        "list_public_playlists",
+        args,
+      );
+
+    if (error) {
+      throw new Error(
+        `Playlist SEO enumeration failed: ${
+          error.message || String(error)
+        }`,
+      );
+    }
+
+    const page =
+      Array.isArray(data)
+        ? data as Record<string, unknown>[]
+        : [];
+
+    rows.push(...page);
+
+    if (page.length < 50) {
+      break;
+    }
+
+    const last =
+      page[page.length - 1];
+
+    const nextPublishedAt =
+      String(
+        last?.published_at || "",
+      ).trim();
+
+    const nextSnapshotId =
+      String(
+        last?.snapshot_id || "",
+      ).trim();
+
+    if (
+      !nextPublishedAt ||
+      !nextSnapshotId ||
+      (
+        nextPublishedAt ===
+          beforePublishedAt &&
+        nextSnapshotId ===
+          beforeSnapshotId
+      )
+    ) {
+      throw new Error(
+        "Playlist SEO pagination did not advance.",
+      );
+    }
+
+    beforePublishedAt =
+      nextPublishedAt;
+
+    beforeSnapshotId =
+      nextSnapshotId;
+  }
+
+  return { data: rows };
+}
+
+async function fetchPublicPeople(
+  db: ReturnType<typeof createClient>,
+) {
+  const resourceRows =
+    await fetchAllPages(
+      "public Person resources",
+      (from, to) =>
+        db
+          .from("wk_resource_index")
+          .select(
+            "resource_id, canonical_path, updated_at",
+          )
+          .eq(
+            "resource_kind",
+            "person",
+          )
+          .eq(
+            "visibility",
+            "public",
+          )
+          .eq(
+            "lifecycle_state",
+            "active",
+          )
+          .not(
+            "canonical_path",
+            "is",
+            null,
+          )
+          .order(
+            "resource_id",
+            {
+              ascending: true,
+            },
+          )
+          .range(
+            from,
+            to,
+          ),
+    );
+
+  const rows: Record<string, unknown>[] = [];
+  const resources =
+    resourceRows.data ?? [];
+  const concurrency = 12;
+
+  for (
+    let index = 0;
+    index < resources.length;
+    index += concurrency
+  ) {
+    const batch =
+      resources.slice(
+        index,
+        index + concurrency,
+      );
+
+    const resolved =
+      await Promise.all(
+        batch.map(
+          async (resource) => {
+            const canonicalPath =
+              String(
+                resource.canonical_path ||
+                  "",
+              ).trim();
+
+            const match =
+              /^\/people\/([^/]+)$/.exec(
+                canonicalPath,
+              );
+
+            if (!match) {
+              return null;
+            }
+
+            const { data, error } =
+              await db.rpc(
+                "get_public_person",
+                {
+                  p_slug:
+                    match[1],
+                },
+              );
+
+            if (error) {
+              throw new Error(
+                `Person SEO resolution failed for ${canonicalPath}: ${
+                  error.message ||
+                  String(error)
+                }`,
+              );
+            }
+
+            if (
+              !data ||
+              typeof data !==
+                "object" ||
+              Array.isArray(data)
+            ) {
+              return null;
+            }
+
+            const personData =
+              data as Record<
+                string,
+                unknown
+              >;
+
+            const personResourceId =
+              String(
+                personData.person_id ||
+                  resource.resource_id ||
+                  "",
+              ).trim();
+
+            if (!personResourceId) {
+              return null;
+            }
+
+            const {
+              data: workData,
+              error: workError,
+            } =
+              await db.rpc(
+                "list_public_person_work",
+                {
+                  p_person_resource_id:
+                    personResourceId,
+                },
+              );
+
+            if (workError) {
+              throw new Error(
+                `Person SEO work eligibility failed for ${canonicalPath}: ${
+                  workError.message ||
+                  String(workError)
+                }`,
+              );
+            }
+
+            if (
+              !Array.isArray(
+                workData,
+              ) ||
+              workData.length === 0
+            ) {
+              return null;
+            }
+
+            return {
+              ...personData,
+              resource_id:
+                resource.resource_id,
+              updated_at:
+                resource.updated_at,
+            };
+          },
+        ),
+      );
+
+    rows.push(
+      ...resolved.filter(
+        (
+          row,
+        ): row is Record<
+          string,
+          unknown
+        > =>
+          row !== null,
+      ),
+    );
+  }
+
+  return { data: rows };
+}
+
 async function buildInternalItems(db: ReturnType<typeof createClient>): Promise<SitemapItem[]> {
   const items: SitemapItem[] = [
     { loc: makeUrl("/"), url_type: "static" },
     { loc: makeUrl("/charts"), url_type: "static" },
     { loc: makeUrl("/artists"), url_type: "static" },
     { loc: makeUrl("/releases"), url_type: "static" },
+    { loc: makeUrl("/playlists"), url_type: "static" },
     { loc: makeUrl("/genres"), url_type: "static" },
     { loc: makeUrl("/labels"), url_type: "static" },
     { loc: makeUrl("/guides"), url_type: "static" },
@@ -210,6 +471,8 @@ async function buildInternalItems(db: ReturnType<typeof createClient>): Promise<
 
   const [
     articles,
+    playlists,
+    people,
     artists,
     releases,
     tracks,
@@ -223,6 +486,8 @@ async function buildInternalItems(db: ReturnType<typeof createClient>): Promise<
     chartPrograms,
   ] = await Promise.all([
     db.from("wk_articles").select("id, slug, modified_at, published_at").eq("wp_status", "publish").limit(5000),
+    fetchPublishedPlaylists(db),
+    fetchPublicPeople(db),
     fetchAllPages(
       "registry_artists",
       (from, to) =>
@@ -305,6 +570,85 @@ async function buildInternalItems(db: ReturnType<typeof createClient>): Promise<
       url_type: "article",
       source_table: "wk_articles",
       source_id: String(row.id),
+    });
+  }
+
+  for (const row of playlists.data ?? []) {
+    const slug =
+      String(
+        row.slug || "",
+      ).trim();
+
+    const resourceId =
+      String(
+        row.resource_id ||
+          row.playlist_id ||
+          "",
+      ).trim();
+
+    if (
+      !slug ||
+      !resourceId
+    ) {
+      continue;
+    }
+
+    items.push({
+      loc:
+        makeUrl(
+          `/playlists/${slug}`,
+        ),
+      lastmod:
+        dateOnly(
+          row.published_at ||
+            row.first_published_at,
+        ),
+      url_type: "playlist",
+      source_table:
+        "public_playlist",
+      source_id:
+        resourceId,
+      source_row: row,
+    });
+  }
+
+  for (const row of people.data ?? []) {
+    const canonicalPath =
+      String(
+        row.canonical_path || "",
+      ).trim();
+
+    const personId =
+      String(
+        row.person_id ||
+          row.resource_id ||
+          "",
+      ).trim();
+
+    if (
+      !/^\/people\/[^/]+$/.test(
+        canonicalPath,
+      ) ||
+      !personId
+    ) {
+      continue;
+    }
+
+    items.push({
+      loc:
+        makeUrl(
+          canonicalPath,
+        ),
+      lastmod:
+        dateOnly(
+          row.updated_at,
+        ),
+      url_type: "person",
+      source_table:
+        "public_person",
+      source_id:
+        personId,
+      source_row: row,
     });
   }
 
@@ -571,8 +915,8 @@ type SeoMetadataEntry = {
   title: string;
   description: string;
   robots: "index, follow" | "noindex, follow" | "noindex, nofollow";
-  ogType: "website" | "article" | "profile" | "music.song" | "music.album";
-  kind: "home" | "collection" | "article" | "artist" | "track" | "release" | "chart" | "guide" | "profile" | "utility" | "legal" | "notFound";
+  ogType: "website" | "article" | "profile" | "music.song" | "music.album" | "music.playlist";
+  kind: "home" | "collection" | "article" | "artist" | "track" | "release" | "playlist" | "person" | "chart" | "guide" | "profile" | "utility" | "legal" | "notFound";
   image?: string | null;
   entityName?: string | null;
   publishedAt?: string | null;
@@ -583,6 +927,8 @@ type SeoMetadataEntry = {
   socialDescription?: string | null;
   seoOverrideId?: string | null;
   overrideAppliedAt?: string | null;
+  curatorLabel?: string | null;
+  itemCount?: number | null;
 };
 
 type SeoContentOverrideRow = {
@@ -857,6 +1203,127 @@ function buildSeoMetadataEntry(
       kind: "article",
       image: resolvedImage,
       publishedAt: dateValue(row, ["published_at", "post_date", "created_at"]),
+      modifiedAt,
+      sourceTable,
+      sourceId,
+    };
+  }
+
+  if (sourceTable === "public_playlist") {
+    const title =
+      firstText(
+        row,
+        [
+          "title",
+        ],
+        [],
+        last,
+      );
+
+    const curatorLabel =
+      firstText(
+        row,
+        [
+          "curator_label",
+        ],
+        [],
+      );
+
+    const rawItemCount =
+      row?.item_count;
+
+    const itemCount =
+      typeof rawItemCount ===
+        "number" &&
+      Number.isFinite(
+        rawItemCount,
+      )
+        ? rawItemCount
+        : null;
+
+    return {
+      title,
+      entityName: title,
+      description:
+        descriptionValue(
+          row,
+          curatorLabel
+            ? `${title}, curated by ${curatorLabel}.`
+            : `Listen to ${title} on WAKILISHA.`,
+        ),
+      robots: "index, follow",
+      ogType: "music.playlist",
+      kind: "playlist",
+      image:
+        absoluteImageUrl(
+          firstText(
+            row,
+            [
+              "cover_url",
+            ],
+            [],
+          ),
+        ) ||
+        resolvedImage,
+      publishedAt:
+        dateValue(
+          row,
+          [
+            "first_published_at",
+            "published_at",
+          ],
+        ),
+      modifiedAt:
+        dateValue(
+          row,
+          [
+            "published_at",
+          ],
+        ) ||
+        modifiedAt,
+      sourceTable,
+      sourceId,
+      curatorLabel:
+        curatorLabel ||
+        null,
+      itemCount,
+    };
+  }
+
+  if (sourceTable === "public_person") {
+    const title =
+      firstText(
+        row,
+        [
+          "display_name",
+        ],
+        [],
+        last,
+      );
+
+    return {
+      title,
+      entityName: title,
+      description:
+        descriptionValue(
+          row,
+          `Read work by ${title} on WAKILISHA.`,
+        ),
+      robots: "index, follow",
+      ogType: "profile",
+      kind: "person",
+      image:
+        absoluteImageUrl(
+          firstText(
+            row,
+            [
+              "avatar_url",
+              "cover_url",
+            ],
+            [],
+          ),
+        ) ||
+        resolvedImage,
       modifiedAt,
       sourceTable,
       sourceId,
@@ -1156,7 +1623,14 @@ async function buildSeoMetadataManifest(db: ReturnType<typeof createClient>) {
   const sourceIdsByTable = new Map<string, string[]>();
 
   for (const item of items) {
-    if (!item.source_table || !item.source_id) continue;
+    if (
+      !item.source_table ||
+      !item.source_id ||
+      item.source_row
+    ) {
+      continue;
+    }
+
     const list = sourceIdsByTable.get(item.source_table) || [];
     list.push(item.source_id);
     sourceIdsByTable.set(item.source_table, list);
@@ -1196,7 +1670,11 @@ async function buildSeoMetadataManifest(db: ReturnType<typeof createClient>) {
     const rowFromSlug = item.source_table === "registry_artists" && artistSlug
       ? artistRowsBySlug.get(artistSlug) || null
       : null;
-    const row = rowFromId || rowFromSlug || null;
+    const row =
+      item.source_row ||
+      rowFromId ||
+      rowFromSlug ||
+      null;
 
     const relationshipArtist = item.source_table === "registry_releases" && item.source_id
       ? relationshipMaps.releaseArtistByReleaseId.get(item.source_id) || null

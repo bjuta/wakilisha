@@ -3,3 +3,4 @@
 
 /releases/bien/alusa-why-are-you-topless
 /briefings
+/playlists

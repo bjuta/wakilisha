@@ -91,12 +91,63 @@ function auditMetadataManifest() {
       reportWarning(`${route}: metadata description is long (${description.length} chars).`);
     }
 
-    if (sourceTable && ["artist", "track", "release"].includes(kind) && !entityName) {
+    if (sourceTable && ["artist", "track", "release", "playlist", "person"].includes(kind) && !entityName) {
       reportError(`${route}: ${kind} metadata is missing clean entityName.`);
     }
 
-    if (entityName && ["artist", "track", "release", "profile"].includes(kind) && brandCount(entityName) > 0) {
+    if (entityName && ["artist", "track", "release", "playlist", "person", "profile"].includes(kind) && brandCount(entityName) > 0) {
       reportError(`${route}: ${kind} entityName should not include ${SITE_NAME}: "${entityName}"`);
+    }
+  }
+
+  const playlistCollection =
+    manifest["/playlists"];
+
+  if (!playlistCollection) {
+    reportError(
+      "/playlists: missing from SEO metadata manifest.",
+    );
+  }
+
+  for (
+    const [
+      route,
+      rawEntry,
+    ] of entries
+  ) {
+    const entry =
+      rawEntry &&
+      typeof rawEntry ===
+        "object"
+        ? rawEntry
+        : {};
+
+    if (
+      route.startsWith(
+        "/playlists/",
+      ) &&
+      entry.sourceTable ===
+        "public_playlist" &&
+      entry.kind !==
+        "playlist"
+    ) {
+      reportError(
+        `${route}: public Playlist metadata must use kind playlist.`,
+      );
+    }
+
+    if (
+      route.startsWith(
+        "/people/",
+      ) &&
+      entry.sourceTable ===
+        "public_person" &&
+      entry.kind !==
+        "person"
+    ) {
+      reportError(
+        `${route}: public Person metadata must use kind person.`,
+      );
     }
   }
 
