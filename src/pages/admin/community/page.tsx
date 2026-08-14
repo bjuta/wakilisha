@@ -1,4 +1,5 @@
 import { useEffect, useState, useCallback } from 'react';
+import { Link } from 'react-router-dom';
 import { WkIcon } from '@/components/design-system/Icon';
 import { AdminChartsPageHeader } from '@/pages/admin/charts/components/AdminChartsPageHeader';
 import { AdminChartsKpiCard } from '@/pages/admin/charts/components/AdminChartsKpiCard';
@@ -264,9 +265,16 @@ export default function AdminCommunityPage() {
 
       <AdminChartsPageHeader
         eyebrow="Community"
-        title="Moderation Dashboard"
+        title="Community Moderation"
         description="Review and manage community content: comments, reports, contributions, and audit trail."
-      />
+      >
+        <Link
+          to="/admin/community/artist-claims"
+          className="rounded-full border border-gray-200 bg-white px-4 py-2 text-[12px] font-bold text-gray-700 hover:bg-gray-50"
+        >
+          Artist Claims
+        </Link>
+      </AdminChartsPageHeader>
 
       {/* Stats strip */}
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-6">

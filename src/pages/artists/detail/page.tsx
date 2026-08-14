@@ -16,6 +16,8 @@ import { ArtistBioSection, cleanBioExcerpt } from "./components/ArtistBioSection
 import { ArtistVideos } from "./components/ArtistVideos";
 import { ArtistNewsletterSection } from "./components/ArtistNewsletterSection";
 import { ArtistTaggedArticles } from "./components/ArtistTaggedArticles";
+import { ArtistAuthorityPanel } from "./components/ArtistAuthorityPanel";
+import { getArtistPublicPresentation, type ArtistPublicAuthority } from "@/services/artists/claimedArtist";
 import { ContributionBadges } from "@/components/feature/community/ContributionBadges";
 import { CommunitySection } from "@/pages/magazine/article/components/CommunitySection";
 import { useAuthUser } from "@/hooks/useAuthUser";
@@ -88,6 +90,7 @@ export default function ArtistDetail() {
   const [registeredGenres, setRegisteredGenres] = useState<string[]>([]);
   const [appearsOn, setAppearsOn] = useState<RegistryAppearsOnRelease[]>([]);
   const [relationships, setRelationships] = useState<PublicArtistRelationship[]>([]);
+  const [artistAuthority, setArtistAuthority] = useState<ArtistPublicAuthority | null>(null);
   const [status, setStatus] = useState<"loading" | "ready" | "error">("loading");
   const [error, setError] = useState<string | null>(null);
 
@@ -147,6 +150,24 @@ export default function ArtistDetail() {
     return () => { alive = false; };
   }, [artist?.id]);
 
+  useEffect(() => {
+    let alive = true;
+    if (!artist?.id) {
+      setArtistAuthority(null);
+      return;
+    }
+
+    getArtistPublicPresentation(artist.id)
+      .then((authority) => {
+        if (alive) setArtistAuthority(authority);
+      })
+      .catch(() => {
+        if (alive) setArtistAuthority(null);
+      });
+
+    return () => { alive = false; };
+  }, [artist?.id]);
+
   if (status === "loading") {
     return (
       <div className="min-h-screen flex items-center justify-center bg-[var(--wk-bg)]">
@@ -162,10 +183,10 @@ export default function ArtistDetail() {
     return (
       <div className="wk-container px-6 py-20 text-center">
         <i className="ri-user-line mb-4 block text-5xl text-[var(--wk-text-faint)]" />
-        <h1 className="wk-h-section mb-2">Artist not found</h1>
+        <h1 className="wk-h-section mb-2">Artist Not Found</h1>
         <p className="text-[var(--wk-text-muted)]">{error ? "We couldn't load this artist. Try again in a moment." : "This artist could not be found."}</p>
         <Link to="/artists" className="mt-6 inline-block">
-          <WkButton variant="primary">Back to artists</WkButton>
+          <WkButton variant="primary">Back to Artists</WkButton>
         </Link>
       </div>
     );
@@ -195,11 +216,16 @@ export default function ArtistDetail() {
   const hasReleases = artist.releases.length > 0;
   const hasConnections = artistConnections.length > 0;
   const hasTopSongs = artist.topSongs.length > 0;
-  const hasBio = artist.bio || artist.fullBio;
+  const presentedBio = artistAuthority?.presentation?.bio?.trim() || "";
+  const displayBio = presentedBio || artist.bio || "";
+  const displayFullBio = presentedBio || artist.fullBio || artist.bio || "";
+  const displayProfileImage = artistAuthority?.presentation?.profileImageUrl || artist.profileImageUrl || artist.imageUrl;
+  const displayHeroImage = artistAuthority?.presentation?.heroImageUrl || artist.imageUrl;
+  const hasBio = Boolean(displayBio || displayFullBio);
   const hasVideos = artist.videos && artist.videos.length > 0;
-  const heroBio = cleanBioExcerpt(artist.fullBio || artist.bio || "");
-  const bioForSeo = cleanBioExcerpt(artist.fullBio || artist.bio || "");
-  const seoDescription = bioForSeo || `Explore ${artist.name} on WAKILISHA — songs, releases, chart moments, and more.`;
+  const heroBio = cleanBioExcerpt(displayFullBio || displayBio);
+  const bioForSeo = cleanBioExcerpt(displayFullBio || displayBio);
+  const seoDescription = bioForSeo || `Explore ${artist.name} on WAKILISHA: songs, releases, chart moments, and more.`;
 
   const communityEntity = {
     type: "artist" as const,
@@ -207,7 +233,7 @@ export default function ArtistDetail() {
     slug: artist.slug,
     url: typeof window !== "undefined" ? window.location.href : `/artists/${artist.slug}`,
     title: artist.name,
-    imageUrl: artist.profileImageUrl || artist.imageUrl,
+    imageUrl: displayProfileImage,
   };
 
   return (
@@ -215,7 +241,7 @@ export default function ArtistDetail() {
       <MetaTags
         title={`${artist.name} on WAKILISHA`}
         description={seoDescription}
-        imageUrl={artist.profileImageUrl || artist.imageUrl}
+        imageUrl={displayProfileImage}
         type="website"
       />
 
@@ -223,7 +249,7 @@ export default function ArtistDetail() {
         data={{
           "@type": "MusicGroup",
           name: artist.name,
-          image: artist.profileImageUrl || artist.imageUrl,
+          image: displayProfileImage,
           description: bioForSeo,
           genre: registeredGenres,
           url: typeof window !== "undefined" ? window.location.href : undefined,
@@ -236,8 +262,8 @@ export default function ArtistDetail() {
         artistId={artist.id}
         slug={artist.slug}
         userId={!user.loading ? user.id : undefined}
-        imageUrl={artist.imageUrl}
-        profileImageUrl={artist.profileImageUrl || artist.imageUrl}
+        imageUrl={displayHeroImage}
+        profileImageUrl={displayProfileImage}
         bio={heroBio}
         isRising={artist.isRising}
         spotifyUrl={artist.spotifyUrl}
@@ -249,6 +275,15 @@ export default function ArtistDetail() {
         chartEntryCount={artist.chartEntries.length}
       />
 
+      <ArtistAuthorityPanel
+        artistId={artist.id}
+        artistSlug={artist.slug}
+        artistName={artist.name}
+        authority={artistAuthority}
+        userId={!user.loading ? user.id || undefined : undefined}
+        authLoading={user.loading}
+      />
+
       <div className="wk-container px-6 pb-4">
         <ContributionBadges entityType="artist" entitySlug={artist.slug} />
       </div>
@@ -257,8 +292,8 @@ export default function ArtistDetail() {
         <div className="space-y-14 md:space-y-16 max-w-5xl">
           {hasBio && (
             <ArtistBioSection
-              bio={artist.bio}
-              fullBio={artist.fullBio}
+              bio={displayBio}
+              fullBio={displayFullBio}
               name={artist.name}
               country={artist.country}
               oldestReleaseLabel={oldestReleaseLabel}
