@@ -2,7 +2,7 @@ import fs from "node:fs";
 import { describe, expect, it } from "vitest";
 
 const migration = fs.readFileSync(
-  "supabase/migrations/20260723161000_publishing_workspace_foundation.sql",
+  "docs/engineering/replay-baseline/legacy-migrations/20260723161000_publishing_workspace_foundation.sql",
   "utf8",
 );
 

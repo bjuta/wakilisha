@@ -31,7 +31,7 @@ const listPage = fs.readFileSync(
 const migration = fs.readFileSync(
   path.join(
     root,
-    "supabase/migrations/20260730152000_add_owner_to_resource_index.sql",
+    "docs/engineering/replay-baseline/legacy-migrations/20260730152000_add_owner_to_resource_index.sql",
   ),
   "utf8",
 );
@@ -39,7 +39,7 @@ const migration = fs.readFileSync(
 const correctiveMigration = fs.readFileSync(
   path.join(
     root,
-    "supabase/migrations/20260731100000_restore_resource_index_privacy.sql",
+    "docs/engineering/replay-baseline/legacy-migrations/20260731100000_restore_resource_index_privacy.sql",
   ),
   "utf8",
 );

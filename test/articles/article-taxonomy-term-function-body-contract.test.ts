@@ -17,7 +17,7 @@ function read(relativePath: string): string {
 
 describe("taxonomy term function body repair", () => {
   const migration = read(
-    "supabase/migrations/20260802180500_taxonomy_term_function_body_repair.sql",
+    "docs/engineering/replay-baseline/legacy-migrations/20260802180500_taxonomy_term_function_body_repair.sql",
   );
   const verifier = read(
     "scripts/control-plane/verify-taxonomy-term-function-body-repair.sql",

@@ -18,7 +18,7 @@ function read(relativePath: string): string {
 describe("Article taxonomy term creation contract", () => {
   it("keeps one canonical SQL function signature", () => {
     const migration = read(
-      "supabase/migrations/20260802171000_taxonomy_term_rpc_authority.sql",
+      "docs/engineering/replay-baseline/legacy-migrations/20260802171000_taxonomy_term_rpc_authority.sql",
     );
 
     expect(migration).toContain(

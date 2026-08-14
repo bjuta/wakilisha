@@ -7,7 +7,7 @@ const root = process.cwd();
 const migration = fs.readFileSync(
   path.join(
     root,
-    "supabase/migrations/20260810033000_phase_5b_track_intake_provider_selection_authority.sql",
+    "docs/engineering/replay-baseline/legacy-migrations/20260810033000_phase_5b_track_intake_provider_selection_authority.sql",
   ),
   "utf8",
 );

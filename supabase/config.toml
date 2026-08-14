@@ -14,3 +14,24 @@ verify_jwt = true
 
 [functions.playlist-product-api]
 verify_jwt = false
+
+# WAKILISHA replayable Storage bucket authority.
+[storage.buckets.article-media]
+public = true
+file_size_limit = "50MiB"
+allowed_mime_types = ["image/jpeg", "image/png", "image/gif", "image/webp", "image/svg+xml", "image/jpg"]
+
+[storage.buckets.avatars]
+public = true
+file_size_limit = "5MiB"
+allowed_mime_types = ["image/jpeg", "image/png", "image/webp"]
+
+[storage.buckets.cms-media]
+public = true
+file_size_limit = "50MiB"
+allowed_mime_types = ["image/jpeg", "image/png", "image/gif", "image/webp", "image/svg+xml", "image/jpg", "video/mp4", "audio/mpeg"]
+
+[storage.buckets.profile-covers]
+public = true
+file_size_limit = "8MiB"
+allowed_mime_types = ["image/jpeg", "image/png", "image/webp"]

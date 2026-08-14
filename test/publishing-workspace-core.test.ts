@@ -32,7 +32,7 @@ const relationshipsSection = fs.readFileSync(
 );
 
 const ownerSemanticsMigration = fs.readFileSync(
-  "supabase/migrations/20260723205000_publishing_create_owner_null_semantics.sql",
+  "docs/engineering/replay-baseline/legacy-migrations/20260723205000_publishing_create_owner_null_semantics.sql",
   "utf8",
 );
 

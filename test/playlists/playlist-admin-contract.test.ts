@@ -279,7 +279,7 @@ describe("Phase 5A Playlist admin product", () => {
 
   it("governs Playlist cover mutation without broadening writer or author Media authority", () => {
     const migration = source(
-      "supabase/migrations/20260808095000_phase_5a_playlist_cover_command_authority.sql",
+      "docs/engineering/replay-baseline/legacy-migrations/20260808095000_phase_5a_playlist_cover_command_authority.sql",
     );
 
     expect(migration).toContain("playlist.cover.set");
@@ -296,7 +296,7 @@ describe("Phase 5A Playlist admin product", () => {
 
   it("makes Registry identity mandatory for new Playlist intake", () => {
     const migration = source(
-      "supabase/migrations/20260808113000_phase_5a_playlist_registry_playback_cover_repair.sql",
+      "docs/engineering/replay-baseline/legacy-migrations/20260808113000_phase_5a_playlist_registry_playback_cover_repair.sql",
     );
     const workspace = source(
       "src/pages/admin/content/playlists/detail/PlaylistEditorWorkspace.tsx",
@@ -324,7 +324,7 @@ describe("Phase 5A Playlist admin product", () => {
       "src/services/playlists/playlistAdminService.ts",
     );
     const migration = source(
-      "supabase/migrations/20260808113000_phase_5a_playlist_registry_playback_cover_repair.sql",
+      "docs/engineering/replay-baseline/legacy-migrations/20260808113000_phase_5a_playlist_registry_playback_cover_repair.sql",
     );
 
     expect(edge).toContain("youtube_iframe_browser_probe");
@@ -360,7 +360,7 @@ describe("Phase 5A Playlist admin product", () => {
 
   it("keeps audio and video playback kinds open for mixed Playlists", () => {
     const migration = source(
-      "supabase/migrations/20260808113000_phase_5a_playlist_registry_playback_cover_repair.sql",
+      "docs/engineering/replay-baseline/legacy-migrations/20260808113000_phase_5a_playlist_registry_playback_cover_repair.sql",
     );
     const edge = source(
       "supabase/functions/playlist-product-api/index.ts",
@@ -373,7 +373,7 @@ describe("Phase 5A Playlist admin product", () => {
 
   it("prepares a square derived cover instead of requiring the source image to already be a cover", () => {
     const migration = source(
-      "supabase/migrations/20260808113000_phase_5a_playlist_registry_playback_cover_repair.sql",
+      "docs/engineering/replay-baseline/legacy-migrations/20260808113000_phase_5a_playlist_registry_playback_cover_repair.sql",
     );
     const service = source(
       "src/services/playlists/playlistAdminService.ts",
@@ -444,7 +444,7 @@ describe("Phase 5A Playlist admin product", () => {
 
   it("keeps Registry-review intake visible as an ordinary Playlist item", () => {
     const migration = source(
-      "supabase/migrations/20260808163500_phase_5a_playlist_registry_review_unification.sql",
+      "docs/engineering/replay-baseline/legacy-migrations/20260808163500_phase_5a_playlist_registry_review_unification.sql",
     );
     const workspace = source(
       "src/pages/admin/content/playlists/detail/PlaylistEditorWorkspace.tsx",
@@ -470,7 +470,7 @@ describe("Phase 5A Playlist admin product", () => {
   });
   it("captures multiple primary and featured artist credits during Registry intake", () => {
     const migration = source(
-      "supabase/migrations/20260808143000_phase_5a_playlist_registry_intake_slots_and_artist_credits.sql",
+      "docs/engineering/replay-baseline/legacy-migrations/20260808143000_phase_5a_playlist_registry_intake_slots_and_artist_credits.sql",
     );
     const workspace = source(
       "src/pages/admin/content/playlists/detail/PlaylistEditorWorkspace.tsx",
@@ -491,7 +491,7 @@ describe("Phase 5A Playlist admin product", () => {
 
   it("fills a reserved Playlist slot when Registry canonicalizes the suggestion", () => {
     const migration = source(
-      "supabase/migrations/20260808143000_phase_5a_playlist_registry_intake_slots_and_artist_credits.sql",
+      "docs/engineering/replay-baseline/legacy-migrations/20260808143000_phase_5a_playlist_registry_intake_slots_and_artist_credits.sql",
     );
 
     expect(migration).toContain(
@@ -526,7 +526,7 @@ describe("Phase 5A Playlist admin product", () => {
 
   it("keeps Registry-review tracks under the ordinary Playlist item UX", () => {
     const migration = source(
-      "supabase/migrations/20260808163500_phase_5a_playlist_registry_review_unification.sql",
+      "docs/engineering/replay-baseline/legacy-migrations/20260808163500_phase_5a_playlist_registry_review_unification.sql",
     );
     const workspace = source(
       "src/pages/admin/content/playlists/detail/PlaylistEditorWorkspace.tsx",
@@ -561,7 +561,7 @@ describe("Phase 5A Playlist admin product", () => {
 
   it("materializes Registry-review tracks into the same ordered Playlist item collection", () => {
     const migration = source(
-      "supabase/migrations/20260808163500_phase_5a_playlist_registry_review_unification.sql",
+      "docs/engineering/replay-baseline/legacy-migrations/20260808163500_phase_5a_playlist_registry_review_unification.sql",
     );
     const workspace = source(
       "src/pages/admin/content/playlists/detail/PlaylistEditorWorkspace.tsx",
@@ -615,7 +615,7 @@ describe("Phase 5A Playlist admin product", () => {
       "src/router/config.tsx",
     );
     const migration = source(
-      "supabase/migrations/20260808163500_phase_5a_playlist_registry_review_unification.sql",
+      "docs/engineering/replay-baseline/legacy-migrations/20260808163500_phase_5a_playlist_registry_review_unification.sql",
     );
 
     expect(page).toContain("Track Intake");
@@ -647,7 +647,7 @@ describe("Phase 5A Playlist admin product", () => {
 
   it("keeps playlist_cover valid in the legacy Media compatibility projection", () => {
     const migration = source(
-      "supabase/migrations/20260808163500_phase_5a_playlist_registry_review_unification.sql",
+      "docs/engineering/replay-baseline/legacy-migrations/20260808163500_phase_5a_playlist_registry_review_unification.sql",
     );
 
     expect(migration).toContain(
@@ -660,7 +660,7 @@ describe("Phase 5A Playlist admin product", () => {
 
   it("makes Track Intake an enrichment workspace backed by shared provider evidence", () => {
     const migration = source(
-      "supabase/migrations/20260808163500_phase_5a_playlist_registry_review_unification.sql",
+      "docs/engineering/replay-baseline/legacy-migrations/20260808163500_phase_5a_playlist_registry_review_unification.sql",
     );
     const page = source(
       "src/pages/admin/registry/tracks/intake/page.tsx",
@@ -762,7 +762,7 @@ describe("Phase 5A Playlist admin product", () => {
       "src/pages/admin/registry/tracks/intake/page.tsx",
     );
     const migration = source(
-      "supabase/migrations/20260808204500_phase_5a_track_intake_canonical_creation.sql",
+      "docs/engineering/replay-baseline/legacy-migrations/20260808204500_phase_5a_track_intake_canonical_creation.sql",
     );
     const verifier = source(
       "scripts/control-plane/verify-phase-5a-track-intake-canonical-creation.sql",
@@ -811,7 +811,7 @@ describe("Phase 5A Playlist admin product", () => {
 
   it("separates unresolved Registry identity from enrichment-only review", () => {
     const migration = source(
-      "supabase/migrations/20260808163500_phase_5a_playlist_registry_review_unification.sql",
+      "docs/engineering/replay-baseline/legacy-migrations/20260808163500_phase_5a_playlist_registry_review_unification.sql",
     );
     const verifier = source(
       "scripts/control-plane/verify-phase-5a-playlist-registry-review-unification.sql",

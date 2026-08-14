@@ -2,7 +2,7 @@ import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 
 const migration = readFileSync(
-  "supabase/migrations/20260814164000_claimed_artist_experience.sql",
+  "docs/engineering/replay-baseline/legacy-migrations/20260814164000_claimed_artist_experience.sql",
   "utf8",
 );
 const verifier = readFileSync(

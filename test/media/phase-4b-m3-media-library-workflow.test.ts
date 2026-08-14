@@ -2,15 +2,15 @@ import fs from "node:fs";
 import { describe, expect, it } from "vitest";
 import { hashBlobSha256 } from "@/services/mediaHash";
 
-const migrationName = fs.readdirSync("supabase/migrations").find((name) =>
+const migrationName = fs.readdirSync("docs/engineering/replay-baseline/legacy-migrations").find((name) =>
   name.endsWith("_phase_4b_m3_media_library_workflow_delivery.sql"),
 );
 if (!migrationName) throw new Error("M3 workflow migration is missing.");
 
-const migration = fs.readFileSync(`supabase/migrations/${migrationName}`, "utf8");
+const migration = fs.readFileSync(`docs/engineering/replay-baseline/legacy-migrations/${migrationName}`, "utf8");
 
 const migration204Name = fs
-  .readdirSync("supabase/migrations")
+  .readdirSync("docs/engineering/replay-baseline/legacy-migrations")
   .find((name) =>
     name.endsWith(
       "_phase_4b_m3_upload_session_constraints_v2.sql",
@@ -24,7 +24,7 @@ if (!migration204Name) {
 }
 
 const migration204 = fs.readFileSync(
-  `supabase/migrations/${migration204Name}`,
+  `docs/engineering/replay-baseline/legacy-migrations/${migration204Name}`,
   "utf8",
 );
 
@@ -165,7 +165,7 @@ describe("Phase 4B M3 Media Library workflow contract", () => {
       const migration205Name = fs
 
 
-        .readdirSync("supabase/migrations")
+        .readdirSync("docs/engineering/replay-baseline/legacy-migrations")
 
 
         .find((name) =>
@@ -195,7 +195,7 @@ describe("Phase 4B M3 Media Library workflow contract", () => {
       const migration205 = fs.readFileSync(
 
 
-        `supabase/migrations/${migration205Name}`,
+        `docs/engineering/replay-baseline/legacy-migrations/${migration205Name}`,
 
 
         "utf8",

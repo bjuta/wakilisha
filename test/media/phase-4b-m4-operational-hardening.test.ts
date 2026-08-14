@@ -2,12 +2,12 @@ import fs from "node:fs";
 import { describe, expect, it } from "vitest";
 
 const migration = fs.readFileSync(
-  "supabase/migrations/20260807185000_phase_4b_m4_operational_hardening.sql",
+  "docs/engineering/replay-baseline/legacy-migrations/20260807185000_phase_4b_m4_operational_hardening.sql",
   "utf8",
 );
 
 const textAssetKindMigration = fs.readFileSync(
-  "supabase/migrations/20260807194500_phase_4b_m4_text_asset_kind_registry.sql",
+  "docs/engineering/replay-baseline/legacy-migrations/20260807194500_phase_4b_m4_text_asset_kind_registry.sql",
   "utf8",
 );
 

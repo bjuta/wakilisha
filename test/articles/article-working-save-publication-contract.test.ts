@@ -17,7 +17,7 @@ function read(relativePath: string): string {
 
 describe("published Article working-save isolation", () => {
   const migration = read(
-    "supabase/migrations/20260802202500_preserve_published_article_on_working_save.sql",
+    "docs/engineering/replay-baseline/legacy-migrations/20260802202500_preserve_published_article_on_working_save.sql",
   );
   const verifier = read(
     "scripts/control-plane/verify-published-article-working-save-isolation.sql",

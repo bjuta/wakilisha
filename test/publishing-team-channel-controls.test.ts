@@ -2,7 +2,7 @@ import fs from "node:fs";
 import { describe, expect, it } from "vitest";
 
 const migration = fs.readFileSync(
-  "supabase/migrations/20260724090000_publishing_team_channel_controls.sql",
+  "docs/engineering/replay-baseline/legacy-migrations/20260724090000_publishing_team_channel_controls.sql",
   "utf8",
 );
 
@@ -12,7 +12,7 @@ const verifier = fs.readFileSync(
 );
 
 const channelQualificationMigration = fs.readFileSync(
-  "supabase/migrations/20260724144500_publishing_channel_item_id_qualification.sql",
+  "docs/engineering/replay-baseline/legacy-migrations/20260724144500_publishing_channel_item_id_qualification.sql",
   "utf8",
 );
 
@@ -22,7 +22,7 @@ const channelQualificationVerifier = fs.readFileSync(
 );
 
 const assigneeQualificationMigration = fs.readFileSync(
-  "supabase/migrations/20260724150500_publishing_assignee_item_id_qualification.sql",
+  "docs/engineering/replay-baseline/legacy-migrations/20260724150500_publishing_assignee_item_id_qualification.sql",
   "utf8",
 );
 

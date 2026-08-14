@@ -25,7 +25,7 @@ function findMigration(): string {
   const directory =
     path.join(
       root,
-      "supabase/migrations",
+      "docs/engineering/replay-baseline/legacy-migrations",
     );
 
   const matches =
@@ -42,7 +42,7 @@ function findMigration(): string {
   expect(matches).toHaveLength(1);
 
   return read(
-    `supabase/migrations/${matches[0]}`,
+    `docs/engineering/replay-baseline/legacy-migrations/${matches[0]}`,
   );
 }
 

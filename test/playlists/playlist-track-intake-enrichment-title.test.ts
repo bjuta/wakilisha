@@ -16,7 +16,7 @@ const intake =
 
 const m228 =
   readFileSync(
-    "supabase/migrations/20260810022500_phase_5b_top50_track_canonicalization.sql",
+    "docs/engineering/replay-baseline/legacy-migrations/20260810022500_phase_5b_top50_track_canonicalization.sql",
     "utf8",
   );
 

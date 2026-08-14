@@ -12,10 +12,10 @@ function read(relativePath: string) {
 }
 
 const migration = read(
-  "supabase/migrations/20260814193000_artist_music_submission_registry_review.sql",
+  "docs/engineering/replay-baseline/legacy-migrations/20260814193000_artist_music_submission_registry_review.sql",
 );
 const triggerBoundaryMigration = read(
-  "supabase/migrations/20260814201000_artist_music_submission_playlist_trigger_boundary.sql",
+  "docs/engineering/replay-baseline/legacy-migrations/20260814201000_artist_music_submission_playlist_trigger_boundary.sql",
 );
 const verifier = read(
   "scripts/control-plane/verify-artist-music-submission-registry-review.sql",

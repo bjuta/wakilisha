@@ -16,7 +16,7 @@ const intake =
 
 const m224 =
   readFileSync(
-    "supabase/migrations/20260809184158_phase_5b_public_registry_intake_bridge.sql",
+    "docs/engineering/replay-baseline/legacy-migrations/20260809184158_phase_5b_public_registry_intake_bridge.sql",
     "utf8",
   );
 
