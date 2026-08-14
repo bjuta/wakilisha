@@ -156,7 +156,7 @@ function mapPresentation(value: unknown): ArtistPresentation | null {
 }
 
 async function rpc<T>(name: string, args: Record<string, unknown> = {}): Promise<T> {
-  const invoke = supabase.rpc as unknown as (
+  const invoke = supabase.rpc.bind(supabase) as unknown as (
     functionName: string,
     parameters?: Record<string, unknown>,
   ) => Promise<{ data: unknown; error: { message?: string } | null }>;

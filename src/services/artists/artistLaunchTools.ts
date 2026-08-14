@@ -316,7 +316,7 @@ export async function getArtistLaunchAnalytics(
   days: 7 | 30 | 90 = 30,
 ): Promise<ArtistLaunchAnalytics> {
   const invoke =
-    supabase.rpc as unknown as (
+    supabase.rpc.bind(supabase) as unknown as (
       functionName: string,
       parameters?: Record<string, unknown>,
     ) => Promise<{

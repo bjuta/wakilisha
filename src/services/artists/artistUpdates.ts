@@ -139,7 +139,7 @@ async function rpc(
   args: Record<string, unknown> = {},
 ): Promise<unknown> {
   const invoke =
-    supabase.rpc as unknown as (
+    supabase.rpc.bind(supabase) as unknown as (
       functionName: string,
       parameters?: Record<string, unknown>,
     ) => Promise<{
