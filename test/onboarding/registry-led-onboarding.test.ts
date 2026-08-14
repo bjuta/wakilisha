@@ -278,10 +278,13 @@ describe(
     );
 
     it(
-      "keeps skip available and sends completed onboarding into Following",
+      "keeps Back for Settings but sends Done into Following",
       () => {
         expect(page).toContain(
           "Skip for now",
+        );
+        expect(page).toContain(
+          "Back to Settings",
         );
         expect(page).toContain(
           '"skipped"',
@@ -290,7 +293,13 @@ describe(
           '"completed"',
         );
         expect(page).toContain(
-          '"/following"',
+          'navigate(\n          "/following",',
+        );
+        expect(page).toContain(
+          'if (isEditing) {\n        navigate(\n          "/settings",',
+        );
+        expect(page).not.toContain(
+          'isEditing\n            ? "/settings"\n            : "/following"',
         );
       },
     );
