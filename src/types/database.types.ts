@@ -3554,6 +3554,15 @@ export type Database = {
         }
         Returns: string
       }
+      artist_representation_defaults: {
+        Args: { p_role: string }
+        Returns: {
+          can_manage_profile: boolean
+          can_manage_team: boolean
+          can_post_updates: boolean
+          can_submit_releases: boolean
+        }[]
+      }
       assert_citation_command_actor: { Args: never; Returns: string }
       assert_credit_command_actor: { Args: never; Returns: string }
       assert_playlist_curator_credit: {
@@ -3695,6 +3704,7 @@ export type Database = {
         Returns: boolean
       }
       current_user_can_review_article: { Args: never; Returns: boolean }
+      current_user_can_review_artist_claims: { Args: never; Returns: boolean }
       current_user_can_triage_correction: {
         Args: { p_case_resource_id: string }
         Returns: boolean
@@ -3855,6 +3865,17 @@ export type Database = {
         }
         Returns: Json
       }
+      record_artist_representation_event: {
+        Args: {
+          p_artist_id: string
+          p_claim_id?: string
+          p_event_type: string
+          p_metadata?: Json
+          p_representation_id?: string
+          p_subject_user_id?: string
+        }
+        Returns: string
+      }
       refresh_person_visibility: {
         Args: { p_person_resource_id: string }
         Returns: undefined
@@ -3928,6 +3949,10 @@ export type Database = {
       sync_account_person_handle: {
         Args: { p_user_id: string }
         Returns: string
+      }
+      sync_artist_portal_roles: {
+        Args: { p_user_id: string }
+        Returns: undefined
       }
       username_is_registry_artist_reserved: {
         Args: { p_username: string }
@@ -4547,6 +4572,236 @@ export type Database = {
           user_id?: string | null
         }
         Relationships: []
+      }
+      artist_claim_evidence: {
+        Row: {
+          claim_id: string
+          created_at: string
+          evidence_type: string
+          id: string
+          note: string | null
+          reference: string | null
+        }
+        Insert: {
+          claim_id: string
+          created_at?: string
+          evidence_type: string
+          id?: string
+          note?: string | null
+          reference?: string | null
+        }
+        Update: {
+          claim_id?: string
+          created_at?: string
+          evidence_type?: string
+          id?: string
+          note?: string | null
+          reference?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "artist_claim_evidence_claim_id_fkey"
+            columns: ["claim_id"]
+            isOneToOne: false
+            referencedRelation: "artist_claim_requests"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      artist_claim_requests: {
+        Row: {
+          artist_id: string
+          claimant_role: string
+          claimant_user_id: string | null
+          created_at: string
+          decided_at: string | null
+          decided_by: string | null
+          decision_reason: string | null
+          id: string
+          statement: string
+          status: string
+          submitted_at: string
+          updated_at: string
+        }
+        Insert: {
+          artist_id: string
+          claimant_role: string
+          claimant_user_id?: string | null
+          created_at?: string
+          decided_at?: string | null
+          decided_by?: string | null
+          decision_reason?: string | null
+          id?: string
+          statement: string
+          status?: string
+          submitted_at?: string
+          updated_at?: string
+        }
+        Update: {
+          artist_id?: string
+          claimant_role?: string
+          claimant_user_id?: string | null
+          created_at?: string
+          decided_at?: string | null
+          decided_by?: string | null
+          decision_reason?: string | null
+          id?: string
+          statement?: string
+          status?: string
+          submitted_at?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "artist_claim_requests_artist_id_fkey"
+            columns: ["artist_id"]
+            isOneToOne: false
+            referencedRelation: "registry_artists"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      artist_representation_events: {
+        Row: {
+          actor_user_id: string | null
+          artist_id: string
+          claim_id: string | null
+          created_at: string
+          event_type: string
+          id: string
+          metadata: Json
+          representation_id: string | null
+          subject_user_id: string | null
+        }
+        Insert: {
+          actor_user_id?: string | null
+          artist_id: string
+          claim_id?: string | null
+          created_at?: string
+          event_type: string
+          id?: string
+          metadata?: Json
+          representation_id?: string | null
+          subject_user_id?: string | null
+        }
+        Update: {
+          actor_user_id?: string | null
+          artist_id?: string
+          claim_id?: string | null
+          created_at?: string
+          event_type?: string
+          id?: string
+          metadata?: Json
+          representation_id?: string | null
+          subject_user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "artist_representation_events_artist_id_fkey"
+            columns: ["artist_id"]
+            isOneToOne: false
+            referencedRelation: "registry_artists"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "artist_representation_events_claim_id_fkey"
+            columns: ["claim_id"]
+            isOneToOne: false
+            referencedRelation: "artist_claim_requests"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "artist_representation_events_representation_id_fkey"
+            columns: ["representation_id"]
+            isOneToOne: false
+            referencedRelation: "artist_representations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      artist_representations: {
+        Row: {
+          accepted_at: string | null
+          artist_id: string
+          can_manage_profile: boolean
+          can_manage_team: boolean
+          can_post_updates: boolean
+          can_submit_releases: boolean
+          created_at: string
+          id: string
+          invited_at: string | null
+          invited_by: string | null
+          representation_role: string
+          revocation_reason: string | null
+          revoked_at: string | null
+          revoked_by: string | null
+          source_claim_id: string | null
+          status: string
+          updated_at: string
+          user_id: string
+          verified_at: string | null
+          verified_by: string | null
+        }
+        Insert: {
+          accepted_at?: string | null
+          artist_id: string
+          can_manage_profile?: boolean
+          can_manage_team?: boolean
+          can_post_updates?: boolean
+          can_submit_releases?: boolean
+          created_at?: string
+          id?: string
+          invited_at?: string | null
+          invited_by?: string | null
+          representation_role: string
+          revocation_reason?: string | null
+          revoked_at?: string | null
+          revoked_by?: string | null
+          source_claim_id?: string | null
+          status?: string
+          updated_at?: string
+          user_id: string
+          verified_at?: string | null
+          verified_by?: string | null
+        }
+        Update: {
+          accepted_at?: string | null
+          artist_id?: string
+          can_manage_profile?: boolean
+          can_manage_team?: boolean
+          can_post_updates?: boolean
+          can_submit_releases?: boolean
+          created_at?: string
+          id?: string
+          invited_at?: string | null
+          invited_by?: string | null
+          representation_role?: string
+          revocation_reason?: string | null
+          revoked_at?: string | null
+          revoked_by?: string | null
+          source_claim_id?: string | null
+          status?: string
+          updated_at?: string
+          user_id?: string
+          verified_at?: string | null
+          verified_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "artist_representations_artist_id_fkey"
+            columns: ["artist_id"]
+            isOneToOne: false
+            referencedRelation: "registry_artists"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "artist_representations_source_claim_id_fkey"
+            columns: ["source_claim_id"]
+            isOneToOne: false
+            referencedRelation: "artist_claim_requests"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       audience_interests: {
         Row: {
@@ -17292,12 +17547,67 @@ export type Database = {
           result_payload: Json
         }[]
       }
+      community_admin_decide_artist_claim: {
+        Args: {
+          p_can_manage_profile?: boolean
+          p_can_manage_team?: boolean
+          p_can_post_updates?: boolean
+          p_can_submit_releases?: boolean
+          p_claim_id: string
+          p_decision: string
+          p_reason: string
+        }
+        Returns: Json
+      }
+      community_admin_get_artist_claims: {
+        Args: { p_limit?: number; p_status?: string }
+        Returns: Json
+      }
       community_admin_get_registry_onboarding_artists: {
         Args: never
         Returns: Json
       }
+      community_admin_revoke_artist_representation: {
+        Args: { p_reason: string; p_representation_id: string }
+        Returns: Json
+      }
       community_admin_set_registry_onboarding_artists: {
         Args: { p_artist_slugs: string[]; p_fallback_enabled?: boolean }
+        Returns: Json
+      }
+      community_artist_accept_representation: {
+        Args: { p_representation_id: string }
+        Returns: Json
+      }
+      community_artist_get_team: {
+        Args: { p_artist_id: string }
+        Returns: Json
+      }
+      community_artist_invite_representative: {
+        Args: {
+          p_artist_id: string
+          p_can_manage_profile?: boolean
+          p_can_manage_team?: boolean
+          p_can_post_updates?: boolean
+          p_can_submit_releases?: boolean
+          p_representation_role: string
+          p_username: string
+        }
+        Returns: Json
+      }
+      community_artist_revoke_representation: {
+        Args: { p_reason: string; p_representation_id: string }
+        Returns: Json
+      }
+      community_artist_update_representative: {
+        Args: {
+          p_can_manage_profile: boolean
+          p_can_manage_team: boolean
+          p_can_post_updates: boolean
+          p_can_submit_releases: boolean
+          p_representation_id: string
+          p_representation_role: string
+        }
         Returns: Json
       }
       community_create_comment: {
@@ -17377,6 +17687,10 @@ export type Database = {
       community_generate_username: {
         Args: { p_display_name?: string; p_email: string; p_user_id: string }
         Returns: string
+      }
+      community_get_artist_representation_state: {
+        Args: { p_artist_id: string }
+        Returns: Json
       }
       community_get_comment_replies: {
         Args: { p_limit?: number; p_parent_id: string }
@@ -17771,6 +18085,15 @@ export type Database = {
         Args: { p_comment_id: string }
         Returns: Json
       }
+      community_submit_artist_claim: {
+        Args: {
+          p_artist_id: string
+          p_claimant_role: string
+          p_evidence?: Json
+          p_statement: string
+        }
+        Returns: Json
+      }
       community_update_comment: {
         Args: {
           p_body_html?: string
@@ -17838,6 +18161,10 @@ export type Database = {
       community_username_seed: { Args: { p_seed: string }; Returns: string }
       community_vote_comment: {
         Args: { p_comment_id: string; p_vote_value: number }
+        Returns: Json
+      }
+      community_withdraw_artist_claim: {
+        Args: { p_claim_id: string; p_reason?: string }
         Returns: Json
       }
       complete_media_processing_job_v1: {
