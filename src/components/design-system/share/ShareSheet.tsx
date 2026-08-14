@@ -111,7 +111,7 @@ export type ShareObject = {
   description?: string;
   imageUrl?: string | null;
   url?: string;
-  type?: "track" | "album" | "article" | "chart" | "artist" | "playlist" | "page";
+  type?: "track" | "album" | "article" | "chart" | "artist" | "artist_update" | "playlist" | "page";
 };
 
 const objectTypeLabel: Record<NonNullable<ShareObject["type"]>, string> = {
@@ -120,6 +120,7 @@ const objectTypeLabel: Record<NonNullable<ShareObject["type"]>, string> = {
   article: "article",
   chart: "chart edition",
   artist: "artist page",
+  artist_update: "artist update",
   playlist: "playlist",
   page: "page",
 };
@@ -157,6 +158,15 @@ function parseShareTarget(rawUrl: string, fallbackType: ShareObject["type"] | un
 
     if (first === "releases" && parts.length >= 3) {
       return { targetUrl: parsed.toString(), targetPath: parsed.pathname, entityType: "release", entitySlug: parts[2], artistSlug: parts[1] };
+    }
+
+    if (
+      first === "artists" &&
+      parts[1] &&
+      parts[2] === "updates" &&
+      parts[3]
+    ) {
+      return { targetUrl: parsed.toString(), targetPath: parsed.pathname, entityType: "artist_update", entitySlug: parts[3], artistSlug: parts[1] };
     }
 
     if (first === "artists" && parts[1]) {

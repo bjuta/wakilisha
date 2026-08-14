@@ -17,6 +17,13 @@ import {
   type ArtistRepresentationState,
   type ArtistTeamMember,
 } from "@/services/artists/claimedArtist";
+import {
+  editArtistUpdate,
+  listArtistManageUpdates,
+  publishArtistUpdate,
+  withdrawArtistUpdate,
+  type ArtistUpdate,
+} from "@/services/artists/artistUpdates";
 
 const EMPTY_PRESENTATION: ArtistPresentation = {
   bio: null,
@@ -99,6 +106,13 @@ export default function ArtistManagePage() {
   const [correctionValue, setCorrectionValue] = useState("");
   const [correctionReason, setCorrectionReason] = useState("");
 
+  const [artistUpdates, setArtistUpdates] = useState<ArtistUpdate[]>([]);
+  const [updateBody, setUpdateBody] = useState("");
+  const [updateImageUrl, setUpdateImageUrl] = useState("");
+  const [updateLinkUrl, setUpdateLinkUrl] = useState("");
+  const [updateLinkLabel, setUpdateLinkLabel] = useState("");
+  const [editingUpdateId, setEditingUpdateId] = useState<string | null>(null);
+
   const activeRepresentation = representationState?.representation?.status === "active"
     ? representationState.representation
     : null;
@@ -115,6 +129,14 @@ export default function ArtistManagePage() {
       role: member.role,
       permissions: { ...member.permissions },
     }])));
+  }
+
+  async function loadUpdates(artistId: string, canPostUpdates: boolean) {
+    if (!canPostUpdates) {
+      setArtistUpdates([]);
+      return;
+    }
+    setArtistUpdates(await listArtistManageUpdates(artistId));
   }
 
   useEffect(() => {
@@ -157,7 +179,11 @@ export default function ArtistManagePage() {
         setSocialLinks(nextPresentation.socialLinks ?? {});
 
         const canManageTeam = state.representation?.status === "active" && state.representation.permissions.team;
-        await loadTeam(loadedArtist.id, Boolean(canManageTeam));
+        const canPostUpdates = state.representation?.status === "active" && state.representation.permissions.updates;
+        await Promise.all([
+          loadTeam(loadedArtist.id, Boolean(canManageTeam)),
+          loadUpdates(loadedArtist.id, Boolean(canPostUpdates)),
+        ]);
       } catch (error) {
         if (alive) setMessage({ type: "error", text: error instanceof Error ? error.message : "We could not load Artist management." });
       } finally {
@@ -318,6 +344,79 @@ export default function ArtistManagePage() {
     }
   }
 
+  function resetUpdateComposer() {
+    setEditingUpdateId(null);
+    setUpdateBody("");
+    setUpdateImageUrl("");
+    setUpdateLinkUrl("");
+    setUpdateLinkLabel("");
+  }
+
+  function beginEditUpdate(update: ArtistUpdate) {
+    if (update.status !== "published") return;
+    setEditingUpdateId(update.id);
+    setUpdateBody(update.body);
+    setUpdateImageUrl(update.imageUrl ?? "");
+    setUpdateLinkUrl(update.linkUrl ?? "");
+    setUpdateLinkLabel(update.linkLabel ?? "");
+    document.getElementById("artist-updates")?.scrollIntoView({
+      behavior: "smooth",
+      block: "start",
+    });
+  }
+
+  async function handleArtistUpdate(event: FormEvent) {
+    event.preventDefault();
+    if (!artist || !activeRepresentation?.permissions.updates || !updateBody.trim()) return;
+    setBusy(true);
+    setMessage(null);
+    try {
+      if (editingUpdateId) {
+        await editArtistUpdate({
+          updateId: editingUpdateId,
+          body: updateBody.trim(),
+          imageUrl: updateImageUrl.trim(),
+          linkUrl: updateLinkUrl.trim(),
+          linkLabel: updateLinkLabel.trim(),
+        });
+        setMessage({ type: "success", text: "Artist Update saved." });
+      } else {
+        await publishArtistUpdate({
+          artistId: artist.id,
+          body: updateBody.trim(),
+          imageUrl: updateImageUrl.trim(),
+          linkUrl: updateLinkUrl.trim(),
+          linkLabel: updateLinkLabel.trim(),
+        });
+        setMessage({ type: "success", text: "Artist Update published to Following." });
+      }
+      resetUpdateComposer();
+      await loadUpdates(artist.id, true);
+    } catch (error) {
+      setMessage({ type: "error", text: error instanceof Error ? error.message : "We could not publish this Artist Update." });
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function handleWithdrawUpdate(update: ArtistUpdate) {
+    if (!artist || !activeRepresentation?.permissions.updates || update.status !== "published") return;
+    const reason = window.prompt("Why are you withdrawing this Artist Update?");
+    if (!reason || reason.trim().length < 3) return;
+    setBusy(true);
+    setMessage(null);
+    try {
+      await withdrawArtistUpdate(update.id, reason.trim());
+      if (editingUpdateId === update.id) resetUpdateComposer();
+      setMessage({ type: "success", text: "Artist Update withdrawn." });
+      await loadUpdates(artist.id, true);
+    } catch (error) {
+      setMessage({ type: "error", text: error instanceof Error ? error.message : "We could not withdraw this Artist Update." });
+    } finally {
+      setBusy(false);
+    }
+  }
+
   if (user.loading || loading) {
     return <main className="wk-container px-6 py-20"><p className="text-[14px] text-[var(--wk-text-muted)]">Loading Artist access…</p></main>;
   }
@@ -425,6 +524,80 @@ export default function ArtistManagePage() {
 
                 <div className="flex justify-end"><WkButton type="submit" disabled={busy}>Save Profile</WkButton></div>
               </form>
+            </section>
+          )}
+
+          {permissions.updates && (
+            <section id="artist-updates" className="scroll-mt-24 rounded-3xl border border-[var(--wk-border)] bg-[var(--wk-surface)] p-6 md:p-7">
+              <h2 className="text-[22px] font-black tracking-tight text-[var(--wk-text)]">Post Update</h2>
+              <p className="mt-1 text-[13px] leading-6 text-[var(--wk-text-muted)]">Share something directly from this Artist with people who follow them on WAKILISHA.</p>
+
+              <form onSubmit={handleArtistUpdate} className="mt-5 space-y-4">
+                <label className="block">
+                  <span className="mb-1.5 block text-[12px] font-bold text-[var(--wk-text)]">Update</span>
+                  <textarea
+                    value={updateBody}
+                    onChange={(event) => setUpdateBody(event.target.value)}
+                    rows={6}
+                    maxLength={2000}
+                    placeholder="What do you want people following this Artist to know?"
+                    className="w-full resize-y rounded-xl border border-[var(--wk-border)] bg-[var(--wk-bg)] px-4 py-3 text-[14px] leading-6 text-[var(--wk-text)]"
+                  />
+                  <span className="mt-1 block text-right text-[10px] font-semibold text-[var(--wk-text-faint)]">{updateBody.length}/2000</span>
+                </label>
+
+                <div className="grid gap-4 md:grid-cols-2">
+                  <label className="block">
+                    <span className="mb-1.5 block text-[12px] font-bold text-[var(--wk-text)]">Image URL</span>
+                    <input type="url" value={updateImageUrl} onChange={(event) => setUpdateImageUrl(event.target.value)} placeholder="https://" className="w-full rounded-xl border border-[var(--wk-border)] bg-[var(--wk-bg)] px-4 py-3 text-[14px] text-[var(--wk-text)]" />
+                  </label>
+                  <label className="block">
+                    <span className="mb-1.5 block text-[12px] font-bold text-[var(--wk-text)]">Link URL</span>
+                    <input type="url" value={updateLinkUrl} onChange={(event) => setUpdateLinkUrl(event.target.value)} placeholder="https://" className="w-full rounded-xl border border-[var(--wk-border)] bg-[var(--wk-bg)] px-4 py-3 text-[14px] text-[var(--wk-text)]" />
+                  </label>
+                </div>
+
+                <label className="block">
+                  <span className="mb-1.5 block text-[12px] font-bold text-[var(--wk-text)]">Link Label</span>
+                  <input value={updateLinkLabel} onChange={(event) => setUpdateLinkLabel(event.target.value)} maxLength={120} placeholder="Listen, read, RSVP, or another short action" className="w-full rounded-xl border border-[var(--wk-border)] bg-[var(--wk-bg)] px-4 py-3 text-[14px] text-[var(--wk-text)]" />
+                </label>
+
+                <div className="flex flex-wrap justify-end gap-2">
+                  {editingUpdateId && (
+                    <WkButton type="button" variant="ghost" onClick={resetUpdateComposer} disabled={busy}>Cancel Edit</WkButton>
+                  )}
+                  <WkButton type="submit" disabled={busy || !updateBody.trim()}>
+                    {editingUpdateId ? "Save Update" : "Post Update"}
+                  </WkButton>
+                </div>
+              </form>
+
+              <div className="mt-7 border-t border-[var(--wk-divider)] pt-5">
+                <h3 className="text-[13px] font-black text-[var(--wk-text)]">Recent Updates</h3>
+                <div className="mt-3 space-y-3">
+                  {artistUpdates.map((update) => (
+                    <div key={update.id} className="rounded-2xl border border-[var(--wk-border)] p-4">
+                      <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+                        <div className="min-w-0">
+                          <div className="text-[10px] font-black uppercase tracking-[0.12em] text-[var(--wk-text-faint)]">
+                            {update.status === "published" ? "Published" : "Withdrawn"} · {new Date(update.publishedAt).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" })}
+                          </div>
+                          <p className="mt-2 whitespace-pre-wrap text-[13px] leading-6 text-[var(--wk-text)]">{update.body}</p>
+                        </div>
+                        {update.status === "published" && (
+                          <div className="flex shrink-0 gap-2">
+                            <WkButton type="button" variant="soft" onClick={() => beginEditUpdate(update)} disabled={busy}>Edit</WkButton>
+                            <WkButton type="button" variant="ghost" onClick={() => void handleWithdrawUpdate(update)} disabled={busy}>Withdraw</WkButton>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                  {artistUpdates.length === 0 && (
+                    <p className="text-[13px] text-[var(--wk-text-muted)]">No Artist Updates yet.</p>
+                  )}
+                </div>
+              </div>
             </section>
           )}
 
@@ -536,8 +709,15 @@ export default function ArtistManagePage() {
               </div>
               <div className={`rounded-2xl border border-[var(--wk-border)] p-4 ${permissions.updates ? "" : "opacity-50"}`}>
                 <div className="text-[13px] font-black text-[var(--wk-text)]">Post Update</div>
-                <p className="mt-1 text-[12px] leading-5 text-[var(--wk-text-muted)]">Artist updates are not open here yet.</p>
-                <button type="button" disabled className="mt-3 rounded-full border border-[var(--wk-border)] px-4 py-2 text-[12px] font-bold text-[var(--wk-text-muted)]">Post Update</button>
+                <p className="mt-1 text-[12px] leading-5 text-[var(--wk-text-muted)]">Share an Artist-authored update with people following this Artist.</p>
+                <button
+                  type="button"
+                  disabled={!permissions.updates}
+                  onClick={() => document.getElementById("artist-updates")?.scrollIntoView({ behavior: "smooth", block: "start" })}
+                  className="mt-3 rounded-full border border-[var(--wk-border)] px-4 py-2 text-[12px] font-bold text-[var(--wk-text)] disabled:text-[var(--wk-text-muted)]"
+                >
+                  Post Update
+                </button>
               </div>
             </div>
           </section>

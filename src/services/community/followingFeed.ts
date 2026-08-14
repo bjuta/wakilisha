@@ -7,7 +7,8 @@ export type FollowingFeedSubjectType =
 export type FollowingFeedItemType =
   | "article"
   | "playlist"
-  | "release";
+  | "release"
+  | "artist_update";
 
 export type FollowingFeedReason = {
   targetType: FollowingFeedSubjectType;
@@ -103,7 +104,8 @@ function isItemType(
   return (
     value === "article" ||
     value === "playlist" ||
-    value === "release"
+    value === "release" ||
+    value === "artist_update"
   );
 }
 
