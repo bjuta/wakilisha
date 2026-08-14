@@ -81,6 +81,84 @@ function spotifyArtwork(
   );
 }
 
+async function recordArtistSubmissionValidation(
+  db: ReturnType<typeof createClient>,
+  requestedBy: string,
+  artistId: string,
+  result: Record<string, any>,
+): Promise<string> {
+  const enrichment =
+    result.enrichment &&
+    typeof result.enrichment === "object" &&
+    !Array.isArray(result.enrichment)
+      ? result.enrichment as Record<string, unknown>
+      : {};
+
+  const provider =
+    String(result.provider ?? "").trim().toLowerCase();
+  const providerEntityId =
+    String(result.providerEntityId ?? "").trim();
+  const providerUrl =
+    String(result.providerUrl ?? enrichment.provider_url ?? "").trim();
+  const title =
+    String(result.title ?? enrichment.title ?? "").trim();
+  const artistNames =
+    Array.isArray(enrichment.artist_names)
+      ? enrichment.artist_names
+          .map((value) => String(value ?? "").trim())
+          .filter(Boolean)
+      : [];
+  const releaseTitle =
+    String(enrichment.release_title ?? "").trim() || null;
+
+  if (
+    !["apple_music", "spotify"].includes(provider) ||
+    !providerEntityId ||
+    !providerUrl ||
+    !title
+  ) {
+    throw new Error(
+      "Provider inspection did not return complete Artist submission evidence.",
+    );
+  }
+
+  const { data, error } = await db.rpc(
+    "record_artist_music_submission_validation",
+    {
+      p_requested_by: requestedBy,
+      p_artist_id: artistId,
+      p_provider_key: provider,
+      p_provider_object_id: providerEntityId,
+      p_provider_url: providerUrl,
+      p_provider_title: title,
+      p_provider_artist_names: artistNames,
+      p_provider_release_title: releaseTitle,
+      p_playback_kind: "audio",
+      p_validation_snapshot: {
+        enrichment,
+        source:
+          result.source &&
+          typeof result.source === "object"
+            ? result.source
+            : {},
+      },
+      p_expires_at:
+        new Date(
+          Date.now() + 30 * 60 * 1000,
+        ).toISOString(),
+    },
+  );
+
+  if (error || !data) {
+    throw new Error(
+      error?.message ||
+      "Artist submission validation could not be recorded.",
+    );
+  }
+
+  return String(data);
+}
+
 async function getAC(db:ReturnType<typeof createClient>):Promise<{token:string}|{error:string}>{
   const pk=await rCred("APPLE_MUSIC_PRIVATE_KEY","apple_music_private_key",db);
   const tid=await rCred("APPLE_MUSIC_TEAM_ID","apple_music_team_id",db);
@@ -112,13 +190,73 @@ Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: cors });
   const auth = await vJwt(req);
   if (!auth) return jRaw({ error: "Missing or invalid token" }, cors, 401);
-  const canAccess = await rCap(auth.id, "manage_registry");
-  if (!canAccess) return jRaw({ error: "Missing capability: manage_registry" }, cors, 403);
   const db = createClient(SUPABASE_URL, SERVICE_KEY);
   let body: Record<string, unknown>;
   try { body = await req.json(); } catch { body = {}; }
-  const route = (body.route as string) || "";
+  let route = String(body.route ?? "");
   const now = new Date().toISOString();
+  let artistSubmissionContext: { artistId: string } | null = null;
+
+  const artistSubmissionRoute =
+    route === "artist-submission-search" ||
+    route === "artist-submission-inspect";
+
+  if (artistSubmissionRoute) {
+    const artistId = String(body.artistId ?? "").trim();
+    if (!artistId) {
+      return jRaw({ error: "Artist is required." }, cors, 400);
+    }
+
+    const { data: representation, error: representationError } =
+      await db
+        .from("artist_representations")
+        .select("id")
+        .eq("artist_id", artistId)
+        .eq("user_id", auth.id)
+        .eq("status", "active")
+        .eq("can_submit_releases", true)
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+    const { data: artist, error: artistError } =
+      await db
+        .from("registry_artists")
+        .select("id")
+        .eq("id", artistId)
+        .eq("status", "active")
+        .maybeSingle();
+
+    if (
+      representationError ||
+      artistError ||
+      !representation ||
+      !artist
+    ) {
+      return jRaw(
+        { error: "Artist music submission permission is required." },
+        cors,
+        403,
+      );
+    }
+
+    artistSubmissionContext = { artistId };
+    body.entityType = "track";
+    body.providerEntityType = "track";
+    route =
+      route === "artist-submission-search"
+        ? "search"
+        : "inspect";
+  } else {
+    const canAccess = await rCap(auth.id, "manage_registry");
+    if (!canAccess) {
+      return jRaw(
+        { error: "Missing capability: manage_registry" },
+        cors,
+        403,
+      );
+    }
+  }
 
   try {
 if (route === "search") {
@@ -492,24 +630,37 @@ if (route === "inspect") {
           : null,
     };
 
+    const result = {
+      provider: "spotify",
+      providerEntityType: "track",
+      providerEntityId,
+      title: fields.title,
+      artistDisplayName:
+        artistNames.join(", ") || null,
+      artworkUrl: fields.track_artwork_url,
+      confidenceScore: 0.95,
+      providerUrl: fields.provider_url,
+      enrichment: fields,
+      source: {
+        storefrontOrMarket: creds.market,
+        fetchedAt: now,
+      },
+    };
+
+    const validationId =
+      artistSubmissionContext
+        ? await recordArtistSubmissionValidation(
+            db,
+            auth.id,
+            artistSubmissionContext.artistId,
+            result,
+          )
+        : null;
+
     return jRaw(
       {
-        result: {
-          provider: "spotify",
-          providerEntityType: "track",
-          providerEntityId,
-          title: fields.title,
-          artistDisplayName:
-            artistNames.join(", ") || null,
-          artworkUrl: fields.track_artwork_url,
-          confidenceScore: 0.95,
-          providerUrl: fields.provider_url,
-          enrichment: fields,
-          source: {
-            storefrontOrMarket: creds.market,
-            fetchedAt: now,
-          },
-        },
+        result,
+        ...(validationId ? { validationId } : {}),
         raw: {
           track,
           album,
@@ -722,24 +873,37 @@ if (route === "inspect") {
       String(albumAttributes.copyright ?? "") || null,
   };
 
+  const result = {
+    provider: "apple_music",
+    providerEntityType,
+    providerEntityId,
+    title: fields.title,
+    artistDisplayName:
+      fields.artist_names.join(", ") || null,
+    artworkUrl: fields.track_artwork_url,
+    confidenceScore: 0.95,
+    providerUrl: fields.provider_url,
+    enrichment: fields,
+    source: {
+      storefrontOrMarket: storefront,
+      fetchedAt: now,
+    },
+  };
+
+  const validationId =
+    artistSubmissionContext
+      ? await recordArtistSubmissionValidation(
+          db,
+          auth.id,
+          artistSubmissionContext.artistId,
+          result,
+        )
+      : null;
+
   return jRaw(
     {
-      result: {
-        provider: "apple_music",
-        providerEntityType,
-        providerEntityId,
-        title: fields.title,
-        artistDisplayName:
-          fields.artist_names.join(", ") || null,
-        artworkUrl: fields.track_artwork_url,
-        confidenceScore: 0.95,
-        providerUrl: fields.provider_url,
-        enrichment: fields,
-        source: {
-          storefrontOrMarket: storefront,
-          fetchedAt: now,
-        },
-      },
+      result,
+      ...(validationId ? { validationId } : {}),
       raw,
     },
     cors,

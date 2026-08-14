@@ -3554,6 +3554,10 @@ export type Database = {
         }
         Returns: string
       }
+      artist_music_submission_review_due_at: {
+        Args: { p_submitted_at: string }
+        Returns: string
+      }
       artist_representation_defaults: {
         Args: { p_role: string }
         Returns: {
@@ -11972,6 +11976,7 @@ export type Database = {
       registry_provider_track_suggestions: {
         Row: {
           artist_resolution_mode: string
+          artist_submission_key: string | null
           canonical_track_id: string | null
           canonicalized_track_id: string | null
           created_at: string
@@ -11988,19 +11993,24 @@ export type Database = {
           registry_artist_id: string | null
           requested_by: string | null
           reserved_position: number | null
+          review_due_at: string | null
           review_note: string | null
           reviewed_at: string | null
           reviewed_by: string | null
+          source_artist_validation_id: string | null
           source_contribution_id: string | null
-          source_playlist_id: string
+          source_playlist_id: string | null
           source_playlist_item_id: string | null
           status: string
+          submitted_by_representation_id: string | null
+          submitted_for_artist_id: string | null
           submitted_track_title: string | null
           updated_at: string
           validation_snapshot: Json
         }
         Insert: {
           artist_resolution_mode?: string
+          artist_submission_key?: string | null
           canonical_track_id?: string | null
           canonicalized_track_id?: string | null
           created_at?: string
@@ -12017,19 +12027,24 @@ export type Database = {
           registry_artist_id?: string | null
           requested_by?: string | null
           reserved_position?: number | null
+          review_due_at?: string | null
           review_note?: string | null
           reviewed_at?: string | null
           reviewed_by?: string | null
+          source_artist_validation_id?: string | null
           source_contribution_id?: string | null
-          source_playlist_id: string
+          source_playlist_id?: string | null
           source_playlist_item_id?: string | null
           status?: string
+          submitted_by_representation_id?: string | null
+          submitted_for_artist_id?: string | null
           submitted_track_title?: string | null
           updated_at?: string
           validation_snapshot?: Json
         }
         Update: {
           artist_resolution_mode?: string
+          artist_submission_key?: string | null
           canonical_track_id?: string | null
           canonicalized_track_id?: string | null
           created_at?: string
@@ -12046,18 +12061,36 @@ export type Database = {
           registry_artist_id?: string | null
           requested_by?: string | null
           reserved_position?: number | null
+          review_due_at?: string | null
           review_note?: string | null
           reviewed_at?: string | null
           reviewed_by?: string | null
+          source_artist_validation_id?: string | null
           source_contribution_id?: string | null
-          source_playlist_id?: string
+          source_playlist_id?: string | null
           source_playlist_item_id?: string | null
           status?: string
+          submitted_by_representation_id?: string | null
+          submitted_for_artist_id?: string | null
           submitted_track_title?: string | null
           updated_at?: string
           validation_snapshot?: Json
         }
         Relationships: [
+          {
+            foreignKeyName: "registry_provider_track_sugge_submitted_by_representation__fkey"
+            columns: ["submitted_by_representation_id"]
+            isOneToOne: false
+            referencedRelation: "artist_representations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "registry_provider_track_suggestion_submitted_for_artist_id_fkey"
+            columns: ["submitted_for_artist_id"]
+            isOneToOne: false
+            referencedRelation: "registry_artists"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "registry_provider_track_suggestions_artist_fkey"
             columns: ["registry_artist_id"]
@@ -17822,6 +17855,10 @@ export type Database = {
         Args: { p_artist_id: string; p_limit?: number }
         Returns: Json
       }
+      community_get_artist_music_submissions: {
+        Args: { p_artist_id: string; p_limit?: number }
+        Returns: Json
+      }
       community_get_artist_public_presentation: {
         Args: { p_artist_id: string }
         Returns: Json
@@ -18259,6 +18296,15 @@ export type Database = {
           p_claimant_role: string
           p_evidence?: Json
           p_statement: string
+        }
+        Returns: Json
+      }
+      community_submit_artist_music: {
+        Args: {
+          p_artist_credits: Json
+          p_artist_id: string
+          p_submission_key: string
+          p_validation_id: string
         }
         Returns: Json
       }
@@ -20219,6 +20265,22 @@ export type Database = {
           target_record_id?: string
           target_table?: string
           target_user_id?: string
+        }
+        Returns: string
+      }
+      record_artist_music_submission_validation: {
+        Args: {
+          p_artist_id: string
+          p_expires_at: string
+          p_playback_kind: string
+          p_provider_artist_names: string[]
+          p_provider_key: string
+          p_provider_object_id: string
+          p_provider_release_title: string
+          p_provider_title: string
+          p_provider_url: string
+          p_requested_by: string
+          p_validation_snapshot: Json
         }
         Returns: string
       }

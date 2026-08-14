@@ -31,12 +31,14 @@ interface RegistryArtistHit {
 interface IntakeRow {
   suggestion_id: string;
   status: string;
-  intake_origin: "playlist_editor" | "public_contribution";
+  intake_origin: "playlist_editor" | "public_contribution" | "artist_submission";
   source_contribution_id: string | null;
   contribution_status: string | null;
   contribution_payload: Record<string, unknown>;
   submitted_track_title: string | null;
-  playlist_id: string;
+  submitted_for_artist_id: string | null;
+  review_due_at: string | null;
+  playlist_id: string | null;
   playlist_title: string | null;
   playlist_item_id: string | null;
   playlist_position: number | null;
@@ -292,12 +294,67 @@ export default function TrackIntakePage() {
       );
 
       const envelope = (data ?? {}) as QueueEnvelope;
+      const rows = Array.isArray(envelope.rows)
+        ? envelope.rows
+        : [];
+      const artistSubmissionIds = rows
+        .filter((row) => row.intake_origin === "artist_submission")
+        .map((row) => row.suggestion_id);
+
+      let artistSubmissionMeta = new Map<
+        string,
+        {
+          submitted_for_artist_id: string | null;
+          review_due_at: string | null;
+        }
+      >();
+
+      if (artistSubmissionIds.length > 0) {
+        const intakeTable = (supabase.from as any)(
+          "registry_provider_track_suggestions",
+        );
+        const { data: metadataRows, error: metadataError } =
+          await intakeTable
+            .select("id,submitted_for_artist_id,review_due_at")
+            .in("id", artistSubmissionIds);
+
+        if (metadataError) throw metadataError;
+
+        artistSubmissionMeta = new Map(
+          (metadataRows ?? []).map(
+            (row: {
+              id: string;
+              submitted_for_artist_id: string | null;
+              review_due_at: string | null;
+            }) => [
+              row.id,
+              {
+                submitted_for_artist_id:
+                  row.submitted_for_artist_id ?? null,
+                review_due_at:
+                  row.review_due_at ?? null,
+              },
+            ],
+          ),
+        );
+      }
+
+      const enrichedRows = rows.map((row) => ({
+        ...row,
+        submitted_for_artist_id:
+          artistSubmissionMeta.get(row.suggestion_id)
+            ?.submitted_for_artist_id ?? null,
+        review_due_at:
+          artistSubmissionMeta.get(row.suggestion_id)
+            ?.review_due_at ?? null,
+      }));
+
       setQueue({
         status: envelope.status ?? status,
         total: Number(envelope.total ?? 0),
         limit: Number(envelope.limit ?? 100),
         offset: Number(envelope.offset ?? 0),
-        rows: Array.isArray(envelope.rows) ? envelope.rows : [],
+        rows: enrichedRows,
       });
     } catch (reason) {
       setError(
@@ -1341,7 +1398,7 @@ export default function TrackIntakePage() {
           </section>
         ) : (
           <div className="mb-5 flex items-center justify-between rounded-xl border border-wk-brand/20 bg-wk-brand-soft p-3 text-sm">
-            <span>Opened from a specific Playlist track.</span>
+            <span>Opened from a specific Track Intake item.</span>
             <a
               href="/admin/registry/tracks/intake"
               className="font-bold text-wk-brand"
@@ -1382,8 +1439,8 @@ export default function TrackIntakePage() {
               Nothing waiting here
             </h2>
             <p className="mt-1 text-sm text-wk-text-muted">
-              Track Intake items appear when Playlist editors or
-              Community suggestions send music to the Registry for review.
+              Track Intake items appear when Playlist editors, Artist teams,
+              or Community suggestions send music to the Registry for review.
             </p>
           </div>
         ) : (
@@ -1446,6 +1503,25 @@ export default function TrackIntakePage() {
               const isPublicContribution =
                 row.intake_origin ===
                 "public_contribution";
+              const isArtistSubmission =
+                row.intake_origin ===
+                "artist_submission";
+              const reviewDue =
+                row.review_due_at
+                  ? new Date(row.review_due_at)
+                  : null;
+              const reviewOverdue =
+                row.status === "needs_review" &&
+                reviewDue !== null &&
+                reviewDue.getTime() < Date.now();
+              const submittedArtist =
+                (row.artist_credits ?? []).find(
+                  (credit) =>
+                    credit.registry_artist_id ===
+                    row.submitted_for_artist_id,
+                ) ??
+                (row.artist_credits ?? [])[0] ??
+                null;
 
               const contributionDetails =
                 typeof row.contribution_payload?.details ===
@@ -1490,6 +1566,12 @@ export default function TrackIntakePage() {
                             {isPublicContribution ? (
                               <span className="rounded-full bg-wk-brand-soft px-2 py-1 text-[9px] font-black uppercase text-wk-brand">
                                 Community suggestion
+                              </span>
+                            ) : null}
+
+                            {isArtistSubmission ? (
+                              <span className="rounded-full bg-wk-brand-soft px-2 py-1 text-[9px] font-black uppercase text-wk-brand">
+                                Artist submission
                               </span>
                             ) : null}
 
@@ -1542,7 +1624,50 @@ export default function TrackIntakePage() {
                         </div>
                       </div>
 
-                      {isPublicContribution ? (
+                      {isArtistSubmission ? (
+                        <div className="grid gap-3 md:grid-cols-2">
+                          <div className="rounded-xl bg-wk-surface-raised p-3">
+                            <div className="text-[10px] font-black uppercase tracking-wide text-wk-text-faint">
+                              Submitted for Artist
+                            </div>
+                            <div className="mt-1 font-bold text-wk-text">
+                              {submittedArtist?.display_name ||
+                                "Registry Artist"}
+                            </div>
+                            <div className="mt-2 text-xs text-wk-text-muted">
+                              Submitted by{" "}
+                              <strong className="text-wk-text">
+                                {row.requested_by_name ||
+                                  "Artist representative"}
+                              </strong>
+                            </div>
+                            <div className="mt-1 text-[10px] text-wk-text-faint">
+                              {new Date(row.created_at).toLocaleString()}
+                            </div>
+                          </div>
+
+                          <div className="rounded-xl bg-wk-surface-raised p-3">
+                            <div className="text-[10px] font-black uppercase tracking-wide text-wk-text-faint">
+                              Review target
+                            </div>
+                            <div className="mt-1 text-sm font-bold text-wk-text">
+                              {reviewDue
+                                ? reviewDue.toLocaleString()
+                                : "Target unavailable"}
+                            </div>
+                            {reviewOverdue ? (
+                              <div className="mt-2 text-xs font-bold text-wk-danger">
+                                Overdue
+                              </div>
+                            ) : null}
+                            <div className="mt-1 text-[10px] leading-4 text-wk-text-muted">
+                              {reviewOverdue
+                                ? "This submission has passed the 3-business-day review target."
+                                : "Within the 3-business-day review target."}
+                            </div>
+                          </div>
+                        </div>
+                      ) : isPublicContribution ? (
                         <div className="grid gap-3 md:grid-cols-2">
                           <div className="rounded-xl bg-wk-surface-raised p-3">
                             <div className="text-[10px] font-black uppercase tracking-wide text-wk-text-faint">

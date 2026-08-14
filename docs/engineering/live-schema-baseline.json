@@ -1,9 +1,9 @@
 {
   "projectRef": "pgzizndxdyhqmtyywjmt",
   "schema": "public",
-  "generatedAt": "2026-08-14T16:05:37Z",
-  "typesSha256": "9c11b2fd489af5d5067f4b8c95642d6ca064eec114081e54cbeac5e289aa7364",
+  "generatedAt": "2026-08-14T17:13:34Z",
+  "typesSha256": "22b6150f6cb2d253840ab200a0d0f69c814cb67858fe80c0b839d5876206e7b9",
   "authoritativeMigrationDirectory": "supabase/migrations",
-  "migrationCount": 252,
-  "latestMigration": "20260814174000_artist_updates_following.sql"
+  "migrationCount": 254,
+  "latestMigration": "20260814201000_artist_music_submission_playlist_trigger_boundary.sql"
 }
