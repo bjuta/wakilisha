@@ -24,6 +24,17 @@ import {
   withdrawArtistUpdate,
   type ArtistUpdate,
 } from "@/services/artists/artistUpdates";
+import {
+  inspectArtistMusicProvider,
+  listArtistMusicSubmissions,
+  searchArtistMusicProvider,
+  submitArtistMusic,
+  type ArtistMusicCreditInput,
+  type ArtistMusicInspection,
+  type ArtistMusicProviderHit,
+  type ArtistMusicProviderKey,
+  type ArtistMusicSubmission,
+} from "@/services/artists/artistMusicSubmissions";
 
 const EMPTY_PRESENTATION: ArtistPresentation = {
   bio: null,
@@ -113,6 +124,15 @@ export default function ArtistManagePage() {
   const [updateLinkLabel, setUpdateLinkLabel] = useState("");
   const [editingUpdateId, setEditingUpdateId] = useState<string | null>(null);
 
+  const [musicSubmissions, setMusicSubmissions] = useState<ArtistMusicSubmission[]>([]);
+  const [musicProvider, setMusicProvider] = useState<ArtistMusicProviderKey>("apple_music");
+  const [musicQuery, setMusicQuery] = useState("");
+  const [musicHits, setMusicHits] = useState<ArtistMusicProviderHit[]>([]);
+  const [musicInspection, setMusicInspection] = useState<ArtistMusicInspection | null>(null);
+  const [musicCreditName, setMusicCreditName] = useState("");
+  const [musicCreditRole, setMusicCreditRole] = useState<ArtistMusicCreditInput["role"]>("featured");
+  const [musicCredits, setMusicCredits] = useState<ArtistMusicCreditInput[]>([]);
+
   const activeRepresentation = representationState?.representation?.status === "active"
     ? representationState.representation
     : null;
@@ -137,6 +157,14 @@ export default function ArtistManagePage() {
       return;
     }
     setArtistUpdates(await listArtistManageUpdates(artistId));
+  }
+
+  async function loadMusicSubmissions(artistId: string, canSubmitMusic: boolean) {
+    if (!canSubmitMusic) {
+      setMusicSubmissions([]);
+      return;
+    }
+    setMusicSubmissions(await listArtistMusicSubmissions(artistId));
   }
 
   useEffect(() => {
@@ -180,9 +208,11 @@ export default function ArtistManagePage() {
 
         const canManageTeam = state.representation?.status === "active" && state.representation.permissions.team;
         const canPostUpdates = state.representation?.status === "active" && state.representation.permissions.updates;
+        const canSubmitMusic = state.representation?.status === "active" && state.representation.permissions.releases;
         await Promise.all([
           loadTeam(loadedArtist.id, Boolean(canManageTeam)),
           loadUpdates(loadedArtist.id, Boolean(canPostUpdates)),
+          loadMusicSubmissions(loadedArtist.id, Boolean(canSubmitMusic)),
         ]);
       } catch (error) {
         if (alive) setMessage({ type: "error", text: error instanceof Error ? error.message : "We could not load Artist management." });
@@ -417,6 +447,128 @@ export default function ArtistManagePage() {
     }
   }
 
+  function resetMusicComposer() {
+    setMusicQuery("");
+    setMusicHits([]);
+    setMusicInspection(null);
+    setMusicCreditName("");
+    setMusicCreditRole("featured");
+    setMusicCredits([]);
+  }
+
+  async function handleMusicSearch() {
+    if (!artist || !activeRepresentation?.permissions.releases) return;
+    const query = musicQuery.trim();
+    if (query.length < 2) {
+      setMessage({ type: "error", text: "Enter at least two characters to search for the track." });
+      return;
+    }
+
+    setBusy(true);
+    setMessage(null);
+    setMusicInspection(null);
+    try {
+      setMusicHits(await searchArtistMusicProvider({
+        artistId: artist.id,
+        provider: musicProvider,
+        query,
+      }));
+    } catch (error) {
+      setMusicHits([]);
+      setMessage({
+        type: "error",
+        text: error instanceof Error ? error.message : "We could not search this music provider.",
+      });
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function handleMusicInspect(hit: ArtistMusicProviderHit) {
+    if (!artist || !activeRepresentation?.permissions.releases) return;
+    setBusy(true);
+    setMessage(null);
+    try {
+      const inspection = await inspectArtistMusicProvider({
+        artistId: artist.id,
+        hit,
+      });
+      setMusicInspection(inspection);
+      setMusicQuery(inspection.title);
+      setMusicHits([]);
+    } catch (error) {
+      setMessage({
+        type: "error",
+        text: error instanceof Error ? error.message : "We could not validate this provider track.",
+      });
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  function addMusicCredit() {
+    if (!artist) return;
+    const name = musicCreditName.trim();
+    if (!name) return;
+
+    const duplicate = [
+      artist.name,
+      ...musicCredits.map((credit) => credit.name),
+    ].some((existing) => existing.trim().toLowerCase() === name.toLowerCase());
+
+    if (duplicate) {
+      setMessage({ type: "error", text: "That Artist is already included in this submission." });
+      return;
+    }
+
+    setMusicCredits((current) => [
+      ...current,
+      {
+        role: musicCreditRole,
+        name,
+      },
+    ]);
+    setMusicCreditName("");
+    setMusicCreditRole("featured");
+    setMessage(null);
+  }
+
+  function removeMusicCredit(index: number) {
+    setMusicCredits((current) =>
+      current.filter((_, creditIndex) => creditIndex !== index),
+    );
+  }
+
+  async function handleMusicSubmission(event: FormEvent) {
+    event.preventDefault();
+    if (!artist || !activeRepresentation?.permissions.releases) return;
+    if (!musicInspection) {
+      setMessage({ type: "error", text: "Choose and validate the provider track first." });
+      return;
+    }
+
+    setBusy(true);
+    setMessage(null);
+    try {
+      await submitArtistMusic({
+        artistId: artist.id,
+        validationId: musicInspection.validationId,
+        credits: musicCredits,
+        submissionKey: crypto.randomUUID(),
+      });
+      resetMusicComposer();
+      await loadMusicSubmissions(artist.id, true);
+      setMessage({ type: "success", text: "Music sent to Registry review." });
+    } catch (error) {
+      setMessage({
+        type: "error",
+        text: error instanceof Error ? error.message : "We could not send this music to Registry review.",
+      });
+    } finally {
+      setBusy(false);
+    }
+  }
+
   if (user.loading || loading) {
     return <main className="wk-container px-6 py-20"><p className="text-[14px] text-[var(--wk-text-muted)]">Loading Artist access…</p></main>;
   }
@@ -524,6 +676,197 @@ export default function ArtistManagePage() {
 
                 <div className="flex justify-end"><WkButton type="submit" disabled={busy}>Save Profile</WkButton></div>
               </form>
+            </section>
+          )}
+
+          {permissions.releases && (
+            <section id="artist-music-submission" className="scroll-mt-24 rounded-3xl border border-[var(--wk-border)] bg-[var(--wk-surface)] p-6 md:p-7">
+              <h2 className="text-[22px] font-black tracking-tight text-[var(--wk-text)]">Submit Music</h2>
+              <p className="mt-1 max-w-3xl text-[13px] leading-6 text-[var(--wk-text-muted)]">
+                Choose the Apple Music or Spotify record that represents this track. WAKILISHA uses it as review evidence, then checks the Music Registry before anything is added.
+              </p>
+              <p className="mt-2 text-[12px] font-bold text-[var(--wk-text)]">Registry review target: 3 business days.</p>
+
+              <form onSubmit={handleMusicSubmission} className="mt-6 space-y-5">
+                <div className="grid gap-3 md:grid-cols-[160px_minmax(0,1fr)_auto]">
+                  <label className="block">
+                    <span className="mb-1.5 block text-[12px] font-bold text-[var(--wk-text)]">Provider</span>
+                    <select
+                      value={musicProvider}
+                      onChange={(event) => {
+                        setMusicProvider(event.target.value as ArtistMusicProviderKey);
+                        setMusicHits([]);
+                        setMusicInspection(null);
+                      }}
+                      className="h-11 w-full rounded-xl border border-[var(--wk-border)] bg-[var(--wk-bg)] px-3 text-[13px] text-[var(--wk-text)]"
+                    >
+                      <option value="apple_music">Apple Music</option>
+                      <option value="spotify">Spotify</option>
+                    </select>
+                  </label>
+                  <label className="block">
+                    <span className="mb-1.5 block text-[12px] font-bold text-[var(--wk-text)]">Track</span>
+                    <input
+                      value={musicQuery}
+                      onChange={(event) => {
+                        setMusicQuery(event.target.value);
+                        setMusicInspection(null);
+                      }}
+                      placeholder="Search by track title"
+                      className="h-11 w-full rounded-xl border border-[var(--wk-border)] bg-[var(--wk-bg)] px-4 text-[14px] text-[var(--wk-text)]"
+                    />
+                  </label>
+                  <div className="flex items-end">
+                    <WkButton type="button" variant="soft" disabled={busy || musicQuery.trim().length < 2} onClick={() => void handleMusicSearch()}>
+                      Search
+                    </WkButton>
+                  </div>
+                </div>
+
+                {musicHits.length > 0 && (
+                  <div className="max-h-64 overflow-y-auto rounded-2xl border border-[var(--wk-border)] bg-[var(--wk-bg)] p-2">
+                    {musicHits.map((hit) => (
+                      <button
+                        key={`${hit.provider}:${hit.providerEntityId}`}
+                        type="button"
+                        onClick={() => void handleMusicInspect(hit)}
+                        disabled={busy}
+                        className="flex w-full items-center gap-3 rounded-xl p-3 text-left hover:bg-[var(--wk-surface)] disabled:opacity-50"
+                      >
+                        {hit.artworkUrl ? (
+                          <img src={hit.artworkUrl} alt="" className="h-12 w-12 shrink-0 rounded-xl object-cover" />
+                        ) : (
+                          <div className="h-12 w-12 shrink-0 rounded-xl bg-[var(--wk-surface-strong)]" />
+                        )}
+                        <div className="min-w-0">
+                          <div className="truncate text-[13px] font-black text-[var(--wk-text)]">{hit.title}</div>
+                          <div className="truncate text-[11px] text-[var(--wk-text-muted)]">{hit.artistDisplayName || "Artist name unavailable"}</div>
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+                )}
+
+                {musicInspection && (
+                  <div className="rounded-2xl border border-[var(--wk-brand)]/20 bg-[var(--wk-brand-soft)] p-4">
+                    <div className="text-[10px] font-black uppercase tracking-[0.14em] text-[var(--wk-brand)]">Provider Record Selected</div>
+                    <div className="mt-3 flex items-center gap-3">
+                      {musicInspection.artworkUrl ? (
+                        <img src={musicInspection.artworkUrl} alt="" className="h-16 w-16 shrink-0 rounded-xl object-cover" />
+                      ) : (
+                        <div className="h-16 w-16 shrink-0 rounded-xl bg-[var(--wk-surface)]" />
+                      )}
+                      <div className="min-w-0">
+                        <div className="truncate text-[15px] font-black text-[var(--wk-text)]">{musicInspection.title}</div>
+                        <div className="mt-0.5 truncate text-[12px] text-[var(--wk-text-muted)]">{musicInspection.artistDisplayName || artist.name}</div>
+                        {musicInspection.releaseTitle && <div className="mt-0.5 truncate text-[11px] text-[var(--wk-text-faint)]">{musicInspection.releaseTitle}</div>}
+                      </div>
+                    </div>
+                    <p className="mt-3 text-[11px] leading-5 text-[var(--wk-text-muted)]">This provider record is review evidence. It does not create or replace Music Registry identity.</p>
+                  </div>
+                )}
+
+                <div className="rounded-2xl border border-[var(--wk-border)] p-4">
+                  <h3 className="text-[13px] font-black text-[var(--wk-text)]">Artist Credits</h3>
+                  <div className="mt-3 rounded-xl bg-[var(--wk-bg)] px-3 py-2.5">
+                    <div className="text-[12px] font-bold text-[var(--wk-text)]">{artist.name}</div>
+                    <div className="text-[10px] font-semibold text-[var(--wk-text-muted)]">Primary · Music Registry Artist</div>
+                  </div>
+
+                  <div className="mt-4">
+                    <div className="text-[12px] font-black text-[var(--wk-text)]">Other Artists</div>
+                    <p className="mt-1 text-[11px] leading-5 text-[var(--wk-text-muted)]">Add other Primary or Featured Artists exactly as they should be reviewed.</p>
+                    <div className="mt-3 grid gap-2 md:grid-cols-[150px_minmax(0,1fr)_auto]">
+                      <select
+                        value={musicCreditRole}
+                        onChange={(event) => setMusicCreditRole(event.target.value as ArtistMusicCreditInput["role"])}
+                        className="h-10 rounded-xl border border-[var(--wk-border)] bg-[var(--wk-bg)] px-3 text-[12px] text-[var(--wk-text)]"
+                      >
+                        <option value="primary">Primary</option>
+                        <option value="featured">Featured</option>
+                      </select>
+                      <input
+                        value={musicCreditName}
+                        onChange={(event) => setMusicCreditName(event.target.value)}
+                        placeholder="Artist name"
+                        maxLength={300}
+                        className="h-10 rounded-xl border border-[var(--wk-border)] bg-[var(--wk-bg)] px-3 text-[13px] text-[var(--wk-text)]"
+                      />
+                      <WkButton type="button" variant="soft" disabled={!musicCreditName.trim()} onClick={addMusicCredit}>
+                        Add
+                      </WkButton>
+                    </div>
+
+                    {musicCredits.length > 0 && (
+                      <div className="mt-3 space-y-2">
+                        {musicCredits.map((credit, index) => (
+                          <div key={`${credit.role}:${credit.name}:${index}`} className="flex items-center justify-between gap-3 rounded-xl bg-[var(--wk-bg)] px-3 py-2.5">
+                            <div>
+                              <div className="text-[12px] font-bold text-[var(--wk-text)]">{credit.name}</div>
+                              <div className="text-[10px] font-semibold text-[var(--wk-text-muted)]">{credit.role === "primary" ? "Primary" : "Featured"} · Registry review required</div>
+                            </div>
+                            <button type="button" onClick={() => removeMusicCredit(index)} className="text-[11px] font-bold text-[var(--wk-text-muted)] hover:text-[var(--wk-text)]">
+                              Remove
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                <div className="flex justify-end">
+                  <WkButton type="submit" disabled={busy || !musicInspection}>
+                    Submit to Registry Review
+                  </WkButton>
+                </div>
+              </form>
+
+              <div className="mt-8 border-t border-[var(--wk-border)] pt-6">
+                <div>
+                  <h3 className="text-[16px] font-black text-[var(--wk-text)]">Review History</h3>
+                  <p className="mt-1 text-[11px] leading-5 text-[var(--wk-text-muted)]">Your recent music submissions and their Registry review status.</p>
+                </div>
+
+                {musicSubmissions.length === 0 ? (
+                  <p className="mt-4 rounded-xl bg-[var(--wk-bg)] px-4 py-5 text-[12px] text-[var(--wk-text-muted)]">No music submissions yet.</p>
+                ) : (
+                  <div className="mt-4 space-y-3">
+                    {musicSubmissions.map((submission) => {
+                      const overdue = submission.slaStatus === "overdue";
+                      return (
+                        <article key={submission.id} className="rounded-2xl border border-[var(--wk-border)] p-4">
+                          <div className="flex items-start gap-3">
+                            {submission.artworkUrl ? (
+                              <img src={submission.artworkUrl} alt="" className="h-12 w-12 shrink-0 rounded-xl object-cover" />
+                            ) : (
+                              <div className="h-12 w-12 shrink-0 rounded-xl bg-[var(--wk-bg)]" />
+                            )}
+                            <div className="min-w-0 flex-1">
+                              <div className="text-[13px] font-black text-[var(--wk-text)]">{submission.trackTitle}</div>
+                              {submission.releaseTitle && <div className="mt-0.5 text-[11px] text-[var(--wk-text-muted)]">{submission.releaseTitle}</div>}
+                              <div className="mt-2 text-[11px] font-semibold text-[var(--wk-text)]">Registry review: {submission.status.replace(/_/g, " ")}.</div>
+                              <div className="mt-1 text-[10px] leading-4 text-[var(--wk-text-muted)]">
+                                Submitted {new Date(submission.createdAt).toLocaleString()} · Review target {new Date(submission.reviewDueAt).toLocaleString()}
+                              </div>
+                              {overdue ? (
+                                <div className="mt-2 text-[11px] font-bold text-amber-700">Overdue: this submission has passed the 3-business-day review target.</div>
+                              ) : submission.reviewedAt ? (
+                                <div className="mt-2 text-[11px] text-[var(--wk-text-muted)]">Reviewed {new Date(submission.reviewedAt).toLocaleString()}.</div>
+                              ) : (
+                                <div className="mt-2 text-[11px] text-[var(--wk-text-muted)]">Within the 3-business-day review target.</div>
+                              )}
+                              {submission.canonicalTrackTitle && (
+                                <div className="mt-2 text-[11px] font-bold text-[var(--wk-brand)]">Music Registry: {submission.canonicalTrackTitle}</div>
+                              )}
+                            </div>
+                          </div>
+                        </article>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
             </section>
           )}
 
@@ -704,8 +1047,15 @@ export default function ArtistManagePage() {
             <div className="mt-4 space-y-3">
               <div className={`rounded-2xl border border-[var(--wk-border)] p-4 ${permissions.releases ? "" : "opacity-50"}`}>
                 <div className="text-[13px] font-black text-[var(--wk-text)]">Add Music</div>
-                <p className="mt-1 text-[12px] leading-5 text-[var(--wk-text-muted)]">Music submissions are not open here yet.</p>
-                <button type="button" disabled className="mt-3 rounded-full border border-[var(--wk-border)] px-4 py-2 text-[12px] font-bold text-[var(--wk-text-muted)]">Add Music</button>
+                <p className="mt-1 text-[12px] leading-5 text-[var(--wk-text-muted)]">Send a provider-confirmed track to Music Registry review.</p>
+                <button
+                  type="button"
+                  disabled={!permissions.releases}
+                  onClick={() => document.getElementById("artist-music-submission")?.scrollIntoView({ behavior: "smooth", block: "start" })}
+                  className="mt-3 rounded-full border border-[var(--wk-border)] px-4 py-2 text-[12px] font-bold text-[var(--wk-text-muted)] disabled:opacity-40"
+                >
+                  Add Music
+                </button>
               </div>
               <div className={`rounded-2xl border border-[var(--wk-border)] p-4 ${permissions.updates ? "" : "opacity-50"}`}>
                 <div className="text-[13px] font-black text-[var(--wk-text)]">Post Update</div>

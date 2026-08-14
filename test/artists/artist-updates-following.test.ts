@@ -178,7 +178,7 @@ describe(
     );
 
     it(
-      "activates Post Update without opening M5 Add Music",
+      "keeps Post Update active on Artist Management",
       () => {
         expect(
           managePage,
@@ -199,11 +199,6 @@ describe(
           managePage,
         ).toContain(
           "withdrawArtistUpdate",
-        );
-        expect(
-          managePage,
-        ).toContain(
-          "Music submissions are not open here yet.",
         );
         expect(
           managePage,
