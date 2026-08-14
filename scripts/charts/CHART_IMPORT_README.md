@@ -10,7 +10,7 @@ The old WordPress URL format (`/charts/2026/ke/2026-05-18/`) does not carry over
 
 ## What Gets Imported
 
-From WordPress MySQL (`bitnami_wordpress`), the importer reads:
+From WordPress MySQL (`[removed]`), the importer reads:
 
 | WordPress Table | Maps To | Contents |
 |---|---|---|
@@ -37,70 +37,9 @@ The importer creates slug aliases in `wk_chart_slug_aliases_v2` so old links con
 
 ---
 
-## How to Run
+## Legacy Import Status
 
-### Option 1: From the WordPress Lightsail Server (Recommended)
-
-SSH into the server first, then run:
-
-```bash
-# On the WordPress Lightsail server (ip-172-26-5-134)
-
-# Install Node.js if not present
-curl -sS https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.7/install.sh | bash
-source ~/.bashrc
-nvm install 20 && nvm use 20
-
-# Copy the script (or git clone the repo)
-mkdir -p /tmp/wakilisha-import
-cd /tmp/wakilisha-import
-
-# Run dry run first
-DATABASE_URL="postgresql://..." \
-WP_DB_HOST=127.0.0.1 WP_DB_USER=bn_wordpress \
-WP_DB_PASSWORD='236407f4e9404d1cd2215f9759d1ddc198d04fa6aaffc7d61fb98f1422c4eb0b' \
-WP_DB_NAME=bitnami_wordpress WP_DB_PREFIX=wp_ \
-npx tsx scripts/charts/import-wordpress-charts-to-v2.ts --dry-run
-
-# Review reports/chart-v2-wordpress-import.json
-# Then commit for real:
-WAKILISHA_CHART_IMPORT_COMMIT=1 \
-DATABASE_URL="postgresql://..." \
-WP_DB_HOST=127.0.0.1 WP_DB_USER=bn_wordpress \
-WP_DB_PASSWORD='...' \
-WP_DB_NAME=bitnami_wordpress WP_DB_PREFIX=wp_ \
-npx tsx scripts/charts/import-wordpress-charts-to-v2.ts
-```
-
-### Option 2: Via SSH from your local machine
-
-```bash
-# Set your SSH key path
-export WP_SSH_KEY=~/.ssh/your-lightsail-key.pem
-export DATABASE_URL="postgresql://..."
-
-# Dry run
-bash scripts/charts/import-charts-via-ssh.sh --dry-run
-
-# Commit for real
-WAKILISHA_CHART_IMPORT_COMMIT=1 bash scripts/charts/import-charts-via-ssh.sh
-```
-
----
-
-## WordPress Database Credentials
-
-From the PDF (already in scope):
-
-| Field | Value |
-|---|---|
-| Host | `ip-172-26-5-134` (Lightsail internal IP) |
-| Port | `3306` |
-| User | `bn_wordpress` |
-| Password | `236407f4e9404d1cd2215f9759d1ddc198d04fa6aaffc7d61fb98f1422c4eb0b` |
-| Database | `bitnami_wordpress` |
-| Table prefix | `wp_` |
-| SSH user | `bitnami` |
+WordPress is retired. The legacy import tooling is retained only as historical implementation reference. No WordPress database or server credentials are retained or documented in this repository, and the old importer should not be run against production.
 
 ---
 
