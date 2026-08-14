@@ -26,7 +26,7 @@ const adminSearch = fs.readFileSync(
 );
 
 const migration = fs.readFileSync(
-  "supabase/migrations/20260806162000_retire_wordpress_runtime.sql",
+  "docs/engineering/replay-baseline/legacy-migrations/20260806162000_retire_wordpress_runtime.sql",
   "utf8",
 );
 

@@ -2,7 +2,7 @@ import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 
 const migration = readFileSync(
-  "supabase/migrations/20260807103000_phase_4b_m1_upload_sessions.sql",
+  "docs/engineering/replay-baseline/legacy-migrations/20260807103000_phase_4b_m1_upload_sessions.sql",
   "utf8",
 );
 const receiver = readFileSync("ops/media-receiver/server.py", "utf8");

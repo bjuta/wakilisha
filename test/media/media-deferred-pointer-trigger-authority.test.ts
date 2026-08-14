@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import fs from "node:fs";
 
 const migration = fs.readFileSync(
-  "supabase/migrations/20260806124500_phase_4a_media_deferred_pointer_trigger_authority.sql",
+  "docs/engineering/replay-baseline/legacy-migrations/20260806124500_phase_4a_media_deferred_pointer_trigger_authority.sql",
   "utf8",
 );
 

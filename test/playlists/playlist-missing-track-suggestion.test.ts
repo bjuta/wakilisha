@@ -28,7 +28,7 @@ const page =
 
 const m221 =
   readFileSync(
-    "supabase/migrations/20260809114136_phase_5b_community_interaction_authority.sql",
+    "docs/engineering/replay-baseline/legacy-migrations/20260809114136_phase_5b_community_interaction_authority.sql",
     "utf8",
   );
 

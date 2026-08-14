@@ -10,7 +10,7 @@ import {
 
 const migrationName =
   readdirSync(
-    "supabase/migrations",
+    "docs/engineering/replay-baseline/legacy-migrations",
   ).find(
     (name) =>
       name.endsWith(
@@ -26,7 +26,7 @@ if (!migrationName) {
 
 const migration =
   readFileSync(
-    `supabase/migrations/${migrationName}`,
+    `docs/engineering/replay-baseline/legacy-migrations/${migrationName}`,
     "utf8",
   );
 

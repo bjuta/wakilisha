@@ -2,7 +2,7 @@ import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 
 const migration = readFileSync(
-  "supabase/migrations/20260806083000_phase_4a_media_write_authority.sql",
+  "docs/engineering/replay-baseline/legacy-migrations/20260806083000_phase_4a_media_write_authority.sql",
   "utf8",
 );
 const verifier = readFileSync(

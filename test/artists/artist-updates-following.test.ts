@@ -9,7 +9,7 @@ import {
 
 const migration =
   readFileSync(
-    "supabase/migrations/20260814174000_artist_updates_following.sql",
+    "docs/engineering/replay-baseline/legacy-migrations/20260814174000_artist_updates_following.sql",
     "utf8",
   );
 

@@ -1,0 +1,237 @@
+{
+  "archive_only_sql_file_count": 23,
+  "archived_repository_sql_file_count": 277,
+  "definition": "SQL migration file identities present in the locked repository base commit but absent from the exact frozen pre-repair production migration ledger.",
+  "duplicate_version_groups": {
+    "202606260001": [
+      "202606260001_audience_interest_foundation.sql",
+      "202606260001_repair_keki_apple_music_duplicate.sql"
+    ],
+    "202606260003": [
+      "202606260003_public_cutover_read_grants.sql",
+      "202606260003_track_duplicate_repair_preview_apply.sql"
+    ],
+    "202606260004": [
+      "202606260004_artist_scoped_music_slugs.sql",
+      "202606260004_public_cutover_chart_read_grants.sql"
+    ]
+  },
+  "files": [
+    {
+      "base_commit_path": "supabase/migrations/_archived_duplicate_versions_20260710/202606260001_repair_keki_apple_music_duplicate.sql",
+      "classification": "repository_migration_identity_absent_from_frozen_production_ledger",
+      "file": "202606260001_repair_keki_apple_music_duplicate.sql",
+      "name": "repair_keki_apple_music_duplicate",
+      "same_version_production_ledger_files": [
+        "202606260001_audience_interest_foundation.sql"
+      ],
+      "sha256": "adc9b286a31c8c11c21c886c047e4b523b5144f4298bedb54be929314e0b2b6e",
+      "version": "202606260001"
+    },
+    {
+      "base_commit_path": "supabase/migrations/_archived_duplicate_versions_20260710/202606260003_track_duplicate_repair_preview_apply.sql",
+      "classification": "repository_migration_identity_absent_from_frozen_production_ledger",
+      "file": "202606260003_track_duplicate_repair_preview_apply.sql",
+      "name": "track_duplicate_repair_preview_apply",
+      "same_version_production_ledger_files": [
+        "202606260003_public_cutover_read_grants.sql"
+      ],
+      "sha256": "0de9882e5d34e58760bf72854be0aabefd2fd8b0f5805a5742d7faab52e87786",
+      "version": "202606260003"
+    },
+    {
+      "base_commit_path": "supabase/migrations/_archived_duplicate_versions_20260710/202606260004_public_cutover_chart_read_grants.sql",
+      "classification": "repository_migration_identity_absent_from_frozen_production_ledger",
+      "file": "202606260004_public_cutover_chart_read_grants.sql",
+      "name": "public_cutover_chart_read_grants",
+      "same_version_production_ledger_files": [
+        "202606260004_artist_scoped_music_slugs.sql"
+      ],
+      "sha256": "44ee403d75ffbe40716f218b8b017c6fc97cf35142961c560562e27c9b1b6dde",
+      "version": "202606260004"
+    },
+    {
+      "base_commit_path": "supabase/migrations/_archived_consolidated_versions_20260712/202607110001_registry_relationship_foundation.sql",
+      "classification": "repository_migration_identity_absent_from_frozen_production_ledger",
+      "file": "202607110001_registry_relationship_foundation.sql",
+      "name": "registry_relationship_foundation",
+      "same_version_production_ledger_files": [],
+      "sha256": "26ddd36b7592b5825635a0010f71fb2273ee1c7d784850fc7a176c8457e481d9",
+      "version": "202607110001"
+    },
+    {
+      "base_commit_path": "supabase/migrations/_archived_consolidated_versions_20260712/20260711124500_registry_evidence_foundation.sql",
+      "classification": "repository_migration_identity_absent_from_frozen_production_ledger",
+      "file": "20260711124500_registry_evidence_foundation.sql",
+      "name": "registry_evidence_foundation",
+      "same_version_production_ledger_files": [],
+      "sha256": "0af13a92b15dffe23c64412809771b4081dcf39576eb5ac4f7d03930f16e1bc6",
+      "version": "20260711124500"
+    },
+    {
+      "base_commit_path": "supabase/migrations/_archived_consolidated_versions_20260712/20260711133000_lock_down_exec_sql.sql",
+      "classification": "repository_migration_identity_absent_from_frozen_production_ledger",
+      "file": "20260711133000_lock_down_exec_sql.sql",
+      "name": "lock_down_exec_sql",
+      "same_version_production_ledger_files": [],
+      "sha256": "d51ef78d1f116760344db1eaaaf893cae37c44bbfdaf58d2bbdf0ea87ba3c90a",
+      "version": "20260711133000"
+    },
+    {
+      "base_commit_path": "supabase/migrations/_archived_consolidated_versions_20260712/20260711143000_lock_down_admin_security_definer_rpcs.sql",
+      "classification": "repository_migration_identity_absent_from_frozen_production_ledger",
+      "file": "20260711143000_lock_down_admin_security_definer_rpcs.sql",
+      "name": "lock_down_admin_security_definer_rpcs",
+      "same_version_production_ledger_files": [],
+      "sha256": "4ffcd19c45afce88344d81aa772429b3341ffc5301cb5172f6753e7fef13d900",
+      "version": "20260711143000"
+    },
+    {
+      "base_commit_path": "supabase/migrations/_archived_consolidated_versions_20260712/20260711150000_registry_evidence_review_rules.sql",
+      "classification": "repository_migration_identity_absent_from_frozen_production_ledger",
+      "file": "20260711150000_registry_evidence_review_rules.sql",
+      "name": "registry_evidence_review_rules",
+      "same_version_production_ledger_files": [],
+      "sha256": "94b0b4c9856042a0d1e9a11d6231738a60197761daa1beee2fa4e295415def7e",
+      "version": "20260711150000"
+    },
+    {
+      "base_commit_path": "supabase/migrations/_archived_consolidated_versions_20260712/20260711160000_registry_relationship_promotion_rules.sql",
+      "classification": "repository_migration_identity_absent_from_frozen_production_ledger",
+      "file": "20260711160000_registry_relationship_promotion_rules.sql",
+      "name": "registry_relationship_promotion_rules",
+      "same_version_production_ledger_files": [],
+      "sha256": "bb1d573840d883a0e460ae5634eb1a3503dd27f91908b073051381f3236f6190",
+      "version": "20260711160000"
+    },
+    {
+      "base_commit_path": "supabase/migrations/_archived_consolidated_versions_20260712/20260711170000_registry_canonical_entity_index.sql",
+      "classification": "repository_migration_identity_absent_from_frozen_production_ledger",
+      "file": "20260711170000_registry_canonical_entity_index.sql",
+      "name": "registry_canonical_entity_index",
+      "same_version_production_ledger_files": [],
+      "sha256": "5982418787d63e3545f966833c2e072c5924eaf34d65c4241bf1207fc8adc3e2",
+      "version": "20260711170000"
+    },
+    {
+      "base_commit_path": "supabase/migrations/_archived_consolidated_versions_20260712/20260711180000_registry_cultural_entity_workflows.sql",
+      "classification": "repository_migration_identity_absent_from_frozen_production_ledger",
+      "file": "20260711180000_registry_cultural_entity_workflows.sql",
+      "name": "registry_cultural_entity_workflows",
+      "same_version_production_ledger_files": [],
+      "sha256": "8baf4142be9ba01ef7c01cd1a5bb8dc854b003c7bf39e8e945473c6e4fc10dbe",
+      "version": "20260711180000"
+    },
+    {
+      "base_commit_path": "supabase/migrations/_archived_consolidated_versions_20260712/20260711190000_registry_entity_relationship_creation_workflow.sql",
+      "classification": "repository_migration_identity_absent_from_frozen_production_ledger",
+      "file": "20260711190000_registry_entity_relationship_creation_workflow.sql",
+      "name": "registry_entity_relationship_creation_workflow",
+      "same_version_production_ledger_files": [],
+      "sha256": "1ed9568ddaeff713ebac9e49ecb2586462e2adad1a69f6574553eb021acabc35",
+      "version": "20260711190000"
+    },
+    {
+      "base_commit_path": "supabase/migrations/_archived_consolidated_versions_20260712/20260711200000_registry_relationship_endpoint_resolution.sql",
+      "classification": "repository_migration_identity_absent_from_frozen_production_ledger",
+      "file": "20260711200000_registry_relationship_endpoint_resolution.sql",
+      "name": "registry_relationship_endpoint_resolution",
+      "same_version_production_ledger_files": [],
+      "sha256": "a0242fa2c104be5e2ab19a3fc903fc6284da104e4c01a83980773f389e9cf5bb",
+      "version": "20260711200000"
+    },
+    {
+      "base_commit_path": "supabase/migrations/_archived_consolidated_versions_20260712/20260711210000_registry_provenance_separation.sql",
+      "classification": "repository_migration_identity_absent_from_frozen_production_ledger",
+      "file": "20260711210000_registry_provenance_separation.sql",
+      "name": "registry_provenance_separation",
+      "same_version_production_ledger_files": [],
+      "sha256": "d0a98c526e69aa34ff1a6e7ce5633dd7edf1ca814f53fc953a8908619f4e1fda",
+      "version": "20260711210000"
+    },
+    {
+      "base_commit_path": "supabase/migrations/_archived_consolidated_versions_20260712/20260711220000_registry_relationship_consolidation_queue.sql",
+      "classification": "repository_migration_identity_absent_from_frozen_production_ledger",
+      "file": "20260711220000_registry_relationship_consolidation_queue.sql",
+      "name": "registry_relationship_consolidation_queue",
+      "same_version_production_ledger_files": [],
+      "sha256": "1a94203cb5dab98b3222c7a3b2aaa2bb63e4d8e366d028df21ff5bb18d839c7f",
+      "version": "20260711220000"
+    },
+    {
+      "base_commit_path": "supabase/migrations/_archived_consolidated_versions_20260712/20260711230000_registry_relationship_duplicate_review.sql",
+      "classification": "repository_migration_identity_absent_from_frozen_production_ledger",
+      "file": "20260711230000_registry_relationship_duplicate_review.sql",
+      "name": "registry_relationship_duplicate_review",
+      "same_version_production_ledger_files": [],
+      "sha256": "5a37cdd6a9f907d70ee0e5a7dca1d4db3d82e63e877e7d13b2566bf879931541",
+      "version": "20260711230000"
+    },
+    {
+      "base_commit_path": "supabase/migrations/_archived_consolidated_versions_20260712/20260712000000_registry_endpoint_evidence_readiness.sql",
+      "classification": "repository_migration_identity_absent_from_frozen_production_ledger",
+      "file": "20260712000000_registry_endpoint_evidence_readiness.sql",
+      "name": "registry_endpoint_evidence_readiness",
+      "same_version_production_ledger_files": [],
+      "sha256": "5a3162660ca3f2acd4b60712ba191a457a21dfc69dcc80b1c5d04287a78045cf",
+      "version": "20260712000000"
+    },
+    {
+      "base_commit_path": "supabase/migrations/_archived_consolidated_versions_20260712/20260712010000_registry_missing_artist_intake.sql",
+      "classification": "repository_migration_identity_absent_from_frozen_production_ledger",
+      "file": "20260712010000_registry_missing_artist_intake.sql",
+      "name": "registry_missing_artist_intake",
+      "same_version_production_ledger_files": [],
+      "sha256": "2dbc2c93f3580c47198270b0309cf815512fb365ac3aa81c5de5dc17d5793b33",
+      "version": "20260712010000"
+    },
+    {
+      "base_commit_path": "supabase/migrations/_archived_consolidated_versions_20260712/20260712020000_registry_accept_missing_artist_intake.sql",
+      "classification": "repository_migration_identity_absent_from_frozen_production_ledger",
+      "file": "20260712020000_registry_accept_missing_artist_intake.sql",
+      "name": "registry_accept_missing_artist_intake",
+      "same_version_production_ledger_files": [],
+      "sha256": "71471b9e6f21a589af3fe6b3ef94d203d0948846a32e1f1fd8b3c42f0d8e6637",
+      "version": "20260712020000"
+    },
+    {
+      "base_commit_path": "supabase/migrations/_archived_consolidated_versions_20260712/20260712030000_registry_review_view_select_grants.sql",
+      "classification": "repository_migration_identity_absent_from_frozen_production_ledger",
+      "file": "20260712030000_registry_review_view_select_grants.sql",
+      "name": "registry_review_view_select_grants",
+      "same_version_production_ledger_files": [],
+      "sha256": "2a32b4a6b0860649e4b568ecd70a97e86e4ac8b7d45c31f0dd50d6e518f668c2",
+      "version": "20260712030000"
+    },
+    {
+      "base_commit_path": "supabase/migrations/_archived_consolidated_versions_20260712/20260712040000_registry_public_artist_relationships.sql",
+      "classification": "repository_migration_identity_absent_from_frozen_production_ledger",
+      "file": "20260712040000_registry_public_artist_relationships.sql",
+      "name": "registry_public_artist_relationships",
+      "same_version_production_ledger_files": [],
+      "sha256": "565f12cf54d9eea123b197a2e574a008e3eb3c43c10f3c70393e46030df196f8",
+      "version": "20260712040000"
+    },
+    {
+      "base_commit_path": "supabase/migrations/_archived_consolidated_versions_20260712/20260712050000_registry_complete_relationship_review.sql",
+      "classification": "repository_migration_identity_absent_from_frozen_production_ledger",
+      "file": "20260712050000_registry_complete_relationship_review.sql",
+      "name": "registry_complete_relationship_review",
+      "same_version_production_ledger_files": [],
+      "sha256": "c3574a544ce66fe1bc02b386df64f1b8aae9bee4077aecfad85e475387a79a71",
+      "version": "20260712050000"
+    },
+    {
+      "base_commit_path": "supabase/migrations/_archived_consolidated_versions_20260712/20260712090000_registry_living_memory_public_read.sql",
+      "classification": "repository_migration_identity_absent_from_frozen_production_ledger",
+      "file": "20260712090000_registry_living_memory_public_read.sql",
+      "name": "registry_living_memory_public_read",
+      "same_version_production_ledger_files": [],
+      "sha256": "bc0c4443a8f9fb8ef49c0ea7739a0a9e15243451755373043c247525f49134c7",
+      "version": "20260712090000"
+    }
+  ],
+  "frozen_production_ledger_row_count": 254,
+  "identity_rule": "Production membership is matched by exact migration (version, name), corresponding to VERSION_NAME.sql. Numeric version alone is insufficient because the locked repository contains duplicate-version migration files.",
+  "locked_base_commit": "259f50967b0c5eba81dce5baa861672f7132e78a"
+}

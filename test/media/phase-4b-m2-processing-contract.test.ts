@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import fs from "node:fs";
 
 const replayFixName = fs
-  .readdirSync("supabase/migrations")
+  .readdirSync("docs/engineering/replay-baseline/legacy-migrations")
   .find((name) =>
     name.endsWith("_phase_4b_m2_idempotent_replay_fix.sql"),
   );
@@ -12,12 +12,12 @@ if (!replayFixName) {
 }
 
 const replayFix = fs.readFileSync(
-  `supabase/migrations/${replayFixName}`,
+  `docs/engineering/replay-baseline/legacy-migrations/${replayFixName}`,
   "utf8",
 );
 
 const migration = fs.readFileSync(
-  "supabase/migrations/20260807125500_phase_4b_m2_durable_media_processing.sql",
+  "docs/engineering/replay-baseline/legacy-migrations/20260807125500_phase_4b_m2_durable_media_processing.sql",
   "utf8",
 );
 

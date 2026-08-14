@@ -2,7 +2,7 @@ import fs from "node:fs";
 import path from "node:path";
 
 const migrationDirectory =
-  "supabase/migrations";
+  "docs/engineering/replay-baseline/legacy-migrations";
 
 const migrationFiles = fs
   .readdirSync(migrationDirectory)

@@ -17,7 +17,7 @@ function read(relativePath: string): string {
 
 describe("Article Credit governance controls", () => {
   const migration = read(
-    "supabase/migrations/20260802231000_article_trust_published_version_context.sql",
+    "docs/engineering/replay-baseline/legacy-migrations/20260802231000_article_trust_published_version_context.sql",
   );
   const verifier = read(
     "scripts/control-plane/verify-article-trust-published-version-context.sql",
