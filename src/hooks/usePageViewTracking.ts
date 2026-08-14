@@ -48,6 +48,19 @@ function inferPageContext(pathname: string): PageContext | null {
     return { pageType: "article", entitySlug: segments[1], entityType: "article" };
   }
 
+  // /artists/:slug/updates/:updateId
+  if (
+    segments[0] === "artists" &&
+    segments.length === 4 &&
+    segments[2] === "updates"
+  ) {
+    return {
+      pageType: "artist_update",
+      entitySlug: segments[3],
+      entityType: "artist_update",
+    };
+  }
+
   // /artists/:slug
   if (segments[0] === "artists" && segments.length === 2) {
     return { pageType: "artist_detail", entitySlug: segments[1], entityType: "artist" };

@@ -17851,6 +17851,10 @@ export type Database = {
         Args: { p_display_name?: string; p_email: string; p_user_id: string }
         Returns: string
       }
+      community_get_artist_launch_analytics: {
+        Args: { p_artist_id: string; p_days?: number }
+        Returns: Json
+      }
       community_get_artist_manage_updates: {
         Args: { p_artist_id: string; p_limit?: number }
         Returns: Json

@@ -35,6 +35,13 @@ import {
   type ArtistMusicProviderKey,
   type ArtistMusicSubmission,
 } from "@/services/artists/artistMusicSubmissions";
+import {
+  buildArtistLaunchLink,
+  getArtistLaunchAnalytics,
+  type ArtistLaunchAnalytics,
+  type ArtistLaunchTarget,
+  type ArtistLaunchTargetType,
+} from "@/services/artists/artistLaunchTools";
 
 const EMPTY_PRESENTATION: ArtistPresentation = {
   bio: null,
@@ -90,6 +97,23 @@ function Toggle({
   );
 }
 
+function formatArtistMetric(value: number): string {
+  if (value >= 1_000_000) return `${(value / 1_000_000).toFixed(value >= 10_000_000 ? 0 : 1)}m`;
+  if (value >= 1_000) return `${(value / 1_000).toFixed(value >= 10_000 ? 0 : 1)}k`;
+  return value.toLocaleString();
+}
+
+function artistLaunchTargetLabel(type: ArtistLaunchTargetType): string {
+  if (type === "artist") return "Artist Page";
+  if (type === "release") return "Release";
+  if (type === "track") return "Track";
+  return "Artist Update";
+}
+
+function artistLaunchTargetKey(target: ArtistLaunchTarget): string {
+  return `${target.type}:${target.id}`;
+}
+
 export default function ArtistManagePage() {
   const { slug } = useParams<{ slug: string }>();
   const user = useAuthUser();
@@ -132,6 +156,15 @@ export default function ArtistManagePage() {
   const [musicCreditName, setMusicCreditName] = useState("");
   const [musicCreditRole, setMusicCreditRole] = useState<ArtistMusicCreditInput["role"]>("featured");
   const [musicCredits, setMusicCredits] = useState<ArtistMusicCreditInput[]>([]);
+
+  const [launchAnalytics, setLaunchAnalytics] = useState<ArtistLaunchAnalytics | null>(null);
+  const [launchAnalyticsLoading, setLaunchAnalyticsLoading] = useState(false);
+  const [launchAnalyticsError, setLaunchAnalyticsError] = useState<string | null>(null);
+  const [launchRangeDays, setLaunchRangeDays] = useState<7 | 30 | 90>(30);
+  const [launchTargetKey, setLaunchTargetKey] = useState("");
+  const [launchSource, setLaunchSource] = useState("instagram");
+  const [launchCampaign, setLaunchCampaign] = useState("");
+  const [launchCopied, setLaunchCopied] = useState(false);
 
   const activeRepresentation = representationState?.representation?.status === "active"
     ? representationState.representation
@@ -224,6 +257,83 @@ export default function ArtistManagePage() {
     return () => { alive = false; };
   }, [slug, user.id, user.loading]);
 
+  useEffect(() => {
+    let alive = true;
+
+    if (
+      !artist?.id ||
+      representationState?.representation?.status !== "active"
+    ) {
+      setLaunchAnalytics(null);
+      setLaunchAnalyticsError(null);
+      setLaunchAnalyticsLoading(false);
+      return () => {
+        alive = false;
+      };
+    }
+
+    setLaunchAnalyticsLoading(true);
+    setLaunchAnalyticsError(null);
+
+    getArtistLaunchAnalytics(
+      artist.id,
+      launchRangeDays,
+    )
+      .then((analytics) => {
+        if (!alive) return;
+
+        setLaunchAnalytics(analytics);
+
+        setLaunchCampaign((current) =>
+          current.trim()
+            ? current
+            : `${analytics.artist.slug}-launch`,
+        );
+
+        setLaunchTargetKey((current) => {
+          const currentExists =
+            analytics.launchTargets.some(
+              (target) =>
+                artistLaunchTargetKey(target) === current,
+            );
+
+          if (currentExists) {
+            return current;
+          }
+
+          const first =
+            analytics.launchTargets[0];
+
+          return first
+            ? artistLaunchTargetKey(first)
+            : "";
+        });
+      })
+      .catch((error) => {
+        if (!alive) return;
+
+        setLaunchAnalytics(null);
+        setLaunchAnalyticsError(
+          error instanceof Error
+            ? error.message
+            : "Artist performance could not be loaded.",
+        );
+      })
+      .finally(() => {
+        if (alive) {
+          setLaunchAnalyticsLoading(false);
+        }
+      });
+
+    return () => {
+      alive = false;
+    };
+  }, [
+    artist?.id,
+    representationState?.representation?.status,
+    launchRangeDays,
+  ]);
+
   const socialFields = useMemo(() => [
     ["instagram", "Instagram"],
     ["tiktok", "TikTok"],
@@ -233,6 +343,36 @@ export default function ArtistManagePage() {
     ["spotify", "Spotify"],
     ["soundcloud", "SoundCloud"],
   ] as const, []);
+
+  const selectedLaunchTarget = useMemo(
+    () =>
+      launchAnalytics?.launchTargets.find(
+        (target) =>
+          artistLaunchTargetKey(target) === launchTargetKey,
+      ) ??
+      launchAnalytics?.launchTargets[0] ??
+      null,
+    [
+      launchAnalytics,
+      launchTargetKey,
+    ],
+  );
+
+  const launchLink = useMemo(
+    () =>
+      selectedLaunchTarget
+        ? buildArtistLaunchLink({
+            target: selectedLaunchTarget,
+            source: launchSource,
+            campaign: launchCampaign,
+          })
+        : "",
+    [
+      selectedLaunchTarget,
+      launchSource,
+      launchCampaign,
+    ],
+  );
 
   function patchSocial(key: string, value: string) {
     setSocialLinks((current) => ({ ...current, [key]: value }));
@@ -569,6 +709,40 @@ export default function ArtistManagePage() {
     }
   }
 
+  async function handleCopyLaunchLink() {
+    if (!launchLink) {
+      setMessage({
+        type: "error",
+        text: "Choose a public page and enter a campaign name before copying the link.",
+      });
+      return;
+    }
+
+    try {
+      if (!navigator.clipboard?.writeText) {
+        throw new Error("Clipboard is unavailable.");
+      }
+
+      await navigator.clipboard.writeText(launchLink);
+      setLaunchCopied(true);
+      setMessage({
+        type: "success",
+        text: "Launch link copied.",
+      });
+
+      window.setTimeout(
+        () => setLaunchCopied(false),
+        2000,
+      );
+    } catch {
+      setLaunchCopied(false);
+      setMessage({
+        type: "error",
+        text: "Copy the launch link from the field below.",
+      });
+    }
+  }
+
   if (user.loading || loading) {
     return <main className="wk-container px-6 py-20"><p className="text-[14px] text-[var(--wk-text-muted)]">Loading Artist access…</p></main>;
   }
@@ -632,6 +806,217 @@ export default function ArtistManagePage() {
 
       <div className="grid gap-6 xl:grid-cols-[minmax(0,1.6fr)_minmax(300px,0.8fr)]">
         <div className="space-y-6">
+          <section id="artist-launch-tools" className="scroll-mt-24 rounded-3xl border border-[var(--wk-border)] bg-[var(--wk-surface)] p-6 md:p-7">
+            <h2 className="text-[22px] font-black tracking-tight text-[var(--wk-text)]">Launch Tools</h2>
+            <p className="mt-1 max-w-3xl text-[13px] leading-6 text-[var(--wk-text-muted)]">
+              Create tracked links to this Artist page, music, and published Updates. Visits from these links are grouped in Performance below.
+            </p>
+
+            <div className="mt-6 rounded-2xl border border-[var(--wk-border)] p-5">
+              <h3 className="text-[16px] font-black text-[var(--wk-text)]">Launch Links</h3>
+              <p className="mt-1 text-[11px] leading-5 text-[var(--wk-text-muted)]">
+                Choose a public WAKILISHA page, name the campaign, and copy a link for the channel you are using.
+              </p>
+
+              <div className="mt-4 grid gap-3 lg:grid-cols-[minmax(0,1.4fr)_160px_minmax(0,1fr)]">
+                <label className="block">
+                  <span className="mb-1.5 block text-[11px] font-bold text-[var(--wk-text)]">Public Page</span>
+                  <select
+                    value={launchTargetKey}
+                    onChange={(event) => {
+                      setLaunchTargetKey(event.target.value);
+                      setLaunchCopied(false);
+                    }}
+                    disabled={launchAnalyticsLoading || !launchAnalytics?.launchTargets.length}
+                    className="h-11 w-full rounded-xl border border-[var(--wk-border)] bg-[var(--wk-bg)] px-3 text-[12px] text-[var(--wk-text)] disabled:opacity-50"
+                  >
+                    {(launchAnalytics?.launchTargets ?? []).map((target) => (
+                      <option key={artistLaunchTargetKey(target)} value={artistLaunchTargetKey(target)}>
+                        {artistLaunchTargetLabel(target.type)} · {target.title}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+
+                <label className="block">
+                  <span className="mb-1.5 block text-[11px] font-bold text-[var(--wk-text)]">Source</span>
+                  <select
+                    value={launchSource}
+                    onChange={(event) => {
+                      setLaunchSource(event.target.value);
+                      setLaunchCopied(false);
+                    }}
+                    className="h-11 w-full rounded-xl border border-[var(--wk-border)] bg-[var(--wk-bg)] px-3 text-[12px] text-[var(--wk-text)]"
+                  >
+                    <option value="instagram">Instagram</option>
+                    <option value="tiktok">TikTok</option>
+                    <option value="x">X</option>
+                    <option value="whatsapp">WhatsApp</option>
+                    <option value="newsletter">Newsletter</option>
+                    <option value="press">Press</option>
+                    <option value="other">Other</option>
+                  </select>
+                </label>
+
+                <label className="block">
+                  <span className="mb-1.5 block text-[11px] font-bold text-[var(--wk-text)]">Campaign</span>
+                  <input
+                    value={launchCampaign}
+                    onChange={(event) => {
+                      setLaunchCampaign(event.target.value);
+                      setLaunchCopied(false);
+                    }}
+                    maxLength={80}
+                    placeholder="new-single-launch"
+                    className="h-11 w-full rounded-xl border border-[var(--wk-border)] bg-[var(--wk-bg)] px-3 text-[12px] text-[var(--wk-text)]"
+                  />
+                </label>
+              </div>
+
+              <div className="mt-4 grid gap-3 md:grid-cols-[minmax(0,1fr)_auto]">
+                <input
+                  readOnly
+                  value={launchLink}
+                  placeholder="Your tracked launch link appears here."
+                  className="h-11 w-full rounded-xl border border-[var(--wk-border)] bg-[var(--wk-bg)] px-3 text-[11px] text-[var(--wk-text-muted)]"
+                />
+                <WkButton
+                  type="button"
+                  disabled={!launchLink}
+                  onClick={() => void handleCopyLaunchLink()}
+                >
+                  {launchCopied ? "Copied" : "Copy Launch Link"}
+                </WkButton>
+              </div>
+
+              <p className="mt-2 text-[10px] leading-4 text-[var(--wk-text-faint)]">
+                Tracked visits appear under Launch Campaigns after people open the link.
+              </p>
+            </div>
+
+            <div className="mt-7 border-t border-[var(--wk-divider)] pt-6">
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+                <div>
+                  <h3 className="text-[18px] font-black text-[var(--wk-text)]">Performance</h3>
+                  <p className="mt-1 text-[11px] leading-5 text-[var(--wk-text-muted)]">
+                    Public activity across this Artist's WAKILISHA pages. Visitor and follower identities are not shown here.
+                  </p>
+                </div>
+
+                <div className="flex gap-2">
+                  {([7, 30, 90] as const).map((range) => (
+                    <WkButton
+                      key={range}
+                      type="button"
+                      variant={launchRangeDays === range ? "primary" : "soft"}
+                      onClick={() => setLaunchRangeDays(range)}
+                      disabled={launchAnalyticsLoading}
+                    >
+                      {range} Days
+                    </WkButton>
+                  ))}
+                </div>
+              </div>
+
+              {launchAnalyticsError && (
+                <div className="mt-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-[12px] text-red-800">
+                  {launchAnalyticsError}
+                </div>
+              )}
+
+              {launchAnalyticsLoading && !launchAnalytics ? (
+                <p className="mt-5 text-[12px] text-[var(--wk-text-muted)]">Loading performance…</p>
+              ) : launchAnalytics ? (
+                <>
+                  <div className="mt-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
+                    {[
+                      ["Views", launchAnalytics.summary.views],
+                      ["Plays", launchAnalytics.summary.plays],
+                      ["Shares", launchAnalytics.summary.shares],
+                      ["Visitors", launchAnalytics.summary.visitors],
+                    ].map(([label, value]) => (
+                      <div key={String(label)} className="rounded-2xl bg-[var(--wk-bg)] p-4">
+                        <div className="text-[10px] font-black uppercase tracking-[0.12em] text-[var(--wk-text-faint)]">{label}</div>
+                        <div className="mt-2 text-[26px] font-black tracking-tight text-[var(--wk-text)]">{formatArtistMetric(Number(value))}</div>
+                      </div>
+                    ))}
+                    <div className="rounded-2xl bg-[var(--wk-bg)] p-4">
+                      <div className="text-[10px] font-black uppercase tracking-[0.12em] text-[var(--wk-text-faint)]">Followers</div>
+                      <div className="mt-2 text-[26px] font-black tracking-tight text-[var(--wk-text)]">{formatArtistMetric(launchAnalytics.summary.followers)}</div>
+                      <div className="mt-1 text-[10px] font-semibold text-[var(--wk-text-muted)]">
+                        +{formatArtistMetric(launchAnalytics.summary.newFollowers)} in this period
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="mt-6 grid gap-5 lg:grid-cols-2">
+                    <div className="rounded-2xl border border-[var(--wk-border)] p-4">
+                      <h4 className="text-[13px] font-black text-[var(--wk-text)]">Top Content</h4>
+                      <div className="mt-3 space-y-2">
+                        {launchAnalytics.topContent.map((item) => (
+                          <Link
+                            key={`${item.type}:${item.id}`}
+                            to={item.path}
+                            className="flex items-center justify-between gap-3 rounded-xl bg-[var(--wk-bg)] px-3 py-3 hover:bg-[var(--wk-surface-strong)]"
+                          >
+                            <div className="min-w-0">
+                              <div className="truncate text-[12px] font-black text-[var(--wk-text)]">{item.title}</div>
+                              <div className="mt-0.5 text-[10px] font-semibold text-[var(--wk-text-muted)]">{artistLaunchTargetLabel(item.type)}</div>
+                            </div>
+                            <div className="shrink-0 text-right text-[10px] leading-4 text-[var(--wk-text-muted)]">
+                              <div>{formatArtistMetric(item.views)} views</div>
+                              {(item.plays > 0 || item.shares > 0) && (
+                                <div>
+                                  {item.plays > 0 ? `${formatArtistMetric(item.plays)} plays` : ""}
+                                  {item.plays > 0 && item.shares > 0 ? " · " : ""}
+                                  {item.shares > 0 ? `${formatArtistMetric(item.shares)} shares` : ""}
+                                </div>
+                              )}
+                            </div>
+                          </Link>
+                        ))}
+                        {launchAnalytics.topContent.length === 0 && (
+                          <p className="rounded-xl bg-[var(--wk-bg)] px-3 py-4 text-[11px] text-[var(--wk-text-muted)]">
+                            No public activity in this range yet.
+                          </p>
+                        )}
+                      </div>
+                    </div>
+
+                    <div className="rounded-2xl border border-[var(--wk-border)] p-4">
+                      <h4 className="text-[13px] font-black text-[var(--wk-text)]">Launch Campaigns</h4>
+                      <div className="mt-3 space-y-2">
+                        {launchAnalytics.launchCampaigns.map((campaign) => (
+                          <div key={`${campaign.campaign}:${campaign.source}`} className="rounded-xl bg-[var(--wk-bg)] px-3 py-3">
+                            <div className="flex items-start justify-between gap-3">
+                              <div className="min-w-0">
+                                <div className="truncate text-[12px] font-black text-[var(--wk-text)]">{campaign.campaign}</div>
+                                <div className="mt-0.5 text-[10px] font-semibold text-[var(--wk-text-muted)]">{campaign.source}</div>
+                              </div>
+                              <div className="shrink-0 text-right text-[10px] leading-4 text-[var(--wk-text-muted)]">
+                                <div>{formatArtistMetric(campaign.views)} views</div>
+                                <div>{formatArtistMetric(campaign.visitors)} visitors</div>
+                              </div>
+                            </div>
+                          </div>
+                        ))}
+                        {launchAnalytics.launchCampaigns.length === 0 && (
+                          <p className="rounded-xl bg-[var(--wk-bg)] px-3 py-4 text-[11px] text-[var(--wk-text-muted)]">
+                            No tracked launch visits in this range yet.
+                          </p>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+
+                  <p className="mt-4 text-[10px] text-[var(--wk-text-faint)]">
+                    Range starts {new Date(launchAnalytics.since).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" })}.
+                  </p>
+                </>
+              ) : null}
+            </div>
+          </section>
+
           {permissions.profile && (
             <section className="rounded-3xl border border-[var(--wk-border)] bg-[var(--wk-surface)] p-6 md:p-7">
               <h2 className="text-[22px] font-black tracking-tight text-[var(--wk-text)]">Edit Profile</h2>
@@ -1045,6 +1430,17 @@ export default function ArtistManagePage() {
           <section className="rounded-3xl border border-[var(--wk-border)] bg-[var(--wk-surface)] p-5">
             <h2 className="text-[16px] font-black text-[var(--wk-text)]">Artist Actions</h2>
             <div className="mt-4 space-y-3">
+              <div className="rounded-2xl border border-[var(--wk-border)] p-4">
+                <div className="text-[13px] font-black text-[var(--wk-text)]">Launch Tools</div>
+                <p className="mt-1 text-[12px] leading-5 text-[var(--wk-text-muted)]">Create tracked launch links and see public performance.</p>
+                <button
+                  type="button"
+                  onClick={() => document.getElementById("artist-launch-tools")?.scrollIntoView({ behavior: "smooth", block: "start" })}
+                  className="mt-3 rounded-full border border-[var(--wk-border)] px-4 py-2 text-[12px] font-bold text-[var(--wk-text)]"
+                >
+                  Open Launch Tools
+                </button>
+              </div>
               <div className={`rounded-2xl border border-[var(--wk-border)] p-4 ${permissions.releases ? "" : "opacity-50"}`}>
                 <div className="text-[13px] font-black text-[var(--wk-text)]">Add Music</div>
                 <p className="mt-1 text-[12px] leading-5 text-[var(--wk-text-muted)]">Send a provider-confirmed track to Music Registry review.</p>
