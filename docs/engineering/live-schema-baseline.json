@@ -1,9 +1,9 @@
 {
   "projectRef": "pgzizndxdyhqmtyywjmt",
   "schema": "public",
-  "generatedAt": "2026-08-14T13:30:42Z",
-  "typesSha256": "89604fdb39f980e2c71524cc2659b46bde29ad8ee9d4ec719c5e559a0d20cbd1",
+  "generatedAt": "2026-08-14T14:16:34Z",
+  "typesSha256": "ed18f077e5212d793c3ae6cd572a6af91e5446bd215d2c55a7d9c5196d85b379",
   "authoritativeMigrationDirectory": "supabase/migrations",
-  "migrationCount": 250,
-  "latestMigration": "20260814124500_artist_claims_representation_authority.sql"
+  "migrationCount": 251,
+  "latestMigration": "20260814164000_claimed_artist_experience.sql"
 }

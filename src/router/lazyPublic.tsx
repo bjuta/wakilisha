@@ -72,6 +72,10 @@ export const ArtistDetail = lazy(
   () => import("../pages/artists/detail/page"),
 );
 
+export const ArtistManagePage = lazy(
+  () => import("../pages/artists/manage/page"),
+);
+
 export const Releases = lazy(
   () => import("../pages/releases/page"),
 );

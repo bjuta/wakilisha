@@ -148,6 +148,10 @@ export const AdminCommunityPage = lazy(() =>
   import("../pages/admin/community/page"),
 );
 
+export const AdminArtistClaimsPage = lazy(() =>
+  import("../pages/admin/community/artist-claims/page"),
+);
+
 export const AdminContentArchivePage = lazy(() =>
   import("../pages/admin/content/archive/page"),
 );

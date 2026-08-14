@@ -3665,6 +3665,16 @@ export type Database = {
         }
         Returns: string
       }
+      current_artist_representation: {
+        Args: { p_artist_id: string }
+        Returns: Database["public"]["Tables"]["artist_representations"]["Row"]
+        SetofOptions: {
+          from: "*"
+          to: "artist_representations"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
       current_user_can_apply_correction: {
         Args: { p_case_resource_id: string }
         Returns: boolean
@@ -4656,6 +4666,53 @@ export type Database = {
             foreignKeyName: "artist_claim_requests_artist_id_fkey"
             columns: ["artist_id"]
             isOneToOne: false
+            referencedRelation: "registry_artists"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      artist_profile_presentations: {
+        Row: {
+          artist_id: string
+          bio: string | null
+          created_at: string
+          hero_image_url: string | null
+          profile_image_url: string | null
+          public_email: string | null
+          social_links: Json
+          updated_at: string
+          updated_by: string | null
+          website_url: string | null
+        }
+        Insert: {
+          artist_id: string
+          bio?: string | null
+          created_at?: string
+          hero_image_url?: string | null
+          profile_image_url?: string | null
+          public_email?: string | null
+          social_links?: Json
+          updated_at?: string
+          updated_by?: string | null
+          website_url?: string | null
+        }
+        Update: {
+          artist_id?: string
+          bio?: string | null
+          created_at?: string
+          hero_image_url?: string | null
+          profile_image_url?: string | null
+          public_email?: string | null
+          social_links?: Json
+          updated_at?: string
+          updated_by?: string | null
+          website_url?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "artist_profile_presentations_artist_id_fkey"
+            columns: ["artist_id"]
+            isOneToOne: true
             referencedRelation: "registry_artists"
             referencedColumns: ["id"]
           },
@@ -17688,7 +17745,15 @@ export type Database = {
         Args: { p_display_name?: string; p_email: string; p_user_id: string }
         Returns: string
       }
+      community_get_artist_public_presentation: {
+        Args: { p_artist_id: string }
+        Returns: Json
+      }
       community_get_artist_representation_state: {
+        Args: { p_artist_id: string }
+        Returns: Json
+      }
+      community_get_artist_team: {
         Args: { p_artist_id: string }
         Returns: Json
       }
@@ -18043,6 +18108,18 @@ export type Database = {
         Args: { p_comment_id: string; p_details?: string; p_reason: string }
         Returns: Json
       }
+      community_save_artist_profile_presentation: {
+        Args: {
+          p_artist_id: string
+          p_bio?: string
+          p_hero_image_url?: string
+          p_profile_image_url?: string
+          p_public_email?: string
+          p_social_links?: Json
+          p_website_url?: string
+        }
+        Returns: Json
+      }
       community_save_entity: {
         Args: {
           p_entity_id?: string
@@ -18091,6 +18168,15 @@ export type Database = {
           p_claimant_role: string
           p_evidence?: Json
           p_statement: string
+        }
+        Returns: Json
+      }
+      community_submit_artist_registry_correction: {
+        Args: {
+          p_artist_id: string
+          p_field_key: string
+          p_proposed_value: string
+          p_reason: string
         }
         Returns: Json
       }
