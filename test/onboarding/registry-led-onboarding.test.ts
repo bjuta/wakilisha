@@ -182,6 +182,9 @@ describe(
           "overflow-x-auto",
         );
         expect(page).toContain(
+          'className="-mx-1 flex gap-3 overflow-x-auto px-1 pb-2 pt-1"',
+        );
+        expect(page).toContain(
           "const visibleArtists =",
         );
         expect(page).toContain(
