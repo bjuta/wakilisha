@@ -112,6 +112,8 @@ const SEO_PAGE_TYPES = new Set([
   "artist_detail",
   "release_detail",
   "track_detail",
+  "playlist_detail",
+  "person_detail",
   "charts_edition",
   "charts_directory",
   "guide_detail",
@@ -128,6 +130,8 @@ const SEO_ENTITY_TYPES = new Set([
   "release",
   "track",
   "article",
+  "playlist",
+  "person",
   "chart",
   "guide",
   "genre",
@@ -135,7 +139,7 @@ const SEO_ENTITY_TYPES = new Set([
   "issue",
 ]);
 
-const SEO_IMAGE_KINDS = new Set(["artist", "release", "track", "article", "label"]);
+const SEO_IMAGE_KINDS = new Set(["artist", "release", "track", "article", "playlist", "person", "label"]);
 
 const SUPABASE_URL = import.meta.env.VITE_PUBLIC_SUPABASE_URL as string;
 const EDGE_XML_URL = `${SUPABASE_URL}/functions/v1/seo-sitemap-admin?action=xml`;
@@ -154,7 +158,7 @@ function shortHash(value?: string | null) {
 
 function isSeoPage(page: TopPage) {
   if (SEO_PAGE_TYPES.has(page.page_type)) return true;
-  return /^\/(artists|releases|tracks|charts|articles|magazine|guides|genres|labels|categories|tags|authors)\//.test(page.page_url || "");
+  return /^\/(artists|releases|tracks|playlists|people|charts|articles|magazine|guides|genres|labels|categories|tags|authors)\//.test(page.page_url || "");
 }
 
 function isSeoEntity(entity: TopEntity) {

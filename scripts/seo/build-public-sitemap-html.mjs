@@ -177,10 +177,12 @@ const groupOrder = [
   "magazine",
   "artists",
   "releases",
+  "playlists",
   "charts",
   "genres",
   "labels",
   "authors",
+  "people",
   "categories",
   "tags",
   "about",
@@ -249,6 +251,7 @@ const publicLinksBlock = `<noscript data-wakilisha-public-links>
     <a href="/magazine">Magazine</a>
     <a href="/artists">Artists</a>
     <a href="/releases">Releases</a>
+    <a href="/playlists">Playlists</a>
     <a href="/charts">Charts</a>
   </nav>
 </noscript>`;
@@ -280,7 +283,7 @@ fs.writeFileSync(sitemapXmlPath, updatedSitemapXml);
 
 const finalIndexHtml = readRequired(indexHtmlPath);
 const finalSitemapHtml = readRequired(sitemapHtmlPath);
-const homepageRequiredLinks = ["/sitemap.html", "/magazine", "/artists", "/releases", "/charts"];
+const homepageRequiredLinks = ["/sitemap.html", "/magazine", "/artists", "/releases", "/playlists", "/charts"];
 
 const missingHomepageLinks = homepageRequiredLinks.filter((href) => !finalIndexHtml.includes(`href="${href}"`));
 if (missingHomepageLinks.length) fail(`Homepage is missing raw links: ${missingHomepageLinks.join(", ")}`);
