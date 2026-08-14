@@ -955,12 +955,9 @@ export default function RegistryOnboardingPage() {
         }
 
         navigate(
-          isEditing
-            ? "/settings"
-            : "/following",
+          "/following",
           {
-            replace:
-              !isEditing,
+            replace: true,
           },
         );
       } catch (nextError) {
@@ -1031,7 +1028,7 @@ export default function RegistryOnboardingPage() {
             className="text-[12px] font-bold text-[var(--wk-text-muted)] transition-colors hover:text-[var(--wk-text)] disabled:opacity-50"
           >
             {isEditing
-              ? "Back"
+              ? "Back to Settings"
               : "Skip for now"}
           </button>
         </div>
