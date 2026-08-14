@@ -3859,6 +3859,10 @@ export type Database = {
         Args: { p_person_resource_id: string }
         Returns: undefined
       }
+      refresh_registry_artist_username_reservations: {
+        Args: never
+        Returns: Json
+      }
       resequence_playlist_with_registry_intake: {
         Args: { p_playlist_id: string }
         Returns: undefined
@@ -3924,6 +3928,10 @@ export type Database = {
       sync_account_person_handle: {
         Args: { p_user_id: string }
         Returns: string
+      }
+      username_is_registry_artist_reserved: {
+        Args: { p_username: string }
+        Returns: boolean
       }
       validate_citation_locator: {
         Args: { p_locator_data: Json; p_locator_type: string }
@@ -6745,6 +6753,38 @@ export type Database = {
             columns: ["comment_id"]
             isOneToOne: false
             referencedRelation: "community_comments"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      community_artist_username_reservations: {
+        Row: {
+          artist_id: string
+          created_at: string
+          source: string
+          updated_at: string
+          username: string
+        }
+        Insert: {
+          artist_id: string
+          created_at?: string
+          source: string
+          updated_at?: string
+          username: string
+        }
+        Update: {
+          artist_id?: string
+          created_at?: string
+          source?: string
+          updated_at?: string
+          username?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "community_artist_username_reservations_artist_id_fkey"
+            columns: ["artist_id"]
+            isOneToOne: false
+            referencedRelation: "registry_artists"
             referencedColumns: ["id"]
           },
         ]
