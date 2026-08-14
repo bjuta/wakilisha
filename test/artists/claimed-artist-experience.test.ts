@@ -13,6 +13,18 @@ const service = readFileSync(
   "src/services/artists/claimedArtist.ts",
   "utf8",
 );
+const artistUpdatesService = readFileSync(
+  "src/services/artists/artistUpdates.ts",
+  "utf8",
+);
+const artistMusicSubmissionsService = readFileSync(
+  "src/services/artists/artistMusicSubmissions.ts",
+  "utf8",
+);
+const artistLaunchToolsService = readFileSync(
+  "src/services/artists/artistLaunchTools.ts",
+  "utf8",
+);
 const artistPage = readFileSync(
   "src/pages/artists/detail/page.tsx",
   "utf8",
@@ -73,6 +85,18 @@ describe("claimed Artist experience", () => {
     expect(migration).toContain("or not v_actor_rep.can_manage_team");
     expect(migration).toContain("insufficient_artist_team_privilege");
     expect(verifier).toContain("team reader is not bound to team-management permission");
+  });
+
+  it("keeps Supabase RPC calls bound to the client across Artist services", () => {
+    for (const artistService of [
+      service,
+      artistUpdatesService,
+      artistMusicSubmissionsService,
+      artistLaunchToolsService,
+    ]) {
+      expect(artistService).toContain("supabase.rpc.bind(supabase)");
+      expect(artistService).not.toMatch(/supabase\.rpc\s+as\s+unknown\s+as/);
+    }
   });
 
   it("keeps one canonical Artist page and adds a bounded management route", () => {
