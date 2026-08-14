@@ -1181,7 +1181,7 @@ export default function RegistryOnboardingPage() {
               </span>
             </div>
 
-            <div className="-mx-1 flex gap-3 overflow-x-auto px-1 pb-2">
+            <div className="-mx-1 flex gap-3 overflow-x-auto px-1 pb-2 pt-1">
               {yourPeople.map(
                 (artist) => (
                   <div
