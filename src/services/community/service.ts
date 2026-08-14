@@ -272,6 +272,7 @@ function isCommunityPublicReactionTargetType(
     value === 'article'
     || value === 'playlist'
     || value === 'release'
+    || value === 'artist_update'
   );
 }
 

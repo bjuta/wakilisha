@@ -4860,6 +4860,69 @@ export type Database = {
           },
         ]
       }
+      artist_updates: {
+        Row: {
+          artist_id: string
+          author_user_id: string | null
+          body: string
+          created_at: string
+          id: string
+          image_url: string | null
+          link_label: string | null
+          link_url: string | null
+          published_at: string
+          representation_id: string | null
+          status: string
+          updated_at: string
+          withdrawn_at: string | null
+        }
+        Insert: {
+          artist_id: string
+          author_user_id?: string | null
+          body: string
+          created_at?: string
+          id?: string
+          image_url?: string | null
+          link_label?: string | null
+          link_url?: string | null
+          published_at?: string
+          representation_id?: string | null
+          status?: string
+          updated_at?: string
+          withdrawn_at?: string | null
+        }
+        Update: {
+          artist_id?: string
+          author_user_id?: string | null
+          body?: string
+          created_at?: string
+          id?: string
+          image_url?: string | null
+          link_label?: string | null
+          link_url?: string | null
+          published_at?: string
+          representation_id?: string | null
+          status?: string
+          updated_at?: string
+          withdrawn_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "artist_updates_artist_id_fkey"
+            columns: ["artist_id"]
+            isOneToOne: false
+            referencedRelation: "registry_artists"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "artist_updates_representation_id_fkey"
+            columns: ["representation_id"]
+            isOneToOne: false
+            referencedRelation: "artist_representations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       audience_interests: {
         Row: {
           created_at: string
@@ -17729,6 +17792,16 @@ export type Database = {
         }
         Returns: undefined
       }
+      community_edit_artist_update: {
+        Args: {
+          p_body: string
+          p_image_url?: string
+          p_link_label?: string
+          p_link_url?: string
+          p_update_id: string
+        }
+        Returns: Json
+      }
       community_ensure_user_account: {
         Args: { p_user_id: string }
         Returns: undefined
@@ -17745,6 +17818,10 @@ export type Database = {
         Args: { p_display_name?: string; p_email: string; p_user_id: string }
         Returns: string
       }
+      community_get_artist_manage_updates: {
+        Args: { p_artist_id: string; p_limit?: number }
+        Returns: Json
+      }
       community_get_artist_public_presentation: {
         Args: { p_artist_id: string }
         Returns: Json
@@ -17755,6 +17832,10 @@ export type Database = {
       }
       community_get_artist_team: {
         Args: { p_artist_id: string }
+        Returns: Json
+      }
+      community_get_artist_update: {
+        Args: { p_update_id: string }
         Returns: Json
       }
       community_get_comment_replies: {
@@ -18096,6 +18177,16 @@ export type Database = {
         }
         Returns: Json
       }
+      community_publish_artist_update: {
+        Args: {
+          p_artist_id: string
+          p_body: string
+          p_image_url?: string
+          p_link_label?: string
+          p_link_url?: string
+        }
+        Returns: Json
+      }
       community_react_to_target: {
         Args: {
           p_reaction_type: string
@@ -18251,6 +18342,10 @@ export type Database = {
       }
       community_withdraw_artist_claim: {
         Args: { p_claim_id: string; p_reason?: string }
+        Returns: Json
+      }
+      community_withdraw_artist_update: {
+        Args: { p_reason: string; p_update_id: string }
         Returns: Json
       }
       complete_media_processing_job_v1: {

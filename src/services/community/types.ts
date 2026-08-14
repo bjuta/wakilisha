@@ -3,6 +3,7 @@ export type CommunityEntityType =
   | 'magazine_issue'
   | 'briefing_issue'
   | 'artist'
+  | 'artist_update'
   | 'track'
   | 'release'
   | 'label'
@@ -35,7 +36,8 @@ export type ReactionType = string;
 export type CommunityPublicReactionTargetType =
   | 'article'
   | 'playlist'
-  | 'release';
+  | 'release'
+  | 'artist_update';
 
 export interface CommunityPublicReactionTarget {
   targetType: CommunityPublicReactionTargetType;

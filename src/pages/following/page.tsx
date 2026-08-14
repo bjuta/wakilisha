@@ -266,6 +266,10 @@ function activityLabel(
     return "WAKILISHA Playlist";
   }
 
+  if (item.itemType === "artist_update") {
+    return "Artist Update";
+  }
+
   return "Release";
 }
 
@@ -406,6 +410,13 @@ function ActivityMedia({
     );
   }
 
+  if (
+    item.itemType === "artist_update" &&
+    !item.imageUrl
+  ) {
+    return null;
+  }
+
   const shape =
     item.itemType === "release"
       ? "mx-auto aspect-square w-full max-w-[680px]"
@@ -506,7 +517,9 @@ function FollowingShareAction({
         type:
           item.itemType === "release"
             ? "album"
-            : item.itemType,
+            : item.itemType === "artist_update"
+              ? "artist_update"
+              : item.itemType,
       }),
       [
         item,
@@ -822,28 +835,51 @@ function FollowingActivity({
         </div>
       </div>
 
-      <Link
-        to={item.canonicalPath}
-        aria-label={item.title}
-        className="group mt-4 block overflow-hidden md:mt-5"
-      >
-        <ActivityMedia item={item} />
-      </Link>
+      {(
+        item.itemType !== "artist_update" ||
+        item.imageUrl
+      ) && (
+        <Link
+          to={item.canonicalPath}
+          aria-label={item.title}
+          className="group mt-4 block overflow-hidden md:mt-5"
+        >
+          <ActivityMedia item={item} />
+        </Link>
+      )}
 
       <div className="px-4 pt-4 md:px-0 md:pt-5">
-        <h2 className="text-[22px] font-black leading-[1.02] tracking-[-0.035em] text-[var(--wk-text)] md:text-[30px]">
-          <Link
-            to={item.canonicalPath}
-            className="transition-colors hover:text-[var(--wk-brand)]"
-          >
-            {item.title}
-          </Link>
-        </h2>
+        {item.itemType === "artist_update" ? (
+          <>
+            {item.summary && (
+              <p className="max-w-[680px] whitespace-pre-wrap text-[18px] font-semibold leading-[1.55] tracking-[-0.015em] text-[var(--wk-text)] md:text-[21px]">
+                {item.summary}
+              </p>
+            )}
+            <Link
+              to={item.canonicalPath}
+              className="mt-3 inline-block text-[11px] font-black text-[var(--wk-brand)] hover:underline"
+            >
+              View Update
+            </Link>
+          </>
+        ) : (
+          <>
+            <h2 className="text-[22px] font-black leading-[1.02] tracking-[-0.035em] text-[var(--wk-text)] md:text-[30px]">
+              <Link
+                to={item.canonicalPath}
+                className="transition-colors hover:text-[var(--wk-brand)]"
+              >
+                {item.title}
+              </Link>
+            </h2>
 
-        {item.summary && (
-          <p className="mt-2 line-clamp-2 max-w-[680px] text-[13px] leading-relaxed text-[var(--wk-text-muted)] md:mt-3 md:text-[14px] md:line-clamp-3">
-            {item.summary}
-          </p>
+            {item.summary && (
+              <p className="mt-2 line-clamp-2 max-w-[680px] text-[13px] leading-relaxed text-[var(--wk-text-muted)] md:mt-3 md:text-[14px] md:line-clamp-3">
+                {item.summary}
+              </p>
+            )}
+          </>
         )}
 
         <div
