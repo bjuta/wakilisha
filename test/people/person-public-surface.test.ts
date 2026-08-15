@@ -881,7 +881,7 @@ describe(
 
         expect(followingFeedService)
           .toContain(
-            '"community_get_following_feed"',
+            '"community_get_social_feed"',
           );
 
         expect(followingFeedService)
@@ -911,7 +911,7 @@ describe(
 
         expect(followingFeedPage)
           .toContain(
-            'buildCommunityAuthUrl("/following")',
+            "<GuestFollowingPicker />",
           );
 
         expect(appTopBar)

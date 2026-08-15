@@ -191,11 +191,6 @@ function getAvatarExtension(file: File): AvatarExtension | null {
   return null;
 }
 
-function buildProfileMediaStoragePath(userId: string, kind: "avatar" | "cover", ext: AvatarExtension): string {
-  const safeUserId = userId.replace(/[^a-zA-Z0-9_-]/g, "-");
-  return `uploads/profiles/${safeUserId}/${kind}-${Date.now()}.${ext}`;
-}
-
 async function uploadProfileMediaToLightsail(
   userId: string,
   file: File,
@@ -203,7 +198,6 @@ async function uploadProfileMediaToLightsail(
   ext: AvatarExtension,
 ): Promise<string> {
   const form = new FormData();
-  const storagePath = buildProfileMediaStoragePath(userId, kind, ext);
   const fileName = `${kind}.${ext}`;
   const uploadFile = new File([file], fileName, {
     type: getAvatarContentType(file, ext),
@@ -211,7 +205,6 @@ async function uploadProfileMediaToLightsail(
 
   form.append("file", uploadFile);
   form.append("folder", `uploads/profiles/${userId}`);
-  form.append("storage_path", storagePath);
 
   const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
   const { data: userData, error: userError } = await supabase.auth.getUser();

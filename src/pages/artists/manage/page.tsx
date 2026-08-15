@@ -1,6 +1,12 @@
 import { useEffect, useMemo, useState, type FormEvent } from "react";
-import { Link, useParams } from "react-router-dom";
+import { Link, useParams, useSearchParams } from "react-router-dom";
 import { WkButton } from "@/components/design-system/primitives/Button";
+import {
+  WkIcon,
+  type WkIconName,
+} from "@/components/design-system/Icon";
+import { ArtistImageField } from "@/components/artists/ArtistImageField";
+import { ArtistPostComposer } from "@/components/artists/ArtistPostComposer";
 import { useAuthUser } from "@/hooks/useAuthUser";
 import { getArtist, type PublicArtistDetail } from "@/services/publicContent/client";
 import {
@@ -18,9 +24,7 @@ import {
   type ArtistTeamMember,
 } from "@/services/artists/claimedArtist";
 import {
-  editArtistUpdate,
   listArtistManageUpdates,
-  publishArtistUpdate,
   withdrawArtistUpdate,
   type ArtistUpdate,
 } from "@/services/artists/artistUpdates";
@@ -70,6 +74,48 @@ const CORRECTION_FIELDS = [
   ["other", "Something Else"],
 ] as const;
 
+type ArtistStudioSection =
+  | "home"
+  | "posts"
+  | "music"
+  | "insights"
+  | "settings";
+
+type ArtistSettingsSection =
+  | "profile"
+  | "team"
+  | "registry";
+
+function StudioNavItem({
+  active,
+  icon,
+  label,
+  onClick,
+}: {
+  active: boolean;
+  icon: WkIconName;
+  label: string;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={`flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left text-[12px] font-black transition ${
+        active
+          ? "bg-[var(--wk-brand-soft)] text-[var(--wk-brand)]"
+          : "text-[var(--wk-text-muted)] hover:bg-[var(--wk-bg)] hover:text-[var(--wk-text)]"
+      }`}
+    >
+      <WkIcon
+        name={icon}
+        size={16}
+      />
+      {label}
+    </button>
+  );
+}
+
 function defaultPermissionsForRole(role: string): ArtistPermissionSet {
   if (role === "manager") return { profile: true, releases: true, updates: true, team: true };
   if (role === "label") return { profile: false, releases: true, updates: true, team: false };
@@ -116,6 +162,7 @@ function artistLaunchTargetKey(target: ArtistLaunchTarget): string {
 
 export default function ArtistManagePage() {
   const { slug } = useParams<{ slug: string }>();
+  const [searchParams, setSearchParams] = useSearchParams();
   const user = useAuthUser();
   const [artist, setArtist] = useState<PublicArtistDetail | null>(null);
   const [representationState, setRepresentationState] = useState<ArtistRepresentationState | null>(null);
@@ -142,10 +189,6 @@ export default function ArtistManagePage() {
   const [correctionReason, setCorrectionReason] = useState("");
 
   const [artistUpdates, setArtistUpdates] = useState<ArtistUpdate[]>([]);
-  const [updateBody, setUpdateBody] = useState("");
-  const [updateImageUrl, setUpdateImageUrl] = useState("");
-  const [updateLinkUrl, setUpdateLinkUrl] = useState("");
-  const [updateLinkLabel, setUpdateLinkLabel] = useState("");
   const [editingUpdateId, setEditingUpdateId] = useState<string | null>(null);
 
   const [musicSubmissions, setMusicSubmissions] = useState<ArtistMusicSubmission[]>([]);
@@ -374,6 +417,29 @@ export default function ArtistManagePage() {
     ],
   );
 
+  const artistMediaUrls = useMemo(
+    () =>
+      Array.from(
+        new Set(
+          [
+            profileImageUrl,
+            heroImageUrl,
+            ...artistUpdates.map(
+              (update) =>
+                update.imageUrl ?? "",
+            ),
+          ]
+            .map((url) => url.trim())
+            .filter(Boolean),
+        ),
+      ),
+    [
+      profileImageUrl,
+      heroImageUrl,
+      artistUpdates,
+    ],
+  );
+
   function patchSocial(key: string, value: string) {
     setSocialLinks((current) => ({ ...current, [key]: value }));
   }
@@ -514,59 +580,14 @@ export default function ArtistManagePage() {
     }
   }
 
-  function resetUpdateComposer() {
-    setEditingUpdateId(null);
-    setUpdateBody("");
-    setUpdateImageUrl("");
-    setUpdateLinkUrl("");
-    setUpdateLinkLabel("");
-  }
-
   function beginEditUpdate(update: ArtistUpdate) {
     if (update.status !== "published") return;
     setEditingUpdateId(update.id);
-    setUpdateBody(update.body);
-    setUpdateImageUrl(update.imageUrl ?? "");
-    setUpdateLinkUrl(update.linkUrl ?? "");
-    setUpdateLinkLabel(update.linkLabel ?? "");
-    document.getElementById("artist-updates")?.scrollIntoView({
+
+    document.getElementById("artist-posts")?.scrollIntoView({
       behavior: "smooth",
       block: "start",
     });
-  }
-
-  async function handleArtistUpdate(event: FormEvent) {
-    event.preventDefault();
-    if (!artist || !activeRepresentation?.permissions.updates || !updateBody.trim()) return;
-    setBusy(true);
-    setMessage(null);
-    try {
-      if (editingUpdateId) {
-        await editArtistUpdate({
-          updateId: editingUpdateId,
-          body: updateBody.trim(),
-          imageUrl: updateImageUrl.trim(),
-          linkUrl: updateLinkUrl.trim(),
-          linkLabel: updateLinkLabel.trim(),
-        });
-        setMessage({ type: "success", text: "Artist Update saved." });
-      } else {
-        await publishArtistUpdate({
-          artistId: artist.id,
-          body: updateBody.trim(),
-          imageUrl: updateImageUrl.trim(),
-          linkUrl: updateLinkUrl.trim(),
-          linkLabel: updateLinkLabel.trim(),
-        });
-        setMessage({ type: "success", text: "Artist Update published to Following." });
-      }
-      resetUpdateComposer();
-      await loadUpdates(artist.id, true);
-    } catch (error) {
-      setMessage({ type: "error", text: error instanceof Error ? error.message : "We could not publish this Artist Update." });
-    } finally {
-      setBusy(false);
-    }
   }
 
   async function handleWithdrawUpdate(update: ArtistUpdate) {
@@ -577,11 +598,13 @@ export default function ArtistManagePage() {
     setMessage(null);
     try {
       await withdrawArtistUpdate(update.id, reason.trim());
-      if (editingUpdateId === update.id) resetUpdateComposer();
-      setMessage({ type: "success", text: "Artist Update withdrawn." });
+      if (editingUpdateId === update.id) {
+        setEditingUpdateId(null);
+      }
+      setMessage({ type: "success", text: "Post withdrawn." });
       await loadUpdates(artist.id, true);
     } catch (error) {
-      setMessage({ type: "error", text: error instanceof Error ? error.message : "We could not withdraw this Artist Update." });
+      setMessage({ type: "error", text: error instanceof Error ? error.message : "We could not withdraw this post." });
     } finally {
       setBusy(false);
     }
@@ -743,6 +766,47 @@ export default function ArtistManagePage() {
     }
   }
 
+  function openStudioSection(
+    section: ArtistStudioSection,
+    settings?: ArtistSettingsSection,
+  ) {
+    const next =
+      new URLSearchParams(
+        searchParams,
+      );
+
+    next.set(
+      "section",
+      section,
+    );
+
+    if (
+      section === "settings" &&
+      settings
+    ) {
+      next.set(
+        "settings",
+        settings,
+      );
+    } else if (
+      section !== "settings"
+    ) {
+      next.delete("settings");
+    }
+
+    setSearchParams(
+      next,
+      {
+        replace: true,
+      },
+    );
+
+    window.scrollTo({
+      top: 0,
+      behavior: "smooth",
+    });
+  }
+
   if (user.loading || loading) {
     return <main className="wk-container px-6 py-20"><p className="text-[14px] text-[var(--wk-text-muted)]">Loading Artist access…</p></main>;
   }
@@ -778,24 +842,139 @@ export default function ArtistManagePage() {
 
   const permissions = activeRepresentation.permissions;
 
+  const requestedStudioSection =
+    searchParams.get("section");
+  const requestedSettingsSection =
+    searchParams.get("settings");
+
+  const requestedStudioAllowed =
+    requestedStudioSection === "home" ||
+    (
+      requestedStudioSection === "posts" &&
+      permissions.updates
+    ) ||
+    (
+      requestedStudioSection === "music" &&
+      permissions.releases
+    ) ||
+    requestedStudioSection === "insights" ||
+    (
+      requestedStudioSection === "settings" &&
+      (
+        permissions.profile ||
+        permissions.team
+      )
+    );
+
+  const studioSection: ArtistStudioSection =
+    requestedStudioAllowed
+      ? requestedStudioSection as ArtistStudioSection
+      : "home";
+
+  const requestedSettingsAllowed =
+    (
+      requestedSettingsSection === "profile" &&
+      permissions.profile
+    ) ||
+    (
+      requestedSettingsSection === "team" &&
+      permissions.team
+    ) ||
+    (
+      requestedSettingsSection === "registry" &&
+      permissions.profile
+    );
+
+  const settingsSection: ArtistSettingsSection =
+    requestedSettingsAllowed
+      ? requestedSettingsSection as ArtistSettingsSection
+      : permissions.profile
+        ? "profile"
+        : "team";
+
+  const profileChecks = [
+    {
+      label: "Profile picture",
+      complete:
+        Boolean(
+          profileImageUrl.trim(),
+        ),
+    },
+    {
+      label: "Cover image",
+      complete:
+        Boolean(
+          heroImageUrl.trim(),
+        ),
+    },
+    {
+      label: "Bio",
+      complete:
+        Boolean(
+          bio.trim(),
+        ),
+    },
+    {
+      label: "Contact or social link",
+      complete:
+        Boolean(
+          websiteUrl.trim() ||
+          publicEmail.trim() ||
+          Object.values(
+            socialLinks,
+          ).some(
+            (value) =>
+              value.trim(),
+          ),
+        ),
+    },
+  ];
+
+  const completedProfileChecks =
+    profileChecks.filter(
+      (item) =>
+        item.complete,
+    ).length;
+
+  const profileCompletionPercent =
+    Math.round(
+      (
+        completedProfileChecks /
+        profileChecks.length
+      ) * 100,
+    );
+
   return (
     <main className="wk-container px-6 py-10 md:py-14">
       <div className="mb-8 flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
         <div>
-          <Link to={`/artists/${artist.slug}`} className="text-[12px] font-bold text-[var(--wk-brand)] hover:underline">Back to {artist.name}</Link>
-          <h1 className="mt-2 text-[34px] font-black tracking-[-0.03em] text-[var(--wk-text)]">Manage {artist.name}</h1>
-          <p className="mt-2 max-w-2xl text-[14px] leading-6 text-[var(--wk-text-muted)]">Your access follows the permissions assigned to your Artist role.</p>
+          <Link
+            to={`/artists/${artist.slug}`}
+            className="text-[12px] font-bold text-[var(--wk-brand)] hover:underline"
+          >
+            Back to {artist.name}
+          </Link>
+          <div className="mt-3 text-[10px] font-black uppercase tracking-[0.16em] text-[var(--wk-brand)]">
+            Official Artist
+          </div>
+          <h1 className="mt-1 text-[34px] font-black tracking-[-0.03em] text-[var(--wk-text)]">
+            Artist Studio
+          </h1>
+          <p className="mt-2 max-w-2xl text-[14px] leading-6 text-[var(--wk-text-muted)]">
+            Create, manage, and understand {artist.name}'s presence on WAKILISHA.
+          </p>
         </div>
-        <p className="text-[12px] font-semibold text-[var(--wk-text-muted)]">
-          You can manage {
-            [
-              permissions.profile ? "profile" : null,
-              permissions.releases ? "music" : null,
-              permissions.updates ? "updates" : null,
-              permissions.team ? "team" : null,
-            ].filter(Boolean).join(", ")
-          }.
-        </p>
+
+        <Link
+          to={`/artists/${artist.slug}`}
+          className="inline-flex items-center gap-2 text-[12px] font-black text-[var(--wk-text-muted)] hover:text-[var(--wk-brand)]"
+        >
+          View Public Profile
+          <WkIcon
+            name="ExternalLink"
+            size={14}
+          />
+        </Link>
       </div>
 
       {message && (
@@ -804,9 +983,288 @@ export default function ArtistManagePage() {
         </div>
       )}
 
-      <div className="grid gap-6 xl:grid-cols-[minmax(0,1.6fr)_minmax(300px,0.8fr)]">
-        <div className="space-y-6">
-          <section id="artist-launch-tools" className="scroll-mt-24 rounded-3xl border border-[var(--wk-border)] bg-[var(--wk-surface)] p-6 md:p-7">
+      <div className="grid gap-6 lg:grid-cols-[230px_minmax(0,1fr)]">
+        <aside className="self-start rounded-2xl border border-[var(--wk-border)] bg-[var(--wk-surface)] p-3 lg:sticky lg:top-24">
+          <div className="mb-3 flex items-center gap-3 rounded-xl bg-[var(--wk-bg)] p-3">
+            <div className="h-11 w-11 shrink-0 overflow-hidden rounded-xl bg-[var(--wk-surface-raised)]">
+              {(profileImageUrl || artist.profileImageUrl || artist.imageUrl) ? (
+                <img
+                  src={profileImageUrl || artist.profileImageUrl || artist.imageUrl}
+                  alt=""
+                  className="h-full w-full object-cover"
+                />
+              ) : (
+                <div className="flex h-full w-full items-center justify-center text-[16px] font-black text-[var(--wk-brand)]">
+                  {artist.name[0]?.toUpperCase() || "A"}
+                </div>
+              )}
+            </div>
+            <div className="min-w-0">
+              <div className="truncate text-[12px] font-black text-[var(--wk-text)]">
+                {artist.name}
+              </div>
+              <div className="mt-0.5 text-[10px] font-semibold capitalize text-[var(--wk-text-muted)]">
+                {activeRepresentation.role.replace(/_/g, " ")}
+              </div>
+            </div>
+          </div>
+
+          <nav
+            className="space-y-1"
+            aria-label="Artist Studio sections"
+          >
+            <StudioNavItem
+              active={studioSection === "home"}
+              icon="Home"
+              label="Home"
+              onClick={() => openStudioSection("home")}
+            />
+
+            {permissions.updates && (
+              <StudioNavItem
+                active={studioSection === "posts"}
+                icon="FileText"
+                label="Posts"
+                onClick={() => openStudioSection("posts")}
+              />
+            )}
+
+            {permissions.releases && (
+              <StudioNavItem
+                active={studioSection === "music"}
+                icon="Music"
+                label="Music"
+                onClick={() => openStudioSection("music")}
+              />
+            )}
+
+            <StudioNavItem
+              active={studioSection === "insights"}
+              icon="BarChart3"
+              label="Insights"
+              onClick={() => openStudioSection("insights")}
+            />
+
+            {(permissions.profile || permissions.team) && (
+              <StudioNavItem
+                active={studioSection === "settings"}
+                icon="Settings"
+                label="Settings"
+                onClick={() =>
+                  openStudioSection(
+                    "settings",
+                    settingsSection,
+                  )
+                }
+              />
+            )}
+          </nav>
+        </aside>
+
+        <div className="min-w-0 space-y-6">
+          {studioSection === "home" && (
+            <section className="rounded-3xl border border-[var(--wk-border)] bg-[var(--wk-surface)] p-6 md:p-8">
+              <div className="flex flex-col gap-6 lg:flex-row lg:items-start lg:justify-between">
+                <div>
+                  <div className="text-[10px] font-black uppercase tracking-[0.16em] text-[var(--wk-brand)]">
+                    Artist Studio
+                  </div>
+                  <h2 className="mt-2 text-[26px] font-black tracking-tight text-[var(--wk-text)]">
+                    You represent {artist.name} on WAKILISHA.
+                  </h2>
+                  <p className="mt-2 max-w-2xl text-[13px] leading-6 text-[var(--wk-text-muted)]">
+                    Keep the public profile current, share updates, submit music for Registry review, and understand what reaches people.
+                  </p>
+                </div>
+
+                <div className="rounded-2xl bg-[var(--wk-bg)] px-4 py-3">
+                  <div className="text-[10px] font-black uppercase tracking-[0.12em] text-[var(--wk-text-faint)]">
+                    Profile Setup
+                  </div>
+                  <div className="mt-1 text-[24px] font-black text-[var(--wk-text)]">
+                    {profileCompletionPercent}%
+                  </div>
+                </div>
+              </div>
+
+              <div className="mt-7 grid gap-5 xl:grid-cols-[minmax(0,1fr)_minmax(280px,0.7fr)]">
+                <div className="rounded-2xl border border-[var(--wk-border)] p-5">
+                  <h3 className="text-[15px] font-black text-[var(--wk-text)]">
+                    Start With Your Presence
+                  </h3>
+                  <p className="mt-1 text-[11px] leading-5 text-[var(--wk-text-muted)]">
+                    These details shape how people see {artist.name} across WAKILISHA.
+                  </p>
+
+                  <div className="mt-4 space-y-2">
+                    {profileChecks.map((item) => (
+                      <div
+                        key={item.label}
+                        className="flex items-center gap-2 text-[12px] font-semibold text-[var(--wk-text-muted)]"
+                      >
+                        <WkIcon
+                          name={item.complete ? "CheckCircle2" : "Circle"}
+                          size={15}
+                          className={item.complete ? "text-[var(--wk-success)]" : "text-[var(--wk-text-faint)]"}
+                        />
+                        {item.label}
+                      </div>
+                    ))}
+                  </div>
+
+                  {permissions.profile && (
+                    <button
+                      type="button"
+                      onClick={() =>
+                        openStudioSection(
+                          "settings",
+                          "profile",
+                        )
+                      }
+                      className="mt-5 inline-flex items-center gap-2 text-[12px] font-black text-[var(--wk-brand)] hover:underline"
+                    >
+                      Edit Profile
+                      <WkIcon
+                        name="ArrowRight"
+                        size={14}
+                      />
+                    </button>
+                  )}
+                </div>
+
+                <div className="rounded-2xl border border-[var(--wk-border)] p-5">
+                  <h3 className="text-[15px] font-black text-[var(--wk-text)]">
+                    Quick Actions
+                  </h3>
+
+                  <div className="mt-4 grid gap-2">
+                    {permissions.updates && (
+                      <button
+                        type="button"
+                        onClick={() => openStudioSection("posts")}
+                        className="flex items-center justify-between rounded-xl bg-[var(--wk-bg)] px-4 py-3 text-left text-[12px] font-black text-[var(--wk-text)] hover:bg-[var(--wk-surface-strong)]"
+                      >
+                        Create Post
+                        <WkIcon name="ArrowRight" size={14} />
+                      </button>
+                    )}
+
+                    {permissions.releases && (
+                      <button
+                        type="button"
+                        onClick={() => openStudioSection("music")}
+                        className="flex items-center justify-between rounded-xl bg-[var(--wk-bg)] px-4 py-3 text-left text-[12px] font-black text-[var(--wk-text)] hover:bg-[var(--wk-surface-strong)]"
+                      >
+                        Add Music
+                        <WkIcon name="ArrowRight" size={14} />
+                      </button>
+                    )}
+
+                    <button
+                      type="button"
+                      onClick={() => openStudioSection("insights")}
+                      className="flex items-center justify-between rounded-xl bg-[var(--wk-bg)] px-4 py-3 text-left text-[12px] font-black text-[var(--wk-text)] hover:bg-[var(--wk-surface-strong)]"
+                    >
+                      View Insights
+                      <WkIcon name="ArrowRight" size={14} />
+                    </button>
+
+                    {permissions.team && (
+                      <button
+                        type="button"
+                        onClick={() =>
+                          openStudioSection(
+                            "settings",
+                            "team",
+                          )
+                        }
+                        className="flex items-center justify-between rounded-xl bg-[var(--wk-bg)] px-4 py-3 text-left text-[12px] font-black text-[var(--wk-text)] hover:bg-[var(--wk-surface-strong)]"
+                      >
+                        Team Access
+                        <WkIcon name="ArrowRight" size={14} />
+                      </button>
+                    )}
+                  </div>
+                </div>
+              </div>
+            </section>
+          )}
+
+          {studioSection === "settings" && (
+            <section className="rounded-3xl border border-[var(--wk-border)] bg-[var(--wk-surface)] p-5 md:p-6">
+              <div>
+                <div className="text-[10px] font-black uppercase tracking-[0.14em] text-[var(--wk-brand)]">
+                  Artist Studio
+                </div>
+                <h2 className="mt-1 text-[22px] font-black tracking-tight text-[var(--wk-text)]">
+                  Settings
+                </h2>
+                <p className="mt-1 text-[12px] leading-5 text-[var(--wk-text-muted)]">
+                  Manage presentation, team access, and reviewed Registry corrections.
+                </p>
+              </div>
+
+              <div className="mt-5 flex flex-wrap gap-2">
+                {permissions.profile && (
+                  <button
+                    type="button"
+                    onClick={() =>
+                      openStudioSection(
+                        "settings",
+                        "profile",
+                      )
+                    }
+                    className={`rounded-full px-4 py-2 text-[11px] font-black ${
+                      settingsSection === "profile"
+                        ? "bg-[var(--wk-brand)] text-[var(--wk-brand-on)]"
+                        : "border border-[var(--wk-border)] text-[var(--wk-text-muted)]"
+                    }`}
+                  >
+                    Profile
+                  </button>
+                )}
+
+                {permissions.team && (
+                  <button
+                    type="button"
+                    onClick={() =>
+                      openStudioSection(
+                        "settings",
+                        "team",
+                      )
+                    }
+                    className={`rounded-full px-4 py-2 text-[11px] font-black ${
+                      settingsSection === "team"
+                        ? "bg-[var(--wk-brand)] text-[var(--wk-brand-on)]"
+                        : "border border-[var(--wk-border)] text-[var(--wk-text-muted)]"
+                    }`}
+                  >
+                    Team
+                  </button>
+                )}
+
+                {permissions.profile && (
+                  <button
+                    type="button"
+                    onClick={() =>
+                      openStudioSection(
+                        "settings",
+                        "registry",
+                      )
+                    }
+                    className={`rounded-full px-4 py-2 text-[11px] font-black ${
+                      settingsSection === "registry"
+                        ? "bg-[var(--wk-brand)] text-[var(--wk-brand-on)]"
+                        : "border border-[var(--wk-border)] text-[var(--wk-text-muted)]"
+                    }`}
+                  >
+                    Registry
+                  </button>
+                )}
+              </div>
+            </section>
+          )}
+          <section id="artist-launch-tools" className={`${studioSection === "insights" ? "" : "hidden"} scroll-mt-24 rounded-3xl border border-[var(--wk-border)] bg-[var(--wk-surface)] p-6 md:p-7`}>
             <h2 className="text-[22px] font-black tracking-tight text-[var(--wk-text)]">Launch Tools</h2>
             <p className="mt-1 max-w-3xl text-[13px] leading-6 text-[var(--wk-text-muted)]">
               Create tracked links to this Artist page, music, and published Updates. Visits from these links are grouped in Performance below.
@@ -1018,8 +1476,8 @@ export default function ArtistManagePage() {
           </section>
 
           {permissions.profile && (
-            <section className="rounded-3xl border border-[var(--wk-border)] bg-[var(--wk-surface)] p-6 md:p-7">
-              <h2 className="text-[22px] font-black tracking-tight text-[var(--wk-text)]">Edit Profile</h2>
+            <section className={`${studioSection === "settings" && settingsSection === "profile" ? "" : "hidden"} rounded-3xl border border-[var(--wk-border)] bg-[var(--wk-surface)] p-6 md:p-7`}>
+              <h2 className="text-[22px] font-black tracking-tight text-[var(--wk-text)]">Profile</h2>
               <p className="mt-1 text-[13px] leading-6 text-[var(--wk-text-muted)]">These details shape the public Artist page. Registry facts stay under WAKILISHA review.</p>
 
               <form onSubmit={handleSaveProfile} className="mt-6 space-y-5">
@@ -1028,23 +1486,37 @@ export default function ArtistManagePage() {
                   <textarea value={bio} onChange={(event) => setBio(event.target.value)} rows={8} maxLength={4000} className="w-full resize-y rounded-xl border border-[var(--wk-border)] bg-[var(--wk-bg)] px-4 py-3 text-[14px] leading-6 text-[var(--wk-text)]" />
                 </label>
 
-                <div className="grid gap-4 md:grid-cols-2">
-                  <label className="block">
-                    <span className="mb-1.5 block text-[12px] font-bold text-[var(--wk-text)]">Profile Image URL</span>
-                    <input type="url" value={profileImageUrl} onChange={(event) => setProfileImageUrl(event.target.value)} placeholder="https://" className="w-full rounded-xl border border-[var(--wk-border)] bg-[var(--wk-bg)] px-4 py-3 text-[14px] text-[var(--wk-text)]" />
-                  </label>
-                  <label className="block">
-                    <span className="mb-1.5 block text-[12px] font-bold text-[var(--wk-text)]">Hero Image URL</span>
-                    <input type="url" value={heroImageUrl} onChange={(event) => setHeroImageUrl(event.target.value)} placeholder="https://" className="w-full rounded-xl border border-[var(--wk-border)] bg-[var(--wk-bg)] px-4 py-3 text-[14px] text-[var(--wk-text)]" />
-                  </label>
-                  <label className="block">
-                    <span className="mb-1.5 block text-[12px] font-bold text-[var(--wk-text)]">Website</span>
-                    <input type="url" value={websiteUrl} onChange={(event) => setWebsiteUrl(event.target.value)} placeholder="https://" className="w-full rounded-xl border border-[var(--wk-border)] bg-[var(--wk-bg)] px-4 py-3 text-[14px] text-[var(--wk-text)]" />
-                  </label>
-                  <label className="block">
-                    <span className="mb-1.5 block text-[12px] font-bold text-[var(--wk-text)]">Public Email</span>
-                    <input type="email" value={publicEmail} onChange={(event) => setPublicEmail(event.target.value)} placeholder="artist@example.com" className="w-full rounded-xl border border-[var(--wk-border)] bg-[var(--wk-bg)] px-4 py-3 text-[14px] text-[var(--wk-text)]" />
-                  </label>
+                <div className="space-y-6">
+                  <ArtistImageField
+                    artistId={artist.id}
+                    label="Cover Image"
+                    value={heroImageUrl}
+                    onChange={setHeroImageUrl}
+                    libraryUrls={artistMediaUrls}
+                    variant="cover"
+                    helper="Use a wide image that works behind the Artist name."
+                  />
+
+                  <ArtistImageField
+                    artistId={artist.id}
+                    label="Profile Picture"
+                    value={profileImageUrl}
+                    onChange={setProfileImageUrl}
+                    libraryUrls={artistMediaUrls}
+                    variant="profile"
+                    helper="Use a clear square Artist image. JPG, PNG, or WebP."
+                  />
+
+                  <div className="grid gap-4 md:grid-cols-2">
+                    <label className="block">
+                      <span className="mb-1.5 block text-[12px] font-bold text-[var(--wk-text)]">Website</span>
+                      <input type="url" value={websiteUrl} onChange={(event) => setWebsiteUrl(event.target.value)} placeholder="https://" className="w-full rounded-xl border border-[var(--wk-border)] bg-[var(--wk-bg)] px-4 py-3 text-[14px] text-[var(--wk-text)]" />
+                    </label>
+                    <label className="block">
+                      <span className="mb-1.5 block text-[12px] font-bold text-[var(--wk-text)]">Public Email</span>
+                      <input type="email" value={publicEmail} onChange={(event) => setPublicEmail(event.target.value)} placeholder="artist@example.com" className="w-full rounded-xl border border-[var(--wk-border)] bg-[var(--wk-bg)] px-4 py-3 text-[14px] text-[var(--wk-text)]" />
+                    </label>
+                  </div>
                 </div>
 
                 <div>
@@ -1065,7 +1537,7 @@ export default function ArtistManagePage() {
           )}
 
           {permissions.releases && (
-            <section id="artist-music-submission" className="scroll-mt-24 rounded-3xl border border-[var(--wk-border)] bg-[var(--wk-surface)] p-6 md:p-7">
+            <section id="artist-music-submission" className={`${studioSection === "music" ? "" : "hidden"} scroll-mt-24 rounded-3xl border border-[var(--wk-border)] bg-[var(--wk-surface)] p-6 md:p-7`}>
               <h2 className="text-[22px] font-black tracking-tight text-[var(--wk-text)]">Submit Music</h2>
               <p className="mt-1 max-w-3xl text-[13px] leading-6 text-[var(--wk-text-muted)]">
                 Choose the Apple Music or Spotify record that represents this track. WAKILISHA uses it as review evidence, then checks the Music Registry before anything is added.
@@ -1256,73 +1728,224 @@ export default function ArtistManagePage() {
           )}
 
           {permissions.updates && (
-            <section id="artist-updates" className="scroll-mt-24 rounded-3xl border border-[var(--wk-border)] bg-[var(--wk-surface)] p-6 md:p-7">
-              <h2 className="text-[22px] font-black tracking-tight text-[var(--wk-text)]">Post Update</h2>
-              <p className="mt-1 text-[13px] leading-6 text-[var(--wk-text-muted)]">Share something directly from this Artist with people who follow them on WAKILISHA.</p>
-
-              <form onSubmit={handleArtistUpdate} className="mt-5 space-y-4">
-                <label className="block">
-                  <span className="mb-1.5 block text-[12px] font-bold text-[var(--wk-text)]">Update</span>
-                  <textarea
-                    value={updateBody}
-                    onChange={(event) => setUpdateBody(event.target.value)}
-                    rows={6}
-                    maxLength={2000}
-                    placeholder="What do you want people following this Artist to know?"
-                    className="w-full resize-y rounded-xl border border-[var(--wk-border)] bg-[var(--wk-bg)] px-4 py-3 text-[14px] leading-6 text-[var(--wk-text)]"
-                  />
-                  <span className="mt-1 block text-right text-[10px] font-semibold text-[var(--wk-text-faint)]">{updateBody.length}/2000</span>
-                </label>
-
-                <div className="grid gap-4 md:grid-cols-2">
-                  <label className="block">
-                    <span className="mb-1.5 block text-[12px] font-bold text-[var(--wk-text)]">Image URL</span>
-                    <input type="url" value={updateImageUrl} onChange={(event) => setUpdateImageUrl(event.target.value)} placeholder="https://" className="w-full rounded-xl border border-[var(--wk-border)] bg-[var(--wk-bg)] px-4 py-3 text-[14px] text-[var(--wk-text)]" />
-                  </label>
-                  <label className="block">
-                    <span className="mb-1.5 block text-[12px] font-bold text-[var(--wk-text)]">Link URL</span>
-                    <input type="url" value={updateLinkUrl} onChange={(event) => setUpdateLinkUrl(event.target.value)} placeholder="https://" className="w-full rounded-xl border border-[var(--wk-border)] bg-[var(--wk-bg)] px-4 py-3 text-[14px] text-[var(--wk-text)]" />
-                  </label>
-                </div>
-
-                <label className="block">
-                  <span className="mb-1.5 block text-[12px] font-bold text-[var(--wk-text)]">Link Label</span>
-                  <input value={updateLinkLabel} onChange={(event) => setUpdateLinkLabel(event.target.value)} maxLength={120} placeholder="Listen, read, RSVP, or another short action" className="w-full rounded-xl border border-[var(--wk-border)] bg-[var(--wk-bg)] px-4 py-3 text-[14px] text-[var(--wk-text)]" />
-                </label>
-
-                <div className="flex flex-wrap justify-end gap-2">
-                  {editingUpdateId && (
-                    <WkButton type="button" variant="ghost" onClick={resetUpdateComposer} disabled={busy}>Cancel Edit</WkButton>
-                  )}
-                  <WkButton type="submit" disabled={busy || !updateBody.trim()}>
-                    {editingUpdateId ? "Save Update" : "Post Update"}
-                  </WkButton>
-                </div>
-              </form>
-
-              <div className="mt-7 border-t border-[var(--wk-divider)] pt-5">
-                <h3 className="text-[13px] font-black text-[var(--wk-text)]">Recent Updates</h3>
-                <div className="mt-3 space-y-3">
-                  {artistUpdates.map((update) => (
-                    <div key={update.id} className="rounded-2xl border border-[var(--wk-border)] p-4">
-                      <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
-                        <div className="min-w-0">
-                          <div className="text-[10px] font-black uppercase tracking-[0.12em] text-[var(--wk-text-faint)]">
-                            {update.status === "published" ? "Published" : "Withdrawn"} · {new Date(update.publishedAt).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" })}
-                          </div>
-                          <p className="mt-2 whitespace-pre-wrap text-[13px] leading-6 text-[var(--wk-text)]">{update.body}</p>
-                        </div>
-                        {update.status === "published" && (
-                          <div className="flex shrink-0 gap-2">
-                            <WkButton type="button" variant="soft" onClick={() => beginEditUpdate(update)} disabled={busy}>Edit</WkButton>
-                            <WkButton type="button" variant="ghost" onClick={() => void handleWithdrawUpdate(update)} disabled={busy}>Withdraw</WkButton>
-                          </div>
-                        )}
-                      </div>
+            <section
+              id="artist-posts"
+              className={`${studioSection === "posts" ? "" : "hidden"} scroll-mt-24`}
+            >
+              <div className="mx-auto w-full max-w-[760px]">
+                <div className="mb-6">
+                  <div className="text-[10px] font-black uppercase tracking-[0.14em] text-[var(--wk-brand)]">
+                    Artist Studio
+                  </div>
+                  <div className="mt-1 flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
+                    <div>
+                      <h2 className="text-[24px] font-black tracking-tight text-[var(--wk-text)]">
+                        Posts
+                      </h2>
+                      <p className="mt-1 text-[12px] leading-5 text-[var(--wk-text-muted)]">
+                        What {artist.name} shares with people who follow this Artist.
+                      </p>
                     </div>
-                  ))}
-                  {artistUpdates.length === 0 && (
-                    <p className="text-[13px] text-[var(--wk-text-muted)]">No Artist Updates yet.</p>
+                    <div className="text-[10px] font-semibold text-[var(--wk-text-faint)]">
+                      {artistUpdates.filter((update) => update.status === "published").length} published
+                    </div>
+                  </div>
+                </div>
+
+                <ArtistPostComposer
+                  artistId={artist.id}
+                  artistName={artist.name}
+                  artistImageUrl={profileImageUrl || artist.profileImageUrl || artist.imageUrl}
+                  mediaUrls={artistMediaUrls}
+                  editingUpdate={
+                    editingUpdateId
+                      ? artistUpdates.find(
+                          (update) =>
+                            update.id === editingUpdateId,
+                        ) ?? null
+                      : null
+                  }
+                  onCancelEdit={() =>
+                    setEditingUpdateId(null)
+                  }
+                  onSaved={async (saved) => {
+                    setEditingUpdateId(null);
+                    setMessage({
+                      type: "success",
+                      text:
+                        saved.updatedAt !== saved.publishedAt
+                          ? "Post saved."
+                          : "Post published to Following.",
+                    });
+                    await loadUpdates(artist.id, true);
+                  }}
+                  onError={(text) =>
+                    setMessage({
+                      type: "error",
+                      text,
+                    })
+                  }
+                />
+
+                <div className="mt-7 border-t border-[var(--wk-divider)]">
+                  {artistUpdates.length === 0 ? (
+                    <div className="py-12 text-center">
+                      <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-[var(--wk-brand-soft)] text-[var(--wk-brand)]">
+                        <WkIcon
+                          name="FileText"
+                          size={20}
+                        />
+                      </div>
+                      <h3 className="mt-4 text-[15px] font-black text-[var(--wk-text)]">
+                        No posts yet
+                      </h3>
+                      <p className="mx-auto mt-1 max-w-sm text-[12px] leading-5 text-[var(--wk-text-muted)]">
+                        When {artist.name} posts an update, it will appear here and in Following.
+                      </p>
+                    </div>
+                  ) : (
+                    artistUpdates.map((update) => (
+                      <article
+                        key={update.id}
+                        className={`border-b border-[var(--wk-divider)] py-7 md:py-10 ${
+                          update.status === "withdrawn"
+                            ? "opacity-60"
+                            : ""
+                        }`}
+                      >
+                        <div className="flex items-center gap-3">
+                          <div className="h-11 w-11 shrink-0 overflow-hidden rounded-full bg-[var(--wk-brand-soft)] md:h-12 md:w-12">
+                            {(profileImageUrl || artist.profileImageUrl || artist.imageUrl) ? (
+                              <img
+                                src={profileImageUrl || artist.profileImageUrl || artist.imageUrl}
+                                alt=""
+                                className="h-full w-full object-cover"
+                              />
+                            ) : (
+                              <div className="flex h-full w-full items-center justify-center text-[12px] font-black text-[var(--wk-brand)]">
+                                {artist.name[0]?.toUpperCase() || "A"}
+                              </div>
+                            )}
+                          </div>
+
+                          <div className="min-w-0 flex-1">
+                            <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+                              <span className="truncate text-[14px] font-black text-[var(--wk-text)] md:text-[15px]">
+                                {artist.name}
+                              </span>
+                              <span className="rounded-full bg-[var(--wk-brand-soft)] px-2 py-0.5 text-[9px] font-black uppercase tracking-[0.1em] text-[var(--wk-brand)]">
+                                Official Artist
+                              </span>
+                            </div>
+
+                            <div className="mt-0.5 flex flex-wrap items-center gap-1.5 text-[11px] text-[var(--wk-text-muted)] md:text-[12px]">
+                              <span>
+                                {update.status === "published"
+                                  ? "Artist Update"
+                                  : "Withdrawn Post"}
+                              </span>
+                              <span aria-hidden="true">·</span>
+                              <time dateTime={update.publishedAt}>
+                                {new Date(update.publishedAt).toLocaleDateString(
+                                  "en-GB",
+                                  {
+                                    day: "numeric",
+                                    month: "short",
+                                    year:
+                                      new Date(update.publishedAt).getFullYear() === new Date().getFullYear()
+                                        ? undefined
+                                        : "numeric",
+                                  },
+                                )}
+                              </time>
+                            </div>
+                          </div>
+                        </div>
+
+                        {update.imageUrl && (
+                          <Link
+                            to={update.canonicalPath}
+                            className="group mt-4 block overflow-hidden md:mt-5"
+                          >
+                            <div className="aspect-[4/3] w-full overflow-hidden bg-[var(--wk-surface-raised)] md:aspect-[16/10] md:rounded-[28px]">
+                              <img
+                                src={update.imageUrl}
+                                alt=""
+                                className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-[1.015]"
+                              />
+                            </div>
+                          </Link>
+                        )}
+
+                        <div className="pt-4 md:pt-5">
+                          <p className="max-w-[680px] whitespace-pre-wrap text-[18px] font-semibold leading-[1.55] tracking-[-0.015em] text-[var(--wk-text)] md:text-[21px]">
+                            {update.body}
+                          </p>
+
+                          {update.linkUrl && (
+                            <a
+                              href={update.linkUrl}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="mt-4 inline-flex items-center gap-2 rounded-full border border-[var(--wk-border)] px-4 py-2 text-[11px] font-black text-[var(--wk-text)] hover:border-[var(--wk-brand)] hover:text-[var(--wk-brand)]"
+                            >
+                              {update.linkLabel || "Open Link"}
+                              <WkIcon
+                                name="ExternalLink"
+                                size={13}
+                              />
+                            </a>
+                          )}
+
+                          <div className="mt-4 flex flex-wrap items-center gap-1 border-t border-[var(--wk-divider)] pt-2">
+                            <Link
+                              to={update.canonicalPath}
+                              className="inline-flex min-h-10 items-center gap-2 rounded-full px-3 text-[11px] font-bold text-[var(--wk-text-muted)] hover:bg-[var(--wk-surface-raised)] hover:text-[var(--wk-text)]"
+                            >
+                              <WkIcon
+                                name="ExternalLink"
+                                size={15}
+                              />
+                              View
+                            </Link>
+
+                            {update.status === "published" && (
+                              <>
+                                <button
+                                  type="button"
+                                  onClick={() =>
+                                    beginEditUpdate(update)
+                                  }
+                                  disabled={busy}
+                                  className="inline-flex min-h-10 items-center gap-2 rounded-full px-3 text-[11px] font-bold text-[var(--wk-text-muted)] hover:bg-[var(--wk-surface-raised)] hover:text-[var(--wk-text)] disabled:opacity-50"
+                                >
+                                  <WkIcon
+                                    name="Pencil"
+                                    size={15}
+                                  />
+                                  Edit
+                                </button>
+
+                                <button
+                                  type="button"
+                                  onClick={() =>
+                                    void handleWithdrawUpdate(update)
+                                  }
+                                  disabled={busy}
+                                  className="inline-flex min-h-10 items-center gap-2 rounded-full px-3 text-[11px] font-bold text-[var(--wk-text-muted)] hover:bg-[var(--wk-surface-raised)] hover:text-[var(--wk-danger)] disabled:opacity-50"
+                                >
+                                  <WkIcon
+                                    name="Archive"
+                                    size={15}
+                                  />
+                                  Withdraw
+                                </button>
+                              </>
+                            )}
+                          </div>
+                        </div>
+                      </article>
+                    ))
                   )}
                 </div>
               </div>
@@ -1330,7 +1953,7 @@ export default function ArtistManagePage() {
           )}
 
           {permissions.team && (
-            <section className="rounded-3xl border border-[var(--wk-border)] bg-[var(--wk-surface)] p-6 md:p-7">
+            <section className={`${studioSection === "settings" && settingsSection === "team" ? "" : "hidden"} rounded-3xl border border-[var(--wk-border)] bg-[var(--wk-surface)] p-6 md:p-7`}>
               <h2 className="text-[22px] font-black tracking-tight text-[var(--wk-text)]">Manage Team</h2>
               <p className="mt-1 text-[13px] leading-6 text-[var(--wk-text-muted)]">Invite WAKILISHA accounts and choose what each person can manage.</p>
 
@@ -1402,7 +2025,7 @@ export default function ArtistManagePage() {
           )}
 
           {permissions.profile && (
-            <section className="rounded-3xl border border-[var(--wk-border)] bg-[var(--wk-surface)] p-6 md:p-7">
+            <section className={`${studioSection === "settings" && settingsSection === "registry" ? "" : "hidden"} rounded-3xl border border-[var(--wk-border)] bg-[var(--wk-surface)] p-6 md:p-7`}>
               <h2 className="text-[22px] font-black tracking-tight text-[var(--wk-text)]">Suggest a Registry Correction</h2>
               <p className="mt-1 text-[13px] leading-6 text-[var(--wk-text-muted)]">Names, country, type, credits, and discography stay under WAKILISHA review.</p>
               <form onSubmit={handleCorrection} className="mt-5 space-y-4">
@@ -1426,53 +2049,6 @@ export default function ArtistManagePage() {
           )}
         </div>
 
-        <aside className="space-y-4">
-          <section className="rounded-3xl border border-[var(--wk-border)] bg-[var(--wk-surface)] p-5">
-            <h2 className="text-[16px] font-black text-[var(--wk-text)]">Artist Actions</h2>
-            <div className="mt-4 space-y-3">
-              <div className="rounded-2xl border border-[var(--wk-border)] p-4">
-                <div className="text-[13px] font-black text-[var(--wk-text)]">Launch Tools</div>
-                <p className="mt-1 text-[12px] leading-5 text-[var(--wk-text-muted)]">Create tracked launch links and see public performance.</p>
-                <button
-                  type="button"
-                  onClick={() => document.getElementById("artist-launch-tools")?.scrollIntoView({ behavior: "smooth", block: "start" })}
-                  className="mt-3 rounded-full border border-[var(--wk-border)] px-4 py-2 text-[12px] font-bold text-[var(--wk-text)]"
-                >
-                  Open Launch Tools
-                </button>
-              </div>
-              <div className={`rounded-2xl border border-[var(--wk-border)] p-4 ${permissions.releases ? "" : "opacity-50"}`}>
-                <div className="text-[13px] font-black text-[var(--wk-text)]">Add Music</div>
-                <p className="mt-1 text-[12px] leading-5 text-[var(--wk-text-muted)]">Send a provider-confirmed track to Music Registry review.</p>
-                <button
-                  type="button"
-                  disabled={!permissions.releases}
-                  onClick={() => document.getElementById("artist-music-submission")?.scrollIntoView({ behavior: "smooth", block: "start" })}
-                  className="mt-3 rounded-full border border-[var(--wk-border)] px-4 py-2 text-[12px] font-bold text-[var(--wk-text-muted)] disabled:opacity-40"
-                >
-                  Add Music
-                </button>
-              </div>
-              <div className={`rounded-2xl border border-[var(--wk-border)] p-4 ${permissions.updates ? "" : "opacity-50"}`}>
-                <div className="text-[13px] font-black text-[var(--wk-text)]">Post Update</div>
-                <p className="mt-1 text-[12px] leading-5 text-[var(--wk-text-muted)]">Share an Artist-authored update with people following this Artist.</p>
-                <button
-                  type="button"
-                  disabled={!permissions.updates}
-                  onClick={() => document.getElementById("artist-updates")?.scrollIntoView({ behavior: "smooth", block: "start" })}
-                  className="mt-3 rounded-full border border-[var(--wk-border)] px-4 py-2 text-[12px] font-bold text-[var(--wk-text)] disabled:text-[var(--wk-text-muted)]"
-                >
-                  Post Update
-                </button>
-              </div>
-            </div>
-          </section>
-
-          <section className="rounded-3xl border border-[var(--wk-border)] bg-[var(--wk-surface)] p-5">
-            <h2 className="text-[16px] font-black text-[var(--wk-text)]">What Stays Protected</h2>
-            <p className="mt-2 text-[12px] leading-5 text-[var(--wk-text-muted)]">WAKILISHA still reviews canonical Artist facts, credits, and discography. Your profile presentation stays separate from those records.</p>
-          </section>
-        </aside>
       </div>
     </main>
   );

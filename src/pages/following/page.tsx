@@ -6,7 +6,13 @@ import {
   useState,
 } from "react";
 import { Link } from "react-router-dom";
+import { GuestFollowingPicker } from "@/components/feature/community/GuestFollowingPicker";
+import {
+  claimGuestFollowIntent,
+  clearGuestFollowingDraft,
+} from "@/services/community/guestFollowIntent";
 import { MetaTags } from "@/components/seo/MetaTags";
+import { PostComposer } from "@/components/community/PostComposer";
 import { PlaylistCoverPresentation } from "@/components/media/PlaylistCoverPresentation";
 import { Ch19GradientImage } from "@/components/media/Ch19GradientImage";
 import {
@@ -30,11 +36,9 @@ import {
   type CommunityPublicReactionState,
   type FollowingFeedItem,
   type FollowingFeedReason,
+  type PostActor,
   type ReactionType,
 } from "@/services/community";
-import {
-  buildCommunityAuthUrl,
-} from "@/services/community/authIntent";
 import type {
   FollowingPresentationItem,
 } from "@/services/community/followingPresentation";
@@ -270,6 +274,10 @@ function activityLabel(
     return "Artist Update";
   }
 
+  if (item.itemType === "post") {
+    return "Post";
+  }
+
   return "Release";
 }
 
@@ -411,7 +419,10 @@ function ActivityMedia({
   }
 
   if (
-    item.itemType === "artist_update" &&
+    (
+      item.itemType === "artist_update" ||
+      item.itemType === "post"
+    ) &&
     !item.imageUrl
   ) {
     return null;
@@ -519,7 +530,9 @@ function FollowingShareAction({
             ? "album"
             : item.itemType === "artist_update"
               ? "artist_update"
-              : item.itemType,
+              : item.itemType === "post"
+                ? "post"
+                : item.itemType,
       }),
       [
         item,
@@ -836,7 +849,10 @@ function FollowingActivity({
       </div>
 
       {(
-        item.itemType !== "artist_update" ||
+        (
+          item.itemType !== "artist_update" &&
+          item.itemType !== "post"
+        ) ||
         item.imageUrl
       ) && (
         <Link
@@ -849,19 +865,37 @@ function FollowingActivity({
       )}
 
       <div className="px-4 pt-4 md:px-0 md:pt-5">
-        {item.itemType === "artist_update" ? (
+        {(
+          item.itemType === "artist_update" ||
+          item.itemType === "post"
+        ) ? (
           <>
             {item.summary && (
               <p className="max-w-[680px] whitespace-pre-wrap text-[18px] font-semibold leading-[1.55] tracking-[-0.015em] text-[var(--wk-text)] md:text-[21px]">
                 {item.summary}
               </p>
             )}
-            <Link
-              to={item.canonicalPath}
-              className="mt-3 inline-block text-[11px] font-black text-[var(--wk-brand)] hover:underline"
-            >
-              View Update
-            </Link>
+
+            {item.itemType === "post" && item.linkUrl && (
+              <a
+                href={item.linkUrl}
+                target="_blank"
+                rel="noreferrer"
+                className="mt-3 inline-flex items-center gap-2 rounded-full border border-[var(--wk-border)] px-4 py-2 text-[11px] font-black text-[var(--wk-text)] hover:border-[var(--wk-brand)] hover:text-[var(--wk-brand)]"
+              >
+                {item.linkLabel || "Open Link"}
+                <i className="ri-external-link-line" aria-hidden="true" />
+              </a>
+            )}
+
+            <div>
+              <Link
+                to={item.canonicalPath}
+                className="mt-3 inline-block text-[11px] font-black text-[var(--wk-brand)] hover:underline"
+              >
+                {item.itemType === "post" ? "View Post" : "View Update"}
+              </Link>
+            </div>
           </>
         ) : (
           <>
@@ -960,6 +994,13 @@ export default function FollowingPage() {
   const authUser =
     useAuthUser();
 
+  const [
+    viewerActor,
+    setViewerActor,
+  ] = useState<PostActor | null>(
+    null,
+  );
+
   const [items, setItems] =
     useState<FollowingFeedItem[]>([]);
 
@@ -1010,6 +1051,23 @@ export default function FollowingPage() {
   const [reloadKey, setReloadKey] =
     useState(0);
 
+  const [guestIntentToken, setGuestIntentToken] =
+    useState<string | null>(() => {
+      if (typeof window === "undefined") {
+        return null;
+      }
+
+      return new URLSearchParams(
+        window.location.search,
+      ).get("followIntent");
+    });
+
+  const [guestIntentError, setGuestIntentError] =
+    useState<string | null>(null);
+
+  const [guestClaimRetryKey, setGuestClaimRetryKey] =
+    useState(0);
+
   const [activeAnchorKey, setActiveAnchorKey] =
     useState<string | null>(null);
 
@@ -1029,6 +1087,7 @@ export default function FollowingPage() {
     if (!authUser.id) {
       setItems([]);
       setFollows([]);
+      setViewerActor(null);
       setSavedKeys(new Set());
       setReactionStates(new Map());
       setReactingKeys(new Set());
@@ -1037,6 +1096,13 @@ export default function FollowingPage() {
       setHasMore(false);
       setLoading(false);
 
+      return () => {
+        cancelled = true;
+      };
+    }
+
+    if (guestIntentToken) {
+      setLoading(false);
       return () => {
         cancelled = true;
       };
@@ -1068,6 +1134,7 @@ export default function FollowingPage() {
 
         setItems(feed.items);
         setFollows(nextFollows);
+        setViewerActor(feed.viewerActor);
         setSavedKeys(
           readSavedKeys(
             nextSaves,
@@ -1101,6 +1168,69 @@ export default function FollowingPage() {
     authUser.loading,
     authUser.id,
     reloadKey,
+    guestIntentToken,
+  ]);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    if (
+      authUser.loading
+      || !authUser.id
+      || !guestIntentToken
+    ) {
+      return () => {
+        cancelled = true;
+      };
+    }
+
+    setGuestIntentError(null);
+
+    claimGuestFollowIntent(
+      guestIntentToken,
+    )
+      .then(() => {
+        if (cancelled) {
+          return;
+        }
+
+        clearGuestFollowingDraft();
+        setGuestIntentToken(null);
+
+        if (typeof window !== "undefined") {
+          window.history.replaceState(
+            {},
+            document.title,
+            "/following",
+          );
+        }
+
+        setReloadKey(
+          (value) => value + 1,
+        );
+      })
+      .catch((nextError) => {
+        if (cancelled) {
+          return;
+        }
+
+        console.error(
+          "Could not claim guest Following choices:",
+          nextError,
+        );
+        setGuestIntentError(
+          "We could not keep your Artists yet. Try once more.",
+        );
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [
+    authUser.id,
+    authUser.loading,
+    guestIntentToken,
+    guestClaimRetryKey,
   ]);
 
   useEffect(() => {
@@ -1180,19 +1310,45 @@ export default function FollowingPage() {
 
   const subjectLookup =
     useMemo(
-      () =>
-        new Map(
-          matureFollows.map(
-            (follow) => [
-              subjectKey(
-                follow.targetType,
-                follow.targetId,
-              ),
-              follow,
-            ],
-          ),
-        ),
-      [matureFollows],
+      () => {
+        const lookup =
+          new Map(
+            matureFollows.map(
+              (follow) => [
+                subjectKey(
+                  follow.targetType,
+                  follow.targetId,
+                ),
+                follow,
+              ],
+            ),
+          );
+
+        if (viewerActor?.type === "person") {
+          lookup.set(
+            subjectKey(
+              "person",
+              viewerActor.id,
+            ),
+            {
+              followId: "self",
+              targetType: "person",
+              targetId: viewerActor.id,
+              targetSlug: viewerActor.slug,
+              createdAt: "",
+              title: viewerActor.name,
+              imageUrl: viewerActor.imageUrl,
+              canonicalPath: viewerActor.canonicalPath,
+            },
+          );
+        }
+
+        return lookup;
+      },
+      [
+        matureFollows,
+        viewerActor,
+      ],
     );
 
   const activityAnchors =
@@ -1757,32 +1913,62 @@ export default function FollowingPage() {
             )}
         </header>
 
+        {isSignedIn && viewerActor?.type === "person" && (
+          <section className="px-4 pb-6 md:px-0">
+            <PostComposer
+              actor={viewerActor}
+              onSaved={() => {
+                setActionError(null);
+                setReloadKey(
+                  (value) => value + 1,
+                );
+              }}
+              onError={setActionError}
+            />
+          </section>
+        )}
+
         {authUser.loading || loading ? (
           <FeedSkeleton />
         ) : !isSignedIn ? (
-          <section className="mx-4 rounded-3xl border border-dashed border-[var(--wk-border)] bg-[var(--wk-surface)] px-6 py-16 text-center md:mx-0">
-            <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-[var(--wk-brand-soft)] text-[var(--wk-brand)]">
-              <i
-                className="ri-user-follow-line text-2xl"
-                aria-hidden="true"
-              />
-            </div>
-            <h2 className="mt-5 text-[22px] font-black tracking-[-0.03em]">
-              Following Starts When You Do
-            </h2>
-            <p className="mx-auto mt-2 max-w-md text-[13px] leading-relaxed text-[var(--wk-text-muted)]">
-              Sign in to keep up with people and artists you choose to follow.
-            </p>
-            <Link
-              to={buildCommunityAuthUrl("/following")}
-              className="mt-6 inline-flex items-center gap-2 rounded-full bg-[var(--wk-brand)] px-5 py-3 text-[13px] font-black text-[var(--wk-brand-on)]"
-            >
-              Sign In
-              <i
-                className="ri-arrow-right-line"
-                aria-hidden="true"
-              />
-            </Link>
+          <GuestFollowingPicker />
+        ) : guestIntentToken ? (
+          <section className="mx-4 rounded-3xl border border-[var(--wk-border)] bg-[var(--wk-surface)] px-6 py-14 text-center md:mx-0">
+            {guestIntentError ? (
+              <>
+                <i
+                  className="ri-error-warning-line text-2xl text-[var(--wk-text-faint)]"
+                  aria-hidden="true"
+                />
+                <h2 className="mt-4 text-[20px] font-black tracking-[-0.03em]">
+                  Your People Are Still Here
+                </h2>
+                <p className="mx-auto mt-2 max-w-md text-[13px] leading-relaxed text-[var(--wk-text-muted)]">
+                  {guestIntentError}
+                </p>
+                <button
+                  type="button"
+                  onClick={() =>
+                    setGuestClaimRetryKey(
+                      (value) => value + 1,
+                    )
+                  }
+                  className="mt-5 rounded-full bg-[var(--wk-brand)] px-5 py-3 text-[12px] font-black text-[var(--wk-brand-on)]"
+                >
+                  Try Again
+                </button>
+              </>
+            ) : (
+              <>
+                <div className="mx-auto h-8 w-8 animate-spin rounded-full border-2 border-[var(--wk-border)] border-t-[var(--wk-brand)]" />
+                <h2 className="mt-5 text-[20px] font-black tracking-[-0.03em]">
+                  Keeping Your People
+                </h2>
+                <p className="mx-auto mt-2 max-w-md text-[13px] leading-relaxed text-[var(--wk-text-muted)]">
+                  Turning the Artists you chose into real Follows.
+                </p>
+              </>
+            )}
           </section>
         ) : error && items.length === 0 ? (
           <section className="mx-4 rounded-2xl border border-[var(--wk-border)] bg-[var(--wk-surface)] px-6 py-14 text-center md:mx-0">

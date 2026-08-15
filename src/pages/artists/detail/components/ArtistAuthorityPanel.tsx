@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState, type FormEvent } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { WkButton } from "@/components/design-system/primitives/Button";
+import { ArtistPostComposer } from "@/components/artists/ArtistPostComposer";
 import {
   acceptArtistRepresentation,
   getArtistRepresentationState,
@@ -64,6 +65,24 @@ export function ArtistAuthorityPanel({
     if (presentation?.publicEmail) items.push({ label: "Email", href: `mailto:${presentation.publicEmail}` });
     return items;
   }, [presentation]);
+
+  const profileComposerMedia = useMemo(
+    () =>
+      Array.from(
+        new Set(
+          [
+            presentation?.profileImageUrl ?? "",
+            presentation?.heroImageUrl ?? "",
+          ]
+            .map((url) => url.trim())
+            .filter(Boolean),
+        ),
+      ),
+    [
+      presentation?.profileImageUrl,
+      presentation?.heroImageUrl,
+    ],
+  );
 
   async function refreshState() {
     if (!userId) {
@@ -144,6 +163,7 @@ export function ArtistAuthorityPanel({
     }
   }
 
+
   const activeRepresentation = state?.representation?.status === "active" ? state.representation : null;
   const pendingInvitation = state?.representation?.status === "pending" ? state.representation : null;
   const pendingClaim = state?.latestClaim?.status === "pending" ? state.latestClaim : null;
@@ -183,9 +203,16 @@ export function ArtistAuthorityPanel({
 
           <div className="flex flex-wrap items-center gap-2">
             {activeRepresentation ? (
-              <Link to={`/artists/${artistSlug}/manage`}>
-                <WkButton variant="primary">Manage Artist</WkButton>
-              </Link>
+              <>
+                {activeRepresentation.permissions.profile && (
+                  <Link to={`/artists/${artistSlug}/manage?section=settings&settings=profile`}>
+                    <WkButton variant="soft">Edit Profile</WkButton>
+                  </Link>
+                )}
+                <Link to={`/artists/${artistSlug}/manage`}>
+                  <WkButton variant="primary">Artist Studio</WkButton>
+                </Link>
+              </>
             ) : pendingInvitation ? (
               <WkButton variant="primary" onClick={handleAcceptInvitation} disabled={actionLoading}>
                 Accept Invitation
@@ -214,6 +241,29 @@ export function ArtistAuthorityPanel({
             }`}
           >
             {message.text}
+          </div>
+        )}
+
+        {activeRepresentation?.permissions.updates && (
+          <div className="mt-5">
+            <ArtistPostComposer
+              artistId={artistId}
+              artistName={artistName}
+              artistImageUrl={presentation?.profileImageUrl}
+              mediaUrls={profileComposerMedia}
+              onSaved={() => {
+                setMessage({
+                  type: "success",
+                  text: "Post published to Following.",
+                });
+              }}
+              onError={(text) =>
+                setMessage({
+                  type: "error",
+                  text,
+                })
+              }
+            />
           </div>
         )}
       </div>

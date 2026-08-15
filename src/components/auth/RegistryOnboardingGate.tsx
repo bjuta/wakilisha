@@ -26,6 +26,11 @@ export function RegistryOnboardingGate({
   const location = useLocation();
   const onAuthPage =
     location.pathname === "/auth";
+  const hasGuestFollowIntent =
+    location.pathname === "/following"
+    && new URLSearchParams(
+      location.search,
+    ).has("followIntent");
   const [gate, setGate] =
     useState<GateState>("clear");
 
@@ -58,6 +63,7 @@ export function RegistryOnboardingGate({
 
         setGate(
           state.status === "not_started"
+          && !hasGuestFollowIntent
             ? "onboarding"
             : "clear",
         );
@@ -80,6 +86,7 @@ export function RegistryOnboardingGate({
     authUser.id,
     authUser.loading,
     onAuthPage,
+    hasGuestFollowIntent,
   ]);
 
   if (

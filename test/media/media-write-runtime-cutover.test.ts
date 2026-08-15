@@ -5,6 +5,14 @@ const mediaService = readFileSync(
   "src/services/mediaService.ts",
   "utf8",
 );
+const userSettings = readFileSync(
+  "src/hooks/useUserSettings.ts",
+  "utf8",
+);
+const artistMediaService = readFileSync(
+  "src/services/artists/artistMedia.ts",
+  "utf8",
+);
 const uploadEdge = readFileSync(
   "supabase/functions/media-upload-api/index.ts",
   "utf8",
@@ -72,6 +80,24 @@ describe("Phase 4A Media write runtime cutover", () => {
     expect(uploadEdge).toContain("This file path is already in use");
     expect(uploadEdge).not.toContain("validateExistingPath");
     expect(mediaService).not.toContain('form.append("storage_path"');
+    expect(userSettings).not.toContain('form.append("storage_path"');
+    expect(artistMediaService).not.toContain('form.append("storage_path"');
+  });
+
+  it("keeps self-service Artist images inside the existing user-owned profile media boundary", () => {
+    expect(artistMediaService).toContain(
+      'uploads/profiles/${safeUserId}/artists/${safeArtistId}',
+    );
+    expect(artistMediaService).not.toContain("uploads/artists/");
+    expect(uploadEdge).toContain(
+      "isOwnProfileMediaPath(storagePath, actor.id)",
+    );
+    expect(uploadEdge).toContain(
+      "You can only upload your own profile media.",
+    );
+    expect(userSettings).toContain(
+      'form.append("folder", `uploads/profiles/${userId}`);',
+    );
   });
 
   it("replaces files with new immutable revisions", () => {
