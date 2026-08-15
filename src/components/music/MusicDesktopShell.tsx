@@ -631,6 +631,10 @@ export function MusicDesktopShell({
       const pathname =
         location.pathname;
 
+      if (pathname === "/") {
+        return "posts";
+      }
+
       if (
         pathname.startsWith(
           "/following",

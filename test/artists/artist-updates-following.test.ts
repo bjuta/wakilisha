@@ -582,8 +582,18 @@ describe(
         );
         expect(
           followingPage,
-        ).toContain(
+        ).not.toContain(
           "View Update",
+        );
+        expect(
+          followingPage,
+        ).toContain(
+          "PostActions",
+        );
+        expect(
+          followingPage,
+        ).toContain(
+          "usePostInteractionState",
         );
       },
     );
