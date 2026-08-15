@@ -37,6 +37,18 @@ const managePage = readFileSync(
   "src/pages/artists/manage/page.tsx",
   "utf8",
 );
+const artistImageField = readFileSync(
+  "src/components/artists/ArtistImageField.tsx",
+  "utf8",
+);
+const artistPostComposer = readFileSync(
+  "src/components/artists/ArtistPostComposer.tsx",
+  "utf8",
+);
+const artistMediaService = readFileSync(
+  "src/services/artists/artistMedia.ts",
+  "utf8",
+);
 const adminClaimsPage = readFileSync(
   "src/pages/admin/community/artist-claims/page.tsx",
   "utf8",
@@ -118,18 +130,49 @@ describe("claimed Artist experience", () => {
     expect(authorityPanel).toContain("Built from WAKILISHA's reviewed music records.");
     expect(authorityPanel).toContain("Claim This Artist");
     expect(authorityPanel).toContain("Claim Under Review");
-    expect(authorityPanel).toContain("Manage Artist");
+    expect(authorityPanel).toContain("Artist Studio");
+    expect(authorityPanel).toContain("Edit Profile");
+    expect(authorityPanel).toContain("ArtistPostComposer");
     expect(authorityPanel).toContain("Accept Invitation");
   });
 
-  it("keeps profile presentation, Registry corrections, and team controls visibly separated", () => {
-    expect(managePage).toContain("Edit Profile");
+  it("recomposes claimed Artist capabilities into one profile-led Artist Studio", () => {
+    expect(managePage).toContain("Artist Studio");
+    expect(managePage).toContain('label="Home"');
+    expect(managePage).toContain('label="Posts"');
+    expect(managePage).toContain('label="Music"');
+    expect(managePage).toContain('label="Insights"');
+    expect(managePage).toContain('label="Settings"');
+    expect(managePage).toContain('settingsSection === "profile"');
+    expect(managePage).toContain('settingsSection === "team"');
+    expect(managePage).toContain('settingsSection === "registry"');
     expect(managePage).toContain("Suggest a Registry Correction");
     expect(managePage).toContain("Manage Team");
     expect(managePage).toContain("Add Music");
-    expect(managePage).toContain("Post Update");
-    expect(managePage).toContain("Registry facts stay under WAKILISHA review.");
+    expect(managePage).toContain("Create Post");
+    expect(managePage).not.toContain("Artist Actions");
+    expect(managePage).not.toContain("Profile Image URL");
+    expect(managePage).not.toContain("Hero Image URL");
     expect(managePage).not.toContain('.from("registry_artists")');
+
+    expect(artistPostComposer).toContain("Create Post");
+    expect(artistPostComposer).toContain("Share an update from");
+    expect(artistPostComposer).toContain("Photo");
+    expect(artistPostComposer).toContain("Link");
+    expect(artistPostComposer).toContain("publishArtistUpdate");
+    expect(artistPostComposer).toContain("editArtistUpdate");
+
+    expect(artistImageField).toContain("Upload Image");
+    expect(artistImageField).toContain("Choose From Your Media");
+    expect(artistImageField).toContain("Your Media");
+    expect(artistMediaService).toContain("media-upload-api");
+    expect(artistMediaService).toContain(
+      "uploads/profiles/${safeUserId}/artists/${safeArtistId}",
+    );
+    expect(artistMediaService).not.toContain("uploads/artists/");
+    expect(artistMediaService).not.toContain(
+      'form.append("storage_path"',
+    );
   });
 
   it("makes claim review reachable in admin without SQL", () => {
@@ -144,8 +187,15 @@ describe("claimed Artist experience", () => {
 
   it("keeps the M3 contract in the critical suite and public copy free of em dashes", () => {
     expect(packageJson).toContain("test/artists/claimed-artist-experience.test.ts");
-    for (const surface of [authorityPanel, managePage]) {
+    for (const surface of [
+      authorityPanel,
+      managePage,
+      artistImageField,
+      artistPostComposer,
+      artistMediaService,
+    ]) {
       expect(surface).not.toContain("—");
+      expect(surface).not.toContain("–");
     }
   });
 });

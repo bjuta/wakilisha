@@ -132,6 +132,10 @@ export const FollowingPage = lazy(
   () => import("../pages/following/page"),
 );
 
+export const PostDetailPage = lazy(
+  () => import("../pages/posts/detail/page"),
+);
+
 export const RegistryOnboardingPage = lazy(
   () => import("../pages/start/page"),
 );

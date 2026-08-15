@@ -1,4 +1,8 @@
 import { supabase } from "@/lib/supabase";
+import {
+  mapPostActor,
+  type PostActor,
+} from "@/services/community/posts";
 
 export type FollowingFeedSubjectType =
   | "person"
@@ -8,7 +12,8 @@ export type FollowingFeedItemType =
   | "article"
   | "playlist"
   | "release"
-  | "artist_update";
+  | "artist_update"
+  | "post";
 
 export type FollowingFeedReason = {
   targetType: FollowingFeedSubjectType;
@@ -25,6 +30,8 @@ export type FollowingFeedItem = {
   title: string;
   summary: string | null;
   imageUrl: string | null;
+  linkUrl: string | null;
+  linkLabel: string | null;
   publishedAt: string;
   matchedFollows: FollowingFeedReason[];
 };
@@ -39,6 +46,7 @@ export type FollowingFeedResponse = {
   subjectTypes: ["person", "artist"];
   recentWindowDays: number;
   perSubjectRecentLimit: number;
+  viewerActor: PostActor | null;
   items: FollowingFeedItem[];
 };
 
@@ -105,7 +113,8 @@ function isItemType(
     value === "article" ||
     value === "playlist" ||
     value === "release" ||
-    value === "artist_update"
+    value === "artist_update" ||
+    value === "post"
   );
 }
 
@@ -203,6 +212,10 @@ function decodeItem(
       readString(record, "summary"),
     imageUrl:
       readString(record, "image_url"),
+    linkUrl:
+      readString(record, "link_url"),
+    linkLabel:
+      readString(record, "link_label"),
     publishedAt,
     matchedFollows,
   };
@@ -243,10 +256,36 @@ export function decodeFollowingFeed(
     );
   }
 
+  const viewerActor =
+    record.viewer_actor == null
+      ? null
+      : mapPostActor(
+          record.viewer_actor,
+        );
+
+  if (
+    record.viewer_actor != null &&
+    !viewerActor
+  ) {
+    throw new Error(
+      "Following returned an invalid viewer Post actor.",
+    );
+  }
+
   const rawItems =
     Array.isArray(record.items)
       ? record.items
       : [];
+
+  const items =
+    rawItems.flatMap((item) => {
+      const decoded =
+        decodeItem(item);
+
+      return decoded
+        ? [decoded]
+        : [];
+    });
 
   return {
     mode,
@@ -256,11 +295,8 @@ export function decodeFollowingFeed(
     ],
     recentWindowDays,
     perSubjectRecentLimit,
-    items:
-      rawItems.flatMap((item) => {
-        const decoded = decodeItem(item);
-        return decoded ? [decoded] : [];
-      }),
+    viewerActor,
+    items,
   };
 }
 
@@ -280,7 +316,7 @@ export async function getFollowingFeed(
 
   const { data, error } =
     await supabase.rpc(
-      "community_get_following_feed",
+      "community_get_social_feed",
       {
         p_limit: limit,
         p_before_published_at:

@@ -4,6 +4,7 @@ export type CommunityEntityType =
   | 'briefing_issue'
   | 'artist'
   | 'artist_update'
+  | 'post'
   | 'track'
   | 'release'
   | 'label'
@@ -37,7 +38,8 @@ export type CommunityPublicReactionTargetType =
   | 'article'
   | 'playlist'
   | 'release'
-  | 'artist_update';
+  | 'artist_update'
+  | 'post';
 
 export interface CommunityPublicReactionTarget {
   targetType: CommunityPublicReactionTargetType;

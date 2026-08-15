@@ -1,9 +1,9 @@
 {
   "projectRef": "pgzizndxdyhqmtyywjmt",
   "schema": "public",
-  "generatedAt": "2026-08-14T22:42:35Z",
-  "typesSha256": "1123fc70925ae54f43913b67666eeff755f86519d57dcd216cd93353c01c6e54",
+  "generatedAt": "2026-08-15T11:16:06Z",
+  "typesSha256": "1938fd2f5b9d0e29158f10fbb30c6bf69b9a75b339d743599cb11be9bd0742f6",
   "authoritativeMigrationDirectory": "supabase/migrations",
-  "migrationCount": 3,
-  "latestMigration": "20260814203000_artist_launch_tools_analytics.sql"
+  "migrationCount": 8,
+  "latestMigration": "20260815084011_repair_auth_signup_person_deferred_integrity_context.sql"
 }

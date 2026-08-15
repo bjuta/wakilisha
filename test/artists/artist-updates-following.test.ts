@@ -19,6 +19,24 @@ const managePage =
     "utf8",
   );
 
+const authorityPanel =
+  readFileSync(
+    "src/pages/artists/detail/components/ArtistAuthorityPanel.tsx",
+    "utf8",
+  );
+
+const artistImageField =
+  readFileSync(
+    "src/components/artists/ArtistImageField.tsx",
+    "utf8",
+  );
+
+const artistPostComposer =
+  readFileSync(
+    "src/components/artists/ArtistPostComposer.tsx",
+    "utf8",
+  );
+
 const updateService =
   readFileSync(
     "src/services/artists/artistUpdates.ts",
@@ -178,22 +196,74 @@ describe(
     );
 
     it(
-      "keeps Post Update active on Artist Management",
+      "makes Artist Posts a shared-composer timeline across profile and Studio",
       () => {
         expect(
-          managePage,
+          authorityPanel,
         ).toContain(
-          'id="artist-updates"',
+          "ArtistPostComposer",
         );
         expect(
-          managePage,
+          authorityPanel,
+        ).not.toContain(
+          "publishArtistUpdate",
+        );
+
+        expect(
+          artistPostComposer,
+        ).toContain(
+          "Share an update from",
+        );
+        expect(
+          artistPostComposer,
+        ).toContain(
+          "Create Post",
+        );
+        expect(
+          artistPostComposer,
         ).toContain(
           "publishArtistUpdate",
         );
         expect(
-          managePage,
+          artistPostComposer,
         ).toContain(
           "editArtistUpdate",
+        );
+        expect(
+          artistPostComposer,
+        ).toContain(
+          "ArtistImageField",
+        );
+
+        expect(
+          managePage,
+        ).toContain(
+          'id="artist-posts"',
+        );
+        expect(
+          managePage,
+        ).toContain(
+          'label="Posts"',
+        );
+        expect(
+          managePage,
+        ).toContain(
+          'studioSection === "posts"',
+        );
+        expect(
+          managePage,
+        ).toContain(
+          "ArtistPostComposer",
+        );
+        expect(
+          managePage,
+        ).toContain(
+          "No posts yet",
+        );
+        expect(
+          managePage,
+        ).toContain(
+          "Official Artist",
         );
         expect(
           managePage,
@@ -203,7 +273,17 @@ describe(
         expect(
           managePage,
         ).not.toContain(
-          "Artist updates are not open here yet.",
+          'label="Content"',
+        );
+        expect(
+          managePage,
+        ).not.toContain(
+          "Recent Updates",
+        );
+        expect(
+          artistImageField,
+        ).toContain(
+          "Choose From Your Media",
         );
       },
     );
@@ -309,6 +389,9 @@ describe(
         for (
           const source of [
             managePage,
+            authorityPanel,
+            artistImageField,
+            artistPostComposer,
             followingPage,
             artistUpdatePage,
           ]
@@ -317,6 +400,11 @@ describe(
             source,
           ).not.toContain(
             "—",
+          );
+          expect(
+            source,
+          ).not.toContain(
+            "–",
           );
         }
       },

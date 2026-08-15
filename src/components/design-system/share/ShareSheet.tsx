@@ -111,7 +111,7 @@ export type ShareObject = {
   description?: string;
   imageUrl?: string | null;
   url?: string;
-  type?: "track" | "album" | "article" | "chart" | "artist" | "artist_update" | "playlist" | "page";
+  type?: "track" | "album" | "article" | "chart" | "artist" | "artist_update" | "post" | "playlist" | "page";
 };
 
 const objectTypeLabel: Record<NonNullable<ShareObject["type"]>, string> = {
@@ -121,6 +121,7 @@ const objectTypeLabel: Record<NonNullable<ShareObject["type"]>, string> = {
   chart: "chart edition",
   artist: "artist page",
   artist_update: "artist update",
+  post: "post",
   playlist: "playlist",
   page: "page",
 };
@@ -166,7 +167,31 @@ function parseShareTarget(rawUrl: string, fallbackType: ShareObject["type"] | un
       parts[2] === "updates" &&
       parts[3]
     ) {
-      return { targetUrl: parsed.toString(), targetPath: parsed.pathname, entityType: "artist_update", entitySlug: parts[3], artistSlug: parts[1] };
+      return {
+        targetUrl: parsed.toString(),
+        targetPath: parsed.pathname,
+        entityType:
+          fallbackType === "post"
+            ? "post"
+            : "artist_update",
+        entitySlug: parts[3],
+        artistSlug: parts[1],
+      };
+    }
+
+    if (
+      first === "people" &&
+      parts[1] &&
+      parts[2] === "posts" &&
+      parts[3]
+    ) {
+      return {
+        targetUrl: parsed.toString(),
+        targetPath: parsed.pathname,
+        entityType: "post",
+        entitySlug: parts[3],
+        artistSlug: "",
+      };
     }
 
     if (first === "artists" && parts[1]) {
