@@ -66,9 +66,12 @@ const lazyImportCount = (
  * Registry-led onboarding adds one lazy Admin Settings route:
  * - AdminSettingsOnboarding
  *
- * The current authority is therefore 92 lazy imports.
+ * Claimed Artist review adds one lazy Admin Community route:
+ * - AdminArtistClaimsPage
+ *
+ * The current authority is therefore 93 lazy imports.
  */
-const expectedLazyImportCount = 92;
+const expectedLazyImportCount = 93;
 
 if (lazyImportCount !== expectedLazyImportCount) {
   fail(
@@ -98,6 +101,7 @@ for (const marker of [
   "AdminShell",
   "AdminLoginPage",
   "AdminInquiryInterfacePage",
+  "AdminArtistClaimsPage",
   "AdminPlaylistsPage",
   "AdminNewPlaylistPage",
   "AdminPlaylistDetailPage",
