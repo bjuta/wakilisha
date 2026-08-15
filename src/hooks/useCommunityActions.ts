@@ -347,6 +347,31 @@ export function useEntityActions(userId?: string) {
     ]
   );
 
+  const react = useCallback(
+    async (
+      targetType: string,
+      targetId: string,
+      reactionType: ReactionType,
+    ) => {
+      if (!effectiveUserId) {
+        redirectTo(buildCommunityAuthUrl());
+        return null;
+      }
+      if (!requireVerified()) return null;
+      setLoading(true);
+      try {
+        return await reactToTarget({
+          targetType,
+          targetId,
+          reactionType,
+        });
+      } finally {
+        setLoading(false);
+      }
+    },
+    [effectiveUserId, requireVerified],
+  );
+
   const contribute = useCallback(
     async (input: {
       sourceCommentId?: string;
@@ -386,6 +411,7 @@ export function useEntityActions(userId?: string) {
     setFollow,
     save,
     setSaved,
+    react,
     contribute,
     loading,
   };

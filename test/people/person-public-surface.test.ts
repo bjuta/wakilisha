@@ -690,7 +690,7 @@ describe(
 
         expect(personPage)
           .toContain(
-            'label: "Saves"',
+            'label: "Bookmarks"',
           );
       },
     );

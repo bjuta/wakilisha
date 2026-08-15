@@ -6,7 +6,6 @@ import {
   type WkIconName,
 } from "@/components/design-system/Icon";
 import { ArtistImageField } from "@/components/artists/ArtistImageField";
-import { ArtistPostComposer } from "@/components/artists/ArtistPostComposer";
 import { useAuthUser } from "@/hooks/useAuthUser";
 import { getArtist, type PublicArtistDetail } from "@/services/publicContent/client";
 import {
@@ -25,7 +24,6 @@ import {
 } from "@/services/artists/claimedArtist";
 import {
   listArtistManageUpdates,
-  withdrawArtistUpdate,
   type ArtistUpdate,
 } from "@/services/artists/artistUpdates";
 import {
@@ -76,7 +74,6 @@ const CORRECTION_FIELDS = [
 
 type ArtistStudioSection =
   | "home"
-  | "posts"
   | "music"
   | "insights"
   | "settings";
@@ -580,36 +577,6 @@ export default function ArtistManagePage() {
     }
   }
 
-  function beginEditUpdate(update: ArtistUpdate) {
-    if (update.status !== "published") return;
-    setEditingUpdateId(update.id);
-
-    document.getElementById("artist-posts")?.scrollIntoView({
-      behavior: "smooth",
-      block: "start",
-    });
-  }
-
-  async function handleWithdrawUpdate(update: ArtistUpdate) {
-    if (!artist || !activeRepresentation?.permissions.updates || update.status !== "published") return;
-    const reason = window.prompt("Why are you withdrawing this Artist Update?");
-    if (!reason || reason.trim().length < 3) return;
-    setBusy(true);
-    setMessage(null);
-    try {
-      await withdrawArtistUpdate(update.id, reason.trim());
-      if (editingUpdateId === update.id) {
-        setEditingUpdateId(null);
-      }
-      setMessage({ type: "success", text: "Post withdrawn." });
-      await loadUpdates(artist.id, true);
-    } catch (error) {
-      setMessage({ type: "error", text: error instanceof Error ? error.message : "We could not withdraw this post." });
-    } finally {
-      setBusy(false);
-    }
-  }
-
   function resetMusicComposer() {
     setMusicQuery("");
     setMusicHits([]);
@@ -850,10 +817,6 @@ export default function ArtistManagePage() {
   const requestedStudioAllowed =
     requestedStudioSection === "home" ||
     (
-      requestedStudioSection === "posts" &&
-      permissions.updates
-    ) ||
-    (
       requestedStudioSection === "music" &&
       permissions.releases
     ) ||
@@ -1020,15 +983,6 @@ export default function ArtistManagePage() {
               onClick={() => openStudioSection("home")}
             />
 
-            {permissions.updates && (
-              <StudioNavItem
-                active={studioSection === "posts"}
-                icon="FileText"
-                label="Posts"
-                onClick={() => openStudioSection("posts")}
-              />
-            )}
-
             {permissions.releases && (
               <StudioNavItem
                 active={studioSection === "music"}
@@ -1139,14 +1093,13 @@ export default function ArtistManagePage() {
 
                   <div className="mt-4 grid gap-2">
                     {permissions.updates && (
-                      <button
-                        type="button"
-                        onClick={() => openStudioSection("posts")}
+                      <Link
+                        to={`/artists/${artist.slug}`}
                         className="flex items-center justify-between rounded-xl bg-[var(--wk-bg)] px-4 py-3 text-left text-[12px] font-black text-[var(--wk-text)] hover:bg-[var(--wk-surface-strong)]"
                       >
                         Create Post
                         <WkIcon name="ArrowRight" size={14} />
-                      </button>
+                      </Link>
                     )}
 
                     {permissions.releases && (
@@ -1723,231 +1676,6 @@ export default function ArtistManagePage() {
                     })}
                   </div>
                 )}
-              </div>
-            </section>
-          )}
-
-          {permissions.updates && (
-            <section
-              id="artist-posts"
-              className={`${studioSection === "posts" ? "" : "hidden"} scroll-mt-24`}
-            >
-              <div className="mx-auto w-full max-w-[760px]">
-                <div className="mb-6">
-                  <div className="text-[10px] font-black uppercase tracking-[0.14em] text-[var(--wk-brand)]">
-                    Artist Studio
-                  </div>
-                  <div className="mt-1 flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
-                    <div>
-                      <h2 className="text-[24px] font-black tracking-tight text-[var(--wk-text)]">
-                        Posts
-                      </h2>
-                      <p className="mt-1 text-[12px] leading-5 text-[var(--wk-text-muted)]">
-                        What {artist.name} shares with people who follow this Artist.
-                      </p>
-                    </div>
-                    <div className="text-[10px] font-semibold text-[var(--wk-text-faint)]">
-                      {artistUpdates.filter((update) => update.status === "published").length} published
-                    </div>
-                  </div>
-                </div>
-
-                <ArtistPostComposer
-                  artistId={artist.id}
-                  artistName={artist.name}
-                  artistImageUrl={profileImageUrl || artist.profileImageUrl || artist.imageUrl}
-                  mediaUrls={artistMediaUrls}
-                  editingUpdate={
-                    editingUpdateId
-                      ? artistUpdates.find(
-                          (update) =>
-                            update.id === editingUpdateId,
-                        ) ?? null
-                      : null
-                  }
-                  onCancelEdit={() =>
-                    setEditingUpdateId(null)
-                  }
-                  onSaved={async (saved) => {
-                    setEditingUpdateId(null);
-                    setMessage({
-                      type: "success",
-                      text:
-                        saved.updatedAt !== saved.publishedAt
-                          ? "Post saved."
-                          : "Post published to Following.",
-                    });
-                    await loadUpdates(artist.id, true);
-                  }}
-                  onError={(text) =>
-                    setMessage({
-                      type: "error",
-                      text,
-                    })
-                  }
-                />
-
-                <div className="mt-7 border-t border-[var(--wk-divider)]">
-                  {artistUpdates.length === 0 ? (
-                    <div className="py-12 text-center">
-                      <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-[var(--wk-brand-soft)] text-[var(--wk-brand)]">
-                        <WkIcon
-                          name="FileText"
-                          size={20}
-                        />
-                      </div>
-                      <h3 className="mt-4 text-[15px] font-black text-[var(--wk-text)]">
-                        No posts yet
-                      </h3>
-                      <p className="mx-auto mt-1 max-w-sm text-[12px] leading-5 text-[var(--wk-text-muted)]">
-                        When {artist.name} posts an update, it will appear here and in Following.
-                      </p>
-                    </div>
-                  ) : (
-                    artistUpdates.map((update) => (
-                      <article
-                        key={update.id}
-                        className={`border-b border-[var(--wk-divider)] py-7 md:py-10 ${
-                          update.status === "withdrawn"
-                            ? "opacity-60"
-                            : ""
-                        }`}
-                      >
-                        <div className="flex items-center gap-3">
-                          <div className="h-11 w-11 shrink-0 overflow-hidden rounded-full bg-[var(--wk-brand-soft)] md:h-12 md:w-12">
-                            {(profileImageUrl || artist.profileImageUrl || artist.imageUrl) ? (
-                              <img
-                                src={profileImageUrl || artist.profileImageUrl || artist.imageUrl}
-                                alt=""
-                                className="h-full w-full object-cover"
-                              />
-                            ) : (
-                              <div className="flex h-full w-full items-center justify-center text-[12px] font-black text-[var(--wk-brand)]">
-                                {artist.name[0]?.toUpperCase() || "A"}
-                              </div>
-                            )}
-                          </div>
-
-                          <div className="min-w-0 flex-1">
-                            <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
-                              <span className="truncate text-[14px] font-black text-[var(--wk-text)] md:text-[15px]">
-                                {artist.name}
-                              </span>
-                              <span className="rounded-full bg-[var(--wk-brand-soft)] px-2 py-0.5 text-[9px] font-black uppercase tracking-[0.1em] text-[var(--wk-brand)]">
-                                Official Artist
-                              </span>
-                            </div>
-
-                            <div className="mt-0.5 flex flex-wrap items-center gap-1.5 text-[11px] text-[var(--wk-text-muted)] md:text-[12px]">
-                              <span>
-                                {update.status === "published"
-                                  ? "Artist Update"
-                                  : "Withdrawn Post"}
-                              </span>
-                              <span aria-hidden="true">·</span>
-                              <time dateTime={update.publishedAt}>
-                                {new Date(update.publishedAt).toLocaleDateString(
-                                  "en-GB",
-                                  {
-                                    day: "numeric",
-                                    month: "short",
-                                    year:
-                                      new Date(update.publishedAt).getFullYear() === new Date().getFullYear()
-                                        ? undefined
-                                        : "numeric",
-                                  },
-                                )}
-                              </time>
-                            </div>
-                          </div>
-                        </div>
-
-                        {update.imageUrl && (
-                          <Link
-                            to={update.canonicalPath}
-                            className="group mt-4 block overflow-hidden md:mt-5"
-                          >
-                            <div className="aspect-[4/3] w-full overflow-hidden bg-[var(--wk-surface-raised)] md:aspect-[16/10] md:rounded-[28px]">
-                              <img
-                                src={update.imageUrl}
-                                alt=""
-                                className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-[1.015]"
-                              />
-                            </div>
-                          </Link>
-                        )}
-
-                        <div className="pt-4 md:pt-5">
-                          <p className="max-w-[680px] whitespace-pre-wrap text-[18px] font-semibold leading-[1.55] tracking-[-0.015em] text-[var(--wk-text)] md:text-[21px]">
-                            {update.body}
-                          </p>
-
-                          {update.linkUrl && (
-                            <a
-                              href={update.linkUrl}
-                              target="_blank"
-                              rel="noreferrer"
-                              className="mt-4 inline-flex items-center gap-2 rounded-full border border-[var(--wk-border)] px-4 py-2 text-[11px] font-black text-[var(--wk-text)] hover:border-[var(--wk-brand)] hover:text-[var(--wk-brand)]"
-                            >
-                              {update.linkLabel || "Open Link"}
-                              <WkIcon
-                                name="ExternalLink"
-                                size={13}
-                              />
-                            </a>
-                          )}
-
-                          <div className="mt-4 flex flex-wrap items-center gap-1 border-t border-[var(--wk-divider)] pt-2">
-                            <Link
-                              to={update.canonicalPath}
-                              className="inline-flex min-h-10 items-center gap-2 rounded-full px-3 text-[11px] font-bold text-[var(--wk-text-muted)] hover:bg-[var(--wk-surface-raised)] hover:text-[var(--wk-text)]"
-                            >
-                              <WkIcon
-                                name="ExternalLink"
-                                size={15}
-                              />
-                              View
-                            </Link>
-
-                            {update.status === "published" && (
-                              <>
-                                <button
-                                  type="button"
-                                  onClick={() =>
-                                    beginEditUpdate(update)
-                                  }
-                                  disabled={busy}
-                                  className="inline-flex min-h-10 items-center gap-2 rounded-full px-3 text-[11px] font-bold text-[var(--wk-text-muted)] hover:bg-[var(--wk-surface-raised)] hover:text-[var(--wk-text)] disabled:opacity-50"
-                                >
-                                  <WkIcon
-                                    name="Pencil"
-                                    size={15}
-                                  />
-                                  Edit
-                                </button>
-
-                                <button
-                                  type="button"
-                                  onClick={() =>
-                                    void handleWithdrawUpdate(update)
-                                  }
-                                  disabled={busy}
-                                  className="inline-flex min-h-10 items-center gap-2 rounded-full px-3 text-[11px] font-bold text-[var(--wk-text-muted)] hover:bg-[var(--wk-surface-raised)] hover:text-[var(--wk-danger)] disabled:opacity-50"
-                                >
-                                  <WkIcon
-                                    name="Archive"
-                                    size={15}
-                                  />
-                                  Withdraw
-                                </button>
-                              </>
-                            )}
-                          </div>
-                        </div>
-                      </article>
-                    ))
-                  )}
-                </div>
               </div>
             </section>
           )}

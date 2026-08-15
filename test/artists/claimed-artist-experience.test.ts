@@ -139,7 +139,7 @@ describe("claimed Artist experience", () => {
   it("recomposes claimed Artist capabilities into one profile-led Artist Studio", () => {
     expect(managePage).toContain("Artist Studio");
     expect(managePage).toContain('label="Home"');
-    expect(managePage).toContain('label="Posts"');
+    expect(managePage).not.toContain('label="Posts"');
     expect(managePage).toContain('label="Music"');
     expect(managePage).toContain('label="Insights"');
     expect(managePage).toContain('label="Settings"');
@@ -150,6 +150,7 @@ describe("claimed Artist experience", () => {
     expect(managePage).toContain("Manage Team");
     expect(managePage).toContain("Add Music");
     expect(managePage).toContain("Create Post");
+    expect(managePage).not.toContain('openStudioSection("posts")');
     expect(managePage).not.toContain("Artist Actions");
     expect(managePage).not.toContain("Profile Image URL");
     expect(managePage).not.toContain("Hero Image URL");

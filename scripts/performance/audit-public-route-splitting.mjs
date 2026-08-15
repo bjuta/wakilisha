@@ -148,9 +148,22 @@ const directLazyImports = [
  * The accepted authority was 51 direct lazy public imports.
  * Following added one direct lazy public import.
  * Registry-led onboarding adds one more direct lazy public import.
- * The current authority is therefore 53 direct lazy imports.
+ *
+ * Claimed Artist management adds:
+ * - ../pages/artists/manage/page
+ *
+ * Artist Posts add:
+ * - ../pages/artists/update/page
+ *
+ * Universal Posts add:
+ * - ../pages/posts/detail/page
+ *
+ * Music discovery adds:
+ * - ../pages/music/page
+ *
+ * The current authority is therefore 57 direct lazy imports.
  */
-const expectedDirectLazyImportCount = 53;
+const expectedDirectLazyImportCount = 57;
 
 if (
   directLazyImports.length !==
@@ -216,6 +229,10 @@ for (const requiredModule of [
   "../pages/playlists/detail/page",
   "../pages/people/detail/page",
   "../pages/artists/detail/page",
+  "../pages/artists/manage/page",
+  "../pages/artists/update/page",
+  "../pages/posts/detail/page",
+  "../pages/music/page",
   "../pages/charts/edition/page",
   "../pages/magazine/article/page",
   "../pages/mobile/magazine/article/page",
@@ -309,9 +326,22 @@ const routePaths = [
  * - /start
  * - Admin Settings onboarding
  *
- * The current authority is therefore 154 paths.
+ * Claimed Artist experience adds two route paths:
+ * - /artists/:slug/manage
+ * - community/artist-claims
+ *
+ * Artist Posts add one public route path:
+ * - /artists/:slug/updates/:updateId
+ *
+ * Universal Posts add one public Person Post route path:
+ * - /people/:slug/posts/:postId
+ *
+ * Music discovery adds one public route path:
+ * - /music
+ *
+ * The current authority is therefore 159 paths.
  */
-const expectedRoutePathCount = 154;
+const expectedRoutePathCount = 159;
 
 if (routePaths.length !== expectedRoutePathCount) {
   fail(
@@ -328,7 +358,7 @@ const routeChecksum = crypto
   .digest("hex");
 
 const expectedRouteChecksum =
-  "f5a21b1a2013b16559d992e03c838568db1050db4da7d8872463269323a354e1";
+  "0392a85c6656e01dfb783515e8daf60d584e4c0739eedc7c076b5d4dbf1c1755";
 
 if (
   routeChecksum !==

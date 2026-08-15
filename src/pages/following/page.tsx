@@ -13,6 +13,7 @@ import {
 } from "@/services/community/guestFollowIntent";
 import { MetaTags } from "@/components/seo/MetaTags";
 import { PostComposer } from "@/components/community/PostComposer";
+import { PostActions } from "@/components/community/PostActions";
 import { PlaylistCoverPresentation } from "@/components/media/PlaylistCoverPresentation";
 import { Ch19GradientImage } from "@/components/media/Ch19GradientImage";
 import {
@@ -25,6 +26,7 @@ import {
   type ShareObject,
 } from "@/components/design-system/share/ShareSheet";
 import { useAuthUser } from "@/hooks/useAuthUser";
+import { usePostInteractionState } from "@/hooks/usePostInteractionState";
 import {
   followingFeedCursorFrom,
   getFollowingFeed,
@@ -36,6 +38,7 @@ import {
   type CommunityPublicReactionState,
   type FollowingFeedItem,
   type FollowingFeedReason,
+  type CommunityPost,
   type PostActor,
   type ReactionType,
 } from "@/services/community";
@@ -396,6 +399,111 @@ function ActivityAnchorAvatar({
   );
 }
 
+function followingPostFromItem(
+  item: FollowingFeedItem,
+  subjectLookup: Map<
+    string,
+    MatureFollow
+  >,
+): CommunityPost | null {
+  if (
+    item.itemType !==
+      "artist_update" &&
+    item.itemType !== "post"
+  ) {
+    return null;
+  }
+
+  const reason =
+    item.matchedFollows[0];
+
+  if (!reason) {
+    return null;
+  }
+
+  const presentation =
+    subjectLookup.get(
+      subjectKey(
+        reason.targetType,
+        reason.targetId,
+      ),
+    );
+
+  const fallback =
+    fallbackSubject(
+      reason,
+    );
+
+  const actorType =
+    presentation?.targetType ??
+    reason.targetType;
+
+  if (
+    actorType !== "artist" &&
+    actorType !== "person"
+  ) {
+    return null;
+  }
+
+  const actorId =
+    presentation?.targetId ??
+    reason.targetId;
+
+  const canonicalPath =
+    presentation?.canonicalPath ??
+    fallback.canonicalPath;
+
+  const slug =
+    canonicalPath
+      .split("/")
+      .filter(Boolean)
+      .pop() ||
+    actorId;
+
+  return {
+    id:
+      item.itemId,
+    actorType,
+    actorId,
+    actor: {
+      type:
+        actorType,
+      id:
+        actorId,
+      slug,
+      name:
+        presentation?.title ??
+        fallback.title,
+      imageUrl:
+        presentation?.imageUrl ??
+        fallback.imageUrl,
+      canonicalPath,
+      official:
+        actorType ===
+        "artist",
+    },
+    body:
+      item.summary ||
+      item.title,
+    imageUrl:
+      item.imageUrl,
+    linkUrl:
+      item.linkUrl,
+    linkLabel:
+      item.linkLabel,
+    status:
+      "published",
+    publishedAt:
+      item.publishedAt,
+    withdrawnAt:
+      null,
+    updatedAt:
+      item.publishedAt,
+    canonicalPath:
+      item.canonicalPath,
+  };
+}
+
 function ActivityMedia({
   item,
 }: {
@@ -721,6 +829,9 @@ function FollowingReactionAction({
 function FollowingActivity({
   item,
   subjectLookup,
+  post,
+  postInteraction,
+  onPostWithdrawn,
   saved,
   saving,
   reactionState,
@@ -730,6 +841,14 @@ function FollowingActivity({
 }: {
   item: FollowingFeedItem;
   subjectLookup: Map<string, MatureFollow>;
+  post: CommunityPost | null;
+  postInteraction:
+    ReturnType<
+      typeof usePostInteractionState
+    >;
+  onPostWithdrawn: (
+    postId: string,
+  ) => void;
   saved: boolean;
   saving: boolean;
   reactionState:
@@ -888,14 +1007,6 @@ function FollowingActivity({
               </a>
             )}
 
-            <div>
-              <Link
-                to={item.canonicalPath}
-                className="mt-3 inline-block text-[11px] font-black text-[var(--wk-brand)] hover:underline"
-              >
-                {item.itemType === "post" ? "View Post" : "View Update"}
-              </Link>
-            </div>
           </>
         ) : (
           <>
@@ -916,47 +1027,115 @@ function FollowingActivity({
           </>
         )}
 
-        <div
-          data-following-actions
-          className="mt-3 flex items-center gap-1 border-t border-[var(--wk-divider)] pt-2 md:mt-4"
-        >
-          <ActivityAction
-            icon={
-              saved
-                ? "ri-bookmark-fill"
-                : "ri-bookmark-line"
-            }
-            label={
-              saved
-                ? "Saved"
-                : "Save"
-            }
-            active={saved}
-            disabled={saving}
-            onClick={() =>
-              onToggleSave(
-                item,
-                primarySubject,
+        {post ? (
+          <PostActions
+            post={post}
+            saved={
+              postInteraction.savedPostIds.has(
+                post.id,
               )
             }
-          />
-
-          <FollowingShareAction
-            item={item}
-            subject={primarySubject}
-          />
-
-          <FollowingReactionAction
-            state={reactionState}
-            reacting={reacting}
-            onSelect={(reactionType) =>
-              onReact(
-                item,
+            saving={
+              postInteraction.savingPostIds.has(
+                post.id,
+              )
+            }
+            reactionState={
+              postInteraction.reactionStates.get(
+                post.id,
+              )
+            }
+            reacting={
+              postInteraction.reactingPostIds.has(
+                post.id,
+              )
+            }
+            followed={
+              postInteraction.followedActorKeys.has(
+                `${post.actor.type}:${post.actor.id}`,
+              )
+            }
+            following={
+              postInteraction.followingActorKeys.has(
+                `${post.actor.type}:${post.actor.id}`,
+              )
+            }
+            canManage={
+              postInteraction.manageableActorKeys.has(
+                `${post.actor.type}:${post.actor.id}`,
+              )
+            }
+            onToggleSave={() =>
+              void postInteraction.toggleSave(
+                post,
+              )
+            }
+            onToggleFollow={() =>
+              void postInteraction.toggleFollow(
+                post.actor,
+              )
+            }
+            onReact={(
+              reactionType,
+            ) =>
+              void postInteraction.toggleReaction(
+                post,
                 reactionType,
               )
             }
+            onWithdrawn={
+              onPostWithdrawn
+            }
           />
-        </div>
+        ) : (
+          <div
+            data-following-actions
+            className="mt-3 flex items-center gap-1 border-t border-[var(--wk-divider)] pt-2 md:mt-4"
+          >
+            <ActivityAction
+              icon={
+                saved
+                  ? "ri-bookmark-fill"
+                  : "ri-bookmark-line"
+              }
+              label={
+                saved
+                  ? "Saved"
+                  : "Save"
+              }
+              active={saved}
+              disabled={saving}
+              onClick={() =>
+                onToggleSave(
+                  item,
+                  primarySubject,
+                )
+              }
+            />
+
+            <FollowingShareAction
+              item={item}
+              subject={primarySubject}
+            />
+
+            <FollowingReactionAction
+              state={
+                reactionState
+              }
+              reacting={
+                reacting
+              }
+              onSelect={(
+                reactionType,
+              ) =>
+                onReact(
+                  item,
+                  reactionType,
+                )
+              }
+            />
+          </div>
+        )}
       </div>
     </article>
   );
@@ -1350,6 +1529,73 @@ export default function FollowingPage() {
         viewerActor,
       ],
     );
+
+  const postEntities =
+    useMemo(
+      () =>
+        items.flatMap(
+          (item) => {
+            const post =
+              followingPostFromItem(
+                item,
+                subjectLookup,
+              );
+
+            return post
+              ? [post]
+              : [];
+          },
+        ),
+      [
+        items,
+        subjectLookup,
+      ],
+    );
+
+  const postInteraction =
+    usePostInteractionState(
+      postEntities,
+    );
+
+  const postLookup =
+    useMemo(
+      () =>
+        new Map(
+          postEntities.map(
+            (post) => [
+              post.id,
+              post,
+            ],
+          ),
+        ),
+      [postEntities],
+    );
+
+  const handlePostWithdrawn =
+    useCallback(
+      (
+        postId: string,
+      ) => {
+        setItems(
+          (current) =>
+            current.filter(
+              (item) =>
+                !(
+                  (
+                    item.itemType ===
+                      "post" ||
+                    item.itemType ===
+                      "artist_update"
+                  ) &&
+                  item.itemId ===
+                    postId
+                ),
+            ),
+        );
+      },
+      [],
+    );
+
 
   const activityAnchors =
     useMemo(
@@ -2039,6 +2285,17 @@ export default function FollowingPage() {
                     key={item.itemKey}
                     item={item}
                     subjectLookup={subjectLookup}
+                    post={
+                      postLookup.get(
+                        item.itemId,
+                      ) ?? null
+                    }
+                    postInteraction={
+                      postInteraction
+                    }
+                    onPostWithdrawn={
+                      handlePostWithdrawn
+                    }
                     saved={
                       savedKeys.has(key)
                     }
