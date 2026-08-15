@@ -1,9 +1,9 @@
 {
   "projectRef": "pgzizndxdyhqmtyywjmt",
   "schema": "public",
-  "generatedAt": "2026-08-15T11:16:06Z",
-  "typesSha256": "1938fd2f5b9d0e29158f10fbb30c6bf69b9a75b339d743599cb11be9bd0742f6",
+  "generatedAt": "2026-08-15T17:07:26Z",
+  "typesSha256": "e957c08b2f8d3fdb7fc2c8f5b183fb5b46d7a6ab69da158fe4f7a59d2a05a5f4",
   "authoritativeMigrationDirectory": "supabase/migrations",
-  "migrationCount": 8,
-  "latestMigration": "20260815084011_repair_auth_signup_person_deferred_integrity_context.sql"
+  "migrationCount": 10,
+  "latestMigration": "20260815184700_repair_community_comment_authenticated_commands.sql"
 }

@@ -18054,6 +18054,7 @@ export type Database = {
         Args: { p_limit?: number }
         Returns: Json
       }
+      community_get_my_artist_representations: { Args: never; Returns: Json }
       community_get_notification_by_id: {
         Args: { p_notification_id: string }
         Returns: Json
@@ -18298,6 +18299,10 @@ export type Database = {
       }
       community_increment_reputation: {
         Args: { p_amount: number; p_user_id: string }
+        Returns: Json
+      }
+      community_list_artist_posts: {
+        Args: { p_artist_id: string; p_limit?: number }
         Returns: Json
       }
       community_mark_all_read: { Args: never; Returns: Json }
