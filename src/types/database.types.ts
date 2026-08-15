@@ -3679,6 +3679,7 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      current_person_post_actor: { Args: never; Returns: string }
       current_user_can_apply_correction: {
         Args: { p_case_resource_id: string }
         Returns: boolean
@@ -4860,69 +4861,6 @@ export type Database = {
             columns: ["source_claim_id"]
             isOneToOne: false
             referencedRelation: "artist_claim_requests"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      artist_updates: {
-        Row: {
-          artist_id: string
-          author_user_id: string | null
-          body: string
-          created_at: string
-          id: string
-          image_url: string | null
-          link_label: string | null
-          link_url: string | null
-          published_at: string
-          representation_id: string | null
-          status: string
-          updated_at: string
-          withdrawn_at: string | null
-        }
-        Insert: {
-          artist_id: string
-          author_user_id?: string | null
-          body: string
-          created_at?: string
-          id?: string
-          image_url?: string | null
-          link_label?: string | null
-          link_url?: string | null
-          published_at?: string
-          representation_id?: string | null
-          status?: string
-          updated_at?: string
-          withdrawn_at?: string | null
-        }
-        Update: {
-          artist_id?: string
-          author_user_id?: string | null
-          body?: string
-          created_at?: string
-          id?: string
-          image_url?: string | null
-          link_label?: string | null
-          link_url?: string | null
-          published_at?: string
-          representation_id?: string | null
-          status?: string
-          updated_at?: string
-          withdrawn_at?: string | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "artist_updates_artist_id_fkey"
-            columns: ["artist_id"]
-            isOneToOne: false
-            referencedRelation: "registry_artists"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "artist_updates_representation_id_fkey"
-            columns: ["representation_id"]
-            isOneToOne: false
-            referencedRelation: "artist_representations"
             referencedColumns: ["id"]
           },
         ]
@@ -7504,6 +7442,75 @@ export type Database = {
             columns: ["comment_id"]
             isOneToOne: false
             referencedRelation: "community_comments"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      community_posts: {
+        Row: {
+          actor_type: string
+          artist_id: string | null
+          author_user_id: string | null
+          body: string
+          created_at: string
+          id: string
+          image_url: string | null
+          link_label: string | null
+          link_url: string | null
+          person_resource_id: string | null
+          published_at: string
+          representation_id: string | null
+          status: string
+          updated_at: string
+          withdrawn_at: string | null
+        }
+        Insert: {
+          actor_type?: string
+          artist_id?: string | null
+          author_user_id?: string | null
+          body: string
+          created_at?: string
+          id?: string
+          image_url?: string | null
+          link_label?: string | null
+          link_url?: string | null
+          person_resource_id?: string | null
+          published_at?: string
+          representation_id?: string | null
+          status?: string
+          updated_at?: string
+          withdrawn_at?: string | null
+        }
+        Update: {
+          actor_type?: string
+          artist_id?: string | null
+          author_user_id?: string | null
+          body?: string
+          created_at?: string
+          id?: string
+          image_url?: string | null
+          link_label?: string | null
+          link_url?: string | null
+          person_resource_id?: string | null
+          published_at?: string
+          representation_id?: string | null
+          status?: string
+          updated_at?: string
+          withdrawn_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "artist_updates_artist_id_fkey"
+            columns: ["artist_id"]
+            isOneToOne: false
+            referencedRelation: "registry_artists"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "artist_updates_representation_id_fkey"
+            columns: ["representation_id"]
+            isOneToOne: false
+            referencedRelation: "artist_representations"
             referencedColumns: ["id"]
           },
         ]
@@ -16387,6 +16394,69 @@ export type Database = {
       }
     }
     Views: {
+      artist_updates: {
+        Row: {
+          artist_id: string | null
+          author_user_id: string | null
+          body: string | null
+          created_at: string | null
+          id: string | null
+          image_url: string | null
+          link_label: string | null
+          link_url: string | null
+          published_at: string | null
+          representation_id: string | null
+          status: string | null
+          updated_at: string | null
+          withdrawn_at: string | null
+        }
+        Insert: {
+          artist_id?: string | null
+          author_user_id?: string | null
+          body?: string | null
+          created_at?: string | null
+          id?: string | null
+          image_url?: string | null
+          link_label?: string | null
+          link_url?: string | null
+          published_at?: string | null
+          representation_id?: string | null
+          status?: string | null
+          updated_at?: string | null
+          withdrawn_at?: string | null
+        }
+        Update: {
+          artist_id?: string | null
+          author_user_id?: string | null
+          body?: string | null
+          created_at?: string | null
+          id?: string | null
+          image_url?: string | null
+          link_label?: string | null
+          link_url?: string | null
+          published_at?: string | null
+          representation_id?: string | null
+          status?: string | null
+          updated_at?: string | null
+          withdrawn_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "artist_updates_artist_id_fkey"
+            columns: ["artist_id"]
+            isOneToOne: false
+            referencedRelation: "registry_artists"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "artist_updates_representation_id_fkey"
+            columns: ["representation_id"]
+            isOneToOne: false
+            referencedRelation: "artist_representations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       institute_admin_entity_relationships: {
         Row: {
           confidence: string | null
@@ -17763,6 +17833,10 @@ export type Database = {
         }
         Returns: Json
       }
+      community_claim_guest_follow_intent: {
+        Args: { p_intent_token: string }
+        Returns: Json
+      }
       community_create_comment: {
         Args: {
           p_body_html: string
@@ -17800,6 +17874,10 @@ export type Database = {
         }
         Returns: Json
       }
+      community_create_guest_follow_intent: {
+        Args: { p_artist_ids: string[] }
+        Returns: Json
+      }
       community_create_profile: {
         Args: { p_display_name?: string; p_user_id: string; p_username: string }
         Returns: Json
@@ -17832,6 +17910,16 @@ export type Database = {
           p_link_label?: string
           p_link_url?: string
           p_update_id: string
+        }
+        Returns: Json
+      }
+      community_edit_post: {
+        Args: {
+          p_body: string
+          p_image_url?: string
+          p_link_label?: string
+          p_link_url?: string
+          p_post_id: string
         }
         Returns: Json
       }
@@ -17988,6 +18076,7 @@ export type Database = {
         Args: { p_person_resource_id: string }
         Returns: Json
       }
+      community_get_post: { Args: { p_post_id: string }; Returns: Json }
       community_get_profile_by_username: {
         Args: { p_username: string }
         Returns: Json
@@ -18005,6 +18094,14 @@ export type Database = {
         Returns: Json
       }
       community_get_registry_onboarding_state: { Args: never; Returns: Json }
+      community_get_social_feed: {
+        Args: {
+          p_before_item_key?: string
+          p_before_published_at?: string
+          p_limit?: number
+        }
+        Returns: Json
+      }
       community_get_thread_by_entity: {
         Args: {
           p_entity_id?: string
@@ -18228,6 +18325,17 @@ export type Database = {
         }
         Returns: Json
       }
+      community_publish_post: {
+        Args: {
+          p_actor_id: string
+          p_actor_type: string
+          p_body: string
+          p_image_url?: string
+          p_link_label?: string
+          p_link_url?: string
+        }
+        Returns: Json
+      }
       community_react_to_target: {
         Args: {
           p_reaction_type: string
@@ -18396,6 +18504,10 @@ export type Database = {
       }
       community_withdraw_artist_update: {
         Args: { p_reason: string; p_update_id: string }
+        Returns: Json
+      }
+      community_withdraw_post: {
+        Args: { p_post_id: string; p_reason: string }
         Returns: Json
       }
       complete_media_processing_job_v1: {
