@@ -18,6 +18,7 @@ export function ArtistNewsletterSection({ artistName, artistSlug }: ArtistNewsle
         description="Get Artist Signals when new releases, chart entries, and stories around this artist drop."
         briefingSlugs={BRIEFING_SLUGS.artistSignals}
         sourceForm="artist_follow"
+        variant="compact"
         interests={[
           artistInterest({
             slug: artistSlug,

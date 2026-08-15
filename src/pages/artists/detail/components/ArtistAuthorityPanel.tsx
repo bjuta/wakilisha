@@ -1,4 +1,10 @@
-import { useEffect, useMemo, useState, type FormEvent } from "react";
+import {
+  useEffect,
+  useMemo,
+  useState,
+  type FormEvent,
+  type ReactNode,
+} from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { WkButton } from "@/components/design-system/primitives/Button";
 import { ArtistPostComposer } from "@/components/artists/ArtistPostComposer";
@@ -20,6 +26,16 @@ const SOCIAL_LABELS: Record<string, string> = {
   soundcloud: "SoundCloud",
 };
 
+const SOCIAL_ICONS: Record<string, string> = {
+  instagram: "ri-instagram-line",
+  tiktok: "ri-tiktok-line",
+  x: "ri-twitter-x-line",
+  youtube: "ri-youtube-line",
+  facebook: "ri-facebook-circle-line",
+  spotify: "ri-spotify-line",
+  soundcloud: "ri-soundcloud-line",
+};
+
 const CLAIM_ROLES = [
   ["artist", "Artist"],
   ["manager", "Manager"],
@@ -36,6 +52,9 @@ export function ArtistAuthorityPanel({
   authority,
   userId,
   authLoading,
+  navigation,
+  showComposer = true,
+  onPostSaved,
 }: {
   artistId: string;
   artistSlug: string;
@@ -43,6 +62,9 @@ export function ArtistAuthorityPanel({
   authority: ArtistPublicAuthority | null;
   userId?: string;
   authLoading: boolean;
+  navigation?: ReactNode;
+  showComposer?: boolean;
+  onPostSaved?: () => void;
 }) {
   const navigate = useNavigate();
   const [state, setState] = useState<ArtistRepresentationState | null>(null);
@@ -56,13 +78,47 @@ export function ArtistAuthorityPanel({
 
   const presentation = authority?.presentation;
   const publicLinks = useMemo(() => {
-    const items: Array<{ label: string; href: string }> = [];
-    if (presentation?.websiteUrl) items.push({ label: "Website", href: presentation.websiteUrl });
-    for (const [key, href] of Object.entries(presentation?.socialLinks ?? {})) {
-      if (!href) continue;
-      items.push({ label: SOCIAL_LABELS[key] ?? key, href });
+    const items: Array<{
+      label: string;
+      href: string;
+      icon: string;
+    }> = [];
+
+    if (presentation?.websiteUrl) {
+      items.push({
+        label: "Website",
+        href: presentation.websiteUrl,
+        icon: "ri-global-line",
+      });
     }
-    if (presentation?.publicEmail) items.push({ label: "Email", href: `mailto:${presentation.publicEmail}` });
+
+    for (
+      const [key, href] of
+      Object.entries(
+        presentation?.socialLinks ?? {},
+      )
+    ) {
+      if (!href) continue;
+
+      items.push({
+        label:
+          SOCIAL_LABELS[key] ?? key,
+        href,
+        icon:
+          SOCIAL_ICONS[key] ??
+          "ri-links-line",
+      });
+    }
+
+    if (presentation?.publicEmail) {
+      items.push({
+        label: "Email",
+        href:
+          `mailto:${presentation.publicEmail}`,
+        icon: "ri-mail-line",
+      });
+    }
+
     return items;
   }, [presentation]);
 
@@ -185,16 +241,21 @@ export function ArtistAuthorityPanel({
                 : "Built from WAKILISHA's reviewed music records."}
             </p>
             {publicLinks.length > 0 && (
-              <div className="mt-3 flex flex-wrap gap-x-4 gap-y-2">
+              <div className="author-profile-hero-socials mt-3 !mb-0">
                 {publicLinks.map((item) => (
                   <a
                     key={`${item.label}-${item.href}`}
                     href={item.href}
                     target={item.href.startsWith("mailto:") ? undefined : "_blank"}
                     rel={item.href.startsWith("mailto:") ? undefined : "noopener noreferrer"}
-                    className="text-[12px] font-bold text-[var(--wk-brand)] hover:underline"
+                    className="author-profile-hero-social-link"
+                    aria-label={item.label}
+                    title={item.label}
                   >
-                    {item.label}
+                    <i
+                      className={`${item.icon} text-[17px]`}
+                      aria-hidden="true"
+                    />
                   </a>
                 ))}
               </div>
@@ -244,7 +305,14 @@ export function ArtistAuthorityPanel({
           </div>
         )}
 
-        {activeRepresentation?.permissions.updates && (
+        {navigation ? (
+          <div className="mt-5">
+            {navigation}
+          </div>
+        ) : null}
+
+        {showComposer &&
+          activeRepresentation?.permissions.updates && (
           <div className="mt-5">
             <ArtistPostComposer
               artistId={artistId}
@@ -254,8 +322,9 @@ export function ArtistAuthorityPanel({
               onSaved={() => {
                 setMessage({
                   type: "success",
-                  text: "Post published to Following.",
+                  text: "Post published.",
                 });
+                onPostSaved?.();
               }}
               onError={(text) =>
                 setMessage({

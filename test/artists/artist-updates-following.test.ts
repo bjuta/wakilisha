@@ -97,6 +97,54 @@ const packageJson =
     "utf8",
   );
 
+const artistProfileReadMigration =
+  readFileSync(
+    "supabase/migrations/20260815165600_artist_profile_read_surfaces.sql",
+    "utf8",
+  );
+
+const artistDetailPage =
+  readFileSync(
+    "src/pages/artists/detail/page.tsx",
+    "utf8",
+  );
+
+const artistPostsTimeline =
+  readFileSync(
+    "src/pages/artists/detail/components/ArtistPostsTimeline.tsx",
+    "utf8",
+  );
+
+const artistNewsletterSection =
+  readFileSync(
+    "src/pages/artists/detail/components/ArtistNewsletterSection.tsx",
+    "utf8",
+  );
+
+const newsletterSubscribe =
+  readFileSync(
+    "src/components/feature/NewsletterSubscribe.tsx",
+    "utf8",
+  );
+
+const postService =
+  readFileSync(
+    "src/services/community/posts.ts",
+    "utf8",
+  );
+
+const musicShell =
+  readFileSync(
+    "src/components/music/MusicDesktopShell.tsx",
+    "utf8",
+  );
+
+const myArtistsService =
+  readFileSync(
+    "src/services/artists/artistRepresentationChoices.ts",
+    "utf8",
+  );
+
 describe(
   "Artist Updates -> Following",
   () => {
@@ -237,38 +285,43 @@ describe(
 
         expect(
           managePage,
-        ).toContain(
+        ).not.toContain(
           'id="artist-posts"',
         );
         expect(
           managePage,
-        ).toContain(
+        ).not.toContain(
           'label="Posts"',
         );
         expect(
           managePage,
-        ).toContain(
+        ).not.toContain(
           'studioSection === "posts"',
         );
         expect(
           managePage,
-        ).toContain(
+        ).not.toContain(
           "ArtistPostComposer",
         );
         expect(
           managePage,
-        ).toContain(
-          "No posts yet",
-        );
-        expect(
-          managePage,
-        ).toContain(
-          "Official Artist",
-        );
-        expect(
-          managePage,
-        ).toContain(
+        ).not.toContain(
           "withdrawArtistUpdate",
+        );
+        expect(
+          managePage,
+        ).toContain(
+          'label="Music"',
+        );
+        expect(
+          managePage,
+        ).toContain(
+          'label="Insights"',
+        );
+        expect(
+          managePage,
+        ).toContain(
+          'label="Settings"',
         );
         expect(
           managePage,
@@ -284,6 +337,164 @@ describe(
           artistImageField,
         ).toContain(
           "Choose From Your Media",
+        );
+      },
+    );
+
+    it(
+      "makes the public Artist profile a real Posts timeline and keeps Studio launch owned",
+      () => {
+        expect(
+          artistProfileReadMigration,
+        ).toContain(
+          "community_list_artist_posts",
+        );
+        expect(
+          artistProfileReadMigration,
+        ).toContain(
+          "community_get_my_artist_representations",
+        );
+        expect(
+          artistProfileReadMigration,
+        ).toContain(
+          "private.phase_0a_rpc_classification",
+        );
+        expect(
+          artistProfileReadMigration,
+        ).toContain(
+          "'authenticated_read'",
+        );
+        expect(
+          artistProfileReadMigration,
+        ).toContain(
+          "'public_read'",
+        );
+        expect(
+          artistProfileReadMigration,
+        ).not.toMatch(
+          /(insert\s+into|update\s+public\.|delete\s+from)\s+public\.community_posts\b/i,
+        );
+
+        expect(
+          postService,
+        ).toContain(
+          "listArtistPosts",
+        );
+        expect(
+          artistPostsTimeline,
+        ).toContain(
+          "PostActions",
+        );
+        expect(
+          artistPostsTimeline,
+        ).not.toContain(
+          "View Post",
+        );
+        expect(
+          artistPostsTimeline,
+        ).not.toContain(
+          'id="artist-posts-heading"',
+        );
+        expect(
+          artistPostsTimeline,
+        ).toContain(
+          'aria-label={`${artistName} Posts`}',
+        );
+        expect(
+          artistNewsletterSection,
+        ).toContain(
+          'variant="compact"',
+        );
+        expect(
+          newsletterSubscribe,
+        ).toContain(
+          'variant?: "default" | "compact"',
+        );
+        expect(
+          newsletterSubscribe,
+        ).toContain(
+          'variant = "default"',
+        );
+        expect(
+          artistDetailPage,
+        ).toContain(
+          "ArtistPostsTimeline",
+        );
+        expect(
+          artistDetailPage,
+        ).toContain(
+          "ARTIST_PROFILE_TABS",
+        );
+        expect(
+          artistDetailPage,
+        ).toContain(
+          'id: "posts"',
+        );
+        expect(
+          artistDetailPage,
+        ).toContain(
+          'id: "music"',
+        );
+        expect(
+          artistDetailPage,
+        ).toContain(
+          'id: "about"',
+        );
+        expect(
+          artistDetailPage,
+        ).toContain(
+          'id: "community"',
+        );
+        expect(
+          artistDetailPage,
+        ).toContain(
+          'activeTab === "posts"',
+        );
+        expect(
+          artistDetailPage,
+        ).toContain(
+          'activeTab === "music"',
+        );
+        expect(
+          artistDetailPage,
+        ).toContain(
+          'activeTab === "about"',
+        );
+        expect(
+          artistDetailPage,
+        ).toContain(
+          'activeTab === "community"',
+        );
+        expect(
+          authorityPanel,
+        ).toContain(
+          "author-profile-hero-social-link",
+        );
+        expect(
+          authorityPanel,
+        ).toContain(
+          "navigation?: ReactNode",
+        );
+        expect(
+          authorityPanel,
+        ).toContain(
+          "showComposer",
+        );
+
+        expect(
+          myArtistsService,
+        ).toContain(
+          "community_get_my_artist_representations",
+        );
+        expect(
+          musicShell,
+        ).toContain(
+          "listMyArtistRepresentations",
+        );
+        expect(
+          musicShell,
+        ).not.toContain(
+          "await listArtists()",
         );
       },
     );

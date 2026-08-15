@@ -1,9 +1,13 @@
 import { useEffect } from "react";
-import { Link, Outlet } from "react-router-dom";
+import { Link, Outlet, useLocation } from "react-router-dom";
 import { useTheme } from "@/components/design-system/theme/ThemeProvider";
 import { usePlayer } from "@/context/PlayerContext";
 import { PlayerDock } from "@/components/design-system/music/PlayerDock";
 import { AppTopBar } from "./AppTopBar";
+import {
+  MusicDesktopShell,
+  isMusicAppPath,
+} from "@/components/music/MusicDesktopShell";
 import DesktopPlayerPage from "@/pages/player/page";
 import { useAuthUser } from "@/hooks/useAuthUser";
 import { usePendingCommunityActionReplay } from "@/hooks/usePendingCommunityActionReplay";
@@ -32,6 +36,11 @@ const FOOTER_ABOUT = [
 export function AppLayout() {
   const { theme } = useTheme();
   const { isFullPlayerOpen } = usePlayer();
+  const location = useLocation();
+  const isMusicRoute =
+    isMusicAppPath(
+      location.pathname,
+    );
   const authUser = useAuthUser();
 
   usePendingCommunityActionReplay(
@@ -59,9 +68,15 @@ export function AppLayout() {
 
   return (
     <div className={`wk-app-shell flex flex-col ${isFullPlayerOpen ? "h-screen overflow-hidden" : "min-h-screen"}`}>
-      {!isFullPlayerOpen && <AppTopBar />}
+      {!isFullPlayerOpen && !isMusicRoute && <AppTopBar />}
       <main className={isFullPlayerOpen ? "hidden" : "flex-1"}>
-        <Outlet />
+        {isMusicRoute ? (
+          <MusicDesktopShell>
+            <Outlet />
+          </MusicDesktopShell>
+        ) : (
+          <Outlet />
+        )}
       </main>
       {!isFullPlayerOpen && <PlayerDock />}
 
@@ -75,7 +90,7 @@ export function AppLayout() {
           <DesktopPlayerPage />
         </div>
       )}
-      {!isFullPlayerOpen && (
+      {!isFullPlayerOpen && !isMusicRoute && (
         <footer className="border-t border-[var(--wk-border)] bg-[var(--wk-surface-raised)]">
           <div className="wk-container-wide px-6 py-12">
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-8">

@@ -158,9 +158,12 @@ const directLazyImports = [
  * Universal Posts add:
  * - ../pages/posts/detail/page
  *
- * The current authority is therefore 56 direct lazy imports.
+ * Music discovery adds:
+ * - ../pages/music/page
+ *
+ * The current authority is therefore 57 direct lazy imports.
  */
-const expectedDirectLazyImportCount = 56;
+const expectedDirectLazyImportCount = 57;
 
 if (
   directLazyImports.length !==
@@ -229,6 +232,7 @@ for (const requiredModule of [
   "../pages/artists/manage/page",
   "../pages/artists/update/page",
   "../pages/posts/detail/page",
+  "../pages/music/page",
   "../pages/charts/edition/page",
   "../pages/magazine/article/page",
   "../pages/mobile/magazine/article/page",
@@ -332,9 +336,12 @@ const routePaths = [
  * Universal Posts add one public Person Post route path:
  * - /people/:slug/posts/:postId
  *
- * The current authority is therefore 158 paths.
+ * Music discovery adds one public route path:
+ * - /music
+ *
+ * The current authority is therefore 159 paths.
  */
-const expectedRoutePathCount = 158;
+const expectedRoutePathCount = 159;
 
 if (routePaths.length !== expectedRoutePathCount) {
   fail(
@@ -351,7 +358,7 @@ const routeChecksum = crypto
   .digest("hex");
 
 const expectedRouteChecksum =
-  "e5ba2a59867aa98a8662ae6f5a201d965885a9c2b7bada3cd7af994c58abd60e";
+  "0392a85c6656e01dfb783515e8daf60d584e4c0739eedc7c076b5d4dbf1c1755";
 
 if (
   routeChecksum !==

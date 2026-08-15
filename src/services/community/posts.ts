@@ -174,3 +174,46 @@ export async function getPost(postId: string): Promise<CommunityPost> {
   if (!post) throw new Error("Post was not found.");
   return post;
 }
+
+export async function listArtistPosts(
+  artistId: string,
+  limit = 20,
+): Promise<CommunityPost[]> {
+  const data =
+    await rpc(
+      "community_list_artist_posts",
+      {
+        p_artist_id: artistId,
+        p_limit:
+          Math.min(
+            50,
+            Math.max(
+              1,
+              Math.round(limit),
+            ),
+          ),
+      },
+    );
+
+  if (!Array.isArray(data)) {
+    return [];
+  }
+
+  return data.flatMap(
+    (value) => {
+      const post =
+        mapCommunityPost(value);
+
+      if (
+        !post ||
+        post.actorType !== "artist" ||
+        post.actorId !== artistId ||
+        post.status !== "published"
+      ) {
+        return [];
+      }
+
+      return [post];
+    },
+  );
+}

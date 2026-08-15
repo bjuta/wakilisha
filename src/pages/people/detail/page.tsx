@@ -162,6 +162,8 @@ function savedItemTypeLabel(
       playlist: "Playlist",
       person: "Person",
       profile: "Profile",
+      post: "Post",
+      artist_update: "Post",
     };
 
   return (
@@ -2089,7 +2091,7 @@ export default function PersonDetailPage() {
   if (isOwner) {
     profileTabs.push({
       id: "saves",
-      label: "Saves",
+      label: "Bookmarks",
       count:
         ownerSavesLoaded
           ? ownerSaves.length
@@ -3175,10 +3177,10 @@ export default function PersonDetailPage() {
             <div className="profile-dt-body">
               <div className="profile-dt-section-head">
                 <div className="profile-dt-section-kicker">
-                  Saved
+                  Bookmarks
                 </div>
                 <h2 className="profile-dt-section-title">
-                  Your saves
+                  Your bookmarks
                 </h2>
               </div>
 
@@ -3272,7 +3274,7 @@ export default function PersonDetailPage() {
                     className="mx-auto mb-3 text-[var(--wk-text-faint)]"
                   />
                   <p className="text-sm font-bold text-[var(--wk-text-muted)]">
-                    Nothing saved yet.
+                    Nothing bookmarked yet.
                   </p>
                 </div>
               )}
