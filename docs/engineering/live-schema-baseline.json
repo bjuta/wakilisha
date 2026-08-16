@@ -1,9 +1,9 @@
 {
   "projectRef": "pgzizndxdyhqmtyywjmt",
   "schema": "public",
-  "generatedAt": "2026-08-16T19:26:34Z",
+  "generatedAt": "2026-08-16T20:29:53Z",
   "typesSha256": "b50adc60d559694df0fc351ffd7a74fb8c74782c83296828ac3b66f5f6fb670f",
   "authoritativeMigrationDirectory": "supabase/migrations",
-  "migrationCount": 14,
-  "latestMigration": "20260816143000_personal_playlist_duplicate_track_confirmation.sql"
+  "migrationCount": 15,
+  "latestMigration": "20260816200500_correct_valle_release_featured_credit.sql"
 }
