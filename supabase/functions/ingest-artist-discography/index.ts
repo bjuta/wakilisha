@@ -6,6 +6,10 @@ import {
   resolveExistingAppleRelease,
   type ExistingAppleRelease,
 } from "./releaseIdentity.ts";
+import {
+  albumArtistCreditIncludesArtist,
+  resolveReleaseArtistCredit,
+} from "./releaseArtistCredit.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -265,12 +269,6 @@ interface ApplySelection {
   apple_music_id: string;
   action: "merge" | "canonicalize" | "ignore";
   additional_primary_artists?: AdditionalPrimaryArtist[];
-}
-
-function isArtistPrimaryForAlbum(albumArtistName: string, currentArtistName: string): boolean {
-  const albumArtist = albumArtistName.toLowerCase().trim();
-  const currentArtist = currentArtistName.toLowerCase().trim();
-  return albumArtist.includes(currentArtist) || currentArtist.includes(albumArtist);
 }
 
 Deno.serve(async (req: Request) => {
@@ -730,7 +728,10 @@ Deno.serve(async (req: Request) => {
         const upc = attrs.upc ? String(attrs.upc) : null;
 
         const albumArtistName = (attrs.artistName ?? "").trim();
-        const artistIsAlbumPrimary = isArtistPrimaryForAlbum(albumArtistName, artistName);
+        const artistIsAlbumPrimary = albumArtistCreditIncludesArtist(
+          albumArtistName,
+          artistName,
+        );
 
         let releaseId: string;
         let releaseSlug: string;
@@ -784,36 +785,46 @@ Deno.serve(async (req: Request) => {
 
         const addedReleaseArtistIds = new Set<string>();
 
-        if (artistIsAlbumPrimary) {
-          releaseArtistRows.push({
-            release_id: releaseId, artist_id: artistId, artist_slug: artistSlug, artist_name_text: artistName,
-            role: "primary_artist", is_primary: true, is_featured: false, credit_order: 1,
-            source: "apple_music_ingest", confidence: 90, status: "active",
-            metadata: { apple_music_album_id: album.id },
-          });
-          addedReleaseArtistIds.add(artistId);
-        } else {
-          releaseArtistRows.push({
-            release_id: releaseId, artist_id: artistId, artist_slug: artistSlug, artist_name_text: artistName,
-            role: "featured_artist", is_primary: false, is_featured: true, credit_order: 98,
-            source: "apple_music_ingest", confidence: 70, status: "active",
-            metadata: { apple_music_album_id: album.id, ingested_artist_is_featured: true },
-          });
-          addedReleaseArtistIds.add(artistId);
-        }
+        const currentArtistCredit = resolveReleaseArtistCredit(
+          "current_artist",
+          artistIsAlbumPrimary,
+        );
+        releaseArtistRows.push({
+          release_id: releaseId,
+          artist_id: artistId,
+          artist_slug: artistSlug,
+          artist_name_text: artistName,
+          role: currentArtistCredit.role,
+          is_primary: currentArtistCredit.is_primary,
+          is_featured: currentArtistCredit.is_featured,
+          credit_order: currentArtistCredit.is_primary ? 1 : 98,
+          source: "apple_music_ingest",
+          confidence: currentArtistCredit.is_primary ? 90 : 70,
+          status: "active",
+          metadata: currentArtistCredit.is_primary
+            ? { apple_music_album_id: album.id }
+            : {
+              apple_music_album_id: album.id,
+              ingested_artist_is_featured: true,
+            },
+        });
+        addedReleaseArtistIds.add(artistId);
 
         const additionalPrimary = additionalPrimaryById.get(sel.apple_music_id);
         if (additionalPrimary) {
           let order = 2;
           for (const ap of additionalPrimary) {
+            const additionalPrimaryCredit = resolveReleaseArtistCredit(
+              "explicit_additional_primary",
+            );
             releaseArtistRows.push({
               release_id: releaseId,
               artist_id: ap.artist_id,
               artist_slug: ap.artist_slug,
               artist_name_text: ap.artist_name,
-              role: "primary_artist",
-              is_primary: true,
-              is_featured: false,
+              role: additionalPrimaryCredit.role,
+              is_primary: additionalPrimaryCredit.is_primary,
+              is_featured: additionalPrimaryCredit.is_featured,
               credit_order: order,
               source: "apple_music_ingest",
               confidence: 90,
@@ -837,17 +848,19 @@ Deno.serve(async (req: Request) => {
           if (matchedReg && addedReleaseArtistIds.has(matchedReg.id)) continue;
           if (matchedReg) addedReleaseArtistIds.add(matchedReg.id);
 
-          const isAlbumPrimary = isArtistPrimaryForAlbum(albumArtistName, amName);
+          const discoveredArtistCredit = resolveReleaseArtistCredit(
+            "discovered_album_artist",
+          );
 
           releaseArtistRows.push({
             release_id: releaseId,
             artist_id: matchedReg?.id ?? null,
             artist_slug: matchedReg?.slug ?? amSlug,
             artist_name_text: matchedReg?.display_name ?? amName,
-            role: isAlbumPrimary ? "primary_artist" : "featured_artist",
-            is_primary: isAlbumPrimary,
-            is_featured: !isAlbumPrimary,
-            credit_order: isAlbumPrimary ? 2 : 99 + ai,
+            role: discoveredArtistCredit.role,
+            is_primary: discoveredArtistCredit.is_primary,
+            is_featured: discoveredArtistCredit.is_featured,
+            credit_order: 99 + ai,
             source: "apple_music_ingest",
             confidence: matchedReg ? 85 : 50,
             status: "active",
