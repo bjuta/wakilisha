@@ -157,6 +157,7 @@ import {
 } from "./lazyPublic";
 import { ResponsiveAppLayout } from "@/components/mobile/ResponsiveAppLayout";
 import { ResponsivePage } from "@/components/mobile/ResponsivePage";
+import { useAuthUser } from "@/hooks/useAuthUser";
 
 // Author profiles
 
@@ -226,6 +227,31 @@ function LegacyEntityRedirect({ base }: { base: "/artists" | "/releases" | "/tra
   return <Navigate to="/tracks" replace />;
 }
 
+function AuthenticatedProfileRoute() {
+  const authUser = useAuthUser();
+
+  if (authUser.loading) {
+    return (
+      <div
+        className="min-h-[40vh]"
+        aria-busy="true"
+        aria-label="Loading Profile"
+      />
+    );
+  }
+
+  if (!authUser.id) {
+    return <Navigate to="/auth" replace />;
+  }
+
+  return (
+    <ResponsivePage
+      mobile={<MobileProfilePage />}
+      desktop={<ProfilePage />}
+    />
+  );
+}
+
 const routes: RouteObject[] = [
     { path: "/admin/login", element: <AdminLoginPage /> },
   { path: "/auth/reset-password", element: <ResetPasswordPage /> },
@@ -277,7 +303,7 @@ const routes: RouteObject[] = [
       { path: "/search", element: <ResponsivePage mobile={<Search />} desktop={<Search />} /> },
       { path: "/player", element: <Navigate to="/" replace /> },
       { path: "/auth", element: <ResponsivePage mobile={<AuthPage />} desktop={<AuthPage />} /> },
-      { path: "/profile", element: <ResponsivePage mobile={<MobileProfilePage />} desktop={<ProfilePage />} /> },
+      { path: "/profile", element: <AuthenticatedProfileRoute /> },
       { path: "/music", element: <ResponsivePage mobile={<MusicPage />} desktop={<MusicPage />} /> },
       { path: "/following", element: <ResponsivePage mobile={<FollowingPage />} desktop={<FollowingPage />} /> },
       { path: "/u/:username", element: <ResponsivePage mobile={<PublicProfilePage />} desktop={<PublicProfilePage />} /> },

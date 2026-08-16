@@ -1,51 +1,98 @@
-import { useMemo, useRef, useState } from "react";
-import { Link } from "react-router-dom";
+import {
+  useMemo,
+  useRef,
+  useState,
+} from "react";
+import {
+  Link,
+  useNavigate,
+} from "react-router-dom";
 import {
   CommunityReactionPicker,
   getReactionGlyph,
 } from "@/components/feature/community/CommunityReactionPicker";
-import { ShareSheet, type ShareObject } from "@/components/design-system/share/ShareSheet";
-import { withdrawPost, type CommunityPost } from "@/services/community/posts";
-import type { CommunityPublicReactionState, ReactionType } from "@/services/community";
+import {
+  ShareSheet,
+  type ShareObject,
+} from "@/components/design-system/share/ShareSheet";
+import { PostQuoteDialog } from "@/components/community/PostQuoteDialog";
+import { PostReportDialog } from "@/components/community/PostReportDialog";
+import {
+  withdrawPost,
+  type CommunityPost,
+  type PostActor,
+  type PostRepostState,
+} from "@/services/community/posts";
+import type {
+  CommunityPublicReactionState,
+  ReactionType,
+  ReportReason,
+} from "@/services/community";
 
 const PUBLIC_ORIGIN = "https://wakilisha.africa";
 
 export function PostActions({
   post,
+  actionActor = null,
   saved = false,
   saving = false,
   reactionState,
   reacting = false,
+  repostState,
+  reposting = false,
   followed,
   following = false,
+  blocked = false,
+  blocking = false,
+  reporting = false,
   canManage = false,
   onToggleSave,
   onToggleFollow,
   onReact,
+  onToggleRepost,
+  onToggleBlock,
+  onReport,
   onWithdrawn,
 }: {
   post: CommunityPost;
+  actionActor?: PostActor | null;
   saved?: boolean;
   saving?: boolean;
   reactionState?: CommunityPublicReactionState;
   reacting?: boolean;
+  repostState?: PostRepostState;
+  reposting?: boolean;
   followed?: boolean;
   following?: boolean;
+  blocked?: boolean;
+  blocking?: boolean;
+  reporting?: boolean;
   canManage?: boolean;
   onToggleSave?: () => void;
   onToggleFollow?: () => void;
   onReact?: (reactionType: ReactionType) => void;
+  onToggleRepost?: () => void;
+  onToggleBlock?: () => void;
+  onReport?: (reason: ReportReason) => Promise<void> | void;
   onWithdrawn?: (postId: string) => void;
 }) {
+  const navigate = useNavigate();
   const [reactionOpen, setReactionOpen] = useState(false);
+  const [repostOpen, setRepostOpen] = useState(false);
+  const [quoteOpen, setQuoteOpen] = useState(false);
   const [shareOpen, setShareOpen] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
+  const [reportOpen, setReportOpen] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const reactionTriggerRef = useRef<HTMLButtonElement | null>(null);
 
-  const activeReactions = reactionState?.reactions.filter((reaction) => reaction.viewerReacted).map((reaction) => reaction.reactionType) ?? [];
-  const visibleReactions = reactionState?.reactions.filter((reaction) => reaction.count > 0).slice(0, 3) ?? [];
+  const activeReactions =
+    reactionState?.reactions.filter((reaction) => reaction.viewerReacted).map((reaction) => reaction.reactionType) ?? [];
+  const visibleReactions =
+    reactionState?.reactions.filter((reaction) => reaction.count > 0).slice(0, 3) ?? [];
   const reactionCount = reactionState?.reactionCount ?? 0;
+  const repostCount = repostState?.repostCount ?? 0;
+  const viewerReposted = repostState?.viewerReposted ?? false;
 
   const shareItem = useMemo<ShareObject>(() => ({
     title: `Post from ${post.actor.name}`,
@@ -69,17 +116,35 @@ export function PostActions({
     }
   }
 
-  const showMenu = canManage || (typeof followed === "boolean" && Boolean(onToggleFollow));
+  function handleBlock() {
+    if (!onToggleBlock) return;
+    if (!blocked) {
+      const confirmed = window.confirm(
+        `Block ${post.actor.name}? You will unfollow them, and their Posts will stop appearing in your Following feed.`,
+      );
+      if (!confirmed) return;
+    }
+    setMenuOpen(false);
+    onToggleBlock();
+  }
+
+  const showRepost = Boolean(actionActor && onToggleRepost);
+  const showMenu =
+    canManage ||
+    (typeof followed === "boolean" && Boolean(onToggleFollow)) ||
+    Boolean(actionActor && (onToggleBlock || onReport));
 
   return (
     <>
       <div data-post-actions className="mt-4 flex flex-wrap items-center gap-1 border-t border-[var(--wk-divider)] pt-2">
         <Link
           to={`${post.canonicalPath}#community-section`}
-          className="inline-flex min-h-10 items-center gap-2 rounded-full px-3 text-[11px] font-bold text-[var(--wk-text-muted)] hover:bg-[var(--wk-surface-raised)] hover:text-[var(--wk-text)]"
+          title="Reply"
+          aria-label="Reply"
+          className="inline-flex h-10 w-10 items-center justify-center rounded-full text-[var(--wk-text-muted)] hover:bg-[var(--wk-surface-raised)] hover:text-[var(--wk-text)]"
         >
-          <i className="ri-chat-3-line text-[17px]" aria-hidden="true" />
-          Reply
+          <i className="ri-chat-3-line text-[18px]" aria-hidden="true" />
+          <span className="sr-only">Reply</span>
         </Link>
 
         {onToggleSave && (
@@ -87,10 +152,21 @@ export function PostActions({
             type="button"
             disabled={saving}
             onClick={onToggleSave}
-            className={`inline-flex min-h-10 items-center gap-2 rounded-full px-3 text-[11px] font-bold ${saved ? "bg-[var(--wk-brand-soft)] text-[var(--wk-brand)]" : "text-[var(--wk-text-muted)] hover:bg-[var(--wk-surface-raised)] hover:text-[var(--wk-text)]"} disabled:opacity-55`}
+            title={saved ? "Remove Bookmark" : "Bookmark"}
+            aria-label={saved ? "Remove Bookmark" : "Bookmark"}
+            className={`inline-flex h-10 w-10 items-center justify-center rounded-full ${
+              saved
+                ? "bg-[var(--wk-brand-soft)] text-[var(--wk-brand)]"
+                : "text-[var(--wk-text-muted)] hover:bg-[var(--wk-surface-raised)] hover:text-[var(--wk-text)]"
+            } disabled:opacity-55`}
           >
-            <i className={saved ? "ri-bookmark-fill text-[17px]" : "ri-bookmark-line text-[17px]"} aria-hidden="true" />
-            {saved ? "Bookmarked" : "Bookmark"}
+            <i
+              className={saved ? "ri-bookmark-fill text-[17px]" : "ri-bookmark-line text-[17px]"}
+              aria-hidden="true"
+            />
+            <span className="sr-only">
+              {saved ? "Bookmarked" : "Bookmark"}
+            </span>
           </button>
         )}
 
@@ -101,8 +177,21 @@ export function PostActions({
               type="button"
               disabled={reacting}
               onClick={() => setReactionOpen((current) => !current)}
-              className={`inline-flex min-h-10 items-center gap-2 rounded-full px-3 text-[11px] font-bold ${activeReactions.length > 0 ? "bg-[var(--wk-brand-soft)] text-[var(--wk-brand)]" : "text-[var(--wk-text-muted)] hover:bg-[var(--wk-surface-raised)] hover:text-[var(--wk-text)]"} disabled:opacity-55`}
-              aria-label={reactionCount > 0 ? `${reactionCount} reactions. Add or remove a reaction.` : "React to this Post"}
+              title={
+                activeReactions.length > 0
+                  ? "Manage Reactions"
+                  : "React"
+              }
+              className={`inline-flex h-10 min-w-10 items-center justify-center gap-1.5 rounded-full px-2 ${
+                activeReactions.length > 0
+                  ? "bg-[var(--wk-brand-soft)] text-[var(--wk-brand)]"
+                  : "text-[var(--wk-text-muted)] hover:bg-[var(--wk-surface-raised)] hover:text-[var(--wk-text)]"
+              } disabled:opacity-55`}
+              aria-label={
+                reactionCount > 0
+                  ? `${reactionCount} reactions. Add or remove a reaction.`
+                  : "React to this Post"
+              }
               aria-expanded={reactionOpen}
             >
               {visibleReactions.length > 0 ? (
@@ -116,7 +205,12 @@ export function PostActions({
               ) : (
                 <i className="ri-emotion-happy-line text-[17px]" aria-hidden="true" />
               )}
-              <span>{reactionCount > 0 ? reactionCount : "React"}</span>
+              {reactionCount > 0 && (
+                <span className="text-[10px] font-black tabular-nums">
+                  {reactionCount}
+                </span>
+              )}
+              <span className="sr-only">React</span>
             </button>
 
             {reactionOpen && (
@@ -133,13 +227,70 @@ export function PostActions({
           </div>
         )}
 
+        {showRepost && (
+          <div className="relative">
+            <button
+              type="button"
+              disabled={reposting}
+              onClick={() => setRepostOpen((current) => !current)}
+              aria-expanded={repostOpen}
+              aria-label={viewerReposted ? "Reposted. Open Repost options." : "Open Repost options"}
+              title={viewerReposted ? "Repost Options" : "Repost"}
+              className={`inline-flex h-10 min-w-10 items-center justify-center gap-1.5 rounded-full px-2 ${
+                viewerReposted
+                  ? "bg-[var(--wk-brand-soft)] text-[var(--wk-brand)]"
+                  : "text-[var(--wk-text-muted)] hover:bg-[var(--wk-surface-raised)] hover:text-[var(--wk-text)]"
+              } disabled:opacity-55`}
+            >
+              <i className="ri-repeat-2-line text-[17px]" aria-hidden="true" />
+              {repostCount > 0 && (
+                <span className="text-[10px] font-black tabular-nums">
+                  {repostCount}
+                </span>
+              )}
+              <span className="sr-only">Repost</span>
+            </button>
+
+            {repostOpen && (
+              <div className="absolute bottom-12 left-0 z-40 min-w-[190px] overflow-hidden rounded-2xl border border-[var(--wk-border)] bg-[var(--wk-surface)] p-1.5 shadow-xl">
+                <button
+                  type="button"
+                  disabled={reposting}
+                  onClick={() => {
+                    setRepostOpen(false);
+                    onToggleRepost?.();
+                  }}
+                  className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left text-[12px] font-black text-[var(--wk-text)] hover:bg-[var(--wk-bg)] disabled:opacity-50"
+                >
+                  <i className="ri-repeat-2-line text-[17px]" aria-hidden="true" />
+                  {viewerReposted ? "Undo Repost" : "Repost"}
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    setRepostOpen(false);
+                    setQuoteOpen(true);
+                  }}
+                  className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left text-[12px] font-black text-[var(--wk-text)] hover:bg-[var(--wk-bg)]"
+                >
+                  <i className="ri-double-quotes-l text-[17px]" aria-hidden="true" />
+                  Quote Post
+                </button>
+              </div>
+            )}
+          </div>
+        )}
+
         <button
           type="button"
           onClick={() => setShareOpen(true)}
-          className="inline-flex min-h-10 items-center gap-2 rounded-full px-3 text-[11px] font-bold text-[var(--wk-text-muted)] hover:bg-[var(--wk-surface-raised)] hover:text-[var(--wk-text)]"
+          title="Share"
+          aria-label="Share"
+          className="inline-flex h-10 w-10 items-center justify-center rounded-full text-[var(--wk-text-muted)] hover:bg-[var(--wk-surface-raised)] hover:text-[var(--wk-text)]"
         >
-          <i className="ri-share-forward-line text-[17px]" aria-hidden="true" />
-          Share
+          <i className="ri-share-forward-line text-[18px]" aria-hidden="true" />
+          <span className="sr-only">Share</span>
         </button>
 
         {showMenu && (
@@ -155,7 +306,7 @@ export function PostActions({
             </button>
 
             {menuOpen && (
-              <div className="absolute bottom-12 right-0 z-40 min-w-[220px] overflow-hidden rounded-2xl border border-[var(--wk-border)] bg-[var(--wk-surface)] p-1.5 shadow-xl">
+              <div className="absolute bottom-12 right-0 z-40 min-w-[230px] overflow-hidden rounded-2xl border border-[var(--wk-border)] bg-[var(--wk-surface)] p-1.5 shadow-xl">
                 {canManage ? (
                   <button
                     type="button"
@@ -167,18 +318,55 @@ export function PostActions({
                     {deleting ? "Deleting..." : "Delete Post"}
                   </button>
                 ) : (
-                  <button
-                    type="button"
-                    disabled={following}
-                    onClick={() => {
-                      setMenuOpen(false);
-                      onToggleFollow?.();
-                    }}
-                    className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left text-[12px] font-black text-[var(--wk-text)] hover:bg-[var(--wk-bg)] disabled:opacity-50"
-                  >
-                    <i className={followed ? "ri-user-unfollow-line text-[17px]" : "ri-user-follow-line text-[17px]"} aria-hidden="true" />
-                    {followed ? `Unfollow ${post.actor.name}` : `Follow ${post.actor.name}`}
-                  </button>
+                  <>
+                    {typeof followed === "boolean" && onToggleFollow && (
+                      <button
+                        type="button"
+                        disabled={following}
+                        onClick={() => {
+                          setMenuOpen(false);
+                          onToggleFollow();
+                        }}
+                        className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left text-[12px] font-black text-[var(--wk-text)] hover:bg-[var(--wk-bg)] disabled:opacity-50"
+                      >
+                        <i
+                          className={followed ? "ri-user-unfollow-line text-[17px]" : "ri-user-follow-line text-[17px]"}
+                          aria-hidden="true"
+                        />
+                        {followed ? `Unfollow ${post.actor.name}` : `Follow ${post.actor.name}`}
+                      </button>
+                    )}
+
+                    {actionActor && onToggleBlock && (
+                      <button
+                        type="button"
+                        disabled={blocking}
+                        onClick={handleBlock}
+                        className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left text-[12px] font-black text-[var(--wk-text)] hover:bg-[var(--wk-bg)] disabled:opacity-50"
+                      >
+                        <i
+                          className={blocked ? "ri-forbid-2-line text-[17px]" : "ri-forbid-line text-[17px]"}
+                          aria-hidden="true"
+                        />
+                        {blocked ? `Unblock ${post.actor.name}` : `Block ${post.actor.name}`}
+                      </button>
+                    )}
+
+                    {actionActor && onReport && (
+                      <button
+                        type="button"
+                        disabled={reporting}
+                        onClick={() => {
+                          setMenuOpen(false);
+                          setReportOpen(true);
+                        }}
+                        className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left text-[12px] font-black text-[var(--wk-danger)] hover:bg-[var(--wk-danger-soft)] disabled:opacity-50"
+                      >
+                        <i className="ri-flag-line text-[17px]" aria-hidden="true" />
+                        Report Post
+                      </button>
+                    )}
+                  </>
                 )}
               </div>
             )}
@@ -187,6 +375,26 @@ export function PostActions({
       </div>
 
       <ShareSheet open={shareOpen} onClose={() => setShareOpen(false)} item={shareItem} />
+
+      {actionActor && (
+        <PostQuoteDialog
+          open={quoteOpen}
+          actor={actionActor}
+          post={post}
+          onClose={() => setQuoteOpen(false)}
+          onQuoted={(quote) => navigate(quote.canonicalPath)}
+        />
+      )}
+
+      {onReport && (
+        <PostReportDialog
+          open={reportOpen}
+          postAuthorName={post.actor.name}
+          reporting={reporting}
+          onClose={() => setReportOpen(false)}
+          onReport={onReport}
+        />
+      )}
     </>
   );
 }

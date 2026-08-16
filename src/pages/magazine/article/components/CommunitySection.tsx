@@ -12,6 +12,7 @@ import { getPublicLivingMemory, type LivingMemoryEditorial } from "@/services/li
 interface CommunitySectionProps {
   entity: CommunityEntity;
   user?: AuthUser | null;
+  mode?: "default" | "post";
 }
 
 const SORT_OPTIONS: { value: SortMode; label: string }[] = [
@@ -30,9 +31,14 @@ function supportsLivingMemory(type: CommunityEntity["type"]): type is "artist" |
   return type === "artist" || type === "release" || type === "track";
 }
 
-export function CommunitySection({ entity, user }: CommunitySectionProps) {
+export function CommunitySection({
+  entity,
+  user,
+  mode = "default",
+}: CommunitySectionProps) {
   const userId = user?.id || (user && !user.loading ? user.id : undefined);
   const isLoggedIn = !!userId && userId.length > 0;
+  const isPostMode = mode === "post";
   const [livingMemory, setLivingMemory] = useState<LivingMemoryEditorial | null>(null);
 
   const {
@@ -209,7 +215,13 @@ export function CommunitySection({ entity, user }: CommunitySectionProps) {
 
   return (
     <section id="community-section" className="border-t border-[var(--wk-border)] bg-[var(--wk-bg)]">
-      <div className="max-w-[740px] mx-auto px-6 lg:px-8 py-12">
+      <div
+        className={
+          isPostMode
+            ? "mx-auto w-full max-w-[760px] px-4 py-6 md:px-0 md:py-8"
+            : "max-w-[740px] mx-auto px-6 lg:px-8 py-12"
+        }
+      >
         {livingMemory && (
           <div className="mb-10 overflow-hidden rounded-2xl border border-[var(--wk-border)] bg-[var(--wk-surface)]">
             <div className="px-6 py-6 md:px-8 md:py-8">
@@ -235,46 +247,60 @@ export function CommunitySection({ entity, user }: CommunitySectionProps) {
           </div>
         )}
 
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-6">
-          <div className="flex items-center gap-3 shrink-0">
-            <h2 className="text-[20px] font-black text-[var(--wk-text)] tracking-[-0.02em]">
-              {livingMemory ? "Living Memory" : "Community"}
-            </h2>
-            {!loading && (
-              <span className="text-[12px] font-bold text-[var(--wk-text-muted)] bg-[var(--wk-surface)] border border-[var(--wk-border)] px-2.5 py-0.5 rounded-full">
-                {visibleCommentCount} {visibleCountLabel}
-              </span>
-            )}
-          </div>
+        {(!isPostMode || (!loading && visibleComments.length > 0)) && (
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-4">
+            <div className="flex items-center gap-3 shrink-0">
+              {!isPostMode && (
+                <h2 className="text-[20px] font-black text-[var(--wk-text)] tracking-[-0.02em]">
+                  {livingMemory ? "Living Memory" : "Community"}
+                </h2>
+              )}
 
-          {!loading && visibleComments.length > 0 && (
-            <div className="flex items-center gap-1 bg-[var(--wk-surface)] border border-[var(--wk-border)] rounded-full p-1 overflow-x-auto max-w-full">
-              {SORT_OPTIONS.map((opt) => (
-                <button
-                  key={opt.value}
-                  onClick={() => handleSortChange(opt.value)}
-                  className={`px-3 py-1.5 rounded-full text-[11px] font-bold transition-all cursor-pointer whitespace-nowrap shrink-0 ${
-                    sortBy === opt.value
-                      ? "bg-[var(--wk-brand)] text-[var(--wk-brand-on)]"
-                      : "text-[var(--wk-text-muted)] hover:text-[var(--wk-text)]"
-                  }`}
+              {!loading && (!isPostMode || visibleCommentCount > 0) && (
+                <span
+                  className={
+                    isPostMode
+                      ? "text-[12px] font-bold text-[var(--wk-text-muted)]"
+                      : "text-[12px] font-bold text-[var(--wk-text-muted)] bg-[var(--wk-surface)] border border-[var(--wk-border)] px-2.5 py-0.5 rounded-full"
+                  }
                 >
-                  {opt.label}
-                </button>
-              ))}
+                  {visibleCommentCount} {visibleCountLabel}
+                </span>
+              )}
             </div>
-          )}
-        </div>
 
-        <div className="mb-8">
+            {!loading &&
+              visibleComments.length > (isPostMode ? 1 : 0) && (
+                <div className="flex items-center gap-1 bg-[var(--wk-surface)] border border-[var(--wk-border)] rounded-full p-1 overflow-x-auto max-w-full">
+                  {SORT_OPTIONS.map((opt) => (
+                    <button
+                      key={opt.value}
+                      onClick={() => handleSortChange(opt.value)}
+                      className={`px-3 py-1.5 rounded-full text-[11px] font-bold transition-all cursor-pointer whitespace-nowrap shrink-0 ${
+                        sortBy === opt.value
+                          ? "bg-[var(--wk-brand)] text-[var(--wk-brand-on)]"
+                          : "text-[var(--wk-text-muted)] hover:text-[var(--wk-text)]"
+                      }`}
+                    >
+                      {opt.label}
+                    </button>
+                  ))}
+                </div>
+              )}
+          </div>
+        )}
+
+        <div className={isPostMode ? "mb-4" : "mb-8"}>
           {isLoggedIn && user ? (
             <CommentComposer
               user={user}
               onSubmit={handlePostComment}
               placeholder={livingMemory ? "Share what you remember…" : "Share your thoughts…"}
+              compact={isPostMode}
             />
           ) : (
             <LoginToComment
+              compact={isPostMode}
               onSignIn={() => {
                 window.location.href = "/auth";
               }}
@@ -283,11 +309,11 @@ export function CommunitySection({ entity, user }: CommunitySectionProps) {
         </div>
 
         {loading ? (
-          loadingSkeleton
+          isPostMode ? null : loadingSkeleton
         ) : error ? (
           errorState
         ) : visibleComments.length === 0 ? (
-          emptyState
+          isPostMode ? null : emptyState
         ) : (
           <div className="space-y-1">
             {visibleComments.map((comment) => (

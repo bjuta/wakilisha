@@ -36,6 +36,8 @@ const NOTIFICATION_ICONS: Record<string, string> = {
   contribution_approved: 'ri-check-double-line',
   contribution_merged: 'ri-git-merge-line',
   follow: 'ri-user-follow-line',
+  post_repost: 'ri-repeat-2-line',
+  post_quote: 'ri-double-quotes-l',
 };
 
 const NOTIFICATION_LABELS: Record<string, string> = {
@@ -47,6 +49,8 @@ const NOTIFICATION_LABELS: Record<string, string> = {
   contribution_approved: 'approved your contribution',
   contribution_merged: 'merged your contribution',
   follow: 'started following',
+  post_repost: 'reposted your Post',
+  post_quote: 'quoted your Post',
 };
 
 function timeAgo(dateStr: string): string {
@@ -196,6 +200,13 @@ export function NotificationBell({ userId, className = '', placement = 'auto' }:
   }, []);
 
   const getNotificationLink = (notif: NotificationWithActor): string | null => {
+    if (notif.entityType === 'post') {
+      const path = (notif.metadata as Record<string, unknown> | null)?.canonical_path;
+      if (typeof path === 'string' && path.startsWith('/')) {
+        return path;
+      }
+    }
+
     if (notif.commentId && notif.entitySlug) {
       if (notif.entityType === 'article') {
         return `/magazine/${notif.entitySlug}#community-section`;

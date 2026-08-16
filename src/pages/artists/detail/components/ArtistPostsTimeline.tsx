@@ -9,6 +9,7 @@ import {
   WkIcon,
 } from "@/components/design-system/Icon";
 import { PostActions } from "@/components/community/PostActions";
+import { QuotedPostCard } from "@/components/community/QuotedPostCard";
 import { usePostInteractionState } from "@/hooks/usePostInteractionState";
 import {
   listArtistPosts,
@@ -200,6 +201,13 @@ export function ArtistPostsTimeline({
                       {post.body}
                     </p>
 
+                    {post.quotedPost && (
+                      <QuotedPostCard
+                        quotedPost={post.quotedPost}
+                        className="mt-4"
+                      />
+                    )}
+
                     {post.imageUrl ? (
                       <Link
                         to={post.canonicalPath}
@@ -236,12 +244,21 @@ export function ArtistPostsTimeline({
                       saving={interaction.savingPostIds.has(post.id)}
                       reactionState={interaction.reactionStates.get(post.id)}
                       reacting={interaction.reactingPostIds.has(post.id)}
+                      actionActor={interaction.viewerActor}
                       followed={interaction.followedActorKeys.has(`${post.actor.type}:${post.actor.id}`)}
                       following={interaction.followingActorKeys.has(`${post.actor.type}:${post.actor.id}`)}
+                      repostState={interaction.repostStates.get(post.id)}
+                      reposting={interaction.repostingPostIds.has(post.id)}
+                      blocked={interaction.blockedActorKeys.has(`${post.actor.type}:${post.actor.id}`)}
+                      blocking={interaction.blockingActorKeys.has(`${post.actor.type}:${post.actor.id}`)}
+                      reporting={interaction.reportingPostIds.has(post.id)}
                       canManage={interaction.manageableActorKeys.has(`${post.actor.type}:${post.actor.id}`)}
                       onToggleSave={() => void interaction.toggleSave(post)}
                       onToggleFollow={() => void interaction.toggleFollow(post.actor)}
                       onReact={(reactionType) => void interaction.toggleReaction(post, reactionType)}
+                      onToggleRepost={() => void interaction.toggleRepost(post)}
+                      onToggleBlock={() => void interaction.toggleBlock(post.actor)}
+                      onReport={(reason) => interaction.submitReport(post, reason)}
                       onWithdrawn={(postId) => setPosts((current) => current.filter((item) => item.id !== postId))}
                     />
                   </article>
