@@ -84,6 +84,7 @@ export interface ChartEntryRowViewModel {
   artistSlugs: string[];
   artworkUrl: string | null;
   slug: string;
+  registryTrackId: string | null;
   genre: string | null;
   peakPosition: number;
   weeksOnChart: number;
@@ -121,6 +122,7 @@ export interface ChartTrackPlayerModel {
   previewUrl?: string;
   appleMusicId?: string | null;
   appleMusicCatalogId?: string | null;
+  registryTrackId?: string | null;
   trackSlug?: string;
   artistSlug?: string;
 }
@@ -267,6 +269,7 @@ export function toChartEntryRowViewModel(
     artistSlugs: entry.artistSlugs ?? [],
     artworkUrl: entry.artworkUrl,
     slug: normalizedSlug || entry.trackSlug,
+    registryTrackId: entry.canonicalTrackId ?? null,
     genre: rich.genre ?? null,
     peakPosition: entry.peakPosition ?? entry.rank,
     weeksOnChart: entry.weeksOnChart ?? 1,
@@ -515,6 +518,7 @@ export function toChartTrackPlayerModel(entry: ChartEntryRowViewModel): ChartTra
     previewUrl: entry.previewUrl,
     appleMusicId: entry.appleMusicId ?? entry.appleMusicCatalogId ?? null,
     appleMusicCatalogId: entry.appleMusicCatalogId ?? entry.appleMusicId ?? null,
+    registryTrackId: entry.registryTrackId,
     trackSlug: entry.slug,
     artistSlug: entry.artistSlugs?.[0],
   };

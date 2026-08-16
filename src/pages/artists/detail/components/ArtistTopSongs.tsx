@@ -2,6 +2,8 @@ import React, { useState } from "react";
 import { Link } from "react-router-dom";
 import { useScrollReveal } from "@/hooks/useScrollReveal";
 import { Ch19GradientImage } from "@/components/media/Ch19GradientImage";
+import { PlayableArtwork } from "@/components/design-system/music/PlayableArtwork";
+import { TrackActionsMenu } from "@/components/tracks/TrackActionsMenu";
 import { usePlayer } from "@/context/PlayerContext";
 import type { PublicArtistRelationship } from "@/services/publicArtistRelationships";
 
@@ -30,12 +32,10 @@ function SongExpandedPanel({
   song,
   rank,
   artistSlug,
-  reviewedRelationship,
 }: {
   song: Song;
   rank: number;
   artistSlug?: string;
-  reviewedRelationship?: PublicArtistRelationship;
 }) {
   const { playTrack, currentTrack, isPlaying, togglePlay } = usePlayer();
   const artistList = song.artists
@@ -56,6 +56,7 @@ function SongExpandedPanel({
     playTrack(
       {
         id: trackId,
+        registryTrackId: song.id,
         title: song.title,
         artist: song.artists,
         artworkUrl: song.image,
@@ -103,37 +104,6 @@ function SongExpandedPanel({
           )}
         </div>
 
-        {reviewedRelationship && (
-          <div className="mb-3.5 rounded-xl border border-[var(--wk-border)] bg-[var(--wk-surface)] px-3.5 py-3">
-            <div className="mb-1.5 flex flex-wrap items-center justify-between gap-2">
-              <span className="text-[9px] font-black uppercase tracking-[0.16em] text-[var(--wk-brand)]">
-                Reviewed connection
-              </span>
-              <span className="text-[10px] font-semibold text-[var(--wk-text-faint)]">
-                {reviewedRelationship.evidenceCount} {reviewedRelationship.evidenceCount === 1 ? "source" : "sources"}
-              </span>
-            </div>
-
-            <p className="text-[12px] leading-relaxed text-[var(--wk-text-muted)]">
-              {reviewedRelationship.plainReason}
-            </p>
-
-            {(reviewedRelationship.relatedEntityUrl ||
-              (song.artistSlug && song.slug)) && (
-              <Link
-                to={
-                  reviewedRelationship.relatedEntityUrl ||
-                  `/tracks/${song.artistSlug}/${song.slug}`
-                }
-                className="mt-2.5 inline-flex items-center gap-1 text-[11px] font-bold text-[var(--wk-brand)] transition-opacity hover:opacity-70"
-              >
-                View Track
-                <i className="ri-arrow-right-line text-[10px]" />
-              </Link>
-            )}
-          </div>
-        )}
-
         {/* Bottom row: artist chips + listen link */}
         <div className="flex flex-wrap items-center justify-between gap-2">
           <div className="flex flex-wrap items-center gap-1.5">
@@ -147,15 +117,6 @@ function SongExpandedPanel({
             ))}
           </div>
 
-          {song.songUrl && (
-            <button
-              onClick={handlePlaySong}
-              className="flex items-center gap-1 text-[11px] font-bold text-[var(--wk-brand)] transition-opacity hover:opacity-70 whitespace-nowrap"
-            >
-              <i className={`text-[10px] ${isTrackPlaying ? "ri-pause-line" : "ri-play-line"}`} />
-              {isTrackPlaying ? "Pause" : "Listen"}
-            </button>
-          )}
         </div>
       </div>
     </div>
@@ -169,12 +130,10 @@ function ArtistSongRow({
   song,
   index,
   artistSlug,
-  reviewedRelationship,
 }: {
   song: Song;
   index: number;
   artistSlug?: string;
-  reviewedRelationship?: PublicArtistRelationship;
 }) {
   const { playTrack, currentTrack, isPlaying, togglePlay } = usePlayer();
   const [isExpanded, setIsExpanded] = useState(false);
@@ -192,6 +151,7 @@ function ArtistSongRow({
     }
     playTrack({
       id: trackId,
+      registryTrackId: song.id,
       title: song.title,
       artist: song.artists,
       artworkUrl: song.image,
@@ -214,47 +174,40 @@ function ArtistSongRow({
       {/* Main row */}
       <div
         onClick={() => setIsExpanded((v) => !v)}
-        className="flex cursor-pointer items-center gap-3 px-3 py-3 select-none"
+        className="flex cursor-pointer items-center gap-2 px-2.5 py-3 select-none sm:gap-3 sm:px-3"
       >
         {/* Rank */}
-        <div className="flex w-10 shrink-0 flex-col items-center">
-          <span className="text-[20px] font-black leading-none text-[var(--wk-text-muted)]">
+        <div className="flex w-7 shrink-0 flex-col items-center sm:w-10">
+          <span className="text-[18px] font-black leading-none text-[var(--wk-text-muted)] sm:text-[20px]">
             {rank}
           </span>
         </div>
 
-        {/* Artwork — visible on all screen sizes */}
-        <div className="relative h-12 w-12 shrink-0 overflow-hidden rounded-lg bg-[var(--wk-surface-raised)]">
+        {/* Artwork owns playback. */}
+        <PlayableArtwork
+          label={song.title}
+          onPlay={handlePlaySong}
+          isPlaying={isTrackPlaying}
+          className="h-12 w-12 rounded-lg bg-[var(--wk-surface-raised)]"
+        >
           {song.image ? (
             <img
               src={song.image}
-              alt={song.title}
+              alt=""
               className="h-full w-full object-cover object-top"
             />
           ) : (
             <Ch19GradientImage slug={`song-${index}-${song.title}`} name={song.title} />
           )}
-        </div>
+        </PlayableArtwork>
 
         {/* Title + artist */}
         <div className="min-w-0 flex-1">
-          <div className="flex min-w-0 items-center gap-2">
-            <div className="truncate text-[14px] font-bold text-[var(--wk-text)]">
-              {song.title}
-            </div>
-
-            {reviewedRelationship && (
-              <span
-                title="Reviewed by WAKILISHA against the listed sources."
-                aria-label="Reviewed by WAKILISHA against the listed sources"
-                className="shrink-0 rounded-full border border-[var(--wk-border)] px-1.5 py-0.5 text-[8px] font-black uppercase tracking-[0.12em] text-[var(--wk-brand)]"
-              >
-                Reviewed
-              </span>
-            )}
+          <div className="truncate text-[13px] font-bold text-[var(--wk-text)] sm:text-[14px]">
+            {song.title}
           </div>
 
-          <div className="truncate text-[12px] text-[var(--wk-text-muted)]">
+          <div className="mt-0.5 truncate text-[11px] text-[var(--wk-text-muted)] sm:text-[12px]">
             {song.artists}
           </div>
         </div>
@@ -266,18 +219,20 @@ function ArtistSongRow({
           </span>
         )}
 
-        {/* Play button — always uses PlayerContext, never downloads */}
-        <button
-          onClick={handlePlaySong}
-          aria-label={isTrackPlaying ? `Pause ${song.title}` : `Play ${song.title}`}
-          className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full transition-all duration-150 whitespace-nowrap ${
-            isCurrentTrack
-              ? "bg-[var(--wk-brand)] text-[var(--wk-brand-on)] opacity-100 scale-100"
-              : "bg-[var(--wk-brand)] text-[var(--wk-brand-on)] opacity-0 group-hover:opacity-100 group-hover:scale-100 scale-75"
-          }`}
+        <div
+          className="flex shrink-0 items-center justify-center"
+          onClick={(event) => event.stopPropagation()}
         >
-          <i className={`text-sm ${isTrackPlaying ? "ri-pause-mini-fill" : "ri-play-mini-fill"}`} />
-        </button>
+          <TrackActionsMenu
+            registryTrackId={song.id}
+            trackTitle={song.title}
+            artistName={song.artists}
+            artistSlug={song.artistSlug || artistSlug}
+            artworkUrl={song.image}
+            trackSlug={song.slug}
+          />
+        </div>
+
 
         {/* Expand chevron */}
         <div
@@ -303,7 +258,6 @@ function ArtistSongRow({
           song={song}
           rank={rank}
           artistSlug={artistSlug}
-          reviewedRelationship={reviewedRelationship}
         />
       </div>
     </div>
@@ -316,15 +270,8 @@ function ArtistSongRow({
 export function ArtistTopSongs({
   songs,
   artistSlug,
-  reviewedRelationships = [],
 }: ArtistTopSongsProps) {
   const { ref, revealed } = useScrollReveal<HTMLElement>(0.1);
-  const reviewedByTrackId = new Map(
-    reviewedRelationships.map((relationship) => [
-      relationship.relatedEntityId,
-      relationship,
-    ]),
-  );
 
   return (
     <section ref={ref} className={`${revealed ? "is-visible" : ""} reveal-up`}>
@@ -353,7 +300,6 @@ export function ArtistTopSongs({
               song={song}
               index={index}
               artistSlug={artistSlug}
-              reviewedRelationship={reviewedByTrackId.get(song.id)}
             />
           ))}
         </div>

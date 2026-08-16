@@ -32,6 +32,7 @@ import { ChartRefreshButton } from "@/components/charts/ChartRefreshButton";
 import { WkIcon } from "@/components/design-system/Icon";
 import { Ch19GradientImage } from "@/components/media/Ch19GradientImage";
 import { ChartRow } from "@/components/design-system/music/ChartRow";
+import { AddToPlaylistButton } from "@/components/playlists/AddToPlaylistButton";
 import { ArtistRolodex } from "@/pages/charts/directory/components/ArtistRolodex";
 import { SkeletonChartEdition } from "@/components/skeletons/Skeletons";
 import { trackUrl } from "@/utils/trackUrl";
@@ -631,6 +632,11 @@ export default function ChartEdition() {
             <button onClick={() => playAt(0, "chart_no1")} className="chart-hero-v2-cta chart-hero-v2-cta-ghost">
               <WkIcon name="Play" size={16} /> Play #1
             </button>
+            <AddToPlaylistButton
+              trackId={topTrack.registryTrackId}
+              trackTitle={topTrack.title}
+              compact
+            />
             <button onClick={() => openChartEntryDiscussion(topTrack, edition.publicLabel)} className="chart-hero-v2-cta chart-hero-v2-cta-ghost">
               <WkIcon name="MessageCircle" size={16} /> Discuss #1
             </button>
@@ -808,6 +814,14 @@ export default function ChartEdition() {
                     >
                       <WkIcon name="MessageCircle" size={13} /> Discuss
                     </button>
+                    <div onClick={(event) => { event.preventDefault(); event.stopPropagation(); }}>
+                      <AddToPlaylistButton
+                        trackId={entry.registryTrackId}
+                        trackTitle={entry.title}
+                        compact
+                        iconOnly
+                      />
+                    </div>
                   </div>
                 </div>
               </Link>
@@ -982,6 +996,7 @@ export default function ChartEdition() {
                     source={entry.source}
                     genre={entry.genre ?? undefined}
                     slug={entry.slug}
+                    registryTrackId={entry.registryTrackId}
                     score={entry.score}
                     duration={entry.duration}
                     onPlay={() => playAt(idx + 3)}

@@ -11,6 +11,8 @@ import {
 import {
   WkIcon,
 } from "@/components/design-system/Icon";
+import { PlayableArtwork } from "@/components/design-system/music/PlayableArtwork";
+import { AddToPlaylistButton } from "@/components/playlists/AddToPlaylistButton";
 import {
   usePlayer,
   type PlayerTrack,
@@ -110,16 +112,23 @@ function CompactRelease({
 }) {
   return (
     <article className="group flex min-w-[260px] flex-1 overflow-hidden rounded-xl border border-[var(--wk-border)] bg-[var(--wk-surface-raised)] transition hover:bg-[var(--wk-surface-strong)]">
-      <Link
-        to={releaseUrl(release)}
-        className="h-[88px] w-[88px] shrink-0 overflow-hidden"
+      <PlayableArtwork
+        label={release.title}
+        onPlay={(event) => {
+          event.stopPropagation();
+          onPlay(release, "fresh-arrivals");
+        }}
+        isPlaying={active}
+        pending={busy}
+        className="h-[88px] w-[88px]"
+        iconClassName="h-9 w-9 text-[15px]"
       >
         <MusicArtwork
           src={release.artworkUrl}
-          alt={`${release.title} artwork`}
+          alt=""
           className="transition-transform duration-500 group-hover:scale-[1.04]"
         />
-      </Link>
+      </PlayableArtwork>
 
       <div className="flex min-w-0 flex-1 items-center gap-2 p-3">
         <div className="min-w-0 flex-1">
@@ -143,44 +152,6 @@ function CompactRelease({
           </p>
         </div>
 
-        <button
-          type="button"
-          onClick={() =>
-            onPlay(
-              release,
-              "fresh-arrivals",
-            )
-          }
-          aria-label={
-            active
-              ? `Pause ${release.title}`
-              : `Play ${release.title}`
-          }
-          className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[var(--wk-text)] text-[var(--wk-bg)] transition hover:scale-105"
-        >
-          <WkIcon
-            name={
-              busy
-                ? "LoaderCircle"
-                : active
-                  ? "Pause"
-                  : "Play"
-            }
-            size={14}
-            className={
-              busy
-                ? "animate-spin"
-                : active
-                  ? ""
-                  : "translate-x-[1px]"
-            }
-            fill={
-              active || busy
-                ? "none"
-                : "currentColor"
-            }
-          />
-        </button>
       </div>
     </article>
   );
@@ -298,7 +269,7 @@ function ChartMiniList({
               alt={entry.trackTitle}
             />
           </div>
-          <div className="min-w-0">
+          <div className="min-w-0 flex-1">
             <div className="truncate text-[10px] font-black text-[var(--wk-text)]">
               {entry.trackTitle}
             </div>
@@ -306,6 +277,12 @@ function ChartMiniList({
               {entry.artistNames.join(", ")}
             </div>
           </div>
+          <AddToPlaylistButton
+            trackId={entry.canonicalTrackId}
+            trackTitle={entry.trackTitle}
+            compact
+            iconOnly
+          />
         </div>
       ))}
       <Link

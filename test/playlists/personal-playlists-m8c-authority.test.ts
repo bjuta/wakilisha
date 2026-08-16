@@ -12,15 +12,23 @@ const migration = readFileSync(
   "utf8",
 );
 
+const duplicateConfirmationMigration = readFileSync(
+  "supabase/migrations/20260816143000_personal_playlist_duplicate_track_confirmation.sql",
+  "utf8",
+);
+
 const verifier = readFileSync(
   "scripts/control-plane/verify-personal-playlists-m8c-authority.sql",
   "utf8",
 );
 
+const authorityMigrations =
+  `${migration}\n${duplicateConfirmationMigration}`;
+
 const signatures = [
   "create_personal_playlist(text,text,text,text,text,uuid)",
   "update_personal_playlist(uuid,bigint,jsonb,text,uuid)",
-  "add_personal_playlist_track(uuid,bigint,uuid,text,uuid)",
+  "add_personal_playlist_track(uuid,bigint,uuid,text,uuid,boolean)",
   "remove_personal_playlist_item(uuid,uuid,bigint,text,uuid)",
   "reorder_personal_playlist_items(uuid,bigint,uuid[],text,uuid)",
   "archive_personal_playlist(uuid,bigint,text,text,uuid)",
@@ -167,11 +175,17 @@ describe(
       "classifies every new browser-reachable RPC",
       () => {
         for (const signature of signatures) {
-          expect(migration).toContain(signature);
+          expect(authorityMigrations).toContain(signature);
           expect(verifier).toContain(signature);
         }
-        expect(migration).toContain(
+        expect(authorityMigrations).toContain(
           "private.phase_0a_rpc_classification",
+        );
+        expect(duplicateConfirmationMigration).toContain(
+          "p_allow_duplicate boolean default false",
+        );
+        expect(duplicateConfirmationMigration).toContain(
+          "not coalesce(p_allow_duplicate, false)",
         );
       },
     );
@@ -192,7 +206,7 @@ describe(
     it(
       "keeps M8C runtime authority free of em and en dashes",
       () => {
-        for (const source of [migration, verifier]) {
+        for (const source of [migration, duplicateConfirmationMigration, verifier]) {
           expect(source).not.toContain("—");
           expect(source).not.toContain("–");
         }

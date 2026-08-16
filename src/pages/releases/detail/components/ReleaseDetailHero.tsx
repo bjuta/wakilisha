@@ -1,6 +1,8 @@
 import { useEffect, useState } from "react";
 import { WkIcon } from "@/components/design-system/Icon";
-import { ShareButton } from "@/components/design-system/share/ShareSheet";
+import { ShareButton, ShareSheet } from "@/components/design-system/share/ShareSheet";
+import { AddToPlaylistButton } from "@/components/playlists/AddToPlaylistButton";
+import { ReleaseSaveButton } from "@/components/releases/ReleaseSaveButton";
 import { usePlayer } from "@/context/PlayerContext";
 import { slugify } from "@/services/publicContent/client";
 import type { PublicReleaseDetail } from "@/services/publicContent/client";
@@ -15,6 +17,7 @@ export default function ReleaseDetailHero({
 }) {
   const [hovered, setHovered] = useState(false);
   const [artworkFailed, setArtworkFailed] = useState(false);
+  const [shareOpen, setShareOpen] = useState(false);
   const { currentTrack, isPlaying, playTrack, togglePlay, toggleShuffle, isShuffle } = usePlayer();
 
   useEffect(() => {
@@ -26,6 +29,7 @@ export default function ReleaseDetailHero({
   const shareDescription = buildReleaseSeoDescription(release);
 
   const tracks = release.tracks || [];
+  const isSingleTrack = tracks.length === 1;
   const isThisReleasePlaying = currentTrack && tracks.some((t) => t.id === currentTrack.id);
 
   const artistSlug = slugify(release.artist);
@@ -33,6 +37,7 @@ export default function ReleaseDetailHero({
   const buildQueue = () =>
     tracks.map((t) => ({
       id: t.id,
+      registryTrackId: t.id,
       title: t.title,
       artist: t.artist,
       artworkUrl: t.artworkUrl,
@@ -218,29 +223,44 @@ export default function ReleaseDetailHero({
             </div>
 
             {/* Actions */}
-            <div className="flex flex-wrap gap-3 mt-8">
-              <button
-                onClick={handlePlay}
-                disabled={!tracks.length}
-                className="inline-flex items-center gap-2.5 rounded-xl bg-[var(--wk-brand)] text-white px-6 py-3 text-[14px] font-extrabold hover:bg-[var(--wk-brand)]/90 transition-colors whitespace-nowrap cursor-pointer disabled:cursor-not-allowed disabled:opacity-50"
-              >
-                <WkIcon name={isThisReleasePlaying && isPlaying ? "Pause" : "Play"} size={18} />
-                {isThisReleasePlaying && isPlaying ? "Pause" : "Play"}
-              </button>
-              <button
-                onClick={handleShuffle}
-                disabled={!tracks.length}
-                className="inline-flex items-center gap-2.5 rounded-xl border border-[var(--wk-border)] bg-[var(--wk-surface)] text-[var(--wk-text)] px-5 py-3 text-[13px] font-bold hover:bg-[var(--wk-surface-raised)] transition-colors whitespace-nowrap cursor-pointer disabled:cursor-not-allowed disabled:opacity-50"
-              >
-                <WkIcon name="Shuffle" size={16} />
-                Shuffle
-              </button>
-              <button className="inline-flex items-center gap-2.5 rounded-xl border border-[var(--wk-border)] bg-[var(--wk-surface)] text-[var(--wk-text)] px-5 py-3 text-[13px] font-bold hover:bg-[var(--wk-surface-raised)] transition-colors whitespace-nowrap">
-                <WkIcon name="Heart" size={16} />
-                Save
-              </button>
-              <div className="ml-1">
-                <ShareButton
+            {isSingleTrack ? (
+              <>
+                <div className="mt-8 flex items-center gap-2">
+                  <button
+                    onClick={handlePlay}
+                    disabled={!tracks.length}
+                    className="inline-flex h-10 items-center gap-2 rounded-full bg-[var(--wk-brand)] px-4 text-[13px] font-extrabold text-white transition-colors hover:bg-[var(--wk-brand)]/90 disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    <WkIcon name={isThisReleasePlaying && isPlaying ? "Pause" : "Play"} size={17} />
+                    {isThisReleasePlaying && isPlaying ? "Pause" : "Play"}
+                  </button>
+
+                  <div className="inline-flex items-center gap-1 rounded-full border border-[var(--wk-border)] bg-[var(--wk-surface)]/72 p-1 backdrop-blur">
+                    <AddToPlaylistButton
+                      trackId={tracks[0].id}
+                      trackTitle={tracks[0].title}
+                      reactionStyle
+                    />
+
+                    <ReleaseSaveButton
+                      release={release}
+                      compact
+                    />
+
+                    <button
+                      type="button"
+                      onClick={() => setShareOpen(true)}
+                      className="inline-flex h-10 w-10 items-center justify-center rounded-full text-[var(--wk-text-muted)] transition-colors hover:bg-[var(--wk-surface-raised)] hover:text-[var(--wk-text)]"
+                      aria-label="Share"
+                      title="Share"
+                    >
+                      <WkIcon name="Share2" size={17} />
+                      <span className="sr-only">Share</span>
+                    </button>
+                  </div>
+                </div>
+
+                <ShareSheet
                   item={{
                     title: release.title,
                     subtitle: release.artist,
@@ -248,9 +268,44 @@ export default function ReleaseDetailHero({
                     imageUrl: release.artworkUrl,
                     type: "album",
                   }}
+                  open={shareOpen}
+                  onClose={() => setShareOpen(false)}
                 />
+              </>
+            ) : (
+              <div className="flex flex-wrap gap-3 mt-8">
+                <button
+                  onClick={handlePlay}
+                  disabled={!tracks.length}
+                  className="inline-flex items-center gap-2.5 rounded-xl bg-[var(--wk-brand)] text-white px-6 py-3 text-[14px] font-extrabold hover:bg-[var(--wk-brand)]/90 transition-colors whitespace-nowrap cursor-pointer disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  <WkIcon name={isThisReleasePlaying && isPlaying ? "Pause" : "Play"} size={18} />
+                  {isThisReleasePlaying && isPlaying ? "Pause" : "Play"}
+                </button>
+                <button
+                  onClick={handleShuffle}
+                  disabled={!tracks.length}
+                  className="inline-flex items-center gap-2.5 rounded-xl border border-[var(--wk-border)] bg-[var(--wk-surface)] text-[var(--wk-text)] px-5 py-3 text-[13px] font-bold hover:bg-[var(--wk-surface-raised)] transition-colors whitespace-nowrap cursor-pointer disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  <WkIcon name="Shuffle" size={16} />
+                  Shuffle
+                </button>
+                <ReleaseSaveButton
+                  release={release}
+                />
+                <div className="ml-1">
+                  <ShareButton
+                    item={{
+                      title: release.title,
+                      subtitle: release.artist,
+                      description: shareDescription,
+                      imageUrl: release.artworkUrl,
+                      type: "album",
+                    }}
+                  />
+                </div>
               </div>
-            </div>
+            )}
           </div>
         </div>
       </div>

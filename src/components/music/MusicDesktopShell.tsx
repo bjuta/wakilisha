@@ -1006,9 +1006,6 @@ export function MusicDesktopShell({
             <span className="truncate">
               Search artists, songs, albums, scenes...
             </span>
-            <span className="ml-auto hidden rounded-md border border-[var(--wk-border)] px-2 py-1 text-[9px] font-bold text-[var(--wk-text-faint)] sm:block">
-              ⌘ K
-            </span>
           </Link>
 
           <div className="ml-auto flex shrink-0 items-center gap-2">

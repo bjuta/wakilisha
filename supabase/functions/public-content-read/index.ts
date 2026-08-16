@@ -471,6 +471,7 @@ function buildEntryItem(e: any) {
     movement: String(e.movement || "same"),
     trackSlug: String(e.track_slug || ""),
     trackTitle: String(e.track_title || ""),
+    canonicalTrackId: e.canonical_track_id ? String(e.canonical_track_id) : null,
     artistNames: publicArtistNames,
     artistSlugs: publicArtistSlugs,
     artworkUrl: e.artwork_url || null,
@@ -1451,7 +1452,7 @@ Deno.serve(async (req) => {
           ),
         ];
 
-        const { data: scopedTracks } = scopedTrackIds.length > 0
+        const { data: membershipScopedTracks } = scopedTrackIds.length > 0
           ? await supabase
               .from("registry_tracks")
               .select(MUSIC_ENTITY_SELECT)
@@ -1459,8 +1460,31 @@ Deno.serve(async (req) => {
               .in("status", ["active", "needs_review", "draft"])
           : { data: [] };
 
+        // Release detail already supports legacy/shell Releases whose Track
+        // membership is carried by registry_tracks.release_id rather than
+        // registry_release_tracks. The release-scoped Track endpoint must
+        // resolve the same public Track set or its own Track links can 404.
+        const { data: directReleaseTracks } = await supabase
+          .from("registry_tracks")
+          .select(MUSIC_ENTITY_SELECT)
+          .eq("release_id", String(scopedRelease.id))
+          .in("status", ["active", "needs_review", "draft"]);
+
+        const scopedTrackMap = new Map<string, any>();
+
+        for (const row of [
+          ...(membershipScopedTracks ?? []),
+          ...(directReleaseTracks ?? []),
+        ]) {
+          const rowId = String(row.id || "");
+          if (!rowId || scopedTrackMap.has(rowId)) continue;
+          scopedTrackMap.set(rowId, row);
+        }
+
+        const scopedTracks = [...scopedTrackMap.values()];
+
         const normalizedRequestedSlug = slugify(trackSlug);
-        const scopedMatches = (scopedTracks ?? []).filter((row: any) => {
+        const scopedMatches = scopedTracks.filter((row: any) => {
           const storedSlug = slugify(String(row.slug || ""));
           const publicSlug = cleanPublicMusicSlug(
             row.slug,

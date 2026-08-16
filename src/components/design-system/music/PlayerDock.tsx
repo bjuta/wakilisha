@@ -6,6 +6,7 @@ import {
 } from "@/components/music/MusicDesktopShell";
 import { usePlayer } from "@/context/PlayerContext";
 import { Ch19GradientImage } from "@/components/media/Ch19GradientImage";
+import { AddToPlaylistButton } from "@/components/playlists/AddToPlaylistButton";
 
 export function PlayerDock() {
   const {
@@ -235,6 +236,7 @@ export function PlayerDock() {
           </div>
 
           <div className="flex items-center justify-end gap-3">
+            <AddToPlaylistButton trackId={currentTrack.registryTrackId} trackTitle={currentTrack.title} compact iconOnly />
             <button
               type="button"
               onClick={togglePlay}
@@ -443,6 +445,8 @@ export function PlayerDock() {
             </div>
           </div>
         </button>
+
+        <AddToPlaylistButton trackId={currentTrack.registryTrackId} trackTitle={currentTrack.title} compact iconOnly />
 
         {/* Controls */}
         <div className="flex shrink-0 items-center gap-1">

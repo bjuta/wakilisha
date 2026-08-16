@@ -1851,7 +1851,7 @@ describe("chart edition row information density regression", () => {
     );
 
   it(
-    "uses mobile width for chart identity instead of an invisible playback slot",
+    "uses mobile width for chart identity while artwork owns playback",
     () => {
       expect(chartRowInformationDensity)
         .toContain(
@@ -1865,16 +1865,26 @@ describe("chart edition row information density regression", () => {
 
       expect(chartRowInformationDensity)
         .toContain(
+          'import { PlayableArtwork } from "@/components/design-system/music/PlayableArtwork";',
+        );
+
+      expect(chartRowInformationDensity)
+        .toContain(
+          "<PlayableArtwork",
+        );
+
+      expect(chartRowInformationDensity)
+        .not.toContain(
           "bg-black/70 text-white shadow-sm",
         );
 
       expect(chartRowInformationDensity)
-        .toContain(
+        .not.toContain(
           "active:scale-95 md:hidden",
         );
 
       expect(chartRowInformationDensity)
-        .toContain(
+        .not.toContain(
           "hidden h-9 w-9",
         );
     },

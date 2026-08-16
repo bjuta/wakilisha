@@ -1,6 +1,10 @@
 import { useEffect, useState } from "react";
 import { useParams, Link } from "react-router-dom";
 import { WkIcon } from "@/components/design-system/Icon";
+import { PlayableArtwork } from "@/components/design-system/music/PlayableArtwork";
+import { TrackActionsMenu } from "@/components/tracks/TrackActionsMenu";
+import { AddToPlaylistButton } from "@/components/playlists/AddToPlaylistButton";
+import { ReleaseSaveButton } from "@/components/releases/ReleaseSaveButton";
 import { MetaTags } from "@/components/seo/MetaTags";
 import { usePlayer } from "@/context/PlayerContext";
 import { getRelease, slugify, listReleases, type PublicReleaseDetail, type PublicRelease } from "@/services/publicContent/client";
@@ -160,6 +164,7 @@ export default function MobileReleaseDetail() {
 
   const buildPlayerTrack = (track: PublicReleaseDetail["tracks"][number]) => ({
     id: track.id,
+    registryTrackId: track.id,
     title: track.title,
     artist: track.artist,
     artworkUrl: track.artworkUrl,
@@ -356,25 +361,51 @@ export default function MobileReleaseDetail() {
               <div className="text-[11px] text-[var(--wk-text-muted)]">{release.year} · {release.trackCount} tracks{release.labelName && release.labelName !== "WAKILISHA Registry" && release.labelName !== "WAKILISHA" ? ` · ${release.labelName}` : ""}</div>
             </div>
           </div>
-          <div className="mt-4 flex items-center gap-3">
+          <div className="mt-4 flex items-center gap-2">
             <button
               type="button"
               onClick={handlePlayRelease}
               disabled={!release.tracks.length}
-              className="inline-flex items-center gap-2 rounded-full bg-[var(--wk-brand)] px-5 py-2.5 text-[12px] font-bold text-white active:scale-[0.97] transition-transform whitespace-nowrap disabled:cursor-not-allowed disabled:opacity-50"
+              className="inline-flex h-10 items-center gap-2 rounded-full bg-[var(--wk-brand)] px-4 text-[12px] font-bold text-white active:scale-[0.97] transition-transform whitespace-nowrap disabled:cursor-not-allowed disabled:opacity-50"
             >
               <i className={`${isThisReleasePlaying && isPlaying ? "ri-pause-fill" : "ri-play-fill"} text-base`} />
               {isThisReleasePlaying && isPlaying ? "Pause" : "Play"}
             </button>
-            <button
-              type="button"
-              onClick={handleShuffleRelease}
-              disabled={!release.tracks.length}
-              className="inline-flex items-center gap-2 rounded-full border border-[var(--wk-border)] bg-[var(--wk-surface)]/80 backdrop-blur px-5 py-2.5 text-[12px] font-semibold text-[var(--wk-text)] active:scale-[0.97] transition-transform whitespace-nowrap disabled:cursor-not-allowed disabled:opacity-50"
-            >
-              <i className="ri-shuffle-line text-base" />
-              Shuffle
-            </button>
+
+            {release.tracks.length === 1 ? (
+              <div className="inline-flex items-center gap-1 rounded-full border border-[var(--wk-border)] bg-[var(--wk-surface)]/72 p-1 backdrop-blur">
+                <AddToPlaylistButton
+                  trackId={release.tracks[0].id}
+                  trackTitle={release.tracks[0].title}
+                  reactionStyle
+                />
+                <ReleaseSaveButton
+                  release={release}
+                  compact
+                />
+                <MobileShareButton
+                  item={{
+                    title: release.title,
+                    subtitle: release.artist,
+                    description: `${release.title} by ${release.artist}`,
+                    imageUrl: release.artworkUrl,
+                    type: "album",
+                  }}
+                  size="md"
+                  variant="light"
+                />
+              </div>
+            ) : (
+              <button
+                type="button"
+                onClick={handleShuffleRelease}
+                disabled={!release.tracks.length}
+                className="inline-flex h-10 items-center gap-2 rounded-full border border-[var(--wk-border)] bg-[var(--wk-surface)]/80 px-4 text-[12px] font-semibold text-[var(--wk-text)] backdrop-blur active:scale-[0.97] transition-transform whitespace-nowrap disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                <i className="ri-shuffle-line text-base" />
+                Shuffle
+              </button>
+            )}
           </div>
         </div>
       </section>
@@ -461,18 +492,42 @@ export default function MobileReleaseDetail() {
                 const isThisPlaying = isCurrentTrack && isPlaying;
                 return (
                   <div key={track.id} className="flex items-center gap-3 px-4 py-3 border-b border-[var(--wk-divider)] last:border-b-0 active:bg-[var(--wk-surface-raised)] transition-colors">
-                    <button
-                      onClick={() => handlePlayTrack(track, index)}
-                      className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[var(--wk-brand)] text-white active:scale-95 transition-transform cursor-pointer whitespace-nowrap"
-                      aria-label={isCurrentTrack && isPlaying ? "Pause" : `Play ${track.title}`}
+                    <PlayableArtwork
+                      label={track.title}
+                      onPlay={(event) => {
+                        event.stopPropagation();
+                        handlePlayTrack(track, index);
+                      }}
+                      isPlaying={isThisPlaying}
+                      className="h-9 w-9 rounded-md bg-[var(--wk-surface-raised)]"
+                      iconClassName="h-7 w-7 text-[12px]"
                     >
-                      <i className={`${isCurrentTrack && isPlaying ? "ri-pause-fill" : "ri-play-fill"} text-sm`} />
-                    </button>
+                      {track.artworkUrl || release.artworkUrl ? (
+                        <img
+                          src={track.artworkUrl || release.artworkUrl}
+                          alt=""
+                          className="h-full w-full object-cover object-top"
+                        />
+                      ) : (
+                        <div className="flex h-full w-full items-center justify-center text-[11px] font-black text-[var(--wk-text-muted)]">
+                          {index + 1}
+                        </div>
+                      )}
+                    </PlayableArtwork>
                     <Link to={releaseTrackUrl(artistSlug, releaseSlug, track.slug)} className="min-w-0 flex-1">
-                      <div className="text-[13px] font-bold text-[var(--wk-text)] truncate">{track.title}</div>
-                      <div className="text-[11px] text-[var(--wk-text-muted)] truncate">{track.artist}</div>
+                      <div className="line-clamp-2 text-[13px] font-bold leading-tight text-[var(--wk-text)]">{track.title}</div>
+                      <div className="mt-1 truncate text-[11px] text-[var(--wk-text-muted)]">{track.artist}</div>
                     </Link>
                     <span className="text-[11px] font-semibold text-[var(--wk-text-faint)] tabular-nums">{formatDuration(track.duration)}</span>
+                    <TrackActionsMenu
+                      registryTrackId={track.id}
+                      trackTitle={track.title}
+                      artistName={track.artist}
+                      artistSlug={artistSlug}
+                      artworkUrl={track.artworkUrl || release.artworkUrl}
+                      trackSlug={track.slug}
+                      trackHref={releaseTrackUrl(artistSlug, releaseSlug, track.slug)}
+                    />
                   </div>
                 );
               })}

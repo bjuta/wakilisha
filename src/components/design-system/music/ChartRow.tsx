@@ -2,7 +2,9 @@ import { useState } from "react";
 import { Link } from "react-router-dom";
 import { usePlayer, type PlaySource } from "@/context/PlayerContext";
 import { Ch19GradientImage } from "@/components/media/Ch19GradientImage";
+import { PlayableArtwork } from "@/components/design-system/music/PlayableArtwork";
 import { ChartRowExpandedPanel } from "@/components/design-system/music/ChartRowExpandedPanel";
+import { AddToPlaylistButton } from "@/components/playlists/AddToPlaylistButton";
 import { trackUrl } from "@/utils/trackUrl";
 
 export interface ChartRowProps {
@@ -26,6 +28,7 @@ export interface ChartRowProps {
   label?: string;
   previousWeek?: number;
   slug?: string;
+  registryTrackId?: string | null;
   artistSlug?: string;
   score?: number;
   duration?: number;
@@ -61,6 +64,7 @@ export function ChartRow({
   label,
   previousWeek,
   slug,
+  registryTrackId,
   score,
   duration,
   compact,
@@ -81,7 +85,7 @@ export function ChartRow({
     e.stopPropagation();
     if (!playable) return;
     if (onPlay) { onPlay(); return; }
-    const track = { id: trackId, title, artist, artworkUrl, isPlayable: playable, source, previewUrl };
+    const track = { id: trackId, registryTrackId, title, artist, artworkUrl, isPlayable: playable, source, previewUrl, trackSlug: slug };
     playTrack(track, [track], playSource);
   };
 
@@ -111,17 +115,34 @@ export function ChartRow({
             {rank}
           </span>
         </div>
-        <div className="h-8 w-8 shrink-0 overflow-hidden rounded-md bg-[var(--wk-surface-raised)]">
+        <PlayableArtwork
+          label={title}
+          onPlay={handlePlay}
+          isPlaying={isCurrentTrack && isPlaying}
+          disabled={!playable}
+          className="h-8 w-8 rounded-md bg-[var(--wk-surface-raised)]"
+          iconClassName="h-6 w-6 text-[11px]"
+        >
           {artworkUrl ? (
             <img src={artworkUrl} alt="" className="h-full w-full object-cover object-top" />
           ) : (
             <Ch19GradientImage slug={slug || trackId} name={title} />
           )}
-        </div>
+        </PlayableArtwork>
         <div className="min-w-0 flex-1">
           <div className="truncate text-[12px] font-bold text-[var(--wk-text)]">{title}</div>
           <div className="truncate text-[11px] text-[var(--wk-text-muted)]">{artist}</div>
         </div>
+        {registryTrackId ? (
+          <div onClick={(event) => event.stopPropagation()}>
+            <AddToPlaylistButton
+              trackId={registryTrackId}
+              trackTitle={title}
+              compact
+              iconOnly
+            />
+          </div>
+        ) : null}
         {movement === "up" && (
           <span className="flex items-center gap-0.5 text-[10px] font-bold" style={{ color: "var(--wk-success)" }}>
             <i className="ri-arrow-up-line text-[10px]" />+{movementAmount && movementAmount > 0 ? movementAmount : ""}
@@ -180,25 +201,20 @@ export function ChartRow({
           )}
         </div>
 
-        {/* Artwork */}
-        <div className="relative h-14 w-14 shrink-0 overflow-hidden rounded-lg bg-[var(--wk-surface-raised)]">
+        {/* Artwork owns playback. */}
+        <PlayableArtwork
+          label={title}
+          onPlay={handlePlay}
+          isPlaying={isCurrentTrack && isPlaying}
+          disabled={!playable}
+          className="h-14 w-14 rounded-lg bg-[var(--wk-surface-raised)]"
+        >
           {artworkUrl ? (
             <img src={artworkUrl} alt="" className="h-full w-full object-cover object-top" />
           ) : (
             <Ch19GradientImage slug={slug || trackId} name={title} />
           )}
-
-          {playable && (
-            <button
-              type="button"
-              onClick={handlePlay}
-              aria-label={isCurrentTrack && isPlaying ? `Pause ${title}` : `Play ${title}`}
-              className="absolute bottom-1 right-1 flex h-7 w-7 items-center justify-center rounded-full bg-black/70 text-white shadow-sm backdrop-blur-sm transition-transform active:scale-95 md:hidden"
-            >
-              <i className={`text-[12px] ${isCurrentTrack && isPlaying ? "ri-pause-fill" : "ri-play-fill"}`} />
-            </button>
-          )}
-        </div>
+        </PlayableArtwork>
 
         {/* Info */}
         <div className="min-w-0 flex-1">
@@ -257,15 +273,17 @@ export function ChartRow({
           )}
         </div>
 
-        {/* Play button */}
-        <button
-          onClick={handlePlay}
-          disabled={!playable}
-          aria-label={isCurrentTrack && isPlaying ? "Pause" : "Play"}
-          className={`hidden h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[var(--wk-brand)] text-[var(--wk-brand-on)] transition-all duration-150 disabled:cursor-not-allowed disabled:opacity-40 md:flex ${isCurrentTrack ? "opacity-100" : "opacity-0 group-hover:opacity-100"}`}
-        >
-          <i className={`text-sm ${isCurrentTrack && isPlaying ? "ri-pause-fill" : "ri-play-mini-fill"}`} />
-        </button>
+        {registryTrackId ? (
+          <div onClick={(event) => event.stopPropagation()}>
+            <AddToPlaylistButton
+              trackId={registryTrackId}
+              trackTitle={title}
+              compact
+              iconOnly
+            />
+          </div>
+        ) : null}
+
 
         {/* Expand chevron */}
         <div
@@ -286,6 +304,8 @@ export function ChartRow({
         <ChartRowExpandedPanel
           rank={rank}
           slug={slug}
+          registryTrackId={registryTrackId}
+          trackTitle={title}
           artistNames={resolvedArtistNames}
           artistSlugs={artistSlugs}
           peakPosition={peakPosition ?? rank}

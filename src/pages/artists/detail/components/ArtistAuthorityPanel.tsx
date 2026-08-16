@@ -224,24 +224,20 @@ export function ArtistAuthorityPanel({
   const pendingInvitation = state?.representation?.status === "pending" ? state.representation : null;
   const pendingClaim = state?.latestClaim?.status === "pending" ? state.latestClaim : null;
 
+  const showAuthorityToolbar =
+    publicLinks.length > 0 ||
+    Boolean(activeRepresentation) ||
+    Boolean(pendingInvitation) ||
+    Boolean(pendingClaim) ||
+    !authority?.official;
+
   return (
     <section className="border-b border-[var(--wk-border)] bg-[var(--wk-surface)]">
-      <div className="wk-container px-6 py-5">
-        <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-          <div className="min-w-0">
-            <div className="flex flex-wrap items-center gap-2">
-              <span className="rounded-full border border-[var(--wk-border)] bg-[var(--wk-bg)] px-3 py-1 text-[11px] font-black uppercase tracking-[0.12em] text-[var(--wk-text)]">
-                {authority?.official ? "Official Artist" : "WAKILISHA Registry"}
-              </span>
-              {stateLoading && <span className="text-[12px] text-[var(--wk-text-muted)]">Checking access…</span>}
-            </div>
-            <p className="mt-2 max-w-2xl text-[13px] leading-6 text-[var(--wk-text-muted)]">
-              {authority?.official
-                ? "Managed by the Artist or their team."
-                : "Built from WAKILISHA's reviewed music records."}
-            </p>
+      <div className="wk-container px-6">
+        {showAuthorityToolbar ? (
+          <div className="flex min-h-10 flex-wrap items-center justify-end gap-2 py-2.5">
             {publicLinks.length > 0 && (
-              <div className="author-profile-hero-socials mt-3 !mb-0">
+              <div className="author-profile-hero-socials mr-auto !mb-0">
                 {publicLinks.map((item) => (
                   <a
                     key={`${item.label}-${item.href}`}
@@ -260,9 +256,7 @@ export function ArtistAuthorityPanel({
                 ))}
               </div>
             )}
-          </div>
 
-          <div className="flex flex-wrap items-center gap-2">
             {activeRepresentation ? (
               <>
                 {activeRepresentation.permissions.profile && (
@@ -279,19 +273,25 @@ export function ArtistAuthorityPanel({
                 Accept Invitation
               </WkButton>
             ) : pendingClaim ? (
-              <div className="text-right">
-                <span className="rounded-full bg-[var(--wk-brand-soft)] px-4 py-2 text-[12px] font-bold text-[var(--wk-brand)]">
-                  Claim Under Review
-                </span>
-                <p className="mt-2 text-[11px] text-[var(--wk-text-muted)]">WAKILISHA is reviewing your claim.</p>
-              </div>
+              <span className="rounded-full bg-[var(--wk-brand-soft)] px-3 py-1.5 text-[11px] font-bold text-[var(--wk-brand)]">
+                Claim under review
+              </span>
             ) : !authority?.official ? (
-              <WkButton variant="soft" onClick={startClaim} disabled={authLoading || stateLoading}>
-                Claim This Artist
-              </WkButton>
+              <button
+                type="button"
+                onClick={startClaim}
+                disabled={authLoading || stateLoading}
+                className="inline-flex items-center gap-1.5 rounded-full px-2 py-1.5 text-[11px] font-bold text-[var(--wk-text-faint)] transition-colors hover:bg-[var(--wk-bg)] hover:text-[var(--wk-text-muted)] disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                <i
+                  className="ri-user-add-line text-[13px]"
+                  aria-hidden="true"
+                />
+                Claim this Artist
+              </button>
             ) : null}
           </div>
-        </div>
+        ) : null}
 
         {message && (
           <div
@@ -305,11 +305,7 @@ export function ArtistAuthorityPanel({
           </div>
         )}
 
-        {navigation ? (
-          <div className="mt-5">
-            {navigation}
-          </div>
-        ) : null}
+        {navigation ?? null}
 
         {showComposer &&
           activeRepresentation?.permissions.updates && (

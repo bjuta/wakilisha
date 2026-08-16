@@ -4,12 +4,15 @@ import { usePlayer } from "@/context/PlayerContext";
 import { supabase } from "@/lib/supabase";
 import { slugify } from "@/utils/releaseUrl";
 import { Ch19GradientImage } from "@/components/media/Ch19GradientImage";
+import { PlayableArtwork } from "@/components/design-system/music/PlayableArtwork";
+import { AddToPlaylistButton } from "@/components/playlists/AddToPlaylistButton";
 
 /* ------------------------------------------------------------------ */
 /*  Types                                                             */
 /* ------------------------------------------------------------------ */
 
 export interface TrackEmbedData {
+  id: string;
   slug: string;
   title: string;
   artistName: string;
@@ -173,6 +176,7 @@ export async function resolveTrackMarkers(
     const appleMusicCatalogId = readAppleMusicCatalogId(row);
 
     const trackData: TrackEmbedData = {
+      id: row.id,
       slug: row.slug,
       title: row.title,
       artistName: artistInfo?.name || "Unknown",
@@ -229,6 +233,7 @@ export function TrackEmbedCard({ track, articleSlug }: { track: TrackEmbedData; 
 
     const playerTrack = {
       id: track.slug,
+      registryTrackId: track.id,
       title: track.title,
       artist: track.artistName,
       artworkUrl: track.artworkUrl || "",
@@ -261,20 +266,29 @@ export function TrackEmbedCard({ track, articleSlug }: { track: TrackEmbedData; 
   return (
     <div className="rounded-xl border border-[var(--wk-border)] bg-[var(--wk-surface)] overflow-hidden my-6">
       <div className="flex items-center gap-3 p-3 md:p-4">
-        {/* Artwork or gradient fallback */}
-        <div className="relative w-[52px] h-[52px] md:w-[60px] md:h-[60px] shrink-0 rounded-lg overflow-hidden bg-[var(--wk-surface-raised)]">
+        {/* Artwork owns playback. */}
+        <PlayableArtwork
+          label={track.title}
+          onPlay={(event) => {
+            event.stopPropagation();
+            handlePlayTrack();
+          }}
+          isPlaying={isPlayingThis}
+          disabled={!hasPlayableSource}
+          className="h-[52px] w-[52px] rounded-lg bg-[var(--wk-surface-raised)] md:h-[60px] md:w-[60px]"
+        >
           {track.artworkUrl ? (
             <img
               src={track.artworkUrl}
-              alt={track.title}
-              className={`absolute inset-0 w-full h-full object-cover transition-opacity duration-500 ${imgLoaded ? "opacity-100" : "opacity-0"}`}
+              alt=""
+              className={`absolute inset-0 h-full w-full object-cover transition-opacity duration-500 ${imgLoaded ? "opacity-100" : "opacity-0"}`}
               onLoad={() => setImgLoaded(true)}
               onError={() => setImgLoaded(true)}
             />
           ) : (
             <Ch19GradientImage slug={track.slug} name={track.title} />
           )}
-        </div>
+        </PlayableArtwork>
 
         {/* Track info */}
         <div className="flex-1 min-w-0">
@@ -306,22 +320,9 @@ export function TrackEmbedCard({ track, articleSlug }: { track: TrackEmbedData; 
           </div>
         </div>
 
-        {/* Play button + link */}
+        {/* Curation, play, and link actions */}
         <div className="flex items-center gap-1.5 shrink-0">
-          {hasPlayableSource && (
-            <button
-              type="button"
-              onClick={handlePlayTrack}
-              className={`flex items-center justify-center w-9 h-9 md:w-10 md:h-10 rounded-full transition-all cursor-pointer ${
-                isPlayingThis
-                  ? "bg-[var(--wk-brand)] text-[var(--wk-brand-on)]"
-                  : "bg-[var(--wk-brand-soft)]/30 text-[var(--wk-brand)] hover:bg-[var(--wk-brand)] hover:text-[var(--wk-brand-on)]"
-              }`}
-              aria-label={isPlayingThis ? `Pause ${track.title}` : hasAppleCatalog ? `Play full track: ${track.title}` : `Play preview: ${track.title}`}
-            >
-              <i className={`${isPlayingThis ? "ri-pause-fill" : "ri-play-fill"} text-[15px]`} />
-            </button>
-          )}
+          <AddToPlaylistButton trackId={track.id} trackTitle={track.title} compact iconOnly />
           {trackUrl && (
             <Link
               to={trackUrl}

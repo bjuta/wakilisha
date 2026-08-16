@@ -3,6 +3,7 @@ import { supabase } from "@/lib/supabase";
 import { buildChartEntrySearchSnippet } from "@/services/cultureContext/searchAdapters";
 
 export interface ChartSearchItem {
+  canonicalTrackId: string | null;
   slug: string;
   title: string;
   artist: string;
@@ -48,7 +49,7 @@ export function useChartSearchData() {
 
         const { data: entries, error: entErr } = await supabase
           .from("wk_chart_entries_v2")
-          .select("track_slug, track_title, artist_name, artwork_url, rank, movement, previous_rank")
+          .select("canonical_track_id, track_slug, track_title, artist_name, artwork_url, rank, movement, previous_rank")
           .eq("edition_id", editionId)
           .order("rank");
 
@@ -66,6 +67,7 @@ export function useChartSearchData() {
           }
 
           const item = {
+            canonicalTrackId: e.canonical_track_id || null,
             slug: e.track_slug,
             title: e.track_title,
             artist: e.artist_name || "",

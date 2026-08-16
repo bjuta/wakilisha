@@ -3,6 +3,7 @@ import { useNavigate, Link } from "react-router-dom";
 import { usePlayer } from "@/context/PlayerContext";
 import { WkIcon } from "@/components/design-system/Icon";
 import { ShareSheet } from "@/components/design-system/share/ShareSheet";
+import { AddToPlaylistButton } from "@/components/playlists/AddToPlaylistButton";
 import { useScrollLock } from "@/hooks/useScrollLock";
 import { useEntityActions } from "@/hooks/useCommunityActions";
 import {
@@ -356,6 +357,8 @@ export function MobileFullPlayer() {
               {currentTrack.artist}
             </div>
           </div>
+          <div className="flex items-center gap-2">
+            <AddToPlaylistButton trackId={currentTrack.registryTrackId} trackTitle={currentTrack.title} compact iconOnly />
           <button
             onClick={handleSaveCurrentTrack}
             disabled={savePending}
@@ -364,6 +367,7 @@ export function MobileFullPlayer() {
           >
             <WkIcon name="Heart" size={23} fill={liked ? "currentColor" : "none"} />
           </button>
+          </div>
         </div>
 
         {saveError && (

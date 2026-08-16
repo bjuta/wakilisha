@@ -96,9 +96,89 @@ describe("release-scoped track routes", () => {
       "releaseScopedMembership",
     );
     expect(publicGateway).toContain(
+      "directReleaseTracks",
+    );
+    expect(publicGateway).toContain(
+      '.eq("release_id", String(scopedRelease.id))',
+    );
+    expect(publicGateway).toContain(
       '.select("release_id, track_id, track_number, disc_number")',
     );
   });
+  it("uses the Release design grammar without dropping Track capability", () => {
+    const trackPage = readFileSync(
+      "src/pages/tracks/detail/page.tsx",
+      "utf8",
+    );
+
+    expect(trackPage).toContain("From This Release");
+    expect(trackPage).not.toContain("Back to Release");
+    expect(trackPage).not.toContain("View release");
+    expect(trackPage).not.toContain("Track profile");
+    expect(trackPage).toContain("Track Details");
+    expect(trackPage).toContain("Registry Details");
+    expect(trackPage).toContain("Your Listening");
+    expect(trackPage).toContain("<ShareSheet");
+    expect(trackPage).toContain("reactionStyle");
+    expect(trackPage).toContain('import { PlayableArtwork }');
+    expect(trackPage).toContain("<PlayableArtwork");
+    expect(trackPage).toContain("if (hasPlayableSource) handlePlay();");
+    expect(trackPage).toContain('import { TrackActionsMenu }');
+    expect((trackPage.match(/<TrackActionsMenu/g) || []).length).toBe(1);
+    expect(trackPage).toContain("const artistNames =");
+    expect(trackPage).toContain("{vm.title}");
+    expect(trackPage).toContain("{artistNames}");
+    expect(trackPage).toContain("formatDuration(vm.duration)");
+    expect(trackPage).toContain("if (canPlay) onPlay();");
+    expect(trackPage).toContain("isPlaying={isPlaying}");
+    expect(trackPage).toContain("onPlay={handlePlay}");
+    expect(trackPage).toContain("isPlaying={isTrackPlaying}");
+    expect(trackPage).toContain("canPlay={hasPlayableSource}");
+    expect(trackPage).toContain(
+      "track.artists.length > 1 && <ConnectedArtists",
+    );
+    expect(trackPage).toContain("entityId: track.id,");
+    expect(trackPage).toContain("entitySlug: track.slug,");
+    expect(trackPage).not.toContain("entityId: track.slug,");
+    expect(trackPage).toContain("getUserSaves(user.id)");
+    expect(trackPage).toContain('saved.entity_type === "track"');
+    expect(trackPage).toContain("saved.entity_id === track.id");
+    expect(trackPage).toContain(
+      "}, [user.id, user.loading, track?.id]);",
+    );
+    expect(trackPage).not.toContain(
+      "track.artists.length > 0 && <ConnectedArtists",
+    );
+    expect(trackPage).toContain("registryTrackId={vm.id}");
+    expect(trackPage).toContain("trackHref={trackActionsHref}");
+    expect(trackPage).not.toContain("trackHref={location.pathname}");
+    expect(trackPage).not.toContain('name="ChevronRight"');
+    expect(trackPage).not.toContain("const trackPosition =");
+    expect(trackPage).not.toContain("const releaseDate =");
+    expect(trackPage).not.toContain("const meta =");
+    expect(trackPage).toContain('gridTemplateColumns: "44px minmax(0, 1fr) auto 40px"');
+    expect(trackPage).not.toContain("grid-cols-[88px_minmax(0,1fr)]");
+
+    for (const capability of [
+      "TrackReleaseTracklist",
+      "TrackListeningSignalPanel",
+      "TrackMomentSummary",
+      "TrackChartSparkline",
+      "ChartKpiGrid",
+      "TrackLyricsSection",
+      "TrackRelatedTracks",
+      "ConnectedArtists",
+      "ContributionBadges",
+      "CommunitySection",
+      "handlePlay",
+      "handleSaveTrack",
+      "AddToPlaylistButton",
+      "lyricsContributionPath",
+    ]) {
+      expect(trackPage).toContain(capability);
+    }
+  });
+
   it("makes release-connected tracks own release-scoped canonical URLs", () => {
     const trackPage = readFileSync(
       "src/pages/tracks/detail/page.tsx",

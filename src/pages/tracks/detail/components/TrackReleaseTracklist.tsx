@@ -1,5 +1,7 @@
 import { Link } from "react-router-dom";
 import { WkIcon } from "@/components/design-system/Icon";
+import { PlayableArtwork } from "@/components/design-system/music/PlayableArtwork";
+import { AddToPlaylistButton } from "@/components/playlists/AddToPlaylistButton";
 import { usePlayer } from "@/context/PlayerContext";
 import { trackUrl } from "@/utils/trackUrl";
 
@@ -49,6 +51,7 @@ export default function TrackReleaseTracklist({
 
     const queueTracks = tracks.slice(trackIndex).map((t) => ({
       id: t.id,
+      registryTrackId: t.id,
       title: t.title,
       artist: t.artist,
       artworkUrl: t.artworkUrl,
@@ -61,6 +64,7 @@ export default function TrackReleaseTracklist({
 
     const remainingTracks = tracks.slice(0, trackIndex).map((t) => ({
       id: t.id,
+      registryTrackId: t.id,
       title: t.title,
       artist: t.artist,
       artworkUrl: t.artworkUrl,
@@ -107,31 +111,38 @@ export default function TrackReleaseTracklist({
               className={`group grid items-center gap-3 px-4 py-3.5 border-b border-[var(--wk-divider)] last:border-b-0 transition-colors ${
                 isCurrentPage ? "bg-[var(--wk-brand-soft)]/20" : "hover:bg-[var(--wk-surface-raised)]"
               }`}
-              style={{ gridTemplateColumns: "44px 1fr 72px 40px" }}
+              style={{ gridTemplateColumns: "44px 1fr 72px 40px 40px" }}
             >
-              {/* Track number / play button / current indicator */}
-              <div className="flex items-center justify-center w-8 h-8 rounded-full text-[13px] font-extrabold transition-colors">
-                {isCurrentPage ? (
-                  <span className="w-2 h-2 rounded-full bg-[var(--wk-brand)]" aria-hidden="true" />
-                ) : isThisPlaying ? (
-                  <span className="animate-pulse text-[var(--wk-brand)]">
-                    <WkIcon name="Volume2" size={14} />
-                  </span>
+              {/* Artwork owns playback; current-page state stays on the artwork. */}
+              <PlayableArtwork
+                label={track.title}
+                onPlay={(event) => {
+                  event.stopPropagation();
+                  handlePlayTrack(track, index);
+                }}
+                isPlaying={isThisPlaying}
+                disabled={isCurrentPage}
+                className={[
+                  "h-10 w-10 rounded-md bg-[var(--wk-surface-raised)]",
+                  isCurrentPage ? "ring-2 ring-[var(--wk-brand)]/45" : "",
+                ].filter(Boolean).join(" ")}
+                iconClassName="h-7 w-7 text-[12px]"
+              >
+                {track.artworkUrl ? (
+                  <img
+                    src={track.artworkUrl}
+                    alt=""
+                    className="h-full w-full object-cover object-top"
+                  />
                 ) : (
-                  <span className="text-[var(--wk-text-faint)] group-hover:text-[var(--wk-brand)] transition-colors group-hover:hidden">
+                  <div className="flex h-full w-full items-center justify-center text-[12px] font-black text-[var(--wk-text-muted)]">
                     {index + 1}
-                  </span>
+                  </div>
                 )}
-                {!isCurrentPage && (
-                  <button
-                    className="hidden group-hover:inline-flex items-center justify-center w-8 h-8 rounded-full bg-[var(--wk-brand)] text-white cursor-pointer"
-                    onClick={() => handlePlayTrack(track, index)}
-                    aria-label={isCurrentTrack ? (isPlaying ? "Pause" : "Play") : `Play ${track.title}`}
-                  >
-                    <WkIcon name={isCurrentTrack && isPlaying ? "Pause" : "Play"} size={13} />
-                  </button>
-                )}
-              </div>
+                <span className="pointer-events-none absolute left-1 top-1 rounded bg-black/65 px-1 text-[8px] font-black leading-4 text-white">
+                  {index + 1}
+                </span>
+              </PlayableArtwork>
 
               {/* Track info */}
               <Link
@@ -154,6 +165,18 @@ export default function TrackReleaseTracklist({
               {/* Duration */}
               <div className="text-[12px] font-bold text-[var(--wk-text-faint)] text-right tabular-nums">
                 {formatDuration(track.duration)}
+              </div>
+
+              <div
+                className="flex items-center justify-center"
+                onClick={(event) => event.stopPropagation()}
+              >
+                <AddToPlaylistButton
+                  trackId={track.id}
+                  trackTitle={track.title}
+                  compact
+                  iconOnly
+                />
               </div>
 
               {/* Chevron to detail page */}

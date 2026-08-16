@@ -44,6 +44,7 @@ export type PlaylistPlaybackEngine =
 
 export interface PlayerTrack {
   id: string;
+  registryTrackId?: string | null;
   title: string;
   artist: string;
   artworkUrl?: string;
