@@ -7106,6 +7106,45 @@ export type Database = {
           },
         ]
       }
+      community_blocks: {
+        Row: {
+          blocked_at: string
+          created_at: string
+          id: string
+          status: string
+          target_id: string
+          target_slug: string | null
+          target_type: string
+          unblocked_at: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          blocked_at?: string
+          created_at?: string
+          id?: string
+          status?: string
+          target_id: string
+          target_slug?: string | null
+          target_type: string
+          unblocked_at?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          blocked_at?: string
+          created_at?: string
+          id?: string
+          status?: string
+          target_id?: string
+          target_slug?: string | null
+          target_type?: string
+          unblocked_at?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       community_comments: {
         Row: {
           anchor_end_time_ms: number | null
@@ -7446,6 +7485,77 @@ export type Database = {
           },
         ]
       }
+      community_post_reposts: {
+        Row: {
+          actor_type: string
+          artist_id: string | null
+          author_user_id: string | null
+          created_at: string
+          id: string
+          person_resource_id: string | null
+          post_id: string
+          representation_id: string | null
+          status: string
+          updated_at: string
+          withdrawn_at: string | null
+        }
+        Insert: {
+          actor_type: string
+          artist_id?: string | null
+          author_user_id?: string | null
+          created_at?: string
+          id?: string
+          person_resource_id?: string | null
+          post_id: string
+          representation_id?: string | null
+          status?: string
+          updated_at?: string
+          withdrawn_at?: string | null
+        }
+        Update: {
+          actor_type?: string
+          artist_id?: string | null
+          author_user_id?: string | null
+          created_at?: string
+          id?: string
+          person_resource_id?: string | null
+          post_id?: string
+          representation_id?: string | null
+          status?: string
+          updated_at?: string
+          withdrawn_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "community_post_reposts_artist_id_fkey"
+            columns: ["artist_id"]
+            isOneToOne: false
+            referencedRelation: "registry_artists"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "community_post_reposts_post_id_fkey"
+            columns: ["post_id"]
+            isOneToOne: false
+            referencedRelation: "artist_updates"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "community_post_reposts_post_id_fkey"
+            columns: ["post_id"]
+            isOneToOne: false
+            referencedRelation: "community_posts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "community_post_reposts_representation_id_fkey"
+            columns: ["representation_id"]
+            isOneToOne: false
+            referencedRelation: "artist_representations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       community_posts: {
         Row: {
           actor_type: string
@@ -7459,6 +7569,7 @@ export type Database = {
           link_url: string | null
           person_resource_id: string | null
           published_at: string
+          quoted_post_id: string | null
           representation_id: string | null
           status: string
           updated_at: string
@@ -7476,6 +7587,7 @@ export type Database = {
           link_url?: string | null
           person_resource_id?: string | null
           published_at?: string
+          quoted_post_id?: string | null
           representation_id?: string | null
           status?: string
           updated_at?: string
@@ -7493,6 +7605,7 @@ export type Database = {
           link_url?: string | null
           person_resource_id?: string | null
           published_at?: string
+          quoted_post_id?: string | null
           representation_id?: string | null
           status?: string
           updated_at?: string
@@ -7511,6 +7624,20 @@ export type Database = {
             columns: ["representation_id"]
             isOneToOne: false
             referencedRelation: "artist_representations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "community_posts_quoted_post_id_fkey"
+            columns: ["quoted_post_id"]
+            isOneToOne: false
+            referencedRelation: "artist_updates"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "community_posts_quoted_post_id_fkey"
+            columns: ["quoted_post_id"]
+            isOneToOne: false
+            referencedRelation: "community_posts"
             referencedColumns: ["id"]
           },
         ]
@@ -7602,6 +7729,7 @@ export type Database = {
           created_at: string
           details: string | null
           id: string
+          post_id: string | null
           profile_id: string | null
           reason: string
           reporter_id: string
@@ -7614,6 +7742,7 @@ export type Database = {
           created_at?: string
           details?: string | null
           id?: string
+          post_id?: string | null
           profile_id?: string | null
           reason: string
           reporter_id: string
@@ -7626,6 +7755,7 @@ export type Database = {
           created_at?: string
           details?: string | null
           id?: string
+          post_id?: string | null
           profile_id?: string | null
           reason?: string
           reporter_id?: string
@@ -7639,6 +7769,20 @@ export type Database = {
             columns: ["comment_id"]
             isOneToOne: false
             referencedRelation: "community_comments"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "community_reports_post_id_fkey"
+            columns: ["post_id"]
+            isOneToOne: false
+            referencedRelation: "artist_updates"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "community_reports_post_id_fkey"
+            columns: ["post_id"]
+            isOneToOne: false
+            referencedRelation: "community_posts"
             referencedColumns: ["id"]
           },
           {
@@ -17939,6 +18083,10 @@ export type Database = {
         Args: { p_display_name?: string; p_email: string; p_user_id: string }
         Returns: string
       }
+      community_get_actor_repost_state: {
+        Args: { p_actor_id: string; p_actor_type: string; p_post_ids: string[] }
+        Returns: Json
+      }
       community_get_artist_launch_analytics: {
         Args: { p_artist_id: string; p_days?: number }
         Returns: Json
@@ -17965,6 +18113,14 @@ export type Database = {
       }
       community_get_artist_update: {
         Args: { p_update_id: string }
+        Returns: Json
+      }
+      community_get_block_state: {
+        Args: {
+          p_target_id: string
+          p_target_slug: string
+          p_target_type: string
+        }
         Returns: Json
       }
       community_get_comment_replies: {
@@ -18096,6 +18252,14 @@ export type Database = {
       }
       community_get_registry_onboarding_state: { Args: never; Returns: Json }
       community_get_social_feed: {
+        Args: {
+          p_before_item_key?: string
+          p_before_published_at?: string
+          p_limit?: number
+        }
+        Returns: Json
+      }
+      community_get_social_feed_legacy_m8b: {
         Args: {
           p_before_item_key?: string
           p_before_published_at?: string
@@ -18341,6 +18505,18 @@ export type Database = {
         }
         Returns: Json
       }
+      community_quote_post: {
+        Args: {
+          p_actor_id: string
+          p_actor_type: string
+          p_body: string
+          p_image_url?: string
+          p_link_label?: string
+          p_link_url?: string
+          p_quoted_post_id: string
+        }
+        Returns: Json
+      }
       community_react_to_target: {
         Args: {
           p_reaction_type: string
@@ -18351,6 +18527,10 @@ export type Database = {
       }
       community_report_comment: {
         Args: { p_comment_id: string; p_details?: string; p_reason: string }
+        Returns: Json
+      }
+      community_report_post: {
+        Args: { p_details?: string; p_post_id: string; p_reason: string }
         Returns: Json
       }
       community_save_artist_profile_presentation: {
@@ -18377,12 +18557,30 @@ export type Database = {
         }
         Returns: Json
       }
+      community_set_block_state: {
+        Args: {
+          p_blocked: boolean
+          p_target_id: string
+          p_target_slug: string
+          p_target_type: string
+        }
+        Returns: Json
+      }
       community_set_follow_state: {
         Args: {
           p_followed: boolean
           p_target_id: string
           p_target_slug: string
           p_target_type: string
+        }
+        Returns: Json
+      }
+      community_set_post_repost_state: {
+        Args: {
+          p_actor_id: string
+          p_actor_type: string
+          p_post_id: string
+          p_reposted: boolean
         }
         Returns: Json
       }
