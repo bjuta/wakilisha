@@ -835,11 +835,8 @@ export default function MusicDiscoveryPage() {
                 <>
                   <div className="absolute inset-0">
                     <MusicArtwork
-                      src={
-                        heroArtist?.imageUrl ||
-                        hero.artworkUrl
-                      }
-                      alt={hero.artist}
+                      src={hero.artworkUrl}
+                      alt={`${hero.title} artwork`}
                       className="object-cover object-center opacity-75"
                     />
                     <div className="absolute inset-0 bg-[linear-gradient(90deg,rgba(4,4,4,0.98)_0%,rgba(4,4,4,0.86)_29%,rgba(4,4,4,0.18)_67%,rgba(4,4,4,0.62)_100%)]" />
