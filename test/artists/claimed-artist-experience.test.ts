@@ -123,17 +123,20 @@ describe("claimed Artist experience", () => {
     expect(artistPage).toContain("displayHeroImage");
   });
 
-  it("shows clear public ownership language and claim actions", () => {
-    expect(authorityPanel).toContain("Official Artist");
-    expect(authorityPanel).toContain("Managed by the Artist or their team.");
-    expect(authorityPanel).toContain("WAKILISHA Registry");
-    expect(authorityPanel).toContain("Built from WAKILISHA's reviewed music records.");
-    expect(authorityPanel).toContain("Claim This Artist");
-    expect(authorityPanel).toContain("Claim Under Review");
+  it("keeps public ownership actions quiet without removing claim or management capability", () => {
+    expect(authorityPanel).toContain("Claim this Artist");
+    expect(authorityPanel).toContain("ri-user-add-line");
+    expect(authorityPanel).toContain("Claim under review");
     expect(authorityPanel).toContain("Artist Studio");
     expect(authorityPanel).toContain("Edit Profile");
     expect(authorityPanel).toContain("ArtistPostComposer");
     expect(authorityPanel).toContain("Accept Invitation");
+
+    expect(authorityPanel).not.toContain("Official Artist");
+    expect(authorityPanel).not.toContain("Managed by the Artist or their team.");
+    expect(authorityPanel).not.toContain("WAKILISHA Registry");
+    expect(authorityPanel).not.toContain("Built from WAKILISHA's reviewed music records.");
+    expect(authorityPanel).not.toContain("Claim This Artist");
   });
 
   it("recomposes claimed Artist capabilities into one profile-led Artist Studio", () => {

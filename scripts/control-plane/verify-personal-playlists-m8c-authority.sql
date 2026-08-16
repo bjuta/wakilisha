@@ -23,7 +23,7 @@ begin
     values
       ('create_personal_playlist(text,text,text,text,text,uuid)'),
       ('update_personal_playlist(uuid,bigint,jsonb,text,uuid)'),
-      ('add_personal_playlist_track(uuid,bigint,uuid,text,uuid)'),
+      ('add_personal_playlist_track(uuid,bigint,uuid,text,uuid,boolean)'),
       ('remove_personal_playlist_item(uuid,uuid,bigint,text,uuid)'),
       ('reorder_personal_playlist_items(uuid,bigint,uuid[],text,uuid)'),
       ('archive_personal_playlist(uuid,bigint,text,text,uuid)'),
@@ -45,7 +45,7 @@ begin
     values
       ('create_personal_playlist(text,text,text,text,text,uuid)'),
       ('update_personal_playlist(uuid,bigint,jsonb,text,uuid)'),
-      ('add_personal_playlist_track(uuid,bigint,uuid,text,uuid)'),
+      ('add_personal_playlist_track(uuid,bigint,uuid,text,uuid,boolean)'),
       ('remove_personal_playlist_item(uuid,uuid,bigint,text,uuid)'),
       ('reorder_personal_playlist_items(uuid,bigint,uuid[],text,uuid)'),
       ('archive_personal_playlist(uuid,bigint,text,text,uuid)'),
@@ -119,7 +119,7 @@ select jsonb_build_object(
     where function_signature in (
       'create_personal_playlist(text,text,text,text,text,uuid)',
       'update_personal_playlist(uuid,bigint,jsonb,text,uuid)',
-      'add_personal_playlist_track(uuid,bigint,uuid,text,uuid)',
+      'add_personal_playlist_track(uuid,bigint,uuid,text,uuid,boolean)',
       'remove_personal_playlist_item(uuid,uuid,bigint,text,uuid)',
       'reorder_personal_playlist_items(uuid,bigint,uuid[],text,uuid)',
       'archive_personal_playlist(uuid,bigint,text,text,uuid)',

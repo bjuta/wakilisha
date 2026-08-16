@@ -396,7 +396,31 @@ describe(
         expect(
           addButton,
         ).toContain(
-          'Save "{trackLabel}" to "{playlist.title}"',
+          'Save "${trackLabel}" to "${playlist.title}"',
+        );
+
+        expect(
+          addButton,
+        ).toContain(
+          "Create new Playlist",
+        );
+
+        expect(
+          addButton,
+        ).toContain(
+          "Create and add",
+        );
+
+        expect(
+          addButton,
+        ).toContain(
+          "createPersonalPlaylist",
+        );
+
+        expect(
+          addButton,
+        ).not.toContain(
+          "/playlists?create=1",
         );
 
         expect(

@@ -59,6 +59,7 @@ export interface ChartEditionEntry {
   weeksOnChart: number | null;
   trackSlug: string;
   trackTitle: string;
+  canonicalTrackId?: string | null;
   artistSlugs: string[];
   artistNames: string[];
   artworkUrl: string | null;

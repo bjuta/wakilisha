@@ -2,6 +2,7 @@ import { useState, useEffect, useMemo, useCallback } from "react";
 import { Link, useParams, useNavigate } from "react-router-dom";
 import { usePlayer } from "@/context/PlayerContext";
 import { ChartRow } from "@/components/design-system/music/ChartRow";
+import { AddToPlaylistButton } from "@/components/playlists/AddToPlaylistButton";
 import { SkeletonChartRow } from "@/components/skeletons/Skeletons";
 import {
   getChartFamily,
@@ -540,6 +541,12 @@ export default function MobileChartEdition() {
                   )}
                 </div>
               </div>
+              <AddToPlaylistButton
+                trackId={topTrack.registryTrackId}
+                trackTitle={topTrack.title}
+                compact
+                iconOnly
+              />
               <button
                 onClick={() => { const t = chartTracks[0]; if (t) playTrack(t, chartTracks, { pageType: "charts_edition", entitySlug: editionSlug, entityType: "chart_edition", sourceSection: "hero" }); }}
                 className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[var(--wk-brand)] text-[var(--wk-brand-on)] active:scale-[0.93] transition-transform"
@@ -652,6 +659,15 @@ export default function MobileChartEdition() {
                   </div>
                 </div>
 
+                <div onClick={(event) => { event.preventDefault(); event.stopPropagation(); }}>
+                  <AddToPlaylistButton
+                    trackId={entry.registryTrackId}
+                    trackTitle={entry.title}
+                    compact
+                    iconOnly
+                  />
+                </div>
+
                 {/* Play */}
                 <button
                   onClick={(e) => { e.preventDefault(); e.stopPropagation(); const t = chartTracks[i]; if (t) playTrack(t, chartTracks, { pageType: "charts_edition", entitySlug: editionSlug, entityType: "chart_edition", sourceSection: "top3" }); }}
@@ -732,6 +748,7 @@ export default function MobileChartEdition() {
                   source={entry.source}
                   genre={entry.genre ?? undefined}
                   slug={entry.slug}
+                  registryTrackId={entry.registryTrackId}
                   score={entry.score}
                   duration={entry.duration}
                   onPlay={() => { const t = chartTracks[idx + 3]; if (t) playTrack(t, chartTracks, { pageType: "charts_edition", entitySlug: editionSlug, entityType: "chart_edition", sourceSection: "leaderboard" }); }}

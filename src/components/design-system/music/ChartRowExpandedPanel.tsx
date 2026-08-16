@@ -1,10 +1,13 @@
 import { useMemo } from "react";
 import { Link } from "react-router-dom";
+import { AddToPlaylistButton } from "@/components/playlists/AddToPlaylistButton";
 import { trackUrl } from "@/utils/trackUrl";
 
 export interface ChartRowExpandedPanelProps {
   rank: number;
   slug?: string;
+  registryTrackId?: string | null;
+  trackTitle: string;
   artistNames: string[];
   artistSlugs?: string[];
   peakPosition: number;
@@ -119,6 +122,8 @@ function PerformanceStat({
 export function ChartRowExpandedPanel({
   rank,
   slug,
+  registryTrackId,
+  trackTitle,
   artistNames,
   artistSlugs = [],
   peakPosition,
@@ -264,6 +269,13 @@ export function ChartRowExpandedPanel({
                 )}
             </div>
 
+            {registryTrackId ? (
+              <AddToPlaylistButton
+                trackId={registryTrackId}
+                trackTitle={trackTitle}
+                compact
+              />
+            ) : null}
             {slug && (
               <Link
                 to={trackUrl(

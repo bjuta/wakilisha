@@ -375,6 +375,9 @@ export async function addPersonalPlaylistTrack(
   playlistId: string,
   authorityRevision: number,
   registryTrackId: string,
+  options: {
+    allowDuplicate?: boolean;
+  } = {},
 ): Promise<PersonalPlaylistCommandResult> {
   return commandResult(
     await invokeRpc(
@@ -385,6 +388,7 @@ export async function addPersonalPlaylistTrack(
         p_registry_track_id: registryTrackId,
         p_idempotency_key: idempotencyKey("track-add"),
         p_correlation_id: correlationId(),
+        p_allow_duplicate: options.allowDuplicate ?? false,
       },
     ),
   );

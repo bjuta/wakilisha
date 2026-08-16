@@ -3,7 +3,9 @@ import { supabase } from "@/lib/supabase";
 import { buildTrackSearchSnippet } from "@/services/cultureContext/trackAdapters";
 
 export interface TrackSearchItem {
+  id: string;
   slug: string;
+  artistSlug: string;
   title: string;
   artist: string;
   genre: string;
@@ -178,7 +180,9 @@ export function useTrackSearchData() {
           });
 
           return {
+            id: t.id,
             slug: t.slug,
+            artistSlug,
             title: t.title || "Untitled track",
             artist,
             genre,

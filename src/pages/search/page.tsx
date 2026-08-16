@@ -1,6 +1,8 @@
 import { useState, useMemo, useEffect, useRef } from "react";
-import { Link } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
 import { usePlayer } from "@/context/PlayerContext";
+import { TrackActionsMenu } from "@/components/tracks/TrackActionsMenu";
+import { PlayableArtwork } from "@/components/design-system/music/PlayableArtwork";
 import { ArtistCard } from "@/components/design-system/registry/ArtistCard";
 import { ReleaseCard } from "@/components/design-system/registry/ReleaseCard";
 import { slugify } from "@/services/publicContent/client";
@@ -50,7 +52,9 @@ function SectionHeader({ title, count, onViewAll }: { title: string; count: numb
 
 
 export default function Search() {
-  const [query, setQuery] = useState("");
+  const [searchParams, setSearchParams] = useSearchParams();
+  const urlQuery = searchParams.get("q") ?? "";
+  const [query, setQuery] = useState(urlQuery);
   const [activeTab, setActiveTab] = useState<Tab>("All");
   const [loading, setLoading] = useState(false);
   const [releases, setReleases] = useState<PublicRelease[]>([]);
@@ -65,6 +69,40 @@ export default function Search() {
   const prevTabRef = useRef<Tab>("All");
   const hasTrackedQueryRef = useRef(false);
 
+  const updateQuery = (nextQuery: string) => {
+    setQuery(nextQuery);
+
+    const nextParams =
+      new URLSearchParams(searchParams);
+
+    if (nextQuery.trim()) {
+      nextParams.set("q", nextQuery);
+    } else {
+      nextParams.delete("q");
+    }
+
+    setSearchParams(
+      nextParams,
+      {
+        replace: true,
+      },
+    );
+  };
+
+  useEffect(
+    () => {
+      const nextUrlQuery =
+        searchParams.get("q") ?? "";
+
+      setQuery(
+        (current) =>
+          current === nextUrlQuery
+            ? current
+            : nextUrlQuery,
+      );
+    },
+    [searchParams],
+  );
 
   const q = query.trim().toLowerCase();
 
@@ -141,8 +179,8 @@ export default function Search() {
 
   const handlePlayTrack = (track: TrackSearchItem) => {
     playTrack(
-      { id: track.slug, title: track.title, artist: track.artist, artworkUrl: track.artworkUrl, isPlayable: track.isPlayable, source: track.source },
-      [{ id: track.slug, title: track.title, artist: track.artist, artworkUrl: track.artworkUrl, isPlayable: track.isPlayable, source: track.source }],
+      { id: track.slug, registryTrackId: track.id, title: track.title, artist: track.artist, artworkUrl: track.artworkUrl, isPlayable: track.isPlayable, source: track.source, trackSlug: track.slug },
+      [{ id: track.slug, registryTrackId: track.id, title: track.title, artist: track.artist, artworkUrl: track.artworkUrl, isPlayable: track.isPlayable, source: track.source, trackSlug: track.slug }],
       { pageType: "search", sourceSection: "search_results" }
     );
   };
@@ -195,13 +233,13 @@ export default function Search() {
           <input
             type="text"
             value={query}
-            onChange={(e) => setQuery(e.target.value)}
+            onChange={(e) => updateQuery(e.target.value)}
             placeholder="Search artists, songs, releases, genres, labels, charts..."
             className="w-full rounded-full border border-[var(--wk-border)] bg-[var(--wk-surface)] py-3.5 pl-12 pr-4 text-[15px] text-[var(--wk-text)] placeholder:text-[var(--wk-text-faint)] outline-none focus:border-[var(--wk-brand)]"
             autoFocus
           />
           {query && (
-            <button onClick={() => setQuery("")} className="absolute right-4 top-1/2 -translate-y-1/2 text-[var(--wk-text-faint)] hover:text-[var(--wk-text)]">
+            <button onClick={() => updateQuery("")} className="absolute right-4 top-1/2 -translate-y-1/2 text-[var(--wk-text-faint)] hover:text-[var(--wk-text)]">
               <i className="ri-close-line text-lg" />
             </button>
           )}
@@ -252,7 +290,7 @@ export default function Search() {
               ) : trendingArtists.length === 0 ? (
                 <p className="text-[13px] text-[var(--wk-text-muted)]">Type a name, sound, place, or issue thread to get started.</p>
               ) : (
-                <div className="flex flex-wrap gap-2">{trendingArtists.map((name) => <button key={name} onClick={() => setQuery(name)} className="rounded-full border border-[var(--wk-border)] bg-[var(--wk-surface)] px-4 py-2 text-[13px] font-semibold text-[var(--wk-text-soft)] transition-all hover:border-[var(--wk-brand)]/40 hover:text-[var(--wk-brand)]">{name}</button>)}</div>
+                <div className="flex flex-wrap gap-2">{trendingArtists.map((name) => <button key={name} onClick={() => updateQuery(name)} className="rounded-full border border-[var(--wk-border)] bg-[var(--wk-surface)] px-4 py-2 text-[13px] font-semibold text-[var(--wk-text-soft)] transition-all hover:border-[var(--wk-brand)]/40 hover:text-[var(--wk-brand)]">{name}</button>)}</div>
               )}
             </div>
           </div>
@@ -277,7 +315,44 @@ export default function Search() {
             {showArtists && results.artists.length > 0 && <section><SectionHeader title="Artists" count={results.artists.length} onViewAll={activeTab === "All" && results.artists.length > 4 ? () => setActiveTab("Artists") : undefined} /><div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4">{results.artists.slice(0, activeTab === "All" ? 4 : undefined).map((artist, idx) => <div key={artist.slug} onClick={() => handleResultClick("artist", artist.slug, idx + 1)}><ArtistCard {...artist} contextText={artist.contextText} sourceSection="search" clickPosition={idx + 1} /></div>)}</div></section>}
 
             {showTracks && results.tracks.length > 0 && (
-              <section><SectionHeader title="Tracks" count={results.tracks.length} onViewAll={activeTab === "All" && results.tracks.length > 6 ? () => setActiveTab("Tracks") : undefined} /><div className="rounded-2xl border border-[var(--wk-border)] bg-[var(--wk-surface)] overflow-hidden"><div className="divide-y divide-[var(--wk-divider)]">{results.tracks.slice(0, activeTab === "All" ? 6 : undefined).map((track, idx) => { const meta = [track.artist, track.genre, track.label].filter(Boolean).join(" · "); return <div key={track.slug} className="group flex items-center gap-3 px-5 py-3 transition-colors hover:bg-[var(--wk-surface-raised)]"><div className="h-12 w-12 shrink-0 overflow-hidden rounded-md bg-[var(--wk-surface-raised)]"><img src={track.artworkUrl} alt="" className="h-full w-full object-cover" /></div><div className="min-w-0 flex-1"><Link to={`/tracks/${slugify(track.artist)}/${track.slug}`} onClick={() => handleResultClick("track", track.slug, idx + 1)} className="text-[13px] font-bold text-[var(--wk-text)] hover:underline">{highlight(track.title, query)}</Link>{meta && <div className="text-[11px] text-[var(--wk-text-muted)]">{highlight(meta, query)}</div>}{track.contextText && <p className="mt-1 line-clamp-2 text-[12px] leading-snug text-[var(--wk-text-soft)]">{highlight(track.contextText, query)}</p>}</div><button onClick={() => handlePlayTrack(track)} disabled={!track.isPlayable} className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[var(--wk-brand)] text-[var(--wk-brand-on)] opacity-0 transition-all group-hover:opacity-100 disabled:opacity-0" aria-label="Play"><i className="ri-play-mini-fill text-sm" /></button></div>; })}</div></div></section>
+              <section>
+                <SectionHeader title="Tracks" count={results.tracks.length} onViewAll={activeTab === "All" && results.tracks.length > 6 ? () => setActiveTab("Tracks") : undefined} />
+                <div className="overflow-hidden rounded-2xl border border-[var(--wk-border)] bg-[var(--wk-surface)]">
+                  <div className="divide-y divide-[var(--wk-divider)]">
+                    {results.tracks.slice(0, activeTab === "All" ? 6 : undefined).map((track, idx) => {
+                      const meta = [track.artist, track.genre, track.label].filter(Boolean).join(" · ");
+                      return (
+                        <div key={track.id} className="group flex items-center gap-3 px-5 py-3 transition-colors hover:bg-[var(--wk-surface-raised)]">
+                          <PlayableArtwork
+                            label={track.title}
+                            onPlay={(event) => {
+                              event.stopPropagation();
+                              handlePlayTrack(track);
+                            }}
+                            disabled={!track.isPlayable}
+                            className="h-12 w-12 rounded-md bg-[var(--wk-surface-raised)]"
+                          >
+                            <img src={track.artworkUrl} alt="" className="h-full w-full object-cover" />
+                          </PlayableArtwork>
+                          <div className="min-w-0 flex-1">
+                            <Link to={`/tracks/${slugify(track.artist)}/${track.slug}`} onClick={() => handleResultClick("track", track.slug, idx + 1)} className="text-[13px] font-bold text-[var(--wk-text)] hover:underline">{highlight(track.title, query)}</Link>
+                            {meta && <div className="text-[11px] text-[var(--wk-text-muted)]">{highlight(meta, query)}</div>}
+                            {track.contextText && <p className="mt-1 line-clamp-2 text-[12px] leading-snug text-[var(--wk-text-soft)]">{highlight(track.contextText, query)}</p>}
+                          </div>
+                          <TrackActionsMenu
+                            registryTrackId={track.id}
+                            trackTitle={track.title}
+                            artistName={track.artist}
+                            artistSlug={track.artistSlug}
+                            artworkUrl={track.artworkUrl}
+                            trackSlug={track.slug}
+                          />
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              </section>
             )}
 
             {showReleases && results.releases.length > 0 && <section><SectionHeader title="Releases" count={results.releases.length} onViewAll={activeTab === "All" && results.releases.length > 4 ? () => setActiveTab("Releases") : undefined} /><div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4">{results.releases.slice(0, activeTab === "All" ? 4 : undefined).map((release, idx) => <div key={release.slug} onClick={() => handleResultClick("release", release.slug, idx + 1)}><ReleaseCard {...release} contextText={buildReleaseSearchSnippet(release)} sourceSection="search" clickPosition={idx + 1} /></div>)}</div></section>}
@@ -286,7 +361,34 @@ export default function Search() {
 
             {showLabels && results.labels.length > 0 && <section><SectionHeader title="Labels" count={results.labels.length} /><div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">{results.labels.map((label, idx) => <Link key={label.slug} to={`/labels/${label.slug}`} onClick={() => handleResultClick("label", label.slug, idx + 1)} className="block rounded-xl border border-[var(--wk-border)] bg-[var(--wk-surface)] p-5 transition-all hover:border-[var(--wk-border-2)] hover:bg-[var(--wk-surface-raised)]"><div className="flex items-center justify-between mb-2"><h3 className="text-[16px] font-bold text-[var(--wk-text)]">{highlight(label.name, query)}</h3>{label.country && <span className="text-[11px] text-[var(--wk-text-muted)]">{label.country}</span>}</div>{label.contextText && <p className="mb-3 line-clamp-2 text-[13px] leading-snug text-[var(--wk-text-soft)]">{highlight(label.contextText, query)}</p>}</Link>)}</div></section>}
 
-            {showCharts && results.charts.length > 0 && <section><SectionHeader title="Chart entries" count={results.charts.length} /><div className="rounded-2xl border border-[var(--wk-border)] bg-[var(--wk-surface)] overflow-hidden"><div className="divide-y divide-[var(--wk-divider)]">{results.charts.map((entry, idx) => <div key={`${entry.rank}-${entry.slug}`} className="flex items-center gap-3 px-5 py-3"><div className="w-6 text-right text-[14px] font-black text-[var(--wk-brand)]">{entry.rank}</div><div className="h-10 w-10 shrink-0 overflow-hidden rounded-md bg-[var(--wk-surface-raised)]"><img src={entry.artworkUrl} alt="" className="h-full w-full object-cover" /></div><div className="min-w-0 flex-1"><Link to={`/tracks/${slugify(entry.artist)}/${entry.slug}`} onClick={() => handleResultClick("chart_entry", entry.slug, idx + 1)} className="text-[13px] font-bold text-[var(--wk-text)] hover:underline">{highlight(entry.title, query)}</Link><div className="text-[11px] text-[var(--wk-text-muted)]">{highlight(entry.artist, query)}</div>{entry.contextText && <p className="mt-1 line-clamp-2 text-[12px] leading-snug text-[var(--wk-text-soft)]">{highlight(entry.contextText, query)}</p>}</div></div>)}</div></div></section>}
+            {showCharts && results.charts.length > 0 && (
+              <section>
+                <SectionHeader title="Chart entries" count={results.charts.length} />
+                <div className="overflow-hidden rounded-2xl border border-[var(--wk-border)] bg-[var(--wk-surface)]">
+                  <div className="divide-y divide-[var(--wk-divider)]">
+                    {results.charts.map((entry, idx) => (
+                      <div key={`${entry.rank}-${entry.slug}`} className="flex items-center gap-3 px-5 py-3">
+                        <div className="w-6 text-right text-[14px] font-black text-[var(--wk-brand)]">{entry.rank}</div>
+                        <div className="h-10 w-10 shrink-0 overflow-hidden rounded-md bg-[var(--wk-surface-raised)]"><img src={entry.artworkUrl} alt="" className="h-full w-full object-cover" /></div>
+                        <div className="min-w-0 flex-1">
+                          <Link to={`/tracks/${slugify(entry.artist)}/${entry.slug}`} onClick={() => handleResultClick("chart_entry", entry.slug, idx + 1)} className="text-[13px] font-bold text-[var(--wk-text)] hover:underline">{highlight(entry.title, query)}</Link>
+                          <div className="text-[11px] text-[var(--wk-text-muted)]">{highlight(entry.artist, query)}</div>
+                          {entry.contextText && <p className="mt-1 line-clamp-2 text-[12px] leading-snug text-[var(--wk-text-soft)]">{highlight(entry.contextText, query)}</p>}
+                        </div>
+                        <TrackActionsMenu
+                          registryTrackId={entry.canonicalTrackId}
+                          trackTitle={entry.title}
+                          artistName={entry.artist}
+                          artistSlug={slugify(entry.artist)}
+                          artworkUrl={entry.artworkUrl}
+                          trackSlug={entry.slug}
+                        />
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </section>
+            )}
           </div>
         )}
       </div>

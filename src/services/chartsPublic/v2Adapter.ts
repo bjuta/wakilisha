@@ -73,6 +73,7 @@ type V2Entry = {
   movement: "up" | "down" | "same" | "new" | "re_entry" | string;
   trackSlug: string | null;
   trackTitle: string;
+  canonicalTrackId?: string | null;
   artistNames: string[];
   artistSlugs?: string[];
   artworkUrl: string | null;
@@ -277,6 +278,7 @@ function toEntry(entry: V2Entry, editionSlug: string): ChartEditionEntry {
     weeksOnChart: null,
     trackSlug: entry.trackSlug ?? entry.id,
     trackTitle: entry.trackTitle,
+    canonicalTrackId: entry.canonicalTrackId ?? null,
     artistSlugs: entry.artistSlugs ?? [],
     artistNames: entry.artistNames ?? [],
     artworkUrl: entry.artworkUrl,

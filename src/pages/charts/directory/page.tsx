@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState, useCallback, useRef } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { usePlayer } from "@/context/PlayerContext";
 import { ChartRowExpandedPanel } from "@/components/design-system/music/ChartRowExpandedPanel";
+import { AddToPlaylistButton } from "@/components/playlists/AddToPlaylistButton";
 import { ChartHighlights } from "./components/ChartHighlights";
 import {
   getChartFamilies,
@@ -21,6 +22,7 @@ import {
 import type { ChartEdition, ChartEditionEntry } from "@/services/chartsPublic/types";
 import { ChartRefreshButton } from "@/components/charts/ChartRefreshButton";
 import { Ch19GradientImage } from "@/components/media/Ch19GradientImage";
+import { PlayableArtwork } from "@/components/design-system/music/PlayableArtwork";
 import { trackUrl } from "@/utils/trackUrl";
 
 // ─── Constants ───
@@ -79,6 +81,8 @@ function entryPlaylist(entries: ChartEntryRowViewModel[]) {
     .filter((e) => e.isPlayable !== false)
     .map((e) => ({
       id: e.slug,
+      registryTrackId: e.registryTrackId,
+      trackSlug: e.slug,
       title: e.title,
       artist: e.artist,
       artworkUrl: e.artworkUrl ?? undefined,
@@ -146,14 +150,21 @@ function LeaderboardRow({
           )}
         </div>
 
-        {/* Artwork */}
-        <div className="relative h-10 w-10 shrink-0 overflow-hidden rounded-lg bg-[var(--wk-surface-raised)] md:h-12 md:w-12">
+        {/* Artwork owns playback. */}
+        <PlayableArtwork
+          label={entry.title}
+          onPlay={(event) => {
+            event.stopPropagation();
+            onPlay();
+          }}
+          className="h-10 w-10 rounded-lg bg-[var(--wk-surface-raised)] md:h-12 md:w-12"
+        >
           {entry.artworkUrl ? (
             <img src={entry.artworkUrl} alt="" className="h-full w-full object-cover object-top" loading="lazy" />
           ) : (
             <Ch19GradientImage slug={entry.slug} name={entry.title} />
           )}
-        </div>
+        </PlayableArtwork>
 
         {/* Track info — on mobile, movement + weeks are inline here */}
         <div className="min-w-0 flex-1 py-0.5">
@@ -235,14 +246,17 @@ function LeaderboardRow({
           </span>
         </div>
 
-        {/* Play button */}
-        <button
-          onClick={(e) => { e.stopPropagation(); onPlay(); }}
-          className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[var(--wk-brand)] text-[var(--wk-brand-on)] transition-all duration-200 hover:scale-110 active:scale-95 md:h-9 md:w-9"
-          aria-label={`Play ${entry.title}`}
-        >
-          <i className="ri-play-mini-fill text-sm" />
-        </button>
+        {entry.registryTrackId ? (
+          <div onClick={(event) => event.stopPropagation()}>
+            <AddToPlaylistButton
+              trackId={entry.registryTrackId}
+              trackTitle={entry.title}
+              compact
+              iconOnly
+            />
+          </div>
+        ) : null}
+
       </div>
 
       {/* Expandable panel */}
@@ -256,6 +270,8 @@ function LeaderboardRow({
         <ChartRowExpandedPanel
           rank={entry.rank}
           slug={entry.slug}
+          registryTrackId={entry.registryTrackId}
+          trackTitle={entry.title}
           artistNames={entry.artistNames}
           artistSlugs={entry.artistSlugs}
           peakPosition={entry.peakPosition}
