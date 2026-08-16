@@ -17231,6 +17231,7 @@ export type Database = {
       }
       add_personal_playlist_track: {
         Args: {
+          p_allow_duplicate?: boolean
           p_correlation_id?: string
           p_expected_authority_revision: number
           p_idempotency_key?: string
