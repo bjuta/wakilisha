@@ -3700,6 +3700,10 @@ export type Database = {
         Args: { p_case_resource_id: string }
         Returns: boolean
       }
+      current_user_can_manage_personal_playlist: {
+        Args: { p_include_archived?: boolean; p_playlist_id: string }
+        Returns: boolean
+      }
       current_user_can_manage_publishing: { Args: never; Returns: boolean }
       current_user_can_participate_article_review: {
         Args: { p_resource_id: string }
@@ -3738,6 +3742,10 @@ export type Database = {
       }
       current_user_can_view_publishing_item: {
         Args: { p_item_id: string }
+        Returns: boolean
+      }
+      current_user_owns_personal_playlist: {
+        Args: { p_include_archived?: boolean; p_playlist_id: string }
         Returns: boolean
       }
       derive_publishing_editorial_state: {
@@ -3832,6 +3840,26 @@ export type Database = {
       normalize_source_metadata: { Args: { p_metadata: Json }; Returns: Json }
       normalize_source_registry_links: {
         Args: { p_registry_links: Json }
+        Returns: Json
+      }
+      personal_playlist_command_context: {
+        Args: { p_include_archived?: boolean; p_playlist_id: string }
+        Returns: {
+          actor_id: string
+          authority_revision: number
+          lifecycle_state: string
+          owner_id: string
+          playlist_status: string
+          resource_id: string
+          visibility: string
+        }[]
+      }
+      personal_playlist_is_public: {
+        Args: { p_playlist_id: string }
+        Returns: boolean
+      }
+      personal_playlist_payload: {
+        Args: { p_playlist_id: string; p_public_view?: boolean }
         Returns: Json
       }
       playlist_current_content_fingerprint: {
@@ -16431,6 +16459,7 @@ export type Database = {
           description: string | null
           id: string
           metadata: Json
+          playlist_kind: string
           published_at: string | null
           slug: string
           source_inquiry_id: string | null
@@ -16450,6 +16479,7 @@ export type Database = {
           description?: string | null
           id?: string
           metadata?: Json
+          playlist_kind?: string
           published_at?: string | null
           slug: string
           source_inquiry_id?: string | null
@@ -16469,6 +16499,7 @@ export type Database = {
           description?: string | null
           id?: string
           metadata?: Json
+          playlist_kind?: string
           published_at?: string | null
           slug?: string
           source_inquiry_id?: string | null
@@ -17198,6 +17229,23 @@ export type Database = {
           thread_id: string
         }[]
       }
+      add_personal_playlist_track: {
+        Args: {
+          p_correlation_id?: string
+          p_expected_authority_revision: number
+          p_idempotency_key?: string
+          p_playlist_id: string
+          p_registry_track_id: string
+        }
+        Returns: {
+          authority_revision: number
+          playlist_id: string
+          playlist_item_id: string
+          receipt_id: string
+          receipt_status: string
+          result_payload: Json
+        }[]
+      }
       add_playlist_item: {
         Args: {
           p_artist_names?: string[]
@@ -17615,6 +17663,23 @@ export type Database = {
           usage_link_id: string
           usage_revision: number
           usage_state: string
+        }[]
+      }
+      archive_personal_playlist: {
+        Args: {
+          p_correlation_id?: string
+          p_expected_authority_revision: number
+          p_idempotency_key?: string
+          p_note?: string
+          p_playlist_id: string
+        }
+        Returns: {
+          authority_revision: number
+          playlist_id: string
+          receipt_id: string
+          receipt_status: string
+          resource_id: string
+          result_payload: Json
         }[]
       }
       archive_playlist: {
@@ -19109,6 +19174,24 @@ export type Database = {
         }
         Returns: Json
       }
+      create_personal_playlist: {
+        Args: {
+          p_correlation_id?: string
+          p_description?: string
+          p_idempotency_key?: string
+          p_slug: string
+          p_title: string
+          p_visibility?: string
+        }
+        Returns: {
+          authority_revision: number
+          playlist_id: string
+          receipt_id: string
+          receipt_status: string
+          resource_id: string
+          result_payload: Json
+        }[]
+      }
       create_playlist: {
         Args: {
           p_correlation_id?: string
@@ -19628,6 +19711,14 @@ export type Database = {
         Args: { p_session_id: string }
         Returns: Json
       }
+      get_my_personal_playlist: {
+        Args: { p_playlist_id: string }
+        Returns: Json
+      }
+      get_my_personal_playlist_by_route: {
+        Args: { p_slug: string; p_username: string }
+        Returns: Json
+      }
       get_playlist_cover_source: {
         Args: { p_asset_id: string; p_playlist_id: string }
         Returns: Json
@@ -19701,6 +19792,10 @@ export type Database = {
       get_public_person: { Args: { p_slug: string }; Returns: Json }
       get_public_person_social_summary: {
         Args: { p_person_resource_id: string }
+        Returns: Json
+      }
+      get_public_personal_playlist: {
+        Args: { p_slug: string; p_username: string }
         Returns: Json
       }
       get_public_playlist: { Args: { p_slug: string }; Returns: Json }
@@ -20144,6 +20239,21 @@ export type Database = {
           updated_at: string
         }[]
       }
+      list_my_personal_playlists: {
+        Args: { p_include_archived?: boolean; p_limit?: number }
+        Returns: {
+          authority_revision: number
+          created_at: string
+          description: string
+          item_count: number
+          lifecycle_status: string
+          playlist_id: string
+          slug: string
+          title: string
+          updated_at: string
+          visibility: string
+        }[]
+      }
       list_public_person_community_activity: {
         Args: {
           p_activity_kind?: string
@@ -20206,6 +20316,21 @@ export type Database = {
           roles: Json
           summary: string
           title: string
+        }[]
+      }
+      list_public_personal_playlists_for_username: {
+        Args: { p_limit?: number; p_username: string }
+        Returns: {
+          authority_revision: number
+          created_at: string
+          description: string
+          item_count: number
+          lifecycle_status: string
+          playlist_id: string
+          slug: string
+          title: string
+          updated_at: string
+          visibility: string
         }[]
       }
       list_public_playlists: {
@@ -20805,6 +20930,23 @@ export type Database = {
           suggestion_id: string
         }[]
       }
+      remove_personal_playlist_item: {
+        Args: {
+          p_correlation_id?: string
+          p_expected_authority_revision: number
+          p_idempotency_key?: string
+          p_playlist_id: string
+          p_playlist_item_id: string
+        }
+        Returns: {
+          authority_revision: number
+          playlist_id: string
+          playlist_item_id: string
+          receipt_id: string
+          receipt_status: string
+          result_payload: Json
+        }[]
+      }
       remove_playlist_item: {
         Args: {
           p_correlation_id?: string
@@ -20880,6 +21022,22 @@ export type Database = {
           case_revision: number
           command_receipt_id: string
           idempotent_replay: boolean
+          receipt_status: string
+          result_payload: Json
+        }[]
+      }
+      reorder_personal_playlist_items: {
+        Args: {
+          p_correlation_id?: string
+          p_expected_authority_revision: number
+          p_idempotency_key?: string
+          p_ordered_item_ids: string[]
+          p_playlist_id: string
+        }
+        Returns: {
+          authority_revision: number
+          playlist_id: string
+          receipt_id: string
           receipt_status: string
           result_payload: Json
         }[]
@@ -21957,6 +22115,23 @@ export type Database = {
           p_status: string
         }
         Returns: Json
+      }
+      update_personal_playlist: {
+        Args: {
+          p_correlation_id?: string
+          p_expected_authority_revision: number
+          p_idempotency_key?: string
+          p_payload: Json
+          p_playlist_id: string
+        }
+        Returns: {
+          authority_revision: number
+          playlist_id: string
+          receipt_id: string
+          receipt_status: string
+          resource_id: string
+          result_payload: Json
+        }[]
       }
       update_playlist_item: {
         Args: {
