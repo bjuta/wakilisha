@@ -1,5 +1,6 @@
 do $$
 declare
+  v_release_id uuid;
   v_release_count integer;
   v_active_relationship_count integer;
   v_primary_count integer;
@@ -10,22 +11,33 @@ declare
 begin
   select count(*)
     into v_release_count
-  from public.registry_releases r
-  where r.id = '03099a3e-866f-4f32-b355-62df6b8e0e10'::uuid
-    and r.slug = 'valle-single'
-    and r.title = 'Valle - Single';
+  from public.registry_releases release
+  where release.slug = 'valle-single'
+    and release.title = 'Valle - Single'
+    and release.status = 'active'
+    and release.metadata ->> 'source' = 'apple_music_ingest'
+    and release.metadata ->> 'apple_music_album_id' = '6786722212';
 
   if v_release_count <> 1 then
     raise exception
-      'STOP: Valle release identity changed. Expected one exact release, found %.',
+      'STOP: Valle release authority changed. Expected one active Apple Music Release, found %.',
       v_release_count;
   end if;
 
+  select release.id
+    into v_release_id
+  from public.registry_releases release
+  where release.slug = 'valle-single'
+    and release.title = 'Valle - Single'
+    and release.status = 'active'
+    and release.metadata ->> 'source' = 'apple_music_ingest'
+    and release.metadata ->> 'apple_music_album_id' = '6786722212';
+
   select count(*)
     into v_active_relationship_count
-  from public.registry_release_artists ra
-  where ra.release_id = '03099a3e-866f-4f32-b355-62df6b8e0e10'::uuid
-    and ra.status = 'active';
+  from public.registry_release_artists relationship
+  where relationship.release_id = v_release_id
+    and relationship.status = 'active';
 
   if v_active_relationship_count <> 2 then
     raise exception
@@ -35,12 +47,12 @@ begin
 
   select count(*)
     into v_primary_count
-  from public.registry_release_artists ra
-  where ra.release_id = '03099a3e-866f-4f32-b355-62df6b8e0e10'::uuid
-    and ra.status = 'active'
-    and ra.role = 'primary_artist'
-    and ra.is_primary is true
-    and ra.is_featured is false;
+  from public.registry_release_artists relationship
+  where relationship.release_id = v_release_id
+    and relationship.status = 'active'
+    and relationship.role = 'primary_artist'
+    and relationship.is_primary is true
+    and relationship.is_featured is false;
 
   if v_primary_count <> 2 then
     raise exception
@@ -50,68 +62,68 @@ begin
 
   select count(*)
     into v_matata_count
-  from public.registry_release_artists ra
-  where ra.id = '016f4cd5-0faf-42e9-bad9-fadadf581f64'::uuid
-    and ra.release_id = '03099a3e-866f-4f32-b355-62df6b8e0e10'::uuid
-    and ra.artist_id = '0d121663-dc75-43be-ac18-8e37eb52e36a'::uuid
-    and ra.artist_slug = 'matata'
-    and ra.artist_name_text = 'Matata'
-    and ra.role = 'primary_artist'
-    and ra.is_primary is true
-    and ra.is_featured is false
-    and ra.credit_order = 1
-    and ra.source = 'apple_music_ingest'
-    and ra.confidence = 90
-    and ra.status = 'active'
-    and ra.metadata ->> 'apple_music_album_id' = '6786722212';
+  from public.registry_release_artists relationship
+  join public.registry_artists artist
+    on artist.id = relationship.artist_id
+   and artist.status = 'active'
+  where relationship.release_id = v_release_id
+    and artist.slug = 'matata'
+    and relationship.artist_slug = 'matata'
+    and relationship.artist_name_text = 'Matata'
+    and relationship.role = 'primary_artist'
+    and relationship.is_primary is true
+    and relationship.is_featured is false
+    and relationship.credit_order = 1
+    and relationship.source = 'apple_music_ingest'
+    and relationship.confidence = 90
+    and relationship.status = 'active'
+    and relationship.metadata ->> 'apple_music_album_id' = '6786722212';
 
   if v_matata_count <> 1 then
     raise exception
-      'STOP: Matata primary authority changed. Expected exact relationship 016f4cd5-0faf-42e9-bad9-fadadf581f64.';
+      'STOP: Matata primary authority changed. Expected one canonical Matata primary relationship.';
   end if;
 
   select count(*)
     into v_djames_bad_count
-  from public.registry_release_artists ra
-  where ra.id = 'f2e5cf04-5a55-4c6d-94ef-fbe1b3d03660'::uuid
-    and ra.release_id = '03099a3e-866f-4f32-b355-62df6b8e0e10'::uuid
-    and ra.artist_id is null
-    and ra.artist_slug = 'djames'
-    and ra.artist_name_text = 'DJames'
-    and ra.role = 'primary_artist'
-    and ra.is_primary is true
-    and ra.is_featured is false
-    and ra.credit_order = 2
-    and ra.source = 'apple_music_ingest'
-    and ra.confidence = 50
-    and ra.status = 'active'
-    and ra.metadata ->> 'apple_music_album_id' = '6786722212'
-    and ra.metadata ->> 'resolved_by' = 'text_only';
+  from public.registry_release_artists relationship
+  where relationship.release_id = v_release_id
+    and relationship.artist_id is null
+    and relationship.artist_slug = 'djames'
+    and relationship.artist_name_text = 'DJames'
+    and relationship.role = 'primary_artist'
+    and relationship.is_primary is true
+    and relationship.is_featured is false
+    and relationship.credit_order = 2
+    and relationship.source = 'apple_music_ingest'
+    and relationship.confidence = 50
+    and relationship.status = 'active'
+    and relationship.metadata ->> 'apple_music_album_id' = '6786722212'
+    and relationship.metadata ->> 'resolved_by' = 'text_only';
 
   if v_djames_bad_count <> 1 then
     raise exception
-      'STOP: DJames bad Valle relationship changed. Expected exact relationship f2e5cf04-5a55-4c6d-94ef-fbe1b3d03660.';
+      'STOP: DJames bad Valle relationship changed. Expected one text-only primary relationship.';
   end if;
 
-  update public.registry_release_artists
+  update public.registry_release_artists relationship
   set
     role = 'featured_artist',
     is_primary = false,
     is_featured = true
-  where id = 'f2e5cf04-5a55-4c6d-94ef-fbe1b3d03660'::uuid
-    and release_id = '03099a3e-866f-4f32-b355-62df6b8e0e10'::uuid
-    and artist_id is null
-    and artist_slug = 'djames'
-    and artist_name_text = 'DJames'
-    and role = 'primary_artist'
-    and is_primary is true
-    and is_featured is false
-    and credit_order = 2
-    and source = 'apple_music_ingest'
-    and confidence = 50
-    and status = 'active'
-    and metadata ->> 'apple_music_album_id' = '6786722212'
-    and metadata ->> 'resolved_by' = 'text_only';
+  where relationship.release_id = v_release_id
+    and relationship.artist_id is null
+    and relationship.artist_slug = 'djames'
+    and relationship.artist_name_text = 'DJames'
+    and relationship.role = 'primary_artist'
+    and relationship.is_primary is true
+    and relationship.is_featured is false
+    and relationship.credit_order = 2
+    and relationship.source = 'apple_music_ingest'
+    and relationship.confidence = 50
+    and relationship.status = 'active'
+    and relationship.metadata ->> 'apple_music_album_id' = '6786722212'
+    and relationship.metadata ->> 'resolved_by' = 'text_only';
 
   get diagnostics v_updated = row_count;
 
@@ -123,12 +135,12 @@ begin
 
   select count(*)
     into v_primary_count
-  from public.registry_release_artists ra
-  where ra.release_id = '03099a3e-866f-4f32-b355-62df6b8e0e10'::uuid
-    and ra.status = 'active'
-    and ra.role = 'primary_artist'
-    and ra.is_primary is true
-    and ra.is_featured is false;
+  from public.registry_release_artists relationship
+  where relationship.release_id = v_release_id
+    and relationship.status = 'active'
+    and relationship.role = 'primary_artist'
+    and relationship.is_primary is true
+    and relationship.is_featured is false;
 
   if v_primary_count <> 1 then
     raise exception
@@ -138,16 +150,22 @@ begin
 
   select count(*)
     into v_matata_count
-  from public.registry_release_artists ra
-  where ra.id = '016f4cd5-0faf-42e9-bad9-fadadf581f64'::uuid
-    and ra.release_id = '03099a3e-866f-4f32-b355-62df6b8e0e10'::uuid
-    and ra.artist_id = '0d121663-dc75-43be-ac18-8e37eb52e36a'::uuid
-    and ra.artist_slug = 'matata'
-    and ra.role = 'primary_artist'
-    and ra.is_primary is true
-    and ra.is_featured is false
-    and ra.credit_order = 1
-    and ra.status = 'active';
+  from public.registry_release_artists relationship
+  join public.registry_artists artist
+    on artist.id = relationship.artist_id
+   and artist.status = 'active'
+  where relationship.release_id = v_release_id
+    and artist.slug = 'matata'
+    and relationship.artist_slug = 'matata'
+    and relationship.artist_name_text = 'Matata'
+    and relationship.role = 'primary_artist'
+    and relationship.is_primary is true
+    and relationship.is_featured is false
+    and relationship.credit_order = 1
+    and relationship.source = 'apple_music_ingest'
+    and relationship.confidence = 90
+    and relationship.status = 'active'
+    and relationship.metadata ->> 'apple_music_album_id' = '6786722212';
 
   if v_matata_count <> 1 then
     raise exception
@@ -156,21 +174,20 @@ begin
 
   select count(*)
     into v_djames_fixed_count
-  from public.registry_release_artists ra
-  where ra.id = 'f2e5cf04-5a55-4c6d-94ef-fbe1b3d03660'::uuid
-    and ra.release_id = '03099a3e-866f-4f32-b355-62df6b8e0e10'::uuid
-    and ra.artist_id is null
-    and ra.artist_slug = 'djames'
-    and ra.artist_name_text = 'DJames'
-    and ra.role = 'featured_artist'
-    and ra.is_primary is false
-    and ra.is_featured is true
-    and ra.credit_order = 2
-    and ra.source = 'apple_music_ingest'
-    and ra.confidence = 50
-    and ra.status = 'active'
-    and ra.metadata ->> 'apple_music_album_id' = '6786722212'
-    and ra.metadata ->> 'resolved_by' = 'text_only';
+  from public.registry_release_artists relationship
+  where relationship.release_id = v_release_id
+    and relationship.artist_id is null
+    and relationship.artist_slug = 'djames'
+    and relationship.artist_name_text = 'DJames'
+    and relationship.role = 'featured_artist'
+    and relationship.is_primary is false
+    and relationship.is_featured is true
+    and relationship.credit_order = 2
+    and relationship.source = 'apple_music_ingest'
+    and relationship.confidence = 50
+    and relationship.status = 'active'
+    and relationship.metadata ->> 'apple_music_album_id' = '6786722212'
+    and relationship.metadata ->> 'resolved_by' = 'text_only';
 
   if v_djames_fixed_count <> 1 then
     raise exception

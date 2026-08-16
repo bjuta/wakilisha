@@ -20,60 +20,84 @@ describe(
   "Valle Release credit correction",
   () => {
     it(
-      "targets only the exact bad DJames relationship",
+      "targets Valle through canonical natural authority only",
+      () => {
+        expect(sql).toContain(
+          "release.slug = 'valle-single'",
+        );
+
+        expect(sql).toContain(
+          "release.title = 'Valle - Single'",
+        );
+
+        expect(sql).toContain(
+          "release.metadata ->> 'apple_music_album_id' = '6786722212'",
+        );
+
+        expect(sql).toContain(
+          "release.metadata ->> 'source' = 'apple_music_ingest'",
+        );
+
+        expect(sql).toContain(
+          "v_release_id",
+        );
+
+        expect(sql).not.toMatch(
+          /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i,
+        );
+      },
+    );
+
+    it(
+      "preserves Matata as the canonical Release primary",
+      () => {
+        expect(sql).toContain(
+          "artist.slug = 'matata'",
+        );
+
+        expect(sql).toContain(
+          "relationship.artist_slug = 'matata'",
+        );
+
+        expect(sql).toContain(
+          "relationship.artist_name_text = 'Matata'",
+        );
+
+        expect(sql).toContain(
+          "relationship.credit_order = 1",
+        );
+
+        expect(sql).toContain(
+          "relationship.confidence = 90",
+        );
+      },
+    );
+
+    it(
+      "changes only the one guarded DJames role and flags",
       () => {
         expect(
           sql.match(
-            /update public\.registry_release_artists/g,
+            /update public\.registry_release_artists relationship/g,
           )?.length,
         ).toBe(1);
 
         expect(sql).toContain(
-          "f2e5cf04-5a55-4c6d-94ef-fbe1b3d03660",
+          "relationship.artist_slug = 'djames'",
         );
 
         expect(sql).toContain(
-          "03099a3e-866f-4f32-b355-62df6b8e0e10",
+          "relationship.artist_name_text = 'DJames'",
         );
 
         expect(sql).toContain(
-          "6786722212",
+          "relationship.artist_id is null",
         );
 
         expect(sql).toContain(
-          "get diagnostics v_updated = row_count",
+          "relationship.metadata ->> 'resolved_by' = 'text_only'",
         );
 
-        expect(sql).toContain(
-          "if v_updated <> 1",
-        );
-      },
-    );
-
-    it(
-      "preserves Matata as the exact Release primary",
-      () => {
-        expect(sql).toContain(
-          "016f4cd5-0faf-42e9-bad9-fadadf581f64",
-        );
-
-        expect(sql).toContain(
-          "0d121663-dc75-43be-ac18-8e37eb52e36a",
-        );
-
-        expect(sql).toContain(
-          "ra.artist_slug = 'matata'",
-        );
-
-        expect(sql).toContain(
-          "ra.credit_order = 1",
-        );
-      },
-    );
-
-    it(
-      "changes only DJames role flags and preserves ordering",
-      () => {
         expect(sql).toContain(
           "role = 'featured_artist'",
         );
@@ -86,8 +110,12 @@ describe(
           "is_featured = true",
         );
 
-        expect(sql).not.toContain(
-          "credit_order = 99",
+        expect(sql).toContain(
+          "get diagnostics v_updated = row_count",
+        );
+
+        expect(sql).toContain(
+          "if v_updated <> 1",
         );
 
         expect(sql).not.toContain(
