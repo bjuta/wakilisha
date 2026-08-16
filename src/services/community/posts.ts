@@ -12,6 +12,20 @@ export type PostActor = {
   official: boolean;
 };
 
+export type CommunityQuotedPost = {
+  id: string;
+  available: boolean;
+  unavailableReason: "blocked" | "unavailable" | null;
+  actorType: PostActorType | null;
+  actor: PostActor | null;
+  body: string | null;
+  imageUrl: string | null;
+  linkUrl: string | null;
+  linkLabel: string | null;
+  publishedAt: string | null;
+  canonicalPath: string | null;
+};
+
 export type CommunityPost = {
   id: string;
   actorType: PostActorType;
@@ -25,7 +39,24 @@ export type CommunityPost = {
   publishedAt: string;
   withdrawnAt: string | null;
   updatedAt: string;
+  quotedPostId: string | null;
+  quotedPost: CommunityQuotedPost | null;
   canonicalPath: string;
+};
+
+export type PostRepostState = {
+  postId: string;
+  repostCount: number;
+  viewerReposted: boolean;
+  viewerRepostId: string | null;
+};
+
+export type PostBlockState = {
+  blocked: boolean;
+  blockId: string | null;
+  targetType: PostActorType;
+  targetId: string;
+  targetSlug: string | null;
 };
 
 type JsonRecord = Record<string, unknown>;
@@ -73,6 +104,68 @@ export function mapPostActor(value: unknown): PostActor | null {
   };
 }
 
+export function mapCommunityQuotedPost(
+  value: unknown,
+): CommunityQuotedPost | null {
+  const record = asRecord(value);
+  const id = readString(record, "id");
+
+  if (!record || !id || typeof record.available !== "boolean") {
+    return null;
+  }
+
+  if (!record.available) {
+    const unavailableReason =
+      readString(record, "unavailable_reason") === "blocked"
+        ? "blocked"
+        : "unavailable";
+
+    const rawActorType =
+      readString(record, "actor_type");
+
+    const actorType =
+      rawActorType === "person" ||
+      rawActorType === "artist"
+        ? rawActorType
+        : null;
+
+    return {
+      id,
+      available: false,
+      unavailableReason,
+      actorType,
+      actor: null,
+      body: null,
+      imageUrl: null,
+      linkUrl: null,
+      linkLabel: null,
+      publishedAt: null,
+      canonicalPath: null,
+    };
+  }
+
+  const actor = mapPostActor(record.actor);
+  const body = readString(record, "body");
+  const publishedAt = readString(record, "published_at");
+  const canonicalPath = readString(record, "canonical_path");
+
+  if (!actor || !body || !publishedAt || !canonicalPath) {
+    return null;
+  }
+
+  return {
+    id,
+    available: true,
+    actor,
+    body,
+    imageUrl: readString(record, "image_url"),
+    linkUrl: readString(record, "link_url"),
+    linkLabel: readString(record, "link_label"),
+    publishedAt,
+    canonicalPath,
+  };
+}
+
 export function mapCommunityPost(value: unknown): CommunityPost | null {
   const record = asRecord(value);
   const actor = mapPostActor(record?.actor);
@@ -93,6 +186,22 @@ export function mapCommunityPost(value: unknown): CommunityPost | null {
     return null;
   }
 
+  const quotedPostId =
+    readString(record, "quoted_post_id");
+  const quotedPost =
+    record?.quoted_post == null
+      ? null
+      : mapCommunityQuotedPost(
+          record.quoted_post,
+        );
+
+  if (
+    quotedPostId &&
+    !quotedPost
+  ) {
+    return null;
+  }
+
   return {
     id,
     actorType,
@@ -106,6 +215,8 @@ export function mapCommunityPost(value: unknown): CommunityPost | null {
     publishedAt,
     withdrawnAt: readString(record, "withdrawn_at"),
     updatedAt,
+    quotedPostId,
+    quotedPost,
     canonicalPath,
   };
 }
@@ -139,6 +250,201 @@ export async function publishPost(input: {
   const post = mapCommunityPost(data);
   if (!post) throw new Error("Post returned an invalid publish response.");
   return post;
+}
+
+export async function quotePost(input: {
+  actor: PostActor;
+  quotedPostId: string;
+  body: string;
+  imageUrl: string;
+  linkUrl: string;
+  linkLabel: string;
+}): Promise<CommunityPost> {
+  const data = await rpc("community_quote_post", {
+    p_actor_type: input.actor.type,
+    p_actor_id: input.actor.id,
+    p_quoted_post_id: input.quotedPostId,
+    p_body: input.body,
+    p_image_url: input.imageUrl || null,
+    p_link_url: input.linkUrl || null,
+    p_link_label: input.linkLabel || null,
+  });
+  const post = mapCommunityPost(data);
+  if (!post) throw new Error("Post returned an invalid Quote Post response.");
+  return post;
+}
+
+export async function setPostRepostState(input: {
+  actor: PostActor;
+  postId: string;
+  reposted: boolean;
+}): Promise<{
+  reposted: boolean;
+  repostId: string | null;
+  changed: boolean;
+}> {
+  const data = asRecord(
+    await rpc("community_set_post_repost_state", {
+      p_actor_type: input.actor.type,
+      p_actor_id: input.actor.id,
+      p_post_id: input.postId,
+      p_reposted: input.reposted,
+    }),
+  );
+
+  if (!data || typeof data.reposted !== "boolean") {
+    throw new Error("Repost returned an invalid response.");
+  }
+
+  return {
+    reposted: data.reposted,
+    repostId: readString(data, "repost_id"),
+    changed: data.changed === true,
+  };
+}
+
+export async function getActorRepostState(
+  actor: PostActor,
+  postIds: string[],
+): Promise<PostRepostState[]> {
+  if (postIds.length === 0) return [];
+
+  const data = await rpc("community_get_actor_repost_state", {
+    p_actor_type: actor.type,
+    p_actor_id: actor.id,
+    p_post_ids: Array.from(new Set(postIds)).slice(0, 100),
+  });
+
+  if (!Array.isArray(data)) {
+    throw new Error("Repost state returned an invalid response.");
+  }
+
+  return data.flatMap((value) => {
+    const record = asRecord(value);
+    const postId = readString(record, "post_id");
+    const repostCount = record?.repost_count;
+    const viewerReposted = record?.viewer_reposted;
+
+    if (
+      !postId ||
+      typeof repostCount !== "number" ||
+      !Number.isFinite(repostCount) ||
+      typeof viewerReposted !== "boolean"
+    ) {
+      return [];
+    }
+
+    return [{
+      postId,
+      repostCount: Math.max(0, Math.floor(repostCount)),
+      viewerReposted,
+      viewerRepostId: readString(record, "viewer_repost_id"),
+    }];
+  });
+}
+
+export async function setBlockState(
+  actor: PostActor,
+  blocked: boolean,
+): Promise<PostBlockState> {
+  const data = asRecord(
+    await rpc("community_set_block_state", {
+      p_target_type: actor.type,
+      p_target_id: actor.id,
+      p_target_slug: actor.slug,
+      p_blocked: blocked,
+    }),
+  );
+
+  const targetType = readString(data, "target_type");
+  const targetId = readString(data, "target_id");
+
+  if (
+    !data ||
+    typeof data.blocked !== "boolean" ||
+    !targetType ||
+    !isActorType(targetType) ||
+    !targetId
+  ) {
+    throw new Error("Block returned an invalid response.");
+  }
+
+  return {
+    blocked: data.blocked,
+    blockId: readString(data, "block_id"),
+    targetType,
+    targetId,
+    targetSlug: readString(data, "target_slug"),
+  };
+}
+
+export async function getBlockState(
+  actor: PostActor,
+): Promise<PostBlockState> {
+  const data = asRecord(
+    await rpc("community_get_block_state", {
+      p_target_type: actor.type,
+      p_target_id: actor.id,
+      p_target_slug: actor.slug,
+    }),
+  );
+
+  const targetType = readString(data, "target_type");
+  const targetId = readString(data, "target_id");
+
+  if (
+    !data ||
+    typeof data.blocked !== "boolean" ||
+    !targetType ||
+    !isActorType(targetType) ||
+    !targetId
+  ) {
+    throw new Error("Block state returned an invalid response.");
+  }
+
+  return {
+    blocked: data.blocked,
+    blockId: readString(data, "block_id"),
+    targetType,
+    targetId,
+    targetSlug: readString(data, "target_slug"),
+  };
+}
+
+export async function reportPost(input: {
+  postId: string;
+  reason:
+    | "spam"
+    | "harassment"
+    | "hate_or_abuse"
+    | "misinformation"
+    | "privacy"
+    | "copyright"
+    | "off_topic"
+    | "other";
+  details?: string;
+}): Promise<{ created: boolean; reportCount: number }> {
+  const data = asRecord(
+    await rpc("community_report_post", {
+      p_post_id: input.postId,
+      p_reason: input.reason,
+      p_details: input.details || "",
+    }),
+  );
+
+  if (
+    !data ||
+    typeof data.created !== "boolean" ||
+    typeof data.report_count !== "number" ||
+    !Number.isFinite(data.report_count)
+  ) {
+    throw new Error("Post Report returned an invalid response.");
+  }
+
+  return {
+    created: data.created,
+    reportCount: Math.max(0, Math.floor(data.report_count)),
+  };
 }
 
 export async function editPost(input: {

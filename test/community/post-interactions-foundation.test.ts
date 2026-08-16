@@ -4,6 +4,8 @@ import { describe, expect, it } from "vitest";
 const postActions = readFileSync("src/components/community/PostActions.tsx", "utf8");
 const postState = readFileSync("src/hooks/usePostInteractionState.ts", "utf8");
 const postSurface = readFileSync("src/components/community/PostDetailSurface.tsx", "utf8");
+const communitySection = readFileSync("src/pages/magazine/article/components/CommunitySection.tsx", "utf8");
+const commentComposer = readFileSync("src/components/feature/community/CommentComposer.tsx", "utf8");
 const artistTimeline = readFileSync("src/pages/artists/detail/components/ArtistPostsTimeline.tsx", "utf8");
 const personPost = readFileSync("src/pages/posts/detail/page.tsx", "utf8");
 const artistPost = readFileSync("src/pages/artists/update/page.tsx", "utf8");
@@ -44,11 +46,24 @@ describe("M8A universal Post interaction foundation", () => {
     expect(managePage).not.toContain("ArtistPostComposer");
   });
 
-  it("does not fake the next authority milestones", () => {
-    expect(postActions).not.toContain("Repost");
-    expect(postActions).not.toContain("Block");
-    expect(postActions).not.toContain("Report Post");
+  it("does not fake unimplemented future milestones", () => {
     expect(postActions).not.toContain("Add to Playlist");
+  });
+
+  it("keeps Post discussion compact without flattening mature Community surfaces", () => {
+    expect(postSurface).toContain('mode="post"');
+    expect(communitySection).toContain('mode?: "default" | "post"');
+    expect(communitySection).toContain('const isPostMode = mode === "post";');
+    expect(communitySection).toContain('compact={isPostMode}');
+    expect(communitySection).toContain('isPostMode ? null : emptyState');
+    expect(communitySection).toContain(
+      'visibleComments.length > (isPostMode ? 1 : 0)',
+    );
+    expect(communitySection).toContain('"Community"');
+    expect(commentComposer).toContain('rows={compact ? 2 : 3}');
+    expect(commentComposer).toContain('body.length >= 1800');
+    expect(commentComposer).toContain('Maximum 2000 characters.');
+    expect(commentComposer).toContain("Sign In to Reply");
   });
 
   it("keeps new runtime copy free of em and en dashes", () => {

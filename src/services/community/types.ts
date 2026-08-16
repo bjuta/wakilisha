@@ -168,6 +168,7 @@ export interface CommunityReport {
   reporterId: string;
   commentId: string | null;
   profileId: string | null;
+  postId: string | null;
   reason: ReportReason;
   details: string | null;
   status: string;

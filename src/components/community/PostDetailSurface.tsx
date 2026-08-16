@@ -1,5 +1,6 @@
 import { Link, useNavigate } from "react-router-dom";
 import { PostActions } from "@/components/community/PostActions";
+import { QuotedPostCard } from "@/components/community/QuotedPostCard";
 import { CommunitySection } from "@/pages/magazine/article/components/CommunitySection";
 import { useAuthUser } from "@/hooks/useAuthUser";
 import { usePostInteractionState } from "@/hooks/usePostInteractionState";
@@ -45,6 +46,13 @@ export function PostDetailSurface({ post }: { post: CommunityPost }) {
           {post.body}
         </p>
 
+        {post.quotedPost && (
+          <QuotedPostCard
+            quotedPost={post.quotedPost}
+            className="mt-5"
+          />
+        )}
+
         {post.imageUrl && (
           <div className="mt-5 overflow-hidden rounded-[28px] bg-[var(--wk-surface-raised)]">
             <img src={post.imageUrl} alt="" className="max-h-[760px] w-full object-cover" />
@@ -64,12 +72,21 @@ export function PostDetailSurface({ post }: { post: CommunityPost }) {
           saving={interaction.savingPostIds.has(post.id)}
           reactionState={interaction.reactionStates.get(post.id)}
           reacting={interaction.reactingPostIds.has(post.id)}
+          actionActor={interaction.viewerActor}
           followed={interaction.followedActorKeys.has(key)}
           following={interaction.followingActorKeys.has(key)}
+          repostState={interaction.repostStates.get(post.id)}
+          reposting={interaction.repostingPostIds.has(post.id)}
+          blocked={interaction.blockedActorKeys.has(key)}
+          blocking={interaction.blockingActorKeys.has(key)}
+          reporting={interaction.reportingPostIds.has(post.id)}
           canManage={interaction.manageableActorKeys.has(key)}
           onToggleSave={() => void interaction.toggleSave(post)}
           onToggleFollow={() => void interaction.toggleFollow(post.actor)}
           onReact={(reactionType) => void interaction.toggleReaction(post, reactionType)}
+          onToggleRepost={() => void interaction.toggleRepost(post)}
+          onToggleBlock={() => void interaction.toggleBlock(post.actor)}
+          onReport={(reason) => interaction.submitReport(post, reason)}
           onWithdrawn={() => navigate(post.actor.canonicalPath)}
         />
       </article>
@@ -84,6 +101,7 @@ export function PostDetailSurface({ post }: { post: CommunityPost }) {
           imageUrl: post.imageUrl,
         }}
         user={user}
+        mode="post"
       />
     </>
   );

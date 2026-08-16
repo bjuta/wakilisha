@@ -1,6 +1,8 @@
 import { supabase } from "@/lib/supabase";
 import {
+  mapCommunityPost,
   mapPostActor,
+  type CommunityPost,
   type PostActor,
 } from "@/services/community/posts";
 
@@ -34,6 +36,9 @@ export type FollowingFeedItem = {
   linkLabel: string | null;
   publishedAt: string;
   matchedFollows: FollowingFeedReason[];
+  post: CommunityPost | null;
+  repostActor: PostActor | null;
+  repostId: string | null;
 };
 
 export type FollowingFeedCursor = {
@@ -202,6 +207,44 @@ function decodeItem(
     return null;
   }
 
+  const post =
+    record.post == null
+      ? null
+      : mapCommunityPost(
+          record.post,
+        );
+
+  const repostActor =
+    record.repost_actor == null
+      ? null
+      : mapPostActor(
+          record.repost_actor,
+        );
+
+  const repostId =
+    readString(
+      record,
+      "repost_id",
+    );
+
+  if (
+    record.post != null &&
+    !post
+  ) {
+    return null;
+  }
+
+  if (
+    record.repost_actor != null &&
+    (
+      !repostActor ||
+      !repostId ||
+      !post
+    )
+  ) {
+    return null;
+  }
+
   return {
     itemType,
     itemId,
@@ -218,6 +261,9 @@ function decodeItem(
       readString(record, "link_label"),
     publishedAt,
     matchedFollows,
+    post,
+    repostActor,
+    repostId,
   };
 }
 

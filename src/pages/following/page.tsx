@@ -14,6 +14,7 @@ import {
 import { MetaTags } from "@/components/seo/MetaTags";
 import { PostComposer } from "@/components/community/PostComposer";
 import { PostActions } from "@/components/community/PostActions";
+import { QuotedPostCard } from "@/components/community/QuotedPostCard";
 import { PlaylistCoverPresentation } from "@/components/media/PlaylistCoverPresentation";
 import { Ch19GradientImage } from "@/components/media/Ch19GradientImage";
 import {
@@ -265,6 +266,10 @@ function formatPublishedAt(
 function activityLabel(
   item: FollowingFeedItem,
 ): string {
+  if (item.repostActor) {
+    return "Repost";
+  }
+
   if (item.itemType === "article") {
     return "WAKILISHA Article";
   }
@@ -412,6 +417,10 @@ function followingPostFromItem(
     item.itemType !== "post"
   ) {
     return null;
+  }
+
+  if (item.post) {
+    return item.post;
   }
 
   const reason =
@@ -995,6 +1004,13 @@ function FollowingActivity({
               </p>
             )}
 
+            {post?.quotedPost && (
+              <QuotedPostCard
+                quotedPost={post.quotedPost}
+                className="mt-4 max-w-[680px]"
+              />
+            )}
+
             {item.itemType === "post" && item.linkUrl && (
               <a
                 href={item.linkUrl}
@@ -1050,6 +1066,9 @@ function FollowingActivity({
                 post.id,
               )
             }
+            actionActor={
+              postInteraction.viewerActor
+            }
             followed={
               postInteraction.followedActorKeys.has(
                 `${post.actor.type}:${post.actor.id}`,
@@ -1058,6 +1077,31 @@ function FollowingActivity({
             following={
               postInteraction.followingActorKeys.has(
                 `${post.actor.type}:${post.actor.id}`,
+              )
+            }
+            repostState={
+              postInteraction.repostStates.get(
+                post.id,
+              )
+            }
+            reposting={
+              postInteraction.repostingPostIds.has(
+                post.id,
+              )
+            }
+            blocked={
+              postInteraction.blockedActorKeys.has(
+                `${post.actor.type}:${post.actor.id}`,
+              )
+            }
+            blocking={
+              postInteraction.blockingActorKeys.has(
+                `${post.actor.type}:${post.actor.id}`,
+              )
+            }
+            reporting={
+              postInteraction.reportingPostIds.has(
+                post.id,
               )
             }
             canManage={
@@ -1081,6 +1125,24 @@ function FollowingActivity({
               void postInteraction.toggleReaction(
                 post,
                 reactionType,
+              )
+            }
+            onToggleRepost={() =>
+              void postInteraction.toggleRepost(
+                post,
+              )
+            }
+            onToggleBlock={() =>
+              void postInteraction.toggleBlock(
+                post.actor,
+              )
+            }
+            onReport={(
+              reason,
+            ) =>
+              postInteraction.submitReport(
+                post,
+                reason,
               )
             }
             onWithdrawn={

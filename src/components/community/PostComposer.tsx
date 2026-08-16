@@ -6,10 +6,13 @@ import {
   type FormEvent,
 } from "react";
 import { WkIcon } from "@/components/design-system/Icon";
+import { QuotedPostCard } from "@/components/community/QuotedPostCard";
 import {
   editPost,
   publishPost,
+  quotePost,
   type CommunityPost,
+  type CommunityQuotedPost,
   type PostActor,
 } from "@/services/community/posts";
 import { uploadPostImage } from "@/services/community/postMedia";
@@ -17,6 +20,7 @@ import { uploadPostImage } from "@/services/community/postMedia";
 export function PostComposer({
   actor,
   editingPost = null,
+  quotedPost = null,
   defaultOpen = false,
   onSaved,
   onCancelEdit,
@@ -24,13 +28,16 @@ export function PostComposer({
 }: {
   actor: PostActor;
   editingPost?: CommunityPost | null;
+  quotedPost?: CommunityPost | null;
   defaultOpen?: boolean;
   onSaved?: (post: CommunityPost) => void | Promise<void>;
   onCancelEdit?: () => void;
   onError?: (message: string) => void;
 }) {
   const inputRef = useRef<HTMLInputElement>(null);
-  const [open, setOpen] = useState(defaultOpen || Boolean(editingPost));
+  const [open, setOpen] = useState(
+    defaultOpen || Boolean(editingPost) || Boolean(quotedPost),
+  );
   const [body, setBody] = useState("");
   const [imageUrl, setImageUrl] = useState("");
   const [linkUrl, setLinkUrl] = useState("");
@@ -41,6 +48,22 @@ export function PostComposer({
   const [error, setError] = useState<string | null>(null);
 
   const isEditing = Boolean(editingPost);
+  const isQuoting = Boolean(quotedPost);
+
+  const quotePresentation: CommunityQuotedPost | null =
+    quotedPost
+      ? {
+          id: quotedPost.id,
+          available: true,
+          actor: quotedPost.actor,
+          body: quotedPost.body,
+          imageUrl: quotedPost.imageUrl,
+          linkUrl: quotedPost.linkUrl,
+          linkLabel: quotedPost.linkLabel,
+          publishedAt: quotedPost.publishedAt,
+          canonicalPath: quotedPost.canonicalPath,
+        }
+      : editingPost?.quotedPost ?? null;
 
   useEffect(() => {
     if (!editingPost) return;
@@ -64,7 +87,7 @@ export function PostComposer({
   function close() {
     reset();
     setOpen(false);
-    if (isEditing) onCancelEdit?.();
+    if (isEditing || isQuoting) onCancelEdit?.();
   }
 
   async function handlePhoto(event: ChangeEvent<HTMLInputElement>) {
@@ -103,13 +126,22 @@ export function PostComposer({
             linkUrl: linkUrl.trim(),
             linkLabel: linkLabel.trim(),
           })
-        : await publishPost({
-            actor,
-            body: cleanBody,
-            imageUrl: imageUrl.trim(),
-            linkUrl: linkUrl.trim(),
-            linkLabel: linkLabel.trim(),
-          });
+        : quotedPost
+          ? await quotePost({
+              actor,
+              quotedPostId: quotedPost.id,
+              body: cleanBody,
+              imageUrl: imageUrl.trim(),
+              linkUrl: linkUrl.trim(),
+              linkLabel: linkLabel.trim(),
+            })
+          : await publishPost({
+              actor,
+              body: cleanBody,
+              imageUrl: imageUrl.trim(),
+              linkUrl: linkUrl.trim(),
+              linkLabel: linkLabel.trim(),
+            });
 
       reset();
       setOpen(false);
@@ -170,7 +202,7 @@ export function PostComposer({
           </button>
 
           <h3 className="justify-self-center text-[15px] font-black sm:hidden">
-            {isEditing ? "Edit Post" : "Create Post"}
+            {isEditing ? "Edit Post" : isQuoting ? "Quote Post" : "Create Post"}
           </h3>
 
           <button
@@ -178,7 +210,7 @@ export function PostComposer({
             disabled={busy || uploading || !body.trim()}
             className="justify-self-end rounded-full bg-[var(--wk-brand)] px-4 py-1.5 text-[11px] font-black text-[var(--wk-brand-on)] disabled:opacity-40 sm:hidden"
           >
-            {busy ? "Posting..." : isEditing ? "Save" : "Post"}
+            {busy ? "Posting..." : isEditing ? "Save" : isQuoting ? "Quote" : "Post"}
           </button>
         </div>
 
@@ -234,6 +266,13 @@ export function PostComposer({
                 placeholder="What's happening?"
                 className="mt-2 min-h-[96px] max-h-[32dvh] w-full resize-none overflow-y-auto border-0 bg-transparent p-0 text-[17px] font-medium leading-[1.5] outline-none placeholder:text-[var(--wk-text-faint)] sm:mt-4 sm:min-h-[160px] sm:max-h-none sm:text-[17px]"
               />
+
+              {quotePresentation && (
+                <QuotedPostCard
+                  quotedPost={quotePresentation}
+                  className="mt-3"
+                />
+              )}
 
               <div className="mt-1 flex items-center gap-1 border-t border-[var(--wk-divider)] pt-2 sm:hidden">
                 <button
@@ -369,7 +408,7 @@ export function PostComposer({
               disabled={busy || uploading || !body.trim()}
               className="rounded-full bg-[var(--wk-brand)] px-5 py-2 text-[11px] font-black text-[var(--wk-brand-on)] disabled:opacity-40"
             >
-              {busy ? "Posting..." : isEditing ? "Save Post" : "Post"}
+              {busy ? "Posting..." : isEditing ? "Save Post" : isQuoting ? "Quote Post" : "Post"}
             </button>
           </div>
         </div>

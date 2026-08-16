@@ -232,6 +232,31 @@ describe(
     );
 
     it(
+      "keeps the owner Profile route behind authentication",
+      () => {
+        expect(router)
+          .toContain(
+            "function AuthenticatedProfileRoute",
+          );
+
+        expect(router)
+          .toContain(
+            "const authUser = useAuthUser();",
+          );
+
+        expect(router)
+          .toContain(
+            'return <Navigate to="/auth" replace />;',
+          );
+
+        expect(router)
+          .toContain(
+            'path: "/profile", element: <AuthenticatedProfileRoute />',
+          );
+      },
+    );
+
+    it(
       "keeps Person identity and work membership on governed RPCs",
       () => {
         expect(service)
