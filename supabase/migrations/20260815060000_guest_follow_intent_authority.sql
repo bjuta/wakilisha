@@ -372,13 +372,13 @@ revoke all on function
   public.community_create_guest_follow_intent(
     uuid[]
   )
-from public;
+from public, anon, authenticated;
 
 revoke all on function
   public.community_claim_guest_follow_intent(
     text
   )
-from public;
+from public, anon, authenticated;
 
 grant execute on function
   public.community_create_guest_follow_intent(
