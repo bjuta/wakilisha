@@ -389,6 +389,17 @@ export default function MobileProfilePage() {
         <div className="flex items-center justify-center gap-2 mb-4">
           {isSignedIn ? (
             <>
+              {profileUsername ? (
+                <Link
+                  to={`/u/${profileUsername}/playlists`}
+                  className="inline-flex items-center gap-1.5 h-[34px] px-4 rounded-lg text-xs font-bold whitespace-nowrap cursor-pointer"
+                  style={{ background: "var(--wk-surface-raised)", color: "var(--wk-text)", border: "1px solid var(--wk-border)" }}
+                >
+                  <WkIcon name="ListMusic" size={14} />
+                  Playlists
+                </Link>
+              ) : null}
+
               <Link
                 to="/settings"
                 className="inline-flex items-center gap-1.5 h-[34px] px-4 rounded-lg text-xs font-bold whitespace-nowrap cursor-pointer"

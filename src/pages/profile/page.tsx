@@ -230,6 +230,11 @@ export default function ProfilePage() {
                         <WkIcon name="ExternalLink" size={14} /> Public profile
                       </Link>
                     )}
+                    {profileUsername && (
+                      <Link to={`/u/${profileUsername}/playlists`} className="profile-dt-btn-ghost whitespace-nowrap">
+                        <WkIcon name="ListMusic" size={14} /> Your Playlists
+                      </Link>
+                    )}
                     <Link to="/settings" className="profile-dt-btn-edit whitespace-nowrap">
                       <WkIcon name="Pencil" size={14} /> Edit profile
                     </Link>
