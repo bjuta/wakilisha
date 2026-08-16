@@ -161,9 +161,13 @@ const directLazyImports = [
  * Music discovery adds:
  * - ../pages/music/page
  *
- * The current authority is therefore 57 direct lazy imports.
+ * Personal Playlists add two direct lazy public imports:
+ * - ../pages/playlists/person/page
+ * - ../pages/playlists/person/detail/page
+ *
+ * The current authority is therefore 59 direct lazy imports.
  */
-const expectedDirectLazyImportCount = 57;
+const expectedDirectLazyImportCount = 59;
 
 if (
   directLazyImports.length !==
@@ -339,9 +343,13 @@ const routePaths = [
  * Music discovery adds one public route path:
  * - /music
  *
- * The current authority is therefore 159 paths.
+ * Personal Playlists add two canonical Person Playlist routes:
+ * - /u/:username/playlists
+ * - /u/:username/playlists/:playlistSlug
+ *
+ * The current authority is therefore 161 paths.
  */
-const expectedRoutePathCount = 159;
+const expectedRoutePathCount = 161;
 
 if (routePaths.length !== expectedRoutePathCount) {
   fail(
@@ -358,7 +366,7 @@ const routeChecksum = crypto
   .digest("hex");
 
 const expectedRouteChecksum =
-  "0392a85c6656e01dfb783515e8daf60d584e4c0739eedc7c076b5d4dbf1c1755";
+  "1c6c2fbb0c457afee7e1ef8e654d55e37feebcd15c77a3e08ad619532ec2f988";
 
 if (
   routeChecksum !==
