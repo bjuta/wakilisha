@@ -8,6 +8,10 @@ import {
   type PublicArticleTrust,
 } from "@/services/publicContent/articleTrust";
 import {
+  selectPrimaryReleaseArtistCredit,
+  type ReleaseArtistCreditCandidate,
+} from "@/services/publicContent/releaseArtistCredit";
+import {
   enrichArtistMedia,
   enrichArtistsMedia,
   enrichReleaseMedia,
@@ -506,7 +510,7 @@ async function resolvePrimaryArtistsForReleases(
   for (const ids of chunkArray(uniqueReleaseIds)) {
     const { data: releaseArtistRows, error } = await supabase
       .from("registry_release_artists")
-      .select("release_id, artist_name_text, artist_slug, is_primary, credit_order")
+      .select("release_id, artist_id, artist_name_text, artist_slug, is_primary, credit_order, confidence")
       .in("release_id", ids)
       .eq("status", "active")
       .order("credit_order", { ascending: true });
@@ -516,22 +520,62 @@ async function resolvePrimaryArtistsForReleases(
       continue;
     }
 
+    const creditsByRelease = new Map<
+      string,
+      ReleaseArtistCreditCandidate[]
+    >();
+
     for (const row of (releaseArtistRows || []) as Array<{
       release_id: string;
+      artist_id: string | null;
       artist_name_text: string | null;
       artist_slug: string | null;
       is_primary: boolean | null;
       credit_order: number | null;
+      confidence: number | null;
     }>) {
-      if (!hasKnownArtistName(row.artist_name_text)) continue;
+      const credits =
+        creditsByRelease.get(row.release_id) ||
+        [];
 
-      const current = artistsByRelease.get(row.release_id);
-      if (!current || row.is_primary) {
-        artistsByRelease.set(row.release_id, {
-          name: String(row.artist_name_text).trim(),
-          slug: row.artist_slug || "",
-        });
-      }
+      credits.push({
+        artistId: row.artist_id,
+        artistNameText: row.artist_name_text,
+        artistSlug: row.artist_slug,
+        isPrimary: row.is_primary,
+        creditOrder: row.credit_order,
+        confidence: row.confidence,
+      });
+
+      creditsByRelease.set(
+        row.release_id,
+        credits,
+      );
+    }
+
+    for (const [
+      releaseId,
+      credits,
+    ] of creditsByRelease) {
+      const selected =
+        selectPrimaryReleaseArtistCredit(
+          credits,
+        );
+
+      if (!selected) continue;
+
+      artistsByRelease.set(
+        releaseId,
+        {
+          name: String(
+            selected.artistNameText ||
+            selected.artistSlug,
+          ).trim(),
+          slug:
+            selected.artistSlug ||
+            "",
+        },
+      );
     }
   }
 
@@ -735,13 +779,33 @@ async function aggregateFeaturedArtists(
   // 1. Check release-level featured artists first (explicitly flagged)
   const { data: releaseArtists } = await supabase
     .from("registry_release_artists")
-    .select("artist_name_text, artist_slug, is_featured, is_primary")
+    .select("artist_id, artist_name_text, artist_slug, is_featured, is_primary, credit_order, confidence")
     .eq("release_id", releaseId)
     .eq("status", "active");
 
-  // Get the primary artist slug to exclude from featured list
-  const primaryReleaseArtist = (releaseArtists || []).find((ra) => ra.is_primary);
-  const primarySlug = primaryReleaseArtist?.artist_slug || "";
+  // Get the deterministic canonical primary artist slug to exclude from featured list.
+  const primaryReleaseArtist =
+    selectPrimaryReleaseArtistCredit(
+      (releaseArtists || []).map(
+        (row) => ({
+          artistId: row.artist_id,
+          artistNameText:
+            row.artist_name_text,
+          artistSlug:
+            row.artist_slug,
+          isPrimary:
+            row.is_primary,
+          creditOrder:
+            row.credit_order,
+          confidence:
+            row.confidence,
+        }),
+      ),
+    );
+
+  const primarySlug =
+    primaryReleaseArtist?.artistSlug ||
+    "";
 
   // Collect all non-primary release artists
   for (const ra of (releaseArtists || [])) {
@@ -1163,15 +1227,53 @@ async function getReleaseFromRegistry(artistSlug: string, releaseSlug: string): 
 
   const { data: releaseArtistRows } = await supabase
     .from("registry_release_artists")
-    .select("artist_name_text, artist_slug, is_primary, is_featured")
+    .select("artist_id, artist_name_text, artist_slug, is_primary, is_featured, credit_order, confidence")
     .eq("release_id", releaseId)
     .eq("status", "active");
 
-  const primaryReleaseArtist = (releaseArtistRows || []).find((ra) => ra.is_primary);
-  const releaseMetaForArtist = (releaseRow.metadata || {}) as Record<string, unknown>;
-  const metadataArtist = artistNameFromReleaseMetadata(releaseMetaForArtist);
-  let fallbackArtist = primaryReleaseArtist?.artist_name_text || metadataArtist || "";
-  let fallbackArtistSlug = primaryReleaseArtist?.artist_slug || (metadataArtist ? slugify(metadataArtist) : artistSlug);
+  const primaryReleaseArtist =
+    selectPrimaryReleaseArtistCredit(
+      (releaseArtistRows || []).map(
+        (row) => ({
+          artistId: row.artist_id,
+          artistNameText:
+            row.artist_name_text,
+          artistSlug:
+            row.artist_slug,
+          isPrimary:
+            row.is_primary,
+          creditOrder:
+            row.credit_order,
+          confidence:
+            row.confidence,
+        }),
+      ),
+    );
+
+  const releaseMetaForArtist =
+    (releaseRow.metadata || {}) as Record<
+      string,
+      unknown
+    >;
+
+  const metadataArtist =
+    artistNameFromReleaseMetadata(
+      releaseMetaForArtist,
+    );
+
+  let fallbackArtist =
+    primaryReleaseArtist?.artistNameText ||
+    primaryReleaseArtist?.artistSlug ||
+    metadataArtist ||
+    "";
+
+  let fallbackArtistSlug =
+    primaryReleaseArtist?.artistSlug ||
+    (
+      metadataArtist
+        ? slugify(metadataArtist)
+        : artistSlug
+    );
 
   const { data: releaseTrackRows } = await supabase
     .from("registry_release_tracks")
