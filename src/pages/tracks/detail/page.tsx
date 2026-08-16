@@ -15,6 +15,7 @@ import { releaseUrl } from "@/utils/releaseUrl";
 import { releaseTrackUrl, trackUrl } from "@/utils/trackUrl";
 import { WkIcon } from "@/components/design-system/Icon";
 import { ShareButton } from "@/components/design-system/share/ShareSheet";
+import { AddToPlaylistButton } from "@/components/playlists/AddToPlaylistButton";
 import { ContributionBadges } from "@/components/feature/community/ContributionBadges";
 import { CommunitySection } from "@/pages/magazine/article/components/CommunitySection";
 import { TrackMomentSummary } from "@/components/feature/community/TrackMomentDrawer";
@@ -46,6 +47,7 @@ type TrackChartAppearance = {
 };
 
 type TrackViewModel = {
+  id: string;
   slug: string;
   title: string;
   artist: string;
@@ -328,6 +330,7 @@ function apiToViewModel(api: PublicTrackDetail): TrackViewModel {
   }));
 
   return {
+    id: clean(trackData.id || raw.id),
     slug: trackData.slug,
     title: trackData.title,
     artist: artistName,
@@ -1184,6 +1187,10 @@ export default function TrackDetail() {
                   <WkIcon name="Heart" size={16} fill={trackSaved ? "currentColor" : "none"} />
                   {entityActionLoading ? "Saving..." : trackSaved ? "Saved" : "Save track"}
                 </button>
+                <AddToPlaylistButton
+                  trackId={track.id}
+                  trackTitle={track.title}
+                />
                 <ShareButton item={{ title: track.title, subtitle: track.artist, description: trackIntro || seoDescription, imageUrl: track.artworkUrl, type: "track" }} />
               </div>
               {trackSaveError && (

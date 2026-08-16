@@ -11,6 +11,9 @@ import {
   WkIcon,
 } from "@/components/design-system/Icon";
 import {
+  PublicPersonalPlaylistsSection,
+} from "@/components/playlists/PublicPersonalPlaylistsSection";
+import {
   useAuthUser,
 } from "@/hooks/useAuthUser";
 import {
@@ -893,6 +896,10 @@ export default function PublicProfilePage() {
             </div>
           </div>
         </div>
+
+        <PublicPersonalPlaylistsSection
+          username={profile.username}
+        />
 
         <nav
           className="profile-dt-tabbar"

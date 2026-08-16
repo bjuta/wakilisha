@@ -19,6 +19,9 @@ import {
   ShareButton,
 } from "@/components/design-system/share/ShareSheet";
 import {
+  AddToPlaylistButton,
+} from "@/components/playlists/AddToPlaylistButton";
+import {
   PlaylistCoverPresentation,
 } from "@/components/media/PlaylistCoverPresentation";
 import {
@@ -1078,6 +1081,16 @@ function PlaylistTrackRow({
                           />
                           Discuss this track
                         </button>
+
+                        <AddToPlaylistButton
+                          trackId={
+                            track.registry?.trackId
+                          }
+                          trackTitle={
+                            track.title
+                          }
+                          compact
+                        />
 
                         <ShareButton
                           item={{

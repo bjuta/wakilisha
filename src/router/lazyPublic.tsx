@@ -56,6 +56,14 @@ export const PublicPlaylistDetailPage = lazy(
   () => import("../pages/playlists/detail/page"),
 );
 
+export const PersonPlaylistsPage = lazy(
+  () => import("../pages/playlists/person/page"),
+);
+
+export const PersonPlaylistDetailPage = lazy(
+  () => import("../pages/playlists/person/detail/page"),
+);
+
 export const ChartsDirectory = lazy(
   () => import("../pages/charts/directory/page"),
 );

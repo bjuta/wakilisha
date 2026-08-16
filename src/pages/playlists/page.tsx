@@ -19,6 +19,12 @@ import {
   MetaTags,
 } from "@/components/seo/MetaTags";
 import {
+  useAuthUser,
+} from "@/hooks/useAuthUser";
+import {
+  getUserProfileWithStats,
+} from "@/services/community";
+import {
   listPublicPlaylists,
 } from "@/services/playlists/playlistPublicService";
 import type {
@@ -85,6 +91,14 @@ function PlaylistCard({
 }
 
 export default function PublicPlaylistsPage() {
+  const authUser =
+    useAuthUser();
+
+  const [
+    personalPlaylistUsername,
+    setPersonalPlaylistUsername,
+  ] = useState("");
+
   const [
     playlists,
     setPlaylists,
@@ -171,6 +185,42 @@ export default function PublicPlaylistsPage() {
     },
     [
       loadInitial,
+    ],
+  );
+
+  useEffect(
+    () => {
+      let alive = true;
+
+      if (!authUser.id) {
+        setPersonalPlaylistUsername("");
+        return () => {
+          alive = false;
+        };
+      }
+
+      getUserProfileWithStats(
+        authUser.id,
+      )
+        .then((profile) => {
+          if (alive) {
+            setPersonalPlaylistUsername(
+              profile?.username ?? "",
+            );
+          }
+        })
+        .catch(() => {
+          if (alive) {
+            setPersonalPlaylistUsername("");
+          }
+        });
+
+      return () => {
+        alive = false;
+      };
+    },
+    [
+      authUser.id,
     ],
   );
 
@@ -288,6 +338,32 @@ export default function PublicPlaylistsPage() {
             <p className="wk-copy mt-5 max-w-2xl text-[16px]">
               Curated music from WAKILISHA. New releases, deep cuts, scenes, moods, and moments worth hearing.
             </p>
+
+            {!authUser.loading && authUser.id && personalPlaylistUsername ? (
+              <div className="mt-6 flex flex-wrap gap-2">
+                <Link
+                  to={`/u/${personalPlaylistUsername}/playlists`}
+                  className="inline-flex h-9 items-center gap-2 rounded-lg border border-[var(--wk-border)] px-3 text-xs font-black text-[var(--wk-text)] hover:bg-[var(--wk-surface-raised)]"
+                >
+                  <WkIcon
+                    name="ListMusic"
+                    size={14}
+                  />
+                  Your Playlists
+                </Link>
+
+                <Link
+                  to={`/u/${personalPlaylistUsername}/playlists?create=1`}
+                  className="inline-flex h-9 items-center gap-2 rounded-lg bg-[var(--wk-brand)] px-3 text-xs font-black text-white"
+                >
+                  <WkIcon
+                    name="Plus"
+                    size={14}
+                  />
+                  Create Playlist
+                </Link>
+              </div>
+            ) : null}
           </div>
         </section>
 
