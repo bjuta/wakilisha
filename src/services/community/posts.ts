@@ -58,6 +58,9 @@ export type CommunityPost = {
   updatedAt: string;
   quotedPostId: string | null;
   quotedPost: CommunityQuotedPost | null;
+  threadId: string | null;
+  threadPosition: number | null;
+  threadItemCount: number | null;
   canonicalPath: string;
 };
 
@@ -277,10 +280,37 @@ export function mapCommunityPost(value: unknown): CommunityPost | null {
       : mapCommunityQuotedPost(
           record.quoted_post,
         );
+  const threadId =
+    readString(record, "thread_id");
+  const threadPosition =
+    readNumber(record, "thread_position");
+  const threadItemCount =
+    readNumber(record, "thread_item_count");
 
   if (
     quotedPostId &&
     !quotedPost
+  ) {
+    return null;
+  }
+
+  if (
+    (
+      threadId &&
+      (
+        threadPosition == null ||
+        threadPosition < 1 ||
+        threadItemCount == null ||
+        threadItemCount < 1
+      )
+    ) ||
+    (
+      !threadId &&
+      (
+        threadPosition != null ||
+        threadItemCount != null
+      )
+    )
   ) {
     return null;
   }
@@ -301,6 +331,9 @@ export function mapCommunityPost(value: unknown): CommunityPost | null {
     updatedAt,
     quotedPostId,
     quotedPost,
+    threadId,
+    threadPosition,
+    threadItemCount,
     canonicalPath,
   };
 }

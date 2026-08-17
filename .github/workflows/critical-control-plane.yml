@@ -70,12 +70,24 @@ jobs:
       - name: Run critical security and lifecycle tests
         run: npm run test:critical
 
+      - name: Enforce Post draft and authored Thread authority
+        run: >-
+          npx vitest run
+          test/community/post-drafts-authored-threads-m8c3.test.ts
+          test/community/post-thread-presentation-m8c3.test.ts
+          test/community/post-thread-detail-m8c3.test.ts
+          test/community/post-drafts-thread-composer-m8c3.test.ts
+          test/community/post-thread-affordance-m8c3.test.ts
+          test/community/post-thread-publish-actor-resolution-m8c3.test.ts
+
       - name: Enforce public anonymous read authority and Edge runtime
         run: >-
           npx vitest run
           test/public-read-authority-boundary.test.ts
           test/security/public-anon-content.test.ts
           test/security/public-edge-runtime.test.ts
+          test/security/configured-supabase-csp.test.ts
+          test/security/configured-public-content-edge-origin.test.ts
 
       - name: Detect live schema and migration-history drift
         run: npm run schema:verify
