@@ -4,6 +4,6 @@
   "generatedAt": "2026-08-17T18:06:38Z",
   "typesSha256": "68e25b349e750151fbb9050e2939e336afe0e445e80e9da2480570afc720f106",
   "authoritativeMigrationDirectory": "supabase/migrations",
-  "migrationCount": 21,
-  "latestMigration": "20260817192000_post_thread_rls_hardening.sql"
+  "migrationCount": 22,
+  "latestMigration": "20260817193000_post_draft_thread_fk_indexes.sql"
 }
