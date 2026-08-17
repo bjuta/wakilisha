@@ -4,6 +4,6 @@
   "generatedAt": "2026-08-17T18:06:38Z",
   "typesSha256": "68e25b349e750151fbb9050e2939e336afe0e445e80e9da2480570afc720f106",
   "authoritativeMigrationDirectory": "supabase/migrations",
-  "migrationCount": 17,
-  "latestMigration": "20260817174500_harden_public_read_authority_boundary.sql"
+  "migrationCount": 20,
+  "latestMigration": "20260817185000_post_draft_order_hardening.sql"
 }
