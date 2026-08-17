@@ -123,6 +123,21 @@ describe("WAKILISHA M8C.3 Post drafts and authored Threads", () => {
     expect(verifier).toContain("thread_table_has_browser_policy");
   });
 
+  it("tolerates production auto-enabling RLS before the hardening migration runs", () => {
+    expect(rlsHardeningMigration).toContain(
+      "Production may auto-enable RLS on CREATE TABLE",
+    );
+    expect(rlsHardeningMigration).not.toContain(
+      "STOP: community_post_threads RLS is already enabled",
+    );
+    expect(rlsHardeningMigration).toContain(
+      "alter table public.community_post_threads enable row level security",
+    );
+    expect(rlsHardeningMigration).toContain(
+      "STOP: community_post_threads must not expose direct browser policies",
+    );
+  });
+
   it("caps Thread drafts at 50 Posts and reorders under a deferrable uniqueness constraint", () => {
     expect(orderHardeningMigration).toContain(
       "check (position between 1 and 50)",
