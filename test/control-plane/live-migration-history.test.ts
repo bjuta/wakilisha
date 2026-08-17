@@ -51,9 +51,9 @@ describe(
   "live migration-history control plane",
   () => {
     it(
-      "uses production-recorded timestamps for the four proven historical aliases without changing SQL",
+      "uses production-recorded timestamps and locks reviewed historical SQL identities",
       () => {
-        const canonical = [
+        const byteExactCanonical = [
           [
             "supabase/migrations/20260816083329_community_social_graph_m8b_authority.sql",
             "7892249b9601459aeb81b19596695c1c9db6ab46985afbdc66c6ef6fb09d92ed",
@@ -66,11 +66,15 @@ describe(
             "supabase/migrations/20260816185425_personal_playlist_duplicate_track_confirmation.sql",
             "a479cdd9b99682fd2f233d8ecc74ae4460ccc69fa7a5b5388e76ad5ea86c7407",
           ],
-          [
-            "supabase/migrations/20260816202232_correct_valle_release_featured_credit.sql",
-            "63b6b8d10e73cd7217e027aa5d62f6ba1148e11ee18924c622e78dcf888fe90b",
-          ],
         ] as const;
+
+        const valleReplayRepair = {
+          path: "supabase/migrations/20260816202232_correct_valle_release_featured_credit.sql",
+          productionAppliedSha:
+            "63b6b8d10e73cd7217e027aa5d62f6ba1148e11ee18924c622e78dcf888fe90b",
+          repositoryReplaySafeSha:
+            "513ada10babc06bb7f4e03b79c3d06fa6ee3b71feffa6abc3fe7a74b1cd87a47",
+        } as const;
 
         const retired = [
           "supabase/migrations/20260816083500_community_social_graph_m8b_authority.sql",
@@ -97,7 +101,7 @@ describe(
             path,
             expectedSha,
           ]
-          of canonical
+          of byteExactCanonical
         ) {
           expect(
             existsSync(
@@ -115,6 +119,28 @@ describe(
             expectedSha,
           );
         }
+
+        expect(
+          existsSync(
+            valleReplayRepair.path,
+          ),
+        ).toBe(
+          true,
+        );
+
+        expect(
+          productionStatementSha(
+            valleReplayRepair.path,
+          ),
+        ).toBe(
+          valleReplayRepair.repositoryReplaySafeSha,
+        );
+
+        expect(
+          valleReplayRepair.productionAppliedSha,
+        ).not.toBe(
+          valleReplayRepair.repositoryReplaySafeSha,
+        );
       },
     );
 
