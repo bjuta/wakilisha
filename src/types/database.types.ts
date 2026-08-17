@@ -7598,6 +7598,7 @@ export type Database = {
           person_resource_id: string | null
           published_at: string
           quoted_post_id: string | null
+          registry_track_id: string | null
           representation_id: string | null
           status: string
           updated_at: string
@@ -7616,6 +7617,7 @@ export type Database = {
           person_resource_id?: string | null
           published_at?: string
           quoted_post_id?: string | null
+          registry_track_id?: string | null
           representation_id?: string | null
           status?: string
           updated_at?: string
@@ -7634,6 +7636,7 @@ export type Database = {
           person_resource_id?: string | null
           published_at?: string
           quoted_post_id?: string | null
+          registry_track_id?: string | null
           representation_id?: string | null
           status?: string
           updated_at?: string
@@ -7666,6 +7669,13 @@ export type Database = {
             columns: ["quoted_post_id"]
             isOneToOne: false
             referencedRelation: "community_posts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "community_posts_registry_track_id_fkey"
+            columns: ["registry_track_id"]
+            isOneToOne: false
+            referencedRelation: "registry_tracks"
             referencedColumns: ["id"]
           },
         ]
@@ -18130,6 +18140,7 @@ export type Database = {
           p_link_label?: string
           p_link_url?: string
           p_post_id: string
+          p_registry_track_id?: string
         }
         Returns: Json
       }
@@ -18326,6 +18337,14 @@ export type Database = {
         Returns: Json
       }
       community_get_social_feed_legacy_m8b: {
+        Args: {
+          p_before_item_key?: string
+          p_before_published_at?: string
+          p_limit?: number
+        }
+        Returns: Json
+      }
+      community_get_social_feed_legacy_m8c2: {
         Args: {
           p_before_item_key?: string
           p_before_published_at?: string
@@ -18568,6 +18587,7 @@ export type Database = {
           p_image_url?: string
           p_link_label?: string
           p_link_url?: string
+          p_registry_track_id?: string
         }
         Returns: Json
       }
@@ -18580,6 +18600,7 @@ export type Database = {
           p_link_label?: string
           p_link_url?: string
           p_quoted_post_id: string
+          p_registry_track_id?: string
         }
         Returns: Json
       }

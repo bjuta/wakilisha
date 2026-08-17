@@ -2,6 +2,7 @@
 set -euo pipefail
 
 PROJECT_REF="${SUPABASE_PROJECT_REF:-pgzizndxdyhqmtyywjmt}"
+SUPABASE_CLI_VERSION="${SUPABASE_CLI_VERSION:-2.107.0}"
 TYPE_FILE="src/types/database.types.ts"
 BASELINE_FILE="docs/engineering/live-schema-baseline.json"
 TMP_FILE="$(mktemp)"
@@ -22,7 +23,7 @@ if [ ! -f "$BASELINE_FILE" ]; then
   exit 1
 fi
 
-npx supabase gen types typescript \
+npx --yes "supabase@${SUPABASE_CLI_VERSION}" gen types typescript \
   --project-id "$PROJECT_REF" \
   --schema public,editorial \
   > "$TMP_FILE"
@@ -70,4 +71,4 @@ if [ "$EXPECTED_SHA" != "$ACTUAL_SHA" ]; then
   exit 1
 fi
 
-echo "PASS: Committed public-schema types match production."
+echo "PASS: Committed public-schema types match production using Supabase CLI ${SUPABASE_CLI_VERSION}."
