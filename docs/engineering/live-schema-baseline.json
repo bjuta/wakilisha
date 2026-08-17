@@ -1,9 +1,9 @@
 {
   "projectRef": "pgzizndxdyhqmtyywjmt",
   "schema": "public",
-  "generatedAt": "2026-08-16T20:29:53Z",
-  "typesSha256": "b50adc60d559694df0fc351ffd7a74fb8c74782c83296828ac3b66f5f6fb670f",
+  "generatedAt": "2026-08-17T18:06:38Z",
+  "typesSha256": "68e25b349e750151fbb9050e2939e336afe0e445e80e9da2480570afc720f106",
   "authoritativeMigrationDirectory": "supabase/migrations",
-  "migrationCount": 15,
-  "latestMigration": "20260816202232_correct_valle_release_featured_credit.sql"
+  "migrationCount": 17,
+  "latestMigration": "20260817174500_harden_public_read_authority_boundary.sql"
 }
