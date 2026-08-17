@@ -2,7 +2,7 @@ import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 
 const m1Migration = readFileSync(
-  "supabase/migrations/20260816083500_community_social_graph_m8b_authority.sql",
+  "supabase/migrations/20260816083329_community_social_graph_m8b_authority.sql",
   "utf8",
 );
 const postActions = readFileSync("src/components/community/PostActions.tsx", "utf8");

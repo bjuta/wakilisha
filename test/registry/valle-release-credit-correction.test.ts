@@ -8,7 +8,7 @@ import {
 } from "node:fs";
 
 const migrationPath =
-  "supabase/migrations/20260816200500_correct_valle_release_featured_credit.sql";
+  "supabase/migrations/20260816202232_correct_valle_release_featured_credit.sql";
 
 const sql =
   readFileSync(
