@@ -100,6 +100,7 @@ export function PostComposer({
   const [threadDrafts, setThreadDrafts] = useState<CommunityPostDraft[]>([]);
   const [activeDraftId, setActiveDraftId] = useState<string | null>(null);
   const [draftQuotedPost, setDraftQuotedPost] = useState<CommunityPost | null>(null);
+  const [quotedPostDetached, setQuotedPostDetached] = useState(false);
   const [threadMode, setThreadMode] = useState(false);
   const [busy, setBusy] = useState(false);
   const [draftBusy, setDraftBusy] = useState(false);
@@ -107,7 +108,8 @@ export function PostComposer({
   const [error, setError] = useState<string | null>(null);
 
   const isEditing = Boolean(editingPost);
-  const isQuoting = Boolean(quotedPost || draftQuotedPost);
+  const activeQuotedPost = quotedPostDetached ? null : quotedPost;
+  const isQuoting = Boolean(activeQuotedPost || draftQuotedPost);
   const hasContent = Boolean(
     body.trim() ||
     imageUrl.trim() ||
@@ -135,8 +137,8 @@ export function PostComposer({
   const canAddAnother = !isEditing && (hasContent || Boolean(activeDraftId));
 
   const quotePresentation: CommunityQuotedPost | null =
-    quotedPost
-      ? quotedPostPresentation(quotedPost)
+    activeQuotedPost
+      ? quotedPostPresentation(activeQuotedPost)
       : draftQuotedPost
         ? quotedPostPresentation(draftQuotedPost)
         : editingPost?.quotedPost ?? null;
@@ -156,6 +158,10 @@ export function PostComposer({
       media.removeEventListener("change", sync);
     };
   }, []);
+
+  useEffect(() => {
+    setQuotedPostDetached(false);
+  }, [quotedPost?.id]);
 
   useScrollLock(open && mobileComposerViewport);
 
@@ -184,6 +190,7 @@ export function PostComposer({
     setDraftGroupId(null);
     setThreadDrafts([]);
     setActiveDraftId(null);
+    setQuotedPostDetached(false);
     setThreadMode(false);
   }
 
@@ -207,6 +214,7 @@ export function PostComposer({
     setLinkLabel(draft.linkLabel ?? "");
     setSelectedTrack(draft.track);
     setDraftQuotedPost(draft.quotedPost);
+    setQuotedPostDetached(true);
     setError(null);
   }
 
@@ -242,7 +250,7 @@ export function PostComposer({
       linkUrl,
       linkLabel,
       registryTrackId: selectedTrack?.id ?? null,
-      quotedPostId: quotedPost?.id ?? draftQuotedPost?.id ?? null,
+      quotedPostId: activeQuotedPost?.id ?? draftQuotedPost?.id ?? null,
     });
 
     setDraftGroupId(saved.draftGroupId);
@@ -279,6 +287,7 @@ export function PostComposer({
     setError(null);
     try {
       await persistCurrentDraft();
+      setQuotedPostDetached(true);
       setThreadMode(true);
       setActiveDraftId(null);
       resetFields();
@@ -443,10 +452,10 @@ export function PostComposer({
             linkLabel: linkLabel.trim(),
             registryTrackId: selectedTrack?.id ?? null,
           })
-        : quotedPost
+        : activeQuotedPost
           ? await quotePost({
               actor,
-              quotedPostId: quotedPost.id,
+              quotedPostId: activeQuotedPost.id,
               body: cleanBody,
               imageUrl: imageUrl.trim(),
               linkUrl: linkUrl.trim(),
