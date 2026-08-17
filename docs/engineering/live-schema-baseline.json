@@ -1,8 +1,8 @@
 {
   "projectRef": "pgzizndxdyhqmtyywjmt",
   "schema": "public",
-  "generatedAt": "2026-08-17T18:06:38Z",
-  "typesSha256": "68e25b349e750151fbb9050e2939e336afe0e445e80e9da2480570afc720f106",
+  "generatedAt": "2026-08-17T20:49:46Z",
+  "typesSha256": "844e4a5b77985f25e71b9be718d1785d91850e4aaf0f700b711cbce87aad8d5c",
   "authoritativeMigrationDirectory": "supabase/migrations",
   "migrationCount": 24,
   "latestMigration": "20260817201000_post_thread_publish_actor_resolution_fix.sql"

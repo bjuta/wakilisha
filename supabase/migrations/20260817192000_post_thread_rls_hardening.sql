@@ -1,6 +1,8 @@
 -- WAKILISHA M8C.3-M4: authored Thread backing-table RLS hardening.
 -- Public Thread reads remain RPC-only. The backing table keeps author ownership
 -- metadata private even if a future grant is added accidentally.
+-- Production may auto-enable RLS on CREATE TABLE. ENABLE ROW LEVEL SECURITY is
+-- intentionally idempotent here so the migration works with or without that hook.
 
 begin;
 
@@ -13,17 +15,6 @@ begin
      or to_regprocedure('public.community_get_thread(uuid)') is null
      or to_regprocedure('public.community_get_post_thread_context(uuid)') is null then
     raise exception 'STOP: M8C.3 Thread authority must exist before RLS hardening';
-  end if;
-
-  if exists (
-    select 1
-    from pg_class relation
-    join pg_namespace namespace on namespace.oid=relation.relnamespace
-    where namespace.nspname='public'
-      and relation.relname='community_post_threads'
-      and relation.relrowsecurity
-  ) then
-    raise exception 'STOP: community_post_threads RLS is already enabled';
   end if;
 end;
 $m8c3_thread_rls_preflight$;
