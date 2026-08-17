@@ -39,7 +39,7 @@ select
   has_table_privilege('authenticated','public.community_post_threads','select') as authenticated_can_read_thread_table,
   exists (
     select 1
-    from pg_policy policy
+    from pg_policies policy
     where policy.schemaname='public'
       and policy.tablename='community_post_threads'
   ) as thread_table_has_browser_policy;
