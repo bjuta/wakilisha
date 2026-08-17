@@ -85,6 +85,7 @@ jobs:
           test/public-read-authority-boundary.test.ts
           test/security/public-anon-content.test.ts
           test/security/public-edge-runtime.test.ts
+          test/security/configured-supabase-csp.test.ts
 
       - name: Detect live schema and migration-history drift
         run: npm run schema:verify
