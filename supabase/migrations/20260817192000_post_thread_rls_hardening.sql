@@ -51,7 +51,7 @@ begin
 
   if exists (
     select 1
-    from pg_policy policy
+    from pg_policies policy
     where policy.schemaname='public'
       and policy.tablename='community_post_threads'
   ) then
