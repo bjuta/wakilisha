@@ -2,6 +2,7 @@
 set -euo pipefail
 
 PROJECT_REF="${SUPABASE_PROJECT_REF:-pgzizndxdyhqmtyywjmt}"
+SUPABASE_CLI_VERSION="${SUPABASE_CLI_VERSION:-2.107.0}"
 TYPE_FILE="src/types/database.types.ts"
 BASELINE_FILE="docs/engineering/live-schema-baseline.json"
 TMP_FILE="$(mktemp)"
@@ -16,7 +17,7 @@ mkdir -p \
   "$(dirname "$TYPE_FILE")" \
   "$(dirname "$BASELINE_FILE")"
 
-npx supabase gen types typescript \
+npx --yes "supabase@${SUPABASE_CLI_VERSION}" gen types typescript \
   --project-id "$PROJECT_REF" \
   --schema public,editorial \
   > "$TMP_FILE"
@@ -93,5 +94,5 @@ fs.writeFileSync(
 );
 NODE
 
-echo "Generated $TYPE_FILE"
+echo "Generated $TYPE_FILE with Supabase CLI ${SUPABASE_CLI_VERSION}"
 echo "Recorded $BASELINE_FILE"
