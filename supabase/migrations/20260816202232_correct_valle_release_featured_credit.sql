@@ -18,6 +18,14 @@ begin
     and release.metadata ->> 'source' = 'apple_music_ingest'
     and release.metadata ->> 'apple_music_album_id' = '6786722212';
 
+  if v_release_count = 0
+     and not exists (
+       select 1
+       from public.registry_releases
+     ) then
+    return;
+  end if;
+
   if v_release_count <> 1 then
     raise exception
       'STOP: Valle release authority changed. Expected one active Apple Music Release, found %.',
