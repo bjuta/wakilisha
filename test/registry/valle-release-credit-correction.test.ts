@@ -49,6 +49,27 @@ describe(
     );
 
     it(
+      "replays safely only when the Registry Release catalog is truly empty",
+      () => {
+        expect(sql).toContain(
+          "if v_release_count = 0",
+        );
+
+        expect(sql).toContain(
+          "and not exists (\n       select 1\n       from public.registry_releases\n     ) then",
+        );
+
+        expect(sql).toContain(
+          "STOP: Valle release authority changed. Expected one active Apple Music Release, found %.",
+        );
+
+        expect(sql).not.toContain(
+          "if v_release_count = 0 then\n    return;",
+        );
+      },
+    );
+
+    it(
       "preserves Matata as the canonical Release primary",
       () => {
         expect(sql).toContain(
