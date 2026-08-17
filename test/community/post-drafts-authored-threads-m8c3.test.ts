@@ -5,6 +5,14 @@ const migration = readFileSync(
   "supabase/migrations/20260817183000_post_drafts_authored_threads.sql",
   "utf8",
 );
+const orderHardeningMigration = readFileSync(
+  "supabase/migrations/20260817185000_post_draft_order_hardening.sql",
+  "utf8",
+);
+const rlsHardeningMigration = readFileSync(
+  "supabase/migrations/20260817192000_post_thread_rls_hardening.sql",
+  "utf8",
+);
 const verifier = readFileSync(
   "scripts/control-plane/verify-post-drafts-authored-threads.sql",
   "utf8",
@@ -94,6 +102,38 @@ describe("WAKILISHA M8C.3 Post drafts and authored Threads", () => {
     );
   });
 
+  it("hardens the public Thread backing table with RLS and no browser policies", () => {
+    expect(rlsHardeningMigration).toContain(
+      "alter table public.community_post_threads enable row level security",
+    );
+    expect(rlsHardeningMigration).toContain(
+      "revoke all on table public.community_post_threads from public,anon,authenticated",
+    );
+    expect(rlsHardeningMigration).toContain(
+      "grant select on table public.community_post_threads to service_role",
+    );
+    expect(rlsHardeningMigration).toContain(
+      "policy.tablename='community_post_threads'",
+    );
+    expect(verifier).toContain("thread_store_rls");
+    expect(verifier).toContain("thread_table_has_browser_policy");
+  });
+
+  it("caps Thread drafts at 50 Posts and reorders under a deferrable uniqueness constraint", () => {
+    expect(orderHardeningMigration).toContain(
+      "check (position between 1 and 50)",
+    );
+    expect(orderHardeningMigration).toContain(
+      "deferrable initially immediate",
+    );
+    expect(orderHardeningMigration).toContain(
+      "set constraints community_post_drafts_owner_group_position_key deferred",
+    );
+    expect(orderHardeningMigration).not.toContain("position=1000+");
+    expect(verifier).toContain("community_post_drafts_position_check");
+    expect(verifier).toContain("community_post_drafts_owner_group_position_key");
+  });
+
   it("supports owner-scoped save, read, delete, reorder, and publish commands", () => {
     expect(migration).toContain("community_save_post_draft");
     expect(migration).toContain("community_get_post_drafts");
@@ -119,5 +159,9 @@ describe("WAKILISHA M8C.3 Post drafts and authored Threads", () => {
     expect(verifier).not.toContain("alter table");
     expect(migration).not.toContain("—");
     expect(migration).not.toContain("–");
+    expect(orderHardeningMigration).not.toContain("—");
+    expect(orderHardeningMigration).not.toContain("–");
+    expect(rlsHardeningMigration).not.toContain("—");
+    expect(rlsHardeningMigration).not.toContain("–");
   });
 });
