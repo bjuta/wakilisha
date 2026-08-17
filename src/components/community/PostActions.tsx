@@ -16,6 +16,7 @@ import {
   type ShareObject,
 } from "@/components/design-system/share/ShareSheet";
 import { PostQuoteDialog } from "@/components/community/PostQuoteDialog";
+import { PostEditDialog } from "@/components/community/PostEditDialog";
 import { PostReportDialog } from "@/components/community/PostReportDialog";
 import {
   withdrawPost,
@@ -82,6 +83,7 @@ export function PostActions({
   const [quoteOpen, setQuoteOpen] = useState(false);
   const [shareOpen, setShareOpen] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
+  const [editOpen, setEditOpen] = useState(false);
   const [reportOpen, setReportOpen] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const reactionTriggerRef = useRef<HTMLButtonElement | null>(null);
@@ -308,15 +310,29 @@ export function PostActions({
             {menuOpen && (
               <div className="absolute bottom-12 right-0 z-40 min-w-[230px] overflow-hidden rounded-2xl border border-[var(--wk-border)] bg-[var(--wk-surface)] p-1.5 shadow-xl">
                 {canManage ? (
-                  <button
-                    type="button"
-                    disabled={deleting}
-                    onClick={() => void handleDelete()}
-                    className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left text-[12px] font-black text-[var(--wk-danger)] hover:bg-[var(--wk-danger-soft)] disabled:opacity-50"
-                  >
-                    <i className="ri-delete-bin-line text-[17px]" aria-hidden="true" />
-                    {deleting ? "Deleting..." : "Delete Post"}
-                  </button>
+                  <>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setMenuOpen(false);
+                        setEditOpen(true);
+                      }}
+                      className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left text-[12px] font-black text-[var(--wk-text)] hover:bg-[var(--wk-bg)]"
+                    >
+                      <i className="ri-edit-line text-[17px]" aria-hidden="true" />
+                      Edit Post
+                    </button>
+
+                    <button
+                      type="button"
+                      disabled={deleting}
+                      onClick={() => void handleDelete()}
+                      className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left text-[12px] font-black text-[var(--wk-danger)] hover:bg-[var(--wk-danger-soft)] disabled:opacity-50"
+                    >
+                      <i className="ri-delete-bin-line text-[17px]" aria-hidden="true" />
+                      {deleting ? "Deleting..." : "Delete Post"}
+                    </button>
+                  </>
                 ) : (
                   <>
                     {typeof followed === "boolean" && onToggleFollow && (
@@ -375,6 +391,13 @@ export function PostActions({
       </div>
 
       <ShareSheet open={shareOpen} onClose={() => setShareOpen(false)} item={shareItem} />
+
+      <PostEditDialog
+        open={editOpen}
+        post={post}
+        onClose={() => setEditOpen(false)}
+        onEdited={() => navigate(0)}
+      />
 
       {actionActor && (
         <PostQuoteDialog

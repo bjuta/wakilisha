@@ -222,8 +222,9 @@ describe("M8C.1 Track curation reach", () => {
     expect(musicPage).toContain("<PlayableArtwork");
   });
 
-  it("does not invent a Post Track target where the current Post contract has none", () => {
-    expect(posts).not.toContain("registryTrackId");
+  it("lets Post Track attachments use canonical Registry Track identity", () => {
+    expect(posts).toContain("registryTrackId");
+    expect(posts).toContain("p_registry_track_id");
     expect(posts).not.toContain("canonicalTrackId");
   });
 });

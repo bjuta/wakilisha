@@ -1,6 +1,8 @@
 import {
   Link,
 } from "react-router-dom";
+import { PostTrackAttachment } from "@/components/community/PostTrackAttachment";
+import { PostLinkAttachment } from "@/components/community/PostLinkAttachment";
 import type {
   CommunityQuotedPost,
 } from "@/services/community/posts";
@@ -26,7 +28,7 @@ export function QuotedPostCard({
           {quotedPost.unavailableReason === "blocked"
             ? quotedPost.actorType === "artist"
               ? "You blocked this Artist. Unblock them to view the original Post."
-              : "You blocked this person. Unblock them to view the original Post."
+              : "You blocked this Person. Unblock them to view the original Post."
             : "The original Post is unavailable."}
         </div>
       </div>
@@ -36,23 +38,22 @@ export function QuotedPostCard({
   const actor =
     quotedPost.actor;
 
-  if (
-    !actor ||
-    !quotedPost.canonicalPath ||
-    !quotedPost.body
-  ) {
+  if (!actor || !quotedPost.canonicalPath) {
     return null;
   }
 
   return (
-    <Link
+    <div
       data-quoted-post="available"
-      to={quotedPost.canonicalPath}
-      className={`block overflow-hidden rounded-2xl border border-[var(--wk-border)] bg-[var(--wk-bg)] transition-colors hover:border-[var(--wk-brand)]/45 ${className}`}
+      className={`overflow-hidden rounded-2xl border border-[var(--wk-border)] bg-[var(--wk-bg)] ${className}`}
     >
       <div className="p-4">
         <div className="flex items-center gap-2.5">
-          <div className="h-8 w-8 shrink-0 overflow-hidden rounded-full bg-[var(--wk-brand-soft)]">
+          <Link
+            to={actor.canonicalPath}
+            className="h-8 w-8 shrink-0 overflow-hidden rounded-full bg-[var(--wk-brand-soft)]"
+            aria-label={actor.name}
+          >
             {actor.imageUrl ? (
               <img
                 src={actor.imageUrl}
@@ -64,31 +65,60 @@ export function QuotedPostCard({
                 {actor.name[0]?.toUpperCase() || "W"}
               </div>
             )}
-          </div>
+          </Link>
 
           <div className="min-w-0">
-            <div className="truncate text-[12px] font-black text-[var(--wk-text)]">
+            <Link
+              to={actor.canonicalPath}
+              className="truncate text-[12px] font-black text-[var(--wk-text)] hover:text-[var(--wk-brand)]"
+            >
               {actor.name}
-            </div>
+            </Link>
             <div className="truncate text-[10px] font-semibold text-[var(--wk-text-faint)]">
               @{actor.slug}
             </div>
           </div>
         </div>
 
-        <p className="mt-3 line-clamp-4 whitespace-pre-wrap text-[13px] font-semibold leading-[1.5] text-[var(--wk-text)]">
-          {quotedPost.body}
-        </p>
+        {quotedPost.body ? (
+          <Link
+            to={quotedPost.canonicalPath}
+            className="mt-3 block line-clamp-4 whitespace-pre-wrap text-[13px] font-semibold leading-[1.5] text-[var(--wk-text)]"
+          >
+            {quotedPost.body}
+          </Link>
+        ) : null}
+
+        {quotedPost.track ? (
+          <PostTrackAttachment
+            track={quotedPost.track}
+            compact
+            showActions={false}
+            className="mt-3"
+          />
+        ) : null}
       </div>
 
       {quotedPost.imageUrl && (
-        <img
-          src={quotedPost.imageUrl}
-          alt=""
-          loading="lazy"
-          className="max-h-[360px] w-full border-t border-[var(--wk-border)] object-cover"
-        />
+        <Link to={quotedPost.canonicalPath} className="block border-t border-[var(--wk-border)]">
+          <img
+            src={quotedPost.imageUrl}
+            alt=""
+            loading="lazy"
+            className="max-h-[360px] w-full object-cover"
+          />
+        </Link>
       )}
-    </Link>
+
+      {quotedPost.linkUrl ? (
+        <div className="border-t border-[var(--wk-border)] p-3">
+          <PostLinkAttachment
+            linkUrl={quotedPost.linkUrl}
+            linkLabel={quotedPost.linkLabel}
+            compact
+          />
+        </div>
+      ) : null}
+    </div>
   );
 }

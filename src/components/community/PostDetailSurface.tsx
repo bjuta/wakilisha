@@ -1,6 +1,8 @@
 import { Link, useNavigate } from "react-router-dom";
 import { PostActions } from "@/components/community/PostActions";
 import { QuotedPostCard } from "@/components/community/QuotedPostCard";
+import { PostTrackAttachment } from "@/components/community/PostTrackAttachment";
+import { PostLinkAttachment } from "@/components/community/PostLinkAttachment";
 import { CommunitySection } from "@/pages/magazine/article/components/CommunitySection";
 import { useAuthUser } from "@/hooks/useAuthUser";
 import { usePostInteractionState } from "@/hooks/usePostInteractionState";
@@ -42,16 +44,18 @@ export function PostDetailSurface({ post }: { post: CommunityPost }) {
           </div>
         </header>
 
-        <p className="mt-6 whitespace-pre-wrap text-[21px] font-semibold leading-[1.55] tracking-[-0.015em] text-[var(--wk-text)] md:text-[25px]">
-          {post.body}
-        </p>
+        {post.body ? (
+          <p className="mt-6 whitespace-pre-wrap text-[21px] font-semibold leading-[1.55] tracking-[-0.015em] text-[var(--wk-text)] md:text-[25px]">
+            {post.body}
+          </p>
+        ) : null}
 
-        {post.quotedPost && (
-          <QuotedPostCard
-            quotedPost={post.quotedPost}
+        {post.track ? (
+          <PostTrackAttachment
+            track={post.track}
             className="mt-5"
           />
-        )}
+        ) : null}
 
         {post.imageUrl && (
           <div className="mt-5 overflow-hidden rounded-[28px] bg-[var(--wk-surface-raised)]">
@@ -59,11 +63,20 @@ export function PostDetailSurface({ post }: { post: CommunityPost }) {
           </div>
         )}
 
-        {post.linkUrl && (
-          <a href={post.linkUrl} target="_blank" rel="noreferrer" className="mt-5 inline-flex items-center gap-2 rounded-full border border-[var(--wk-border)] px-4 py-2.5 text-[12px] font-black text-[var(--wk-text)] hover:border-[var(--wk-brand)] hover:text-[var(--wk-brand)]">
-            {post.linkLabel || "Open Link"}
-            <i className="ri-external-link-line" aria-hidden="true" />
-          </a>
+        {post.linkUrl ? (
+          <PostLinkAttachment
+            linkUrl={post.linkUrl}
+            linkLabel={post.linkLabel}
+            className="mt-5 block"
+          />
+        ) : null}
+
+
+        {post.quotedPost && (
+          <QuotedPostCard
+            quotedPost={post.quotedPost}
+            className="mt-5"
+          />
         )}
 
         <PostActions
@@ -97,8 +110,12 @@ export function PostDetailSurface({ post }: { post: CommunityPost }) {
           id: post.id,
           url: post.canonicalPath,
           title: `Post from ${post.actor.name}`,
-          description: post.body,
-          imageUrl: post.imageUrl,
+          description:
+            post.body ||
+            (post.track
+              ? `${post.track.title}${post.track.artistName ? ` by ${post.track.artistName}` : ""}`
+              : ""),
+          imageUrl: post.imageUrl || post.track?.artworkUrl || null,
         }}
         user={user}
         mode="post"

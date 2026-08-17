@@ -174,7 +174,7 @@ function decodeItem(
     readString(record, "item_key");
   const canonicalPath =
     readString(record, "canonical_path");
-  const title =
+  const rawTitle =
     readString(record, "title");
   const publishedAt =
     readString(record, "published_at");
@@ -186,7 +186,6 @@ function decodeItem(
     !itemKey ||
     !canonicalPath ||
     !canonicalPath.startsWith("/") ||
-    !title ||
     !publishedAt
   ) {
     return null;
@@ -242,6 +241,15 @@ function decodeItem(
       !post
     )
   ) {
+    return null;
+  }
+
+  const title =
+    rawTitle ||
+    post?.track?.title ||
+    (post ? `Post from ${post.actor.name}` : null);
+
+  if (!title) {
     return null;
   }
 

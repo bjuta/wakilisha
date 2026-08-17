@@ -15,6 +15,8 @@ import { MetaTags } from "@/components/seo/MetaTags";
 import { PostComposer } from "@/components/community/PostComposer";
 import { PostActions } from "@/components/community/PostActions";
 import { QuotedPostCard } from "@/components/community/QuotedPostCard";
+import { PostLinkAttachment } from "@/components/community/PostLinkAttachment";
+import { PostTrackAttachment } from "@/components/community/PostTrackAttachment";
 import { PlaylistCoverPresentation } from "@/components/media/PlaylistCoverPresentation";
 import { Ch19GradientImage } from "@/components/media/Ch19GradientImage";
 import {
@@ -500,6 +502,8 @@ function followingPostFromItem(
       item.linkUrl,
     linkLabel:
       item.linkLabel,
+    track:
+      null,
     status:
       "published",
     publishedAt:
@@ -508,6 +512,10 @@ function followingPostFromItem(
       null,
     updatedAt:
       item.publishedAt,
+    quotedPostId:
+      null,
+    quotedPost:
+      null,
     canonicalPath:
       item.canonicalPath,
   };
@@ -1004,23 +1012,27 @@ function FollowingActivity({
               </p>
             )}
 
+            {post?.track ? (
+              <PostTrackAttachment
+                track={post.track}
+                className="mt-4 max-w-[680px]"
+              />
+            ) : null}
+
+            {item.itemType === "post" && item.linkUrl ? (
+              <PostLinkAttachment
+                linkUrl={item.linkUrl}
+                linkLabel={item.linkLabel}
+                className="mt-4 block max-w-[680px]"
+              />
+            ) : null}
+
+
             {post?.quotedPost && (
               <QuotedPostCard
                 quotedPost={post.quotedPost}
                 className="mt-4 max-w-[680px]"
               />
-            )}
-
-            {item.itemType === "post" && item.linkUrl && (
-              <a
-                href={item.linkUrl}
-                target="_blank"
-                rel="noreferrer"
-                className="mt-3 inline-flex items-center gap-2 rounded-full border border-[var(--wk-border)] px-4 py-2 text-[11px] font-black text-[var(--wk-text)] hover:border-[var(--wk-brand)] hover:text-[var(--wk-brand)]"
-              >
-                {item.linkLabel || "Open Link"}
-                <i className="ri-external-link-line" aria-hidden="true" />
-              </a>
             )}
 
           </>
