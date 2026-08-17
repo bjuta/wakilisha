@@ -22,13 +22,27 @@ select
       and table_name='community_posts'
       and column_name='thread_position'
       and data_type='integer'
-  ) then 'PASS' else 'FAIL' end as thread_position_column;
+  ) then 'PASS' else 'FAIL' end as thread_position_column,
+  case when exists (
+    select 1
+    from pg_class relation
+    join pg_namespace namespace on namespace.oid=relation.relnamespace
+    where namespace.nspname='public'
+      and relation.relname='community_post_threads'
+      and relation.relrowsecurity
+  ) then 'PASS' else 'FAIL' end as thread_store_rls;
 
 select
   has_table_privilege('anon','private.community_post_drafts','select') as anon_can_read_drafts,
   has_table_privilege('authenticated','private.community_post_drafts','select') as authenticated_can_read_drafts,
   has_table_privilege('anon','public.community_post_threads','select') as anon_can_read_thread_table,
-  has_table_privilege('authenticated','public.community_post_threads','select') as authenticated_can_read_thread_table;
+  has_table_privilege('authenticated','public.community_post_threads','select') as authenticated_can_read_thread_table,
+  exists (
+    select 1
+    from pg_policy policy
+    where policy.schemaname='public'
+      and policy.tablename='community_post_threads'
+  ) as thread_table_has_browser_policy;
 
 select
   to_regprocedure('public.community_save_post_draft(uuid,uuid,integer,text,uuid,text,text,text,text,uuid,uuid)') is not null as save_draft_rpc,
@@ -51,6 +65,22 @@ where namespace.nspname='public'
     'community_posts_thread_id_fkey',
     'community_posts_thread_pair_check',
     'community_posts_thread_position_key'
+  )
+order by constraint_row.conname;
+
+select
+  constraint_row.conname,
+  constraint_row.condeferrable,
+  constraint_row.condeferred,
+  pg_get_constraintdef(constraint_row.oid) as definition
+from pg_constraint constraint_row
+join pg_class relation on relation.oid=constraint_row.conrelid
+join pg_namespace namespace on namespace.oid=relation.relnamespace
+where namespace.nspname='private'
+  and relation.relname='community_post_drafts'
+  and constraint_row.conname in (
+    'community_post_drafts_position_check',
+    'community_post_drafts_owner_group_position_key'
   )
 order by constraint_row.conname;
 
