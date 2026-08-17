@@ -85,6 +85,31 @@ where namespace.nspname='private'
 order by constraint_row.conname;
 
 select
+  schemaname,
+  tablename,
+  indexname
+from pg_indexes
+where (
+    schemaname='private'
+    and tablename='community_post_drafts'
+    and indexname in (
+      'community_post_drafts_artist_id_idx',
+      'community_post_drafts_person_resource_id_idx',
+      'community_post_drafts_quoted_post_id_idx',
+      'community_post_drafts_registry_track_id_idx'
+    )
+  )
+  or (
+    schemaname='public'
+    and tablename='community_post_threads'
+    and indexname in (
+      'community_post_threads_artist_id_idx',
+      'community_post_threads_person_resource_id_idx'
+    )
+  )
+order by schemaname,tablename,indexname;
+
+select
   function_signature,
   access_class
 from private.phase_0a_rpc_classification
