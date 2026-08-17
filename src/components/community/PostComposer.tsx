@@ -3,10 +3,20 @@ import {
   useRef,
   useState,
   type ChangeEvent,
+  type ClipboardEvent,
   type FormEvent,
 } from "react";
 import { WkIcon } from "@/components/design-system/Icon";
+import { Portal } from "@/components/base/Portal";
+import { useScrollLock } from "@/hooks/useScrollLock";
 import { QuotedPostCard } from "@/components/community/QuotedPostCard";
+import { PostLinkAttachment } from "@/components/community/PostLinkAttachment";
+import {
+  extractPostLinkFromText,
+  normalizePostLinkUrl,
+} from "@/services/community/postLinkPreview";
+import { PostTrackAttachment } from "@/components/community/PostTrackAttachment";
+import { PostTrackPicker } from "@/components/community/PostTrackPicker";
 import {
   editPost,
   publishPost,
@@ -14,6 +24,7 @@ import {
   type CommunityPost,
   type CommunityQuotedPost,
   type PostActor,
+  type PostTrack,
 } from "@/services/community/posts";
 import { uploadPostImage } from "@/services/community/postMedia";
 
@@ -38,32 +49,65 @@ export function PostComposer({
   const [open, setOpen] = useState(
     defaultOpen || Boolean(editingPost) || Boolean(quotedPost),
   );
+  const [mobileComposerViewport, setMobileComposerViewport] =
+    useState(() =>
+      typeof window !== "undefined"
+      && window.matchMedia("(max-width: 639px)").matches,
+    );
   const [body, setBody] = useState("");
   const [imageUrl, setImageUrl] = useState("");
   const [linkUrl, setLinkUrl] = useState("");
   const [linkLabel, setLinkLabel] = useState("");
-  const [showLink, setShowLink] = useState(false);
+  const [selectedTrack, setSelectedTrack] = useState<PostTrack | null>(null);
+  const [trackPickerOpen, setTrackPickerOpen] = useState(false);
   const [busy, setBusy] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const isEditing = Boolean(editingPost);
   const isQuoting = Boolean(quotedPost);
+  const hasContent = Boolean(
+    body.trim() ||
+    imageUrl.trim() ||
+    linkUrl.trim() ||
+    selectedTrack,
+  );
 
   const quotePresentation: CommunityQuotedPost | null =
     quotedPost
       ? {
           id: quotedPost.id,
           available: true,
+          unavailableReason: null,
+          actorType: quotedPost.actor.type,
           actor: quotedPost.actor,
           body: quotedPost.body,
           imageUrl: quotedPost.imageUrl,
           linkUrl: quotedPost.linkUrl,
           linkLabel: quotedPost.linkLabel,
+          track: quotedPost.track,
           publishedAt: quotedPost.publishedAt,
           canonicalPath: quotedPost.canonicalPath,
         }
       : editingPost?.quotedPost ?? null;
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+
+    const media = window.matchMedia("(max-width: 639px)");
+    const sync = () => {
+      setMobileComposerViewport(media.matches);
+    };
+
+    sync();
+    media.addEventListener("change", sync);
+
+    return () => {
+      media.removeEventListener("change", sync);
+    };
+  }, []);
+
+  useScrollLock(open && mobileComposerViewport);
 
   useEffect(() => {
     if (!editingPost) return;
@@ -72,7 +116,7 @@ export function PostComposer({
     setImageUrl(editingPost.imageUrl ?? "");
     setLinkUrl(editingPost.linkUrl ?? "");
     setLinkLabel(editingPost.linkLabel ?? "");
-    setShowLink(Boolean(editingPost.linkUrl || editingPost.linkLabel));
+    setSelectedTrack(editingPost.track);
   }, [editingPost]);
 
   function reset() {
@@ -80,7 +124,8 @@ export function PostComposer({
     setImageUrl("");
     setLinkUrl("");
     setLinkLabel("");
-    setShowLink(false);
+    setSelectedTrack(null);
+    setTrackPickerOpen(false);
     setError(null);
   }
 
@@ -110,10 +155,72 @@ export function PostComposer({
     }
   }
 
+  function promoteBodyLink(
+    nextBody: string,
+    requireTerminator: boolean,
+  ): boolean {
+    if (linkUrl.trim()) return false;
+
+    const extracted = extractPostLinkFromText(
+      nextBody,
+      requireTerminator,
+    );
+    if (!extracted) return false;
+
+    setBody(extracted.body);
+    setLinkUrl(extracted.linkUrl);
+    setLinkLabel("");
+    return true;
+  }
+
+  function handleBodyChange(
+    event: ChangeEvent<HTMLTextAreaElement>,
+  ) {
+    const nextBody = event.target.value;
+    if (promoteBodyLink(nextBody, true)) return;
+    setBody(nextBody);
+  }
+
+  function handleBodyBlur() {
+    void promoteBodyLink(body, false);
+  }
+
+  function handleBodyPaste(
+    event: ClipboardEvent<HTMLTextAreaElement>,
+  ) {
+    if (linkUrl.trim()) return;
+
+    const extracted = extractPostLinkFromText(
+      event.clipboardData.getData("text/plain"),
+      false,
+    );
+    if (!extracted) return;
+
+    event.preventDefault();
+
+    const target = event.currentTarget;
+    const start =
+      target.selectionStart ?? body.length;
+    const end =
+      target.selectionEnd ?? start;
+
+    const nextBody =
+      `${body.slice(0, start)}${extracted.body}${body.slice(end)}`;
+
+    setBody(nextBody);
+    setLinkUrl(extracted.linkUrl);
+    setLinkLabel("");
+  }
+
+  function removeLinkAttachment() {
+    setLinkUrl("");
+    setLinkLabel("");
+  }
+
   async function submit(event: FormEvent) {
     event.preventDefault();
     const cleanBody = body.trim();
-    if (!cleanBody || busy || uploading) return;
+    if (!hasContent || busy || uploading) return;
 
     setBusy(true);
     setError(null);
@@ -125,6 +232,7 @@ export function PostComposer({
             imageUrl: imageUrl.trim(),
             linkUrl: linkUrl.trim(),
             linkLabel: linkLabel.trim(),
+            registryTrackId: selectedTrack?.id ?? null,
           })
         : quotedPost
           ? await quotePost({
@@ -134,6 +242,7 @@ export function PostComposer({
               imageUrl: imageUrl.trim(),
               linkUrl: linkUrl.trim(),
               linkLabel: linkLabel.trim(),
+              registryTrackId: selectedTrack?.id ?? null,
             })
           : await publishPost({
               actor,
@@ -141,6 +250,7 @@ export function PostComposer({
               imageUrl: imageUrl.trim(),
               linkUrl: linkUrl.trim(),
               linkLabel: linkLabel.trim(),
+              registryTrackId: selectedTrack?.id ?? null,
             });
 
       reset();
@@ -181,15 +291,28 @@ export function PostComposer({
             <WkIcon name="Image" size={16} />
           </span>
           <span className="flex h-9 w-9 items-center justify-center rounded-full bg-[var(--wk-bg)] text-[var(--wk-text-muted)]">
-            <WkIcon name="Link2" size={16} />
+            <WkIcon name="Music" size={16} />
           </span>
         </span>
       </button>
     );
   }
 
-  return (
-    <div className="fixed inset-0 z-[160] h-[100dvh] max-h-[100dvh] overflow-hidden bg-[var(--wk-surface)] sm:static sm:h-auto sm:max-h-none sm:overflow-visible sm:rounded-3xl sm:border sm:border-[var(--wk-border)]">
+  const composerSurface = (
+    <div
+      role={mobileComposerViewport ? "dialog" : undefined}
+      aria-modal={mobileComposerViewport ? true : undefined}
+      aria-label={
+        mobileComposerViewport
+          ? isEditing
+            ? "Edit Post"
+            : isQuoting
+              ? "Quote Post"
+              : "Create Post"
+          : undefined
+      }
+      className="fixed inset-0 z-[160] h-[100dvh] max-h-[100dvh] overflow-hidden bg-[var(--wk-surface)] sm:static sm:h-auto sm:max-h-none sm:overflow-visible sm:rounded-3xl sm:border sm:border-[var(--wk-border)]"
+    >
       <form onSubmit={submit} className="flex h-full min-h-0 flex-col overflow-hidden sm:h-auto sm:overflow-visible">
         <div className="grid min-h-[52px] shrink-0 grid-cols-[1fr_auto_1fr] items-center border-b border-[var(--wk-divider)] px-3 pt-[env(safe-area-inset-top)] sm:flex sm:h-auto sm:min-h-0 sm:items-center sm:justify-between sm:border-b-0 sm:px-5 sm:pt-5">
           <button
@@ -207,7 +330,7 @@ export function PostComposer({
 
           <button
             type="submit"
-            disabled={busy || uploading || !body.trim()}
+            disabled={busy || uploading || !hasContent}
             className="justify-self-end rounded-full bg-[var(--wk-brand)] px-4 py-1.5 text-[11px] font-black text-[var(--wk-brand-on)] disabled:opacity-40 sm:hidden"
           >
             {busy ? "Posting..." : isEditing ? "Save" : isQuoting ? "Quote" : "Post"}
@@ -260,19 +383,14 @@ export function PostComposer({
               <textarea
                 autoFocus
                 value={body}
-                onChange={(event) => setBody(event.target.value)}
+                onChange={handleBodyChange}
+                onBlur={handleBodyBlur}
+                onPaste={handleBodyPaste}
                 rows={4}
                 maxLength={2000}
                 placeholder="What's happening?"
                 className="mt-2 min-h-[96px] max-h-[32dvh] w-full resize-none overflow-y-auto border-0 bg-transparent p-0 text-[17px] font-medium leading-[1.5] outline-none placeholder:text-[var(--wk-text-faint)] sm:mt-4 sm:min-h-[160px] sm:max-h-none sm:text-[17px]"
               />
-
-              {quotePresentation && (
-                <QuotedPostCard
-                  quotedPost={quotePresentation}
-                  className="mt-3"
-                />
-              )}
 
               <div className="mt-1 flex items-center gap-1 border-t border-[var(--wk-divider)] pt-2 sm:hidden">
                 <button
@@ -286,18 +404,19 @@ export function PostComposer({
                   <WkIcon name="Image" size={19} />
                 </button>
 
+
                 <button
                   type="button"
-                  onClick={() => setShowLink((current) => !current)}
-                  aria-label="Add Link"
-                  title="Link"
+                  onClick={() => setTrackPickerOpen(true)}
+                  aria-label="Add Track"
+                  title="Track"
                   className={`flex h-9 w-9 items-center justify-center rounded-full ${
-                    showLink
+                    selectedTrack
                       ? "bg-[var(--wk-brand-soft)] text-[var(--wk-brand)]"
                       : "text-[var(--wk-brand)] hover:bg-[var(--wk-brand-soft)]"
                   }`}
                 >
-                  <WkIcon name="Link2" size={19} />
+                  <WkIcon name="Music" size={19} />
                 </button>
 
                 {uploading && (
@@ -323,34 +442,49 @@ export function PostComposer({
             </div>
           )}
 
-          {showLink && (
-            <div className="ml-[52px] mt-3 grid gap-2 sm:ml-0 sm:mt-4 sm:grid-cols-2 sm:gap-3">
-              <label>
-                <span className="mb-1 block text-[10px] font-black uppercase tracking-[0.12em] text-[var(--wk-text-faint)]">
-                  Link
-                </span>
-                <input
-                  type="url"
-                  value={linkUrl}
-                  onChange={(event) => setLinkUrl(event.target.value)}
-                  placeholder="https://"
-                  className="w-full rounded-xl border border-[var(--wk-border)] bg-[var(--wk-bg)] px-3 py-2.5 text-[13px]"
-                />
-              </label>
-
-              <label>
-                <span className="mb-1 block text-[10px] font-black uppercase tracking-[0.12em] text-[var(--wk-text-faint)]">
-                  Link Label
-                </span>
-                <input
-                  value={linkLabel}
-                  onChange={(event) => setLinkLabel(event.target.value)}
-                  maxLength={120}
-                  placeholder="Listen, read, RSVP"
-                  className="w-full rounded-xl border border-[var(--wk-border)] bg-[var(--wk-bg)] px-3 py-2.5 text-[13px]"
-                />
-              </label>
+          {selectedTrack && (
+            <div className="relative ml-[52px] mt-3 sm:ml-0 sm:mt-4">
+              <PostTrackAttachment
+                track={selectedTrack}
+                compact
+                showActions={false}
+              />
+              <button
+                type="button"
+                onClick={() => setSelectedTrack(null)}
+                aria-label="Remove Track"
+                className="absolute right-2 top-2 flex h-8 w-8 items-center justify-center rounded-full bg-[var(--wk-surface)] text-[var(--wk-text-muted)] shadow-sm hover:text-[var(--wk-text)]"
+              >
+                <WkIcon name="X" size={14} />
+              </button>
             </div>
+          )}
+
+          {linkUrl.trim() ? (
+            <div className="relative ml-[52px] mt-3 sm:ml-0 sm:mt-4">
+              <PostLinkAttachment
+                linkUrl={linkUrl.trim()}
+                linkLabel={linkLabel.trim() || null}
+                interactive={false}
+                className="block"
+              />
+              <button
+                type="button"
+                onClick={removeLinkAttachment}
+                aria-label="Remove Link"
+                title="Remove Link"
+                className="absolute right-3 top-3 z-10 flex h-11 w-11 items-center justify-center rounded-full border border-[var(--wk-border)] bg-[var(--wk-surface)] text-[var(--wk-text)] shadow-lg transition-transform hover:scale-[1.03] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--wk-brand)]"
+              >
+                <WkIcon name="X" size={19} />
+              </button>
+            </div>
+          ) : null}
+
+                    {quotePresentation && (
+            <QuotedPostCard
+              quotedPost={quotePresentation}
+              className="ml-[52px] mt-3 sm:ml-0 sm:mt-4"
+            />
           )}
 
           <input
@@ -380,17 +514,18 @@ export function PostComposer({
               {uploading ? "Uploading..." : "Photo"}
             </button>
 
+
             <button
               type="button"
-              onClick={() => setShowLink((current) => !current)}
+              onClick={() => setTrackPickerOpen(true)}
               className={`flex h-10 items-center gap-2 rounded-full px-3 text-[11px] font-black ${
-                showLink
+                selectedTrack
                   ? "bg-[var(--wk-brand-soft)] text-[var(--wk-brand)]"
                   : "text-[var(--wk-text-muted)] hover:bg-[var(--wk-bg)]"
               }`}
             >
-              <WkIcon name="Link2" size={17} />
-              Link
+              <WkIcon name="Music" size={17} />
+              Track
             </button>
           </div>
 
@@ -405,7 +540,7 @@ export function PostComposer({
 
             <button
               type="submit"
-              disabled={busy || uploading || !body.trim()}
+              disabled={busy || uploading || !hasContent}
               className="rounded-full bg-[var(--wk-brand)] px-5 py-2 text-[11px] font-black text-[var(--wk-brand-on)] disabled:opacity-40"
             >
               {busy ? "Posting..." : isEditing ? "Save Post" : isQuoting ? "Quote Post" : "Post"}
@@ -413,6 +548,21 @@ export function PostComposer({
           </div>
         </div>
       </form>
+
+      {trackPickerOpen ? (
+        <PostTrackPicker
+          selectedTrackId={selectedTrack?.id}
+          onSelect={(track) => {
+            setSelectedTrack(track);
+            setTrackPickerOpen(false);
+          }}
+          onClose={() => setTrackPickerOpen(false)}
+        />
+      ) : null}
     </div>
   );
+
+  return mobileComposerViewport
+    ? <Portal>{composerSurface}</Portal>
+    : composerSurface;
 }

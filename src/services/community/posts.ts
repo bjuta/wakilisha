@@ -12,6 +12,21 @@ export type PostActor = {
   official: boolean;
 };
 
+export type PostTrack = {
+  id: string;
+  title: string;
+  artistName: string | null;
+  artistSlug: string | null;
+  artworkUrl: string | null;
+  previewUrl: string | null;
+  durationMs: number | null;
+  trackSlug: string | null;
+  releaseId: string | null;
+  releaseTitle: string | null;
+  releaseSlug: string | null;
+  canonicalPath: string | null;
+};
+
 export type CommunityQuotedPost = {
   id: string;
   available: boolean;
@@ -22,6 +37,7 @@ export type CommunityQuotedPost = {
   imageUrl: string | null;
   linkUrl: string | null;
   linkLabel: string | null;
+  track: PostTrack | null;
   publishedAt: string | null;
   canonicalPath: string | null;
 };
@@ -35,6 +51,7 @@ export type CommunityPost = {
   imageUrl: string | null;
   linkUrl: string | null;
   linkLabel: string | null;
+  track: PostTrack | null;
   status: "published" | "withdrawn";
   publishedAt: string;
   withdrawnAt: string | null;
@@ -74,8 +91,50 @@ function readString(record: JsonRecord | null, key: string): string | null {
   return clean || null;
 }
 
+function readBody(record: JsonRecord | null): string | null {
+  const value = record?.body;
+  return typeof value === "string" ? value.trim() : null;
+}
+
+function readNumber(record: JsonRecord | null, key: string): number | null {
+  const value = record?.[key];
+  return typeof value === "number" && Number.isFinite(value)
+    ? value
+    : null;
+}
+
 function isActorType(value: string): value is PostActorType {
   return value === "person" || value === "artist";
+}
+
+export function mapPostTrack(value: unknown): PostTrack | null {
+  const record = asRecord(value);
+  const id = readString(record, "id");
+  const title = readString(record, "title");
+  const canonicalPath = readString(record, "canonical_path");
+
+  if (!record || !id || !title) {
+    return null;
+  }
+
+  if (canonicalPath && !canonicalPath.startsWith("/")) {
+    return null;
+  }
+
+  return {
+    id,
+    title,
+    artistName: readString(record, "artist_name"),
+    artistSlug: readString(record, "artist_slug"),
+    artworkUrl: readString(record, "artwork_url"),
+    previewUrl: readString(record, "preview_url"),
+    durationMs: readNumber(record, "duration_ms"),
+    trackSlug: readString(record, "track_slug"),
+    releaseId: readString(record, "release_id"),
+    releaseTitle: readString(record, "release_title"),
+    releaseSlug: readString(record, "release_slug"),
+    canonicalPath,
+  };
 }
 
 export function mapPostActor(value: unknown): PostActor | null {
@@ -139,28 +198,44 @@ export function mapCommunityQuotedPost(
       imageUrl: null,
       linkUrl: null,
       linkLabel: null,
+      track: null,
       publishedAt: null,
       canonicalPath: null,
     };
   }
 
   const actor = mapPostActor(record.actor);
-  const body = readString(record, "body");
+  const body = readBody(record);
+  const imageUrl = readString(record, "image_url");
+  const linkUrl = readString(record, "link_url");
+  const track = record.track == null
+    ? null
+    : mapPostTrack(record.track);
   const publishedAt = readString(record, "published_at");
   const canonicalPath = readString(record, "canonical_path");
 
-  if (!actor || !body || !publishedAt || !canonicalPath) {
+  if (
+    !actor ||
+    body == null ||
+    !publishedAt ||
+    !canonicalPath ||
+    (record.track != null && !track) ||
+    !(body.trim() || imageUrl || linkUrl || track)
+  ) {
     return null;
   }
 
   return {
     id,
     available: true,
+    unavailableReason: null,
+    actorType: actor.type,
     actor,
     body,
-    imageUrl: readString(record, "image_url"),
-    linkUrl: readString(record, "link_url"),
+    imageUrl,
+    linkUrl,
     linkLabel: readString(record, "link_label"),
+    track,
     publishedAt,
     canonicalPath,
   };
@@ -172,7 +247,12 @@ export function mapCommunityPost(value: unknown): CommunityPost | null {
   const id = readString(record, "id");
   const actorType = readString(record, "actor_type");
   const actorId = readString(record, "actor_id");
-  const body = readString(record, "body");
+  const body = readBody(record);
+  const imageUrl = readString(record, "image_url");
+  const linkUrl = readString(record, "link_url");
+  const track = record?.track == null
+    ? null
+    : mapPostTrack(record.track);
   const status = readString(record, "status");
   const publishedAt = readString(record, "published_at");
   const updatedAt = readString(record, "updated_at");
@@ -180,7 +260,10 @@ export function mapCommunityPost(value: unknown): CommunityPost | null {
 
   if (
     !record || !actor || !id || !actorType || !isActorType(actorType) ||
-    !actorId || !body || (status !== "published" && status !== "withdrawn") ||
+    !actorId || body == null ||
+    (record.track != null && !track) ||
+    !(body.trim() || imageUrl || linkUrl || track) ||
+    (status !== "published" && status !== "withdrawn") ||
     !publishedAt || !updatedAt || !canonicalPath
   ) {
     return null;
@@ -208,9 +291,10 @@ export function mapCommunityPost(value: unknown): CommunityPost | null {
     actorId,
     actor,
     body,
-    imageUrl: readString(record, "image_url"),
-    linkUrl: readString(record, "link_url"),
+    imageUrl,
+    linkUrl,
     linkLabel: readString(record, "link_label"),
+    track,
     status,
     publishedAt,
     withdrawnAt: readString(record, "withdrawn_at"),
@@ -238,6 +322,7 @@ export async function publishPost(input: {
   imageUrl: string;
   linkUrl: string;
   linkLabel: string;
+  registryTrackId?: string | null;
 }): Promise<CommunityPost> {
   const data = await rpc("community_publish_post", {
     p_actor_type: input.actor.type,
@@ -246,6 +331,7 @@ export async function publishPost(input: {
     p_image_url: input.imageUrl || null,
     p_link_url: input.linkUrl || null,
     p_link_label: input.linkLabel || null,
+    p_registry_track_id: input.registryTrackId || null,
   });
   const post = mapCommunityPost(data);
   if (!post) throw new Error("Post returned an invalid publish response.");
@@ -259,6 +345,7 @@ export async function quotePost(input: {
   imageUrl: string;
   linkUrl: string;
   linkLabel: string;
+  registryTrackId?: string | null;
 }): Promise<CommunityPost> {
   const data = await rpc("community_quote_post", {
     p_actor_type: input.actor.type,
@@ -268,6 +355,7 @@ export async function quotePost(input: {
     p_image_url: input.imageUrl || null,
     p_link_url: input.linkUrl || null,
     p_link_label: input.linkLabel || null,
+    p_registry_track_id: input.registryTrackId || null,
   });
   const post = mapCommunityPost(data);
   if (!post) throw new Error("Post returned an invalid Quote Post response.");
@@ -453,6 +541,7 @@ export async function editPost(input: {
   imageUrl: string;
   linkUrl: string;
   linkLabel: string;
+  registryTrackId?: string | null;
 }): Promise<CommunityPost> {
   const data = await rpc("community_edit_post", {
     p_post_id: input.postId,
@@ -460,6 +549,7 @@ export async function editPost(input: {
     p_image_url: input.imageUrl || null,
     p_link_url: input.linkUrl || null,
     p_link_label: input.linkLabel || null,
+    p_registry_track_id: input.registryTrackId || null,
   });
   const post = mapCommunityPost(data);
   if (!post) throw new Error("Post returned an invalid edit response.");

@@ -10,6 +10,8 @@ import {
 } from "@/components/design-system/Icon";
 import { PostActions } from "@/components/community/PostActions";
 import { QuotedPostCard } from "@/components/community/QuotedPostCard";
+import { PostLinkAttachment } from "@/components/community/PostLinkAttachment";
+import { PostTrackAttachment } from "@/components/community/PostTrackAttachment";
 import { usePostInteractionState } from "@/hooks/usePostInteractionState";
 import {
   listArtistPosts,
@@ -197,16 +199,18 @@ export function ArtistPostsTimeline({
                       </div>
                     </div>
 
-                    <p className="mt-4 whitespace-pre-wrap text-[16px] font-semibold leading-[1.55] tracking-[-0.01em] text-[var(--wk-text)] md:text-[18px]">
-                      {post.body}
-                    </p>
+                    {post.body ? (
+                      <p className="mt-4 whitespace-pre-wrap text-[16px] font-semibold leading-[1.55] tracking-[-0.01em] text-[var(--wk-text)] md:text-[18px]">
+                        {post.body}
+                      </p>
+                    ) : null}
 
-                    {post.quotedPost && (
-                      <QuotedPostCard
-                        quotedPost={post.quotedPost}
+                    {post.track ? (
+                      <PostTrackAttachment
+                        track={post.track}
                         className="mt-4"
                       />
-                    )}
+                    ) : null}
 
                     {post.imageUrl ? (
                       <Link
@@ -223,20 +227,20 @@ export function ArtistPostsTimeline({
                     ) : null}
 
                     {post.linkUrl ? (
-                      <a
-                        href={post.linkUrl}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="mt-4 inline-flex items-center gap-2 rounded-full border border-[var(--wk-border)] px-4 py-2 text-[11px] font-black text-[var(--wk-text)] transition-colors hover:border-[var(--wk-brand)] hover:text-[var(--wk-brand)]"
-                      >
-                        {post.linkLabel ||
-                          "Open Link"}
-                        <WkIcon
-                          name="ExternalLink"
-                          size={13}
-                        />
-                      </a>
+                      <PostLinkAttachment
+                        linkUrl={post.linkUrl}
+                        linkLabel={post.linkLabel}
+                        className="mt-4 block"
+                      />
                     ) : null}
+
+
+                    {post.quotedPost && (
+                      <QuotedPostCard
+                        quotedPost={post.quotedPost}
+                        className="mt-4"
+                      />
+                    )}
 
                     <PostActions
                       post={post}
