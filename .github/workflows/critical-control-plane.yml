@@ -71,7 +71,10 @@ jobs:
         run: npm run test:critical
 
       - name: Enforce Post draft and authored Thread authority
-        run: npx vitest run test/community/post-drafts-authored-threads-m8c3.test.ts
+        run: >-
+          npx vitest run
+          test/community/post-drafts-authored-threads-m8c3.test.ts
+          test/community/post-thread-presentation-m8c3.test.ts
 
       - name: Enforce public anonymous read authority and Edge runtime
         run: >-
