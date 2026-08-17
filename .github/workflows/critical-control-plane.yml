@@ -78,6 +78,7 @@ jobs:
           test/community/post-thread-detail-m8c3.test.ts
           test/community/post-drafts-thread-composer-m8c3.test.ts
           test/community/post-thread-affordance-m8c3.test.ts
+          test/community/post-thread-publish-actor-resolution-m8c3.test.ts
 
       - name: Enforce public anonymous read authority and Edge runtime
         run: >-
