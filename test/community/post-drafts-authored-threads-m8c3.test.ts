@@ -13,6 +13,10 @@ const rlsHardeningMigration = readFileSync(
   "supabase/migrations/20260817192000_post_thread_rls_hardening.sql",
   "utf8",
 );
+const fkIndexMigration = readFileSync(
+  "supabase/migrations/20260817193000_post_draft_thread_fk_indexes.sql",
+  "utf8",
+);
 const verifier = readFileSync(
   "scripts/control-plane/verify-post-drafts-authored-threads.sql",
   "utf8",
@@ -134,6 +138,20 @@ describe("WAKILISHA M8C.3 Post drafts and authored Threads", () => {
     expect(verifier).toContain("community_post_drafts_owner_group_position_key");
   });
 
+  it("covers every new M8C.3 foreign key with a dedicated index", () => {
+    for (const indexName of [
+      "community_post_drafts_artist_id_idx",
+      "community_post_drafts_person_resource_id_idx",
+      "community_post_drafts_quoted_post_id_idx",
+      "community_post_drafts_registry_track_id_idx",
+      "community_post_threads_artist_id_idx",
+      "community_post_threads_person_resource_id_idx",
+    ]) {
+      expect(fkIndexMigration).toContain(`create index ${indexName}`);
+      expect(verifier).toContain(indexName);
+    }
+  });
+
   it("supports owner-scoped save, read, delete, reorder, and publish commands", () => {
     expect(migration).toContain("community_save_post_draft");
     expect(migration).toContain("community_get_post_drafts");
@@ -163,5 +181,7 @@ describe("WAKILISHA M8C.3 Post drafts and authored Threads", () => {
     expect(orderHardeningMigration).not.toContain("–");
     expect(rlsHardeningMigration).not.toContain("—");
     expect(rlsHardeningMigration).not.toContain("–");
+    expect(fkIndexMigration).not.toContain("—");
+    expect(fkIndexMigration).not.toContain("–");
   });
 });
