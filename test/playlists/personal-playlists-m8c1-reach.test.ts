@@ -36,7 +36,7 @@ const chartMobile = read("src/pages/mobile/charts/edition/page.tsx");
 const posts = read("src/services/community/posts.ts");
 const personalPlaylistService = read("src/services/playlists/personalPlaylistService.ts");
 const releaseSaveButton = read("src/components/releases/ReleaseSaveButton.tsx");
-const duplicateConfirmationMigration = read("supabase/migrations/20260816143000_personal_playlist_duplicate_track_confirmation.sql");
+const duplicateConfirmationMigration = read("supabase/migrations/20260816185425_personal_playlist_duplicate_track_confirmation.sql");
 
 describe("M8C.1 Track curation reach", () => {
   it("keeps Add to Playlist bound to canonical Registry Track identity", () => {

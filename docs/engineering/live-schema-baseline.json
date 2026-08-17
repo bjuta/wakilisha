@@ -5,5 +5,5 @@
   "typesSha256": "b50adc60d559694df0fc351ffd7a74fb8c74782c83296828ac3b66f5f6fb670f",
   "authoritativeMigrationDirectory": "supabase/migrations",
   "migrationCount": 15,
-  "latestMigration": "20260816200500_correct_valle_release_featured_credit.sql"
+  "latestMigration": "20260816202232_correct_valle_release_featured_credit.sql"
 }

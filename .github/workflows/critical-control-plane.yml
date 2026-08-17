@@ -70,7 +70,7 @@ jobs:
       - name: Run critical security and lifecycle tests
         run: npm run test:critical
 
-      - name: Detect live schema drift
+      - name: Detect live schema and migration-history drift
         run: npm run schema:verify
 
       - name: Build application

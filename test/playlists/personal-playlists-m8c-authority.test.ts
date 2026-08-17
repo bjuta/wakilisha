@@ -13,7 +13,7 @@ const migration = readFileSync(
 );
 
 const duplicateConfirmationMigration = readFileSync(
-  "supabase/migrations/20260816143000_personal_playlist_duplicate_track_confirmation.sql",
+  "supabase/migrations/20260816185425_personal_playlist_duplicate_track_confirmation.sql",
   "utf8",
 );
 

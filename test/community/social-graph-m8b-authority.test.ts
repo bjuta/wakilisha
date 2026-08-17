@@ -8,7 +8,7 @@ import {
 } from "vitest";
 
 const migration = readFileSync(
-  "supabase/migrations/20260816083500_community_social_graph_m8b_authority.sql",
+  "supabase/migrations/20260816083329_community_social_graph_m8b_authority.sql",
   "utf8",
 );
 
