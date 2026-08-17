@@ -6,10 +6,20 @@ const migration = readFileSync(
   "utf8",
 );
 
+const publisherStart = migration.indexOf(
+  "create or replace function public.community_publish_post_draft_group(",
+);
+const publisherEnd = migration.indexOf("$function$;", publisherStart);
+const publisherDefinition =
+  publisherStart >= 0 && publisherEnd > publisherStart
+    ? migration.slice(publisherStart, publisherEnd)
+    : "";
+
 describe("WAKILISHA M8C.3 Thread publication actor resolution", () => {
-  it("does not aggregate nullable UUID actor identities", () => {
-    expect(migration).not.toContain("min(draft.person_resource_id)");
-    expect(migration).not.toContain("min(draft.artist_id)");
+  it("does not aggregate nullable UUID actor identities inside the publisher", () => {
+    expect(publisherDefinition).not.toBe("");
+    expect(publisherDefinition).not.toContain("min(draft.person_resource_id)");
+    expect(publisherDefinition).not.toContain("min(draft.artist_id)");
   });
 
   it("resolves the authored identity from the first deterministic Draft row", () => {

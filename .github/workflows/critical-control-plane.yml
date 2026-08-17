@@ -87,6 +87,7 @@ jobs:
           test/security/public-anon-content.test.ts
           test/security/public-edge-runtime.test.ts
           test/security/configured-supabase-csp.test.ts
+          test/security/configured-public-content-edge-origin.test.ts
 
       - name: Detect live schema and migration-history drift
         run: npm run schema:verify

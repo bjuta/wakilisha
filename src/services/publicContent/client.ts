@@ -1,6 +1,7 @@
 import { deepDecode } from "@/utils/decodeHtmlEntities";
 import { withPlaceholderImage } from "@/utils/imagePlaceholders";
 import { supabase } from "@/lib/supabase";
+import { resolvePublicContentApiBase } from "@/services/publicContent/runtimeBase";
 import { releaseUrl, slugify } from "@/utils/releaseUrl";
 import { normalizeGenres } from "@/services/publicContent/genreNormalization";
 import {
@@ -282,9 +283,10 @@ export async function getArtistAppearsOn(
 const SUPABASE_URL = (import.meta.env.VITE_PUBLIC_SUPABASE_URL as string) || "";
 const SUPABASE_ANON_KEY = (import.meta.env.VITE_PUBLIC_SUPABASE_ANON_KEY as string) || "";
 
-const API_BASE =
-  (import.meta.env.VITE_PUBLIC_API_BASE as string | undefined) ||
-  (SUPABASE_URL ? `${SUPABASE_URL}/functions/v1/public-content-read` : "/api/v1");
+const API_BASE = resolvePublicContentApiBase(
+  SUPABASE_URL,
+  import.meta.env.VITE_PUBLIC_API_BASE as string | undefined,
+);
 
 type Envelope<T> = {
   data: T;
