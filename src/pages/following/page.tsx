@@ -516,6 +516,12 @@ function followingPostFromItem(
       null,
     quotedPost:
       null,
+    threadId:
+      null,
+    threadPosition:
+      null,
+    threadItemCount:
+      null,
     canonicalPath:
       item.canonicalPath,
   };
@@ -1034,6 +1040,20 @@ function FollowingActivity({
                 className="mt-4 max-w-[680px]"
               />
             )}
+
+            {post?.threadId &&
+            post.threadItemCount != null &&
+            post.threadItemCount > 1 ? (
+              <Link
+                to={post.canonicalPath}
+                aria-label={`View Thread with ${post.threadItemCount} Posts`}
+                className="mt-4 inline-flex items-center gap-1.5 text-[12px] font-black text-[var(--wk-brand)] transition-colors hover:text-[var(--wk-text)]"
+              >
+                <span>Thread</span>
+                <span aria-hidden="true">·</span>
+                <span>{post.threadItemCount} Posts</span>
+              </Link>
+            ) : null}
 
           </>
         ) : (

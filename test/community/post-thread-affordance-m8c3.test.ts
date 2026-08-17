@@ -5,6 +5,14 @@ const migration = readFileSync(
   "supabase/migrations/20260817194000_post_thread_item_count.sql",
   "utf8",
 );
+const postsService = readFileSync(
+  "src/services/community/posts.ts",
+  "utf8",
+);
+const followingPage = readFileSync(
+  "src/pages/following/page.tsx",
+  "utf8",
+);
 
 describe("WAKILISHA M8C.3 Thread feed affordance", () => {
   it("extends the canonical Post payload instead of adding a second Thread read per feed item", () => {
@@ -30,8 +38,26 @@ describe("WAKILISHA M8C.3 Thread feed affordance", () => {
     expect(migration).toContain("published item count");
   });
 
+  it("maps Thread identity and item count through the canonical Post client", () => {
+    expect(postsService).toContain("threadId: string | null");
+    expect(postsService).toContain("threadPosition: number | null");
+    expect(postsService).toContain("threadItemCount: number | null");
+    expect(postsService).toContain('readString(record, "thread_id")');
+    expect(postsService).toContain('readNumber(record, "thread_item_count")');
+  });
+
+  it("reveals collapsed Threads in Following without expanding every Thread item", () => {
+    expect(followingPage).toContain("post.threadItemCount > 1");
+    expect(followingPage).toContain("<span>Thread</span>");
+    expect(followingPage).toContain("<span>{post.threadItemCount} Posts</span>");
+    expect(followingPage).toContain("to={post.canonicalPath}");
+    expect(followingPage).not.toContain("getPostThreadContext(post.id)");
+  });
+
   it("keeps runtime copy punctuation clean", () => {
     expect(migration).not.toContain("—");
     expect(migration).not.toContain("–");
+    expect(followingPage).not.toContain("Thread —");
+    expect(followingPage).not.toContain("Thread –");
   });
 });
