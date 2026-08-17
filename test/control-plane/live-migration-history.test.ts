@@ -4,6 +4,7 @@ import {
 import {
   readFileSync,
   existsSync,
+  readdirSync,
 } from "node:fs";
 import {
   describe,
@@ -118,7 +119,7 @@ describe(
     );
 
     it(
-      "keeps historical tests and the live baseline pinned to production-recorded timestamps",
+      "keeps historical tests and the live baseline aligned with repository migration authority",
       () => {
         const expectedReferences = [
           [
@@ -170,16 +171,36 @@ describe(
             ),
           );
 
+        const migrationFiles =
+          readdirSync(
+            "supabase/migrations",
+          )
+            .filter(
+              (name) =>
+                /^\d{14}_.+\.sql$/.test(
+                  name,
+                ),
+            )
+            .sort();
+
+        expect(
+          migrationFiles.length,
+        ).toBeGreaterThan(
+          0,
+        );
+
         expect(
           baseline.migrationCount,
         ).toBe(
-          15,
+          migrationFiles.length,
         );
 
         expect(
           baseline.latestMigration,
         ).toBe(
-          "20260816202232_correct_valle_release_featured_credit.sql",
+          migrationFiles.at(
+            -1,
+          ),
         );
       },
     );
