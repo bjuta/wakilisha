@@ -14,6 +14,7 @@ import {
 import { MetaTags } from "@/components/seo/MetaTags";
 import { PostComposer } from "@/components/community/PostComposer";
 import { PostActions } from "@/components/community/PostActions";
+import { PostBody } from "@/components/community/PostBody";
 import { QuotedPostCard } from "@/components/community/QuotedPostCard";
 import { PostLinkAttachment } from "@/components/community/PostLinkAttachment";
 import { PostTrackAttachment } from "@/components/community/PostTrackAttachment";
@@ -496,6 +497,8 @@ function followingPostFromItem(
     body:
       item.summary ||
       item.title,
+    mentions:
+      [],
     imageUrl:
       item.imageUrl,
     linkUrl:
@@ -1012,11 +1015,19 @@ function FollowingActivity({
           item.itemType === "post"
         ) ? (
           <>
-            {item.summary && (
+            {item.itemType === "post" && post?.body ? (
+              <PostBody
+                body={post.body}
+                mentions={post.mentions}
+                canonicalPath={post.canonicalPath}
+                openLabel={`Open Post from ${post.actor.name}`}
+                className="max-w-[680px] whitespace-pre-wrap text-[18px] font-semibold leading-[1.55] tracking-[-0.015em] text-[var(--wk-text)] md:text-[21px]"
+              />
+            ) : item.summary ? (
               <p className="max-w-[680px] whitespace-pre-wrap text-[18px] font-semibold leading-[1.55] tracking-[-0.015em] text-[var(--wk-text)] md:text-[21px]">
                 {item.summary}
               </p>
-            )}
+            ) : null}
 
             {post?.track ? (
               <PostTrackAttachment

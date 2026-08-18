@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { PostActions } from "@/components/community/PostActions";
+import { PostBody } from "@/components/community/PostBody";
 import { QuotedPostCard } from "@/components/community/QuotedPostCard";
 import { PostTrackAttachment } from "@/components/community/PostTrackAttachment";
 import { PostLinkAttachment } from "@/components/community/PostLinkAttachment";
@@ -146,9 +147,11 @@ export function PostDetailSurface({ post }: { post: CommunityPost }) {
 
               <div className="ml-[60px]">
                 {item.body ? (
-                  <p className="mt-5 whitespace-pre-wrap text-[19px] font-semibold leading-[1.55] tracking-[-0.015em] text-[var(--wk-text)] md:text-[22px]">
-                    {item.body}
-                  </p>
+                  <PostBody
+                    body={item.body}
+                    mentions={item.mentions}
+                    className="mt-5 whitespace-pre-wrap text-[19px] font-semibold leading-[1.55] tracking-[-0.015em] text-[var(--wk-text)] md:text-[22px]"
+                  />
                 ) : null}
 
                 {item.track ? (

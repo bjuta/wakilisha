@@ -6,11 +6,13 @@ import {
   type ChangeEvent,
   type ClipboardEvent,
   type FormEvent,
+  type KeyboardEvent,
 } from "react";
 import { WkIcon } from "@/components/design-system/Icon";
 import { Portal } from "@/components/base/Portal";
 import { useScrollLock } from "@/hooks/useScrollLock";
 import { QuotedPostCard } from "@/components/community/QuotedPostCard";
+import { PostMentionSuggestions } from "@/components/community/PostMentionSuggestions";
 import { PostLinkAttachment } from "@/components/community/PostLinkAttachment";
 import { PostDraftsDialog } from "@/components/community/PostDraftsDialog";
 import {
@@ -34,6 +36,15 @@ import {
   type CommunityPostDraft,
 } from "@/services/community/postDrafts";
 import { uploadPostImage } from "@/services/community/postMedia";
+import {
+  searchPostMentionSuggestions,
+  type PostMentionSuggestion,
+} from "@/services/community/mentionSuggestions";
+import {
+  applyPostMentionSuggestion,
+  findPostMentionComposerQuery,
+  type PostMentionComposerQuery,
+} from "@/services/community/postMentionComposer";
 
 function quotedPostPresentation(post: CommunityPost): CommunityQuotedPost {
   return {
@@ -43,6 +54,7 @@ function quotedPostPresentation(post: CommunityPost): CommunityQuotedPost {
     actorType: post.actor.type,
     actor: post.actor,
     body: post.body,
+    mentions: post.mentions,
     imageUrl: post.imageUrl,
     linkUrl: post.linkUrl,
     linkLabel: post.linkLabel,
@@ -81,6 +93,8 @@ export function PostComposer({
   onError?: (message: string) => void;
 }) {
   const inputRef = useRef<HTMLInputElement>(null);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const mentionRequestRef = useRef(0);
   const [open, setOpen] = useState(
     defaultOpen || Boolean(editingPost) || Boolean(quotedPost),
   );
@@ -106,6 +120,12 @@ export function PostComposer({
   const [draftBusy, setDraftBusy] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [mentionQuery, setMentionQuery] =
+    useState<PostMentionComposerQuery | null>(null);
+  const [mentionSuggestions, setMentionSuggestions] =
+    useState<PostMentionSuggestion[]>([]);
+  const [mentionLoading, setMentionLoading] = useState(false);
+  const [mentionActiveIndex, setMentionActiveIndex] = useState(0);
 
   const isEditing = Boolean(editingPost);
   const activeQuotedPost = quotedPostDetached ? null : quotedPost;
@@ -163,6 +183,43 @@ export function PostComposer({
     setQuotedPostDetached(false);
   }, [quotedPost?.id]);
 
+  useEffect(() => {
+    const query = mentionQuery?.query ?? "";
+    const requestId = ++mentionRequestRef.current;
+
+    if (!query) {
+      setMentionSuggestions([]);
+      setMentionLoading(false);
+      setMentionActiveIndex(0);
+      return;
+    }
+
+    setMentionLoading(true);
+
+    const timer = window.setTimeout(() => {
+      void searchPostMentionSuggestions(query)
+        .then((suggestions) => {
+          if (mentionRequestRef.current !== requestId) return;
+          setMentionSuggestions(suggestions);
+          setMentionActiveIndex(0);
+        })
+        .catch(() => {
+          if (mentionRequestRef.current !== requestId) return;
+          setMentionSuggestions([]);
+          setMentionActiveIndex(0);
+        })
+        .finally(() => {
+          if (mentionRequestRef.current === requestId) {
+            setMentionLoading(false);
+          }
+        });
+    }, 140);
+
+    return () => {
+      window.clearTimeout(timer);
+    };
+  }, [mentionQuery?.query]);
+
   useScrollLock(open && mobileComposerViewport);
 
   useEffect(() => {
@@ -183,6 +240,10 @@ export function PostComposer({
     setSelectedTrack(null);
     setTrackPickerOpen(false);
     setDraftQuotedPost(null);
+    setMentionQuery(null);
+    setMentionSuggestions([]);
+    setMentionLoading(false);
+    setMentionActiveIndex(0);
     setError(null);
   }
 
@@ -372,16 +433,104 @@ export function PostComposer({
     return true;
   }
 
+  function syncMentionComposer(
+    nextBody: string,
+    caret: number | null,
+  ) {
+    const nextQuery =
+      findPostMentionComposerQuery(nextBody, caret);
+    setMentionQuery(nextQuery);
+
+    if (!nextQuery) {
+      setMentionSuggestions([]);
+      setMentionLoading(false);
+      setMentionActiveIndex(0);
+    }
+  }
+
   function handleBodyChange(
     event: ChangeEvent<HTMLTextAreaElement>,
   ) {
     const nextBody = event.target.value;
-    if (promoteBodyLink(nextBody, true)) return;
+    const caret = event.target.selectionStart;
+    if (promoteBodyLink(nextBody, true)) {
+      setMentionQuery(null);
+      setMentionSuggestions([]);
+      return;
+    }
     setBody(nextBody);
+    syncMentionComposer(nextBody, caret);
   }
 
   function handleBodyBlur() {
     void promoteBodyLink(body, false);
+    setMentionQuery(null);
+    setMentionSuggestions([]);
+  }
+
+  function handleMentionSelect(
+    suggestion: PostMentionSuggestion,
+  ) {
+    if (!mentionQuery) return;
+
+    const next = applyPostMentionSuggestion(
+      body,
+      mentionQuery,
+      suggestion.handle,
+    );
+
+    setBody(next.body);
+    setMentionQuery(null);
+    setMentionSuggestions([]);
+    setMentionActiveIndex(0);
+
+    window.requestAnimationFrame(() => {
+      textareaRef.current?.focus();
+      textareaRef.current?.setSelectionRange(
+        next.caret,
+        next.caret,
+      );
+    });
+  }
+
+  function handleMentionKeyDown(
+    event: KeyboardEvent<HTMLTextAreaElement>,
+  ) {
+    if (!mentionQuery) return;
+
+    if (event.key === "Escape") {
+      event.preventDefault();
+      setMentionQuery(null);
+      setMentionSuggestions([]);
+      return;
+    }
+
+    if (mentionSuggestions.length === 0) return;
+
+    if (event.key === "ArrowDown") {
+      event.preventDefault();
+      setMentionActiveIndex((current) =>
+        (current + 1) % mentionSuggestions.length
+      );
+      return;
+    }
+
+    if (event.key === "ArrowUp") {
+      event.preventDefault();
+      setMentionActiveIndex((current) =>
+        (current - 1 + mentionSuggestions.length)
+        % mentionSuggestions.length
+      );
+      return;
+    }
+
+    if (event.key === "Enter") {
+      const suggestion =
+        mentionSuggestions[mentionActiveIndex];
+      if (!suggestion) return;
+      event.preventDefault();
+      handleMentionSelect(suggestion);
+    }
   }
 
   function handleBodyPaste(
@@ -407,6 +556,10 @@ export function PostComposer({
     setBody(nextBody);
     setLinkUrl(extracted.linkUrl);
     setLinkLabel("");
+    syncMentionComposer(
+      nextBody,
+      start + extracted.body.length,
+    );
   }
 
   function removeLinkAttachment() {
@@ -680,17 +833,33 @@ export function PostComposer({
                 </div>
               </div>
 
-              <textarea
-                autoFocus
-                value={body}
-                onChange={handleBodyChange}
-                onBlur={handleBodyBlur}
-                onPaste={handleBodyPaste}
-                rows={4}
-                maxLength={2000}
-                placeholder={threadMode ? "Continue the Thread..." : "What's happening?"}
-                className="mt-2 min-h-[96px] max-h-[32dvh] w-full resize-none overflow-y-auto border-0 bg-transparent p-0 text-[17px] font-medium leading-[1.5] outline-none placeholder:text-[var(--wk-text-faint)] sm:mt-4 sm:min-h-[160px] sm:max-h-none sm:text-[17px]"
-              />
+              <div className="relative">
+                <textarea
+                  ref={textareaRef}
+                  autoFocus
+                  value={body}
+                  onChange={handleBodyChange}
+                  onBlur={handleBodyBlur}
+                  onPaste={handleBodyPaste}
+                  onKeyDown={handleMentionKeyDown}
+                  rows={4}
+                  maxLength={2000}
+                  placeholder={threadMode ? "Continue the Thread..." : "What's happening?"}
+                  aria-autocomplete="list"
+                  aria-expanded={Boolean(mentionQuery)}
+                  className="mt-2 min-h-[96px] max-h-[32dvh] w-full resize-none overflow-y-auto border-0 bg-transparent p-0 text-[17px] font-medium leading-[1.5] outline-none placeholder:text-[var(--wk-text-faint)] sm:mt-4 sm:min-h-[160px] sm:max-h-none sm:text-[17px]"
+                />
+
+                {mentionQuery ? (
+                  <PostMentionSuggestions
+                    query={mentionQuery.query}
+                    suggestions={mentionSuggestions}
+                    loading={mentionLoading}
+                    activeIndex={mentionActiveIndex}
+                    onSelect={handleMentionSelect}
+                  />
+                ) : null}
+              </div>
 
               <div className="mt-1 flex flex-wrap items-center gap-1 border-t border-[var(--wk-divider)] pt-2 sm:hidden">
                 <button

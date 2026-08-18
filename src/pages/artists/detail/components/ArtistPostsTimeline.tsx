@@ -9,6 +9,7 @@ import {
   WkIcon,
 } from "@/components/design-system/Icon";
 import { PostActions } from "@/components/community/PostActions";
+import { PostBody } from "@/components/community/PostBody";
 import { QuotedPostCard } from "@/components/community/QuotedPostCard";
 import { PostLinkAttachment } from "@/components/community/PostLinkAttachment";
 import { PostTrackAttachment } from "@/components/community/PostTrackAttachment";
@@ -200,9 +201,13 @@ export function ArtistPostsTimeline({
                     </div>
 
                     {post.body ? (
-                      <p className="mt-4 whitespace-pre-wrap text-[16px] font-semibold leading-[1.55] tracking-[-0.01em] text-[var(--wk-text)] md:text-[18px]">
-                        {post.body}
-                      </p>
+                      <PostBody
+                        body={post.body}
+                        mentions={post.mentions}
+                        canonicalPath={post.canonicalPath}
+                        openLabel={`Open Post from ${post.actor.name}`}
+                        className="mt-4 whitespace-pre-wrap text-[16px] font-semibold leading-[1.55] tracking-[-0.01em] text-[var(--wk-text)] md:text-[18px]"
+                      />
                     ) : null}
 
                     {post.track ? (

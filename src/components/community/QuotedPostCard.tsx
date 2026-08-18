@@ -1,6 +1,7 @@
 import {
   Link,
 } from "react-router-dom";
+import { PostBody } from "@/components/community/PostBody";
 import { PostTrackAttachment } from "@/components/community/PostTrackAttachment";
 import { PostLinkAttachment } from "@/components/community/PostLinkAttachment";
 import type {
@@ -81,12 +82,18 @@ export function QuotedPostCard({
         </div>
 
         {quotedPost.body ? (
-          <Link
-            to={quotedPost.canonicalPath}
-            className="mt-3 block line-clamp-4 whitespace-pre-wrap text-[13px] font-semibold leading-[1.5] text-[var(--wk-text)]"
-          >
-            {quotedPost.body}
-          </Link>
+          <div className="relative mt-3">
+            <Link
+              to={quotedPost.canonicalPath}
+              aria-label={`View Post from ${actor.name}`}
+              className="absolute inset-0 z-0"
+            />
+            <PostBody
+              body={quotedPost.body}
+              mentions={quotedPost.mentions}
+              className="pointer-events-none relative z-[1] line-clamp-4 whitespace-pre-wrap text-[13px] font-semibold leading-[1.5] text-[var(--wk-text)] [&_a]:pointer-events-auto"
+            />
+          </div>
         ) : null}
 
         {quotedPost.track ? (

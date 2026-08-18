@@ -86,6 +86,7 @@ export function PostActions({
   const [editOpen, setEditOpen] = useState(false);
   const [reportOpen, setReportOpen] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const [linkCopied, setLinkCopied] = useState(false);
   const reactionTriggerRef = useRef<HTMLButtonElement | null>(null);
 
   const activeReactions =
@@ -115,6 +116,20 @@ export function PostActions({
       onWithdrawn?.(post.id);
     } finally {
       setDeleting(false);
+    }
+  }
+
+  async function handleCopyLink() {
+    try {
+      await navigator.clipboard.writeText(shareItem.url);
+      setLinkCopied(true);
+      window.setTimeout(() => {
+        setLinkCopied(false);
+        setMenuOpen(false);
+      }, 700);
+    } catch {
+      setMenuOpen(false);
+      setShareOpen(true);
     }
   }
 
@@ -309,6 +324,29 @@ export function PostActions({
 
             {menuOpen && (
               <div className="absolute bottom-12 right-0 z-40 min-w-[230px] overflow-hidden rounded-2xl border border-[var(--wk-border)] bg-[var(--wk-surface)] p-1.5 shadow-xl">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setMenuOpen(false);
+                    navigate(post.canonicalPath);
+                  }}
+                  className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left text-[12px] font-black text-[var(--wk-text)] hover:bg-[var(--wk-bg)]"
+                >
+                  <i className="ri-external-link-line text-[17px]" aria-hidden="true" />
+                  Open Post
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => void handleCopyLink()}
+                  className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left text-[12px] font-black text-[var(--wk-text)] hover:bg-[var(--wk-bg)]"
+                >
+                  <i className="ri-link text-[17px]" aria-hidden="true" />
+                  {linkCopied ? "Link Copied" : "Copy Link"}
+                </button>
+
+                <div className="my-1 border-t border-[var(--wk-divider)]" />
+
                 {canManage ? (
                   <>
                     <button
