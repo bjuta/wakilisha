@@ -17,6 +17,7 @@ import {
 } from "@/components/design-system/share/ShareSheet";
 import { PostQuoteDialog } from "@/components/community/PostQuoteDialog";
 import { PostEditDialog } from "@/components/community/PostEditDialog";
+import { PostDeleteDialog } from "@/components/community/PostDeleteDialog";
 import { PostReportDialog } from "@/components/community/PostReportDialog";
 import {
   withdrawPost,
@@ -84,6 +85,8 @@ export function PostActions({
   const [shareOpen, setShareOpen] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
   const [editOpen, setEditOpen] = useState(false);
+  const [deleteOpen, setDeleteOpen] = useState(false);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
   const [reportOpen, setReportOpen] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [linkCopied, setLinkCopied] = useState(false);
@@ -107,13 +110,15 @@ export function PostActions({
   }), [post]);
 
   async function handleDelete() {
-    const reason = window.prompt("Why are you deleting this Post?");
-    if (!reason || reason.trim().length < 3) return;
     setDeleting(true);
+    setDeleteError(null);
+
     try {
-      await withdrawPost(post.id, reason.trim());
-      setMenuOpen(false);
+      await withdrawPost(post.id);
+      setDeleteOpen(false);
       onWithdrawn?.(post.id);
+    } catch {
+      setDeleteError("We couldn't delete this Post. Try again.");
     } finally {
       setDeleting(false);
     }
@@ -364,11 +369,15 @@ export function PostActions({
                     <button
                       type="button"
                       disabled={deleting}
-                      onClick={() => void handleDelete()}
+                      onClick={() => {
+                        setMenuOpen(false);
+                        setDeleteError(null);
+                        setDeleteOpen(true);
+                      }}
                       className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left text-[12px] font-black text-[var(--wk-danger)] hover:bg-[var(--wk-danger-soft)] disabled:opacity-50"
                     >
                       <i className="ri-delete-bin-line text-[17px]" aria-hidden="true" />
-                      {deleting ? "Deleting..." : "Delete Post"}
+                      Delete Post
                     </button>
                   </>
                 ) : (
@@ -435,6 +444,18 @@ export function PostActions({
         post={post}
         onClose={() => setEditOpen(false)}
         onEdited={() => navigate(0)}
+      />
+
+      <PostDeleteDialog
+        open={deleteOpen}
+        deleting={deleting}
+        error={deleteError}
+        onClose={() => {
+          if (deleting) return;
+          setDeleteOpen(false);
+          setDeleteError(null);
+        }}
+        onConfirm={() => void handleDelete()}
       />
 
       {actionActor && (
