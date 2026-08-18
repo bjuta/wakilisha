@@ -99,3 +99,26 @@ directory now contains only active replay authority:
 
 Control-plane tooling that intentionally reasons about the active migration
 chain continues to use `supabase/migrations/`.
+
+
+## Post-baseline retired active migrations
+
+A migration can leave active replay authority when all of the following are true:
+
+- its production effect is already complete,
+- it is not an enduring schema or bootstrap contract,
+- replaying it on a fresh database would incorrectly require production-only data, and
+- no current runtime, verifier, or test depends on replaying it.
+
+Retired post-baseline migrations are preserved byte-identically under
+`retired-active-migrations/`. They are historical receipts only and are not
+active replay authority.
+
+Production migration-history retirement is performed with Supabase
+`migration repair --status reverted`. That operation changes only
+`supabase_migrations.schema_migrations`; it does not undo the SQL or mutate the
+production application schema or data.
+
+`20260816202232_correct_valle_release_featured_credit.sql` was retired under
+this rule because it was a one-off production data correction for one Release,
+not an enduring WAKILISHA database contract.
