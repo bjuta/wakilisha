@@ -18797,6 +18797,16 @@ export type Database = {
         }
         Returns: Json
       }
+      community_search_mention_suggestions: {
+        Args: { p_limit?: number; p_query: string }
+        Returns: {
+          avatar_url: string
+          canonical_path: string
+          display_name: string
+          handle: string
+          person_id: string
+        }[]
+      }
       community_set_block_state: {
         Args: {
           p_blocked: boolean

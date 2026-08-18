@@ -192,11 +192,14 @@ if (
 
 if (
   !notificationBell.includes(
-    "aria-label={`Alerts",
+    "aria-label={`Notifications",
+  ) ||
+  !notificationBell.includes(
+    '<span className="pnl">Notifications</span>',
   )
 ) {
   fail(
-    "Alerts visible text and accessible name do not match",
+    "Notifications visible text and accessible name do not match",
   );
 }
 
