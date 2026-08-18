@@ -1,9 +1,9 @@
 {
   "projectRef": "pgzizndxdyhqmtyywjmt",
   "schema": "public",
-  "generatedAt": "2026-08-17T20:49:46Z",
-  "typesSha256": "844e4a5b77985f25e71b9be718d1785d91850e4aaf0f700b711cbce87aad8d5c",
+  "generatedAt": "2026-08-18T16:43:46Z",
+  "typesSha256": "d72b5bd382f39e9eae464efafd4c5adccdac2405e6defa85e63920327327b95b",
   "authoritativeMigrationDirectory": "supabase/migrations",
   "migrationCount": 24,
-  "latestMigration": "20260817201000_post_thread_publish_actor_resolution_fix.sql"
+  "latestMigration": "20260818103000_canonical_post_mentions_notification_preferences.sql"
 }
