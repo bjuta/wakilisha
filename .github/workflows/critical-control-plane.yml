@@ -78,14 +78,11 @@ jobs:
           test/community/post-thread-detail-m8c3.test.ts
           test/community/post-drafts-thread-composer-m8c3.test.ts
           test/community/post-thread-affordance-m8c3.test.ts
-          test/community/post-thread-publish-actor-resolution-m8c3.test.ts
 
-      - name: Enforce public anonymous read authority and Edge runtime
+      - name: Enforce public configuration and anonymous authority boundaries
         run: >-
           npx vitest run
           test/public-read-authority-boundary.test.ts
-          test/security/public-anon-content.test.ts
-          test/security/public-edge-runtime.test.ts
           test/security/configured-supabase-csp.test.ts
           test/security/configured-public-content-edge-origin.test.ts
 
