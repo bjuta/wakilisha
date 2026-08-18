@@ -7513,6 +7513,51 @@ export type Database = {
           },
         ]
       }
+      community_post_mentions: {
+        Row: {
+          created_at: string
+          handle_at_mention: string
+          id: string
+          mentioned_user_id: string | null
+          person_resource_id: string
+          post_id: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          handle_at_mention: string
+          id?: string
+          mentioned_user_id?: string | null
+          person_resource_id: string
+          post_id: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          handle_at_mention?: string
+          id?: string
+          mentioned_user_id?: string | null
+          person_resource_id?: string
+          post_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "community_post_mentions_post_fkey"
+            columns: ["post_id"]
+            isOneToOne: false
+            referencedRelation: "artist_updates"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "community_post_mentions_post_fkey"
+            columns: ["post_id"]
+            isOneToOne: false
+            referencedRelation: "community_posts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       community_post_reposts: {
         Row: {
           actor_type: string
@@ -18371,6 +18416,14 @@ export type Database = {
         Returns: Json
       }
       community_get_post_legacy_m8c3: {
+        Args: { p_post_id: string }
+        Returns: Json
+      }
+      community_get_post_legacy_m8c4: {
+        Args: { p_post_id: string }
+        Returns: Json
+      }
+      community_get_post_mentions: {
         Args: { p_post_id: string }
         Returns: Json
       }
