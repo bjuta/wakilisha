@@ -31,6 +31,7 @@ const NOTIFICATION_ICONS: Record<string, string> = {
   reply: 'ri-reply-line',
   new_comment: 'ri-chat-1-line',
   mention: 'ri-at-line',
+  post_mention: 'ri-at-line',
   pin: 'ri-pushpin-line',
   editor_pick: 'ri-star-line',
   contribution_approved: 'ri-check-double-line',
@@ -44,6 +45,7 @@ const NOTIFICATION_LABELS: Record<string, string> = {
   reply: 'replied to your comment',
   new_comment: 'commented on',
   mention: 'mentioned you',
+  post_mention: 'mentioned you in a Post',
   pin: 'pinned your comment',
   editor_pick: 'made your comment an editor pick',
   contribution_approved: 'approved your contribution',
@@ -243,7 +245,7 @@ export function NotificationBell({ userId, className = '', placement = 'auto' }:
         <button
           onClick={handleToggle}
           className="flex flex-col items-center justify-center gap-[2px] w-full h-full text-[var(--wk-text-muted)] cursor-pointer"
-          aria-label={`Alerts${unreadCount > 0 ? ` (${unreadCount} unread)` : ''}`}
+          aria-label={`Notifications${unreadCount > 0 ? ` (${unreadCount} unread)` : ''}`}
         >
           <div className="relative">
             <WkIcon name="Bell" size={18} />
@@ -253,7 +255,7 @@ export function NotificationBell({ userId, className = '', placement = 'auto' }:
               </span>
             )}
           </div>
-          <span className="pnl">Alerts</span>
+          <span className="pnl">Notifications</span>
         </button>
 
         {/* Dropdown - opens upward on mobile nav, full-width within viewport */}

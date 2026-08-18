@@ -405,7 +405,7 @@ function MobileBottomNav() {
                     userId={authUser.id}
                     placement="bottom"
                   />
-                  <span>Alerts</span>
+                  <span>Notifications</span>
                 </div>
               )}
             </div>

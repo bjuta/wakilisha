@@ -41,7 +41,7 @@ export function NotificationsSettingsPane({ notifications, isSignedIn, updateNot
       <div className="flex items-center justify-between gap-4 py-4 border-b border-[var(--wk-divider)] last:border-b-0">
         <div className="flex-1 min-w-0">
           <div className="text-[13px] font-bold text-[var(--wk-text)]">Mention notifications</div>
-          <div className="text-[11px] leading-relaxed text-[var(--wk-text-muted)] mt-0.5">Get notified when someone @mentions you in a comment.</div>
+          <div className="text-[11px] leading-relaxed text-[var(--wk-text-muted)] mt-0.5">Get notified when someone @mentions you in a Post or comment.</div>
         </div>
         <WakilishaToggle value={notifications.mentionNotifications} onChange={(v) => updateNotifications({ mentionNotifications: v })} />
       </div>

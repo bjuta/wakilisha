@@ -27,6 +27,12 @@ export type PostTrack = {
   canonicalPath: string | null;
 };
 
+export type PostMention = {
+  handle: string;
+  personId: string;
+  canonicalPath: string;
+};
+
 export type CommunityQuotedPost = {
   id: string;
   available: boolean;
@@ -34,6 +40,7 @@ export type CommunityQuotedPost = {
   actorType: PostActorType | null;
   actor: PostActor | null;
   body: string | null;
+  mentions: PostMention[];
   imageUrl: string | null;
   linkUrl: string | null;
   linkLabel: string | null;
@@ -48,6 +55,7 @@ export type CommunityPost = {
   actorId: string;
   actor: PostActor;
   body: string;
+  mentions: PostMention[];
   imageUrl: string | null;
   linkUrl: string | null;
   linkLabel: string | null;
@@ -108,6 +116,40 @@ function readNumber(record: JsonRecord | null, key: string): number | null {
 
 function isActorType(value: string): value is PostActorType {
   return value === "person" || value === "artist";
+}
+
+function mapPostMention(value: unknown): PostMention | null {
+  const record = asRecord(value);
+  const handle = readString(record, "handle");
+  const personId = readString(record, "person_id");
+  const canonicalPath = readString(record, "canonical_path");
+
+  if (
+    !record ||
+    !handle ||
+    !personId ||
+    !canonicalPath ||
+    !canonicalPath.startsWith("/people/")
+  ) {
+    return null;
+  }
+
+  return {
+    handle: handle.toLowerCase(),
+    personId,
+    canonicalPath,
+  };
+}
+
+function mapPostMentions(value: unknown): PostMention[] {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+
+  return value.flatMap((item) => {
+    const mention = mapPostMention(item);
+    return mention ? [mention] : [];
+  });
 }
 
 export function mapPostTrack(value: unknown): PostTrack | null {
@@ -198,6 +240,7 @@ export function mapCommunityQuotedPost(
       actorType,
       actor: null,
       body: null,
+      mentions: [],
       imageUrl: null,
       linkUrl: null,
       linkLabel: null,
@@ -235,6 +278,7 @@ export function mapCommunityQuotedPost(
     actorType: actor.type,
     actor,
     body,
+    mentions: mapPostMentions(record.mentions),
     imageUrl,
     linkUrl,
     linkLabel: readString(record, "link_label"),
@@ -321,6 +365,7 @@ export function mapCommunityPost(value: unknown): CommunityPost | null {
     actorId,
     actor,
     body,
+    mentions: mapPostMentions(record.mentions),
     imageUrl,
     linkUrl,
     linkLabel: readString(record, "link_label"),
