@@ -82,6 +82,9 @@ jobs:
       - name: Enforce canonical Post mention product UI
         run: npx vitest run test/community/post-mentions-product-ui-m8c4.test.ts
 
+      - name: Enforce public Post delete product UI
+        run: npx vitest run test/community/post-delete-product-ui.test.ts
+
       - name: Enforce public configuration and anonymous authority boundaries
         run: >-
           npx vitest run

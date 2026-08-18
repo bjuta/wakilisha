@@ -634,10 +634,12 @@ export async function editPost(input: {
   return post;
 }
 
-export async function withdrawPost(postId: string, reason: string): Promise<void> {
+const POST_WITHDRAWAL_AUDIT_REASON = "Deleted by publisher";
+
+export async function withdrawPost(postId: string): Promise<void> {
   await rpc("community_withdraw_post", {
     p_post_id: postId,
-    p_reason: reason,
+    p_reason: POST_WITHDRAWAL_AUDIT_REASON,
   });
 }
 
