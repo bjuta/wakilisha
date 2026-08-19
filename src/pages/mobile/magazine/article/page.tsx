@@ -244,7 +244,10 @@ export default function MobileArticle() {
           description: article.dek || undefined,
           image: article.heroUrl,
           datePublished: article.date,
-          author: article.authorPersonPath ? { "@type": "Person", name: article.author, url: article.authorPersonPath } : undefined,
+          author: article.authorPersonPath ? { "@type": "Person", name: article.author, url: article.authorPersonPath }
+            : article.authorOrganizationPath
+              ? { "@type": "Organization", name: article.author, url: article.authorOrganizationPath }
+              : undefined,
           publisher: { "@type": "Organization", name: "WAKILISHA" },
           url: typeof window !== "undefined" ? window.location.href : undefined,
         }}
@@ -341,14 +344,14 @@ export default function MobileArticle() {
           {/* Author row — avatar, name, share action */}
           <div className="flex items-center justify-between gap-3">
             <div className="flex items-center gap-2.5">
-              <ArticleAuthorIdentity name={article.author} personPath={article.authorPersonPath}
+              <ArticleAuthorIdentity name={article.author} personPath={article.authorPersonPath} organizationPath={article.authorOrganizationPath}
 
                 className="w-9 h-9 rounded-full bg-[var(--wk-brand)] flex items-center justify-center text-[11px] font-black text-[var(--wk-brand-on)] shrink-0"
               >
                 {initials}
               </ArticleAuthorIdentity>
               <div>
-                <ArticleAuthorIdentity name={article.author} personPath={article.authorPersonPath}
+                <ArticleAuthorIdentity name={article.author} personPath={article.authorPersonPath} organizationPath={article.authorOrganizationPath}
 
                   className="text-[13px] font-bold text-[var(--wk-text)] block leading-tight"
                 >

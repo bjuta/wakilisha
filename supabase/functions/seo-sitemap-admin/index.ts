@@ -449,6 +449,221 @@ async function fetchPublicPeople(
   return { data: rows };
 }
 
+async function fetchPublicOrganizations(
+  db: ReturnType<typeof createClient>,
+) {
+  const {
+    data: authorPathData,
+    error: authorPathError,
+  } =
+    await db.rpc(
+      "list_public_article_author_organization_paths",
+      {
+        p_article_slug: null,
+      },
+    );
+
+  if (authorPathError) {
+    throw new Error(
+      `Organization SEO author-path discovery failed: ${
+        authorPathError.message ||
+        String(authorPathError)
+      }`,
+    );
+  }
+
+  if (!Array.isArray(authorPathData)) {
+    return { data: [] };
+  }
+
+  const candidates =
+    new Map<
+      string,
+      {
+        organizationId: string;
+        canonicalPath: string;
+      }
+    >();
+
+  for (const row of authorPathData) {
+    const organizationId =
+      String(
+        row.author_organization_id ||
+          "",
+      ).trim();
+
+    const canonicalPath =
+      String(
+        row.author_organization_path ||
+          "",
+      ).trim();
+
+    if (
+      !organizationId ||
+      !/^\/organizations\/[^/]+$/.test(
+        canonicalPath,
+      )
+    ) {
+      continue;
+    }
+
+    if (!candidates.has(organizationId)) {
+      candidates.set(
+        organizationId,
+        {
+          organizationId,
+          canonicalPath,
+        },
+      );
+    }
+  }
+
+  const rows: Record<
+    string,
+    unknown
+  >[] = [];
+
+  const organizations =
+    [...candidates.values()];
+
+  const concurrency = 12;
+
+  for (
+    let index = 0;
+    index < organizations.length;
+    index += concurrency
+  ) {
+    const batch =
+      organizations.slice(
+        index,
+        index + concurrency,
+      );
+
+    const resolved =
+      await Promise.all(
+        batch.map(
+          async ({
+            organizationId,
+            canonicalPath,
+          }) => {
+            const match =
+              /^\/organizations\/([^/]+)$/.exec(
+                canonicalPath,
+              );
+
+            if (!match) {
+              return null;
+            }
+
+            const { data, error } =
+              await db.rpc(
+                "get_public_organization",
+                {
+                  p_slug:
+                    match[1],
+                },
+              );
+
+            if (error) {
+              throw new Error(
+                `Organization SEO resolution failed for ${canonicalPath}: ${
+                  error.message ||
+                  String(error)
+                }`,
+              );
+            }
+
+            if (
+              !data ||
+              typeof data !==
+                "object" ||
+              Array.isArray(data)
+            ) {
+              return null;
+            }
+
+            const organizationData =
+              data as Record<
+                string,
+                unknown
+              >;
+
+            const resolvedOrganizationId =
+              String(
+                organizationData.organization_id ||
+                  "",
+              ).trim();
+
+            if (
+              !resolvedOrganizationId ||
+              resolvedOrganizationId !==
+                organizationId
+            ) {
+              throw new Error(
+                `Organization SEO identity mismatch for ${canonicalPath}.`,
+              );
+            }
+
+            const {
+              data: workData,
+              error: workError,
+            } =
+              await db.rpc(
+                "list_public_organization_work",
+                {
+                  p_organization_resource_id:
+                    resolvedOrganizationId,
+                  p_limit: 1,
+                },
+              );
+
+            if (workError) {
+              throw new Error(
+                `Organization SEO work eligibility failed for ${canonicalPath}: ${
+                  workError.message ||
+                  String(workError)
+                }`,
+              );
+            }
+
+            if (
+              !Array.isArray(
+                workData,
+              ) ||
+              workData.length === 0
+            ) {
+              return null;
+            }
+
+            return {
+              ...organizationData,
+              resource_id:
+                resolvedOrganizationId,
+              canonical_path:
+                canonicalPath,
+              updated_at:
+                null,
+            };
+          },
+        ),
+      );
+
+    rows.push(
+      ...resolved.filter(
+        (
+          row,
+        ): row is Record<
+          string,
+          unknown
+        > =>
+          row !== null,
+      ),
+    );
+  }
+
+  return { data: rows };
+}
+
 async function buildInternalItems(db: ReturnType<typeof createClient>): Promise<SitemapItem[]> {
   const items: SitemapItem[] = [
     { loc: makeUrl("/"), url_type: "static" },
@@ -472,6 +687,7 @@ async function buildInternalItems(db: ReturnType<typeof createClient>): Promise<
     articles,
     playlists,
     people,
+    organizations,
     artists,
     releases,
     tracks,
@@ -487,6 +703,7 @@ async function buildInternalItems(db: ReturnType<typeof createClient>): Promise<
     db.from("wk_articles").select("id, slug, modified_at, published_at").eq("wp_status", "publish").limit(5000),
     fetchPublishedPlaylists(db),
     fetchPublicPeople(db),
+    fetchPublicOrganizations(db),
     fetchAllPages(
       "registry_artists",
       (from, to) =>
@@ -647,6 +864,46 @@ async function buildInternalItems(db: ReturnType<typeof createClient>): Promise<
         "public_person",
       source_id:
         personId,
+      source_row: row,
+    });
+  }
+
+  for (const row of organizations.data ?? []) {
+    const canonicalPath =
+      String(
+        row.canonical_path || "",
+      ).trim();
+
+    const organizationId =
+      String(
+        row.organization_id ||
+          row.resource_id ||
+          "",
+      ).trim();
+
+    if (
+      !/^\/organizations\/[^/]+$/.test(
+        canonicalPath,
+      ) ||
+      !organizationId
+    ) {
+      continue;
+    }
+
+    items.push({
+      loc:
+        makeUrl(
+          canonicalPath,
+        ),
+      lastmod:
+        dateOnly(
+          row.updated_at,
+        ),
+      url_type: "organization",
+      source_table:
+        "public_organization",
+      source_id:
+        organizationId,
       source_row: row,
     });
   }
@@ -1308,6 +1565,46 @@ function buildSeoMetadataEntry(
             row,
             [
               "avatar_url",
+              "cover_url",
+            ],
+            [],
+          ),
+        ) ||
+        resolvedImage,
+      modifiedAt,
+      sourceTable,
+      sourceId,
+    };
+  }
+
+  if (sourceTable === "public_organization") {
+    const title =
+      firstText(
+        row,
+        [
+          "display_name",
+        ],
+        [],
+        last,
+      );
+
+    return {
+      title,
+      entityName: title,
+      description:
+        descriptionValue(
+          row,
+          `${title} on WAKILISHA.`,
+        ),
+      robots: "index, follow",
+      ogType: "website",
+      kind: "organization",
+      image:
+        absoluteImageUrl(
+          firstText(
+            row,
+            [
+              "logo_url",
               "cover_url",
             ],
             [],

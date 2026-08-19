@@ -23,6 +23,7 @@ export type MagazineArticle = {
   section: string;
   author: string;
   authorPersonPath?: string | null;
+  authorOrganizationPath?: string | null;
   date: string;
   readingTime: number;
   heroUrl: string;
@@ -60,6 +61,7 @@ function storyToArticle(story: PublicStory): MagazineArticle {
     section: story.section || 'Article',
     author: story.author || 'WAKILISHA Editorial',
     authorPersonPath: story.authorPersonPath ?? null,
+    authorOrganizationPath: story.authorOrganizationPath ?? null,
     date: story.date || 'Undated',
     readingTime: story.readingTime || 3,
     heroUrl: articleHeroUrl(story),
@@ -99,6 +101,7 @@ export async function getMagazineArticleBySlug(
     section: detail.section,
     author: detail.author,
     authorPersonPath: detail.authorPersonPath ?? null,
+    authorOrganizationPath: detail.authorOrganizationPath ?? null,
     date: detail.date,
     readingTime: detail.readingTime,
     heroUrl: articleHeroUrl(detail),
@@ -176,6 +179,7 @@ export function toPublicStory(article: MagazineArticle): PublicStory {
     dek: article.dek,
     author: article.author,
     authorPersonPath: article.authorPersonPath ?? null,
+    authorOrganizationPath: article.authorOrganizationPath ?? null,
     date: article.date,
     readingTime: article.readingTime,
     heroUrl: article.heroUrl,

@@ -1547,6 +1547,7 @@ export type Database = {
           display_name_snapshot: string
           external_contributor_id: string | null
           id: string
+          organization_resource_id: string | null
           registry_author_id: string | null
           registry_author_slug_snapshot: string | null
           role_label_snapshot: string | null
@@ -1561,6 +1562,7 @@ export type Database = {
           display_name_snapshot: string
           external_contributor_id?: string | null
           id?: string
+          organization_resource_id?: string | null
           registry_author_id?: string | null
           registry_author_slug_snapshot?: string | null
           role_label_snapshot?: string | null
@@ -1575,6 +1577,7 @@ export type Database = {
           display_name_snapshot?: string
           external_contributor_id?: string | null
           id?: string
+          organization_resource_id?: string | null
           registry_author_id?: string | null
           registry_author_slug_snapshot?: string | null
           role_label_snapshot?: string | null
@@ -1595,6 +1598,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "external_contributors"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "credits_organization_resource_id_fkey"
+            columns: ["organization_resource_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["resource_id"]
           },
         ]
       }
@@ -1671,6 +1681,175 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: "media_asset_resources_resource_fkey"
+            columns: ["resource_id", "resource_kind"]
+            isOneToOne: false
+            referencedRelation: "resources"
+            referencedColumns: ["id", "resource_kind"]
+          },
+        ]
+      }
+      organization_registry_label_links: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          link_reason: string
+          link_state: string
+          organization_resource_id: string
+          registry_label_id: string
+          retired_at: string | null
+          retired_by: string | null
+          retired_reason: string | null
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          link_reason: string
+          link_state?: string
+          organization_resource_id: string
+          registry_label_id: string
+          retired_at?: string | null
+          retired_by?: string | null
+          retired_reason?: string | null
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          link_reason?: string
+          link_state?: string
+          organization_resource_id?: string
+          registry_label_id?: string
+          retired_at?: string | null
+          retired_by?: string | null
+          retired_reason?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "organization_registry_label_links_org_fkey"
+            columns: ["organization_resource_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["resource_id"]
+          },
+        ]
+      }
+      organization_type_assignments: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          display_order: number
+          is_primary: boolean
+          organization_resource_id: string
+          organization_type: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          display_order?: number
+          is_primary?: boolean
+          organization_resource_id: string
+          organization_type: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          display_order?: number
+          is_primary?: boolean
+          organization_resource_id?: string
+          organization_type?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "organization_type_assignments_org_fkey"
+            columns: ["organization_resource_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["resource_id"]
+          },
+          {
+            foreignKeyName: "organization_type_assignments_type_fkey"
+            columns: ["organization_type"]
+            isOneToOne: false
+            referencedRelation: "organization_types"
+            referencedColumns: ["organization_type"]
+          },
+        ]
+      }
+      organization_types: {
+        Row: {
+          created_at: string
+          description: string
+          enabled: boolean
+          label: string
+          organization_type: string
+          sort_order: number
+        }
+        Insert: {
+          created_at?: string
+          description: string
+          enabled?: boolean
+          label: string
+          organization_type: string
+          sort_order?: number
+        }
+        Update: {
+          created_at?: string
+          description?: string
+          enabled?: boolean
+          label?: string
+          organization_type?: string
+          sort_order?: number
+        }
+        Relationships: []
+      }
+      organizations: {
+        Row: {
+          cover_url: string | null
+          created_at: string
+          created_by: string | null
+          description: string | null
+          display_name: string
+          location_text: string | null
+          logo_url: string | null
+          organization_state: string
+          resource_id: string
+          resource_kind: string
+          updated_at: string
+          updated_by: string | null
+          website_url: string | null
+        }
+        Insert: {
+          cover_url?: string | null
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          display_name: string
+          location_text?: string | null
+          logo_url?: string | null
+          organization_state?: string
+          resource_id: string
+          resource_kind?: string
+          updated_at?: string
+          updated_by?: string | null
+          website_url?: string | null
+        }
+        Update: {
+          cover_url?: string | null
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          display_name?: string
+          location_text?: string | null
+          logo_url?: string | null
+          organization_state?: string
+          resource_id?: string
+          resource_kind?: string
+          updated_at?: string
+          updated_by?: string | null
+          website_url?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "organizations_resource_fkey"
             columns: ["resource_id", "resource_kind"]
             isOneToOne: false
             referencedRelation: "resources"
@@ -3994,6 +4173,10 @@ export type Database = {
       resequence_playlist_with_registry_intake: {
         Args: { p_playlist_id: string }
         Returns: undefined
+      }
+      resolve_credit_organization: {
+        Args: { p_credit_id: string }
+        Returns: string
       }
       resolve_credit_person: { Args: { p_credit_id: string }; Returns: string }
       resolve_person_follow_target: {
@@ -20038,6 +20221,7 @@ export type Database = {
           updated_at: string
         }[]
       }
+      get_public_organization: { Args: { p_slug: string }; Returns: Json }
       get_public_person: { Args: { p_slug: string }; Returns: Json }
       get_public_person_social_summary: {
         Args: { p_person_resource_id: string }
@@ -20503,6 +20687,15 @@ export type Database = {
           visibility: string
         }[]
       }
+      list_public_article_author_organization_paths: {
+        Args: { p_article_slug?: string }
+        Returns: {
+          article_id: string
+          article_slug: string
+          author_organization_id: string
+          author_organization_path: string
+        }[]
+      }
       list_public_article_author_paths: {
         Args: { p_article_slug?: string }
         Returns: {
@@ -20510,6 +20703,27 @@ export type Database = {
           article_slug: string
           author_person_id: string
           author_person_path: string
+        }[]
+      }
+      list_public_organization_work: {
+        Args: {
+          p_before_published_at?: string
+          p_before_resource_id?: string
+          p_limit?: number
+          p_organization_resource_id: string
+        }
+        Returns: {
+          byline: string
+          canonical_path: string
+          credit_role: string
+          image_url: string
+          is_primary: boolean
+          published_at: string
+          resource_id: string
+          resource_kind: string
+          role_label: string
+          summary: string
+          title: string
         }[]
       }
       list_public_person_community_activity: {

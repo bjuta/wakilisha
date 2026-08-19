@@ -183,6 +183,7 @@ const groupOrder = [
   "labels",
   "authors",
   "people",
+  "organizations",
   "categories",
   "tags",
   "about",

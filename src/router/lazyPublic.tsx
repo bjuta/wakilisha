@@ -16,6 +16,10 @@ export const PersonDetailPage = lazy(
   () => import("../pages/people/detail/page"),
 );
 
+export const OrganizationDetailPage = lazy(
+  () => import("../pages/organizations/detail/page"),
+);
+
 export const LegacyArticleRedirect = lazy(
   () => import("../pages/LegacyArticleRedirect"),
 );

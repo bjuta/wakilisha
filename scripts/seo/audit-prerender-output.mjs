@@ -149,6 +149,20 @@ function auditMetadataManifest() {
         `${route}: public Person metadata must use kind person.`,
       );
     }
+
+    if (
+      route.startsWith(
+        "/organizations/",
+      ) &&
+      entry.sourceTable ===
+        "public_organization" &&
+      entry.kind !==
+        "organization"
+    ) {
+      reportError(
+        `${route}: public Organization metadata must use kind organization.`,
+      );
+    }
   }
 
   console.log(`SEO audit: metadata manifest checked ${entries.length.toLocaleString()} entries.`);

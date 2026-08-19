@@ -326,7 +326,10 @@ export default function ArticlePage() {
           description: article.dek || undefined,
           image: article.heroUrl,
           datePublished: article.date,
-          author: article.authorPersonPath ? { "@type": "Person", name: article.author, url: article.authorPersonPath } : undefined,
+          author: article.authorPersonPath ? { "@type": "Person", name: article.author, url: article.authorPersonPath }
+            : article.authorOrganizationPath
+              ? { "@type": "Organization", name: article.author, url: article.authorOrganizationPath }
+              : undefined,
           publisher: { "@type": "Organization", name: "WAKILISHA" },
           url: typeof window !== "undefined" ? window.location.href : undefined,
         }}

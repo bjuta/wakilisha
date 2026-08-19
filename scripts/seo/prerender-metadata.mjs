@@ -438,6 +438,7 @@ async function fetchArticleMetadataManifest() {
         description: firstNonEmpty(story.dek, story.description, story.excerpt),
         author: firstNonEmpty(story.author, story.authorName, story.byline),
         authorPersonPath: firstNonEmpty(story.authorPersonPath, story.author_person_path),
+        authorOrganizationPath: firstNonEmpty(story.authorOrganizationPath, story.author_organization_path),
         date: firstNonEmpty(story.date, story.publishedAt, story.datePublished),
         modifiedAt: firstNonEmpty(story.modifiedAt, story.updatedAt, story.dateModified),
         image: publicArticleImage(story),
@@ -972,6 +973,11 @@ function pageSchema(model, url) {
     const image = socialImageForModel(model);
     const authorName = firstNonEmpty(model.author, model.authorName, model.byline, articleMeta.author, "WAKILISHA Editorial");
     const authorPersonPath = firstNonEmpty(model.authorPersonPath, model.author_person_path, articleMeta.authorPersonPath);
+    const authorOrganizationPath = firstNonEmpty(
+      model.authorOrganizationPath,
+      model.author_organization_path,
+      articleMeta.authorOrganizationPath,
+    );
     const publishedAt = firstNonEmpty(model.publishedAt, model.datePublished, model.date, articleMeta.date);
     const modifiedAt = firstNonEmpty(model.modifiedAt, model.updatedAt, model.dateModified, articleMeta.modifiedAt, publishedAt);
     const article = {
@@ -985,6 +991,10 @@ function pageSchema(model, url) {
         "@type": "Person",
         name: authorName,
         url: canonicalUrl(authorPersonPath),
+      } : authorOrganizationPath ? {
+        "@type": "Organization",
+        name: authorName,
+        url: canonicalUrl(authorOrganizationPath),
       } : undefined,
       datePublished: publishedAt || undefined,
       dateModified: modifiedAt || undefined,
@@ -1209,6 +1219,46 @@ function pageSchema(model, url) {
         person,
       mainEntity:
         person,
+    });
+  }
+
+  if (model.kind === "organization") {
+    const image =
+      socialImageForModel(
+        model,
+      );
+
+    const organization =
+      compactSchema({
+        "@type":
+          "Organization",
+        "@id":
+          `${url}#organization`,
+        name:
+          firstNonEmpty(
+            model.entityName,
+            model.title,
+            entityName,
+          ),
+        url,
+        description:
+          model.description,
+        image:
+          image ||
+          undefined,
+      });
+
+    return compactSchema({
+      ...base,
+      "@type":
+        "ProfilePage",
+      image:
+        image ||
+        undefined,
+      about:
+        organization,
+      mainEntity:
+        organization,
     });
   }
 
@@ -1608,12 +1658,25 @@ async function main() {
       )
       .length;
 
+  const organizationMetadataCount =
+    [...DB_METADATA_BY_PATH.values()]
+      .filter(
+        (entry) =>
+          entry?.kind ===
+            "organization",
+      )
+      .length;
+
   console.log(
     `Playlist metadata manifest loaded: ${playlistMetadataCount.toLocaleString()} playlist rows.`,
   );
 
   console.log(
     `Person metadata manifest loaded: ${personMetadataCount.toLocaleString()} Person rows.`,
+  );
+
+  console.log(
+    `Organization metadata manifest loaded: ${organizationMetadataCount.toLocaleString()} Organization rows.`,
   );
 
   ARTICLE_IMAGE_BY_PATH = await fetchArticleImageManifest();

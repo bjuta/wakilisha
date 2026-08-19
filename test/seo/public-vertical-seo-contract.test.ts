@@ -208,6 +208,91 @@ describe(
     );
 
     it(
+      "keeps work-backed public Organizations in dynamic SEO authority without inventing an Organization collection page",
+      () => {
+        expect(router)
+          .toContain(
+            'path: "/organizations/:slug"',
+          );
+
+        expect(router)
+          .not.toContain(
+            'path: "/organizations"',
+          );
+
+        expect(seoEdge)
+          .toContain(
+            '"list_public_article_author_organization_paths"',
+          );
+
+        expect(seoEdge)
+          .toContain(
+            '"get_public_organization"',
+          );
+
+        expect(seoEdge)
+          .toContain(
+            '"list_public_organization_work"',
+          );
+
+        expect(seoEdge)
+          .toContain(
+            '"public_organization"',
+          );
+
+        expect(seoEdge)
+          .toContain(
+            'kind: "organization"',
+          );
+
+        expect(prerender)
+          .toContain(
+            'authorOrganizationPath',
+          );
+
+        expect(prerender)
+          .toContain(
+            'model.kind === "organization"',
+          );
+
+        expect(prerender)
+          .toContain(
+            'Organization metadata manifest loaded:',
+          );
+
+        expect(prerender)
+          .toContain(
+            '"@type": "Organization"',
+          );
+
+        expect(sitemapBuilder)
+          .toContain(
+            '"organizations"',
+          );
+
+        expect(seoAudit)
+          .toContain(
+            '"/organizations/"',
+          );
+
+        expect(seoAudit)
+          .toContain(
+            '"public_organization"',
+          );
+
+        expect(adminSeo)
+          .toContain(
+            '"organization_detail"',
+          );
+
+        expect(adminSeo)
+          .toContain(
+            '"organization"',
+          );
+      },
+    );
+
+    it(
       "keeps private or personal product surfaces outside this SEO contract",
       () => {
         expect(seoEdge)

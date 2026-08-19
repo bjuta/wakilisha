@@ -95,6 +95,7 @@ export function ArticleFloatHeader({ article }: ArticleFloatHeaderProps) {
           <ArticleAuthorIdentity
             name={article.author}
             personPath={article.authorPersonPath}
+            organizationPath={article.authorOrganizationPath}
             className="w-11 h-11 rounded-full bg-[var(--wk-brand)] flex items-center justify-center text-[13px] font-black text-[var(--wk-brand-on)] hover:opacity-80 transition-opacity shrink-0"
             plainClassName="w-11 h-11 rounded-full bg-[var(--wk-brand)] flex items-center justify-center text-[13px] font-black text-[var(--wk-brand-on)] shrink-0"
           >
@@ -104,6 +105,7 @@ export function ArticleFloatHeader({ article }: ArticleFloatHeaderProps) {
             <ArticleAuthorIdentity
               name={article.author}
               personPath={article.authorPersonPath}
+            organizationPath={article.authorOrganizationPath}
               className="text-[14px] font-bold text-[var(--wk-text)] hover:text-[var(--wk-brand)] transition-colors block leading-tight"
               plainClassName="text-[14px] font-bold text-[var(--wk-text)] block leading-tight"
             >
