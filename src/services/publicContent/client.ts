@@ -30,6 +30,7 @@ export type PublicStory = {
   dek: string;
   author: string;
   authorPersonPath?: string | null;
+  authorOrganizationPath?: string | null;
   date: string;
   readingTime: number;
   heroUrl: string;

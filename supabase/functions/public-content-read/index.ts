@@ -273,6 +273,43 @@ async function loadPublicArticleAuthorPathMap(
   );
 }
 
+type ArticleAuthorOrganizationPathMap = Map<string, string>;
+
+async function loadPublicArticleAuthorOrganizationPathMap(
+  supabase: ReturnType<typeof createClient>,
+  articleSlug?: string | null,
+): Promise<ArticleAuthorOrganizationPathMap> {
+  const { data, error } = await supabase.rpc(
+    "list_public_article_author_organization_paths",
+    {
+      p_article_slug: articleSlug || null,
+    },
+  );
+
+  if (error) {
+    console.error(
+      "Failed to load public Article author Organization paths:",
+      error.message,
+    );
+    return new Map();
+  }
+
+  return new Map(
+    (data ?? []).flatMap((row: any) => {
+      const articleSlug = String(
+        row.article_slug || "",
+      ).trim();
+      const canonicalPath = String(
+        row.author_organization_path || "",
+      ).trim();
+
+      return articleSlug && canonicalPath
+        ? [[articleSlug, canonicalPath] as const]
+        : [];
+    }),
+  );
+}
+
 function buildArticleResponse(
   a: any,
   authorPaths: ArticleAuthorPathMap = new Map(),
@@ -306,6 +343,18 @@ function buildArticleResponse(
     ),
     heroUrl,
     tags: tagNames,
+  };
+}
+
+function buildArticleIdentityResponse(
+  article: any,
+  authorPaths: ArticleAuthorPathMap = new Map(),
+  authorOrganizationPaths: ArticleAuthorOrganizationPathMap = new Map(),
+) {
+  return {
+    ...buildArticleResponse(article, authorPaths),
+    authorOrganizationPath:
+      authorOrganizationPaths.get(String(article.slug)) || null,
   };
 }
 
@@ -1007,7 +1056,8 @@ Deno.serve(async (req) => {
       const { data: allArticles } = await supabase.from("wk_article_publication_snapshots").select("id, slug, title, excerpt, author, published_at, content_html, categories, tags, hero_image_url, seo, raw_meta").eq("is_active", true).order("published_at", { ascending: false }).limit(500);
       const matchedArticles = (allArticles ?? []).filter((a: any) => authorSlugFromName(resolveAuthor(a)) === asn);
       const authorPaths = await loadPublicArticleAuthorPathMap(supabase);
-      const articleList = matchedArticles.map((a: any) => buildArticleResponse(a, authorPaths));
+      const authorOrganizationPaths = await loadPublicArticleAuthorOrganizationPathMap(supabase);
+      const articleList = matchedArticles.map((a: any) => buildArticleIdentityResponse(a, authorPaths, authorOrganizationPaths));
       data = { author: { id: String(author.id), slug: String(author.slug), name: String(author.name), bio: author.bio || null, role: author.role || "Contributor", location: author.location || null, avatarUrl: author.avatar_url || null, coverUrl: author.cover_url || null, socialLinks: author.social_links || [], joinedDate: author.joined_date || null }, articles: articleList, articleCount: articleList.length };
     }
 
@@ -1019,10 +1069,18 @@ Deno.serve(async (req) => {
         supabase,
         String(article.slug || ""),
       );
+      const authorOrganizationPaths = await loadPublicArticleAuthorOrganizationPathMap(
+        supabase,
+        String(article.slug || ""),
+      );
 
       data = {
         article: {
-          ...buildArticleResponse(article, authorPaths),
+          ...buildArticleIdentityResponse(
+            article,
+            authorPaths,
+            authorOrganizationPaths,
+          ),
           contentHtml: String(article.content_html || ""),
           seo: (article.seo || {}) as Record<string, unknown>,
           categories: parseCategoryNames(article.categories),
@@ -1042,7 +1100,8 @@ Deno.serve(async (req) => {
         supabase.from("wk_chart_entries_v2").select("rank, track_title, track_slug, artist_name, artwork_url, edition_id").order("rank", { ascending: true }).limit(20)
       ]);
       const authorPaths = await loadPublicArticleAuthorPathMap(supabase);
-      const articles = (articleResult.data ?? []).map((a: any) => ({ contentType: "article" as const, ...buildArticleResponse(a, authorPaths) }));
+      const authorOrganizationPaths = await loadPublicArticleAuthorOrganizationPathMap(supabase);
+      const articles = (articleResult.data ?? []).map((a: any) => ({ contentType: "article" as const, ...buildArticleIdentityResponse(a, authorPaths, authorOrganizationPaths) }));
       const artists = (artistResult.data ?? []).map((a: any) => { const meta = (a.metadata || {}) as Record<string, unknown>; const ag: string[] = Array.isArray(meta.genres) ? (meta.genres as string[]).map(String) : []; return { contentType: "artist" as const, id: String(a.id), slug: String(a.slug), title: String(a.display_name), section: ag[0] || "Artist", dek: ag.slice(0, 3).join(" / ") || "Artist in the registry", author: "", authorSlug: "", date: "", readingTime: 0, heroUrl: String(a.public_image_url || ""), tags: ag, originIso2: a.origin_iso2 || null }; });
       const releases = (releaseResult.data ?? []).map((r: any) => ({ contentType: "release" as const, id: String(r.id), slug: String(r.slug), title: String(r.title), section: String(r.release_type || "Release"), dek: r.description || "", author: "", authorSlug: "", date: r.release_date ? String(r.release_date).split("T")[0] : "", readingTime: 0, heroUrl: String(r.artwork_url || ""), tags: [], releaseType: String(r.release_type || "album") }));
       const chartHighlights = (chartResult.data ?? []).map((c: any) => ({ contentType: "chart_entry" as const, id: String(c.track_slug || c.edition_id), slug: String(c.track_slug || ""), title: String(c.track_title || ""), section: "Chart Entry", dek: `#${c.rank} \u00B7 ${c.artist_name || ""}`, author: String(c.artist_name || ""), authorSlug: "", date: "", readingTime: 0, heroUrl: String(c.artwork_url || ""), tags: [], rank: Number(c.rank), artistName: String(c.artist_name || "") }));
@@ -1070,6 +1129,10 @@ Deno.serve(async (req) => {
         supabase,
         artSlug,
       );
+      const authorOrganizationPaths = await loadPublicArticleAuthorOrganizationPathMap(
+        supabase,
+        artSlug,
+      );
 
       const { data: trust, error: trustError } = await supabase.rpc(
         "public_get_article_trust",
@@ -1082,7 +1145,11 @@ Deno.serve(async (req) => {
 
       data = {
         article: {
-          ...buildArticleResponse(article, authorPaths),
+          ...buildArticleIdentityResponse(
+            article,
+            authorPaths,
+            authorOrganizationPaths,
+          ),
           contentHtml: String(article.content_html || ""),
           seo: (article.seo || {}) as Record<string, unknown>,
           categories: parseCategoryNames(article.categories),
@@ -1100,7 +1167,8 @@ Deno.serve(async (req) => {
       await supabase.rpc("publish_due_article_publications", { p_limit: 50 });
       const { data: articles } = await supabase.from("wk_article_publication_snapshots").select("id, slug, title, excerpt, author, published_at, content_html, categories, tags, hero_image_url, seo, raw_meta").eq("is_active", true).order("published_at", { ascending: false }).limit(limit);
       const authorPaths = await loadPublicArticleAuthorPathMap(supabase);
-      data = { stories: (articles ?? []).map((a: any) => buildArticleResponse(a, authorPaths)) };
+      const authorOrganizationPaths = await loadPublicArticleAuthorOrganizationPathMap(supabase);
+      data = { stories: (articles ?? []).map((a: any) => buildArticleIdentityResponse(a, authorPaths, authorOrganizationPaths)) };
     }
 
     else if (path.startsWith("/artists/")) {

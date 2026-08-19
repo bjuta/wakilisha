@@ -67,7 +67,7 @@ export function ArticleRelated({ stories, loading, issueContext }: ArticleRelate
                   <h3 className="text-[20px] font-black tracking-[-0.03em] leading-snug text-[var(--wk-text)] group-hover:text-[var(--wk-brand)] transition-colors line-clamp-2">{primary.title}</h3>
                   {primary.dek && <p className="text-[14px] leading-relaxed text-[var(--wk-text-muted)] line-clamp-2">{primary.dek}</p>}
                   <div className="flex items-center gap-2 text-[12px] text-[var(--wk-text-faint)] mt-auto">
-                    <ArticleAuthorIdentity name={primary.author} personPath={primary.authorPersonPath}  className="font-semibold hover:text-[var(--wk-brand)] transition-colors">{primary.author}</ArticleAuthorIdentity>
+                    <ArticleAuthorIdentity name={primary.author} personPath={primary.authorPersonPath} organizationPath={primary.authorOrganizationPath} nested className="font-semibold hover:text-[var(--wk-brand)] transition-colors">{primary.author}</ArticleAuthorIdentity>
                     <span>·</span><span>{primary.readingTime} min read</span><span>·</span><span>{primary.date}</span>
                   </div>
                 </div>

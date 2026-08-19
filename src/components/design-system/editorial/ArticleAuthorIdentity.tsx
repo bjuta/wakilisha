@@ -11,6 +11,7 @@ import {
 type ArticleAuthorIdentityProps = {
   name: string;
   personPath?: string | null;
+  organizationPath?: string | null;
   className?: string;
   plainClassName?: string;
   children?: ReactNode;
@@ -42,6 +43,7 @@ function plainClasses(
 export function ArticleAuthorIdentity({
   name,
   personPath,
+  organizationPath,
   className,
   plainClassName,
   children,
@@ -52,19 +54,25 @@ export function ArticleAuthorIdentity({
   const content = children ?? name;
 
   if (!personPath) {
-    return (
-      <span
-        className={
-          plainClassName
-          ?? plainClasses(className)
-        }
-      >
-        {content}
-      </span>
-    );
+    if (!organizationPath) {
+      return (
+        <span
+          className={
+            plainClassName
+            ?? plainClasses(className)
+          }
+        >
+          {content}
+        </span>
+      );
+    }
   }
 
-  if (!nested && !onClick) {
+  if (
+    !nested
+    && !onClick
+    && personPath
+  ) {
     return (
       <Link
         to={personPath}
@@ -75,13 +83,36 @@ export function ArticleAuthorIdentity({
     );
   }
 
+  if (
+    !nested
+    && !onClick
+    && organizationPath
+  ) {
+    return (
+      <Link
+        to={organizationPath}
+        className={className}
+      >
+        {content}
+      </Link>
+    );
+  }
+
+  const identityPath =
+    personPath
+    ?? organizationPath;
+
+  if (!identityPath) {
+    return null;
+  }
+
   const handleClick = (
     event: MouseEvent<HTMLElement>,
   ) => {
     event.preventDefault();
     event.stopPropagation();
     onClick?.(event);
-    navigate(personPath);
+    navigate(identityPath);
   };
 
   const handleKeyDown = (
@@ -96,7 +127,7 @@ export function ArticleAuthorIdentity({
 
     event.preventDefault();
     event.stopPropagation();
-    navigate(personPath);
+    navigate(identityPath);
   };
 
   return (
