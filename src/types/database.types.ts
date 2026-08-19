@@ -1882,6 +1882,7 @@ export type Database = {
           retired_at: string | null
           retired_by: string | null
           retired_reason: string | null
+          retired_user_id_snapshot: string | null
           superseded_by_link_id: string | null
           supersedes_link_id: string | null
           user_id: string | null
@@ -1900,6 +1901,7 @@ export type Database = {
           retired_at?: string | null
           retired_by?: string | null
           retired_reason?: string | null
+          retired_user_id_snapshot?: string | null
           superseded_by_link_id?: string | null
           supersedes_link_id?: string | null
           user_id?: string | null
@@ -1918,6 +1920,7 @@ export type Database = {
           retired_at?: string | null
           retired_by?: string | null
           retired_reason?: string | null
+          retired_user_id_snapshot?: string | null
           superseded_by_link_id?: string | null
           supersedes_link_id?: string | null
           user_id?: string | null
@@ -1936,6 +1939,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "people"
             referencedColumns: ["resource_id", "resource_kind"]
+          },
+          {
+            foreignKeyName: "person_identity_links_retired_user_snapshot_fkey"
+            columns: ["retired_user_id_snapshot"]
+            isOneToOne: false
+            referencedRelation: "retired_account_identities"
+            referencedColumns: ["user_id"]
           },
           {
             foreignKeyName: "person_identity_links_superseded_by_fkey"
@@ -3109,6 +3119,60 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "resource_kinds"
             referencedColumns: ["kind"]
+          },
+        ]
+      }
+      retired_account_identities: {
+        Row: {
+          command_receipt_id: string
+          correlation_id: string | null
+          created_at: string
+          identity_link_id: string
+          person_resource_id: string
+          reason: string
+          retired_at: string
+          retired_by: string | null
+          user_id: string
+          username_snapshot: string | null
+        }
+        Insert: {
+          command_receipt_id: string
+          correlation_id?: string | null
+          created_at?: string
+          identity_link_id: string
+          person_resource_id: string
+          reason: string
+          retired_at?: string
+          retired_by?: string | null
+          user_id: string
+          username_snapshot?: string | null
+        }
+        Update: {
+          command_receipt_id?: string
+          correlation_id?: string | null
+          created_at?: string
+          identity_link_id?: string
+          person_resource_id?: string
+          reason?: string
+          retired_at?: string
+          retired_by?: string | null
+          user_id?: string
+          username_snapshot?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "retired_account_identities_link_fkey"
+            columns: ["identity_link_id"]
+            isOneToOne: true
+            referencedRelation: "person_identity_links"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "retired_account_identities_person_fkey"
+            columns: ["person_resource_id"]
+            isOneToOne: false
+            referencedRelation: "people"
+            referencedColumns: ["resource_id"]
           },
         ]
       }
@@ -21554,6 +21618,29 @@ export type Database = {
           p_source_id: string
         }
         Returns: Json
+      }
+      retire_account_identity: {
+        Args: {
+          p_correlation_id?: string
+          p_expected_identity_revision: number
+          p_idempotency_key: string
+          p_identity_link_id: string
+          p_person_resource_id: string
+          p_reason: string
+          p_user_id: string
+        }
+        Returns: {
+          account_deleted: boolean
+          command_receipt_id: string
+          idempotent_replay: boolean
+          identity_link_id: string
+          identity_revision: number
+          person_archived: boolean
+          person_resource_id: string
+          receipt_status: string
+          result_payload: Json
+          user_id: string
+        }[]
       }
       return_correction_to_investigation: {
         Args: {
