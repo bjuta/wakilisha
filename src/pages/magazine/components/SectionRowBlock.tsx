@@ -1,6 +1,6 @@
 import { Link } from "react-router-dom";
-import { getAuthorMeta } from "@/services/authorProfiles";
 import type { MagazineArticle } from "@/services/magazineArticles";
+import { ArticleAuthorIdentity } from "@/components/design-system/editorial/ArticleAuthorIdentity";
 
 interface SectionRowBlockProps {
   section: string;
@@ -139,13 +139,13 @@ function ListVariant({ stories }: { stories: MagazineArticle[] }) {
               </p>
             )}
             <div className="flex items-center gap-2 text-[11px] text-[var(--wk-text-faint)] mt-auto pt-1">
-              <Link
-                to={`/authors/${getAuthorMeta(story.author).slug}`}
+              <ArticleAuthorIdentity name={story.author} personPath={story.authorPersonPath}
+
                 className="font-semibold hover:text-[var(--wk-brand)] transition-colors"
                 onClick={(e) => e.stopPropagation()}
               >
                 {story.author}
-              </Link>
+              </ArticleAuthorIdentity>
               <span>·</span>
               <span>{story.readingTime} min</span>
             </div>

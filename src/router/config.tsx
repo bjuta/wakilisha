@@ -98,7 +98,7 @@ import {
 import {
   NotFound,
   ResetPasswordPage,
-  AuthorProfilePage,
+  LegacyAuthorPersonRedirect,
   PersonDetailPage,
   LegacyArticleRedirect,
   PublicApiDocsPage,
@@ -313,7 +313,7 @@ const routes: RouteObject[] = [
       { path: "/u/:username/playlists/:playlistSlug", element: <ResponsivePage mobile={<PersonPlaylistDetailPage />} desktop={<PersonPlaylistDetailPage />} /> },
       { path: "/u/:username/playlists", element: <ResponsivePage mobile={<PersonPlaylistsPage />} desktop={<PersonPlaylistsPage />} /> },
       { path: "/u/:username", element: <ResponsivePage mobile={<PublicProfilePage />} desktop={<PublicProfilePage />} /> },
-      { path: "/authors/:slug", element: <ResponsivePage mobile={<AuthorProfilePage />} desktop={<AuthorProfilePage />} /> },
+      { path: "/authors/:slug", element: <LegacyAuthorPersonRedirect /> },
       { path: "/people/:slug/posts/:postId", element: <ResponsivePage mobile={<PostDetailPage />} desktop={<PostDetailPage />} /> },
       { path: "/people/:slug", element: <ResponsivePage mobile={<PersonDetailPage />} desktop={<PersonDetailPage />} /> },
       { path: "/settings", element: <ResponsivePage mobile={<MobileSettingsPage />} desktop={<SettingsPage />} /> },

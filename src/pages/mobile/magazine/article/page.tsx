@@ -5,7 +5,6 @@ import {
   useMagazineArticles,
   type MagazineArticle,
 } from "@/services/magazineArticles";
-import { getAuthorMeta } from "@/services/authorProfiles";
 import { getShareCounts, getTotalShareCount } from "@/services/shareTracking";
 import { transformReleaseShortcodes } from "@/utils/transformReleaseShortcodes";
 import { transformArtistShortcodes } from "@/utils/transformArtistShortcodes";
@@ -25,6 +24,7 @@ import { SchemaOrg } from "@/components/seo/SchemaOrg";
 import { useScrollDepthTracking } from "@/hooks/useScrollDepthTracking";
 import { useAuthUser } from "@/hooks/useAuthUser";
 import { ArticlePreviewModeBanner } from "@/pages/magazine/article/components/ArticlePreviewModeBanner";
+import { ArticleAuthorIdentity } from "@/components/design-system/editorial/ArticleAuthorIdentity";
 
 function formatReadCount(count: number): string {
   if (count >= 1000) return `${(count / 1000).toFixed(1)}k`;
@@ -244,7 +244,7 @@ export default function MobileArticle() {
           description: article.dek || undefined,
           image: article.heroUrl,
           datePublished: article.date,
-          author: article.author ? { "@type": "Person", name: article.author } : undefined,
+          author: article.authorPersonPath ? { "@type": "Person", name: article.author, url: article.authorPersonPath } : undefined,
           publisher: { "@type": "Organization", name: "WAKILISHA" },
           url: typeof window !== "undefined" ? window.location.href : undefined,
         }}
@@ -341,19 +341,19 @@ export default function MobileArticle() {
           {/* Author row — avatar, name, share action */}
           <div className="flex items-center justify-between gap-3">
             <div className="flex items-center gap-2.5">
-              <Link
-                to={`/authors/${getAuthorMeta(article.author).slug}`}
+              <ArticleAuthorIdentity name={article.author} personPath={article.authorPersonPath}
+
                 className="w-9 h-9 rounded-full bg-[var(--wk-brand)] flex items-center justify-center text-[11px] font-black text-[var(--wk-brand-on)] shrink-0"
               >
                 {initials}
-              </Link>
+              </ArticleAuthorIdentity>
               <div>
-                <Link
-                  to={`/authors/${getAuthorMeta(article.author).slug}`}
+                <ArticleAuthorIdentity name={article.author} personPath={article.authorPersonPath}
+
                   className="text-[13px] font-bold text-[var(--wk-text)] block leading-tight"
                 >
                   {article.author}
-                </Link>
+                </ArticleAuthorIdentity>
                 <span className="text-[11px] text-[var(--wk-text-muted)]">{article.date}</span>
               </div>
             </div>

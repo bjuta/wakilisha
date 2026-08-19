@@ -8,8 +8,8 @@ export const ResetPasswordPage = lazy(
   () => import("../pages/auth/reset-password/page"),
 );
 
-export const AuthorProfilePage = lazy(
-  () => import("../pages/authors/detail/page"),
+export const LegacyAuthorPersonRedirect = lazy(
+  () => import("../pages/authors/legacy-redirect/page"),
 );
 
 export const PersonDetailPage = lazy(

@@ -326,7 +326,7 @@ export default function ArticlePage() {
           description: article.dek || undefined,
           image: article.heroUrl,
           datePublished: article.date,
-          author: article.author ? { "@type": "Person", name: article.author } : undefined,
+          author: article.authorPersonPath ? { "@type": "Person", name: article.author, url: article.authorPersonPath } : undefined,
           publisher: { "@type": "Organization", name: "WAKILISHA" },
           url: typeof window !== "undefined" ? window.location.href : undefined,
         }}

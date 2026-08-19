@@ -1,13 +1,13 @@
 import { useCallback, useEffect, useMemo, useState, useRef } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useMagazineArticles, type MagazineArticle } from "@/services/magazineArticles";
-import { getAuthorMeta } from "@/services/authorProfiles";
 import { MagazineCard } from "@/pages/magazine/components/MagazineCard";
 import { SkeletonMagazinePage } from "@/components/skeletons/Skeletons";
 import { Chapter19FallbackImage } from "@/components/media/Chapter19FallbackImage";
 import { ResponsiveMediaImage } from "@/components/media/ResponsiveMediaImage";
 import { trackEvent, getAnalyticsSessionId, getCanonicalPageUrl } from "@/services/analytics";
 import { BRIEFING_SLUGS, briefingInterest, subscribeToBriefings } from "@/services/audienceSubscriptionService";
+import { ArticleAuthorIdentity } from "@/components/design-system/editorial/ArticleAuthorIdentity";
 
 function useScrollReveal(deps: unknown[] = []) {
   useEffect(() => {
@@ -245,13 +245,13 @@ export default function MobileMagazine() {
           )}
 
           <div className="flex items-center gap-2 mt-5 text-[11px] flex-wrap">
-            <Link
-              to={`/authors/${getAuthorMeta(heroStory.author).slug}`}
+            <ArticleAuthorIdentity name={heroStory.author} personPath={heroStory.authorPersonPath}
+
               className="inline-flex items-center rounded-full bg-white/10 backdrop-blur-md border border-white/15 text-white/85 font-semibold px-3 py-1.5 hover:bg-white/18 hover:text-white transition-all"
               onClick={(e) => e.stopPropagation()}
             >
               {heroStory.author}
-            </Link>
+            </ArticleAuthorIdentity>
             <span className="inline-flex items-center rounded-full bg-white/10 backdrop-blur-md border border-white/15 text-white/65 px-3 py-1.5">
               {heroStory.date || issueDate}
             </span>
@@ -415,27 +415,18 @@ export default function MobileMagazine() {
                             </p>
                           )}
                           <div className="flex items-center gap-2 text-[10px] sm:text-[11px] text-white/40">
-                            <span
-                              role="link"
-                              tabIndex={0}
+                            <ArticleAuthorIdentity
+                              name={story.author}
+                              personPath={story.authorPersonPath}
+                              nested
                               className="flex items-center gap-1.5 font-semibold text-white/60 hover:text-white/90 transition-colors cursor-pointer"
-                              onClick={(event) => {
-                                event.preventDefault();
-                                event.stopPropagation();
-                                navigate(`/authors/${getAuthorMeta(story.author).slug}`);
-                              }}
-                              onKeyDown={(event) => {
-                                if (event.key !== "Enter" && event.key !== " ") return;
-                                event.preventDefault();
-                                event.stopPropagation();
-                                navigate(`/authors/${getAuthorMeta(story.author).slug}`);
-                              }}
+                              plainClassName="flex items-center gap-1.5 font-semibold text-white/60"
                             >
                               <span className="w-4 h-4 rounded-full bg-[var(--wk-brand)] flex items-center justify-center text-[7px] font-black text-[var(--wk-brand-on)] shrink-0">
                                 {story.author.split(' ').map((n) => n[0]).join('').slice(0, 2)}
                               </span>
                               {story.author}
-                            </span>
+                            </ArticleAuthorIdentity>
                             <span className="text-white/15">·</span>
                             <span>{story.readingTime} min</span>
                           </div>

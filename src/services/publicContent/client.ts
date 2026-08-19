@@ -29,7 +29,7 @@ export type PublicStory = {
   section: string;
   dek: string;
   author: string;
-  authorSlug?: string;
+  authorPersonPath?: string | null;
   date: string;
   readingTime: number;
   heroUrl: string;

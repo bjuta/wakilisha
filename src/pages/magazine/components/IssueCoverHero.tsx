@@ -2,8 +2,8 @@ import { useEffect, useRef } from "react";
 import { Link } from "react-router-dom";
 import { WkIcon } from "@/components/design-system/Icon";
 import { ShareButton } from "@/components/design-system/share/ShareSheet";
-import { getAuthorMeta } from "@/services/authorProfiles";
 import type { MagazineArticle } from "@/services/magazineArticles";
+import { ArticleAuthorIdentity } from "@/components/design-system/editorial/ArticleAuthorIdentity";
 
 interface IssueCoverHeroProps {
   story: MagazineArticle;
@@ -64,19 +64,19 @@ export function IssueCoverHero({ story, issueNumber, issueDate }: IssueCoverHero
         {story.dek && <p className="mag-hero-v2-dek">{story.dek}</p>}
 
         <div className="mag-hero-v2-meta">
-          <Link
-            to={`/authors/${getAuthorMeta(story.author).slug}`}
+          <ArticleAuthorIdentity name={story.author} personPath={story.authorPersonPath}
+
             className="mag-hero-v2-avatar hover:opacity-80 transition-opacity"
           >
             <span>{story.author.slice(0, 2).toUpperCase()}</span>
-          </Link>
+          </ArticleAuthorIdentity>
           <div className="mag-hero-v2-meta-text">
-            <Link
-              to={`/authors/${getAuthorMeta(story.author).slug}`}
+            <ArticleAuthorIdentity name={story.author} personPath={story.authorPersonPath}
+
               className="mag-hero-v2-author hover:text-white/90 transition-colors"
             >
               By {story.author}
-            </Link>
+            </ArticleAuthorIdentity>
             <span className="mag-hero-v2-sep">·</span>
             <span>{story.date || "Undated"}</span>
             <span className="mag-hero-v2-sep">·</span>

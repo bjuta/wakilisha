@@ -437,7 +437,7 @@ async function fetchArticleMetadataManifest() {
         title: firstNonEmpty(story.title),
         description: firstNonEmpty(story.dek, story.description, story.excerpt),
         author: firstNonEmpty(story.author, story.authorName, story.byline),
-        authorSlug: firstNonEmpty(story.authorSlug, story.author_slug),
+        authorPersonPath: firstNonEmpty(story.authorPersonPath, story.author_person_path),
         date: firstNonEmpty(story.date, story.publishedAt, story.datePublished),
         modifiedAt: firstNonEmpty(story.modifiedAt, story.updatedAt, story.dateModified),
         image: publicArticleImage(story),
@@ -971,7 +971,7 @@ function pageSchema(model, url) {
     const articleMeta = ARTICLE_METADATA_BY_PATH.get(cleanPath(model.canonicalPath)) || {};
     const image = socialImageForModel(model);
     const authorName = firstNonEmpty(model.author, model.authorName, model.byline, articleMeta.author, "WAKILISHA Editorial");
-    const authorSlug = firstNonEmpty(model.authorSlug, model.author_slug, articleMeta.authorSlug);
+    const authorPersonPath = firstNonEmpty(model.authorPersonPath, model.author_person_path, articleMeta.authorPersonPath);
     const publishedAt = firstNonEmpty(model.publishedAt, model.datePublished, model.date, articleMeta.date);
     const modifiedAt = firstNonEmpty(model.modifiedAt, model.updatedAt, model.dateModified, articleMeta.modifiedAt, publishedAt);
     const article = {
@@ -981,11 +981,11 @@ function pageSchema(model, url) {
       headline: entityName,
       description: firstNonEmpty(model.description, articleMeta.description),
       image: image ? [image] : undefined,
-      author: {
+      author: authorPersonPath ? {
         "@type": "Person",
         name: authorName,
-        ...(authorSlug ? { url: canonicalUrl(`/authors/${authorSlug}`) } : {}),
-      },
+        url: canonicalUrl(authorPersonPath),
+      } : undefined,
       datePublished: publishedAt || undefined,
       dateModified: modifiedAt || undefined,
       publisher: { "@id": `${SITE_URL}/#organization` },
@@ -1440,7 +1440,7 @@ function modelFromPath(pagePath) {
     };
   }
 
-  if (["genres", "labels", "categories", "tags", "authors", "guides", "u"].includes(section) && parts[1]) {
+  if (["genres", "labels", "categories", "tags", "guides", "u"].includes(section) && parts[1]) {
     const title = titleCase(parts[1]);
     const kind = section === "u" ? "profile" : section === "guides" ? "guide" : "collection";
 

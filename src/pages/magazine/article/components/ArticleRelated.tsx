@@ -1,6 +1,6 @@
 import { Link } from "react-router-dom";
-import { getAuthorMeta } from "@/services/authorProfiles";
 import type { MagazineArticle } from "@/services/magazineArticles";
+import { ArticleAuthorIdentity } from "@/components/design-system/editorial/ArticleAuthorIdentity";
 
 interface ArticleRelatedProps {
   stories: MagazineArticle[];
@@ -67,7 +67,7 @@ export function ArticleRelated({ stories, loading, issueContext }: ArticleRelate
                   <h3 className="text-[20px] font-black tracking-[-0.03em] leading-snug text-[var(--wk-text)] group-hover:text-[var(--wk-brand)] transition-colors line-clamp-2">{primary.title}</h3>
                   {primary.dek && <p className="text-[14px] leading-relaxed text-[var(--wk-text-muted)] line-clamp-2">{primary.dek}</p>}
                   <div className="flex items-center gap-2 text-[12px] text-[var(--wk-text-faint)] mt-auto">
-                    <Link to={`/authors/${getAuthorMeta(primary.author).slug}`} className="font-semibold hover:text-[var(--wk-brand)] transition-colors">{primary.author}</Link>
+                    <ArticleAuthorIdentity name={primary.author} personPath={primary.authorPersonPath}  className="font-semibold hover:text-[var(--wk-brand)] transition-colors">{primary.author}</ArticleAuthorIdentity>
                     <span>·</span><span>{primary.readingTime} min read</span><span>·</span><span>{primary.date}</span>
                   </div>
                 </div>
