@@ -883,7 +883,7 @@ components:
         section: { type: string }
         dek: { type: string }
         author: { type: string }
-        authorSlug: { type: string }
+        authorPersonPath: { type: string, nullable: true }
         date: { type: string }
         readingTime: { type: integer }
         heroUrl: { type: string }

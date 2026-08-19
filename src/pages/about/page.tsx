@@ -3,6 +3,7 @@ import { Link } from "react-router-dom";
 import { trackEvent, getAnalyticsSessionId, getCanonicalPageUrl } from "@/services/analytics";
 import { BRIEFING_SLUGS, isValidEmail, normalizeEmail, subscribeToBriefings } from "@/services/audienceSubscriptionService";
 import { fetchAllAuthors, type AuthorRow } from "@/services/authorProfiles";
+import { resolvePublicRegistryAuthorPerson } from "@/services/people/authorCompatibilityService";
 import { Chapter19FallbackImage } from "@/components/media/Chapter19FallbackImage";
 import { getFrontendAppearanceSettings } from "@/services/adminSettings/settingsStore";
 
@@ -129,7 +130,10 @@ function isFounderProfile(name: string, role: string, slug: string) {
   );
 }
 
-function authorToPerson(author: AuthorRow): PersonProfile {
+function authorToPerson(
+  author: AuthorRow,
+  profilePath?: string | null,
+): PersonProfile {
   const name = (author.name || author.slug).trim();
   const role = author.role || "Contributor";
   const founder = isFounderProfile(name, role, author.slug);
@@ -155,7 +159,7 @@ function authorToPerson(author: AuthorRow): PersonProfile {
     team: founder ? "Founder" : role.toLowerCase().includes("editor") ? "Editorial" : "Contributor",
     location: author.location || "",
     avatarUrl: isUsablePortraitUrl(author.avatar_url) ? author.avatar_url || "" : "",
-    profilePath: `/authors/${author.slug}`,
+    profilePath: profilePath || undefined,
     links,
     source: "registry_authors",
     bio: author.bio || `${name} contributes to WAKILISHA’s coverage of African music and creative life.`,
@@ -329,6 +333,7 @@ function PersonCard({ person, featured = false }: { person: PersonProfile; featu
 
 export default function AboutPage() {
   const [authors, setAuthors] = useState<AuthorRow[]>([]);
+  const [authorPersonPaths, setAuthorPersonPaths] = useState<Record<string, string>>({});
   const [authorsStatus, setAuthorsStatus] = useState<"loading" | "ready" | "error">("loading");
   const [appearance, setAppearance] = useState(() => getFrontendAppearanceSettings());
   const heroRef = useRef<HTMLDivElement>(null);
@@ -344,9 +349,43 @@ export default function AboutPage() {
   useEffect(() => {
     let alive = true;
     fetchAllAuthors()
-      .then((rows) => {
+      .then(async (rows) => {
+        const visibleAuthors = rows.filter(
+          (row) => row.slug && row.name,
+        );
+
+        const resolvedPaths = await Promise.all(
+          visibleAuthors.map(async (author) => {
+            try {
+              const resolved =
+                await resolvePublicRegistryAuthorPerson(
+                  author.slug,
+                );
+
+              return [
+                author.slug,
+                resolved?.canonicalPath ?? null,
+              ] as const;
+            } catch {
+              return [
+                author.slug,
+                null,
+              ] as const;
+            }
+          }),
+        );
+
         if (!alive) return;
-        setAuthors(rows.filter((row) => row.slug && row.name));
+
+        const pathMap: Record<string, string> = {};
+        resolvedPaths.forEach(([slug, path]) => {
+          if (path) {
+            pathMap[slug] = path;
+          }
+        });
+
+        setAuthors(visibleAuthors);
+        setAuthorPersonPaths(pathMap);
         setAuthorsStatus("ready");
       })
       .catch((err) => {
@@ -363,7 +402,12 @@ export default function AboutPage() {
   const contributorPeople = useMemo(() => {
     const seen = new Set<string>();
     return authors
-      .map(authorToPerson)
+      .map((author) =>
+        authorToPerson(
+          author,
+          authorPersonPaths[author.slug] ?? null,
+        ),
+      )
       .filter((person) => {
         if (seen.has(person.slug)) return false;
         seen.add(person.slug);
@@ -374,7 +418,7 @@ export default function AboutPage() {
         const bRank = b.team === "Founder" ? 0 : b.team === "Editorial" ? 1 : 2;
         return aRank - bRank || a.name.localeCompare(b.name);
       });
-  }, [authors]);
+  }, [authors, authorPersonPaths]);
 
   const hasContributors = contributorPeople.length > 0;
 

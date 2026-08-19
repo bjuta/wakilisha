@@ -1,6 +1,6 @@
 import { Link } from "react-router-dom";
-import { getAuthorMeta } from "@/services/authorProfiles";
 import type { MagazineArticle } from "@/services/magazineArticles";
+import { ArticleAuthorIdentity } from "@/components/design-system/editorial/ArticleAuthorIdentity";
 
 interface LeadStoriesProps {
   stories: MagazineArticle[];
@@ -33,12 +33,12 @@ export function LeadStories({ stories }: LeadStoriesProps) {
                 <p className="mag-lead-v2-primary-dek">{primary.dek}</p>
               )}
               <div className="mag-lead-v2-primary-meta">
-                <Link
-                  to={`/authors/${getAuthorMeta(primary.author).slug}`}
+                <ArticleAuthorIdentity name={primary.author} personPath={primary.authorPersonPath}
+
                   className="hover:text-[var(--wk-brand)] transition-colors"
                 >
                   By {primary.author}
-                </Link>
+                </ArticleAuthorIdentity>
                 <span className="mag-lead-v2-meta-sep">·</span>
                 <span>{primary.readingTime} min</span>
                 <span className="mag-lead-v2-meta-sep">·</span>
@@ -65,12 +65,12 @@ export function LeadStories({ stories }: LeadStoriesProps) {
                 <p className="mag-lead-v2-secondary-dek">{secondary.dek}</p>
               )}
               <div className="mag-lead-v2-secondary-meta">
-                <Link
-                  to={`/authors/${getAuthorMeta(secondary.author).slug}`}
+                <ArticleAuthorIdentity name={secondary.author} personPath={secondary.authorPersonPath}
+
                   className="hover:text-[var(--wk-brand)] transition-colors"
                 >
                   By {secondary.author}
-                </Link>
+                </ArticleAuthorIdentity>
                 <span className="mag-lead-v2-meta-sep">·</span>
                 <span>{secondary.readingTime} min</span>
               </div>

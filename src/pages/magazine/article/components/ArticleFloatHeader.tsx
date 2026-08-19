@@ -1,10 +1,9 @@
 import { useState, useEffect, useRef } from "react";
-import { Link } from "react-router-dom";
 import { WkIcon } from "@/components/design-system/Icon";
-import { getAuthorMeta, resolveAuthorMeta, type AuthorMeta } from "@/services/authorProfiles";
 import { getShareCounts, getTotalShareCount } from "@/services/shareTracking";
 import type { MagazineArticle } from "@/services/magazineArticles";
 import { SharePopover } from "@/components/design-system/share/ShareSheet";
+import { ArticleAuthorIdentity } from "@/components/design-system/editorial/ArticleAuthorIdentity";
 
 const SECTION_COLORS: Record<string, string> = {
   Analysis: "#C44A3B",
@@ -28,23 +27,9 @@ interface ArticleFloatHeaderProps {
 }
 
 export function ArticleFloatHeader({ article }: ArticleFloatHeaderProps) {
-  const [authorMeta, setAuthorMeta] = useState<AuthorMeta | null>(null);
   const [shareCounts, setShareCounts] = useState<Record<string, number>>({});
   const [sharePopoverOpen, setSharePopoverOpen] = useState(false);
   const shareBtnRef = useRef<HTMLButtonElement>(null);
-
-  useEffect(() => {
-    let alive = true;
-    resolveAuthorMeta(article.author)
-      .then((resolved) => {
-        if (!alive) return;
-        setAuthorMeta(resolved);
-      })
-      .catch(() => {
-        // Fallback to synchronous generated meta
-      });
-    return () => { alive = false; };
-  }, [article.author]);
 
   // Fetch share counts on mount
   useEffect(() => {
@@ -55,9 +40,12 @@ export function ArticleFloatHeader({ article }: ArticleFloatHeaderProps) {
   const totalShares = getTotalShareCount(shareCounts);
   const pageUrl = typeof window !== "undefined" ? window.location.href : "";
 
-  // Use resolved author meta when available, fall back to synchronous generation
-  const meta = authorMeta ?? getAuthorMeta(article.author);
-  const initials = meta.displayName.split(" ").map((n) => n[0]).join("").slice(0, 2).toUpperCase();
+  const initials = article.author
+    .split(" ")
+    .map((name) => name[0])
+    .join("")
+    .slice(0, 2)
+    .toUpperCase();
 
   return (
     <div className="max-w-[740px] mx-auto px-6 lg:px-8 pt-12 pb-8">
@@ -104,19 +92,23 @@ export function ArticleFloatHeader({ article }: ArticleFloatHeaderProps) {
       <div className="flex items-center justify-between gap-4 flex-wrap">
         {/* Author */}
         <div className="flex items-center gap-3">
-          <Link
-            to={`/authors/${meta.slug}`}
+          <ArticleAuthorIdentity
+            name={article.author}
+            personPath={article.authorPersonPath}
             className="w-11 h-11 rounded-full bg-[var(--wk-brand)] flex items-center justify-center text-[13px] font-black text-[var(--wk-brand-on)] hover:opacity-80 transition-opacity shrink-0"
+            plainClassName="w-11 h-11 rounded-full bg-[var(--wk-brand)] flex items-center justify-center text-[13px] font-black text-[var(--wk-brand-on)] shrink-0"
           >
             {initials}
-          </Link>
+          </ArticleAuthorIdentity>
           <div>
-            <Link
-              to={`/authors/${meta.slug}`}
+            <ArticleAuthorIdentity
+              name={article.author}
+              personPath={article.authorPersonPath}
               className="text-[14px] font-bold text-[var(--wk-text)] hover:text-[var(--wk-brand)] transition-colors block leading-tight"
+              plainClassName="text-[14px] font-bold text-[var(--wk-text)] block leading-tight"
             >
-              {meta.displayName}
-            </Link>
+              {article.author}
+            </ArticleAuthorIdentity>
             <span className="text-[12px] text-[var(--wk-text-muted)]">{article.date}</span>
           </div>
         </div>

@@ -1,6 +1,6 @@
 import { Link } from "react-router-dom";
-import { getAuthorMeta } from "@/services/authorProfiles";
 import type { MagazineArticle } from "@/services/magazineArticles";
+import { ArticleAuthorIdentity } from "@/components/design-system/editorial/ArticleAuthorIdentity";
 
 interface LatestGridProps {
   stories: MagazineArticle[];
@@ -36,12 +36,12 @@ export function LatestGrid({ stories }: LatestGridProps) {
                 <p className="mag-latest-v2-dek">{story.dek}</p>
               )}
               <div className="mag-latest-v2-meta">
-                <Link
-                  to={`/authors/${getAuthorMeta(story.author).slug}`}
+                <ArticleAuthorIdentity name={story.author} personPath={story.authorPersonPath}
+
                   className="hover:text-[var(--wk-brand)] transition-colors"
                 >
                   {story.author}
-                </Link>
+                </ArticleAuthorIdentity>
                 <span className="mag-latest-v2-meta-sep">·</span>
                 <span>{story.readingTime} min</span>
                 <span className="mag-latest-v2-meta-sep">·</span>

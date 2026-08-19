@@ -235,7 +235,79 @@ function normalizePath(raw: string): string { const withoutPrefix = raw.replace(
 const WP_AUTHOR_MAP: Record<string, string> = { "1": "Wakilisha Staff", "37": "Muiruri Beautah", "38": "Shalom Kendi Mbae", "39": "Michael Mburu", "40": "Kambura Matiri", "41": "Kiuta Faith", "42": "gatwiri_c", "43": "Mary Gathoni", "44": "Timothy Muiruri", "47": "Sarah Wambi", "48": "Frank Njugi", "52": "Victor Muia", "54": "Hafare Segelan", "179": "Wangari Karume" };
 function resolveAuthor(article: Record<string, unknown>): string { const storedAuthor = String(article.author || "").trim(); if (storedAuthor && storedAuthor !== "Wakilisha") return storedAuthor; const rawMeta = (article.raw_meta || {}) as Record<string, unknown>; const wpAuthorId = rawMeta.post_author ? String(rawMeta.post_author) : ""; if (wpAuthorId && WP_AUTHOR_MAP[wpAuthorId]) return WP_AUTHOR_MAP[wpAuthorId]; return "Wakilisha Staff"; }
 function authorSlugFromName(name: string): string { return name.trim().toLowerCase().replace(/[\s_-]+/g, "-").replace(/[^a-z0-9-]/g, ""); }
-function buildArticleResponse(a: any) { const catNames = parseCategoryNames(a.categories); const section = catNames.length > 0 ? catNames[0] : "Music"; const contentText = stripHtml(String(a.content_html || "")); const tagNames = parseTagNames(a.tags); const dek = resolveDek(a, 280); let heroUrl = String(a.hero_image_url || ""); if (!heroUrl && a.content_html) heroUrl = extractFirstImgSrc(String(a.content_html)); const authorName = resolveAuthor(a); return { id: String(a.id), slug: String(a.slug), title: String(a.title), section, dek, author: authorName, authorSlug: authorSlugFromName(authorName), date: a.published_at ? String(a.published_at).split("T")[0] : "", readingTime: Math.max(1, Math.ceil(contentText.length / 1500)), heroUrl, tags: tagNames }; }
+
+type ArticleAuthorPathMap = Map<string, string>;
+
+async function loadPublicArticleAuthorPathMap(
+  supabase: ReturnType<typeof createClient>,
+  articleSlug?: string | null,
+): Promise<ArticleAuthorPathMap> {
+  const { data, error } = await supabase.rpc(
+    "list_public_article_author_paths",
+    {
+      p_article_slug: articleSlug || null,
+    },
+  );
+
+  if (error) {
+    console.error(
+      "Failed to load public Article author Person paths:",
+      error.message,
+    );
+    return new Map();
+  }
+
+  // Use the publication snapshot slug as the Article presentation join key.
+  // Snapshot UUIDs are publication-snapshot identity, not wk_articles identity.
+  return new Map(
+    (data ?? []).flatMap((row: any) => {
+      const articleSlug = String(row.article_slug || "").trim();
+      const canonicalPath = String(
+        row.author_person_path || "",
+      ).trim();
+
+      return articleSlug && canonicalPath
+        ? [[articleSlug, canonicalPath] as const]
+        : [];
+    }),
+  );
+}
+
+function buildArticleResponse(
+  a: any,
+  authorPaths: ArticleAuthorPathMap = new Map(),
+) {
+  const catNames = parseCategoryNames(a.categories);
+  const section = catNames.length > 0 ? catNames[0] : "Music";
+  const contentText = stripHtml(String(a.content_html || ""));
+  const tagNames = parseTagNames(a.tags);
+  const dek = resolveDek(a, 280);
+  let heroUrl = String(a.hero_image_url || "");
+  if (!heroUrl && a.content_html) {
+    heroUrl = extractFirstImgSrc(String(a.content_html));
+  }
+  const authorName = resolveAuthor(a);
+
+  return {
+    id: String(a.id),
+    slug: String(a.slug),
+    title: String(a.title),
+    section,
+    dek,
+    author: authorName,
+    authorPersonPath:
+      authorPaths.get(String(a.slug)) || null,
+    date: a.published_at
+      ? String(a.published_at).split("T")[0]
+      : "",
+    readingTime: Math.max(
+      1,
+      Math.ceil(contentText.length / 1500),
+    ),
+    heroUrl,
+    tags: tagNames,
+  };
+}
 
 type PublicArticleTrust = {
   sources: unknown[];
@@ -934,7 +1006,8 @@ Deno.serve(async (req) => {
       const asn = authorSlugFromName(authorName);
       const { data: allArticles } = await supabase.from("wk_article_publication_snapshots").select("id, slug, title, excerpt, author, published_at, content_html, categories, tags, hero_image_url, seo, raw_meta").eq("is_active", true).order("published_at", { ascending: false }).limit(500);
       const matchedArticles = (allArticles ?? []).filter((a: any) => authorSlugFromName(resolveAuthor(a)) === asn);
-      const articleList = matchedArticles.map((a: any) => buildArticleResponse(a));
+      const authorPaths = await loadPublicArticleAuthorPathMap(supabase);
+      const articleList = matchedArticles.map((a: any) => buildArticleResponse(a, authorPaths));
       data = { author: { id: String(author.id), slug: String(author.slug), name: String(author.name), bio: author.bio || null, role: author.role || "Contributor", location: author.location || null, avatarUrl: author.avatar_url || null, coverUrl: author.cover_url || null, socialLinks: author.social_links || [], joinedDate: author.joined_date || null }, articles: articleList, articleCount: articleList.length };
     }
 
@@ -942,9 +1015,14 @@ Deno.serve(async (req) => {
       const nonce = path.replace(/^\/preview\//, "").replace(/\/$/, "");
       const { data: article } = await supabase.rpc("resolve_article_preview_nonce", { p_nonce: nonce }).maybeSingle();
       if (!article) return jsonResponse({ data: null, meta: { reason: "expired_or_invalid" } }, origin, 404);
+      const authorPaths = await loadPublicArticleAuthorPathMap(
+        supabase,
+        String(article.slug || ""),
+      );
+
       data = {
         article: {
-          ...buildArticleResponse(article),
+          ...buildArticleResponse(article, authorPaths),
           contentHtml: String(article.content_html || ""),
           seo: (article.seo || {}) as Record<string, unknown>,
           categories: parseCategoryNames(article.categories),
@@ -963,7 +1041,8 @@ Deno.serve(async (req) => {
         supabase.from("registry_releases").select("id, slug, title, release_date, release_type, artwork_url, label_id, description, status").in("status", ["active", "draft"]).order("release_date", { ascending: false }).limit(30),
         supabase.from("wk_chart_entries_v2").select("rank, track_title, track_slug, artist_name, artwork_url, edition_id").order("rank", { ascending: true }).limit(20)
       ]);
-      const articles = (articleResult.data ?? []).map((a: any) => ({ contentType: "article" as const, ...buildArticleResponse(a) }));
+      const authorPaths = await loadPublicArticleAuthorPathMap(supabase);
+      const articles = (articleResult.data ?? []).map((a: any) => ({ contentType: "article" as const, ...buildArticleResponse(a, authorPaths) }));
       const artists = (artistResult.data ?? []).map((a: any) => { const meta = (a.metadata || {}) as Record<string, unknown>; const ag: string[] = Array.isArray(meta.genres) ? (meta.genres as string[]).map(String) : []; return { contentType: "artist" as const, id: String(a.id), slug: String(a.slug), title: String(a.display_name), section: ag[0] || "Artist", dek: ag.slice(0, 3).join(" / ") || "Artist in the registry", author: "", authorSlug: "", date: "", readingTime: 0, heroUrl: String(a.public_image_url || ""), tags: ag, originIso2: a.origin_iso2 || null }; });
       const releases = (releaseResult.data ?? []).map((r: any) => ({ contentType: "release" as const, id: String(r.id), slug: String(r.slug), title: String(r.title), section: String(r.release_type || "Release"), dek: r.description || "", author: "", authorSlug: "", date: r.release_date ? String(r.release_date).split("T")[0] : "", readingTime: 0, heroUrl: String(r.artwork_url || ""), tags: [], releaseType: String(r.release_type || "album") }));
       const chartHighlights = (chartResult.data ?? []).map((c: any) => ({ contentType: "chart_entry" as const, id: String(c.track_slug || c.edition_id), slug: String(c.track_slug || ""), title: String(c.track_title || ""), section: "Chart Entry", dek: `#${c.rank} \u00B7 ${c.artist_name || ""}`, author: String(c.artist_name || ""), authorSlug: "", date: "", readingTime: 0, heroUrl: String(c.artwork_url || ""), tags: [], rank: Number(c.rank), artistName: String(c.artist_name || "") }));
@@ -987,6 +1066,11 @@ Deno.serve(async (req) => {
       const { data: article } = await supabase.from("wk_article_publication_snapshots").select("id, slug, title, excerpt, content_html, author, published_at, modified_at, categories, tags, hero_image_url, seo, wp_status, raw_meta").eq("is_active", true).eq("slug", artSlug).maybeSingle();
       if (!article) return jsonResponse({ data: null }, origin, 404);
 
+      const authorPaths = await loadPublicArticleAuthorPathMap(
+        supabase,
+        artSlug,
+      );
+
       const { data: trust, error: trustError } = await supabase.rpc(
         "public_get_article_trust",
         { p_article_slug: artSlug },
@@ -998,7 +1082,7 @@ Deno.serve(async (req) => {
 
       data = {
         article: {
-          ...buildArticleResponse(article),
+          ...buildArticleResponse(article, authorPaths),
           contentHtml: String(article.content_html || ""),
           seo: (article.seo || {}) as Record<string, unknown>,
           categories: parseCategoryNames(article.categories),
@@ -1015,7 +1099,8 @@ Deno.serve(async (req) => {
       const now = new Date().toISOString();
       await supabase.rpc("publish_due_article_publications", { p_limit: 50 });
       const { data: articles } = await supabase.from("wk_article_publication_snapshots").select("id, slug, title, excerpt, author, published_at, content_html, categories, tags, hero_image_url, seo, raw_meta").eq("is_active", true).order("published_at", { ascending: false }).limit(limit);
-      data = { stories: (articles ?? []).map((a: any) => buildArticleResponse(a)) };
+      const authorPaths = await loadPublicArticleAuthorPathMap(supabase);
+      data = { stories: (articles ?? []).map((a: any) => buildArticleResponse(a, authorPaths)) };
     }
 
     else if (path.startsWith("/artists/")) {

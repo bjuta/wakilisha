@@ -1,7 +1,7 @@
 import { Link } from "react-router-dom";
 import { WkTag } from "@/components/design-system/primitives/Tag";
-import { getAuthorMeta } from "@/services/authorProfiles";
 import { trackEvent } from "@/services/analytics";
+import { ArticleAuthorIdentity } from "@/components/design-system/editorial/ArticleAuthorIdentity";
 
 export interface StoryCardProps {
   slug: string;
@@ -12,6 +12,7 @@ export interface StoryCardProps {
   heroUrl?: string;
   dek?: string;
   author?: string;
+  authorPersonPath?: string | null;
   isFeatured?: boolean;
   sourceSection?: string;
   sourceEntity?: string;
@@ -27,13 +28,12 @@ export function StoryCard({
   heroUrl,
   dek,
   author,
+  authorPersonPath,
   isFeatured = false,
   sourceSection,
   sourceEntity,
   clickPosition,
 }: StoryCardProps) {
-  const authorUrl = author ? `/authors/${getAuthorMeta(author).slug}` : null;
-
   const handleClick = () => {
     if (sourceSection) {
       trackEvent("card_click", {
@@ -75,15 +75,17 @@ export function StoryCard({
           <h2 className="wk-h-section mb-2">{title}</h2>
           {dek && <p className="wk-copy mb-3">{dek}</p>}
           <div className="flex items-center gap-2 text-[12px] text-[var(--wk-text-faint)]">
-            {author && authorUrl && (
+            {author && (
               <>
-                <Link
-                  to={authorUrl}
+                <ArticleAuthorIdentity
+                  name={author}
+                  personPath={authorPersonPath}
+                  nested
                   className="font-semibold hover:text-[var(--wk-brand)] transition-colors"
-                  onClick={(e) => e.stopPropagation()}
+                  plainClassName="font-semibold"
                 >
                   {author}
-                </Link>
+                </ArticleAuthorIdentity>
                 <span>·</span>
               </>
             )}
@@ -115,15 +117,17 @@ export function StoryCard({
         {section && <WkTag variant="brand">{section}</WkTag>}
         <h3 className="mt-1 line-clamp-2 text-[13px] font-bold text-[var(--wk-text)]">{title}</h3>
         <div className="mt-1 flex items-center gap-2 text-[11px] text-[var(--wk-text-faint)]">
-          {author && authorUrl && (
+          {author && (
             <>
-              <Link
-                to={authorUrl}
+              <ArticleAuthorIdentity
+                name={author}
+                personPath={authorPersonPath}
+                nested
                 className="font-semibold hover:text-[var(--wk-brand)] transition-colors"
-                onClick={(e) => e.stopPropagation()}
+                plainClassName="font-semibold"
               >
                 {author}
-              </Link>
+              </ArticleAuthorIdentity>
               <span>·</span>
             </>
           )}

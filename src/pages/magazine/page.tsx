@@ -1,7 +1,6 @@
 import { useEffect, useMemo, useState, useRef, useCallback } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { useMagazineArticles, type MagazineArticle } from "@/services/magazineArticles";
-import { getAuthorMeta } from "@/services/authorProfiles";
 import { MagazineCard } from "./components/MagazineCard";
 import { SectionCarousel } from "./components/SectionCarousel";
 import { FeaturedArtistSpotlight } from "./components/FeaturedArtistSpotlight";
@@ -26,6 +25,7 @@ import {
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import { NewsletterSubscribe } from "@/components/feature/NewsletterSubscribe";
+import { ArticleAuthorIdentity } from "@/components/design-system/editorial/ArticleAuthorIdentity";
 
 
 /* ── Scroll reveal ── */
@@ -580,13 +580,13 @@ export default function Magazine() {
           </p>
 
           <div className="flex items-center gap-2 mt-6 text-[12px] flex-wrap">
-            <Link
-              to={`/authors/${getAuthorMeta(heroStory.author).slug}`}
+            <ArticleAuthorIdentity name={heroStory.author} personPath={heroStory.authorPersonPath}
+
               className="inline-flex items-center gap-1.5 rounded-full bg-white/10 backdrop-blur-md border border-white/15 text-white/85 font-semibold px-3 py-1.5 hover:bg-white/18 hover:text-white transition-all"
               onClick={(e) => e.stopPropagation()}
             >
               {heroStory.author}
-            </Link>
+            </ArticleAuthorIdentity>
             <span className="inline-flex items-center rounded-full bg-white/10 backdrop-blur-md border border-white/15 text-white/65 px-3 py-1.5">
               {heroStory.date || issueDate}
             </span>

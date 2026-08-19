@@ -108,9 +108,14 @@ function inferPageContext(pathname: string): PageContext | null {
     return { pageType: "tag_detail", entitySlug: segments[1], entityType: "tag" };
   }
 
-  // /authors/:slug
+  // /people/:slug
+  if (segments[0] === "people" && segments.length === 2) {
+    return { pageType: "person_detail", entitySlug: segments[1], entityType: "person" };
+  }
+
+  // /authors/:slug — legacy compatibility redirect only
   if (segments[0] === "authors" && segments.length === 2) {
-    return { pageType: "author_detail", entitySlug: segments[1], entityType: "author" };
+    return { pageType: "legacy_author_redirect", entitySlug: segments[1], entityType: "person" };
   }
 
   // /preview/:nonce

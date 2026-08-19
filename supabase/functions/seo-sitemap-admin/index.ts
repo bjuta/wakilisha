@@ -461,7 +461,6 @@ async function buildInternalItems(db: ReturnType<typeof createClient>): Promise<
     { loc: makeUrl("/guides"), url_type: "static" },
     { loc: makeUrl("/categories"), url_type: "static" },
     { loc: makeUrl("/tags"), url_type: "static" },
-    { loc: makeUrl("/authors"), url_type: "static" },
     { loc: makeUrl("/about"), url_type: "static" },
     { loc: makeUrl("/contact"), url_type: "static" },
     { loc: makeUrl("/faqs"), url_type: "static" },
@@ -883,15 +882,6 @@ async function buildInternalItems(db: ReturnType<typeof createClient>): Promise<
     });
   }
 
-  for (const row of authors.data ?? []) {
-    items.push({
-      loc: makeUrl(`/authors/${row.slug}`),
-      lastmod: dateOnly(row.updated_at),
-      url_type: "author",
-      source_table: "registry_authors",
-      source_id: String(row.id),
-    });
-  }
 
   for (const program of chartPrograms.data ?? []) {
     const programSlug = String(program.public_slug || "").trim();

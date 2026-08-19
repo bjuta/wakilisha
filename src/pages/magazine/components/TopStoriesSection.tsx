@@ -1,6 +1,6 @@
 import { Link } from "react-router-dom";
-import { getAuthorMeta } from "@/services/authorProfiles";
 import type { MagazineArticle } from "@/services/magazineArticles";
+import { ArticleAuthorIdentity } from "@/components/design-system/editorial/ArticleAuthorIdentity";
 
 interface TopStoriesSectionProps {
   stories: MagazineArticle[];
@@ -71,8 +71,8 @@ export function TopStoriesSection({ stories }: TopStoriesSectionProps) {
               </p>
             )}
             <div className="flex items-center gap-2.5 text-[12px] text-white/55">
-              <Link
-                to={`/authors/${getAuthorMeta(primary.author).slug}`}
+              <ArticleAuthorIdentity name={primary.author} personPath={primary.authorPersonPath}
+
                 className="flex items-center gap-2 hover:text-white/80 transition-colors"
                 onClick={(e) => e.stopPropagation()}
               >
@@ -80,7 +80,7 @@ export function TopStoriesSection({ stories }: TopStoriesSectionProps) {
                   {primary.author.split(" ").map((n) => n[0]).join("").slice(0, 2)}
                 </div>
                 <span className="font-semibold text-white/80">{primary.author}</span>
-              </Link>
+              </ArticleAuthorIdentity>
               <span className="text-white/30">·</span>
               <span className="flex items-center gap-1">
                 <i className="ri-time-line" /> {primary.readingTime} min
@@ -126,13 +126,13 @@ export function TopStoriesSection({ stories }: TopStoriesSectionProps) {
                   </p>
                 )}
                 <div className="flex items-center gap-2 text-[11px] text-[var(--wk-text-faint)] mt-1">
-                  <Link
-                    to={`/authors/${getAuthorMeta(story.author).slug}`}
+                  <ArticleAuthorIdentity name={story.author} personPath={story.authorPersonPath}
+
                     className="font-semibold hover:text-[var(--wk-brand)] transition-colors"
                     onClick={(e) => e.stopPropagation()}
                   >
                     {story.author}
-                  </Link>
+                  </ArticleAuthorIdentity>
                   <span>·</span>
                   <span>{story.readingTime} min read</span>
                 </div>

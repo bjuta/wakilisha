@@ -1,6 +1,6 @@
 import { Link } from "react-router-dom";
-import { getAuthorMeta } from "@/services/authorProfiles";
 import type { MagazineArticle } from "@/services/magazineArticles";
+import { ArticleAuthorIdentity } from "@/components/design-system/editorial/ArticleAuthorIdentity";
 
 interface CuratedGridProps {
   stories: MagazineArticle[];
@@ -31,12 +31,12 @@ export function CuratedGrid({ stories }: CuratedGridProps) {
               <h3 className="mag-curated-primary-title">{primary.title}</h3>
               {primary.dek && <p className="mag-curated-primary-dek">{primary.dek}</p>}
               <div className="mag-curated-primary-meta">
-                <Link
-                  to={`/authors/${getAuthorMeta(primary.author).slug}`}
+                <ArticleAuthorIdentity name={primary.author} personPath={primary.authorPersonPath}
+
                   className="hover:text-[var(--wk-brand)] transition-colors"
                 >
                   By {primary.author}
-                </Link>
+                </ArticleAuthorIdentity>
                 <span className="mag-curated-meta-sep">·</span>
                 <span>{primary.readingTime} min</span>
               </div>
@@ -58,12 +58,12 @@ export function CuratedGrid({ stories }: CuratedGridProps) {
                 <span className="mag-curated-secondary-section">{story.section}</span>
                 <h4 className="mag-curated-secondary-title">{story.title}</h4>
                 <div className="mag-curated-secondary-meta">
-                  <Link
-                    to={`/authors/${getAuthorMeta(story.author).slug}`}
+                  <ArticleAuthorIdentity name={story.author} personPath={story.authorPersonPath}
+
                     className="hover:text-[var(--wk-brand)] transition-colors"
                   >
                     {story.author}
-                  </Link>
+                  </ArticleAuthorIdentity>
                   <span className="mag-curated-meta-sep">·</span>
                   <span>{story.readingTime} min</span>
                 </div>
