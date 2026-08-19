@@ -46,6 +46,14 @@ const notificationBell = read(
   "src/components/feature/community/NotificationBell.tsx",
 );
 
+const notificationsPage = read(
+  "src/pages/notifications/page.tsx",
+);
+
+const mobileAppLayout = read(
+  "src/components/mobile/MobileAppLayout.tsx",
+);
+
 const mobileCss = read(
   "src/styles/wakilisha-mobile-ch53-75.css",
 );
@@ -192,14 +200,20 @@ if (
 
 if (
   !notificationBell.includes(
-    "aria-label={`Notifications",
+    'to="/notifications"',
   ) ||
   !notificationBell.includes(
-    '<span className="pnl">Notifications</span>',
+    "aria-label={`Notifications",
+  ) ||
+  !/<h1[^>]*>\s*Notifications\s*<\/h1>/m.test(
+    notificationsPage,
+  ) ||
+  !mobileAppLayout.includes(
+    '{ label: "Notifications", to: "/notifications", icon: "Bell" }',
   )
 ) {
   fail(
-    "Notifications visible text and accessible name do not match",
+    "Notifications destination, visible label, or accessible name is incomplete",
   );
 }
 

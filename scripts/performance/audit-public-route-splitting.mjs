@@ -165,9 +165,12 @@ const directLazyImports = [
  * - ../pages/playlists/person/page
  * - ../pages/playlists/person/detail/page
  *
- * The current authority is therefore 59 direct lazy imports.
+ * Notifications adds one more direct lazy public import:
+ * - ../pages/notifications/page
+ *
+ * The current authority is therefore 60 direct lazy imports.
  */
-const expectedDirectLazyImportCount = 59;
+const expectedDirectLazyImportCount = 60;
 
 if (
   directLazyImports.length !==
@@ -243,6 +246,7 @@ for (const requiredModule of [
   "../pages/releases/detail/page",
   "../pages/mobile/releases/detail/page",
   "../pages/following/page",
+  "../pages/notifications/page",
   "../pages/start/page",
   "../pages/settings/page",
   "../pages/mobile/settings/page",
@@ -347,9 +351,12 @@ const routePaths = [
  * - /u/:username/playlists
  * - /u/:username/playlists/:playlistSlug
  *
- * The current authority is therefore 161 paths.
+ * Notifications adds one signed-in public route:
+ * - /notifications
+ *
+ * The current authority is therefore 162 paths.
  */
-const expectedRoutePathCount = 161;
+const expectedRoutePathCount = 162;
 
 if (routePaths.length !== expectedRoutePathCount) {
   fail(
@@ -366,7 +373,7 @@ const routeChecksum = crypto
   .digest("hex");
 
 const expectedRouteChecksum =
-  "1c6c2fbb0c457afee7e1ef8e654d55e37feebcd15c77a3e08ad619532ec2f988";
+  "07aab54e542f6ec86eaa5c9591411c550598c56cc93300d060fcabf1c2ab8a58";
 
 if (
   routeChecksum !==

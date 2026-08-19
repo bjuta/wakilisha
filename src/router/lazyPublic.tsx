@@ -140,6 +140,10 @@ export const FollowingPage = lazy(
   () => import("../pages/following/page"),
 );
 
+export const NotificationsPage = lazy(
+  () => import("../pages/notifications/page"),
+);
+
 export const MusicPage = lazy(
   () => import("../pages/music/page"),
 );

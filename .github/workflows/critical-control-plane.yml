@@ -85,6 +85,9 @@ jobs:
       - name: Enforce public Post delete product UI
         run: npx vitest run test/community/post-delete-product-ui.test.ts
 
+      - name: Enforce dedicated Notifications product UI
+        run: npx vitest run test/community/notifications-page-m8c4.test.ts
+
       - name: Enforce public configuration and anonymous authority boundaries
         run: >-
           npx vitest run

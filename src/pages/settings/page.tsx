@@ -1,5 +1,5 @@
-import { useState } from "react";
-import { Link } from "react-router-dom";
+import { useEffect, useState } from "react";
+import { Link, useSearchParams } from "react-router-dom";
 import { useUserSettings } from "@/hooks/useUserSettings";
 import { WkIcon } from "@/components/design-system/Icon";
 import { AccountSettingsPane } from "./components/AccountSettingsPane";
@@ -44,8 +44,30 @@ const tabs: { key: SettingsTab; icon: string; desc: string }[] = [
   },
 ];
 
+function isSettingsTab(
+  value: string | null,
+): value is SettingsTab {
+  return tabs.some(
+    (tab) => tab.key === value,
+  );
+}
+
 export default function SettingsPage() {
-  const [active, setActive] = useState<SettingsTab>("Account");
+  const [searchParams] = useSearchParams();
+  const requestedSection =
+    searchParams.get("section");
+  const [active, setActive] =
+    useState<SettingsTab>(
+      isSettingsTab(requestedSection)
+        ? requestedSection
+        : "Account",
+    );
+
+  useEffect(() => {
+    if (isSettingsTab(requestedSection)) {
+      setActive(requestedSection);
+    }
+  }, [requestedSection]);
 
   const {
     profile,
