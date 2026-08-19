@@ -8,7 +8,6 @@ import { WkIcon } from "@/components/design-system/Icon";
 import { useTheme } from "@/components/design-system/theme/ThemeProvider";
 import { Portal } from "@/components/base/Portal";
 import { MobileFullPlayer } from "./MobileFullPlayer";
-import { NotificationBell } from "@/components/feature/community/NotificationBell";
 import { usePendingCommunityActionReplay } from "@/hooks/usePendingCommunityActionReplay";
 import {
   connectAppleMusicForPlayback,
@@ -26,7 +25,7 @@ const SIGNED_IN_NAV: MobileNavItem[] = [
   { label: "Following", to: "/following", icon: "UserPlus" },
   { label: "Charts", to: "/charts", icon: "BarChart3" },
   { label: "Home", to: "/", icon: "Home", prominent: true },
-  { label: "Artists", to: "/artists", icon: "Mic2" },
+  { label: "Notifications", to: "/notifications", icon: "Bell" },
 ];
 
 const SIGNED_OUT_NAV: MobileNavItem[] = [
@@ -400,13 +399,16 @@ function MobileBottomNav() {
               </Link>
 
               {isLoggedIn && (
-                <div className="flex min-h-14 flex-col items-center justify-center gap-0.5 rounded-2xl border border-[var(--wk-border)] bg-[var(--wk-bg)] px-2 py-1.5 text-[11px] font-bold text-[var(--wk-text)]">
-                  <NotificationBell
-                    userId={authUser.id}
-                    placement="bottom"
+                <Link
+                  to="/artists"
+                  className="flex min-h-14 flex-col items-center justify-center gap-1.5 rounded-2xl border border-[var(--wk-border)] bg-[var(--wk-bg)] px-2 py-2 text-[11px] font-bold text-[var(--wk-text)]"
+                >
+                  <WkIcon
+                    name="Mic2"
+                    size={18}
                   />
-                  <span>Notifications</span>
-                </div>
+                  <span>Artists</span>
+                </Link>
               )}
             </div>
 

@@ -1,5 +1,5 @@
 import { useEffect, useState, useCallback } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { useUserSettings } from "@/hooks/useUserSettings";
 import { useTheme, type ThemeMode } from "@/components/design-system/theme/ThemeProvider";
 import { WakilishaToggle } from "@/components/design-system/primitives/WakilishaToggle";
@@ -25,9 +25,31 @@ const ACCENTS = [
   { label: "Teal", value: "#4AB8A0" },
 ];
 
+function isSettingsTab(
+  value: string | null,
+): value is SettingsTab {
+  return TABS.some(
+    (tab) => tab.key === value,
+  );
+}
+
 export default function MobileSettingsPage() {
-  const [active, setActive] = useState<SettingsTab>("Account");
+  const [searchParams] = useSearchParams();
+  const requestedSection =
+    searchParams.get("section");
+  const [active, setActive] =
+    useState<SettingsTab>(
+      isSettingsTab(requestedSection)
+        ? requestedSection
+        : "Account",
+    );
   const navigate = useNavigate();
+
+  useEffect(() => {
+    if (isSettingsTab(requestedSection)) {
+      setActive(requestedSection);
+    }
+  }, [requestedSection]);
 
   const {
     profile,

@@ -40,6 +40,10 @@ const notificationBell = readFileSync(
   "src/components/feature/community/NotificationBell.tsx",
   "utf8",
 );
+const notificationsPage = readFileSync(
+  "src/pages/notifications/page.tsx",
+  "utf8",
+);
 const notificationSettings = readFileSync(
   "src/pages/settings/components/NotificationsSettingsPane.tsx",
   "utf8",
@@ -210,12 +214,12 @@ describe("WAKILISHA M8C.4 Mention product UI", () => {
     );
   });
 
-  it("presents Post Mention alerts and the stored Mention preference in human language", () => {
-    expect(notificationBell).toContain(
-      "post_mention: 'ri-at-line'",
+  it("presents Post Mention notifications and the stored Mention preference in human language", () => {
+    expect(notificationsPage).toContain(
+      'post_mention: "ri-at-line"',
     );
-    expect(notificationBell).toContain(
-      "post_mention: 'mentioned you in a Post'",
+    expect(notificationsPage).toContain(
+      'post_mention: "mentioned you in a Post"',
     );
     expect(notificationSettings).toContain(
       "Get notified when someone @mentions you in a Post or comment.",
@@ -324,16 +328,16 @@ describe("WAKILISHA M8C.4 Mention product UI", () => {
       "aria-label={`Notifications",
     );
     expect(notificationBell).toContain(
-      '<span className="pnl">Notifications</span>',
+      'to="/notifications"',
     );
     expect(notificationBell).not.toContain(
-      '<span className="pnl">Alerts</span>',
+      "Alerts",
     );
     expect(mobileLayout).toContain(
-      "<span>Notifications</span>",
+      '{ label: "Notifications", to: "/notifications", icon: "Bell" }',
     );
     expect(mobileLayout).not.toContain(
-      "<span>Alerts</span>",
+      "Alerts",
     );
   });
 

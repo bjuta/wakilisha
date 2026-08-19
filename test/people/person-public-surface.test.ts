@@ -1429,7 +1429,17 @@ describe(
 
         expect(mobileAppLayout)
           .toContain(
-            "NotificationBell",
+            '{ label: "Notifications", to: "/notifications", icon: "Bell" }',
+          );
+
+        expect(mobileAppLayout)
+          .toContain(
+            'to="/artists"',
+          );
+
+        expect(mobileAppLayout)
+          .not.toContain(
+            "<NotificationBell",
           );
 
         expect(mobileChromeCss)
