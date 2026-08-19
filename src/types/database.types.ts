@@ -21403,6 +21403,10 @@ export type Database = {
         Args: { p_nonce: string }
         Returns: Json
       }
+      resolve_public_registry_author_person: {
+        Args: { p_slug: string }
+        Returns: Json
+      }
       resolve_registry_relationship_endpoint: {
         Args: {
           p_endpoint_side: string
