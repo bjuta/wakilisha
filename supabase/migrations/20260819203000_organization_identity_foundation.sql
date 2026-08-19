@@ -546,7 +546,7 @@ begin
             'Wakilisha Staff'
     ),
     encode(
-      digest(
+      extensions.digest(
         string_agg(
           article_id::text || '|' ||
           resource_id::text || '|' ||
