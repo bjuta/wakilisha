@@ -20503,6 +20503,15 @@ export type Database = {
           visibility: string
         }[]
       }
+      list_public_article_author_paths: {
+        Args: { p_article_slug?: string }
+        Returns: {
+          article_id: string
+          article_slug: string
+          author_person_id: string
+          author_person_path: string
+        }[]
+      }
       list_public_person_community_activity: {
         Args: {
           p_activity_kind?: string
