@@ -134,6 +134,20 @@ describe(
     );
 
     it(
+      "schema-qualifies pgcrypto digest for migration-session portability",
+      () => {
+        expect(migration)
+          .toContain(
+            "extensions.digest(",
+          );
+        expect(migration)
+          .not.toContain(
+            "\\n      digest(\\n",
+          );
+      },
+    );
+
+    it(
       "preserves Person authority and human Article cardinality",
       () => {
         expect(verifier)
