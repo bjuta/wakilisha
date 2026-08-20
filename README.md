@@ -1,16 +1,39 @@
-# WAKILISHA React Rebuild
+# WAKILISHA
 
-This repository is the clean React-era home for WAKILISHA.
+WAKILISHA is a cultural platform, beginning with music.
 
-The first milestone is **data repair, not UI**.
+This repository is the React-era production home for the public platform, Registry, editorial tools, Community, shared Trust systems, Media, and the long-running cultural production programme.
 
-WAKILISHA is moving from a WordPress plugin into a unified React app, but we are not copying WordPress into React. The old WordPress plugin and Supabase export contain the cultural data spine: tracks, artists, releases, labels, genres, charts, chart entries, media, articles, guides, old slugs, and preserved registry rows. The job now is to repair that data into a clean graph before building public pages.
+The project began with WordPress and Supabase data repair. That foundation remains important project history, but it is no longer the current implementation phase.
 
-## Current migration rule
+## Current programme
 
-Do not build frontend pages directly on the flat imported tables.
+Read these first:
 
-Build the repaired data layer first:
+```text
+docs/institute/PROGRAMME_STATUS.md
+docs/roadmap/wakilisha-master-programme-map.md
+docs/institute/two-workspace-pilot-audit-and-build-plan.md
+```
+
+As of 20 August 2026:
+
+- Phases 0 through 5 are complete.
+- Phase 5 Playlist closed after the first real governed Playlist was reviewed and published end to end.
+- The Community, onboarding, Personal Playlist, identity, Organization, and reliability work completed afterward is recorded as the Post-Phase-5 Interlude.
+- The next numbered programme phase is **Phase 6: Audio**.
+
+The roadmap is an orientation tool. Building WAKILISHA naturally exposes adjacent work, and those detours can materially improve the platform. When they do, record what changed and reconcile the map so the project remains understandable.
+
+Do not infer the current programme phase from old parity documents, local milestone labels, or chat history. Use the current programme status and master map.
+
+## Historical foundation: data repair first
+
+The React rebuild began with data repair rather than UI work.
+
+WAKILISHA moved from a WordPress plugin into a unified React app, but the goal was never to copy WordPress into React. The old WordPress plugin and Supabase export contained the cultural data spine: tracks, artists, releases, labels, genres, charts, chart entries, media, articles, guides, old slugs, and preserved Registry rows. The first job was to repair that data into a clean graph before building public pages.
+
+That historical migration rule was:
 
 ```text
 raw Supabase CSVs
@@ -21,11 +44,13 @@ raw Supabase CSVs
   -> React UI
 ```
 
+The sections below preserve that original migration context because it still matters when working on Registry history, imported relationships, old routes, and one-time repair logic.
+
 ## Structured Supabase import bundle
 
 The large CSV bundle is stored outside GitHub because it is too large for normal source control.
 
-Current source file:
+Historical source file:
 
 ```text
 wakilisha_supabase_import_2026-05-30.zip
@@ -77,15 +102,9 @@ data/
 
 The raw CSVs are intentionally ignored by Git. They are source data files, not application source code. Keep them locally under the `raw/` folder and load them through repeatable migration scripts.
 
-## First build target: data repair
+## Historical first repair target
 
-Create a migration/repair package, ideally:
-
-```text
-packages/migration
-```
-
-The repair package should produce:
+The repair package was designed to produce:
 
 ```text
 entity_relationships
@@ -101,15 +120,15 @@ playback coverage report
 relationship review queue
 ```
 
-## First repair priority: relationship graph
+## Historical first repair priority: relationship graph
 
-The current imported dataset has the content, but the relationship graph is incomplete. `wk_entity_relationships` is empty. The relationships are recoverable from `wk_old_registry_rows`, especially old rows corresponding to track-artist links, release-track links, artist-genre links, entity slugs, chart edition items, track sources, release sources, release shell tracks, and release shell artists.
+The imported dataset contained the content, but the relationship graph was incomplete. `wk_entity_relationships` was empty. The relationships were recoverable from `wk_old_registry_rows`, especially old rows corresponding to track-artist links, release-track links, artist-genre links, entity slugs, chart edition items, track sources, release sources, release shell tracks, and release shell artists.
 
-Build order:
+Original build order:
 
 1. CSV loader: identify each export by columns, not by filename.
 2. Canonical entity index for tracks, artists, releases, labels, genres, chart entries, and media.
-3. Slug resolver from old slugs, registry hrefs, and WordPress items.
+3. Slug resolver from old slugs, Registry hrefs, and WordPress items.
 4. Rebuild track to artist relationships.
 5. Rebuild release to track relationships.
 6. Rebuild artist to genre relationships.
@@ -118,11 +137,11 @@ Build order:
 9. Rebuild entity to media relationships.
 10. Generate duplicate candidates and review queue rows.
 
-## Non-negotiables
+## Data-repair non-negotiables
 
 Do not silently guess risky relationships. Flag them for review.
 
-Review queue items must include:
+Review queue items should include:
 
 ```text
 combined artist strings
@@ -139,9 +158,19 @@ The direct `preview_url` fields are not trustworthy. Extract clean playback data
 
 Release states such as `canonicalized`, `duplicate_suspected`, `review_needed`, and `rejected` must be preserved. Do not flatten all releases into a simple published list.
 
-## Repo docs
+## Repository documentation
 
-Use these docs as the implementation guide:
+Current programme orientation:
+
+```text
+docs/institute/PROGRAMME_STATUS.md
+docs/roadmap/wakilisha-master-programme-map.md
+docs/roadmap/post-phase-5-interlude-ledger.md
+docs/roadmap/document-authority-map.md
+docs/institute/two-workspace-pilot-audit-and-build-plan.md
+```
+
+Historical repair and parity references include:
 
 ```text
 docs/data-repair-first-implementation-plan.md
@@ -154,11 +183,14 @@ docs/wordpress-plugin-audit.md
 docs/culture-context-engine-plan.md
 docs/magazine-issue-engine-plan.md
 docs/magazine-issue-ui-experience-plan.md
+docs/parity/
 ```
 
-## Acceptance gate before frontend work
+Read `docs/parity/README.md` before treating parity-phase numbering as current programme numbering.
 
-Do not start React page design until the data repair package can prove:
+## Historical frontend acceptance gate
+
+The original data-repair programme required the following before React page design:
 
 ```text
 all CSVs load repeatedly
@@ -173,4 +205,4 @@ old routes are active, redirected, retired, or flagged
 React page payloads can be generated from repaired graph queries
 ```
 
-Once this gate is met, the app can safely build charts, artists, tracks, releases, labels, genres, magazine, guides, registry canvas, the player, corrections, and Admin Studio without carrying over WordPress-era structural mess.
+That gate belongs to the repository's foundation history. The current programme now builds on the much larger production system documented above.
