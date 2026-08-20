@@ -350,16 +350,18 @@ function publicArticleImage(article) {
   );
 }
 
-async function fetchArticleImageManifest() {
+async function fetchArticleManifests() {
   const supabaseUrl = envValue("VITE_PUBLIC_SUPABASE_URL").replace(/\/+$/, "");
   const anonKey = envValue("VITE_PUBLIC_SUPABASE_ANON_KEY");
   const explicitBase = envValue("VITE_PUBLIC_API_BASE").replace(/\/+$/, "");
   const apiBase = explicitBase || (supabaseUrl ? `${supabaseUrl}/functions/v1/public-content-read` : "");
 
   if (!apiBase) {
-    explicitBase = envValue("VITE_PUBLIC_API_BASE").replace(/\/+$/, "");
-  console.warn("Article image manifest skipped: no VITE_PUBLIC_API_BASE or VITE_PUBLIC_SUPABASE_URL.");
-    return new Map();
+    console.warn("Article manifests skipped: no VITE_PUBLIC_API_BASE or VITE_PUBLIC_SUPABASE_URL.");
+    return {
+      imageByPath: new Map(),
+      metadataByPath: new Map(),
+    };
   }
 
   try {
@@ -368,8 +370,11 @@ async function fetchArticleImageManifest() {
     });
 
     if (!response.ok) {
-      console.warn(`Article image manifest skipped: ${response.status} ${response.statusText}`);
-      return new Map();
+      console.warn(`Article manifests skipped: ${response.status} ${response.statusText}`);
+      return {
+        imageByPath: new Map(),
+        metadataByPath: new Map(),
+      };
     }
 
     const payload = await response.json();
@@ -380,50 +385,6 @@ async function fetchArticleImageManifest() {
       [];
 
     const imageByPath = new Map();
-
-    for (const story of Array.isArray(stories) ? stories : []) {
-      const slug = firstNonEmpty(story.slug, story.path, story.url);
-      const pagePath = articlePathFromSlug(slug);
-      const image = publicArticleImage(story);
-      if (pagePath && image) imageByPath.set(cleanPath(pagePath), image);
-    }
-
-    console.log(`Article image manifest loaded: ${imageByPath.size.toLocaleString()} article images.`);
-    return imageByPath;
-  } catch (error) {
-    console.warn(`Article image manifest skipped: ${error instanceof Error ? error.message : String(error)}`);
-    return new Map();
-  }
-}
-
-async function fetchArticleMetadataManifest() {
-  const supabaseUrl = envValue("VITE_PUBLIC_SUPABASE_URL").replace(/\/+$/, "");
-  const anonKey = envValue("VITE_PUBLIC_SUPABASE_ANON_KEY");
-  const explicitBase = envValue("VITE_PUBLIC_API_BASE").replace(/\/+$/, "");
-  const apiBase = explicitBase || (supabaseUrl ? `${supabaseUrl}/functions/v1/public-content-read` : "");
-
-  if (!apiBase) {
-    console.warn("Article metadata manifest skipped: no VITE_PUBLIC_API_BASE or VITE_PUBLIC_SUPABASE_URL.");
-    return new Map();
-  }
-
-  try {
-    const response = await fetchWithTimeout(`${apiBase}/magazine?limit=1000`, {
-      headers: publicContentHeaders(anonKey),
-    });
-
-    if (!response.ok) {
-      console.warn(`Article metadata manifest skipped: ${response.status} ${response.statusText}`);
-      return new Map();
-    }
-
-    const payload = await response.json();
-    const stories =
-      payload?.data?.stories ||
-      payload?.stories ||
-      payload?.data ||
-      [];
-
     const metadataByPath = new Map();
 
     for (const story of Array.isArray(stories) ? stories : []) {
@@ -431,7 +392,14 @@ async function fetchArticleMetadataManifest() {
       const pagePath = articlePathFromSlug(slug);
       if (!pagePath) continue;
 
-      metadataByPath.set(cleanPath(pagePath), {
+      const cleanPagePath = cleanPath(pagePath);
+      const image = publicArticleImage(story);
+
+      if (image) {
+        imageByPath.set(cleanPagePath, image);
+      }
+
+      metadataByPath.set(cleanPagePath, {
         id: firstNonEmpty(story.id),
         slug: firstNonEmpty(story.slug),
         title: firstNonEmpty(story.title),
@@ -441,15 +409,23 @@ async function fetchArticleMetadataManifest() {
         authorOrganizationPath: firstNonEmpty(story.authorOrganizationPath, story.author_organization_path),
         date: firstNonEmpty(story.date, story.publishedAt, story.datePublished),
         modifiedAt: firstNonEmpty(story.modifiedAt, story.updatedAt, story.dateModified),
-        image: publicArticleImage(story),
+        image,
       });
     }
 
+    console.log(`Article image manifest loaded: ${imageByPath.size.toLocaleString()} article images.`);
     console.log(`Article metadata manifest loaded: ${metadataByPath.size.toLocaleString()} article rows.`);
-    return metadataByPath;
+
+    return {
+      imageByPath,
+      metadataByPath,
+    };
   } catch (error) {
-    console.warn(`Article metadata manifest skipped: ${error instanceof Error ? error.message : String(error)}`);
-    return new Map();
+    console.warn(`Article manifests skipped: ${error instanceof Error ? error.message : String(error)}`);
+    return {
+      imageByPath: new Map(),
+      metadataByPath: new Map(),
+    };
   }
 }
 
@@ -1679,8 +1655,9 @@ async function main() {
     `Organization metadata manifest loaded: ${organizationMetadataCount.toLocaleString()} Organization rows.`,
   );
 
-  ARTICLE_IMAGE_BY_PATH = await fetchArticleImageManifest();
-  ARTICLE_METADATA_BY_PATH = await fetchArticleMetadataManifest();
+  const articleManifests = await fetchArticleManifests();
+  ARTICLE_IMAGE_BY_PATH = articleManifests.imageByPath;
+  ARTICLE_METADATA_BY_PATH = articleManifests.metadataByPath;
   ARTIST_METADATA_BY_PATH = await fetchArtistMetadataManifest();
   RELEASE_METADATA_BY_PATH = await fetchReleaseMetadataManifest();
   TRACK_METADATA_BY_PATH = await fetchTrackMetadataManifest();
