@@ -6,9 +6,9 @@ Date: 9 August 2026
 
 Phase 5A is closed.
 
-Phase 5B is active.
+Phase 5B is complete.
 
-The authoritative programme requires:
+The authoritative programme required:
 
 - public collection and detail routes
 - responsive playback
@@ -20,7 +20,23 @@ The authoritative programme requires:
 - cached read model
 - migration of useful existing drafts
 
-The exit gate is one real Playlist reviewed and published end to end.
+The exit gate was one real Playlist reviewed and published end to end.
+
+That gate is satisfied.
+
+Completion evidence:
+
+- PR #590 shipped the public Playlist product and recorded the first production acceptance for the public surface and Registry contribution path.
+- PR #591 seeded the first real Phase 5B Playlist intake.
+- PR #592 completed the first Playlist Registry canonicalization.
+- PR #593 recorded the first governed publication of `Top 50 Kenyan Songs Of 2025`. Its verifier required published state, submitted, approved, and published immutable versions, durable review events, a durable publication snapshot, 50 public tracks, 50 playable tracks, 50 artist-linked tracks, 50 Registry-linked tracks, and 50 editor notes.
+- PR #597 added Playlist editorial lifecycle parity.
+- PR #598 added exact version-bound Playlist Preview.
+- PR #599 proved published-update review continuity and recorded production acceptance through published Version 8.
+
+The Playlist product remains active and can continue to evolve as use exposes new needs. Its Phase 5 foundation no longer needs to remain open for that product work to continue.
+
+The current numbered programme status is recorded in `docs/institute/PROGRAMME_STATUS.md` and `docs/roadmap/wakilisha-master-programme-map.md`.
 
 ## Product standard
 
@@ -251,7 +267,7 @@ M218 does not own:
 - PlayerContext provider adapters
 - SEO build integration
 
-Those remain Phase 5B work after the publication contract is proven.
+Those remained Phase 5B work after the publication contract was proven.
 
 ## Acceptance
 
@@ -278,3 +294,9 @@ Phase 5B playback runtime acceptance proved one global WAKILISHA player across p
 Registry-backed tracks may carry Apple Music catalog identity independently of their primary Playlist playback engine. When Apple Music is connected, full Apple playback takes precedence over preview audio. Siaka was accepted as the real production-backed proof of this behavior through Registry Apple Music song identity `1882060090`.
 
 The collapsed mobile player seek interaction remains deferred to dedicated player UI work. Full-player mobile seeking and playback correctness are accepted. Phase 5B does not add further interaction complexity to the collapsed mobile dock.
+
+## Completion checkpoint
+
+The Phase 5B public product, playback authority, Registry canonicalization, first real publication, exact Preview, editorial lifecycle parity, cover governance, and published-update review continuity are accepted.
+
+Future Playlist work should start from those accepted contracts and change them only when real product use requires it.
