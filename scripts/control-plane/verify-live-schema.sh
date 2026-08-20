@@ -26,7 +26,7 @@ if [ ! -f "$BASELINE_FILE" ]; then
 fi
 
 DRY_RUN_OUTPUT="$(
-  supabase db push \
+  npx --yes "supabase@${SUPABASE_CLI_VERSION}" db push \
     --dry-run \
     --linked \
     2>&1
