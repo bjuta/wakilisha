@@ -12,6 +12,10 @@
 ## Database deployment
 
 - Apply only immutable files from `supabase/migrations`.
+- Promote repository migrations only with `bash scripts/control-plane/promote-repository-migrations.sh` from exact merged `main`.
+- That promotion path must show the intended repository migration filenames in the native `supabase db push --dry-run --linked` output before any write.
+- Do not use connector `apply_migration` or any raw-SQL migration helper for a migration file that already exists in the repository. Those paths may generate a different migration version and create ledger drift.
+- After promotion, require the production ledger versions to match the numeric prefixes of the repository filenames and require zero pending migrations.
 - Never apply SQL from archived migration trees.
 - Verify the intended grants, policies, functions, and public read contracts.
 - Regenerate committed database types after the live migration.
