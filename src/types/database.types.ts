@@ -4046,11 +4046,19 @@ export type Database = {
         Args: { p_resource_id: string }
         Returns: boolean
       }
+      current_user_can_participate_audio_review: {
+        Args: { p_resource_id: string }
+        Returns: boolean
+      }
       current_user_can_participate_playlist_review: {
         Args: { p_resource_id: string }
         Returns: boolean
       }
       current_user_can_publish_article: { Args: never; Returns: boolean }
+      current_user_can_publish_audio: {
+        Args: { p_resource_id: string }
+        Returns: boolean
+      }
       current_user_can_publish_correction_note: {
         Args: { p_case_resource_id: string }
         Returns: boolean
@@ -21265,6 +21273,29 @@ export type Database = {
           version_number: number
         }[]
       }
+      publish_audio_publication_version: {
+        Args: {
+          p_approved_version_id: string
+          p_correlation_id?: string
+          p_expected_authority_revision: number
+          p_idempotency_key: string
+          p_note?: string
+          p_publication_id: string
+        }
+        Returns: {
+          authority_revision: number
+          command_receipt_id: string
+          idempotent_replay: boolean
+          lifecycle_status: string
+          publication_id: string
+          publication_snapshot_id: string
+          receipt_status: string
+          resource_id: string
+          result_payload: Json
+          version_id: string
+          version_number: number
+        }[]
+      }
       publish_correction_note: {
         Args: {
           p_case_resource_id: string
@@ -22051,6 +22082,29 @@ export type Database = {
           result_payload: Json
         }[]
       }
+      review_audio_publication: {
+        Args: {
+          p_correlation_id?: string
+          p_decision: string
+          p_expected_authority_revision: number
+          p_idempotency_key: string
+          p_note?: string
+          p_publication_id: string
+          p_submitted_version_id: string
+        }
+        Returns: {
+          authority_revision: number
+          command_receipt_id: string
+          idempotent_replay: boolean
+          lifecycle_status: string
+          publication_id: string
+          receipt_status: string
+          resource_id: string
+          result_payload: Json
+          version_id: string
+          version_number: number
+        }[]
+      }
       review_evidence_item: {
         Args: {
           p_decision: string
@@ -22517,6 +22571,27 @@ export type Database = {
           idempotent_replay: boolean
           job_id: string
           receipt_status: string
+        }[]
+      }
+      submit_audio_publication_for_review: {
+        Args: {
+          p_correlation_id?: string
+          p_expected_authority_revision: number
+          p_idempotency_key: string
+          p_note?: string
+          p_publication_id: string
+        }
+        Returns: {
+          authority_revision: number
+          command_receipt_id: string
+          idempotent_replay: boolean
+          lifecycle_status: string
+          publication_id: string
+          receipt_status: string
+          resource_id: string
+          result_payload: Json
+          version_id: string
+          version_number: number
         }[]
       }
       submit_correction_for_decision: {
