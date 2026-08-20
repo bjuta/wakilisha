@@ -528,6 +528,96 @@ export type Database = {
           },
         ]
       }
+      audio_publication_resources: {
+        Row: {
+          current_approved_version_id: string | null
+          current_published_version_id: string | null
+          current_submitted_version_id: string | null
+          current_working_version_id: string | null
+          publication_id: string
+          resource_id: string
+          resource_kind: string
+        }
+        Insert: {
+          current_approved_version_id?: string | null
+          current_published_version_id?: string | null
+          current_submitted_version_id?: string | null
+          current_working_version_id?: string | null
+          publication_id: string
+          resource_id: string
+          resource_kind: string
+        }
+        Update: {
+          current_approved_version_id?: string | null
+          current_published_version_id?: string | null
+          current_submitted_version_id?: string | null
+          current_working_version_id?: string | null
+          publication_id?: string
+          resource_id?: string
+          resource_kind?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "audio_publication_resources_resource_fkey"
+            columns: ["resource_id", "resource_kind"]
+            isOneToOne: false
+            referencedRelation: "resources"
+            referencedColumns: ["id", "resource_kind"]
+          },
+        ]
+      }
+      audio_season_resources: {
+        Row: {
+          resource_id: string
+          resource_kind: string
+          season_id: string
+        }
+        Insert: {
+          resource_id: string
+          resource_kind?: string
+          season_id: string
+        }
+        Update: {
+          resource_id?: string
+          resource_kind?: string
+          season_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "audio_season_resources_resource_fkey"
+            columns: ["resource_id", "resource_kind"]
+            isOneToOne: false
+            referencedRelation: "resources"
+            referencedColumns: ["id", "resource_kind"]
+          },
+        ]
+      }
+      audio_show_resources: {
+        Row: {
+          resource_id: string
+          resource_kind: string
+          show_id: string
+        }
+        Insert: {
+          resource_id: string
+          resource_kind?: string
+          show_id: string
+        }
+        Update: {
+          resource_id?: string
+          resource_kind?: string
+          show_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "audio_show_resources_resource_fkey"
+            columns: ["resource_id", "resource_kind"]
+            isOneToOne: false
+            referencedRelation: "resources"
+            referencedColumns: ["id", "resource_kind"]
+          },
+        ]
+      }
       citation_locator_types: {
         Row: {
           created_at: string
@@ -3935,6 +4025,10 @@ export type Database = {
         Args: { p_resource_id: string }
         Returns: boolean
       }
+      current_user_can_edit_audio: {
+        Args: { p_resource_id: string }
+        Returns: boolean
+      }
       current_user_can_edit_playlist: {
         Args: { p_resource_id: string }
         Returns: boolean
@@ -3969,6 +4063,10 @@ export type Database = {
       current_user_can_review_artist_claims: { Args: never; Returns: boolean }
       current_user_can_triage_correction: {
         Args: { p_case_resource_id: string }
+        Returns: boolean
+      }
+      current_user_can_view_audio: {
+        Args: { p_resource_id: string }
         Returns: boolean
       }
       current_user_can_view_correction: {
@@ -19349,6 +19447,73 @@ export type Database = {
           created_thread_id: string
         }[]
       }
+      create_audio_publication: {
+        Args: {
+          p_correlation_id?: string
+          p_episode_number?: number
+          p_idempotency_key: string
+          p_metadata?: Json
+          p_publication_kind: string
+          p_season_id?: string
+          p_show_id?: string
+          p_slug: string
+          p_summary?: string
+          p_title: string
+          p_visibility?: string
+        }
+        Returns: {
+          authority_revision: number
+          command_receipt_id: string
+          idempotent_replay: boolean
+          publication_id: string
+          receipt_status: string
+          resource_id: string
+          resource_kind: string
+          result_payload: Json
+          version_id: string
+          version_number: number
+        }[]
+      }
+      create_audio_season: {
+        Args: {
+          p_correlation_id?: string
+          p_description?: string
+          p_idempotency_key: string
+          p_metadata?: Json
+          p_season_number: number
+          p_show_id: string
+          p_title: string
+        }
+        Returns: {
+          authority_revision: number
+          command_receipt_id: string
+          idempotent_replay: boolean
+          receipt_status: string
+          resource_id: string
+          result_payload: Json
+          season_id: string
+        }[]
+      }
+      create_audio_show: {
+        Args: {
+          p_correlation_id?: string
+          p_description?: string
+          p_idempotency_key: string
+          p_metadata?: Json
+          p_slug: string
+          p_title: string
+          p_visibility?: string
+        }
+        Returns: {
+          authority_revision: number
+          command_receipt_id: string
+          idempotent_replay: boolean
+          receipt_status: string
+          resource_id: string
+          result_payload: Json
+          show_id: string
+        }[]
+      }
       create_citation: {
         Args: {
           p_editor_note?: string
@@ -22250,6 +22415,26 @@ export type Database = {
         Args: { p_page_url: string }
         Returns: string
       }
+      snapshot_audio_publication_working_version: {
+        Args: {
+          p_correlation_id?: string
+          p_expected_authority_revision: number
+          p_idempotency_key: string
+          p_publication_id: string
+        }
+        Returns: {
+          authority_revision: number
+          command_receipt_id: string
+          idempotent_replay: boolean
+          publication_id: string
+          receipt_status: string
+          resource_id: string
+          resource_kind: string
+          result_payload: Json
+          version_id: string
+          version_number: number
+        }[]
+      }
       snapshot_playlist_working_version: {
         Args: {
           p_correlation_id?: string
@@ -22530,6 +22715,61 @@ export type Database = {
       update_article_hero_image: {
         Args: { article_id: string; hero_url: string }
         Returns: undefined
+      }
+      update_audio_publication_metadata: {
+        Args: {
+          p_correlation_id?: string
+          p_expected_authority_revision: number
+          p_idempotency_key: string
+          p_payload: Json
+          p_publication_id: string
+        }
+        Returns: {
+          authority_revision: number
+          command_receipt_id: string
+          idempotent_replay: boolean
+          publication_id: string
+          receipt_status: string
+          resource_id: string
+          resource_kind: string
+          result_payload: Json
+        }[]
+      }
+      update_audio_season_metadata: {
+        Args: {
+          p_correlation_id?: string
+          p_expected_authority_revision: number
+          p_idempotency_key: string
+          p_payload: Json
+          p_season_id: string
+        }
+        Returns: {
+          authority_revision: number
+          command_receipt_id: string
+          idempotent_replay: boolean
+          receipt_status: string
+          resource_id: string
+          result_payload: Json
+          season_id: string
+        }[]
+      }
+      update_audio_show_metadata: {
+        Args: {
+          p_correlation_id?: string
+          p_expected_authority_revision: number
+          p_idempotency_key: string
+          p_payload: Json
+          p_show_id: string
+        }
+        Returns: {
+          authority_revision: number
+          command_receipt_id: string
+          idempotent_replay: boolean
+          receipt_status: string
+          resource_id: string
+          result_payload: Json
+          show_id: string
+        }[]
       }
       update_correction_investigation: {
         Args: {
