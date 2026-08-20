@@ -86,6 +86,7 @@ FFMPEG = os.environ.get("FFMPEG_BIN", "/usr/bin/ffmpeg")
 FFPROBE = os.environ.get("FFPROBE_BIN", "/usr/bin/ffprobe")
 GENERATOR_NAME = "wakilisha-media-processor"
 PROFILE_GENERATOR_VERSION = "m2-v1"
+AUDIO_PUBLICATION_PROFILE_GENERATOR_VERSION = "phase6a-m2-v1"
 PUBLIC_MEDIA_ORIGIN = "https://media.wakilisha.africa"
 
 
@@ -648,6 +649,44 @@ def audio_preview(
     )
 
 
+def audio_delivery(
+    source,
+    destination,
+):
+    destination.unlink(
+        missing_ok=True
+    )
+
+    run_process(
+        [
+            FFMPEG,
+            "-nostdin",
+            "-hide_banner",
+            "-loglevel",
+            "error",
+            "-i",
+            str(source),
+            "-map_metadata",
+            "-1",
+            "-vn",
+            "-ac",
+            "2",
+            "-c:a",
+            "libmp3lame",
+            "-b:a",
+            "128k",
+            "-write_xing",
+            "0",
+            "-fflags",
+            "+bitexact",
+            "-flags:a",
+            "+bitexact",
+            str(destination),
+        ],
+        capture_output=False,
+    )
+
+
 def waveform_data(
     source,
     destination,
@@ -878,6 +917,7 @@ def output_contract(
     mime_type,
     transformation_spec,
     producer,
+    generator_version=PROFILE_GENERATOR_VERSION,
 ):
     protected_relative, public_relative = (
         deterministic_paths(
@@ -1009,7 +1049,7 @@ def output_contract(
         "generator_name":
             GENERATOR_NAME,
         "generator_version":
-            PROFILE_GENERATOR_VERSION,
+            generator_version,
         "_protected_relative":
             protected_relative.as_posix(),
         "_public_relative":
@@ -1098,6 +1138,53 @@ def build_outputs(job):
         return [
             preview,
             waveform,
+        ]
+
+    if profile == "audio-publication-v1":
+        has_audio = any(
+            stream.get("codec_type")
+            == "audio"
+            for stream in probe.get(
+                "streams",
+                [],
+            )
+        )
+
+        if not has_audio:
+            raise TerminalProcessingError(
+                "Audio publication profile source has no audio stream."
+            )
+
+        delivery = output_contract(
+            payload,
+            probe,
+            "audio_delivery",
+            "mp3",
+            "audio/mpeg",
+            {
+                "profile":
+                    "audio-publication-v1",
+                "full_length":
+                    True,
+                "codec":
+                    "mp3",
+                "bitrate_kbps":
+                    128,
+                "channels":
+                    2,
+            },
+            lambda stage:
+                audio_delivery(
+                    source,
+                    stage,
+                ),
+            generator_version=(
+                AUDIO_PUBLICATION_PROFILE_GENERATOR_VERSION
+            ),
+        )
+
+        return [
+            delivery,
         ]
 
     if profile == "video-v1":
@@ -1284,8 +1371,17 @@ def process_job(job):
             job
         )
 
+        profile = job["input_payload"].get(
+            "profile_version"
+        )
+        registration_rpc = (
+            "register_audio_delivery_processing_outputs_v1"
+            if profile == "audio-publication-v1"
+            else "register_media_processing_outputs_v1"
+        )
+
         registration = rpc(
-            "register_media_processing_outputs_v1",
+            registration_rpc,
             {
                 "p_job_id":
                     job_id,

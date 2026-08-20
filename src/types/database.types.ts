@@ -10,7 +10,7 @@ export type Database = {
   // Allows to automatically instantiate createClient with right options
   // instead of createClient<Database, { PostgrestVersion: 'XX' }>(URL, KEY)
   __InternalSupabase: {
-    PostgrestVersion: "14.5"
+    PostgrestVersion: "14.15"
   }
   editorial: {
     Tables: {
@@ -21441,6 +21441,10 @@ export type Database = {
         Args: { p_limit?: number; p_retry_delay_seconds?: number }
         Returns: number
       }
+      register_audio_delivery_processing_outputs_v1: {
+        Args: { p_job_id: string; p_outputs: Json; p_worker_id: string }
+        Returns: Json
+      }
       register_media_file_object: {
         Args: {
           p_byte_size?: number
@@ -22316,6 +22320,29 @@ export type Database = {
           term_slug: string
         }[]
       }
+      set_audio_publication_master: {
+        Args: {
+          p_asset_id: string
+          p_asset_revision_id: string
+          p_correlation_id?: string
+          p_expected_authority_revision: number
+          p_idempotency_key: string
+          p_publication_id: string
+        }
+        Returns: {
+          audio_delivery_variant_id: string
+          authority_revision: number
+          command_receipt_id: string
+          idempotent_replay: boolean
+          master_media_asset_id: string
+          master_media_revision_id: string
+          master_usage_link_id: string
+          publication_id: string
+          receipt_status: string
+          resource_id: string
+          result_payload: Json
+        }[]
+      }
       set_credit_governance: {
         Args: {
           p_credit_id: string
@@ -22475,6 +22502,21 @@ export type Database = {
           lifecycle_status: string
           version_id: string
           version_number: number
+        }[]
+      }
+      submit_audio_delivery_processing_v1: {
+        Args: {
+          p_asset_id: string
+          p_asset_revision_id: string
+          p_correlation_id?: string
+          p_idempotency_key: string
+        }
+        Returns: {
+          accepted_event_id: string
+          command_receipt_id: string
+          idempotent_replay: boolean
+          job_id: string
+          receipt_status: string
         }[]
       }
       submit_correction_for_decision: {
