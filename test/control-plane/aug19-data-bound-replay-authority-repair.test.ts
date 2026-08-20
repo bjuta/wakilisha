@@ -1,4 +1,5 @@
 import {
+  existsSync,
   readFileSync,
 } from "node:fs";
 import {
@@ -27,15 +28,10 @@ const retiredOrganization = readFileSync(
   "utf8",
 );
 
-const activeAuthor = readFileSync(
-  "supabase/migrations/20260819124500_article_author_person_convergence.sql",
-  "utf8",
-);
-
-const activeOrganization = readFileSync(
-  "supabase/migrations/20260819203000_organization_identity_foundation.sql",
-  "utf8",
-);
+const activeAuthorPath =
+  "supabase/migrations/20260819124500_article_author_person_convergence.sql";
+const activeOrganizationPath =
+  "supabase/migrations/20260819203000_organization_identity_foundation.sql";
 
 const replayBaselineReadme = readFileSync(
   "docs/engineering/replay-baseline/README.md",
@@ -81,12 +77,12 @@ describe(
     );
 
     it(
-      "keeps Stage A production migration authority byte-identical while preparing retirement",
+      "retires the two production-data-bound migrations from active replay after Stage A",
       () => {
-        expect(activeAuthor)
-          .toBe(retiredAuthor);
-        expect(activeOrganization)
-          .toBe(retiredOrganization);
+        expect(existsSync(activeAuthorPath))
+          .toBe(false);
+        expect(existsSync(activeOrganizationPath))
+          .toBe(false);
         expect(replayBaselineReadme)
           .toContain(
             "The cutover is intentionally two-stage",
