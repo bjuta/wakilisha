@@ -122,3 +122,31 @@ production application schema or data.
 `20260816202232_correct_valle_release_featured_credit.sql` was retired under
 this rule because it was a one-off production data correction for one Release,
 not an enduring WAKILISHA database contract.
+
+### August 19 replay retirement
+
+Phase 6A preview rehearsal exposed two additional post-baseline migrations that
+combine enduring authority with production-only reconciliation:
+
+- `20260819124500_article_author_person_convergence.sql`
+- `20260819203000_organization_identity_foundation.sql`
+
+Their exact production-applied SQL is preserved under
+`retired-active-migrations/`.
+
+Replay-safe forward replacements retain only the authority a fresh database
+must reconstruct:
+
+- `20260820102000_article_author_person_replay_authority.sql`
+- `20260820102100_organization_identity_replay_authority.sql`
+
+The cutover is intentionally two-stage. The forward replacements land and are
+applied first while the original production migration rows remain active.
+A follow-up history-retirement change then removes the two production-data-bound
+files from active replay authority and marks their migration-history rows
+`reverted`. This keeps protected CI aligned with production at each reviewed
+checkpoint.
+
+The canonical WAKILISHA Organization is replayed with its accepted Resource UUID
+`97d2dd8c-ff4d-48a0-95a7-5167f5e378d9`, so its institutional identity is stable
+across production and fresh controlled environments.
