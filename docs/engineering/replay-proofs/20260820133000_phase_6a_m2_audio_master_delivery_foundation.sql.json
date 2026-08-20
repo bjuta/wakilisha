@@ -1,0 +1,16 @@
+{
+  "migration_file": "supabase/migrations/20260820133000_phase_6a_m2_audio_master_delivery_foundation.sql",
+  "migration_sha256": "701a4d9dce56252299d29999bc4919825308fc327ff94c96078087b322006612",
+  "base_main_sha": "1cd0469abfd2448cf6b40e7ab8714970f7ceab06",
+  "preview_project_ref": "aukynfjhenoaukoiwtcd",
+  "preview_branch_id": "06fc6f32-15a8-41c1-948e-420622bad846",
+  "preview_migration_head": "20260820133000",
+  "baseline_replay": "pass",
+  "candidate_apply": "pass",
+  "verifier": "pass",
+  "verifier_file": "scripts/control-plane/verify-phase-6a-m2-audio-master-delivery.sql",
+  "schema_types_sha256": "4cbe10d880cca0acf4b0f239ce0e03a917ec8b69eccf079ae30b5f8f35f404de",
+  "schema_migration_count": 31,
+  "schema_migration_head": "20260820133000",
+  "verified_at": "2026-08-20T13:16:52.157Z"
+}
