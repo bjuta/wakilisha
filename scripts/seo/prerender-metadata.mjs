@@ -497,52 +497,75 @@ async function fetchArtistMetadataManifest() {
     return new Map();
   }
 
-  try {
-    const response = await fetchWithTimeout(`${apiBase}/artists?limit=3000`, {
-      headers: publicContentHeaders(anonKey),
-    });
+  let lastError = null;
 
-    if (!response.ok) {
-      console.warn(`Artist metadata manifest skipped: ${response.status} ${response.statusText}`);
-      return new Map();
+  for (let attempt = 1; attempt <= PRERENDER_MANIFEST_RETRY_COUNT; attempt += 1) {
+    try {
+      const response = await fetchWithTimeout(
+        `${apiBase}/artists?limit=3000`,
+        {
+          headers: publicContentHeaders(anonKey),
+        },
+        PRERENDER_MANIFEST_TIMEOUT_MS,
+      );
+
+      if (!response.ok) {
+        lastError = new Error(`${response.status} ${response.statusText}`);
+      } else {
+        const payload = await response.json();
+        const artists =
+          payload?.data?.artists ||
+          payload?.artists ||
+          payload?.data ||
+          [];
+
+        const metadataByPath = new Map();
+
+        for (const artist of Array.isArray(artists) ? artists : []) {
+          const slug = firstNonEmpty(artist.slug, artist.path, artist.url);
+          const cleanSlug = String(slug || "").trim().replace(/^\/+|\/+$/g, "");
+          if (!cleanSlug) continue;
+
+          metadataByPath.set(cleanPath(`/artists/${cleanSlug}`), {
+            id: firstNonEmpty(artist.id),
+            slug: cleanSlug,
+            name: firstNonEmpty(artist.name, artist.title),
+            description: firstNonEmpty(artist.bio, artist.fullBio, artist.description),
+            country: firstNonEmpty(artist.country, artist.countryCode, artist.country_code),
+            image: firstNonEmpty(artist.imageUrl, artist.profileImageUrl, artist.image, artist.photoUrl, artist.avatarUrl),
+            genres: Array.isArray(artist.genres) ? artist.genres.filter(Boolean) : [],
+            sameAs: socialUrlListFromArtist(artist),
+            trackCount: artist.trackCount,
+            releaseCount: artist.releaseCount,
+            isChartArtist: artist.isChartArtist,
+            isRising: artist.isRising,
+          });
+        }
+
+        console.log(`Artist metadata manifest loaded: ${metadataByPath.size.toLocaleString()} artist rows.`);
+        return metadataByPath;
+      }
+    } catch (error) {
+      lastError = error;
     }
 
-    const payload = await response.json();
-    const artists =
-      payload?.data?.artists ||
-      payload?.artists ||
-      payload?.data ||
-      [];
-
-    const metadataByPath = new Map();
-
-    for (const artist of Array.isArray(artists) ? artists : []) {
-      const slug = firstNonEmpty(artist.slug, artist.path, artist.url);
-      const cleanSlug = String(slug || "").trim().replace(/^\/+|\/+$/g, "");
-      if (!cleanSlug) continue;
-
-      metadataByPath.set(cleanPath(`/artists/${cleanSlug}`), {
-        id: firstNonEmpty(artist.id),
-        slug: cleanSlug,
-        name: firstNonEmpty(artist.name, artist.title),
-        description: firstNonEmpty(artist.bio, artist.fullBio, artist.description),
-        country: firstNonEmpty(artist.country, artist.countryCode, artist.country_code),
-        image: firstNonEmpty(artist.imageUrl, artist.profileImageUrl, artist.image, artist.photoUrl, artist.avatarUrl),
-        genres: Array.isArray(artist.genres) ? artist.genres.filter(Boolean) : [],
-        sameAs: socialUrlListFromArtist(artist),
-        trackCount: artist.trackCount,
-        releaseCount: artist.releaseCount,
-        isChartArtist: artist.isChartArtist,
-        isRising: artist.isRising,
-      });
+    if (attempt < PRERENDER_MANIFEST_RETRY_COUNT) {
+      const waitMs = attempt * 1000;
+      console.warn(
+        `Artist metadata manifest retry ${attempt}/${PRERENDER_MANIFEST_RETRY_COUNT} failed: ${
+          lastError instanceof Error ? lastError.message : String(lastError)
+        }`,
+      );
+      await sleep(waitMs);
     }
-
-    console.log(`Artist metadata manifest loaded: ${metadataByPath.size.toLocaleString()} artist rows.`);
-    return metadataByPath;
-  } catch (error) {
-    console.warn(`Artist metadata manifest skipped: ${error instanceof Error ? error.message : String(error)}`);
-    return new Map();
   }
+
+  console.warn(
+    `Artist metadata manifest unavailable after ${PRERENDER_MANIFEST_RETRY_COUNT} attempt(s): ${
+      lastError instanceof Error ? lastError.message : String(lastError)
+    }`,
+  );
+  return new Map();
 }
 
 

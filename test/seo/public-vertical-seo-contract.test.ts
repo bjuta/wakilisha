@@ -244,6 +244,47 @@ describe(
     );
 
     it(
+      "uses manifest timeout and retry authority for Artist metadata",
+      () => {
+        const start =
+          prerender.indexOf(
+            "async function fetchArtistMetadataManifest()",
+          );
+        const end =
+          prerender.indexOf(
+            "\n\nfunction cleanPath",
+            start,
+          );
+        const artistManifest =
+          prerender.slice(
+            start,
+            end,
+          );
+
+        expect(start)
+          .toBeGreaterThanOrEqual(0);
+        expect(end)
+          .toBeGreaterThan(start);
+        expect(artistManifest)
+          .toContain(
+            "PRERENDER_MANIFEST_TIMEOUT_MS",
+          );
+        expect(artistManifest)
+          .toContain(
+            "PRERENDER_MANIFEST_RETRY_COUNT",
+          );
+        expect(artistManifest)
+          .toContain(
+            "Artist metadata manifest retry",
+          );
+        expect(artistManifest)
+          .toContain(
+            "Artist metadata manifest unavailable after",
+          );
+      },
+    );
+
+    it(
       "keeps work-backed public Organizations in dynamic SEO authority without inventing an Organization collection page",
       () => {
         expect(router)
