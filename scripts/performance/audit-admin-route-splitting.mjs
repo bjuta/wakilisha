@@ -69,9 +69,13 @@ const lazyImportCount = (
  * Claimed Artist review adds one lazy Admin Community route:
  * - AdminArtistClaimsPage
  *
- * The current authority is therefore 93 lazy imports.
+ * Phase 6A final Audio adds two canonical Admin Content routes:
+ * - AdminAudioPage
+ * - AdminAudioDetailPage
+ *
+ * The current authority is therefore 95 lazy imports.
  */
-const expectedLazyImportCount = 93;
+const expectedLazyImportCount = 95;
 
 if (lazyImportCount !== expectedLazyImportCount) {
   fail(
@@ -102,6 +106,8 @@ for (const marker of [
   "AdminLoginPage",
   "AdminInquiryInterfacePage",
   "AdminArtistClaimsPage",
+  "AdminAudioPage",
+  "AdminAudioDetailPage",
   "AdminPlaylistsPage",
   "AdminNewPlaylistPage",
   "AdminPlaylistDetailPage",

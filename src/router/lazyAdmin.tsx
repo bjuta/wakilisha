@@ -18,6 +18,14 @@ export const AdminArticlesPage = lazy(() =>
   import("../pages/admin/content/articles/page"),
 );
 
+export const AdminAudioPage = lazy(() =>
+  import("../pages/admin/content/audio/page"),
+);
+
+export const AdminAudioDetailPage = lazy(() =>
+  import("../pages/admin/content/audio/detail/page"),
+);
+
 export const AdminPlaylistsPage = lazy(() =>
   import("../pages/admin/content/playlists/page"),
 );
