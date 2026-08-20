@@ -4133,6 +4133,10 @@ export type Database = {
         Args: { p_item_id: string }
         Returns: string
       }
+      ensure_article_resource_identity: {
+        Args: { p_article_id: string; p_owner_id?: string }
+        Returns: string
+      }
       ensure_person_for_external_contributor: {
         Args: { p_external_contributor_id: string }
         Returns: string

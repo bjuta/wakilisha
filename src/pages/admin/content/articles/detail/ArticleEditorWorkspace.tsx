@@ -624,7 +624,11 @@ export function ArticleEditorWorkspace({
         setPreviewNonce(data.previewNonce ?? null);
 
         // Auto-generate preview nonce for non-published articles so Preview works immediately
-        if (data.wpStatus !== "publish" && !data.previewNonce) {
+        if (
+          data.resourceId &&
+          data.wpStatus !== "publish" &&
+          !data.previewNonce
+        ) {
           generatePreviewNonce(data.id).then((nonce) => {
             if (nonce && alive) setPreviewNonce(nonce);
           }).catch(() => {});
@@ -634,8 +638,13 @@ export function ArticleEditorWorkspace({
         setIsDirty(false);
         setLoading(false);
 
-        // Check for recovery
-        await checkForRecovery(data.id, data.updatedAt);
+        // Version-bound recovery only exists after canonical Article identity.
+        if (data.resourceId) {
+          await checkForRecovery(
+            data.id,
+            data.updatedAt,
+          );
+        }
       } catch (err) {
         if (!alive) return;
         addToast("error", "Failed to load article.");
@@ -1483,6 +1492,13 @@ export function ArticleEditorWorkspace({
   /** Generate a shareable preview link for this article. */
   async function handleGeneratePreviewLink() {
     if (!article) return;
+    if (!article.resourceId) {
+      addToast(
+        "error",
+        "Could not prepare the exact Article preview.",
+      );
+      return;
+    }
     setIsGeneratingPreview(true);
     try {
       if (isDirty) {
@@ -1505,6 +1521,13 @@ export function ArticleEditorWorkspace({
   /** Open the exact public rendering for the current governed or draft version. */
   async function handleMagazinePreview() {
     if (!article) return;
+    if (!article.resourceId) {
+      addToast(
+        "error",
+        "Could not prepare the exact Article preview.",
+      );
+      return;
+    }
 
     const hadDirtyDraft = isDirty;
 
