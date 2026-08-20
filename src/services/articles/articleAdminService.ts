@@ -212,14 +212,14 @@ export async function fetchArticleForAdmin(slug: string): Promise<AdminArticleDe
   const row = data as ArticleRow & { raw_meta?: Record<string, unknown> };
 
   const {
-    data: resourceIdentity,
+    data: resourceIdentityRows,
     error: resourceIdentityError,
-  } = await supabase
-    .from("wk_resource_owner_index")
-    .select("resource_id, owner_id")
-    .eq("resource_kind", "article")
-    .eq("canonical_record_id", row.id)
-    .maybeSingle();
+  } = await (supabase as any).rpc(
+    "get_admin_article_resource_identities",
+    {
+      p_article_ids: [row.id],
+    },
+  );
 
   if (resourceIdentityError) {
     console.error(
@@ -228,7 +228,11 @@ export async function fetchArticleForAdmin(slug: string): Promise<AdminArticleDe
     );
   }
 
-  const canonicalIdentity = resourceIdentity as {
+  const canonicalIdentity = (
+    Array.isArray(resourceIdentityRows)
+      ? resourceIdentityRows[0] ?? null
+      : null
+  ) as {
     resource_id: string | null;
     owner_id: string | null;
   } | null;
@@ -348,11 +352,13 @@ export async function fetchArticlesForAdminList(limit = 200): Promise<AdminArtic
     return articles;
   }
 
-  const { data: resourceData, error: resourceError } = await supabase
-    .from("wk_resource_owner_index")
-    .select("canonical_record_id, resource_id, owner_id")
-    .eq("resource_kind", "article")
-    .in("canonical_record_id", articleIds);
+  const { data: resourceData, error: resourceError } =
+    await (supabase as any).rpc(
+      "get_admin_article_resource_identities",
+      {
+        p_article_ids: articleIds,
+      },
+    );
 
   if (resourceError) {
     console.error("Error loading Article resource links:", resourceError);
