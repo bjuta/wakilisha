@@ -7,10 +7,16 @@ TYPE_FILE="src/types/database.types.ts"
 BASELINE_FILE="docs/engineering/live-schema-baseline.json"
 SNAPSHOT_VERIFIER="scripts/control-plane/verify-repository-schema-snapshot.mjs"
 REPLAY_VERIFIER="scripts/control-plane/verify-migration-replay-contract.mjs"
+RUNTIME_NORMALIZER="scripts/control-plane/normalize-database-types-runtime-metadata.mjs"
 TMP_FILE="$(mktemp)"
+COMMITTED_NORMALIZED="$(mktemp)"
+LIVE_NORMALIZED="$(mktemp)"
 
 cleanup() {
-  rm -f "$TMP_FILE"
+  rm -f \
+    "$TMP_FILE" \
+    "$COMMITTED_NORMALIZED" \
+    "$LIVE_NORMALIZED"
 }
 
 trap cleanup EXIT
@@ -22,6 +28,11 @@ fi
 
 if [ ! -f "$BASELINE_FILE" ]; then
   echo "Repository schema baseline metadata is missing."
+  exit 1
+fi
+
+if [ ! -f "$RUNTIME_NORMALIZER" ]; then
+  echo "Database types runtime metadata normalizer is missing."
   exit 1
 fi
 
@@ -63,18 +74,31 @@ npx --yes "supabase@${SUPABASE_CLI_VERSION}" gen types typescript \
   --schema public,editorial \
   > "$TMP_FILE"
 
-if ! cmp -s "$TYPE_FILE" "$TMP_FILE"; then
-  echo "STOP: Committed database types differ from production."
+node "$RUNTIME_NORMALIZER" \
+  --input "$TYPE_FILE" \
+  --normalize \
+  --output "$COMMITTED_NORMALIZED"
+
+node "$RUNTIME_NORMALIZER" \
+  --input "$TMP_FILE" \
+  --normalize \
+  --output "$LIVE_NORMALIZED"
+
+if ! cmp -s \
+  "$COMMITTED_NORMALIZED" \
+  "$LIVE_NORMALIZED"
+then
+  echo "STOP: Committed database types differ from production after excluding volatile PostgREST runtime metadata."
 
   diff -u \
     --label committed-database.types.ts \
     --label live-database.types.ts \
-    "$TYPE_FILE" \
-    "$TMP_FILE" \
+    "$COMMITTED_NORMALIZED" \
+    "$LIVE_NORMALIZED" \
     | sed -n '1,240p' \
     || true
 
   exit 1
 fi
 
-echo "PASS: Committed public,editorial schema types match production using Supabase CLI ${SUPABASE_CLI_VERSION}."
+echo "PASS: Committed public,editorial schema types match production using Supabase CLI ${SUPABASE_CLI_VERSION}; volatile PostgREST runtime metadata is excluded from schema equality."
