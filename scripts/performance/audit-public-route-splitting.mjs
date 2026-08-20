@@ -361,9 +361,14 @@ const routePaths = [
  * Organization public surface adds one canonical public route:
  * - /organizations/:slug
  *
- * The current authority is therefore 163 paths.
+ * Phase 6A final Audio adds two internal Admin Content paths:
+ * - audio
+ * - audio/:publicationId
+ *
+ * These are Admin Studio routes only; Phase 6B public Audio routes remain absent.
+ * The current authority is therefore 165 paths.
  */
-const expectedRoutePathCount = 163;
+const expectedRoutePathCount = 165;
 
 if (routePaths.length !== expectedRoutePathCount) {
   fail(
@@ -380,7 +385,7 @@ const routeChecksum = crypto
   .digest("hex");
 
 const expectedRouteChecksum =
-  "9ceaf21ad813e9052185ea60724a1b57e82593d830b9841c4274d2ec6c8f42e7";
+  "b88dad0db887b324d9d9db70019651a8dfff0a745106b0838c338f6ffcc455fc";
 
 if (
   routeChecksum !==
