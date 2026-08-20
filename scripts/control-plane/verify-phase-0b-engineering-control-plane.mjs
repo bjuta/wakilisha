@@ -13,6 +13,7 @@ const requiredFiles = [
   "docs/institute/LEGACY_INSTITUTE_FREEZE.md",
   "docs/operations/production-change-runbook.md",
   "scripts/control-plane/generate-live-schema.sh",
+  "scripts/control-plane/promote-repository-migrations.sh",
   "scripts/control-plane/resolve-supabase-anon-key.mjs",
   "scripts/control-plane/verify-frozen-institute.mjs",
   "scripts/control-plane/verify-live-schema.sh",
@@ -159,6 +160,27 @@ for (const forbiddenScript of [
   ) {
     throw new Error(
       `Legacy migration script remains in the normal namespace: ${forbiddenScript}`,
+    );
+  }
+}
+
+const promotionScript = fs.readFileSync(
+  "scripts/control-plane/promote-repository-migrations.sh",
+  "utf8",
+);
+
+for (const fragment of [
+  'test "$(git branch --show-current)" = "main"',
+  'test "$(git rev-parse HEAD)" = "$(git rev-parse origin/main)"',
+  "npm run schema:verify",
+  "supabase db push --dry-run --linked",
+  "supabase db push --linked",
+  "POST_PENDING",
+  "REPOSITORY_MIGRATION_PROMOTION_PASS",
+]) {
+  if (!promotionScript.includes(fragment)) {
+    throw new Error(
+      `Canonical production migration promotion is missing: ${fragment}`,
     );
   }
 }
