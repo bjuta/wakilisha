@@ -20239,6 +20239,14 @@ export type Database = {
               similarity_score: number
             }[]
           }
+      get_admin_article_resource_identities: {
+        Args: { p_article_ids: string[] }
+        Returns: {
+          canonical_record_id: string
+          owner_id: string
+          resource_id: string
+        }[]
+      }
       get_admin_audio_publication_workspace: {
         Args: { p_publication_id: string }
         Returns: Json
