@@ -7,15 +7,19 @@ SUPABASE_CLI_VERSION="${SUPABASE_CLI_VERSION:-2.107.0}"
 
 TYPE_FILE="src/types/database.types.ts"
 BASELINE_FILE="docs/engineering/live-schema-baseline.json"
+RUNTIME_NORMALIZER="scripts/control-plane/normalize-database-types-runtime-metadata.mjs"
 
 SCHEMA_SEAL_MODE="${SCHEMA_SEAL_MODE:-production}"
 SCHEMA_BASE_MAIN_SHA="${SCHEMA_BASE_MAIN_SHA:-}"
 SCHEMA_PREVIEW_BRANCH_ID="${SCHEMA_PREVIEW_BRANCH_ID:-}"
 
-TMP_FILE="$(mktemp)"
+SOURCE_TMP_FILE="$(mktemp)"
+TARGET_RUNTIME_TMP_FILE="$(mktemp)"
 
 cleanup() {
-  rm -f "$TMP_FILE"
+  rm -f \
+    "$SOURCE_TMP_FILE" \
+    "$TARGET_RUNTIME_TMP_FILE"
 }
 
 trap cleanup EXIT
@@ -41,6 +45,11 @@ if [ "$SCHEMA_SEAL_MODE" = "preview" ]; then
   fi
 fi
 
+if [ ! -f "$RUNTIME_NORMALIZER" ]; then
+  echo "STOP: database types runtime metadata normalizer is missing."
+  exit 1
+fi
+
 mkdir -p \
   "$(dirname "$TYPE_FILE")" \
   "$(dirname "$BASELINE_FILE")"
@@ -48,14 +57,31 @@ mkdir -p \
 npx --yes "supabase@${SUPABASE_CLI_VERSION}" gen types typescript \
   --project-id "$SOURCE_PROJECT_REF" \
   --schema public,editorial \
-  > "$TMP_FILE"
+  > "$SOURCE_TMP_FILE"
 
-if [ ! -s "$TMP_FILE" ]; then
+if [ ! -s "$SOURCE_TMP_FILE" ]; then
   echo "Live schema generation returned an empty file."
   exit 1
 fi
 
-mv "$TMP_FILE" "$TYPE_FILE"
+if [ "$SOURCE_PROJECT_REF" != "$TARGET_PROJECT_REF" ]; then
+  npx --yes "supabase@${SUPABASE_CLI_VERSION}" gen types typescript \
+    --project-id "$TARGET_PROJECT_REF" \
+    --schema public,editorial \
+    > "$TARGET_RUNTIME_TMP_FILE"
+
+  if [ ! -s "$TARGET_RUNTIME_TMP_FILE" ]; then
+    echo "Target runtime metadata generation returned an empty file."
+    exit 1
+  fi
+
+  node "$RUNTIME_NORMALIZER" \
+    --input "$SOURCE_TMP_FILE" \
+    --runtime-source "$TARGET_RUNTIME_TMP_FILE" \
+    --output "$TYPE_FILE"
+else
+  mv "$SOURCE_TMP_FILE" "$TYPE_FILE"
+fi
 
 SCHEMA_SHA="$(
   shasum -a 256 "$TYPE_FILE" \
