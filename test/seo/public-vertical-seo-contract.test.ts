@@ -208,6 +208,42 @@ describe(
     );
 
     it(
+      "derives Article image and typed author metadata from one public Magazine listing fetch",
+      () => {
+        expect(
+          prerender.match(
+            /\/magazine\?limit=1000/g,
+          )?.length,
+        ).toBe(1);
+
+        expect(prerender)
+          .toContain(
+            "async function fetchArticleManifests()",
+          );
+
+        expect(prerender)
+          .toContain(
+            "ARTICLE_IMAGE_BY_PATH = articleManifests.imageByPath;",
+          );
+
+        expect(prerender)
+          .toContain(
+            "ARTICLE_METADATA_BY_PATH = articleManifests.metadataByPath;",
+          );
+
+        expect(prerender)
+          .not.toContain(
+            "fetchArticleImageManifest()",
+          );
+
+        expect(prerender)
+          .not.toContain(
+            "fetchArticleMetadataManifest()",
+          );
+      },
+    );
+
+    it(
       "keeps work-backed public Organizations in dynamic SEO authority without inventing an Organization collection page",
       () => {
         expect(router)
