@@ -1,9 +1,14 @@
 {
   "projectRef": "pgzizndxdyhqmtyywjmt",
-  "schema": "public",
+  "schema": "public,editorial",
   "generatedAt": "2026-08-20T12:24:38Z",
   "typesSha256": "e2d1d682a98e8531083c1f864dd9df7a5bea77441de3663275d9d2ffb5bfe549",
   "authoritativeMigrationDirectory": "supabase/migrations",
   "migrationCount": 30,
-  "latestMigration": "20260820105540_phase_6a_m1_audio_identity_working_versions.sql"
+  "latestMigration": "20260820105540_phase_6a_m1_audio_identity_working_versions.sql",
+  "schemaSeal": {
+    "mode": "production",
+    "sourceProjectRef": "pgzizndxdyhqmtyywjmt",
+    "migrationHead": "20260820105540"
+  }
 }
