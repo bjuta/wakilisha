@@ -566,6 +566,30 @@ export type Database = {
           },
         ]
       }
+      audio_publication_version_trust_revisions: {
+        Row: {
+          citation_revision: number
+          credit_revision: number
+          publication_version_id: string
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          citation_revision?: number
+          credit_revision?: number
+          publication_version_id: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          citation_revision?: number
+          credit_revision?: number
+          publication_version_id?: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: []
+      }
       audio_season_resources: {
         Row: {
           resource_id: string
@@ -3927,6 +3951,10 @@ export type Database = {
           version_id: string
           version_number: number
         }[]
+      }
+      copy_audio_version_trust_to_version: {
+        Args: { p_source_version_id: string; p_target_version_id: string }
+        Returns: undefined
       }
       copy_playlist_lifecycle_version: {
         Args: {
@@ -20207,6 +20235,10 @@ export type Database = {
               similarity_score: number
             }[]
           }
+      get_admin_audio_publication_workspace: {
+        Args: { p_publication_id: string }
+        Returns: Json
+      }
       get_admin_import_runs: {
         Args: { p_limit?: number }
         Returns: {
@@ -20721,6 +20753,7 @@ export type Database = {
           record_version: number
         }[]
       }
+      list_admin_audio_publications: { Args: never; Returns: Json }
       list_article_lifecycle_events: {
         Args: { p_article_id: string; p_limit?: number }
         Returns: {
@@ -21760,6 +21793,61 @@ export type Database = {
         }
         Returns: Json
       }
+      replace_audio_publication_chapters: {
+        Args: {
+          p_chapters: Json
+          p_correlation_id?: string
+          p_expected_authority_revision: number
+          p_idempotency_key: string
+          p_publication_id: string
+        }
+        Returns: {
+          authority_revision: number
+          chapter_count: number
+          command_receipt_id: string
+          idempotent_replay: boolean
+          publication_id: string
+          receipt_status: string
+          resource_id: string
+          result_payload: Json
+        }[]
+      }
+      replace_audio_publication_version_citations: {
+        Args: {
+          p_attachments: Json
+          p_correlation_id?: string
+          p_expected_citation_revision: number
+          p_idempotency_key: string
+          p_publication_version_id: string
+        }
+        Returns: {
+          attachment_count: number
+          citation_revision: number
+          command_receipt_id: string
+          idempotent_replay: boolean
+          publication_version_id: string
+          receipt_status: string
+          result_payload: Json
+        }[]
+      }
+      replace_audio_publication_version_credits: {
+        Args: {
+          p_attachments: Json
+          p_correlation_id?: string
+          p_expected_credit_revision: number
+          p_idempotency_key: string
+          p_publication_version_id: string
+        }
+        Returns: {
+          attachment_count: number
+          command_receipt_id: string
+          credit_revision: number
+          idempotent_replay: boolean
+          publication_version_id: string
+          receipt_status: string
+          result_payload: Json
+        }[]
+      }
       replace_media_asset_file_v2: {
         Args: {
           p_asset_id: string
@@ -22395,6 +22483,28 @@ export type Database = {
           receipt_status: string
           resource_id: string
           result_payload: Json
+        }[]
+      }
+      set_audio_publication_transcript: {
+        Args: {
+          p_asset_id: string
+          p_asset_revision_id: string
+          p_correlation_id?: string
+          p_expected_authority_revision: number
+          p_idempotency_key: string
+          p_publication_id: string
+        }
+        Returns: {
+          authority_revision: number
+          command_receipt_id: string
+          idempotent_replay: boolean
+          publication_id: string
+          receipt_status: string
+          resource_id: string
+          result_payload: Json
+          transcript_media_asset_id: string
+          transcript_media_revision_id: string
+          transcript_usage_link_id: string
         }[]
       }
       set_credit_governance: {
