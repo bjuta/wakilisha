@@ -67,12 +67,15 @@ export function PlayerFullSurface({
     );
   const [appleConnecting, setAppleConnecting] =
     useState(false);
+  const [appleConnectError, setAppleConnectError] =
+    useState<string | null>(null);
   const [unlockDismissed, setUnlockDismissed] =
     useState(false);
 
   useEffect(() => {
     if (!currentTrack?.id) {
       setUnlockDismissed(false);
+      setAppleConnectError(null);
       return;
     }
 
@@ -81,6 +84,7 @@ export function PlayerFullSurface({
         availabilityDismissKey(currentTrack.id),
       ) === "1",
     );
+    setAppleConnectError(null);
     setPanel("none");
   }, [currentTrack?.id]);
 
@@ -166,6 +170,9 @@ export function PlayerFullSurface({
     currentTrack.appleMusicCatalogId ||
     currentTrack.appleMusicId,
   );
+  const usesProviderMedia =
+    playbackBackend === "youtube" ||
+    playbackBackend === "soundcloud";
   const showContextualUnlock =
     !experience.spokenAudio &&
     experience.availability === "excerpt" &&
@@ -196,12 +203,14 @@ export function PlayerFullSurface({
       "1",
     );
     setUnlockDismissed(true);
+    setAppleConnectError(null);
   };
 
   const connectForFullPlayback = async () => {
     if (appleConnecting) return;
 
     setAppleConnecting(true);
+    setAppleConnectError(null);
     const resumeAt = currentTime;
 
     try {
@@ -233,6 +242,12 @@ export function PlayerFullSurface({
           }
         },
         1200,
+      );
+    } catch (error) {
+      setAppleConnectError(
+        error instanceof Error
+          ? error.message
+          : "Could not connect Apple Music right now.",
       );
     } finally {
       setAppleConnecting(false);
@@ -314,7 +329,12 @@ export function PlayerFullSurface({
         >
           <section className="flex w-full max-w-[520px] flex-col items-center">
             <div className="aspect-square w-full max-w-[420px] overflow-hidden rounded-[26px] bg-[var(--wk-surface-raised)] shadow-2xl md:max-w-[480px]">
-              {currentTrack.artworkUrl ? (
+              {usesProviderMedia ? (
+                <div
+                  data-wk-provider-media-host={mode}
+                  className="h-full w-full"
+                />
+              ) : currentTrack.artworkUrl ? (
                 <img
                   src={currentTrack.artworkUrl}
                   alt=""
@@ -552,6 +572,11 @@ export function PlayerFullSurface({
                     <p className="mt-1 text-sm leading-6 text-[var(--wk-text-muted)]">
                       Connect Apple Music to continue with the full track here.
                     </p>
+                    {appleConnectError ? (
+                      <p className="mt-2 text-xs font-semibold text-red-500">
+                        {appleConnectError}
+                      </p>
+                    ) : null}
                   </div>
                   <button
                     type="button"
