@@ -4,6 +4,7 @@ import { MediaPickerModal } from "@/components/admin/MediaPickerModal";
 import { WkIcon } from "@/components/design-system/Icon";
 import { WkSurface } from "@/components/design-system/primitives/Surface";
 import { AdminRecordHeader } from "@/components/design-system/admin/AdminRecordHeader";
+import { AdminSaveState } from "@/components/design-system/admin/AdminSaveState";
 import { AdminWorkspaceSection } from "@/components/design-system/admin/AdminWorkspaceSection";
 import {
   fetchAudioPublicationWorkspace,
@@ -43,6 +44,17 @@ function secondsLabel(value: number): string {
   const minutes = Math.floor(total / 60);
   const seconds = String(total % 60).padStart(2, "0");
   return `${minutes}:${seconds}`;
+}
+
+function chapterSignature(chapters: AudioChapter[]): string {
+  return JSON.stringify(
+    chapters.map((chapter) => ({
+      startSeconds: chapter.startSeconds,
+      title: chapter.title,
+      chapterUrl: chapter.chapterUrl,
+      imageUrl: chapter.imageUrl,
+    })),
+  );
 }
 
 export function AudioEditorWorkspace({
@@ -106,6 +118,27 @@ export function AudioEditorWorkspace({
     workspace?.canEdit === true
     && ["draft", "changes_requested"].includes(workspace.publication.status);
 
+  const metadataDirty = Boolean(
+    workspace
+    && (
+      title !== workspace.publication.title
+      || slug !== workspace.publication.slug
+      || summary !== (workspace.publication.summary ?? "")
+    ),
+  );
+
+  const chaptersDirty = Boolean(
+    workspace
+    && chapterSignature(chapters) !== chapterSignature(workspace.chapters),
+  );
+
+  const workingDirty = editable && (metadataDirty || chaptersDirty);
+  const isSaving =
+    busy === "save"
+    || busy === "metadata"
+    || busy === "chapters"
+    || busy === "snapshot";
+
   const canSubmit =
     workspace?.canEdit === true
     && ["draft", "changes_requested"].includes(workspace.publication.status)
@@ -144,13 +177,37 @@ export function AudioEditorWorkspace({
     );
   };
 
-  const handleWorkingSnapshot = async () => {
+  const handleSaveWorkingVersion = async () => {
     if (!workspace) return;
-    await run(
-      "snapshot",
-      () => snapshotAudioWorkingVersion(workspace),
-      "Working version saved.",
-    );
+
+    setBusy("save");
+    setMessage(null);
+
+    try {
+      let current = workspace;
+
+      if (metadataDirty) {
+        await saveAudioMetadata(current, { title, slug, summary });
+        current = await fetchAudioPublicationWorkspace(
+          current.publication.id,
+        );
+      }
+
+      if (chaptersDirty) {
+        await replaceAudioChapters(current, chapters);
+        current = await fetchAudioPublicationWorkspace(
+          current.publication.id,
+        );
+      }
+
+      await snapshotAudioWorkingVersion(current);
+      await reload();
+      setMessage("Working version saved.");
+    } catch (reason) {
+      setMessage(errorText(reason));
+    } finally {
+      setBusy(null);
+    }
   };
 
   const addChapter = () => {
@@ -306,21 +363,35 @@ export function AudioEditorWorkspace({
         }
         actions={
           <>
+            <AdminSaveState
+              isDirty={workingDirty}
+              isSaving={isSaving}
+              locked={!editable}
+              lockedLabel={`${humanize(workspace.publication.status)} Version`}
+            />
+
             {editable ? (
               <button
                 type="button"
                 disabled={busy !== null}
-                onClick={handleWorkingSnapshot}
+                onClick={handleSaveWorkingVersion}
+                title="Save local Audio edits and snapshot the immutable working version."
                 className="wk-button wk-button-secondary wk-button-sm disabled:opacity-50"
               >
                 <WkIcon name="Save" size={14} />
                 Save
               </button>
             ) : null}
+
             {canSubmit ? (
               <button
                 type="button"
-                disabled={busy !== null}
+                disabled={busy !== null || workingDirty}
+                title={
+                  workingDirty
+                    ? "Save changes before submitting for Review."
+                    : undefined
+                }
                 onClick={() =>
                   run(
                     "submit",
@@ -332,6 +403,81 @@ export function AudioEditorWorkspace({
               >
                 <WkIcon name="Send" size={14} />
                 Submit for Review
+              </button>
+            ) : null}
+
+            {workspace.canManageReview
+            && workspace.publication.status === "ready_for_review" ? (
+              <button
+                type="button"
+                disabled={busy !== null}
+                onClick={() =>
+                  run(
+                    "review-start",
+                    () => reviewAudio(workspace, "start_review", reviewNote),
+                    "Review started.",
+                  )
+                }
+                className="wk-button wk-button-secondary wk-button-sm disabled:opacity-50"
+              >
+                Start Review
+              </button>
+            ) : null}
+
+            {workspace.canManageReview
+            && workspace.publication.status === "in_review" ? (
+              <>
+                <button
+                  type="button"
+                  disabled={busy !== null}
+                  onClick={() =>
+                    run(
+                      "review-changes",
+                      () =>
+                        reviewAudio(
+                          workspace,
+                          "request_changes",
+                          reviewNote,
+                        ),
+                      "Changes requested.",
+                    )
+                  }
+                  className="wk-button wk-button-ghost wk-button-sm text-wk-warning disabled:opacity-50"
+                >
+                  Request Changes
+                </button>
+                <button
+                  type="button"
+                  disabled={busy !== null}
+                  onClick={() =>
+                    run(
+                      "review-approve",
+                      () => reviewAudio(workspace, "approve", reviewNote),
+                      "Audio approved.",
+                    )
+                  }
+                  className="wk-button wk-button-primary wk-button-sm disabled:opacity-50"
+                >
+                  Approve
+                </button>
+              </>
+            ) : null}
+
+            {workspace.canPublish
+            && workspace.publication.status === "approved" ? (
+              <button
+                type="button"
+                disabled={busy !== null}
+                onClick={() =>
+                  run(
+                    "publish",
+                    () => publishAudio(workspace, reviewNote),
+                    "Audio published.",
+                  )
+                }
+                className="wk-button wk-button-primary wk-button-sm disabled:opacity-50"
+              >
+                Publish
               </button>
             ) : null}
           </>
@@ -703,82 +849,10 @@ export function AudioEditorWorkspace({
               />
             </label>
 
-            <div className="mt-4 grid gap-2">
-              {workspace.canManageReview
-              && workspace.publication.status === "ready_for_review" ? (
-                <button
-                  type="button"
-                  disabled={busy !== null}
-                  onClick={() =>
-                    run(
-                      "review-start",
-                      () => reviewAudio(workspace, "start_review", reviewNote),
-                      "Review started.",
-                    )
-                  }
-                  className="wk-button wk-button-ghost wk-button-sm disabled:opacity-50"
-                >
-                  Start Review
-                </button>
-              ) : null}
-
-              {workspace.canManageReview
-              && workspace.publication.status === "in_review" ? (
-                <>
-                  <button
-                    type="button"
-                    disabled={busy !== null}
-                    onClick={() =>
-                      run(
-                        "review-changes",
-                        () =>
-                          reviewAudio(
-                            workspace,
-                            "request_changes",
-                            reviewNote,
-                          ),
-                        "Changes requested.",
-                      )
-                    }
-                    className="wk-button wk-button-ghost wk-button-sm text-wk-warning disabled:opacity-50"
-                  >
-                    Request Changes
-                  </button>
-                  <button
-                    type="button"
-                    disabled={busy !== null}
-                    onClick={() =>
-                      run(
-                        "review-approve",
-                        () => reviewAudio(workspace, "approve", reviewNote),
-                        "Audio approved.",
-                      )
-                    }
-                    className="wk-button wk-button-primary wk-button-sm disabled:opacity-50"
-                  >
-                    Approve
-                  </button>
-                </>
-              ) : null}
-
-              {workspace.canPublish
-              && workspace.publication.status === "approved" ? (
-                <button
-                  type="button"
-                  disabled={busy !== null}
-                  onClick={() =>
-                    run(
-                      "publish",
-                      () => publishAudio(workspace, reviewNote),
-                      "Audio published.",
-                    )
-                  }
-                  className="wk-button wk-button-primary wk-button-sm disabled:opacity-50"
-                >
-                  Publish
-                </button>
-              ) : null}
-            </div>
+            <p className="mt-3 text-[11px] text-wk-text-muted">
+              Lifecycle actions stay in the record header while this panel
+              holds the review note and exact version identities.
+            </p>
 
             <div className="mt-5 space-y-2 border-t border-wk-border pt-4">
               {[
