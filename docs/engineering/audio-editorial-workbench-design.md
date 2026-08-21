@@ -1,5 +1,17 @@
 # Audio Editorial Workbench design
 
+Status: CLOSED AND ACCEPTED IN PRODUCTION
+
+Closure date: 21 August 2026
+
+## Closure note
+
+The workbench described here is live in production through PR #683 and merged main `fd0580e3a1a19e3d1f06a9c8466a37c84cd26a8b`.
+
+Its reusable residue is now tracked by the Primitive Compounding Contract. `EditorialWorkflowRail`, `EditorialCommentEditor`, `MediaTransport`, and `MediaTimeline` remain candidate primitives until another real domain proves their cross-domain boundary.
+
+See `docs/engineering/phase-6a-closure-record.md` for production evidence.
+
 ## Purpose
 
 Audio must not be a CMS form with Audio fields. It is a governed editorial workstation whose primary coordinate system is time.
@@ -161,16 +173,23 @@ A reviewer gets:
 
 ## Acceptance
 
-The milestone is accepted when:
+The milestone was accepted when:
 
-- collection creation is one mode-based composer
-- record browsing has search and lifecycle filters
-- Audio detail uses grouped ontology navigation
-- rich time-point/range comments are durable and version-bound
-- comments jump playback to their anchor
-- waveform and technical facts come from canonical Media derivatives
-- Review still uses the existing Audio participant/capability model
-- no anonymous review authority is introduced
-- no Article review behavior is changed
-- existing Audio lifecycle, Media, Trust, and immutable version tests remain green
-- disposable-preview behavior proof passes before PR
+- collection creation used one mode-based composer
+- record browsing had search and lifecycle filters
+- Audio detail used grouped ontology navigation
+- rich time-point/range comments were durable and version-bound
+- comments jumped playback to their anchor
+- waveform and technical facts came from canonical Media derivatives
+- Review continued to use the existing Audio participant/capability model
+- no anonymous review authority was introduced
+- no Article review behavior changed
+- existing Audio lifecycle, Media, Trust, and immutable version tests remained green
+- disposable-preview behavior proof passed before PR
+- production migration promotion remained byte-identical to preview-proven SQL
+- the permanent production verifier passed independently
+- the exact tested frontend build was activated and verified at origin and public HTTPS
+- authenticated production browser acceptance passed
+- the disposable preview was deleted after closure
+
+This milestone is closed. Phase 6B may reuse or extend its candidate primitives without reopening the Audio Workbench milestone.
