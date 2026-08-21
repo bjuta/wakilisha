@@ -62,12 +62,23 @@ function surfaceRoots(root, registry) {
   return [...deduped.values()];
 }
 
-function newlyAddedPrimitiveFiles(root, registry, baseRef) {
+function gitDiffNames(root, baseRef, { diffFilter = null, paths = [] } = {}) {
   if (!baseRef) return [];
   try {
-    const args = ['diff', '--name-only', '--diff-filter=A', `${baseRef}...HEAD`, '--', ...(registry.primitiveDirectories ?? [])];
-    const output = execFileSync('git', args, { cwd: root, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] });
-    return output.split('\n').map((value) => value.trim()).filter(Boolean).map(normalize);
+    const args = ['diff', '--name-only'];
+    if (diffFilter) args.push(`--diff-filter=${diffFilter}`);
+    args.push(`${baseRef}...HEAD`);
+    if (paths.length) args.push('--', ...paths);
+    const output = execFileSync('git', args, {
+      cwd: root,
+      encoding: 'utf8',
+      stdio: ['ignore', 'pipe', 'ignore'],
+    });
+    return output
+      .split('\n')
+      .map((value) => value.trim())
+      .filter(Boolean)
+      .map(normalize);
   } catch {
     return [];
   }
@@ -77,6 +88,7 @@ export function verifyPrimitiveCompounding({
   root = process.cwd(),
   registryPath = 'scripts/control-plane/primitive-registry.json',
   baseRef = process.env.CONTROL_PLANE_BASE_REF ?? null,
+  changedPaths = null,
 } = {}) {
   const errors = [];
   const absoluteRegistry = path.join(root, registryPath);
@@ -95,11 +107,15 @@ export function verifyPrimitiveCompounding({
 
   const allowedKinds = new Set(['presentation', 'interaction', 'authority']);
   const allowedMaturity = new Set(['candidate', 'canonical', 'foundation']);
+  const allowedExceptionClasses = new Set(['legacy', 'semantic']);
   const primitives = Array.isArray(registry.primitives) ? registry.primitives : [];
   const ids = new Set();
   const paths = new Set();
   const surfaces = surfaceRoots(root, registry);
   const consumers = {};
+  const effectiveChangedPaths = new Set(
+    (changedPaths ?? gitDiffNames(root, baseRef)).map(normalize),
+  );
 
   for (const surface of surfaces) {
     if (surface.missing) errors.push(`Required primitive surface is missing: ${surface.id} (${surface.path})`);
@@ -156,6 +172,26 @@ export function verifyPrimitiveCompounding({
       errors.push(`${primitive.id}: foundation primitives require at least one real consumer.`);
     }
 
+    const exceptionList = Array.isArray(primitive.competingImplementationExceptions)
+      ? primitive.competingImplementationExceptions
+      : [];
+    const exceptions = new Map();
+    for (const exception of exceptionList) {
+      const exceptionPath = normalize(exception.path ?? '');
+      if (!exceptionPath || exceptions.has(exceptionPath)) {
+        errors.push(`${primitive.id}: competing implementation exception path is missing or duplicated: ${exceptionPath || '<missing>'}.`);
+        continue;
+      }
+      if (!allowedExceptionClasses.has(exception.classification)) {
+        errors.push(`${primitive.id}: ${exceptionPath} has unsupported exception classification ${exception.classification}.`);
+      }
+      if (!exception.reason || !String(exception.reason).trim()) {
+        errors.push(`${primitive.id}: ${exceptionPath} exception requires a reason.`);
+      }
+      exceptions.set(exceptionPath, exception);
+    }
+    const matchedExceptions = new Set();
+
     for (const patternSource of primitive.competingImplementationPatterns ?? []) {
       let pattern;
       try {
@@ -168,22 +204,46 @@ export function verifyPrimitiveCompounding({
         if (surface.missing) continue;
         for (const file of walkFiles(path.join(root, surface.path))) {
           const source = fs.readFileSync(file, 'utf8');
-          if (pattern.test(source)) {
-            errors.push(`${primitive.id}: competing local implementation found in ${normalize(path.relative(root, file))} matching /${patternSource}/.`);
+          if (!pattern.test(source)) continue;
+
+          const relative = normalize(path.relative(root, file));
+          const exception = exceptions.get(relative);
+          if (!exception) {
+            errors.push(`${primitive.id}: competing local implementation found in ${relative} matching /${patternSource}/.`);
+            continue;
+          }
+
+          matchedExceptions.add(relative);
+          if (exception.classification === 'legacy' && effectiveChangedPaths.has(relative)) {
+            errors.push(`${primitive.id}: legacy competing implementation ${relative} was touched. Migrate it to the canonical primitive and remove the legacy exception instead of renewing the debt.`);
           }
         }
+      }
+    }
+
+    for (const exceptionPath of exceptions.keys()) {
+      if (!matchedExceptions.has(exceptionPath)) {
+        errors.push(`${primitive.id}: stale competing implementation exception ${exceptionPath}. Remove the exception because the competing implementation is no longer present.`);
       }
     }
   }
 
   const registeredPaths = new Set(primitives.map((primitive) => normalize(primitive.path)));
-  for (const added of newlyAddedPrimitiveFiles(root, registry, baseRef)) {
+  const addedPrimitiveFiles = gitDiffNames(root, baseRef, {
+    diffFilter: 'A',
+    paths: registry.primitiveDirectories ?? [],
+  });
+  for (const added of addedPrimitiveFiles) {
     if (!registeredPaths.has(added)) {
       errors.push(`New design-system primitive ${added} is not registered. Register it as candidate/canonical/foundation or keep the implementation inside its domain.`);
     }
   }
 
-  return { errors, surfaces: surfaces.map(({ id, path: surfacePath }) => ({ id, path: surfacePath })), consumers };
+  return {
+    errors,
+    surfaces: surfaces.map(({ id, path: surfacePath }) => ({ id, path: surfacePath })),
+    consumers,
+  };
 }
 
 const isMain = process.argv[1] && path.resolve(process.argv[1]) === path.resolve(fileURLToPath(import.meta.url));
