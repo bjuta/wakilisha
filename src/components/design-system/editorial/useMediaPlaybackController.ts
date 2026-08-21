@@ -2,6 +2,7 @@ import {
   useEffect,
   useRef,
   useState,
+  type SyntheticEvent,
 } from "react";
 
 export function useMediaPlaybackController({
@@ -80,7 +81,7 @@ export function useMediaPlaybackController({
     mediaEventHandlers: {
       onPlay: () => setPlaying(true),
       onPause: () => setPlaying(false),
-      onTimeUpdate: (event: React.SyntheticEvent<HTMLAudioElement>) =>
+      onTimeUpdate: (event: SyntheticEvent<HTMLAudioElement>) =>
         setCurrentTime(event.currentTarget.currentTime),
       onEnded: () => setPlaying(false),
     },
