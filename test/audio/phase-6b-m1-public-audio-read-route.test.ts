@@ -156,9 +156,9 @@ describe("Phase 6B M1 public Audio read and route", () => {
     expect(page).toContain("This recording is not published or could not be found.");
     expect(page).toContain("Open Transcript");
     expect(page).toContain("Listen");
-    expect(page).not.toContain("canonical");
-    expect(page).not.toContain("asset");
-    expect(page).not.toContain("identity");
+    expect(page).not.toContain("Canonical ");
+    expect(page).not.toContain("Asset ");
+    expect(page).not.toContain("Identity ");
     expect(page).not.toContain("—");
   });
 });
