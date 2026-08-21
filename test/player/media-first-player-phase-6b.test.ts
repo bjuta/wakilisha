@@ -96,13 +96,14 @@ describe("Phase 6B media-first WAKILISHA Player", () => {
     expect(audioPage).toContain('playbackSpeed: false');
   });
 
-  it("makes the active public shells use the new player chrome", () => {
+  it("makes the active public shells use the new player chrome and provider media host", () => {
     expect(desktopShell).toContain("PlayerCompactSurface");
     expect(desktopShell).not.toContain("PlayerDock");
     expect(desktopShell).not.toContain("DesktopPlayerPage");
     expect(responsiveShell).toContain("PlayerCompactSurface");
     expect(responsiveShell).toContain("PlayerFullSurface");
     expect(responsiveShell).toContain("isFullPlayerOpen");
+    expect(full).toContain('data-wk-provider-media-host={mode}');
     expect(playerChrome).toContain(".phn-miniplayer");
     expect(playerChrome).toContain("display: none !important");
   });
