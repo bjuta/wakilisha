@@ -301,12 +301,83 @@ const routePaths = [
 ].map((match) => match[1]);
 
 /*
- * The pre-M1 authority is 165 paths. Phase 6B M1 adds exactly one public path:
+ * Commit af3dda15 established 147 public route paths.
+ * Commit d5c81f32 added two release-scoped track routes,
+ * bringing the authority to 149.
+ *
+ * Commit 6b1388f4 intentionally retired five WordPress
+ * runtime paths:
+ * - migrate
+ * - imports
+ * - jobs
+ * - jobs/:id
+ * - scraper
+ *
+ * The post-retirement authority was therefore 144 paths.
+ *
+ * Phase 5A adds three canonical Playlist Admin Studio paths:
+ * - playlists
+ * - playlists/new
+ * - playlists/:playlistId
+ *
+ * Removing those three paths reproduces the accepted 144-path
+ * baseline checksum exactly.
+ *
+ * The accepted pre-Phase-5B authority is 148 paths.
+ * Phase 5B adds two public Playlist routes:
+ * - /playlists
+ * - /playlists/:slug
+ *
+ * The current pre-People frontend authority is therefore 150 paths.
+ *
+ * Person frontend M1 adds one canonical role-neutral public route:
+ * - /people/:slug
+ *
+ * That established 151 paths.
+ *
+ * Following adds one canonical signed-in route:
+ * - /following
+ *
+ * Registry-led onboarding adds two route paths:
+ * - /start
+ * - Admin Settings onboarding
+ *
+ * Claimed Artist experience adds two route paths:
+ * - /artists/:slug/manage
+ * - community/artist-claims
+ *
+ * Artist Posts add one public route path:
+ * - /artists/:slug/updates/:updateId
+ *
+ * Universal Posts add one public Person Post route path:
+ * - /people/:slug/posts/:postId
+ *
+ * Music discovery adds one public route path:
+ * - /music
+ *
+ * Personal Playlists add two canonical Person Playlist routes:
+ * - /u/:username/playlists
+ * - /u/:username/playlists/:playlistSlug
+ *
+ * Notifications adds one signed-in public route:
+ * - /notifications
+ *
+ * Organization public surface adds one canonical public route:
+ * - /organizations/:slug
+ *
+ * Phase 6A final Audio adds two internal Admin Content paths:
+ * - audio
+ * - audio/:publicationId
+ *
+ * These are Admin Studio routes only; Phase 6B public Audio routes remain absent.
+ * The accepted pre-M1 authority is therefore 165 paths.
+ *
+ * Phase 6B M1 adds exactly one public Audio path:
  * - /audio/:slug
  *
- * The audit removes only that declared additive path before hashing, so every
- * pre-M1 route must remain in the same sequence and retain the accepted
- * checksum.
+ * The current authority is therefore 166 paths. The checksum below removes
+ * only that declared additive path and must still reproduce the exact 165-path
+ * pre-M1 sequence.
  */
 const expectedRoutePathCount = 166;
 const publicAudioPath = "/audio/:slug";
