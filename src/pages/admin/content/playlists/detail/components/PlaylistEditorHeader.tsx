@@ -1,4 +1,6 @@
 import { WkIcon, type WkIconName } from "@/components/design-system/Icon";
+import { AdminRecordHeader } from "@/components/design-system/admin/AdminRecordHeader";
+import { AdminSaveState } from "@/components/design-system/admin/AdminSaveState";
 
 export interface PlaylistEditorHeaderAction {
   label: string;
@@ -41,18 +43,6 @@ export function PlaylistEditorHeader({
   primaryAction?: PlaylistEditorHeaderAction | null;
   secondaryActions?: PlaylistEditorHeaderAction[];
 }) {
-  const saveLabel = isSaving
-    ? "Saving"
-    : isDirty
-      ? "Unsaved"
-      : "All Saved";
-
-  const saveTone = isSaving
-    ? "border-wk-info/20 bg-wk-info-soft text-wk-info"
-    : isDirty
-      ? "border-wk-warning/20 bg-wk-warning-soft text-wk-warning"
-      : "border-wk-success/20 bg-wk-success-soft text-wk-success";
-
   function actionClass(
     action: PlaylistEditorHeaderAction,
   ): string {
@@ -106,57 +96,25 @@ export function PlaylistEditorHeader({
   }
 
   return (
-    <header className="sticky top-0 z-40 -mx-4 border-b border-wk-border bg-wk-bg/95 px-4 py-3 backdrop-blur sm:-mx-6 sm:px-6">
-      <div className="flex min-w-0 flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
-        <div className="flex min-w-0 items-center gap-3">
-          <button
-            type="button"
-            onClick={onBack}
-            className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-wk-text-muted hover:bg-wk-surface hover:text-wk-text"
-            aria-label="Back to Playlists"
-          >
-            <WkIcon name="ArrowLeft" size={16} />
-          </button>
-
-          <div className="min-w-0">
-            <div className="flex min-w-0 items-center gap-2">
-              <h1 className="truncate text-[16px] font-black tracking-tight text-wk-text sm:text-[18px]">
-                {title || "Untitled Playlist"}
-              </h1>
-              <span className="shrink-0 rounded-full bg-wk-surface-raised px-2 py-0.5 text-[9px] font-black uppercase tracking-[0.08em] text-wk-text-muted">
-                {status.replace(/_/g, " ")}
-              </span>
-            </div>
-            <div className="mt-0.5 flex min-w-0 items-center gap-2 text-[10px] text-wk-text-faint">
-              <span className="truncate">/{slug}</span>
-              <span aria-hidden="true">·</span>
-              <span className="shrink-0">Revision {revision}</span>
-              <span aria-hidden="true">·</span>
-              <span className="shrink-0">
-                {trackCount} {trackCount === 1 ? "track" : "tracks"}
-              </span>
-            </div>
-          </div>
-        </div>
-
-        <div className="flex flex-wrap items-center gap-2 xl:justify-end">
-          <span
-            className={`inline-flex h-8 items-center gap-1.5 rounded-full border px-3 text-[10px] font-bold ${saveTone}`}
-          >
-            {isSaving ? (
-              <WkIcon
-                name="LoaderCircle"
-                size={12}
-                className="animate-spin"
-              />
-            ) : (
-              <WkIcon
-                name={isDirty ? "Circle" : "CheckCircle2"}
-                size={11}
-              />
-            )}
-            {saveLabel}
+    <AdminRecordHeader
+      collectionLabel="Playlists"
+      title={title || "Untitled Playlist"}
+      status={status}
+      onBack={onBack}
+      meta={
+        <>
+          <span className="max-w-full truncate font-mono">/{slug}</span>
+          <span aria-hidden="true">·</span>
+          <span className="shrink-0">Revision {revision}</span>
+          <span aria-hidden="true">·</span>
+          <span className="shrink-0">
+            {trackCount} {trackCount === 1 ? "track" : "tracks"}
           </span>
+        </>
+      }
+      actions={
+        <>
+          <AdminSaveState isDirty={isDirty} isSaving={isSaving} />
 
           {canEdit ? (
             <button
@@ -168,7 +126,7 @@ export function PlaylistEditorHeader({
                   ? "Wait for moving changes to finish saving first."
                   : "Save an immutable working version."
               }
-              className="wk-button wk-button-ghost wk-button-sm disabled:opacity-40"
+              className="wk-button wk-button-secondary wk-button-sm disabled:opacity-40"
             >
               <WkIcon name="Save" size={14} />
               Save
@@ -192,8 +150,8 @@ export function PlaylistEditorHeader({
           {primaryAction
             ? renderAction(primaryAction, "primary")
             : null}
-        </div>
-      </div>
-    </header>
+        </>
+      }
+    />
   );
 }
