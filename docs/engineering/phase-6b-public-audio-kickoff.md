@@ -4,7 +4,9 @@ Status: OPEN
 
 Opened: 21 August 2026
 
-Starting accepted main: `fd0580e3a1a19e3d1f06a9c8466a37c84cd26a8b`
+Phase 6A production authority baseline: `fd0580e3a1a19e3d1f06a9c8466a37c84cd26a8b`
+
+Phase 6B governance gate: PR #684, `Enforce primitive compounding and open Phase 6B`
 
 Starting production migration head: `20260821095406`
 
@@ -103,7 +105,7 @@ Do not generalize the global player, build RSS, or redesign every public Audio s
 
 Before the first Phase 6B implementation PR is opened:
 
-1. audit the exact current public route and read-model seams from accepted Phase 6A main
+1. audit the exact current public route and read-model seams from protected `main` after PR #684
 2. define the smallest public read contract
 3. identify primitive reuse and primitive impact explicitly
 4. keep the migration additive and narrow if SQL is required
