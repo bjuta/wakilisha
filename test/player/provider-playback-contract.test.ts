@@ -388,10 +388,15 @@ describe(
     );
 
     it(
-      "counts every provider backend as full playback",
+      "keeps provider playback full without equating HTML Audio with excerpts",
       () => {
         expect(history)
           .toContain(
+            'experience.availability === "full"',
+          );
+
+        expect(history)
+          .not.toContain(
             'input.backend !== "audio"',
           );
 
