@@ -1,0 +1,120 @@
+{
+  "version": 1,
+  "primitiveDirectories": [
+    "src/components/design-system/admin",
+    "src/components/design-system/editorial"
+  ],
+  "surfaceDiscovery": [
+    {
+      "childrenOf": "src/pages/admin/content",
+      "idPrefix": "admin:"
+    }
+  ],
+  "surfaces": [
+    {
+      "id": "public:audio",
+      "path": "src/pages/audio",
+      "required": false
+    }
+  ],
+  "primitives": [
+    {
+      "id": "admin.record-header",
+      "path": "src/components/design-system/admin/AdminRecordHeader.tsx",
+      "kind": "presentation",
+      "maturity": "canonical",
+      "concept": "governed record identity and lifecycle header",
+      "authorityOwner": "consumer",
+      "consumers": ["admin:articles", "admin:playlists", "admin:audio"]
+    },
+    {
+      "id": "admin.status-badge",
+      "path": "src/components/design-system/admin/AdminStatusBadge.tsx",
+      "kind": "presentation",
+      "maturity": "canonical",
+      "concept": "governed lifecycle status presentation",
+      "authorityOwner": "consumer",
+      "consumers": ["admin:articles", "admin:playlists", "admin:audio"],
+      "competingImplementationPatterns": [
+        "(?:function|const)\\s+[A-Za-z0-9_]*StatusBadge\\b",
+        "function\\s+statusClass\\b",
+        "const\\s+STATUS_COLORS\\b"
+      ]
+    },
+    {
+      "id": "admin.save-state",
+      "path": "src/components/design-system/admin/AdminSaveState.tsx",
+      "kind": "presentation",
+      "maturity": "canonical",
+      "concept": "working-record save and immutable submitted state",
+      "authorityOwner": "consumer",
+      "consumers": ["admin:articles", "admin:playlists", "admin:audio"]
+    },
+    {
+      "id": "admin.workspace-section",
+      "path": "src/components/design-system/admin/AdminWorkspaceSection.tsx",
+      "kind": "presentation",
+      "maturity": "candidate",
+      "concept": "governed admin workspace section framing",
+      "authorityOwner": "consumer",
+      "consumers": ["admin:audio"]
+    },
+    {
+      "id": "admin.collection-header",
+      "path": "src/components/design-system/admin/AdminCollectionHeader.tsx",
+      "kind": "presentation",
+      "maturity": "canonical",
+      "concept": "admin collection identity and context heading",
+      "authorityOwner": "consumer",
+      "consumers": ["admin:articles", "admin:playlists", "admin:audio"]
+    },
+    {
+      "id": "admin.mode-composer",
+      "path": "src/components/design-system/admin/AdminModeComposer.tsx",
+      "kind": "interaction",
+      "maturity": "candidate",
+      "concept": "one creation surface with explicit domain modes",
+      "authorityOwner": "consumer",
+      "consumers": ["admin:audio"]
+    },
+    {
+      "id": "editorial.workflow-rail",
+      "path": "src/components/design-system/editorial/EditorialWorkflowRail.tsx",
+      "kind": "interaction",
+      "maturity": "candidate",
+      "concept": "semantic workflow phase navigation",
+      "authorityOwner": "consumer",
+      "consumers": ["admin:audio"]
+    },
+    {
+      "id": "editorial.comment-editor",
+      "path": "src/components/design-system/editorial/EditorialCommentEditor.tsx",
+      "kind": "interaction",
+      "maturity": "candidate",
+      "concept": "lightweight rich editorial discussion input and read presentation",
+      "authorityOwner": "consumer",
+      "consumers": ["admin:audio"]
+    },
+    {
+      "id": "editorial.media-transport",
+      "path": "src/components/design-system/editorial/MediaTransport.tsx",
+      "kind": "interaction",
+      "maturity": "candidate",
+      "concept": "time-based media playback transport",
+      "authorityOwner": "consumer",
+      "consumers": ["admin:audio"]
+    },
+    {
+      "id": "editorial.media-timeline",
+      "path": "src/components/design-system/editorial/MediaTimeline.tsx",
+      "kind": "interaction",
+      "maturity": "candidate",
+      "concept": "time-coordinate media navigation and point/range annotation",
+      "authorityOwner": "consumer",
+      "consumers": ["admin:audio"],
+      "competingImplementationPatterns": [
+        "(?:function|const)\\s+(?:AudioTimeline|VideoTimeline|WaveformTimeline|MediaTimeline)\\b"
+      ]
+    }
+  ]
+}
