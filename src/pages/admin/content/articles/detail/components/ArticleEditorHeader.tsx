@@ -1,6 +1,9 @@
 import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { WkIcon } from "@/components/design-system/Icon";
+import { AdminRecordHeader } from "@/components/design-system/admin/AdminRecordHeader";
+import { AdminSaveState } from "@/components/design-system/admin/AdminSaveState";
+import { AdminStatusBadge } from "@/components/design-system/admin/AdminStatusBadge";
 
 interface Props {
   slug: string;
@@ -47,17 +50,6 @@ interface Props {
   };
 }
 
-const STATUS_COLORS: Record<string, string> = {
-  publish: "bg-wk-success-soft text-wk-success",
-  draft: "bg-wk-warning-soft text-wk-warning",
-  pending: "bg-wk-info-soft text-wk-info",
-  approved: "bg-wk-success-soft text-wk-success",
-  changes_requested: "bg-wk-warning-soft text-wk-warning",
-  future: "bg-wk-brand-soft text-wk-brand",
-  private: "bg-wk-surface-raised text-wk-text-muted",
-  trash: "bg-wk-danger-soft text-wk-danger",
-};
-
 export function ArticleEditorHeader({
   slug,
   title,
@@ -100,10 +92,6 @@ export function ArticleEditorHeader({
   const overflowRef = useRef<HTMLDivElement>(null);
   const [overflowOpen, setOverflowOpen] = useState(false);
 
-  const resolvedStatusColorKey = statusColorKey ?? status ?? "draft";
-  const statusColor =
-    STATUS_COLORS[resolvedStatusColorKey] ?? STATUS_COLORS.draft;
-
   const isPublished = status === "publish";
   const isFuture = status === "future";
   const shouldShowSubmitForReview =
@@ -114,19 +102,14 @@ export function ArticleEditorHeader({
     !draftActionsDisabled;
   const canManagePublication =
     !permissions || permissions.canPublish;
-
   const canDeleteArticle =
     (!permissions || permissions.canDelete) &&
     !draftActionsDisabled;
 
   const hasOverflowActions =
     isPublished ||
-    (
-      isFuture &&
-      canManagePublication
-    ) ||
+    (isFuture && canManagePublication) ||
     canDeleteArticle;
-
 
   useEffect(() => {
     function handlePointerDown(event: MouseEvent) {
@@ -152,28 +135,6 @@ export function ArticleEditorHeader({
       document.removeEventListener("keydown", handleKeyDown);
     };
   }, []);
-
-  const saveStateLabel = isSaving
-    ? "Saving"
-    : isDirty
-      ? "Unsaved"
-      : "All Saved";
-
-  const saveStateTone = isSaving
-    ? "border-wk-info/30 bg-wk-info-soft text-wk-info"
-    : isDirty
-      ? "border-wk-warning/30 bg-wk-warning-soft text-wk-warning"
-      : "border-wk-success/30 bg-wk-success-soft text-wk-success";
-
-  const displayedSaveStateLabel =
-    draftActionsDisabled
-      ? documentModeLabel || "Submitted Version"
-      : saveStateLabel;
-
-  const displayedSaveStateTone =
-    draftActionsDisabled
-      ? "border-wk-info/30 bg-wk-info-soft text-wk-info"
-      : saveStateTone;
 
   function renderPrimaryAction() {
     if (canApproveVersion) {
@@ -282,73 +243,48 @@ export function ArticleEditorHeader({
   }
 
   return (
-    <header className="sticky top-0 z-30 rounded-2xl border border-wk-border bg-wk-surface shadow-sm">
-      <div className="flex flex-col gap-3 px-4 py-3 lg:flex-row lg:items-center lg:justify-between">
-        <div className="min-w-0">
-          <div className="mb-1 flex items-center gap-2 text-[10px] font-bold uppercase tracking-[0.16em] text-wk-text-faint">
-            <button
-              type="button"
-              onClick={() => navigate("/admin/content/articles")}
-              className="text-wk-brand transition-colors hover:text-wk-brand-hover"
-            >
-              Articles
-            </button>
-            <WkIcon name="ChevronRight" size={11} />
-            <span className="truncate">{title || slug}</span>
-          </div>
-
-          <div className="flex min-w-0 flex-wrap items-center gap-2">
-            <h1 className="max-w-full truncate text-[18px] font-black tracking-tight text-wk-text sm:text-[20px] lg:max-w-[520px]">
-              {title || "(Untitled)"}
-            </h1>
-
-            <span
-              className={`inline-flex items-center rounded-full px-2.5 py-1 text-[10px] font-bold uppercase tracking-wide ${statusColor}`}
-            >
-              {statusLabel ?? status ?? "Draft"}
+    <AdminRecordHeader
+      collectionLabel="Articles"
+      title={title || "(Untitled)"}
+      status={statusColorKey ?? status ?? "draft"}
+      statusLabel={statusLabel ?? status ?? "Draft"}
+      onBack={() => navigate("/admin/content/articles")}
+      badges={
+        <>
+          {isAdmin ? (
+            <span className="inline-flex items-center gap-1 rounded-full bg-wk-brand-soft px-2.5 py-1 text-[10px] font-bold text-wk-brand">
+              <WkIcon name="Shield" size={10} />
+              Admin
             </span>
-
-            {isAdmin ? (
-              <span className="inline-flex items-center gap-1 rounded-full bg-wk-brand-soft px-2.5 py-1 text-[10px] font-bold text-wk-brand">
-                <WkIcon name="Shield" size={10} />
-                Admin
-              </span>
-            ) : null}
-
-            {permissions && !permissions.canEdit ? (
-              <span className="inline-flex items-center gap-1 rounded-full bg-wk-warning-soft px-2.5 py-1 text-[10px] font-bold text-wk-warning">
-                <WkIcon name="Eye" size={10} />
-                Read-only
-              </span>
-            ) : null}
-
-          </div>
-
-          <div className="mt-1 flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1 text-[11px] text-wk-text-faint">
-            <span className="max-w-full truncate font-mono">{slug}</span>
-            {articleOwner ? (
-              <>
-                <span aria-hidden="true">·</span>
-                <span>Owner: {articleOwner}</span>
-              </>
-            ) : null}
-          </div>
-        </div>
-
-        <div className="flex flex-wrap items-center gap-2 lg:justify-end">
-          <span
-            aria-live="polite"
-            className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1.5 text-[10px] font-bold ${displayedSaveStateTone}`}
-          >
-            {isSaving ? (
-              <WkIcon name="Loader2" size={11} className="animate-spin" />
-            ) : isDirty ? (
-              <WkIcon name="Circle" size={7} />
-            ) : (
-              <WkIcon name="Check" size={11} />
-            )}
-            {displayedSaveStateLabel}
-          </span>
+          ) : null}
+          {permissions && !permissions.canEdit ? (
+            <AdminStatusBadge
+              status="changes_requested"
+              label="Read-only"
+              className="normal-case tracking-normal"
+            />
+          ) : null}
+        </>
+      }
+      meta={
+        <>
+          <span className="max-w-full truncate font-mono">{slug}</span>
+          {articleOwner ? (
+            <>
+              <span aria-hidden="true">·</span>
+              <span>Owner: {articleOwner}</span>
+            </>
+          ) : null}
+        </>
+      }
+      actions={
+        <>
+          <AdminSaveState
+            isDirty={isDirty}
+            isSaving={isSaving}
+            locked={draftActionsDisabled}
+            lockedLabel={documentModeLabel || "Submitted Version"}
+          />
 
           {!draftActionsDisabled ? (
             <button
@@ -359,11 +295,7 @@ export function ArticleEditorHeader({
             >
               {isPreviewing ? (
                 <>
-                  <WkIcon
-                    name="Loader2"
-                    size={14}
-                    className="animate-spin"
-                  />
+                  <WkIcon name="Loader2" size={14} className="animate-spin" />
                   Preparing
                 </>
               ) : (
@@ -394,9 +326,7 @@ export function ArticleEditorHeader({
               className="wk-button wk-button-ghost wk-button-sm whitespace-nowrap"
             >
               <WkIcon name="PanelLeftOpen" size={14} />
-              <span className="hidden sm:inline">
-                Exit Focus
-              </span>
+              <span className="hidden sm:inline">Exit Focus</span>
             </button>
           ) : null}
 
@@ -411,9 +341,7 @@ export function ArticleEditorHeader({
               className="wk-button wk-button-ghost wk-button-sm whitespace-nowrap"
             >
               <WkIcon name="PanelRightOpen" size={14} />
-              <span className="hidden sm:inline">
-                Details
-              </span>
+              <span className="hidden sm:inline">Details</span>
             </button>
           ) : null}
 
@@ -433,11 +361,7 @@ export function ArticleEditorHeader({
 
           <div
             ref={overflowRef}
-            className={
-              hasOverflowActions
-                ? "relative"
-                : "hidden"
-            }
+            className={hasOverflowActions ? "relative" : "hidden"}
           >
             <button
               type="button"
@@ -468,8 +392,7 @@ export function ArticleEditorHeader({
                   </a>
                 ) : null}
 
-                {(isPublished || isFuture) &&
-                canManagePublication ? (
+                {(isPublished || isFuture) && canManagePublication ? (
                   <button
                     type="button"
                     role="menuitem"
@@ -484,8 +407,7 @@ export function ArticleEditorHeader({
                   </button>
                 ) : null}
 
-                {!draftActionsDisabled &&
-                canDeleteArticle ? (
+                {!draftActionsDisabled && canDeleteArticle ? (
                   <>
                     <div className="my-1 h-px bg-wk-border" />
                     <button
@@ -505,24 +427,24 @@ export function ArticleEditorHeader({
               </div>
             ) : null}
           </div>
-        </div>
-      </div>
-
-      {publishDisabledReason || lastAutosavedAt ? (
-        <div className="flex flex-col gap-1 border-t border-wk-border px-4 py-2 text-[10px] text-wk-text-faint sm:flex-row sm:items-center sm:justify-between">
-          <span>
-            {lastAutosavedAt
-              ? `Last auto-saved ${new Date(lastAutosavedAt).toLocaleTimeString()}`
-              : "Auto-save starts after the first change."}
-          </span>
-
-          {publishDisabledReason ? (
-            <span className="font-semibold text-wk-warning">
-              {publishDisabledReason}
+        </>
+      }
+      footer={
+        publishDisabledReason || lastAutosavedAt ? (
+          <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
+            <span>
+              {lastAutosavedAt
+                ? `Last auto-saved ${new Date(lastAutosavedAt).toLocaleTimeString()}`
+                : "Auto-save starts after the first change."}
             </span>
-          ) : null}
-        </div>
-      ) : null}
-    </header>
+            {publishDisabledReason ? (
+              <span className="font-semibold text-wk-warning">
+                {publishDisabledReason}
+              </span>
+            ) : null}
+          </div>
+        ) : null
+      }
+    />
   );
 }
