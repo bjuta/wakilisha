@@ -2,7 +2,9 @@
 
 Status date: 21 August 2026
 
-Repository baseline reconciled: `fd0580e3a1a19e3d1f06a9c8466a37c84cd26a8b`
+Phase 6A production authority baseline: `fd0580e3a1a19e3d1f06a9c8466a37c84cd26a8b`
+
+Phase 6B governance gate: PR #684, `Enforce primitive compounding and open Phase 6B`
 
 ## Purpose
 
@@ -244,6 +246,6 @@ Build Inquiry as a capability across canonical editors, then the public Inquiry 
 
 ## Immediate next step
 
-Begin Phase 6B M1 from accepted Phase 6A main.
+Begin Phase 6B M1 from protected `main` after PR #684.
 
 Audit only the exact public-read and route seams needed for the smallest published-Audio contract, declare primitive impact, and then build the narrowest preview-proven slice. Do not reopen Phase 6A or rebuild authority that production already owns.
