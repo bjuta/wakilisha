@@ -148,7 +148,7 @@ function audioPlayerItem(
         save: false,
         chapters: publication.chapters.length > 0,
         transcript: Boolean(publication.transcript?.url),
-        playbackSpeed: true,
+        playbackSpeed: false,
       },
     },
   );
