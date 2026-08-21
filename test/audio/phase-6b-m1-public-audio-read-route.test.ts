@@ -40,27 +40,12 @@ const routeAudit = readFileSync(
   "scripts/performance/audit-public-route-splitting.mjs",
   "utf8",
 );
-const registry = JSON.parse(
-  readFileSync("scripts/control-plane/primitive-registry.json", "utf8"),
-) as {
-  surfaces: Array<{ id: string; path: string; required?: boolean }>;
-  primitives: Array<{
-    id: string;
-    maturity: string;
-    consumers: string[];
-    path: string;
-  }>;
-};
+const registry = readFileSync(
+  "scripts/control-plane/primitive-registry.json",
+  "utf8",
+);
 const reviewWorkspace = readFileSync(
   "src/pages/admin/content/audio/detail/components/AudioReviewWorkspace.tsx",
-  "utf8",
-);
-const playbackController = readFileSync(
-  "src/components/design-system/editorial/useMediaPlaybackController.ts",
-  "utf8",
-);
-const timeline = readFileSync(
-  "src/components/design-system/editorial/MediaTimeline.tsx",
   "utf8",
 );
 
@@ -145,34 +130,32 @@ describe("Phase 6B M1 public Audio read and route", () => {
     );
   });
 
-  it("compounds the Audio player primitives instead of forking them", () => {
-    const publicSurface = registry.surfaces.find((surface) => surface.id === "public:audio");
-    expect(publicSurface?.required).toBe(true);
+  it("hands playback to the existing WAKILISHA Player instead of creating a local Audio engine", () => {
+    expect(page).toContain('import { usePlayer } from "@/context/PlayerContext"');
+    expect(page).toContain("playerMediaItem(");
+    expect(page).toContain('playbackAvailability: "full"');
+    expect(page).toContain('mediaKind:');
+    expect(page).toContain("playTrack(");
+    expect(page).toContain("seek(startSeconds)");
+    expect(page).not.toContain("<audio");
+    expect(page).not.toContain("MediaTransport");
+    expect(page).not.toContain("MediaTimeline");
+    expect(page).not.toContain("useMediaPlaybackController");
+  });
 
-    for (const id of [
-      "editorial.media-transport",
-      "editorial.media-timeline",
-      "editorial.media-playback-controller",
-    ]) {
-      const primitive = registry.primitives.find((entry) => entry.id === id);
-      expect(primitive?.maturity).toBe("canonical");
-      expect(primitive?.consumers).toEqual(["admin:audio", "public:audio"]);
-    }
-
-    expect(reviewWorkspace).toContain("useMediaPlaybackController");
-    expect(page).toContain("useMediaPlaybackController");
-    expect(page).toContain("<MediaTransport");
-    expect(page).toContain("<MediaTimeline");
-    expect(playbackController).not.toContain("@/services/");
-    expect(playbackController).not.toContain("@/lib/supabase");
-    expect(timeline).toContain('idleLabel = "Canonical waveform"');
-    expect(page).toContain('idleLabel="Timeline"');
+  it("does not manufacture public reuse from Audio editorial primitives", () => {
+    expect(registry).toContain('"editorial.media-transport"');
+    expect(registry).toContain('"editorial.media-timeline"');
+    expect(registry).toContain('"maturity": "candidate"');
+    expect(registry).not.toContain("editorial.media-playback-controller");
+    expect(reviewWorkspace).not.toContain("useMediaPlaybackController");
   });
 
   it("keeps public Audio language reader-facing", () => {
     expect(page).toContain("Audio Unavailable");
     expect(page).toContain("This recording is not published or could not be found.");
     expect(page).toContain("Open Transcript");
+    expect(page).toContain("Listen");
     expect(page).not.toContain("canonical");
     expect(page).not.toContain("asset");
     expect(page).not.toContain("identity");
