@@ -1,8 +1,8 @@
 # WAKILISHA Programme Status
 
-Status date: 20 August 2026
+Status date: 21 August 2026
 
-Repository baseline reconciled: `5aa54cf445693e403d50e90f51dc2e3609498b3e`
+Repository baseline reconciled: `fd0580e3a1a19e3d1f06a9c8466a37c84cd26a8b`
 
 ## Status authority
 
@@ -10,15 +10,23 @@ This file is the current status overlay for `docs/institute/two-workspace-pilot-
 
 The long-form plan remains the architectural, product-doctrine, phase-scope, engineering-rule, and five-year durability authority.
 
-Where the long-form plan's **current phase**, **immediate next implementation**, or **completion status** conflicts with this file, use this file. The long-form plan was last reconciled before the Phase 5B real-work acceptance sequence and therefore understates the programme's actual progress.
+Where the long-form plan's current phase, immediate next implementation, or completion status conflicts with this file, use this file.
 
 The compact navigation view is `docs/roadmap/wakilisha-master-programme-map.md`.
 
-## Current numbered phase
+## Current numbered work
 
-**Phase 6: Audio**
+**Phase 6B: Public Audio product**
 
 Phases 0 through 5 are complete.
+
+Phase 6A Audio publication and internal editorial authority is complete and closed in production.
+
+See:
+
+- `docs/engineering/phase-6a-closure-record.md`
+- `docs/engineering/phase-6b-public-audio-kickoff.md`
+- `docs/engineering/primitive-compounding-contract.md`
 
 ## Phase 5 closure
 
@@ -30,16 +38,7 @@ Complete through PR #587 and PR #588.
 
 Complete through the production acceptance sequence that followed the initial Phase 5B product shipment.
 
-Evidence:
-
-- PR #590 shipped the public Playlist product and recorded production acceptance for the first public surface and Registry contribution path.
-- PR #591 seeded the first real Phase 5B Playlist intake.
-- PR #592 completed the first Playlist Registry canonicalization.
-- PR #593 recorded the first real governed publication of `Top 50 Kenyan Songs Of 2025`.
-- The PR #593 verifier required exact published state, submitted, approved, and published immutable versions, durable review events, a durable publication snapshot, 50 public tracks, 50 playable tracks, 50 artist-linked tracks, 50 Registry-linked tracks, and 50 editor notes.
-- PR #597 added Playlist editorial lifecycle parity.
-- PR #598 added exact version-bound Playlist Preview.
-- PR #599 proved published-update review continuity and recorded production acceptance through published Version 8.
+Evidence includes PR #590 through PR #599, including the first governed publication of `Top 50 Kenyan Songs Of 2025`, public product delivery, Registry canonicalization, lifecycle parity, exact version-bound Preview, and published-update review continuity.
 
 The Phase 5 programme exit gate was:
 
@@ -47,11 +46,11 @@ The Phase 5 programme exit gate was:
 
 That gate is satisfied.
 
-## Work completed after Phase 5
+## Post-Phase-5 Interlude
 
-After the Playlist exit gate, the project naturally moved through adjacent product and platform work before returning to the numbered programme.
+After the Playlist exit gate, WAKILISHA moved through adjacent product and platform work before returning to the numbered programme.
 
-That work included:
+That accepted baseline includes:
 
 - Registry-led onboarding
 - universal Posts and the desktop application shell
@@ -67,37 +66,86 @@ That work included:
 - Organization identity and public repertoire
 - Article and Artist prerender reliability
 
-This work is recorded in `docs/roadmap/post-phase-5-interlude-ledger.md`.
+The detailed ledger remains `docs/roadmap/post-phase-5-interlude-ledger.md`.
 
-It is part of the accepted platform baseline. It does not need to be retrofitted into a new numbered phase.
+## Phase 6A closure
+
+Phase 6A now provides the accepted internal Audio system:
+
+- Show, Season, Episode, and Standalone Audio identity
+- typed Resource bindings and Audio capabilities
+- immutable Audio versions
+- full-length governed Audio delivery
+- exact master/revision binding
+- Chapters and Transcript Media binding
+- shared Credits and Citations
+- Review and publication lifecycle
+- stable GUID and enclosure identity
+- canonical Audio Admin Studio collection and editor
+- lifecycle History
+- Audio Editorial Workbench
+- canonical waveform and technical Media context
+- time-point and time-range submitted-version review
+- rich comments/replies and resolve/reopen workflow
+
+PR #683 merged the final Audio Editorial Workbench. The migration `20260821095406_audio_editorial_workbench_time_anchored_review.sql` is live in production. Production closed at 37 migrations with zero pending repository migrations.
+
+Authenticated browser acceptance passed, and the final disposable Supabase preview was deleted after closure.
+
+Admin Studio convergence across Article, Playlist, and Audio is also accepted. Its reusable residue is now governed by the Primitive Compounding Contract.
 
 ## Immediate numbered programme work
 
-The next numbered programme phase is Phase 6 Audio.
+Phase 6B owns the remaining public Audio product and the Phase 6 exit gate.
 
-The next engineering activity should begin with a diagnostic against the current codebase before assuming the original Phase 6 scope still maps one-to-one onto present implementation.
+The first recommended slice is **M1: published Audio public-read and route foundation**.
 
-Audit:
+Before building the whole public experience, prove a narrow public contract where:
 
-- current Audio tables, routes, services, and admin surfaces
-- Media audio ingest, preservation masters, derivatives, transcripts, and captions
-- global player capabilities and Audio-specific gaps
-- Resource identity support for shows, seasons, episodes, and standalone Audio
-- Review lifecycle reuse
-- Sources, Citations, Credits, Corrections, and provenance reuse
-- command, receipt, job, outbox, and concurrency support
-- RSS or feed infrastructure
-- stable GUID and enclosure identity
-- public read models
-- search and SEO integration
+- only the exact current published Audio version is public
+- draft/review state cannot leak
+- Show / Season / Episode / Standalone identity resolves canonically
+- public route identity is deterministic
+- full-length Audio delivery comes from canonical Media authority
+- Chapters and Transcript identity remain version-bound
+- Transcript public-safety rules remain enforced
+- public Credits/Citations come from shared Trust authority
+- stable GUID and enclosure identity survive the public boundary
+- anonymous/public execution is narrowly granted and permanently verified
 
-The diagnostic should determine the smallest honest PR 6A slice.
+Then continue into public Show/Episode presentation, accessible playback, transcript navigation, RSS, Corrections, scheduling, search, SEO, caching, and global-player integration.
+
+## Primitive compounding rule
+
+Phase 6B is the first numbered phase that begins with the Primitive Compounding Contract already active in CI.
+
+Every milestone must record whether it:
+
+- reuses an existing primitive
+- creates a candidate primitive from a real need
+- promotes a candidate after a second-domain proof
+- extends an existing primitive from new field learning
+- deliberately retains domain-specific implementation
+
+Do not build a universal screen. Do not rebuild a concept WAKILISHA has already learned.
+
+## Phase 6 exit gate
+
+Phase 6 remains open until one real podcast episode:
+
+- moves through the governed Audio workflow
+- publishes publicly
+- has valid RSS
+- preserves stable GUID and enclosure identity
+- works on desktop and mobile
+- exposes the required Credits and Trust presentation
+- proves that a transcript correction preserves prior history
 
 ## Programme continuity
 
 The roadmap is an orientation tool, not a prohibition on detours.
 
-If building Phase 6 exposes adjacent work that is better solved first, that work can be done. When it settles, reconcile the map so the project continues with a shared understanding of what changed and what remains.
+If building Phase 6B exposes adjacent work that is better solved first, that work can be done. When it settles, reconcile the map so the project continues with a shared understanding of what changed and what remains.
 
 ## Deployment state of this status correction
 
