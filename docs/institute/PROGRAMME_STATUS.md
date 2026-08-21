@@ -2,7 +2,9 @@
 
 Status date: 21 August 2026
 
-Repository baseline reconciled: `fd0580e3a1a19e3d1f06a9c8466a37c84cd26a8b`
+Phase 6A production authority baseline: `fd0580e3a1a19e3d1f06a9c8466a37c84cd26a8b`
+
+Phase 6B governance gate: PR #684, `Enforce primitive compounding and open Phase 6B`
 
 ## Status authority
 
