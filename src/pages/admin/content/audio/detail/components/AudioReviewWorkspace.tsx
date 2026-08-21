@@ -1,10 +1,9 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { WkIcon } from "@/components/design-system/Icon";
 import { AdminWorkspaceSection } from "@/components/design-system/admin/AdminWorkspaceSection";
 import { EditorialCommentEditor } from "@/components/design-system/editorial/EditorialCommentEditor";
 import { MediaTimeline, type TimelineAnchor } from "@/components/design-system/editorial/MediaTimeline";
 import { MediaTransport, formatMediaTime } from "@/components/design-system/editorial/MediaTransport";
-import { useMediaPlaybackController } from "@/components/design-system/editorial/useMediaPlaybackController";
 import {
   addAudioReviewComment,
   createAudioTimeReviewThread,
@@ -44,10 +43,14 @@ export function AudioReviewWorkspace({
   decisionNote: string;
   onDecisionNoteChange: (value: string) => void;
 }) {
+  const audioRef = useRef<HTMLAudioElement>(null);
   const [workbench, setWorkbench] = useState<AudioEditorialWorkbench | null>(null);
   const [loading, setLoading] = useState(true);
   const [message, setMessage] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [playing, setPlaying] = useState(false);
+  const [currentTime, setCurrentTime] = useState(0);
+  const [playbackRate, setPlaybackRate] = useState(1);
   const [anchor, setAnchor] = useState<TimelineAnchor | null>(null);
   const [commentHtml, setCommentHtml] = useState("");
   const [commentText, setCommentText] = useState("");
@@ -78,21 +81,7 @@ export function AudioReviewWorkspace({
   }, [publicationId]);
 
   const target = workbench?.targetVersion ?? null;
-  const {
-    mediaRef: audioRef,
-    playing,
-    currentTime,
-    playbackRate,
-    duration,
-    seek,
-    togglePlayback,
-    changePlaybackRate,
-    mediaEventHandlers,
-  } = useMediaPlaybackController({
-    durationSeconds: target?.durationSeconds ?? 0,
-    sourceKey: target?.id ?? null,
-  });
-
+  const duration = target?.durationSeconds ?? 0;
   const markers = useMemo(
     () => (workbench?.threads ?? []).map((thread) => ({
       id: thread.id,
@@ -111,6 +100,25 @@ export function AudioReviewWorkspace({
     [target?.chapters],
   );
   const stream = audioStream(target?.sourceProbe ?? {});
+
+  const seek = (seconds: number) => {
+    const audio = audioRef.current;
+    const next = Math.min(Math.max(0, seconds), Math.max(duration, audio?.duration || 0));
+    if (audio) audio.currentTime = next;
+    setCurrentTime(next);
+  };
+
+  const togglePlayback = async () => {
+    const audio = audioRef.current;
+    if (!audio) return;
+    if (audio.paused) await audio.play();
+    else audio.pause();
+  };
+
+  const changeRate = (rate: number) => {
+    setPlaybackRate(rate);
+    if (audioRef.current) audioRef.current.playbackRate = rate;
+  };
 
   const createThread = async () => {
     if (!target || !anchor || !commentText.trim()) return;
@@ -190,7 +198,10 @@ export function AudioReviewWorkspace({
           src={target.deliveryUrl ?? undefined}
           preload="metadata"
           className="hidden"
-          {...mediaEventHandlers}
+          onPlay={() => setPlaying(true)}
+          onPause={() => setPlaying(false)}
+          onTimeUpdate={(event) => setCurrentTime(event.currentTarget.currentTime)}
+          onEnded={() => setPlaying(false)}
         />
         <MediaTransport
           playing={playing}
@@ -199,7 +210,7 @@ export function AudioReviewWorkspace({
           playbackRate={playbackRate}
           onToggle={() => void togglePlayback()}
           onSeekBy={(delta) => seek(currentTime + delta)}
-          onPlaybackRateChange={changePlaybackRate}
+          onPlaybackRateChange={changeRate}
         />
         <div className="mt-4">
           <MediaTimeline

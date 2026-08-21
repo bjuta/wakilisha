@@ -14,7 +14,7 @@
     {
       "id": "public:audio",
       "path": "src/pages/audio",
-      "required": true
+      "required": false
     }
   ],
   "primitives": [
@@ -121,31 +121,22 @@
       "id": "editorial.media-transport",
       "path": "src/components/design-system/editorial/MediaTransport.tsx",
       "kind": "interaction",
-      "maturity": "canonical",
+      "maturity": "candidate",
       "concept": "time-based media playback transport",
       "authorityOwner": "consumer",
-      "consumers": ["admin:audio", "public:audio"]
+      "consumers": ["admin:audio"]
     },
     {
       "id": "editorial.media-timeline",
       "path": "src/components/design-system/editorial/MediaTimeline.tsx",
       "kind": "interaction",
-      "maturity": "canonical",
+      "maturity": "candidate",
       "concept": "time-coordinate media navigation and point/range annotation",
       "authorityOwner": "consumer",
-      "consumers": ["admin:audio", "public:audio"],
+      "consumers": ["admin:audio"],
       "competingImplementationPatterns": [
         "(?:function|const)\\s+(?:AudioTimeline|VideoTimeline|WaveformTimeline|MediaTimeline)\\b"
       ]
-    },
-    {
-      "id": "editorial.media-playback-controller",
-      "path": "src/components/design-system/editorial/useMediaPlaybackController.ts",
-      "kind": "interaction",
-      "maturity": "canonical",
-      "concept": "native time-based media playback state and controls",
-      "authorityOwner": "consumer",
-      "consumers": ["admin:audio", "public:audio"]
     }
   ]
 }
