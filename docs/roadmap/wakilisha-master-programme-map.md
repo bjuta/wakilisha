@@ -1,14 +1,14 @@
 # WAKILISHA Master Programme Map
 
-Status date: 20 August 2026
+Status date: 21 August 2026
 
-Repository baseline reconciled: `5aa54cf445693e403d50e90f51dc2e3609498b3e`
+Repository baseline reconciled: `fd0580e3a1a19e3d1f06a9c8466a37c84cd26a8b`
 
 ## Purpose
 
 This map keeps the long-running WAKILISHA programme visible while the product continues to evolve.
 
-Detours are expected. Building one part of WAKILISHA naturally exposes adjacent product, identity, infrastructure, and reliability work. The purpose of the roadmap is not to prevent that work. It is to preserve orientation so that, after a detour, we can see what changed, what became part of the baseline, and where the numbered programme now continues.
+Detours are expected. Building one part of WAKILISHA naturally exposes adjacent product, identity, infrastructure, reliability, and primitive work. The purpose of the roadmap is not to prevent that work. It is to preserve orientation so that, after a detour, we can see what changed, what became part of the baseline, and where the numbered programme now continues.
 
 For current phase status, this file and `docs/institute/PROGRAMME_STATUS.md` are the first references to read.
 
@@ -16,17 +16,17 @@ The detailed architectural and product doctrine remains in `docs/institute/two-w
 
 ## Current programme position
 
-**Phase 5: Playlist is complete.**
+**Phase 6A: Audio publication authority and internal editorial product is complete.**
 
-Phase 5A established canonical Playlist authority.
+The numbered programme now continues at:
 
-Phase 5B shipped the public Playlist product and satisfied the real-work exit gate through the first governed production Playlist, `Top 50 Kenyan Songs Of 2025`.
+**Phase 6B: Public Audio product**
 
-The numbered programme therefore continues at:
+The current kickoff is `docs/engineering/phase-6b-public-audio-kickoff.md`.
 
-**Phase 6: Audio**
+The Phase 6A closure record is `docs/engineering/phase-6a-closure-record.md`.
 
-The product, Community, identity, onboarding, and reliability work completed after Phase 5 is recorded as the **Post-Phase-5 Interlude**. That work remains part of the accepted WAKILISHA baseline. It does not need to be forced into the numbered programme to be legitimate.
+The Primitive Compounding Contract is now part of the engineering control plane and applies to Phase 6B onward.
 
 ## Programme map
 
@@ -38,7 +38,8 @@ The product, Community, identity, onboarding, and reliability work completed aft
 | 3 | Trust infrastructure | Complete | Sources, Citations, Credits, Corrections, and provenance |
 | 4 | Media platform | Complete | Media authority plus upload and processing pipeline |
 | 5 | Playlist | Complete | One real Playlist reviewed and published end to end |
-| 6 | Audio | Next numbered phase | One real podcast episode published, RSS validated, and transcript correction preserves history |
+| 6A | Audio publication authority and internal editorial product | Complete | Governed Audio authority, Admin Studio workbench, submitted-version review, and production acceptance |
+| 6B | Public Audio product | Current | One real podcast episode published, RSS validated, and transcript correction preserves history |
 | 7 | Video | Planned | One real captioned video publishes across desktop and mobile |
 | 8 | Field Capture | Planned | Weak-network capture survives intake, private review, and safe promotion |
 | 9 | Public delivery, search, and SEO at scale | Planned | Public delivery no longer depends on giant read or whole-corpus build paths |
@@ -50,33 +51,33 @@ The product, Community, identity, onboarding, and reliability work completed aft
 
 ### Phase 0: Secure and control the existing estate
 
-- **0A Security perimeter:** closed through PR #452.
-- **0B Engineering control plane:** closed through PR #453.
+- 0A Security perimeter: closed through PR #452.
+- 0B Engineering control plane: closed through PR #453.
 
 ### Phase 1: Platform kernel
 
-- **1A Resource identity and domain boundaries:** closed through PR #457.
-- **1B Commands, idempotency, jobs, and outbox:** closed through PR #458 and PR #459.
+- 1A Resource identity and domain boundaries: closed through PR #457.
+- 1B Commands, idempotency, jobs, and outbox: closed through PR #458 and PR #459.
 
 ### Phase 2: Article authority
 
-- **2A Durable drafts and immutable versions:** closed through PR #460, PR #461, PR #463, and PR #464.
-- **2B Review and publication lifecycle:** closed through PR #467, PR #469, PR #470, and PR #481.
-- **2C Article Editor Workbench:** closed through PR #482 and PR #483.
+- 2A Durable drafts and immutable versions: closed through PR #460, PR #461, PR #463, and PR #464.
+- 2B Review and publication lifecycle: closed through PR #467, PR #469, PR #470, and PR #481.
+- 2C Article Editor Workbench: closed through PR #482 and PR #483.
 
 The C slice was a quality and product closure inside Phase 2. It did not create a new top-level programme phase.
 
 ### Phase 3: Trust infrastructure
 
-- **3A Sources, Citations, and Credits:** closed through PR #542.
-- **3B Corrections and provenance:** closed through PR #557.
+- 3A Sources, Citations, and Credits: closed through PR #542.
+- 3B Corrections and provenance: closed through PR #557.
 
 The Article Workspace North Star work remains an accepted quality layer around the Article and Trust foundations.
 
 ### Phase 4: Media platform
 
-- **4A Media authority redesign:** closed through PR #580.
-- **4B Upload and processing pipeline:** closed through PR #586.
+- 4A Media authority redesign: closed through PR #580.
+- 4B Upload and processing pipeline: closed through PR #586.
 
 ### Phase 5: Playlist
 
@@ -84,35 +85,15 @@ The Article Workspace North Star work remains an accepted quality layer around t
 
 Closed through PR #587 and PR #588.
 
-Accepted authority includes:
-
-- canonical Playlist Resource identity
-- Playlist command and concurrency authority
-- immutable Playlist versions
-- review lifecycle
-- atomic ordering
-- Registry-first Track Intake
-- provider playback validation
-- Media cover authority
-- shared Sources, Citations, Credits, Corrections, and provenance
-- canonical Playlist admin workspace
+Accepted authority includes canonical Playlist Resource identity, command and concurrency authority, immutable Playlist versions, review lifecycle, atomic ordering, Registry-first Track Intake, provider playback validation, Media cover authority, shared Trust and Corrections, and the canonical Playlist admin workspace.
 
 #### 5B Public Playlist product
 
 Closed through the real-work acceptance sequence.
 
-Key evidence:
+Key evidence includes PR #590 through PR #599, including the first real governed publication of `Top 50 Kenyan Songs Of 2025`, exact version-bound Preview, editorial lifecycle parity, and published-update review continuity.
 
-- PR #590 shipped the Phase 5B public Playlist product.
-- PR #591 seeded the first real Phase 5B Playlist intake.
-- PR #592 completed the first Playlist Registry canonicalization.
-- PR #593 recorded the first governed publication of `Top 50 Kenyan Songs Of 2025`.
-- The PR #593 verifier required published state, submitted, approved, and published immutable versions, durable review events, a durable publication snapshot, 50 public tracks, 50 playable tracks, 50 artist-linked tracks, 50 Registry-linked tracks, and 50 editor notes.
-- PR #597 added Playlist editorial lifecycle parity.
-- PR #598 added exact version-bound Playlist Preview.
-- PR #599 proved published-update review continuity and recorded production acceptance through published Version 8.
-
-That satisfies the Phase 5 exit gate: **one real Playlist reviewed and published end to end**.
+That satisfies the Phase 5 exit gate: one real Playlist reviewed and published end to end.
 
 Playlist remains an active product. Future Playlist work can continue naturally where real use exposes needs. Phase 5 does not need to stay administratively open for that to happen.
 
@@ -144,43 +125,61 @@ The lesson is not that detours should stop. The lesson is that the roadmap shoul
 
 ## Phase 6: Audio
 
-Phase 6 is the next numbered programme phase.
+### Phase 6A: Audio publication authority and internal editorial product
 
-### PR 6A: Audio publication authority
+**Closed 21 August 2026.**
 
-Build:
+Accepted Phase 6A now includes:
 
-- shows
-- seasons
-- episodes
-- standalone audio
-- immutable episode versions
-- canonical Audio Editor
-- preservation-master selection
-- chapters
-- transcripts
+- Shows
+- Seasons
+- Episodes
+- Standalone Audio
+- typed Resource bindings and Audio capabilities
+- immutable Audio versions
+- full-length governed Audio delivery
+- exact Media master/revision binding
+- Chapters
+- Transcript Media attachment
 - Credits
 - Citations
-- RSS contract
+- governed Review and publication lifecycle
 - stable GUID and enclosure identity
+- canonical Audio Admin Studio collection and editor
+- lifecycle/version History
+- Audio Editorial Workbench
+- canonical Media waveform and technical facts
+- time-point and time-range review bound to exact submitted versions
+- rich comments, replies, and resolve/reopen lifecycle
 
-Reuse the foundations already built for Resource identity, Media, Trust, Review, Corrections, provenance, Registry links, commands, jobs, and outbox.
+The final Audio Editorial Workbench merged through PR #683 at `fd0580e3a1a19e3d1f06a9c8466a37c84cd26a8b`.
 
-### PR 6B: Public Audio product
+Production closed at migration `20260821095406`, 37 migrations total, zero pending repository migrations. Authenticated production acceptance passed and the final disposable preview was deleted.
+
+See `docs/engineering/phase-6a-closure-record.md`.
+
+### Phase 6B: Public Audio product
+
+**Current numbered work.**
 
 Build:
 
-- public show and episode routes
-- accessible audio playback
+- public Show and Episode routes
+- public Standalone Audio routes where required
+- accessible Audio playback
 - transcript navigation
-- chapters
+- Chapters
 - RSS delivery
-- public review and provenance presentation
-- Corrections
+- public Credits, Citations, provenance, and Corrections presentation
 - scheduling
 - search
 - SEO
-- cached public read models
+- cached or stable public read models
+- global-player integration
+
+The recommended first slice is a narrow published-Audio public-read and route foundation before the whole product is built.
+
+See `docs/engineering/phase-6b-public-audio-kickoff.md`.
 
 ### Phase 6 exit gate
 
@@ -193,6 +192,18 @@ One real podcast episode must:
 - work on desktop and mobile
 - expose the required Credits and Trust presentation
 - prove that a transcript correction preserves prior history
+
+Phase 6A is closed. Phase 6B owns this remaining exit gate.
+
+## Primitive compounding doctrine
+
+From Phase 6B onward, repeated product work must compound platform learning.
+
+The rule is:
+
+> Solve the domain problem completely, then preserve the reusable residue. Never flatten the domain merely to manufacture reuse, and never allow the next domain to quietly rebuild a concept WAKILISHA has already learned.
+
+The machine-enforced contract is documented in `docs/engineering/primitive-compounding-contract.md` and enforced by Critical Control Plane.
 
 ## Later programme
 
@@ -224,14 +235,15 @@ Build Inquiry as a capability across canonical editors, then the public Inquiry 
 
 - The cultural output remains the centre.
 - One canonical authority remains preferable to duplicate authorities.
-- Shared Trust, Media, Review, Corrections, and provenance should be reused rather than rebuilt per format.
+- Shared Trust, Media, Review, Corrections, provenance, and learned primitives should be reused rather than rebuilt per format.
 - Real cultural work remains the strongest acceptance test.
 - Public and admin capability should meet at the actual product outcome.
+- Purpose-built domain workspaces may remain different while sharing the same meaning for shared concepts.
 - Detours are part of building. Record what they changed and return to the map when the work settles.
 - The roadmap is a navigation instrument, not a ban on discovering better work.
 
 ## Immediate next step
 
-Before writing Phase 6A code, audit the current Audio, Media, player, transcript, RSS, Review, Trust, Corrections, Resource, job, command, and public-route authorities against the Phase 6 contract.
+Begin Phase 6B M1 from accepted Phase 6A main.
 
-That diagnostic should tell us what Phase 6A actually needs, rather than assuming the 9 August plan still describes the present codebase exactly.
+Audit only the exact public-read and route seams needed for the smallest published-Audio contract, declare primitive impact, and then build the narrowest preview-proven slice. Do not reopen Phase 6A or rebuild authority that production already owns.

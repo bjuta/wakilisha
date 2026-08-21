@@ -44,6 +44,11 @@ jobs:
       - name: Test migration replay contract
         run: npx vitest run test/control-plane/migration-replay-contract.test.ts
 
+      - name: Enforce primitive compounding contract
+        run: |
+          node scripts/control-plane/verify-primitive-compounding.mjs
+          npx vitest run test/control-plane/primitive-compounding.test.ts
+
       - name: Require Supabase control-plane access
         run: |
           if [ -z "$SUPABASE_ACCESS_TOKEN" ]; then

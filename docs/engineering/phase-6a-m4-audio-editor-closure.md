@@ -1,8 +1,24 @@
-# Phase 6A M4 — Audio Editor Closure
+# Phase 6A M4 - Audio Editor Closure
+
+Status: CLOSED
+
+Historical milestone date: 20 August 2026
+
+Final Phase 6A closure: 21 August 2026
+
+## Reconciliation note
+
+M4 closed the internal Audio Editor authority described below. Its original runtime evidence correctly recorded that production was unchanged **at the time of M4 preview acceptance**.
+
+Phase 6A subsequently completed Admin Studio convergence and the Audio Editorial Workbench, promoted the remaining Audio migration to production, activated the exact tested frontend, passed authenticated browser acceptance, and deleted the final disposable preview.
+
+The authoritative final Phase 6A state is now `docs/engineering/phase-6a-closure-record.md`.
+
+Phase 6B is open at `docs/engineering/phase-6b-public-audio-kickoff.md`.
 
 ## Purpose
 
-This is the second and final Phase 6A closure commit. It completes the internal Audio editorial product that sits on top of the M1 identity/version authority, M2 exact master/delivery authority, and M3 Review/publication identity authority.
+This milestone completed the internal Audio editorial product that sits on top of the M1 identity/version authority, M2 exact master/delivery authority, and M3 Review/publication identity authority.
 
 ## Adds
 
@@ -12,7 +28,7 @@ This is the second and final Phase 6A closure commit. It completes the internal 
 - Transcript asset/revision identity frozen into immutable Audio versions.
 - Transcript Media public-safety revalidation at publication time.
 - Narrow Audio adapters over shared `editorial.resource_citations` and `editorial.resource_credits`.
-- Immutable Trust copying from working → submitted → approved → published Audio versions.
+- Immutable Trust copying from working to submitted to approved to published Audio versions.
 - Audio working-version Trust revision counters and optimistic concurrency.
 - Admin-only read models for Audio list/workspace data while the `audio` schema remains non-exposed.
 - Permanent read-only verifier for the complete internal Phase 6A Audio authority.
@@ -29,15 +45,17 @@ This is the second and final Phase 6A closure commit. It completes the internal 
 ## Deliberately deferred to Phase 6B
 
 - Public show and episode routes.
-- Public audio playback and transcript navigation.
+- Public Audio playback and transcript navigation.
 - RSS XML generation/delivery.
 - Public Corrections presentation and scheduling.
 - Public Audio search, SEO, caching, and read models.
 - Global-player integration.
 
-## Acceptance
+These remain Phase 6B scope and are no longer described as a future unnamed phase.
 
-The final Phase 6A acceptance requires a disposable preview replayed from the exact production migration baseline, successful execution of this migration, behavior fixtures covering Chapters + Transcript + Trust + Review/publish immutability, the permanent verifier, Supabase advisors, focused Audio tests, critical suite, and production build. Promotion must preserve the exact preview-proven migration bytes.
+## M4 acceptance
+
+M4 acceptance required a disposable preview replayed from the exact production migration baseline, successful execution of the M4 migration, behavior fixtures covering Chapters + Transcript + Trust + Review/publish immutability, the permanent verifier, Supabase advisors, focused Audio tests, critical suite, and production build. Promotion required exact preview-proven migration bytes.
 
 ## Runtime acceptance evidence
 
@@ -70,6 +88,10 @@ The behavioral fixture initially exposed an actual PL/pgSQL ambiguity in M4. The
 
 Post-rollback residue was verified as zero for Audio publications, Media assets, Citations, Credits, and command receipts.
 
-The disposable preview used for final runtime acceptance was deleted after verification. Production remained unchanged.
+The disposable preview used for M4 runtime acceptance was deleted after verification. Production was unchanged by that preview exercise.
 
-Phase 6B public Audio delivery, RSS XML, public playback, transcript navigation, public search delivery, and scheduling remain explicitly out of scope for M4.
+## Final disposition
+
+M4 is closed and should not be reopened for public Audio work.
+
+The later Audio Editorial Workbench is also closed in production. Phase 6B now owns public Audio delivery, RSS XML, public playback, transcript navigation, public search delivery, scheduling, SEO, Corrections presentation, and the remaining Phase 6 exit gate.
