@@ -86,35 +86,31 @@ begin
     raise exception 'Admin or Editorial Audio RPC execution leaked to anon.';
   end if;
 
-  for v_definition in
-    select v_definition
-  loop
-    if position('current_published_version_id' in v_definition) = 0
-       or position("version_row.version_kind = 'published'" in v_definition) = 0
-       or position("version_row.status = 'published'" in v_definition) = 0
-       or position('audio.publication_snapshots' in v_definition) = 0
-       or position('audio.assert_publishable_version_media' in v_definition) = 0
-       or position('audio.publication_version_chapters' in v_definition) = 0
-       or position("attachment.target_version_type = 'audio_publication_version'" in v_definition) = 0
-       or position('attachment.public_safe' in v_definition) = 0
-       or position('governance.public_safe' in v_definition) = 0
-       or position("source.exposure_class in ('public', 'public_redacted')" in v_definition) = 0
-       or position("'canonical_path', '/audio/' || v_version.slug" in v_definition) = 0
-    then
-      raise exception 'Public Audio resolver lost an exact-version, Media, Trust, or route authority guard.';
-    end if;
+  if position('current_published_version_id' in v_definition) = 0
+     or position("version_row.version_kind = 'published'" in v_definition) = 0
+     or position("version_row.status = 'published'" in v_definition) = 0
+     or position('audio.publication_snapshots' in v_definition) = 0
+     or position('audio.assert_publishable_version_media' in v_definition) = 0
+     or position('audio.publication_version_chapters' in v_definition) = 0
+     or position("attachment.target_version_type = 'audio_publication_version'" in v_definition) = 0
+     or position('attachment.public_safe' in v_definition) = 0
+     or position('governance.public_safe' in v_definition) = 0
+     or position("source.exposure_class in ('public', 'public_redacted')" in v_definition) = 0
+     or position("'canonical_path', '/audio/' || v_version.slug" in v_definition) = 0
+  then
+    raise exception 'Public Audio resolver lost an exact-version, Media, Trust, or route authority guard.';
+  end if;
 
-    if position('binding.current_working_version_id' in v_definition) > 0
-       or position('binding.current_submitted_version_id' in v_definition) > 0
-       or position('binding.current_approved_version_id' in v_definition) > 0
-       or position('publication_review_events' in v_definition) > 0
-       or position('publication_review_threads' in v_definition) > 0
-       or position('publication_review_comments' in v_definition) > 0
-       or position("'metadata'" in v_definition) > 0
-    then
-      raise exception 'Public Audio resolver exposes moving, Review, or raw metadata authority.';
-    end if;
-  end loop;
+  if position('binding.current_working_version_id' in v_definition) > 0
+     or position('binding.current_submitted_version_id' in v_definition) > 0
+     or position('binding.current_approved_version_id' in v_definition) > 0
+     or position('publication_review_events' in v_definition) > 0
+     or position('publication_review_threads' in v_definition) > 0
+     or position('publication_review_comments' in v_definition) > 0
+     or position("'metadata'" in v_definition) > 0
+  then
+    raise exception 'Public Audio resolver exposes moving, Review, or raw metadata authority.';
+  end if;
 
   raise notice 'PASS: Phase 6B M1 public Audio resolves only the exact current published version through current Media safety and public-safe Trust, while private Audio authority remains closed.';
 end;
