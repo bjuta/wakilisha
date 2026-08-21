@@ -1,8 +1,10 @@
 import { FormEvent, useEffect, useMemo, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { MediaPickerModal } from "@/components/admin/MediaPickerModal";
 import { WkIcon } from "@/components/design-system/Icon";
 import { WkSurface } from "@/components/design-system/primitives/Surface";
+import { AdminRecordHeader } from "@/components/design-system/admin/AdminRecordHeader";
+import { AdminWorkspaceSection } from "@/components/design-system/admin/AdminWorkspaceSection";
 import {
   fetchAudioPublicationWorkspace,
   publishAudio,
@@ -43,50 +45,12 @@ function secondsLabel(value: number): string {
   return `${minutes}:${seconds}`;
 }
 
-function WorkflowPill({ value }: { value: string }) {
-  const classes =
-    value === "published" || value === "approved"
-      ? "bg-wk-success-soft text-wk-success"
-      : value === "ready_for_review" || value === "in_review"
-        ? "bg-wk-info-soft text-wk-info"
-        : value === "changes_requested"
-          ? "bg-wk-warning-soft text-wk-warning"
-          : "bg-wk-surface-raised text-wk-text-muted";
-
-  return (
-    <span className={`rounded-full px-2.5 py-1 text-[10px] font-black ${classes}`}>
-      {humanize(value)}
-    </span>
-  );
-}
-
-function SectionHeader({
-  icon,
-  title,
-  note,
-}: {
-  icon: "FileText" | "Music" | "ListMusic" | "Quote" | "GitPullRequest";
-  title: string;
-  note: string;
-}) {
-  return (
-    <div className="mb-4 flex items-start gap-3">
-      <span className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-wk-brand-soft text-wk-brand">
-        <WkIcon name={icon} size={15} />
-      </span>
-      <div>
-        <h2 className="text-sm font-black text-wk-text">{title}</h2>
-        <p className="mt-0.5 text-xs leading-5 text-wk-text-muted">{note}</p>
-      </div>
-    </div>
-  );
-}
-
 export function AudioEditorWorkspace({
   publicationId,
 }: {
   publicationId?: string;
 }) {
+  const navigate = useNavigate();
   const [workspace, setWorkspace] =
     useState<AudioPublicationWorkspace | null>(null);
   const [loading, setLoading] = useState(true);
@@ -319,65 +283,65 @@ export function AudioEditorWorkspace({
   }
 
   return (
-    <div className="mx-auto w-full max-w-[1320px] p-4 sm:p-6 lg:p-8">
-      <div className="mb-5 flex flex-wrap items-start justify-between gap-4 border-b border-wk-border pb-5">
-        <div>
-          <Link
-            to="/admin/content/audio"
-            className="mb-2 inline-flex items-center gap-1 text-xs font-bold text-wk-text-muted hover:text-wk-brand"
-          >
-            <WkIcon name="ChevronLeft" size={14} />
-            Audio
-          </Link>
-          <div className="flex flex-wrap items-center gap-3">
-            <h1 className="text-2xl font-black tracking-tight text-wk-text">
-              {workspace.publication.title}
-            </h1>
-            <WorkflowPill value={workspace.publication.status} />
-          </div>
-          <p className="mt-2 text-sm text-wk-text-muted">
-            {workspace.publication.publicationKind === "episode"
-              ? "Episode"
-              : "Standalone Audio"}
-            {" · "}
-            Revision {workspace.publication.authorityRevision}
-          </p>
-        </div>
-
-        <div className="flex flex-wrap gap-2">
-          {editable ? (
-            <button
-              type="button"
-              disabled={busy !== null}
-              onClick={handleWorkingSnapshot}
-              className="rounded-lg border border-wk-border bg-wk-surface px-3 py-2 text-xs font-black text-wk-text disabled:opacity-50"
-            >
-              Save Working Version
-            </button>
-          ) : null}
-          {canSubmit ? (
-            <button
-              type="button"
-              disabled={busy !== null}
-              onClick={() =>
-                run(
-                  "submit",
-                  () => submitAudioForReview(workspace, reviewNote),
-                  "Sent to Review.",
-                )
-              }
-              className="rounded-lg bg-wk-brand px-3 py-2 text-xs font-black text-wk-brand-on disabled:opacity-50"
-            >
-              Send to Review
-            </button>
-          ) : null}
-        </div>
-      </div>
+    <div className="mx-auto w-full max-w-[1320px] space-y-5 p-4 sm:p-6 lg:p-8">
+      <AdminRecordHeader
+        collectionLabel="Audio"
+        title={workspace.publication.title}
+        status={workspace.publication.status}
+        onBack={() => navigate("/admin/content/audio")}
+        meta={
+          <>
+            <span className="max-w-full truncate font-mono">
+              {workspace.publication.slug}
+            </span>
+            <span aria-hidden="true">·</span>
+            <span>
+              {workspace.publication.publicationKind === "episode"
+                ? "Episode"
+                : "Standalone Audio"}
+            </span>
+            <span aria-hidden="true">·</span>
+            <span>Revision {workspace.publication.authorityRevision}</span>
+          </>
+        }
+        actions={
+          <>
+            {editable ? (
+              <button
+                type="button"
+                disabled={busy !== null}
+                onClick={handleWorkingSnapshot}
+                className="wk-button wk-button-secondary wk-button-sm disabled:opacity-50"
+              >
+                <WkIcon name="Save" size={14} />
+                Save
+              </button>
+            ) : null}
+            {canSubmit ? (
+              <button
+                type="button"
+                disabled={busy !== null}
+                onClick={() =>
+                  run(
+                    "submit",
+                    () => submitAudioForReview(workspace, reviewNote),
+                    "Sent to Review.",
+                  )
+                }
+                className="wk-button wk-button-primary wk-button-sm disabled:opacity-50"
+              >
+                <WkIcon name="Send" size={14} />
+                Submit for Review
+              </button>
+            ) : null}
+          </>
+        }
+      />
 
       {message ? (
         <div
           role="status"
-          className="mb-5 rounded-xl border border-wk-border bg-wk-surface px-4 py-3 text-sm text-wk-text"
+          className="rounded-xl border border-wk-border bg-wk-surface px-4 py-3 text-sm text-wk-text"
         >
           {message}
         </div>
@@ -385,12 +349,11 @@ export function AudioEditorWorkspace({
 
       <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_360px]">
         <main className="space-y-5">
-          <WkSurface className="p-5">
-            <SectionHeader
-              icon="FileText"
-              title="Publication"
-              note="These are the words and permanent path attached to this recording."
-            />
+          <AdminWorkspaceSection
+            icon="FileText"
+            title="Publication"
+            note="These are the words and permanent path attached to this recording."
+          >
             <form className="grid gap-4 sm:grid-cols-2" onSubmit={handleMetadata}>
               <label className="block text-xs font-bold text-wk-text-muted">
                 Title
@@ -427,21 +390,20 @@ export function AudioEditorWorkspace({
                   <button
                     type="submit"
                     disabled={busy !== null}
-                    className="rounded-lg bg-wk-brand px-3 py-2 text-xs font-black text-wk-brand-on disabled:opacity-50"
+                    className="wk-button wk-button-primary wk-button-sm disabled:opacity-50"
                   >
                     Save Details
                   </button>
                 </div>
               ) : null}
             </form>
-          </WkSurface>
+          </AdminWorkspaceSection>
 
-          <WkSurface className="p-5">
-            <SectionHeader
-              icon="Music"
-              title="Sound and Transcript"
-              note="Choose exact Media revisions. Review locks these selections into the version history."
-            />
+          <AdminWorkspaceSection
+            icon="Music"
+            title="Sound and Transcript"
+            note="Choose exact Media revisions. Review locks these selections into the version history."
+          >
             <div className="grid gap-4 sm:grid-cols-2">
               <div className="rounded-xl border border-wk-border bg-wk-bg p-4">
                 <p className="text-xs font-black text-wk-text">Master Audio</p>
@@ -460,7 +422,7 @@ export function AudioEditorWorkspace({
                     <button
                       type="button"
                       onClick={() => setPicker("master")}
-                      className="rounded-lg border border-wk-border px-3 py-2 text-xs font-bold text-wk-text"
+                      className="wk-button wk-button-ghost wk-button-sm"
                     >
                       {workspace.master ? "Replace Master" : "Choose Master"}
                     </button>
@@ -474,7 +436,7 @@ export function AudioEditorWorkspace({
                             "Master cleared.",
                           )
                         }
-                        className="rounded-lg px-3 py-2 text-xs font-bold text-wk-danger"
+                        className="wk-button wk-button-ghost wk-button-sm text-wk-danger"
                       >
                         Clear
                       </button>
@@ -498,7 +460,7 @@ export function AudioEditorWorkspace({
                     <button
                       type="button"
                       onClick={() => setPicker("transcript")}
-                      className="rounded-lg border border-wk-border px-3 py-2 text-xs font-bold text-wk-text"
+                      className="wk-button wk-button-ghost wk-button-sm"
                     >
                       {workspace.transcript
                         ? "Replace Transcript"
@@ -514,7 +476,7 @@ export function AudioEditorWorkspace({
                             "Transcript cleared.",
                           )
                         }
-                        className="rounded-lg px-3 py-2 text-xs font-bold text-wk-danger"
+                        className="wk-button wk-button-ghost wk-button-sm text-wk-danger"
                       >
                         Clear
                       </button>
@@ -523,26 +485,25 @@ export function AudioEditorWorkspace({
                 ) : null}
               </div>
             </div>
-          </WkSurface>
+          </AdminWorkspaceSection>
 
-          <WkSurface className="p-5">
-            <div className="flex flex-wrap items-start justify-between gap-3">
-              <SectionHeader
-                icon="ListMusic"
-                title="Chapters"
-                note="Chapter times must rise in order. Saved versions keep their own immutable copy."
-              />
-              {editable ? (
+          <AdminWorkspaceSection
+            icon="ListMusic"
+            title="Chapters"
+            note="Chapter times must rise in order. Saved versions keep their own immutable copy."
+            actions={
+              editable ? (
                 <button
                   type="button"
                   onClick={addChapter}
-                  className="rounded-lg border border-wk-border px-3 py-2 text-xs font-black text-wk-text"
+                  className="wk-button wk-button-ghost wk-button-sm"
                 >
+                  <WkIcon name="Plus" size={14} />
                   Add Chapter
                 </button>
-              ) : null}
-            </div>
-
+              ) : null
+            }
+          >
             <div className="space-y-2">
               {chapters.map((chapter, index) => (
                 <div
@@ -605,20 +566,18 @@ export function AudioEditorWorkspace({
                 type="button"
                 disabled={busy !== null}
                 onClick={saveChapters}
-                className="mt-4 rounded-lg bg-wk-brand px-3 py-2 text-xs font-black text-wk-brand-on disabled:opacity-50"
+                className="wk-button wk-button-primary wk-button-sm mt-4 disabled:opacity-50"
               >
                 Save Chapters
               </button>
             ) : null}
-          </WkSurface>
+          </AdminWorkspaceSection>
 
-          <WkSurface className="p-5">
-            <SectionHeader
-              icon="Quote"
-              title="Credits and Citations"
-              note="Audio uses the same governed Trust records as the rest of WAKILISHA."
-            />
-
+          <AdminWorkspaceSection
+            icon="Quote"
+            title="Credits and Citations"
+            note="Audio uses the same governed Trust records as the rest of WAKILISHA."
+          >
             {!workspace.versions.working ? (
               <div className="mb-4 rounded-xl border border-wk-border bg-wk-bg px-4 py-3 text-xs text-wk-text-muted">
                 Save a working version before attaching Credits or Citations.
@@ -668,7 +627,7 @@ export function AudioEditorWorkspace({
                       type="button"
                       disabled={!creditInput.trim() || busy !== null}
                       onClick={addCredit}
-                      className="rounded-lg border border-wk-border px-3 py-2 text-xs font-black text-wk-text disabled:opacity-50"
+                      className="wk-button wk-button-ghost wk-button-sm disabled:opacity-50"
                     >
                       Attach
                     </button>
@@ -717,7 +676,7 @@ export function AudioEditorWorkspace({
                       type="button"
                       disabled={!citationInput.trim() || busy !== null}
                       onClick={addCitation}
-                      className="rounded-lg border border-wk-border px-3 py-2 text-xs font-black text-wk-text disabled:opacity-50"
+                      className="wk-button wk-button-ghost wk-button-sm disabled:opacity-50"
                     >
                       Attach
                     </button>
@@ -725,16 +684,15 @@ export function AudioEditorWorkspace({
                 ) : null}
               </div>
             </div>
-          </WkSurface>
+          </AdminWorkspaceSection>
         </main>
 
         <aside className="space-y-5">
-          <WkSurface className="p-5">
-            <SectionHeader
-              icon="GitPullRequest"
-              title="Review"
-              note="Review always targets one exact immutable version."
-            />
+          <AdminWorkspaceSection
+            icon="GitPullRequest"
+            title="Review"
+            note="Review always targets one exact immutable version."
+          >
             <label className="block text-xs font-bold text-wk-text-muted">
               Review Note
               <textarea
@@ -758,7 +716,7 @@ export function AudioEditorWorkspace({
                       "Review started.",
                     )
                   }
-                  className="rounded-lg border border-wk-border px-3 py-2 text-xs font-black text-wk-text"
+                  className="wk-button wk-button-ghost wk-button-sm disabled:opacity-50"
                 >
                   Start Review
                 </button>
@@ -782,7 +740,7 @@ export function AudioEditorWorkspace({
                         "Changes requested.",
                       )
                     }
-                    className="rounded-lg border border-wk-warning px-3 py-2 text-xs font-black text-wk-warning"
+                    className="wk-button wk-button-ghost wk-button-sm text-wk-warning disabled:opacity-50"
                   >
                     Request Changes
                   </button>
@@ -796,7 +754,7 @@ export function AudioEditorWorkspace({
                         "Audio approved.",
                       )
                     }
-                    className="rounded-lg bg-wk-success px-3 py-2 text-xs font-black text-white"
+                    className="wk-button wk-button-primary wk-button-sm disabled:opacity-50"
                   >
                     Approve
                   </button>
@@ -815,7 +773,7 @@ export function AudioEditorWorkspace({
                       "Audio published.",
                     )
                   }
-                  className="rounded-lg bg-wk-brand px-3 py-2 text-xs font-black text-wk-brand-on"
+                  className="wk-button wk-button-primary wk-button-sm disabled:opacity-50"
                 >
                   Publish
                 </button>
@@ -840,17 +798,15 @@ export function AudioEditorWorkspace({
                 </div>
               ))}
             </div>
-          </WkSurface>
+          </AdminWorkspaceSection>
 
           {workspace.feedIdentity ? (
-            <WkSurface className="p-5">
-              <h2 className="text-sm font-black text-wk-text">
-                Podcast Identity
-              </h2>
-              <p className="mt-1 text-xs leading-5 text-wk-text-muted">
-                These stay stable when a later correction publishes a new version.
-              </p>
-              <dl className="mt-4 space-y-3">
+            <AdminWorkspaceSection
+              icon="Podcast"
+              title="Podcast Identity"
+              note="These stay stable when a later correction publishes a new version."
+            >
+              <dl className="space-y-3">
                 <div>
                   <dt className="text-[10px] font-black uppercase tracking-[0.1em] text-wk-text-muted">
                     GUID
@@ -868,12 +824,15 @@ export function AudioEditorWorkspace({
                   </dd>
                 </div>
               </dl>
-            </WkSurface>
+            </AdminWorkspaceSection>
           ) : null}
 
-          <WkSurface className="p-5">
-            <h2 className="text-sm font-black text-wk-text">History</h2>
-            <div className="mt-4 space-y-3">
+          <AdminWorkspaceSection
+            icon="History"
+            title="History"
+            note="Immutable lifecycle transitions for this Audio publication."
+          >
+            <div className="space-y-3">
               {workspace.reviewEvents
                 .slice()
                 .reverse()
@@ -898,7 +857,7 @@ export function AudioEditorWorkspace({
                 </p>
               ) : null}
             </div>
-          </WkSurface>
+          </AdminWorkspaceSection>
         </aside>
       </div>
 
