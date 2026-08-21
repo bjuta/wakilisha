@@ -2,30 +2,13 @@ import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { WkIcon } from "@/components/design-system/Icon";
 import { WkSurface } from "@/components/design-system/primitives/Surface";
+import { AdminCollectionHeader } from "@/components/design-system/admin/AdminCollectionHeader";
+import { AdminStatusBadge, humanizeAdminStatus } from "@/components/design-system/admin/AdminStatusBadge";
 import { AdminTable } from "@/components/design-system/admin/AdminTable";
 import {
   fetchPlaylistsForAdmin,
   type AdminPlaylistListItem,
 } from "@/services/playlists/playlistAdminService";
-
-function humanize(value: string): string {
-  return value
-    .replace(/_/g, " ")
-    .replace(/\b\w/g, (character) => character.toUpperCase());
-}
-
-function statusClass(status: string): string {
-  if (status === "approved" || status === "published") {
-    return "bg-wk-success-soft text-wk-success";
-  }
-  if (status === "ready_for_review" || status === "in_review") {
-    return "bg-wk-info-soft text-wk-info";
-  }
-  if (status === "changes_requested") {
-    return "bg-wk-warning-soft text-wk-warning";
-  }
-  return "bg-wk-surface-raised text-wk-text-muted";
-}
 
 export default function AdminPlaylistsPage() {
   const navigate = useNavigate();
@@ -80,27 +63,20 @@ export default function AdminPlaylistsPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-        <div>
-          <div className="mb-1 text-[11px] font-black uppercase tracking-wider text-wk-brand">
-            Content
-          </div>
-          <h1 className="text-[22px] font-black tracking-tight text-wk-text">
-            Playlists
-          </h1>
-          <p className="mt-1 max-w-2xl text-[13px] text-wk-text-muted">
-            Build ordered music publications, resolve track identity, and move
-            them through editorial review.
-          </p>
-        </div>
-        <button
-          onClick={() => navigate("/admin/content/playlists/new")}
-          className="wk-button wk-button-primary wk-button-sm whitespace-nowrap"
-        >
-          <WkIcon name="Plus" size={14} />
-          New Playlist
-        </button>
-      </div>
+      <AdminCollectionHeader
+        eyebrow="Content & Editorial"
+        title="Playlists"
+        description="Build ordered music publications, resolve Track identity, and move them through editorial review."
+        actions={
+          <button
+            onClick={() => navigate("/admin/content/playlists/new")}
+            className="wk-button wk-button-primary wk-button-sm whitespace-nowrap"
+          >
+            <WkIcon name="Plus" size={14} />
+            New Playlist
+          </button>
+        }
+      />
 
       <WkSurface className="p-4">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
@@ -130,7 +106,7 @@ export default function AdminPlaylistsPage() {
             <option value="all">All statuses</option>
             {statusOptions.map((option) => (
               <option key={option} value={option}>
-                {humanize(option)}
+                {humanizeAdminStatus(option)}
               </option>
             ))}
           </select>
@@ -204,13 +180,7 @@ export default function AdminPlaylistsPage() {
               key: "status",
               label: "Status",
               width: "160px",
-              render: (row) => (
-                <span
-                  className={`inline-flex rounded-full px-2 py-1 text-[10px] font-black uppercase tracking-[0.08em] ${statusClass(row.status)}`}
-                >
-                  {humanize(row.status)}
-                </span>
-              ),
+              render: (row) => <AdminStatusBadge status={row.status} />,
             },
             {
               key: "updatedAt",
