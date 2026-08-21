@@ -50,6 +50,9 @@ export function MediaTimeline({
   markers = [],
   chapters = [],
   interactive = true,
+  waveformUnavailableLabel = "Waveform preview unavailable.",
+  waveformMissingLabel = "No canonical waveform yet.",
+  idleLabel = "Canonical waveform",
   onSeek,
   onAnchorChange,
 }: {
@@ -60,6 +63,9 @@ export function MediaTimeline({
   markers?: TimelineMarker[];
   chapters?: TimelineChapter[];
   interactive?: boolean;
+  waveformUnavailableLabel?: string;
+  waveformMissingLabel?: string;
+  idleLabel?: string;
   onSeek?: (seconds: number) => void;
   onAnchorChange?: (anchor: TimelineAnchor) => void;
 }) {
@@ -152,7 +158,7 @@ export function MediaTimeline({
             />
           )) : (
             <div className="m-auto text-xs text-wk-text-muted">
-              {waveformUrl ? "Waveform preview unavailable." : "No canonical waveform yet."}
+              {waveformUrl ? waveformUnavailableLabel : waveformMissingLabel}
             </div>
           )}
         </div>
@@ -205,7 +211,7 @@ export function MediaTimeline({
               : `At ${formatMediaTime(displayedAnchor.startSeconds)}`}
           </span>
         ) : (
-          <span>{interactive ? "Click for a point · drag for a range" : "Canonical waveform"}</span>
+          <span>{interactive ? "Click for a point · drag for a range" : idleLabel}</span>
         )}
         <span>{formatMediaTime(duration)}</span>
       </div>
