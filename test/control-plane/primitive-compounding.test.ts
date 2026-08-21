@@ -18,11 +18,28 @@ function write(root: string, relative: string, content: string) {
   writeFileSync(target, content, "utf8");
 }
 
+function readRegistry(root: string) {
+  return JSON.parse(
+    readFileSync(
+      path.join(root, "scripts/control-plane/primitive-registry.json"),
+      "utf8",
+    ),
+  );
+}
+
+function writeRegistry(root: string, registry: Record<string, unknown>) {
+  write(
+    root,
+    "scripts/control-plane/primitive-registry.json",
+    JSON.stringify(registry, null, 2),
+  );
+}
+
 function fixture() {
   const root = mkdtempSync(path.join(os.tmpdir(), "wakilisha-primitives-"));
   temporaryRoots.push(root);
 
-  write(root, "scripts/control-plane/primitive-registry.json", JSON.stringify({
+  writeRegistry(root, {
     version: 1,
     primitiveDirectories: [
       "src/components/design-system/admin",
@@ -37,7 +54,7 @@ function fixture() {
         path: "src/components/design-system/admin/AdminStatusBadge.tsx",
         kind: "presentation",
         maturity: "canonical",
-        concept: "governed lifecycle status presentation",
+        concept: "governed publication lifecycle status presentation",
         authorityOwner: "consumer",
         consumers: ["admin:articles", "admin:audio"],
         competingImplementationPatterns: [
@@ -57,7 +74,7 @@ function fixture() {
         ],
       },
     ],
-  }, null, 2));
+  });
 
   write(root, "src/components/design-system/admin/AdminStatusBadge.tsx", "export const AdminStatusBadge = () => null;\n");
   write(root, "src/components/design-system/editorial/MediaTimeline.tsx", "export const MediaTimeline = () => null;\n");
@@ -65,6 +82,18 @@ function fixture() {
   write(root, "src/pages/admin/content/audio/page.tsx", 'import { AdminStatusBadge } from "@/components/design-system/admin/AdminStatusBadge";\nimport { MediaTimeline } from "@/components/design-system/editorial/MediaTimeline";\nexport default function Audio(){ return null; }\n');
 
   return root;
+}
+
+function addStatusException(
+  root: string,
+  exception: { path: string; classification: "legacy" | "semantic"; reason: string },
+) {
+  const registry = readRegistry(root);
+  const status = registry.primitives.find(
+    (primitive: { id: string }) => primitive.id === "admin.status-badge",
+  );
+  status.competingImplementationExceptions = [exception];
+  writeRegistry(root, registry);
 }
 
 afterEach(() => {
@@ -82,34 +111,131 @@ describe("Primitive Compounding Contract", () => {
   it("rejects a competing page-local implementation of a canonical concept", () => {
     const root = fixture();
     const file = path.join(root, "src/pages/admin/content/articles/page.tsx");
-    writeFileSync(file, `${readFileSync(file, "utf8")}\nfunction LocalStatusBadge(){ return null; }\n`, "utf8");
+    writeFileSync(
+      file,
+      `${readFileSync(file, "utf8")}\nfunction LocalStatusBadge(){ return null; }\n`,
+      "utf8",
+    );
     const result = verifyPrimitiveCompounding({ root, baseRef: null });
     expect(result.errors.join("\n")).toContain("competing local implementation");
   });
 
   it("rejects a VideoTimeline fork instead of silently relearning the time-coordinate concept", () => {
     const root = fixture();
-    write(root, "src/pages/admin/content/video/page.tsx", "function VideoTimeline(){ return null; }\nexport default VideoTimeline;\n");
+    write(
+      root,
+      "src/pages/admin/content/video/page.tsx",
+      "function VideoTimeline(){ return null; }\nexport default VideoTimeline;\n",
+    );
     const result = verifyPrimitiveCompounding({ root, baseRef: null });
-    expect(result.errors.join("\n")).toContain("editorial.media-timeline: competing local implementation");
+    expect(result.errors.join("\n")).toContain(
+      "editorial.media-timeline: competing local implementation",
+    );
   });
 
   it("requires candidate promotion when a second domain starts consuming it", () => {
     const root = fixture();
-    write(root, "src/pages/admin/content/articles/Timeline.tsx", 'import { MediaTimeline } from "@/components/design-system/editorial/MediaTimeline";\nexport default MediaTimeline;\n');
+    write(
+      root,
+      "src/pages/admin/content/articles/Timeline.tsx",
+      'import { MediaTimeline } from "@/components/design-system/editorial/MediaTimeline";\nexport default MediaTimeline;\n',
+    );
     const result = verifyPrimitiveCompounding({ root, baseRef: null });
     expect(result.errors.join("\n")).toContain("Promote it to canonical");
   });
 
   it("rejects domain-service authority inside a consumer-owned primitive", () => {
     const root = fixture();
-    write(root, "src/components/design-system/editorial/MediaTimeline.tsx", 'import { reviewAudio } from "@/services/audio/audioReviewService";\nexport const MediaTimeline = () => reviewAudio;\n');
+    write(
+      root,
+      "src/components/design-system/editorial/MediaTimeline.tsx",
+      'import { reviewAudio } from "@/services/audio/audioReviewService";\nexport const MediaTimeline = () => reviewAudio;\n',
+    );
     const result = verifyPrimitiveCompounding({ root, baseRef: null });
-    expect(result.errors.join("\n")).toContain("imports forbidden authority path @/services/");
+    expect(result.errors.join("\n")).toContain(
+      "imports forbidden authority path @/services/",
+    );
+  });
+
+  it("allows an exact semantic exception for a genuinely different domain state", () => {
+    const root = fixture();
+    const relative = "src/pages/admin/content/lyrics/page.tsx";
+    write(
+      root,
+      relative,
+      "function StatusBadge(){ return null; }\nexport default StatusBadge;\n",
+    );
+    addStatusException(root, {
+      path: relative,
+      classification: "semantic",
+      reason: "Lyrics submission moderation is not publication lifecycle.",
+    });
+
+    const result = verifyPrimitiveCompounding({
+      root,
+      baseRef: null,
+      changedPaths: [relative],
+    });
+    expect(result.errors).toEqual([]);
+  });
+
+  it("allows named legacy debt only while that exact file remains untouched", () => {
+    const root = fixture();
+    const relative = "src/pages/admin/content/guides/page.tsx";
+    write(
+      root,
+      relative,
+      "function StatusBadge(){ return null; }\nexport default StatusBadge;\n",
+    );
+    addStatusException(root, {
+      path: relative,
+      classification: "legacy",
+      reason: "Pre-contract publication lifecycle badge.",
+    });
+
+    const baseline = verifyPrimitiveCompounding({
+      root,
+      baseRef: null,
+      changedPaths: [],
+    });
+    expect(baseline.errors).toEqual([]);
+
+    const touched = verifyPrimitiveCompounding({
+      root,
+      baseRef: null,
+      changedPaths: [relative],
+    });
+    expect(touched.errors.join("\n")).toContain(
+      "was touched. Migrate it to the canonical primitive",
+    );
+  });
+
+  it("rejects stale exceptions once the competing implementation is gone", () => {
+    const root = fixture();
+    const relative = "src/pages/admin/content/guides/page.tsx";
+    write(root, relative, "export default function Guides(){ return null; }\n");
+    addStatusException(root, {
+      path: relative,
+      classification: "legacy",
+      reason: "Pre-contract publication lifecycle badge.",
+    });
+
+    const result = verifyPrimitiveCompounding({
+      root,
+      baseRef: null,
+      changedPaths: [],
+    });
+    expect(result.errors.join("\n")).toContain(
+      "stale competing implementation exception",
+    );
   });
 
   it("keeps the live WAKILISHA primitive registry internally consistent", () => {
-    const result = verifyPrimitiveCompounding({ root: process.cwd(), baseRef: null });
+    const result = verifyPrimitiveCompounding({
+      root: process.cwd(),
+      baseRef: null,
+      changedPaths: [],
+    });
     expect(result.errors).toEqual([]);
   });
 });
