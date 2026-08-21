@@ -2,6 +2,9 @@ import { WkIcon, type WkIconName } from "@/components/design-system/Icon";
 import { AdminRecordHeader } from "@/components/design-system/admin/AdminRecordHeader";
 import { AdminSaveState } from "@/components/design-system/admin/AdminSaveState";
 
+// Shell semantics are organization-level now:
+// AdminRecordHeader owns sticky top-0; AdminSaveState owns Saving, Unsaved, and All Saved.
+
 export interface PlaylistEditorHeaderAction {
   label: string;
   icon: WkIconName;
