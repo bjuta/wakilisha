@@ -1,0 +1,16 @@
+{
+  "migration_file": "supabase/migrations/20260821095406_audio_editorial_workbench_time_anchored_review.sql",
+  "migration_sha256": "bfdbc12c616479977f804c4c33617bff7482ca2ecc470ac187124e88b573eb09",
+  "base_main_sha": "7efcd0a3c797e077b900cfa3aa0b859761db0937",
+  "preview_project_ref": "atqpttwumivoyhifpkih",
+  "preview_branch_id": "7ada499b-36a1-44b0-a04d-fb9cc3609d84",
+  "preview_migration_head": "20260821095406",
+  "baseline_replay": "pass",
+  "candidate_apply": "pass",
+  "verifier": "pass",
+  "verifier_file": "scripts/control-plane/verify-audio-editorial-workbench.sql",
+  "schema_types_sha256": "bc2ae9cd78b12bacb8c29b094b210f760fe270dd858134e53aef89b54b34896a",
+  "schema_migration_count": 37,
+  "schema_migration_head": "20260821095406",
+  "verified_at": "2026-08-21T13:01:58.831Z"
+}

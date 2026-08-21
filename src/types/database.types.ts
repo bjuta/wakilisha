@@ -17720,6 +17720,10 @@ export type Database = {
           thread_id: string
         }[]
       }
+      add_audio_review_comment: {
+        Args: { p_body_html: string; p_body_text: string; p_thread_id: string }
+        Returns: Json
+      }
       add_personal_playlist_track: {
         Args: {
           p_allow_duplicate?: boolean
@@ -19554,6 +19558,18 @@ export type Database = {
           show_id: string
         }[]
       }
+      create_audio_time_review_thread: {
+        Args: {
+          p_anchor_end_seconds: number
+          p_anchor_kind: string
+          p_anchor_start_seconds: number
+          p_body_html: string
+          p_body_text: string
+          p_publication_id: string
+          p_target_version_id: string
+        }
+        Returns: Json
+      }
       create_citation: {
         Args: {
           p_editor_note?: string
@@ -20284,6 +20300,14 @@ export type Database = {
       }
       get_article_working_version_identity: {
         Args: { p_article_id: string }
+        Returns: Json
+      }
+      get_audio_editorial_media_context: {
+        Args: { p_publication_id: string }
+        Returns: Json
+      }
+      get_audio_editorial_workbench: {
+        Args: { p_publication_id: string }
         Returns: Json
       }
       get_chart_programs: {
@@ -22518,6 +22542,10 @@ export type Database = {
           transcript_media_revision_id: string
           transcript_usage_link_id: string
         }[]
+      }
+      set_audio_review_thread_status: {
+        Args: { p_status: string; p_thread_id: string }
+        Returns: Json
       }
       set_credit_governance: {
         Args: {
