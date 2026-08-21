@@ -93,6 +93,7 @@ describe("Phase 6B media-first WAKILISHA Player", () => {
     expect(audioPage).toContain('lyrics: false');
     expect(audioPage).toContain('moments: false');
     expect(audioPage).toContain('addToPlaylist: false');
+    expect(audioPage).toContain('playbackSpeed: false');
   });
 
   it("makes the active public shells use the new player chrome", () => {
