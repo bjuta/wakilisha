@@ -2,6 +2,9 @@ import { FormEvent, useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { WkIcon } from "@/components/design-system/Icon";
 import { WkSurface } from "@/components/design-system/primitives/Surface";
+import { AdminCollectionHeader } from "@/components/design-system/admin/AdminCollectionHeader";
+import { AdminStatusBadge } from "@/components/design-system/admin/AdminStatusBadge";
+import { AdminWorkspaceSection } from "@/components/design-system/admin/AdminWorkspaceSection";
 import { useAdminUser } from "@/hooks/useAdminUser";
 import {
   createAudioPublication,
@@ -11,25 +14,6 @@ import {
   slugifyAudioTitle,
   type AudioAdminIndex,
 } from "@/services/audio/audioAdminService";
-
-function humanize(value: string): string {
-  return value
-    .replace(/_/g, " ")
-    .replace(/\b\w/g, (character) => character.toUpperCase());
-}
-
-function statusClass(status: string): string {
-  if (status === "published" || status === "approved") {
-    return "bg-wk-success-soft text-wk-success";
-  }
-  if (status === "ready_for_review" || status === "in_review") {
-    return "bg-wk-info-soft text-wk-info";
-  }
-  if (status === "changes_requested") {
-    return "bg-wk-warning-soft text-wk-warning";
-  }
-  return "bg-wk-surface-raised text-wk-text-muted";
-}
 
 function errorText(reason: unknown): string {
   return reason instanceof Error ? reason.message : "Audio could not be updated.";
@@ -170,23 +154,17 @@ export default function AdminAudioPage() {
 
   return (
     <div className="mx-auto w-full max-w-[1280px] space-y-6 p-4 sm:p-6 lg:p-8">
-      <header className="flex flex-col gap-3 border-b border-wk-border pb-5 sm:flex-row sm:items-end sm:justify-between">
-        <div>
-          <p className="mb-1 text-[11px] font-bold uppercase tracking-[0.14em] text-wk-text-muted">
-            Content and Editorial
-          </p>
-          <h1 className="text-2xl font-black tracking-tight text-wk-text">
-            Audio
-          </h1>
-          <p className="mt-2 max-w-2xl text-sm text-wk-text-muted">
-            Build shows, episodes, and standalone Audio inside the same editorial record.
-          </p>
-        </div>
-        <div className="rounded-xl border border-wk-border bg-wk-surface px-4 py-3 text-sm text-wk-text-muted">
-          {index?.publications.length ?? 0} Audio publication
-          {(index?.publications.length ?? 0) === 1 ? "" : "s"}
-        </div>
-      </header>
+      <AdminCollectionHeader
+        eyebrow="Content & Editorial"
+        title="Audio"
+        description="Build shows, episodes, and standalone Audio inside the same editorial record."
+        meta={
+          <span>
+            {index?.publications.length ?? 0} Audio publication
+            {(index?.publications.length ?? 0) === 1 ? "" : "s"}
+          </span>
+        }
+      />
 
       {message ? (
         <div
@@ -199,11 +177,11 @@ export default function AdminAudioPage() {
 
       {canCreate ? (
         <section className="grid gap-4 lg:grid-cols-3">
-          <WkSurface className="p-5">
-            <div className="mb-4 flex items-center gap-2">
-              <WkIcon name="Mic2" size={17} />
-              <h2 className="text-sm font-black text-wk-text">New Show</h2>
-            </div>
+          <AdminWorkspaceSection
+            icon="Mic2"
+            title="New Show"
+            note="Create the durable show identity that Episodes can belong to."
+          >
             <form className="space-y-3" onSubmit={handleShow}>
               <label className="block text-xs font-bold text-wk-text-muted">
                 Show Title
@@ -226,18 +204,18 @@ export default function AdminAudioPage() {
               <button
                 type="submit"
                 disabled={busy !== null}
-                className="rounded-lg bg-wk-brand px-3 py-2 text-xs font-black text-wk-brand-on disabled:opacity-50"
+                className="wk-button wk-button-primary wk-button-sm disabled:opacity-50"
               >
                 Create Show
               </button>
             </form>
-          </WkSurface>
+          </AdminWorkspaceSection>
 
-          <WkSurface className="p-5">
-            <div className="mb-4 flex items-center gap-2">
-              <WkIcon name="Layers" size={17} />
-              <h2 className="text-sm font-black text-wk-text">New Season</h2>
-            </div>
+          <AdminWorkspaceSection
+            icon="Layers"
+            title="New Season"
+            note="Organize Episodes beneath a Show without changing their publication identity."
+          >
             <form className="space-y-3" onSubmit={handleSeason}>
               <label className="block text-xs font-bold text-wk-text-muted">
                 Show
@@ -280,18 +258,18 @@ export default function AdminAudioPage() {
               <button
                 type="submit"
                 disabled={busy !== null}
-                className="rounded-lg bg-wk-brand px-3 py-2 text-xs font-black text-wk-brand-on disabled:opacity-50"
+                className="wk-button wk-button-primary wk-button-sm disabled:opacity-50"
               >
                 Create Season
               </button>
             </form>
-          </WkSurface>
+          </AdminWorkspaceSection>
 
-          <WkSurface className="p-5">
-            <div className="mb-4 flex items-center gap-2">
-              <WkIcon name="Music" size={17} />
-              <h2 className="text-sm font-black text-wk-text">New Audio</h2>
-            </div>
+          <AdminWorkspaceSection
+            icon="Music"
+            title="New Audio"
+            note="Open a standalone recording or Episode directly in the governed Audio workspace."
+          >
             <form className="space-y-3" onSubmit={handlePublication}>
               <div className="grid grid-cols-2 gap-2">
                 {(["standalone", "episode"] as const).map((kind) => (
@@ -401,12 +379,12 @@ export default function AdminAudioPage() {
               <button
                 type="submit"
                 disabled={busy !== null}
-                className="rounded-lg bg-wk-brand px-3 py-2 text-xs font-black text-wk-brand-on disabled:opacity-50"
+                className="wk-button wk-button-primary wk-button-sm disabled:opacity-50"
               >
                 Open Audio Editor
               </button>
             </form>
-          </WkSurface>
+          </AdminWorkspaceSection>
         </section>
       ) : null}
 
@@ -444,19 +422,19 @@ export default function AdminAudioPage() {
                   </span>
                   <span className="mt-1 block truncate text-xs text-wk-text-muted">
                     {publication.publicationKind === "episode"
-                      ? [show?.title, season?.title, publication.episodeNumber
-                          ? `Episode ${publication.episodeNumber}`
-                          : null]
+                      ? [
+                          show?.title,
+                          season?.title,
+                          publication.episodeNumber
+                            ? `Episode ${publication.episodeNumber}`
+                            : null,
+                        ]
                           .filter(Boolean)
                           .join(" · ")
                       : "Standalone Audio"}
                   </span>
                 </span>
-                <span
-                  className={`rounded-full px-2.5 py-1 text-[10px] font-black ${statusClass(publication.status)}`}
-                >
-                  {humanize(publication.status)}
-                </span>
+                <AdminStatusBadge status={publication.status} />
                 <WkIcon name="ChevronRight" size={16} />
               </button>
             );
@@ -464,9 +442,7 @@ export default function AdminAudioPage() {
 
           {index?.publications.length === 0 ? (
             <div className="px-5 py-12 text-center">
-              <p className="text-sm font-bold text-wk-text">
-                No Audio yet.
-              </p>
+              <p className="text-sm font-bold text-wk-text">No Audio yet.</p>
               <p className="mt-1 text-xs text-wk-text-muted">
                 Start with a show, an episode, or one standalone recording.
               </p>
