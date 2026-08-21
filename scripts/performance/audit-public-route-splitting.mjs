@@ -171,9 +171,12 @@ const directLazyImports = [
  * Organization public surface adds one direct lazy public import:
  * - ../pages/organizations/detail/page
  *
- * The current authority is therefore 61 direct lazy imports.
+ * Phase 6B M1 adds one direct lazy public Audio import:
+ * - ../pages/audio/detail/page
+ *
+ * The current authority is therefore 62 direct lazy imports.
  */
-const expectedDirectLazyImportCount = 61;
+const expectedDirectLazyImportCount = 62;
 
 if (
   directLazyImports.length !==
@@ -237,6 +240,7 @@ for (const homepageModule of expectedEagerModules) {
 for (const requiredModule of [
   "../pages/playlists/page",
   "../pages/playlists/detail/page",
+  "../pages/audio/detail/page",
   "../pages/people/detail/page",
   "../pages/organizations/detail/page",
   "../pages/artists/detail/page",
@@ -297,78 +301,15 @@ const routePaths = [
 ].map((match) => match[1]);
 
 /*
- * Commit af3dda15 established 147 public route paths.
- * Commit d5c81f32 added two release-scoped track routes,
- * bringing the authority to 149.
+ * The pre-M1 authority is 165 paths. Phase 6B M1 adds exactly one public path:
+ * - /audio/:slug
  *
- * Commit 6b1388f4 intentionally retired five WordPress
- * runtime paths:
- * - migrate
- * - imports
- * - jobs
- * - jobs/:id
- * - scraper
- *
- * The post-retirement authority was therefore 144 paths.
- *
- * Phase 5A adds three canonical Playlist Admin Studio paths:
- * - playlists
- * - playlists/new
- * - playlists/:playlistId
- *
- * Removing those three paths reproduces the accepted 144-path
- * baseline checksum exactly.
- *
- * The accepted pre-Phase-5B authority is 148 paths.
- * Phase 5B adds two public Playlist routes:
- * - /playlists
- * - /playlists/:slug
- *
- * The current pre-People frontend authority is therefore 150 paths.
- *
- * Person frontend M1 adds one canonical role-neutral public route:
- * - /people/:slug
- *
- * That established 151 paths.
- *
- * Following adds one canonical signed-in route:
- * - /following
- *
- * Registry-led onboarding adds two route paths:
- * - /start
- * - Admin Settings onboarding
- *
- * Claimed Artist experience adds two route paths:
- * - /artists/:slug/manage
- * - community/artist-claims
- *
- * Artist Posts add one public route path:
- * - /artists/:slug/updates/:updateId
- *
- * Universal Posts add one public Person Post route path:
- * - /people/:slug/posts/:postId
- *
- * Music discovery adds one public route path:
- * - /music
- *
- * Personal Playlists add two canonical Person Playlist routes:
- * - /u/:username/playlists
- * - /u/:username/playlists/:playlistSlug
- *
- * Notifications adds one signed-in public route:
- * - /notifications
- *
- * Organization public surface adds one canonical public route:
- * - /organizations/:slug
- *
- * Phase 6A final Audio adds two internal Admin Content paths:
- * - audio
- * - audio/:publicationId
- *
- * These are Admin Studio routes only; Phase 6B public Audio routes remain absent.
- * The current authority is therefore 165 paths.
+ * The audit removes only that declared additive path before hashing, so every
+ * pre-M1 route must remain in the same sequence and retain the accepted
+ * checksum.
  */
-const expectedRoutePathCount = 165;
+const expectedRoutePathCount = 166;
+const publicAudioPath = "/audio/:slug";
 
 if (routePaths.length !== expectedRoutePathCount) {
   fail(
@@ -376,8 +317,26 @@ if (routePaths.length !== expectedRoutePathCount) {
   );
 }
 
+if (
+  routePaths.filter((routePath) => routePath === publicAudioPath).length !== 1
+) {
+  fail(
+    "Phase 6B M1 must add exactly one /audio/:slug route",
+  );
+}
+
+const preM1RoutePaths = routePaths.filter(
+  (routePath) => routePath !== publicAudioPath,
+);
+
+if (preM1RoutePaths.length !== 165) {
+  fail(
+    `expected 165 pre-M1 route paths after removing ${publicAudioPath}, found ${preM1RoutePaths.length}`,
+  );
+}
+
 const routePayload =
-  `${routePaths.join("\n")}\n`;
+  `${preM1RoutePaths.join("\n")}\n`;
 
 const routeChecksum = crypto
   .createHash("sha256")
@@ -392,7 +351,7 @@ if (
   expectedRouteChecksum
 ) {
   fail(
-    `route path sequence changed: ${routeChecksum}`,
+    `pre-M1 route path sequence changed: ${routeChecksum}`,
   );
 }
 
@@ -427,5 +386,5 @@ if (
 
 console.log(
   "Public route splitting audit passed: " +
-  `${directLazyImports.length} lazy imports, ${expectedRoutePathCount} route paths preserved.`,
+  `${directLazyImports.length} lazy imports, ${expectedRoutePathCount} route paths, pre-M1 sequence preserved.`,
 );
