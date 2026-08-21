@@ -107,6 +107,36 @@ A product or engineering milestone should record:
 
 The question is: what did WAKILISHA learn from this deployment, and where does that learning now live?
 
+## Pre-contract debt and semantic exceptions
+
+The first live CI run found implementation that existed before this contract. The contract distinguishes two cases instead of treating both as permission to weaken the rule.
+
+`legacy`
+
+- the implementation is genuinely the same concept as a canonical primitive
+- the exact file may remain unchanged so this control-plane milestone does not become an unrelated frontend deployment
+- the exception is non-renewable
+- if that exact file is touched by a later change, CI requires migration to the canonical primitive and removal of the exception
+- when the competing implementation disappears, CI rejects the now-stale exception until the registry is cleaned
+
+`semantic`
+
+- the implementation only looks or is named similarly, but represents a genuinely different domain state or interaction
+- the exception must name one exact file and state why the semantics differ
+- it does not turn that local implementation into a shared primitive
+- if another real domain later proves the same distinct concept, that is the moment to extract and register a new candidate primitive
+
+There are no directory-wide or pattern-wide exceptions.
+
+The initial classified debt is deliberately explicit:
+
+- Guides publication status: legacy lifecycle badge, migrate when Guides is next touched
+- Pages publication status: legacy lifecycle badge, migrate when Pages is next touched
+- Playlist editor `statusClass`: unused legacy lifecycle helper, remove when that workspace is next touched
+- Timed Lyrics submission status: semantic exception because submission moderation is not publication lifecycle
+
+This is a ratchet. Existing debt can be named once, but ordinary product work cannot silently renew it.
+
 ## Current learned primitive set
 
 The machine-readable source is `scripts/control-plane/primitive-registry.json`.
@@ -142,7 +172,10 @@ The gate enforces:
 - candidates have exactly one proven domain consumer
 - canonical primitives have at least two distinct domain consumers
 - consumer-owned primitives do not import domain services, pages, or the Supabase client
-- known competing local implementations of reserved concepts are rejected
+- known competing local implementations of reserved concepts are rejected unless one exact classified exception exists
+- legacy exceptions fail when their file is touched
+- stale exceptions fail after the competing implementation is removed
+- semantic exceptions require an exact path and documented reason
 - new files added under governed Admin or Editorial design-system directories must be registered
 
 The verifier intentionally does not claim it can infer semantic equivalence perfectly. That remains an engineering review responsibility. CI verifies that declared primitive intent is structurally true and blocks known forms of silent duplication.
