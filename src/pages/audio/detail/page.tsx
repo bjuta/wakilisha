@@ -5,19 +5,20 @@ import {
 } from "react";
 import { useParams } from "react-router-dom";
 import { WkIcon } from "@/components/design-system/Icon";
-import { MediaTimeline } from "@/components/design-system/editorial/MediaTimeline";
-import {
-  MediaTransport,
-  formatMediaTime,
-} from "@/components/design-system/editorial/MediaTransport";
-import { useMediaPlaybackController } from "@/components/design-system/editorial/useMediaPlaybackController";
+import { Ch19GradientImage } from "@/components/media/Ch19GradientImage";
 import { PublicTrustSummary } from "@/components/design-system/trust/PublicTrustSummary";
+import { usePlayer } from "@/context/PlayerContext";
 import { getPublicAudioPublication } from "@/services/audio/audioPublicService";
 import type {
   PublicAudioCitation,
   PublicAudioCredit,
   PublicAudioPublication,
 } from "@/services/audio/audioPublicModel";
+import {
+  formatPlayerClock,
+  playerMediaItem,
+  type PlayerMediaItem,
+} from "@/services/player/playerExperience";
 
 function humanize(value: string): string {
   return value
@@ -46,7 +47,7 @@ function citationLocatorLabel(citation: PublicAudioCitation): string | null {
         : null;
 
   if (timestamp !== null && Number.isFinite(timestamp)) {
-    return `At ${formatMediaTime(timestamp)}`;
+    return `At ${formatPlayerClock(timestamp)}`;
   }
 
   for (const key of ["chapter", "section", "page", "paragraph"]) {
@@ -84,11 +85,90 @@ function buildTrustPresentation(publication: PublicAudioPublication) {
   };
 }
 
+function audioPlayerItem(
+  publication: PublicAudioPublication,
+): PlayerMediaItem {
+  const primaryCredit =
+    publication.credits.find(
+      (credit) => credit.isPrimary,
+    )?.displayName ??
+    publication.credits[0]?.displayName ??
+    null;
+  const creatorLabel =
+    primaryCredit ??
+    publication.show?.title ??
+    "WAKILISHA";
+  const contextLabel =
+    publication.show?.title &&
+    publication.show.title !== creatorLabel
+      ? publication.show.title
+      : null;
+
+  return playerMediaItem(
+    {
+      id: publication.publicationId,
+      title: publication.title,
+      artist: creatorLabel,
+      album: publication.show?.title ?? undefined,
+      duration:
+        publication.delivery.durationSeconds ?? undefined,
+      isPlayable: true,
+      source: "WAKILISHA",
+      previewUrl: publication.delivery.url,
+      playbackEngine: "audio",
+    },
+    {
+      mediaKind:
+        publication.publicationKind === "episode"
+          ? "audio_episode"
+          : "standalone_audio",
+      canonicalPath: publication.canonicalPath,
+      creatorLabel,
+      contextLabel,
+      playbackAvailability: "full",
+      chapters: publication.chapters.map((chapter) => ({
+        id: `chapter-${chapter.chapterNumber}`,
+        startSeconds: chapter.startSeconds,
+        title: chapter.title,
+      })),
+      transcript: publication.transcript?.url
+        ? {
+            url: publication.transcript.url,
+            label: "Transcript",
+          }
+        : null,
+      capabilities: {
+        previousNext: false,
+        jumpBySeconds: 15,
+        shuffle: false,
+        repeat: false,
+        lyrics: false,
+        moments: false,
+        addToPlaylist: false,
+        save: false,
+        chapters: publication.chapters.length > 0,
+        transcript: Boolean(publication.transcript?.url),
+        playbackSpeed: true,
+      },
+    },
+  );
+}
+
 export default function PublicAudioDetailPage() {
   const { slug = "" } = useParams<{ slug: string }>();
   const [publication, setPublication] = useState<PublicAudioPublication | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
+  const {
+    currentTrack,
+    isPlaying,
+    currentTime,
+    duration,
+    playTrack,
+    togglePlay,
+    seek,
+    openFullPlayer,
+  } = usePlayer();
 
   useEffect(() => {
     let alive = true;
@@ -114,28 +194,9 @@ export default function PublicAudioDetailPage() {
     };
   }, [slug]);
 
-  const {
-    mediaRef,
-    playing,
-    currentTime,
-    playbackRate,
-    duration,
-    seek,
-    togglePlayback,
-    changePlaybackRate,
-    mediaEventHandlers,
-  } = useMediaPlaybackController({
-    durationSeconds: publication?.delivery.durationSeconds ?? 0,
-    sourceKey: publication?.versionId ?? null,
-  });
-
-  const chapters = useMemo(
-    () => (publication?.chapters ?? []).map((chapter) => ({
-      id: `chapter-${chapter.chapterNumber}`,
-      timeSeconds: chapter.startSeconds,
-      label: chapter.title,
-    })),
-    [publication?.chapters],
+  const playerItem = useMemo(
+    () => publication ? audioPlayerItem(publication) : null,
+    [publication],
   );
 
   const trust = useMemo(
@@ -149,13 +210,13 @@ export default function PublicAudioDetailPage() {
         <div className="mx-auto max-w-5xl animate-pulse space-y-4">
           <div className="h-4 w-20 rounded bg-wk-surface-raised" />
           <div className="h-12 w-3/4 rounded bg-wk-surface-raised" />
-          <div className="h-44 rounded-2xl bg-wk-surface" />
+          <div className="h-64 rounded-[28px] bg-wk-surface" />
         </div>
       </main>
     );
   }
 
-  if (!publication) {
+  if (!publication || !playerItem) {
     return (
       <main className="wk-container-wide min-h-[60vh] px-5 py-16 md:px-6">
         <div className="mx-auto max-w-2xl rounded-2xl border border-wk-border bg-wk-surface px-6 py-12 text-center">
@@ -180,62 +241,122 @@ export default function PublicAudioDetailPage() {
       ? `Episode ${publication.episodeNumber}`
       : null,
   ].filter(Boolean);
+  const active =
+    currentTrack?.id === publication.publicationId;
+  const activeDuration =
+    active
+      ? duration || publication.delivery.durationSeconds || 0
+      : publication.delivery.durationSeconds || 0;
+  const activeTime = active ? currentTime : 0;
+
+  const startListening = () => {
+    if (active) {
+      togglePlay();
+      return;
+    }
+
+    playTrack(
+      playerItem,
+      [playerItem],
+      {
+        pageType: "audio_detail",
+        entityType:
+          publication.publicationKind === "episode"
+            ? "audio_episode"
+            : "standalone_audio",
+        entitySlug: publication.slug,
+        sourceSection: "audio_detail_listen",
+      },
+    );
+  };
+
+  const playChapter = (startSeconds: number) => {
+    if (!active) {
+      playTrack(
+        playerItem,
+        [playerItem],
+        {
+          pageType: "audio_detail",
+          entityType:
+            publication.publicationKind === "episode"
+              ? "audio_episode"
+              : "standalone_audio",
+          entitySlug: publication.slug,
+          sourceSection: "audio_detail_chapter",
+        },
+      );
+
+      window.requestAnimationFrame(() => {
+        seek(startSeconds);
+      });
+      return;
+    }
+
+    seek(startSeconds);
+  };
 
   return (
     <main>
-      <section className="wk-container-wide px-5 pb-8 pt-10 md:px-6 md:pb-10 md:pt-14">
-        <div className="mx-auto max-w-5xl">
-          <div className="wk-eyebrow mb-3">Audio</div>
-          {context.length ? (
-            <div className="mb-3 flex flex-wrap gap-x-2 gap-y-1 text-xs font-bold text-wk-text-muted">
-              {context.map((item, index) => (
-                <span key={String(item)}>
-                  {index > 0 ? <span className="mr-2 text-wk-text-faint">·</span> : null}
-                  {item}
-                </span>
-              ))}
-            </div>
-          ) : null}
-          <h1 className="max-w-4xl text-4xl font-black tracking-[-0.035em] text-wk-text md:text-6xl">
-            {publication.title}
-          </h1>
-          {publication.summary ? (
-            <p className="mt-5 max-w-3xl text-base leading-7 text-wk-text-muted md:text-lg md:leading-8">
-              {publication.summary}
-            </p>
-          ) : null}
-        </div>
-      </section>
+      <section className="wk-container-wide px-5 pb-10 pt-10 md:px-6 md:pb-14 md:pt-14">
+        <div className="mx-auto grid max-w-5xl gap-7 lg:grid-cols-[minmax(0,1fr)_320px] lg:items-end">
+          <div>
+            <div className="wk-eyebrow mb-3">Audio</div>
+            {context.length ? (
+              <div className="mb-3 flex flex-wrap gap-x-2 gap-y-1 text-xs font-bold text-wk-text-muted">
+                {context.map((item, index) => (
+                  <span key={String(item)}>
+                    {index > 0 ? <span className="mr-2 text-wk-text-faint">·</span> : null}
+                    {item}
+                  </span>
+                ))}
+              </div>
+            ) : null}
+            <h1 className="max-w-4xl text-4xl font-black tracking-[-0.035em] text-wk-text md:text-6xl">
+              {publication.title}
+            </h1>
+            {publication.summary ? (
+              <p className="mt-5 max-w-3xl text-base leading-7 text-wk-text-muted md:text-lg md:leading-8">
+                {publication.summary}
+              </p>
+            ) : null}
 
-      <section className="wk-container-wide px-5 pb-10 md:px-6">
-        <div className="mx-auto max-w-5xl rounded-2xl border border-wk-border bg-wk-surface p-4 md:p-6">
-          <audio
-            ref={mediaRef}
-            src={publication.delivery.url}
-            preload="metadata"
-            className="hidden"
-            {...mediaEventHandlers}
-          />
-          <MediaTransport
-            playing={playing}
-            currentTime={currentTime}
-            duration={duration}
-            playbackRate={playbackRate}
-            onToggle={() => void togglePlayback()}
-            onSeekBy={(seconds) => seek(currentTime + seconds)}
-            onPlaybackRateChange={changePlaybackRate}
-          />
-          <div className="mt-4">
-            <MediaTimeline
-              waveformUrl={publication.delivery.waveformUrl}
-              durationSeconds={duration}
-              currentTime={currentTime}
-              chapters={chapters}
-              interactive={false}
-              waveformUnavailableLabel="Waveform unavailable."
-              waveformMissingLabel="Waveform unavailable."
-              idleLabel="Timeline"
-              onSeek={seek}
+            <div className="mt-7 flex flex-wrap items-center gap-3">
+              <button
+                type="button"
+                onClick={startListening}
+                className="inline-flex min-h-12 items-center gap-2 rounded-full bg-wk-text px-5 py-3 text-sm font-black text-wk-bg"
+              >
+                <WkIcon
+                  name={active && isPlaying ? "Pause" : "Play"}
+                  size={17}
+                  fill="currentColor"
+                />
+                {active && isPlaying ? "Pause" : active && activeTime > 0 ? "Continue" : "Listen"}
+              </button>
+
+              {active ? (
+                <button
+                  type="button"
+                  onClick={openFullPlayer}
+                  className="inline-flex min-h-12 items-center gap-2 rounded-full border border-wk-border bg-wk-surface px-5 py-3 text-sm font-black text-wk-text-muted hover:text-wk-text"
+                >
+                  Open Player
+                  <i className="ri-expand-diagonal-line" />
+                </button>
+              ) : null}
+
+              <span className="text-xs font-semibold tabular-nums text-wk-text-faint">
+                {active
+                  ? `${formatPlayerClock(activeTime)} / ${formatPlayerClock(activeDuration)}`
+                  : formatPlayerClock(activeDuration)}
+              </span>
+            </div>
+          </div>
+
+          <div className="aspect-square overflow-hidden rounded-[28px] border border-wk-border bg-wk-surface-raised shadow-xl">
+            <Ch19GradientImage
+              slug={publication.slug}
+              name={publication.title}
             />
           </div>
         </div>
@@ -247,20 +368,28 @@ export default function PublicAudioDetailPage() {
             {publication.chapters.length ? (
               <div className="rounded-2xl border border-wk-border bg-wk-surface p-5 md:p-6">
                 <h2 className="text-xl font-black text-wk-text">Chapters</h2>
+                <p className="mt-1 text-sm text-wk-text-muted">
+                  Jump into the recording without leaving the listening session.
+                </p>
                 <div className="mt-4 divide-y divide-wk-border">
                   {publication.chapters.map((chapter) => (
                     <button
                       key={chapter.chapterNumber}
                       type="button"
-                      onClick={() => seek(chapter.startSeconds)}
-                      className="flex w-full items-center gap-4 py-3 text-left hover:text-wk-brand"
+                      onClick={() => playChapter(chapter.startSeconds)}
+                      className="group flex w-full items-center gap-4 py-3 text-left"
                     >
                       <span className="w-12 shrink-0 font-mono text-xs font-bold text-wk-brand">
-                        {formatMediaTime(chapter.startSeconds)}
+                        {formatPlayerClock(chapter.startSeconds)}
                       </span>
-                      <span className="text-sm font-bold text-wk-text">
+                      <span className="min-w-0 flex-1 text-sm font-bold text-wk-text group-hover:text-wk-brand">
                         {chapter.title}
                       </span>
+                      <WkIcon
+                        name="Play"
+                        size={14}
+                        className="text-wk-text-faint group-hover:text-wk-brand"
+                      />
                     </button>
                   ))}
                 </div>
@@ -272,7 +401,7 @@ export default function PublicAudioDetailPage() {
                 <WkIcon name="FileText" size={20} className="text-wk-brand" />
                 <h2 className="mt-3 text-lg font-black text-wk-text">Transcript</h2>
                 <p className="mt-2 text-sm leading-6 text-wk-text-muted">
-                  Read the transcript for this recording.
+                  Read alongside the recording or return to it later.
                 </p>
                 <a
                   href={publication.transcript.url}
