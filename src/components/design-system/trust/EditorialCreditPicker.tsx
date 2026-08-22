@@ -62,18 +62,20 @@ export function EditorialCreditPicker({
 
   const filteredParties = useMemo(() => {
     const needle = query.trim().toLowerCase();
-    if (!needle) return parties;
+    if (!needle) return [];
 
-    return parties.filter((party) =>
-      [
-        party.displayName,
-        party.canonicalPath,
-        identityLabel(party),
-      ]
-        .join(" ")
-        .toLowerCase()
-        .includes(needle),
-    );
+    return parties
+      .filter((party) =>
+        [
+          party.displayName,
+          party.canonicalPath,
+          identityLabel(party),
+        ]
+          .join(" ")
+          .toLowerCase()
+          .includes(needle),
+      )
+      .slice(0, 8);
   }, [parties, query]);
 
   const selectedParty =
@@ -105,6 +107,7 @@ export function EditorialCreditPicker({
 
   const canAttach =
     Boolean(selectedParty) && Boolean(resolvedRole);
+  const hasQuery = query.trim().length > 0;
 
   return (
     <div className="mt-3 space-y-3 rounded-xl border border-wk-border bg-wk-bg-subtle p-3">
@@ -122,35 +125,60 @@ export function EditorialCreditPicker({
         Find Person or Organization
         <input
           value={query}
-          onChange={(event) => setQuery(event.target.value)}
+          onChange={(event) => {
+            setQuery(event.target.value);
+            setPartyResourceId("");
+            setCreditRole("");
+          }}
           disabled={disabled}
           placeholder="Search by name"
           className="mt-1 w-full rounded-lg border border-wk-border bg-wk-surface px-3 py-2 text-xs text-wk-text outline-none focus:border-wk-brand disabled:opacity-60"
+          aria-controls="editorial-credit-search-results"
+          aria-expanded={hasQuery && filteredParties.length > 0}
+          autoComplete="off"
         />
       </label>
 
-      <label className="block text-[11px] font-bold text-wk-text-muted">
-        Credited party
-        <select
-          value={partyResourceId}
-          onChange={(event) => {
-            setPartyResourceId(event.target.value);
-            setCreditRole("");
-          }}
-          disabled={disabled || filteredParties.length === 0}
-          className="mt-1 w-full rounded-lg border border-wk-border bg-wk-surface px-3 py-2 text-xs text-wk-text disabled:opacity-60"
+      {hasQuery ? (
+        <div
+          id="editorial-credit-search-results"
+          className="overflow-hidden rounded-lg border border-wk-border bg-wk-surface"
         >
-          <option value="">Choose identity</option>
-          {filteredParties.map((party) => (
-            <option
-              key={`${party.partyKind}:${party.resourceId}`}
-              value={party.resourceId}
-            >
-              {party.displayName} · {identityLabel(party)}
-            </option>
-          ))}
-        </select>
-      </label>
+          {filteredParties.length > 0 ? (
+            <div className="divide-y divide-wk-border" role="listbox" aria-label="Matching credited identities">
+              {filteredParties.map((party) => {
+                const selected = party.resourceId === partyResourceId;
+                return (
+                  <button
+                    key={`${party.partyKind}:${party.resourceId}`}
+                    type="button"
+                    role="option"
+                    aria-selected={selected}
+                    disabled={disabled}
+                    onClick={() => {
+                      setPartyResourceId(party.resourceId);
+                      setCreditRole("");
+                      setQuery(party.displayName);
+                    }}
+                    className="block w-full px-3 py-2 text-left hover:bg-wk-bg-subtle focus:bg-wk-bg-subtle focus:outline-none disabled:opacity-60"
+                  >
+                    <span className="block text-xs font-bold text-wk-text">
+                      {party.displayName}
+                    </span>
+                    <span className="mt-0.5 block text-[10px] text-wk-text-muted">
+                      {identityLabel(party)} · {party.canonicalPath}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+          ) : (
+            <p className="px-3 py-2 text-[11px] text-wk-text-muted">
+              No matching canonical identity.
+            </p>
+          )}
+        </div>
+      ) : null}
 
       {selectedParty ? (
         <div className="rounded-lg border border-wk-border bg-wk-surface px-3 py-2">
@@ -158,7 +186,7 @@ export function EditorialCreditPicker({
             {selectedParty.displayName}
           </div>
           <div className="mt-0.5 text-[10px] text-wk-text-muted">
-            {identityLabel(selectedParty)} · {selectedParty.canonicalPath}
+            Selected · {identityLabel(selectedParty)} · {selectedParty.canonicalPath}
           </div>
         </div>
       ) : null}
@@ -173,7 +201,7 @@ export function EditorialCreditPicker({
         >
           {availableRoles.length === 0 ? (
             <option value="">
-              No governed Credit available
+              Choose an identity first
             </option>
           ) : null}
           {availableRoles.map((role) => (
