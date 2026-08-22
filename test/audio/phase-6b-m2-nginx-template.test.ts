@@ -16,12 +16,25 @@ describe("Phase 6B M2 production Nginx transport template", () => {
     );
   });
 
+  it("keeps the Supabase upstream hostname static while routing dynamic public identity through args", () => {
+    expect(nginx).toContain(
+      'set $args "kind=enclosure&id=$wk_audio_publication_id";',
+    );
+    expect(nginx).toContain('set $args "kind=rss&show=$wk_show_slug";');
+    expect(nginx.match(/rewrite \^ \/functions\/v1\/audio-public-delivery break;/g)).toHaveLength(2);
+    expect(
+      nginx.match(/proxy_pass https:\/\/__SUPABASE_PROJECT_REF__\.supabase\.co;/g),
+    ).toHaveLength(2);
+    expect(nginx).not.toMatch(/proxy_pass[^\n]*\$/);
+    expect(nginx).not.toContain("resolver ");
+  });
+
   it("keeps the public feed and enclosure routes bound to the Audio delivery Edge adapter", () => {
     expect(nginx).toContain("/audio/enclosures/");
     expect(nginx).toContain("^/shows/");
     expect(nginx).toContain("feed\\.xml");
-    expect(nginx).toContain("functions/v1/audio-public-delivery?kind=enclosure");
-    expect(nginx).toContain("functions/v1/audio-public-delivery?kind=rss");
+    expect(nginx).toContain('kind=enclosure&id=$wk_audio_publication_id');
+    expect(nginx).toContain('kind=rss&show=$wk_show_slug');
     expect(nginx).not.toContain("/audio/shows/");
   });
 });
