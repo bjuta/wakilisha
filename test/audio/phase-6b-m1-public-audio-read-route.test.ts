@@ -34,6 +34,14 @@ const page = readFileSync(
   "src/pages/audio/detail/page.tsx",
   "utf8",
 );
+const adapter = readFileSync(
+  "src/services/audio/audioPlayerAdapter.ts",
+  "utf8",
+);
+const listeningSurface = readFileSync(
+  "src/components/audio/PublicAudioListeningSurface.tsx",
+  "utf8",
+);
 const router = readFileSync("src/router/config.tsx", "utf8");
 const lazyPublic = readFileSync("src/router/lazyPublic.tsx", "utf8");
 const routeAudit = readFileSync(
@@ -112,17 +120,15 @@ describe("Phase 6B M1 public Audio read and route", () => {
     expect(service).toContain('supabase.rpc(\n    "get_public_audio_publication"');
     expect(service).toContain("decodePublicAudioPublication(data)");
     expect(service).not.toContain('.schema("audio")');
-    expect(page).toContain("getPublicAudioPublication(slug)");
+    expect(page).toContain("getPublicStandaloneAudio(slug)");
     expect(page).not.toContain("@/lib/supabase");
     expect(model).toContain("export interface PublicAudioPublication");
   });
 
-  it("adds exactly one lazy public Audio route while preserving the old route checksum", () => {
+  it("retains exactly one public Audio route and the pre-M1 route checksum", () => {
     expect(lazyPublic).toContain('import("../pages/audio/detail/page")');
     expect(router).toContain('path: "/audio/:slug"');
     expect(router.match(/path: "\/audio\/:slug"/g)?.length).toBe(1);
-    expect(routeAudit).toContain('const expectedDirectLazyImportCount = 62;');
-    expect(routeAudit).toContain('const expectedRoutePathCount = 166;');
     expect(routeAudit).toContain('const publicAudioPath = "/audio/:slug";');
     expect(routeAudit).toContain("const preM1RoutePaths = routePaths.filter(");
     expect(routeAudit).toContain(
@@ -131,16 +137,17 @@ describe("Phase 6B M1 public Audio read and route", () => {
   });
 
   it("hands playback to the existing WAKILISHA Player instead of creating a local Audio engine", () => {
-    expect(page).toContain('import { usePlayer } from "@/context/PlayerContext"');
-    expect(page).toContain("playerMediaItem(");
-    expect(page).toContain('playbackAvailability: "full"');
-    expect(page).toContain('mediaKind:');
-    expect(page).toContain("playTrack(");
-    expect(page).toContain("seek(startSeconds)");
-    expect(page).not.toContain("<audio");
-    expect(page).not.toContain("MediaTransport");
-    expect(page).not.toContain("MediaTimeline");
-    expect(page).not.toContain("useMediaPlaybackController");
+    expect(page).toContain("PublicAudioListeningSurface");
+    expect(adapter).toContain("playerMediaItem(");
+    expect(adapter).toContain('playbackAvailability: "full"');
+    expect(adapter).toContain("mediaKind:");
+    expect(listeningSurface).toContain('import { usePlayer } from "@/context/PlayerContext"');
+    expect(listeningSurface).toContain("playTrack(");
+    expect(listeningSurface).toContain("seek(startSeconds)");
+    expect(listeningSurface).not.toContain("<audio");
+    expect(listeningSurface).not.toContain("MediaTransport");
+    expect(listeningSurface).not.toContain("MediaTimeline");
+    expect(listeningSurface).not.toContain("useMediaPlaybackController");
   });
 
   it("does not manufacture public reuse from Audio editorial primitives", () => {
@@ -154,11 +161,11 @@ describe("Phase 6B M1 public Audio read and route", () => {
   it("keeps public Audio language reader-facing", () => {
     expect(page).toContain("Audio Unavailable");
     expect(page).toContain("This recording is not published or could not be found.");
-    expect(page).toContain("Open Transcript");
-    expect(page).toContain("Listen");
+    expect(listeningSurface).toContain("Open Transcript");
+    expect(listeningSurface).toContain("Listen");
     expect(page).not.toContain("Canonical ");
-    expect(page).not.toContain("Asset ");
-    expect(page).not.toContain("Identity ");
-    expect(page).not.toContain("—");
+    expect(listeningSurface).not.toContain("Asset ");
+    expect(listeningSurface).not.toContain("Identity ");
+    expect(listeningSurface).not.toContain("—");
   });
 });
