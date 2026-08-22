@@ -23,9 +23,13 @@ export interface EditorialCreditPartyOption {
   availableCreditRoles: string[];
 }
 
-export interface EditorialCreditPickerOptions {
+export interface EditorialCreditPickerAuthority {
   canCreateCredit: boolean;
   roles: EditorialCreditRoleOption[];
+}
+
+export interface EditorialCreditPickerOptions
+  extends EditorialCreditPickerAuthority {
   parties: EditorialCreditPartyOption[];
 }
 
@@ -81,7 +85,7 @@ function rpc(): (
 
 export async function fetchEditorialCreditPickerOptions(
   query: string | null = null,
-  limit = 100,
+  limit = 20,
 ): Promise<EditorialCreditPickerOptions> {
   const { data, error } = await rpc()(
     "list_editorial_credit_picker_options",
@@ -136,6 +140,28 @@ export async function fetchEditorialCreditPickerOptions(
           option.canonicalPath,
       ),
   };
+}
+
+export async function fetchEditorialCreditPickerAuthority(): Promise<EditorialCreditPickerAuthority> {
+  const options = await fetchEditorialCreditPickerOptions(null, 1);
+  return {
+    canCreateCredit: options.canCreateCredit,
+    roles: options.roles,
+  };
+}
+
+export async function searchEditorialCreditParties(
+  query: string,
+  limit = 20,
+): Promise<EditorialCreditPartyOption[]> {
+  const needle = query.trim();
+  if (needle.length < 2) return [];
+
+  const options = await fetchEditorialCreditPickerOptions(
+    needle,
+    Math.min(Math.max(limit, 1), 50),
+  );
+  return options.parties;
 }
 
 export async function resolveEditorialCredit(
