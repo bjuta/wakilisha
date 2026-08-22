@@ -68,12 +68,8 @@ begin
       return null;
   end;
 
-  select
-    show_row.*,
-    episode_row.*
-  into
-    v_show,
-    v_episode
+  select episode_row.*
+  into v_episode
   from editorial.audio_episode_shared_links audio_link
   join editorial.show_episodes episode_row
     on episode_row.resource_id = audio_link.show_episode_resource_id
@@ -82,14 +78,22 @@ begin
    and episode_resource.resource_kind = 'show_episode'
    and episode_resource.lifecycle_state = 'active'
    and episode_resource.visibility = 'public'
-  join editorial.shows show_row
-    on show_row.resource_id = episode_row.show_resource_id
+  where audio_link.audio_publication_id = v_publication_id
+  limit 1;
+
+  if not found then
+    return null;
+  end if;
+
+  select show_row.*
+  into v_show
+  from editorial.shows show_row
   join editorial.resources show_resource
     on show_resource.id = show_row.resource_id
    and show_resource.resource_kind = 'show'
    and show_resource.lifecycle_state = 'active'
    and show_resource.visibility = 'public'
-  where audio_link.audio_publication_id = v_publication_id
+  where show_row.resource_id = v_episode.show_resource_id
   limit 1;
 
   if not found then
