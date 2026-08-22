@@ -18,6 +18,9 @@ verify_jwt = true
 [functions.playlist-product-api]
 verify_jwt = false
 
+[functions.audio-public-delivery]
+verify_jwt = false
+
 # WAKILISHA replayable Storage bucket authority.
 [storage.buckets.article-media]
 public = true
