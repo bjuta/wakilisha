@@ -9,22 +9,22 @@ declare
     to_regprocedure('public.get_public_show(text)');
   v_episode_reader_oid oid :=
     to_regprocedure('public.get_public_show_episode(text,text)');
-  v_audio_reader_oid oid :=
-    to_regprocedure('public.get_public_audio_publication(text)');
   v_enclosure_oid oid :=
     to_regprocedure('public.get_public_audio_enclosure(uuid)');
-  v_slug_guard_oid oid :=
-    to_regprocedure('audio.enforce_publication_slug_identity()');
-  v_trust_candidates_oid oid :=
-    to_regprocedure('public.list_audio_trust_attachment_candidates()');
   v_show_helper_definition text;
   v_episode_helper_definition text;
   v_show_reader_definition text;
   v_episode_reader_definition text;
-  v_audio_reader_definition text;
   v_enclosure_definition text;
-  v_slug_guard_definition text;
-  v_trust_candidates_definition text;
+  v_show_reader_security_definer boolean;
+  v_show_reader_volatility "char";
+  v_episode_reader_security_definer boolean;
+  v_episode_reader_volatility "char";
+  v_enclosure_security_definer boolean;
+  v_enclosure_volatility "char";
+  v_public_show_execute boolean;
+  v_public_episode_execute boolean;
+  v_public_enclosure_execute boolean;
   v_trigger_count integer;
 begin
   if not exists (
@@ -55,18 +55,16 @@ begin
      or v_episode_helper_oid is null
      or v_show_reader_oid is null
      or v_episode_reader_oid is null
-     or v_audio_reader_oid is null
      or v_enclosure_oid is null
-     or v_slug_guard_oid is null
-     or v_trust_candidates_oid is null
   then
     raise exception
-      'Phase 6B M2 shared Show, Audio identity, or Trust helper is missing.';
+      'Phase 6B M2 shared Show helper or public resolver is missing.';
   end if;
 
   select pg_get_functiondef(
     'editorial.assert_resource_binding_integrity()'::regprocedure
-  ) into v_binding_definition;
+  )
+  into v_binding_definition;
 
   if position('when ''show''' in v_binding_definition) = 0
      or position('from editorial.shows' in v_binding_definition) = 0
@@ -83,20 +81,9 @@ begin
 
   select pg_get_functiondef(v_show_helper_oid)
   into v_show_helper_definition;
+
   select pg_get_functiondef(v_episode_helper_oid)
   into v_episode_helper_definition;
-  select pg_get_functiondef(v_show_reader_oid)
-  into v_show_reader_definition;
-  select pg_get_functiondef(v_episode_reader_oid)
-  into v_episode_reader_definition;
-  select pg_get_functiondef(v_audio_reader_oid)
-  into v_audio_reader_definition;
-  select pg_get_functiondef(v_enclosure_oid)
-  into v_enclosure_definition;
-  select pg_get_functiondef(v_slug_guard_oid)
-  into v_slug_guard_definition;
-  select pg_get_functiondef(v_trust_candidates_oid)
-  into v_trust_candidates_definition;
 
   if position('editorial.audio_show_shared_links' in v_show_helper_definition) = 0
      or position('editorial.shows' in v_show_helper_definition) = 0
@@ -109,32 +96,10 @@ begin
   if position('editorial.audio_episode_shared_links' in v_episode_helper_definition) = 0
      or position('editorial.show_episodes' in v_episode_helper_definition) = 0
      or position('editorial.ensure_audio_show_shared_identity' in v_episode_helper_definition) = 0
-     or position('v_internal_prefix' in v_episode_helper_definition) = 0
-     or position('v_episode_slug' in v_episode_helper_definition) = 0
-     or position('set' || chr(10) || '    title = v_publication.title' in v_episode_helper_definition) = 0
-     or position('slug = v_publication.slug' in v_episode_helper_definition) > 0
+     or position('Published Show Episode slug is immutable' in v_episode_helper_definition) = 0
   then
     raise exception
-      'Audio Episode no longer derives immutable shared Show Episode identity from the Audio lookup key.';
-  end if;
-
-  if position('Audio URL identity is system-managed' in v_slug_guard_definition) = 0
-     or position('''ep-'' || new.show_id::text || ''-''' in v_slug_guard_definition) = 0
-     or position('new.slug is distinct from old.slug' in v_slug_guard_definition) = 0
-  then
-    raise exception
-      'Audio publication slug guard no longer keeps URL identity system-managed.';
-  end if;
-
-  if not exists (
-    select 1
-    from pg_trigger trigger_row
-    where trigger_row.tgname = 'audio_publication_slug_identity_guard'
-      and not trigger_row.tgisinternal
-      and trigger_row.tgenabled <> 'D'
-  ) then
-    raise exception
-      'Audio publication slug identity guard is missing or disabled.';
+      'Audio Episode no longer maintains shared Show Episode identity or canonical slug stability.';
   end if;
 
   select count(*)
@@ -151,58 +116,109 @@ begin
 
   if v_trigger_count <> 4 then
     raise exception
-      'One or more shared Show or Audio invariant triggers are missing or disabled.';
+      'One or more shared Show/Audio invariant triggers are missing or disabled.';
   end if;
 
-  if not exists (
-    select 1
-    from pg_proc p
-    where p.oid = v_show_reader_oid
-      and p.prosecdef
-      and p.provolatile = 's'
-  ) or not exists (
-    select 1
-    from pg_proc p
-    where p.oid = v_episode_reader_oid
-      and p.prosecdef
-      and p.provolatile = 's'
-  ) or not exists (
-    select 1
-    from pg_proc p
-    where p.oid = v_audio_reader_oid
-      and p.prosecdef
-      and p.provolatile = 's'
-  ) or not exists (
-    select 1
-    from pg_proc p
-    where p.oid = v_enclosure_oid
-      and p.prosecdef
-      and p.provolatile = 's'
-  ) then
+  select
+    p.prosecdef,
+    p.provolatile,
+    pg_get_functiondef(p.oid),
+    exists (
+      select 1
+      from aclexplode(coalesce(p.proacl, acldefault('f', p.proowner))) acl
+      where acl.grantee = 0
+        and acl.privilege_type = 'EXECUTE'
+    )
+  into
+    v_show_reader_security_definer,
+    v_show_reader_volatility,
+    v_show_reader_definition,
+    v_public_show_execute
+  from pg_proc p
+  where p.oid = v_show_reader_oid;
+
+  select
+    p.prosecdef,
+    p.provolatile,
+    pg_get_functiondef(p.oid),
+    exists (
+      select 1
+      from aclexplode(coalesce(p.proacl, acldefault('f', p.proowner))) acl
+      where acl.grantee = 0
+        and acl.privilege_type = 'EXECUTE'
+    )
+  into
+    v_episode_reader_security_definer,
+    v_episode_reader_volatility,
+    v_episode_reader_definition,
+    v_public_episode_execute
+  from pg_proc p
+  where p.oid = v_episode_reader_oid;
+
+  select
+    p.prosecdef,
+    p.provolatile,
+    pg_get_functiondef(p.oid),
+    exists (
+      select 1
+      from aclexplode(coalesce(p.proacl, acldefault('f', p.proowner))) acl
+      where acl.grantee = 0
+        and acl.privilege_type = 'EXECUTE'
+    )
+  into
+    v_enclosure_security_definer,
+    v_enclosure_volatility,
+    v_enclosure_definition,
+    v_public_enclosure_execute
+  from pg_proc p
+  where p.oid = v_enclosure_oid;
+
+  if not v_show_reader_security_definer
+     or v_show_reader_volatility <> 's'
+     or not v_episode_reader_security_definer
+     or v_episode_reader_volatility <> 's'
+     or not v_enclosure_security_definer
+     or v_enclosure_volatility <> 's'
+  then
     raise exception
-      'Phase 6B M2 public readers must remain STABLE SECURITY DEFINER.';
+      'Shared Show public readers must remain STABLE SECURITY DEFINER.';
   end if;
 
-  if has_function_privilege('public', 'public.get_public_show(text)', 'EXECUTE')
-     or has_function_privilege('public', 'public.get_public_show_episode(text,text)', 'EXECUTE')
-     or has_function_privilege('public', 'public.get_public_audio_publication(text)', 'EXECUTE')
-     or has_function_privilege('public', 'public.get_public_audio_enclosure(uuid)', 'EXECUTE')
+  if v_public_show_execute
+     or v_public_episode_execute
+     or v_public_enclosure_execute
   then
     raise exception
       'PUBLIC received blanket Phase 6B M2 resolver execution.';
   end if;
 
-  if not has_function_privilege('anon', 'public.get_public_show(text)', 'EXECUTE')
-     or not has_function_privilege('authenticated', 'public.get_public_show(text)', 'EXECUTE')
-     or not has_function_privilege('anon', 'public.get_public_show_episode(text,text)', 'EXECUTE')
-     or not has_function_privilege('authenticated', 'public.get_public_show_episode(text,text)', 'EXECUTE')
-     or not has_function_privilege('anon', 'public.get_public_audio_publication(text)', 'EXECUTE')
-     or not has_function_privilege('authenticated', 'public.get_public_audio_publication(text)', 'EXECUTE')
-     or not has_function_privilege('anon', 'public.get_public_audio_enclosure(uuid)', 'EXECUTE')
-     or not has_function_privilege('authenticated', 'public.get_public_audio_enclosure(uuid)', 'EXECUTE')
-  then
+  if not has_function_privilege(
+    'anon',
+    'public.get_public_show(text)',
+    'EXECUTE'
+  ) or not has_function_privilege(
+    'authenticated',
+    'public.get_public_show(text)',
+    'EXECUTE'
+  ) or not has_function_privilege(
+    'anon',
+    'public.get_public_show_episode(text,text)',
+    'EXECUTE'
+  ) or not has_function_privilege(
+    'authenticated',
+    'public.get_public_show_episode(text,text)',
+    'EXECUTE'
+  ) or not has_function_privilege(
+    'anon',
+    'public.get_public_audio_enclosure(uuid)',
+    'EXECUTE'
+  ) or not has_function_privilege(
+    'authenticated',
+    'public.get_public_audio_enclosure(uuid)',
+    'EXECUTE'
+  ) then
     raise exception
-      'Intended API roles cannot execute the Phase 6B M2 public readers.';
+      'Intended API roles cannot execute the shared Show public readers.';
   end if;
 
   if has_schema_privilege('anon', 'audio', 'USAGE')
@@ -228,33 +244,15 @@ begin
      or position('''feed_path'', ''/shows/'' || v_show.slug || ''/feed.xml''' in v_show_reader_definition) = 0
   then
     raise exception
-      'Public Show resolver lost shared identity or canonical Show and feed paths.';
+      'Public Show resolver lost shared identity or canonical Show/feed paths.';
   end if;
 
-  if position('public.get_public_audio_publication_m1' in v_episode_reader_definition) = 0
-     or position('v_audio_publication.slug' in v_episode_reader_definition) = 0
-     or position('''/shows/'' ||' in v_episode_reader_definition) = 0
-     or position('to_jsonb(v_episode.slug)' in v_episode_reader_definition) = 0
-     or position('''audio'',' in v_episode_reader_definition) = 0
+  if position('public.get_public_audio_publication' in v_episode_reader_definition) = 0
+     or position('''/shows/'' || v_show.slug || ''/'' || v_episode.slug' in v_episode_reader_definition) = 0
+     or position('''audio'', v_audio' in v_episode_reader_definition) = 0
   then
     raise exception
-      'Public Show Episode resolver no longer composes shared identity with the exact M1 Audio safety projection.';
-  end if;
-
-  if position('public.get_public_audio_publication_m1' in v_audio_reader_definition) = 0
-     or position('''standalone''' in v_audio_reader_definition) = 0
-     or position('''/audio/''' in v_audio_reader_definition) = 0
-  then
-    raise exception
-      'Plain Audio resolver is no longer Standalone-only over the exact M1 safety projection.';
-  end if;
-
-  if position('public.get_public_audio_publication_m1' in v_enclosure_definition) = 0
-     or position('''enclosure_url''' in v_enclosure_definition) = 0
-     or position('''source_url''' in v_enclosure_definition) = 0
-  then
-    raise exception
-      'Audio enclosure no longer inherits the exact M1 public-safety authority.';
+      'Public Show Episode resolver no longer wraps the exact M1 Audio safety projection.';
   end if;
 
   if position('/audio/shows/' in v_show_reader_definition) > 0
@@ -266,19 +264,25 @@ begin
       'Rejected Audio-bucket or redundant Episode URL grammar returned.';
   end if;
 
-  if has_function_privilege('public', 'public.list_audio_trust_attachment_candidates()', 'EXECUTE')
-     or has_function_privilege('anon', 'public.list_audio_trust_attachment_candidates()', 'EXECUTE')
-     or not has_function_privilege('authenticated', 'public.list_audio_trust_attachment_candidates()', 'EXECUTE')
-     or position('edit_own_audio' in v_trust_candidates_definition) = 0
-     or position('edit_others_audio' in v_trust_candidates_definition) = 0
-     or position('credit_note' in v_trust_candidates_definition) > 0
-     or position('editor_note' in v_trust_candidates_definition) > 0
+  if position('current_working_version_id' in v_show_reader_definition) > 0
+     or position('current_submitted_version_id' in v_show_reader_definition) > 0
+     or position('current_approved_version_id' in v_show_reader_definition) > 0
+     or position('publication_review_events' in v_show_reader_definition) > 0
+     or position('''metadata''' in v_show_reader_definition) > 0
   then
     raise exception
-      'Audio Trust candidate picker authority leaked access or private Trust notes.';
+      'Public Show resolver exposes moving Audio, Review, or raw metadata authority.';
+  end if;
+
+  if position('public.get_public_audio_publication' in v_enclosure_definition) = 0
+     or position('''enclosure_url''' in v_enclosure_definition) = 0
+     or position('''source_url''' in v_enclosure_definition) = 0
+  then
+    raise exception
+      'Audio enclosure no longer inherits M1 public-safety authority.';
   end if;
 
   raise notice
-    'PASS: Phase 6B M2 keeps shared Show identity canonical, keeps Audio lookup identity internal, and removes raw Trust IDs from the editor contract.';
+    'PASS: Phase 6B M2 keeps Show and Show Episode identity shared, nests Episode URLs directly under Show, and keeps Audio as the first media consumer.';
 end;
 $verify$;
