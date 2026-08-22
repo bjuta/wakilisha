@@ -4260,6 +4260,7 @@ export type Database = {
         Args: { p_case_resource_id: string }
         Returns: boolean
       }
+      current_user_can_use_credit_identity: { Args: never; Returns: boolean }
       current_user_can_view_audio: {
         Args: { p_resource_id: string }
         Returns: boolean
@@ -21063,6 +21064,10 @@ export type Database = {
           updated_at: string
         }[]
       }
+      list_editorial_credit_picker_options: {
+        Args: { p_limit?: number; p_query?: string }
+        Returns: Json
+      }
       list_media_assets_v2: {
         Args: {
           p_asset_kind?: string
@@ -22131,6 +22136,15 @@ export type Database = {
           version_number: number
           wp_status: string
         }[]
+      }
+      resolve_editorial_credit: {
+        Args: {
+          p_credit_role: string
+          p_party_kind: string
+          p_party_resource_id: string
+          p_public_safe?: boolean
+        }
+        Returns: Json
       }
       resolve_legacy_media_asset_lite_batch: {
         Args: { p_asset_ids?: string[]; p_urls?: string[] }
