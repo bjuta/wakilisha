@@ -5,8 +5,12 @@ const migration = readFileSync(
   "supabase/migrations/20260822173446_phase_6b_m2_audio_ontology_closure.sql",
   "utf8",
 );
-const verifier = readFileSync(
+const m2Verifier = readFileSync(
   "scripts/control-plane/verify-phase-6b-m2-shared-show-hierarchy-rss.sql",
+  "utf8",
+);
+const ontologyVerifier = readFileSync(
+  "scripts/control-plane/verify-phase-6b-m2-audio-ontology-closure.sql",
   "utf8",
 );
 const audioPage = readFileSync(
@@ -57,7 +61,8 @@ describe("Phase 6B M2 ontology closure", () => {
     expect(migration).toContain("<> 'standalone'");
     expect(migration).toContain("public.get_public_audio_enclosure");
     expect(migration).toContain("v_audio_publication.slug");
-    expect(verifier).toContain("Plain Audio resolver is no longer Standalone-only");
+    expect(ontologyVerifier).toContain("Plain Audio resolver is no longer Standalone-only");
+    expect(m2Verifier).toContain("Public Show resolver exposes moving Audio, Review, or raw metadata authority.");
   });
 
   it("uses semantic Trust attachment controls instead of raw relationship IDs", () => {
@@ -97,19 +102,21 @@ describe("Phase 6B M2 ontology closure", () => {
     expect(audioPage).toContain("shared Shows and Episodes");
   });
 
-  it("keeps the permanent verifier read-only", () => {
-    const body = verifier
-      .toLowerCase()
-      .replace(/raise exception/g, "")
-      .replace(/raise notice/g, "");
+  it("keeps both permanent verifiers read-only", () => {
+    for (const verifier of [m2Verifier, ontologyVerifier]) {
+      const body = verifier
+        .toLowerCase()
+        .replace(/raise exception/g, "")
+        .replace(/raise notice/g, "");
 
-    for (const forbidden of [
-      /\binsert\s+into\b/,
-      /\bupdate\s+[a-z_]/,
-      /\bdelete\s+from\b/,
-      /\bcreate\s+(table|function|trigger|index|policy)\b/,
-    ]) {
-      expect(body).not.toMatch(forbidden);
+      for (const forbidden of [
+        /\binsert\s+into\b/,
+        /\bupdate\s+[a-z_]/,
+        /\bdelete\s+from\b/,
+        /\bcreate\s+(table|function|trigger|index|policy)\b/,
+      ]) {
+        expect(body).not.toMatch(forbidden);
+      }
     }
   });
 });
