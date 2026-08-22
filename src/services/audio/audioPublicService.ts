@@ -71,7 +71,7 @@ export async function getPublicAudioEpisode(
     publication.show?.slug !== normalizedShowSlug ||
     publication.slug !== normalizedEpisodeSlug ||
     publication.canonicalPath !==
-      `/shows/${normalizedShowSlug}/episodes/${normalizedEpisodeSlug}`
+      `/shows/${normalizedShowSlug}/${normalizedEpisodeSlug}`
   ) {
     return null;
   }
