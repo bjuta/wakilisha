@@ -66,6 +66,19 @@ async function sha256(value: string): Promise<string> {
     .join("");
 }
 
+function etagMatches(ifNoneMatch: string | null, etag: string): boolean {
+  if (!ifNoneMatch) return false;
+
+  const expected = etag.replace(/^W\//i, "");
+
+  return ifNoneMatch
+    .split(",")
+    .map((candidate) => candidate.trim())
+    .some((candidate) =>
+      candidate === "*" || candidate.replace(/^W\//i, "") === expected
+    );
+}
+
 Deno.serve(async (request) => {
   const method = request.method.toUpperCase();
 
@@ -178,7 +191,7 @@ Deno.serve(async (request) => {
 
     const etag = `"${await sha256(xml)}"`;
 
-    if (request.headers.get("if-none-match") === etag) {
+    if (etagMatches(request.headers.get("if-none-match"), etag)) {
       return response(null, 304, {
         "ETag": etag,
         "Cache-Control": "public, max-age=60, stale-while-revalidate=300",
