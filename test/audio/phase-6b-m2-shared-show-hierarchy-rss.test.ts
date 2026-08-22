@@ -236,6 +236,9 @@ describe("Phase 6B M2 shared Show hierarchy and Audio RSS", () => {
     expect(edge).not.toContain("SERVICE_ROLE");
     expect(edge).toContain('"get_public_show"');
     expect(edge).toContain('"get_public_audio_enclosure"');
+    expect(edge).toContain("function etagMatches");
+    expect(edge).toContain('candidate.replace(/^W\\//i, "") === expected');
+    expect(edge).toContain('etagMatches(request.headers.get("if-none-match"), etag)');
     expect(edge).toContain("307");
     expect(nginx).toContain("/audio/enclosures/");
     expect(nginx).toContain("^/shows/");
