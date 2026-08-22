@@ -16,7 +16,7 @@ import {
   type AudioPublicationSummary,
 } from "@/services/audio/audioAdminService";
 
-type ComposerMode = "show" | "season" | "recording";
+type ComposerMode = "show" | "season" | "audio";
 type StatusFilter = "all" | "draft" | "in_review" | "changes_requested" | "approved" | "published";
 
 function errorText(reason: unknown): string {
@@ -36,7 +36,7 @@ export default function AdminAudioPage() {
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
-  const [composerMode, setComposerMode] = useState<ComposerMode>("recording");
+  const [composerMode, setComposerMode] = useState<ComposerMode>("audio");
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
 
@@ -47,7 +47,6 @@ export default function AdminAudioPage() {
   const [seasonTitle, setSeasonTitle] = useState("");
   const [publicationKind, setPublicationKind] = useState<"standalone" | "episode">("standalone");
   const [publicationTitle, setPublicationTitle] = useState("");
-  const [publicationSlug, setPublicationSlug] = useState("");
   const [publicationSummary, setPublicationSummary] = useState("");
   const [publicationShowId, setPublicationShowId] = useState("");
   const [publicationSeasonId, setPublicationSeasonId] = useState("");
@@ -88,7 +87,11 @@ export default function AdminAudioPage() {
     setBusy("show");
     setMessage(null);
     try {
-      const showId = await createAudioShow({ title: showTitle, slug: slugifyAudioTitle(showTitle), description: showDescription });
+      const showId = await createAudioShow({
+        title: showTitle,
+        slug: slugifyAudioTitle(showTitle),
+        description: showDescription,
+      });
       setShowTitle("");
       setShowDescription("");
       setSeasonShowId(showId);
@@ -108,12 +111,16 @@ export default function AdminAudioPage() {
     setBusy("season");
     setMessage(null);
     try {
-      const seasonId = await createAudioSeason({ showId: seasonShowId, seasonNumber: Number(seasonNumber), title: seasonTitle });
+      const seasonId = await createAudioSeason({
+        showId: seasonShowId,
+        seasonNumber: Number(seasonNumber),
+        title: seasonTitle,
+      });
       setSeasonTitle("");
       setPublicationShowId(seasonShowId);
       setPublicationSeasonId(seasonId);
       await reload();
-      setComposerMode("recording");
+      setComposerMode("audio");
       setPublicationKind("episode");
       setMessage("Season created.");
     } catch (reason) {
@@ -131,7 +138,7 @@ export default function AdminAudioPage() {
       const publicationId = await createAudioPublication({
         publicationKind,
         title: publicationTitle,
-        slug: publicationSlug || publicationTitle,
+        slug: slugifyAudioTitle(publicationTitle),
         summary: publicationSummary,
         showId: publicationShowId || null,
         seasonId: publicationSeasonId || null,
@@ -152,7 +159,7 @@ export default function AdminAudioPage() {
       <AdminCollectionHeader
         eyebrow="Content & Editorial"
         title="Audio"
-        description="Build shows, seasons, episodes, and standalone recordings inside one governed Audio system."
+        description="Create Audio for shared Shows and Episodes, or publish standalone Audio. Seasons, sound, review, and delivery stay governed here."
         meta={<span>{index?.publications.length ?? 0} Audio publication{(index?.publications.length ?? 0) === 1 ? "" : "s"}</span>}
       />
 
@@ -161,9 +168,9 @@ export default function AdminAudioPage() {
       {canCreate ? (
         <AdminModeComposer
           modes={[
-            { id: "show", label: "New Show", description: "Create the durable identity that Episodes can belong to." },
-            { id: "season", label: "New Season", description: "Organize Episodes beneath a Show without changing publication identity." },
-            { id: "recording", label: "New Recording", description: "Open a standalone recording or Episode in the governed Audio workbench." },
+            { id: "show", label: "New Show", description: "Create a shared Show identity that Audio Episodes can belong to." },
+            { id: "season", label: "New Season", description: "Organize Audio Episodes inside a Show without changing their public paths." },
+            { id: "audio", label: "New Audio", description: "Create Standalone Audio or an Audio rendition for a Show Episode." },
           ]}
           activeMode={composerMode}
           onModeChange={(mode) => setComposerMode(mode as ComposerMode)}
@@ -185,18 +192,15 @@ export default function AdminAudioPage() {
             </form>
           ) : null}
 
-          {composerMode === "recording" ? (
+          {composerMode === "audio" ? (
             <form className="space-y-4" onSubmit={handlePublication}>
-              <div className="flex gap-2">{(["standalone", "episode"] as const).map((kind) => <button key={kind} type="button" onClick={() => setPublicationKind(kind)} className={`rounded-lg border px-4 py-2 text-xs font-black ${publicationKind === kind ? "border-wk-brand bg-wk-brand-soft text-wk-brand" : "border-wk-border text-wk-text-muted"}`}>{kind === "standalone" ? "Standalone" : "Episode"}</button>)}</div>
-              <div className="grid gap-4 lg:grid-cols-2">
-                <label className="text-xs font-bold text-wk-text-muted">Title<input value={publicationTitle} onChange={(event) => { setPublicationTitle(event.target.value); if (!publicationSlug) setPublicationSlug(slugifyAudioTitle(event.target.value)); }} required className="mt-1 w-full rounded-lg border border-wk-border bg-wk-bg px-3 py-3 text-sm text-wk-text" /></label>
-                <label className="text-xs font-bold text-wk-text-muted">Slug<input value={publicationSlug} onChange={(event) => setPublicationSlug(event.target.value)} required className="mt-1 w-full rounded-lg border border-wk-border bg-wk-bg px-3 py-3 text-sm text-wk-text" /></label>
-              </div>
+              <div className="flex gap-2">{(["standalone", "episode"] as const).map((kind) => <button key={kind} type="button" onClick={() => setPublicationKind(kind)} className={`rounded-lg border px-4 py-2 text-xs font-black ${publicationKind === kind ? "border-wk-brand bg-wk-brand-soft text-wk-brand" : "border-wk-border text-wk-text-muted"}`}>{kind === "standalone" ? "Standalone Audio" : "Show Episode"}</button>)}</div>
+              <label className="block text-xs font-bold text-wk-text-muted">Title<input value={publicationTitle} onChange={(event) => setPublicationTitle(event.target.value)} required className="mt-1 w-full rounded-lg border border-wk-border bg-wk-bg px-3 py-3 text-sm text-wk-text" /></label>
               {publicationKind === "episode" ? (
                 <div className="grid gap-4 lg:grid-cols-[1fr_1fr_120px]">
                   <label className="text-xs font-bold text-wk-text-muted">Show<select value={publicationShowId} onChange={(event) => { setPublicationShowId(event.target.value); setPublicationSeasonId(""); }} required className="mt-1 w-full rounded-lg border border-wk-border bg-wk-bg px-3 py-3 text-sm text-wk-text"><option value="">Choose a Show</option>{index?.shows.map((show) => <option key={show.id} value={show.id}>{show.title}</option>)}</select></label>
-                  <label className="text-xs font-bold text-wk-text-muted">Season<select value={publicationSeasonId} onChange={(event) => setPublicationSeasonId(event.target.value)} className="mt-1 w-full rounded-lg border border-wk-border bg-wk-bg px-3 py-3 text-sm text-wk-text"><option value="">No season</option>{selectedShowSeasons.map((season) => <option key={season.id} value={season.id}>{season.seasonNumber}. {season.title}</option>)}</select></label>
-                  <label className="text-xs font-bold text-wk-text-muted">Episode<input type="number" min={1} value={episodeNumber} onChange={(event) => setEpisodeNumber(event.target.value)} required className="mt-1 w-full rounded-lg border border-wk-border bg-wk-bg px-3 py-3 text-sm text-wk-text" /></label>
+                  <label className="text-xs font-bold text-wk-text-muted">Season<select value={publicationSeasonId} onChange={(event) => setPublicationSeasonId(event.target.value)} className="mt-1 w-full rounded-lg border border-wk-border bg-wk-bg px-3 py-3 text-sm text-wk-text"><option value="">No Season</option>{selectedShowSeasons.map((season) => <option key={season.id} value={season.id}>{season.seasonNumber}. {season.title}</option>)}</select></label>
+                  <label className="text-xs font-bold text-wk-text-muted">Episode Number<input type="number" min={1} value={episodeNumber} onChange={(event) => setEpisodeNumber(event.target.value)} required className="mt-1 w-full rounded-lg border border-wk-border bg-wk-bg px-3 py-3 text-sm text-wk-text" /></label>
                 </div>
               ) : null}
               <label className="block text-xs font-bold text-wk-text-muted">Summary<textarea value={publicationSummary} onChange={(event) => setPublicationSummary(event.target.value)} rows={2} className="mt-1 w-full rounded-lg border border-wk-border bg-wk-bg px-3 py-3 text-sm text-wk-text" /></label>
@@ -225,7 +229,6 @@ export default function AdminAudioPage() {
               <button key={publication.id} type="button" onClick={() => navigate(`/admin/content/audio/${publication.id}`)} className="flex w-full items-center gap-4 px-5 py-4 text-left transition-colors hover:bg-wk-surface-raised">
                 <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-wk-brand-soft text-wk-brand"><WkIcon name={publication.publicationKind === "episode" ? "ListMusic" : "Disc3"} size={18} /></span>
                 <span className="min-w-0 flex-1"><span className="block truncate text-sm font-black text-wk-text">{publication.title}</span><span className="mt-1 block truncate text-xs text-wk-text-muted">{context}</span></span>
-                <span className="hidden font-mono text-[10px] text-wk-text-faint md:block">rev {publication.authorityRevision}</span>
                 <AdminStatusBadge status={publication.status} />
                 <WkIcon name="ChevronRight" size={16} className="text-wk-text-faint" />
               </button>
