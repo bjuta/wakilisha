@@ -1,5 +1,10 @@
 import { supabase } from "@/lib/supabase";
-import type { TrustAttachmentOption } from "@/components/design-system/trust/TrustAttachmentPicker";
+
+export interface AudioTrustAttachmentOption {
+  id: string;
+  label: string;
+  detail?: string | null;
+}
 
 type RpcResult = {
   data: unknown;
@@ -7,8 +12,8 @@ type RpcResult = {
 };
 
 type AudioTrustCandidateBundle = {
-  credits: TrustAttachmentOption[];
-  citations: TrustAttachmentOption[];
+  credits: AudioTrustAttachmentOption[];
+  citations: AudioTrustAttachmentOption[];
 };
 
 function record(value: unknown): Record<string, unknown> {
