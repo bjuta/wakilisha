@@ -124,6 +124,30 @@ describe(
     );
 
     it(
+      "shows identity matches directly from the search interaction",
+      () => {
+        expect(primitive).toContain(
+          'id="editorial-credit-search-results"',
+        );
+        expect(primitive).toContain(
+          'role="listbox"',
+        );
+        expect(primitive).toContain(
+          'role="option"',
+        );
+        expect(primitive).toContain(
+          "No matching canonical identity.",
+        );
+        expect(primitive).toContain(
+          "setPartyResourceId(party.resourceId)",
+        );
+        expect(primitive).not.toContain(
+          "Choose identity</option>",
+        );
+      },
+    );
+
+    it(
       "registers Audio as the first proven candidate consumer",
       () => {
         expect(registry).toContain(
