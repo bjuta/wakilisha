@@ -174,9 +174,12 @@ const directLazyImports = [
  * Phase 6B M1 adds one direct lazy public Audio import:
  * - ../pages/audio/detail/page
  *
- * The current authority is therefore 62 direct lazy imports.
+ * Phase 6B M2 adds one direct lazy public Show import:
+ * - ../pages/audio/show/page
+ *
+ * The current authority is therefore 63 direct lazy imports.
  */
-const expectedDirectLazyImportCount = 62;
+const expectedDirectLazyImportCount = 63;
 
 if (
   directLazyImports.length !==
@@ -241,6 +244,7 @@ for (const requiredModule of [
   "../pages/playlists/page",
   "../pages/playlists/detail/page",
   "../pages/audio/detail/page",
+  "../pages/audio/show/page",
   "../pages/people/detail/page",
   "../pages/organizations/detail/page",
   "../pages/artists/detail/page",
@@ -372,15 +376,18 @@ const routePaths = [
  * These are Admin Studio routes only; Phase 6B public Audio routes remain absent.
  * The accepted pre-M1 authority is therefore 165 paths.
  *
- * Phase 6B M1 adds exactly one public Audio path:
+ * Phase 6B M1 adds one public Audio path:
  * - /audio/:slug
  *
- * The current authority is therefore 166 paths. The checksum below removes
- * only that declared additive path and must still reproduce the exact 165-path
- * pre-M1 sequence.
+ * Phase 6B M2 adds one public Show path:
+ * - /audio/shows/:showSlug
+ *
+ * The current authority is therefore 167 paths. Removing the two declared
+ * Phase 6B paths must still reproduce the exact 165-path pre-M1 sequence.
  */
-const expectedRoutePathCount = 166;
+const expectedRoutePathCount = 167;
 const publicAudioPath = "/audio/:slug";
+const publicAudioShowPath = "/audio/shows/:showSlug";
 
 if (routePaths.length !== expectedRoutePathCount) {
   fail(
@@ -392,17 +399,27 @@ if (
   routePaths.filter((routePath) => routePath === publicAudioPath).length !== 1
 ) {
   fail(
-    "Phase 6B M1 must add exactly one /audio/:slug route",
+    "Phase 6B M1 must retain exactly one /audio/:slug route",
+  );
+}
+
+if (
+  routePaths.filter((routePath) => routePath === publicAudioShowPath).length !== 1
+) {
+  fail(
+    "Phase 6B M2 must add exactly one /audio/shows/:showSlug route",
   );
 }
 
 const preM1RoutePaths = routePaths.filter(
-  (routePath) => routePath !== publicAudioPath,
+  (routePath) =>
+    routePath !== publicAudioPath &&
+    routePath !== publicAudioShowPath,
 );
 
 if (preM1RoutePaths.length !== 165) {
   fail(
-    `expected 165 pre-M1 route paths after removing ${publicAudioPath}, found ${preM1RoutePaths.length}`,
+    `expected 165 pre-M1 route paths after removing declared Phase 6B paths, found ${preM1RoutePaths.length}`,
   );
 }
 
