@@ -39,6 +39,14 @@ const audioPage = readFileSync(
   "src/pages/audio/detail/page.tsx",
   "utf8",
 );
+const audioAdapter = readFileSync(
+  "src/services/audio/audioPlayerAdapter.ts",
+  "utf8",
+);
+const audioSurface = readFileSync(
+  "src/components/audio/PublicAudioListeningSurface.tsx",
+  "utf8",
+);
 
 describe("Phase 6B media-first WAKILISHA Player", () => {
   it("separates media kind, playback availability, backend, and capabilities", () => {
@@ -89,11 +97,11 @@ describe("Phase 6B media-first WAKILISHA Player", () => {
     expect(full).not.toContain("AddToPlaylistButton");
     expect(full).not.toContain("TrackMoment");
     expect(full).not.toContain("Toggle lyrics");
-    expect(audioPage).toContain('jumpBySeconds: 15');
-    expect(audioPage).toContain('lyrics: false');
-    expect(audioPage).toContain('moments: false');
-    expect(audioPage).toContain('addToPlaylist: false');
-    expect(audioPage).toContain('playbackSpeed: false');
+    expect(audioAdapter).toContain('jumpBySeconds: 15');
+    expect(audioAdapter).toContain('lyrics: false');
+    expect(audioAdapter).toContain('moments: false');
+    expect(audioAdapter).toContain('addToPlaylist: false');
+    expect(audioAdapter).toContain('playbackSpeed: false');
   });
 
   it("makes the active public shells use the new player chrome and provider media host", () => {
@@ -115,13 +123,15 @@ describe("Phase 6B media-first WAKILISHA Player", () => {
     expect(history).toContain("experience.mediaKind");
   });
 
-  it("lets public Audio join the persistent player as full WAKILISHA media", () => {
-    expect(audioPage).toContain('playbackAvailability: "full"');
-    expect(audioPage).toContain('playbackEngine: "audio"');
-    expect(audioPage).toContain("publication.delivery.url");
-    expect(audioPage).toContain("playTrack(");
-    expect(audioPage).toContain("openFullPlayer");
-    expect(audioPage).not.toContain("<audio");
-    expect(audioPage).not.toContain("MediaTimeline");
+  it("lets public Audio renditions join the persistent player as full WAKILISHA media", () => {
+    expect(audioPage).toContain("PublicAudioListeningSurface");
+    expect(audioAdapter).toContain('playbackAvailability: "full"');
+    expect(audioAdapter).toContain('playbackEngine: "audio"');
+    expect(audioAdapter).toContain("publication.delivery.url");
+    expect(audioSurface).toContain("playTrack(");
+    expect(audioSurface).toContain("openFullPlayer");
+    expect(audioSurface).toContain("seek(startSeconds)");
+    expect(audioSurface).not.toContain("<audio");
+    expect(audioSurface).not.toContain("MediaTimeline");
   });
 });

@@ -2,12 +2,21 @@ import { useEffect, useState } from "react";
 import { useParams } from "react-router-dom";
 import { WkIcon } from "@/components/design-system/Icon";
 import { PublicAudioListeningSurface } from "@/components/audio/PublicAudioListeningSurface";
-import { getPublicStandaloneAudio } from "@/services/audio/audioPublicService";
-import type { PublicAudioPublication } from "@/services/audio/audioPublicModel";
+import { MetaTags } from "@/components/seo/MetaTags";
+import type { PublicShowEpisode } from "@/services/shows/showPublicModel";
+import { getPublicShowEpisode } from "@/services/shows/showPublicService";
 
-export default function PublicAudioDetailPage() {
-  const { slug = "" } = useParams<{ slug: string }>();
-  const [publication, setPublication] = useState<PublicAudioPublication | null>(null);
+const SITE_URL = "https://wakilisha.africa";
+
+export default function PublicShowEpisodePage() {
+  const {
+    showSlug = "",
+    episodeSlug = "",
+  } = useParams<{
+    showSlug: string;
+    episodeSlug: string;
+  }>();
+  const [episode, setEpisode] = useState<PublicShowEpisode | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
 
@@ -16,13 +25,13 @@ export default function PublicAudioDetailPage() {
     setLoading(true);
     setError(false);
 
-    getPublicStandaloneAudio(slug)
+    getPublicShowEpisode(showSlug, episodeSlug)
       .then((next) => {
-        if (alive) setPublication(next);
+        if (alive) setEpisode(next);
       })
       .catch(() => {
         if (alive) {
-          setPublication(null);
+          setEpisode(null);
           setError(true);
         }
       })
@@ -33,14 +42,14 @@ export default function PublicAudioDetailPage() {
     return () => {
       alive = false;
     };
-  }, [slug]);
+  }, [episodeSlug, showSlug]);
 
   if (loading) {
     return (
       <main
         className="wk-container-wide min-h-[60vh] px-5 py-10 md:px-6"
         aria-busy="true"
-        aria-label="Loading Audio"
+        aria-label="Loading Episode"
       >
         <div className="mx-auto max-w-5xl animate-pulse space-y-4">
           <div className="h-4 w-20 rounded bg-wk-surface-raised" />
@@ -51,21 +60,36 @@ export default function PublicAudioDetailPage() {
     );
   }
 
-  if (!publication) {
+  if (!episode) {
     return (
       <main className="wk-container-wide min-h-[60vh] px-5 py-16 md:px-6">
         <div className="mx-auto max-w-2xl rounded-2xl border border-wk-border bg-wk-surface px-6 py-12 text-center">
           <WkIcon name="AudioLines" size={30} className="mx-auto text-wk-text-faint" />
-          <h1 className="mt-4 text-2xl font-black text-wk-text">Audio Unavailable</h1>
+          <h1 className="mt-4 text-2xl font-black text-wk-text">Episode Unavailable</h1>
           <p className="mx-auto mt-2 max-w-lg text-sm leading-6 text-wk-text-muted">
             {error
-              ? "We could not load this recording."
-              : "This recording is not published or could not be found."}
+              ? "We could not load this Episode."
+              : "This Episode is not published or could not be found."}
           </p>
         </div>
       </main>
     );
   }
 
-  return <PublicAudioListeningSurface publication={publication} />;
+  const canonicalUrl = `${SITE_URL}${episode.episode.canonicalPath}`;
+  const description =
+    episode.episode.summary ||
+    episode.audio.summary ||
+    `Listen to ${episode.episode.title} on WAKILISHA.`;
+
+  return (
+    <>
+      <MetaTags
+        title={episode.episode.title}
+        description={description}
+        url={canonicalUrl}
+      />
+      <PublicAudioListeningSurface publication={episode.audio} />
+    </>
+  );
 }

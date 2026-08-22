@@ -528,6 +528,32 @@ export type Database = {
           },
         ]
       }
+      audio_episode_shared_links: {
+        Row: {
+          audio_publication_id: string
+          created_at: string
+          show_episode_resource_id: string
+        }
+        Insert: {
+          audio_publication_id: string
+          created_at?: string
+          show_episode_resource_id: string
+        }
+        Update: {
+          audio_publication_id?: string
+          created_at?: string
+          show_episode_resource_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "audio_episode_shared_links_show_episode_resource_id_fkey"
+            columns: ["show_episode_resource_id"]
+            isOneToOne: true
+            referencedRelation: "show_episodes"
+            referencedColumns: ["resource_id"]
+          },
+        ]
+      }
       audio_publication_resources: {
         Row: {
           current_approved_version_id: string | null
@@ -639,6 +665,32 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "resources"
             referencedColumns: ["id", "resource_kind"]
+          },
+        ]
+      }
+      audio_show_shared_links: {
+        Row: {
+          audio_show_id: string
+          created_at: string
+          show_resource_id: string
+        }
+        Insert: {
+          audio_show_id: string
+          created_at?: string
+          show_resource_id: string
+        }
+        Update: {
+          audio_show_id?: string
+          created_at?: string
+          show_resource_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "audio_show_shared_links_show_resource_id_fkey"
+            columns: ["show_resource_id"]
+            isOneToOne: true
+            referencedRelation: "shows"
+            referencedColumns: ["resource_id"]
           },
         ]
       }
@@ -3469,6 +3521,113 @@ export type Database = {
           },
         ]
       }
+      show_episodes: {
+        Row: {
+          authority_revision: number
+          created_at: string
+          created_by: string | null
+          episode_number: number | null
+          resource_id: string
+          resource_kind: string
+          show_resource_id: string
+          slug: string
+          summary: string | null
+          title: string
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          authority_revision?: number
+          created_at?: string
+          created_by?: string | null
+          episode_number?: number | null
+          resource_id: string
+          resource_kind?: string
+          show_resource_id: string
+          slug: string
+          summary?: string | null
+          title: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          authority_revision?: number
+          created_at?: string
+          created_by?: string | null
+          episode_number?: number | null
+          resource_id?: string
+          resource_kind?: string
+          show_resource_id?: string
+          slug?: string
+          summary?: string | null
+          title?: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "show_episodes_resource_fkey"
+            columns: ["resource_id", "resource_kind"]
+            isOneToOne: false
+            referencedRelation: "resources"
+            referencedColumns: ["id", "resource_kind"]
+          },
+          {
+            foreignKeyName: "show_episodes_show_resource_id_fkey"
+            columns: ["show_resource_id"]
+            isOneToOne: false
+            referencedRelation: "shows"
+            referencedColumns: ["resource_id"]
+          },
+        ]
+      }
+      shows: {
+        Row: {
+          authority_revision: number
+          created_at: string
+          created_by: string | null
+          description: string | null
+          resource_id: string
+          resource_kind: string
+          slug: string
+          title: string
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          authority_revision?: number
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          resource_id: string
+          resource_kind?: string
+          slug: string
+          title: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          authority_revision?: number
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          resource_id?: string
+          resource_kind?: string
+          slug?: string
+          title?: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "shows_resource_fkey"
+            columns: ["resource_id", "resource_kind"]
+            isOneToOne: false
+            referencedRelation: "resources"
+            referencedColumns: ["id", "resource_kind"]
+          },
+        ]
+      }
       source_registry_links: {
         Row: {
           created_at: string
@@ -4135,6 +4294,14 @@ export type Database = {
       }
       ensure_article_resource_identity: {
         Args: { p_article_id: string; p_owner_id?: string }
+        Returns: string
+      }
+      ensure_audio_episode_shared_identity: {
+        Args: { p_audio_publication_id: string }
+        Returns: string
+      }
+      ensure_audio_show_shared_identity: {
+        Args: { p_audio_show_id: string }
         Returns: string
       }
       ensure_person_for_external_contributor: {
@@ -20445,7 +20612,15 @@ export type Database = {
           they_feature: number
         }[]
       }
+      get_public_audio_enclosure: {
+        Args: { p_publication_id: string }
+        Returns: Json
+      }
       get_public_audio_publication: { Args: { p_slug: string }; Returns: Json }
+      get_public_audio_publication_m1: {
+        Args: { p_slug: string }
+        Returns: Json
+      }
       get_public_living_memory: {
         Args: {
           p_entity_id?: string
@@ -20474,6 +20649,11 @@ export type Database = {
         Returns: Json
       }
       get_public_playlist: { Args: { p_slug: string }; Returns: Json }
+      get_public_show: { Args: { p_slug: string }; Returns: Json }
+      get_public_show_episode: {
+        Args: { p_episode_slug: string; p_show_slug: string }
+        Returns: Json
+      }
       get_release_artists_for_anon: {
         Args: { p_artist_slug: string }
         Returns: {

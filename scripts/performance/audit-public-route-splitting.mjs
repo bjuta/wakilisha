@@ -174,9 +174,13 @@ const directLazyImports = [
  * Phase 6B M1 adds one direct lazy public Audio import:
  * - ../pages/audio/detail/page
  *
- * The current authority is therefore 62 direct lazy imports.
+ * Phase 6B M2 adds two shared Show imports:
+ * - ../pages/shows/detail/page
+ * - ../pages/shows/episode/page
+ *
+ * The current authority is therefore 64 direct lazy imports.
  */
-const expectedDirectLazyImportCount = 62;
+const expectedDirectLazyImportCount = 64;
 
 if (
   directLazyImports.length !==
@@ -241,6 +245,8 @@ for (const requiredModule of [
   "../pages/playlists/page",
   "../pages/playlists/detail/page",
   "../pages/audio/detail/page",
+  "../pages/shows/detail/page",
+  "../pages/shows/episode/page",
   "../pages/people/detail/page",
   "../pages/organizations/detail/page",
   "../pages/artists/detail/page",
@@ -372,15 +378,20 @@ const routePaths = [
  * These are Admin Studio routes only; Phase 6B public Audio routes remain absent.
  * The accepted pre-M1 authority is therefore 165 paths.
  *
- * Phase 6B M1 adds exactly one public Audio path:
+ * Phase 6B M1 adds one Standalone Audio-capable path:
  * - /audio/:slug
  *
- * The current authority is therefore 166 paths. The checksum below removes
- * only that declared additive path and must still reproduce the exact 165-path
- * pre-M1 sequence.
+ * Phase 6B M2 adds two shared Show identity paths:
+ * - /shows/:showSlug
+ * - /shows/:showSlug/:episodeSlug
+ *
+ * The current authority is therefore 168 paths. Removing all three declared
+ * Phase 6B paths must still reproduce the exact 165-path pre-M1 sequence.
  */
-const expectedRoutePathCount = 166;
+const expectedRoutePathCount = 168;
 const publicAudioPath = "/audio/:slug";
+const publicShowPath = "/shows/:showSlug";
+const publicShowEpisodePath = "/shows/:showSlug/:episodeSlug";
 
 if (routePaths.length !== expectedRoutePathCount) {
   fail(
@@ -388,21 +399,39 @@ if (routePaths.length !== expectedRoutePathCount) {
   );
 }
 
+for (const [routePath, label] of [
+  [publicAudioPath, "Standalone Audio"],
+  [publicShowPath, "Show"],
+  [publicShowEpisodePath, "Show Episode"],
+]) {
+  if (
+    routePaths.filter((candidate) => candidate === routePath).length !== 1
+  ) {
+    fail(
+      `Phase 6B must retain exactly one ${label} route at ${routePath}`,
+    );
+  }
+}
+
 if (
-  routePaths.filter((routePath) => routePath === publicAudioPath).length !== 1
+  routePaths.some((routePath) => routePath.startsWith("/audio/shows/")) ||
+  routePaths.some((routePath) => routePath.includes("/episodes/"))
 ) {
   fail(
-    "Phase 6B M1 must add exactly one /audio/:slug route",
+    "rejected Audio-bucket or redundant Episode route grammar returned",
   );
 }
 
 const preM1RoutePaths = routePaths.filter(
-  (routePath) => routePath !== publicAudioPath,
+  (routePath) =>
+    routePath !== publicAudioPath &&
+    routePath !== publicShowPath &&
+    routePath !== publicShowEpisodePath,
 );
 
 if (preM1RoutePaths.length !== 165) {
   fail(
-    `expected 165 pre-M1 route paths after removing ${publicAudioPath}, found ${preM1RoutePaths.length}`,
+    `expected 165 pre-M1 route paths after removing declared Phase 6B paths, found ${preM1RoutePaths.length}`,
   );
 }
 

@@ -1,16 +1,16 @@
 {
   "projectRef": "pgzizndxdyhqmtyywjmt",
   "schema": "public,editorial",
-  "generatedAt": "2026-08-21T16:56:30Z",
-  "typesSha256": "430a9ca8f02bdedac07cfebe3a147d2c7acaa33d795459fe14b99c73b4a2995e",
+  "generatedAt": "2026-08-22T14:42:26Z",
+  "typesSha256": "86a71900a523d79687559e0451bed087eb05331fcda0f3e5701b144cd4123267",
   "authoritativeMigrationDirectory": "supabase/migrations",
-  "migrationCount": 38,
-  "latestMigration": "20260821150000_phase_6b_m1_public_audio_read_route.sql",
+  "migrationCount": 40,
+  "latestMigration": "20260822131600_phase_6b_m2_audio_canonical_show_paths.sql",
   "schemaSeal": {
     "mode": "preview",
-    "sourceProjectRef": "gmyefapevgqajkihjigj",
-    "migrationHead": "20260821150000",
-    "baseMainSha": "43b2f7ca5d65b2ac67f93cc4d5137832cb3d4688",
-    "previewBranchId": "c65472ad-4e0a-4c0f-8b34-72edfd0b53e1"
+    "sourceProjectRef": "lerpljwjxaggphkywnkf",
+    "migrationHead": "20260822131600",
+    "baseMainSha": "f47d08049fafd852e7b3f5cf4cbaf3fc91e5fbd0",
+    "previewBranchId": "7e01231c-ec5a-4ca4-a424-2df199c2f77d"
   }
 }

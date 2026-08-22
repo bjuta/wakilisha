@@ -1,14 +1,19 @@
 do $verify$
 declare
-  v_function_oid oid := to_regprocedure('public.get_public_audio_publication(text)');
-  v_definition text;
+  v_public_oid oid := to_regprocedure('public.get_public_audio_publication(text)');
+  v_core_oid oid := to_regprocedure('public.get_public_audio_publication_m1(text)');
+  v_guard_oid oid;
+  v_public_definition text;
+  v_guard_definition text;
   v_security_definer boolean;
   v_volatility "char";
   v_public_execute boolean;
 begin
-  if v_function_oid is null then
+  if v_public_oid is null then
     raise exception 'public.get_public_audio_publication(text) is missing.';
   end if;
+
+  v_guard_oid := coalesce(v_core_oid, v_public_oid);
 
   select
     p.prosecdef,
@@ -23,10 +28,15 @@ begin
   into
     v_security_definer,
     v_volatility,
-    v_definition,
+    v_public_definition,
     v_public_execute
   from pg_proc p
-  where p.oid = v_function_oid;
+  where p.oid = v_public_oid;
+
+  select pg_get_functiondef(p.oid)
+  into v_guard_definition
+  from pg_proc p
+  where p.oid = v_guard_oid;
 
   if not v_security_definer then
     raise exception 'Public Audio resolver must remain SECURITY DEFINER.';
@@ -86,32 +96,58 @@ begin
     raise exception 'Admin or Editorial Audio RPC execution leaked to anon.';
   end if;
 
-  if position('current_published_version_id' in v_definition) = 0
-     or position('version_row.version_kind = ''published''' in v_definition) = 0
-     or position('version_row.status = ''published''' in v_definition) = 0
-     or position('audio.publication_snapshots' in v_definition) = 0
-     or position('audio.assert_publishable_version_media' in v_definition) = 0
-     or position('audio.publication_version_chapters' in v_definition) = 0
-     or position('attachment.target_version_type = ''audio_publication_version''' in v_definition) = 0
-     or position('attachment.public_safe' in v_definition) = 0
-     or position('governance.public_safe' in v_definition) = 0
-     or position('source.exposure_class in (''public'', ''public_redacted'')' in v_definition) = 0
-     or position('''canonical_path'', ''/audio/'' || v_version.slug' in v_definition) = 0
+  if position('current_published_version_id' in v_guard_definition) = 0
+     or position('version_row.version_kind = ''published''' in v_guard_definition) = 0
+     or position('version_row.status = ''published''' in v_guard_definition) = 0
+     or position('audio.publication_snapshots' in v_guard_definition) = 0
+     or position('audio.assert_publishable_version_media' in v_guard_definition) = 0
+     or position('audio.publication_version_chapters' in v_guard_definition) = 0
+     or position('attachment.target_version_type = ''audio_publication_version''' in v_guard_definition) = 0
+     or position('attachment.public_safe' in v_guard_definition) = 0
+     or position('governance.public_safe' in v_guard_definition) = 0
+     or position('source.exposure_class in (''public'', ''public_redacted'')' in v_guard_definition) = 0
+     or position('''canonical_path'', ''/audio/'' || v_version.slug' in v_guard_definition) = 0
   then
-    raise exception 'Public Audio resolver lost an exact-version, Media, Trust, or route authority guard.';
+    raise exception 'Public Audio safety core lost an exact-version, Media, Trust, or original route guard.';
   end if;
 
-  if position('binding.current_working_version_id' in v_definition) > 0
-     or position('binding.current_submitted_version_id' in v_definition) > 0
-     or position('binding.current_approved_version_id' in v_definition) > 0
-     or position('publication_review_events' in v_definition) > 0
-     or position('publication_review_threads' in v_definition) > 0
-     or position('publication_review_comments' in v_definition) > 0
-     or position('''metadata''' in v_definition) > 0
+  if position('binding.current_working_version_id' in v_guard_definition) > 0
+     or position('binding.current_submitted_version_id' in v_guard_definition) > 0
+     or position('binding.current_approved_version_id' in v_guard_definition) > 0
+     or position('publication_review_events' in v_guard_definition) > 0
+     or position('publication_review_threads' in v_guard_definition) > 0
+     or position('publication_review_comments' in v_guard_definition) > 0
+     or position('''metadata''' in v_guard_definition) > 0
   then
-    raise exception 'Public Audio resolver exposes moving, Review, or raw metadata authority.';
+    raise exception 'Public Audio safety core exposes moving, Review, or raw metadata authority.';
   end if;
 
-  raise notice 'PASS: Phase 6B M1 public Audio resolves only the exact current published version through current Media safety and public-safe Trust, while private Audio authority remains closed.';
+  if v_core_oid is not null then
+    if has_function_privilege(
+      'anon',
+      'public.get_public_audio_publication_m1(text)',
+      'EXECUTE'
+    ) or has_function_privilege(
+      'authenticated',
+      'public.get_public_audio_publication_m1(text)',
+      'EXECUTE'
+    ) then
+      raise exception 'M2 internal Audio safety core leaked direct API execution.';
+    end if;
+
+    if position('public.get_public_audio_publication_m1' in v_public_definition) = 0
+       or position('editorial.audio_episode_shared_links' in v_public_definition) = 0
+       or position('editorial.show_episodes' in v_public_definition) = 0
+       or position('editorial.shows' in v_public_definition) = 0
+       or position('''/shows/''' in v_public_definition) = 0
+       or position('''/audio/''' in v_public_definition) = 0
+       or position('v_publication_kind = ''standalone''' in v_public_definition) = 0
+       or position('v_publication_kind <> ''episode''' in v_public_definition) = 0
+    then
+      raise exception 'M2 public Audio identity wrapper lost standalone/Show canonical separation.';
+    end if;
+  end if;
+
+  raise notice 'PASS: Phase 6B M1 public Audio retains exact current published-version Media and Trust safety, while M2 may compound canonical Show identity without exposing the private safety core.';
 end;
 $verify$;
