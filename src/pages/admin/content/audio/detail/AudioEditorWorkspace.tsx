@@ -15,12 +15,21 @@ import { AdminWorkspaceSection } from "@/components/design-system/admin/AdminWor
 import { EditorialWorkflowRail } from "@/components/design-system/editorial/EditorialWorkflowRail";
 import { MediaTimeline } from "@/components/design-system/editorial/MediaTimeline";
 import { TrustAttachmentPicker } from "@/components/design-system/trust/TrustAttachmentPicker";
+import {
+  EditorialCreditPicker,
+  type EditorialCreditSelection,
+} from "@/components/design-system/trust/EditorialCreditPicker";
 import { AudioReviewWorkspace } from "./components/AudioReviewWorkspace";
 import {
   fetchAudioEditorialMediaContext,
   type AudioEditorialMediaContext,
 } from "@/services/audio/audioReviewService";
 import { fetchAudioTrustCandidates } from "@/services/audio/audioTrustCandidateService";
+import {
+  fetchEditorialCreditPickerOptions,
+  resolveEditorialCredit,
+  type EditorialCreditPickerOptions,
+} from "@/services/trust/editorialCreditService";
 import {
   fetchAudioPublicationWorkspace,
   publishAudio,
@@ -40,6 +49,14 @@ import type { TrustAttachmentOption } from "@/components/design-system/trust/Tru
 
 type PickerKind = "master" | "transcript" | null;
 type WorkspaceView = "details" | "sound" | "trust" | "review" | "history";
+type AudioTrustCandidateBundle = Awaited<
+  ReturnType<typeof fetchAudioTrustCandidates>
+>;
+type AuxiliaryResults = [
+  PromiseSettledResult<AudioEditorialMediaContext>,
+  PromiseSettledResult<AudioTrustCandidateBundle>,
+  PromiseSettledResult<EditorialCreditPickerOptions>,
+];
 
 function humanize(value: string): string {
   return value
@@ -94,11 +111,12 @@ export function AudioEditorWorkspace({
 
   const [workspace, setWorkspace] = useState<AudioPublicationWorkspace | null>(null);
   const [mediaContext, setMediaContext] = useState<AudioEditorialMediaContext | null>(null);
-  const [creditCandidates, setCreditCandidates] = useState<TrustAttachmentOption[]>([]);
+  const [creditPickerOptions, setCreditPickerOptions] = useState<EditorialCreditPickerOptions | null>(null);
   const [citationCandidates, setCitationCandidates] = useState<TrustAttachmentOption[]>([]);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
+  const [auxiliaryMessage, setAuxiliaryMessage] = useState<string | null>(null);
   const [picker, setPicker] = useState<PickerKind>(null);
   const [view, setView] = useState<WorkspaceView>("details");
   const [title, setTitle] = useState("");
@@ -115,19 +133,57 @@ export function AudioEditorWorkspace({
     setChapters(next.chapters);
   };
 
+  const applyAuxiliaryResults = (results: AuxiliaryResults) => {
+    const [mediaResult, trustResult, creditResult] = results;
+    const warnings: string[] = [];
+
+    if (mediaResult.status === "fulfilled") {
+      setMediaContext(mediaResult.value);
+    } else {
+      setMediaContext(null);
+      warnings.push(`Media context: ${errorText(mediaResult.reason)}`);
+    }
+
+    if (trustResult.status === "fulfilled") {
+      setCitationCandidates(trustResult.value.citations);
+    } else {
+      setCitationCandidates([]);
+      warnings.push(`Citation library: ${errorText(trustResult.reason)}`);
+    }
+
+    if (creditResult.status === "fulfilled") {
+      setCreditPickerOptions(creditResult.value);
+    } else {
+      setCreditPickerOptions(null);
+      warnings.push(`Credit identities: ${errorText(creditResult.reason)}`);
+    }
+
+    setAuxiliaryMessage(
+      warnings.length > 0
+        ? `Some supporting tools are unavailable. ${warnings.join(" ")}`
+        : null,
+    );
+  };
+
+  const loadAuxiliary = async (): Promise<void> => {
+    if (!publicationId) return;
+
+    const results = await Promise.allSettled([
+      fetchAudioEditorialMediaContext(publicationId),
+      fetchAudioTrustCandidates(),
+      fetchEditorialCreditPickerOptions(),
+    ]) as AuxiliaryResults;
+
+    applyAuxiliaryResults(results);
+  };
+
   const reload = async () => {
     if (!publicationId) return;
 
-    const [nextWorkspace, nextMedia, nextTrust] = await Promise.all([
-      fetchAudioPublicationWorkspace(publicationId),
-      fetchAudioEditorialMediaContext(publicationId),
-      fetchAudioTrustCandidates(),
-    ]);
-
+    const nextWorkspace =
+      await fetchAudioPublicationWorkspace(publicationId);
     hydrateWorkspace(nextWorkspace);
-    setMediaContext(nextMedia);
-    setCreditCandidates(nextTrust.credits);
-    setCitationCandidates(nextTrust.citations);
+    await loadAuxiliary();
   };
 
   useEffect(() => {
@@ -138,24 +194,26 @@ export function AudioEditorWorkspace({
       return;
     }
 
-    Promise.all([
-      fetchAudioPublicationWorkspace(publicationId),
-      fetchAudioEditorialMediaContext(publicationId),
-      fetchAudioTrustCandidates(),
-    ])
-      .then(([nextWorkspace, nextMedia, nextTrust]) => {
+    void (async () => {
+      try {
+        const nextWorkspace =
+          await fetchAudioPublicationWorkspace(publicationId);
         if (!alive) return;
         hydrateWorkspace(nextWorkspace);
-        setMediaContext(nextMedia);
-        setCreditCandidates(nextTrust.credits);
-        setCitationCandidates(nextTrust.citations);
-      })
-      .catch((reason) => {
+
+        const results = await Promise.allSettled([
+          fetchAudioEditorialMediaContext(publicationId),
+          fetchAudioTrustCandidates(),
+          fetchEditorialCreditPickerOptions(),
+        ]) as AuxiliaryResults;
+        if (!alive) return;
+        applyAuxiliaryResults(results);
+      } catch (reason) {
         if (alive) setMessage(errorText(reason));
-      })
-      .finally(() => {
+      } finally {
         if (alive) setLoading(false);
-      });
+      }
+    })();
 
     return () => {
       alive = false;
@@ -330,11 +388,17 @@ export function AudioEditorWorkspace({
     );
   };
 
-  const addCredit = async (creditId: string) => {
+  const addCredit = async (selection: EditorialCreditSelection) => {
     if (!workspace) return;
     await run(
       "credits",
-      () => replaceAudioCredits(workspace, [...new Set([...creditIds, creditId])]),
+      async () => {
+        const resolved = await resolveEditorialCredit(selection);
+        await replaceAudioCredits(
+          workspace,
+          [...new Set([...creditIds, resolved.creditId])],
+        );
+      },
       "Credit attached.",
     );
   };
@@ -504,6 +568,12 @@ export function AudioEditorWorkspace({
       {message ? (
         <div role="status" className="rounded-xl border border-wk-border bg-wk-surface px-4 py-3 text-sm text-wk-text">
           {message}
+        </div>
+      ) : null}
+
+      {auxiliaryMessage ? (
+        <div role="status" className="rounded-xl border border-wk-warning/25 bg-wk-warning-soft px-4 py-3 text-xs text-wk-warning">
+          {auxiliaryMessage}
         </div>
       ) : null}
 
@@ -771,13 +841,19 @@ export function AudioEditorWorkspace({
                   </div>
 
                   {editable && workspace.versions.working ? (
-                    <TrustAttachmentPicker
-                      noun="Credit"
-                      options={creditCandidates}
-                      attachedIds={creditIds}
-                      disabled={busy !== null}
-                      onAttach={(id) => void addCredit(id)}
-                    />
+                    creditPickerOptions ? (
+                      <EditorialCreditPicker
+                        roles={creditPickerOptions.roles}
+                        parties={creditPickerOptions.parties}
+                        canCreateCredit={creditPickerOptions.canCreateCredit}
+                        disabled={busy !== null}
+                        onAttach={(selection) => void addCredit(selection)}
+                      />
+                    ) : (
+                      <p className="mt-3 rounded-lg border border-dashed border-wk-border px-3 py-3 text-xs text-wk-text-muted">
+                        Credit identity tools are temporarily unavailable. The Audio record remains editable.
+                      </p>
+                    )
                   ) : null}
                 </div>
 

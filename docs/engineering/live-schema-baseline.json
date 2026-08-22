@@ -1,16 +1,16 @@
 {
   "projectRef": "pgzizndxdyhqmtyywjmt",
   "schema": "public,editorial",
-  "generatedAt": "2026-08-22T18:38:06Z",
-  "typesSha256": "5ac57bd6b75d9303454cd185e7d61e0bb58bfc123208018e9516af7b7483fc1e",
+  "generatedAt": "2026-08-22T20:56:30Z",
+  "typesSha256": "ac88f99bb69c578920f1356b435bc4c4562e0388810c25fa136d3f6896af72de",
   "authoritativeMigrationDirectory": "supabase/migrations",
-  "migrationCount": 41,
-  "latestMigration": "20260822173446_phase_6b_m2_audio_ontology_closure.sql",
+  "migrationCount": 42,
+  "latestMigration": "20260822203000_editorial_credit_identity_primitive.sql",
   "schemaSeal": {
     "mode": "preview",
     "sourceProjectRef": "lerpljwjxaggphkywnkf",
-    "migrationHead": "20260822173446",
-    "baseMainSha": "ac71daf62df31ff46002d97d3896c651a80ddf17",
+    "migrationHead": "20260822203000",
+    "baseMainSha": "d6128a53013a96aa0220d361e39aa012824136f9",
     "previewBranchId": "7e01231c-ec5a-4ca4-a424-2df199c2f77d"
   }
 }

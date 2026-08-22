@@ -581,9 +581,9 @@ export async function replaceAudioCredits(
     "replace_audio_publication_version_credits",
     {
       p_publication_version_id: workspace.versions.working,
-      p_attachments: creditIds.map((creditId, index) => ({
+      p_attachments: creditIds.map((creditId) => ({
         credit_id: creditId,
-        is_primary: index === 0,
+        is_primary: false,
         public_safe: true,
       })),
       p_expected_credit_revision: workspace.trust.creditRevision,

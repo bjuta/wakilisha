@@ -25,7 +25,11 @@
       "maturity": "canonical",
       "concept": "governed record identity and lifecycle header",
       "authorityOwner": "consumer",
-      "consumers": ["admin:articles", "admin:playlists", "admin:audio"]
+      "consumers": [
+        "admin:articles",
+        "admin:playlists",
+        "admin:audio"
+      ]
     },
     {
       "id": "admin.status-badge",
@@ -34,7 +38,11 @@
       "maturity": "canonical",
       "concept": "governed publication lifecycle status presentation",
       "authorityOwner": "consumer",
-      "consumers": ["admin:articles", "admin:playlists", "admin:audio"],
+      "consumers": [
+        "admin:articles",
+        "admin:playlists",
+        "admin:audio"
+      ],
       "competingImplementationPatterns": [
         "(?:function|const)\\s+[A-Za-z0-9_]*StatusBadge\\b",
         "function\\s+statusClass\\b",
@@ -70,7 +78,11 @@
       "maturity": "canonical",
       "concept": "working-record save and immutable submitted state",
       "authorityOwner": "consumer",
-      "consumers": ["admin:articles", "admin:playlists", "admin:audio"]
+      "consumers": [
+        "admin:articles",
+        "admin:playlists",
+        "admin:audio"
+      ]
     },
     {
       "id": "admin.workspace-section",
@@ -79,7 +91,9 @@
       "maturity": "candidate",
       "concept": "governed admin workspace section framing",
       "authorityOwner": "consumer",
-      "consumers": ["admin:audio"]
+      "consumers": [
+        "admin:audio"
+      ]
     },
     {
       "id": "admin.collection-header",
@@ -88,7 +102,11 @@
       "maturity": "canonical",
       "concept": "admin collection identity and context heading",
       "authorityOwner": "consumer",
-      "consumers": ["admin:articles", "admin:playlists", "admin:audio"]
+      "consumers": [
+        "admin:articles",
+        "admin:playlists",
+        "admin:audio"
+      ]
     },
     {
       "id": "admin.mode-composer",
@@ -97,7 +115,9 @@
       "maturity": "candidate",
       "concept": "one creation surface with explicit domain modes",
       "authorityOwner": "consumer",
-      "consumers": ["admin:audio"]
+      "consumers": [
+        "admin:audio"
+      ]
     },
     {
       "id": "editorial.workflow-rail",
@@ -106,7 +126,9 @@
       "maturity": "candidate",
       "concept": "semantic workflow phase navigation",
       "authorityOwner": "consumer",
-      "consumers": ["admin:audio"]
+      "consumers": [
+        "admin:audio"
+      ]
     },
     {
       "id": "editorial.comment-editor",
@@ -115,7 +137,9 @@
       "maturity": "candidate",
       "concept": "lightweight rich editorial discussion input and read presentation",
       "authorityOwner": "consumer",
-      "consumers": ["admin:audio"]
+      "consumers": [
+        "admin:audio"
+      ]
     },
     {
       "id": "editorial.media-transport",
@@ -124,7 +148,9 @@
       "maturity": "candidate",
       "concept": "time-based media playback transport",
       "authorityOwner": "consumer",
-      "consumers": ["admin:audio"]
+      "consumers": [
+        "admin:audio"
+      ]
     },
     {
       "id": "editorial.media-timeline",
@@ -133,9 +159,22 @@
       "maturity": "candidate",
       "concept": "time-coordinate media navigation and point/range annotation",
       "authorityOwner": "consumer",
-      "consumers": ["admin:audio"],
+      "consumers": [
+        "admin:audio"
+      ],
       "competingImplementationPatterns": [
         "(?:function|const)\\s+(?:AudioTimeline|VideoTimeline|WaveformTimeline|MediaTimeline)\\b"
+      ]
+    },
+    {
+      "id": "trust.editorial-credit-picker",
+      "path": "src/components/design-system/trust/EditorialCreditPicker.tsx",
+      "kind": "interaction",
+      "maturity": "candidate",
+      "concept": "canonical credited-party selection plus semantic Credit role",
+      "authorityOwner": "consumer",
+      "consumers": [
+        "admin:audio"
       ]
     }
   ]
