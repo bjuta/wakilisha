@@ -6,7 +6,6 @@ import {
   Play,
   Rss,
 } from "lucide-react";
-import { AppLayout } from "@/components/layout/AppLayout";
 import { MetaTags } from "@/components/seo/MetaTags";
 import { usePlayer } from "@/context/PlayerContext";
 import { publicAudioPlayerItem } from "@/services/audio/audioPlayerAdapter";
@@ -126,29 +125,25 @@ export default function PublicAudioShowPage() {
 
   if (loading) {
     return (
-      <AppLayout>
-        <main className="mx-auto w-full max-w-5xl px-4 py-12 sm:px-6 lg:px-8">
-          <p className="text-sm text-neutral-500">Loading Audio Show.</p>
-        </main>
-      </AppLayout>
+      <main className="mx-auto w-full max-w-5xl px-4 py-12 sm:px-6 lg:px-8">
+        <p className="text-sm text-neutral-500">Loading Audio Show.</p>
+      </main>
     );
   }
 
   if (!detail || error) {
     return (
-      <AppLayout>
-        <main className="mx-auto w-full max-w-5xl px-4 py-12 sm:px-6 lg:px-8">
-          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-neutral-500">
-            Audio
-          </p>
-          <h1 className="mt-3 text-3xl font-semibold tracking-tight text-neutral-950 dark:text-white">
-            Show unavailable
-          </h1>
-          <p className="mt-3 max-w-xl text-sm leading-6 text-neutral-600 dark:text-neutral-300">
-            {error || "This Show has no currently published Episodes."}
-          </p>
-        </main>
-      </AppLayout>
+      <main className="mx-auto w-full max-w-5xl px-4 py-12 sm:px-6 lg:px-8">
+        <p className="text-xs font-semibold uppercase tracking-[0.18em] text-neutral-500">
+          Audio
+        </p>
+        <h1 className="mt-3 text-3xl font-semibold tracking-tight text-neutral-950 dark:text-white">
+          Show unavailable
+        </h1>
+        <p className="mt-3 max-w-xl text-sm leading-6 text-neutral-600 dark:text-neutral-300">
+          {error || "This Show has no currently published Episodes."}
+        </p>
+      </main>
     );
   }
 
@@ -159,7 +154,7 @@ export default function PublicAudioShowPage() {
   const latestActive = Boolean(latest && currentTrack?.id === latest.publicationId);
 
   return (
-    <AppLayout>
+    <>
       <MetaTags
         title={show.title}
         description={show.description || `Listen to ${show.title} on WAKILISHA.`}
@@ -243,7 +238,7 @@ export default function PublicAudioShowPage() {
               const duration = formatDuration(episode.delivery.durationSeconds);
               const publishedAt = formatDate(episode.provenance.publishedAt);
               const context = [
-                episode.season?.seasonNumber !== undefined && episode.season
+                episode.season
                   ? `Season ${episode.season.seasonNumber}`
                   : "",
                 episode.episodeNumber !== null
@@ -296,6 +291,6 @@ export default function PublicAudioShowPage() {
           </ol>
         </section>
       </main>
-    </AppLayout>
+    </>
   );
 }
