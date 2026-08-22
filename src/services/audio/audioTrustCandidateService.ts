@@ -39,8 +39,12 @@ function text(value: unknown): string {
 }
 
 export async function fetchAudioTrustCandidates(): Promise<AudioTrustCandidateBundle> {
-  const rpc = supabase.rpc as unknown as (name: string) => Promise<RpcResult>;
-  const { data, error } = await rpc("list_audio_trust_attachment_candidates");
+  const rpc = supabase.rpc.bind(supabase) as unknown as (
+    name: string,
+  ) => Promise<RpcResult>;
+  const { data, error } = await rpc(
+    "list_audio_trust_attachment_candidates",
+  );
 
   // Reviewers can open the workbench without having Audio edit capability.
   // Trust attachment options are only needed when the record itself is editable.
