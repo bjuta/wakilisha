@@ -1,0 +1,12 @@
+/*
+ * Phase 6B player convergence.
+ *
+ * MobileAppLayout still owns navigation and the accepted mobile shell, but its
+ * legacy mini-player leaks provider/acquisition state into persistent chrome.
+ * The media-first player is rendered at ResponsiveAppLayout instead. Keep this
+ * exact override until the legacy mini-player implementation is removed in a
+ * dedicated cleanup milestone.
+ */
+.phn-miniplayer {
+  display: none !important;
+}

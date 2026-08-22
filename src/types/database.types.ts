@@ -20445,6 +20445,7 @@ export type Database = {
           they_feature: number
         }[]
       }
+      get_public_audio_publication: { Args: { p_slug: string }; Returns: Json }
       get_public_living_memory: {
         Args: {
           p_entity_id?: string
