@@ -57,7 +57,10 @@ function durationLabel(value: unknown): string {
 
 function episodeXml(value: unknown): string {
   const episode = record(value);
+  const show = record(episode.show);
   const title = text(episode.title);
+  const episodeSlug = text(episode.slug);
+  const showSlug = text(show.slug);
   const canonicalPath = text(episode.canonical_path);
   const summary = text(episode.summary);
   const feed = record(episode.feed);
@@ -76,7 +79,9 @@ function episodeXml(value: unknown): string {
 
   if (
     !title ||
-    !canonicalPath.startsWith("/audio/") ||
+    !showSlug ||
+    !episodeSlug ||
+    canonicalPath !== `/shows/${showSlug}/${episodeSlug}` ||
     !guid ||
     !enclosureUrl.startsWith(`${SITE_URL}/audio/enclosures/`) ||
     mimeType !== "audio/mpeg" ||
@@ -118,8 +123,8 @@ export function renderAudioShowRss(value: unknown): string {
   if (
     !slug ||
     !title ||
-    canonicalPath !== `/audio/shows/${slug}` ||
-    feedPath !== `/audio/shows/${slug}/feed.xml` ||
+    canonicalPath !== `/shows/${slug}` ||
+    feedPath !== `/shows/${slug}/feed.xml` ||
     episodes.length === 0
   ) {
     throw new Error("Public Audio Show is not feed-addressable.");
