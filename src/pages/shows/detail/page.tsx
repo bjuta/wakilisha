@@ -126,7 +126,7 @@ export default function PublicShowPage() {
   if (loading) {
     return (
       <main className="mx-auto w-full max-w-5xl px-4 py-12 sm:px-6 lg:px-8">
-        <p className="text-sm text-neutral-500">Loading Show.</p>
+        <p className="text-sm text-wk-text-muted">Loading Show.</p>
       </main>
     );
   }
@@ -134,13 +134,13 @@ export default function PublicShowPage() {
   if (!detail || error) {
     return (
       <main className="mx-auto w-full max-w-5xl px-4 py-12 sm:px-6 lg:px-8">
-        <p className="text-xs font-semibold uppercase tracking-[0.18em] text-neutral-500">
+        <p className="text-xs font-semibold uppercase tracking-[0.18em] text-wk-text-faint">
           Show
         </p>
-        <h1 className="mt-3 text-3xl font-semibold tracking-tight text-neutral-950 dark:text-white">
+        <h1 className="mt-3 text-3xl font-semibold tracking-tight text-wk-text">
           Show unavailable
         </h1>
-        <p className="mt-3 max-w-xl text-sm leading-6 text-neutral-600 dark:text-neutral-300">
+        <p className="mt-3 max-w-xl text-sm leading-6 text-wk-text-muted">
           {error || "This Show has no currently published Episodes."}
         </p>
       </main>
@@ -164,10 +164,10 @@ export default function PublicShowPage() {
       />
 
       <main className="mx-auto w-full max-w-5xl px-4 pb-20 pt-8 sm:px-6 lg:px-8 lg:pt-12">
-        <section className="grid gap-7 border-b border-neutral-200 pb-9 dark:border-neutral-800 md:grid-cols-[220px_minmax(0,1fr)] md:items-end">
+        <section className="grid gap-7 border-b border-wk-border pb-9 md:grid-cols-[220px_minmax(0,1fr)] md:items-end">
           <div
             aria-hidden="true"
-            className="aspect-square w-full max-w-[220px] rounded-[28px] border border-black/5 shadow-sm dark:border-white/10"
+            className="aspect-square w-full max-w-[220px] rounded-[28px] border border-wk-border shadow-sm"
             style={{
               background:
                 "radial-gradient(circle at 30% 25%, rgba(255,255,255,.75), transparent 30%), linear-gradient(145deg, #f8d57e 0%, #ee8d68 42%, #714f7d 100%)",
@@ -175,15 +175,15 @@ export default function PublicShowPage() {
           />
 
           <div>
-            <p className="text-xs font-semibold uppercase tracking-[0.2em] text-neutral-500">
+            <p className="text-xs font-semibold uppercase tracking-[0.2em] text-wk-text-faint">
               Show
             </p>
-            <h1 className="mt-3 max-w-3xl text-4xl font-semibold tracking-[-0.035em] text-neutral-950 dark:text-white sm:text-5xl">
+            <h1 className="mt-3 max-w-3xl text-4xl font-semibold tracking-[-0.035em] text-wk-text sm:text-5xl">
               {show.title}
             </h1>
 
             {show.description ? (
-              <p className="mt-4 max-w-2xl text-base leading-7 text-neutral-600 dark:text-neutral-300">
+              <p className="mt-4 max-w-2xl text-base leading-7 text-wk-text-muted">
                 {show.description}
               </p>
             ) : null}
@@ -193,7 +193,7 @@ export default function PublicShowPage() {
                 <button
                   type="button"
                   onClick={() => playEpisode(0)}
-                  className="inline-flex items-center gap-2 rounded-full bg-neutral-950 px-5 py-3 text-sm font-semibold text-white transition hover:bg-neutral-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-neutral-500 focus-visible:ring-offset-2 dark:bg-white dark:text-neutral-950 dark:hover:bg-neutral-200"
+                  className="inline-flex items-center gap-2 rounded-full bg-wk-text px-5 py-3 text-sm font-semibold text-wk-bg transition hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-wk-brand focus-visible:ring-offset-2"
                 >
                   {latestActive && isPlaying ? (
                     <Pause className="h-4 w-4" aria-hidden="true" />
@@ -206,7 +206,7 @@ export default function PublicShowPage() {
 
               <a
                 href={feedUrl}
-                className="inline-flex items-center gap-2 rounded-full border border-neutral-300 px-4 py-3 text-sm font-semibold text-neutral-800 transition hover:border-neutral-500 dark:border-neutral-700 dark:text-neutral-100 dark:hover:border-neutral-500"
+                className="inline-flex items-center gap-2 rounded-full border border-wk-border bg-wk-surface px-4 py-3 text-sm font-semibold text-wk-text transition hover:bg-wk-surface-raised"
               >
                 <Rss className="h-4 w-4" aria-hidden="true" />
                 RSS Feed
@@ -214,7 +214,7 @@ export default function PublicShowPage() {
               </a>
             </div>
 
-            <p className="mt-5 text-sm text-neutral-500">
+            <p className="mt-5 text-sm text-wk-text-faint">
               {show.episodeCount} {show.episodeCount === 1 ? "Episode" : "Episodes"}
             </p>
           </div>
@@ -222,18 +222,18 @@ export default function PublicShowPage() {
 
         <section className="pt-9" aria-labelledby="episodes-heading">
           <div>
-            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-neutral-500">
+            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-wk-text-faint">
               Published
             </p>
             <h2
               id="episodes-heading"
-              className="mt-2 text-2xl font-semibold tracking-tight text-neutral-950 dark:text-white"
+              className="mt-2 text-2xl font-semibold tracking-tight text-wk-text"
             >
               Episodes
             </h2>
           </div>
 
-          <ol className="mt-5 divide-y divide-neutral-200 border-y border-neutral-200 dark:divide-neutral-800 dark:border-neutral-800">
+          <ol className="mt-5 divide-y divide-wk-border border-y border-wk-border">
             {episodes.map((item, index) => {
               const { episode, audio } = item;
               const active = currentTrack?.id === audio.publicationId;
@@ -257,7 +257,7 @@ export default function PublicShowPage() {
                     type="button"
                     onClick={() => playEpisode(index)}
                     aria-label={`${active && isPlaying ? "Pause" : "Play"} ${episode.title}`}
-                    className="inline-flex h-11 w-11 items-center justify-center rounded-full border border-neutral-300 text-neutral-950 transition hover:border-neutral-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-neutral-500 focus-visible:ring-offset-2 dark:border-neutral-700 dark:text-white dark:hover:border-neutral-500"
+                    className="inline-flex h-11 w-11 items-center justify-center rounded-full border border-wk-border text-wk-text transition hover:bg-wk-surface-raised focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-wk-brand focus-visible:ring-offset-2"
                   >
                     {active && isPlaying ? (
                       <Pause className="h-4 w-4" aria-hidden="true" />
@@ -267,23 +267,23 @@ export default function PublicShowPage() {
                   </button>
 
                   <div className="min-w-0">
-                    <p className="text-xs font-medium uppercase tracking-[0.14em] text-neutral-500">
+                    <p className="text-xs font-medium uppercase tracking-[0.14em] text-wk-text-faint">
                       {context}
                     </p>
                     <Link
                       to={episode.canonicalPath}
-                      className="mt-1 block text-lg font-semibold text-neutral-950 underline-offset-4 hover:underline dark:text-white"
+                      className="mt-1 block text-lg font-semibold text-wk-text underline-offset-4 hover:text-wk-brand hover:underline"
                     >
                       {episode.title}
                     </Link>
                     {episode.summary ? (
-                      <p className="mt-1 line-clamp-2 max-w-2xl text-sm leading-6 text-neutral-600 dark:text-neutral-300">
+                      <p className="mt-1 line-clamp-2 max-w-2xl text-sm leading-6 text-wk-text-muted">
                         {episode.summary}
                       </p>
                     ) : null}
                   </div>
 
-                  <div className="flex items-center gap-3 text-xs text-neutral-500 sm:justify-end">
+                  <div className="flex items-center gap-3 text-xs text-wk-text-faint sm:justify-end">
                     {publishedAt ? <span>{publishedAt}</span> : null}
                     {duration ? <span>{duration}</span> : null}
                   </div>
