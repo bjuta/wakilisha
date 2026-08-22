@@ -2,8 +2,11 @@ import { useEffect, useState } from "react";
 import { useParams } from "react-router-dom";
 import { WkIcon } from "@/components/design-system/Icon";
 import { PublicAudioListeningSurface } from "@/components/audio/PublicAudioListeningSurface";
+import { MetaTags } from "@/components/seo/MetaTags";
 import type { PublicShowEpisode } from "@/services/shows/showPublicModel";
 import { getPublicShowEpisode } from "@/services/shows/showPublicService";
+
+const SITE_URL = "https://wakilisha.africa";
 
 export default function PublicShowEpisodePage() {
   const {
@@ -73,5 +76,20 @@ export default function PublicShowEpisodePage() {
     );
   }
 
-  return <PublicAudioListeningSurface publication={episode.audio} />;
+  const canonicalUrl = `${SITE_URL}${episode.episode.canonicalPath}`;
+  const description =
+    episode.episode.summary ||
+    episode.audio.summary ||
+    `Listen to ${episode.episode.title} on WAKILISHA.`;
+
+  return (
+    <>
+      <MetaTags
+        title={episode.episode.title}
+        description={description}
+        url={canonicalUrl}
+      />
+      <PublicAudioListeningSurface publication={episode.audio} />
+    </>
+  );
 }
