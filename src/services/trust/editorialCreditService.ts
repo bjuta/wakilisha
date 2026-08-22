@@ -73,7 +73,7 @@ function rpc(): (
   name: string,
   args?: Record<string, unknown>,
 ) => Promise<RpcResult> {
-  return supabase.rpc as unknown as (
+  return supabase.rpc.bind(supabase) as unknown as (
     name: string,
     args?: Record<string, unknown>,
   ) => Promise<RpcResult>;
