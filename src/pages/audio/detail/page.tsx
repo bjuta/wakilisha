@@ -3,22 +3,19 @@ import {
   useMemo,
   useState,
 } from "react";
-import { useParams } from "react-router-dom";
+import { Link, useParams } from "react-router-dom";
 import { WkIcon } from "@/components/design-system/Icon";
 import { Ch19GradientImage } from "@/components/media/Ch19GradientImage";
 import { PublicTrustSummary } from "@/components/design-system/trust/PublicTrustSummary";
 import { usePlayer } from "@/context/PlayerContext";
+import { publicAudioPlayerItem } from "@/services/audio/audioPlayerAdapter";
 import { getPublicAudioPublication } from "@/services/audio/audioPublicService";
 import type {
   PublicAudioCitation,
   PublicAudioCredit,
   PublicAudioPublication,
 } from "@/services/audio/audioPublicModel";
-import {
-  formatPlayerClock,
-  playerMediaItem,
-  type PlayerMediaItem,
-} from "@/services/player/playerExperience";
+import { formatPlayerClock } from "@/services/player/playerExperience";
 
 function humanize(value: string): string {
   return value
@@ -85,75 +82,6 @@ function buildTrustPresentation(publication: PublicAudioPublication) {
   };
 }
 
-function audioPlayerItem(
-  publication: PublicAudioPublication,
-): PlayerMediaItem {
-  const primaryCredit =
-    publication.credits.find(
-      (credit) => credit.isPrimary,
-    )?.displayName ??
-    publication.credits[0]?.displayName ??
-    null;
-  const creatorLabel =
-    primaryCredit ??
-    publication.show?.title ??
-    "WAKILISHA";
-  const contextLabel =
-    publication.show?.title &&
-    publication.show.title !== creatorLabel
-      ? publication.show.title
-      : null;
-
-  return playerMediaItem(
-    {
-      id: publication.publicationId,
-      title: publication.title,
-      artist: creatorLabel,
-      album: publication.show?.title ?? undefined,
-      duration:
-        publication.delivery.durationSeconds ?? undefined,
-      isPlayable: true,
-      source: "WAKILISHA",
-      previewUrl: publication.delivery.url,
-      playbackEngine: "audio",
-    },
-    {
-      mediaKind:
-        publication.publicationKind === "episode"
-          ? "audio_episode"
-          : "standalone_audio",
-      canonicalPath: publication.canonicalPath,
-      creatorLabel,
-      contextLabel,
-      playbackAvailability: "full",
-      chapters: publication.chapters.map((chapter) => ({
-        id: `chapter-${chapter.chapterNumber}`,
-        startSeconds: chapter.startSeconds,
-        title: chapter.title,
-      })),
-      transcript: publication.transcript?.url
-        ? {
-            url: publication.transcript.url,
-            label: "Transcript",
-          }
-        : null,
-      capabilities: {
-        previousNext: false,
-        jumpBySeconds: 15,
-        shuffle: false,
-        repeat: false,
-        lyrics: false,
-        moments: false,
-        addToPlaylist: false,
-        save: false,
-        chapters: publication.chapters.length > 0,
-        transcript: Boolean(publication.transcript?.url),
-        playbackSpeed: false,
-      },
-    },
-  );
-}
-
 export default function PublicAudioDetailPage() {
   const { slug = "" } = useParams<{ slug: string }>();
   const [publication, setPublication] = useState<PublicAudioPublication | null>(null);
@@ -195,7 +123,7 @@ export default function PublicAudioDetailPage() {
   }, [slug]);
 
   const playerItem = useMemo(
-    () => publication ? audioPlayerItem(publication) : null,
+    () => publication ? publicAudioPlayerItem(publication) : null,
     [publication],
   );
 
@@ -232,15 +160,6 @@ export default function PublicAudioDetailPage() {
     );
   }
 
-  const context = [
-    publication.show?.title ?? null,
-    publication.season
-      ? `Season ${publication.season.seasonNumber}`
-      : null,
-    publication.episodeNumber !== null
-      ? `Episode ${publication.episodeNumber}`
-      : null,
-  ].filter(Boolean);
   const active =
     currentTrack?.id === publication.publicationId;
   const activeDuration =
@@ -301,14 +220,28 @@ export default function PublicAudioDetailPage() {
         <div className="mx-auto grid max-w-5xl gap-7 lg:grid-cols-[minmax(0,1fr)_320px] lg:items-end">
           <div>
             <div className="wk-eyebrow mb-3">Audio</div>
-            {context.length ? (
-              <div className="mb-3 flex flex-wrap gap-x-2 gap-y-1 text-xs font-bold text-wk-text-muted">
-                {context.map((item, index) => (
-                  <span key={String(item)}>
-                    {index > 0 ? <span className="mr-2 text-wk-text-faint">·</span> : null}
-                    {item}
-                  </span>
-                ))}
+            {publication.show || publication.season || publication.episodeNumber !== null ? (
+              <div className="mb-3 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs font-bold text-wk-text-muted">
+                {publication.show ? (
+                  <Link
+                    to={`/audio/shows/${publication.show.slug}`}
+                    className="underline-offset-4 hover:text-wk-text hover:underline"
+                  >
+                    {publication.show.title}
+                  </Link>
+                ) : null}
+                {publication.season ? (
+                  <>
+                    {publication.show ? <span className="text-wk-text-faint">·</span> : null}
+                    <span>Season {publication.season.seasonNumber}</span>
+                  </>
+                ) : null}
+                {publication.episodeNumber !== null ? (
+                  <>
+                    {publication.show || publication.season ? <span className="text-wk-text-faint">·</span> : null}
+                    <span>Episode {publication.episodeNumber}</span>
+                  </>
+                ) : null}
               </div>
             ) : null}
             <h1 className="max-w-4xl text-4xl font-black tracking-[-0.035em] text-wk-text md:text-6xl">
