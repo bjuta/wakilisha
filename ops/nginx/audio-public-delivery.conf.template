@@ -4,13 +4,20 @@
 # these locations inside the canonical wakilisha.africa HTTPS server block.
 # The upstream Edge Function owns transport only; Show and Audio authority
 # remain in anonymous public RPCs.
+#
+# Keep proxy_pass itself static. Nginx treats any variable-bearing proxy_pass
+# URL as runtime-resolved and requires an explicit resolver. The public route
+# variables belong only in $args; the upstream hostname remains config-time
+# resolved through the normal host resolver.
 
 location ~ "^/audio/enclosures/(?<wk_audio_publication_id>[0-9a-fA-F-]{36})\.mp3$" {
     proxy_ssl_server_name on;
     proxy_set_header Host __SUPABASE_PROJECT_REF__.supabase.co;
     proxy_set_header X-Forwarded-Host $host;
     proxy_set_header X-Forwarded-Proto https;
-    proxy_pass https://__SUPABASE_PROJECT_REF__.supabase.co/functions/v1/audio-public-delivery?kind=enclosure&id=$wk_audio_publication_id;
+    set $args "kind=enclosure&id=$wk_audio_publication_id";
+    rewrite ^ /functions/v1/audio-public-delivery break;
+    proxy_pass https://__SUPABASE_PROJECT_REF__.supabase.co;
 }
 
 location ~ ^/shows/(?<wk_show_slug>[a-z0-9]+(?:-[a-z0-9]+)*)/feed\.xml$ {
@@ -18,5 +25,7 @@ location ~ ^/shows/(?<wk_show_slug>[a-z0-9]+(?:-[a-z0-9]+)*)/feed\.xml$ {
     proxy_set_header Host __SUPABASE_PROJECT_REF__.supabase.co;
     proxy_set_header X-Forwarded-Host $host;
     proxy_set_header X-Forwarded-Proto https;
-    proxy_pass https://__SUPABASE_PROJECT_REF__.supabase.co/functions/v1/audio-public-delivery?kind=rss&show=$wk_show_slug;
+    set $args "kind=rss&show=$wk_show_slug";
+    rewrite ^ /functions/v1/audio-public-delivery break;
+    proxy_pass https://__SUPABASE_PROJECT_REF__.supabase.co;
 }
