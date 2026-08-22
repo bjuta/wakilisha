@@ -38,6 +38,9 @@ const primitive = read(
 const creditService = read(
   "src/services/trust/editorialCreditService.ts",
 );
+const audioTrustService = read(
+  "src/services/audio/audioTrustCandidateService.ts",
+);
 const audioWorkspace = read(
   "src/pages/admin/content/audio/detail/AudioEditorWorkspace.tsx",
 );
@@ -137,6 +140,24 @@ describe(
         );
         expect(audioWorkspace).toContain(
           "resolveEditorialCredit",
+        );
+      },
+    );
+
+    it(
+      "keeps Supabase RPC transport bound to its client receiver",
+      () => {
+        expect(creditService).toContain(
+          "supabase.rpc.bind(supabase)",
+        );
+        expect(audioTrustService).toContain(
+          "supabase.rpc.bind(supabase)",
+        );
+        expect(creditService).not.toContain(
+          "return supabase.rpc as unknown as",
+        );
+        expect(audioTrustService).not.toContain(
+          "const rpc = supabase.rpc as unknown as",
         );
       },
     );
