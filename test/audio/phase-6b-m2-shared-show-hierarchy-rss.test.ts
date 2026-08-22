@@ -10,8 +10,16 @@ const migration = readFileSync(
   "supabase/migrations/20260822131500_phase_6b_m2_shared_show_hierarchy_rss.sql",
   "utf8",
 );
+const canonicalMigration = readFileSync(
+  "supabase/migrations/20260822131600_phase_6b_m2_audio_canonical_show_paths.sql",
+  "utf8",
+);
 const verifier = readFileSync(
   "scripts/control-plane/verify-phase-6b-m2-shared-show-hierarchy-rss.sql",
+  "utf8",
+);
+const m1Verifier = readFileSync(
+  "scripts/control-plane/verify-phase-6b-m1-public-audio-read-route.sql",
   "utf8",
 );
 const edge = readFileSync(
@@ -160,15 +168,32 @@ describe("Phase 6B M2 shared Show hierarchy and Audio RSS", () => {
     expect(config).not.toContain("/shows/:showSlug/episodes/");
     expect(config).not.toContain("/audio/shows/");
     expect(migration).not.toContain("/audio/shows/");
+    expect(canonicalMigration).not.toContain("/audio/shows/");
+    expect(canonicalMigration).not.toContain("/episodes/");
     expect(verifier).toContain("Rejected Audio-bucket or redundant Episode URL grammar returned.");
   });
 
-  it("makes the plain Audio browser route Standalone-only", () => {
+  it("makes the plain Audio browser route and public RPC canonical identity Standalone-aware", () => {
     expect(config.match(/path: "\/audio\/:slug"/g)).toHaveLength(1);
     expect(audioService).toContain("getPublicStandaloneAudio");
     expect(audioService).toContain('publication.publicationKind !== "standalone"');
     expect(audioService).toContain('`/audio/${publication.slug}`');
     expect(audioService).not.toContain("get_public_show_episode");
+
+    expect(canonicalMigration).toContain(
+      "alter function public.get_public_audio_publication(text)",
+    );
+    expect(canonicalMigration).toContain("rename to get_public_audio_publication_m1");
+    expect(canonicalMigration).toContain("public.get_public_audio_publication_m1(p_slug)");
+    expect(canonicalMigration).toContain("v_publication_kind = 'standalone'");
+    expect(canonicalMigration).toContain("v_publication_kind <> 'episode'");
+    expect(canonicalMigration).toContain("'/audio/' || (v_payload ->> 'slug')");
+    expect(canonicalMigration).toContain(
+      "'/shows/' || v_show.slug || '/' || v_episode.slug",
+    );
+    expect(canonicalMigration).toContain("editorial.audio_episode_shared_links");
+    expect(m1Verifier).toContain("public.get_public_audio_publication_m1(text)");
+    expect(m1Verifier).toContain("M2 internal Audio safety core leaked direct API execution.");
   });
 
   it("reuses exact M1 Audio safety for Show Episode and enclosure delivery", () => {
@@ -178,6 +203,8 @@ describe("Phase 6B M2 shared Show hierarchy and Audio RSS", () => {
     expect(migration).toContain("public.get_public_audio_enclosure(");
     expect(verifier).toContain("Private Audio schema usage leaked to API roles.");
     expect(verifier).toContain("public.get_public_audio_publication");
+    expect(canonicalMigration).toContain("get_public_audio_publication_m1");
+    expect(canonicalMigration).not.toContain("audio.assert_publishable_version_media");
   });
 
   it("renders deterministic RSS from shared Episode links and stable Audio enclosure identity", () => {
@@ -229,19 +256,22 @@ describe("Phase 6B M2 shared Show hierarchy and Audio RSS", () => {
     expect(listeningSurface).not.toContain("MediaTimeline");
   });
 
-  it("keeps the permanent verifier read-only", () => {
-    const lower = verifier.toLowerCase();
-    for (const forbidden of [
-      "insert into ",
-      "update ",
-      "delete from ",
-      "create table ",
-      "alter table ",
-      "drop table ",
-      "create or replace function ",
-    ]) {
-      expect(lower).not.toContain(forbidden);
+  it("keeps permanent verifiers read-only", () => {
+    for (const source of [verifier, m1Verifier]) {
+      const lower = source.toLowerCase();
+      for (const forbidden of [
+        "insert into ",
+        "update ",
+        "delete from ",
+        "create table ",
+        "alter table ",
+        "drop table ",
+        "create or replace function ",
+      ]) {
+        expect(lower).not.toContain(forbidden);
+      }
     }
     expect(verifier).toContain("PASS: Phase 6B M2");
+    expect(m1Verifier).toContain("PASS: Phase 6B M1 public Audio");
   });
 });
