@@ -2,10 +2,12 @@ import {
   type FormEvent,
   useEffect,
   useMemo,
-  useRef,
   useState,
 } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import {
+  Link,
+  useNavigate,
+} from "react-router-dom";
 import { MediaPickerModal } from "@/components/admin/MediaPickerModal";
 import { WkIcon } from "@/components/design-system/Icon";
 import { WkSurface } from "@/components/design-system/primitives/Surface";
@@ -14,13 +16,11 @@ import { AdminSaveState } from "@/components/design-system/admin/AdminSaveState"
 import { AdminWorkspaceSection } from "@/components/design-system/admin/AdminWorkspaceSection";
 import { EditorialWorkflowRail } from "@/components/design-system/editorial/EditorialWorkflowRail";
 import { MediaTimeline } from "@/components/design-system/editorial/MediaTimeline";
-import { TrustAttachmentPicker } from "@/components/design-system/trust/TrustAttachmentPicker";
 import { AudioReviewWorkspace } from "./components/AudioReviewWorkspace";
 import {
   fetchAudioEditorialMediaContext,
   type AudioEditorialMediaContext,
 } from "@/services/audio/audioReviewService";
-import { fetchAudioTrustCandidates } from "@/services/audio/audioTrustCandidateService";
 import {
   fetchAudioPublicationWorkspace,
   publishAudio,
@@ -36,52 +36,104 @@ import {
   type AudioChapter,
   type AudioPublicationWorkspace,
 } from "@/services/audio/audioAdminService";
-import type { TrustAttachmentOption } from "@/components/design-system/trust/TrustAttachmentPicker";
 
-type PickerKind = "master" | "transcript" | null;
-type WorkspaceView = "details" | "sound" | "trust" | "review" | "history";
+type PickerKind =
+  | "master"
+  | "transcript"
+  | null;
 
-function humanize(value: string): string {
+type WorkspaceView =
+  | "details"
+  | "sound"
+  | "trust"
+  | "review"
+  | "history";
+
+function humanize(
+  value: string,
+): string {
   return value
     .replace(/_/g, " ")
-    .replace(/\b\w/g, (character) => character.toUpperCase());
+    .replace(
+      /\b\w/g,
+      (character) =>
+        character.toUpperCase(),
+    );
 }
 
-function errorText(reason: unknown): string {
-  return reason instanceof Error ? reason.message : "Audio could not be updated.";
+function errorText(
+  reason: unknown,
+): string {
+  return reason instanceof Error
+    ? reason.message
+    : "Audio could not be updated.";
 }
 
-function compactId(value: string | null | undefined): string {
+function compactId(
+  value:
+    | string
+    | null
+    | undefined,
+): string {
   if (!value) return "Not set";
-  return `${value.slice(0, 8)}…${value.slice(-4)}`;
+
+  return `${value.slice(
+    0,
+    8,
+  )}…${value.slice(-4)}`;
 }
 
-function secondsLabel(value: number): string {
-  const total = Math.max(0, Math.floor(value));
-  const minutes = Math.floor(total / 60);
-  const seconds = String(total % 60).padStart(2, "0");
+function secondsLabel(
+  value: number,
+): string {
+  const total = Math.max(
+    0,
+    Math.floor(value),
+  );
+  const minutes =
+    Math.floor(total / 60);
+  const seconds = String(
+    total % 60,
+  ).padStart(2, "0");
+
   return `${minutes}:${seconds}`;
 }
 
-function chapterSignature(chapters: AudioChapter[]): string {
+function chapterSignature(
+  chapters: AudioChapter[],
+): string {
   return JSON.stringify(
     chapters.map((chapter) => ({
-      startSeconds: chapter.startSeconds,
+      startSeconds:
+        chapter.startSeconds,
       title: chapter.title,
-      chapterUrl: chapter.chapterUrl,
+      chapterUrl:
+        chapter.chapterUrl,
       imageUrl: chapter.imageUrl,
     })),
   );
 }
 
-function object(value: unknown): Record<string, unknown> {
-  return value && typeof value === "object" && !Array.isArray(value)
-    ? value as Record<string, unknown>
+function object(
+  value: unknown,
+): Record<string, unknown> {
+  return value &&
+    typeof value === "object" &&
+    !Array.isArray(value)
+    ? value as Record<
+        string,
+        unknown
+      >
     : {};
 }
 
-function fact(value: unknown): string {
-  return value == null || value === "" ? "Not available" : String(value);
+function fact(
+  value: unknown,
+): string {
+  return value == null ||
+    value === ""
+    ? "—"
+    : String(value);
 }
 
 export function AudioEditorWorkspace({
@@ -90,44 +142,90 @@ export function AudioEditorWorkspace({
   publicationId?: string;
 }) {
   const navigate = useNavigate();
-  const audioRef = useRef<HTMLAudioElement>(null);
 
-  const [workspace, setWorkspace] = useState<AudioPublicationWorkspace | null>(null);
-  const [mediaContext, setMediaContext] = useState<AudioEditorialMediaContext | null>(null);
-  const [creditCandidates, setCreditCandidates] = useState<TrustAttachmentOption[]>([]);
-  const [citationCandidates, setCitationCandidates] = useState<TrustAttachmentOption[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [busy, setBusy] = useState<string | null>(null);
-  const [message, setMessage] = useState<string | null>(null);
-  const [picker, setPicker] = useState<PickerKind>(null);
-  const [view, setView] = useState<WorkspaceView>("details");
-  const [title, setTitle] = useState("");
-  const [summary, setSummary] = useState("");
-  const [chapters, setChapters] = useState<AudioChapter[]>([]);
-  const [reviewNote, setReviewNote] = useState("");
-  const [playhead, setPlayhead] = useState(0);
-  const [chapterCursor, setChapterCursor] = useState(0);
+  const [
+    workspace,
+    setWorkspace,
+  ] =
+    useState<AudioPublicationWorkspace | null>(
+      null,
+    );
 
-  const hydrateWorkspace = (next: AudioPublicationWorkspace) => {
+  const [
+    mediaContext,
+    setMediaContext,
+  ] =
+    useState<AudioEditorialMediaContext | null>(
+      null,
+    );
+
+  const [loading, setLoading] =
+    useState(true);
+  const [busy, setBusy] =
+    useState<string | null>(null);
+  const [message, setMessage] =
+    useState<string | null>(null);
+  const [picker, setPicker] =
+    useState<PickerKind>(null);
+  const [view, setView] =
+    useState<WorkspaceView>("details");
+
+  const [title, setTitle] =
+    useState("");
+  const [slug, setSlug] =
+    useState("");
+  const [summary, setSummary] =
+    useState("");
+  const [chapters, setChapters] =
+    useState<AudioChapter[]>([]);
+  const [
+    citationInput,
+    setCitationInput,
+  ] = useState("");
+  const [
+    creditInput,
+    setCreditInput,
+  ] = useState("");
+  const [reviewNote, setReviewNote] =
+    useState("");
+
+  const hydrateWorkspace = (
+    next: AudioPublicationWorkspace,
+  ) => {
     setWorkspace(next);
-    setTitle(next.publication.title);
-    setSummary(next.publication.summary ?? "");
-    setChapters(next.chapters);
+    setTitle(
+      next.publication.title,
+    );
+    setSlug(
+      next.publication.slug,
+    );
+    setSummary(
+      next.publication.summary ?? "",
+    );
+    setChapters(
+      next.chapters,
+    );
   };
 
   const reload = async () => {
     if (!publicationId) return;
 
-    const [nextWorkspace, nextMedia, nextTrust] = await Promise.all([
-      fetchAudioPublicationWorkspace(publicationId),
-      fetchAudioEditorialMediaContext(publicationId),
-      fetchAudioTrustCandidates(),
+    const [
+      nextWorkspace,
+      nextMedia,
+    ] = await Promise.all([
+      fetchAudioPublicationWorkspace(
+        publicationId,
+      ),
+      fetchAudioEditorialMediaContext(
+        publicationId,
+      ),
     ]);
 
-    hydrateWorkspace(nextWorkspace);
+    hydrateWorkspace(
+      nextWorkspace,
+    );
     setMediaContext(nextMedia);
-    setCreditCandidates(nextTrust.credits);
-    setCitationCandidates(nextTrust.citations);
   };
 
   useEffect(() => {
@@ -139,22 +237,39 @@ export function AudioEditorWorkspace({
     }
 
     Promise.all([
-      fetchAudioPublicationWorkspace(publicationId),
-      fetchAudioEditorialMediaContext(publicationId),
-      fetchAudioTrustCandidates(),
+      fetchAudioPublicationWorkspace(
+        publicationId,
+      ),
+      fetchAudioEditorialMediaContext(
+        publicationId,
+      ),
     ])
-      .then(([nextWorkspace, nextMedia, nextTrust]) => {
-        if (!alive) return;
-        hydrateWorkspace(nextWorkspace);
-        setMediaContext(nextMedia);
-        setCreditCandidates(nextTrust.credits);
-        setCitationCandidates(nextTrust.citations);
-      })
+      .then(
+        ([
+          nextWorkspace,
+          nextMedia,
+        ]) => {
+          if (!alive) return;
+
+          hydrateWorkspace(
+            nextWorkspace,
+          );
+          setMediaContext(
+            nextMedia,
+          );
+        },
+      )
       .catch((reason) => {
-        if (alive) setMessage(errorText(reason));
+        if (alive) {
+          setMessage(
+            errorText(reason),
+          );
+        }
       })
       .finally(() => {
-        if (alive) setLoading(false);
+        if (alive) {
+          setLoading(false);
+        }
       });
 
     return () => {
@@ -162,37 +277,117 @@ export function AudioEditorWorkspace({
     };
   }, [publicationId]);
 
-  const editable = workspace?.canEdit === true && ["draft", "changes_requested"].includes(workspace.publication.status);
-  const metadataDirty = Boolean(
-    workspace &&
-      (
-        title !== workspace.publication.title ||
-        summary !== (workspace.publication.summary ?? "")
+  const editable =
+    workspace?.canEdit === true &&
+    [
+      "draft",
+      "changes_requested",
+    ].includes(
+      workspace.publication.status,
+    );
+
+  const metadataDirty =
+    Boolean(
+      workspace &&
+        (
+          title !==
+            workspace.publication
+              .title ||
+          slug !==
+            workspace.publication
+              .slug ||
+          summary !==
+            (
+              workspace.publication
+                .summary ?? ""
+            )
+        ),
+    );
+
+  const chaptersDirty =
+    Boolean(
+      workspace &&
+        chapterSignature(
+          chapters,
+        ) !==
+          chapterSignature(
+            workspace.chapters,
+          ),
+    );
+
+  const workingDirty =
+    editable &&
+    (
+      metadataDirty ||
+      chaptersDirty
+    );
+
+  const isSaving =
+    busy === "save" ||
+    busy === "metadata" ||
+    busy === "chapters" ||
+    busy === "snapshot";
+
+  const canSubmit =
+    workspace?.canEdit === true &&
+    [
+      "draft",
+      "changes_requested",
+    ].includes(
+      workspace.publication.status,
+    ) &&
+    Boolean(
+      workspace.master
+        ?.audioDeliveryVariantId,
+    );
+
+  const citationIds =
+    useMemo(
+      () =>
+        workspace?.trust.citations.map(
+          (item) =>
+            item.citationId,
+        ) ?? [],
+      [
+        workspace?.trust
+          .citations,
+      ],
+    );
+
+  const creditIds =
+    useMemo(
+      () =>
+        workspace?.trust.credits.map(
+          (item) =>
+            item.creditId,
+        ) ?? [],
+      [
+        workspace?.trust
+          .credits,
+      ],
+    );
+
+  const sourceProbe =
+    object(
+      mediaContext?.sourceProbe,
+    );
+
+  const sourceStreams =
+    Array.isArray(
+      sourceProbe.streams,
+    )
+      ? sourceProbe.streams
+      : [];
+
+  const audioStream =
+    object(
+      sourceStreams.find(
+        (candidate) =>
+          object(candidate)
+            .codec_type ===
+          "audio",
       ),
-  );
-  const chaptersDirty = Boolean(
-    workspace && chapterSignature(chapters) !== chapterSignature(workspace.chapters),
-  );
-  const workingDirty = editable && (metadataDirty || chaptersDirty);
-  const isSaving = ["save", "metadata", "chapters", "snapshot"].includes(busy ?? "");
-  const canSubmit = workspace?.canEdit === true &&
-    ["draft", "changes_requested"].includes(workspace.publication.status) &&
-    Boolean(workspace.master?.audioDeliveryVariantId);
-
-  const citationIds = useMemo(
-    () => workspace?.trust.citations.map((item) => item.citationId) ?? [],
-    [workspace?.trust.citations],
-  );
-  const creditIds = useMemo(
-    () => workspace?.trust.credits.map((item) => item.creditId) ?? [],
-    [workspace?.trust.credits],
-  );
-
-  const sourceProbe = object(mediaContext?.sourceProbe);
-  const sourceStreams = Array.isArray(sourceProbe.streams) ? sourceProbe.streams : [];
-  const audioStream = object(
-    sourceStreams.find((candidate) => object(candidate).codec_type === "audio"),
-  );
+    );
 
   const run = async (
     key: string,
@@ -207,157 +402,310 @@ export function AudioEditorWorkspace({
       await reload();
       setMessage(success);
     } catch (reason) {
-      setMessage(errorText(reason));
+      setMessage(
+        errorText(reason),
+      );
     } finally {
       setBusy(null);
     }
   };
 
-  const saveMetadata = async (target: AudioPublicationWorkspace) => {
-    await saveAudioMetadata(target, {
-      title,
-      slug: target.publication.slug,
-      summary,
-    });
-  };
-
-  const handleMetadata = async (event: FormEvent) => {
+  const handleMetadata = async (
+    event: FormEvent,
+  ) => {
     event.preventDefault();
+
     if (!workspace) return;
 
     await run(
       "metadata",
-      () => saveMetadata(workspace),
+      () =>
+        saveAudioMetadata(
+          workspace,
+          {
+            title,
+            slug,
+            summary,
+          },
+        ),
       "Audio details saved.",
     );
   };
 
-  const handleSaveWorkingVersion = async () => {
-    if (!workspace) return;
+  const handleSaveWorkingVersion =
+    async () => {
+      if (!workspace) return;
 
-    setBusy("save");
-    setMessage(null);
+      setBusy("save");
+      setMessage(null);
 
-    try {
-      let current = workspace;
+      try {
+        let current =
+          workspace;
 
-      if (metadataDirty) {
-        await saveMetadata(current);
-        current = await fetchAudioPublicationWorkspace(current.publication.id);
+        if (metadataDirty) {
+          await saveAudioMetadata(
+            current,
+            {
+              title,
+              slug,
+              summary,
+            },
+          );
+
+          current =
+            await fetchAudioPublicationWorkspace(
+              current.publication
+                .id,
+            );
+        }
+
+        if (chaptersDirty) {
+          await replaceAudioChapters(
+            current,
+            chapters,
+          );
+
+          current =
+            await fetchAudioPublicationWorkspace(
+              current.publication
+                .id,
+            );
+        }
+
+        await snapshotAudioWorkingVersion(
+          current,
+        );
+
+        await reload();
+
+        setMessage(
+          "Working version saved.",
+        );
+      } catch (reason) {
+        setMessage(
+          errorText(reason),
+        );
+      } finally {
+        setBusy(null);
       }
-
-      if (chaptersDirty) {
-        await replaceAudioChapters(current, chapters);
-        current = await fetchAudioPublicationWorkspace(current.publication.id);
-      }
-
-      await snapshotAudioWorkingVersion(current);
-      await reload();
-      setMessage("Working version saved.");
-    } catch (reason) {
-      setMessage(errorText(reason));
-    } finally {
-      setBusy(null);
-    }
-  };
-
-  const seekPreview = (seconds: number) => {
-    const target = Math.max(0, Math.min(seconds, mediaContext?.durationSeconds ?? seconds));
-    setPlayhead(target);
-    setChapterCursor(target);
-    if (audioRef.current) audioRef.current.currentTime = target;
-  };
+    };
 
   const addChapter = () => {
-    const startSeconds = chapterCursor || playhead;
-    setChapters((current) => [
-      ...current,
-      {
-        chapterNumber: current.length + 1,
-        startSeconds,
-        title: "",
-        chapterUrl: null,
-        imageUrl: null,
-      },
-    ]);
-  };
+    const last =
+      chapters.at(-1);
 
-  const updateChapter = (index: number, patch: Partial<AudioChapter>) => {
-    setChapters((current) =>
-      current.map((chapter, chapterIndex) => ({
-        ...chapter,
-        ...(chapterIndex === index ? patch : {}),
-        chapterNumber: chapterIndex + 1,
-      })),
+    setChapters(
+      (current) => [
+        ...current,
+        {
+          chapterNumber:
+            current.length + 1,
+          startSeconds:
+            last
+              ? last.startSeconds +
+                60
+              : 0,
+          title: "",
+          chapterUrl: null,
+          imageUrl: null,
+        },
+      ],
     );
   };
 
-  const removeChapter = (index: number) => {
-    setChapters((current) =>
-      current
-        .filter((_, chapterIndex) => chapterIndex !== index)
-        .map((chapter, chapterIndex) => ({
-          ...chapter,
-          chapterNumber: chapterIndex + 1,
-        })),
+  const updateChapter = (
+    index: number,
+    patch: Partial<AudioChapter>,
+  ) => {
+    setChapters(
+      (current) =>
+        current.map(
+          (
+            chapter,
+            chapterIndex,
+          ) =>
+            chapterIndex ===
+            index
+              ? {
+                  ...chapter,
+                  ...patch,
+                  chapterNumber:
+                    chapterIndex +
+                    1,
+                }
+              : {
+                  ...chapter,
+                  chapterNumber:
+                    chapterIndex +
+                    1,
+                },
+        ),
     );
   };
 
-  const saveChapters = async () => {
-    if (!workspace) return;
-    await run(
-      "chapters",
-      () => replaceAudioChapters(workspace, chapters),
-      "Chapters saved.",
+  const removeChapter = (
+    index: number,
+  ) => {
+    setChapters(
+      (current) =>
+        current
+          .filter(
+            (
+              _,
+              chapterIndex,
+            ) =>
+              chapterIndex !==
+              index,
+          )
+          .map(
+            (
+              chapter,
+              chapterIndex,
+            ) => ({
+              ...chapter,
+              chapterNumber:
+                chapterIndex + 1,
+            }),
+          ),
     );
   };
 
-  const addCitation = async (citationId: string) => {
-    if (!workspace) return;
-    await run(
-      "citations",
-      () => replaceAudioCitations(workspace, [...new Set([...citationIds, citationId])]),
-      "Citation attached.",
-    );
-  };
+  const saveChapters =
+    async () => {
+      if (!workspace) return;
 
-  const removeCitation = async (citationId: string) => {
-    if (!workspace) return;
-    await run(
-      "citations",
-      () => replaceAudioCitations(workspace, citationIds.filter((id) => id !== citationId)),
-      "Citation removed.",
-    );
-  };
+      await run(
+        "chapters",
+        () =>
+          replaceAudioChapters(
+            workspace,
+            chapters,
+          ),
+        "Chapters saved.",
+      );
+    };
 
-  const addCredit = async (creditId: string) => {
-    if (!workspace) return;
-    await run(
-      "credits",
-      () => replaceAudioCredits(workspace, [...new Set([...creditIds, creditId])]),
-      "Credit attached.",
-    );
-  };
+  const addCitation =
+    async () => {
+      if (
+        !workspace ||
+        !citationInput.trim()
+      ) {
+        return;
+      }
 
-  const removeCredit = async (creditId: string) => {
-    if (!workspace) return;
-    await run(
-      "credits",
-      () => replaceAudioCredits(workspace, creditIds.filter((id) => id !== creditId)),
-      "Credit removed.",
-    );
-  };
+      await run(
+        "citations",
+        () =>
+          replaceAudioCitations(
+            workspace,
+            [
+              ...new Set([
+                ...citationIds,
+                citationInput.trim(),
+              ]),
+            ],
+          ),
+        "Citation attached.",
+      );
+
+      setCitationInput("");
+    };
+
+  const removeCitation =
+    async (
+      citationId: string,
+    ) => {
+      if (!workspace) return;
+
+      await run(
+        "citations",
+        () =>
+          replaceAudioCitations(
+            workspace,
+            citationIds.filter(
+              (id) =>
+                id !== citationId,
+            ),
+          ),
+        "Citation removed.",
+      );
+    };
+
+  const addCredit =
+    async () => {
+      if (
+        !workspace ||
+        !creditInput.trim()
+      ) {
+        return;
+      }
+
+      await run(
+        "credits",
+        () =>
+          replaceAudioCredits(
+            workspace,
+            [
+              ...new Set([
+                ...creditIds,
+                creditInput.trim(),
+              ]),
+            ],
+          ),
+        "Credit attached.",
+      );
+
+      setCreditInput("");
+    };
+
+  const removeCredit =
+    async (
+      creditId: string,
+    ) => {
+      if (!workspace) return;
+
+      await run(
+        "credits",
+        () =>
+          replaceAudioCredits(
+            workspace,
+            creditIds.filter(
+              (id) =>
+                id !== creditId,
+            ),
+          ),
+        "Credit removed.",
+      );
+    };
 
   if (loading) {
-    return <div className="min-h-[45vh]" aria-busy="true" aria-label="Loading Audio Editor" />;
+    return (
+      <div
+        className="min-h-[45vh]"
+        aria-busy="true"
+        aria-label="Loading Audio Editor"
+      />
+    );
   }
 
-  if (!publicationId || !workspace) {
+  if (
+    !publicationId ||
+    !workspace
+  ) {
     return (
       <div className="mx-auto max-w-3xl p-6">
         <WkSurface className="p-6">
-          <p className="text-sm font-bold text-wk-text">This Audio publication could not be opened.</p>
-          <Link to="/admin/content/audio" className="mt-3 inline-flex text-sm font-bold text-wk-brand">
+          <p className="text-sm font-bold text-wk-text">
+            This Audio publication
+            could not be opened.
+          </p>
+
+          <Link
+            to="/admin/content/audio"
+            className="mt-3 inline-flex text-sm font-bold text-wk-brand"
+          >
             Back to Audio
           </Link>
         </WkSurface>
@@ -369,34 +717,88 @@ export function AudioEditorWorkspace({
     <div className="mx-auto w-full max-w-[1320px] space-y-4 p-4 sm:p-6 lg:p-8">
       <AdminRecordHeader
         collectionLabel="Audio"
-        title={workspace.publication.title}
-        status={workspace.publication.status}
-        onBack={() => navigate("/admin/content/audio")}
+        title={
+          workspace.publication
+            .title
+        }
+        status={
+          workspace.publication
+            .status
+        }
+        onBack={() =>
+          navigate(
+            "/admin/content/audio",
+          )
+        }
         meta={
-          <span>
-            {workspace.publication.publicationKind === "episode"
-              ? "Show Episode"
-              : "Standalone Audio"}
-          </span>
+          <>
+            <span className="max-w-full truncate font-mono">
+              {
+                workspace
+                  .publication.slug
+              }
+            </span>
+
+            <span aria-hidden="true">
+              ·
+            </span>
+
+            <span>
+              {workspace.publication
+                .publicationKind ===
+              "episode"
+                ? "Episode"
+                : "Standalone Audio"}
+            </span>
+
+            <span aria-hidden="true">
+              ·
+            </span>
+
+            <span>
+              Revision{" "}
+              {
+                workspace
+                  .publication
+                  .authorityRevision
+              }
+            </span>
+          </>
         }
         actions={
           <>
             <AdminSaveState
-              isDirty={workingDirty}
-              isSaving={isSaving}
-              locked={!editable}
-              lockedLabel={`${humanize(workspace.publication.status)} Version`}
+              isDirty={
+                workingDirty
+              }
+              isSaving={
+                isSaving
+              }
+              locked={
+                !editable
+              }
+              lockedLabel={`${humanize(
+                workspace.publication
+                  .status,
+              )} Version`}
             />
 
             {editable ? (
               <button
                 type="button"
-                disabled={busy !== null}
-                onClick={handleSaveWorkingVersion}
-                title="Save Audio edits and snapshot the working version."
+                disabled={
+                  busy !== null
+                }
+                onClick={
+                  handleSaveWorkingVersion
+                }
+                title="Save local Audio edits and snapshot the immutable working version."
                 className="wk-button wk-button-secondary wk-button-sm disabled:opacity-50"
               >
-                <WkIcon name="Save" size={14} />
+                <WkIcon
+                  name="Save"
+                  size={14}
+                />
                 Save
               </button>
             ) : null}
@@ -404,30 +806,54 @@ export function AudioEditorWorkspace({
             {canSubmit ? (
               <button
                 type="button"
-                disabled={busy !== null || workingDirty}
-                title={workingDirty ? "Save changes before submitting for Review." : undefined}
+                disabled={
+                  busy !== null ||
+                  workingDirty
+                }
+                title={
+                  workingDirty
+                    ? "Save changes before submitting for Review."
+                    : undefined
+                }
                 onClick={() =>
                   run(
                     "submit",
-                    () => submitAudioForReview(workspace, reviewNote),
+                    () =>
+                      submitAudioForReview(
+                        workspace,
+                        reviewNote,
+                      ),
                     "Sent to Review.",
                   )
                 }
                 className="wk-button wk-button-primary wk-button-sm disabled:opacity-50"
               >
-                <WkIcon name="Send" size={14} />
+                <WkIcon
+                  name="Send"
+                  size={14}
+                />
                 Submit for Review
               </button>
             ) : null}
 
-            {workspace.canManageReview && workspace.publication.status === "ready_for_review" ? (
+            {workspace.canManageReview &&
+            workspace.publication
+              .status ===
+              "ready_for_review" ? (
               <button
                 type="button"
-                disabled={busy !== null}
+                disabled={
+                  busy !== null
+                }
                 onClick={() =>
                   run(
                     "review-start",
-                    () => reviewAudio(workspace, "start_review", reviewNote),
+                    () =>
+                      reviewAudio(
+                        workspace,
+                        "start_review",
+                        reviewNote,
+                      ),
                     "Review started.",
                   )
                 }
@@ -437,15 +863,25 @@ export function AudioEditorWorkspace({
               </button>
             ) : null}
 
-            {workspace.canManageReview && workspace.publication.status === "in_review" ? (
+            {workspace.canManageReview &&
+            workspace.publication
+              .status ===
+              "in_review" ? (
               <>
                 <button
                   type="button"
-                  disabled={busy !== null}
+                  disabled={
+                    busy !== null
+                  }
                   onClick={() =>
                     run(
                       "review-changes",
-                      () => reviewAudio(workspace, "request_changes", reviewNote),
+                      () =>
+                        reviewAudio(
+                          workspace,
+                          "request_changes",
+                          reviewNote,
+                        ),
                       "Changes requested.",
                     )
                   }
@@ -453,13 +889,21 @@ export function AudioEditorWorkspace({
                 >
                   Request Changes
                 </button>
+
                 <button
                   type="button"
-                  disabled={busy !== null}
+                  disabled={
+                    busy !== null
+                  }
                   onClick={() =>
                     run(
                       "review-approve",
-                      () => reviewAudio(workspace, "approve", reviewNote),
+                      () =>
+                        reviewAudio(
+                          workspace,
+                          "approve",
+                          reviewNote,
+                        ),
                       "Audio approved.",
                     )
                   }
@@ -470,14 +914,23 @@ export function AudioEditorWorkspace({
               </>
             ) : null}
 
-            {workspace.canPublish && workspace.publication.status === "approved" ? (
+            {workspace.canPublish &&
+            workspace.publication
+              .status ===
+              "approved" ? (
               <button
                 type="button"
-                disabled={busy !== null}
+                disabled={
+                  busy !== null
+                }
                 onClick={() =>
                   run(
                     "publish",
-                    () => publishAudio(workspace, reviewNote),
+                    () =>
+                      publishAudio(
+                        workspace,
+                        reviewNote,
+                      ),
                     "Audio published.",
                   )
                 }
@@ -492,17 +945,62 @@ export function AudioEditorWorkspace({
 
       <EditorialWorkflowRail
         activeId={view}
-        onChange={(id) => setView(id as WorkspaceView)}
+        onChange={(id) =>
+          setView(
+            id as WorkspaceView,
+          )
+        }
         groups={[
-          { label: "Compose", items: [{ id: "details", label: "Details" }, { id: "sound", label: "Sound & Chapters" }] },
-          { label: "Prepare", items: [{ id: "trust", label: "Credits & Citations" }] },
-          { label: "Workflow", items: [{ id: "review", label: "Review" }] },
-          { label: "Record", items: [{ id: "history", label: "History" }] },
+          {
+            label: "Compose",
+            items: [
+              {
+                id: "details",
+                label: "Details",
+              },
+              {
+                id: "sound",
+                label:
+                  "Sound & Chapters",
+              },
+            ],
+          },
+          {
+            label: "Prepare",
+            items: [
+              {
+                id: "trust",
+                label:
+                  "Credits & Citations",
+              },
+            ],
+          },
+          {
+            label: "Workflow",
+            items: [
+              {
+                id: "review",
+                label: "Review",
+              },
+            ],
+          },
+          {
+            label: "Record",
+            items: [
+              {
+                id: "history",
+                label: "History",
+              },
+            ],
+          },
         ]}
       />
 
       {message ? (
-        <div role="status" className="rounded-xl border border-wk-border bg-wk-surface px-4 py-3 text-sm text-wk-text">
+        <div
+          role="status"
+          className="rounded-xl border border-wk-border bg-wk-surface px-4 py-3 text-sm text-wk-text"
+        >
           {message}
         </div>
       ) : null}
@@ -513,35 +1011,87 @@ export function AudioEditorWorkspace({
             <AdminWorkspaceSection
               icon="FileText"
               title="Publication"
-              note="Edit the title and summary here. WAKILISHA keeps the public URL stable."
+              note="These are the words and permanent path attached to this recording."
             >
-              <form className="space-y-4" onSubmit={handleMetadata}>
+              <form
+                className="grid gap-4 sm:grid-cols-2"
+                onSubmit={
+                  handleMetadata
+                }
+              >
                 <label className="block text-xs font-bold text-wk-text-muted">
                   Title
                   <input
                     value={title}
-                    onChange={(event) => setTitle(event.target.value)}
-                    disabled={!editable}
+                    onChange={(
+                      event,
+                    ) =>
+                      setTitle(
+                        event.target
+                          .value,
+                      )
+                    }
+                    disabled={
+                      !editable
+                    }
                     required
                     className="mt-1 w-full rounded-lg border border-wk-border bg-wk-bg px-3 py-2 text-sm text-wk-text disabled:opacity-60"
                   />
                 </label>
 
                 <label className="block text-xs font-bold text-wk-text-muted">
+                  Slug
+                  <input
+                    value={slug}
+                    onChange={(
+                      event,
+                    ) =>
+                      setSlug(
+                        event.target
+                          .value,
+                      )
+                    }
+                    disabled={
+                      !editable
+                    }
+                    required
+                    className="mt-1 w-full rounded-lg border border-wk-border bg-wk-bg px-3 py-2 text-sm text-wk-text disabled:opacity-60"
+                  />
+                </label>
+
+                <label className="block text-xs font-bold text-wk-text-muted sm:col-span-2">
                   Summary
                   <textarea
                     value={summary}
-                    onChange={(event) => setSummary(event.target.value)}
-                    disabled={!editable}
+                    onChange={(
+                      event,
+                    ) =>
+                      setSummary(
+                        event.target
+                          .value,
+                      )
+                    }
+                    disabled={
+                      !editable
+                    }
                     rows={5}
                     className="mt-1 w-full rounded-lg border border-wk-border bg-wk-bg px-3 py-2 text-sm text-wk-text disabled:opacity-60"
                   />
                 </label>
 
                 {editable ? (
-                  <button type="submit" disabled={busy !== null} className="wk-button wk-button-primary wk-button-sm disabled:opacity-50">
-                    Save Details
-                  </button>
+                  <div className="sm:col-span-2">
+                    <button
+                      type="submit"
+                      disabled={
+                        busy !==
+                        null
+                      }
+                      className="wk-button wk-button-primary wk-button-sm disabled:opacity-50"
+                    >
+                      Save Details
+                    </button>
+                  </div>
                 ) : null}
               </form>
             </AdminWorkspaceSection>
@@ -552,28 +1102,61 @@ export function AudioEditorWorkspace({
               <AdminWorkspaceSection
                 icon="Music"
                 title="Sound and Transcript"
-                note="Choose exact Media revisions. Review keeps those selections with the version."
+                note="Choose exact Media revisions. Review locks these selections into immutable version history."
               >
                 <div className="grid gap-4 sm:grid-cols-2">
                   <div className="rounded-xl border border-wk-border bg-wk-bg p-4">
-                    <p className="text-xs font-black text-wk-text">Master Audio</p>
+                    <p className="text-xs font-black text-wk-text">
+                      Master Audio
+                    </p>
+
                     <p className="mt-2 text-xs text-wk-text-muted">
-                      {workspace.master ? `Media ${compactId(workspace.master.assetId)}` : "No master selected."}
+                      {workspace.master
+                        ? `Media ${compactId(
+                            workspace
+                              .master
+                              .assetId,
+                          )}`
+                        : "No master selected."}
                     </p>
+
                     <p className="mt-1 text-[11px] text-wk-text-muted">
-                      {workspace.master?.audioDeliveryVariantId
+                      {workspace.master
+                        ?.audioDeliveryVariantId
                         ? "Full-length delivery is ready."
-                        : "Choose a master before Review."}
+                        : "A full-length delivery is required before Review."}
                     </p>
+
                     {editable ? (
                       <div className="mt-3 flex gap-2">
-                        <button type="button" onClick={() => setPicker("master")} className="wk-button wk-button-ghost wk-button-sm">
-                          {workspace.master ? "Replace Master" : "Choose Master"}
+                        <button
+                          type="button"
+                          onClick={() =>
+                            setPicker(
+                              "master",
+                            )
+                          }
+                          className="wk-button wk-button-ghost wk-button-sm"
+                        >
+                          {workspace.master
+                            ? "Replace Master"
+                            : "Choose Master"}
                         </button>
+
                         {workspace.master ? (
                           <button
                             type="button"
-                            onClick={() => run("master", () => setAudioMaster(workspace, null), "Master cleared.")}
+                            onClick={() =>
+                              run(
+                                "master",
+                                () =>
+                                  setAudioMaster(
+                                    workspace,
+                                    null,
+                                  ),
+                                "Master cleared.",
+                              )
+                            }
                             className="wk-button wk-button-ghost wk-button-sm text-wk-danger"
                           >
                             Clear
@@ -584,22 +1167,54 @@ export function AudioEditorWorkspace({
                   </div>
 
                   <div className="rounded-xl border border-wk-border bg-wk-bg p-4">
-                    <p className="text-xs font-black text-wk-text">Transcript</p>
+                    <p className="text-xs font-black text-wk-text">
+                      Transcript
+                    </p>
+
                     <p className="mt-2 text-xs text-wk-text-muted">
-                      {workspace.transcript ? `Media ${compactId(workspace.transcript.assetId)}` : "No transcript selected."}
+                      {workspace.transcript
+                        ? `Media ${compactId(
+                            workspace
+                              .transcript
+                              .assetId,
+                          )}`
+                        : "No transcript selected."}
                     </p>
+
                     <p className="mt-1 text-[11px] text-wk-text-muted">
-                      A public Transcript must pass Media safety checks before publication.
+                      If present, Transcript Media must pass public-safety checks before publishing.
                     </p>
+
                     {editable ? (
                       <div className="mt-3 flex gap-2">
-                        <button type="button" onClick={() => setPicker("transcript")} className="wk-button wk-button-ghost wk-button-sm">
-                          {workspace.transcript ? "Replace Transcript" : "Choose Transcript"}
+                        <button
+                          type="button"
+                          onClick={() =>
+                            setPicker(
+                              "transcript",
+                            )
+                          }
+                          className="wk-button wk-button-ghost wk-button-sm"
+                        >
+                          {workspace.transcript
+                            ? "Replace Transcript"
+                            : "Choose Transcript"}
                         </button>
+
                         {workspace.transcript ? (
                           <button
                             type="button"
-                            onClick={() => run("transcript", () => setAudioTranscript(workspace, null), "Transcript cleared.")}
+                            onClick={() =>
+                              run(
+                                "transcript",
+                                () =>
+                                  setAudioTranscript(
+                                    workspace,
+                                    null,
+                                  ),
+                                "Transcript cleared.",
+                              )
+                            }
                             className="wk-button wk-button-ghost wk-button-sm text-wk-danger"
                           >
                             Clear
@@ -613,51 +1228,114 @@ export function AudioEditorWorkspace({
                 {mediaContext?.deliveryUrl ? (
                   <div className="mt-5 space-y-3 border-t border-wk-border pt-5">
                     <audio
-                      ref={audioRef}
                       controls
                       preload="metadata"
-                      src={mediaContext.deliveryUrl}
-                      onTimeUpdate={(event) => {
-                        const next = event.currentTarget.currentTime;
-                        setPlayhead(next);
-                        setChapterCursor(next);
-                      }}
-                      onSeeked={(event) => {
-                        const next = event.currentTarget.currentTime;
-                        setPlayhead(next);
-                        setChapterCursor(next);
-                      }}
+                      src={
+                        mediaContext
+                          .deliveryUrl
+                      }
                       className="w-full"
                     />
 
                     <MediaTimeline
-                      waveformUrl={mediaContext.waveformUrl}
-                      durationSeconds={mediaContext.durationSeconds}
-                      currentTime={playhead}
-                      interactive={editable}
-                      onSeek={seekPreview}
-                      onAnchorChange={(anchor) => setChapterCursor(anchor.startSeconds)}
-                      chapters={chapters.map((chapter) => ({
-                        id: chapter.id ?? `chapter-${chapter.chapterNumber}`,
-                        timeSeconds: chapter.startSeconds,
-                        label: chapter.title || `Chapter ${chapter.chapterNumber}`,
-                      }))}
+                      waveformUrl={
+                        mediaContext
+                          .waveformUrl
+                      }
+                      durationSeconds={
+                        mediaContext
+                          .durationSeconds
+                      }
+                      currentTime={0}
+                      interactive={
+                        false
+                      }
+                      chapters={chapters.map(
+                        (chapter) => ({
+                          id:
+                            chapter.id ??
+                            `chapter-${chapter.chapterNumber}`,
+                          timeSeconds:
+                            chapter.startSeconds,
+                          label:
+                            chapter.title ||
+                            `Chapter ${chapter.chapterNumber}`,
+                        }),
+                      )}
                     />
 
                     <div className="grid gap-2 sm:grid-cols-3 lg:grid-cols-6">
                       {[
-                        ["Duration", mediaContext.durationSeconds ? secondsLabel(mediaContext.durationSeconds) : "Not available"],
-                        ["Format", fact(sourceProbe.format_name)],
-                        ["Codec", fact(audioStream.codec_name)],
-                        ["Sample Rate", fact(audioStream.sample_rate)],
-                        ["Channels", fact(audioStream.channels)],
-                        ["Bitrate", fact(audioStream.bit_rate)],
-                      ].map(([label, value]) => (
-                        <div key={label} className="rounded-lg border border-wk-border bg-wk-bg px-3 py-2">
-                          <p className="text-[9px] font-black uppercase tracking-[0.1em] text-wk-text-faint">{label}</p>
-                          <p className="mt-1 text-xs font-bold text-wk-text">{value}</p>
-                        </div>
-                      ))}
+                        [
+                          "Duration",
+                          mediaContext
+                            .durationSeconds
+                            ? secondsLabel(
+                                mediaContext
+                                  .durationSeconds,
+                              )
+                            : "—",
+                        ],
+                        [
+                          "Format",
+                          fact(
+                            sourceProbe
+                              .format_name,
+                          ),
+                        ],
+                        [
+                          "Codec",
+                          fact(
+                            audioStream
+                              .codec_name,
+                          ),
+                        ],
+                        [
+                          "Sample",
+                          fact(
+                            audioStream
+                              .sample_rate,
+                          ),
+                        ],
+                        [
+                          "Channels",
+                          fact(
+                            audioStream
+                              .channels,
+                          ),
+                        ],
+                        [
+                          "Bitrate",
+                          fact(
+                            audioStream
+                              .bit_rate,
+                          ),
+                        ],
+                      ].map(
+                        ([
+                          label,
+                          value,
+                        ]) => (
+                          <div
+                            key={
+                              label
+                            }
+                            className="rounded-lg border border-wk-border bg-wk-bg px-3 py-2"
+                          >
+                            <p className="text-[9px] font-black uppercase tracking-[0.1em] text-wk-text-faint">
+                              {
+                                label
+                              }
+                            </p>
+
+                            <p className="mt-1 text-xs font-bold text-wk-text">
+                              {
+                                value
+                              }
+                            </p>
+                          </div>
+                        ),
+                      )}
                     </div>
                   </div>
                 ) : null}
@@ -666,59 +1344,126 @@ export function AudioEditorWorkspace({
               <AdminWorkspaceSection
                 icon="ListMusic"
                 title="Chapters"
-                note="Move the playhead or click the timeline, then place each Chapter marker."
+                note="Chapter times must rise in order. Saved versions keep their own immutable copy."
                 actions={
                   editable ? (
-                    <button type="button" onClick={addChapter} className="wk-button wk-button-ghost wk-button-sm">
-                      <WkIcon name="Plus" size={14} />
-                      Add at {secondsLabel(chapterCursor || playhead)}
+                    <button
+                      type="button"
+                      onClick={
+                        addChapter
+                      }
+                      className="wk-button wk-button-ghost wk-button-sm"
+                    >
+                      <WkIcon
+                        name="Plus"
+                        size={14}
+                      />
+                      Add Chapter
                     </button>
                   ) : null
                 }
               >
                 <div className="space-y-2">
-                  {chapters.map((chapter, index) => (
-                    <div
-                      key={`${chapter.id ?? "new"}-${index}`}
-                      className="grid gap-2 rounded-xl border border-wk-border bg-wk-bg p-3 sm:grid-cols-[120px_minmax(0,1fr)_auto] sm:items-center"
-                    >
-                      <div>
-                        <p className="font-mono text-xs font-bold text-wk-brand">{secondsLabel(chapter.startSeconds)}</p>
-                        {editable ? (
-                          <button
-                            type="button"
-                            onClick={() => updateChapter(index, { startSeconds: chapterCursor || playhead })}
-                            className="mt-1 text-[10px] font-bold text-wk-text-muted hover:text-wk-brand"
-                          >
-                            Set at Playhead
-                          </button>
-                        ) : null}
+                  {chapters.map(
+                    (
+                      chapter,
+                      index,
+                    ) => (
+                      <div
+                        key={`${
+                          chapter.id ??
+                          "new"
+                        }-${index}`}
+                        className="grid gap-2 rounded-xl border border-wk-border bg-wk-bg p-3 sm:grid-cols-[90px_minmax(0,1fr)_auto]"
+                      >
+                        <input
+                          type="number"
+                          min={0}
+                          step="0.001"
+                          value={
+                            chapter.startSeconds
+                          }
+                          disabled={
+                            !editable
+                          }
+                          aria-label={`Chapter ${index + 1} start seconds`}
+                          onChange={(
+                            event,
+                          ) =>
+                            updateChapter(
+                              index,
+                              {
+                                startSeconds:
+                                  Number(
+                                    event
+                                      .target
+                                      .value,
+                                  ),
+                              },
+                            )
+                          }
+                          className="rounded-lg border border-wk-border bg-wk-surface px-2 py-2 text-sm text-wk-text"
+                        />
+
+                        <input
+                          value={
+                            chapter.title
+                          }
+                          disabled={
+                            !editable
+                          }
+                          onChange={(
+                            event,
+                          ) =>
+                            updateChapter(
+                              index,
+                              {
+                                title:
+                                  event
+                                    .target
+                                    .value,
+                              },
+                            )
+                          }
+                          placeholder={`Chapter ${index + 1}`}
+                          className="rounded-lg border border-wk-border bg-wk-surface px-3 py-2 text-sm text-wk-text"
+                        />
+
+                        <div className="flex items-center gap-2">
+                          <span className="font-mono text-[11px] text-wk-text-muted">
+                            {secondsLabel(
+                              chapter
+                                .startSeconds,
+                            )}
+                          </span>
+
+                          {editable ? (
+                            <button
+                              type="button"
+                              onClick={() =>
+                                removeChapter(
+                                  index,
+                                )
+                              }
+                              className="rounded-lg p-2 text-wk-danger hover:bg-wk-danger-soft"
+                              aria-label={`Remove Chapter ${index + 1}`}
+                            >
+                              <WkIcon
+                                name="Trash2"
+                                size={
+                                  15
+                                }
+                              />
+                            </button>
+                          ) : null}
+                        </div>
                       </div>
-
-                      <input
-                        value={chapter.title}
-                        disabled={!editable}
-                        onChange={(event) => updateChapter(index, { title: event.target.value })}
-                        placeholder={`Chapter ${index + 1}`}
-                        className="rounded-lg border border-wk-border bg-wk-surface px-3 py-2 text-sm text-wk-text"
-                      />
-
-                      {editable ? (
-                        <button
-                          type="button"
-                          onClick={() => removeChapter(index)}
-                          className="rounded-lg p-2 text-wk-danger hover:bg-wk-danger-soft"
-                          aria-label={`Remove Chapter ${index + 1}`}
-                        >
-                          <WkIcon name="Trash2" size={15} />
-                        </button>
-                      ) : null}
-                    </div>
-                  ))}
+                    ),
+                  )}
 
                   {!chapters.length ? (
                     <p className="rounded-xl border border-dashed border-wk-border px-4 py-7 text-center text-xs text-wk-text-muted">
-                      No Chapters yet. Move the playhead to the first marker and add one.
+                      No chapters yet.
                     </p>
                   ) : null}
                 </div>
@@ -726,8 +1471,12 @@ export function AudioEditorWorkspace({
                 {editable ? (
                   <button
                     type="button"
-                    disabled={busy !== null}
-                    onClick={saveChapters}
+                    disabled={
+                      busy !== null
+                    }
+                    onClick={
+                      saveChapters
+                    }
                     className="wk-button wk-button-primary wk-button-sm mt-4 disabled:opacity-50"
                   >
                     Save Chapters
@@ -741,74 +1490,199 @@ export function AudioEditorWorkspace({
             <AdminWorkspaceSection
               icon="Quote"
               title="Credits and Citations"
-              note="Choose governed Trust records by name. Database identities stay behind the attachment controls."
+              note="Audio uses the same governed Trust records as the rest of WAKILISHA."
             >
-              {!workspace.versions.working ? (
+              {!workspace.versions
+                .working ? (
                 <div className="mb-4 rounded-xl border border-wk-border bg-wk-bg px-4 py-3 text-xs text-wk-text-muted">
-                  Save a working version before changing Credits or Citations.
+                  Save a working
+                  version before
+                  attaching Credits or
+                  Citations.
                 </div>
               ) : null}
 
               <div className="grid gap-5 lg:grid-cols-2">
                 <div>
-                  <h3 className="text-xs font-black text-wk-text">Credits</h3>
+                  <h3 className="text-xs font-black text-wk-text">
+                    Credits
+                  </h3>
+
                   <div className="mt-2 space-y-2">
-                    {workspace.trust.credits.map((credit) => (
-                      <div key={credit.attachmentId} className="flex items-center gap-3 rounded-lg border border-wk-border bg-wk-bg px-3 py-2">
-                        <span className="min-w-0 flex-1">
-                          <span className="block truncate text-xs font-bold text-wk-text">{credit.displayName}</span>
-                          <span className="block text-[11px] text-wk-text-muted">
-                            {credit.roleLabel || humanize(credit.creditRole)}
+                    {workspace.trust.credits.map(
+                      (credit) => (
+                        <div
+                          key={
+                            credit.attachmentId
+                          }
+                          className="flex items-center gap-3 rounded-lg border border-wk-border bg-wk-bg px-3 py-2"
+                        >
+                          <span className="min-w-0 flex-1">
+                            <span className="block truncate text-xs font-bold text-wk-text">
+                              {credit.displayName ||
+                                compactId(
+                                  credit.creditId,
+                                )}
+                            </span>
+
+                            <span className="block text-[11px] text-wk-text-muted">
+                              {humanize(
+                                credit.creditRole,
+                              )}
+                              {credit.roleLabel
+                                ? ` · ${credit.roleLabel}`
+                                : ""}
+                            </span>
                           </span>
-                        </span>
-                        {editable ? (
-                          <button type="button" onClick={() => removeCredit(credit.creditId)} className="text-wk-danger" aria-label={`Remove Credit for ${credit.displayName}`}>
-                            <WkIcon name="X" size={14} />
-                          </button>
-                        ) : null}
-                      </div>
-                    ))}
+
+                          {editable ? (
+                            <button
+                              type="button"
+                              onClick={() =>
+                                removeCredit(
+                                  credit.creditId,
+                                )
+                              }
+                              className="text-wk-danger"
+                              aria-label={`Remove Credit for ${credit.displayName}`}
+                            >
+                              <WkIcon
+                                name="X"
+                                size={14}
+                              />
+                            </button>
+                          ) : null}
+                        </div>
+                      ),
+                    )}
                   </div>
 
-                  {editable && workspace.versions.working ? (
-                    <TrustAttachmentPicker
-                      noun="Credit"
-                      options={creditCandidates}
-                      attachedIds={creditIds}
-                      disabled={busy !== null}
-                      onAttach={(id) => void addCredit(id)}
-                    />
+                  {editable &&
+                  workspace.versions
+                    .working ? (
+                    <div className="mt-3 flex gap-2">
+                      <input
+                        value={
+                          creditInput
+                        }
+                        onChange={(
+                          event,
+                        ) =>
+                          setCreditInput(
+                            event
+                              .target
+                              .value,
+                          )
+                        }
+                        placeholder="Existing Credit ID"
+                        className="min-w-0 flex-1 rounded-lg border border-wk-border bg-wk-bg px-3 py-2 text-xs text-wk-text"
+                      />
+
+                      <button
+                        type="button"
+                        disabled={
+                          !creditInput.trim() ||
+                          busy !==
+                            null
+                        }
+                        onClick={
+                          addCredit
+                        }
+                        className="wk-button wk-button-ghost wk-button-sm disabled:opacity-50"
+                      >
+                        Attach
+                      </button>
+                    </div>
                   ) : null}
                 </div>
 
                 <div>
-                  <h3 className="text-xs font-black text-wk-text">Citations</h3>
+                  <h3 className="text-xs font-black text-wk-text">
+                    Citations
+                  </h3>
+
                   <div className="mt-2 space-y-2">
-                    {workspace.trust.citations.map((citation) => (
-                      <div key={citation.attachmentId} className="flex items-center gap-3 rounded-lg border border-wk-border bg-wk-bg px-3 py-2">
-                        <span className="min-w-0 flex-1">
-                          <span className="block truncate text-xs font-bold text-wk-text">
-                            {citation.publicLabel || "Citation"}
+                    {workspace.trust.citations.map(
+                      (citation) => (
+                        <div
+                          key={
+                            citation.attachmentId
+                          }
+                          className="flex items-center gap-3 rounded-lg border border-wk-border bg-wk-bg px-3 py-2"
+                        >
+                          <span className="min-w-0 flex-1">
+                            <span className="block truncate text-xs font-bold text-wk-text">
+                              {citation.publicLabel ||
+                                compactId(
+                                  citation.citationId,
+                                )}
+                            </span>
+
+                            <span className="block text-[11px] text-wk-text-muted">
+                              {humanize(
+                                citation.citationPurpose,
+                              )}
+                            </span>
                           </span>
-                          <span className="block text-[11px] text-wk-text-muted">{humanize(citation.citationPurpose)}</span>
-                        </span>
-                        {editable ? (
-                          <button type="button" onClick={() => removeCitation(citation.citationId)} className="text-wk-danger" aria-label="Remove Citation">
-                            <WkIcon name="X" size={14} />
-                          </button>
-                        ) : null}
-                      </div>
-                    ))}
+
+                          {editable ? (
+                            <button
+                              type="button"
+                              onClick={() =>
+                                removeCitation(
+                                  citation.citationId,
+                                )
+                              }
+                              className="text-wk-danger"
+                              aria-label="Remove Citation"
+                            >
+                              <WkIcon
+                                name="X"
+                                size={14}
+                              />
+                            </button>
+                          ) : null}
+                        </div>
+                      ),
+                    )}
                   </div>
 
-                  {editable && workspace.versions.working ? (
-                    <TrustAttachmentPicker
-                      noun="Citation"
-                      options={citationCandidates}
-                      attachedIds={citationIds}
-                      disabled={busy !== null}
-                      onAttach={(id) => void addCitation(id)}
-                    />
+                  {editable &&
+                  workspace.versions
+                    .working ? (
+                    <div className="mt-3 flex gap-2">
+                      <input
+                        value={
+                          citationInput
+                        }
+                        onChange={(
+                          event,
+                        ) =>
+                          setCitationInput(
+                            event
+                              .target
+                              .value,
+                          )
+                        }
+                        placeholder="Existing Citation ID"
+                        className="min-w-0 flex-1 rounded-lg border border-wk-border bg-wk-bg px-3 py-2 text-xs text-wk-text"
+                      />
+
+                      <button
+                        type="button"
+                        disabled={
+                          !citationInput.trim() ||
+                          busy !==
+                            null
+                        }
+                        onClick={
+                          addCitation
+                        }
+                        className="wk-button wk-button-ghost wk-button-sm disabled:opacity-50"
+                      >
+                        Attach
+                      </button>
+                    </div>
                   ) : null}
                 </div>
               </div>
@@ -816,11 +1690,20 @@ export function AudioEditorWorkspace({
           ) : null}
 
           {view === "review" ? (
-            <div aria-label="Review always targets one exact immutable version.">
+            <div
+              aria-label="Review always targets one exact immutable version."
+            >
               <AudioReviewWorkspace
-                publicationId={workspace.publication.id}
-                decisionNote={reviewNote}
-                onDecisionNoteChange={setReviewNote}
+                publicationId={
+                  workspace.publication
+                    .id
+                }
+                decisionNote={
+                  reviewNote
+                }
+                onDecisionNoteChange={
+                  setReviewNote
+                }
               />
             </div>
           ) : null}
@@ -829,21 +1712,55 @@ export function AudioEditorWorkspace({
             <AdminWorkspaceSection
               icon="History"
               title="History"
-              note="Lifecycle decisions for this Audio publication."
+              note="Immutable lifecycle transitions for this Audio publication."
             >
               <div className="space-y-4">
-                {workspace.reviewEvents.slice().reverse().map((event) => (
-                  <div key={event.id} className="border-l-2 border-wk-border pl-4">
-                    <p className="text-xs font-black text-wk-text">{humanize(event.action)}</p>
-                    <p className="mt-1 text-[11px] text-wk-text-muted">
-                      {humanize(event.priorStatus ?? "draft")} {" → "} {humanize(event.resultingStatus)}
-                    </p>
-                    {event.reason ? <p className="mt-1 text-xs text-wk-text">{event.reason}</p> : null}
-                  </div>
-                ))}
+                {workspace.reviewEvents
+                  .slice()
+                  .reverse()
+                  .map(
+                    (event) => (
+                      <div
+                        key={
+                          event.id
+                        }
+                        className="border-l-2 border-wk-border pl-4"
+                      >
+                        <p className="text-xs font-black text-wk-text">
+                          {humanize(
+                            event.action,
+                          )}
+                        </p>
 
-                {!workspace.reviewEvents.length ? (
-                  <p className="text-xs text-wk-text-muted">Review has not started.</p>
+                        <p className="mt-1 text-[11px] text-wk-text-muted">
+                          {humanize(
+                            event.priorStatus ??
+                              "draft",
+                          )}
+                          {" → "}
+                          {humanize(
+                            event.resultingStatus,
+                          )}
+                        </p>
+
+                        {event.reason ? (
+                          <p className="mt-1 text-xs text-wk-text">
+                            {
+                              event.reason
+                            }
+                          </p>
+                        ) : null}
+                      </div>
+                    ),
+                  )}
+
+                {!workspace
+                  .reviewEvents
+                  .length ? (
+                  <p className="text-xs text-wk-text-muted">
+                    Review has not
+                    started.
+                  </p>
                 ) : null}
               </div>
             </AdminWorkspaceSection>
@@ -851,35 +1768,99 @@ export function AudioEditorWorkspace({
         </main>
 
         <aside className="space-y-4">
-          <AdminWorkspaceSection icon="GitCommitHorizontal" title="Versions" note="Saved lifecycle versions for this Audio publication.">
+          <AdminWorkspaceSection
+            icon="GitCommitHorizontal"
+            title="Versions"
+            note="Immutable lifecycle identities."
+          >
             <div className="space-y-2">
               {[
-                ["Working", workspace.versions.working],
-                ["Submitted", workspace.versions.submitted],
-                ["Approved", workspace.versions.approved],
-                ["Published", workspace.versions.published],
-              ].map(([label, value]) => (
-                <div key={label} className="flex items-center justify-between gap-3 text-xs">
-                  <span className="flex items-center gap-2 font-bold text-wk-text-muted">
-                    <span className={`h-1.5 w-1.5 rounded-full ${value ? "bg-wk-success" : "bg-wk-border"}`} />
-                    {label}
-                  </span>
-                  <span className="font-mono text-[10px] text-wk-text">{compactId(value)}</span>
-                </div>
-              ))}
+                [
+                  "Working",
+                  workspace.versions
+                    .working,
+                ],
+                [
+                  "Submitted",
+                  workspace.versions
+                    .submitted,
+                ],
+                [
+                  "Approved",
+                  workspace.versions
+                    .approved,
+                ],
+                [
+                  "Published",
+                  workspace.versions
+                    .published,
+                ],
+              ].map(
+                ([
+                  label,
+                  value,
+                ]) => (
+                  <div
+                    key={
+                      label
+                    }
+                    className="flex items-center justify-between gap-3 text-xs"
+                  >
+                    <span className="flex items-center gap-2 font-bold text-wk-text-muted">
+                      <span
+                        className={`h-1.5 w-1.5 rounded-full ${
+                          value
+                            ? "bg-wk-success"
+                            : "bg-wk-border"
+                        }`}
+                      />
+                      {label}
+                    </span>
+
+                    <span className="font-mono text-[10px] text-wk-text">
+                      {compactId(
+                        value,
+                      )}
+                    </span>
+                  </div>
+                ),
+              )}
             </div>
           </AdminWorkspaceSection>
 
           {workspace.feedIdentity ? (
-            <AdminWorkspaceSection icon="Podcast" title="Podcast Delivery" note="Stable delivery identity for podcast clients.">
+            <AdminWorkspaceSection
+              icon="Podcast"
+              title="Podcast Identity"
+              note="Stable across later corrections."
+            >
               <dl className="space-y-3">
                 <div>
-                  <dt className="text-[9px] font-black uppercase tracking-[0.1em] text-wk-text-muted">GUID</dt>
-                  <dd className="mt-1 break-all font-mono text-[10px] text-wk-text">{workspace.feedIdentity.guid}</dd>
+                  <dt className="text-[9px] font-black uppercase tracking-[0.1em] text-wk-text-muted">
+                    GUID
+                  </dt>
+
+                  <dd className="mt-1 break-all font-mono text-[10px] text-wk-text">
+                    {
+                      workspace
+                        .feedIdentity
+                        .guid
+                    }
+                  </dd>
                 </div>
+
                 <div>
-                  <dt className="text-[9px] font-black uppercase tracking-[0.1em] text-wk-text-muted">Enclosure</dt>
-                  <dd className="mt-1 break-all font-mono text-[10px] text-wk-text">{workspace.feedIdentity.enclosureUrl}</dd>
+                  <dt className="text-[9px] font-black uppercase tracking-[0.1em] text-wk-text-muted">
+                    Enclosure
+                  </dt>
+
+                  <dd className="mt-1 break-all font-mono text-[10px] text-wk-text">
+                    {
+                      workspace
+                        .feedIdentity
+                        .enclosureUrl
+                    }
+                  </dd>
                 </div>
               </dl>
             </AdminWorkspaceSection>
@@ -888,32 +1869,69 @@ export function AudioEditorWorkspace({
       </div>
 
       <MediaPickerModal
-        open={picker === "master"}
-        onClose={() => setPicker(null)}
+        open={
+          picker === "master"
+        }
+        onClose={() =>
+          setPicker(null)
+        }
         title="Choose Master Audio"
         allowedKinds={["audio"]}
-        onSelect={(assetId) => {
+        onSelect={(
+          assetId,
+        ) => {
           setPicker(null);
+
           if (!assetId) {
-            setMessage("Register the Audio in Media before selecting it.");
+            setMessage(
+              "Register the Audio in Media before selecting it.",
+            );
             return;
           }
-          void run("master", () => setAudioMaster(workspace, assetId), "Master audio selected.");
+
+          void run(
+            "master",
+            () =>
+              setAudioMaster(
+                workspace,
+                assetId,
+              ),
+            "Master audio selected.",
+          );
         }}
       />
 
       <MediaPickerModal
-        open={picker === "transcript"}
-        onClose={() => setPicker(null)}
+        open={
+          picker ===
+          "transcript"
+        }
+        onClose={() =>
+          setPicker(null)
+        }
         title="Choose Transcript"
         allowedKinds={["transcript"]}
-        onSelect={(assetId) => {
+        onSelect={(
+          assetId,
+        ) => {
           setPicker(null);
+
           if (!assetId) {
-            setMessage("Register the Transcript in Media before selecting it.");
+            setMessage(
+              "Register the Transcript in Media before selecting it.",
+            );
             return;
           }
-          void run("transcript", () => setAudioTranscript(workspace, assetId), "Transcript selected.");
+
+          void run(
+            "transcript",
+            () =>
+              setAudioTranscript(
+                workspace,
+                assetId,
+              ),
+            "Transcript selected.",
+          );
         }}
       />
     </div>
