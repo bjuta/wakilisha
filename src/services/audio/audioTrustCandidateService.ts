@@ -8,12 +8,20 @@ export interface AudioTrustAttachmentOption {
 
 type RpcResult = {
   data: unknown;
-  error: { message?: string } | null;
+  error: {
+    code?: string;
+    message?: string;
+  } | null;
 };
 
 type AudioTrustCandidateBundle = {
   credits: AudioTrustAttachmentOption[];
   citations: AudioTrustAttachmentOption[];
+};
+
+const EMPTY_CANDIDATES: AudioTrustCandidateBundle = {
+  credits: [],
+  citations: [],
 };
 
 function record(value: unknown): Record<string, unknown> {
@@ -33,6 +41,12 @@ function text(value: unknown): string {
 export async function fetchAudioTrustCandidates(): Promise<AudioTrustCandidateBundle> {
   const rpc = supabase.rpc as unknown as (name: string) => Promise<RpcResult>;
   const { data, error } = await rpc("list_audio_trust_attachment_candidates");
+
+  // Reviewers can open the workbench without having Audio edit capability.
+  // Trust attachment options are only needed when the record itself is editable.
+  if (error?.code === "42501") {
+    return EMPTY_CANDIDATES;
+  }
 
   if (error) {
     throw new Error(error.message || "Trust records could not load.");
