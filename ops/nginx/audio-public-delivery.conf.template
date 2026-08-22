@@ -1,0 +1,22 @@
+# Phase 6B public Audio transport routes.
+#
+# Render __SUPABASE_PROJECT_REF__ to the exact deployment target and include
+# these locations inside the canonical wakilisha.africa HTTPS server block.
+# The upstream Edge Function owns transport only; Audio authority remains in
+# the anonymous public RPCs.
+
+location ~ ^/audio/enclosures/(?<wk_audio_publication_id>[0-9a-fA-F-]{36})\.mp3$ {
+    proxy_ssl_server_name on;
+    proxy_set_header Host __SUPABASE_PROJECT_REF__.supabase.co;
+    proxy_set_header X-Forwarded-Host $host;
+    proxy_set_header X-Forwarded-Proto https;
+    proxy_pass https://__SUPABASE_PROJECT_REF__.supabase.co/functions/v1/audio-public-delivery?kind=enclosure&id=$wk_audio_publication_id;
+}
+
+location ~ ^/audio/shows/(?<wk_audio_show_slug>[a-z0-9]+(?:-[a-z0-9]+)*)/feed\.xml$ {
+    proxy_ssl_server_name on;
+    proxy_set_header Host __SUPABASE_PROJECT_REF__.supabase.co;
+    proxy_set_header X-Forwarded-Host $host;
+    proxy_set_header X-Forwarded-Proto https;
+    proxy_pass https://__SUPABASE_PROJECT_REF__.supabase.co/functions/v1/audio-public-delivery?kind=rss&show=$wk_audio_show_slug;
+}
