@@ -87,7 +87,9 @@ export function decodePublicAudioShow(
       (episode): episode is PublicAudioPublication =>
         episode !== null &&
         episode.publicationKind === "episode" &&
-        episode.show?.id === id,
+        episode.show?.id === id &&
+        episode.show.slug === slug &&
+        episode.canonicalPath === `/shows/${slug}/${episode.slug}`,
     );
 
   if (
@@ -95,8 +97,8 @@ export function decodePublicAudioShow(
     !resourceId ||
     !slug ||
     !title ||
-    canonicalPath !== `/audio/shows/${slug}` ||
-    feedPath !== `/audio/shows/${slug}/feed.xml` ||
+    canonicalPath !== `/shows/${slug}` ||
+    feedPath !== `/shows/${slug}/feed.xml` ||
     episodes.length === 0 ||
     numberValue(showInput.episode_count) !== episodes.length
   ) {
