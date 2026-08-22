@@ -1,0 +1,16 @@
+{
+  "migration_file": "supabase/migrations/20260822173446_phase_6b_m2_audio_ontology_closure.sql",
+  "migration_sha256": "50ecfb306fb47d84ee3e63c1a0bbabeb459622309d1b910c95fcdb8406197c48",
+  "base_main_sha": "ac71daf62df31ff46002d97d3896c651a80ddf17",
+  "preview_project_ref": "lerpljwjxaggphkywnkf",
+  "preview_branch_id": "7e01231c-ec5a-4ca4-a424-2df199c2f77d",
+  "preview_migration_head": "20260822173446",
+  "baseline_replay": "pass",
+  "candidate_apply": "pass",
+  "verifier": "pass",
+  "verifier_file": "scripts/control-plane/verify-phase-6b-m2-audio-ontology-closure.sql",
+  "schema_types_sha256": "5ac57bd6b75d9303454cd185e7d61e0bb58bfc123208018e9516af7b7483fc1e",
+  "schema_migration_count": 41,
+  "schema_migration_head": "20260822173446",
+  "verified_at": "2026-08-22T18:38:06.063Z"
+}

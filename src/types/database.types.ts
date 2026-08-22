@@ -21012,6 +21012,7 @@ export type Database = {
           wp_status: string
         }[]
       }
+      list_audio_trust_attachment_candidates: { Args: never; Returns: Json }
       list_correction_case_events: {
         Args: {
           p_after_event_number?: number
