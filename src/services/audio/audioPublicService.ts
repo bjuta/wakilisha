@@ -23,3 +23,19 @@ export async function getPublicAudioPublication(
 
   return decodePublicAudioPublication(data);
 }
+
+export async function getPublicStandaloneAudio(
+  slug: string,
+): Promise<PublicAudioPublication | null> {
+  const publication = await getPublicAudioPublication(slug);
+
+  if (
+    !publication ||
+    publication.publicationKind !== "standalone" ||
+    publication.canonicalPath !== `/audio/${publication.slug}`
+  ) {
+    return null;
+  }
+
+  return publication;
+}
