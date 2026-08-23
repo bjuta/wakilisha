@@ -1,9 +1,12 @@
-import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { WkIcon } from "@/components/design-system/Icon";
 import { AdminRecordHeader } from "@/components/design-system/admin/AdminRecordHeader";
 import { AdminSaveState } from "@/components/design-system/admin/AdminSaveState";
 import { AdminStatusBadge } from "@/components/design-system/admin/AdminStatusBadge";
+import {
+  AdminRecordActions,
+  type AdminRecordAction,
+} from "@/components/design-system/admin/AdminRecordActions";
 
 interface Props {
   slug: string;
@@ -89,157 +92,163 @@ export function ArticleEditorHeader({
   permissions,
 }: Props) {
   const navigate = useNavigate();
-  const overflowRef = useRef<HTMLDivElement>(null);
-  const [overflowOpen, setOverflowOpen] = useState(false);
-
   const isPublished = status === "publish";
   const isFuture = status === "future";
-  const shouldShowSubmitForReview =
-    !isPublished && !isFuture && canSubmitForReview;
+  const shouldShowSubmitForReview = !isPublished && !isFuture && canSubmitForReview;
   const shouldShowPublish = userCanPublish && !publishDisabledReason;
-  const canEdit =
-    (!permissions || permissions.canEdit) &&
-    !draftActionsDisabled;
-  const canManagePublication =
-    !permissions || permissions.canPublish;
-  const canDeleteArticle =
-    (!permissions || permissions.canDelete) &&
-    !draftActionsDisabled;
+  const canEdit = (!permissions || permissions.canEdit) && !draftActionsDisabled;
+  const canManagePublication = !permissions || permissions.canPublish;
+  const canDeleteArticle = (!permissions || permissions.canDelete) && !draftActionsDisabled;
 
-  const hasOverflowActions =
-    isPublished ||
-    (isFuture && canManagePublication) ||
-    canDeleteArticle;
+  const actions: AdminRecordAction[] = [];
 
-  useEffect(() => {
-    function handlePointerDown(event: MouseEvent) {
-      if (
-        overflowRef.current &&
-        !overflowRef.current.contains(event.target as Node)
-      ) {
-        setOverflowOpen(false);
-      }
-    }
+  if (!draftActionsDisabled) {
+    actions.push({
+      id: "preview",
+      label: isPreviewing ? "Preparing" : "Preview",
+      icon: isPreviewing ? "Loader2" : "Eye",
+      onClick: () => void onPreview(),
+      disabled: isPreviewing || isSaving,
+      placement: "rail",
+    });
+  }
 
-    function handleKeyDown(event: KeyboardEvent) {
-      if (event.key === "Escape") {
-        setOverflowOpen(false);
-      }
-    }
+  if (canEdit) {
+    actions.push({
+      id: "save",
+      label: "Save",
+      icon: "Save",
+      onClick: onSaveDraft,
+      disabled: isSaving || isPublishing,
+      tone: "secondary",
+      placement: "rail",
+    });
+  }
 
-    document.addEventListener("mousedown", handlePointerDown);
-    document.addEventListener("keydown", handleKeyDown);
+  if (focusMode && onToggleFocusMode) {
+    actions.push({
+      id: "exit-focus",
+      label: "Exit Focus",
+      icon: "PanelLeftOpen",
+      onClick: onToggleFocusMode,
+      placement: "rail",
+    });
+  }
 
-    return () => {
-      document.removeEventListener("mousedown", handlePointerDown);
-      document.removeEventListener("keydown", handleKeyDown);
-    };
-  }, []);
+  if (showArticleDetails && onOpenArticleDetails) {
+    actions.push({
+      id: "details",
+      label: "Details",
+      icon: "PanelRightOpen",
+      onClick: onOpenArticleDetails,
+      title: articleDetailsOpen ? "Close Article Details" : "Open Article Details",
+      placement: "rail",
+    });
+  }
 
-  function renderPrimaryAction() {
-    if (canApproveVersion) {
-      return (
-        <button
-          type="button"
-          onClick={onApproveVersion}
-          disabled={isSaving || isPublishing || reviewActionBusy}
-          className="wk-button wk-button-primary wk-button-sm whitespace-nowrap"
-        >
-          <WkIcon name="ShieldCheck" size={14} />
-          Approve Version
-        </button>
-      );
-    }
+  if (canRequestChanges && canApproveVersion && onRequestChanges) {
+    actions.push({
+      id: "request-changes",
+      label: "Request Changes",
+      icon: "Flag",
+      onClick: onRequestChanges,
+      disabled: isSaving || isPublishing || reviewActionBusy,
+      tone: "secondary",
+      placement: "rail",
+    });
+  }
 
-    if (canRequestChanges) {
-      return (
-        <button
-          type="button"
-          onClick={onRequestChanges}
-          disabled={isSaving || isPublishing || reviewActionBusy}
-          className="wk-button wk-button-primary wk-button-sm whitespace-nowrap"
-        >
-          <WkIcon name="Flag" size={14} />
-          Request Changes
-        </button>
-      );
-    }
+  if (canApproveVersion && onApproveVersion) {
+    actions.push({
+      id: "approve",
+      label: "Approve Version",
+      icon: "ShieldCheck",
+      onClick: onApproveVersion,
+      disabled: isSaving || isPublishing || reviewActionBusy,
+      tone: "primary",
+      placement: "rail",
+    });
+  } else if (canRequestChanges && onRequestChanges) {
+    actions.push({
+      id: "request-changes-primary",
+      label: "Request Changes",
+      icon: "Flag",
+      onClick: onRequestChanges,
+      disabled: isSaving || isPublishing || reviewActionBusy,
+      tone: "primary",
+      placement: "rail",
+    });
+  } else if (shouldShowSubmitForReview) {
+    actions.push({
+      id: "submit-review",
+      label: submitForReviewLabel,
+      icon: "Send",
+      onClick: onSubmitForReview,
+      disabled: isSaving || reviewActionBusy,
+      tone: "primary",
+      placement: "rail",
+    });
+  } else if (isFuture) {
+    actions.push({
+      id: "unschedule",
+      label: "Unschedule",
+      icon: "CalendarX",
+      onClick: onUnpublish,
+      disabled: isSaving || isPublishing,
+      tone: "primary",
+      placement: "rail",
+    });
+  } else if (isPublished && shouldShowPublish) {
+    actions.push({
+      id: "publish",
+      label: isPublishing ? "Updating" : "Update",
+      icon: isPublishing ? "Loader2" : "RefreshCw",
+      onClick: onPublish,
+      disabled: isSaving || isPublishing,
+      tone: "primary",
+      placement: "rail",
+    });
+  } else if (!isPublished && !isFuture && shouldShowPublish) {
+    actions.push({
+      id: "publish",
+      label: isPublishing ? "Publishing" : "Publish",
+      icon: isPublishing ? "Loader2" : "Globe",
+      onClick: onPublish,
+      disabled: isSaving || isPublishing,
+      tone: "primary",
+      placement: "rail",
+    });
+  }
 
-    if (shouldShowSubmitForReview) {
-      return (
-        <button
-          type="button"
-          onClick={onSubmitForReview}
-          disabled={isSaving || reviewActionBusy}
-          className="wk-button wk-button-primary wk-button-sm whitespace-nowrap"
-        >
-          <WkIcon name="Send" size={14} />
-          {submitForReviewLabel}
-        </button>
-      );
-    }
+  if (isPublished) {
+    actions.push({
+      id: "view-live",
+      label: "View Live",
+      icon: "ExternalLink",
+      href: `/magazine/${slug}`,
+      placement: "menu",
+    });
+  }
 
-    if (isFuture) {
-      return (
-        <button
-          type="button"
-          onClick={onUnpublish}
-          disabled={isSaving || isPublishing}
-          className="wk-button wk-button-primary wk-button-sm whitespace-nowrap"
-        >
-          <WkIcon name="CalendarX" size={14} />
-          Unschedule
-        </button>
-      );
-    }
+  if ((isPublished || isFuture) && canManagePublication) {
+    actions.push({
+      id: isFuture ? "unschedule-menu" : "return-draft",
+      label: isFuture ? "Unschedule" : "Return to Draft",
+      icon: "Undo2",
+      onClick: onUnpublish,
+      placement: "menu",
+    });
+  }
 
-    if (isPublished && shouldShowPublish) {
-      return (
-        <button
-          type="button"
-          onClick={onPublish}
-          disabled={isSaving || isPublishing}
-          className="wk-button wk-button-primary wk-button-sm whitespace-nowrap"
-        >
-          {isPublishing ? (
-            <>
-              <WkIcon name="Loader2" size={14} className="animate-spin" />
-              Updating
-            </>
-          ) : (
-            <>
-              <WkIcon name="RefreshCw" size={14} />
-              Update
-            </>
-          )}
-        </button>
-      );
-    }
-
-    if (!isPublished && !isFuture && shouldShowPublish) {
-      return (
-        <button
-          type="button"
-          onClick={onPublish}
-          disabled={isSaving || isPublishing}
-          className="wk-button wk-button-primary wk-button-sm whitespace-nowrap"
-        >
-          {isPublishing ? (
-            <>
-              <WkIcon name="Loader2" size={14} className="animate-spin" />
-              Publishing
-            </>
-          ) : (
-            <>
-              <WkIcon name="Globe" size={14} />
-              Publish
-            </>
-          )}
-        </button>
-      );
-    }
-
-    return null;
+  if (!draftActionsDisabled && canDeleteArticle) {
+    actions.push({
+      id: "trash",
+      label: "Move to Trash",
+      icon: "Trash2",
+      onClick: onDelete,
+      tone: "danger",
+      placement: "menu",
+    });
   }
 
   return (
@@ -285,148 +294,10 @@ export function ArticleEditorHeader({
             locked={draftActionsDisabled}
             lockedLabel={documentModeLabel || "Submitted Version"}
           />
-
-          {!draftActionsDisabled ? (
-            <button
-              type="button"
-              onClick={onPreview}
-              disabled={isPreviewing || isSaving}
-              className="wk-button wk-button-ghost wk-button-sm whitespace-nowrap"
-            >
-              {isPreviewing ? (
-                <>
-                  <WkIcon name="Loader2" size={14} className="animate-spin" />
-                  Preparing
-                </>
-              ) : (
-                <>
-                  <WkIcon name="Eye" size={14} />
-                  Preview
-                </>
-              )}
-            </button>
-          ) : null}
-
-          {canEdit ? (
-            <button
-              type="button"
-              onClick={onSaveDraft}
-              disabled={isSaving || isPublishing}
-              className="wk-button wk-button-secondary wk-button-sm whitespace-nowrap"
-            >
-              <WkIcon name="Save" size={14} />
-              Save
-            </button>
-          ) : null}
-
-          {focusMode && onToggleFocusMode ? (
-            <button
-              type="button"
-              onClick={onToggleFocusMode}
-              className="wk-button wk-button-ghost wk-button-sm whitespace-nowrap"
-            >
-              <WkIcon name="PanelLeftOpen" size={14} />
-              <span className="hidden sm:inline">Exit Focus</span>
-            </button>
-          ) : null}
-
-          {showArticleDetails && onOpenArticleDetails ? (
-            <button
-              type="button"
-              title="Article Details"
-              aria-label="Open Article Details"
-              aria-expanded={articleDetailsOpen}
-              aria-controls="article-write-context-drawer"
-              onClick={onOpenArticleDetails}
-              className="wk-button wk-button-ghost wk-button-sm whitespace-nowrap"
-            >
-              <WkIcon name="PanelRightOpen" size={14} />
-              <span className="hidden sm:inline">Details</span>
-            </button>
-          ) : null}
-
-          {canRequestChanges && canApproveVersion ? (
-            <button
-              type="button"
-              onClick={onRequestChanges}
-              disabled={isSaving || isPublishing || reviewActionBusy}
-              className="wk-button wk-button-secondary wk-button-sm whitespace-nowrap"
-            >
-              <WkIcon name="Flag" size={14} />
-              Request Changes
-            </button>
-          ) : null}
-
-          {renderPrimaryAction()}
-
-          <div
-            ref={overflowRef}
-            className={hasOverflowActions ? "relative" : "hidden"}
-          >
-            <button
-              type="button"
-              aria-label="More Article actions"
-              aria-haspopup="menu"
-              aria-expanded={overflowOpen}
-              onClick={() => setOverflowOpen((current) => !current)}
-              className="wk-button wk-button-ghost wk-button-sm"
-            >
-              <WkIcon name="Ellipsis" size={16} />
-            </button>
-
-            {overflowOpen ? (
-              <div
-                role="menu"
-                className="absolute right-0 top-full z-50 mt-2 w-52 overflow-hidden rounded-xl border border-wk-border bg-wk-surface p-1.5 shadow-lg"
-              >
-                {isPublished ? (
-                  <a
-                    role="menuitem"
-                    href={`/magazine/${slug}`}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-[12px] font-semibold text-wk-text-muted hover:bg-wk-surface-raised hover:text-wk-text"
-                  >
-                    <WkIcon name="ExternalLink" size={14} />
-                    View Live
-                  </a>
-                ) : null}
-
-                {(isPublished || isFuture) && canManagePublication ? (
-                  <button
-                    type="button"
-                    role="menuitem"
-                    onClick={() => {
-                      setOverflowOpen(false);
-                      onUnpublish();
-                    }}
-                    className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-[12px] font-semibold text-wk-text-muted hover:bg-wk-surface-raised hover:text-wk-text"
-                  >
-                    <WkIcon name="Undo2" size={14} />
-                    {isFuture ? "Unschedule" : "Return to Draft"}
-                  </button>
-                ) : null}
-
-                {!draftActionsDisabled && canDeleteArticle ? (
-                  <>
-                    <div className="my-1 h-px bg-wk-border" />
-                    <button
-                      type="button"
-                      role="menuitem"
-                      onClick={() => {
-                        setOverflowOpen(false);
-                        onDelete();
-                      }}
-                      className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-[12px] font-semibold text-wk-danger hover:bg-wk-danger-soft"
-                    >
-                      <WkIcon name="Trash2" size={14} />
-                      Move to Trash
-                    </button>
-                  </>
-                ) : null}
-              </div>
-            ) : null}
-          </div>
+          <AdminRecordActions
+            actions={actions}
+            overflowLabel="More Article actions"
+          />
         </>
       }
       footer={
@@ -438,9 +309,7 @@ export function ArticleEditorHeader({
                 : "Auto-save starts after the first change."}
             </span>
             {publishDisabledReason ? (
-              <span className="font-semibold text-wk-warning">
-                {publishDisabledReason}
-              </span>
+              <span className="font-semibold text-wk-warning">{publishDisabledReason}</span>
             ) : null}
           </div>
         ) : null

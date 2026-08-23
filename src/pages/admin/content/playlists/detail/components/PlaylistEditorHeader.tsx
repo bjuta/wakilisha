@@ -1,18 +1,34 @@
-import { WkIcon, type WkIconName } from "@/components/design-system/Icon";
 import { AdminRecordHeader } from "@/components/design-system/admin/AdminRecordHeader";
 import { AdminSaveState } from "@/components/design-system/admin/AdminSaveState";
-
-// Shell semantics are organization-level now:
-// AdminRecordHeader owns sticky top-0; AdminSaveState owns Saving, Unsaved, and All Saved.
+import {
+  AdminRecordActions,
+  type AdminRecordAction,
+} from "@/components/design-system/admin/AdminRecordActions";
+import type { WkIconName } from "@/components/design-system/Icon";
 
 export interface PlaylistEditorHeaderAction {
+  id?: string;
   label: string;
   icon: WkIconName;
   onClick?: () => void;
   href?: string;
   disabled?: boolean;
   title?: string;
-  tone?: "primary" | "ghost" | "danger";
+  tone?: "primary" | "secondary" | "ghost" | "danger";
+  placement?: "rail" | "menu";
+}
+
+function asRecordAction(
+  action: PlaylistEditorHeaderAction,
+  fallbackId: string,
+): AdminRecordAction {
+  return {
+    ...action,
+    id: action.id || fallbackId,
+    placement:
+      action.placement ||
+      (action.tone === "danger" ? "menu" : "rail"),
+  };
 }
 
 export function PlaylistEditorHeader({
@@ -46,55 +62,46 @@ export function PlaylistEditorHeader({
   primaryAction?: PlaylistEditorHeaderAction | null;
   secondaryActions?: PlaylistEditorHeaderAction[];
 }) {
-  function actionClass(
-    action: PlaylistEditorHeaderAction,
-  ): string {
-    if (action.tone === "danger") {
-      return "wk-button wk-button-ghost wk-button-sm text-wk-danger";
-    }
-    if (action.tone === "primary") {
-      return "wk-button wk-button-primary wk-button-sm";
-    }
-    return "wk-button wk-button-ghost wk-button-sm";
+  const actions: AdminRecordAction[] = [];
+
+  if (canEdit) {
+    actions.push({
+      id: "save",
+      label: "Save",
+      icon: "Save",
+      onClick: onSave,
+      disabled: isDirty || isSaving,
+      title: isDirty
+        ? "Wait for moving changes to finish saving first."
+        : "Save an immutable working version.",
+      tone: "secondary",
+      placement: "rail",
+    });
   }
 
-  function renderAction(
-    action: PlaylistEditorHeaderAction,
-    key: string,
-  ) {
-    const content = (
-      <>
-        <WkIcon name={action.icon} size={14} />
-        {action.label}
-      </>
-    );
+  actions.push({
+    id: "details",
+    label: "Details",
+    icon: "PanelRightOpen",
+    onClick: onToggleDetails,
+    title: detailsOpen ? "Close Playlist details" : "Open Playlist details",
+    tone: "ghost",
+    placement: "rail",
+  });
 
-    if (action.href) {
-      return (
-        <a
-          key={key}
-          href={action.href}
-          target="_blank"
-          rel="noreferrer"
-          title={action.title}
-          className={actionClass(action)}
-        >
-          {content}
-        </a>
-      );
-    }
+  secondaryActions.forEach((action, index) => {
+    actions.push(asRecordAction(action, `secondary-${index}-${action.label}`));
+  });
 
-    return (
-      <button
-        key={key}
-        type="button"
-        onClick={action.onClick}
-        disabled={action.disabled}
-        title={action.title}
-        className={`${actionClass(action)} disabled:opacity-40`}
-      >
-        {content}
-      </button>
+  if (primaryAction) {
+    actions.push(
+      asRecordAction(
+        {
+          ...primaryAction,
+          placement: "rail",
+        },
+        `primary-${primaryAction.label}`,
+      ),
     );
   }
 
@@ -118,41 +125,7 @@ export function PlaylistEditorHeader({
       actions={
         <>
           <AdminSaveState isDirty={isDirty} isSaving={isSaving} />
-
-          {canEdit ? (
-            <button
-              type="button"
-              onClick={onSave}
-              disabled={isDirty || isSaving}
-              title={
-                isDirty
-                  ? "Wait for moving changes to finish saving first."
-                  : "Save an immutable working version."
-              }
-              className="wk-button wk-button-secondary wk-button-sm disabled:opacity-40"
-            >
-              <WkIcon name="Save" size={14} />
-              Save
-            </button>
-          ) : null}
-
-          <button
-            type="button"
-            onClick={onToggleDetails}
-            aria-expanded={detailsOpen}
-            className="wk-button wk-button-ghost wk-button-sm"
-          >
-            <WkIcon name="PanelRightOpen" size={14} />
-            Details
-          </button>
-
-          {secondaryActions.map((action, index) =>
-            renderAction(action, `secondary-${index}`),
-          )}
-
-          {primaryAction
-            ? renderAction(primaryAction, "primary")
-            : null}
+          <AdminRecordActions actions={actions} />
         </>
       }
     />

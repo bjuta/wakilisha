@@ -32,6 +32,19 @@
       ]
     },
     {
+      "id": "admin.record-actions",
+      "path": "src/components/design-system/admin/AdminRecordActions.tsx",
+      "kind": "interaction",
+      "maturity": "canonical",
+      "concept": "semantic record actions, action-rail priority, overflow placement, and destructive action grammar",
+      "authorityOwner": "consumer",
+      "consumers": [
+        "admin:articles",
+        "admin:playlists",
+        "admin:audio"
+      ]
+    },
+    {
       "id": "admin.status-badge",
       "path": "src/components/design-system/admin/AdminStatusBadge.tsx",
       "kind": "presentation",
