@@ -113,6 +113,7 @@ function decodeDocument(
 ): TrackLyricsDocument | null {
   if (!value) return null;
   const row = record(value);
+  const provenance = record(row.provenance);
   const versionId = text(row.version_id ?? row.id);
   if (!versionId) return null;
 
@@ -127,8 +128,12 @@ function decodeDocument(
     sourceKind: text(row.source_kind, "editorial"),
     rightsNote: nullableText(row.rights_note),
     sourceContributionId: nullableText(row.source_contribution_id),
-    sourceContributorLabel: nullableText(row.source_contributor_label),
-    communityRevisionMode: decodeRevisionMode(row.community_revision_mode),
+    sourceContributorLabel: nullableText(
+      row.source_contributor_label ?? provenance.contributor_label,
+    ),
+    communityRevisionMode: decodeRevisionMode(
+      row.community_revision_mode ?? provenance.revision_mode,
+    ),
   };
 }
 
