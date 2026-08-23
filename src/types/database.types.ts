@@ -3386,6 +3386,109 @@ export type Database = {
         }
         Relationships: []
       }
+      resource_version_editorial_metadata: {
+        Row: {
+          created_at: string
+          focus_keyword: string | null
+          metadata_revision: number
+          resource_id: string
+          resource_kind: string
+          seo_description: string | null
+          seo_keywords: string[]
+          seo_title: string | null
+          target_version_id: string
+          target_version_type: string
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          created_at?: string
+          focus_keyword?: string | null
+          metadata_revision?: number
+          resource_id: string
+          resource_kind: string
+          seo_description?: string | null
+          seo_keywords?: string[]
+          seo_title?: string | null
+          target_version_id: string
+          target_version_type: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          created_at?: string
+          focus_keyword?: string | null
+          metadata_revision?: number
+          resource_id?: string
+          resource_kind?: string
+          seo_description?: string | null
+          seo_keywords?: string[]
+          seo_title?: string | null
+          target_version_id?: string
+          target_version_type?: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "resource_version_editorial_metadata_resource_id_fkey"
+            columns: ["resource_id"]
+            isOneToOne: false
+            referencedRelation: "resources"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      resource_version_taxonomy_terms: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          display_order: number
+          resource_id: string
+          resource_kind: string
+          target_version_id: string
+          target_version_type: string
+          taxonomy: string
+          taxonomy_term_id: string
+          term_name_snapshot: string
+          term_slug_snapshot: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          display_order?: number
+          resource_id: string
+          resource_kind: string
+          target_version_id: string
+          target_version_type: string
+          taxonomy: string
+          taxonomy_term_id: string
+          term_name_snapshot: string
+          term_slug_snapshot: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          display_order?: number
+          resource_id?: string
+          resource_kind?: string
+          target_version_id?: string
+          target_version_type?: string
+          taxonomy?: string
+          taxonomy_term_id?: string
+          term_name_snapshot?: string
+          term_slug_snapshot?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "resource_version_taxonomy_terms_resource_id_fkey"
+            columns: ["resource_id"]
+            isOneToOne: false
+            referencedRelation: "resources"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       resources: {
         Row: {
           created_at: string
@@ -4154,6 +4257,24 @@ export type Database = {
         }
         Returns: undefined
       }
+      copy_playlist_working_trust_to_working_successor: {
+        Args: {
+          p_resource_id: string
+          p_source_working_version_id: string
+          p_target_working_version_id: string
+        }
+        Returns: undefined
+      }
+      copy_resource_version_editorial_metadata: {
+        Args: {
+          p_actor_id: string
+          p_source_version_id: string
+          p_source_version_type: string
+          p_target_version_id: string
+          p_target_version_type: string
+        }
+        Returns: undefined
+      }
       correction_article_publication_proof: {
         Args: { p_application_id: string }
         Returns: {
@@ -4293,6 +4414,10 @@ export type Database = {
         Args: { p_item_id: string }
         Returns: string
       }
+      discovery_fingerprint_fragment: {
+        Args: { p_discovery: Json }
+        Returns: Json
+      }
       ensure_article_resource_identity: {
         Args: { p_article_id: string; p_owner_id?: string }
         Returns: string
@@ -4427,6 +4552,10 @@ export type Database = {
         }
         Returns: string[]
       }
+      playlist_version_content_fingerprint_with_discovery: {
+        Args: { p_discovery: Json; p_version_id: string }
+        Returns: string
+      }
       playlist_version_public_presentation_json: {
         Args: { p_version_id: string }
         Returns: Json
@@ -4509,6 +4638,22 @@ export type Database = {
           registry_author_slug: string
           user_username: string
         }[]
+      }
+      resolve_resource_version_identity: {
+        Args: { p_target_version_id: string; p_target_version_type: string }
+        Returns: {
+          resource_id: string
+          resource_kind: string
+          version_kind: string
+        }[]
+      }
+      resource_version_discovery_content_json: {
+        Args: { p_target_version_id: string; p_target_version_type: string }
+        Returns: Json
+      }
+      resource_version_editorial_metadata_json: {
+        Args: { p_target_version_id: string; p_target_version_type: string }
+        Returns: Json
       }
       seed_registry_track_intake_provider_observations: {
         Args: { p_suggestion_id: string }
@@ -20710,6 +20855,10 @@ export type Database = {
           title: string
         }[]
       }
+      get_resource_version_editorial_metadata: {
+        Args: { p_target_version_id: string; p_target_version_type: string }
+        Returns: Json
+      }
       get_taxonomy_article_counts: {
         Args: { p_taxonomy: string }
         Returns: {
@@ -22634,6 +22783,32 @@ export type Database = {
           p_suggestion_id: string
         }
         Returns: Json
+      }
+      save_resource_version_editorial_metadata: {
+        Args: {
+          p_category_ids: string[]
+          p_correlation_id?: string
+          p_expected_metadata_revision: number
+          p_focus_keyword: string
+          p_idempotency_key: string
+          p_seo_description: string
+          p_seo_keywords: string[]
+          p_seo_title: string
+          p_tag_ids: string[]
+          p_target_version_id: string
+          p_target_version_type: string
+        }
+        Returns: {
+          command_receipt_id: string
+          error_code: string
+          error_message: string
+          idempotent_replay: boolean
+          metadata_revision: number
+          receipt_status: string
+          resource_id: string
+          result_payload: Json
+          target_version_id: string
+        }[]
       }
       save_source_version: {
         Args: {

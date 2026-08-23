@@ -14,6 +14,7 @@ import {
   type MediaDerivative,
 } from "@/services/mediaService";
 import { MediaEditModal } from "@/components/admin/media/MediaEditModal";
+import type { MediaPickerPurpose } from "@/types/mediaPicker";
 
 function assetFileKind(asset: MediaAsset): string {
   return asset.file_kind || (asset.mime_type === "application/pdf" ? "document" : asset.media_kind || "other");
@@ -40,13 +41,32 @@ function derivative(
   return asset?.selected_derivatives?.[role] ?? null;
 }
 
+function pickerActionLabel(
+  purpose: MediaPickerPurpose,
+  replace: boolean,
+  selectedKind: string,
+): string {
+  if (purpose === "master_audio") return replace ? "Replace Master Audio" : "Use Master Audio";
+  if (purpose === "transcript") return replace ? "Replace Transcript" : "Use Transcript";
+  if (purpose === "cover_art") return replace ? "Replace Cover Art" : "Use Cover Art";
+  if (purpose === "featured_image") return replace ? "Replace Featured Image" : "Use Featured Image";
+  if (selectedKind === "image") return replace ? "Replace Image" : "Use Image";
+  if (selectedKind === "audio") return replace ? "Replace Audio" : "Use Audio";
+  if (selectedKind === "video") return replace ? "Replace Video" : "Use Video";
+  if (selectedKind === "transcript") return replace ? "Replace Transcript" : "Use Transcript";
+  if (selectedKind === "document") return replace ? "Replace Document" : "Use Document";
+  return replace ? "Replace Media" : "Use Media";
+}
+
 interface Props {
   /** Currently selected asset (if it's a registered asset) */
   selectedAsset: MediaAsset | null;
   /** Always-set URL (either from asset or raw storage file) */
   selectedUrl: string;
-  /** True if we're replacing an existing image */
+  /** True if we are replacing an existing selection. */
   isReplaceMode: boolean;
+  /** Semantic role for the picker confirmation action. */
+  selectionPurpose?: MediaPickerPurpose;
   /** Picker mode: confirm selection */
   onSelect: () => void;
   /** Picker mode: close the modal */
@@ -67,6 +87,7 @@ export function MediaLibraryPreviewPanel({
   selectedAsset,
   selectedUrl,
   isReplaceMode,
+  selectionPurpose = "media",
   onSelect,
   onClose,
   onCopy,
@@ -496,7 +517,7 @@ export function MediaLibraryPreviewPanel({
             className="w-full flex items-center justify-center gap-2 rounded-lg bg-wk-brand px-4 py-2.5 text-[13px] font-bold text-wk-brand-on disabled:opacity-40 transition-all hover:opacity-90 cursor-pointer disabled:cursor-not-allowed whitespace-nowrap"
           >
             <WkIcon name="Check" size={14} />
-            {isReplaceMode ? "Replace Image" : "Use This Image"}
+            {pickerActionLabel(selectionPurpose, isReplaceMode, selectedKind)}
           </button>
         )}
 

@@ -13,6 +13,7 @@ import { AdminRecordHeader } from "@/components/design-system/admin/AdminRecordH
 import { AdminSaveState } from "@/components/design-system/admin/AdminSaveState";
 import { AdminWorkspaceSection } from "@/components/design-system/admin/AdminWorkspaceSection";
 import { EditorialWorkflowRail } from "@/components/design-system/editorial/EditorialWorkflowRail";
+import { EditorialMetadataWorkspace } from "@/components/design-system/editorial/EditorialMetadataWorkspace";
 import { MediaTimeline } from "@/components/design-system/editorial/MediaTimeline";
 import { TrustAttachmentPicker } from "@/components/design-system/trust/TrustAttachmentPicker";
 import {
@@ -47,9 +48,19 @@ import {
   type AudioPublicationWorkspace,
 } from "@/services/audio/audioAdminService";
 import type { TrustAttachmentOption } from "@/components/design-system/trust/TrustAttachmentPicker";
+import {
+  createEditorialTaxonomyTerm,
+  fetchEditorialDiscovery,
+  saveEditorialDiscovery,
+  searchEditorialTaxonomyTerms,
+} from "@/services/editorial/editorialDiscoveryService";
+import type {
+  EditorialDiscoveryDraft,
+  EditorialDiscoveryValue,
+} from "@/types/editorialDiscovery";
 
 type PickerKind = "master" | "transcript" | null;
-type WorkspaceView = "details" | "sound" | "trust" | "review" | "history";
+type WorkspaceView = "details" | "sound" | "discovery" | "trust" | "review" | "history";
 type AudioTrustCandidateBundle = Awaited<
   ReturnType<typeof fetchAudioTrustCandidates>
 >;
@@ -123,6 +134,9 @@ export function AudioEditorWorkspace({
   const [title, setTitle] = useState("");
   const [summary, setSummary] = useState("");
   const [chapters, setChapters] = useState<AudioChapter[]>([]);
+  const [discovery, setDiscovery] = useState<EditorialDiscoveryValue | null>(null);
+  const [discoveryLoading, setDiscoveryLoading] = useState(false);
+  const [discoveryError, setDiscoveryError] = useState<string | null>(null);
   const [reviewNote, setReviewNote] = useState("");
   const [playhead, setPlayhead] = useState(0);
   const [chapterCursor, setChapterCursor] = useState(0);
@@ -221,6 +235,30 @@ export function AudioEditorWorkspace({
     };
   }, [publicationId]);
 
+  useEffect(() => {
+    const versionId = workspace?.versions.working ?? null;
+    if (!versionId) {
+      setDiscovery(null);
+      setDiscoveryLoading(false);
+      setDiscoveryError(null);
+      return;
+    }
+
+    let alive = true;
+    setDiscoveryLoading(true);
+    setDiscoveryError(null);
+    fetchEditorialDiscovery("audio_publication_version", versionId)
+      .then((value) => { if (alive) setDiscovery(value); })
+      .catch((reason) => {
+        if (!alive) return;
+        setDiscovery(null);
+        setDiscoveryError(errorText(reason));
+      })
+      .finally(() => { if (alive) setDiscoveryLoading(false); });
+
+    return () => { alive = false; };
+  }, [workspace?.versions.working]);
+
   const editable = workspace?.canEdit === true && ["draft", "changes_requested"].includes(workspace.publication.status);
   const metadataDirty = Boolean(
     workspace &&
@@ -315,6 +353,23 @@ export function AudioEditorWorkspace({
       setMessage("Working version saved.");
     } catch (reason) {
       setMessage(errorText(reason));
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  const handleDiscoverySave = async (draft: EditorialDiscoveryDraft) => {
+    if (!discovery) return;
+    setBusy("discovery");
+    setMessage(null);
+    try {
+      const saved = await saveEditorialDiscovery(discovery, draft);
+      setDiscovery(saved);
+      await reload();
+      setMessage("Discovery saved.");
+    } catch (reason) {
+      setMessage(errorText(reason));
+      throw reason;
     } finally {
       setBusy(null);
     }
@@ -560,7 +615,7 @@ export function AudioEditorWorkspace({
         onChange={(id) => setView(id as WorkspaceView)}
         groups={[
           { label: "Compose", items: [{ id: "details", label: "Details" }, { id: "sound", label: "Sound & Chapters" }] },
-          { label: "Prepare", items: [{ id: "trust", label: "Credits & Citations" }] },
+          { label: "Prepare", items: [{ id: "discovery", label: "Discovery" }, { id: "trust", label: "Credits & Citations" }] },
           { label: "Workflow", items: [{ id: "review", label: "Review" }] },
           { label: "Record", items: [{ id: "history", label: "History" }] },
         ]}
@@ -808,6 +863,35 @@ export function AudioEditorWorkspace({
             </div>
           ) : null}
 
+          {view === "discovery" ? (
+            <AdminWorkspaceSection
+              icon="Search"
+              title="Discovery"
+              note="Categories, Tags, and search details stay with the exact Audio version."
+            >
+              {!workspace.versions.working ? (
+                <p className="text-xs text-wk-text-muted">
+                  Save a working version before changing Discovery.
+                </p>
+              ) : discoveryLoading ? (
+                <p className="text-xs text-wk-text-muted">Loading Discovery...</p>
+              ) : discovery ? (
+                <EditorialMetadataWorkspace
+                  value={discovery}
+                  disabled={!editable}
+                  saving={busy === "discovery"}
+                  onSearchTerms={searchEditorialTaxonomyTerms}
+                  onCreateTerm={createEditorialTaxonomyTerm}
+                  onSave={handleDiscoverySave}
+                />
+              ) : (
+                <p className="text-xs text-wk-danger">
+                  {discoveryError || "Discovery tools are unavailable."}
+                </p>
+              )}
+            </AdminWorkspaceSection>
+          ) : null}
+
           {view === "trust" ? (
             <AdminWorkspaceSection
               icon="Quote"
@@ -969,6 +1053,7 @@ export function AudioEditorWorkspace({
         onClose={() => setPicker(null)}
         title="Choose Master Audio"
         allowedKinds={["audio"]}
+        selectionPurpose="master_audio"
         onSelect={(assetId) => {
           setPicker(null);
           if (!assetId) {
@@ -984,6 +1069,7 @@ export function AudioEditorWorkspace({
         onClose={() => setPicker(null)}
         title="Choose Transcript"
         allowedKinds={["transcript"]}
+        selectionPurpose="transcript"
         onSelect={(assetId) => {
           setPicker(null);
           if (!assetId) {

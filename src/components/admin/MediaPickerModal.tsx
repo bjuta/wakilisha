@@ -11,6 +11,7 @@ import { createPortal } from "react-dom";
 import { WkIcon } from "@/components/design-system/Icon";
 import { MediaLibraryCore } from "@/components/admin/media/MediaLibraryCore";
 import { MediaLibraryPreviewPanel } from "@/components/admin/media/MediaLibraryPreviewPanel";
+import type { MediaPickerPurpose } from "@/types/mediaPicker";
 import {
   type MediaAsset,
   type MediaFileKind,
@@ -32,6 +33,8 @@ interface Props {
   currentUrl?: string;
   /** Existing consumers default to images/documents. Audio/video are opt-in. */
   allowedKinds?: MediaFileKind[];
+  /** Semantic role for the final picker action. */
+  selectionPurpose?: MediaPickerPurpose;
 }
 
 export function MediaPickerModal({
@@ -41,6 +44,7 @@ export function MediaPickerModal({
   title = "Select Media",
   currentUrl,
   allowedKinds = ["image", "document"],
+  selectionPurpose = "media",
 }: Props) {
   const [selectedUrl, setSelectedUrl] = useState(currentUrl ?? "");
   const [selectedAssetId, setSelectedAssetId] = useState<string | null>(null);
@@ -174,6 +178,7 @@ export function MediaPickerModal({
                 selectedAsset={resolvedAsset}
                 selectedUrl={selectedUrl}
                 isReplaceMode={isReplaceMode}
+                selectionPurpose={selectionPurpose}
                 onSelect={() => {
                   if (selectedUrl) {
                     onSelect(selectedAssetId, selectedUrl);
