@@ -8,6 +8,7 @@ import { WkIcon } from "@/components/design-system/Icon";
 import { useTheme } from "@/components/design-system/theme/ThemeProvider";
 import { Portal } from "@/components/base/Portal";
 import { MobileFullPlayer } from "./MobileFullPlayer";
+import { MobileTopBar } from "./MobileTopBar";
 import { usePendingCommunityActionReplay } from "@/hooks/usePendingCommunityActionReplay";
 import {
   connectAppleMusicForPlayback,
@@ -49,7 +50,7 @@ const MORE_LINKS = [
 const WAKILISHA_THUNDERBOLT_URL =
   "https://media.wakilisha.africa/uploads/1782585460487-2ef3876f-wakilisha-thunderbolt.png";
 
-function MobileMiniPlayer() {
+function MobileMiniPlayer({ scrollVisible }: { scrollVisible: boolean }) {
   const {
     currentTrack,
     isPlaying,
@@ -63,7 +64,6 @@ function MobileMiniPlayer() {
     queue,
   } = usePlayer();
   const location = useLocation();
-  const navVisible = useScrollDirection();
 
   const [appleConnected, setAppleConnected] = useState(() => getApplePlaybackPrefsSnapshot().appleMusicConnected);
   const [appleConnecting, setAppleConnecting] = useState(false);
@@ -120,9 +120,9 @@ function MobileMiniPlayer() {
     <div
       className="phn-miniplayer"
       style={{
-        visibility: navVisible ? "visible" : "hidden",
-        opacity: navVisible ? 1 : 0,
-        transform: navVisible ? "translateY(0) translateZ(0)" : "translateY(16px) translateZ(0)",
+        visibility: scrollVisible ? "visible" : "hidden",
+        opacity: scrollVisible ? 1 : 0,
+        transform: scrollVisible ? "translateY(0) translateZ(0)" : "translateY(16px) translateZ(0)",
         transition: "opacity 0.28s cubic-bezier(.16,1,.3,1), transform 0.28s cubic-bezier(.16,1,.3,1), visibility 0.28s",
       }}
     >
@@ -172,7 +172,7 @@ function MobileMiniPlayer() {
   );
 }
 
-function MobileBottomNav() {
+function MobileBottomNav({ scrollVisible }: { scrollVisible: boolean }) {
   const location = useLocation();
   const authUser = useAuthUser();
   const { theme, toggle } = useTheme();
@@ -180,7 +180,6 @@ function MobileBottomNav() {
   const isLoggedIn =
     !authUser.loading
     && authUser.id.length > 0;
-  const navVisible = useScrollDirection();
   const navItems =
     isLoggedIn
       ? SIGNED_IN_NAV
@@ -216,7 +215,7 @@ function MobileBottomNav() {
   }
 
   const chromeVisible =
-    navVisible || moreOpen;
+    scrollVisible || moreOpen;
 
   return (
     <>
@@ -480,6 +479,7 @@ function MobileBottomNav() {
 
 export function MobileAppLayout() {
   const location = useLocation();
+  const scrollVisible = useScrollDirection();
   const { currentTrack, isFullPlayerOpen } = usePlayer();
   const authUser = useAuthUser();
   const showMobileChrome = !isFullPlayerOpen && location.pathname !== "/auth";
@@ -512,6 +512,11 @@ export function MobileAppLayout() {
             : "calc(52px + max(env(safe-area-inset-bottom), 8px) + 12px)",
       }}
     >
+      {showMobileChrome && (
+        <MobileTopBar
+          scrollVisible={scrollVisible}
+        />
+      )}
       <main className="flex-1">
         <Outlet />
       </main>
@@ -534,8 +539,8 @@ export function MobileAppLayout() {
       )}
       {showMobileChrome && (
         <Portal>
-          {showMiniPlayer && <MobileMiniPlayer />}
-          <MobileBottomNav />
+          {showMiniPlayer && <MobileMiniPlayer scrollVisible={scrollVisible} />}
+          <MobileBottomNav scrollVisible={scrollVisible} />
         </Portal>
       )}
     </div>

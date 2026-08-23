@@ -1,5 +1,9 @@
 import { useMemo } from "react";
 import { Link } from "react-router-dom";
+import {
+  AudioHero,
+  type AudioHeroMetaItem,
+} from "@/components/design-system/audio/AudioHero";
 import { WkIcon } from "@/components/design-system/Icon";
 import { Ch19GradientImage } from "@/components/media/Ch19GradientImage";
 import { PublicTrustSummary } from "@/components/design-system/trust/PublicTrustSummary";
@@ -155,98 +159,79 @@ export function PublicAudioListeningSurface({
     seek(startSeconds);
   };
 
+  const meta: AudioHeroMetaItem[] = [];
+  if (publication.show) {
+    meta.push({ label: publication.show.title, icon: "Radio" });
+  }
+  if (publication.season) {
+    meta.push({ label: `Season ${publication.season.seasonNumber}`, icon: "Layers3" });
+  }
+  if (publication.episodeNumber !== null) {
+    meta.push({ label: `Episode ${publication.episodeNumber}`, icon: "ListOrdered" });
+  }
+  if (activeDuration > 0) {
+    meta.push({ label: formatPlayerClock(activeDuration), icon: "Clock3" });
+  }
+
   return (
     <main>
-      <section className="wk-container-wide px-5 pb-10 pt-10 md:px-6 md:pb-14 md:pt-14">
-        <div className="mx-auto grid max-w-5xl gap-7 lg:grid-cols-[minmax(0,1fr)_320px] lg:items-end">
-          <div>
-            <div className="wk-eyebrow mb-3">
-              {publication.publicationKind === "episode" ? "Episode" : "Audio"}
-            </div>
+      <AudioHero
+        eyebrow={publication.publicationKind === "episode" ? "WAKILISHA Audio · Episode" : "WAKILISHA Audio"}
+        title={publication.title}
+        description={publication.summary}
+        meta={meta}
+        visualLabel={`${publication.title} artwork`}
+        visual={(
+          <Ch19GradientImage
+            slug={publication.slug}
+            name={publication.title}
+          />
+        )}
+        actions={(
+          <>
+            <button
+              type="button"
+              onClick={startListening}
+              className="inline-flex min-h-12 items-center gap-2 rounded-full bg-[var(--wk-text)] px-5 py-3 text-sm font-black text-[var(--wk-bg)] shadow-lg"
+            >
+              <WkIcon
+                name={active && isPlaying ? "Pause" : "Play"}
+                size={17}
+                fill="currentColor"
+              />
+              {active && isPlaying
+                ? "Pause"
+                : active && activeTime > 0
+                  ? "Continue"
+                  : "Listen"}
+            </button>
 
-            {publication.show || publication.season || publication.episodeNumber !== null ? (
-              <div className="mb-3 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs font-bold text-wk-text-muted">
-                {publication.show ? (
-                  <Link
-                    to={showPath(publication.show.slug)}
-                    className="underline-offset-4 hover:text-wk-text hover:underline"
-                  >
-                    {publication.show.title}
-                  </Link>
-                ) : null}
-                {publication.season ? (
-                  <>
-                    {publication.show ? <span className="text-wk-text-faint">·</span> : null}
-                    <span>Season {publication.season.seasonNumber}</span>
-                  </>
-                ) : null}
-                {publication.episodeNumber !== null ? (
-                  <>
-                    {publication.show || publication.season ? <span className="text-wk-text-faint">·</span> : null}
-                    <span>Episode {publication.episodeNumber}</span>
-                  </>
-                ) : null}
-              </div>
-            ) : null}
-
-            <h1 className="max-w-4xl text-4xl font-black tracking-[-0.035em] text-wk-text md:text-6xl">
-              {publication.title}
-            </h1>
-
-            {publication.summary ? (
-              <p className="mt-5 max-w-3xl text-base leading-7 text-wk-text-muted md:text-lg md:leading-8">
-                {publication.summary}
-              </p>
-            ) : null}
-
-            <div className="mt-7 flex flex-wrap items-center gap-3">
+            {active ? (
               <button
                 type="button"
-                onClick={startListening}
-                className="inline-flex min-h-12 items-center gap-2 rounded-full bg-wk-text px-5 py-3 text-sm font-black text-wk-bg"
+                onClick={openFullPlayer}
+                className="inline-flex min-h-12 items-center gap-2 rounded-full border border-[var(--wk-border)] bg-[var(--wk-surface)]/80 px-5 py-3 text-sm font-black text-[var(--wk-text-muted)] backdrop-blur-xl hover:text-[var(--wk-text)]"
               >
-                <WkIcon
-                  name={active && isPlaying ? "Pause" : "Play"}
-                  size={17}
-                  fill="currentColor"
-                />
-                {active && isPlaying
-                  ? "Pause"
-                  : active && activeTime > 0
-                    ? "Continue"
-                    : "Listen"}
+                Open Player
+                <WkIcon name="Expand" size={14} />
               </button>
+            ) : null}
 
-              {active ? (
-                <button
-                  type="button"
-                  onClick={openFullPlayer}
-                  className="inline-flex min-h-12 items-center gap-2 rounded-full border border-wk-border bg-wk-surface px-5 py-3 text-sm font-black text-wk-text-muted hover:text-wk-text"
-                >
-                  Open Player
-                  <i className="ri-expand-diagonal-line" />
-                </button>
-              ) : null}
-
-              <span className="text-xs font-semibold tabular-nums text-wk-text-faint">
-                {active
-                  ? `${formatPlayerClock(activeTime)} / ${formatPlayerClock(activeDuration)}`
-                  : formatPlayerClock(activeDuration)}
-              </span>
-            </div>
-          </div>
-
-          <div className="aspect-square overflow-hidden rounded-[28px] border border-wk-border bg-wk-surface-raised shadow-xl">
-            <Ch19GradientImage
-              slug={publication.slug}
-              name={publication.title}
-            />
-          </div>
-        </div>
-      </section>
+            {publication.show ? (
+              <Link
+                to={showPath(publication.show.slug)}
+                className="inline-flex min-h-12 items-center gap-2 rounded-full border border-[var(--wk-border)] bg-[var(--wk-surface)]/70 px-5 py-3 text-sm font-black text-[var(--wk-text-muted)] backdrop-blur-xl hover:text-[var(--wk-text)]"
+              >
+                View Show
+                <WkIcon name="ArrowUpRight" size={14} />
+              </Link>
+            ) : null}
+          </>
+        )}
+      />
 
       {publication.chapters.length || publication.transcript?.url ? (
-        <section className="wk-container-wide px-5 pb-10 md:px-6 md:pb-14">
+        <section className="wk-container-wide px-5 py-10 md:px-6 md:py-14">
           <div className="mx-auto grid max-w-5xl gap-5 md:grid-cols-[minmax(0,1fr)_280px]">
             {publication.chapters.length ? (
               <div className="rounded-2xl border border-wk-border bg-wk-surface p-5 md:p-6">

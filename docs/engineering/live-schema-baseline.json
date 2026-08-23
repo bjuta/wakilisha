@@ -1,16 +1,16 @@
 {
   "projectRef": "pgzizndxdyhqmtyywjmt",
   "schema": "public,editorial",
-  "generatedAt": "2026-08-23T14:00:16Z",
-  "typesSha256": "517d79b48019994e94ba098b9d46b6392757544fe04b33d8b57bb8d16c691855",
+  "generatedAt": "2026-08-23T18:19:39Z",
+  "typesSha256": "9825f15814de9da8b8249ccaacf4a9ce5daa6fc2a2648fffd4cca57346a2f974",
   "authoritativeMigrationDirectory": "supabase/migrations",
-  "migrationCount": 45,
-  "latestMigration": "20260823133531_track_lyrics_authority.sql",
+  "migrationCount": 48,
+  "latestMigration": "20260823181332_public_artist_search_authority.sql",
   "schemaSeal": {
     "mode": "preview",
     "sourceProjectRef": "ryztjudjxakjnmwfklsq",
-    "migrationHead": "20260823133531",
-    "baseMainSha": "6045f9795c3805b8ca7815ab614a60d11d76c7ad",
+    "migrationHead": "20260823181332",
+    "baseMainSha": "5b398f2b279dbf0d68f2e5e2d6bcc1479f805c8f",
     "previewBranchId": "d2d15da7-d8c5-4b56-9bb2-9b53f76f36ad"
   }
 }

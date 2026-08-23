@@ -178,9 +178,12 @@ const directLazyImports = [
  * - ../pages/shows/detail/page
  * - ../pages/shows/episode/page
  *
- * The current authority is therefore 64 direct lazy imports.
+ * Public Audio directory convergence adds one direct lazy public import:
+ * - ../pages/audio/page
+ *
+ * The current authority is therefore 65 direct lazy imports.
  */
-const expectedDirectLazyImportCount = 64;
+const expectedDirectLazyImportCount = 65;
 
 if (
   directLazyImports.length !==
@@ -244,6 +247,7 @@ for (const homepageModule of expectedEagerModules) {
 for (const requiredModule of [
   "../pages/playlists/page",
   "../pages/playlists/detail/page",
+  "../pages/audio/page",
   "../pages/audio/detail/page",
   "../pages/shows/detail/page",
   "../pages/shows/episode/page",
@@ -385,10 +389,14 @@ const routePaths = [
  * - /shows/:showSlug
  * - /shows/:showSlug/:episodeSlug
  *
- * The current authority is therefore 168 paths. Removing all three declared
- * Phase 6B paths must still reproduce the exact 165-path pre-M1 sequence.
+ * Public Audio directory convergence adds one public route:
+ * - /audio
+ *
+ * The current authority is therefore 169 paths. Removing all four declared
+ * public Audio and Show paths must still reproduce the exact 165-path pre-M1 sequence.
  */
-const expectedRoutePathCount = 168;
+const expectedRoutePathCount = 169;
+const publicAudioIndexPath = "/audio";
 const publicAudioPath = "/audio/:slug";
 const publicShowPath = "/shows/:showSlug";
 const publicShowEpisodePath = "/shows/:showSlug/:episodeSlug";
@@ -400,6 +408,7 @@ if (routePaths.length !== expectedRoutePathCount) {
 }
 
 for (const [routePath, label] of [
+  [publicAudioIndexPath, "Audio Directory"],
   [publicAudioPath, "Standalone Audio"],
   [publicShowPath, "Show"],
   [publicShowEpisodePath, "Show Episode"],
@@ -408,7 +417,7 @@ for (const [routePath, label] of [
     routePaths.filter((candidate) => candidate === routePath).length !== 1
   ) {
     fail(
-      `Phase 6B must retain exactly one ${label} route at ${routePath}`,
+      `Public Audio and Show authority must retain exactly one ${label} route at ${routePath}`,
     );
   }
 }
@@ -424,6 +433,7 @@ if (
 
 const preM1RoutePaths = routePaths.filter(
   (routePath) =>
+    routePath !== publicAudioIndexPath &&
     routePath !== publicAudioPath &&
     routePath !== publicShowPath &&
     routePath !== publicShowEpisodePath,

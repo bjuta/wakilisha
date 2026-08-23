@@ -50,7 +50,7 @@ describe(
       expect(trackSearch).toContain("previewUrl");
       expect(searchPage).toContain("previewUrl: track.previewUrl");
       expect(globalSearch).toContain("previewUrl: track.previewUrl");
-      expect(globalSearch).toContain("See all results");
+      expect(globalSearch).toContain("See All Results");
     });
 
     it("restores Music utilities while keeping spoken Audio grammar distinct", () => {

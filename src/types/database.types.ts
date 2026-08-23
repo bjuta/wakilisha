@@ -4117,6 +4117,65 @@ export type Database = {
           },
         ]
       }
+      track_lyrics_contributions: {
+        Row: {
+          accepted_version_id: string | null
+          contributor_id: string | null
+          created_at: string
+          id: string
+          language_code: string
+          lines: Json
+          plain_text: string
+          review_note: string | null
+          reviewed_at: string | null
+          reviewed_by: string | null
+          source_description: string | null
+          status: string
+          timing_mode: string
+          track_id: string
+        }
+        Insert: {
+          accepted_version_id?: string | null
+          contributor_id?: string | null
+          created_at?: string
+          id?: string
+          language_code?: string
+          lines: Json
+          plain_text: string
+          review_note?: string | null
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          source_description?: string | null
+          status?: string
+          timing_mode?: string
+          track_id: string
+        }
+        Update: {
+          accepted_version_id?: string | null
+          contributor_id?: string | null
+          created_at?: string
+          id?: string
+          language_code?: string
+          lines?: Json
+          plain_text?: string
+          review_note?: string | null
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          source_description?: string | null
+          status?: string
+          timing_mode?: string
+          track_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "track_lyrics_contributions_accepted_version_id_fkey"
+            columns: ["accepted_version_id"]
+            isOneToOne: false
+            referencedRelation: "track_lyrics_versions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       track_lyrics_documents: {
         Row: {
           authority_revision: number
@@ -20710,6 +20769,10 @@ export type Database = {
           isSetofReturn: true
         }
       }
+      get_admin_track_lyrics_contributions: {
+        Args: { p_track_id: string }
+        Returns: Json
+      }
       get_admin_track_lyrics_workspace: {
         Args: { p_track_id: string }
         Returns: Json
@@ -20874,6 +20937,7 @@ export type Database = {
         Args: { p_publication_id: string }
         Returns: Json
       }
+      get_public_audio_index: { Args: { p_limit?: number }; Returns: Json }
       get_public_audio_publication: { Args: { p_slug: string }; Returns: Json }
       get_public_audio_publication_m1: {
         Args: { p_slug: string }
@@ -20907,6 +20971,16 @@ export type Database = {
         Returns: Json
       }
       get_public_playlist: { Args: { p_slug: string }; Returns: Json }
+      get_public_registry_artists_for_search: {
+        Args: { p_limit?: number }
+        Returns: {
+          display_name: string
+          id: string
+          metadata: Json
+          public_image_url: string
+          slug: string
+        }[]
+      }
       get_public_show: { Args: { p_slug: string }; Returns: Json }
       get_public_show_episode: {
         Args: { p_episode_slug: string; p_show_slug: string }
@@ -21698,6 +21772,13 @@ export type Database = {
         Args: { p_staging_record_id: string }
         Returns: Json
       }
+      promote_track_lyrics_contribution_to_draft: {
+        Args: {
+          p_contribution_id: string
+          p_expected_authority_revision: number
+        }
+        Returns: Json
+      }
       public_get_article_correction_notes: {
         Args: { p_slug: string }
         Returns: {
@@ -22127,6 +22208,10 @@ export type Database = {
           decision_status: string
           suggestion_id: string
         }[]
+      }
+      reject_track_lyrics_contribution: {
+        Args: { p_contribution_id: string; p_review_note?: string }
+        Returns: Json
       }
       remove_personal_playlist_item: {
         Args: {
@@ -23356,6 +23441,16 @@ export type Database = {
           p_reason?: string
           p_source_id: string
           p_source_version_id: string
+        }
+        Returns: Json
+      }
+      submit_track_lyrics_contribution: {
+        Args: {
+          p_language_code: string
+          p_lines: Json
+          p_source_description?: string
+          p_timing_mode: string
+          p_track_id: string
         }
         Returns: Json
       }

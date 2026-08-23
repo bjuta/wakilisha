@@ -53,13 +53,21 @@ function chunks<T>(items: T[], size = QUERY_CHUNK_SIZE): T[][] {
   return out;
 }
 
-export function useTrackSearchData() {
+export function useTrackSearchData(enabled = true) {
   const [data, setData] = useState<TrackSearchItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     let alive = true;
+
+    if (!enabled) {
+      setLoading(false);
+      setError(null);
+      return () => {
+        alive = false;
+      };
+    }
 
     const fetchData = async () => {
       setLoading(true);
@@ -121,25 +129,52 @@ export function useTrackSearchData() {
           }
         });
 
-        const artistSlugs = [...new Set(trackArtists.map((ta) => ta.artist_slug).filter(Boolean))] as string[];
+        const artistSlugs = [
+          ...new Set(
+            trackArtists
+              .map((ta) => ta.artist_slug)
+              .filter(Boolean),
+          ),
+        ] as string[];
         const artistGenreMap: Record<string, string> = {};
 
-        for (const slugBatch of chunks(artistSlugs)) {
-          const { data: artistsWithGenres, error: artistErr } = await supabase
-            .from("registry_artists")
-            .select("slug, metadata")
-            .in("slug", slugBatch)
-            .eq("status", "active");
+        const {
+          data: artistsWithGenres,
+          error: artistErr,
+        } = await supabase.rpc(
+          "get_public_registry_artists_for_search",
+          {
+            p_limit: 500,
+          },
+        );
 
-          if (artistErr) {
-            console.error("Failed to fetch artist genres batch:", artistErr.message);
-            continue;
-          }
+        if (artistErr) {
+          console.error(
+            "Failed to fetch artist genres:",
+            artistErr.message,
+          );
+        } else {
+          const wantedSlugs =
+            new Set(artistSlugs);
 
-          ((artistsWithGenres || []) as ArtistGenreRow[]).forEach((a) => {
+          (
+            (artistsWithGenres || []) as
+              ArtistGenreRow[]
+          ).forEach((a) => {
+            if (!wantedSlugs.has(a.slug)) {
+              return;
+            }
+
             const meta = a.metadata || {};
-            const genres = Array.isArray(meta.genres) ? (meta.genres as string[]) : [];
-            if (genres.length > 0) artistGenreMap[a.slug] = genres[0];
+            const genres =
+              Array.isArray(meta.genres)
+                ? (meta.genres as string[])
+                : [];
+
+            if (genres.length > 0) {
+              artistGenreMap[a.slug] =
+                genres[0];
+            }
           });
         }
 
@@ -213,7 +248,7 @@ export function useTrackSearchData() {
     return () => {
       alive = false;
     };
-  }, []);
+  }, [enabled]);
 
   return { data, loading, error };
 }

@@ -3,7 +3,11 @@ import {
   useMemo,
   useState,
 } from "react";
-import { WkIcon } from "@/components/design-system/Icon";
+import { useNavigate } from "react-router-dom";
+import {
+  WkIcon,
+  type WkIconName,
+} from "@/components/design-system/Icon";
 import { Ch19GradientImage } from "@/components/media/Ch19GradientImage";
 import { AddToPlaylistButton } from "@/components/playlists/AddToPlaylistButton";
 import { ShareSheet } from "@/components/design-system/share/ShareSheet";
@@ -26,10 +30,26 @@ import {
   formatPlayerClock,
   resolvePlayerExperience,
 } from "@/services/player/playerExperience";
+import { PlayerTopBar } from "./PlayerTopBar";
+import {
+  PlayerContextSheet,
+  type PlayerContextAction,
+} from "./PlayerContextSheet";
+import { PlayerPanelSheet } from "./PlayerPanelSheet";
+import { PlayerQueuePanel } from "./PlayerQueuePanel";
+import { PlayerTimedTextPanel } from "./PlayerTimedTextPanel";
 
 export type PlayerFullMode =
   | "desktop"
   | "mobile";
+
+type PlayerPanel =
+  | "none"
+  | "chapters"
+  | "queue"
+  | "lyrics"
+  | "transcript"
+  | "more";
 
 function availabilityDismissKey(id: string) {
   return `wk-player-unlock-dismissed:${id}`;
@@ -47,11 +67,48 @@ function canonicalShareUrl(path: string | null): string {
     : window.location.href;
 }
 
+function PlayerUtilityButton({
+  icon,
+  label,
+  onClick,
+  active = false,
+  disabled = false,
+}: {
+  icon: WkIconName;
+  label: string;
+  onClick: () => void;
+  active?: boolean;
+  disabled?: boolean;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      disabled={disabled}
+      className={[
+        "flex min-w-0 flex-col items-center justify-center gap-1.5 rounded-2xl border px-2 py-2.5 transition-all",
+        active
+          ? "border-[var(--wk-brand)] bg-[var(--wk-brand-soft)] text-[var(--wk-brand)]"
+          : "border-[var(--wk-border)] bg-[var(--wk-surface)]/70 text-[var(--wk-text-muted)] hover:bg-[var(--wk-surface-raised)] hover:text-[var(--wk-text)]",
+        disabled
+          ? "cursor-not-allowed opacity-35"
+          : "",
+      ].join(" ")}
+    >
+      <WkIcon name={icon} size={18} />
+      <span className="max-w-full truncate text-[10px] font-black">
+        {label}
+      </span>
+    </button>
+  );
+}
+
 export function PlayerFullSurface({
   mode,
 }: {
   mode: PlayerFullMode;
 }) {
+  const navigate = useNavigate();
   const {
     currentTrack,
     isPlaying,
@@ -60,6 +117,7 @@ export function PlayerFullSurface({
     progress,
     queue,
     queueIndex,
+    queueOrder,
     repeatMode,
     isShuffle,
     playbackBackend,
@@ -77,17 +135,14 @@ export function PlayerFullSurface({
     toggleRepeat,
     toggleShuffle,
     playFromQueue,
+    moveQueueItem,
+    removeQueueItem,
+    clearUpcoming,
     playTrack,
   } = usePlayer();
 
-  const [panel, setPanel] = useState<
-    | "none"
-    | "chapters"
-    | "queue"
-    | "lyrics"
-    | "transcript"
-    | "details"
-  >("none");
+  const [panel, setPanel] =
+    useState<PlayerPanel>("none");
   const [appleConnected, setAppleConnected] = useState(
     () => getApplePlaybackPrefsSnapshot().appleMusicConnected,
   );
@@ -251,14 +306,14 @@ export function PlayerFullSurface({
             />
           </div>
           <h1 className="mt-5 text-xl font-black">
-            Nothing playing
+            Nothing Playing
           </h1>
           <button
             type="button"
             onClick={closeFullPlayer}
             className="mt-6 rounded-full bg-[var(--wk-text)] px-5 py-2.5 text-sm font-black text-[var(--wk-bg)]"
           >
-            Go back
+            Go Back
           </button>
         </div>
       </main>
@@ -275,6 +330,9 @@ export function PlayerFullSurface({
   const usesProviderMedia =
     playbackBackend === "youtube" ||
     playbackBackend === "soundcloud";
+  const queueAvailable =
+    experience.capabilities.queue &&
+    (!experience.spokenAudio || queue.length > 1);
   const showContextualUnlock =
     !experience.spokenAudio &&
     experience.availability === "excerpt" &&
@@ -283,6 +341,18 @@ export function PlayerFullSurface({
     !appleConnected &&
     !unlockDismissed &&
     pct >= 0.72;
+  const lyricsTrackSlug =
+    currentTrack.trackSlug || currentTrack.id;
+  const lyricsContributionQuery =
+    currentTrack.registryTrackId
+      ? `?track_id=${encodeURIComponent(currentTrack.registryTrackId)}`
+      : "";
+  const lyricsContributionPath =
+    !experience.spokenAudio &&
+    currentTrack.artistSlug &&
+    lyricsTrackSlug
+      ? `/tracks/${encodeURIComponent(currentTrack.artistSlug)}/${encodeURIComponent(lyricsTrackSlug)}/lyrics/contribute${lyricsContributionQuery}`
+      : null;
 
   const skipBack = () =>
     seek(Math.max(0, currentTime - jump));
@@ -378,18 +448,176 @@ export function PlayerFullSurface({
       (rate) =>
         Math.abs(rate - playbackRate) < 0.01,
     );
-    const next =
+    const nextRate =
       rates[
         currentIndex >= 0
           ? (currentIndex + 1) % rates.length
           : 0
       ];
 
-    setPlaybackRate(next);
+    setPlaybackRate(nextRate);
   };
 
   const shareUrl =
     canonicalShareUrl(experience.canonicalPath);
+
+  const openPanel = (nextPanel: PlayerPanel) => {
+    setPanel(nextPanel);
+  };
+
+  const goTo = (path: string) => {
+    setPanel("none");
+    closeFullPlayer();
+    navigate(path);
+  };
+
+  const contextActions: PlayerContextAction[] = [];
+
+  if (queueAvailable) {
+    contextActions.push({
+      key: "queue",
+      label: "Open Queue",
+      description:
+        queue.length > 1
+          ? "See what is playing now and what comes next."
+          : "See what is playing now.",
+      icon: "ListMusic",
+      onClick: () => openPanel("queue"),
+    });
+  }
+
+  if (
+    !experience.spokenAudio &&
+    (currentTrack.registryTrackId || lyricsContributionPath)
+  ) {
+    contextActions.push({
+      key: "lyrics",
+      label: "Lyrics",
+      description: "Read published Lyrics or contribute them if they are missing.",
+      icon: "MicVocal",
+      onClick: () => {
+        if (currentTrack.registryTrackId) {
+          openPanel("lyrics");
+        } else if (lyricsContributionPath) {
+          goTo(lyricsContributionPath);
+        }
+      },
+    });
+  }
+
+  if (
+    experience.spokenAudio &&
+    experience.capabilities.transcript &&
+    experience.transcript
+  ) {
+    contextActions.push({
+      key: "transcript",
+      label: "View Transcript",
+      description: "Read along and jump to timed lines.",
+      icon: "Captions",
+      onClick: () => openPanel("transcript"),
+    });
+  }
+
+  if (
+    experience.spokenAudio &&
+    experience.capabilities.chapters &&
+    experience.chapters.length
+  ) {
+    contextActions.push({
+      key: "chapters",
+      label: "View Chapters",
+      description: "Jump to a chapter in this Audio.",
+      icon: "ListTree",
+      onClick: () => openPanel("chapters"),
+    });
+  }
+
+  if (
+    experience.spokenAudio &&
+    experience.capabilities.playbackSpeed
+  ) {
+    contextActions.push({
+      key: "speed",
+      label: `Playback Speed ${playbackRate}×`,
+      description: "Playback speed changes with each tap.",
+      icon: "Gauge",
+      onClick: cyclePlaybackRate,
+    });
+  }
+
+  if (
+    !experience.spokenAudio &&
+    experience.capabilities.save
+  ) {
+    contextActions.push({
+      key: "save",
+      label: saved ? "Saved" : "Save Track",
+      description: saved
+        ? "This Track is in your Saved items."
+        : "Keep this Track for later.",
+      icon: "Heart",
+      active: saved,
+      disabled: savePending,
+      onClick: () => void handleSave(),
+    });
+  }
+
+  if (
+    !experience.spokenAudio &&
+    experience.capabilities.moments
+  ) {
+    contextActions.push({
+      key: "moments",
+      label: "Create Moment",
+      description: "Start a Moment from the time you are hearing now.",
+      icon: "MessageCirclePlus",
+      onClick: () => {
+        setPanel("none");
+        setMomentOpen(true);
+      },
+    });
+  }
+
+  if (experience.capabilities.share) {
+    contextActions.push({
+      key: "share",
+      label: "Share",
+      description: "Share this listen from WAKILISHA.",
+      icon: "Share2",
+      onClick: () => {
+        setPanel("none");
+        setShareOpen(true);
+      },
+    });
+  }
+
+  if (experience.canonicalPath) {
+    contextActions.push({
+      key: "open",
+      label: experience.spokenAudio
+        ? "Open Audio"
+        : "Open Track",
+      description: experience.spokenAudio
+        ? "Open the full Audio page."
+        : "Open the canonical Track page.",
+      icon: "ExternalLink",
+      onClick: () => goTo(experience.canonicalPath as string),
+    });
+  }
+
+  if (
+    !experience.spokenAudio &&
+    currentTrack.artistSlug
+  ) {
+    contextActions.push({
+      key: "artist",
+      label: "View Artist",
+      description: `Open ${currentTrack.artist} on WAKILISHA.`,
+      icon: "UserRound",
+      onClick: () => goTo(`/artists/${currentTrack.artistSlug}`),
+    });
+  }
 
   return (
     <main
@@ -398,7 +626,7 @@ export function PlayerFullSurface({
     >
       <div
         aria-hidden="true"
-        className="absolute inset-0 opacity-20 blur-[90px] saturate-150"
+        className="absolute inset-[-8%] opacity-45 blur-[110px] saturate-150"
         style={{
           backgroundImage:
             currentTrack.artworkUrl
@@ -406,60 +634,48 @@ export function PlayerFullSurface({
               : undefined,
           backgroundPosition: "center",
           backgroundSize: "cover",
-          transform: "scale(1.2)",
+          transform: "scale(1.18)",
         }}
       />
-      <div className="absolute inset-0 bg-gradient-to-b from-[var(--wk-bg)]/45 via-[var(--wk-bg)]/90 to-[var(--wk-bg)]" />
+      <div className="absolute inset-0 bg-gradient-to-b from-black/30 via-[var(--wk-bg)]/84 to-[var(--wk-bg)]" />
 
-      <div className="relative z-10 mx-auto flex min-h-[100dvh] w-full max-w-6xl flex-col px-5 pb-8 pt-4 md:px-8 md:pb-10 md:pt-6">
-        <header className="flex items-center justify-between gap-4">
-          <button
-            type="button"
-            onClick={closeFullPlayer}
-            aria-label="Close player"
-            className="flex h-10 w-10 items-center justify-center rounded-full bg-[var(--wk-surface)]/65 text-[var(--wk-text-muted)] backdrop-blur hover:text-[var(--wk-text)]"
-          >
-            <WkIcon
-              name={isMobile ? "ChevronDown" : "ChevronLeft"}
-              size={20}
-            />
-          </button>
-
-          <div className="min-w-0 flex-1 text-center">
-            <div className="truncate text-[11px] font-black uppercase tracking-[0.14em] text-[var(--wk-text-faint)]">
-              {experience.contextLabel ||
-                (experience.spokenAudio
-                  ? "WAKILISHA Audio"
-                  : "Now playing")}
-            </div>
-          </div>
-
-          <button
-            type="button"
-            onClick={() =>
-              setPanel(
-                panel === "details"
-                  ? "none"
-                  : "details",
-              )
-            }
-            aria-label="Playback details"
-            className="flex h-10 w-10 items-center justify-center rounded-full bg-[var(--wk-surface)]/65 text-[var(--wk-text-muted)] backdrop-blur hover:text-[var(--wk-text)]"
-          >
-            <WkIcon name="MoreHorizontal" size={20} />
-          </button>
-        </header>
+      <div
+        className="relative z-10 mx-auto flex min-h-[100dvh] w-full max-w-6xl flex-col px-5 pb-8 md:px-8 md:pb-10"
+        style={{
+          paddingTop: isMobile
+            ? "max(env(safe-area-inset-top), 16px)"
+            : "24px",
+        }}
+      >
+        <PlayerTopBar
+          mode={mode}
+          label={
+            experience.contextLabel ||
+            (experience.spokenAudio
+              ? "WAKILISHA Audio"
+              : "Now Playing")
+          }
+          onClose={closeFullPlayer}
+          onMore={() => setPanel("more")}
+        />
 
         <div
           className={[
-            "flex flex-1 items-center justify-center gap-8 py-5",
+            "flex flex-1 items-center justify-center gap-7 py-5 md:py-7",
             isMobile
               ? "flex-col"
               : "flex-col lg:flex-row lg:gap-14",
           ].join(" ")}
         >
           <section className="flex w-full max-w-[520px] flex-col items-center">
-            <div className="aspect-square w-full max-w-[420px] overflow-hidden rounded-[26px] bg-[var(--wk-surface-raised)] shadow-2xl md:max-w-[480px]">
+            <div
+              className={[
+                "aspect-square w-full overflow-hidden bg-[var(--wk-surface-raised)] shadow-[0_30px_90px_rgba(0,0,0,0.38)]",
+                isMobile
+                  ? "max-w-[min(82vw,420px)] rounded-[28px]"
+                  : "max-w-[480px] rounded-[30px]",
+              ].join(" ")}
+            >
               {usesProviderMedia ? (
                 <div
                   data-wk-provider-media-host={mode}
@@ -479,11 +695,18 @@ export function PlayerFullSurface({
               )}
             </div>
 
-            <div className="mt-6 w-full max-w-[480px]">
-              <h1 className="text-balance text-center text-[24px] font-black leading-tight tracking-[-0.03em] md:text-[30px]">
+            <div
+              className={[
+                "mt-5 w-full",
+                isMobile
+                  ? "max-w-[min(82vw,420px)] text-left"
+                  : "max-w-[480px] text-left",
+              ].join(" ")}
+            >
+              <h1 className="text-balance text-[25px] font-black leading-tight tracking-[-0.035em] md:text-[30px]">
                 {currentTrack.title}
               </h1>
-              <p className="mt-2 truncate text-center text-sm font-semibold text-[var(--wk-text-muted)]">
+              <p className="mt-2 truncate text-[14px] font-bold text-[var(--wk-text-muted)]">
                 {experience.creatorLabel}
               </p>
             </div>
@@ -505,7 +728,7 @@ export function PlayerFullSurface({
                   onChange={(event) =>
                     seek(Number(event.target.value))
                   }
-                  className="absolute inset-x-0 top-2 h-1 w-full accent-[var(--wk-brand)]"
+                  className="absolute inset-x-0 top-2 h-1.5 w-full accent-[var(--wk-brand)]"
                 />
               </div>
               <div className="flex items-center justify-between text-[11px] font-semibold tabular-nums text-[var(--wk-text-faint)]">
@@ -514,14 +737,14 @@ export function PlayerFullSurface({
               </div>
             </div>
 
-            <div className="mt-5 flex items-center justify-center gap-5">
+            <div className="mt-5 flex items-center justify-center gap-6">
               {experience.spokenAudio ? (
                 <>
                   <button
                     type="button"
                     onClick={skipBack}
                     aria-label={`Back ${jump} seconds`}
-                    className="flex h-12 min-w-12 items-center justify-center rounded-full text-sm font-black text-[var(--wk-text-muted)] hover:bg-[var(--wk-surface-raised)] hover:text-[var(--wk-text)]"
+                    className="flex h-12 min-w-12 items-center justify-center rounded-full text-[13px] font-black text-[var(--wk-text-muted)] hover:bg-[var(--wk-surface-raised)] hover:text-[var(--wk-text)]"
                   >
                     ↺{jump}
                   </button>
@@ -529,11 +752,11 @@ export function PlayerFullSurface({
                     type="button"
                     onClick={togglePlay}
                     aria-label={isPlaying ? "Pause" : "Play"}
-                    className="flex h-16 w-16 items-center justify-center rounded-full bg-[var(--wk-text)] text-[var(--wk-bg)] transition-transform hover:scale-[1.03] active:scale-95"
+                    className="flex h-[74px] w-[74px] items-center justify-center rounded-full bg-[var(--wk-text)] text-[var(--wk-bg)] shadow-xl transition-transform hover:scale-[1.03] active:scale-95"
                   >
                     <WkIcon
                       name={isPlaying ? "Pause" : "Play"}
-                      size={28}
+                      size={31}
                       fill="currentColor"
                     />
                   </button>
@@ -541,7 +764,7 @@ export function PlayerFullSurface({
                     type="button"
                     onClick={skipForward}
                     aria-label={`Forward ${jump} seconds`}
-                    className="flex h-12 min-w-12 items-center justify-center rounded-full text-sm font-black text-[var(--wk-text-muted)] hover:bg-[var(--wk-surface-raised)] hover:text-[var(--wk-text)]"
+                    className="flex h-12 min-w-12 items-center justify-center rounded-full text-[13px] font-black text-[var(--wk-text-muted)] hover:bg-[var(--wk-surface-raised)] hover:text-[var(--wk-text)]"
                   >
                     {jump}↻
                   </button>
@@ -553,19 +776,19 @@ export function PlayerFullSurface({
                     onClick={prev}
                     disabled={!canGoPrev}
                     aria-label="Previous"
-                    className="flex h-11 w-11 items-center justify-center rounded-full text-[var(--wk-text-muted)] disabled:opacity-25"
+                    className="flex h-12 w-12 items-center justify-center rounded-full text-[var(--wk-text-muted)] transition-colors hover:text-[var(--wk-text)] disabled:opacity-25"
                   >
-                    <WkIcon name="SkipBack" size={22} />
+                    <WkIcon name="SkipBack" size={25} fill="currentColor" />
                   </button>
                   <button
                     type="button"
                     onClick={togglePlay}
                     aria-label={isPlaying ? "Pause" : "Play"}
-                    className="flex h-16 w-16 items-center justify-center rounded-full bg-[var(--wk-text)] text-[var(--wk-bg)] transition-transform hover:scale-[1.03] active:scale-95"
+                    className="flex h-[74px] w-[74px] items-center justify-center rounded-full bg-[var(--wk-text)] text-[var(--wk-bg)] shadow-xl transition-transform hover:scale-[1.03] active:scale-95"
                   >
                     <WkIcon
                       name={isPlaying ? "Pause" : "Play"}
-                      size={28}
+                      size={31}
                       fill="currentColor"
                     />
                   </button>
@@ -574,176 +797,91 @@ export function PlayerFullSurface({
                     onClick={next}
                     disabled={!canGoNext}
                     aria-label="Next"
-                    className="flex h-11 w-11 items-center justify-center rounded-full text-[var(--wk-text-muted)] disabled:opacity-25"
+                    className="flex h-12 w-12 items-center justify-center rounded-full text-[var(--wk-text-muted)] transition-colors hover:text-[var(--wk-text)] disabled:opacity-25"
                   >
-                    <WkIcon name="SkipForward" size={22} />
+                    <WkIcon name="SkipForward" size={25} fill="currentColor" />
                   </button>
                 </>
               )}
             </div>
 
-            <div className="mt-5 flex flex-wrap items-center justify-center gap-2">
-              {experience.spokenAudio &&
-              experience.capabilities.chapters &&
-              experience.chapters.length ? (
-                <button
-                  type="button"
-                  onClick={() =>
-                    setPanel(
-                      panel === "chapters" ? "none" : "chapters",
-                    )
-                  }
-                  className="rounded-full border border-[var(--wk-border)] bg-[var(--wk-surface)]/70 px-4 py-2 text-xs font-black text-[var(--wk-text-muted)] hover:text-[var(--wk-text)]"
-                >
-                  Chapters
-                </button>
-              ) : null}
-
-              {experience.spokenAudio &&
-              experience.capabilities.transcript &&
-              experience.transcript ? (
-                <button
-                  type="button"
-                  onClick={() =>
-                    setPanel(
-                      panel === "transcript" ? "none" : "transcript",
-                    )
-                  }
-                  className="rounded-full border border-[var(--wk-border)] bg-[var(--wk-surface)]/70 px-4 py-2 text-xs font-black text-[var(--wk-text-muted)] hover:text-[var(--wk-text)]"
-                >
-                  Transcript
-                </button>
-              ) : null}
-
-              {experience.spokenAudio &&
-              experience.capabilities.playbackSpeed ? (
-                <button
-                  type="button"
-                  onClick={cyclePlaybackRate}
-                  aria-label="Playback speed"
-                  className="rounded-full border border-[var(--wk-border)] bg-[var(--wk-surface)]/70 px-4 py-2 text-xs font-black text-[var(--wk-text-muted)] hover:text-[var(--wk-text)]"
-                >
-                  {playbackRate}×
-                </button>
-              ) : null}
-
-              {experience.capabilities.queue &&
-              queue.length > 1 ? (
-                <button
-                  type="button"
-                  onClick={() =>
-                    setPanel(panel === "queue" ? "none" : "queue")
-                  }
-                  className="rounded-full border border-[var(--wk-border)] bg-[var(--wk-surface)]/70 px-4 py-2 text-xs font-black text-[var(--wk-text-muted)] hover:text-[var(--wk-text)]"
-                >
-                  Queue
-                </button>
-              ) : null}
-
-              {!experience.spokenAudio &&
-              experience.capabilities.lyrics &&
-              currentTrack.registryTrackId ? (
-                <button
-                  type="button"
-                  onClick={() =>
-                    setPanel(panel === "lyrics" ? "none" : "lyrics")
-                  }
-                  className="rounded-full border border-[var(--wk-border)] bg-[var(--wk-surface)]/70 px-4 py-2 text-xs font-black text-[var(--wk-text-muted)] hover:text-[var(--wk-text)]"
-                >
-                  Lyrics
-                </button>
-              ) : null}
-
-              {!experience.spokenAudio &&
-              experience.capabilities.save ? (
-                <button
-                  type="button"
-                  onClick={() => void handleSave()}
-                  disabled={savePending}
-                  aria-label={saved ? "Saved" : "Save"}
-                  className={[
-                    "flex h-9 w-9 items-center justify-center rounded-full border border-[var(--wk-border)] bg-[var(--wk-surface)]/70",
-                    saved
-                      ? "text-[var(--wk-brand)]"
-                      : "text-[var(--wk-text-muted)]",
-                  ].join(" ")}
-                >
-                  <WkIcon
-                    name="Heart"
-                    size={16}
-                    fill={saved ? "currentColor" : "none"}
+            <div className="mt-6 grid grid-cols-4 gap-2">
+              {experience.spokenAudio ? (
+                <>
+                  <PlayerUtilityButton
+                    icon="ListMusic"
+                    label="Queue"
+                    onClick={() => setPanel("queue")}
+                    active={panel === "queue"}
+                    disabled={!queueAvailable}
                   />
-                </button>
-              ) : null}
-
-              {!experience.spokenAudio &&
-              experience.capabilities.addToPlaylist ? (
-                <AddToPlaylistButton
-                  trackId={currentTrack.registryTrackId}
-                  trackTitle={currentTrack.title}
-                  compact
-                  iconOnly
-                />
-              ) : null}
-
-              {!experience.spokenAudio &&
-              experience.capabilities.moments ? (
-                <button
-                  type="button"
-                  onClick={() => setMomentOpen(true)}
-                  className="rounded-full border border-[var(--wk-border)] bg-[var(--wk-surface)]/70 px-4 py-2 text-xs font-black text-[var(--wk-text-muted)] hover:text-[var(--wk-text)]"
-                >
-                  Moments
-                </button>
-              ) : null}
-
-              {experience.capabilities.share ? (
-                <button
-                  type="button"
-                  onClick={() => setShareOpen(true)}
-                  aria-label="Share"
-                  className="flex h-9 w-9 items-center justify-center rounded-full border border-[var(--wk-border)] bg-[var(--wk-surface)]/70 text-[var(--wk-text-muted)]"
-                >
-                  <WkIcon name="Share2" size={16} />
-                </button>
-              ) : null}
-
-              {!experience.spokenAudio &&
-              experience.capabilities.shuffle ? (
-                <button
-                  type="button"
-                  onClick={toggleShuffle}
-                  className={[
-                    "flex h-9 w-9 items-center justify-center rounded-full border border-[var(--wk-border)] bg-[var(--wk-surface)]/70",
-                    isShuffle
-                      ? "text-[var(--wk-brand)]"
-                      : "text-[var(--wk-text-muted)]",
-                  ].join(" ")}
-                  aria-label="Shuffle"
-                >
-                  <WkIcon name="Shuffle" size={16} />
-                </button>
-              ) : null}
-
-              {!experience.spokenAudio &&
-              experience.capabilities.repeat ? (
-                <button
-                  type="button"
-                  onClick={toggleRepeat}
-                  className={[
-                    "flex h-9 w-9 items-center justify-center rounded-full border border-[var(--wk-border)] bg-[var(--wk-surface)]/70",
-                    repeatMode !== "off"
-                      ? "text-[var(--wk-brand)]"
-                      : "text-[var(--wk-text-muted)]",
-                  ].join(" ")}
-                  aria-label="Repeat"
-                >
-                  <WkIcon
-                    name={repeatMode === "one" ? "Repeat1" : "Repeat2"}
-                    size={16}
+                  <PlayerUtilityButton
+                    icon="Captions"
+                    label="Transcript"
+                    onClick={() => setPanel("transcript")}
+                    active={panel === "transcript"}
+                    disabled={
+                      !experience.capabilities.transcript ||
+                      !experience.transcript
+                    }
                   />
-                </button>
-              ) : null}
+                  <PlayerUtilityButton
+                    icon="ListTree"
+                    label="Chapters"
+                    onClick={() => setPanel("chapters")}
+                    active={panel === "chapters"}
+                    disabled={
+                      !experience.capabilities.chapters ||
+                      !experience.chapters.length
+                    }
+                  />
+                  <PlayerUtilityButton
+                    icon="Gauge"
+                    label={`${playbackRate}×`}
+                    onClick={cyclePlaybackRate}
+                    disabled={!experience.capabilities.playbackSpeed}
+                  />
+                </>
+              ) : (
+                <>
+                  <PlayerUtilityButton
+                    icon="ListMusic"
+                    label="Queue"
+                    onClick={() => setPanel("queue")}
+                    active={panel === "queue"}
+                    disabled={!experience.capabilities.queue}
+                  />
+                  <PlayerUtilityButton
+                    icon="MicVocal"
+                    label="Lyrics"
+                    onClick={() => {
+                      if (currentTrack.registryTrackId) {
+                        setPanel("lyrics");
+                      } else if (lyricsContributionPath) {
+                        goTo(lyricsContributionPath);
+                      }
+                    }}
+                    active={panel === "lyrics"}
+                    disabled={
+                      !currentTrack.registryTrackId &&
+                      !lyricsContributionPath
+                    }
+                  />
+                  <PlayerUtilityButton
+                    icon="Heart"
+                    label={saved ? "Saved" : "Save"}
+                    onClick={() => void handleSave()}
+                    active={saved}
+                    disabled={!experience.capabilities.save || savePending}
+                  />
+                  <PlayerUtilityButton
+                    icon="MessageCirclePlus"
+                    label="Moments"
+                    onClick={() => setMomentOpen(true)}
+                    disabled={!experience.capabilities.moments}
+                  />
+                </>
+              )}
             </div>
 
             <div className="mt-6 flex items-center gap-3">
@@ -767,14 +905,14 @@ export function PlayerFullSurface({
             </div>
 
             {showContextualUnlock ? (
-              <div className="mt-6 rounded-2xl border border-[var(--wk-border)] bg-[var(--wk-surface)]/80 p-4 backdrop-blur">
+              <div className="mt-6 rounded-[22px] border border-[var(--wk-border)] bg-[var(--wk-surface)]/80 p-4 backdrop-blur-xl">
                 <div className="flex items-start gap-4">
                   <div className="min-w-0 flex-1">
                     <div className="text-[11px] font-black uppercase tracking-[0.12em] text-[var(--wk-brand)]">
                       Keep listening
                     </div>
                     <p className="mt-1 text-sm leading-6 text-[var(--wk-text-muted)]">
-                      Connect Apple Music to continue with the full track here.
+                      Connect Apple Music to continue with the full Track here.
                     </p>
                     {appleConnectError ? (
                       <p className="mt-2 text-xs font-semibold text-red-500">
@@ -785,7 +923,7 @@ export function PlayerFullSurface({
                   <button
                     type="button"
                     onClick={dismissUnlock}
-                    aria-label="Dismiss full playback option"
+                    aria-label="Dismiss Full Playback Option"
                     className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-[var(--wk-text-faint)] hover:bg-[var(--wk-surface-raised)] hover:text-[var(--wk-text)]"
                   >
                     <WkIcon name="X" size={16} />
@@ -803,190 +941,151 @@ export function PlayerFullSurface({
                 </button>
               </div>
             ) : null}
-
-            {panel !== "none" ? (
-              <div className="mt-6 max-h-[38vh] overflow-y-auto rounded-2xl border border-[var(--wk-border)] bg-[var(--wk-surface)]/80 p-4 backdrop-blur">
-                {panel === "chapters" ? (
-                  <div>
-                    <h2 className="text-sm font-black">Chapters</h2>
-                    <div className="mt-2 divide-y divide-[var(--wk-border)]">
-                      {experience.chapters.map((chapter) => (
-                        <button
-                          key={chapter.id}
-                          type="button"
-                          onClick={() => seek(chapter.startSeconds)}
-                          className="flex w-full items-center gap-4 py-3 text-left"
-                        >
-                          <span className="w-12 font-mono text-[10px] font-bold text-[var(--wk-brand)]">
-                            {formatPlayerClock(chapter.startSeconds)}
-                          </span>
-                          <span className="text-sm font-bold">
-                            {chapter.title}
-                          </span>
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                ) : null}
-
-                {panel === "queue" ? (
-                  <div>
-                    <h2 className="text-sm font-black">Queue</h2>
-                    <div className="mt-2 space-y-1">
-                      {queue.map((item, index) => (
-                        <button
-                          key={`${item.id}-${index}`}
-                          type="button"
-                          onClick={() => playFromQueue(index)}
-                          className={[
-                            "flex w-full items-center gap-3 rounded-xl px-3 py-2 text-left",
-                            index === queueIndex
-                              ? "bg-[var(--wk-brand-soft)]"
-                              : "hover:bg-[var(--wk-surface-raised)]",
-                          ].join(" ")}
-                        >
-                          <span className="w-5 text-center text-[10px] font-black text-[var(--wk-text-faint)]">
-                            {index === queueIndex ? "●" : index + 1}
-                          </span>
-                          <span className="min-w-0 flex-1 truncate text-sm font-bold">
-                            {item.title}
-                          </span>
-                          <span className="max-w-[42%] truncate text-xs text-[var(--wk-text-muted)]">
-                            {item.artist}
-                          </span>
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                ) : null}
-
-                {panel === "lyrics" ? (
-                  <div>
-                    <h2 className="text-sm font-black">Lyrics</h2>
-                    {lyricsLoading ? (
-                      <p className="mt-3 text-sm text-[var(--wk-text-muted)]">
-                        Loading published Lyrics…
-                      </p>
-                    ) : lyricsError ? (
-                      <p className="mt-3 text-sm text-red-500">
-                        {lyricsError}
-                      </p>
-                    ) : lyrics ? (
-                      <div className="mt-3 space-y-1">
-                        {lyrics.lines.map((line) => (
-                          <button
-                            key={line.id}
-                            type="button"
-                            disabled={line.startSeconds === null}
-                            onClick={() => {
-                              if (line.startSeconds !== null) {
-                                seek(line.startSeconds);
-                              }
-                            }}
-                            className="flex w-full gap-4 rounded-lg px-2 py-1.5 text-left hover:bg-[var(--wk-surface-raised)] disabled:hover:bg-transparent"
-                          >
-                            {line.startSeconds !== null ? (
-                              <span className="w-12 shrink-0 font-mono text-[10px] font-bold text-[var(--wk-brand)]">
-                                {formatPlayerClock(line.startSeconds)}
-                              </span>
-                            ) : null}
-                            <span className="text-sm leading-6">
-                              {line.text}
-                            </span>
-                          </button>
-                        ))}
-                      </div>
-                    ) : (
-                      <p className="mt-3 text-sm text-[var(--wk-text-muted)]">
-                        No published Lyrics are available for this Track yet.
-                      </p>
-                    )}
-                  </div>
-                ) : null}
-
-                {panel === "transcript" ? (
-                  <div>
-                    <div className="flex items-center justify-between gap-3">
-                      <h2 className="text-sm font-black">Transcript</h2>
-                      {experience.transcript?.url ? (
-                        <a
-                          href={experience.transcript.url}
-                          target="_blank"
-                          rel="noreferrer"
-                          className="text-xs font-bold text-[var(--wk-brand)]"
-                        >
-                          Open source
-                        </a>
-                      ) : null}
-                    </div>
-
-                    {transcriptLoading ? (
-                      <p className="mt-3 text-sm text-[var(--wk-text-muted)]">
-                        Loading Transcript…
-                      </p>
-                    ) : transcriptError ? (
-                      <p className="mt-3 text-sm text-[var(--wk-text-muted)]">
-                        {transcriptError}
-                      </p>
-                    ) : transcript ? (
-                      <div className="mt-3 space-y-1">
-                        {transcript.lines.map((line) => (
-                          <button
-                            key={line.id}
-                            type="button"
-                            disabled={line.startSeconds === null}
-                            onClick={() => {
-                              if (line.startSeconds !== null) {
-                                seek(line.startSeconds);
-                              }
-                            }}
-                            className="flex w-full gap-4 rounded-lg px-2 py-1.5 text-left hover:bg-[var(--wk-surface-raised)] disabled:hover:bg-transparent"
-                          >
-                            {line.startSeconds !== null ? (
-                              <span className="w-12 shrink-0 font-mono text-[10px] font-bold text-[var(--wk-brand)]">
-                                {formatPlayerClock(line.startSeconds)}
-                              </span>
-                            ) : null}
-                            <span className="text-sm leading-6">
-                              {line.text}
-                            </span>
-                          </button>
-                        ))}
-                      </div>
-                    ) : null}
-                  </div>
-                ) : null}
-
-                {panel === "details" ? (
-                  <div>
-                    <h2 className="text-sm font-black">Playback</h2>
-                    <dl className="mt-3 grid grid-cols-[auto_1fr] gap-x-4 gap-y-2 text-xs">
-                      <dt className="text-[var(--wk-text-faint)]">Media</dt>
-                      <dd className="font-bold">
-                        {experience.spokenAudio ? "Audio" : "Music"}
-                      </dd>
-                      <dt className="text-[var(--wk-text-faint)]">Available</dt>
-                      <dd className="font-bold capitalize">
-                        {experience.availability}
-                      </dd>
-                      <dt className="text-[var(--wk-text-faint)]">Time</dt>
-                      <dd className="font-bold tabular-nums">
-                        {formatPlayerClock(currentTime)} / {formatPlayerClock(duration)}
-                      </dd>
-                      {experience.spokenAudio ? (
-                        <>
-                          <dt className="text-[var(--wk-text-faint)]">Speed</dt>
-                          <dd className="font-bold">{playbackRate}×</dd>
-                        </>
-                      ) : null}
-                    </dl>
-                  </div>
-                ) : null}
-              </div>
-            ) : null}
           </section>
         </div>
       </div>
+
+      <PlayerPanelSheet
+        open={panel === "queue"}
+        onClose={() => setPanel("none")}
+        mode={mode}
+        title="Queue"
+        eyebrow={experience.spokenAudio ? "Audio" : "Music"}
+      >
+        <PlayerQueuePanel
+          queue={queue}
+          queueIndex={queueIndex}
+          queueOrder={queueOrder}
+          isShuffle={isShuffle}
+          repeatMode={repeatMode}
+          isPlaying={isPlaying}
+          onPlay={playFromQueue}
+          onMove={moveQueueItem}
+          onRemove={removeQueueItem}
+          onClearUpcoming={clearUpcoming}
+          onToggleShuffle={toggleShuffle}
+          onToggleRepeat={toggleRepeat}
+          showMusicControls={!experience.spokenAudio}
+        />
+      </PlayerPanelSheet>
+
+      <PlayerPanelSheet
+        open={panel === "lyrics"}
+        onClose={() => setPanel("none")}
+        mode={mode}
+        title="Lyrics"
+        eyebrow={currentTrack.title}
+      >
+        <PlayerTimedTextPanel
+          variant="lyrics"
+          lines={lyrics?.lines ?? []}
+          currentTime={currentTime}
+          loading={lyricsLoading}
+          error={lyricsError}
+          emptyMessage="No published Lyrics are available for this Track yet."
+          emptyAction={
+            lyricsContributionPath ? (
+              <button
+                type="button"
+                onClick={() => goTo(lyricsContributionPath)}
+                className="wk-button wk-button-primary wk-button-sm"
+              >
+                <WkIcon name="Edit3" size={14} />
+                Contribute Lyrics
+              </button>
+            ) : undefined
+          }
+          onSeek={seek}
+        />
+      </PlayerPanelSheet>
+
+      <PlayerPanelSheet
+        open={panel === "transcript"}
+        onClose={() => setPanel("none")}
+        mode={mode}
+        title="Transcript"
+        eyebrow={currentTrack.title}
+      >
+        <PlayerTimedTextPanel
+          variant="transcript"
+          lines={transcript?.lines ?? []}
+          currentTime={currentTime}
+          loading={transcriptLoading}
+          error={transcriptError}
+          emptyMessage="Transcript is not available for this Audio yet."
+          onSeek={seek}
+          sourceUrl={experience.transcript?.url}
+        />
+      </PlayerPanelSheet>
+
+      <PlayerPanelSheet
+        open={panel === "chapters"}
+        onClose={() => setPanel("none")}
+        mode={mode}
+        title="Chapters"
+        eyebrow={currentTrack.title}
+      >
+        <div className="space-y-1">
+          {experience.chapters.map((chapter, index) => {
+            const nextChapter = experience.chapters[index + 1];
+            const active =
+              chapter.startSeconds <= currentTime &&
+              (
+                !nextChapter ||
+                currentTime < nextChapter.startSeconds
+              );
+
+            return (
+              <button
+                key={chapter.id}
+                type="button"
+                onClick={() => seek(chapter.startSeconds)}
+                className={[
+                  "flex w-full items-center gap-4 rounded-2xl px-3 py-3 text-left transition-colors",
+                  active
+                    ? "bg-[var(--wk-brand-soft)]"
+                    : "hover:bg-[var(--wk-bg)]",
+                ].join(" ")}
+              >
+                <span className="w-12 shrink-0 font-mono text-[10px] font-bold text-[var(--wk-brand)]">
+                  {formatPlayerClock(chapter.startSeconds)}
+                </span>
+                <span className="min-w-0 flex-1 text-[13px] font-black text-[var(--wk-text)]">
+                  {chapter.title}
+                </span>
+                {active ? (
+                  <WkIcon
+                    name="AudioLines"
+                    size={15}
+                    className="text-[var(--wk-brand)]"
+                  />
+                ) : null}
+              </button>
+            );
+          })}
+        </div>
+      </PlayerPanelSheet>
+
+      <PlayerContextSheet
+        open={panel === "more"}
+        onClose={() => setPanel("none")}
+        mode={mode}
+        mediaLabel={experience.spokenAudio ? "Audio" : "Music"}
+        title={currentTrack.title}
+        creator={experience.creatorLabel}
+        artworkUrl={currentTrack.artworkUrl}
+        actions={contextActions}
+        playlistAction={
+          !experience.spokenAudio &&
+          experience.capabilities.addToPlaylist ? (
+            <AddToPlaylistButton
+              trackId={currentTrack.registryTrackId}
+              trackTitle={currentTrack.title}
+              menuRow
+            />
+          ) : null
+        }
+      />
 
       <ShareSheet
         item={{

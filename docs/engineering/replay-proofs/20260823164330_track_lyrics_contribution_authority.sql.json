@@ -1,0 +1,16 @@
+{
+  "migration_file": "supabase/migrations/20260823164330_track_lyrics_contribution_authority.sql",
+  "migration_sha256": "fe4548e775ba729d9bae7903f6255e74d7612408e75167a9872873e3dca0165a",
+  "base_main_sha": "5b398f2b279dbf0d68f2e5e2d6bcc1479f805c8f",
+  "preview_project_ref": "ryztjudjxakjnmwfklsq",
+  "preview_branch_id": "d2d15da7-d8c5-4b56-9bb2-9b53f76f36ad",
+  "preview_migration_head": "20260823164330",
+  "baseline_replay": "pass",
+  "candidate_apply": "pass",
+  "verifier": "pass",
+  "verifier_file": "scripts/control-plane/verify-track-lyrics-contribution-authority.sql",
+  "schema_types_sha256": "e38bae36b969d34b790c40f59ab6cceb8acf636f3d6d07fb9a4c0682a8c23620",
+  "schema_migration_count": 47,
+  "schema_migration_head": "20260823164330",
+  "verified_at": "2026-08-23T16:57:35.741Z"
+}
