@@ -9,6 +9,8 @@ declare global {
 let scriptPromise: Promise<void> | null = null;
 let developerTokenPromise: Promise<string> | null = null;
 let configuredDeveloperToken: string | null = null;
+let playbackRequestSerial = 0;
+let playbackOperation: Promise<void> = Promise.resolve();
 
 function loadMusicKitScript(): Promise<void> {
   if (window.MusicKit) return Promise.resolve();
@@ -114,26 +116,55 @@ export function getExistingMusicKit(): any | null {
   }
 }
 
-export async function playAppleMusicCatalogSong(catalogId: string, userToken?: string | null): Promise<void> {
-  const music = await getAuthorizedMusicKit(userToken);
+export function playAppleMusicCatalogSong(
+  catalogId: string,
+  userToken?: string | null,
+): Promise<void> {
   const songId = String(catalogId).trim();
-
   if (!songId) {
-    throw new Error("Missing Apple Music catalog song id");
+    return Promise.reject(new Error("Missing Apple Music catalog song id"));
   }
 
-  try {
-    await music.setQueue({ song: songId });
-  } catch {
-    await music.setQueue({ songs: [songId] });
-  }
+  const requestId = ++playbackRequestSerial;
 
-  await music.play();
+  const operation = playbackOperation
+    .catch(() => {})
+    .then(async () => {
+      if (requestId !== playbackRequestSerial) return;
+
+      const music = await getAuthorizedMusicKit(userToken);
+      if (requestId !== playbackRequestSerial) return;
+
+      try {
+        await music.setQueue({ song: songId });
+      } catch {
+        if (requestId !== playbackRequestSerial) return;
+        await music.setQueue({ songs: [songId] });
+      }
+
+      if (requestId !== playbackRequestSerial) return;
+      await music.play();
+
+      // A newer WAKILISHA playback request may win while MusicKit is still
+      // fulfilling play(). Silence this stale completion rather than allowing
+      // it to become a phantom second source.
+      if (requestId !== playbackRequestSerial) {
+        if (music?.pause) await music.pause();
+      }
+    });
+
+  playbackOperation = operation;
+  return operation;
 }
 
 export async function pauseAppleMusic(): Promise<void> {
   const music = getExistingMusicKit();
   if (music?.pause) await music.pause();
+}
+
+export async function stopAppleMusic(): Promise<void> {
+  playbackRequestSerial += 1;
+  await pauseAppleMusic();
 }
 
 export async function resumeAppleMusic(): Promise<void> {
@@ -163,19 +194,19 @@ export function getAppleMusicPlaybackSnapshot(): {
   const currentTime = Number(
     music.currentPlaybackTime ??
     player.currentPlaybackTime ??
-    0
+    0,
   );
 
   const duration = Number(
     music.currentPlaybackDuration ??
     player.currentPlaybackDuration ??
-    0
+    0,
   );
 
   const isPlaying = Boolean(
     music.isPlaying ??
     player.isPlaying ??
-    false
+    false,
   );
 
   return { currentTime, duration, isPlaying };
