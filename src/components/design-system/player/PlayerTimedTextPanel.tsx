@@ -20,6 +20,7 @@ export function PlayerTimedTextPanel({
   error,
   emptyMessage,
   emptyAction,
+  footer,
   onSeek,
   sourceUrl,
 }: {
@@ -30,6 +31,7 @@ export function PlayerTimedTextPanel({
   error: string | null;
   emptyMessage: string;
   emptyAction?: ReactNode;
+  footer?: ReactNode;
   onSeek: (time: number) => void;
   sourceUrl?: string | null;
 }) {
@@ -142,6 +144,12 @@ export function PlayerTimedTextPanel({
           );
         })}
       </div>
+
+      {footer ? (
+        <div className="mt-5 border-t border-[var(--wk-border)] pt-4 text-[11px] leading-5 text-[var(--wk-text-faint)]">
+          {footer}
+        </div>
+      ) : null}
     </div>
   );
 }
