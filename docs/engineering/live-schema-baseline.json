@@ -1,16 +1,16 @@
 {
   "projectRef": "pgzizndxdyhqmtyywjmt",
   "schema": "public,editorial",
-  "generatedAt": "2026-08-23T09:59:39Z",
-  "typesSha256": "446dbbbc5fc5b98c84e01ba4981280c978d21a5624e3a5d7fb810efccfec0926",
+  "generatedAt": "2026-08-23T14:00:16Z",
+  "typesSha256": "517d79b48019994e94ba098b9d46b6392757544fe04b33d8b57bb8d16c691855",
   "authoritativeMigrationDirectory": "supabase/migrations",
-  "migrationCount": 43,
-  "latestMigration": "20260823084356_rich_editorial_canonical_primitives_m1.sql",
+  "migrationCount": 45,
+  "latestMigration": "20260823133531_track_lyrics_authority.sql",
   "schemaSeal": {
     "mode": "preview",
-    "sourceProjectRef": "lwghgpcxfnamvpoktpkw",
-    "migrationHead": "20260823084356",
-    "baseMainSha": "58325e457e6eae4097c4f2fcfbfb3c02363c0293",
-    "previewBranchId": "6965e240-da9d-4138-97ff-0e0672f72547"
+    "sourceProjectRef": "ryztjudjxakjnmwfklsq",
+    "migrationHead": "20260823133531",
+    "baseMainSha": "6045f9795c3805b8ca7815ab614a60d11d76c7ad",
+    "previewBranchId": "d2d15da7-d8c5-4b56-9bb2-9b53f76f36ad"
   }
 }

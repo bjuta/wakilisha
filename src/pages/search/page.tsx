@@ -179,8 +179,8 @@ export default function Search() {
 
   const handlePlayTrack = (track: TrackSearchItem) => {
     playTrack(
-      { id: track.slug, registryTrackId: track.id, title: track.title, artist: track.artist, artworkUrl: track.artworkUrl, isPlayable: track.isPlayable, source: track.source, trackSlug: track.slug },
-      [{ id: track.slug, registryTrackId: track.id, title: track.title, artist: track.artist, artworkUrl: track.artworkUrl, isPlayable: track.isPlayable, source: track.source, trackSlug: track.slug }],
+      { id: track.slug, registryTrackId: track.id, title: track.title, artist: track.artist, artworkUrl: track.artworkUrl, isPlayable: track.isPlayable, source: track.source, previewUrl: track.previewUrl ?? undefined, playbackEngine: "audio", artistSlug: track.artistSlug || undefined, trackSlug: track.slug },
+      [{ id: track.slug, registryTrackId: track.id, title: track.title, artist: track.artist, artworkUrl: track.artworkUrl, isPlayable: track.isPlayable, source: track.source, previewUrl: track.previewUrl ?? undefined, playbackEngine: "audio", artistSlug: track.artistSlug || undefined, trackSlug: track.slug }],
       { pageType: "search", sourceSection: "search_results" }
     );
   };

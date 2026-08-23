@@ -67,7 +67,7 @@ export function publicAudioPlayerItem(
         save: false,
         chapters: publication.chapters.length > 0,
         transcript: Boolean(publication.transcript?.url),
-        playbackSpeed: false,
+        playbackSpeed: true,
       },
     },
   );

@@ -1,249 +1,386 @@
-import { useState } from 'react';
-import { Link } from 'react-router-dom';
-import { WkIcon } from '@/components/design-system/Icon';
-interface TimedLyricLine { timestampSeconds: number; text: string; }
-interface TimedLyricsSubmission { id: number; trackSlug: string; status: 'approved' | 'pending_review' | 'draft' | 'rejected'; submitterName: string; lines: TimedLyricLine[]; upvotes: number; downvotes: number; sourceDescription?: string; createdAt: string; }
-const TIMED_LYRICS: Record<string, TimedLyricsSubmission> = {};
-
-type AdminTab = 'pending' | 'approved' | 'all';
-
-function formatTime(seconds: number): string {
-  const m = Math.floor(seconds / 60);
-  const s = Math.floor(seconds % 60);
-  return `${m}:${s.toString().padStart(2, '0')}`;
-}
-
-function VoteBar({ submission }: { submission: TimedLyricsSubmission }) {
-  const total = submission.upvotes + submission.downvotes || 1;
-  const upPct = Math.round((submission.upvotes / total) * 100);
-  const downPct = 100 - upPct;
-
-  return (
-    <div className="flex items-center gap-2">
-      <span className="flex items-center gap-1 text-[12px] font-semibold text-emerald-600">
-        <WkIcon name="ArrowUp" size={12} /> {submission.upvotes}
-      </span>
-      <div className="h-1.5 w-20 overflow-hidden rounded-full bg-[var(--wk-surface-raised)]">
-        <div className="h-full rounded-full bg-emerald-500 transition-all" style={{ width: `${upPct}%` }} />
-      </div>
-      <span className="flex items-center gap-1 text-[12px] text-red-500">
-        <WkIcon name="ArrowDown" size={12} /> {submission.downvotes}
-      </span>
-    </div>
-  );
-}
-
-function StatusBadge({ status }: { status: TimedLyricsSubmission['status'] }) {
-  const config = {
-    approved: 'bg-emerald-500/10 text-emerald-600 border-emerald-500/20',
-    pending_review: 'bg-amber-500/10 text-amber-600 border-amber-500/20',
-    draft: 'bg-gray-500/10 text-gray-500 border-gray-500/20',
-    rejected: 'bg-red-500/10 text-red-600 border-red-500/20',
-  };
-  const label = {
-    approved: 'Approved',
-    pending_review: 'Pending Review',
-    draft: 'Draft',
-    rejected: 'Rejected',
-  };
-  return (
-    <span className={`rounded-full border px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wider ${config[status]}`}>
-      {label[status]}
-    </span>
-  );
-}
+import {
+  useEffect,
+  useMemo,
+  useState,
+} from "react";
+import { Link } from "react-router-dom";
+import { WkIcon } from "@/components/design-system/Icon";
+import {
+  fetchAdminTrackLyricsWorkspace,
+  listLyricsTrackChoices,
+  lyricsDocumentToEditorText,
+  parseLyricsEditorText,
+  publishTrackLyrics,
+  saveTrackLyricsDraft,
+  type AdminTrackLyricsWorkspace,
+  type LyricsTrackChoice,
+} from "@/services/player/trackLyricsService";
 
 export default function AdminLyricsPage() {
-  const [activeTab, setActiveTab] = useState<AdminTab>('pending');
-  const [expandedSubmission, setExpandedSubmission] = useState<number | null>(null);
-  const [editingLines, setEditingLines] = useState<Map<number, TimedLyricLine[]>>(new Map());
-  const [toast, setToast] = useState('');
+  const [tracks, setTracks] = useState<LyricsTrackChoice[]>([]);
+  const [query, setQuery] = useState("");
+  const [selectedTrackId, setSelectedTrackId] = useState<string | null>(null);
+  const [workspace, setWorkspace] = useState<AdminTrackLyricsWorkspace | null>(null);
+  const [languageCode, setLanguageCode] = useState("und");
+  const [timingMode, setTimingMode] = useState<"plain" | "line">("plain");
+  const [editorText, setEditorText] = useState("");
+  const [rightsNote, setRightsNote] = useState("");
+  const [loading, setLoading] = useState(true);
+  const [busy, setBusy] = useState<string | null>(null);
+  const [message, setMessage] = useState<string | null>(null);
 
-  const allSubmissions = Object.values(TIMED_LYRICS);
+  useEffect(() => {
+    let alive = true;
 
-  const filtered = activeTab === 'pending'
-    ? allSubmissions.filter((s) => s.status === 'pending_review')
-    : activeTab === 'approved'
-      ? allSubmissions.filter((s) => s.status === 'approved')
-      : allSubmissions;
+    listLyricsTrackChoices()
+      .then((rows) => {
+        if (alive) setTracks(rows);
+      })
+      .catch((error) => {
+        if (alive) {
+          setMessage(
+            error instanceof Error
+              ? error.message
+              : "Registry Tracks could not load.",
+          );
+        }
+      })
+      .finally(() => {
+        if (alive) setLoading(false);
+      });
 
-  const showToast = (msg: string) => {
-    setToast(msg);
-    setTimeout(() => setToast(''), 2500);
+    return () => {
+      alive = false;
+    };
+  }, []);
+
+  const filteredTracks = useMemo(() => {
+    const needle = query.trim().toLowerCase();
+
+    if (!needle) return tracks.slice(0, 80);
+
+    return tracks
+      .filter(
+        (track) =>
+          track.title.toLowerCase().includes(needle) ||
+          track.slug.toLowerCase().includes(needle),
+      )
+      .slice(0, 80);
+  }, [query, tracks]);
+
+  const hydrate = (next: AdminTrackLyricsWorkspace) => {
+    setWorkspace(next);
+    const source = next.working ?? next.published;
+    setLanguageCode(source?.languageCode ?? "und");
+    setTimingMode(source?.timingMode ?? "plain");
+    setEditorText(lyricsDocumentToEditorText(source));
+    setRightsNote(source?.rightsNote ?? "");
   };
 
-  const handleApprove = (submission: TimedLyricsSubmission) => {
-    showToast(`Approved lyrics for "${submission.trackSlug}" — now live`);
+  const loadWorkspace = async (trackId: string) => {
+    setSelectedTrackId(trackId);
+    setBusy("load");
+    setMessage(null);
+
+    try {
+      hydrate(await fetchAdminTrackLyricsWorkspace(trackId));
+    } catch (error) {
+      setWorkspace(null);
+      setMessage(
+        error instanceof Error
+          ? error.message
+          : "Lyrics workspace could not load.",
+      );
+    } finally {
+      setBusy(null);
+    }
   };
 
-  const handleReject = (submission: TimedLyricsSubmission) => {
-    showToast(`Rejected lyrics for "${submission.trackSlug}"`);
+  const reload = async () => {
+    if (!selectedTrackId) return;
+    hydrate(await fetchAdminTrackLyricsWorkspace(selectedTrackId));
   };
 
-  const toggleExpand = (id: number) => {
-    setExpandedSubmission((prev) => (prev === id ? null : id));
+  const saveDraft = async () => {
+    if (!workspace) return;
+    setBusy("save");
+    setMessage(null);
+
+    try {
+      await saveTrackLyricsDraft(
+        workspace,
+        {
+          languageCode,
+          timingMode,
+          lines: parseLyricsEditorText(editorText, timingMode),
+          rightsNote,
+        },
+      );
+      await reload();
+      setMessage("Lyrics draft saved as an immutable version.");
+    } catch (error) {
+      setMessage(
+        error instanceof Error
+          ? error.message
+          : "Lyrics draft could not be saved.",
+      );
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  const publish = async () => {
+    if (!workspace) return;
+    setBusy("publish");
+    setMessage(null);
+
+    try {
+      await publishTrackLyrics(workspace);
+      await reload();
+      setMessage(
+        "Published Lyrics are now available to the WAKILISHA player.",
+      );
+    } catch (error) {
+      setMessage(
+        error instanceof Error
+          ? error.message
+          : "Lyrics could not be published.",
+      );
+    } finally {
+      setBusy(null);
+    }
   };
 
   return (
-    <div className="min-h-screen bg-[var(--wk-bg)]">
-      {/* Header */}
-      <div className="border-b border-[var(--wk-border)] bg-[var(--wk-surface)]">
-        <div className="mx-auto flex max-w-[1200px] items-center justify-between px-6 py-4">
+    <div className="min-h-screen bg-[var(--wk-bg)] text-[var(--wk-text)]">
+      <header className="border-b border-[var(--wk-border)] bg-[var(--wk-surface)]">
+        <div className="mx-auto flex max-w-[1280px] items-center justify-between gap-4 px-6 py-5">
           <div>
-            <h1 className="text-[20px] font-black text-[var(--wk-text)]">Lyric Submissions</h1>
-            <p className="mt-0.5 text-[12px] text-[var(--wk-text-muted)]">
-              Community contributions under peer review. Admins can override any decision.
+            <div className="text-[10px] font-black uppercase tracking-[0.15em] text-[var(--wk-brand)]">
+              Governed Track Authority
+            </div>
+            <h1 className="mt-1 text-[22px] font-black">Lyrics</h1>
+            <p className="mt-1 max-w-2xl text-xs leading-5 text-[var(--wk-text-muted)]">
+              Create immutable Lyrics versions against canonical Registry Tracks. Only an explicitly published version appears in the listener player.
             </p>
           </div>
-          <Link
-            to="/admin"
-            className="flex items-center gap-2 rounded-xl border border-[var(--wk-border)] bg-[var(--wk-surface)] px-4 py-2 text-[12px] font-bold text-[var(--wk-text-muted)] hover:text-[var(--wk-text)]"
-          >
+          <Link to="/admin" className="wk-button wk-button-ghost wk-button-sm">
             <WkIcon name="ArrowLeft" size={14} />
             Dashboard
           </Link>
         </div>
-      </div>
+      </header>
 
-      {/* Tabs */}
-      <div className="border-b border-[var(--wk-border)] bg-[var(--wk-surface)]">
-        <div className="mx-auto flex max-w-[1200px] gap-0 px-6">
-          {([
-            { key: 'pending', label: 'Pending Review', count: allSubmissions.filter((s) => s.status === 'pending_review').length },
-            { key: 'approved', label: 'Approved', count: allSubmissions.filter((s) => s.status === 'approved').length },
-            { key: 'all', label: 'All', count: allSubmissions.length },
-          ] as const).map((tab) => (
-            <button
-              key={tab.key}
-              onClick={() => setActiveTab(tab.key)}
-              className={`flex items-center gap-2 px-4 py-3 text-[13px] font-bold transition-all ${
-                activeTab === tab.key
-                  ? 'border-b-[2px] border-[var(--wk-brand)] text-[var(--wk-brand)]'
-                  : 'text-[var(--wk-text-faint)] hover:text-[var(--wk-text-muted)]'
-              }`}
-            >
-              {tab.label}
-              <span className={`rounded-full px-1.5 py-0.5 text-[10px] ${
-                activeTab === tab.key ? 'bg-[var(--wk-brand)]/10' : 'bg-[var(--wk-surface-raised)]'
-              }`}>
-                {tab.count}
-              </span>
-            </button>
-          ))}
-        </div>
-      </div>
-
-      {/* Submissions list */}
-      <div className="mx-auto max-w-[1200px] px-6 py-6">
-        {filtered.length === 0 ? (
-          <div className="py-20 text-center">
-            <WkIcon name="FileText" size={36} className="mx-auto mb-3 text-[var(--wk-text-faint)]" />
-            <p className="text-[14px] text-[var(--wk-text-muted)]">No submissions in this category.</p>
+      <div className="mx-auto grid max-w-[1280px] gap-5 px-5 py-6 lg:grid-cols-[320px_minmax(0,1fr)] lg:px-6">
+        <aside className="overflow-hidden rounded-2xl border border-[var(--wk-border)] bg-[var(--wk-surface)]">
+          <div className="border-b border-[var(--wk-border)] p-3">
+            <label className="flex items-center gap-2 rounded-xl border border-[var(--wk-border)] bg-[var(--wk-bg-subtle)] px-3 py-2">
+              <WkIcon
+                name="Search"
+                size={14}
+                className="text-[var(--wk-text-faint)]"
+              />
+              <input
+                value={query}
+                onChange={(event) => setQuery(event.target.value)}
+                placeholder="Find a Registry Track"
+                className="min-w-0 flex-1 bg-transparent text-xs font-semibold outline-none"
+              />
+            </label>
           </div>
-        ) : (
-          <div className="space-y-3">
-            {filtered.map((submission) => {
-              const isExpanded = expandedSubmission === submission.id;
-              return (
-                <div
-                  key={submission.id}
-                  className={`rounded-2xl border transition-all ${
-                    isExpanded ? 'border-[var(--wk-brand)]/30 bg-[var(--wk-surface)]' : 'border-[var(--wk-border)] bg-[var(--wk-surface)]'
-                  }`}
-                >
-                  {/* Row header */}
-                  <button
-                    onClick={() => toggleExpand(submission.id)}
-                    className="flex w-full items-center gap-4 px-5 py-4 text-left"
-                  >
-                    <StatusBadge status={submission.status} />
-                    <div className="min-w-0 flex-1">
-                      <div className="truncate text-[14px] font-bold text-[var(--wk-text)]">
-                        <Link
-                          to={`/tracks/submissions/${submission.trackSlug}`}
-                          className="hover:text-[var(--wk-brand)]"
-                          onClick={(e) => e.stopPropagation()}
-                        >
-                          {submission.trackSlug}
-                        </Link>
-                      </div>
-                      <div className="mt-0.5 flex items-center gap-3 text-[11px] text-[var(--wk-text-muted)]">
-                        <span>by <strong className="text-[var(--wk-text-soft)]">{submission.submitterName}</strong></span>
-                        <span>{submission.lines.length} timed lines</span>
-                        {submission.sourceDescription && <span className="text-[var(--wk-text-faint)]">· {submission.sourceDescription}</span>}
-                      </div>
-                    </div>
-
-                    <VoteBar submission={submission} />
-
-                    <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
-                      {submission.status === 'pending_review' && (
-                        <>
-                          <button
-                            onClick={(e) => { e.stopPropagation(); handleApprove(submission); }}
-                            className="flex items-center gap-1.5 rounded-lg bg-emerald-500 px-3 py-1.5 text-[11px] font-bold text-white transition-all hover:bg-emerald-600"
-                          >
-                            <WkIcon name="Check" size={12} /> Approve
-                          </button>
-                          <button
-                            onClick={(e) => { e.stopPropagation(); handleReject(submission); }}
-                            className="flex items-center gap-1.5 rounded-lg border border-red-200 bg-red-500/5 px-3 py-1.5 text-[11px] font-bold text-red-600 transition-all hover:bg-red-500/10"
-                          >
-                            <WkIcon name="Close" size={12} /> Reject
-                          </button>
-                        </>
-                      )}
-                      {submission.status === 'approved' && (
-                        <button
-                          onClick={(e) => { e.stopPropagation(); handleReject(submission); }}
-                          className="flex items-center gap-1.5 rounded-lg border border-red-200 bg-red-500/5 px-3 py-1.5 text-[11px] font-bold text-red-600 transition-all hover:bg-red-500/10"
-                        >
-                          <WkIcon name="Close" size={12} /> Revoke
-                        </button>
-                      )}
-                    </div>
-
-                    <WkIcon name={isExpanded ? 'ArrowUp' : 'ArrowDown'} size={14} className="text-[var(--wk-text-faint)]" />
-                  </button>
-
-                  {/* Expanded lyric lines */}
-                  {isExpanded && (
-                    <div className="border-t border-[var(--wk-border)] px-5 py-4">
-                      <div className="mb-3 flex items-center gap-3">
-                        <span className="text-[11px] font-bold uppercase tracking-wider text-[var(--wk-text-muted)]">
-                          {submission.lines.length} timed lines
-                        </span>
-                        <span className="text-[11px] text-[var(--wk-text-faint)]">
-                          Submitted {submission.createdAt}
-                        </span>
-                      </div>
-                      <div className="space-y-1">
-                        {submission.lines.map((line, idx) => (
-                          <div key={idx} className="flex items-center gap-3 rounded-lg px-3 py-1.5 hover:bg-[var(--wk-surface-raised)]">
-                            <span className="flex h-7 w-[52px] flex-shrink-0 items-center justify-center rounded-md bg-[var(--wk-brand-soft)] text-[11px] font-bold text-[var(--wk-brand)]">
-                              {formatTime(line.timestampSeconds)}
-                            </span>
-                            <span className={`text-[13px] ${line.text.startsWith('—') || line.text.startsWith('♪') ? 'text-[var(--wk-text-faint)] font-semibold uppercase tracking-wider' : 'text-[var(--wk-text)]'}`}>
-                              {line.text}
-                            </span>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  )}
+          <div className="max-h-[70vh] overflow-y-auto p-2">
+            {loading ? (
+              <div className="p-5 text-xs text-[var(--wk-text-muted)]">
+                Loading Registry Tracks…
+              </div>
+            ) : filteredTracks.map((track) => (
+              <button
+                key={track.id}
+                type="button"
+                onClick={() => void loadWorkspace(track.id)}
+                className={[
+                  "flex w-full items-center gap-3 rounded-xl px-3 py-2 text-left",
+                  selectedTrackId === track.id
+                    ? "bg-[var(--wk-brand-soft)]"
+                    : "hover:bg-[var(--wk-surface-raised)]",
+                ].join(" ")}
+              >
+                <div className="h-9 w-9 overflow-hidden rounded-lg bg-[var(--wk-bg-subtle)]">
+                  {track.artworkUrl ? (
+                    <img
+                      src={track.artworkUrl}
+                      alt=""
+                      className="h-full w-full object-cover"
+                    />
+                  ) : null}
                 </div>
-              );
-            })}
+                <span className="min-w-0">
+                  <span className="block truncate text-xs font-bold">
+                    {track.title}
+                  </span>
+                  <span className="block truncate font-mono text-[10px] text-[var(--wk-text-faint)]">
+                    {track.slug}
+                  </span>
+                </span>
+              </button>
+            ))}
           </div>
-        )}
-      </div>
+        </aside>
 
-      {/* Toast notification */}
-      {toast && (
-        <div className="fixed bottom-6 left-1/2 z-50 -translate-x-1/2 rounded-xl bg-[var(--wk-text)] px-6 py-3 text-[13px] font-bold text-white shadow-lg">
-          {toast}
-        </div>
-      )}
+        <main className="rounded-2xl border border-[var(--wk-border)] bg-[var(--wk-surface)] p-5">
+          {!workspace ? (
+            <div className="flex min-h-[420px] items-center justify-center text-center">
+              <div>
+                <WkIcon
+                  name="FileText"
+                  size={32}
+                  className="mx-auto text-[var(--wk-text-faint)]"
+                />
+                <p className="mt-3 text-sm font-bold">
+                  Choose a Registry Track
+                </p>
+                <p className="mt-1 text-xs text-[var(--wk-text-muted)]">
+                  No fake submissions queue. This surface edits the durable Lyrics document for the selected Track.
+                </p>
+              </div>
+            </div>
+          ) : (
+            <div className="space-y-5">
+              <div className="flex flex-wrap items-start justify-between gap-3 border-b border-[var(--wk-border)] pb-4">
+                <div>
+                  <div className="text-[10px] font-black uppercase tracking-[0.13em] text-[var(--wk-text-faint)]">
+                    Authority Revision {workspace.authorityRevision}
+                  </div>
+                  <div className="mt-1 flex flex-wrap gap-2 text-xs">
+                    <span>
+                      Working:{" "}
+                      <strong>
+                        {workspace.working
+                          ? `v${workspace.working.versionNumber}`
+                          : "None"}
+                      </strong>
+                    </span>
+                    <span aria-hidden="true">·</span>
+                    <span>
+                      Published:{" "}
+                      <strong>
+                        {workspace.published
+                          ? `v${workspace.published.versionNumber}`
+                          : "None"}
+                      </strong>
+                    </span>
+                  </div>
+                </div>
+
+                <div className="flex gap-2">
+                  {workspace.canEdit ? (
+                    <button
+                      type="button"
+                      disabled={busy !== null}
+                      onClick={() => void saveDraft()}
+                      className="wk-button wk-button-secondary wk-button-sm"
+                    >
+                      <WkIcon name="Save" size={14} />
+                      Save Draft
+                    </button>
+                  ) : null}
+
+                  {workspace.canPublish &&
+                  workspace.currentWorkingVersionId ? (
+                    <button
+                      type="button"
+                      disabled={busy !== null}
+                      onClick={() => void publish()}
+                      className="wk-button wk-button-primary wk-button-sm"
+                    >
+                      <WkIcon name="Globe" size={14} />
+                      Publish
+                    </button>
+                  ) : null}
+                </div>
+              </div>
+
+              {message ? (
+                <div
+                  role="status"
+                  className="rounded-xl border border-[var(--wk-border)] bg-[var(--wk-bg-subtle)] px-4 py-3 text-xs"
+                >
+                  {message}
+                </div>
+              ) : null}
+
+              <div className="grid gap-4 md:grid-cols-3">
+                <label className="text-xs font-bold">
+                  Language
+                  <input
+                    value={languageCode}
+                    disabled={!workspace.canEdit}
+                    onChange={(event) =>
+                      setLanguageCode(event.target.value)
+                    }
+                    className="mt-1 w-full rounded-lg border border-[var(--wk-border)] bg-[var(--wk-bg)] px-3 py-2"
+                    placeholder="und"
+                  />
+                </label>
+
+                <label className="text-xs font-bold">
+                  Timing
+                  <select
+                    value={timingMode}
+                    disabled={!workspace.canEdit}
+                    onChange={(event) =>
+                      setTimingMode(
+                        event.target.value === "line"
+                          ? "line"
+                          : "plain",
+                      )
+                    }
+                    className="mt-1 w-full rounded-lg border border-[var(--wk-border)] bg-[var(--wk-bg)] px-3 py-2"
+                  >
+                    <option value="plain">Plain Lyrics</option>
+                    <option value="line">Line-synced Lyrics</option>
+                  </select>
+                </label>
+
+                <label className="text-xs font-bold">
+                  Source
+                  <div className="mt-1 rounded-lg border border-[var(--wk-border)] bg-[var(--wk-bg-subtle)] px-3 py-2 text-[var(--wk-text-muted)]">
+                    Editorial
+                  </div>
+                </label>
+              </div>
+
+              <label className="block text-xs font-bold">
+                Lyrics
+                <textarea
+                  value={editorText}
+                  disabled={!workspace.canEdit}
+                  onChange={(event) => setEditorText(event.target.value)}
+                  rows={18}
+                  placeholder={
+                    timingMode === "line"
+                      ? "[00:12.50] First line"
+                      : "One lyric line per row"
+                  }
+                  className="mt-1 w-full rounded-xl border border-[var(--wk-border)] bg-[var(--wk-bg)] px-4 py-3 font-mono text-sm leading-7"
+                />
+              </label>
+
+              <label className="block text-xs font-bold">
+                Rights / provenance note
+                <textarea
+                  value={rightsNote}
+                  disabled={!workspace.canEdit}
+                  onChange={(event) => setRightsNote(event.target.value)}
+                  rows={3}
+                  placeholder="Optional internal note about source or rights."
+                  className="mt-1 w-full rounded-xl border border-[var(--wk-border)] bg-[var(--wk-bg)] px-4 py-3 text-sm"
+                />
+              </label>
+            </div>
+          )}
+        </main>
+      </div>
     </div>
   );
 }

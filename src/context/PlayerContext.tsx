@@ -144,6 +144,7 @@ interface PlayerContextValue {
   currentTime: number;
   duration: number;
   volume: number;
+  playbackRate: number;
   queue: PlayerTrack[];
   queueIndex: number;
   repeatMode: RepeatMode;
@@ -159,6 +160,7 @@ interface PlayerContextValue {
   playFromQueue: (index: number) => void;
   seek: (time: number) => void;
   setVolume: (vol: number) => void;
+  setPlaybackRate: (rate: number) => void;
   toggleRepeat: () => void;
   toggleShuffle: () => void;
   openFullPlayer: () => void;
@@ -176,6 +178,7 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
   const [volume, setVolumeState] = useState(0.8);
+  const [playbackRate, setPlaybackRateState] = useState(1);
   const [queue, setQueue] = useState<PlayerTrack[]>([]);
   const [queueIndex, setQueueIndex] = useState(0);
   const [repeatMode, setRepeatMode] = useState<RepeatMode>("off");
@@ -1298,6 +1301,19 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
       shuffledOrderRef.current = fullQueue.map((_, i) => i);
     }
 
+    const mediaKind =
+      (track as PlayerTrack & {
+        mediaKind?: string;
+      }).mediaKind;
+
+    if (
+      mediaKind !== "audio_episode" &&
+      mediaKind !== "standalone_audio"
+    ) {
+      setPlaybackRateState(1);
+      audio.playbackRate = 1;
+    }
+
     // Load audio source
     playTrackSource(track, audio);
 
@@ -1900,6 +1916,21 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
     );
   }, []);
 
+  const handleSetPlaybackRate = useCallback((
+    rate: number,
+  ) => {
+    const clamped = Math.max(
+      0.5,
+      Math.min(2, rate),
+    );
+
+    setPlaybackRateState(clamped);
+
+    if (audioRef.current) {
+      audioRef.current.playbackRate = clamped;
+    }
+  }, []);
+
   // Sync initial volume to audio element
   useEffect(() => {
     const audio = audioRef.current;
@@ -1972,6 +2003,7 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
     currentTime,
     duration,
     volume,
+    playbackRate,
     queue,
     queueIndex,
     repeatMode,
@@ -1987,6 +2019,7 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
     playFromQueue,
     seek,
     setVolume: handleSetVolume,
+    setPlaybackRate: handleSetPlaybackRate,
     toggleRepeat,
     toggleShuffle,
     openFullPlayer,
