@@ -49,6 +49,45 @@ export interface TrackLyricsAdminTrackResult {
   pendingContributionCount: number;
 }
 
+export interface TrackLyricsHistoryContribution {
+  id: string;
+  trackId: string;
+  trackTitle: string;
+  trackSlug: string;
+  artists: string[];
+  contributorLabel: string;
+  contributionKind: TrackLyricsContributionKind;
+  status: TrackLyricsContributionStatus;
+  acceptanceMode: TrackLyricsAcceptanceMode | null;
+  acceptedVersionId: string | null;
+  reviewNote: string | null;
+  reviewedAt: string | null;
+  createdAt: string;
+}
+
+export interface TrackLyricsHistoryVersion {
+  id: string;
+  trackId: string;
+  trackTitle: string;
+  trackSlug: string;
+  artists: string[];
+  versionNumber: number;
+  languageCode: string;
+  timingMode: "plain" | "line";
+  sourceKind: string;
+  sourceContributionId: string | null;
+  sourceContributorLabel: string | null;
+  communityRevisionMode: TrackLyricsAcceptanceMode | null;
+  isWorking: boolean;
+  isPublished: boolean;
+  createdAt: string;
+}
+
+export interface TrackLyricsHistory {
+  contributions: TrackLyricsHistoryContribution[];
+  versions: TrackLyricsHistoryVersion[];
+}
+
 type AnyRecord = Record<string, unknown>;
 
 type UntypedRpcResponse = {
@@ -76,6 +115,22 @@ function stringArray(value: unknown): string[] {
   return Array.isArray(value)
     ? value.map((item) => String(item).trim()).filter(Boolean)
     : [];
+}
+
+function acceptanceMode(value: unknown): TrackLyricsAcceptanceMode | null {
+  return value === "as_submitted" || value === "with_revisions"
+    ? value
+    : null;
+}
+
+function contributionStatus(value: unknown): TrackLyricsContributionStatus {
+  return value === "promoted" || value === "rejected"
+    ? value
+    : "submitted";
+}
+
+function contributionKind(value: unknown): TrackLyricsContributionKind {
+  return value === "correction" ? "correction" : "submission";
 }
 
 function decodeLines(value: unknown): TimedTextLine[] {
@@ -125,18 +180,6 @@ function decodeInboxItem(value: unknown): TrackLyricsInboxItem | null {
   const trackId = text(row.track_id);
   if (!id || !trackId) return null;
 
-  const rawStatus = text(row.status);
-  const status: TrackLyricsContributionStatus =
-    rawStatus === "promoted" || rawStatus === "rejected"
-      ? rawStatus
-      : "submitted";
-
-  const rawAcceptance = text(row.acceptance_mode);
-  const acceptanceMode: TrackLyricsAcceptanceMode | null =
-    rawAcceptance === "as_submitted" || rawAcceptance === "with_revisions"
-      ? rawAcceptance
-      : null;
-
   return {
     id,
     trackId,
@@ -147,17 +190,14 @@ function decodeInboxItem(value: unknown): TrackLyricsInboxItem | null {
     contributorId: nullableText(row.contributor_id),
     contributorLabel: text(row.contributor_label, "WAKILISHA contributor"),
     contributorUsername: nullableText(row.contributor_username),
-    contributionKind:
-      text(row.contribution_kind) === "correction"
-        ? "correction"
-        : "submission",
+    contributionKind: contributionKind(row.contribution_kind),
     languageCode: text(row.language_code, "und"),
     timingMode: text(row.timing_mode) === "line" ? "line" : "plain",
     lines: decodeLines(row.lines),
     plainText: text(row.plain_text),
     sourceDescription: nullableText(row.source_description),
-    status,
-    acceptanceMode,
+    status: contributionStatus(row.status),
+    acceptanceMode: acceptanceMode(row.acceptance_mode),
     acceptedVersionId: nullableText(row.accepted_version_id),
     reviewedAt: nullableText(row.reviewed_at),
     reviewedBy: nullableText(row.reviewed_by),
@@ -224,6 +264,73 @@ export async function searchTrackLyricsAdminTracks(
       pendingContributionCount: Number(row.pending_contribution_count ?? 0) || 0,
     }];
   });
+}
+
+export async function fetchTrackLyricsHistory(
+  trackId: string | null = null,
+  limit = 200,
+): Promise<TrackLyricsHistory> {
+  const data = record(
+    await invokeUntypedRpc(
+      "get_admin_track_lyrics_history",
+      {
+        p_track_id: trackId,
+        p_limit: limit,
+      },
+    ),
+  );
+
+  const contributions = Array.isArray(data.contributions)
+    ? data.contributions.flatMap((value) => {
+        const row = record(value);
+        const id = text(row.id);
+        const resolvedTrackId = text(row.track_id);
+        if (!id || !resolvedTrackId) return [];
+        return [{
+          id,
+          trackId: resolvedTrackId,
+          trackTitle: text(row.track_title, "Untitled Track"),
+          trackSlug: text(row.track_slug),
+          artists: stringArray(row.artists),
+          contributorLabel: text(row.contributor_label, "WAKILISHA contributor"),
+          contributionKind: contributionKind(row.contribution_kind),
+          status: contributionStatus(row.status),
+          acceptanceMode: acceptanceMode(row.acceptance_mode),
+          acceptedVersionId: nullableText(row.accepted_version_id),
+          reviewNote: nullableText(row.review_note),
+          reviewedAt: nullableText(row.reviewed_at),
+          createdAt: text(row.created_at),
+        } satisfies TrackLyricsHistoryContribution];
+      })
+    : [];
+
+  const versions = Array.isArray(data.versions)
+    ? data.versions.flatMap((value) => {
+        const row = record(value);
+        const id = text(row.id);
+        const resolvedTrackId = text(row.track_id);
+        if (!id || !resolvedTrackId) return [];
+        return [{
+          id,
+          trackId: resolvedTrackId,
+          trackTitle: text(row.track_title, "Untitled Track"),
+          trackSlug: text(row.track_slug),
+          artists: stringArray(row.artists),
+          versionNumber: Number(row.version_number ?? 0) || 0,
+          languageCode: text(row.language_code, "und"),
+          timingMode: text(row.timing_mode) === "line" ? "line" : "plain",
+          sourceKind: text(row.source_kind, "editorial"),
+          sourceContributionId: nullableText(row.source_contribution_id),
+          sourceContributorLabel: nullableText(row.source_contributor_label),
+          communityRevisionMode: acceptanceMode(row.community_revision_mode),
+          isWorking: row.is_working === true,
+          isPublished: row.is_published === true,
+          createdAt: text(row.created_at),
+        } satisfies TrackLyricsHistoryVersion];
+      })
+    : [];
+
+  return { contributions, versions };
 }
 
 export async function acceptTrackLyricsContribution(input: {
