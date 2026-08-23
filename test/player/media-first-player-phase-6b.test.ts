@@ -1,11 +1,5 @@
-import {
-  readFileSync,
-} from "node:fs";
-import {
-  describe,
-  expect,
-  it,
-} from "vitest";
+import { readFileSync } from "node:fs";
+import { describe, expect, it } from "vitest";
 
 const experience = readFileSync(
   "src/services/player/playerExperience.ts",
@@ -61,6 +55,7 @@ describe("Phase 6B media-first WAKILISHA Player", () => {
     expect(experience).toContain("jumpBySeconds");
     expect(experience).toContain("chapters");
     expect(experience).toContain("transcript");
+    expect(experience).toContain("playbackSpeed");
   });
 
   it("keeps compact playback media-first and free of acquisition chrome", () => {
@@ -88,20 +83,33 @@ describe("Phase 6B media-first WAKILISHA Player", () => {
     expect(full).not.toContain("Unlocked through Apple Music");
   });
 
-  it("gives spoken Audio its own listening grammar without Track-only actions", () => {
+  it("keeps Music rich while making every Track-only action capability-bound", () => {
+    expect(full).toContain("AddToPlaylistButton");
+    expect(full).toContain("TrackMomentDrawer");
+    expect(full).toContain("saveCurrentTrack");
+    expect(full).toContain("shareCurrent");
+    expect(full).toContain('experience.capabilities.addToPlaylist');
+    expect(full).toContain('experience.capabilities.save');
+    expect(full).toContain('experience.capabilities.moments');
+    expect(full).toContain('experience.capabilities.lyrics');
+    expect(full).toContain('!experience.spokenAudio');
+  });
+
+  it("gives spoken Audio ±15 primary transport, exact-version tools, speed, and only secondary sequence navigation", () => {
     expect(full).toContain("experience.spokenAudio");
     expect(full).toContain("skipBack");
     expect(full).toContain("skipForward");
+    expect(full).toContain("Playback speed");
     expect(full).toContain("Chapters");
     expect(full).toContain("Transcript");
-    expect(full).not.toContain("AddToPlaylistButton");
-    expect(full).not.toContain("TrackMoment");
-    expect(full).not.toContain("Toggle lyrics");
+    expect(full).toContain("Exact transcript attached to this published Audio version.");
+    expect(full).toContain("Previous episode");
+    expect(full).toContain("Next episode");
     expect(audioAdapter).toContain('jumpBySeconds: 15');
     expect(audioAdapter).toContain('lyrics: false');
     expect(audioAdapter).toContain('moments: false');
     expect(audioAdapter).toContain('addToPlaylist: false');
-    expect(audioAdapter).toContain('playbackSpeed: false');
+    expect(audioAdapter).toContain('playbackSpeed: true');
   });
 
   it("makes the active public shells use the new player chrome and provider media host", () => {

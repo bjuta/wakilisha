@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import { buildTrackSearchSnippet } from "@/services/cultureContext/trackAdapters";
 
@@ -11,6 +11,7 @@ export interface TrackSearchItem {
   genre: string;
   artworkUrl: string;
   isPlayable: boolean;
+  previewUrl: string | null;
   source: string;
   label: string;
   contextText: string;
@@ -46,8 +47,8 @@ const QUERY_CHUNK_SIZE = 100;
 
 function chunks<T>(items: T[], size = QUERY_CHUNK_SIZE): T[][] {
   const out: T[][] = [];
-  for (let i = 0; i < items.length; i += size) {
-    out.push(items.slice(i, i + size));
+  for (let index = 0; index < items.length; index += size) {
+    out.push(items.slice(index, index + size));
   }
   return out;
 }
@@ -65,138 +66,139 @@ export function useTrackSearchData() {
       setError(null);
 
       try {
-        const { data: tracksRaw, error: err } = await supabase
+        const { data: tracksRaw, error: trackError } = await supabase
           .from("registry_tracks")
           .select("id, slug, title, artwork_url, preview_url, metadata, release_id")
           .eq("status", "active")
           .order("title");
 
         if (!alive) return;
-
-        if (err) {
-          console.error("Failed to fetch tracks for search:", err.message);
-          setError(err.message);
+        if (trackError) {
+          console.error("Failed to fetch tracks for search:", trackError.message);
+          setError(trackError.message);
           setData([]);
           return;
         }
 
         const tracks = (tracksRaw || []) as TrackRow[];
-
-        if (tracks.length === 0) {
+        if (!tracks.length) {
           setData([]);
           return;
         }
 
-        const trackIds = tracks.map((t) => t.id).filter(Boolean);
-        const releaseIds = [...new Set(tracks.map((t) => t.release_id).filter(Boolean))] as string[];
-
+        const trackIds = tracks.map((track) => track.id).filter(Boolean);
+        const releaseIds = [
+          ...new Set(tracks.map((track) => track.release_id).filter(Boolean)),
+        ] as string[];
         const trackArtists: TrackArtistRow[] = [];
 
         for (const batchIds of chunks(trackIds)) {
-          const { data: batch, error: batchErr } = await supabase
+          const { data: batch, error: batchError } = await supabase
             .from("registry_track_artists")
             .select("track_id, artist_name_text, artist_slug")
             .in("track_id", batchIds)
             .eq("is_primary", true)
             .eq("status", "active");
-
-          if (batchErr) {
-            console.error("Failed to fetch track artists batch:", batchErr.message);
+          if (batchError) {
+            console.error("Failed to fetch track artists batch:", batchError.message);
             continue;
           }
-
           trackArtists.push(...((batch || []) as TrackArtistRow[]));
         }
 
         if (!alive) return;
 
         const artistByTrackId: Record<string, { name: string; slug: string }> = {};
-        trackArtists.forEach((ta) => {
-          if (!artistByTrackId[ta.track_id]) {
-            artistByTrackId[ta.track_id] = {
-              name: ta.artist_name_text || "Unknown",
-              slug: ta.artist_slug || "",
+        trackArtists.forEach((trackArtist) => {
+          if (!artistByTrackId[trackArtist.track_id]) {
+            artistByTrackId[trackArtist.track_id] = {
+              name: trackArtist.artist_name_text || "Unknown",
+              slug: trackArtist.artist_slug || "",
             };
           }
         });
 
-        const artistSlugs = [...new Set(trackArtists.map((ta) => ta.artist_slug).filter(Boolean))] as string[];
+        const artistSlugs = [
+          ...new Set(trackArtists.map((trackArtist) => trackArtist.artist_slug).filter(Boolean)),
+        ] as string[];
         const artistGenreMap: Record<string, string> = {};
 
         for (const slugBatch of chunks(artistSlugs)) {
-          const { data: artistsWithGenres, error: artistErr } = await supabase
+          const { data: artistsWithGenres, error: artistError } = await supabase
             .from("registry_artists")
             .select("slug, metadata")
             .in("slug", slugBatch)
             .eq("status", "active");
-
-          if (artistErr) {
-            console.error("Failed to fetch artist genres batch:", artistErr.message);
+          if (artistError) {
+            console.error("Failed to fetch artist genres batch:", artistError.message);
             continue;
           }
-
-          ((artistsWithGenres || []) as ArtistGenreRow[]).forEach((a) => {
-            const meta = a.metadata || {};
-            const genres = Array.isArray(meta.genres) ? (meta.genres as string[]) : [];
-            if (genres.length > 0) artistGenreMap[a.slug] = genres[0];
+          ((artistsWithGenres || []) as ArtistGenreRow[]).forEach((artist) => {
+            const metadata = artist.metadata || {};
+            const genres = Array.isArray(metadata.genres)
+              ? (metadata.genres as string[])
+              : [];
+            if (genres.length) artistGenreMap[artist.slug] = genres[0];
           });
         }
 
         const releaseLabelMap: Record<string, string> = {};
-
         for (const releaseBatch of chunks(releaseIds)) {
-          const { data: releases, error: releaseErr } = await supabase
+          const { data: releases, error: releaseError } = await supabase
             .from("registry_releases")
             .select("id, metadata")
             .in("id", releaseBatch)
             .eq("status", "active");
-
-          if (releaseErr) {
-            console.error("Failed to fetch release labels batch:", releaseErr.message);
+          if (releaseError) {
+            console.error("Failed to fetch release labels batch:", releaseError.message);
             continue;
           }
-
-          ((releases || []) as ReleaseLabelRow[]).forEach((r) => {
-            const meta = r.metadata || {};
-            const label = typeof meta.record_label === "string" ? meta.record_label : "";
-            if (label) releaseLabelMap[r.id] = label;
+          ((releases || []) as ReleaseLabelRow[]).forEach((release) => {
+            const metadata = release.metadata || {};
+            const label =
+              typeof metadata.record_label === "string"
+                ? metadata.record_label
+                : "";
+            if (label) releaseLabelMap[release.id] = label;
           });
         }
 
         if (!alive) return;
 
-        const mapped: TrackSearchItem[] = tracks.map((t) => {
-          const artistInfo = artistByTrackId[t.id];
-          const artistSlug = artistInfo?.slug || "";
-          const artist = artistInfo?.name || "Unknown";
-          const genre = artistGenreMap[artistSlug] || "";
-          const label = t.release_id ? releaseLabelMap[t.release_id] || "" : "";
-          const contextText = buildTrackSearchSnippet({
-            title: t.title || "Untitled track",
-            artist,
-            genre,
-            label,
-            isPlayable: !!t.preview_url,
-          });
-
-          return {
-            id: t.id,
-            slug: t.slug,
-            artistSlug,
-            title: t.title || "Untitled track",
-            artist,
-            genre,
-            artworkUrl: t.artwork_url || "",
-            isPlayable: !!t.preview_url,
-            source: "apple_music",
-            label,
-            contextText,
-          };
-        });
-
-        setData(mapped);
-      } catch (e) {
-        console.error("Failed to fetch tracks for search:", e);
+        setData(
+          tracks.map((track) => {
+            const artistInfo = artistByTrackId[track.id];
+            const artistSlug = artistInfo?.slug || "";
+            const artist = artistInfo?.name || "Unknown";
+            const genre = artistGenreMap[artistSlug] || "";
+            const label = track.release_id
+              ? releaseLabelMap[track.release_id] || ""
+              : "";
+            const previewUrl = track.preview_url || null;
+            return {
+              id: track.id,
+              slug: track.slug,
+              artistSlug,
+              title: track.title || "Untitled track",
+              artist,
+              genre,
+              artworkUrl: track.artwork_url || "",
+              isPlayable: Boolean(previewUrl),
+              previewUrl,
+              source: "WAKILISHA Registry",
+              label,
+              contextText: buildTrackSearchSnippet({
+                title: track.title || "Untitled track",
+                artist,
+                genre,
+                label,
+                isPlayable: Boolean(previewUrl),
+              }),
+            };
+          }),
+        );
+      } catch (reason) {
+        console.error("Failed to fetch tracks for search:", reason);
         if (alive) {
           setError("Failed to load tracks");
           setData([]);
@@ -206,8 +208,7 @@ export function useTrackSearchData() {
       }
     };
 
-    fetchData();
-
+    void fetchData();
     return () => {
       alive = false;
     };

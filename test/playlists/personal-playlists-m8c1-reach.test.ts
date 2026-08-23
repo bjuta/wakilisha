@@ -66,9 +66,11 @@ describe("M8C.1 Track curation reach", () => {
     expect(artistTopSongs).toContain("registryTrackId={song.id}");
     expect(artistTopSongs).toContain("<TrackActionsMenu");
     expect(artistTopSongs).toContain("registryTrackId: song.id");
-    expect(trackSearch).toContain("id: t.id");
+    expect(trackSearch).toContain("id: track.id");
+    expect(trackSearch).toContain("previewUrl");
     expect(searchPage).toContain("registryTrackId={track.id}");
     expect(searchPage).toContain("<TrackActionsMenu");
+    expect(searchPage).toContain("previewUrl: track.previewUrl ?? undefined");
     expect(articleTracks).toContain("id: row.id");
     expect(articleTracks).toContain("trackId={track.id}");
     expect(playerDock).toContain("currentTrack.registryTrackId");
@@ -142,8 +144,8 @@ describe("M8C.1 Track curation reach", () => {
     expect(searchPage).toContain("useState(urlQuery)");
     expect(searchPage).toContain('nextParams.set("q", nextQuery)');
     expect(searchPage).toContain('nextParams.delete("q")');
-    expect(searchPage).toContain("setSearchParams(");
-    expect(searchPage).toContain("updateQuery(e.target.value)");
+    expect(searchPage).toContain("setSearchParams(nextParams, { replace: true })");
+    expect(searchPage).toContain("updateQuery(event.target.value)");
   });
 
   it("keeps public Artist ownership affordance quiet", () => {
@@ -153,11 +155,15 @@ describe("M8C.1 Track curation reach", () => {
     expect(artistAuthorityPanel).not.toContain("Official Artist");
     expect(artistAuthorityPanel).not.toContain("Built from WAKILISHA's reviewed music records.");
     expect(artistAuthorityPanel).not.toContain("Managed by the Artist or their team.");
+    expect(artistAuthorityPanel).not.toContain("ri-check-line");
+    expect(artistAuthorityPanel).not.toContain(">Reviewed<");
   });
 
-  it("does not advertise a false Mac-only global Search shortcut", () => {
+  it("makes Search a real sidebar control without advertising a false Mac-only shortcut", () => {
     expect(musicDesktopShell).toContain('to="/search"');
-    expect(musicDesktopShell).toContain("Search artists, songs, albums, scenes...");
+    expect(musicDesktopShell).toContain('role="search"');
+    expect(musicDesktopShell).toContain('placeholder="Search WAKILISHA"');
+    expect(musicDesktopShell).toContain("submitSearch");
     expect(musicDesktopShell).not.toContain("⌘ K");
   });
 
@@ -199,25 +205,18 @@ describe("M8C.1 Track curation reach", () => {
     expect(playableArtwork).toContain("group-hover/playable-art");
     expect(playableArtwork).toContain("group-focus-visible/playable-art");
     expect(playableArtwork).toContain("group-active/playable-art");
-
     expect(searchPage).toContain("<PlayableArtwork");
     expect(searchPage).not.toContain("group-hover:opacity-100 disabled:opacity-0");
-
     expect(chartRow).toContain("<PlayableArtwork");
     expect(chartRow).not.toContain("{/* Play button */}");
-
     expect(chartDirectory).toContain("<PlayableArtwork");
     expect(chartDirectory).not.toContain("{/* Play button */}");
-
     expect(releaseTracklist).toContain("<PlayableArtwork");
     expect(releaseTracklist).not.toContain("Track number / play button");
-
     expect(siblingReleaseTracklist).toContain("<PlayableArtwork");
     expect(siblingReleaseTracklist).not.toContain("Track number / play button / current indicator");
-
     expect(articleTrackEmbeds).toContain("<PlayableArtwork");
     expect(articleTrackEmbeds).not.toContain("Play button + link");
-
     expect(mobileReleasePage).toContain("<PlayableArtwork");
     expect(musicPage).toContain("<PlayableArtwork");
   });
