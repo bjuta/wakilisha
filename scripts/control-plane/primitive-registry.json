@@ -25,12 +25,7 @@
       "maturity": "canonical",
       "concept": "governed record identity and lifecycle header",
       "authorityOwner": "consumer",
-      "consumers": [
-        "admin:articles",
-        "admin:playlists",
-        "admin:audio",
-        "admin:lyrics"
-      ]
+      "consumers": ["admin:articles", "admin:playlists", "admin:audio", "admin:lyrics"]
     },
     {
       "id": "admin.record-actions",
@@ -39,12 +34,7 @@
       "maturity": "canonical",
       "concept": "truthful governed record actions, lifecycle affordances, and shared overflow priority grammar",
       "authorityOwner": "consumer",
-      "consumers": [
-        "admin:articles",
-        "admin:playlists",
-        "admin:audio",
-        "admin:lyrics"
-      ]
+      "consumers": ["admin:articles", "admin:playlists", "admin:audio", "admin:lyrics"]
     },
     {
       "id": "admin.status-badge",
@@ -53,11 +43,7 @@
       "maturity": "canonical",
       "concept": "governed publication lifecycle status presentation",
       "authorityOwner": "consumer",
-      "consumers": [
-        "admin:articles",
-        "admin:playlists",
-        "admin:audio"
-      ],
+      "consumers": ["admin:articles", "admin:playlists", "admin:audio"],
       "competingImplementationPatterns": [
         "(?:function|const)\\s+[A-Za-z0-9_]*StatusBadge\\b",
         "function\\s+statusClass\\b",
@@ -83,12 +69,7 @@
       "maturity": "canonical",
       "concept": "working-record save and immutable submitted state",
       "authorityOwner": "consumer",
-      "consumers": [
-        "admin:articles",
-        "admin:playlists",
-        "admin:audio",
-        "admin:lyrics"
-      ]
+      "consumers": ["admin:articles", "admin:playlists", "admin:audio", "admin:lyrics"]
     },
     {
       "id": "admin.workspace-section",
@@ -97,10 +78,7 @@
       "maturity": "canonical",
       "concept": "governed admin workspace section framing",
       "authorityOwner": "consumer",
-      "consumers": [
-        "admin:audio",
-        "admin:lyrics"
-      ]
+      "consumers": ["admin:audio", "admin:lyrics"]
     },
     {
       "id": "admin.collection-header",
@@ -109,12 +87,7 @@
       "maturity": "canonical",
       "concept": "admin collection identity and context heading",
       "authorityOwner": "consumer",
-      "consumers": [
-        "admin:articles",
-        "admin:playlists",
-        "admin:audio",
-        "admin:lyrics"
-      ]
+      "consumers": ["admin:articles", "admin:playlists", "admin:audio", "admin:lyrics"]
     },
     {
       "id": "admin.mode-composer",
@@ -123,9 +96,7 @@
       "maturity": "candidate",
       "concept": "one creation surface with explicit domain modes",
       "authorityOwner": "consumer",
-      "consumers": [
-        "admin:audio"
-      ]
+      "consumers": ["admin:audio"]
     },
     {
       "id": "editorial.workflow-rail",
@@ -134,10 +105,7 @@
       "maturity": "canonical",
       "concept": "semantic workflow phase navigation",
       "authorityOwner": "consumer",
-      "consumers": [
-        "admin:audio",
-        "admin:lyrics"
-      ]
+      "consumers": ["admin:audio", "admin:lyrics"]
     },
     {
       "id": "editorial.decision-workspace",
@@ -146,21 +114,16 @@
       "maturity": "canonical",
       "concept": "exact-version editorial decision notes, action grammar, validation, and durable decision history presentation",
       "authorityOwner": "consumer",
-      "consumers": [
-        "admin:audio",
-        "admin:lyrics"
-      ]
+      "consumers": ["admin:audio", "admin:lyrics"]
     },
     {
       "id": "editorial.text-diff",
       "path": "src/components/design-system/editorial/EditorialTextDiff.tsx",
       "kind": "presentation",
-      "maturity": "candidate",
+      "maturity": "canonical",
       "concept": "before-and-after editorial text revision evidence",
       "authorityOwner": "consumer",
-      "consumers": [
-        "admin:lyrics"
-      ]
+      "consumers": ["admin:articles", "admin:lyrics"]
     },
     {
       "id": "editorial.comment-editor",
@@ -169,9 +132,7 @@
       "maturity": "candidate",
       "concept": "lightweight rich editorial discussion input and read presentation",
       "authorityOwner": "consumer",
-      "consumers": [
-        "admin:audio"
-      ]
+      "consumers": ["admin:audio"]
     },
     {
       "id": "editorial.media-transport",
@@ -180,9 +141,7 @@
       "maturity": "candidate",
       "concept": "time-based media playback transport",
       "authorityOwner": "consumer",
-      "consumers": [
-        "admin:audio"
-      ]
+      "consumers": ["admin:audio"]
     },
     {
       "id": "editorial.media-timeline",
@@ -191,12 +150,8 @@
       "maturity": "candidate",
       "concept": "time-coordinate media navigation and point/range annotation",
       "authorityOwner": "consumer",
-      "consumers": [
-        "admin:audio"
-      ],
-      "competingImplementationPatterns": [
-        "(?:function|const)\\s+(?:AudioTimeline|VideoTimeline|WaveformTimeline|MediaTimeline)\\b"
-      ]
+      "consumers": ["admin:audio"],
+      "competingImplementationPatterns": ["(?:function|const)\\s+(?:AudioTimeline|VideoTimeline|WaveformTimeline|MediaTimeline)\\b"]
     },
     {
       "id": "trust.editorial-credit-picker",
@@ -205,9 +160,7 @@
       "maturity": "candidate",
       "concept": "canonical credited-party selection plus semantic Credit role",
       "authorityOwner": "consumer",
-      "consumers": [
-        "admin:audio"
-      ]
+      "consumers": ["admin:audio"]
     },
     {
       "id": "editorial.discovery-workspace",
@@ -216,10 +169,7 @@
       "maturity": "canonical",
       "concept": "version-bound Categories, Tags, and search metadata editing",
       "authorityOwner": "consumer",
-      "consumers": [
-        "admin:playlists",
-        "admin:audio"
-      ],
+      "consumers": ["admin:playlists", "admin:audio"],
       "competingImplementationPatterns": [
         "supabase\\.rpc\\([\\\"']get_taxonomy_terms",
         "supabase\\.rpc\\([\\\"']create_taxonomy_term"
