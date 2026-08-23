@@ -47,6 +47,9 @@ const audioWorkspace = read(
 const audioService = read(
   "src/services/audio/audioAdminService.ts",
 );
+const articleService = read(
+  "src/services/articles/articleAdminService.ts",
+);
 const registry = read(
   "scripts/control-plane/primitive-registry.json",
 );
@@ -119,6 +122,93 @@ describe(
         );
         expect(primitive).not.toContain(
           "external_contributor_id",
+        );
+      },
+    );
+
+    it(
+      "shows identity matches directly from the search interaction",
+      () => {
+        expect(primitive).toContain(
+          'id="editorial-credit-search-results"',
+        );
+        expect(primitive).toContain(
+          'role="listbox"',
+        );
+        expect(primitive).toContain(
+          'role="option"',
+        );
+        expect(primitive).toContain(
+          "No matching canonical identity.",
+        );
+        expect(primitive).toContain(
+          "Credit identities could not be searched.",
+        );
+        expect(primitive).toContain(
+          "setSelectedParty(party)",
+        );
+        expect(primitive).not.toContain(
+          "Choose identity</option>",
+        );
+      },
+    );
+
+    it(
+      "keeps identity search query-driven and free of fixture identities",
+      () => {
+        expect(creditService).toContain(
+          "fetchEditorialCreditPickerAuthority",
+        );
+        expect(creditService).toContain(
+          "searchEditorialCreditParties",
+        );
+        expect(primitive).toContain(
+          "onSearch",
+        );
+        expect(primitive).toContain(
+          "requestSequence",
+        );
+        expect(primitive).toContain(
+          "Searching canonical identities",
+        );
+        expect(audioWorkspace).toContain(
+          "fetchEditorialCreditPickerAuthority",
+        );
+        expect(audioWorkspace).toContain(
+          "searchEditorialCreditParties",
+        );
+        expect(audioWorkspace).toContain(
+          "onSearch={searchEditorialCreditParties}",
+        );
+        expect(audioWorkspace).not.toContain(
+          "creditPickerOptions.parties",
+        );
+
+        const runtimeCreditImplementation = [
+          primitive,
+          creditService,
+          audioWorkspace,
+        ]
+          .join("\n")
+          .toLowerCase();
+
+        expect(runtimeCreditImplementation).not.toContain(
+          "hafare",
+        );
+      },
+    );
+
+    it(
+      "does not reconstruct canonical author identity from frontend WordPress id fixtures",
+      () => {
+        expect(articleService).not.toContain(
+          "WP_AUTHOR_ID_MAP",
+        );
+        expect(articleService).not.toContain(
+          "rawMeta.post_author",
+        );
+        expect(articleService).toContain(
+          "Shared Credit / Person authority owns canonical human identity.",
         );
       },
     );
