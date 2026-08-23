@@ -32,6 +32,7 @@ interface Props {
   focusMode?: boolean;
   onToggleFocusMode?: () => void;
   onSubmitForReview: () => void;
+  onOpenReview?: () => void;
   onRequestChanges?: () => void;
   onApproveVersion?: () => void;
   allowSubmitForReview?: boolean;
@@ -77,8 +78,7 @@ export function ArticleEditorHeader({
   focusMode = false,
   onToggleFocusMode,
   onSubmitForReview,
-  onRequestChanges,
-  onApproveVersion,
+  onOpenReview,
   allowSubmitForReview = true,
   canSubmitForReview = allowSubmitForReview,
   canRequestChanges = false,
@@ -106,6 +106,8 @@ export function ArticleEditorHeader({
   const canDeleteArticle =
     (!permissions || permissions.canDelete) &&
     !draftActionsDisabled;
+  const hasReviewDecision =
+    canRequestChanges || canApproveVersion;
 
   const actions: AdminRecordActionDescriptor[] = [];
 
@@ -149,34 +151,14 @@ export function ArticleEditorHeader({
     });
   }
 
-  if (canRequestChanges && canApproveVersion && onRequestChanges) {
+  if (hasReviewDecision && onOpenReview) {
     actions.push({
-      key: "request-changes-secondary",
-      label: "Request Changes",
-      icon: "Flag",
-      tone: "secondary",
-      disabled: isSaving || isPublishing || reviewActionBusy,
-      onClick: onRequestChanges,
-    });
-  }
-
-  if (canApproveVersion && onApproveVersion) {
-    actions.push({
-      key: "approve-version",
-      label: "Approve Version",
+      key: "open-review",
+      label: "Open Review",
       icon: "ShieldCheck",
       tone: "primary",
       disabled: isSaving || isPublishing || reviewActionBusy,
-      onClick: onApproveVersion,
-    });
-  } else if (canRequestChanges && onRequestChanges) {
-    actions.push({
-      key: "request-changes-primary",
-      label: "Request Changes",
-      icon: "Flag",
-      tone: "primary",
-      disabled: isSaving || isPublishing || reviewActionBusy,
-      onClick: onRequestChanges,
+      onClick: onOpenReview,
     });
   } else if (shouldShowSubmitForReview) {
     actions.push({
