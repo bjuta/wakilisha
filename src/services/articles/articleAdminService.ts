@@ -163,37 +163,17 @@ async function fetchArticleRow(slug: string): Promise<ArticleRow | null> {
   return data as ArticleRow | null;
 }
 
-/* ─── WordPress author ID → real display name mapping ─── */
-const WP_AUTHOR_ID_MAP: Record<string, string> = {
-  "1": "Wakilisha Staff",
-  "37": "Muiruri Beautah",
-  "38": "Shalom Kendi Mbae",
-  "39": "Michael Mburu",
-  "40": "Kambura Matiri",
-  "41": "Kiuta Faith",
-  "42": "gatwiri_c",
-  "43": "Mary Gathoni",
-  "44": "Timothy Muiruri",
-  "47": "Sarah Wambi",
-  "48": "Frank Njugi",
-  "52": "Victor Muia",
-  "54": "Hafare Segelan",
-  "179": "Wangari Karume",
-};
-
 function resolveAuthorFromRow(row: ArticleRow): string {
   const stored = (row.author ?? "").trim();
-  if (stored && stored !== "Wakilisha" && stored !== "wakilisha") return stored;
 
-  const rawMeta = (row as unknown as { raw_meta?: Record<string, unknown> }).raw_meta;
-  if (rawMeta) {
-    const wpId = String(rawMeta.post_author ?? "").trim();
-    if (wpId && WP_AUTHOR_ID_MAP[wpId]) {
-      return WP_AUTHOR_ID_MAP[wpId];
-    }
+  // Shared Credit / Person authority owns canonical human identity.
+  // This field is only a historical/display snapshot and must never
+  // reconstruct identity from imported WordPress author ids in the browser.
+  if (!stored || stored.toLowerCase() === "wakilisha") {
+    return "Wakilisha Staff";
   }
 
-  return stored || "Wakilisha Staff";
+  return stored;
 }
 
 /**

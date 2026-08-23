@@ -26,9 +26,10 @@ import {
 } from "@/services/audio/audioReviewService";
 import { fetchAudioTrustCandidates } from "@/services/audio/audioTrustCandidateService";
 import {
-  fetchEditorialCreditPickerOptions,
+  fetchEditorialCreditPickerAuthority,
   resolveEditorialCredit,
-  type EditorialCreditPickerOptions,
+  searchEditorialCreditParties,
+  type EditorialCreditPickerAuthority,
 } from "@/services/trust/editorialCreditService";
 import {
   fetchAudioPublicationWorkspace,
@@ -55,7 +56,7 @@ type AudioTrustCandidateBundle = Awaited<
 type AuxiliaryResults = [
   PromiseSettledResult<AudioEditorialMediaContext>,
   PromiseSettledResult<AudioTrustCandidateBundle>,
-  PromiseSettledResult<EditorialCreditPickerOptions>,
+  PromiseSettledResult<EditorialCreditPickerAuthority>,
 ];
 
 function humanize(value: string): string {
@@ -111,7 +112,7 @@ export function AudioEditorWorkspace({
 
   const [workspace, setWorkspace] = useState<AudioPublicationWorkspace | null>(null);
   const [mediaContext, setMediaContext] = useState<AudioEditorialMediaContext | null>(null);
-  const [creditPickerOptions, setCreditPickerOptions] = useState<EditorialCreditPickerOptions | null>(null);
+  const [creditPickerAuthority, setCreditPickerAuthority] = useState<EditorialCreditPickerAuthority | null>(null);
   const [citationCandidates, setCitationCandidates] = useState<TrustAttachmentOption[]>([]);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState<string | null>(null);
@@ -152,9 +153,9 @@ export function AudioEditorWorkspace({
     }
 
     if (creditResult.status === "fulfilled") {
-      setCreditPickerOptions(creditResult.value);
+      setCreditPickerAuthority(creditResult.value);
     } else {
-      setCreditPickerOptions(null);
+      setCreditPickerAuthority(null);
       warnings.push(`Credit identities: ${errorText(creditResult.reason)}`);
     }
 
@@ -171,7 +172,7 @@ export function AudioEditorWorkspace({
     const results = await Promise.allSettled([
       fetchAudioEditorialMediaContext(publicationId),
       fetchAudioTrustCandidates(),
-      fetchEditorialCreditPickerOptions(),
+      fetchEditorialCreditPickerAuthority(),
     ]) as AuxiliaryResults;
 
     applyAuxiliaryResults(results);
@@ -204,7 +205,7 @@ export function AudioEditorWorkspace({
         const results = await Promise.allSettled([
           fetchAudioEditorialMediaContext(publicationId),
           fetchAudioTrustCandidates(),
-          fetchEditorialCreditPickerOptions(),
+          fetchEditorialCreditPickerAuthority(),
         ]) as AuxiliaryResults;
         if (!alive) return;
         applyAuxiliaryResults(results);
@@ -841,12 +842,12 @@ export function AudioEditorWorkspace({
                   </div>
 
                   {editable && workspace.versions.working ? (
-                    creditPickerOptions ? (
+                    creditPickerAuthority ? (
                       <EditorialCreditPicker
-                        roles={creditPickerOptions.roles}
-                        parties={creditPickerOptions.parties}
-                        canCreateCredit={creditPickerOptions.canCreateCredit}
+                        roles={creditPickerAuthority.roles}
+                        canCreateCredit={creditPickerAuthority.canCreateCredit}
                         disabled={busy !== null}
+                        onSearch={searchEditorialCreditParties}
                         onAttach={(selection) => void addCredit(selection)}
                       />
                     ) : (
