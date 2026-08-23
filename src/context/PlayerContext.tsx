@@ -7,6 +7,7 @@ import {
   playAppleMusicCatalogSong,
   resumeAppleMusic,
   seekAppleMusic,
+  stopAppleMusic,
 } from "@/services/appleMusicPlayback";
 import { recordListeningEvent } from "@/services/listeningHistory";
 import { ProviderPlaybackCanvas } from "@/components/design-system/music/ProviderPlaybackCanvas";
@@ -28,6 +29,10 @@ import {
   seekSoundCloud,
   setSoundCloudVolume,
 } from "@/services/player/soundCloudPlayback";
+import {
+  PlaybackArbiter,
+  type PlaybackSessionId,
+} from "@/services/player/playbackArbiter";
 
 export type PlaybackBackend =
   | "audio"
@@ -192,6 +197,10 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
   const skipFlagRef = useRef(false);
   const currentTrackRef = useRef<PlayerTrack | null>(null);
   const isPlayingRef = useRef(false);
+  const playbackArbiterRef = useRef(new PlaybackArbiter());
+  const htmlAudioSessionRef = useRef<PlaybackSessionId | null>(null);
+  const playbackStartingRef = useRef(false);
+  const restartInterruptedPlaybackRef = useRef(false);
 
   // ─── Read user playback preferences ───
   const playbackPrefs = usePlaybackPrefs();
@@ -320,28 +329,71 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     return () => {
+      playbackArbiterRef.current.invalidate();
+      playbackStartingRef.current = false;
+      restartInterruptedPlaybackRef.current = false;
       stopApplePolling();
       stopProviderPolling();
+      void stopAppleMusic().catch(() => {});
+      stopYouTube();
+      stopSoundCloud();
     };
   }, [
     stopApplePolling,
     stopProviderPolling,
   ]);
 
-  const playViaHtmlAudio = useCallback((
-    track: PlayerTrack,
-    audio: HTMLAudioElement,
+  const isPlaybackSessionCurrent = useCallback((
+    sessionId: PlaybackSessionId,
+  ) => {
+    return playbackArbiterRef.current.isCurrent(
+      sessionId,
+    );
+  }, []);
+
+  const silenceAllPlayback = useCallback(async (
+    audio: HTMLAudioElement | null,
   ) => {
     stopApplePolling();
     stopProviderPolling();
 
+    pendingPlayRef.current = false;
+    htmlAudioSessionRef.current = null;
+
+    audio?.pause();
+    audio?.removeAttribute("src");
+
     stopYouTube();
     stopSoundCloud();
 
+    await stopAppleMusic()
+      .catch(() => {});
+  }, [
+    stopApplePolling,
+    stopProviderPolling,
+  ]);
+
+  const playViaHtmlAudio = useCallback(async (
+    track: PlayerTrack,
+    audio: HTMLAudioElement,
+    sessionId: PlaybackSessionId,
+  ) => {
+    if (!isPlaybackSessionCurrent(sessionId)) {
+      return;
+    }
+
+    await silenceAllPlayback(audio);
+
+    if (!isPlaybackSessionCurrent(sessionId)) {
+      return;
+    }
+
     playbackBackendRef.current = "audio";
+    htmlAudioSessionRef.current = sessionId;
     setPlaybackBackend("audio");
 
     if (!track.previewUrl) {
+      playbackStartingRef.current = false;
       setIsPlaying(false);
       return;
     }
@@ -349,293 +401,361 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
     audio.src = track.previewUrl;
     pendingPlayRef.current = true;
 
-    audio.play().catch((err) => {
+    try {
+      await audio.play();
+
+      if (
+        !isPlaybackSessionCurrent(sessionId) ||
+        htmlAudioSessionRef.current !== sessionId
+      ) {
+        return;
+      }
+
+      pendingPlayRef.current = false;
+      playbackStartingRef.current = false;
+      restartInterruptedPlaybackRef.current = false;
+      setIsPlaying(true);
+    } catch (err) {
+      if (
+        !isPlaybackSessionCurrent(sessionId) ||
+        htmlAudioSessionRef.current !== sessionId
+      ) {
+        return;
+      }
+
       console.warn(
         "Audio autoplay blocked:",
-        err.message,
+        err instanceof Error
+          ? err.message
+          : String(err),
       );
+
       pendingPlayRef.current = false;
-    });
+      playbackStartingRef.current = false;
+      setIsPlaying(false);
+    }
   }, [
-    stopApplePolling,
-    stopProviderPolling,
+    isPlaybackSessionCurrent,
+    silenceAllPlayback,
   ]);
 
   const playTrackSource = useCallback((
     track: PlayerTrack,
     audio: HTMLAudioElement,
   ) => {
-    const fallbackToPreview = (
+    const playbackSessionId =
+      playbackArbiterRef.current.begin();
+
+    playbackStartingRef.current = true;
+    restartInterruptedPlaybackRef.current = false;
+    setIsPlaying(false);
+
+    const isCurrentSession = () =>
+      isPlaybackSessionCurrent(
+        playbackSessionId,
+      );
+
+    let fallbackStarted = false;
+
+    const fallbackToPreview = async (
       message: string,
       error: unknown,
     ) => {
+      if (
+        !isCurrentSession() ||
+        fallbackStarted
+      ) {
+        return;
+      }
+
+      fallbackStarted = true;
+
       console.warn(
         message,
         error,
       );
 
       if (track.previewUrl) {
-        playViaHtmlAudio(
+        await playViaHtmlAudio(
           track,
           audio,
+          playbackSessionId,
         );
-      } else {
+      } else if (isCurrentSession()) {
+        playbackStartingRef.current = false;
         setIsPlaying(false);
       }
     };
 
-    if (
-      track.playbackEngine === "youtube" &&
-      track.providerObjectId
-    ) {
-      stopApplePolling();
-      stopProviderPolling();
+    void (async () => {
+      await silenceAllPlayback(audio);
 
-      pauseAppleMusic().catch(() => {});
-      stopSoundCloud();
+      if (!isCurrentSession()) {
+        return;
+      }
 
-      audio.pause();
-      audio.removeAttribute("src");
-
-      playbackBackendRef.current = "youtube";
-      setPlaybackBackend("youtube");
-      setCurrentTime(0);
-      setDuration(
-        track.duration || 0,
-      );
-
-      playYouTubeTrack(
-          track.providerObjectId!,
-          volume,
-          {
-            onSnapshot: (snapshot) => {
-              if (
-                playbackBackendRef.current !==
-                "youtube"
-              ) {
-                return;
-              }
-
-              setCurrentTime(
-                snapshot.currentTime,
-              );
-
-              if (
-                snapshot.duration > 0
-              ) {
-                setDuration(
-                  snapshot.duration,
-                );
-              }
-
-              setIsPlaying(
-                snapshot.isPlaying,
-              );
-            },
-            onEnded: () => {
-              if (
-                playbackBackendRef.current ===
-                "youtube"
-              ) {
-                handleEndedRef.current();
-              }
-            },
-            onError: (
-              errorCode,
-            ) => {
-              if (
-                playbackBackendRef.current !==
-                "youtube"
-              ) {
-                return;
-              }
-
-              fallbackToPreview(
-                `YouTube playback failed with code ${errorCode}.`,
-                errorCode,
-              );
-            },
-            onAutoplayBlocked: () => {
-              if (
-                playbackBackendRef.current ===
-                "youtube"
-              ) {
-                setIsPlaying(
-                  false,
-                );
-              }
-            },
-          },
-        )
-          .then(() => {
-            if (
-              playbackBackendRef.current ===
-              "youtube"
-            ) {
-              startYouTubePolling();
-            }
-          })
-          .catch((error) => {
-            if (
-              playbackBackendRef.current !==
-              "youtube"
-            ) {
-              return;
-            }
-
-            fallbackToPreview(
-              "YouTube playback failed, falling back to preview:",
-              error,
-            );
-          });
-
-      return;
-    }
-
-    if (
-      track.playbackEngine === "soundcloud" &&
-      track.providerUrl
-    ) {
-      stopApplePolling();
-      stopProviderPolling();
-
-      pauseAppleMusic().catch(() => {});
-      stopYouTube();
-
-      audio.pause();
-      audio.removeAttribute("src");
-
-      playbackBackendRef.current = "soundcloud";
-      setPlaybackBackend("soundcloud");
-      setCurrentTime(0);
-      setDuration(
-        track.duration || 0,
-      );
-
-      playSoundCloudTrack(
-          track.providerUrl!,
-          volume,
-          {
-            onSnapshot: (snapshot) => {
-              if (
-                playbackBackendRef.current !==
-                "soundcloud"
-              ) {
-                return;
-              }
-
-              setCurrentTime(
-                snapshot.currentTime,
-              );
-
-              if (
-                snapshot.duration > 0
-              ) {
-                setDuration(
-                  snapshot.duration,
-                );
-              }
-
-              setIsPlaying(
-                snapshot.isPlaying,
-              );
-            },
-            onEnded: () => {
-              if (
-                playbackBackendRef.current ===
-                "soundcloud"
-              ) {
-                handleEndedRef.current();
-              }
-            },
-            onError: (error) => {
-              if (
-                playbackBackendRef.current !==
-                "soundcloud"
-              ) {
-                return;
-              }
-
-              fallbackToPreview(
-                "SoundCloud playback failed, falling back to preview:",
-                error,
-              );
-            },
-          },
-        )
-          .then(() => {
-            if (
-              playbackBackendRef.current ===
-              "soundcloud"
-            ) {
-              startSoundCloudPolling();
-            }
-          })
-          .catch((error) => {
-            if (
-              playbackBackendRef.current !==
-              "soundcloud"
-            ) {
-              return;
-            }
-
-            fallbackToPreview(
-              "SoundCloud playback failed, falling back to preview:",
-              error,
-            );
-          });
-
-      return;
-    }
-
-    stopProviderPolling();
-    stopYouTube();
-    stopSoundCloud();
-
-    const rawAppleMusicId =
-      track.appleMusicCatalogId ||
-      track.appleMusicId ||
-      null;
-
-    const appleMusicId =
-      rawAppleMusicId
-        ? String(
-            rawAppleMusicId,
-          ).trim()
-        : null;
-
-    const shouldUseAppleMusic =
-      playbackPrefs.appleMusicConnected &&
-      Boolean(
-        appleMusicId,
-      );
-
-    if (
-      !shouldUseAppleMusic ||
-      !appleMusicId
-    ) {
-      playViaHtmlAudio(
-        track,
-        audio,
-      );
-      return;
-    }
-
-    playAppleMusicCatalogSong(
-      appleMusicId,
-      playbackPrefs.appleMusicToken,
-    )
-      .then(() => {
-        audio.pause();
-        audio.removeAttribute("src");
-
-        playbackBackendRef.current =
-          "apple";
-
-        setPlaybackBackend(
-          "apple",
+      if (
+        track.playbackEngine === "youtube" &&
+        track.providerObjectId
+      ) {
+        playbackBackendRef.current = "youtube";
+        setPlaybackBackend("youtube");
+        setCurrentTime(0);
+        setDuration(
+          track.duration || 0,
         );
 
+        try {
+          await playYouTubeTrack(
+            track.providerObjectId,
+            volume,
+            {
+              onSnapshot: (snapshot) => {
+                if (
+                  !isCurrentSession() ||
+                  playbackBackendRef.current !==
+                    "youtube"
+                ) {
+                  return;
+                }
+
+                if (snapshot.isPlaying) {
+                  playbackStartingRef.current = false;
+                  restartInterruptedPlaybackRef.current = false;
+                }
+
+                setCurrentTime(
+                  snapshot.currentTime,
+                );
+
+                if (
+                  snapshot.duration > 0
+                ) {
+                  setDuration(
+                    snapshot.duration,
+                  );
+                }
+
+                setIsPlaying(
+                  snapshot.isPlaying,
+                );
+              },
+              onEnded: () => {
+                if (
+                  isCurrentSession() &&
+                  playbackBackendRef.current ===
+                    "youtube"
+                ) {
+                  handleEndedRef.current();
+                }
+              },
+              onError: (
+                errorCode,
+              ) => {
+                if (
+                  !isCurrentSession() ||
+                  playbackBackendRef.current !==
+                    "youtube"
+                ) {
+                  return;
+                }
+
+                void fallbackToPreview(
+                  `YouTube playback failed with code ${errorCode}.`,
+                  errorCode,
+                );
+              },
+              onAutoplayBlocked: () => {
+                if (
+                  isCurrentSession() &&
+                  playbackBackendRef.current ===
+                    "youtube"
+                ) {
+                  playbackStartingRef.current = false;
+                  setIsPlaying(false);
+                }
+              },
+            },
+          );
+
+          if (
+            isCurrentSession() &&
+            playbackBackendRef.current ===
+              "youtube"
+          ) {
+            startYouTubePolling();
+          }
+        } catch (error) {
+          if (
+            !isCurrentSession() ||
+            playbackBackendRef.current !==
+              "youtube"
+          ) {
+            return;
+          }
+
+          await fallbackToPreview(
+            "YouTube playback failed, falling back to preview:",
+            error,
+          );
+        }
+
+        return;
+      }
+
+      if (
+        track.playbackEngine === "soundcloud" &&
+        track.providerUrl
+      ) {
+        playbackBackendRef.current = "soundcloud";
+        setPlaybackBackend("soundcloud");
+        setCurrentTime(0);
+        setDuration(
+          track.duration || 0,
+        );
+
+        try {
+          await playSoundCloudTrack(
+            track.providerUrl,
+            volume,
+            {
+              onSnapshot: (snapshot) => {
+                if (
+                  !isCurrentSession() ||
+                  playbackBackendRef.current !==
+                    "soundcloud"
+                ) {
+                  return;
+                }
+
+                if (snapshot.isPlaying) {
+                  playbackStartingRef.current = false;
+                  restartInterruptedPlaybackRef.current = false;
+                }
+
+                setCurrentTime(
+                  snapshot.currentTime,
+                );
+
+                if (
+                  snapshot.duration > 0
+                ) {
+                  setDuration(
+                    snapshot.duration,
+                  );
+                }
+
+                setIsPlaying(
+                  snapshot.isPlaying,
+                );
+              },
+              onEnded: () => {
+                if (
+                  isCurrentSession() &&
+                  playbackBackendRef.current ===
+                    "soundcloud"
+                ) {
+                  handleEndedRef.current();
+                }
+              },
+              onError: (error) => {
+                if (
+                  !isCurrentSession() ||
+                  playbackBackendRef.current !==
+                    "soundcloud"
+                ) {
+                  return;
+                }
+
+                void fallbackToPreview(
+                  "SoundCloud playback failed, falling back to preview:",
+                  error,
+                );
+              },
+            },
+          );
+
+          if (
+            isCurrentSession() &&
+            playbackBackendRef.current ===
+              "soundcloud"
+          ) {
+            startSoundCloudPolling();
+          }
+        } catch (error) {
+          if (
+            !isCurrentSession() ||
+            playbackBackendRef.current !==
+              "soundcloud"
+          ) {
+            return;
+          }
+
+          await fallbackToPreview(
+            "SoundCloud playback failed, falling back to preview:",
+            error,
+          );
+        }
+
+        return;
+      }
+
+      const rawAppleMusicId =
+        track.appleMusicCatalogId ||
+        track.appleMusicId ||
+        null;
+
+      const appleMusicId =
+        rawAppleMusicId
+          ? String(
+              rawAppleMusicId,
+            ).trim()
+          : null;
+
+      const shouldUseAppleMusic =
+        playbackPrefs.appleMusicConnected &&
+        Boolean(
+          appleMusicId,
+        );
+
+      if (
+        !shouldUseAppleMusic ||
+        !appleMusicId
+      ) {
+        await playViaHtmlAudio(
+          track,
+          audio,
+          playbackSessionId,
+        );
+        return;
+      }
+
+      playbackBackendRef.current = "apple";
+      setPlaybackBackend("apple");
+      setCurrentTime(0);
+      setDuration(
+        track.duration || 0,
+      );
+
+      try {
+        const started =
+          await playAppleMusicCatalogSong(
+            appleMusicId,
+            playbackPrefs.appleMusicToken,
+          );
+
+        if (!isCurrentSession()) {
+          return;
+        }
+
+        playbackStartingRef.current = false;
+
+        if (!started) {
+          setIsPlaying(false);
+          return;
+        }
+
+        restartInterruptedPlaybackRef.current = false;
         setCurrentTime(0);
         setDuration(
           track.duration || 0,
@@ -643,27 +763,38 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
         setIsPlaying(true);
 
         startApplePolling();
-      })
-      .catch((err) => {
-        console.warn(
+      } catch (err) {
+        if (!isCurrentSession()) {
+          return;
+        }
+
+        await fallbackToPreview(
           "Apple Music playback failed, falling back to preview:",
           err,
         );
+      }
+    })().catch((error) => {
+      if (!isCurrentSession()) {
+        return;
+      }
 
-        playViaHtmlAudio(
-          track,
-          audio,
-        );
-      });
+      playbackStartingRef.current = false;
+      setIsPlaying(false);
+
+      console.warn(
+        "Playback startup failed:",
+        error,
+      );
+    });
   }, [
+    isPlaybackSessionCurrent,
     playbackPrefs.appleMusicConnected,
     playbackPrefs.appleMusicToken,
     playViaHtmlAudio,
+    silenceAllPlayback,
     startApplePolling,
     startSoundCloudPolling,
     startYouTubePolling,
-    stopApplePolling,
-    stopProviderPolling,
     volume,
   ]);
 
@@ -673,19 +804,45 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
     audio.preload = "auto";
     audioRef.current = audio;
 
+    const isActiveHtmlAudio = () => {
+      const sessionId = htmlAudioSessionRef.current;
+
+      return (
+        sessionId !== null &&
+        playbackBackendRef.current === "audio" &&
+        playbackArbiterRef.current.isCurrent(
+          sessionId,
+        )
+      );
+    };
+
     const onTimeUpdate = () => {
+      if (!isActiveHtmlAudio()) {
+        return;
+      }
+
       if (audio.duration && Number.isFinite(audio.duration)) {
         setCurrentTime(audio.currentTime);
       }
     };
 
     const onLoadedMetadata = () => {
+      if (!isActiveHtmlAudio()) {
+        return;
+      }
+
       if (audio.duration && Number.isFinite(audio.duration) && audio.duration > 0) {
         setDuration(audio.duration);
       }
     };
 
     const onEnded = () => {
+      if (!isActiveHtmlAudio()) {
+        return;
+      }
+
+      playbackStartingRef.current = false;
+
       setCurrentTime(
         audio.duration || 0,
       );
@@ -693,16 +850,39 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
       handleEndedRef.current();
     };
 
-    const onPlay = () => setIsPlaying(true);
+    const onPlay = () => {
+      if (!isActiveHtmlAudio()) {
+        return;
+      }
+
+      pendingPlayRef.current = false;
+      playbackStartingRef.current = false;
+      restartInterruptedPlaybackRef.current = false;
+      setIsPlaying(true);
+    };
+
     const onPause = () => {
-      // Only set to false if not triggered by ended (ended fires pause first)
+      if (!isActiveHtmlAudio()) {
+        return;
+      }
+
       if (!audio.ended) {
         setIsPlaying(false);
       }
     };
 
     const onError = () => {
-      console.warn("Audio playback error:", audio.error?.message || "unknown");
+      if (!isActiveHtmlAudio()) {
+        return;
+      }
+
+      console.warn(
+        "Audio playback error:",
+        audio.error?.message || "unknown",
+      );
+
+      pendingPlayRef.current = false;
+      playbackStartingRef.current = false;
       setIsPlaying(false);
     };
 
@@ -1137,6 +1317,40 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
     });
   }, [isShuffle, playTrackSource]);
 
+  // ─── Pause ───
+  const pauseActivePlayback =
+    useCallback(() => {
+      const audio =
+        audioRef.current;
+
+      stopApplePolling();
+      stopProviderPolling();
+
+      if (playbackStartingRef.current) {
+        playbackArbiterRef.current.invalidate();
+
+        playbackStartingRef.current = false;
+        restartInterruptedPlaybackRef.current = true;
+        setIsPlaying(false);
+
+        void silenceAllPlayback(audio);
+        return;
+      }
+
+      audio?.pause();
+      pauseYouTube();
+      pauseSoundCloud();
+
+      void pauseAppleMusic()
+        .catch(() => {});
+
+      setIsPlaying(false);
+    }, [
+      silenceAllPlayback,
+      stopApplePolling,
+      stopProviderPolling,
+    ]);
+
   // ─── Toggle play/pause ───
   const togglePlay = useCallback(() => {
     const audio = audioRef.current;
@@ -1148,19 +1362,46 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
       return;
     }
 
+    const appleSnapshot =
+      playbackBackendRef.current ===
+        "apple"
+        ? getAppleMusicPlaybackSnapshot()
+        : null;
+
+    const activePlayback =
+      isPlaying ||
+      (
+        playbackBackendRef.current ===
+          "audio" &&
+        !audio.paused &&
+        !audio.ended
+      ) ||
+      appleSnapshot?.isPlaying === true;
+
+    if (activePlayback) {
+      pauseActivePlayback();
+      return;
+    }
+
+    if (
+      restartInterruptedPlaybackRef.current
+    ) {
+      restartInterruptedPlaybackRef.current = false;
+
+      playTrackSource(
+        currentTrack,
+        audio,
+      );
+      return;
+    }
+
     if (
       playbackBackendRef.current ===
       "youtube"
     ) {
-      if (isPlaying) {
-        pauseYouTube();
-        setIsPlaying(false);
-      } else {
-        resumeYouTube();
-        startYouTubePolling();
-        setIsPlaying(true);
-      }
-
+      resumeYouTube();
+      startYouTubePolling();
+      setIsPlaying(true);
       return;
     }
 
@@ -1168,14 +1409,8 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
       playbackBackendRef.current ===
       "soundcloud"
     ) {
-      if (isPlaying) {
-        pauseSoundCloud();
-        setIsPlaying(false);
-      } else {
-        resumeSoundCloud();
-        setIsPlaying(true);
-      }
-
+      resumeSoundCloud();
+      setIsPlaying(true);
       return;
     }
 
@@ -1183,87 +1418,33 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
       playbackBackendRef.current ===
       "apple"
     ) {
-      const snapshot =
-        getAppleMusicPlaybackSnapshot();
-
-      if (
-        snapshot?.isPlaying ||
-        isPlaying
-      ) {
-        pauseAppleMusic()
-          .catch(() => {});
-
-        setIsPlaying(false);
-      } else {
-        resumeAppleMusic()
-          .catch(() => {});
-
-        setIsPlaying(true);
-        startApplePolling();
-      }
-
-      return;
-    }
-
-    if (
-      !currentTrack.previewUrl
-    ) {
-      return;
-    }
-
-    if (
-      audio.paused ||
-      audio.ended
-    ) {
-      if (audio.ended) {
-        audio.currentTime = 0;
-      }
-
-      audio
-        .play()
+      resumeAppleMusic()
         .catch(() => {});
-    } else {
-      audio.pause();
+
+      setIsPlaying(true);
+      startApplePolling();
+      return;
     }
+
+    if (!currentTrack.previewUrl) {
+      return;
+    }
+
+    if (audio.ended) {
+      audio.currentTime = 0;
+    }
+
+    audio
+      .play()
+      .catch(() => {});
   }, [
     currentTrack,
     isPlaying,
+    pauseActivePlayback,
+    playTrackSource,
     startApplePolling,
     startYouTubePolling,
   ]);
-
-  // ─── Pause ───
-  const pauseActivePlayback =
-    useCallback(() => {
-      const audio =
-        audioRef.current;
-
-      if (
-        playbackBackendRef.current ===
-        "youtube"
-      ) {
-        pauseYouTube();
-      } else if (
-        playbackBackendRef.current ===
-        "soundcloud"
-      ) {
-        pauseSoundCloud();
-      } else if (
-        playbackBackendRef.current ===
-        "apple"
-      ) {
-        stopApplePolling();
-
-        pauseAppleMusic()
-          .catch(() => {});
-      } else {
-        audio?.pause();
-      }
-
-      setIsPlaying(false);
-    }, [
-      stopApplePolling,
-    ]);
 
   const pause = useCallback(() => {
     if (

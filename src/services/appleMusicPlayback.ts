@@ -9,6 +9,8 @@ declare global {
 let scriptPromise: Promise<void> | null = null;
 let developerTokenPromise: Promise<string> | null = null;
 let configuredDeveloperToken: string | null = null;
+let playbackRequestSerial = 0;
+let playbackMutation: Promise<void> = Promise.resolve();
 
 function loadMusicKitScript(): Promise<void> {
   if (window.MusicKit) return Promise.resolve();
@@ -114,7 +116,11 @@ export function getExistingMusicKit(): any | null {
   }
 }
 
-export async function playAppleMusicCatalogSong(catalogId: string, userToken?: string | null): Promise<void> {
+export async function playAppleMusicCatalogSong(
+  catalogId: string,
+  userToken?: string | null,
+): Promise<boolean> {
+  const requestId = ++playbackRequestSerial;
   const music = await getAuthorizedMusicKit(userToken);
   const songId = String(catalogId).trim();
 
@@ -122,13 +128,67 @@ export async function playAppleMusicCatalogSong(catalogId: string, userToken?: s
     throw new Error("Missing Apple Music catalog song id");
   }
 
-  try {
-    await music.setQueue({ song: songId });
-  } catch {
-    await music.setQueue({ songs: [songId] });
+  if (requestId !== playbackRequestSerial) {
+    return false;
   }
 
-  await music.play();
+  let started = false;
+
+  const run = async () => {
+    if (requestId !== playbackRequestSerial) {
+      return;
+    }
+
+    try {
+      await music.setQueue({ song: songId });
+    } catch {
+      if (requestId !== playbackRequestSerial) {
+        return;
+      }
+
+      await music.setQueue({ songs: [songId] });
+    }
+
+    if (requestId !== playbackRequestSerial) {
+      return;
+    }
+
+    await music.play();
+
+    if (requestId !== playbackRequestSerial) {
+      if (music?.pause) {
+        await music.pause();
+      }
+      return;
+    }
+
+    started = true;
+  };
+
+  const mutation = playbackMutation.then(run, run);
+  playbackMutation = mutation.catch(() => {});
+
+  await mutation;
+
+  return started;
+}
+
+export async function stopAppleMusic(): Promise<void> {
+  playbackRequestSerial += 1;
+
+  const pendingMutation = playbackMutation;
+
+  try {
+    await pendingMutation;
+  } catch {
+    // A failed stale request is already non-authoritative.
+  }
+
+  const music = getExistingMusicKit();
+
+  if (music?.pause) {
+    await music.pause();
+  }
 }
 
 export async function pauseAppleMusic(): Promise<void> {
