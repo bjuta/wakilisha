@@ -30,6 +30,7 @@ import {
 import {
   getArtistRepresentationState,
 } from "@/services/artists/claimedArtist";
+import { GlobalSearchSurface } from "@/components/search/GlobalSearchSurface";
 
 const MUSIC_APP_PREFIXES = [
   "/music",
@@ -42,6 +43,7 @@ const MUSIC_APP_PREFIXES = [
   "/genres",
   "/labels",
   "/magazine",
+  "/search",
 ] as const;
 
 const MUSIC_SIDEBAR_COLLAPSED_KEY =
@@ -296,6 +298,10 @@ export function MusicDesktopShell({
   const [
     studioLauncherOpen,
     setStudioLauncherOpen,
+  ] = useState(false);
+  const [
+    globalSearchOpen,
+    setGlobalSearchOpen,
   ] = useState(false);
   const [
     studioIntent,
@@ -637,6 +643,14 @@ export function MusicDesktopShell({
 
       if (
         pathname.startsWith(
+          "/search",
+        )
+      ) {
+        return "search";
+      }
+
+      if (
+        pathname.startsWith(
           "/following",
         )
       ) {
@@ -772,6 +786,36 @@ export function MusicDesktopShell({
         </div>
 
         <nav className="space-y-1 px-3">
+          <button
+            type="button"
+            onClick={() => setGlobalSearchOpen(true)}
+            aria-label="Search"
+            title={sidebarCollapsed ? "Search" : undefined}
+            className={[
+              "relative flex h-10 w-full items-center rounded-lg text-[13px] font-semibold transition-colors",
+              sidebarCollapsed
+                ? "justify-center px-0"
+                : "gap-3 px-3",
+              activeSection === "search"
+                ? "bg-[var(--wk-surface-raised)] text-[var(--wk-text)]"
+                : "text-[var(--wk-text-muted)] hover:bg-[var(--wk-surface-raised)] hover:text-[var(--wk-text)]",
+            ].join(" ")}
+          >
+            {activeSection === "search" ? (
+              <span className="absolute inset-y-2 left-0 w-0.5 rounded-full bg-[var(--wk-brand)]" />
+            ) : null}
+            <WkIcon
+              name="Search"
+              size={17}
+              className={
+                activeSection === "search"
+                  ? "text-[var(--wk-brand)]"
+                  : "text-[var(--wk-text-faint)]"
+              }
+            />
+            {!sidebarCollapsed ? <span>Search</span> : null}
+          </button>
+
           <AppNavLink
             to="/music"
             icon="AudioLines"
@@ -973,95 +1017,49 @@ export function MusicDesktopShell({
       </aside>
 
       <div className="min-w-0 flex-1 pb-24">
-        <div className="sticky top-0 z-40 flex h-[76px] items-center gap-4 border-b border-[var(--wk-border)] bg-[var(--wk-overlay)] px-4 backdrop-blur-xl sm:px-6 xl:px-8">
-          <Link
-            to="/music"
-            aria-label={displayName}
-            className="shrink-0 lg:hidden"
-          >
+        <div className="sticky top-0 z-40 flex h-[64px] items-center gap-3 border-b border-[var(--wk-border)] bg-[var(--wk-overlay)] px-4 backdrop-blur-xl lg:hidden">
+          <Link to="/music" aria-label={displayName} className="min-w-0 flex-1">
             {showLogo ? (
               <img
                 src={selectedLogoUrl}
                 alt={displayName}
-                onError={() =>
-                  setLogoError(true)
-                }
+                onError={() => setLogoError(true)}
                 className="h-7 max-w-[128px] object-contain object-left"
               />
             ) : (
-              <span className="text-[17px] font-black tracking-[-0.04em] text-[var(--wk-text)]">
+              <span className="truncate text-[17px] font-black tracking-[-0.04em] text-[var(--wk-text)]">
                 {displayName}
               </span>
             )}
           </Link>
 
-          <Link
-            to="/search"
-            className="flex h-11 min-w-0 max-w-[660px] flex-1 items-center gap-3 rounded-full border border-[var(--wk-border)] bg-[var(--wk-surface)] px-4 text-[12px] font-medium text-[var(--wk-text-muted)] transition-colors hover:bg-[var(--wk-surface-raised)] hover:text-[var(--wk-text-soft)]"
+          <button
+            type="button"
+            onClick={() => setGlobalSearchOpen(true)}
+            aria-label="Search"
+            className="flex h-9 w-9 items-center justify-center rounded-full border border-[var(--wk-border)] bg-[var(--wk-surface)] text-[var(--wk-text-muted)]"
           >
-            <WkIcon
-              name="Search"
-              size={16}
-            />
-            <span className="truncate">
-              Search artists, songs, albums, scenes...
-            </span>
+            <WkIcon name="Search" size={16} />
+          </button>
+
+          <Link
+            to="/profile"
+            aria-label="Profile"
+            className="flex h-9 w-9 items-center justify-center rounded-full border border-[var(--wk-border)] bg-[var(--wk-surface)] text-[var(--wk-text-muted)]"
+          >
+            <WkIcon name="UserRound" size={16} />
           </Link>
-
-          <div className="ml-auto flex shrink-0 items-center gap-2">
-            <button
-  type="button"
-  onClick={() =>
-    void beginStudio(
-      "music",
-    )
-  }
-  className="hidden h-10 items-center gap-2 rounded-full border border-[var(--wk-border-2)] bg-[var(--wk-surface)] px-4 text-[11px] font-bold text-[var(--wk-text)] transition-colors hover:bg-[var(--wk-surface-raised)] sm:inline-flex"
->
-              <WkIcon
-                name="Upload"
-                size={14}
-              />
-              Upload Music
-            </button>
-
-            <button
-              type="button"
-              onClick={toggle}
-              aria-label={
-                theme === "dark"
-                  ? "Switch to light mode"
-                  : "Switch to dark mode"
-              }
-              className="flex h-9 w-9 items-center justify-center rounded-full border border-[var(--wk-border)] bg-[var(--wk-surface)] text-[var(--wk-text-muted)] transition-colors hover:bg-[var(--wk-surface-raised)] hover:text-[var(--wk-text)]"
-            >
-              <WkIcon
-                name={
-                  theme === "dark"
-                    ? "Sun"
-                    : "Moon"
-                }
-                size={15}
-              />
-            </button>
-
-            <Link
-              to="/profile"
-              aria-label="Profile"
-              className="flex h-9 w-9 items-center justify-center rounded-full border border-[var(--wk-border)] bg-[var(--wk-surface)] text-[var(--wk-text-muted)]"
-            >
-              <WkIcon
-                name="UserRound"
-                size={16}
-              />
-            </Link>
-          </div>
         </div>
 
-        <div className="min-h-[calc(100vh-76px)]">
+        <div className="min-h-screen">
           {children}
         </div>
       </div>
+      <GlobalSearchSurface
+        open={globalSearchOpen}
+        onClose={() => setGlobalSearchOpen(false)}
+      />
+
       {studioLauncherOpen ? (
         <div
           className="fixed inset-0 z-[140] flex items-center justify-center bg-black/55 p-4 backdrop-blur-sm"
@@ -1097,7 +1095,7 @@ export function MusicDesktopShell({
                 >
                   {studioIntent ===
                   "music"
-                    ? "Upload Music"
+                    ? "Music Submission"
                     : "Artist Studio"}
                 </h2>
                 <p className="mt-2 text-[12px] font-medium leading-relaxed text-[var(--wk-text-muted)]">

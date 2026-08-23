@@ -147,7 +147,7 @@ describe("Admin Studio convergence", () => {
       "Chapters",
       "Credits and Citations",
       "Review",
-      "Podcast Identity",
+      "Podcast Delivery",
       "History",
       "setAudioMaster",
       "setAudioTranscript",
@@ -181,8 +181,8 @@ describe("Admin Studio convergence", () => {
     expect(audit).toContain("Extract -> converge -> migrate");
     expect(audit).toContain("The goal is not that every screen looks identical.");
     expect(audit).toContain("The goal is that every screen knows what the same thing means.");
-    expect(audit).toContain("This milestone is frontend-only.");
+    expect(audit).toContain("This convergence milestone was frontend-only.");
     expect(audit).toContain("schema changes");
-    expect(audit).toContain("changing Audio publication authority");
+    expect(audit).toContain("changes to Article, Playlist, or Audio domain authority");
   });
 });

@@ -67,6 +67,18 @@ export interface AudioTrustCredit {
   roleLabel: string | null;
 }
 
+export interface AudioLifecycleEvent {
+  id: string;
+  eventNumber: number;
+  versionId: string | null;
+  action: "archived" | "restored";
+  priorStatus: string | null;
+  resultingStatus: string;
+  note: string | null;
+  actorId: string | null;
+  createdAt: string;
+}
+
 export interface AudioReviewEvent {
   id: string;
   eventNumber: number;
@@ -105,6 +117,7 @@ export interface AudioPublicationWorkspace {
   } | null;
   chapters: AudioChapter[];
   reviewEvents: AudioReviewEvent[];
+  lifecycleEvents: AudioLifecycleEvent[];
   trust: {
     citationRevision: number;
     creditRevision: number;
@@ -118,6 +131,7 @@ export interface AudioPublicationWorkspace {
   canEdit: boolean;
   canManageReview: boolean;
   canPublish: boolean;
+  canArchive: boolean;
 }
 
 export interface AudioAdminIndex {
@@ -311,6 +325,23 @@ export async function fetchAudioPublicationWorkspace(
         createdAt: text(row.created_at),
       };
     }),
+    lifecycleEvents: array(root.lifecycle_events).map((value) => {
+      const row = object(value);
+      return {
+        id: text(row.id),
+        eventNumber: numberValue(row.event_number),
+        versionId: nullableText(row.version_id),
+        action:
+          text(row.action) === "restored"
+            ? "restored"
+            : "archived",
+        priorStatus: nullableText(row.prior_status),
+        resultingStatus: text(row.resulting_status),
+        note: nullableText(row.note),
+        actorId: nullableText(row.actor_id),
+        createdAt: text(row.created_at),
+      };
+    }),
     trust: {
       citationRevision: numberValue(trust.citation_revision, 1),
       creditRevision: numberValue(trust.credit_revision, 1),
@@ -352,6 +383,7 @@ export async function fetchAudioPublicationWorkspace(
     canEdit: bool(root.can_edit),
     canManageReview: bool(root.can_manage_review),
     canPublish: bool(root.can_publish),
+    canArchive: bool(root.can_archive),
   };
 }
 
@@ -642,6 +674,60 @@ export async function reviewAudio(
     throw new Error("Review state changed somewhere else. Reload and try again.");
   }
 }
+
+
+export async function archiveAudioPublication(
+  workspace: AudioPublicationWorkspace,
+  note: string,
+): Promise<void> {
+  const { data, error } = await supabase.rpc(
+    "archive_audio_publication",
+    {
+      p_publication_id: workspace.publication.id,
+      p_expected_authority_revision:
+        workspace.publication.authorityRevision,
+      p_idempotency_key: idempotency("audio-publication-archive"),
+      p_note: note.trim() || null,
+      p_correlation_id: null,
+    },
+  );
+
+  throwRpc(error, "Audio could not be archived.");
+  const row = unwrapRow(data);
+
+  if (text(row.receipt_status) !== "succeeded") {
+    throw new Error(
+      "Audio archive state changed somewhere else. Reload and try again.",
+    );
+  }
+}
+
+export async function restoreAudioPublication(
+  workspace: AudioPublicationWorkspace,
+  note: string,
+): Promise<void> {
+  const { data, error } = await supabase.rpc(
+    "restore_audio_publication_from_archive",
+    {
+      p_publication_id: workspace.publication.id,
+      p_expected_authority_revision:
+        workspace.publication.authorityRevision,
+      p_idempotency_key: idempotency("audio-publication-restore"),
+      p_note: note.trim() || null,
+      p_correlation_id: null,
+    },
+  );
+
+  throwRpc(error, "Audio could not be restored.");
+  const row = unwrapRow(data);
+
+  if (text(row.receipt_status) !== "succeeded") {
+    throw new Error(
+      "Audio restore state changed somewhere else. Reload and try again.",
+    );
+  }
+}
+
 
 export async function publishAudio(
   workspace: AudioPublicationWorkspace,

@@ -4117,6 +4117,93 @@ export type Database = {
           },
         ]
       }
+      track_lyrics_documents: {
+        Row: {
+          authority_revision: number
+          created_at: string
+          current_published_version_id: string | null
+          current_working_version_id: string | null
+          track_id: string
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          authority_revision?: number
+          created_at?: string
+          current_published_version_id?: string | null
+          current_working_version_id?: string | null
+          track_id: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          authority_revision?: number
+          created_at?: string
+          current_published_version_id?: string | null
+          current_working_version_id?: string | null
+          track_id?: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "track_lyrics_documents_published_fkey"
+            columns: ["current_published_version_id", "track_id"]
+            isOneToOne: false
+            referencedRelation: "track_lyrics_versions"
+            referencedColumns: ["id", "track_id"]
+          },
+          {
+            foreignKeyName: "track_lyrics_documents_working_fkey"
+            columns: ["current_working_version_id", "track_id"]
+            isOneToOne: false
+            referencedRelation: "track_lyrics_versions"
+            referencedColumns: ["id", "track_id"]
+          },
+        ]
+      }
+      track_lyrics_versions: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          id: string
+          language_code: string
+          lines: Json
+          plain_text: string
+          rights_note: string | null
+          source_kind: string
+          timing_mode: string
+          track_id: string
+          version_number: number
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          language_code?: string
+          lines: Json
+          plain_text: string
+          rights_note?: string | null
+          source_kind?: string
+          timing_mode?: string
+          track_id: string
+          version_number: number
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          language_code?: string
+          lines?: Json
+          plain_text?: string
+          rights_note?: string | null
+          source_kind?: string
+          timing_mode?: string
+          track_id?: string
+          version_number?: number
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
@@ -18446,6 +18533,27 @@ export type Database = {
           version_number: number
         }[]
       }
+      archive_audio_publication: {
+        Args: {
+          p_correlation_id?: string
+          p_expected_authority_revision: number
+          p_idempotency_key: string
+          p_note?: string
+          p_publication_id: string
+        }
+        Returns: {
+          authority_revision: number
+          command_receipt_id: string
+          idempotent_replay: boolean
+          lifecycle_status: string
+          publication_id: string
+          receipt_status: string
+          resource_id: string
+          result_payload: Json
+          version_id: string
+          version_number: number
+        }[]
+      }
       archive_media_asset: {
         Args: {
           p_asset_id: string
@@ -20602,6 +20710,10 @@ export type Database = {
           isSetofReturn: true
         }
       }
+      get_admin_track_lyrics_workspace: {
+        Args: { p_track_id: string }
+        Returns: Json
+      }
       get_article_review_workspace: {
         Args: { p_article_id: string }
         Returns: Json
@@ -20800,6 +20912,7 @@ export type Database = {
         Args: { p_episode_slug: string; p_show_slug: string }
         Returns: Json
       }
+      get_public_track_lyrics: { Args: { p_track_id: string }; Returns: Json }
       get_release_artists_for_anon: {
         Args: { p_artist_slug: string }
         Returns: {
@@ -21767,6 +21880,14 @@ export type Database = {
           version_number: number
         }[]
       }
+      publish_track_lyrics_version: {
+        Args: {
+          p_expected_authority_revision: number
+          p_track_id: string
+          p_version_id: string
+        }
+        Returns: Json
+      }
       purge_staging_records: {
         Args: { batch_size?: number; max_batches?: number }
         Returns: number
@@ -22468,6 +22589,27 @@ export type Database = {
           version_number: number
         }[]
       }
+      restore_audio_publication_from_archive: {
+        Args: {
+          p_correlation_id?: string
+          p_expected_authority_revision: number
+          p_idempotency_key: string
+          p_note?: string
+          p_publication_id: string
+        }
+        Returns: {
+          authority_revision: number
+          command_receipt_id: string
+          idempotent_replay: boolean
+          lifecycle_status: string
+          publication_id: string
+          receipt_status: string
+          resource_id: string
+          result_payload: Json
+          version_id: string
+          version_number: number
+        }[]
+      }
       restore_media_asset: {
         Args: {
           p_asset_id: string
@@ -22818,6 +22960,18 @@ export type Database = {
           p_reason?: string
           p_registry_links?: Json
           p_source_id: string
+        }
+        Returns: Json
+      }
+      save_track_lyrics_draft: {
+        Args: {
+          p_expected_authority_revision: number
+          p_language_code: string
+          p_lines: Json
+          p_rights_note?: string
+          p_source_kind?: string
+          p_timing_mode: string
+          p_track_id: string
         }
         Returns: Json
       }

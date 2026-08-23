@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { WkIcon } from "@/components/design-system/Icon";
 import { AdminRecordHeader } from "@/components/design-system/admin/AdminRecordHeader";
+import { AdminRecordActions } from "@/components/design-system/admin/AdminRecordActions";
 import { AdminSaveState } from "@/components/design-system/admin/AdminSaveState";
 import { AdminStatusBadge } from "@/components/design-system/admin/AdminStatusBadge";
 
@@ -278,7 +279,7 @@ export function ArticleEditorHeader({
         </>
       }
       actions={
-        <>
+        <AdminRecordActions>
           <AdminSaveState
             isDirty={isDirty}
             isSaving={isSaving}
@@ -427,7 +428,7 @@ export function ArticleEditorHeader({
               </div>
             ) : null}
           </div>
-        </>
+        </AdminRecordActions>
       }
       footer={
         publishDisabledReason || lastAutosavedAt ? (

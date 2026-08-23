@@ -1,19 +1,15 @@
-import { WkIcon, type WkIconName } from "@/components/design-system/Icon";
+import { WkIcon } from "@/components/design-system/Icon";
 import { AdminRecordHeader } from "@/components/design-system/admin/AdminRecordHeader";
+import {
+  AdminRecordActions,
+  type AdminRecordActionDescriptor,
+} from "@/components/design-system/admin/AdminRecordActions";
 import { AdminSaveState } from "@/components/design-system/admin/AdminSaveState";
 
 // Shell semantics are organization-level now:
 // AdminRecordHeader owns sticky top-0; AdminSaveState owns Saving, Unsaved, and All Saved.
 
-export interface PlaylistEditorHeaderAction {
-  label: string;
-  icon: WkIconName;
-  onClick?: () => void;
-  href?: string;
-  disabled?: boolean;
-  title?: string;
-  tone?: "primary" | "ghost" | "danger";
-}
+export type PlaylistEditorHeaderAction = AdminRecordActionDescriptor;
 
 export function PlaylistEditorHeader({
   title,
@@ -43,61 +39,9 @@ export function PlaylistEditorHeader({
   onBack: () => void;
   onSave: () => void;
   onToggleDetails: () => void;
-  primaryAction?: PlaylistEditorHeaderAction | null;
-  secondaryActions?: PlaylistEditorHeaderAction[];
+  primaryAction?: Omit<PlaylistEditorHeaderAction, "key"> & { key?: string } | null;
+  secondaryActions?: Array<Omit<PlaylistEditorHeaderAction, "key"> & { key?: string }>;
 }) {
-  function actionClass(
-    action: PlaylistEditorHeaderAction,
-  ): string {
-    if (action.tone === "danger") {
-      return "wk-button wk-button-ghost wk-button-sm text-wk-danger";
-    }
-    if (action.tone === "primary") {
-      return "wk-button wk-button-primary wk-button-sm";
-    }
-    return "wk-button wk-button-ghost wk-button-sm";
-  }
-
-  function renderAction(
-    action: PlaylistEditorHeaderAction,
-    key: string,
-  ) {
-    const content = (
-      <>
-        <WkIcon name={action.icon} size={14} />
-        {action.label}
-      </>
-    );
-
-    if (action.href) {
-      return (
-        <a
-          key={key}
-          href={action.href}
-          target="_blank"
-          rel="noreferrer"
-          title={action.title}
-          className={actionClass(action)}
-        >
-          {content}
-        </a>
-      );
-    }
-
-    return (
-      <button
-        key={key}
-        type="button"
-        onClick={action.onClick}
-        disabled={action.disabled}
-        title={action.title}
-        className={`${actionClass(action)} disabled:opacity-40`}
-      >
-        {content}
-      </button>
-    );
-  }
-
   return (
     <AdminRecordHeader
       collectionLabel="Playlists"
@@ -146,13 +90,22 @@ export function PlaylistEditorHeader({
             Details
           </button>
 
-          {secondaryActions.map((action, index) =>
-            renderAction(action, `secondary-${index}`),
-          )}
-
-          {primaryAction
-            ? renderAction(primaryAction, "primary")
-            : null}
+          <AdminRecordActions
+            actions={[
+              ...secondaryActions.map(
+                (action, index) => ({
+                  ...action,
+                  key: action.key ?? `secondary-${index}`,
+                }),
+              ),
+              ...(primaryAction
+                ? [{
+                    ...primaryAction,
+                    key: primaryAction.key ?? "primary",
+                  }]
+                : []),
+            ]}
+          />
         </>
       }
     />

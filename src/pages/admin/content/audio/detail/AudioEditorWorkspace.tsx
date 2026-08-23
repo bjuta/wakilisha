@@ -10,6 +10,7 @@ import { MediaPickerModal } from "@/components/admin/MediaPickerModal";
 import { WkIcon } from "@/components/design-system/Icon";
 import { WkSurface } from "@/components/design-system/primitives/Surface";
 import { AdminRecordHeader } from "@/components/design-system/admin/AdminRecordHeader";
+import { AdminRecordActions } from "@/components/design-system/admin/AdminRecordActions";
 import { AdminSaveState } from "@/components/design-system/admin/AdminSaveState";
 import { AdminWorkspaceSection } from "@/components/design-system/admin/AdminWorkspaceSection";
 import { EditorialWorkflowRail } from "@/components/design-system/editorial/EditorialWorkflowRail";
@@ -33,11 +34,13 @@ import {
   type EditorialCreditPickerAuthority,
 } from "@/services/trust/editorialCreditService";
 import {
+  archiveAudioPublication,
   fetchAudioPublicationWorkspace,
   publishAudio,
   replaceAudioChapters,
   replaceAudioCitations,
   replaceAudioCredits,
+  restoreAudioPublication,
   reviewAudio,
   saveAudioMetadata,
   setAudioMaster,
@@ -500,7 +503,38 @@ export function AudioEditorWorkspace({
           </span>
         }
         actions={
-          <>
+          <AdminRecordActions
+            actions={[
+              ...(workspace.publication.status === "archived" && workspace.canEdit
+                ? [{
+                    key: "restore",
+                    label: "Restore",
+                    icon: "Undo2" as const,
+                    tone: "secondary" as const,
+                    disabled: busy !== null,
+                    onClick: () => void run(
+                      "restore",
+                      () => restoreAudioPublication(workspace, reviewNote),
+                      "Audio restored to Draft.",
+                    ),
+                  }]
+                : []),
+              ...(workspace.publication.status !== "archived" && workspace.canArchive
+                ? [{
+                    key: "archive",
+                    label: "Archive",
+                    icon: "Archive" as const,
+                    tone: "danger" as const,
+                    disabled: busy !== null,
+                    onClick: () => void run(
+                      "archive",
+                      () => archiveAudioPublication(workspace, reviewNote),
+                      "Audio archived.",
+                    ),
+                  }]
+                : []),
+            ]}
+          >
             <AdminSaveState
               isDirty={workingDirty}
               isSaving={isSaving}
@@ -606,7 +640,7 @@ export function AudioEditorWorkspace({
                 Publish
               </button>
             ) : null}
-          </>
+          </AdminRecordActions>
         }
       />
 
@@ -1003,8 +1037,18 @@ export function AudioEditorWorkspace({
                   </div>
                 ))}
 
-                {!workspace.reviewEvents.length ? (
-                  <p className="text-xs text-wk-text-muted">Review has not started.</p>
+                {workspace.lifecycleEvents.slice().reverse().map((event) => (
+                  <div key={event.id} className="border-l-2 border-wk-brand pl-4">
+                    <p className="text-xs font-black text-wk-text">{humanize(event.action)}</p>
+                    <p className="mt-1 text-[11px] text-wk-text-muted">
+                      {humanize(event.priorStatus ?? "draft")} {" → "} {humanize(event.resultingStatus)}
+                    </p>
+                    {event.note ? <p className="mt-1 text-xs text-wk-text">{event.note}</p> : null}
+                  </div>
+                ))}
+
+                {!workspace.reviewEvents.length && !workspace.lifecycleEvents.length ? (
+                  <p className="text-xs text-wk-text-muted">No lifecycle decisions yet.</p>
                 ) : null}
               </div>
             </AdminWorkspaceSection>

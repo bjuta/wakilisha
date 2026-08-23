@@ -14,6 +14,7 @@ export interface TrackSearchItem {
   source: string;
   label: string;
   contextText: string;
+  previewUrl: string | null;
 }
 
 type TrackRow = {
@@ -191,6 +192,7 @@ export function useTrackSearchData() {
             source: "apple_music",
             label,
             contextText,
+            previewUrl: t.preview_url,
           };
         });
 
