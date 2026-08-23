@@ -10,6 +10,7 @@
  */
 import { useState } from "react";
 import { MediaPickerModal } from "./MediaPickerModal";
+import type { MediaPickerPurpose } from "@/types/mediaPicker";
 
 interface Props {
   onSelect: (assetId: string | null, url: string) => void;
@@ -21,8 +22,10 @@ interface Props {
   className?: string;
   /** Use a compact icon-only variant */
   iconOnly?: boolean;
-  /** When provided, the modal pre-selects this image and shows "Replace" */
+  /** When provided, the modal pre-selects the current selection. */
   currentUrl?: string;
+  /** Semantic role for the picker confirmation action. */
+  purpose?: MediaPickerPurpose;
 }
 
 export function MediaPickerButton({
@@ -32,6 +35,7 @@ export function MediaPickerButton({
   className = "",
   iconOnly = false,
   currentUrl,
+  purpose = "media",
 }: Props) {
   const [open, setOpen] = useState(false);
 
@@ -56,6 +60,7 @@ export function MediaPickerButton({
         }}
         title={title}
         currentUrl={currentUrl}
+        selectionPurpose={purpose}
       />
     </>
   );

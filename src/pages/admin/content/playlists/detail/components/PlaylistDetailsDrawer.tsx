@@ -822,6 +822,7 @@ export function PlaylistDetailsDrawer({
               <div className="flex flex-wrap gap-2">
                 <MediaPickerButton
                   currentUrl={coverUrl || undefined}
+                  purpose="cover_art"
                   label={cover ? "Replace cover" : "Choose cover"}
                   title="Select Playlist Cover"
                   onSelect={(assetId) => {

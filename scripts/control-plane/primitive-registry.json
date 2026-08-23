@@ -60,11 +60,6 @@
           "reason": "Pre-contract WordPress publication lifecycle badge. The next change to Pages must migrate this surface to AdminStatusBadge."
         },
         {
-          "path": "src/pages/admin/content/playlists/detail/PlaylistEditorWorkspace.tsx",
-          "classification": "legacy",
-          "reason": "Unused pre-convergence Playlist lifecycle tone helper. The next change to this workspace must remove it rather than preserve parallel lifecycle grammar."
-        },
-        {
           "path": "src/pages/admin/content/lyrics/page.tsx",
           "classification": "semantic",
           "reason": "Timed Lyrics submission moderation states such as pending_review and rejected are not publication lifecycle states. They remain domain-specific unless a real cross-domain moderation primitive is proven."
@@ -175,6 +170,34 @@
       "authorityOwner": "consumer",
       "consumers": [
         "admin:audio"
+      ]
+    },
+    {
+      "id": "editorial.discovery-workspace",
+      "path": "src/components/design-system/editorial/EditorialMetadataWorkspace.tsx",
+      "kind": "interaction",
+      "maturity": "canonical",
+      "concept": "version-bound Categories, Tags, and search metadata editing",
+      "authorityOwner": "consumer",
+      "consumers": [
+        "admin:playlists",
+        "admin:audio"
+      ],
+      "competingImplementationPatterns": [
+        "supabase\\.rpc\\([\\\"']get_taxonomy_terms",
+        "supabase\\.rpc\\([\\\"']create_taxonomy_term"
+      ],
+      "competingImplementationExceptions": [
+        {
+          "path": "src/pages/admin/content/articles/detail/components/ArticleMetaPanel.tsx",
+          "classification": "legacy",
+          "reason": "Article remains the Milestone 1 compatibility writer. Its next taxonomy or discoverability change must migrate to the canonical Discovery primitive."
+        },
+        {
+          "path": "src/pages/admin/content/components/TaxonomyTermsPage.tsx",
+          "classification": "semantic",
+          "reason": "This page manages Registry taxonomy authority itself. It does not attach terms or search metadata to an editorial Resource version, so its taxonomy RPCs are a distinct semantic surface."
+        }
       ]
     }
   ]

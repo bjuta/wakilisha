@@ -7,6 +7,7 @@ import {
 import { useNavigate } from "react-router-dom";
 import { WkIcon } from "@/components/design-system/Icon";
 import { WkSurface } from "@/components/design-system/primitives/Surface";
+import { EditorialMetadataWorkspace } from "@/components/design-system/editorial/EditorialMetadataWorkspace";
 import {
   PlaylistEditorHeader,
   type PlaylistEditorHeaderAction,
@@ -50,24 +51,21 @@ import {
   type RegistryIntakeArtistCreditInput,
   type RegistryTrackSearchResult,
 } from "@/services/playlists/playlistAdminService";
+import {
+  createEditorialTaxonomyTerm,
+  fetchEditorialDiscovery,
+  saveEditorialDiscovery,
+  searchEditorialTaxonomyTerms,
+} from "@/services/editorial/editorialDiscoveryService";
+import type {
+  EditorialDiscoveryDraft,
+  EditorialDiscoveryValue,
+} from "@/types/editorialDiscovery";
 
 function humanize(value: string): string {
   return value
     .replace(/_/g, " ")
     .replace(/\b\w/g, (character) => character.toUpperCase());
-}
-
-function statusClass(status: string): string {
-  if (status === "approved" || status === "published") {
-    return "bg-wk-success-soft text-wk-success";
-  }
-  if (status === "ready_for_review" || status === "in_review") {
-    return "bg-wk-info-soft text-wk-info";
-  }
-  if (status === "changes_requested") {
-    return "bg-wk-warning-soft text-wk-warning";
-  }
-  return "bg-wk-surface-raised text-wk-text-muted";
 }
 
 function errorText(reason: unknown): string {
@@ -108,6 +106,9 @@ export function PlaylistEditorWorkspace({
   const [title, setTitle] = useState("");
   const [slug, setSlug] = useState("");
   const [description, setDescription] = useState("");
+  const [discovery, setDiscovery] = useState<EditorialDiscoveryValue | null>(null);
+  const [discoveryLoading, setDiscoveryLoading] = useState(false);
+  const [discoveryError, setDiscoveryError] = useState<string | null>(null);
 
   const [trackQuery, setTrackQuery] = useState("");
   const [trackResults, setTrackResults] = useState<
@@ -194,6 +195,30 @@ export function PlaylistEditorWorkspace({
       alive = false;
     };
   }, [playlistId]);
+
+  useEffect(() => {
+    const versionId = detail?.review?.currentWorkingVersionId ?? null;
+    if (!versionId) {
+      setDiscovery(null);
+      setDiscoveryLoading(false);
+      setDiscoveryError(null);
+      return;
+    }
+
+    let alive = true;
+    setDiscoveryLoading(true);
+    setDiscoveryError(null);
+    fetchEditorialDiscovery("playlist_version", versionId)
+      .then((value) => { if (alive) setDiscovery(value); })
+      .catch((reason) => {
+        if (!alive) return;
+        setDiscovery(null);
+        setDiscoveryError(errorText(reason));
+      })
+      .finally(() => { if (alive) setDiscoveryLoading(false); });
+
+    return () => { alive = false; };
+  }, [detail?.review?.currentWorkingVersionId]);
 
   useEffect(() => {
     const query = trackQuery.trim();
@@ -376,6 +401,23 @@ export function PlaylistEditorWorkspace({
       (item) =>
         !item.registryTrackId && item.matchStatus !== "needs_review",
     ).length ?? 0;
+
+  async function handleDiscoverySave(draft: EditorialDiscoveryDraft) {
+    if (!discovery) return;
+    setBusy("discovery");
+    setMessage(null);
+    try {
+      const saved = await saveEditorialDiscovery(discovery, draft);
+      setDiscovery(saved);
+      await reload();
+      setMessage({ type: "success", text: "Discovery saved." });
+    } catch (reason) {
+      setMessage({ type: "error", text: errorText(reason) });
+      throw reason;
+    } finally {
+      setBusy(null);
+    }
+  }
 
   async function runAction(
     key: string,
@@ -1545,6 +1587,35 @@ export function PlaylistEditorWorkspace({
       ) : null}
 
       <div className="space-y-5">
+        <WkSurface className="p-5">
+          {!review?.currentWorkingVersionId ? (
+            <div>
+              <h2 className="text-sm font-black text-wk-text">Discovery</h2>
+              <p className="mt-1 text-xs text-wk-text-muted">
+                Save a working version before changing Categories, Tags, or search details.
+              </p>
+            </div>
+          ) : discoveryLoading ? (
+            <p className="text-xs text-wk-text-muted">Loading Discovery...</p>
+          ) : discovery ? (
+            <EditorialMetadataWorkspace
+              value={discovery}
+              disabled={!canEdit}
+              saving={busy === "discovery"}
+              onSearchTerms={searchEditorialTaxonomyTerms}
+              onCreateTerm={createEditorialTaxonomyTerm}
+              onSave={handleDiscoverySave}
+            />
+          ) : (
+            <div>
+              <h2 className="text-sm font-black text-wk-text">Discovery</h2>
+              <p className="mt-1 text-xs text-wk-danger">
+                {discoveryError || "Discovery tools are unavailable."}
+              </p>
+            </div>
+          )}
+        </WkSurface>
+
         <div className="space-y-5">
           <WkSurface className="p-5">
             <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">

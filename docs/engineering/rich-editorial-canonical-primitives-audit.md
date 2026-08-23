@@ -185,3 +185,35 @@ The same MediaLibrary remains underneath. No domain-specific picker is created.
 - Existing published Article, Playlist and Audio versions remain byte/meaning stable through backfill.
 - Public/anonymous Data API access is not widened.
 - The primitive registry proves canonical cross-domain consumption instead of allowing new page-local pickers.
+
+## Milestone 1 Local Candidate
+
+Status: local candidate prepared and focused gates passed. Supabase preview authority is still pending.
+
+The local candidate now contains:
+
+- version-bound Categories and Tags for Article, Playlist, and Audio,
+- immutable taxonomy label and slug snapshots so later Registry edits cannot rewrite old versions,
+- version-bound search metadata with optimistic metadata revision,
+- taxonomy identity corrected to `(taxonomy, slug)`,
+- historical Article snapshot backfill with fail-closed preservation checks,
+- explicit shared metadata rows for every existing Playlist and Audio version,
+- automatic Discovery propagation across new working, submitted, approved, scheduled, and published versions,
+- Playlist and Audio fingerprints that include semantic Discovery content while empty Discovery preserves old fingerprint meaning,
+- immutable successor working versions for Discovery saves rather than mutation of existing version rows,
+- a narrow Playlist working-successor Trust copy that proves frozen Playlist content is unchanged,
+- preservation of older Audio fingerprint history while current editable Audio must satisfy the current canonical fingerprint,
+- bounded authenticated read and save RPC authority,
+- one consumer-owned `EditorialMetadataWorkspace` used by Audio and Playlist,
+- semantic Media-picker actions for Master Audio, Transcript, and Cover Art,
+- primitive-registry enforcement against new page-local taxonomy pickers.
+
+This milestone is not preview-proven, merged, or production-active yet. The next gate is full migration-history replay in one disposable Supabase preview before this migration is applied there.
+
+## Milestone 1 Preview Hardening
+
+The first M1 preview passed migration replay, the permanent verifier, and transactional behavior fixtures. A targeted preview schema inspection then found one M1-specific database hygiene defect before replay proof was sealed: the `resource_version_taxonomy_terms.taxonomy_term_id` foreign key had no left-prefix index.
+
+The candidate now adds `resource_version_taxonomy_terms_taxonomy_term_idx` on `taxonomy_term_id`. The permanent verifier requires that index, and the structural contract test requires the migration to declare it.
+
+The first preview remains evidence for the pre-hardening candidate only. Promotion proof must use the hardened migration bytes after the disposable preview is returned to the accepted production migration head and M1 is applied again.
