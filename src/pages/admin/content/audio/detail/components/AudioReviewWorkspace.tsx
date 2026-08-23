@@ -2,8 +2,19 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { WkIcon } from "@/components/design-system/Icon";
 import { AdminWorkspaceSection } from "@/components/design-system/admin/AdminWorkspaceSection";
 import { EditorialCommentEditor } from "@/components/design-system/editorial/EditorialCommentEditor";
+import {
+  EditorialDecisionWorkspace,
+  type EditorialDecisionDescriptor,
+  type EditorialDecisionEvent,
+} from "@/components/design-system/editorial/EditorialDecisionWorkspace";
 import { MediaTimeline, type TimelineAnchor } from "@/components/design-system/editorial/MediaTimeline";
 import { MediaTransport, formatMediaTime } from "@/components/design-system/editorial/MediaTransport";
+import {
+  fetchAudioPublicationWorkspace,
+  publishAudio,
+  reviewAudio,
+  type AudioPublicationWorkspace,
+} from "@/services/audio/audioAdminService";
 import {
   addAudioReviewComment,
   createAudioTimeReviewThread,
@@ -34,6 +45,12 @@ function anchorLabel(kind: "time_point" | "time_range", start: number, end: numb
     : formatMediaTime(start);
 }
 
+function errorText(reason: unknown): string {
+  return reason instanceof Error
+    ? reason.message
+    : "Audio Review could not be updated.";
+}
+
 export function AudioReviewWorkspace({
   publicationId,
   decisionNote,
@@ -45,6 +62,8 @@ export function AudioReviewWorkspace({
 }) {
   const audioRef = useRef<HTMLAudioElement>(null);
   const [workbench, setWorkbench] = useState<AudioEditorialWorkbench | null>(null);
+  const [publicationWorkspace, setPublicationWorkspace] =
+    useState<AudioPublicationWorkspace | null>(null);
   const [loading, setLoading] = useState(true);
   const [message, setMessage] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -59,18 +78,28 @@ export function AudioReviewWorkspace({
   const [replyText, setReplyText] = useState("");
 
   const reload = async () => {
-    setWorkbench(await fetchAudioEditorialWorkbench(publicationId));
+    const [nextWorkbench, nextWorkspace] = await Promise.all([
+      fetchAudioEditorialWorkbench(publicationId),
+      fetchAudioPublicationWorkspace(publicationId),
+    ]);
+    setWorkbench(nextWorkbench);
+    setPublicationWorkspace(nextWorkspace);
   };
 
   useEffect(() => {
     let alive = true;
     setLoading(true);
-    fetchAudioEditorialWorkbench(publicationId)
-      .then((next) => {
-        if (alive) setWorkbench(next);
+    Promise.all([
+      fetchAudioEditorialWorkbench(publicationId),
+      fetchAudioPublicationWorkspace(publicationId),
+    ])
+      .then(([nextWorkbench, nextWorkspace]) => {
+        if (!alive) return;
+        setWorkbench(nextWorkbench);
+        setPublicationWorkspace(nextWorkspace);
       })
       .catch((reason) => {
-        if (alive) setMessage(reason instanceof Error ? reason.message : "Audio Review could not load.");
+        if (alive) setMessage(errorText(reason));
       })
       .finally(() => {
         if (alive) setLoading(false);
@@ -100,6 +129,29 @@ export function AudioReviewWorkspace({
     [target?.chapters],
   );
   const stream = audioStream(target?.sourceProbe ?? {});
+
+  const decisionEvents = useMemo<EditorialDecisionEvent[]>(() => {
+    if (!publicationWorkspace) return [];
+
+    return [
+      ...publicationWorkspace.reviewEvents.map((event) => ({
+        id: `review-${event.id}`,
+        action: event.action,
+        priorStatus: event.priorStatus,
+        resultingStatus: event.resultingStatus,
+        note: event.reason,
+        createdAt: event.createdAt,
+      })),
+      ...publicationWorkspace.lifecycleEvents.map((event) => ({
+        id: `lifecycle-${event.id}`,
+        action: event.action,
+        priorStatus: event.priorStatus,
+        resultingStatus: event.resultingStatus,
+        note: event.note,
+        createdAt: event.createdAt,
+      })),
+    ];
+  }, [publicationWorkspace]);
 
   const seek = (seconds: number) => {
     const audio = audioRef.current;
@@ -139,7 +191,7 @@ export function AudioReviewWorkspace({
       setAnchor(null);
       await reload();
     } catch (reason) {
-      setMessage(reason instanceof Error ? reason.message : "Review comment failed.");
+      setMessage(errorText(reason));
     } finally {
       setBusy(false);
     }
@@ -148,6 +200,7 @@ export function AudioReviewWorkspace({
   const addReply = async (threadId: string) => {
     if (!replyText.trim()) return;
     setBusy(true);
+    setMessage(null);
     try {
       await addAudioReviewComment({ threadId, bodyHtml: replyHtml, bodyText: replyText });
       setReplyThreadId(null);
@@ -155,7 +208,7 @@ export function AudioReviewWorkspace({
       setReplyText("");
       await reload();
     } catch (reason) {
-      setMessage(reason instanceof Error ? reason.message : "Review reply failed.");
+      setMessage(errorText(reason));
     } finally {
       setBusy(false);
     }
@@ -163,11 +216,41 @@ export function AudioReviewWorkspace({
 
   const changeThreadStatus = async (threadId: string, status: "open" | "resolved") => {
     setBusy(true);
+    setMessage(null);
     try {
       await setAudioReviewThreadStatus(threadId, status);
       await reload();
     } catch (reason) {
-      setMessage(reason instanceof Error ? reason.message : "Thread status failed.");
+      setMessage(errorText(reason));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const runDecision = async (
+    decision: "start_review" | "request_changes" | "approve" | "publish",
+  ) => {
+    if (!publicationWorkspace) return;
+    setBusy(true);
+    setMessage(null);
+    try {
+      if (decision === "publish") {
+        await publishAudio(publicationWorkspace, decisionNote);
+        setMessage("Audio published from the approved exact version.");
+      } else {
+        await reviewAudio(publicationWorkspace, decision, decisionNote);
+        setMessage(
+          decision === "start_review"
+            ? "Audio Review started."
+            : decision === "request_changes"
+              ? "Changes requested."
+              : "Audio version approved.",
+        );
+      }
+      onDecisionNoteChange("");
+      await reload();
+    } catch (reason) {
+      setMessage(errorText(reason));
     } finally {
       setBusy(false);
     }
@@ -177,7 +260,7 @@ export function AudioReviewWorkspace({
     return <div className="min-h-[320px]" aria-busy="true" aria-label="Loading Audio Review" />;
   }
 
-  if (!target) {
+  if (!target || !publicationWorkspace) {
     return (
       <AdminWorkspaceSection icon="MessageSquareMore" title="Review" note="Review always targets one exact immutable submitted version.">
         <div className="rounded-xl border border-dashed border-wk-border px-5 py-10 text-center">
@@ -188,8 +271,75 @@ export function AudioReviewWorkspace({
     );
   }
 
+  const decisionActions: EditorialDecisionDescriptor[] = [];
+
+  if (
+    publicationWorkspace.canManageReview &&
+    publicationWorkspace.publication.status === "ready_for_review"
+  ) {
+    decisionActions.push({
+      key: "start-review",
+      label: "Start Review",
+      icon: "ScanText",
+      tone: "primary",
+      disabled: busy,
+      onClick: () => void runDecision("start_review"),
+    });
+  }
+
+  if (
+    publicationWorkspace.canManageReview &&
+    publicationWorkspace.publication.status === "in_review"
+  ) {
+    decisionActions.push(
+      {
+        key: "request-changes",
+        label: "Request Changes",
+        icon: "MessageSquareWarning",
+        tone: "warning",
+        requiresNote: true,
+        noteRequiredMessage: "Add a Review note explaining what needs to change.",
+        disabled: busy,
+        onClick: () => void runDecision("request_changes"),
+      },
+      {
+        key: "approve",
+        label: "Approve",
+        icon: "CheckCircle2",
+        tone: "primary",
+        disabled: busy,
+        onClick: () => void runDecision("approve"),
+      },
+    );
+  }
+
+  if (
+    publicationWorkspace.canPublish &&
+    publicationWorkspace.publication.status === "approved"
+  ) {
+    decisionActions.push({
+      key: "publish",
+      label: "Publish",
+      icon: "CloudUpload",
+      tone: "primary",
+      disabled: busy,
+      onClick: () => void runDecision("publish"),
+    });
+  }
+
   return (
-    <div className="space-y-5">
+    <EditorialDecisionWorkspace
+      title="Audio editorial decision"
+      note={decisionNote}
+      onNoteChange={onDecisionNoteChange}
+      noteLabel="Review note"
+      notePlaceholder="Record the reason for this exact-version decision."
+      statusLabel={publicationWorkspace.publication.status}
+      targetLabel={`Submitted Audio v${target.versionNumber}`}
+      actions={decisionActions}
+      busy={busy}
+      events={decisionEvents}
+    >
       {message ? <div role="status" className="rounded-xl border border-wk-border bg-wk-surface px-4 py-3 text-xs text-wk-text">{message}</div> : null}
 
       <AdminWorkspaceSection icon="AudioLines" title={`Review submitted version v${target.versionNumber}`} note="Listen and comment against the exact immutable master that was submitted.">
@@ -262,16 +412,6 @@ export function AudioReviewWorkspace({
           <button type="button" disabled={busy || !anchor || !commentText.trim()} onClick={() => void createThread()} className="wk-button wk-button-primary wk-button-sm mt-3 disabled:opacity-50">
             <WkIcon name="MessageSquarePlus" size={14} />Add anchored comment
           </button>
-          <label className="mt-6 block text-xs font-bold text-wk-text-muted">
-            Lifecycle decision note
-            <textarea
-              value={decisionNote}
-              onChange={(event) => onDecisionNoteChange(event.target.value)}
-              rows={2}
-              placeholder="Used only when requesting changes or making a lifecycle decision."
-              className="mt-1 w-full rounded-lg border border-wk-border bg-wk-bg px-3 py-2 text-sm text-wk-text"
-            />
-          </label>
         </AdminWorkspaceSection>
 
         <AdminWorkspaceSection icon="MessagesSquare" title="Review threads" note={`${workbench?.threads.length ?? 0} thread${(workbench?.threads.length ?? 0) === 1 ? "" : "s"} on this submitted version.`}>
@@ -317,6 +457,6 @@ export function AudioReviewWorkspace({
           </div>
         </AdminWorkspaceSection>
       </div>
-    </div>
+    </EditorialDecisionWorkspace>
   );
 }
