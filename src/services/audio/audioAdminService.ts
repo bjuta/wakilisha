@@ -80,6 +80,18 @@ export interface AudioReviewEvent {
   createdAt: string;
 }
 
+export interface AudioLifecycleEvent {
+  id: string;
+  eventNumber: number;
+  versionId: string | null;
+  action: "archived" | "restored" | string;
+  priorStatus: string | null;
+  resultingStatus: string;
+  note: string | null;
+  actorId: string | null;
+  createdAt: string;
+}
+
 export interface AudioPublicationWorkspace {
   publication: AudioPublicationSummary & {
     metadata: JsonObject;
@@ -105,6 +117,7 @@ export interface AudioPublicationWorkspace {
   } | null;
   chapters: AudioChapter[];
   reviewEvents: AudioReviewEvent[];
+  lifecycleEvents: AudioLifecycleEvent[];
   trust: {
     citationRevision: number;
     creditRevision: number;
@@ -118,6 +131,7 @@ export interface AudioPublicationWorkspace {
   canEdit: boolean;
   canManageReview: boolean;
   canPublish: boolean;
+  canArchive: boolean;
 }
 
 export interface AudioAdminIndex {
@@ -172,6 +186,15 @@ function throwRpc(error: { message?: string } | null, fallback: string): void {
   if (error) throw new Error(error.message || fallback);
 }
 
+function assertSucceeded(data: unknown, message: string): JsonObject {
+  const row = unwrapRow(data);
+  if (text(row.receipt_status) !== "succeeded") {
+    const payload = object(row.result_payload);
+    throw new Error(text(payload.message) || message);
+  }
+  return row;
+}
+
 export function slugifyAudioTitle(value: string): string {
   return value
     .normalize("NFKD")
@@ -212,9 +235,7 @@ export async function fetchAudioAdminIndex(): Promise<AudioAdminIndex> {
       const row = object(value);
       return {
         id: text(row.id),
-        publicationKind: text(row.publication_kind) === "episode"
-          ? "episode"
-          : "standalone",
+        publicationKind: text(row.publication_kind) === "episode" ? "episode" : "standalone",
         showId: nullableText(row.show_id),
         seasonId: nullableText(row.season_id),
         episodeNumber: nullableNumber(row.episode_number),
@@ -248,9 +269,7 @@ export async function fetchAudioPublicationWorkspace(
   return {
     publication: {
       id: text(publication.id),
-      publicationKind: text(publication.publication_kind) === "episode"
-        ? "episode"
-        : "standalone",
+      publicationKind: text(publication.publication_kind) === "episode" ? "episode" : "standalone",
       showId: nullableText(publication.show_id),
       seasonId: nullableText(publication.season_id),
       episodeNumber: nullableNumber(publication.episode_number),
@@ -311,6 +330,20 @@ export async function fetchAudioPublicationWorkspace(
         createdAt: text(row.created_at),
       };
     }),
+    lifecycleEvents: array(root.lifecycle_events).map((value) => {
+      const row = object(value);
+      return {
+        id: text(row.id),
+        eventNumber: numberValue(row.event_number),
+        versionId: nullableText(row.version_id),
+        action: text(row.action),
+        priorStatus: nullableText(row.prior_status),
+        resultingStatus: text(row.resulting_status),
+        note: nullableText(row.note),
+        actorId: nullableText(row.actor_id),
+        createdAt: text(row.created_at),
+      };
+    }),
     trust: {
       citationRevision: numberValue(trust.citation_revision, 1),
       creditRevision: numberValue(trust.credit_revision, 1),
@@ -344,14 +377,12 @@ export async function fetchAudioPublicationWorkspace(
       }),
     },
     feedIdentity: feed.guid
-      ? {
-          guid: text(feed.guid),
-          enclosureUrl: text(feed.enclosure_url),
-        }
+      ? { guid: text(feed.guid), enclosureUrl: text(feed.enclosure_url) }
       : null,
     canEdit: bool(root.can_edit),
     canManageReview: bool(root.can_manage_review),
     canPublish: bool(root.can_publish),
+    canArchive: bool(root.can_archive),
   };
 }
 
@@ -373,10 +404,8 @@ export async function createAudioShow(input: {
     p_idempotency_key: idempotency("audio-show-create"),
   });
   throwRpc(error, "Show could not be created.");
-  const row = unwrapRow(data);
-  if (text(row.receipt_status) !== "succeeded" || !row.show_id) {
-    throw new Error("Show could not be created.");
-  }
+  const row = assertSucceeded(data, "Show could not be created.");
+  if (!row.show_id) throw new Error("Show could not be created.");
   return text(row.show_id);
 }
 
@@ -395,10 +424,8 @@ export async function createAudioSeason(input: {
     p_idempotency_key: idempotency("audio-season-create"),
   });
   throwRpc(error, "Season could not be created.");
-  const row = unwrapRow(data);
-  if (text(row.receipt_status) !== "succeeded" || !row.season_id) {
-    throw new Error("Season could not be created.");
-  }
+  const row = assertSucceeded(data, "Season could not be created.");
+  if (!row.season_id) throw new Error("Season could not be created.");
   return text(row.season_id);
 }
 
@@ -417,19 +444,15 @@ export async function createAudioPublication(input: {
     p_slug: slugifyAudioTitle(input.slug || input.title),
     p_show_id: input.publicationKind === "episode" ? input.showId ?? null : null,
     p_season_id: input.publicationKind === "episode" ? input.seasonId ?? null : null,
-    p_episode_number: input.publicationKind === "episode"
-      ? input.episodeNumber ?? null
-      : null,
+    p_episode_number: input.publicationKind === "episode" ? input.episodeNumber ?? null : null,
     p_summary: input.summary?.trim() || null,
     p_visibility: "internal",
     p_metadata: {},
     p_idempotency_key: idempotency("audio-publication-create"),
   });
   throwRpc(error, "Audio could not be created.");
-  const row = unwrapRow(data);
-  if (text(row.receipt_status) !== "succeeded" || !row.publication_id) {
-    throw new Error("Audio could not be created.");
-  }
+  const row = assertSucceeded(data, "Audio could not be created.");
+  if (!row.publication_id) throw new Error("Audio could not be created.");
   return text(row.publication_id);
 }
 
@@ -448,10 +471,7 @@ export async function saveAudioMetadata(
     p_idempotency_key: idempotency("audio-publication-metadata"),
   });
   throwRpc(error, "Audio details could not be saved.");
-  const row = unwrapRow(data);
-  if (text(row.receipt_status) !== "succeeded") {
-    throw new Error("Audio details changed somewhere else. Reload and try again.");
-  }
+  assertSucceeded(data, "Audio details changed somewhere else. Reload and try again.");
 }
 
 export async function snapshotAudioWorkingVersion(
@@ -466,18 +486,13 @@ export async function snapshotAudioWorkingVersion(
     },
   );
   throwRpc(error, "Working version could not be saved.");
-  const row = unwrapRow(data);
-  if (text(row.receipt_status) !== "succeeded") {
-    throw new Error("Working version could not be saved.");
-  }
+  assertSucceeded(data, "Working version could not be saved.");
 }
 
 async function exactMediaRevision(assetId: string): Promise<string> {
   const asset = await getAdminMediaAssetById(assetId);
   const revisionId = asset?.current_revision_id;
-  if (!revisionId) {
-    throw new Error("Choose Media with a verified current revision.");
-  }
+  if (!revisionId) throw new Error("Choose Media with a verified current revision.");
   return revisionId;
 }
 
@@ -494,10 +509,7 @@ export async function setAudioMaster(
     p_idempotency_key: idempotency("audio-master-set"),
   });
   throwRpc(error, "Master audio could not be changed.");
-  const row = unwrapRow(data);
-  if (text(row.receipt_status) !== "succeeded") {
-    throw new Error("Master audio changed somewhere else. Reload and try again.");
-  }
+  assertSucceeded(data, "Master audio changed somewhere else. Reload and try again.");
 }
 
 export async function setAudioTranscript(
@@ -513,10 +525,7 @@ export async function setAudioTranscript(
     p_idempotency_key: idempotency("audio-transcript-set"),
   });
   throwRpc(error, "Transcript could not be changed.");
-  const row = unwrapRow(data);
-  if (text(row.receipt_status) !== "succeeded") {
-    throw new Error("Transcript changed somewhere else. Reload and try again.");
-  }
+  assertSucceeded(data, "Transcript changed somewhere else. Reload and try again.");
 }
 
 export async function replaceAudioChapters(
@@ -535,10 +544,7 @@ export async function replaceAudioChapters(
     p_idempotency_key: idempotency("audio-chapters-replace"),
   });
   throwRpc(error, "Chapters could not be saved.");
-  const row = unwrapRow(data);
-  if (text(row.receipt_status) !== "succeeded") {
-    throw new Error("Chapters changed somewhere else. Reload and try again.");
-  }
+  assertSucceeded(data, "Chapters changed somewhere else. Reload and try again.");
 }
 
 export async function replaceAudioCitations(
@@ -564,10 +570,7 @@ export async function replaceAudioCitations(
     },
   );
   throwRpc(error, "Citations could not be saved.");
-  const row = unwrapRow(data);
-  if (text(row.receipt_status) !== "succeeded") {
-    throw new Error("Citations changed somewhere else. Reload and try again.");
-  }
+  assertSucceeded(data, "Citations changed somewhere else. Reload and try again.");
 }
 
 export async function replaceAudioCredits(
@@ -591,10 +594,7 @@ export async function replaceAudioCredits(
     },
   );
   throwRpc(error, "Credits could not be saved.");
-  const row = unwrapRow(data);
-  if (text(row.receipt_status) !== "succeeded") {
-    throw new Error("Credits changed somewhere else. Reload and try again.");
-  }
+  assertSucceeded(data, "Credits changed somewhere else. Reload and try again.");
 }
 
 export async function submitAudioForReview(
@@ -611,13 +611,7 @@ export async function submitAudioForReview(
     },
   );
   throwRpc(error, "Audio could not be sent to Review.");
-  const row = unwrapRow(data);
-  if (text(row.receipt_status) !== "succeeded") {
-    throw new Error(
-      text(object(row.result_payload).message)
-      || "Audio is not ready for Review.",
-    );
-  }
+  assertSucceeded(data, "Audio is not ready for Review.");
 }
 
 export async function reviewAudio(
@@ -637,10 +631,7 @@ export async function reviewAudio(
     p_note: note.trim() || null,
   });
   throwRpc(error, "Review action could not be completed.");
-  const row = unwrapRow(data);
-  if (text(row.receipt_status) !== "succeeded") {
-    throw new Error("Review state changed somewhere else. Reload and try again.");
-  }
+  assertSucceeded(data, "Review state changed somewhere else. Reload and try again.");
 }
 
 export async function publishAudio(
@@ -661,8 +652,36 @@ export async function publishAudio(
     },
   );
   throwRpc(error, "Audio could not be published.");
-  const row = unwrapRow(data);
-  if (text(row.receipt_status) !== "succeeded") {
-    throw new Error("Audio is not ready to publish.");
-  }
+  assertSucceeded(data, "Audio is not ready to publish.");
+}
+
+export async function archiveAudioPublication(
+  workspace: AudioPublicationWorkspace,
+  note = "",
+): Promise<void> {
+  const { data, error } = await supabase.rpc("archive_audio_publication", {
+    p_publication_id: workspace.publication.id,
+    p_expected_authority_revision: workspace.publication.authorityRevision,
+    p_idempotency_key: idempotency("audio-publication-archive"),
+    p_note: note.trim() || null,
+  });
+  throwRpc(error, "Audio could not be archived.");
+  assertSucceeded(data, "Audio changed somewhere else. Reload and try again.");
+}
+
+export async function restoreAudioPublicationFromArchive(
+  workspace: AudioPublicationWorkspace,
+  note = "",
+): Promise<void> {
+  const { data, error } = await supabase.rpc(
+    "restore_audio_publication_from_archive",
+    {
+      p_publication_id: workspace.publication.id,
+      p_expected_authority_revision: workspace.publication.authorityRevision,
+      p_idempotency_key: idempotency("audio-publication-restore"),
+      p_note: note.trim() || null,
+    },
+  );
+  throwRpc(error, "Audio could not be restored.");
+  assertSucceeded(data, "Audio changed somewhere else. Reload and try again.");
 }
