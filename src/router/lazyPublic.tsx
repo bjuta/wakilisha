@@ -60,6 +60,10 @@ export const PublicPlaylistDetailPage = lazy(
   () => import("../pages/playlists/detail/page"),
 );
 
+export const PublicAudioPage = lazy(
+  () => import("../pages/audio/page"),
+);
+
 export const PublicAudioDetailPage = lazy(
   () => import("../pages/audio/detail/page"),
 );

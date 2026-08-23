@@ -33,6 +33,12 @@ import {
   PlaybackArbiter,
   type PlaybackSessionId,
 } from "@/services/player/playbackArbiter";
+import {
+  clearUpcomingQueue,
+  moveQueueItem as moveQueueItemModel,
+  removeQueueItem as removeQueueItemModel,
+  resolveQueueOrder,
+} from "@/services/player/queueModel";
 
 export type PlaybackBackend =
   | "audio"
@@ -147,6 +153,7 @@ interface PlayerContextValue {
   playbackRate: number;
   queue: PlayerTrack[];
   queueIndex: number;
+  queueOrder: number[];
   repeatMode: RepeatMode;
   isShuffle: boolean;
   isFullPlayerOpen: boolean;
@@ -158,6 +165,9 @@ interface PlayerContextValue {
   next: () => void;
   prev: () => void;
   playFromQueue: (index: number) => void;
+  moveQueueItem: (fromIndex: number, toIndex: number) => void;
+  removeQueueItem: (index: number) => void;
+  clearUpcoming: () => void;
   seek: (time: number) => void;
   setVolume: (vol: number) => void;
   setPlaybackRate: (rate: number) => void;
@@ -1966,9 +1976,87 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
     });
   }, [queue, queueIndex]);
 
+  // ─── Queue management ───
+  const moveQueueItem = useCallback((
+    fromIndex: number,
+    toIndex: number,
+  ) => {
+    if (isShuffle) return;
+
+    const mutation = moveQueueItemModel(
+      queue,
+      queueIndex,
+      fromIndex,
+      toIndex,
+    );
+
+    if (mutation.queue === queue) return;
+
+    setQueue(mutation.queue);
+    setQueueIndex(mutation.queueIndex);
+    shuffledOrderRef.current = mutation.playbackOrder;
+  }, [
+    isShuffle,
+    queue,
+    queueIndex,
+  ]);
+
+  const removeQueueItem = useCallback((
+    index: number,
+  ) => {
+    const mutation = removeQueueItemModel(
+      queue,
+      queueIndex,
+      shuffledOrderRef.current,
+      index,
+      isShuffle,
+    );
+
+    if (mutation.queue === queue) return;
+
+    setQueue(mutation.queue);
+    setQueueIndex(mutation.queueIndex);
+    shuffledOrderRef.current = mutation.playbackOrder;
+  }, [
+    isShuffle,
+    queue,
+    queueIndex,
+  ]);
+
+  const clearUpcoming = useCallback(() => {
+    const mutation = clearUpcomingQueue(
+      queue,
+      queueIndex,
+      shuffledOrderRef.current,
+      isShuffle,
+    );
+
+    if (
+      mutation.queue.length === queue.length &&
+      mutation.queueIndex === queueIndex
+    ) {
+      return;
+    }
+
+    setQueue(mutation.queue);
+    setQueueIndex(mutation.queueIndex);
+    shuffledOrderRef.current = mutation.playbackOrder;
+  }, [
+    isShuffle,
+    queue,
+    queueIndex,
+  ]);
+
   // ─── Full player ───
   const openFullPlayer = useCallback(() => setIsFullPlayerOpen(true), []);
   const closeFullPlayer = useCallback(() => setIsFullPlayerOpen(false), []);
+
+  const queueOrder = resolveQueueOrder(
+    queue.length,
+    queueIndex,
+    shuffledOrderRef.current,
+    isShuffle,
+  );
 
   // ─── Navigation state ───
   const canGoNext = queue.length > 0 && (
@@ -2006,6 +2094,7 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
     playbackRate,
     queue,
     queueIndex,
+    queueOrder,
     repeatMode,
     isShuffle,
     isFullPlayerOpen,
@@ -2017,6 +2106,9 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
     next,
     prev,
     playFromQueue,
+    moveQueueItem,
+    removeQueueItem,
+    clearUpcoming,
     seek,
     setVolume: handleSetVolume,
     setPlaybackRate: handleSetPlaybackRate,

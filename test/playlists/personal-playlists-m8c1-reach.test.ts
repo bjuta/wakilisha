@@ -161,7 +161,7 @@ describe("M8C.1 Track curation reach", () => {
     expect(musicDesktopShell).toContain('aria-label="Search"');
     expect(musicDesktopShell).toContain("setGlobalSearchOpen(true)");
     expect(globalSearch).toContain("Search artists, tracks, releases, scenes…");
-    expect(globalSearch).toContain("See all results");
+    expect(globalSearch).toContain("See All Results");
     expect(musicDesktopShell).not.toContain("⌘ K");
   });
 

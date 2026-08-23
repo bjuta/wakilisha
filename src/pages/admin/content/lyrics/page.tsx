@@ -6,14 +6,18 @@ import {
 import { Link } from "react-router-dom";
 import { WkIcon } from "@/components/design-system/Icon";
 import {
+  fetchAdminTrackLyricsContributions,
   fetchAdminTrackLyricsWorkspace,
   listLyricsTrackChoices,
   lyricsDocumentToEditorText,
   parseLyricsEditorText,
+  promoteTrackLyricsContributionToDraft,
   publishTrackLyrics,
+  rejectTrackLyricsContribution,
   saveTrackLyricsDraft,
   type AdminTrackLyricsWorkspace,
   type LyricsTrackChoice,
+  type TrackLyricsContribution,
 } from "@/services/player/trackLyricsService";
 
 export default function AdminLyricsPage() {
@@ -21,6 +25,7 @@ export default function AdminLyricsPage() {
   const [query, setQuery] = useState("");
   const [selectedTrackId, setSelectedTrackId] = useState<string | null>(null);
   const [workspace, setWorkspace] = useState<AdminTrackLyricsWorkspace | null>(null);
+  const [contributions, setContributions] = useState<TrackLyricsContribution[]>([]);
   const [languageCode, setLanguageCode] = useState("und");
   const [timingMode, setTimingMode] = useState<"plain" | "line">("plain");
   const [editorText, setEditorText] = useState("");
@@ -83,7 +88,12 @@ export default function AdminLyricsPage() {
     setMessage(null);
 
     try {
-      hydrate(await fetchAdminTrackLyricsWorkspace(trackId));
+      const [nextWorkspace, nextContributions] = await Promise.all([
+        fetchAdminTrackLyricsWorkspace(trackId),
+        fetchAdminTrackLyricsContributions(trackId),
+      ]);
+      hydrate(nextWorkspace);
+      setContributions(nextContributions);
     } catch (error) {
       setWorkspace(null);
       setMessage(
@@ -98,7 +108,12 @@ export default function AdminLyricsPage() {
 
   const reload = async () => {
     if (!selectedTrackId) return;
-    hydrate(await fetchAdminTrackLyricsWorkspace(selectedTrackId));
+    const [nextWorkspace, nextContributions] = await Promise.all([
+      fetchAdminTrackLyricsWorkspace(selectedTrackId),
+      fetchAdminTrackLyricsContributions(selectedTrackId),
+    ]);
+    hydrate(nextWorkspace);
+    setContributions(nextContributions);
   };
 
   const saveDraft = async () => {
@@ -145,6 +160,48 @@ export default function AdminLyricsPage() {
         error instanceof Error
           ? error.message
           : "Lyrics could not be published.",
+      );
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  const promoteContribution = async (contributionId: string) => {
+    if (!workspace) return;
+    setBusy(`promote:${contributionId}`);
+    setMessage(null);
+
+    try {
+      await promoteTrackLyricsContributionToDraft(
+        workspace,
+        contributionId,
+      );
+      await reload();
+      setMessage("Contribution moved into the working Lyrics draft.");
+    } catch (error) {
+      setMessage(
+        error instanceof Error
+          ? error.message
+          : "Lyrics contribution could not become a draft.",
+      );
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  const rejectContribution = async (contributionId: string) => {
+    setBusy(`reject:${contributionId}`);
+    setMessage(null);
+
+    try {
+      await rejectTrackLyricsContribution(contributionId);
+      await reload();
+      setMessage("Lyrics contribution rejected.");
+    } catch (error) {
+      setMessage(
+        error instanceof Error
+          ? error.message
+          : "Lyrics contribution could not be rejected.",
       );
     } finally {
       setBusy(null);
@@ -240,7 +297,7 @@ export default function AdminLyricsPage() {
                   Choose a Registry Track
                 </p>
                 <p className="mt-1 text-xs text-[var(--wk-text-muted)]">
-                  No fake submissions queue. This surface edits the durable Lyrics document for the selected Track.
+                  Choose a Registry Track to edit Lyrics and review contributions.
                 </p>
               </div>
             </div>
@@ -307,6 +364,81 @@ export default function AdminLyricsPage() {
                 >
                   {message}
                 </div>
+              ) : null}
+
+              {contributions.length ? (
+                <section className="rounded-2xl border border-[var(--wk-border)] bg-[var(--wk-bg-subtle)] p-4">
+                  <div className="flex items-center justify-between gap-3">
+                    <div>
+                      <div className="text-[10px] font-black uppercase tracking-[0.13em] text-[var(--wk-brand)]">
+                        Contributions
+                      </div>
+                      <h2 className="mt-1 text-sm font-black">
+                        Listener Submissions
+                      </h2>
+                    </div>
+                    <span className="text-[10px] font-bold text-[var(--wk-text-faint)]">
+                      {contributions.length} Recent
+                    </span>
+                  </div>
+
+                  <div className="mt-4 space-y-3">
+                    {contributions.map((contribution) => (
+                      <article
+                        key={contribution.id}
+                        className="rounded-xl border border-[var(--wk-border)] bg-[var(--wk-surface)] p-4"
+                      >
+                        <div className="flex flex-wrap items-center justify-between gap-2">
+                          <div className="text-[10px] font-black uppercase tracking-[0.1em] text-[var(--wk-text-faint)]">
+                            {contribution.status === "submitted"
+                              ? "Submitted"
+                              : contribution.status === "promoted"
+                                ? "In Draft"
+                                : "Rejected"}
+                          </div>
+                          <div className="text-[10px] text-[var(--wk-text-faint)]">
+                            {contribution.languageCode.toUpperCase()} · {contribution.timingMode === "line" ? "Timed" : "Plain"}
+                          </div>
+                        </div>
+
+                        <pre className="mt-3 max-h-44 overflow-y-auto whitespace-pre-wrap font-sans text-xs leading-6 text-[var(--wk-text-soft)]">
+                          {contribution.plainText}
+                        </pre>
+
+                        {contribution.sourceDescription ? (
+                          <p className="mt-3 text-[11px] text-[var(--wk-text-muted)]">
+                            Source: {contribution.sourceDescription}
+                          </p>
+                        ) : null}
+
+                        {contribution.status === "submitted" ? (
+                          <div className="mt-4 flex flex-wrap gap-2">
+                            {workspace.canEdit ? (
+                              <button
+                                type="button"
+                                disabled={busy !== null}
+                                onClick={() => void promoteContribution(contribution.id)}
+                                className="wk-button wk-button-secondary wk-button-sm"
+                              >
+                                Use As Draft
+                              </button>
+                            ) : null}
+                            {workspace.canPublish ? (
+                              <button
+                                type="button"
+                                disabled={busy !== null}
+                                onClick={() => void rejectContribution(contribution.id)}
+                                className="wk-button wk-button-ghost wk-button-sm"
+                              >
+                                Reject
+                              </button>
+                            ) : null}
+                          </div>
+                        ) : null}
+                      </article>
+                    ))}
+                  </div>
+                </section>
               ) : null}
 
               <div className="grid gap-4 md:grid-cols-3">

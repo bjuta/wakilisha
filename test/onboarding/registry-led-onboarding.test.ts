@@ -350,13 +350,16 @@ describe(
     );
 
     it(
-      "adds Registry Artist ids to search without replacing existing search context",
+      "keeps Registry Artist ids and context on governed search authority",
       () => {
         expect(search).toContain(
           "id: string;",
         );
         expect(search).toContain(
-          '.select("id, slug, display_name, public_image_url, metadata")',
+          '"get_public_registry_artists_for_search"',
+        );
+        expect(search).not.toContain(
+          '.from("registry_artists")',
         );
         expect(search).toContain(
           "contextText",

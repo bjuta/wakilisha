@@ -716,6 +716,8 @@ export default function MusicDiscoveryPage() {
             detail.tracks.map(
               (track) => ({
                 id: track.id,
+                registryTrackId:
+                  track.id,
                 title:
                   track.title,
                 artist:

@@ -13,21 +13,32 @@ export interface ArtistSearchItem {
   contextText: string;
 }
 
-export function useArtistSearchData() {
+export function useArtistSearchData(enabled = true) {
   const [data, setData] = useState<ArtistSearchItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     let alive = true;
+
+    if (!enabled) {
+      setLoading(false);
+      setError(null);
+      return () => {
+        alive = false;
+      };
+    }
+
     const fetchData = async () => {
       setLoading(true);
       try {
-        const { data: artists, error: err } = await supabase
-          .from("registry_artists")
-          .select("id, slug, display_name, public_image_url, metadata")
-          .eq("status", "active")
-          .order("display_name");
+        const { data: artists, error: err } =
+          await supabase.rpc(
+            "get_public_registry_artists_for_search",
+            {
+              p_limit: 500,
+            },
+          );
 
         if (!alive) return;
         if (err) {
@@ -66,7 +77,7 @@ export function useArtistSearchData() {
 
     fetchData();
     return () => { alive = false; };
-  }, []);
+  }, [enabled]);
 
   return { data, loading, error };
 }

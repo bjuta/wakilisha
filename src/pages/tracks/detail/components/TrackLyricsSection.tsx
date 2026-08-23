@@ -94,15 +94,15 @@ export default function TrackLyricsSection({
                 No lyrics yet
               </h3>
               <p className="text-[13px] text-[var(--wk-text-muted)] mb-5 max-w-[320px] mx-auto leading-relaxed">
-                Be the first to add timed lyrics for <strong className="text-[var(--wk-text)]">{trackTitle}</strong>. 
-                Your contribution helps the community.
+                Be the first to add lyrics for <strong className="text-[var(--wk-text)]">{trackTitle}</strong>.
+                You can paste the words now. Timing is not required.
               </p>
               <Link
                 to={contributeUrl}
                 className="inline-flex items-center gap-2.5 rounded-xl bg-[var(--wk-brand)] text-white px-6 py-3 text-[13px] font-extrabold hover:opacity-90 transition-opacity whitespace-nowrap"
               >
                 <WkIcon name="Edit3" size={15} />
-                Contribute lyrics
+                Contribute Lyrics
               </Link>
               <div className="mt-4 flex items-center justify-center gap-4 text-[10px] text-[var(--wk-text-faint)]">
                 <span className="inline-flex items-center gap-1">

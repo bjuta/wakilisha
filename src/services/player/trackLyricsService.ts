@@ -15,6 +15,22 @@ export interface TrackLyricsDocument {
   rightsNote: string | null;
 }
 
+export interface TrackLyricsContribution {
+  id: string;
+  trackId: string;
+  contributorId: string | null;
+  languageCode: string;
+  timingMode: "plain" | "line";
+  lines: TimedTextLine[];
+  plainText: string;
+  sourceDescription: string | null;
+  status: "submitted" | "promoted" | "rejected";
+  acceptedVersionId: string | null;
+  reviewedAt: string | null;
+  reviewNote: string | null;
+  createdAt: string;
+}
+
 export interface AdminTrackLyricsWorkspace {
   trackId: string;
   authorityRevision: number;
@@ -100,6 +116,50 @@ function decodeDocument(
   };
 }
 
+function decodeContribution(value: unknown): TrackLyricsContribution | null {
+  const row = record(value);
+  const id = text(row.id ?? row.contribution_id);
+  const trackId = text(row.track_id);
+  if (!id || !trackId) return null;
+
+  const rawStatus = text(row.status);
+  const status: TrackLyricsContribution["status"] =
+    rawStatus === "promoted" || rawStatus === "rejected"
+      ? rawStatus
+      : "submitted";
+
+  return {
+    id,
+    trackId,
+    contributorId:
+      typeof row.contributor_id === "string"
+        ? row.contributor_id
+        : null,
+    languageCode: text(row.language_code, "und"),
+    timingMode: text(row.timing_mode) === "line" ? "line" : "plain",
+    lines: decodeLines(row.lines),
+    plainText: text(row.plain_text),
+    sourceDescription:
+      typeof row.source_description === "string"
+        ? row.source_description
+        : null,
+    status,
+    acceptedVersionId:
+      typeof row.accepted_version_id === "string"
+        ? row.accepted_version_id
+        : null,
+    reviewedAt:
+      typeof row.reviewed_at === "string"
+        ? row.reviewed_at
+        : null,
+    reviewNote:
+      typeof row.review_note === "string"
+        ? row.review_note
+        : null,
+    createdAt: text(row.created_at),
+  };
+}
+
 export async function fetchPublicTrackLyrics(
   trackId: string,
 ): Promise<TrackLyricsDocument | null> {
@@ -113,6 +173,39 @@ export async function fetchPublicTrackLyrics(
   }
 
   return decodeDocument(data, trackId);
+}
+
+export async function submitTrackLyricsContribution(input: {
+  trackId: string;
+  languageCode?: string;
+  lines: Array<{ text: string; start_seconds?: number }>;
+  sourceDescription?: string | null;
+}): Promise<{ contributionId: string; status: "submitted" }> {
+  const { data, error } = await supabase.rpc(
+    "submit_track_lyrics_contribution",
+    {
+      p_track_id: input.trackId,
+      p_language_code: input.languageCode?.trim() || "und",
+      p_timing_mode: "plain",
+      p_lines: input.lines,
+      p_source_description: input.sourceDescription?.trim() || null,
+    },
+  );
+
+  if (error) {
+    throw new Error(error.message || "Lyrics could not be submitted.");
+  }
+
+  const root = record(data);
+  const contributionId = text(root.contribution_id);
+  if (!contributionId) {
+    throw new Error("Lyrics submission did not return a contribution id.");
+  }
+
+  return {
+    contributionId,
+    status: "submitted",
+  };
 }
 
 export async function listLyricsTrackChoices():
@@ -169,6 +262,28 @@ export async function fetchAdminTrackLyricsWorkspace(
     canEdit: root.can_edit === true,
     canPublish: root.can_publish === true,
   };
+}
+
+export async function fetchAdminTrackLyricsContributions(
+  trackId: string,
+): Promise<TrackLyricsContribution[]> {
+  const { data, error } = await supabase.rpc(
+    "get_admin_track_lyrics_contributions",
+    { p_track_id: trackId },
+  );
+
+  if (error) {
+    throw new Error(
+      error.message || "Lyrics contributions could not load.",
+    );
+  }
+
+  return Array.isArray(data)
+    ? data.flatMap((row) => {
+        const contribution = decodeContribution(row);
+        return contribution ? [contribution] : [];
+      })
+    : [];
 }
 
 function parseTimestamp(value: string): number | null {
@@ -274,6 +389,43 @@ export async function saveTrackLyricsDraft(
   if (error) {
     throw new Error(
       error.message || "Lyrics draft could not be saved.",
+    );
+  }
+}
+
+export async function promoteTrackLyricsContributionToDraft(
+  workspace: AdminTrackLyricsWorkspace,
+  contributionId: string,
+): Promise<void> {
+  const { error } = await supabase.rpc(
+    "promote_track_lyrics_contribution_to_draft",
+    {
+      p_contribution_id: contributionId,
+      p_expected_authority_revision: workspace.authorityRevision,
+    },
+  );
+
+  if (error) {
+    throw new Error(
+      error.message || "Lyrics contribution could not become a draft.",
+    );
+  }
+}
+
+export async function rejectTrackLyricsContribution(
+  contributionId: string,
+): Promise<void> {
+  const { error } = await supabase.rpc(
+    "reject_track_lyrics_contribution",
+    {
+      p_contribution_id: contributionId,
+      p_review_note: null,
+    },
+  );
+
+  if (error) {
+    throw new Error(
+      error.message || "Lyrics contribution could not be rejected.",
     );
   }
 }
