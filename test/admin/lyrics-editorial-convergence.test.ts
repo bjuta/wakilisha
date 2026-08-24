@@ -77,6 +77,7 @@ describe("Lyrics editorial convergence", () => {
     expect(lyricsHistory).toContain('title="Contribution history"');
     expect(lyricsHistory).toContain("Review decisions");
     expect(lyricsHistory).toContain("Contributions");
+    expect(lyricsHistory).toContain("Current published versions");
     expect(lyricsHistory).not.toContain("Contribution decisions");
   });
 

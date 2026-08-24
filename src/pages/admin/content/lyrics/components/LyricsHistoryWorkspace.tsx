@@ -141,7 +141,7 @@ export function LyricsHistoryWorkspace({
                 {versions.filter((version) => version.isPublished).length}
               </div>
               <div className="mt-1 text-[10px] font-black uppercase tracking-[0.12em] text-wk-text-faint">
-                Published versions
+                Current published versions
               </div>
             </div>
           </div>
