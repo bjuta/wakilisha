@@ -6,7 +6,9 @@ Phase 6A production authority baseline: `fd0580e3a1a19e3d1f06a9c8466a37c84cd26a8
 
 Phase 6B governance gate: PR #684, `Enforce primitive compounding and open Phase 6B`
 
-Current production main: `77cecd892c63c76ac79921eeb02278ab2b231d30`
+Documentation closure gate: PR #699, `Reconcile Phase 6B milestone closure records`
+
+Production runtime application baseline: `77cecd892c63c76ac79921eeb02278ab2b231d30`
 
 Current production migration head: `20260824061359`
 
@@ -271,6 +273,6 @@ Build Inquiry as a capability across canonical editors, then the public Inquiry 
 
 Do not begin M1; it is closed. Do not reopen M2; it is closed.
 
-Define the next Phase 6B numbered slice from the remaining Phase 6 exit proof and current production main `77cecd892c63c76ac79921eeb02278ab2b231d30`. The next slice should consume the accepted public Audio, Show/RSS, Player, Trust, editorial, and Lyrics/provenance baseline rather than rebuilding it.
+Define the next Phase 6B numbered slice from the remaining Phase 6 exit proof and production runtime baseline `77cecd892c63c76ac79921eeb02278ab2b231d30`. The next slice should consume the accepted public Audio, Show/RSS, Player, Trust, editorial, and Lyrics/provenance baseline rather than rebuilding it.
 
 The roadmap remains at Phase 6B until the real-podcast exit gate and transcript-correction history proof are satisfied.
