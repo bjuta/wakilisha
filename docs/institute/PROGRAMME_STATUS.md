@@ -38,6 +38,7 @@ See:
 - `docs/engineering/phase-6b-public-audio-kickoff.md`
 - `docs/engineering/phase-6b-progress-closure-record.md`
 - `docs/engineering/track-lyrics-review-provenance-closure-record.md`
+- `docs/engineering/charts-public-source-accessibility-soak-wip.md`
 - `docs/engineering/primitive-compounding-contract.md`
 
 ## Phase 5 closure
@@ -144,6 +145,39 @@ The work between M2 and the current baseline is accepted and no longer an unreco
 - PR #698: final Lyrics visual-acceptance corrections for pending-work priority and truthful History semantics.
 
 The production runtime baseline is `77cecd892c63c76ac79921eeb02278ab2b231d30`, with 49 migrations and head `20260824061359`.
+
+## Tracked adjacent WIP: Kenya Charts public-source durability proof
+
+**WIP / PENDING 7-DAY DURABILITY PROOF.**
+
+This work is intentionally tracked outside the numbered Phase 6B milestone sequence. It is not M3 and must not be treated as programme advancement.
+
+The research is testing whether WAKILISHA can operate a long-lived Kenya-first chart from public or ordinary developer-accessible music evidence without requiring privileged DSP data relationships.
+
+Empirical access probes on 24 August 2026 established successful Kenya-specific public access for Apple, YouTube, Mdundo, Audiomack, Boomplay, and Shazam. Spotify remains optional/non-core because the tested public Kenya CSV route returned an HTML shell rather than a proved chart dataset.
+
+A seven-day unattended durability soak is now running locally across:
+
+- Apple
+- YouTube
+- Mdundo
+- Audiomack
+- Boomplay
+- Shazam
+
+The soak began at `2026-08-24T13:52:43Z` / 16:52:43 EAT, runs approximately every six hours, and should complete after 31 August 2026 at approximately 16:52:43 EAT. Its first observation was 6/6 successful with depths of 100, 100, 100, 100, 100, and 200 respectively.
+
+Do not forget this work while other WAKILISHA work proceeds. Do not close or redesign the chart methodology before the seven-day evidence bundle is analyzed.
+
+Known follow-up already identified by the read-only production audit: raw observations can prove the same recording across multiple source records and providers while downstream candidate `source_count` still resolves to `1`. Repair independent observation-source identity through the existing ingestion/scoring pipeline before changing the scoring formula.
+
+Provider genres remain non-authoritative. WAKILISHA Registry genre authority must continue to decide cultural classification and chart eligibility.
+
+Canonical WIP record:
+
+- `docs/engineering/charts-public-source-accessibility-soak-wip.md`
+
+The WIP closes only after the soak bundle is analyzed into a Green / Amber / Red viability decision, source qualification grades, single-source-loss degradation behavior, evidence-plumbing repairs, and the recommended Kenya chart source constitution.
 
 ## Immediate numbered programme work
 
