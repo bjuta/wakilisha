@@ -249,7 +249,7 @@ export async function searchTrackLyricsAdminTracks(
 
   if (!Array.isArray(data)) return [];
 
-  return data.flatMap((value) => {
+  const results = data.flatMap((value) => {
     const row = record(value);
     const id = text(row.id ?? row.track_id);
     if (!id) return [];
@@ -263,6 +263,14 @@ export async function searchTrackLyricsAdminTracks(
       hasPublishedLyrics: row.has_published_lyrics === true,
       pendingContributionCount: Number(row.pending_contribution_count ?? 0) || 0,
     }];
+  });
+
+  return results.sort((left, right) => {
+    const pendingPriority =
+      Number(right.pendingContributionCount > 0) -
+      Number(left.pendingContributionCount > 0);
+
+    return pendingPriority;
   });
 }
 
