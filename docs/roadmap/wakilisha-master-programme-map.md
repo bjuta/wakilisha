@@ -1,10 +1,16 @@
 # WAKILISHA Master Programme Map
 
-Status date: 21 August 2026
+Status date: 24 August 2026
 
 Phase 6A production authority baseline: `fd0580e3a1a19e3d1f06a9c8466a37c84cd26a8b`
 
 Phase 6B governance gate: PR #684, `Enforce primitive compounding and open Phase 6B`
+
+Current production main: `77cecd892c63c76ac79921eeb02278ab2b231d30`
+
+Current production migration head: `20260824061359`
+
+Current production migration count: `49`
 
 ## Purpose
 
@@ -24,11 +30,20 @@ The numbered programme now continues at:
 
 **Phase 6B: Public Audio product**
 
-The current kickoff is `docs/engineering/phase-6b-public-audio-kickoff.md`.
+Phase 6B M1 and M2 are closed in production.
 
-The Phase 6A closure record is `docs/engineering/phase-6a-closure-record.md`.
+The post-M2 convergence interval through shared Editorial Credit, rich editorial primitives, player/editorial authority, player/mobile/public discovery, and governed Track Lyrics review/provenance is accepted production baseline.
 
-The Primitive Compounding Contract is now part of the engineering control plane and applies to Phase 6B onward.
+Phase 6B remains current because the real-podcast exit gate is still open. There is no agreed M3 contract yet; the next slice must be defined from the remaining exit proof rather than reopening M1 or M2.
+
+Current references:
+
+- `docs/engineering/phase-6b-public-audio-kickoff.md`
+- `docs/engineering/phase-6b-progress-closure-record.md`
+- `docs/engineering/track-lyrics-review-provenance-closure-record.md`
+- `docs/engineering/phase-6a-closure-record.md`
+
+The Primitive Compounding Contract remains part of the engineering control plane and applies to Phase 6B onward.
 
 ## Programme map
 
@@ -162,7 +177,7 @@ See `docs/engineering/phase-6a-closure-record.md`.
 
 ### Phase 6B: Public Audio product
 
-**Current numbered work.**
+**Current phase. M1 and M2 are closed; the Phase 6 exit proof remains open.**
 
 Build:
 
@@ -179,9 +194,17 @@ Build:
 - cached or stable public read models
 - global-player integration
 
-The recommended first slice is a narrow published-Audio public-read and route foundation before the whole product is built.
+Closed Phase 6B milestones now include:
 
-See `docs/engineering/phase-6b-public-audio-kickoff.md`.
+- M1: governed published-Audio public read + route foundation and media-first Player integration, closed through PR #686.
+- M2: shared Show / Show Episode identity, public Show hierarchy, RSS and branded enclosure delivery, closed through PR #687 plus production acceptance corrections PR #688, PR #689, and PR #690.
+- post-M2 convergence baseline through PR #698, including shared editorial primitives, player/mobile convergence, Track Lyrics authority, governed Lyrics contribution/review provenance, and public attribution.
+
+See:
+
+- `docs/engineering/phase-6b-public-audio-kickoff.md`
+- `docs/engineering/phase-6b-progress-closure-record.md`
+- `docs/engineering/track-lyrics-review-provenance-closure-record.md`
 
 ### Phase 6 exit gate
 
@@ -246,6 +269,8 @@ Build Inquiry as a capability across canonical editors, then the public Inquiry 
 
 ## Immediate next step
 
-Begin Phase 6B M1 from protected `main` after PR #684.
+Do not begin M1; it is closed. Do not reopen M2; it is closed.
 
-Audit only the exact public-read and route seams needed for the smallest published-Audio contract, declare primitive impact, and then build the narrowest preview-proven slice. Do not reopen Phase 6A or rebuild authority that production already owns.
+Define the next Phase 6B numbered slice from the remaining Phase 6 exit proof and current production main `77cecd892c63c76ac79921eeb02278ab2b231d30`. The next slice should consume the accepted public Audio, Show/RSS, Player, Trust, editorial, and Lyrics/provenance baseline rather than rebuilding it.
+
+The roadmap remains at Phase 6B until the real-podcast exit gate and transcript-correction history proof are satisfied.

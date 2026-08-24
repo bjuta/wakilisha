@@ -2,9 +2,33 @@
 
 ## Status
 
-Candidate architecture. No preview or production mutation has occurred.
+CLOSED IN PRODUCTION
 
 Accepted base: `f47d08049fafd852e7b3f5cf4cbaf3fc91e5fbd0`.
+
+Closure date: 22 August 2026.
+
+## Closure addendum
+
+This audit remains the architecture record for M2. Its candidate language below captures the decisions made before preview and production promotion; it no longer describes the current deployment state.
+
+Phase 6B M2 is closed.
+
+Closure evidence:
+
+- PR #687 established shared Show and Show Episode identity, public Show/Episode reads, RSS delivery, stable branded enclosure delivery, and the canonical `/shows/...` public grammar.
+- PR #688 corrected the production Nginx enclosure-regex syntax before activation.
+- PR #689 corrected the Nginx Supabase upstream shape and production-proved RSS/enclosure transport through Lightsail and public HTTPS.
+- PR #690 closed Audio ontology leaks found during browser acceptance without changing the accepted shared Show grammar.
+- `20260822131500_phase_6b_m2_shared_show_hierarchy_rss.sql` is live.
+- `20260822131600_phase_6b_m2_audio_canonical_show_paths.sql` is live.
+- `20260822173446_phase_6b_m2_audio_ontology_closure.sql` is live.
+- M2 closed at production migration count 41 / head `20260822173446`.
+- `audio-public-delivery` Edge transport and the repo-owned Nginx routes are production-proven.
+- Show and Show Episode remain shared cultural identity; Season and Audio publication/version/delivery remain Audio authority.
+- M2 public/frontend acceptance completed after the authority, transport, Nginx, and ontology corrections were sealed.
+
+Current Phase 6B status is recorded in `docs/engineering/phase-6b-progress-closure-record.md`.
 
 ## Why M2 changed before preview
 
