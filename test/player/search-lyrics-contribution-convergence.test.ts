@@ -8,6 +8,9 @@ const player = read("src/components/design-system/player/PlayerFullSurface.tsx")
 const timedText = read("src/components/design-system/player/PlayerTimedTextPanel.tsx");
 const contribution = read("src/pages/tracks/lyrics/contribute/page.tsx");
 const detailLyrics = read("src/pages/tracks/detail/components/TrackLyricsSection.tsx");
+const trackDetail = read("src/pages/tracks/detail/page.tsx");
+const contributionSheet = read("src/components/feature/community/ContributionSheet.tsx");
+const adminShell = read("src/pages/admin/AdminShell.tsx");
 const adminLyrics = read("src/pages/admin/content/lyrics/page.tsx");
 const adminLyricsReview = read(
   "src/pages/admin/content/lyrics/components/LyricsContributionReviewWorkspace.tsx",
@@ -76,6 +79,16 @@ describe("Search and Lyrics contribution convergence", () => {
   it("removes timed-Lyrics pressure from Track empty state", () => {
     expect(detailLyrics).toContain("Timing is not required.");
     expect(detailLyrics).not.toContain("Be the first to add timed lyrics");
+  });
+
+  it("keeps Lyrics on the governed authority and provenance path everywhere", () => {
+    expect(contributionSheet).not.toContain('"lyrics_correction"');
+    expect(adminShell).toContain(
+      '{ path: "/admin/content/lyrics", label: "Lyrics", icon: "Mic2", requiredCapability: "view_audio" }',
+    );
+    expect(trackDetail).toContain("trackId={track.id}");
+    expect(player).toContain("trackLyricsPublicAttribution");
+    expect(player).toContain("trackLyricsPublicAttribution(lyrics)");
   });
 
   it("gives Admin Lyrics a governed path from contribution to immutable working version", () => {

@@ -26,7 +26,7 @@ const NAV_GROUPS: NavGroup[] = [
     { path: "/admin/content/playlists", label: "Playlists", icon: "ListMusic", requiredCapability: "edit_own_playlists" },
     { path: "/admin/content/guides", label: "Guides", icon: "BookOpen", requiredCapability: "edit_guides" },
     { path: "/admin/content/pages", label: "Pages", icon: "Layout", requiredCapability: "edit_pages" },
-    { path: "/admin/content/lyrics", label: "Lyrics", icon: "Mic2", requiredCapability: "edit_own_articles" },
+    { path: "/admin/content/lyrics", label: "Lyrics", icon: "Mic2", requiredCapability: "view_audio" },
     { path: "", label: "", icon: "Minus", separatorLabel: "Magazine" },
     { path: "/admin/content/magazine/featured-artists", label: "Featured Artists", icon: "Star", requiredCapability: "edit_guides" },
     { path: "/admin/content/magazine/featured-guides", label: "Featured Guides", icon: "BookMarked", requiredCapability: "edit_guides" },
