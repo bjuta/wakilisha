@@ -92,6 +92,37 @@ describe("Lyrics editorial convergence", () => {
     expect(lyricsReview).toContain("requiresNote: true");
   });
 
+  it("keeps accepted Lyrics in Review for the separate Publish decision", () => {
+    expect(lyricsReview).toContain("async function publishAcceptedLyrics");
+    expect(lyricsReview).toContain("await publishTrackLyrics(workspace)");
+    expect(lyricsReview).toContain('label: "Publish"');
+    expect(lyricsReview).toContain("Accepted · Not published");
+    expect(lyricsReview).toContain(
+      "Publication remains a separate governed decision in this same workspace.",
+    );
+    expect(lyricsPage).toContain("const reviewed = historyRows.find(");
+    expect(lyricsPage).toContain("setSelectedContribution(reviewed)");
+    expect(lyricsPage).toContain("openHistoricalContribution");
+    expect(lyricsHistory).toContain("onOpenContribution");
+    expect(lyricsHistory).toContain(
+      "Open current accepted version in Review",
+    );
+    expect(lyricsHistory).toContain("version.id === item.acceptedVersionId");
+    expect(lyricsHistory).toContain("version.isWorking");
+    expect(lyricsReview).toContain("setDecisionStatus(contribution.status)");
+    expect(lyricsReview).toContain(
+      "setAcceptedVersionId(contribution.acceptedVersionId)",
+    );
+    expect(lyricsReview).toContain(
+      "acceptedVersionId === workspace.currentWorkingVersionId",
+    );
+    expect(lyricsReview).toContain("Accepted · Historical version");
+    expect(lyricsReview).toContain("lyricsDocumentToEditorText(next.working)");
+    expect(lyricsPage).not.toContain(
+      'setSelectedContribution(null);\n    await Promise.all([loadInbox(""), loadHistory()]);\n    setInboxQuery("");\n    setView("inbox");',
+    );
+  });
+
   it("reuses one editorial decision grammar for Audio and Lyrics", () => {
     expect(audioReview).toContain("EditorialDecisionWorkspace");
     expect(lyricsReview).toContain("EditorialDecisionWorkspace");

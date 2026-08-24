@@ -20,8 +20,10 @@ function humanize(value: string): string {
 
 export function LyricsHistoryWorkspace({
   refreshKey = 0,
+  onOpenContribution,
 }: {
   refreshKey?: number;
+  onOpenContribution?: (contributionId: string) => void;
 }) {
   const [history, setHistory] = useState<TrackLyricsHistory>({
     contributions: [],
@@ -187,6 +189,23 @@ export function LyricsHistoryWorkspace({
                     <p className="mt-3 rounded-lg border border-wk-border bg-wk-surface px-3 py-2 text-xs leading-5 text-wk-text">
                       {item.reviewNote}
                     </p>
+                  ) : null}
+                  {onOpenContribution &&
+                  item.status === "promoted" &&
+                  item.acceptedVersionId &&
+                  versions.some(
+                    (version) =>
+                      version.id === item.acceptedVersionId &&
+                      version.isWorking,
+                  ) ? (
+                    <button
+                      type="button"
+                      onClick={() => onOpenContribution(item.id)}
+                      className="wk-button wk-button-ghost wk-button-sm mt-3"
+                    >
+                      <WkIcon name="ScanText" size={14} />
+                      Open current accepted version in Review
+                    </button>
                   ) : null}
                 </article>
               ))}
