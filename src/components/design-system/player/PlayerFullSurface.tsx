@@ -24,6 +24,7 @@ import {
 } from "@/services/player/timedText";
 import {
   fetchPublicTrackLyrics,
+  trackLyricsPublicAttribution,
   type TrackLyricsDocument,
 } from "@/services/player/trackLyricsService";
 import {
@@ -983,6 +984,13 @@ export function PlayerFullSurface({
           loading={lyricsLoading}
           error={lyricsError}
           emptyMessage="No published Lyrics are available for this Track yet."
+          footer={
+            lyrics ? (
+              <p className="text-xs leading-5 text-[var(--wk-text-faint)]">
+                {trackLyricsPublicAttribution(lyrics)}
+              </p>
+            ) : undefined
+          }
           emptyAction={
             lyricsContributionPath ? (
               <button

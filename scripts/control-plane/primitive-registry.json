@@ -28,7 +28,8 @@
       "consumers": [
         "admin:articles",
         "admin:playlists",
-        "admin:audio"
+        "admin:audio",
+        "admin:lyrics"
       ]
     },
     {
@@ -36,12 +37,13 @@
       "path": "src/components/design-system/admin/AdminRecordActions.tsx",
       "kind": "interaction",
       "maturity": "canonical",
-      "concept": "truthful governed record actions and lifecycle affordances",
+      "concept": "truthful governed record actions, lifecycle affordances, and shared overflow priority grammar",
       "authorityOwner": "consumer",
       "consumers": [
         "admin:articles",
         "admin:playlists",
-        "admin:audio"
+        "admin:audio",
+        "admin:lyrics"
       ]
     },
     {
@@ -84,18 +86,20 @@
       "consumers": [
         "admin:articles",
         "admin:playlists",
-        "admin:audio"
+        "admin:audio",
+        "admin:lyrics"
       ]
     },
     {
       "id": "admin.workspace-section",
       "path": "src/components/design-system/admin/AdminWorkspaceSection.tsx",
       "kind": "presentation",
-      "maturity": "candidate",
+      "maturity": "canonical",
       "concept": "governed admin workspace section framing",
       "authorityOwner": "consumer",
       "consumers": [
-        "admin:audio"
+        "admin:audio",
+        "admin:lyrics"
       ]
     },
     {
@@ -108,7 +112,8 @@
       "consumers": [
         "admin:articles",
         "admin:playlists",
-        "admin:audio"
+        "admin:audio",
+        "admin:lyrics"
       ]
     },
     {
@@ -126,11 +131,38 @@
       "id": "editorial.workflow-rail",
       "path": "src/components/design-system/editorial/EditorialWorkflowRail.tsx",
       "kind": "interaction",
-      "maturity": "candidate",
+      "maturity": "canonical",
       "concept": "semantic workflow phase navigation",
       "authorityOwner": "consumer",
       "consumers": [
-        "admin:audio"
+        "admin:audio",
+        "admin:lyrics"
+      ]
+    },
+    {
+      "id": "editorial.decision-workspace",
+      "path": "src/components/design-system/editorial/EditorialDecisionWorkspace.tsx",
+      "kind": "interaction",
+      "maturity": "canonical",
+      "concept": "exact-version editorial decision notes, action grammar, validation, and durable decision history presentation",
+      "authorityOwner": "consumer",
+      "consumers": [
+        "admin:articles",
+        "admin:playlists",
+        "admin:audio",
+        "admin:lyrics"
+      ]
+    },
+    {
+      "id": "editorial.text-diff",
+      "path": "src/components/design-system/editorial/EditorialTextDiff.tsx",
+      "kind": "presentation",
+      "maturity": "canonical",
+      "concept": "before-and-after editorial text revision evidence",
+      "authorityOwner": "consumer",
+      "consumers": [
+        "admin:articles",
+        "admin:lyrics"
       ]
     },
     {

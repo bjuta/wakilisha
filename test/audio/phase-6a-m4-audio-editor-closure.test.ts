@@ -91,12 +91,15 @@ describe("Phase 6A M4 final Audio Editor closure", () => {
     expect(workspace).toContain("Review always targets one exact immutable version.");
   });
 
-  it("wires Audio only into Admin Content and not into Phase 6B public routes", () => {
+  it("keeps canonical Admin Audio routing intact after public Audio activation", () => {
     expect(lazyAdmin).toContain("AdminAudioPage");
     expect(lazyAdmin).toContain("AdminAudioDetailPage");
     expect(routes).toContain('path: "audio"');
     expect(routes).toContain('path: "audio/:publicationId"');
-    expect(routes).not.toMatch(/path:\s*["']\/audio/);
+    expect(routes).toContain('path: "/audio"');
+    expect(routes).toContain('path: "/audio/:slug"');
+    expect(routes).toContain("PublicAudioPage");
+    expect(routes).toContain("PublicAudioDetailPage");
     expect(shell).toContain("/admin/content/audio");
     expect(sectionLayouts).toContain('"view_audio"');
     expect(searchIndex).toContain("/admin/content/audio");

@@ -1364,7 +1364,8 @@ export default function TrackDetail() {
               </section>
             )}
 
-            <TrackLyricsSection trackSlug={track.slug} artistSlug={track.artistSlug} trackTitle={track.title} artistName={track.artist} lyrics={track.lyrics} lyricsContributor={track.lyricsContributor} />
+            <TrackLyricsSection
+              trackId={track.id} trackSlug={track.slug} artistSlug={track.artistSlug} trackTitle={track.title} artistName={track.artist} lyrics={track.lyrics} lyricsContributor={track.lyricsContributor} />
 
             <TrackRelatedTracks trackSlug={track.slug} artistSlug={track.artistSlug} artistName={track.artist} albumSlug={track.albumSlug} albumTitle={track.albumTitle} genreSlug={track.genreSlug} genreName={track.genre} />
 

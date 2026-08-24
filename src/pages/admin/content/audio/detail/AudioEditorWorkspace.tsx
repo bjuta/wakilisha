@@ -9,9 +9,7 @@ import { Link, useNavigate } from "react-router-dom";
 import { MediaPickerModal } from "@/components/admin/MediaPickerModal";
 import { WkIcon } from "@/components/design-system/Icon";
 import { WkSurface } from "@/components/design-system/primitives/Surface";
-import { AdminRecordHeader } from "@/components/design-system/admin/AdminRecordHeader";
-import { AdminRecordActions } from "@/components/design-system/admin/AdminRecordActions";
-import { AdminSaveState } from "@/components/design-system/admin/AdminSaveState";
+import { AudioEditorHeader } from "./components/AudioEditorHeader";
 import { AdminWorkspaceSection } from "@/components/design-system/admin/AdminWorkspaceSection";
 import { EditorialWorkflowRail } from "@/components/design-system/editorial/EditorialWorkflowRail";
 import { EditorialMetadataWorkspace } from "@/components/design-system/editorial/EditorialMetadataWorkspace";
@@ -36,12 +34,10 @@ import {
 import {
   archiveAudioPublication,
   fetchAudioPublicationWorkspace,
-  publishAudio,
   replaceAudioChapters,
   replaceAudioCitations,
   replaceAudioCredits,
   restoreAudioPublication,
-  reviewAudio,
   saveAudioMetadata,
   setAudioMaster,
   setAudioTranscript,
@@ -490,157 +486,36 @@ export function AudioEditorWorkspace({
 
   return (
     <div className="mx-auto w-full max-w-[1320px] space-y-4 p-4 sm:p-6 lg:p-8">
-      <AdminRecordHeader
-        collectionLabel="Audio"
-        title={workspace.publication.title}
-        status={workspace.publication.status}
+      <AudioEditorHeader
+        workspace={workspace}
+        workingDirty={workingDirty}
+        isSaving={isSaving}
+        busy={busy !== null}
+        canSubmit={canSubmit}
         onBack={() => navigate("/admin/content/audio")}
-        meta={
-          <span>
-            {workspace.publication.publicationKind === "episode"
-              ? "Show Episode"
-              : "Standalone Audio"}
-          </span>
+        onSave={() => void handleSaveWorkingVersion()}
+        onSubmit={() =>
+          void run(
+            "submit",
+            () => submitAudioForReview(workspace, reviewNote),
+            "Sent to Review.",
+          )
         }
-        actions={
-          <AdminRecordActions
-            actions={[
-              ...(workspace.publication.status === "archived" && workspace.canEdit
-                ? [{
-                    key: "restore",
-                    label: "Restore",
-                    icon: "Undo2" as const,
-                    tone: "secondary" as const,
-                    disabled: busy !== null,
-                    onClick: () => void run(
-                      "restore",
-                      () => restoreAudioPublication(workspace, reviewNote),
-                      "Audio restored to Draft.",
-                    ),
-                  }]
-                : []),
-              ...(workspace.publication.status !== "archived" && workspace.canArchive
-                ? [{
-                    key: "archive",
-                    label: "Archive",
-                    icon: "Archive" as const,
-                    tone: "danger" as const,
-                    disabled: busy !== null,
-                    onClick: () => void run(
-                      "archive",
-                      () => archiveAudioPublication(workspace, reviewNote),
-                      "Audio archived.",
-                    ),
-                  }]
-                : []),
-            ]}
-          >
-            <AdminSaveState
-              isDirty={workingDirty}
-              isSaving={isSaving}
-              locked={!editable}
-              lockedLabel={`${humanize(workspace.publication.status)} Version`}
-            />
-
-            {editable ? (
-              <button
-                type="button"
-                disabled={busy !== null}
-                onClick={handleSaveWorkingVersion}
-                title="Save Audio edits and snapshot the working version."
-                className="wk-button wk-button-secondary wk-button-sm disabled:opacity-50"
-              >
-                <WkIcon name="Save" size={14} />
-                Save
-              </button>
-            ) : null}
-
-            {canSubmit ? (
-              <button
-                type="button"
-                disabled={busy !== null || workingDirty}
-                title={workingDirty ? "Save changes before submitting for Review." : undefined}
-                onClick={() =>
-                  run(
-                    "submit",
-                    () => submitAudioForReview(workspace, reviewNote),
-                    "Sent to Review.",
-                  )
-                }
-                className="wk-button wk-button-primary wk-button-sm disabled:opacity-50"
-              >
-                <WkIcon name="Send" size={14} />
-                Submit for Review
-              </button>
-            ) : null}
-
-            {workspace.canManageReview && workspace.publication.status === "ready_for_review" ? (
-              <button
-                type="button"
-                disabled={busy !== null}
-                onClick={() =>
-                  run(
-                    "review-start",
-                    () => reviewAudio(workspace, "start_review", reviewNote),
-                    "Review started.",
-                  )
-                }
-                className="wk-button wk-button-secondary wk-button-sm disabled:opacity-50"
-              >
-                Start Review
-              </button>
-            ) : null}
-
-            {workspace.canManageReview && workspace.publication.status === "in_review" ? (
-              <>
-                <button
-                  type="button"
-                  disabled={busy !== null}
-                  onClick={() =>
-                    run(
-                      "review-changes",
-                      () => reviewAudio(workspace, "request_changes", reviewNote),
-                      "Changes requested.",
-                    )
-                  }
-                  className="wk-button wk-button-ghost wk-button-sm text-wk-warning disabled:opacity-50"
-                >
-                  Request Changes
-                </button>
-                <button
-                  type="button"
-                  disabled={busy !== null}
-                  onClick={() =>
-                    run(
-                      "review-approve",
-                      () => reviewAudio(workspace, "approve", reviewNote),
-                      "Audio approved.",
-                    )
-                  }
-                  className="wk-button wk-button-primary wk-button-sm disabled:opacity-50"
-                >
-                  Approve
-                </button>
-              </>
-            ) : null}
-
-            {workspace.canPublish && workspace.publication.status === "approved" ? (
-              <button
-                type="button"
-                disabled={busy !== null}
-                onClick={() =>
-                  run(
-                    "publish",
-                    () => publishAudio(workspace, reviewNote),
-                    "Audio published.",
-                  )
-                }
-                className="wk-button wk-button-primary wk-button-sm disabled:opacity-50"
-              >
-                Publish
-              </button>
-            ) : null}
-          </AdminRecordActions>
+        onOpenDetails={() => setView("details")}
+        onOpenReview={() => setView("review")}
+        onArchive={() =>
+          void run(
+            "archive",
+            () => archiveAudioPublication(workspace, reviewNote),
+            "Audio archived.",
+          )
+        }
+        onRestore={() =>
+          void run(
+            "restore",
+            () => restoreAudioPublication(workspace, reviewNote),
+            "Audio restored to Draft.",
+          )
         }
       />
 

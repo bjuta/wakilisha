@@ -3,6 +3,10 @@ import type { TimedTextLine } from "@/services/player/timedText";
 
 type UnknownRecord = Record<string, unknown>;
 
+export type TrackLyricsCommunityRevisionMode =
+  | "as_submitted"
+  | "with_revisions";
+
 export interface TrackLyricsDocument {
   trackId: string;
   versionId: string;
@@ -13,6 +17,9 @@ export interface TrackLyricsDocument {
   plainText: string;
   sourceKind: string;
   rightsNote: string | null;
+  sourceContributionId: string | null;
+  sourceContributorLabel: string | null;
+  communityRevisionMode: TrackLyricsCommunityRevisionMode | null;
 }
 
 export interface TrackLyricsContribution {
@@ -25,6 +32,7 @@ export interface TrackLyricsContribution {
   plainText: string;
   sourceDescription: string | null;
   status: "submitted" | "promoted" | "rejected";
+  acceptanceMode: TrackLyricsCommunityRevisionMode | null;
   acceptedVersionId: string | null;
   reviewedAt: string | null;
   reviewNote: string | null;
@@ -39,14 +47,8 @@ export interface AdminTrackLyricsWorkspace {
   working: TrackLyricsDocument | null;
   published: TrackLyricsDocument | null;
   canEdit: boolean;
+  canManageReview: boolean;
   canPublish: boolean;
-}
-
-export interface LyricsTrackChoice {
-  id: string;
-  slug: string;
-  title: string;
-  artworkUrl: string | null;
 }
 
 function record(value: unknown): UnknownRecord {
@@ -61,9 +63,23 @@ function text(value: unknown, fallback = ""): string {
   return typeof value === "string" ? value : fallback;
 }
 
+function nullableText(value: unknown): string | null {
+  return typeof value === "string" && value.trim()
+    ? value
+    : null;
+}
+
 function numberValue(value: unknown, fallback = 0): number {
   const parsed = Number(value);
   return Number.isFinite(parsed) ? parsed : fallback;
+}
+
+function decodeRevisionMode(
+  value: unknown,
+): TrackLyricsCommunityRevisionMode | null {
+  return value === "as_submitted" || value === "with_revisions"
+    ? value
+    : null;
 }
 
 function decodeLines(value: unknown): TimedTextLine[] {
@@ -97,6 +113,7 @@ function decodeDocument(
 ): TrackLyricsDocument | null {
   if (!value) return null;
   const row = record(value);
+  const provenance = record(row.provenance);
   const versionId = text(row.version_id ?? row.id);
   if (!versionId) return null;
 
@@ -109,10 +126,14 @@ function decodeDocument(
     lines: decodeLines(row.lines),
     plainText: text(row.plain_text),
     sourceKind: text(row.source_kind, "editorial"),
-    rightsNote:
-      typeof row.rights_note === "string"
-        ? row.rights_note
-        : null,
+    rightsNote: nullableText(row.rights_note),
+    sourceContributionId: nullableText(row.source_contribution_id),
+    sourceContributorLabel: nullableText(
+      row.source_contributor_label ?? provenance.contributor_label,
+    ),
+    communityRevisionMode: decodeRevisionMode(
+      row.community_revision_mode ?? provenance.revision_mode,
+    ),
   };
 }
 
@@ -131,33 +152,35 @@ function decodeContribution(value: unknown): TrackLyricsContribution | null {
   return {
     id,
     trackId,
-    contributorId:
-      typeof row.contributor_id === "string"
-        ? row.contributor_id
-        : null,
+    contributorId: nullableText(row.contributor_id),
     languageCode: text(row.language_code, "und"),
     timingMode: text(row.timing_mode) === "line" ? "line" : "plain",
     lines: decodeLines(row.lines),
     plainText: text(row.plain_text),
-    sourceDescription:
-      typeof row.source_description === "string"
-        ? row.source_description
-        : null,
+    sourceDescription: nullableText(row.source_description),
     status,
-    acceptedVersionId:
-      typeof row.accepted_version_id === "string"
-        ? row.accepted_version_id
-        : null,
-    reviewedAt:
-      typeof row.reviewed_at === "string"
-        ? row.reviewed_at
-        : null,
-    reviewNote:
-      typeof row.review_note === "string"
-        ? row.review_note
-        : null,
+    acceptanceMode: decodeRevisionMode(row.acceptance_mode),
+    acceptedVersionId: nullableText(row.accepted_version_id),
+    reviewedAt: nullableText(row.reviewed_at),
+    reviewNote: nullableText(row.review_note),
     createdAt: text(row.created_at),
   };
+}
+
+export function trackLyricsPublicAttribution(
+  document: TrackLyricsDocument | null,
+): string | null {
+  if (!document?.sourceContributorLabel) return null;
+
+  if (document.communityRevisionMode === "with_revisions") {
+    return `Original Lyrics submitted by ${document.sourceContributorLabel}. WAKILISHA Community revisions were accepted.`;
+  }
+
+  if (document.communityRevisionMode === "as_submitted") {
+    return `Lyrics submitted by ${document.sourceContributorLabel}.`;
+  }
+
+  return null;
 }
 
 export async function fetchPublicTrackLyrics(
@@ -208,28 +231,6 @@ export async function submitTrackLyricsContribution(input: {
   };
 }
 
-export async function listLyricsTrackChoices():
-Promise<LyricsTrackChoice[]> {
-  const { data, error } = await supabase
-    .from("registry_tracks")
-    .select("id, slug, title, artwork_url")
-    .eq("status", "active")
-    .order("title");
-
-  if (error) {
-    throw new Error(
-      error.message || "Registry Tracks could not load.",
-    );
-  }
-
-  return (data ?? []).map((row) => ({
-    id: row.id,
-    slug: row.slug,
-    title: row.title,
-    artworkUrl: row.artwork_url,
-  }));
-}
-
 export async function fetchAdminTrackLyricsWorkspace(
   trackId: string,
 ): Promise<AdminTrackLyricsWorkspace> {
@@ -249,17 +250,12 @@ export async function fetchAdminTrackLyricsWorkspace(
   return {
     trackId: text(root.track_id) || trackId,
     authorityRevision: numberValue(root.authority_revision, 1),
-    currentWorkingVersionId:
-      typeof root.current_working_version_id === "string"
-        ? root.current_working_version_id
-        : null,
-    currentPublishedVersionId:
-      typeof root.current_published_version_id === "string"
-        ? root.current_published_version_id
-        : null,
+    currentWorkingVersionId: nullableText(root.current_working_version_id),
+    currentPublishedVersionId: nullableText(root.current_published_version_id),
     working: decodeDocument(root.working, trackId),
     published: decodeDocument(root.published, trackId),
     canEdit: root.can_edit === true,
+    canManageReview: root.can_manage_review === true,
     canPublish: root.can_publish === true,
   };
 }

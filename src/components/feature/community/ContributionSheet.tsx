@@ -17,7 +17,6 @@ const CONTRIBUTION_TYPES = [
   { value: "missing_track", label: "Missing Track", icon: "ri-play-list-add-line", description: "Suggest a song that belongs in this Playlist" },
   { value: "genre_fix", label: "Genre Fix", icon: "ri-price-tag-3-line", description: "Correct or suggest genre classifications" },
   { value: "bio_correction", label: "Bio Correction", icon: "ri-file-text-line", description: "Fix biographical errors or outdated bios" },
-  { value: "lyrics_correction", label: "Lyrics Correction", icon: "ri-music-2-line", description: "Fix incorrect or missing lyrics" },
   { value: "other", label: "Other", icon: "ri-more-line", description: "Something else that needs attention" },
 ];
 

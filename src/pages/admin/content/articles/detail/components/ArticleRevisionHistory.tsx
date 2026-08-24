@@ -1,9 +1,8 @@
 import { useState, useEffect, useMemo } from "react";
 import { WkIcon } from "@/components/design-system/Icon";
 import { WkSurface } from "@/components/design-system/primitives/Surface";
+import { EditorialTextDiff } from "@/components/design-system/editorial/EditorialTextDiff";
 import { supabase } from "@/lib/supabase";
-
-/* ─── Types ─── */
 
 interface Revision {
   id: string;
@@ -36,66 +35,6 @@ interface RestorePayload {
   seo: Record<string, unknown>;
   publishedAt: string;
   wpStatus: string | null;
-}
-
-/* ─── Diff helpers ─── */
-
-interface DiffSegment {
-  type: "equal" | "added" | "removed";
-  text: string;
-}
-
-function wordDiff(oldText: string, newText: string): DiffSegment[] {
-  const oldWords = oldText.split(/(\s+)/);
-  const newWords = newText.split(/(\s+)/);
-
-  // Simple LCS-based diff
-  const m = oldWords.length;
-  const n = newWords.length;
-  const dp: number[][] = Array.from({ length: m + 1 }, () => Array(n + 1).fill(0));
-
-  for (let i = 1; i <= m; i++) {
-    for (let j = 1; j <= n; j++) {
-      if (oldWords[i - 1] === newWords[j - 1]) {
-        dp[i][j] = dp[i - 1][j - 1] + 1;
-      } else {
-        dp[i][j] = Math.max(dp[i - 1][j], dp[i][j - 1]);
-      }
-    }
-  }
-
-  // Backtrack
-  const segments: DiffSegment[] = [];
-  let i = m;
-  let j = n;
-
-  const backtrack: Array<{ type: "equal" | "added" | "removed"; word: string }> = [];
-
-  while (i > 0 || j > 0) {
-    if (i > 0 && j > 0 && oldWords[i - 1] === newWords[j - 1]) {
-      backtrack.unshift({ type: "equal", word: oldWords[i - 1] });
-      i--;
-      j--;
-    } else if (j > 0 && (i === 0 || dp[i][j - 1] >= dp[i - 1][j])) {
-      backtrack.unshift({ type: "added", word: newWords[j - 1] });
-      j--;
-    } else {
-      backtrack.unshift({ type: "removed", word: oldWords[i - 1] });
-      i--;
-    }
-  }
-
-  // Merge consecutive segments of the same type
-  for (const item of backtrack) {
-    const last = segments[segments.length - 1];
-    if (last && last.type === item.type) {
-      last.text += item.word;
-    } else {
-      segments.push({ type: item.type, text: item.word });
-    }
-  }
-
-  return segments;
 }
 
 function stripHtmlForDiff(html: string | null): string {
@@ -180,8 +119,6 @@ function restoreGuidance(revision: Revision, isCurrent: boolean, mode: "history"
   return "This version can be restored into the editor as a draft.";
 }
 
-/* ─── Component ─── */
-
 interface Props {
   articleId: string;
   currentStatus: string | null;
@@ -195,8 +132,6 @@ export function ArticleRevisionHistory({ articleId, currentStatus, currentTitle,
   const [loading, setLoading] = useState(true);
   const [expandedRev, setExpandedRev] = useState<string | null>(null);
   const [showConfirm, setShowConfirm] = useState<Revision | null>(null);
-
-  // Compare mode
   const [compareMode, setCompareMode] = useState(false);
   const [selectedLeft, setSelectedLeft] = useState<string | null>(null);
   const [selectedRight, setSelectedRight] = useState<string | null>(null);
@@ -249,23 +184,24 @@ export function ArticleRevisionHistory({ articleId, currentStatus, currentTitle,
     load();
   }, [articleId]);
 
-  // Compute diff when both sides selected
   const leftRevision = useMemo(
     () => revisions.find((r) => r.id === selectedLeft) ?? null,
-    [revisions, selectedLeft]
+    [revisions, selectedLeft],
   );
   const rightRevision = useMemo(
     () => revisions.find((r) => r.id === selectedRight) ?? null,
-    [revisions, selectedRight]
+    [revisions, selectedRight],
   );
-
-  const diffSegments = useMemo(() => {
-    if (!leftRevision || !rightRevision) return null;
-    const leftText = revisionComparisonText(leftRevision);
-    const rightText = revisionComparisonText(rightRevision);
-    if (leftText === rightText) return null;
-    return wordDiff(leftText, rightText);
-  }, [leftRevision, rightRevision]);
+  const leftComparisonText = useMemo(
+    () => leftRevision ? revisionComparisonText(leftRevision) : "",
+    [leftRevision],
+  );
+  const rightComparisonText = useMemo(
+    () => rightRevision ? revisionComparisonText(rightRevision) : "",
+    [rightRevision],
+  );
+  const comparisonReady = Boolean(leftRevision && rightRevision);
+  const comparisonChanged = comparisonReady && leftComparisonText !== rightComparisonText;
 
   function toggleCompare() {
     setCompareMode(!compareMode);
@@ -284,7 +220,6 @@ export function ArticleRevisionHistory({ articleId, currentStatus, currentTitle,
     } else if (revId === selectedRight) {
       setSelectedRight(null);
     } else {
-      // Reset
       setSelectedLeft(revId);
       setSelectedRight(null);
     }
@@ -362,7 +297,6 @@ export function ArticleRevisionHistory({ articleId, currentStatus, currentTitle,
         ) : null}
       </WkSurface>
 
-      {/* Compare toggle */}
       <div className="flex items-center justify-between">
         <span className="text-[11px] font-semibold text-wk-text-muted uppercase tracking-wider">
           {revisions.length} revision{revisions.length !== 1 ? "s" : ""}
@@ -378,60 +312,23 @@ export function ArticleRevisionHistory({ articleId, currentStatus, currentTitle,
         </button>
       </div>
 
-      {/* Diff display */}
-      {compareMode && selectedLeft && selectedRight && diffSegments && (
-        <WkSurface className="overflow-hidden border-wk-brand/30">
-          <div className="flex items-center justify-between px-4 py-2.5 bg-wk-bg-subtle border-b border-wk-border">
-            <div className="flex items-center gap-2 text-[11px]">
-              <span className="font-semibold text-wk-danger">← v{leftRevision?.revision_number}</span>
-              <span className="text-wk-text-faint">vs</span>
-              <span className="font-semibold text-wk-success">v{rightRevision?.revision_number} →</span>
-            </div>
-            <span className="text-[10px] text-wk-text-faint">
-              {diffSegments.filter((s) => s.type === "added").length > 0 && (
-                <span className="text-wk-success">+{diffSegments.filter((s) => s.type === "added").reduce((sum, s) => sum + s.text.split(/\s+/).filter(Boolean).length, 0)} words </span>
-              )}
-              {diffSegments.filter((s) => s.type === "removed").length > 0 && (
-                <span className="text-wk-danger">-{diffSegments.filter((s) => s.type === "removed").reduce((sum, s) => sum + s.text.split(/\s+/).filter(Boolean).length, 0)} words</span>
-              )}
-            </span>
-          </div>
-          <div className="p-4 max-h-[320px] overflow-y-auto">
-            <div className="text-[13px] leading-relaxed font-mono whitespace-pre-wrap break-words">
-              {diffSegments.map((seg, i) => (
-                <span
-                  key={i}
-                  className={
-                    seg.type === "added"
-                      ? "bg-wk-success-soft text-wk-success"
-                      : seg.type === "removed"
-                        ? "bg-wk-danger-soft text-wk-danger line-through"
-                        : "text-wk-text-soft"
-                  }
-                >
-                  {seg.text}
-                </span>
-              ))}
-            </div>
-          </div>
-        </WkSurface>
-      )}
+      {compareMode && comparisonReady ? (
+        <EditorialTextDiff
+          previousText={leftComparisonText}
+          nextText={rightComparisonText}
+          previousLabel={`← v${leftRevision?.revision_number}`}
+          nextLabel={`v${rightRevision?.revision_number} →`}
+          emptyLabel="No tracked editorial fields changed in this checkpoint."
+        />
+      ) : null}
 
-      {compareMode && selectedLeft && selectedRight && !diffSegments && (
-        <div className="text-center py-3 text-[12px] text-wk-text-faint">
-          <WkIcon name="CheckCircle2" size={14} className="inline text-wk-success mr-1" />
-          No tracked editorial fields changed in this checkpoint.
-        </div>
-      )}
-
-      {compareMode && (!selectedLeft || !selectedRight) && (
+      {compareMode && (!selectedLeft || !selectedRight) ? (
         <div className="text-center py-3 text-[12px] text-wk-text-faint">
           {!selectedLeft ? "Select the older version (left)" : "Now select the newer version (right)"}
         </div>
-      )}
+      ) : null}
 
-      {/* Revision list */}
-      {(!compareMode || diffSegments === null) && revisions.map((rev) => {
+      {(!compareMode || !comparisonChanged) && revisions.map((rev) => {
         const isExpanded = expandedRev === rev.id;
         const isCurrent = rev.revision_number === highestRev;
         const isAutosave = rev.created_by === "System" || rev.created_by === "autosave";
@@ -458,7 +355,6 @@ export function ArticleRevisionHistory({ articleId, currentStatus, currentTitle,
               }}
               className="flex w-full items-center gap-3 px-4 py-3 text-left hover:bg-wk-surface-raised transition-colors"
             >
-              {/* Selection indicator */}
               {compareMode && (
                 <div className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-full border-2 transition-all ${
                   selectedLeft === rev.id
@@ -595,7 +491,6 @@ export function ArticleRevisionHistory({ articleId, currentStatus, currentTitle,
         );
       })}
 
-      {/* Confirm restore modal */}
       {showConfirm && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
           <div className="w-full max-w-sm mx-4 rounded-2xl border border-wk-border bg-wk-surface p-6 shadow-lg">
