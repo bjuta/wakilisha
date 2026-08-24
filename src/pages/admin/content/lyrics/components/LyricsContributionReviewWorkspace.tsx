@@ -69,6 +69,8 @@ export function LyricsContributionReviewWorkspace({
   const [message, setMessage] = useState<string | null>(null);
   const [decisionStatus, setDecisionStatus] =
     useState<TrackLyricsInboxItem["status"]>(contribution.status);
+  const [acceptedVersionId, setAcceptedVersionId] =
+    useState<string | null>(contribution.acceptedVersionId);
 
   useEffect(() => {
     let alive = true;
@@ -78,12 +80,19 @@ export function LyricsContributionReviewWorkspace({
     setLanguageCode(contribution.languageCode);
     setTimingMode(contribution.timingMode);
     setDecisionNote("");
+    setDecisionStatus(contribution.status);
+    setAcceptedVersionId(contribution.acceptedVersionId);
 
     fetchAdminTrackLyricsWorkspace(contribution.trackId)
       .then((next) => {
         if (!alive) return;
         setWorkspace(next);
-        if (contribution.status === "promoted" && next.working) {
+        if (
+          contribution.status === "promoted" &&
+          contribution.acceptedVersionId &&
+          contribution.acceptedVersionId === next.currentWorkingVersionId &&
+          next.working
+        ) {
           setLanguageCode(next.working.languageCode);
           setTimingMode(next.working.timingMode);
           setRevisionText(lyricsDocumentToEditorText(next.working));
@@ -131,7 +140,7 @@ export function LyricsContributionReviewWorkspace({
             }))
           : parseLyricsEditorText(revisionText, timingMode);
 
-      await acceptTrackLyricsContribution({
+      const accepted = await acceptTrackLyricsContribution({
         contributionId: contribution.id,
         expectedAuthorityRevision: workspace.authorityRevision,
         languageCode:
@@ -148,6 +157,7 @@ export function LyricsContributionReviewWorkspace({
       });
 
       setDecisionStatus("promoted");
+      setAcceptedVersionId(accepted.versionId);
 
       const acceptedMessage =
         mode === "as_submitted"
@@ -159,13 +169,19 @@ export function LyricsContributionReviewWorkspace({
           contribution.trackId,
         );
         setWorkspace(nextWorkspace);
+        const acceptedIsCurrentWorking =
+          accepted.versionId === nextWorkspace.currentWorkingVersionId;
+        const acceptedIsPublished =
+          accepted.versionId === nextWorkspace.currentPublishedVersionId;
+
         setMessage(
-          nextWorkspace.currentWorkingVersionId ===
-            nextWorkspace.currentPublishedVersionId
+          acceptedIsPublished
             ? `${acceptedMessage} This exact version is already published.`
-            : nextWorkspace.canPublish
-              ? `${acceptedMessage} It is not public yet. Publish this exact accepted version here when ready.`
-              : `${acceptedMessage} It is not public yet. A publisher with Lyrics publication authority must publish this exact accepted version.`,
+            : !acceptedIsCurrentWorking
+              ? `${acceptedMessage} The Track working version advanced before publication, so this Review will not publish a different version.`
+              : nextWorkspace.canPublish
+                ? `${acceptedMessage} It is not public yet. Publish this exact accepted version here when ready.`
+                : `${acceptedMessage} It is not public yet. A publisher with Lyrics publication authority must publish this exact accepted version.`,
         );
       } catch (reason) {
         setMessage(
@@ -202,8 +218,14 @@ export function LyricsContributionReviewWorkspace({
   }
 
   async function publishAcceptedLyrics() {
-    if (!workspace?.currentWorkingVersionId) {
-      setMessage("The accepted working Lyrics version could not be resolved.");
+    if (
+      !workspace?.currentWorkingVersionId ||
+      !acceptedVersionId ||
+      acceptedVersionId !== workspace.currentWorkingVersionId
+    ) {
+      setMessage(
+        "This accepted Lyrics version is no longer the current working version, so Review will not publish a different version.",
+      );
       return;
     }
 
@@ -249,9 +271,13 @@ export function LyricsContributionReviewWorkspace({
     );
   }
 
-  const acceptedWorkingVersionIsPublished =
-    Boolean(workspace.currentWorkingVersionId) &&
-    workspace.currentWorkingVersionId === workspace.currentPublishedVersionId;
+  const acceptedVersionIsCurrentWorking =
+    Boolean(acceptedVersionId) &&
+    acceptedVersionId === workspace.currentWorkingVersionId;
+
+  const acceptedVersionIsPublished =
+    Boolean(acceptedVersionId) &&
+    acceptedVersionId === workspace.currentPublishedVersionId;
 
   const actions: EditorialDecisionDescriptor[] = [];
 
@@ -292,7 +318,8 @@ export function LyricsContributionReviewWorkspace({
 
   if (
     decisionStatus === "promoted" &&
-    !acceptedWorkingVersionIsPublished &&
+    acceptedVersionIsCurrentWorking &&
+    !acceptedVersionIsPublished &&
     workspace.currentWorkingVersionId &&
     workspace.canPublish
   ) {
@@ -310,11 +337,13 @@ export function LyricsContributionReviewWorkspace({
   const statusLabel =
     decisionStatus === "rejected"
       ? "Rejected"
-      : acceptedWorkingVersionIsPublished
+      : acceptedVersionIsPublished
         ? "Published"
-        : decisionStatus === "promoted"
+        : decisionStatus === "promoted" && acceptedVersionIsCurrentWorking
           ? "Accepted · Not published"
-          : "Awaiting review";
+          : decisionStatus === "promoted"
+            ? "Accepted · Historical version"
+            : "Awaiting review";
 
   const revisionLocked = decisionStatus !== "submitted";
 
@@ -376,14 +405,18 @@ export function LyricsContributionReviewWorkspace({
       <AdminWorkspaceSection
         icon="PencilLine"
         title={
-          decisionStatus === "promoted"
+          decisionStatus === "promoted" && acceptedVersionIsCurrentWorking
             ? "Accepted working version"
-            : "WAKILISHA revision"
+            : decisionStatus === "promoted"
+              ? "Historical accepted contribution"
+              : "WAKILISHA revision"
         }
         note={
-          decisionStatus === "promoted"
+          decisionStatus === "promoted" && acceptedVersionIsCurrentWorking
             ? "This accepted version is immutable review output. Publication remains a separate governed decision in this same workspace."
-            : "Start from the listener submission, make only the changes editorial review requires, then accept the exact resulting version."
+            : decisionStatus === "promoted"
+              ? "This decision remains preserved, but the Track working version has advanced. Review will never publish a different version on its behalf."
+              : "Start from the listener submission, make only the changes editorial review requires, then accept the exact resulting version."
         }
       >
         <div className="grid gap-3 sm:grid-cols-2">
@@ -439,16 +472,20 @@ export function LyricsContributionReviewWorkspace({
           icon="Globe"
           title="Publication"
           note={
-            acceptedWorkingVersionIsPublished
-              ? "The exact accepted working version is the current public Lyrics version."
-              : "Acceptance is complete. Publication is the next separate governed decision and happens here without leaving Review."
+            acceptedVersionIsPublished
+              ? "The exact accepted version is the current public Lyrics version."
+              : acceptedVersionIsCurrentWorking
+                ? "Acceptance is complete. Publication is the next separate governed decision and happens here without leaving Review."
+                : "This accepted version is historical because the Track working version has advanced. No Publish action is offered for a different version."
           }
         >
           <div className="flex flex-wrap items-center gap-2 text-xs text-wk-text-muted">
             <span className="rounded-full bg-wk-brand-soft px-2.5 py-1 font-bold text-wk-brand">
-              {acceptedWorkingVersionIsPublished
+              {acceptedVersionIsPublished
                 ? "Published"
-                : "Accepted · Not published"}
+                : acceptedVersionIsCurrentWorking
+                  ? "Accepted · Not published"
+                  : "Accepted · Historical version"}
             </span>
             <span>
               Working {workspace.working ? `v${workspace.working.versionNumber}` : "none"}

@@ -104,7 +104,19 @@ describe("Lyrics editorial convergence", () => {
     expect(lyricsPage).toContain("setSelectedContribution(reviewed)");
     expect(lyricsPage).toContain("openHistoricalContribution");
     expect(lyricsHistory).toContain("onOpenContribution");
-    expect(lyricsHistory).toContain("Open in Review");
+    expect(lyricsHistory).toContain(
+      "Open current accepted version in Review",
+    );
+    expect(lyricsHistory).toContain("version.id === item.acceptedVersionId");
+    expect(lyricsHistory).toContain("version.isWorking");
+    expect(lyricsReview).toContain("setDecisionStatus(contribution.status)");
+    expect(lyricsReview).toContain(
+      "setAcceptedVersionId(contribution.acceptedVersionId)",
+    );
+    expect(lyricsReview).toContain(
+      "acceptedVersionId === workspace.currentWorkingVersionId",
+    );
+    expect(lyricsReview).toContain("Accepted · Historical version");
     expect(lyricsReview).toContain("lyricsDocumentToEditorText(next.working)");
     expect(lyricsPage).not.toContain(
       'setSelectedContribution(null);\n    await Promise.all([loadInbox(""), loadHistory()]);\n    setInboxQuery("");\n    setView("inbox");',

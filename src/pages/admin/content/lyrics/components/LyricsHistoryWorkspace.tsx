@@ -190,14 +190,21 @@ export function LyricsHistoryWorkspace({
                       {item.reviewNote}
                     </p>
                   ) : null}
-                  {onOpenContribution ? (
+                  {onOpenContribution &&
+                  item.status === "promoted" &&
+                  item.acceptedVersionId &&
+                  versions.some(
+                    (version) =>
+                      version.id === item.acceptedVersionId &&
+                      version.isWorking,
+                  ) ? (
                     <button
                       type="button"
                       onClick={() => onOpenContribution(item.id)}
                       className="wk-button wk-button-ghost wk-button-sm mt-3"
                     >
                       <WkIcon name="ScanText" size={14} />
-                      Open in Review
+                      Open current accepted version in Review
                     </button>
                   ) : null}
                 </article>
