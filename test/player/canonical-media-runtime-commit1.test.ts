@@ -107,6 +107,18 @@ describe(
     );
 
     it(
+      "retains the mobile navigation scroll-lock hook while removing duplicate player ownership",
+      () => {
+        expect(mobileLayout).toContain(
+          'import { useScrollLock } from "@/hooks/useScrollLock";',
+        );
+        expect(mobileLayout).toContain(
+          "useScrollLock(moreOpen);",
+        );
+      },
+    );
+
+    it(
       "uses canonical Track identity and preserves explicit collection listening intent",
       () => {
         expect(playerContext).toContain(

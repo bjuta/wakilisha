@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { Link, useLocation, Outlet } from "react-router-dom";
 import { usePlayer } from "@/context/PlayerContext";
+import { useScrollLock } from "@/hooks/useScrollLock";
 import { useScrollDirection } from "@/hooks/useScrollDirection";
 import { useAuthUser } from "@/hooks/useAuthUser";
 import { WkIcon } from "@/components/design-system/Icon";
