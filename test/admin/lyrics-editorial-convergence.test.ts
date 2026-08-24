@@ -13,6 +13,9 @@ describe("Lyrics editorial convergence", () => {
   const lyricsReview = source(
     "src/pages/admin/content/lyrics/components/LyricsContributionReviewWorkspace.tsx",
   );
+  const lyricsHistory = source(
+    "src/pages/admin/content/lyrics/components/LyricsHistoryWorkspace.tsx",
+  );
   const lyricsAdminService = source(
     "src/services/player/trackLyricsAdminService.ts",
   );
@@ -59,6 +62,23 @@ describe("Lyrics editorial convergence", () => {
     expect(lyricsPage).toContain("fetchTrackLyricsContributionInbox");
     expect(lyricsPage).toContain("searchTrackLyricsAdminTracks");
     expect(lyricsPage).not.toContain("listLyricsTrackChoices");
+  });
+
+  it("locks the browser-accepted search priority and truthful History grammar", () => {
+    expect(lyricsAdminService).toContain(
+      "Number(right.pendingContributionCount > 0)",
+    );
+    expect(lyricsAdminService).toContain(
+      "Number(left.pendingContributionCount > 0)",
+    );
+    expect(lyricsHistory).toContain(
+      'item.status !== "submitted"',
+    );
+    expect(lyricsHistory).toContain('title="Contribution history"');
+    expect(lyricsHistory).toContain("Review decisions");
+    expect(lyricsHistory).toContain("Contributions");
+    expect(lyricsHistory).toContain("Current published versions");
+    expect(lyricsHistory).not.toContain("Contribution decisions");
   });
 
   it("makes contribution review preserve the original while editing a separate revision", () => {

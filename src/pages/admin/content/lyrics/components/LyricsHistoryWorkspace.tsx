@@ -87,13 +87,17 @@ export function LyricsHistoryWorkspace({
     }),
     [history.versions, normalizedFilter],
   );
+  const reviewDecisions = useMemo(
+    () => contributions.filter((item) => item.status !== "submitted"),
+    [contributions],
+  );
 
   return (
     <div className="space-y-5">
       <AdminWorkspaceSection
         icon="History"
         title="Lyrics record"
-        note="Contribution decisions and immutable Lyrics versions stay distinct in authority but visible in one operational history."
+        note="Contributions, review decisions, and immutable Lyrics versions stay distinct in authority but visible in one operational history."
         actions={
           <label className="flex min-w-[250px] items-center gap-2 rounded-lg border border-wk-border bg-wk-bg px-3 py-2">
             <WkIcon name="Search" size={13} className="text-wk-text-faint" />
@@ -113,11 +117,17 @@ export function LyricsHistoryWorkspace({
             {error}
           </p>
         ) : (
-          <div className="grid gap-3 sm:grid-cols-3">
+          <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
             <div className="rounded-xl border border-wk-border bg-wk-bg p-4">
               <div className="text-2xl font-black text-wk-text">{contributions.length}</div>
               <div className="mt-1 text-[10px] font-black uppercase tracking-[0.12em] text-wk-text-faint">
-                Contribution decisions
+                Contributions
+              </div>
+            </div>
+            <div className="rounded-xl border border-wk-border bg-wk-bg p-4">
+              <div className="text-2xl font-black text-wk-text">{reviewDecisions.length}</div>
+              <div className="mt-1 text-[10px] font-black uppercase tracking-[0.12em] text-wk-text-faint">
+                Review decisions
               </div>
             </div>
             <div className="rounded-xl border border-wk-border bg-wk-bg p-4">
@@ -131,7 +141,7 @@ export function LyricsHistoryWorkspace({
                 {versions.filter((version) => version.isPublished).length}
               </div>
               <div className="mt-1 text-[10px] font-black uppercase tracking-[0.12em] text-wk-text-faint">
-                Current published markers
+                Current published versions
               </div>
             </div>
           </div>
@@ -142,8 +152,8 @@ export function LyricsHistoryWorkspace({
         <div className="grid gap-5 xl:grid-cols-2">
           <AdminWorkspaceSection
             icon="ShieldCheck"
-            title="Contribution decisions"
-            note="Original submissions remain immutable after acceptance or rejection."
+            title="Contribution history"
+            note="Submissions remain visible before and after review. Accepted and rejected contributions carry their durable review decision."
           >
             <div className="max-h-[720px] space-y-3 overflow-y-auto pr-1">
               {contributions.map((item) => (
@@ -182,7 +192,7 @@ export function LyricsHistoryWorkspace({
               ))}
               {!contributions.length ? (
                 <p className="rounded-xl border border-dashed border-wk-border px-4 py-8 text-center text-xs text-wk-text-muted">
-                  No contribution decisions match this filter.
+                  No Lyrics contributions match this filter.
                 </p>
               ) : null}
             </div>
