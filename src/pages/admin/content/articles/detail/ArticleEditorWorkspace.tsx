@@ -13,6 +13,7 @@ import { ArticleWriteContextDrawer } from "./components/ArticleWriteContextDrawe
 import { ArticleDocumentModeSwitcher } from "./components/ArticleDocumentModeSwitcher";
 import { ArticlePublishChecklist } from "./components/ArticlePublishChecklist";
 import { ArticleTrustPanel } from "./components/ArticleTrustPanel";
+import { ArticleReviewDecisionWorkspace } from "./components/ArticleReviewDecisionWorkspace";
 import { useArticleTrustWorkspace } from "./hooks/useArticleTrustWorkspace";
 import { useAdminUser } from "@/hooks/useAdminUser";
 import { useArticleDocumentModeState } from "./hooks/useArticleDocumentModeState";
@@ -2407,8 +2408,8 @@ export function ArticleEditorWorkspace({
         onSubmitForReview={handleSubmitForReview}
         allowSubmitForReview={allowSubmitForReview}
         canSubmitForReview={canSubmitCurrentArticleForReview}
-        canRequestChanges={canRequestArticleChanges}
-        canApproveVersion={canApproveCurrentArticleVersion}
+        canRequestChanges={activeWorkbenchMode !== "review" && canRequestArticleChanges}
+        canApproveVersion={activeWorkbenchMode !== "review" && canApproveCurrentArticleVersion}
         reviewActionBusy={isReviewActionBusy}
         publishDisabledReason={publishDisabledReason}
         onRequestChanges={openRequestChanges}
@@ -3307,6 +3308,78 @@ export function ArticleEditorWorkspace({
           <ArticleTrustPanel
             state={articleTrustState}
           />
+        ) : activeWorkbenchMode === "review" ? (
+          <div className="w-full max-w-6xl">
+            <ArticleReviewDecisionWorkspace
+              title={documentTitle}
+              status={article.wpStatus}
+              submittedVersionNumber={submittedDocument?.versionNumber ?? null}
+              note={reviewActionNote}
+              onNoteChange={setReviewActionNote}
+              canRequestChanges={canRequestArticleChanges}
+              canApprove={canApproveCurrentArticleVersion}
+              busy={isReviewActionBusy}
+              events={lifecycleEvents}
+              onRequestChanges={async () => {
+                if (!article) return;
+                const note = reviewActionNote.trim();
+                if (!note) {
+                  addToast("error", "Explain the requested changes before sending this back.");
+                  return;
+                }
+                setIsReviewActionBusy(true);
+                try {
+                  const result = await requestArticleChanges(article.id, null, note);
+                  if (!result.ok) {
+                    addToast("error", result.error ?? "Review action failed.");
+                    return;
+                  }
+                  const refreshedArticle = await fetchArticleForAdmin(
+                    result.articleSlug ?? article.slug,
+                  );
+                  if (refreshedArticle) {
+                    applyServerArticleState(refreshedArticle, true);
+                    await refreshArticleLifecycleEvents(refreshedArticle.id);
+                  } else {
+                    await refreshArticleLifecycleEvents(article.id);
+                  }
+                  setReviewActionNote("");
+                  addToast("success", "Changes requested.");
+                } finally {
+                  setIsReviewActionBusy(false);
+                }
+              }}
+              onApprove={async () => {
+                if (!article) return;
+                const note = reviewActionNote.trim();
+                setIsReviewActionBusy(true);
+                try {
+                  const result = await approveArticleVersion(
+                    article.id,
+                    null,
+                    note || null,
+                  );
+                  if (!result.ok) {
+                    addToast("error", result.error ?? "Review action failed.");
+                    return;
+                  }
+                  const refreshedArticle = await fetchArticleForAdmin(
+                    result.articleSlug ?? article.slug,
+                  );
+                  if (refreshedArticle) {
+                    applyServerArticleState(refreshedArticle, true);
+                    await refreshArticleLifecycleEvents(refreshedArticle.id);
+                  } else {
+                    await refreshArticleLifecycleEvents(article.id);
+                  }
+                  setReviewActionNote("");
+                  addToast("success", "Article version approved.");
+                } finally {
+                  setIsReviewActionBusy(false);
+                }
+              }}
+            />
+          </div>
         ) : (
           <div className="w-full max-w-6xl">
             {articleMetaPanel}

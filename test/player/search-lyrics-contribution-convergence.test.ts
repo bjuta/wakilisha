@@ -9,6 +9,12 @@ const timedText = read("src/components/design-system/player/PlayerTimedTextPanel
 const contribution = read("src/pages/tracks/lyrics/contribute/page.tsx");
 const detailLyrics = read("src/pages/tracks/detail/components/TrackLyricsSection.tsx");
 const adminLyrics = read("src/pages/admin/content/lyrics/page.tsx");
+const adminLyricsReview = read(
+  "src/pages/admin/content/lyrics/components/LyricsContributionReviewWorkspace.tsx",
+);
+const adminLyricsService = read(
+  "src/services/player/trackLyricsAdminService.ts",
+);
 const service = read("src/services/player/trackLyricsService.ts");
 
 describe("Search and Lyrics contribution convergence", () => {
@@ -72,11 +78,15 @@ describe("Search and Lyrics contribution convergence", () => {
     expect(detailLyrics).not.toContain("Be the first to add timed lyrics");
   });
 
-  it("gives Admin Lyrics a real path from contribution to working draft", () => {
-    expect(adminLyrics).toContain("fetchAdminTrackLyricsContributions");
-    expect(adminLyrics).toContain("Use As Draft");
-    expect(adminLyrics).toContain("rejectTrackLyricsContribution");
+  it("gives Admin Lyrics a governed path from contribution to immutable working version", () => {
+    expect(adminLyrics).toContain("fetchTrackLyricsContributionInbox");
+    expect(adminLyrics).toContain("LyricsContributionReviewWorkspace");
+    expect(adminLyricsReview).toContain("acceptTrackLyricsContribution");
+    expect(adminLyricsReview).toContain("rejectTrackLyricsContributionWithNote");
+    expect(adminLyricsReview).toContain("Accept as submitted");
+    expect(adminLyricsReview).toContain("Accept WAKILISHA revision");
+    expect(adminLyricsService).toContain("review_track_lyrics_contribution");
+    expect(adminLyricsService).toContain("reject_track_lyrics_contribution");
     expect(adminLyrics).not.toContain("No fake submissions queue");
-    expect(service).toContain("promoteTrackLyricsContributionToDraft");
   });
 });

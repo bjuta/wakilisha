@@ -19,6 +19,15 @@ describe("Lyrics editorial convergence", () => {
   const audioReview = source(
     "src/pages/admin/content/audio/detail/components/AudioReviewWorkspace.tsx",
   );
+  const audioWorkspace = source(
+    "src/pages/admin/content/audio/detail/AudioEditorWorkspace.tsx",
+  );
+  const playlistWorkspace = source(
+    "src/pages/admin/content/playlists/detail/PlaylistEditorWorkspace.tsx",
+  );
+  const articleWorkspace = source(
+    "src/pages/admin/content/articles/detail/ArticleEditorWorkspace.tsx",
+  );
   const decisionPrimitive = source(
     "src/components/design-system/editorial/EditorialDecisionWorkspace.tsx",
   );
@@ -37,8 +46,8 @@ describe("Lyrics editorial convergence", () => {
       consumers: string[];
     }>;
   };
-  const sqlCandidate = source(
-    "docs/engineering/sql-candidates/track-lyrics-review-provenance.sql",
+  const lyricsReviewMigration = source(
+    "supabase/migrations/20260824061359_track_lyrics_review_provenance.sql",
   );
 
   it("makes Lyrics a contribution-first operations hub", () => {
@@ -97,12 +106,24 @@ describe("Lyrics editorial convergence", () => {
     });
     expect(byId.get("editorial.decision-workspace")).toMatchObject({
       maturity: "canonical",
-      consumers: ["admin:audio", "admin:lyrics"],
+      consumers: [
+        "admin:articles",
+        "admin:playlists",
+        "admin:audio",
+        "admin:lyrics",
+      ],
     });
     expect(byId.get("editorial.text-diff")).toMatchObject({
-      maturity: "candidate",
-      consumers: ["admin:lyrics"],
+      maturity: "canonical",
+      consumers: ["admin:articles", "admin:lyrics"],
     });
+  });
+
+  it("wires shared decision helpers into the real parent workspaces", () => {
+    expect(audioWorkspace).toContain("AudioEditorHeader");
+    expect(playlistWorkspace).toContain("PlaylistReviewDecisionWorkspace");
+    expect(articleWorkspace).toContain("ArticleReviewDecisionWorkspace");
+    expect(lyricsPage).toContain("LyricsHistoryWorkspace");
   });
 
   it("keeps Lyrics search and contribution decisions behind governed RPCs", () => {
@@ -120,7 +141,7 @@ describe("Lyrics editorial convergence", () => {
   });
 
   it("removes bookmark capability from Track Lyrics editorial authority", () => {
-    expect(sqlCandidate).not.toMatch(/current_user_has_capability\('save_content'\)/);
+    expect(lyricsReviewMigration).not.toMatch(/current_user_has_capability\('save_content'\)/);
     for (const capability of [
       "view_audio",
       "edit_own_audio",
@@ -128,7 +149,7 @@ describe("Lyrics editorial convergence", () => {
       "manage_review_queue",
       "publish_audio",
     ]) {
-      expect(sqlCandidate).toContain(`current_user_has_capability('${capability}')`);
+      expect(lyricsReviewMigration).toContain(`current_user_has_capability('${capability}')`);
     }
   });
 
@@ -140,11 +161,11 @@ describe("Lyrics editorial convergence", () => {
       "community_revision_mode",
       "acceptance_mode",
     ]) {
-      expect(sqlCandidate).toContain(field);
+      expect(lyricsReviewMigration).toContain(field);
     }
 
-    expect(sqlCandidate).toContain("protect_track_lyrics_contribution_payload");
-    expect(sqlCandidate).toContain("Submitted Lyrics contribution payload is immutable");
+    expect(lyricsReviewMigration).toContain("protect_track_lyrics_contribution_payload");
+    expect(lyricsReviewMigration).toContain("Submitted Lyrics contribution payload is immutable");
   });
 
   it("keeps the diff primitive consumer-owned and domain-neutral", () => {

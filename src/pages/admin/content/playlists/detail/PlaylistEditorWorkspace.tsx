@@ -13,6 +13,7 @@ import {
   type PlaylistEditorHeaderAction,
 } from "./components/PlaylistEditorHeader";
 import { PlaylistDetailsDrawer } from "./components/PlaylistDetailsDrawer";
+import { PlaylistReviewDecisionWorkspace } from "./components/PlaylistReviewDecisionWorkspace";
 import { useAdminUser } from "@/hooks/useAdminUser";
 import {
   createPlaylistPreviewLink,
@@ -1440,10 +1441,13 @@ export function PlaylistEditorWorkspace({
     submittedVersionId
   ) {
     headerPrimaryAction = {
-      label: "Start Review",
+      label: "Open Review",
       icon: "ScanText",
       tone: "primary",
-      onClick: () => void handleStartReview(),
+      onClick: () =>
+        document
+          .getElementById("playlist-editorial-decision")
+          ?.scrollIntoView({ behavior: "smooth", block: "start" }),
       disabled: busy !== null,
     };
   } else if (
@@ -1451,18 +1455,14 @@ export function PlaylistEditorWorkspace({
     playlist.status === "in_review" &&
     submittedVersionId
   ) {
-    headerSecondaryActions.push({
-      label: "Request changes",
-      icon: "MessageSquareWarning",
-      onClick: () => void handleRequestChanges(),
-      disabled: busy !== null,
-    });
-
     headerPrimaryAction = {
-      label: "Approve",
-      icon: "CheckCircle2",
+      label: "Open Review",
+      icon: "ScanText",
       tone: "primary",
-      onClick: () => void handleApprove(),
+      onClick: () =>
+        document
+          .getElementById("playlist-editorial-decision")
+          ?.scrollIntoView({ behavior: "smooth", block: "start" }),
       disabled: busy !== null,
     };
   } else if (
@@ -1478,10 +1478,13 @@ export function PlaylistEditorWorkspace({
     });
 
     headerPrimaryAction = {
-      label: "Publish",
+      label: "Review & Publish",
       icon: "CloudUpload",
       tone: "primary",
-      onClick: () => void handlePublish(),
+      onClick: () =>
+        document
+          .getElementById("playlist-editorial-decision")
+          ?.scrollIntoView({ behavior: "smooth", block: "start" }),
       disabled: busy !== null,
     };
   } else if (
@@ -1583,6 +1586,22 @@ export function PlaylistEditorWorkspace({
         <div className="rounded-xl border border-wk-info/20 bg-wk-info-soft px-4 py-3 text-[12px] text-wk-info">
           You can review this Playlist, but its working content is read-only for
           your account.
+        </div>
+      ) : null}
+
+      {["ready_for_review", "in_review", "approved"].includes(playlist.status) ? (
+        <div id="playlist-editorial-decision" className="scroll-mt-28">
+          <PlaylistReviewDecisionWorkspace
+            playlist={playlist}
+            review={review}
+            note={reviewNote}
+            onNoteChange={setReviewNote}
+            busy={busy !== null}
+            onStartReview={handleStartReview}
+            onRequestChanges={handleRequestChanges}
+            onApprove={handleApprove}
+            onPublish={handlePublish}
+          />
         </div>
       ) : null}
 

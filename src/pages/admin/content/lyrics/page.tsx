@@ -29,6 +29,7 @@ import {
   type TrackLyricsInboxItem,
 } from "@/services/player/trackLyricsAdminService";
 import { LyricsContributionReviewWorkspace } from "./components/LyricsContributionReviewWorkspace";
+import { LyricsHistoryWorkspace } from "./components/LyricsHistoryWorkspace";
 
 type LyricsWorkspaceView =
   | "inbox"
@@ -80,6 +81,7 @@ export default function AdminLyricsPage() {
   const [rightsNote, setRightsNote] = useState("");
   const [busy, setBusy] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
+  const [historyRefreshKey, setHistoryRefreshKey] = useState(0);
 
   const loadInbox = async (search = inboxQuery) => {
     const rows = await fetchTrackLyricsContributionInbox({
@@ -289,7 +291,10 @@ export default function AdminLyricsPage() {
     setMessage(null);
     try {
       if (view === "inbox") await loadInbox();
-      else if (view === "history") await loadHistory();
+      else if (view === "history") {
+        await loadHistory();
+        setHistoryRefreshKey((value) => value + 1);
+      }
       else if (view === "library") {
         setTrackResults(await searchTrackLyricsAdminTracks(trackQuery, 60));
         if (selectedTrack) await reloadTrack();
@@ -687,55 +692,7 @@ export default function AdminLyricsPage() {
       ) : null}
 
       {view === "history" ? (
-        <AdminWorkspaceSection
-          icon="History"
-          title="Lyrics contribution decisions"
-          note="Accepted and rejected contribution decisions remain attributable after the working Lyrics version moves on."
-        >
-          {reviewedHistory.length ? (
-            <div className="space-y-3">
-              {reviewedHistory.map((item) => (
-                <article
-                  key={item.id}
-                  className="rounded-xl border border-wk-border bg-wk-bg p-4"
-                >
-                  <div className="flex flex-wrap items-start justify-between gap-3">
-                    <div>
-                      <div className="flex flex-wrap items-center gap-2">
-                        <h3 className="text-sm font-black text-wk-text">{item.trackTitle}</h3>
-                        <span className={[
-                          "rounded-full px-2 py-0.5 text-[9px] font-black uppercase tracking-wide",
-                          item.status === "rejected"
-                            ? "bg-wk-danger-soft text-wk-danger"
-                            : "bg-wk-success-soft text-wk-success",
-                        ].join(" ")}>
-                          {acceptanceLabel(item)}
-                        </span>
-                      </div>
-                      <p className="mt-1 text-xs text-wk-text-muted">
-                        {item.artists.join(", ") || "Artist unresolved"} · {item.contributorLabel}
-                      </p>
-                    </div>
-                    <div className="text-right text-[10px] text-wk-text-faint">
-                      <div>{formatDate(item.reviewedAt)}</div>
-                      <div className="mt-1">Submitted {formatDate(item.createdAt)}</div>
-                    </div>
-                  </div>
-
-                  {item.reviewNote ? (
-                    <p className="mt-3 rounded-lg border border-wk-border bg-wk-surface px-3 py-2 text-xs leading-5 text-wk-text">
-                      {item.reviewNote}
-                    </p>
-                  ) : null}
-                </article>
-              ))}
-            </div>
-          ) : (
-            <p className="rounded-xl border border-dashed border-wk-border px-5 py-10 text-center text-xs text-wk-text-muted">
-              No Lyrics contribution decisions have been recorded yet.
-            </p>
-          )}
-        </AdminWorkspaceSection>
+        <LyricsHistoryWorkspace refreshKey={historyRefreshKey} />
       ) : null}
     </div>
   );
