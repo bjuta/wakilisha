@@ -98,6 +98,7 @@ export default function AdminLyricsPage() {
       limit: 200,
     });
     setHistory(rows);
+    return rows;
   };
 
   useEffect(() => {
@@ -256,6 +257,17 @@ export default function AdminLyricsPage() {
     setMessage(null);
   }
 
+  function openHistoricalContribution(contributionId: string) {
+    const item = history.find(
+      (candidate) => candidate.id === contributionId,
+    );
+    if (!item) {
+      setMessage("This Lyrics contribution could not be reopened from History.");
+      return;
+    }
+    openContribution(item);
+  }
+
   async function openPendingForTrack(track: TrackLyricsAdminTrackResult) {
     setBusy(`pending:${track.id}`);
     setMessage(null);
@@ -278,12 +290,20 @@ export default function AdminLyricsPage() {
     }
   }
 
-  async function handleReviewed(nextMessage: string) {
-    setMessage(nextMessage);
-    setSelectedContribution(null);
-    await Promise.all([loadInbox(""), loadHistory()]);
-    setInboxQuery("");
-    setView("inbox");
+  async function handleReviewed(contributionId: string) {
+    try {
+      const [, historyRows] = await Promise.all([
+        loadInbox(""),
+        loadHistory(),
+      ]);
+      const reviewed = historyRows.find(
+        (item) => item.id === contributionId,
+      );
+      if (reviewed) setSelectedContribution(reviewed);
+      setInboxQuery("");
+    } catch (reason) {
+      setMessage(errorText(reason));
+    }
   }
 
   async function refreshCurrentView() {
@@ -692,7 +712,10 @@ export default function AdminLyricsPage() {
       ) : null}
 
       {view === "history" ? (
-        <LyricsHistoryWorkspace refreshKey={historyRefreshKey} />
+        <LyricsHistoryWorkspace
+          refreshKey={historyRefreshKey}
+          onOpenContribution={openHistoricalContribution}
+        />
       ) : null}
     </div>
   );

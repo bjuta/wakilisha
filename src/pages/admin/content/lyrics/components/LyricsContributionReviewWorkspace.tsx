@@ -8,7 +8,9 @@ import {
 import { EditorialTextDiff } from "@/components/design-system/editorial/EditorialTextDiff";
 import {
   fetchAdminTrackLyricsWorkspace,
+  lyricsDocumentToEditorText,
   parseLyricsEditorText,
+  publishTrackLyrics,
   type AdminTrackLyricsWorkspace,
 } from "@/services/player/trackLyricsService";
 import {
@@ -49,7 +51,7 @@ export function LyricsContributionReviewWorkspace({
   onReviewed,
 }: {
   contribution: TrackLyricsInboxItem;
-  onReviewed: (message: string) => void | Promise<void>;
+  onReviewed: (contributionId: string) => void | Promise<void>;
 }) {
   const originalEditorText = useMemo(
     () => editorTextForContribution(contribution),
@@ -65,6 +67,8 @@ export function LyricsContributionReviewWorkspace({
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
+  const [decisionStatus, setDecisionStatus] =
+    useState<TrackLyricsInboxItem["status"]>(contribution.status);
 
   useEffect(() => {
     let alive = true;
@@ -77,7 +81,13 @@ export function LyricsContributionReviewWorkspace({
 
     fetchAdminTrackLyricsWorkspace(contribution.trackId)
       .then((next) => {
-        if (alive) setWorkspace(next);
+        if (!alive) return;
+        setWorkspace(next);
+        if (contribution.status === "promoted" && next.working) {
+          setLanguageCode(next.working.languageCode);
+          setTimingMode(next.working.timingMode);
+          setRevisionText(lyricsDocumentToEditorText(next.working));
+        }
       })
       .catch((reason) => {
         if (alive) setMessage(errorText(reason));
@@ -137,11 +147,33 @@ export function LyricsContributionReviewWorkspace({
         reviewNote: decisionNote,
       });
 
-      await onReviewed(
+      setDecisionStatus("promoted");
+
+      const acceptedMessage =
         mode === "as_submitted"
           ? "Lyrics contribution accepted as submitted and preserved as the working version."
-          : "WAKILISHA revision accepted with the original contributor provenance preserved.",
-      );
+          : "WAKILISHA revision accepted with the original contributor provenance preserved.";
+
+      try {
+        const nextWorkspace = await fetchAdminTrackLyricsWorkspace(
+          contribution.trackId,
+        );
+        setWorkspace(nextWorkspace);
+        setMessage(
+          nextWorkspace.currentWorkingVersionId ===
+            nextWorkspace.currentPublishedVersionId
+            ? `${acceptedMessage} This exact version is already published.`
+            : nextWorkspace.canPublish
+              ? `${acceptedMessage} It is not public yet. Publish this exact accepted version here when ready.`
+              : `${acceptedMessage} It is not public yet. A publisher with Lyrics publication authority must publish this exact accepted version.`,
+        );
+      } catch (reason) {
+        setMessage(
+          `${acceptedMessage} The accepted version is safe, but publication authority could not be reloaded: ${errorText(reason)}`,
+        );
+      }
+
+      await onReviewed(contribution.id);
     } catch (reason) {
       setMessage(errorText(reason));
     } finally {
@@ -157,7 +189,35 @@ export function LyricsContributionReviewWorkspace({
         contribution.id,
         decisionNote,
       );
-      await onReviewed("Lyrics contribution rejected with its review history preserved.");
+      setDecisionStatus("rejected");
+      setMessage(
+        "Lyrics contribution rejected with its review history preserved.",
+      );
+      await onReviewed(contribution.id);
+    } catch (reason) {
+      setMessage(errorText(reason));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function publishAcceptedLyrics() {
+    if (!workspace?.currentWorkingVersionId) {
+      setMessage("The accepted working Lyrics version could not be resolved.");
+      return;
+    }
+
+    setBusy(true);
+    setMessage(null);
+    try {
+      await publishTrackLyrics(workspace);
+      const nextWorkspace = await fetchAdminTrackLyricsWorkspace(
+        contribution.trackId,
+      );
+      setWorkspace(nextWorkspace);
+      setMessage(
+        "Published Lyrics are now available to listeners from this exact accepted version.",
+      );
     } catch (reason) {
       setMessage(errorText(reason));
     } finally {
@@ -189,38 +249,74 @@ export function LyricsContributionReviewWorkspace({
     );
   }
 
-  const actions: EditorialDecisionDescriptor[] = [
-    {
-      key: "accept-submitted",
-      label: "Accept as submitted",
-      icon: "CheckCircle2",
-      tone: revisionChanged ? "secondary" : "primary",
+  const acceptedWorkingVersionIsPublished =
+    Boolean(workspace.currentWorkingVersionId) &&
+    workspace.currentWorkingVersionId === workspace.currentPublishedVersionId;
+
+  const actions: EditorialDecisionDescriptor[] = [];
+
+  if (decisionStatus === "submitted") {
+    actions.push(
+      {
+        key: "accept-submitted",
+        label: "Accept as submitted",
+        icon: "CheckCircle2",
+        tone: revisionChanged ? "secondary" : "primary",
+        disabled: busy,
+        onClick: () => void accept("as_submitted"),
+      },
+      {
+        key: "accept-revision",
+        label: "Accept WAKILISHA revision",
+        icon: "GitMerge",
+        tone: revisionChanged ? "primary" : "secondary",
+        disabled: busy || !revisionChanged,
+        title: revisionChanged
+          ? "Accept the reviewed WAKILISHA revision while preserving the original contributor provenance."
+          : "Change the revision before accepting with revisions.",
+        onClick: () => void accept("with_revisions"),
+      },
+      {
+        key: "reject",
+        label: "Reject",
+        icon: "XCircle",
+        tone: "danger",
+        requiresNote: true,
+        noteRequiredMessage:
+          "Add a review note explaining why this Lyrics contribution is being rejected.",
+        disabled: busy,
+        onClick: () => void reject(),
+      },
+    );
+  }
+
+  if (
+    decisionStatus === "promoted" &&
+    !acceptedWorkingVersionIsPublished &&
+    workspace.currentWorkingVersionId &&
+    workspace.canPublish
+  ) {
+    actions.push({
+      key: "publish",
+      label: "Publish",
+      icon: "Globe",
+      tone: "primary",
       disabled: busy,
-      onClick: () => void accept("as_submitted"),
-    },
-    {
-      key: "accept-revision",
-      label: "Accept WAKILISHA revision",
-      icon: "GitMerge",
-      tone: revisionChanged ? "primary" : "secondary",
-      disabled: busy || !revisionChanged,
-      title: revisionChanged
-        ? "Accept the reviewed WAKILISHA revision while preserving the original contributor provenance."
-        : "Change the revision before accepting with revisions.",
-      onClick: () => void accept("with_revisions"),
-    },
-    {
-      key: "reject",
-      label: "Reject",
-      icon: "XCircle",
-      tone: "danger",
-      requiresNote: true,
-      noteRequiredMessage:
-        "Add a review note explaining why this Lyrics contribution is being rejected.",
-      disabled: busy,
-      onClick: () => void reject(),
-    },
-  ];
+      title: "Publish this exact accepted working Lyrics version.",
+      onClick: () => void publishAcceptedLyrics(),
+    });
+  }
+
+  const statusLabel =
+    decisionStatus === "rejected"
+      ? "Rejected"
+      : acceptedWorkingVersionIsPublished
+        ? "Published"
+        : decisionStatus === "promoted"
+          ? "Accepted · Not published"
+          : "Awaiting review";
+
+  const revisionLocked = decisionStatus !== "submitted";
 
   return (
     <EditorialDecisionWorkspace
@@ -229,7 +325,7 @@ export function LyricsContributionReviewWorkspace({
       onNoteChange={setDecisionNote}
       noteLabel="Review note"
       notePlaceholder="Record context for the contributor and future editors."
-      statusLabel={contribution.status}
+      statusLabel={statusLabel}
       targetLabel={`${contribution.trackTitle} · ${contribution.artists.join(", ") || "Artist unresolved"}`}
       actions={actions}
       busy={busy}
@@ -279,8 +375,16 @@ export function LyricsContributionReviewWorkspace({
 
       <AdminWorkspaceSection
         icon="PencilLine"
-        title="WAKILISHA revision"
-        note="Start from the listener submission, make only the changes editorial review requires, then accept the exact resulting version."
+        title={
+          decisionStatus === "promoted"
+            ? "Accepted working version"
+            : "WAKILISHA revision"
+        }
+        note={
+          decisionStatus === "promoted"
+            ? "This accepted version is immutable review output. Publication remains a separate governed decision in this same workspace."
+            : "Start from the listener submission, make only the changes editorial review requires, then accept the exact resulting version."
+        }
       >
         <div className="grid gap-3 sm:grid-cols-2">
           <label className="text-xs font-bold text-wk-text-muted">
@@ -288,7 +392,7 @@ export function LyricsContributionReviewWorkspace({
             <input
               value={languageCode}
               onChange={(event) => setLanguageCode(event.target.value)}
-              disabled={busy}
+              disabled={busy || revisionLocked}
               className="mt-1 w-full rounded-lg border border-wk-border bg-wk-bg px-3 py-2 text-sm text-wk-text"
             />
           </label>
@@ -300,7 +404,7 @@ export function LyricsContributionReviewWorkspace({
               onChange={(event) =>
                 setTimingMode(event.target.value === "line" ? "line" : "plain")
               }
-              disabled={busy}
+              disabled={busy || revisionLocked}
               className="mt-1 w-full rounded-lg border border-wk-border bg-wk-bg px-3 py-2 text-sm text-wk-text"
             >
               <option value="plain">Plain Lyrics</option>
@@ -312,7 +416,7 @@ export function LyricsContributionReviewWorkspace({
         <textarea
           value={revisionText}
           onChange={(event) => setRevisionText(event.target.value)}
-          disabled={busy}
+          disabled={busy || revisionLocked}
           rows={18}
           spellCheck
           className="mt-4 min-h-[360px] w-full resize-y rounded-xl border border-wk-border bg-wk-bg px-4 py-3 font-mono text-[13px] leading-6 text-wk-text outline-none focus:border-wk-brand"
@@ -329,6 +433,33 @@ export function LyricsContributionReviewWorkspace({
             : "No editorial revisions have been made."}
         </div>
       </AdminWorkspaceSection>
+
+      {decisionStatus === "promoted" ? (
+        <AdminWorkspaceSection
+          icon="Globe"
+          title="Publication"
+          note={
+            acceptedWorkingVersionIsPublished
+              ? "The exact accepted working version is the current public Lyrics version."
+              : "Acceptance is complete. Publication is the next separate governed decision and happens here without leaving Review."
+          }
+        >
+          <div className="flex flex-wrap items-center gap-2 text-xs text-wk-text-muted">
+            <span className="rounded-full bg-wk-brand-soft px-2.5 py-1 font-bold text-wk-brand">
+              {acceptedWorkingVersionIsPublished
+                ? "Published"
+                : "Accepted · Not published"}
+            </span>
+            <span>
+              Working {workspace.working ? `v${workspace.working.versionNumber}` : "none"}
+            </span>
+            <span aria-hidden="true">·</span>
+            <span>
+              Published {workspace.published ? `v${workspace.published.versionNumber}` : "none"}
+            </span>
+          </div>
+        </AdminWorkspaceSection>
+      ) : null}
 
       <AdminWorkspaceSection
         icon="GitCompare"
