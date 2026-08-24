@@ -1,19 +1,13 @@
 import { useEffect, useState } from "react";
 import { Link, useLocation, Outlet } from "react-router-dom";
 import { usePlayer } from "@/context/PlayerContext";
-import { useScrollLock } from "@/hooks/useScrollLock";
 import { useScrollDirection } from "@/hooks/useScrollDirection";
 import { useAuthUser } from "@/hooks/useAuthUser";
 import { WkIcon } from "@/components/design-system/Icon";
 import { useTheme } from "@/components/design-system/theme/ThemeProvider";
 import { Portal } from "@/components/base/Portal";
-import { MobileFullPlayer } from "./MobileFullPlayer";
 import { MobileTopBar } from "./MobileTopBar";
 import { usePendingCommunityActionReplay } from "@/hooks/usePendingCommunityActionReplay";
-import {
-  connectAppleMusicForPlayback,
-  getApplePlaybackPrefsSnapshot,
-} from "@/services/appleMusicConnection";
 
 type MobileNavItem = {
   label: string;
@@ -49,128 +43,6 @@ const MORE_LINKS = [
 
 const WAKILISHA_THUNDERBOLT_URL =
   "https://media.wakilisha.africa/uploads/1782585460487-2ef3876f-wakilisha-thunderbolt.png";
-
-function MobileMiniPlayer({ scrollVisible }: { scrollVisible: boolean }) {
-  const {
-    currentTrack,
-    isPlaying,
-    togglePlay,
-    next,
-    openFullPlayer,
-    progress,
-    playbackSourceLabel,
-    playbackBackend,
-    playTrack,
-    queue,
-  } = usePlayer();
-  const location = useLocation();
-
-  const [appleConnected, setAppleConnected] = useState(() => getApplePlaybackPrefsSnapshot().appleMusicConnected);
-  const [appleConnecting, setAppleConnecting] = useState(false);
-
-  useEffect(() => {
-    const syncAppleState = () => {
-      setAppleConnected(getApplePlaybackPrefsSnapshot().appleMusicConnected);
-    };
-
-    syncAppleState();
-    window.addEventListener("wk-playback-changed", syncAppleState);
-    window.addEventListener("wk-apple-music-connected", syncAppleState);
-
-    return () => {
-      window.removeEventListener("wk-playback-changed", syncAppleState);
-      window.removeEventListener("wk-apple-music-connected", syncAppleState);
-    };
-  }, [currentTrack?.id]);
-
-  if (!currentTrack) return null;
-  if (location.pathname === "/auth") return null;
-
-  const activeSourceLabel = playbackSourceLabel || currentTrack.source || null;
-  const hasAppleCatalog = Boolean(currentTrack.appleMusicCatalogId || currentTrack.appleMusicId);
-  const showUnlockFullTrack = hasAppleCatalog && playbackBackend !== "apple" && !appleConnected;
-  const isPlayable = currentTrack.isPlayable !== false;
-
-  const handleUnlockFullTrack = async (event: React.MouseEvent<HTMLButtonElement>) => {
-    event.stopPropagation();
-    if (appleConnecting) return;
-
-    setAppleConnecting(true);
-
-    try {
-      await connectAppleMusicForPlayback();
-      setAppleConnected(true);
-
-      const nextQueue = queue.length ? queue : [currentTrack];
-      playTrack(currentTrack, nextQueue, {
-        pageType: "player",
-        entityType: "track",
-        entitySlug: currentTrack.trackSlug || currentTrack.id,
-        sourceSection: "mini_player_full_track_cta",
-      });
-    } catch (err) {
-      console.error("Could not connect Apple Music from mini player", err);
-      openFullPlayer();
-    } finally {
-      setAppleConnecting(false);
-    }
-  };
-
-  return (
-    <div
-      className="phn-miniplayer"
-      style={{
-        visibility: scrollVisible ? "visible" : "hidden",
-        opacity: scrollVisible ? 1 : 0,
-        transform: scrollVisible ? "translateY(0) translateZ(0)" : "translateY(16px) translateZ(0)",
-        transition: "opacity 0.28s cubic-bezier(.16,1,.3,1), transform 0.28s cubic-bezier(.16,1,.3,1), visibility 0.28s",
-      }}
-    >
-      <div className="phn-mp-progress"><span style={{ transform: `scaleX(${progress})` }} /></div>
-      <button onClick={() => openFullPlayer()} className="phn-mp-art">
-        {currentTrack.artworkUrl ? <img src={currentTrack.artworkUrl} alt={currentTrack.title} /> : <WkIcon name="Music2" size={18} />}
-      </button>
-      <div className="phn-mp-info" onClick={() => openFullPlayer()}>
-        <div className="phn-mp-title">{currentTrack.title}</div>
-        <div className="phn-mp-sub">{currentTrack.artist}{activeSourceLabel ? ` · ${activeSourceLabel}` : ""}</div>
-      </div>
-      {showUnlockFullTrack && (
-        <button
-          type="button"
-          onPointerDown={(e) => e.stopPropagation()}
-          onTouchStart={(e) => e.stopPropagation()}
-          onClick={handleUnlockFullTrack}
-          className="phn-mp-unlock"
-          aria-label="Connect Apple Music to play the full track"
-        >
-          <WkIcon name={appleConnecting ? "Loader2" : "Music2"} size={13} />
-          <span>{appleConnecting ? "..." : "Full"}</span>
-        </button>
-      )}
-      <button
-        type="button"
-        onPointerDown={(e) => e.stopPropagation()}
-        onTouchStart={(e) => e.stopPropagation()}
-        onClick={(e) => { e.stopPropagation(); togglePlay(); }}
-        disabled={!isPlayable}
-        className="phn-mp-btn phn-mp-play"
-        aria-label={isPlaying ? "Pause" : "Play"}
-      >
-        <WkIcon name={isPlaying ? "Pause" : "Play"} size={16} />
-      </button>
-      <button
-        type="button"
-        onPointerDown={(e) => e.stopPropagation()}
-        onTouchStart={(e) => e.stopPropagation()}
-        onClick={(e) => { e.stopPropagation(); next(); }}
-        className="phn-mp-btn"
-        aria-label="Next track"
-      >
-        <WkIcon name="SkipForward" size={16} />
-      </button>
-    </div>
-  );
-}
 
 function MobileBottomNav({ scrollVisible }: { scrollVisible: boolean }) {
   const location = useLocation();
@@ -480,12 +352,13 @@ function MobileBottomNav({ scrollVisible }: { scrollVisible: boolean }) {
 export function MobileAppLayout() {
   const location = useLocation();
   const scrollVisible = useScrollDirection();
-  const { currentTrack, isFullPlayerOpen } = usePlayer();
+  const { currentTrack } = usePlayer();
   const authUser = useAuthUser();
-  const showMobileChrome = !isFullPlayerOpen && location.pathname !== "/auth";
-  const showMiniPlayer = !!currentTrack && showMobileChrome;
-
-  useScrollLock(isFullPlayerOpen);
+  const showMobileChrome =
+    location.pathname !== "/auth";
+  const showCompactPlayer =
+    Boolean(currentTrack) &&
+    showMobileChrome;
   usePendingCommunityActionReplay(
     !authUser.loading ? authUser.id : undefined,
     !authUser.loading && authUser.isEmailVerified
@@ -505,11 +378,9 @@ export function MobileAppLayout() {
     <div
       className="wk-app-shell min-h-[100dvh] flex flex-col relative"
       style={{
-        paddingBottom: isFullPlayerOpen
-          ? "0px"
-          : showMiniPlayer
-            ? "calc(52px + max(env(safe-area-inset-bottom), 8px) + 12px + 60px + 12px)"
-            : "calc(52px + max(env(safe-area-inset-bottom), 8px) + 12px)",
+        paddingBottom: showCompactPlayer
+          ? "calc(52px + max(env(safe-area-inset-bottom), 8px) + 12px + 60px + 12px)"
+          : "calc(52px + max(env(safe-area-inset-bottom), 8px) + 12px)",
       }}
     >
       {showMobileChrome && (
@@ -520,27 +391,11 @@ export function MobileAppLayout() {
       <main className="flex-1">
         <Outlet />
       </main>
-      {isFullPlayerOpen && (
-        <Portal>
-          <div
-            data-scroll-lock="container"
-            className="fixed inset-0 z-[90] h-[100dvh] overflow-y-auto overscroll-contain bg-[var(--wk-bg)]"
-            style={{
-              height: "100dvh",
-              maxHeight: "100dvh",
-              WebkitOverflowScrolling: "touch",
-              touchAction: "pan-y",
-              animation: "slideUp 0.35s cubic-bezier(.16,1,.3,1)",
-            }}
-          >
-            <MobileFullPlayer />
-          </div>
-        </Portal>
-      )}
       {showMobileChrome && (
         <Portal>
-          {showMiniPlayer && <MobileMiniPlayer scrollVisible={scrollVisible} />}
-          <MobileBottomNav scrollVisible={scrollVisible} />
+          <MobileBottomNav
+            scrollVisible={scrollVisible}
+          />
         </Portal>
       )}
     </div>

@@ -13,6 +13,7 @@ import {
 } from "@/components/design-system/Icon";
 import { PlayableArtwork } from "@/components/design-system/music/PlayableArtwork";
 import { AddToPlaylistButton } from "@/components/playlists/AddToPlaylistButton";
+import { ShareSheet } from "@/components/design-system/share/ShareSheet";
 import {
   usePlayer,
   type PlayerTrack,
@@ -499,6 +500,8 @@ export default function MusicDiscoveryPage() {
     useState(true);
   const [busyReleaseId, setBusyReleaseId] =
     useState<string | null>(null);
+  const [shareRelease, setShareRelease] =
+    useState<PublicRelease | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -670,8 +673,8 @@ export default function MusicDiscoveryPage() {
   const featuredPlaylist =
     playlists[0] || null;
 
-  const activeReleaseTitle =
-    currentTrack?.album || null;
+  const activeReleaseId =
+    currentTrack?.releaseId || null;
 
   const handlePlayRelease =
     useCallback(
@@ -680,8 +683,8 @@ export default function MusicDiscoveryPage() {
         sourceSection: string,
       ) => {
         if (
-          activeReleaseTitle ===
-            release.title &&
+          activeReleaseId ===
+            release.id &&
           currentTrack
         ) {
           togglePlay();
@@ -727,6 +730,8 @@ export default function MusicDiscoveryPage() {
                   release.artworkUrl,
                 album:
                   release.title,
+                releaseId:
+                  release.id,
                 duration:
                   track.duration,
                 previewUrl:
@@ -787,7 +792,7 @@ export default function MusicDiscoveryPage() {
         }
       },
       [
-        activeReleaseTitle,
+        activeReleaseId,
         currentTrack,
         navigate,
         playTrack,
@@ -867,8 +872,8 @@ export default function MusicDiscoveryPage() {
                               busyReleaseId ===
                               hero.id
                                 ? "LoaderCircle"
-                                : activeReleaseTitle ===
-                                      hero.title &&
+                                : activeReleaseId ===
+                                      hero.id &&
                                     isPlaying
                                   ? "Pause"
                                   : "Play"
@@ -881,15 +886,15 @@ export default function MusicDiscoveryPage() {
                                 : ""
                             }
                             fill={
-                              activeReleaseTitle ===
-                                hero.title &&
+                              activeReleaseId ===
+                                hero.id &&
                               isPlaying
                                 ? "none"
                                 : "currentColor"
                             }
                           />
-                          {activeReleaseTitle ===
-                            hero.title &&
+                          {activeReleaseId ===
+                            hero.id &&
                           isPlaying
                             ? "Pause"
                             : "Play"}
@@ -911,14 +916,12 @@ export default function MusicDiscoveryPage() {
                         <button
                           type="button"
                           onClick={() =>
-                            navigator.clipboard?.writeText(
-                              `${window.location.origin}${releaseUrl(
-                                hero,
-                              )}`,
+                            setShareRelease(
+                              hero,
                             )
                           }
                           className="flex h-10 w-10 items-center justify-center rounded-full border border-[var(--wk-border-strong)] bg-black/20 text-[var(--wk-text-soft)] backdrop-blur transition hover:bg-white/10 hover:text-[var(--wk-text)]"
-                          aria-label="Copy release link"
+                          aria-label="Share release"
                         >
                           <WkIcon
                             name="Share2"
@@ -1042,8 +1045,8 @@ export default function MusicDiscoveryPage() {
                         handlePlayRelease
                       }
                       active={
-                        activeReleaseTitle ===
-                          release.title &&
+                        activeReleaseId ===
+                          release.id &&
                         isPlaying
                       }
                       busy={
@@ -1221,6 +1224,34 @@ export default function MusicDiscoveryPage() {
               </div>
             </section>
       </main>
+
+      {shareRelease ? (
+        <ShareSheet
+          item={{
+            title: shareRelease.title,
+            subtitle:
+              shareRelease.artist,
+            description:
+              shareRelease.description,
+            imageUrl:
+              shareRelease.artworkUrl,
+            url:
+              typeof window !==
+              "undefined"
+                ? `${window.location.origin}${releaseUrl(
+                    shareRelease,
+                  )}`
+                : releaseUrl(
+                    shareRelease,
+                  ),
+            type: "album",
+          }}
+          open={Boolean(shareRelease)}
+          onClose={() =>
+            setShareRelease(null)
+          }
+        />
+      ) : null}
     </div>
   );
 }

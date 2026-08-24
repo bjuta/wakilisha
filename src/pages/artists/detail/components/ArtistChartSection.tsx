@@ -2,6 +2,7 @@ import { useState, useMemo } from "react";
 import { Link } from "react-router-dom";
 import { useScrollReveal } from "@/hooks/useScrollReveal";
 import { usePlayer } from "@/context/PlayerContext";
+import { getTrack } from "@/services/publicApi/client";
 import { Ch19GradientImage } from "@/components/media/Ch19GradientImage";
 import { trackUrl } from "@/utils/trackUrl";
 import { slugify } from "@/services/publicContent/client";
@@ -238,24 +239,117 @@ function TrackChartRow({
   onToggle: () => void;
   artistSlug?: string;
 }) {
-  const { currentTrack, isPlaying, playTrack } = usePlayer();
-  const trackSlug = track.slug || track.title.toLowerCase().replace(/\s+/g, "-");
-  const trackId = trackSlug;
-  const isCurrentTrack = currentTrack?.id === trackId;
-  const playable = true;
+  const {
+    currentTrack,
+    isPlaying,
+    playTrack,
+    togglePlay,
+  } = usePlayer();
+  const trackSlug =
+    track.slug ||
+    track.title
+      .toLowerCase()
+      .replace(/\s+/g, "-");
+  const isCurrentTrack = Boolean(
+    currentTrack &&
+    currentTrack.trackSlug === trackSlug &&
+    currentTrack.artistSlug === artistSlug,
+  );
+  const playable =
+    Boolean(trackSlug && artistSlug);
 
-  const handlePlay = (e: React.MouseEvent) => {
+  const handlePlay = async (
+    e: React.MouseEvent,
+  ) => {
     e.stopPropagation();
-    playTrack(
-      { id: trackId, title: track.title, artist: track.artist, artworkUrl: track.artworkUrl, isPlayable: playable },
-      [],
-      {
-        pageType: "artist_detail",
-        entitySlug: artistSlug,
-        entityType: "artist",
-        sourceSection: "chart_journey",
-      },
-    );
+
+    if (isCurrentTrack) {
+      togglePlay();
+      return;
+    }
+
+    if (!artistSlug || !trackSlug) {
+      return;
+    }
+
+    try {
+      const detail = await getTrack(
+        artistSlug,
+        trackSlug,
+      );
+
+      const registryTrackId =
+        detail?.track?.id?.trim() || "";
+      const previewUrl =
+        detail?.previewUrl ||
+        detail?.track?.previewUrl ||
+        null;
+      const appleMusicCatalogId =
+        detail?.appleMusicCatalogId ||
+        detail?.track
+          ?.appleMusicCatalogId ||
+        detail?.appleMusicId ||
+        detail?.track
+          ?.appleMusicId ||
+        null;
+
+      if (
+        !registryTrackId ||
+        (
+          !previewUrl &&
+          !appleMusicCatalogId
+        )
+      ) {
+        return;
+      }
+
+      playTrack(
+        {
+          id: registryTrackId,
+          registryTrackId,
+          title:
+            detail?.track?.title ||
+            track.title,
+          artist:
+            detail?.artist?.name ||
+            track.artist,
+          artworkUrl:
+            detail?.track?.artworkUrl ||
+            track.artworkUrl,
+          duration:
+            detail?.track?.durationMs
+              ? Math.round(
+                  detail.track.durationMs /
+                    1000,
+                )
+              : undefined,
+          isPlayable: true,
+          previewUrl:
+            previewUrl || undefined,
+          appleMusicId:
+            appleMusicCatalogId,
+          appleMusicCatalogId:
+            appleMusicCatalogId,
+          source:
+            "WAKILISHA Registry",
+          artistSlug,
+          trackSlug,
+        },
+        [],
+        {
+          pageType:
+            "artist_detail",
+          entitySlug:
+            artistSlug,
+          entityType:
+            "artist",
+          sourceSection:
+            "chart_journey",
+        },
+      );
+    } catch {
+      return;
+    }
   };
 
   return (
