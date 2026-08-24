@@ -1,10 +1,16 @@
 # WAKILISHA Programme Status
 
-Status date: 21 August 2026
+Status date: 24 August 2026
 
 Phase 6A production authority baseline: `fd0580e3a1a19e3d1f06a9c8466a37c84cd26a8b`
 
 Phase 6B governance gate: PR #684, `Enforce primitive compounding and open Phase 6B`
+
+Current production main: `77cecd892c63c76ac79921eeb02278ab2b231d30`
+
+Current production migration head: `20260824061359`
+
+Current production migration count: `49`
 
 ## Status authority
 
@@ -28,6 +34,8 @@ See:
 
 - `docs/engineering/phase-6a-closure-record.md`
 - `docs/engineering/phase-6b-public-audio-kickoff.md`
+- `docs/engineering/phase-6b-progress-closure-record.md`
+- `docs/engineering/track-lyrics-review-provenance-closure-record.md`
 - `docs/engineering/primitive-compounding-contract.md`
 
 ## Phase 5 closure
@@ -96,26 +104,62 @@ Authenticated browser acceptance passed, and the final disposable Supabase previ
 
 Admin Studio convergence across Article, Playlist, and Audio is also accepted. Its reusable residue is now governed by the Primitive Compounding Contract.
 
+## Phase 6B progress through 24 August 2026
+
+### M1: published Audio public-read and route foundation
+
+**CLOSED.**
+
+PR #686 shipped the governed published-Audio read contract and `/audio/:slug` route, while integrating spoken Audio into the existing WAKILISHA Player under a media-first capability contract.
+
+The M1 migration `20260821150000_phase_6b_m1_public_audio_read_route.sql` is live and permanently verified.
+
+### M2: shared Show hierarchy + Audio RSS
+
+**CLOSED.**
+
+PR #687 established shared Show / Show Episode cultural identity and the canonical public grammar:
+
+- `/shows/:showSlug`
+- `/shows/:showSlug/:episodeSlug`
+- `/shows/:showSlug/feed.xml`
+- `/audio/:slug` for Standalone Audio
+- `/audio/enclosures/:publicationId.mp3`
+
+The production acceptance sequence also includes PR #688, PR #689, and PR #690, which closed Nginx route parsing, static Supabase upstream transport, and Audio ontology leaks discovered during acceptance.
+
+M2 production authority is live through migration `20260822173446_phase_6b_m2_audio_ontology_closure.sql`.
+
+### Accepted post-M2 convergence baseline
+
+The work between M2 and the current baseline is accepted and no longer an unrecorded detour:
+
+- PR #691 through PR #693: shared Editorial Credit identity and production acceptance repairs.
+- PR #694: rich editorial canonical primitives M1.
+- PR #695: global player/editorial authority convergence plus governed Track Lyrics authority.
+- PR #696: player/mobile/public discovery convergence, public Audio index authority, Lyrics contribution intake, and public Artist search authority.
+- PR #697: governed Track Lyrics review/provenance, immutable contribution history, shared editorial decisions, and public attribution.
+- PR #698: final Lyrics visual-acceptance corrections for pending-work priority and truthful History semantics.
+
+The current production baseline is `77cecd892c63c76ac79921eeb02278ab2b231d30`, with 49 migrations and head `20260824061359`.
+
 ## Immediate numbered programme work
 
-Phase 6B owns the remaining public Audio product and the Phase 6 exit gate.
+Phase 6B remains open, but **M1 and M2 are closed**.
 
-The first recommended slice is **M1: published Audio public-read and route foundation**.
+There is no agreed Phase 6B M3 contract in the repository yet. Do not invent one merely to advance numbering.
 
-Before building the whole public experience, prove a narrow public contract where:
+The next numbered slice should be defined from the remaining Phase 6 exit gate and the current production baseline. It must not reopen M1/M2 or rebuild authority already accepted during the post-M2 convergence interval.
 
-- only the exact current published Audio version is public
-- draft/review state cannot leak
-- Show / Season / Episode / Standalone identity resolves canonically
-- public route identity is deterministic
-- full-length Audio delivery comes from canonical Media authority
-- Chapters and Transcript identity remain version-bound
-- Transcript public-safety rules remain enforced
-- public Credits/Citations come from shared Trust authority
-- stable GUID and enclosure identity survive the public boundary
-- anonymous/public execution is narrowly granted and permanently verified
+The remaining Phase 6 exit proof still requires one real podcast episode to:
 
-Then continue into public Show/Episode presentation, accessible playback, transcript navigation, RSS, Corrections, scheduling, search, SEO, caching, and global-player integration.
+- move through the governed Audio workflow
+- publish publicly
+- have valid RSS
+- preserve stable GUID and enclosure identity
+- work on desktop and mobile
+- expose the required Credits and Trust presentation
+- prove that a transcript correction preserves prior history
 
 ## Primitive compounding rule
 

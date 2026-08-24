@@ -2,11 +2,37 @@
 
 Status: OPEN
 
+Status date: 24 August 2026
+
+Current production main: `77cecd892c63c76ac79921eeb02278ab2b231d30`
+
+Current production migration head: `20260824061359`
+
+Current production migration count: `49`
+
 Opened: 21 August 2026
 
 Phase 6A production authority baseline: `fd0580e3a1a19e3d1f06a9c8466a37c84cd26a8b`
 
 Phase 6B governance gate: PR #684, `Enforce primitive compounding and open Phase 6B`
+
+## Current Phase 6B position
+
+Phase 6B remains the current numbered phase, but its first two milestones are no longer open work.
+
+- **M1: published Audio public-read and route foundation — CLOSED.**
+- **M2: shared Show hierarchy + Audio RSS — CLOSED.**
+- the production corrections discovered while accepting M2 — Nginx route parsing, static Supabase upstream behavior, and Audio ontology leaks — are also closed.
+- the post-M2 convergence interval through shared Editorial Credit, rich editorial primitives, player/editorial authority, player/mobile/public discovery, and governed Track Lyrics review/provenance is accepted production baseline.
+
+Phase 6B itself remains open because the Phase 6 exit gate below has not yet been satisfied by one real podcast episode and a transcript-correction history proof.
+
+Do not reopen M1 or M2 to continue Phase 6B. The next numbered slice should be named only after it is defined against the remaining exit-gate work.
+
+See:
+
+- `docs/engineering/phase-6b-progress-closure-record.md`
+- `docs/engineering/track-lyrics-review-provenance-closure-record.md`
 
 Starting production migration head: `20260821095406`
 
@@ -79,7 +105,7 @@ In particular, evaluate before creating alternatives to:
 
 Public Audio is allowed to be visually and structurally different from Admin Studio. Reuse is required only where the concept is genuinely the same.
 
-## Recommended first implementation boundary
+## Historical first implementation boundary (M1, closed)
 
 Begin Phase 6B with the public read contract before building the whole public experience.
 
@@ -101,7 +127,7 @@ Prove the smallest stable public contract for a published Audio publication:
 
 Do not generalize the global player, build RSS, or redesign every public Audio screen in M1 unless the read-contract proof genuinely requires it.
 
-## M1 acceptance target
+## M1 acceptance target (satisfied)
 
 Before the first Phase 6B implementation PR is opened:
 
@@ -129,3 +155,11 @@ Phase 6 remains open until one real podcast episode:
 - proves that a transcript correction preserves prior history
 
 Phase 6A is closed. Phase 6B now owns this remaining exit gate.
+
+## Next programme move
+
+M1 and M2 are closed and must not be reopened administratively.
+
+The next Phase 6B implementation boundary is intentionally not named in this document. Define it from the remaining Phase 6 exit proof, using the current production baseline rather than the 21 August kickoff baseline.
+
+At minimum, the remaining programme must still prove the real-podcast exit gate, including valid RSS, stable GUID/enclosure continuity, desktop/mobile listening, required Trust presentation, and transcript-correction history continuity.

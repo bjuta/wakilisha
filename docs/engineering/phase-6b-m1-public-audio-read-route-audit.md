@@ -1,12 +1,35 @@
 # Phase 6B M1 Public Audio Read and Route Audit
 
-Status: implementation hold pending WAKILISHA Player integration correction
+Status: CLOSED IN PRODUCTION
 
-Date: 21 August 2026
+Audit date: 21 August 2026
+
+Closure date: 22 August 2026
 
 Accepted main: `43b2f7ca5d65b2ac67f93cc4d5137832cb3d4688`
 
 Starting production migration head: `20260821095406`
+
+## Closure addendum
+
+This document is retained as the decision record that corrected M1 before preview. The implementation hold described below was resolved before shipment.
+
+Phase 6B M1 is closed.
+
+Closure evidence:
+
+- PR #686, `Open Phase 6B with public Audio and a media-first player`, merged at `f47d08049fafd852e7b3f5cf4cbaf3fc91e5fbd0`.
+- `20260821150000_phase_6b_m1_public_audio_read_route.sql` was promoted to production as migration 38.
+- the permanent M1 verifier passed after promotion.
+- `/audio/:slug` became the governed public Standalone Audio route.
+- public Audio entered the existing persistent WAKILISHA Player rather than creating a second playback authority.
+- compact and expanded player presentation moved to the media-first, capability-driven contract described in this audit.
+- exact published-version, immutable snapshot, Media safety, Chapters, Transcript, Credits, Citations, GUID, and enclosure read boundaries were production-proven.
+- the disposable M1 preview was retired after acceptance.
+
+The sections below that say a correction was "required before preview" describe the accepted pre-preview design decision. They are historical evidence, not current open work.
+
+Current Phase 6B status is recorded in `docs/engineering/phase-6b-progress-closure-record.md`.
 
 ## Objective
 
