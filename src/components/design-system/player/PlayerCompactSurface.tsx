@@ -1,6 +1,7 @@
 import { createPortal } from "react-dom";
 import { WkIcon } from "@/components/design-system/Icon";
 import { Ch19GradientImage } from "@/components/media/Ch19GradientImage";
+import { SeekRail } from "./SeekRail";
 import { usePlayer } from "@/context/PlayerContext";
 import {
   formatPlayerClock,
@@ -91,28 +92,6 @@ export function PlayerCompactSurface({
     );
   };
 
-  const seekFromClientX = (
-    clientX: number,
-    element: HTMLDivElement,
-  ) => {
-    if (!duration || duration <= 0) {
-      return;
-    }
-
-    const rect =
-      element.getBoundingClientRect();
-    const ratio = Math.max(
-      0,
-      Math.min(
-        1,
-        (clientX - rect.left) /
-          rect.width,
-      ),
-    );
-
-    seek(ratio * duration);
-  };
-
   const isMobile = mode === "mobile";
 
   return createPortal(
@@ -134,46 +113,14 @@ export function PlayerCompactSurface({
           : undefined
       }
     >
-      <div
-        role="slider"
-        tabIndex={duration > 0 ? 0 : -1}
-        aria-label={`Seek ${currentTrack.title}`}
-        aria-valuemin={0}
-        aria-valuemax={Math.max(0, Math.round(duration || 0))}
-        aria-valuenow={Math.max(0, Math.round(currentTime || 0))}
-        className="group relative h-2 w-full cursor-pointer touch-none"
-        onPointerDown={(event) => {
-          if (!duration || duration <= 0) return;
-          seekFromClientX(
-            event.clientX,
-            event.currentTarget,
-          );
-        }}
-        onKeyDown={(event) => {
-          if (event.key === "ArrowLeft") {
-            event.preventDefault();
-            seek(Math.max(0, currentTime - 5));
-          }
-          if (event.key === "ArrowRight") {
-            event.preventDefault();
-            seek(
-              Math.min(
-                duration,
-                currentTime + 5,
-              ),
-            );
-          }
-        }}
-      >
-        <div className="absolute inset-x-0 top-0 h-0.5 bg-[var(--wk-surface-raised)]">
-          <div
-            className="h-full bg-[var(--wk-brand)]"
-            style={{
-              width: `${Math.max(0, Math.min(1, progress || 0)) * 100}%`,
-            }}
-          />
-        </div>
-      </div>
+      <SeekRail
+        label={`Seek ${currentTrack.title}`}
+        currentTime={currentTime}
+        duration={duration}
+        progress={progress}
+        onSeek={seek}
+        variant="edge"
+      />
 
       <div
         className={[
@@ -228,14 +175,13 @@ export function PlayerCompactSurface({
             <span className="w-10 text-right text-[10px] tabular-nums text-[var(--wk-text-faint)]">
               {formatPlayerClock(currentTime)}
             </span>
-            <div className="h-1 min-w-0 flex-1 overflow-hidden rounded-full bg-[var(--wk-surface-raised)]">
-              <div
-                className="h-full rounded-full bg-[var(--wk-brand)]"
-                style={{
-                  width: `${Math.max(0, Math.min(1, progress || 0)) * 100}%`,
-                }}
-              />
-            </div>
+            <SeekRail
+              label={`Seek ${currentTrack.title}`}
+              currentTime={currentTime}
+              duration={duration}
+              progress={progress}
+              onSeek={seek}
+            />
             <span className="w-10 text-[10px] tabular-nums text-[var(--wk-text-faint)]">
               {formatPlayerClock(duration)}
             </span>

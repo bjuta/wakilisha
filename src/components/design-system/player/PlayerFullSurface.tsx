@@ -39,6 +39,7 @@ import {
 import { PlayerPanelSheet } from "./PlayerPanelSheet";
 import { PlayerQueuePanel } from "./PlayerQueuePanel";
 import { PlayerTimedTextPanel } from "./PlayerTimedTextPanel";
+import { SeekRail } from "./SeekRail";
 
 export type PlayerFullMode =
   | "desktop"
@@ -487,22 +488,13 @@ export function PlayerFullSurface({
     });
   }
 
-  if (
-    !experience.spokenAudio &&
-    (currentTrack.registryTrackId || lyricsContributionPath)
-  ) {
+  if (!experience.spokenAudio) {
     contextActions.push({
       key: "lyrics",
       label: "Lyrics",
       description: "Read published Lyrics or contribute them if they are missing.",
       icon: "MicVocal",
-      onClick: () => {
-        if (currentTrack.registryTrackId) {
-          openPanel("lyrics");
-        } else if (lyricsContributionPath) {
-          goTo(lyricsContributionPath);
-        }
-      },
+      onClick: () => openPanel("lyrics"),
     });
   }
 
@@ -715,23 +707,13 @@ export function PlayerFullSurface({
 
           <section className="w-full max-w-[500px]">
             <div>
-              <div className="relative h-7">
-                <input
-                  aria-label={`Seek ${currentTrack.title}`}
-                  type="range"
-                  min={0}
-                  max={Math.max(1, duration || 1)}
-                  step={0.1}
-                  value={Math.min(
-                    currentTime,
-                    Math.max(1, duration || 1),
-                  )}
-                  onChange={(event) =>
-                    seek(Number(event.target.value))
-                  }
-                  className="absolute inset-x-0 top-2 h-1.5 w-full accent-[var(--wk-brand)]"
-                />
-              </div>
+              <SeekRail
+                label={`Seek ${currentTrack.title}`}
+                currentTime={currentTime}
+                duration={duration}
+                progress={progress}
+                onSeek={seek}
+              />
               <div className="flex items-center justify-between text-[11px] font-semibold tabular-nums text-[var(--wk-text-faint)]">
                 <span>{formatPlayerClock(currentTime)}</span>
                 <span>{formatPlayerClock(duration)}</span>
@@ -855,18 +837,14 @@ export function PlayerFullSurface({
                   <PlayerUtilityButton
                     icon="MicVocal"
                     label="Lyrics"
-                    onClick={() => {
-                      if (currentTrack.registryTrackId) {
-                        setPanel("lyrics");
-                      } else if (lyricsContributionPath) {
-                        goTo(lyricsContributionPath);
-                      }
-                    }}
-                    active={panel === "lyrics"}
-                    disabled={
-                      !currentTrack.registryTrackId &&
-                      !lyricsContributionPath
+                    onClick={() =>
+                      setPanel(
+                        panel === "lyrics"
+                          ? "none"
+                          : "lyrics",
+                      )
                     }
+                    active={panel === "lyrics"}
                   />
                   <PlayerUtilityButton
                     icon="Heart"

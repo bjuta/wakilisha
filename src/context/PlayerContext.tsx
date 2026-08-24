@@ -60,6 +60,7 @@ export interface PlayerTrack {
   artist: string;
   artworkUrl?: string;
   album?: string;
+  releaseId?: string;
   duration?: number; // seconds
   isPlayable?: boolean;
   isExplicit?: boolean;
@@ -144,6 +145,30 @@ export interface PlaySource {
   sourceSection?: string;
 }
 
+export function playerTrackIdentity(
+  track: PlayerTrack,
+): string {
+  return (
+    track.registryTrackId?.trim() ||
+    track.id
+  );
+}
+
+function hasContinuousCollectionIntent(
+  playSource: PlaySource | undefined,
+  queueLength: number,
+): boolean {
+  if (queueLength <= 1) return false;
+
+  return [
+    "release",
+    "playlist",
+    "chart_edition",
+  ].includes(
+    playSource?.entityType || "",
+  );
+}
+
 interface PlayerContextValue {
   currentTrack: PlayerTrack | null;
   isPlaying: boolean;
@@ -205,6 +230,8 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
   const hasUserInteractedRef = useRef(false);
   const pendingPlayRef = useRef(false);
   const sourceContextRef = useRef<PlaySource | null>(null);
+  const continuousCollectionRef =
+    useRef(false);
   const playedAtRef = useRef<number>(0);
   const listeningHistoryWriteRef = useRef<number>(0);
   const skipFlagRef = useRef(false);
@@ -1054,7 +1081,8 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
       }
 
       if (
-        !playbackPrefs.autoplay
+        !playbackPrefs.autoplay &&
+        !continuousCollectionRef.current
       ) {
         setIsPlaying(false);
         return;
@@ -1108,10 +1136,7 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
             : 0;
       }
 
-      if (
-        playbackPrefs
-          .explicitFilter
-      ) {
+      {
         const maxIterations =
           queue.length;
 
@@ -1120,8 +1145,16 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
         while (
           nextIdx !== undefined &&
           nextIdx < queue.length &&
-          queue[nextIdx]
-            ?.isExplicit &&
+          (
+            queue[nextIdx]
+              ?.isPlayable === false ||
+            (
+              playbackPrefs
+                .explicitFilter &&
+              queue[nextIdx]
+                ?.isExplicit
+            )
+          ) &&
           iterations <
             maxIterations
         ) {
@@ -1260,11 +1293,20 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
     if (!audio) return;
 
     // If switching tracks, fire player_skip for the previous track
-    if (currentTrackRef.current && currentTrackRef.current.id !== track.id && isPlayingRef.current) {
+    if (
+      currentTrackRef.current &&
+      playerTrackIdentity(
+        currentTrackRef.current,
+      ) !== playerTrackIdentity(track) &&
+      isPlayingRef.current
+    ) {
       skipFlagRef.current = true;
       trackEvent("player_skip", {
         pageType: sourceContextRef.current?.pageType,
-        entitySlug: currentTrackRef.current.id,
+        entitySlug:
+          playerTrackIdentity(
+            currentTrackRef.current,
+          ),
         entityType: "track",
         context: {
           track_title: currentTrackRef.current.title,
@@ -1288,9 +1330,24 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
       playSource,
     });
 
-    const fullQueue = newQueue && newQueue.length > 0 ? newQueue : [track];
-    const idx = fullQueue.findIndex((t) => t.id === track.id);
+    const fullQueue =
+      newQueue && newQueue.length > 0
+        ? newQueue
+        : [track];
+    const selectedIdentity =
+      playerTrackIdentity(track);
+    const idx = fullQueue.findIndex(
+      (item) =>
+        playerTrackIdentity(item) ===
+        selectedIdentity,
+    );
     const safeIdx = idx >= 0 ? idx : 0;
+
+    continuousCollectionRef.current =
+      hasContinuousCollectionIntent(
+        playSource,
+        fullQueue.length,
+      );
 
     setQueue(fullQueue);
     setQueueIndex(safeIdx);
@@ -1330,7 +1387,8 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
     // Fire player_play event
     trackEvent("player_play", {
       pageType: playSource?.pageType,
-      entitySlug: track.id,
+      entitySlug:
+        playerTrackIdentity(track),
       entityType: "track",
       context: {
         track_title: track.title,
@@ -1791,11 +1849,20 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
     if (!track) return;
 
     // Fire player_skip for previous track if switching
-    if (currentTrackRef.current && currentTrackRef.current.id !== track.id && isPlayingRef.current) {
+    if (
+      currentTrackRef.current &&
+      playerTrackIdentity(
+        currentTrackRef.current,
+      ) !== playerTrackIdentity(track) &&
+      isPlayingRef.current
+    ) {
       skipFlagRef.current = true;
       trackEvent("player_skip", {
         pageType: sourceContextRef.current?.pageType,
-        entitySlug: currentTrackRef.current.id,
+        entitySlug:
+          playerTrackIdentity(
+            currentTrackRef.current,
+          ),
         entityType: "track",
         context: {
           track_title: currentTrackRef.current.title,
