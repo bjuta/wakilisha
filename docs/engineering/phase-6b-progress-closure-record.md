@@ -4,7 +4,9 @@ Status: PHASE 6B OPEN; M1 CLOSED; M2 CLOSED
 
 Status date: 24 August 2026
 
-Current production main: `77cecd892c63c76ac79921eeb02278ab2b231d30`
+Production runtime application baseline: `77cecd892c63c76ac79921eeb02278ab2b231d30`
+
+Documentation closure gate: PR #699, `Reconcile Phase 6B milestone closure records`
 
 Current production migration head: `20260824061359`
 

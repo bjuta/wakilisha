@@ -6,7 +6,9 @@ Phase 6A production authority baseline: `fd0580e3a1a19e3d1f06a9c8466a37c84cd26a8
 
 Phase 6B governance gate: PR #684, `Enforce primitive compounding and open Phase 6B`
 
-Current production main: `77cecd892c63c76ac79921eeb02278ab2b231d30`
+Documentation closure gate: PR #699, `Reconcile Phase 6B milestone closure records`
+
+Production runtime application baseline: `77cecd892c63c76ac79921eeb02278ab2b231d30`
 
 Current production migration head: `20260824061359`
 
@@ -141,7 +143,7 @@ The work between M2 and the current baseline is accepted and no longer an unreco
 - PR #697: governed Track Lyrics review/provenance, immutable contribution history, shared editorial decisions, and public attribution.
 - PR #698: final Lyrics visual-acceptance corrections for pending-work priority and truthful History semantics.
 
-The current production baseline is `77cecd892c63c76ac79921eeb02278ab2b231d30`, with 49 migrations and head `20260824061359`.
+The production runtime baseline is `77cecd892c63c76ac79921eeb02278ab2b231d30`, with 49 migrations and head `20260824061359`.
 
 ## Immediate numbered programme work
 
@@ -149,7 +151,7 @@ Phase 6B remains open, but **M1 and M2 are closed**.
 
 There is no agreed Phase 6B M3 contract in the repository yet. Do not invent one merely to advance numbering.
 
-The next numbered slice should be defined from the remaining Phase 6 exit gate and the current production baseline. It must not reopen M1/M2 or rebuild authority already accepted during the post-M2 convergence interval.
+The next numbered slice should be defined from the remaining Phase 6 exit gate and the production runtime baseline. It must not reopen M1/M2 or rebuild authority already accepted during the post-M2 convergence interval.
 
 The remaining Phase 6 exit proof still requires one real podcast episode to:
 

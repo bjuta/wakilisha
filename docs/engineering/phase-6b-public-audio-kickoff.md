@@ -4,7 +4,7 @@ Status: OPEN
 
 Status date: 24 August 2026
 
-Current production main: `77cecd892c63c76ac79921eeb02278ab2b231d30`
+Production runtime application baseline: `77cecd892c63c76ac79921eeb02278ab2b231d30`
 
 Current production migration head: `20260824061359`
 
@@ -15,6 +15,8 @@ Opened: 21 August 2026
 Phase 6A production authority baseline: `fd0580e3a1a19e3d1f06a9c8466a37c84cd26a8b`
 
 Phase 6B governance gate: PR #684, `Enforce primitive compounding and open Phase 6B`
+
+Documentation closure gate: PR #699, `Reconcile Phase 6B milestone closure records`
 
 ## Current Phase 6B position
 
@@ -160,6 +162,6 @@ Phase 6A is closed. Phase 6B now owns this remaining exit gate.
 
 M1 and M2 are closed and must not be reopened administratively.
 
-The next Phase 6B implementation boundary is intentionally not named in this document. Define it from the remaining Phase 6 exit proof, using the current production baseline rather than the 21 August kickoff baseline.
+The next Phase 6B implementation boundary is intentionally not named in this document. Define it from the remaining Phase 6 exit proof, using the production runtime baseline rather than the 21 August kickoff baseline.
 
 At minimum, the remaining programme must still prove the real-podcast exit gate, including valid RSS, stable GUID/enclosure continuity, desktop/mobile listening, required Trust presentation, and transcript-correction history continuity.
