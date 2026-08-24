@@ -4119,7 +4119,9 @@ export type Database = {
       }
       track_lyrics_contributions: {
         Row: {
+          acceptance_mode: string | null
           accepted_version_id: string | null
+          contribution_kind: string
           contributor_id: string | null
           created_at: string
           id: string
@@ -4135,7 +4137,9 @@ export type Database = {
           track_id: string
         }
         Insert: {
+          acceptance_mode?: string | null
           accepted_version_id?: string | null
+          contribution_kind?: string
           contributor_id?: string | null
           created_at?: string
           id?: string
@@ -4151,7 +4155,9 @@ export type Database = {
           track_id: string
         }
         Update: {
+          acceptance_mode?: string | null
           accepted_version_id?: string | null
+          contribution_kind?: string
           contributor_id?: string | null
           created_at?: string
           id?: string
@@ -4223,6 +4229,7 @@ export type Database = {
       }
       track_lyrics_versions: {
         Row: {
+          community_revision_mode: string | null
           created_at: string
           created_by: string | null
           id: string
@@ -4230,12 +4237,16 @@ export type Database = {
           lines: Json
           plain_text: string
           rights_note: string | null
+          source_contribution_id: string | null
+          source_contributor_id: string | null
+          source_contributor_label: string | null
           source_kind: string
           timing_mode: string
           track_id: string
           version_number: number
         }
         Insert: {
+          community_revision_mode?: string | null
           created_at?: string
           created_by?: string | null
           id?: string
@@ -4243,12 +4254,16 @@ export type Database = {
           lines: Json
           plain_text: string
           rights_note?: string | null
+          source_contribution_id?: string | null
+          source_contributor_id?: string | null
+          source_contributor_label?: string | null
           source_kind?: string
           timing_mode?: string
           track_id: string
           version_number: number
         }
         Update: {
+          community_revision_mode?: string | null
           created_at?: string
           created_by?: string | null
           id?: string
@@ -4256,12 +4271,23 @@ export type Database = {
           lines?: Json
           plain_text?: string
           rights_note?: string | null
+          source_contribution_id?: string | null
+          source_contributor_id?: string | null
+          source_contributor_label?: string | null
           source_kind?: string
           timing_mode?: string
           track_id?: string
           version_number?: number
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "track_lyrics_versions_source_contribution_fkey"
+            columns: ["source_contribution_id"]
+            isOneToOne: false
+            referencedRelation: "track_lyrics_contributions"
+            referencedColumns: ["id"]
+          },
+        ]
       }
     }
     Views: {
@@ -4660,6 +4686,10 @@ export type Database = {
       normalize_source_metadata: { Args: { p_metadata: Json }; Returns: Json }
       normalize_source_registry_links: {
         Args: { p_registry_links: Json }
+        Returns: Json
+      }
+      normalize_track_lyrics_payload: {
+        Args: { p_lines: Json; p_timing_mode: string }
         Returns: Json
       }
       personal_playlist_command_context: {
@@ -20769,8 +20799,21 @@ export type Database = {
           isSetofReturn: true
         }
       }
+      get_admin_track_lyrics_contribution_inbox: {
+        Args: {
+          p_limit?: number
+          p_offset?: number
+          p_search?: string
+          p_status?: string
+        }
+        Returns: Json
+      }
       get_admin_track_lyrics_contributions: {
         Args: { p_track_id: string }
+        Returns: Json
+      }
+      get_admin_track_lyrics_history: {
+        Args: { p_limit?: number; p_track_id?: string }
         Returns: Json
       }
       get_admin_track_lyrics_workspace: {
@@ -22952,6 +22995,18 @@ export type Database = {
         }
         Returns: Json
       }
+      review_track_lyrics_contribution: {
+        Args: {
+          p_acceptance_mode: string
+          p_contribution_id: string
+          p_expected_authority_revision: number
+          p_language_code: string
+          p_lines: Json
+          p_review_note?: string
+          p_timing_mode: string
+        }
+        Returns: Json
+      }
       revoke_user_role_admin: {
         Args: { target_role_key: string; target_user_id: string }
         Returns: boolean
@@ -23098,6 +23153,10 @@ export type Database = {
           version_id: string
           version_number: number
         }[]
+      }
+      search_admin_track_lyrics_tracks: {
+        Args: { p_limit?: number; p_query?: string }
+        Returns: Json
       }
       seed_taxonomy_terms_from_articles: {
         Args: never
