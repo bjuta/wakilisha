@@ -76,6 +76,7 @@ function slugify(text: string): string { return text.toLowerCase().replace(/[^a-
 
 const MUSIC_ENTITY_SELECT = "id, slug, title, duration_ms, artwork_url, isrc, explicit, track_number, disc_number, release_id, metadata, status, preview_url";
 const RELEASE_ENTITY_SELECT = "id, slug, title, release_date, release_type, artwork_url, label_id, metadata, status, description";
+const PUBLIC_MUSIC_RELATIONSHIP_STATUSES = ["active", "needs_review", "draft"];
 
 function cleanPublicMusicSlug(storedSlugRaw: unknown, titleRaw: unknown, artistSlugRaw: unknown): string {
   const storedSlug = slugify(String(storedSlugRaw || ""));
@@ -565,6 +566,134 @@ async function getTopSongsFromRelationships(
       duration: string;
       songUrl: string;
     }>;
+}
+
+async function getArtistPublicTracksFromCredits(
+  supabase: ReturnType<typeof createClient>,
+  artistSlug: string,
+): Promise<{
+  trackCount: number;
+  topSongs: Array<{
+    id: string;
+    slug: string;
+    artistSlug: string;
+    title: string;
+    artists: string;
+    image: string;
+    duration: string;
+    songUrl: string;
+  }>;
+}> {
+  const { data: pageArtistCredits } = await supabase
+    .from("registry_track_artists")
+    .select("track_id, artist_slug, artist_name_text, is_primary, is_featured, credit_order, status")
+    .eq("artist_slug", artistSlug)
+    .in("status", PUBLIC_MUSIC_RELATIONSHIP_STATUSES)
+    .order("is_primary", { ascending: false })
+    .order("credit_order", { ascending: true })
+    .limit(500);
+
+  const trackIds = [
+    ...new Set(
+      (pageArtistCredits ?? [])
+        .map((row: any) => String(row.track_id || ""))
+        .filter(Boolean),
+    ),
+  ];
+
+  if (trackIds.length === 0) {
+    return { trackCount: 0, topSongs: [] };
+  }
+
+  const { data: trackRows } = await supabase
+    .from("registry_tracks")
+    .select("id, slug, title, duration_ms, artwork_url, preview_url, updated_at, status")
+    .in("id", trackIds)
+    .in("status", PUBLIC_MUSIC_RELATIONSHIP_STATUSES)
+    .order("updated_at", { ascending: false });
+
+  if (!trackRows || trackRows.length === 0) {
+    return { trackCount: 0, topSongs: [] };
+  }
+
+  const publicTrackIds = trackRows.map((track: any) => String(track.id));
+  const { data: allCredits } = await supabase
+    .from("registry_track_artists")
+    .select("track_id, artist_slug, artist_name_text, is_primary, is_featured, credit_order, status")
+    .in("track_id", publicTrackIds)
+    .in("status", PUBLIC_MUSIC_RELATIONSHIP_STATUSES)
+    .order("credit_order", { ascending: true });
+
+  const creditsByTrack = new Map<string, any[]>();
+
+  for (const credit of (allCredits ?? [])) {
+    const trackId = String(credit.track_id || "");
+    if (!trackId) continue;
+    if (!creditsByTrack.has(trackId)) creditsByTrack.set(trackId, []);
+    creditsByTrack.get(trackId)!.push(credit);
+  }
+
+  const topSongs = trackRows.slice(0, 10).map((track: any) => {
+    const trackId = String(track.id);
+    const credits = (creditsByTrack.get(trackId) ?? [])
+      .slice()
+      .sort(
+        (left, right) =>
+          Number(left.credit_order || 0)
+          - Number(right.credit_order || 0),
+      );
+
+    const primary =
+      credits.find((credit: any) => Boolean(credit.is_primary))
+      ?? credits.find(
+        (credit: any) => String(credit.artist_slug || "") === artistSlug,
+      )
+      ?? credits[0];
+
+    const featured = credits
+      .filter((credit: any) => credit !== primary)
+      .map((credit: any) =>
+        String(credit.artist_name_text || credit.artist_slug || "").trim()
+      )
+      .filter(Boolean);
+
+    const primaryName = String(
+      primary?.artist_name_text
+      || primary?.artist_slug
+      || artistSlug,
+    ).trim();
+
+    const durationMs = Number(track.duration_ms || 0);
+    const duration =
+      durationMs > 0
+        ? `${Math.floor(durationMs / 60000)}:${String(
+            Math.floor((durationMs % 60000) / 1000),
+          ).padStart(2, "0")}`
+        : "";
+
+    return {
+      id: trackId,
+      slug: cleanPublicMusicSlug(
+        track.slug,
+        track.title,
+        primary?.artist_slug || artistSlug,
+      ),
+      artistSlug: String(primary?.artist_slug || artistSlug),
+      title: String(track.title || ""),
+      artists:
+        featured.length > 0
+          ? `${primaryName} (feat. ${featured.join(", ")})`
+          : primaryName,
+      image: String(track.artwork_url || ""),
+      duration,
+      songUrl: String(track.preview_url || ""),
+    };
+  });
+
+  return {
+    trackCount: trackRows.length,
+    topSongs,
+  };
 }
 
 function buildProgramSummary(p: any) { return { id: String(p.id), publicSlug: String(p.public_slug), publicLabel: String(p.public_label), shortLabel: String(p.public_label), sourceFamilySlug: String(p.source_family_slug || p.public_slug), seriesSlug: String(p.series_slug || ""), seriesLabel: String(p.series_slug || ""), marketSlug: String(p.market_slug || ""), marketLabel: String(p.market_slug || ""), periodType: String(p.default_period_type || "weekly"), methodologyVersion: String(p.default_methodology_version || "legacy-import-v1"), eligibilityRulesVersion: "legacy-import-v1" }; }
@@ -1183,7 +1312,12 @@ Deno.serve(async (req) => {
       const spotifyImage = String(meta.spotify_image || meta.portrait_image || "");
       const curatedGenresByArtistId = await fetchCuratedArtistGenresByArtistId(supabase, [String(artist.id)]);
       const curatedGenres = curatedGenresByArtistId.get(String(artist.id)) ?? [];
-      const topSongs = await getTopSongsFromRelationships(supabase, slug);
+      const curatedTopSongs = await getTopSongsFromRelationships(supabase, slug);
+      const publicCreditTracks = await getArtistPublicTracksFromCredits(supabase, slug);
+      const topSongs =
+        curatedTopSongs.length > 0
+          ? curatedTopSongs
+          : publicCreditTracks.topSongs;
       const wpBio = String(artist.bio || "");
       const tagline = String(meta.tagline || "");
       const shortBio = tagline || stripHtml(wpBio).split(".")[0] + "." || "";
@@ -1329,7 +1463,14 @@ Deno.serve(async (req) => {
       const popularity = meta.spotify_popularity ? Number(meta.spotify_popularity) : 0;
       const country = String(meta.country || artist.origin_iso2 || "");
       const heroImage = String(meta.portrait_image || artist.public_image_url || spotifyImage || "");
-      const trackCount = releases.reduce((sum: number, r: any) => sum + (Number(r.trackCount) || 0), 0);
+      const releaseTrackCount = releases.reduce(
+        (sum: number, r: any) => sum + (Number(r.trackCount) || 0),
+        0,
+      );
+      const trackCount = Math.max(
+        releaseTrackCount,
+        publicCreditTracks.trackCount,
+      );
       const isChartArtist = chartEntryList.length > 0;
       const topChartPosition = isChartArtist ? Math.min(...chartEntryList.map((e: any) => Number(e.rank))) : null;
       data = { artist: { id: String(artist.id), slug: String(artist.slug), name: displayName, country, imageUrl: heroImage || artist.public_image_url || "", profileImageUrl: heroImage || artist.public_image_url || "", genres: allGenres, trackCount, releaseCount: releases.length, isChartArtist, isRising: popularity > 0 && popularity < 40, topChartPosition, bio: shortBio || displayName + " is an artist in the WAKILISHA registry.", fullBio: fullBio || wpBio || "", artistType: String(artist.gender || meta.gender || ""), followerCount, popularity, spotifyUrl: meta.spotify_artist_id ? "https://open.spotify.com/artist/" + meta.spotify_artist_id : socialSpotify || "", instagram: socialInstagram, youtubeChannel, chartEntries: chartEntryList, releases, topSongs, relatedArtists, videos, discographySource: "live_registry" } };
@@ -1358,7 +1499,7 @@ Deno.serve(async (req) => {
           supabase
             .from("registry_track_artists")
             .select("artist_id, artist_slug, track_id")
-            .eq("status", "active")
+            .in("status", PUBLIC_MUSIC_RELATIONSHIP_STATUSES)
             .range(from, to)
         );
 

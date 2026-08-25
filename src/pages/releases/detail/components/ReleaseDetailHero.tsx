@@ -46,6 +46,7 @@ export default function ReleaseDetailHero({
       appleMusicId: t.appleMusicId || t.appleMusicCatalogId || null,
       appleMusicCatalogId: t.appleMusicCatalogId || t.appleMusicId || null,
       album: release.title,
+      releaseId: release.id,
       artistSlug,
       trackSlug: t.slug,
     }));
