@@ -4,6 +4,7 @@ import { WkIcon } from "@/components/design-system/Icon";
 import { useScrollReveal } from "@/hooks/useScrollReveal";
 import {
   fetchPublicTrackLyrics,
+  lyricsDocumentToDisplayText,
   trackLyricsPublicAttribution,
   type TrackLyricsDocument,
 } from "@/services/player/trackLyricsService";
@@ -61,7 +62,8 @@ export default function TrackLyricsSection({
     };
   }, [trackId]);
 
-  const governedText = governedLyrics?.plainText?.trim() || "";
+  const governedText =
+    lyricsDocumentToDisplayText(governedLyrics);
   const fallbackText = lyrics?.trim() || "";
   const resolvedLyrics = governedText || fallbackText;
   const hasLyrics = resolvedLyrics.length > 0;

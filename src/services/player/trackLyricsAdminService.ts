@@ -1,5 +1,6 @@
 import { supabase } from "@/lib/supabase";
 import type { TimedTextLine } from "@/services/player/timedText";
+import type { TrackLyricsInputLine } from "@/services/player/trackLyricsService";
 
 export type TrackLyricsContributionStatus =
   | "submitted"
@@ -147,6 +148,9 @@ function decodeLines(value: unknown): TimedTextLine[] {
         ? null
         : Number(rawStart);
 
+    const rawStanza = Number(row.stanza_index);
+    const rawLineIndex = Number(row.line_index);
+
     return [{
       id: text(row.id) || `line-${index + 1}`,
       text: lineText,
@@ -154,6 +158,14 @@ function decodeLines(value: unknown): TimedTextLine[] {
         start !== null && Number.isFinite(start)
           ? start
           : null,
+      stanzaIndex:
+        Number.isInteger(rawStanza) && rawStanza >= 0
+          ? rawStanza
+          : 0,
+      lineIndex:
+        Number.isInteger(rawLineIndex) && rawLineIndex >= 0
+          ? rawLineIndex
+          : index,
     }];
   });
 }
@@ -346,7 +358,7 @@ export async function acceptTrackLyricsContribution(input: {
   expectedAuthorityRevision: number;
   languageCode: string;
   timingMode: "plain" | "line";
-  lines: Array<{ text: string; start_seconds?: number }>;
+  lines: TrackLyricsInputLine[];
   acceptanceMode: TrackLyricsAcceptanceMode;
   reviewNote?: string | null;
 }): Promise<{

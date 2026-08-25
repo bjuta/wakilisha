@@ -10,6 +10,8 @@ export interface PlayerTimedTextLine {
   id: string;
   text: string;
   startSeconds: number | null;
+  stanzaIndex?: number;
+  lineIndex?: number;
 }
 
 export function PlayerTimedTextPanel({
@@ -102,10 +104,19 @@ export function PlayerTimedTextPanel({
         </div>
       ) : null}
 
-      <div className="space-y-1">
+      <div className={variant === "lyrics" ? "" : "space-y-1"}>
         {lines.map((line, index) => {
           const active = index === activeIndex;
           const timed = line.startSeconds !== null;
+          const stanzaIndex = line.stanzaIndex ?? 0;
+          const previousStanzaIndex =
+            index > 0
+              ? lines[index - 1]?.stanzaIndex ?? 0
+              : stanzaIndex;
+          const stanzaStart =
+            variant === "lyrics" &&
+            index > 0 &&
+            stanzaIndex !== previousStanzaIndex;
 
           return (
             <button
@@ -123,6 +134,11 @@ export function PlayerTimedTextPanel({
                 active
                   ? "bg-[var(--wk-brand-soft)] text-[var(--wk-text)]"
                   : "text-[var(--wk-text-muted)] hover:bg-[var(--wk-bg)] hover:text-[var(--wk-text)] disabled:hover:bg-transparent",
+                stanzaStart
+                  ? "mt-5"
+                  : variant === "lyrics" && index > 0
+                    ? "mt-1"
+                    : "",
               ].join(" ")}
             >
               {timed ? (

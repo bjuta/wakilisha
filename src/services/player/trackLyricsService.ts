@@ -3,6 +3,13 @@ import type { TimedTextLine } from "@/services/player/timedText";
 
 type UnknownRecord = Record<string, unknown>;
 
+export interface TrackLyricsInputLine {
+  text: string;
+  start_seconds?: number;
+  stanza_index?: number;
+  line_index?: number;
+}
+
 export type TrackLyricsCommunityRevisionMode =
   | "as_submitted"
   | "with_revisions";
@@ -82,6 +89,16 @@ function decodeRevisionMode(
     : null;
 }
 
+function nonNegativeInteger(
+  value: unknown,
+  fallback: number,
+): number {
+  const parsed = Number(value);
+  return Number.isInteger(parsed) && parsed >= 0
+    ? parsed
+    : fallback;
+}
+
 function decodeLines(value: unknown): TimedTextLine[] {
   if (!Array.isArray(value)) return [];
 
@@ -103,6 +120,8 @@ function decodeLines(value: unknown): TimedTextLine[] {
         parsedStart !== null && Number.isFinite(parsedStart)
           ? parsedStart
           : null,
+      stanzaIndex: nonNegativeInteger(line.stanza_index, 0),
+      lineIndex: nonNegativeInteger(line.line_index, index),
     }];
   });
 }
@@ -201,7 +220,7 @@ export async function fetchPublicTrackLyrics(
 export async function submitTrackLyricsContribution(input: {
   trackId: string;
   languageCode?: string;
-  lines: Array<{ text: string; start_seconds?: number }>;
+  lines: TrackLyricsInputLine[];
   sourceDescription?: string | null;
 }): Promise<{ contributionId: string; status: "submitted" }> {
   const { data, error } = await supabase.rpc(
@@ -302,23 +321,63 @@ function parseTimestamp(value: string): number | null {
 export function parseLyricsEditorText(
   input: string,
   timingMode: "plain" | "line",
-): Array<{ text: string; start_seconds?: number }> {
-  const rows = input
+): TrackLyricsInputLine[] {
+  const rawRows = input
     .replace(/\r/g, "")
-    .split("\n")
-    .map((line) => line.trim())
-    .filter(Boolean);
+    .split("\n");
+
+  const rows: Array<{
+    text: string;
+    stanzaIndex: number;
+    lineIndex: number;
+  }> = [];
+
+  let stanzaIndex = 0;
+  let lineIndex = 0;
+  let stanzaHasLines = false;
+  let pendingStanzaBoundary = false;
+
+  for (const rawRow of rawRows) {
+    const row = rawRow.trim();
+
+    if (!row) {
+      if (stanzaHasLines) {
+        pendingStanzaBoundary = true;
+      }
+      continue;
+    }
+
+    if (pendingStanzaBoundary) {
+      stanzaIndex += 1;
+      lineIndex = 0;
+      stanzaHasLines = false;
+      pendingStanzaBoundary = false;
+    }
+
+    rows.push({
+      text: row,
+      stanzaIndex,
+      lineIndex,
+    });
+
+    lineIndex += 1;
+    stanzaHasLines = true;
+  }
 
   if (!rows.length) {
     throw new Error("Add at least one Lyrics line.");
   }
 
   if (timingMode === "plain") {
-    return rows.map((line) => ({ text: line }));
+    return rows.map((row) => ({
+      text: row.text,
+      stanza_index: row.stanzaIndex,
+      line_index: row.lineIndex,
+    }));
   }
 
-  return rows.map((line) => {
-    const match = line.match(
+  return rows.map((row) => {
+    const match = row.text.match(
       /^\[([0-9]{1,2}:[0-9]{2}(?:\.[0-9]{1,3})?|[0-9]{1,2}:[0-9]{2}:[0-9]{2}(?:\.[0-9]{1,3})?)\]\s*(.+)$/,
     );
 
@@ -337,27 +396,64 @@ export function parseLyricsEditorText(
     return {
       text: match[2].trim(),
       start_seconds: startSeconds,
+      stanza_index: row.stanzaIndex,
+      line_index: row.lineIndex,
     };
   });
+}
+
+export function lyricsLinesToEditorText(
+  lines: TimedTextLine[],
+  timingMode: "plain" | "line",
+): string {
+  const rows: string[] = [];
+  let previousStanza = 0;
+
+  lines.forEach((line, index) => {
+    const stanzaIndex = line.stanzaIndex ?? 0;
+
+    if (index > 0 && stanzaIndex !== previousStanza) {
+      rows.push("");
+    }
+
+    if (timingMode === "plain") {
+      rows.push(line.text);
+    } else {
+      const total = Math.max(0, line.startSeconds ?? 0);
+      const minutes = Math.floor(total / 60);
+      const seconds = (total % 60).toFixed(2).padStart(5, "0");
+      rows.push(
+        `[${String(minutes).padStart(2, "0")}:${seconds}] ${line.text}`,
+      );
+    }
+
+    previousStanza = stanzaIndex;
+  });
+
+  return rows.join("\n");
 }
 
 export function lyricsDocumentToEditorText(
   document: TrackLyricsDocument | null,
 ): string {
   if (!document) return "";
+  return lyricsLinesToEditorText(
+    document.lines,
+    document.timingMode,
+  );
+}
 
-  if (document.timingMode === "plain") {
-    return document.lines.map((line) => line.text).join("\n");
-  }
+export function lyricsDocumentToDisplayText(
+  document: TrackLyricsDocument | null,
+): string {
+  if (!document) return "";
 
-  return document.lines
-    .map((line) => {
-      const total = Math.max(0, line.startSeconds ?? 0);
-      const minutes = Math.floor(total / 60);
-      const seconds = (total % 60).toFixed(2).padStart(5, "0");
-      return `[${String(minutes).padStart(2, "0")}:${seconds}] ${line.text}`;
-    })
-    .join("\n");
+  const structured = lyricsLinesToEditorText(
+    document.lines,
+    "plain",
+  ).trim();
+
+  return structured || document.plainText.trim();
 }
 
 export async function saveTrackLyricsDraft(
@@ -365,7 +461,7 @@ export async function saveTrackLyricsDraft(
   input: {
     languageCode: string;
     timingMode: "plain" | "line";
-    lines: Array<{ text: string; start_seconds?: number }>;
+    lines: TrackLyricsInputLine[];
     rightsNote?: string | null;
   },
 ): Promise<void> {
