@@ -15,60 +15,32 @@ All future work on Articles, Playlists, Audio, Video, Media, Registry, Charts, c
 
 ## Programme status
 
-Current phase: **Phase 5: Playlist**.
+Current phase: **Phase 7A: Video publication authority**.
 
-Phase 4 Media platform is complete. PR 4A Media authority redesign and PR 4B Upload and processing pipeline are closed in production.
+Phases 0 through 6 are closed.
 
-Phase 5A Canonical Playlist authority is complete. The canonical Playlist domain, governed lifecycle, Registry-first intake, Playlist admin product, Track Intake review surface, cover authority, playback validation, capabilities, and supporting verification are live and accepted.
+Phase 6B Public Audio closed on 25 August 2026 by explicit programme decision after its public Audio authority and post-M2 convergence baseline were accepted in production. The former real-podcast exercise remains a useful non-blocking Audio operational acceptance task and is not represented as completed.
 
-The immediate next implementation is **PR 5B: Public Playlist product**.
+The immediate next implementation is the **Phase 7A existing Video authority and surface audit**, followed by the smallest canonical Video publication-authority candidate justified by that audit.
 
-This plan has been reconciled against repository main at:
+This plan is reconciled against protected main at:
 
-`14a37730 Complete Phase 5A Playlist admin product (#588)`
+`dae3de2dc9fb021496eb0fe0c4d4f0338f676a88`
 
 Current production schema authority:
 
-- 217 authoritative migrations
-- latest migration `20260808204500_phase_5a_track_intake_canonical_creation.sql`
-- committed public-schema types match production
-- production migration queue is up to date
+- 50 authoritative repository migrations
+- latest migration `20260825102000_track_lyrics_structured_stanza_authority.sql`
+- zero known pending repository migrations at the Phase 7A opening boundary
 
-Closed phases:
+Current navigation/status authorities:
 
-- **Phase 0A: Security perimeter**, closed through PR #452.
-- **Phase 0B: Engineering control plane**, closed through PR #453.
-- **Phase 1A: Resource identity and domain boundaries**, closed through PR #457.
-- **Phase 1B: Commands, jobs, and outbox**, closed through PR #458 and PR #459.
-- **Phase 2A: Durable Article drafts and immutable versions**, closed through PR #460, PR #461, PR #463, and PR #464.
-- **Phase 2B: Review and publication lifecycle**, closed through PR #467, PR #469, PR #470, and PR #481.
-- **Phase 2C: Article Editor Workbench**, closed through PR #482 and PR #483.
-- **Phase 3A: Sources, Citations, and Credits**, closed through PR #542.
-- **Phase 3B: Corrections and provenance**, closed through PR #557.
-- **Phase 4A: Media authority redesign**, closed through PR #580.
-- **Phase 4B: Upload and processing pipeline**, closed through PR #586.
-- **Phase 5A: Canonical Playlist authority**, closed through PR #587 and PR #588.
+- `docs/institute/PROGRAMME_STATUS.md`
+- `docs/roadmap/wakilisha-master-programme-map.md`
+- `docs/engineering/phase-6b-closure-record.md`
+- `docs/engineering/phase-7a-video-publication-authority-kickoff.md`
 
-Completed Phase 4 work includes resumable large-master ingest, durable Media processing, Media Library workflow and delivery, transcript and caption Media kinds, signed protected delivery, maintenance and reconciliation, and Cloudflare public-CDN activation.
-
-Completed Phase 5A work includes canonical Playlist Resource identity, command authority, immutable Playlist versions, review lifecycle, atomic ordering, Registry and provider matching, Trust attachments, Playlist cover governance, Registry-first Track Intake, provider playback validation, pending-intake unification, canonical Track creation through reviewed Track Intake, and the canonical Playlist admin workspace.
-
-Production acceptance for Phase 5A includes:
-
-- live V217 canonical Track Intake creation verification
-- Playlist contract suite: 29 of 29 passed
-- Critical Control Plane regression suite: 102 of 102 passed
-- full production build: passed
-- browser CSP contract: 3 of 3 passed
-- language gate: passed
-- live-schema verification: passed
-- production migration drift: zero
-- GitHub Critical Control Plane: passed
-
-Phase 5 remains active.
-
-PR 5B now owns the public Playlist product. It must reuse the closed Phase 5A authority rather than creating another Playlist lifecycle, Registry intake path, Trust system, Media authority, or playback-validation authority.
-
+The existing detailed Phase 7 contract later in this document remains authoritative: PR 7A owns Video publication authority and PR 7B owns the public Video product.
 
 ## Decision
 

@@ -1,16 +1,16 @@
 # Phase 6B Progress and Milestone Closure Record
 
-Status: PHASE 6B OPEN; M1 CLOSED; M2 CLOSED
+Status: PHASE 6B CLOSED; M1 CLOSED; M2 CLOSED
 
-Status date: 24 August 2026
+Status date: 25 August 2026
 
-Production runtime application baseline: `77cecd892c63c76ac79921eeb02278ab2b231d30`
+Production runtime application baseline: `dae3de2dc9fb021496eb0fe0c4d4f0338f676a88`
 
 Documentation closure gate: PR #699, `Reconcile Phase 6B milestone closure records`
 
-Current production migration head: `20260824061359`
+Current production migration head: `20260825102000`
 
-Current production migration count: `49`
+Current production migration count: `50`
 
 ## Purpose
 
@@ -118,31 +118,72 @@ The permanent record is:
 
 `docs/engineering/track-lyrics-review-provenance-closure-record.md`
 
-## Current Phase 6B boundary
+## Final Phase 6B boundary
 
-Phase 6B remains open.
+**Phase 6B closed on 25 August 2026.**
 
-There is no repository-approved M3 contract yet.
+The closure decision accepts the production Audio authority already proved through M1, M2, their production acceptance repairs, and the post-M2 convergence baseline through PR #706.
 
-The next numbered slice must be defined from the remaining Phase 6 exit proof, not from stale M1/M2 kickoff text.
+It deliberately changes one earlier programme rule: the real-podcast exercise is no longer a blocker for advancing the numbered roadmap. This record does **not** state that the exercise was completed. Production audit at closure showed:
 
-## Remaining Phase 6 exit gate
+- Show: `The Sounds of Nairobi`
+- Season 1: `Tuko Works Mzeiya`
+- Episode: `Monday Morning in September`
+- episode state: `draft`
 
-One real podcast episode must:
+That episode can still be used for a future operational acceptance exercise.
 
-- move through the governed Audio workflow
-- publish publicly
-- have valid RSS
-- preserve stable GUID and enclosure identity
-- work on desktop and mobile
-- expose the required Credits and Trust presentation
-- prove that a transcript correction preserves prior history
+## Accepted Phase 6B closure authority
 
-Only after that proof should Phase 6 itself be considered for closure or the programme advance to Phase 7.
+The closed phase leaves production with:
+
+- public Standalone Audio, Show, and Episode route authority
+- shared Show / Show Episode cultural identity
+- RSS delivery at `/shows/:showSlug/feed.xml`
+- branded enclosure delivery at `/audio/enclosures/:publicationId.mp3`
+- stable GUID and enclosure identity
+- exact current-published-version public safety
+- persistent Player integration for spoken Audio
+- desktop/mobile public Audio behavior
+- public Audio discovery
+- version-bound Transcript and Chapters
+- shared Credits, Citations, Trust, Review, Corrections, and provenance
+- Audio archive/restore and editorial workbench authority
+- governed Track Lyrics contribution, review/provenance, and structured stanza preservation
+
+Production closure baseline:
+
+- repository main: `dae3de2dc9fb021496eb0fe0c4d4f0338f676a88`
+- migration count: `50`
+- migration head: `20260825102000`
+- frontend entry: `assets/index-COVa-f0y.js`
+
+## Retained non-blocking Audio operational acceptance
+
+Useful follow-up remains:
+
+- publish one real podcast episode through the governed workflow
+- validate its RSS through an external client/validator
+- record stable GUID/enclosure continuity before and after a controlled update
+- exercise desktop/mobile listening against that real episode
+- verify public Credits/Trust presentation on that episode
+- perform a controlled transcript correction and prove prior version history remains reconstructable
+
+These are ongoing Audio product acceptance tasks, not Phase 6B reopening criteria.
+
+## Programme handoff
+
+The numbered programme advances to:
+
+**Phase 7A: Video publication authority**
+
+Canonical kickoff:
+
+`docs/engineering/phase-7a-video-publication-authority-kickoff.md`
 
 ## Deployment classification
 
-This record is documentation only.
+This closure is documentation/programme governance only.
 
 - SQL migration needed: No
 - Supabase Edge Function deploy needed: No

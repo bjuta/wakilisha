@@ -1,6 +1,6 @@
 # WAKILISHA Programme Status
 
-Status date: 24 August 2026
+Status date: 25 August 2026
 
 Phase 6A production authority baseline: `fd0580e3a1a19e3d1f06a9c8466a37c84cd26a8b`
 
@@ -8,11 +8,11 @@ Phase 6B governance gate: PR #684, `Enforce primitive compounding and open Phase
 
 Documentation closure gate: PR #699, `Reconcile Phase 6B milestone closure records`
 
-Production runtime application baseline: `77cecd892c63c76ac79921eeb02278ab2b231d30`
+Production runtime application baseline: `dae3de2dc9fb021496eb0fe0c4d4f0338f676a88`
 
-Current production migration head: `20260824061359`
+Current production migration head: `20260825102000`
 
-Current production migration count: `49`
+Current production migration count: `50`
 
 ## Status authority
 
@@ -26,20 +26,26 @@ The compact navigation view is `docs/roadmap/wakilisha-master-programme-map.md`.
 
 ## Current numbered work
 
-**Phase 6B: Public Audio product**
+**Phase 7A: Video publication authority**
 
-Phases 0 through 5 are complete.
+Phases 0 through 6 are closed.
 
-Phase 6A Audio publication and internal editorial authority is complete and closed in production.
+Phase 6B Public Audio closed by explicit programme decision on 25 August 2026. The former real-podcast exercise is retained as non-blocking Audio operational acceptance and is not falsely recorded as completed.
 
-See:
+Current references:
 
-- `docs/engineering/phase-6a-closure-record.md`
-- `docs/engineering/phase-6b-public-audio-kickoff.md`
-- `docs/engineering/phase-6b-progress-closure-record.md`
-- `docs/engineering/track-lyrics-review-provenance-closure-record.md`
+- `docs/engineering/phase-6b-closure-record.md`
+- `docs/engineering/phase-7a-video-publication-authority-kickoff.md`
+- `docs/roadmap/wakilisha-master-programme-map.md`
 - `docs/engineering/charts-public-source-accessibility-soak-wip.md`
 - `docs/engineering/primitive-compounding-contract.md`
+
+Production opening baseline for 7A:
+
+- repository main: `dae3de2dc9fb021496eb0fe0c4d4f0338f676a88`
+- migrations: `50`
+- migration head: `20260825102000`
+- frontend entry: `assets/index-COVa-f0y.js`
 
 ## Phase 5 closure
 
@@ -107,44 +113,27 @@ Authenticated browser acceptance passed, and the final disposable Supabase previ
 
 Admin Studio convergence across Article, Playlist, and Audio is also accepted. Its reusable residue is now governed by the Primitive Compounding Contract.
 
-## Phase 6B progress through 24 August 2026
+## Phase 6 closure
 
-### M1: published Audio public-read and route foundation
-
-**CLOSED.**
-
-PR #686 shipped the governed published-Audio read contract and `/audio/:slug` route, while integrating spoken Audio into the existing WAKILISHA Player under a media-first capability contract.
-
-The M1 migration `20260821150000_phase_6b_m1_public_audio_read_route.sql` is live and permanently verified.
-
-### M2: shared Show hierarchy + Audio RSS
+### Phase 6A — Audio publication authority and internal editorial product
 
 **CLOSED.**
 
-PR #687 established shared Show / Show Episode cultural identity and the canonical public grammar:
+The accepted Phase 6A authority remains documented in:
 
-- `/shows/:showSlug`
-- `/shows/:showSlug/:episodeSlug`
-- `/shows/:showSlug/feed.xml`
-- `/audio/:slug` for Standalone Audio
-- `/audio/enclosures/:publicationId.mp3`
+`docs/engineering/phase-6a-closure-record.md`
 
-The production acceptance sequence also includes PR #688, PR #689, and PR #690, which closed Nginx route parsing, static Supabase upstream transport, and Audio ontology leaks discovered during acceptance.
+### Phase 6B — Public Audio product
 
-M2 production authority is live through migration `20260822173446_phase_6b_m2_audio_ontology_closure.sql`.
+**CLOSED 25 AUGUST 2026.**
 
-### Accepted post-M2 convergence baseline
+M1 and M2 remain closed. Their production corrections and the post-M2 convergence programme through PR #706 are accepted baseline.
 
-The work between M2 and the current baseline is accepted and no longer an unrecorded detour:
+The earlier real-podcast exercise was retired as a programme-blocking gate by explicit programme decision. It was not falsely marked completed; `Monday Morning in September` remained a draft at closure. The exercise remains available as non-blocking Audio operational acceptance.
 
-- PR #691 through PR #693: shared Editorial Credit identity and production acceptance repairs.
-- PR #694: rich editorial canonical primitives M1.
-- PR #695: global player/editorial authority convergence plus governed Track Lyrics authority.
-- PR #696: player/mobile/public discovery convergence, public Audio index authority, Lyrics contribution intake, and public Artist search authority.
-- PR #697: governed Track Lyrics review/provenance, immutable contribution history, shared editorial decisions, and public attribution.
-- PR #698: final Lyrics visual-acceptance corrections for pending-work priority and truthful History semantics.
+Canonical record:
 
-The production runtime baseline is `77cecd892c63c76ac79921eeb02278ab2b231d30`, with 49 migrations and head `20260824061359`.
+`docs/engineering/phase-6b-closure-record.md`
 
 ## Tracked adjacent WIP: Kenya Charts public-source durability proof
 
@@ -181,21 +170,27 @@ The WIP closes only after the soak bundle is analyzed into a Green / Amber / Red
 
 ## Immediate numbered programme work
 
-Phase 6B remains open, but **M1 and M2 are closed**.
+**Phase 7A: Video publication authority is OPEN.**
 
-There is no agreed Phase 6B M3 contract in the repository yet. Do not invent one merely to advance numbering.
+Use the long-form plan's existing PR 7A contract:
 
-The next numbered slice should be defined from the remaining Phase 6 exit gate and the production runtime baseline. It must not reopen M1/M2 or rebuild authority already accepted during the post-M2 convergence interval.
+- standalone Video
+- series
+- episodes
+- documentary/interview/performance/explainer/field-footage classifications
+- Video Editor
+- master and derivative/rendition management
+- posters
+- chapters
+- captions
+- transcript
+- Credits
+- Citations
+- governed immutable versions, Review, publication, Corrections and provenance
 
-The remaining Phase 6 exit proof still requires one real podcast episode to:
+The first implementation action is an audit of existing Video authority and surfaces from protected main. Do not design new Video SQL until that audit classifies existing seams as reuse, migrate, retire, or preserve.
 
-- move through the governed Audio workflow
-- publish publicly
-- have valid RSS
-- preserve stable GUID and enclosure identity
-- work on desktop and mobile
-- expose the required Credits and Trust presentation
-- prove that a transcript correction preserves prior history
+Phase 7B remains the public Video product.
 
 ## Primitive compounding rule
 
@@ -211,17 +206,11 @@ Every milestone must record whether it:
 
 Do not build a universal screen. Do not rebuild a concept WAKILISHA has already learned.
 
-## Phase 6 exit gate
+## Phase 7A exit gate
 
-Phase 6 remains open until one real podcast episode:
+One real Video publication must move through the canonical internal Video workflow with exact Media authority, poster/caption/transcript/chapter semantics as applicable, shared Credits/Citations, immutable review versions, governed publication, and reconstructable History.
 
-- moves through the governed Audio workflow
-- publishes publicly
-- has valid RSS
-- preserves stable GUID and enclosure identity
-- works on desktop and mobile
-- exposes the required Credits and Trust presentation
-- proves that a transcript correction preserves prior history
+Desktop/mobile public Video delivery belongs to Phase 7B, not 7A.
 
 ## Programme continuity
 
