@@ -964,9 +964,22 @@ export function PlayerFullSurface({
           emptyMessage="No published Lyrics are available for this Track yet."
           footer={
             lyrics ? (
-              <p className="text-xs leading-5 text-[var(--wk-text-faint)]">
-                {trackLyricsPublicAttribution(lyrics)}
-              </p>
+              <div className="space-y-3">
+                {trackLyricsPublicAttribution(lyrics) ? (
+                  <p className="text-xs leading-5 text-[var(--wk-text-faint)]">
+                    {trackLyricsPublicAttribution(lyrics)}
+                  </p>
+                ) : null}
+                {lyricsContributionPath ? (
+                  <button
+                    type="button"
+                    onClick={() => goTo(lyricsContributionPath)}
+                    className="text-xs font-black text-[var(--wk-brand)]"
+                  >
+                    Suggest correction
+                  </button>
+                ) : null}
+              </div>
             ) : undefined
           }
           emptyAction={

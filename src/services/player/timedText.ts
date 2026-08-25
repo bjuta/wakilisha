@@ -2,6 +2,8 @@ export interface TimedTextLine {
   id: string;
   text: string;
   startSeconds: number | null;
+  stanzaIndex?: number;
+  lineIndex?: number;
 }
 
 export interface TimedTextDocument {

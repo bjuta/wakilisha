@@ -9,6 +9,7 @@ import { EditorialTextDiff } from "@/components/design-system/editorial/Editoria
 import {
   fetchAdminTrackLyricsWorkspace,
   lyricsDocumentToEditorText,
+  lyricsLinesToEditorText,
   parseLyricsEditorText,
   publishTrackLyrics,
   type AdminTrackLyricsWorkspace,
@@ -22,18 +23,10 @@ import {
 function editorTextForContribution(
   contribution: TrackLyricsInboxItem,
 ): string {
-  if (contribution.timingMode === "plain") {
-    return contribution.lines.map((line) => line.text).join("\n");
-  }
-
-  return contribution.lines
-    .map((line) => {
-      const total = Math.max(0, line.startSeconds ?? 0);
-      const minutes = Math.floor(total / 60);
-      const seconds = (total % 60).toFixed(2).padStart(5, "0");
-      return `[${String(minutes).padStart(2, "0")}:${seconds}] ${line.text}`;
-    })
-    .join("\n");
+  return lyricsLinesToEditorText(
+    contribution.lines,
+    contribution.timingMode,
+  );
 }
 
 function normalized(value: string): string {
@@ -132,8 +125,10 @@ export function LyricsContributionReviewWorkspace({
     try {
       const lines =
         mode === "as_submitted"
-          ? contribution.lines.map((line) => ({
+          ? contribution.lines.map((line, index) => ({
               text: line.text,
+              stanza_index: line.stanzaIndex ?? 0,
+              line_index: line.lineIndex ?? index,
               ...(line.startSeconds == null
                 ? {}
                 : { start_seconds: line.startSeconds }),
