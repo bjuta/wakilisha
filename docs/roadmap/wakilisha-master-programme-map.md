@@ -1,6 +1,6 @@
 # WAKILISHA Master Programme Map
 
-Status date: 24 August 2026
+Status date: 25 August 2026
 
 Phase 6A production authority baseline: `fd0580e3a1a19e3d1f06a9c8466a37c84cd26a8b`
 
@@ -8,11 +8,11 @@ Phase 6B governance gate: PR #684, `Enforce primitive compounding and open Phase
 
 Documentation closure gate: PR #699, `Reconcile Phase 6B milestone closure records`
 
-Production runtime application baseline: `77cecd892c63c76ac79921eeb02278ab2b231d30`
+Production runtime application baseline: `dae3de2dc9fb021496eb0fe0c4d4f0338f676a88`
 
-Current production migration head: `20260824061359`
+Current production migration head: `20260825102000`
 
-Current production migration count: `49`
+Current production migration count: `50`
 
 ## Purpose
 
@@ -26,26 +26,21 @@ The detailed architectural and product doctrine remains in `docs/institute/two-w
 
 ## Current programme position
 
-**Phase 6A: Audio publication authority and internal editorial product is complete.**
+**Phase 6A and Phase 6B are complete.**
 
 The numbered programme now continues at:
 
-**Phase 6B: Public Audio product**
+**Phase 7A: Video publication authority**
 
-Phase 6B M1 and M2 are closed in production.
-
-The post-M2 convergence interval through shared Editorial Credit, rich editorial primitives, player/editorial authority, player/mobile/public discovery, and governed Track Lyrics review/provenance is accepted production baseline.
-
-Phase 6B remains current because the real-podcast exit gate is still open. There is no agreed M3 contract yet; the next slice must be defined from the remaining exit proof rather than reopening M1 or M2.
+Phase 6B closed on 25 August 2026 by explicit programme decision after its production authority and post-M2 convergence baseline were accepted through PR #706. The former real-podcast exercise remains useful non-blocking Audio operational acceptance; it is not represented as completed.
 
 Current references:
 
-- `docs/engineering/phase-6b-public-audio-kickoff.md`
-- `docs/engineering/phase-6b-progress-closure-record.md`
-- `docs/engineering/track-lyrics-review-provenance-closure-record.md`
-- `docs/engineering/phase-6a-closure-record.md`
+- `docs/engineering/phase-6b-closure-record.md`
+- `docs/engineering/phase-7a-video-publication-authority-kickoff.md`
+- `docs/engineering/primitive-compounding-contract.md`
 
-The Primitive Compounding Contract remains part of the engineering control plane and applies to Phase 6B onward.
+Phase 7A opens from production runtime baseline `dae3de2dc9fb021496eb0fe0c4d4f0338f676a88`, migration count `50`, head `20260825102000`.
 
 ## Programme map
 
@@ -58,8 +53,9 @@ The Primitive Compounding Contract remains part of the engineering control plane
 | 4 | Media platform | Complete | Media authority plus upload and processing pipeline |
 | 5 | Playlist | Complete | One real Playlist reviewed and published end to end |
 | 6A | Audio publication authority and internal editorial product | Complete | Governed Audio authority, Admin Studio workbench, submitted-version review, and production acceptance |
-| 6B | Public Audio product | Current | One real podcast episode published, RSS validated, and transcript correction preserves history |
-| 7 | Video | Planned | One real captioned video publishes across desktop and mobile |
+| 6B | Public Audio product | Complete | Public Audio authority accepted; former real-podcast exercise retained as non-blocking operational acceptance |
+| 7A | Video publication authority | Current | One real Video publication reaches immutable governed publication through the canonical internal workflow |
+| 7B | Public Video product | Planned | One real captioned Video publishes across desktop and mobile |
 | 8 | Field Capture | Planned | Weak-network capture survives intake, private review, and safe promotion |
 | 9 | Public delivery, search, and SEO at scale | Planned | Public delivery no longer depends on giant read or whole-corpus build paths |
 | 10 | Registry, Charts, and evidence consolidation | Planned | Shared Trust used without competing evidence authorities |
@@ -179,48 +175,19 @@ See `docs/engineering/phase-6a-closure-record.md`.
 
 ### Phase 6B: Public Audio product
 
-**Current phase. M1 and M2 are closed; the Phase 6 exit proof remains open.**
+**Closed 25 August 2026.**
 
-Build:
+Accepted production authority includes published Audio public reads, Show/Episode identity and routes, RSS, stable GUID/enclosure identity, persistent Player integration, public Audio discovery, shared Trust presentation, and the post-M2 convergence baseline through PR #706.
 
-- public Show and Episode routes
-- public Standalone Audio routes where required
-- accessible Audio playback
-- transcript navigation
-- Chapters
-- RSS delivery
-- public Credits, Citations, provenance, and Corrections presentation
-- scheduling
-- search
-- SEO
-- cached or stable public read models
-- global-player integration
+The former real-podcast exercise is retained as non-blocking Audio operational acceptance rather than a programme-numbering prerequisite.
 
-Closed Phase 6B milestones now include:
+Canonical record:
 
-- M1: governed published-Audio public read + route foundation and media-first Player integration, closed through PR #686.
-- M2: shared Show / Show Episode identity, public Show hierarchy, RSS and branded enclosure delivery, closed through PR #687 plus production acceptance corrections PR #688, PR #689, and PR #690.
-- post-M2 convergence baseline through PR #698, including shared editorial primitives, player/mobile convergence, Track Lyrics authority, governed Lyrics contribution/review provenance, and public attribution.
+`docs/engineering/phase-6b-closure-record.md`
 
-See:
+### Phase 6 handoff
 
-- `docs/engineering/phase-6b-public-audio-kickoff.md`
-- `docs/engineering/phase-6b-progress-closure-record.md`
-- `docs/engineering/track-lyrics-review-provenance-closure-record.md`
-
-### Phase 6 exit gate
-
-One real podcast episode must:
-
-- move through the governed Audio workflow
-- publish publicly
-- have valid RSS
-- preserve stable GUID and enclosure identity
-- work on desktop and mobile
-- expose the required Credits and Trust presentation
-- prove that a transcript correction preserves prior history
-
-Phase 6A is closed. Phase 6B owns this remaining exit gate.
+Phase 6 is complete and the numbered programme advances to Phase 7A.
 
 ## Primitive compounding doctrine
 
@@ -234,9 +201,13 @@ The machine-enforced contract is documented in `docs/engineering/primitive-compo
 
 ## Later programme
 
-### Phase 7: Video
+### Phase 7A: Video publication authority
 
-Build canonical Video publication authority, then the public Video product. Exit through one real captioned Video publication across desktop and mobile.
+Build standalone Video, series, episodes, classifications, the canonical Video Editor, master/derivative authority, posters, chapters, captions, transcript, Credits, Citations, immutable versions, Review, publication, Corrections and provenance.
+
+### Phase 7B: Public Video product
+
+Compose the public Video experience over 7A authority. Exit Phase 7 through one real captioned Video publication across desktop and mobile.
 
 ### Phase 8: Field Capture
 
@@ -271,8 +242,10 @@ Build Inquiry as a capability across canonical editors, then the public Inquiry 
 
 ## Immediate next step
 
-Do not begin M1; it is closed. Do not reopen M2; it is closed.
+Begin **Phase 7A existing Video authority and surface audit** from exact protected main `dae3de2dc9fb021496eb0fe0c4d4f0338f676a88`.
 
-Define the next Phase 6B numbered slice from the remaining Phase 6 exit proof and production runtime baseline `77cecd892c63c76ac79921eeb02278ab2b231d30`. The next slice should consume the accepted public Audio, Show/RSS, Player, Trust, editorial, and Lyrics/provenance baseline rather than rebuilding it.
+Do not reopen Phase 6B. Do not start by designing a fresh Video schema. First inventory existing Video-like data, routes, components, Media kinds, upload/processing seams and public residue; classify each as reuse, migrate, retire or preserve.
 
-The roadmap remains at Phase 6B until the real-podcast exit gate and transcript-correction history proof are satisfied.
+Canonical kickoff:
+
+`docs/engineering/phase-7a-video-publication-authority-kickoff.md`

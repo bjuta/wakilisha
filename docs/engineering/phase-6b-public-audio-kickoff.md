@@ -1,14 +1,14 @@
 # Phase 6B Public Audio Kickoff
 
-Status: OPEN
+Status: CLOSED
 
-Status date: 24 August 2026
+Status date: 25 August 2026
 
-Production runtime application baseline: `77cecd892c63c76ac79921eeb02278ab2b231d30`
+Production runtime application baseline: `dae3de2dc9fb021496eb0fe0c4d4f0338f676a88`
 
-Current production migration head: `20260824061359`
+Current production migration head: `20260825102000`
 
-Current production migration count: `49`
+Current production migration count: `50`
 
 Opened: 21 August 2026
 
@@ -20,23 +20,23 @@ Documentation closure gate: PR #699, `Reconcile Phase 6B milestone closure recor
 
 ## Current Phase 6B position
 
-Phase 6B remains the current numbered phase, but its first two milestones are no longer open work.
+**Phase 6B is closed as of 25 August 2026.**
 
-- **M1: published Audio public-read and route foundation — CLOSED.**
-- **M2: shared Show hierarchy + Audio RSS — CLOSED.**
-- the production corrections discovered while accepting M2 — Nginx route parsing, static Supabase upstream behavior, and Audio ontology leaks — are also closed.
-- the post-M2 convergence interval through shared Editorial Credit, rich editorial primitives, player/editorial authority, player/mobile/public discovery, and governed Track Lyrics review/provenance is accepted production baseline.
+M1 and M2 remain closed and are not reopened by this decision. The accepted post-M2 convergence interval now extends through the structured Track Lyrics stanza/provenance closure merged in PR #706.
 
-Phase 6B itself remains open because the Phase 6 exit gate below has not yet been satisfied by one real podcast episode and a transcript-correction history proof.
+The programme owner has retired the earlier real-podcast exercise as a **Phase 6B blocking gate**. This is a governance change, not a false claim that the exercise occurred. At closure, production still contained the real episode `Monday Morning in September` as a draft. Publishing that episode, validating its RSS externally, and exercising transcript-correction history remain useful Audio operational acceptance work, but they no longer block programme numbering.
 
-Do not reopen M1 or M2 to continue Phase 6B. The next numbered slice should be named only after it is defined against the remaining exit-gate work.
+Canonical closure record:
+
+- `docs/engineering/phase-6b-closure-record.md`
+
+The numbered programme now continues at **Phase 7A: Video publication authority**.
 
 See:
 
-- `docs/engineering/phase-6b-progress-closure-record.md`
-- `docs/engineering/track-lyrics-review-provenance-closure-record.md`
-
-Starting production migration head: `20260821095406`
+- `docs/engineering/phase-7a-video-publication-authority-kickoff.md`
+- `docs/roadmap/wakilisha-master-programme-map.md`
+- `docs/institute/PROGRAMME_STATUS.md`
 
 ## Purpose
 
@@ -144,24 +144,34 @@ Before the first Phase 6B implementation PR is opened:
 9. keep the exact preview-proven SQL bytes through promotion
 10. run focused, critical, build, schema, and production smoke gates through the normal deployment workflow
 
-## Phase 6 exit gate
+## Phase 6B closure disposition
 
-Phase 6 remains open until one real podcast episode:
+Phase 6B is closed.
 
-- moves through the governed Audio workflow
-- publishes publicly
-- has valid RSS
-- preserves stable GUID and enclosure identity
-- works on desktop and mobile
-- exposes required Credits and Trust presentation
-- proves that a transcript correction preserves prior history
+Accepted production authority includes:
 
-Phase 6A is closed. Phase 6B now owns this remaining exit gate.
+- governed public Audio read contracts
+- canonical Show / Show Episode identity and routes
+- RSS and branded enclosure delivery
+- stable GUID and enclosure identity
+- desktop and mobile persistent-player Audio behavior
+- public Audio discovery
+- shared Credits, Citations, Trust, Review, Corrections, and provenance foundations
+- version-bound Transcript and Chapter authority
+- the post-M2 editorial/player/discovery convergence baseline
+- governed Track Lyrics authority, contribution/review provenance, and structured stanza preservation
+
+The prior real-podcast exit exercise is retained as non-blocking operational acceptance rather than a prerequisite for Phase 7A.
+
+Production closure baseline:
+
+- repository main: `dae3de2dc9fb021496eb0fe0c4d4f0338f676a88`
+- production migrations: `50`
+- migration head: `20260825102000`
+- production frontend entry: `assets/index-COVa-f0y.js`
 
 ## Next programme move
 
-M1 and M2 are closed and must not be reopened administratively.
+Open **Phase 7A: Video publication authority** from the existing long-form programme contract. Do not build the public Video product in 7A; that remains Phase 7B.
 
-The next Phase 6B implementation boundary is intentionally not named in this document. Define it from the remaining Phase 6 exit proof, using the production runtime baseline rather than the 21 August kickoff baseline.
-
-At minimum, the remaining programme must still prove the real-podcast exit gate, including valid RSS, stable GUID/enclosure continuity, desktop/mobile listening, required Trust presentation, and transcript-correction history continuity.
+Phase 7A must reuse the platform WAKILISHA has already learned: Resource identity, commands, immutable versions, Media, upload/processing, Trust, Review, Corrections, provenance, editorial primitives, and the production-control workflow.
