@@ -10,7 +10,7 @@ export type Database = {
   // Allows to automatically instantiate createClient with right options
   // instead of createClient<Database, { PostgrestVersion: 'XX' }>(URL, KEY)
   __InternalSupabase: {
-    PostgrestVersion: "14.5"
+    PostgrestVersion: "14.17"
   }
   editorial: {
     Tables: {
@@ -3489,6 +3489,123 @@ export type Database = {
           },
         ]
       }
+      resource_version_type_kinds: {
+        Row: {
+          created_at: string
+          resource_kind: string
+          version_type: string
+        }
+        Insert: {
+          created_at?: string
+          resource_kind: string
+          version_type: string
+        }
+        Update: {
+          created_at?: string
+          resource_kind?: string
+          version_type?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "resource_version_type_kinds_resource_kind_fkey"
+            columns: ["resource_kind"]
+            isOneToOne: false
+            referencedRelation: "resource_kinds"
+            referencedColumns: ["kind"]
+          },
+          {
+            foreignKeyName: "resource_version_type_kinds_version_type_fkey"
+            columns: ["version_type"]
+            isOneToOne: false
+            referencedRelation: "resource_version_types"
+            referencedColumns: ["version_type"]
+          },
+        ]
+      }
+      resource_version_types: {
+        Row: {
+          created_at: string
+          description: string
+          enabled: boolean
+          label: string
+          source_table_name: string
+          source_table_schema: string
+          version_type: string
+        }
+        Insert: {
+          created_at?: string
+          description: string
+          enabled?: boolean
+          label: string
+          source_table_name: string
+          source_table_schema: string
+          version_type: string
+        }
+        Update: {
+          created_at?: string
+          description?: string
+          enabled?: boolean
+          label?: string
+          source_table_name?: string
+          source_table_schema?: string
+          version_type?: string
+        }
+        Relationships: []
+      }
+      resource_versions: {
+        Row: {
+          content_fingerprint: string
+          created_at: string
+          created_by: string | null
+          id: string
+          registered_at: string
+          resource_id: string
+          resource_kind: string
+          version_kind: string
+          version_number: number
+          version_type: string
+        }
+        Insert: {
+          content_fingerprint: string
+          created_at: string
+          created_by?: string | null
+          id: string
+          registered_at?: string
+          resource_id: string
+          resource_kind: string
+          version_kind: string
+          version_number: number
+          version_type: string
+        }
+        Update: {
+          content_fingerprint?: string
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          registered_at?: string
+          resource_id?: string
+          resource_kind?: string
+          version_kind?: string
+          version_number?: number
+          version_type?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "resource_versions_resource_fkey"
+            columns: ["resource_id", "resource_kind"]
+            isOneToOne: false
+            referencedRelation: "resources"
+            referencedColumns: ["id", "resource_kind"]
+          },
+          {
+            foreignKeyName: "resource_versions_type_kind_fkey"
+            columns: ["version_type", "resource_kind"]
+            isOneToOne: false
+            referencedRelation: "resource_version_type_kinds"
+            referencedColumns: ["version_type", "resource_kind"]
+          },
+        ]
+      }
       resources: {
         Row: {
           created_at: string
@@ -4780,6 +4897,19 @@ export type Database = {
       refresh_registry_artist_username_reservations: {
         Args: never
         Returns: Json
+      }
+      register_resource_version: {
+        Args: {
+          p_content_fingerprint: string
+          p_created_at: string
+          p_created_by: string
+          p_resource_id: string
+          p_version_id: string
+          p_version_kind: string
+          p_version_number: number
+          p_version_type: string
+        }
+        Returns: string
       }
       resequence_playlist_with_registry_intake: {
         Args: { p_playlist_id: string }
