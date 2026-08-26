@@ -219,6 +219,27 @@ begin
       'PHASE_7A_K0_FAIL: invalid immutable Resource Version envelope exists';
   end if;
 
+  if exists (
+    select 1
+    from pg_constraint constraint_row
+    join pg_class table_row
+      on table_row.oid = constraint_row.conrelid
+    join pg_namespace namespace_row
+      on namespace_row.oid = table_row.relnamespace
+    join pg_class referenced_table
+      on referenced_table.oid = constraint_row.confrelid
+    join pg_namespace referenced_namespace
+      on referenced_namespace.oid = referenced_table.relnamespace
+    where constraint_row.contype = 'f'
+      and namespace_row.nspname = 'editorial'
+      and table_row.relname = 'resource_versions'
+      and referenced_namespace.nspname = 'auth'
+      and referenced_table.relname = 'users'
+  ) then
+    raise exception
+      'PHASE_7A_K0_FAIL: immutable Resource Version authority has a mutable Auth foreign key';
+  end if;
+
   select count(*)
   into v_count
   from pg_trigger trigger_row

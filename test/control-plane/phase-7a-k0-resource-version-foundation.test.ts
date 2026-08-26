@@ -193,6 +193,24 @@ describe(
     );
 
     it(
+      "preserves actor provenance without coupling immutable versions to live Auth identity",
+      () => {
+        expect(migration)
+          .toContain(
+            "Historical actor UUID snapshot",
+          );
+        expect(migration)
+          .not.toContain(
+            "references auth.users(id)",
+          );
+        expect(verifier)
+          .toContain(
+            "immutable Resource Version authority has a mutable Auth foreign key",
+          );
+      },
+    );
+
+    it(
       "keeps K0 out of Video and review-event implementation",
       () => {
         expect(design)

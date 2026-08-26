@@ -14,3 +14,4 @@ This file records the implementation invariants before SQL is added.
 10. K0 must not alter `editorial.playlist_resources.current_*_version_id` or `editorial.audio_publication_resources.current_*_version_id`.
 11. Existing shared `target_version_type` values remain accepted during K0; migration of shared consumers to Resource Version FK authority is a later convergence step.
 12. No browser role receives direct write access to Resource Version authority.
+13. Resource Version actor provenance preserves the historical actor UUID without a live Auth foreign key that could mutate the immutable envelope during account retirement.

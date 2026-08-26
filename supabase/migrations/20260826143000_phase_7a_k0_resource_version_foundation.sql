@@ -409,9 +409,9 @@ create table editorial.resource_versions (
     check (version_number >= 1),
   content_fingerprint text not null
     check (content_fingerprint ~ '^[0-9a-f]{64}$'),
-  created_by uuid
-    references auth.users(id)
-    on delete set null,
+  -- Historical actor UUID snapshot. Intentionally not FK-bound to mutable
+  -- Auth identity: account retirement must not mutate an immutable version.
+  created_by uuid,
   created_at timestamptz not null,
   registered_at timestamptz not null default now(),
   constraint resource_versions_resource_fkey
