@@ -4406,6 +4406,58 @@ export type Database = {
           },
         ]
       }
+      video_episode_shared_links: {
+        Row: {
+          created_at: string
+          show_episode_resource_id: string
+          video_publication_id: string
+        }
+        Insert: {
+          created_at?: string
+          show_episode_resource_id: string
+          video_publication_id: string
+        }
+        Update: {
+          created_at?: string
+          show_episode_resource_id?: string
+          video_publication_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "video_episode_shared_links_show_episode_resource_id_fkey"
+            columns: ["show_episode_resource_id"]
+            isOneToOne: true
+            referencedRelation: "show_episodes"
+            referencedColumns: ["resource_id"]
+          },
+        ]
+      }
+      video_publication_resources: {
+        Row: {
+          publication_id: string
+          resource_id: string
+          resource_kind: string
+        }
+        Insert: {
+          publication_id: string
+          resource_id: string
+          resource_kind: string
+        }
+        Update: {
+          publication_id?: string
+          resource_id?: string
+          resource_kind?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "video_publication_resources_resource_fkey"
+            columns: ["resource_id", "resource_kind"]
+            isOneToOne: false
+            referencedRelation: "resources"
+            referencedColumns: ["id", "resource_kind"]
+          },
+        ]
+      }
     }
     Views: {
       [_ in never]: never
@@ -4630,6 +4682,10 @@ export type Database = {
         Args: { p_resource_id: string }
         Returns: boolean
       }
+      current_user_can_edit_video: {
+        Args: { p_resource_id: string }
+        Returns: boolean
+      }
       current_user_can_investigate_correction: {
         Args: { p_case_resource_id: string }
         Returns: boolean
@@ -4664,6 +4720,10 @@ export type Database = {
         Args: { p_resource_id: string }
         Returns: boolean
       }
+      current_user_can_publish_video: {
+        Args: { p_resource_id: string }
+        Returns: boolean
+      }
       current_user_can_review_article: { Args: never; Returns: boolean }
       current_user_can_review_artist_claims: { Args: never; Returns: boolean }
       current_user_can_triage_correction: {
@@ -4689,6 +4749,10 @@ export type Database = {
       }
       current_user_can_view_publishing_item: {
         Args: { p_item_id: string }
+        Returns: boolean
+      }
+      current_user_can_view_video: {
+        Args: { p_resource_id: string }
         Returns: boolean
       }
       current_user_owns_personal_playlist: {
