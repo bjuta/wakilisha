@@ -95,7 +95,7 @@ describe(
     );
 
     it(
-      "keeps Audio versions out of Article-only generic Resource pointers",
+      "preserves the M1 migration boundary while accepting K1 shared lifecycle authority",
       () => {
         expect(design)
           .toContain(
@@ -114,7 +114,7 @@ describe(
 
         expect(verifier)
           .toContain(
-            "Audio Resources wrote into Article-only generic version pointers",
+            "Audio Resource lifecycle pointer compatibility mismatch",
           );
       },
     );

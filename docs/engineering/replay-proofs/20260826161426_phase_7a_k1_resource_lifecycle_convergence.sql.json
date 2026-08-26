@@ -1,0 +1,16 @@
+{
+  "migration_file": "supabase/migrations/20260826161426_phase_7a_k1_resource_lifecycle_convergence.sql",
+  "migration_sha256": "d42635bb867dde2c3cc96913af84604c1d1c59cf3e6b61e5fb4368136e818987",
+  "base_main_sha": "86ae45fdc1b0b5c107792e3a86394c03831d9475",
+  "preview_project_ref": "njkmphumpwkcqgimoqnf",
+  "preview_branch_id": "9e67a4dd-27bd-477d-a835-3057e230e31a",
+  "preview_migration_head": "20260826161426",
+  "baseline_replay": "pass",
+  "candidate_apply": "pass",
+  "verifier": "pass",
+  "verifier_file": "scripts/control-plane/verify-phase-7a-k1-resource-lifecycle-convergence.sql",
+  "schema_types_sha256": "b19c2b2db9806a6bd655f8d4fc0d8ad7bdb0e0b2aac779d15e6169c4537e759c",
+  "schema_migration_count": 52,
+  "schema_migration_head": "20260826161426",
+  "verified_at": "2026-08-26T17:06:05.486Z"
+}

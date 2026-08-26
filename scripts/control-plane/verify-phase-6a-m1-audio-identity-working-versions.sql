@@ -268,23 +268,49 @@ begin
 
   select count(*)
   into v_bad_resource_pointers
-  from editorial.resources resource
-  where resource.resource_kind in (
-    'audio_show',
-    'audio_season',
-    'audio_episode',
-    'standalone_audio'
-  )
-    and (
-      resource.current_working_version_id is not null
-      or resource.current_submitted_version_id is not null
-      or resource.current_approved_version_id is not null
-      or resource.current_published_version_id is not null
-    );
+  from (
+    select resource.id
+    from editorial.resources resource
+    left join editorial.audio_publication_resources binding
+      on binding.resource_id = resource.id
+    where resource.resource_kind in (
+      'audio_episode',
+      'standalone_audio'
+    )
+      and (
+        binding.resource_id is null
+        or (
+          resource.current_working_version_id,
+          resource.current_submitted_version_id,
+          resource.current_approved_version_id,
+          resource.current_published_version_id
+        ) is distinct from (
+          binding.current_working_version_id,
+          binding.current_submitted_version_id,
+          binding.current_approved_version_id,
+          binding.current_published_version_id
+        )
+      )
+
+    union all
+
+    select resource.id
+    from editorial.resources resource
+    where resource.resource_kind in (
+      'audio_show',
+      'audio_season'
+    )
+      and (
+        resource.current_working_version_id is not null
+        or resource.current_submitted_version_id is not null
+        or resource.current_approved_version_id is not null
+        or resource.current_published_version_id is not null
+      )
+  ) bad_pointer;
 
   if v_bad_resource_pointers <> 0 then
     raise exception
-      'FAIL: % Audio Resources wrote into Article-only generic version pointers',
+      'FAIL: % Audio Resource lifecycle pointer compatibility mismatch(es)',
       v_bad_resource_pointers;
   end if;
 
