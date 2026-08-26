@@ -1,16 +1,16 @@
 {
   "projectRef": "pgzizndxdyhqmtyywjmt",
   "schema": "public,editorial",
-  "generatedAt": "2026-08-25T11:50:37Z",
-  "typesSha256": "d3e2b6838e8842bdcbbb257ea1f6a55e91e45b00afd4a368b9a2bcad36c43922",
+  "generatedAt": "2026-08-26T15:21:17Z",
+  "typesSha256": "562120cc20004588694a4bd67ab485ea47da2addffa71594deebcf2431fe9799",
   "authoritativeMigrationDirectory": "supabase/migrations",
-  "migrationCount": 50,
-  "latestMigration": "20260825102000_track_lyrics_structured_stanza_authority.sql",
+  "migrationCount": 51,
+  "latestMigration": "20260826143000_phase_7a_k0_resource_version_foundation.sql",
   "schemaSeal": {
     "mode": "preview",
-    "sourceProjectRef": "wzeaynjtmxnwsyncwqny",
-    "migrationHead": "20260825102000",
-    "baseMainSha": "90bf0842beaccfdeb3893bcc68776a0600829af5",
-    "previewBranchId": "39708f1c-6435-415e-a20e-903f7014808f"
+    "sourceProjectRef": "qdyvatmhhffpcozdtsbo",
+    "migrationHead": "20260826143000",
+    "baseMainSha": "76c17b038207f4396ef3ffe6c6062602979cc5a9",
+    "previewBranchId": "d3a029c7-63ca-4b6c-8704-385090b1d4f1"
   }
 }
