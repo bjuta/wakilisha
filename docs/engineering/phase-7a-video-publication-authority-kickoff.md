@@ -1,12 +1,12 @@
 # Phase 7A Video Publication Authority Kickoff
 
-Status: OPEN — AUDIT COMPLETE, ARCHITECTURE LOCKED
+Status: OPEN — AUDIT COMPLETE, ARCHITECTURE LOCKED, SCHEMA DESIGN IN REVIEW
 
 Opened: 25 August 2026
 
 Architecture audit locked: 26 August 2026
 
-Programme documentation baseline: `a2acd644ee9800ac373860c834b580982a401fc9`
+Programme documentation baseline: `8f6bd2be1f4159fb21a34b71290c8879931cdd49`
 
 Production runtime application baseline: `dae3de2dc9fb021496eb0fe0c4d4f0338f676a88`
 
@@ -21,6 +21,10 @@ Predecessor closure:
 Canonical Phase 7A audit:
 
 `docs/engineering/phase-7a-video-authority-and-primitives-audit.md`
+
+Canonical Phase 7A schema design:
+
+`docs/engineering/phase-7a-video-authority-schema-design.md`
 
 ## Purpose
 
@@ -260,7 +264,7 @@ Ordinary user Video ingress must eventually enter through governed Media ingress
 
 The read-only Video authority/surface audit is complete.
 
-Before writing candidate SQL, design the smallest typed Video authority contract that covers:
+The accepted schema design must cover:
 
 1. Video Resource kinds and typed working publication identity
 2. standalone Video and Video Episode distinction
@@ -329,9 +333,9 @@ Public viewing across desktop/mobile is intentionally not the 7A exit gate. That
 
 ## Deployment classification
 
-This architecture lock is documentation only.
+This schema-design step is documentation only.
 
-- SQL migration needed: No, not for this documentation lock
+- SQL migration needed: No, not for the design lock itself
 - Supabase Edge Function deploy needed: No
 - Readdy Finish update needed: No
 - Frontend deploy needed: No
@@ -339,4 +343,4 @@ This architecture lock is documentation only.
 
 ## Next action
 
-Design and verify the smallest canonical Phase 7A Video authority schema candidate against `docs/engineering/phase-7a-video-authority-and-primitives-audit.md` before any migration is written.
+Merge `docs/engineering/phase-7a-video-authority-schema-design.md` through protected CI, then implement the smallest first Video authority migration, permanent verifier, and focused contract tests from that accepted design before creating a disposable preview.
