@@ -4,6 +4,8 @@ Status: active control-plane doctrine
 
 Effective: 21 August 2026
 
+Latest programme application: Phase 7A Video, 26 August 2026
+
 ## Purpose
 
 WAKILISHA should compound what it learns while building real product surfaces.
@@ -132,7 +134,6 @@ The initial classified debt is deliberately explicit:
 
 - Guides publication status: legacy lifecycle badge, migrate when Guides is next touched
 - Pages publication status: legacy lifecycle badge, migrate when Pages is next touched
-- Playlist editor `statusClass`: unused legacy lifecycle helper, remove when that workspace is next touched
 - Timed Lyrics submission status: semantic exception because submission moderation is not publication lifecycle
 
 This is a ratchet. Existing debt can be named once, but ordinary product work cannot silently renew it.
@@ -141,23 +142,47 @@ This is a ratchet. Existing debt can be named once, but ordinary product work ca
 
 The machine-readable source is `scripts/control-plane/primitive-registry.json`.
 
-Current canonical Admin Studio proof includes Article, Playlist, and Audio consumers for:
+### Canonical interaction and presentation primitives
+
+Current machine-registry proof includes:
 
 - `AdminRecordHeader`
+- `AdminRecordActions`
 - `AdminStatusBadge`
 - `AdminSaveState`
-- `AdminCollectionHeader`
-
-Current Audio-proven candidates include:
-
 - `AdminWorkspaceSection`
-- `AdminModeComposer`
+- `AdminCollectionHeader`
 - `EditorialWorkflowRail`
+- `EditorialDecisionWorkspace`
+- `EditorialTextDiff`
+- `EditorialMetadataWorkspace` / Discovery Workspace
+
+These are already proven by at least two governed domain consumers and should be reused directly where their meaning applies.
+
+### Current candidates awaiting second-domain proof
+
+The machine registry currently identifies:
+
+- `AdminModeComposer`
 - `EditorialCommentEditor`
 - `MediaTransport`
 - `MediaTimeline`
+- `EditorialCreditPicker`
 
-The Audio candidates are deliberately not declared canonical merely because they were written generically. Phase 6B and later Video work should either reuse them, extend them from real requirements, or document why the new concept is genuinely different.
+These are deliberately not canonical merely because their implementation is generic. Video is the next real domain expected to prove, extend, reject, or promote them.
+
+### Authority candidates outside the interaction registry
+
+Some durable authority primitives are enforced through schema and commands rather than `primitive-registry.json`.
+
+The most important Phase 7A example is shared Show / Show Episode identity:
+
+- `editorial.shows`
+- `editorial.show_episodes`
+- Resource kind `show`
+- Resource kind `show_episode`
+
+Phase 6B explicitly built this as cross-media authority with Audio as the first consumer. Video is the second real media-domain consumer and must bind to it rather than creating a competing `video_series` or `video_show` authority.
 
 ## CI enforcement
 
@@ -182,16 +207,80 @@ The verifier intentionally does not claim it can infer semantic equivalence perf
 
 ## Phase 6B rule
 
-The first Phase 6B Public Audio implementation must start by reusing the Phase 6A authority and the proven primitive set.
+Phase 6B Public Audio had to reuse Phase 6A authority and the proven primitive set.
 
-Phase 6B must not create:
+Phase 6B was not permitted to create:
 
 - another Audio publication authority
 - another Media delivery authority
 - another transcript store
 - another review/comment model
-- another player stack merely because public presentation differs from Admin Studio
+- another player stack merely because public presentation differed from Admin Studio
 
-When the public Audio surface creates a genuinely reusable capability, it should enter the registry as a candidate in the same milestone.
+The resulting Audio implementation produced several candidates that Phase 7A must now treat as learned platform behavior rather than optional examples.
 
-When it becomes the second real consumer of an existing candidate, that primitive should be promoted or explicitly rejected as semantically different.
+## Phase 7A rule
+
+Phase 7A Video must begin from:
+
+`docs/engineering/phase-7a-video-authority-and-primitives-audit.md`
+
+The following rules are binding for Video implementation.
+
+### Reuse existing authority
+
+Video must reuse:
+
+- Resource identity
+- command/idempotency/concurrency substrate
+- jobs and transactional outbox
+- Media logical assets, immutable files, revisions, variants, governance, usage, and protected delivery
+- shared Show / Show Episode identity
+- Credits and Citations
+- Discovery metadata
+- Corrections and provenance
+- Registry linking
+
+### Promote shared Show rather than copy it
+
+Phase 6B already established cross-media `show` and `show_episode` Resource identity with Audio as the first real consumer.
+
+Video must become the second consumer. Do not create a parallel canonical `video_series`, `video_show`, or `show_journey` merely because Video needs collection presentation.
+
+Standalone Video remains independent of Show.
+
+### Treat provider as source, not content type
+
+Native Video, YouTube, Vimeo, future providers, editorial uploads, and future user uploads must not become separate Video domains.
+
+The Video cultural object remains typed Video authority. Hosting/provider differences belong to a structured Video Source contract and canonical Media where WAKILISHA owns the bytes.
+
+### Captions and subtitles are typed Video authority over Media
+
+Caption/subtitle file bytes remain Media. Video owns the semantic track relationship, including language, label, track kind, default state, exact Video-version binding, and correction history.
+
+Transcript remains distinct from caption-track authority.
+
+### Do not add a fourth lifecycle implementation by reflex
+
+Playlist and Audio already repeat materially the same review-event meaning while `editorial.resources` owns shared lifecycle pointers.
+
+Before introducing Video review-event storage, Phase 7A must evaluate convergence of common Resource review/lifecycle meaning. Typed Video version snapshots remain Video-owned.
+
+### Candidate promotion is evidence-driven
+
+When Video becomes a real second consumer of the current candidates, the same milestone must either:
+
+- promote the primitive to canonical
+- extend the primitive and then promote it
+- or document why Video exposed a genuinely different semantic concept
+
+It may not silently reuse a candidate while leaving registry maturity inaccurate.
+
+### New Video primitives must solve a real repeated concept
+
+The current audit justifies one new candidate concept before implementation:
+
+- provider-neutral Video Source resolution/playback capability contract
+
+Do not manufacture additional generic abstractions until real Video work proves them.
