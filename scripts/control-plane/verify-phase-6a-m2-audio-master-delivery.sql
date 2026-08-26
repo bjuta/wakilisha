@@ -146,19 +146,29 @@ begin
   if exists (
     select 1
     from editorial.resources resource_row
+    left join editorial.audio_publication_resources binding
+      on binding.resource_id = resource_row.id
     where resource_row.resource_kind in (
       'audio_episode',
       'standalone_audio'
     )
       and (
-        resource_row.current_working_version_id is not null
-        or resource_row.current_submitted_version_id is not null
-        or resource_row.current_approved_version_id is not null
-        or resource_row.current_published_version_id is not null
+        binding.resource_id is null
+        or (
+          resource_row.current_working_version_id,
+          resource_row.current_submitted_version_id,
+          resource_row.current_approved_version_id,
+          resource_row.current_published_version_id
+        ) is distinct from (
+          binding.current_working_version_id,
+          binding.current_submitted_version_id,
+          binding.current_approved_version_id,
+          binding.current_published_version_id
+        )
       )
   ) then
     raise exception
-      'M2 verification failed: Audio Resources wrote into Article-only generic version pointers';
+      'M2 verification failed: Audio Resource lifecycle pointer compatibility mismatch';
   end if;
 
   v_audio_v1_submit := pg_get_functiondef(

@@ -8,7 +8,7 @@ declare
   v_publish text;
   v_bad_published bigint;
   v_bad_snapshots bigint;
-  v_bad_generic_pointers bigint;
+  v_bad_lifecycle_pointers bigint;
 begin
   if to_regclass('audio.publication_review_events') is null
      or to_regclass('audio.publication_feed_identities') is null
@@ -221,24 +221,50 @@ begin
   end if;
 
   select count(*)
-  into v_bad_generic_pointers
-  from editorial.resources resource_row
-  where resource_row.resource_kind in (
-    'audio_show',
-    'audio_season',
-    'audio_episode',
-    'standalone_audio'
-  )
-    and (
-      resource_row.current_working_version_id is not null
-      or resource_row.current_submitted_version_id is not null
-      or resource_row.current_approved_version_id is not null
-      or resource_row.current_published_version_id is not null
-    );
+  into v_bad_lifecycle_pointers
+  from (
+    select resource_row.id
+    from editorial.resources resource_row
+    left join editorial.audio_publication_resources binding
+      on binding.resource_id = resource_row.id
+    where resource_row.resource_kind in (
+      'audio_episode',
+      'standalone_audio'
+    )
+      and (
+        binding.resource_id is null
+        or (
+          resource_row.current_working_version_id,
+          resource_row.current_submitted_version_id,
+          resource_row.current_approved_version_id,
+          resource_row.current_published_version_id
+        ) is distinct from (
+          binding.current_working_version_id,
+          binding.current_submitted_version_id,
+          binding.current_approved_version_id,
+          binding.current_published_version_id
+        )
+      )
 
-  if v_bad_generic_pointers <> 0 then
+    union all
+
+    select resource_row.id
+    from editorial.resources resource_row
+    where resource_row.resource_kind in (
+      'audio_show',
+      'audio_season'
+    )
+      and (
+        resource_row.current_working_version_id is not null
+        or resource_row.current_submitted_version_id is not null
+        or resource_row.current_approved_version_id is not null
+        or resource_row.current_published_version_id is not null
+      )
+  ) bad_pointer;
+
+  if v_bad_lifecycle_pointers <> 0 then
     raise exception
-      'FAIL: Audio Resources wrote into Article-only generic version pointers';
+      'FAIL: Audio Resource lifecycle pointer compatibility mismatch';
   end if;
 
   raise notice

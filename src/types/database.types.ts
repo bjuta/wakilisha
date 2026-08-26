@@ -3651,32 +3651,32 @@ export type Database = {
         }
         Relationships: [
           {
-            foreignKeyName: "resources_current_approved_version_id_fkey"
-            columns: ["current_approved_version_id"]
+            foreignKeyName: "resources_current_approved_resource_version_fkey"
+            columns: ["id", "current_approved_version_id"]
             isOneToOne: false
-            referencedRelation: "article_versions"
-            referencedColumns: ["id"]
+            referencedRelation: "resource_versions"
+            referencedColumns: ["resource_id", "id"]
           },
           {
-            foreignKeyName: "resources_current_published_version_id_fkey"
-            columns: ["current_published_version_id"]
+            foreignKeyName: "resources_current_published_resource_version_fkey"
+            columns: ["id", "current_published_version_id"]
             isOneToOne: false
-            referencedRelation: "article_versions"
-            referencedColumns: ["id"]
+            referencedRelation: "resource_versions"
+            referencedColumns: ["resource_id", "id"]
           },
           {
-            foreignKeyName: "resources_current_submitted_version_fkey"
-            columns: ["current_submitted_version_id"]
+            foreignKeyName: "resources_current_submitted_resource_version_fkey"
+            columns: ["id", "current_submitted_version_id"]
             isOneToOne: false
-            referencedRelation: "article_versions"
-            referencedColumns: ["id"]
+            referencedRelation: "resource_versions"
+            referencedColumns: ["resource_id", "id"]
           },
           {
-            foreignKeyName: "resources_current_working_version_fkey"
-            columns: ["current_working_version_id"]
+            foreignKeyName: "resources_current_working_resource_version_fkey"
+            columns: ["id", "current_working_version_id"]
             isOneToOne: false
-            referencedRelation: "article_versions"
-            referencedColumns: ["id"]
+            referencedRelation: "resource_versions"
+            referencedColumns: ["resource_id", "id"]
           },
           {
             foreignKeyName: "resources_resource_kind_fkey"

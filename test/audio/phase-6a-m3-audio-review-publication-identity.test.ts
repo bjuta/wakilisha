@@ -136,13 +136,13 @@ describe(
       expect(migration).not.toContain("create table audio.rss_feeds");
     });
 
-    it("keeps Article-only generic Resource version pointers untouched", () => {
+    it("preserves the M3 migration boundary while accepting K1 shared lifecycle authority", () => {
       const genericPointerWrite =
         /update\s+editorial\.resources[\s\S]{0,800}current_(?:working|submitted|approved|published)_version_id\s*=/i;
 
       expect(genericPointerWrite.test(migration)).toBe(false);
       expect(verifier).toContain(
-        "Audio Resources wrote into Article-only generic version pointers",
+        "Audio Resource lifecycle pointer compatibility mismatch",
       );
     });
 
