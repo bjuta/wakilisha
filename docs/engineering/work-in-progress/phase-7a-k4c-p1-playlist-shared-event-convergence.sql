@@ -1988,6 +1988,39 @@ begin
 end;
 $function$;
 
+-- Preserve the accepted production RPC execution perimeter explicitly.
+revoke execute
+on function public.submit_playlist_for_review(
+  uuid,bigint,text,text,uuid
+)
+from public, anon;
+
+grant execute
+on function public.submit_playlist_for_review(
+  uuid,bigint,text,text,uuid
+)
+to authenticated, service_role;
+
+revoke execute
+on function public.review_playlist(
+  uuid,bigint,uuid,text,text,text,uuid
+)
+from public, anon;
+
+grant execute
+on function public.review_playlist(
+  uuid,bigint,uuid,text,text,text,uuid
+)
+to authenticated, service_role;
+
+revoke execute
+on function public.get_playlist_review_workspace(uuid)
+from public, anon;
+
+grant execute
+on function public.get_playlist_review_workspace(uuid)
+to authenticated, service_role;
+
 do $phase_7a_k4c_p1_postconditions$
 declare
   v_baseline record;
@@ -2154,6 +2187,76 @@ begin
     raise exception
       'STOP: K4C-P1 left % Playlist pointer mirror divergence(s)',
       v_count;
+  end if;
+
+  if has_function_privilege(
+       'public',
+       'public.submit_playlist_for_review(uuid,bigint,text,text,uuid)',
+       'EXECUTE'
+     )
+     or has_function_privilege(
+       'anon',
+       'public.submit_playlist_for_review(uuid,bigint,text,text,uuid)',
+       'EXECUTE'
+     )
+     or has_function_privilege(
+       'public',
+       'public.review_playlist(uuid,bigint,uuid,text,text,text,uuid)',
+       'EXECUTE'
+     )
+     or has_function_privilege(
+       'anon',
+       'public.review_playlist(uuid,bigint,uuid,text,text,text,uuid)',
+       'EXECUTE'
+     )
+     or has_function_privilege(
+       'public',
+       'public.get_playlist_review_workspace(uuid)',
+       'EXECUTE'
+     )
+     or has_function_privilege(
+       'anon',
+       'public.get_playlist_review_workspace(uuid)',
+       'EXECUTE'
+     )
+  then
+    raise exception
+      'STOP: K4C-P1 broadened anonymous Playlist RPC execution';
+  end if;
+
+  if not has_function_privilege(
+       'authenticated',
+       'public.submit_playlist_for_review(uuid,bigint,text,text,uuid)',
+       'EXECUTE'
+     )
+     or not has_function_privilege(
+       'service_role',
+       'public.submit_playlist_for_review(uuid,bigint,text,text,uuid)',
+       'EXECUTE'
+     )
+     or not has_function_privilege(
+       'authenticated',
+       'public.review_playlist(uuid,bigint,uuid,text,text,text,uuid)',
+       'EXECUTE'
+     )
+     or not has_function_privilege(
+       'service_role',
+       'public.review_playlist(uuid,bigint,uuid,text,text,text,uuid)',
+       'EXECUTE'
+     )
+     or not has_function_privilege(
+       'authenticated',
+       'public.get_playlist_review_workspace(uuid)',
+       'EXECUTE'
+     )
+     or not has_function_privilege(
+       'service_role',
+       'public.get_playlist_review_workspace(uuid)',
+       'EXECUTE'
+     )
+  then
+    raise exception
+      'STOP: K4C-P1 intended Playlist RPC execution grant is missing';
   end if;
 
   if to_regclass('video.publication_review_events') is not null
