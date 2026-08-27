@@ -265,6 +265,33 @@ describe(
     );
 
     it(
+      "flushes deferred backfill trigger events before RLS table DDL",
+      () => {
+        const lifecycleBackfill = migration.indexOf(
+          "insert into editorial.resource_lifecycle_events",
+        );
+        const reviewBackfill = migration.indexOf(
+          "insert into editorial.resource_review_events",
+        );
+        const flushBarrier = migration.indexOf(
+          "set constraints all immediate;",
+        );
+        const deferredRearm = migration.indexOf(
+          "set constraints all deferred;",
+        );
+        const lifecycleRls = migration.indexOf(
+          "alter table editorial.resource_lifecycle_events enable row level security;",
+        );
+
+        expect(lifecycleBackfill).toBeGreaterThan(-1);
+        expect(reviewBackfill).toBeGreaterThan(lifecycleBackfill);
+        expect(flushBarrier).toBeGreaterThan(reviewBackfill);
+        expect(deferredRearm).toBeGreaterThan(flushBarrier);
+        expect(lifecycleRls).toBeGreaterThan(deferredRearm);
+      },
+    );
+
+    it(
       "keeps direct application access closed and uses RLS as defense in depth",
       () => {
         for (const table of [
