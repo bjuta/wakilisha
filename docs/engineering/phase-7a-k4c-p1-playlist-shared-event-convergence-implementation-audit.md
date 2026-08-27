@@ -314,36 +314,62 @@ Sandbox advisors after K4C-P1 proof:
 
 Unrelated pre-existing advisor findings are not part of K4C-P1.
 
+## Canonical preview seal
+
+The native migration is:
+
+`supabase/migrations/20260827165416_phase_7a_k4c_p1_playlist_shared_event_convergence.sql`
+
+Migration SHA-256:
+
+`ff1dbaaf1c19f1932af67ba5e4e98df6f601d4180a25e1cdf43d0e5303ef0b53`
+
+Canonical disposable preview:
+
+- project ref: `lejttbbzasfkkrqdsguy`
+- branch id: `8b833072-befc-4792-b2db-015f9ad537ae`
+- baseline migration count: 55
+- baseline head: `20260827125306_phase_7a_k4b_video_governed_lifecycle_commands`
+- baseline K4B permanent verifier: PASS
+- post-apply migration count: 56
+- post-apply head: `20260827165416_phase_7a_k4c_p1_playlist_shared_event_convergence`
+- zero pending after native apply: PASS
+- K4C-P1 permanent verifier: PASS
+- governed review lifecycle rollback proof: PASS
+- publication adapter rollback proof: PASS
+- fixture residue: 0
+- Playlist pointer parity drift: 0
+- K4C-P1 performance advisor findings: 0
+- touched RPC anonymous execution: closed
+- remaining authenticated SECURITY DEFINER warnings: expected and identical to production
+
+The canonical replay-proof artifact and preview-sealed schema/types are generated from that exact preview authority before commit.
+
+## Final local gates
+
+The final candidate passes:
+
+- focused K4C-P1 contract
+- K1/K4A/K4B Phase 7 ratchets
+- Primitive Compounding
+- critical control-plane suite
+- app build
+- forward-only production migration-history verification
+- preview-sealed repository schema verification
+- exact migration byte identity
+
+An unrelated accepted-main Playlist admin UI test still expects the literal `Start Review` while accepted main renders `Open Review`. K4C-P1 does not touch that UI or baseline test and does not fold that pre-existing mismatch into this milestone.
+
 ## Deployment boundary
 
 Current candidate phase:
 
-- SQL migration needed: Yes
-- canonical migration filename minted: No
+- SQL migration needed: Yes, canonical K4C-P1 migration ready for PR
+- canonical migration filename minted: Yes
 - Supabase Edge Function deploy needed: No
 - Readdy Finish update needed: No
 - frontend deploy needed: No
 - production mutation: No
-- PR ready: No
-
-## Remaining acceptance work
-
-Before PR:
-
-1. mint the canonical migration with `supabase migration new phase_7a_k4c_p1_playlist_shared_event_convergence`;
-2. copy the exact proven WIP SQL into that native file and remove the WIP file;
-3. create a fresh disposable preview from the accepted 55/K4B baseline;
-4. replay the exact canonical migration;
-5. execute the permanent verifier;
-6. repeat rollback-only behavior fixtures;
-7. regenerate schema/types and replay proof;
-8. prove byte identity;
-9. run focused K4C/K4A/K4B/K1 tests;
-10. run Primitive Compounding;
-11. run critical suite;
-12. run app build;
-13. seal exact scope;
-14. commit/push;
-15. only then open PR.
+- PR ready: Yes after exact-scope commit and push
 
 Production remains untouched until protected CI merges the exact candidate and a separate production SQL promotion gate is run.

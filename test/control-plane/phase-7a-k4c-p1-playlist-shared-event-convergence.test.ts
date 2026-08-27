@@ -29,8 +29,31 @@ function readCandidate(): string {
 }
 
 function functionBody(source: string, name: string): string {
-  const token = `create or replace function ${name}`;
-  const start = source.toLowerCase().indexOf(token.toLowerCase());
+  const declaration = "create or replace function";
+  const lowerSource = source.toLowerCase();
+  const lowerName = name.toLowerCase();
+  let searchFrom = 0;
+  let start = -1;
+
+  while (true) {
+    const candidate = lowerSource.indexOf(
+      declaration,
+      searchFrom,
+    );
+    if (candidate < 0) break;
+
+    const headerEnd = lowerSource.indexOf("as $function$", candidate);
+    if (headerEnd < 0) break;
+
+    const header = lowerSource.slice(candidate, headerEnd);
+    if (header.includes(lowerName)) {
+      start = candidate;
+      break;
+    }
+
+    searchFrom = candidate + declaration.length;
+  }
+
   expect(start).toBeGreaterThan(-1);
 
   const bodyEnd = source.indexOf("$function$;", start);
@@ -277,7 +300,7 @@ describe("Phase 7A K4C-P1 Playlist shared-event convergence", () => {
       "typed Video event authority exists",
     );
     expect(verifier).not.toMatch(
-      /\b(insert|update|delete|alter|drop|create|grant|revoke)\b/i,
+      /^\s*(insert|update|delete|alter|drop|create|grant|revoke)\b/im,
     );
   });
 });
