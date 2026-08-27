@@ -328,3 +328,59 @@ Preview acceptance proved:
 Production remained untouched during preview acceptance.
 
 The disposable preview must remain available through PR/CI acceptance and is deleted only after production promotion and independent production verification complete.
+
+
+## Production promotion incident and in-place repair
+
+The first production promotion attempt on 27 August 2026 failed transactionally before K4A was recorded.
+
+Production error:
+
+`cannot ALTER TABLE "resource_lifecycle_events" because it has pending trigger events (SQLSTATE 55006)`
+
+Cause:
+
+- production contains durable Article, Playlist, and Audio lifecycle/review history
+- the K4A historical backfill inserted canonical rows into the new shared event ledgers
+- the shared event sequence constraints are `DEFERRABLE INITIALLY DEFERRED` constraint triggers
+- those inserts therefore left pending deferred trigger events
+- the migration later attempted `ALTER TABLE ... ENABLE ROW LEVEL SECURITY`
+- PostgreSQL rejects that table-level DDL while deferred trigger events remain pending
+
+Why the original preview did not detect this:
+
+- disposable Supabase branches do not carry production data
+- the original preview therefore had no legacy lifecycle/review rows to backfill
+- no deferred sequence trigger events were queued before the RLS DDL
+
+Production rollback verification after the failed promotion proved:
+
+- migration history remained at 53 migrations with K2 as head
+- `20260827095753` was not recorded
+- `editorial.resource_lifecycle_actions` did not exist
+- `editorial.resource_review_actions` did not exist
+- `editorial.resource_lifecycle_events` did not exist
+- `editorial.resource_review_events` did not exist
+
+The failed attempt therefore left no partial K4A production authority.
+
+Repair:
+
+The existing unapplied K4A migration is repaired in place under the same native migration identity. Immediately after both historical backfills and before RLS table DDL, the migration now executes:
+
+```sql
+set constraints all immediate;
+set constraints all deferred;
+```
+
+The first statement forces deferred integrity checks created by the backfill to execute and clears pending trigger events. The second restores deferred semantics for the rest of the transaction.
+
+A focused regression test requires this ordering:
+
+1. lifecycle backfill
+2. review backfill
+3. deferred-trigger flush
+4. deferred-mode re-arm
+5. RLS table DDL
+
+The repaired candidate must be replay-proven again from K2 on a disposable preview containing at least one committed legacy lifecycle row before production is retried.
