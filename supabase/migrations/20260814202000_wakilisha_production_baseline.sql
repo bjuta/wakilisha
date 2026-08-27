@@ -103,6 +103,21 @@ ALTER SCHEMA "public" OWNER TO "pg_database_owner";
 COMMENT ON SCHEMA "public" IS 'standard public schema';
 
 
+-- WAKILISHA REPLAY DEFAULT-PRIVILEGE NORMALIZATION --
+-- Fresh Supabase projects start with broader public-schema defaults than the
+-- accepted production database. Normalize those defaults before WAKILISHA
+-- objects are created. The captured grants later in this baseline then restore
+-- the accepted production perimeter object by object.
+ALTER DEFAULT PRIVILEGES FOR ROLE "postgres" IN SCHEMA "public"
+  REVOKE EXECUTE ON FUNCTIONS FROM PUBLIC, "anon", "authenticated";
+
+ALTER DEFAULT PRIVILEGES FOR ROLE "postgres" IN SCHEMA "public"
+  REVOKE ALL ON SEQUENCES FROM "anon", "authenticated";
+
+ALTER DEFAULT PRIVILEGES FOR ROLE "postgres" IN SCHEMA "public"
+  REVOKE SELECT, INSERT, UPDATE, DELETE ON TABLES FROM "anon", "authenticated";
+
+
 
 CREATE SCHEMA IF NOT EXISTS "platform_private";
 
@@ -97070,6 +97085,49 @@ GRANT REFERENCES,TRIGGER,TRUNCATE,MAINTAIN ON TABLE "public"."wk_slug_redirects"
 GRANT ALL ON TABLE "public"."wk_slug_redirects" TO "service_role";
 
 
+
+
+-- WAKILISHA REPLAY SERVICE_ROLE EXECUTE NORMALIZATION --
+-- The schema baseline is replayed into fresh Supabase projects where the
+-- service_role function default is broader than the accepted production RPC
+-- perimeter. The 34 routines below are the exact effective-privilege delta
+-- proven between a zero-state replay and production on 2026-08-27.
+-- Normalize only that delta; authenticated/anon grants remain unchanged.
+
+REVOKE EXECUTE ON FUNCTION public.add_playlist_registry_track_with_intake_slots(uuid,bigint,uuid,text,uuid) FROM service_role;
+REVOKE EXECUTE ON FUNCTION public.add_playlist_validated_provider_track(uuid,bigint,uuid,uuid,text,uuid) FROM service_role;
+REVOKE EXECUTE ON FUNCTION public.add_playlist_validated_provider_track_with_intake_slots(uuid,bigint,uuid,uuid,text,uuid) FROM service_role;
+REVOKE EXECUTE ON FUNCTION public.admin_get_registry_track_intake_enrichment(uuid) FROM service_role;
+REVOKE EXECUTE ON FUNCTION public.admin_get_registry_track_intake_queue(text,integer,integer,uuid,uuid) FROM service_role;
+REVOKE EXECUTE ON FUNCTION public.admin_record_registry_track_intake_provider_evidence(uuid,text,text,text,jsonb,jsonb,numeric) FROM service_role;
+REVOKE EXECUTE ON FUNCTION public.admin_reject_registry_track_intake(uuid,text) FROM service_role;
+REVOKE EXECUTE ON FUNCTION public.admin_resolve_registry_track_intake(uuid,uuid,text) FROM service_role;
+REVOKE EXECUTE ON FUNCTION public.admin_resolve_registry_track_intake_enriched(uuid,uuid,text,boolean) FROM service_role;
+REVOKE EXECUTE ON FUNCTION public.admin_save_registry_track_intake_enrichment(uuid,jsonb,text) FROM service_role;
+REVOKE EXECUTE ON FUNCTION public.admin_select_registry_track_intake_provider_evidence(uuid,text,text,text) FROM service_role;
+REVOKE EXECUTE ON FUNCTION public.admin_update_registry_track_intake_artist_credit(uuid,integer,text,text,uuid,text) FROM service_role;
+REVOKE EXECUTE ON FUNCTION public.adopt_verified_media_upload_session_v1(uuid,text,text,uuid,uuid) FROM service_role;
+REVOKE EXECUTE ON FUNCTION public.cancel_media_upload_session_v1(uuid,text) FROM service_role;
+REVOKE EXECUTE ON FUNCTION public.create_institute_playlist_draft(uuid,text,text,text,jsonb) FROM service_role;
+REVOKE EXECUTE ON FUNCTION public.create_media_upload_session_v1(text,text,text,bigint,text,integer,uuid) FROM service_role;
+REVOKE EXECUTE ON FUNCTION public.create_media_upload_session_v2(text,text,text,bigint,text,integer,uuid) FROM service_role;
+REVOKE EXECUTE ON FUNCTION public.create_registry_track_intake_suggestion(uuid,uuid,text,uuid) FROM service_role;
+REVOKE EXECUTE ON FUNCTION public.current_user_can_edit_playlist_id(uuid) FROM service_role;
+REVOKE EXECUTE ON FUNCTION public.get_media_private_delivery_target_v1(uuid) FROM service_role;
+REVOKE EXECUTE ON FUNCTION public.get_media_upload_session_v1(uuid) FROM service_role;
+REVOKE EXECUTE ON FUNCTION public.get_playlist_cover_source(uuid,uuid) FROM service_role;
+REVOKE EXECUTE ON FUNCTION public.get_playlist_pending_registry_intake(uuid) FROM service_role;
+REVOKE EXECUTE ON FUNCTION public.get_playlist_pending_registry_intake_editorial(uuid) FROM service_role;
+REVOKE EXECUTE ON FUNCTION public.guard_registry_track_intake_provider_selection() FROM service_role;
+REVOKE EXECUTE ON FUNCTION public.move_playlist_pending_registry_intake(uuid,uuid,bigint,text,text,uuid) FROM service_role;
+REVOKE EXECUTE ON FUNCTION public.read_media_assets_admin_v2(jsonb) FROM service_role;
+REVOKE EXECUTE ON FUNCTION public.remove_playlist_item_with_intake_slots(uuid,uuid,bigint,text,uuid) FROM service_role;
+REVOKE EXECUTE ON FUNCTION public.reorder_playlist_items_with_intake_slots(uuid,bigint,uuid[],text,uuid) FROM service_role;
+REVOKE EXECUTE ON FUNCTION public.save_playlist_pending_registry_note(uuid,uuid,bigint,text,text,uuid) FROM service_role;
+REVOKE EXECUTE ON FUNCTION public.set_playlist_cover(uuid,bigint,uuid,text,jsonb,text,text,text,uuid) FROM service_role;
+REVOKE EXECUTE ON FUNCTION public.submit_media_processing_command_v1(uuid,uuid,text,text,uuid) FROM service_role;
+REVOKE EXECUTE ON FUNCTION public.submit_playlist_registry_intake(uuid,bigint,uuid,jsonb,text,uuid) FROM service_role;
+REVOKE EXECUTE ON FUNCTION public.sync_registry_track_intake_artist_credits(uuid,uuid) FROM service_role;
 
 ALTER DEFAULT PRIVILEGES FOR ROLE "postgres" IN SCHEMA "public" GRANT ALL ON SEQUENCES TO "postgres";
 ALTER DEFAULT PRIVILEGES FOR ROLE "postgres" IN SCHEMA "public" GRANT ALL ON SEQUENCES TO "service_role";
