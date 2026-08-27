@@ -4683,6 +4683,36 @@ export type Database = {
         }
         Returns: string
       }
+      append_resource_lifecycle_event: {
+        Args: {
+          p_action: string
+          p_actor_id: string
+          p_command_receipt_id: string
+          p_correlation_id: string
+          p_metadata: Json
+          p_note: string
+          p_prior_status: string
+          p_resource_id: string
+          p_resulting_status: string
+          p_version_id: string
+        }
+        Returns: string
+      }
+      append_resource_review_event: {
+        Args: {
+          p_action: string
+          p_actor_id: string
+          p_command_receipt_id: string
+          p_correlation_id: string
+          p_prior_status: string
+          p_reason: string
+          p_resource_id: string
+          p_result_version_id: string
+          p_resulting_status: string
+          p_target_version_id: string
+        }
+        Returns: string
+      }
       apply_article_review_snapshot: {
         Args: {
           p_article_id: string
