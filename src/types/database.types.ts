@@ -4908,6 +4908,10 @@ export type Database = {
         Args: { p_resource_id: string }
         Returns: boolean
       }
+      current_user_can_participate_video_review: {
+        Args: { p_resource_id: string }
+        Returns: boolean
+      }
       current_user_can_publish_article: { Args: never; Returns: boolean }
       current_user_can_publish_audio: {
         Args: { p_resource_id: string }
@@ -22407,6 +22411,28 @@ export type Database = {
         }
         Returns: Json
       }
+      publish_video_publication_version: {
+        Args: {
+          p_approved_version_id: string
+          p_correlation_id?: string
+          p_expected_authority_revision: number
+          p_idempotency_key: string
+          p_note?: string
+          p_publication_id: string
+        }
+        Returns: {
+          authority_revision: number
+          command_receipt_id: string
+          idempotent_replay: boolean
+          lifecycle_status: string
+          publication_id: string
+          receipt_status: string
+          resource_id: string
+          result_payload: Json
+          version_id: string
+          version_number: number
+        }[]
+      }
       purge_staging_records: {
         Args: { batch_size?: number; max_batches?: number }
         Returns: number
@@ -23402,6 +23428,29 @@ export type Database = {
         }
         Returns: Json
       }
+      review_video_publication: {
+        Args: {
+          p_correlation_id?: string
+          p_decision: string
+          p_expected_authority_revision: number
+          p_idempotency_key: string
+          p_note?: string
+          p_publication_id: string
+          p_submitted_version_id: string
+        }
+        Returns: {
+          authority_revision: number
+          command_receipt_id: string
+          idempotent_replay: boolean
+          lifecycle_status: string
+          publication_id: string
+          receipt_status: string
+          resource_id: string
+          result_payload: Json
+          version_id: string
+          version_number: number
+        }[]
+      }
       revoke_user_role_admin: {
         Args: { target_role_key: string; target_user_id: string }
         Returns: boolean
@@ -23750,6 +23799,26 @@ export type Database = {
           version_number: number
         }[]
       }
+      snapshot_video_publication_working_version: {
+        Args: {
+          p_correlation_id?: string
+          p_expected_authority_revision: number
+          p_idempotency_key: string
+          p_publication_id: string
+        }
+        Returns: {
+          authority_revision: number
+          command_receipt_id: string
+          idempotent_replay: boolean
+          publication_id: string
+          receipt_status: string
+          resource_id: string
+          resource_kind: string
+          result_payload: Json
+          version_id: string
+          version_number: number
+        }[]
+      }
       soundex: { Args: { "": string }; Returns: string }
       split_multi_release_tracks: {
         Args: never
@@ -23907,6 +23976,27 @@ export type Database = {
           p_track_id: string
         }
         Returns: Json
+      }
+      submit_video_publication_for_review: {
+        Args: {
+          p_correlation_id?: string
+          p_expected_authority_revision: number
+          p_idempotency_key: string
+          p_note?: string
+          p_publication_id: string
+        }
+        Returns: {
+          authority_revision: number
+          command_receipt_id: string
+          idempotent_replay: boolean
+          lifecycle_status: string
+          publication_id: string
+          receipt_status: string
+          resource_id: string
+          result_payload: Json
+          version_id: string
+          version_number: number
+        }[]
       }
       suspend_user_access_admin: {
         Args: { reason?: string; target_user_id: string }
