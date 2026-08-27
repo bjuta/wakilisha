@@ -885,6 +885,14 @@ select
 from numbered
 order by numbered.resource_id, numbered.canonical_event_number;
 
+-- Flush deferred sequence-integrity trigger events produced by historical
+-- backfill before table-level DDL. PostgreSQL rejects ALTER TABLE while a
+-- relation has pending deferred trigger events. Re-arm deferred mode
+-- immediately so normal governed writes retain the accepted transaction
+-- semantics after this migration-local barrier.
+set constraints all immediate;
+set constraints all deferred;
+
 -- ---------------------------------------------------------------------------
 -- Security boundary.
 -- ---------------------------------------------------------------------------
