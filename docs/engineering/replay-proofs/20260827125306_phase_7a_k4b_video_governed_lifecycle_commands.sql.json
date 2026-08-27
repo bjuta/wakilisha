@@ -1,0 +1,16 @@
+{
+  "migration_file": "supabase/migrations/20260827125306_phase_7a_k4b_video_governed_lifecycle_commands.sql",
+  "migration_sha256": "89a3fcd4faf45f491b881efd86382fc4f785d583b4fa0abea0c9dca6c491c532",
+  "base_main_sha": "4aeab5c3ef37d82f216a7960f6e70207b2a86807",
+  "preview_project_ref": "vgrsjjsibewtrzqlxbia",
+  "preview_branch_id": "cff30424-855a-43bf-8acc-2279e1a861a9",
+  "preview_migration_head": "20260827125306",
+  "baseline_replay": "pass",
+  "candidate_apply": "pass",
+  "verifier": "pass",
+  "verifier_file": "scripts/control-plane/verify-phase-7a-k4b-video-governed-lifecycle-commands.sql",
+  "schema_types_sha256": "feba6374547a87441a2ba97b95ab373cd5a87f8f99a0c67d6b534c465e5701ae",
+  "schema_migration_count": 55,
+  "schema_migration_head": "20260827125306",
+  "verified_at": "2026-08-27T15:21:56.664Z"
+}
