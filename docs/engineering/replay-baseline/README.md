@@ -150,3 +150,45 @@ checkpoint.
 The canonical WAKILISHA Organization is replayed with its accepted Resource UUID
 `97d2dd8c-ff4d-48a0-95a7-5167f5e378d9`, so its institutional identity is stable
 across production and fresh controlled environments.
+
+### August 27 default-privilege replay parity repair
+
+A fresh zero-data Supabase preview exposed a replay-only authority difference
+that was not present in production.
+
+Fresh Supabase projects begin with broader `postgres` default privileges in the
+`public` schema than the accepted WAKILISHA production database. The active
+schema baseline recreated the captured object grants but did not first normalize
+those fresh-project defaults. As a result, replay inherited additional EXECUTE
+authority even though production did not have it.
+
+The repair is source-only replay authority. It does not execute against the
+production application schema and does not change the production migration
+ledger.
+
+The baseline now:
+
+- revokes fresh-project `PUBLIC`, `anon`, and `authenticated` default EXECUTE
+  before WAKILISHA functions are created;
+- normalizes fresh-project table and sequence defaults before application
+  objects are created;
+- restores the captured production grants already present later in the baseline;
+- removes the exact 34 replay-only `service_role` function EXECUTE grants proven
+  by effective-privilege comparison against production.
+
+The final zero-state replay was proven at migration count `56`, head
+`20260827165416`, with:
+
+- `884/884` governed routines at zero effective privilege mismatch;
+- `374/374` governed relations at zero effective privilege mismatch;
+- `5/5` governed sequences at zero effective privilege mismatch;
+- the exact production set of `80` anonymous-executable `SECURITY DEFINER`
+  routines;
+- zero new Supabase Advisor security or performance `WARN`/`ERROR` findings;
+- Phase 7A K1 compatibility and K4C-P1 shared-event helper definitions
+  byte-identical to production;
+- Playlist lifecycle pointer parity drift `0`;
+- typed Playlist event writers `0`.
+
+This repair was discovered while preparing Phase 7A K4C-P2. K4C-P2 remains a
+separate sealed candidate and is not part of this replay-baseline repair.
