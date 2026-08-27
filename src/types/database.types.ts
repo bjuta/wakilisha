@@ -3386,6 +3386,207 @@ export type Database = {
         }
         Relationships: []
       }
+      resource_lifecycle_actions: {
+        Row: {
+          action: string
+          created_at: string
+          description: string
+          enabled: boolean
+        }
+        Insert: {
+          action: string
+          created_at?: string
+          description: string
+          enabled?: boolean
+        }
+        Update: {
+          action?: string
+          created_at?: string
+          description?: string
+          enabled?: boolean
+        }
+        Relationships: []
+      }
+      resource_lifecycle_events: {
+        Row: {
+          action: string
+          actor_id: string | null
+          command_receipt_id: string | null
+          correlation_id: string | null
+          created_at: string
+          event_number: number
+          id: string
+          legacy_source_authority: string | null
+          legacy_source_event_id: string | null
+          metadata: Json
+          note: string | null
+          prior_status: string | null
+          resource_id: string
+          resulting_status: string | null
+          version_id: string | null
+        }
+        Insert: {
+          action: string
+          actor_id?: string | null
+          command_receipt_id?: string | null
+          correlation_id?: string | null
+          created_at?: string
+          event_number: number
+          id?: string
+          legacy_source_authority?: string | null
+          legacy_source_event_id?: string | null
+          metadata?: Json
+          note?: string | null
+          prior_status?: string | null
+          resource_id: string
+          resulting_status?: string | null
+          version_id?: string | null
+        }
+        Update: {
+          action?: string
+          actor_id?: string | null
+          command_receipt_id?: string | null
+          correlation_id?: string | null
+          created_at?: string
+          event_number?: number
+          id?: string
+          legacy_source_authority?: string | null
+          legacy_source_event_id?: string | null
+          metadata?: Json
+          note?: string | null
+          prior_status?: string | null
+          resource_id?: string
+          resulting_status?: string | null
+          version_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "resource_lifecycle_events_action_fkey"
+            columns: ["action"]
+            isOneToOne: false
+            referencedRelation: "resource_lifecycle_actions"
+            referencedColumns: ["action"]
+          },
+          {
+            foreignKeyName: "resource_lifecycle_events_resource_fkey"
+            columns: ["resource_id"]
+            isOneToOne: false
+            referencedRelation: "resources"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "resource_lifecycle_events_version_fkey"
+            columns: ["resource_id", "version_id"]
+            isOneToOne: false
+            referencedRelation: "resource_versions"
+            referencedColumns: ["resource_id", "id"]
+          },
+        ]
+      }
+      resource_review_actions: {
+        Row: {
+          action: string
+          created_at: string
+          description: string
+          enabled: boolean
+        }
+        Insert: {
+          action: string
+          created_at?: string
+          description: string
+          enabled?: boolean
+        }
+        Update: {
+          action?: string
+          created_at?: string
+          description?: string
+          enabled?: boolean
+        }
+        Relationships: []
+      }
+      resource_review_events: {
+        Row: {
+          action: string
+          actor_id: string | null
+          command_receipt_id: string | null
+          correlation_id: string | null
+          created_at: string
+          event_number: number
+          id: string
+          legacy_source_authority: string | null
+          legacy_source_event_id: string | null
+          prior_status: string
+          reason: string | null
+          resource_id: string
+          result_version_id: string | null
+          resulting_status: string
+          target_version_id: string
+        }
+        Insert: {
+          action: string
+          actor_id?: string | null
+          command_receipt_id?: string | null
+          correlation_id?: string | null
+          created_at?: string
+          event_number: number
+          id?: string
+          legacy_source_authority?: string | null
+          legacy_source_event_id?: string | null
+          prior_status: string
+          reason?: string | null
+          resource_id: string
+          result_version_id?: string | null
+          resulting_status: string
+          target_version_id: string
+        }
+        Update: {
+          action?: string
+          actor_id?: string | null
+          command_receipt_id?: string | null
+          correlation_id?: string | null
+          created_at?: string
+          event_number?: number
+          id?: string
+          legacy_source_authority?: string | null
+          legacy_source_event_id?: string | null
+          prior_status?: string
+          reason?: string | null
+          resource_id?: string
+          result_version_id?: string | null
+          resulting_status?: string
+          target_version_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "resource_review_events_action_fkey"
+            columns: ["action"]
+            isOneToOne: false
+            referencedRelation: "resource_review_actions"
+            referencedColumns: ["action"]
+          },
+          {
+            foreignKeyName: "resource_review_events_resource_fkey"
+            columns: ["resource_id"]
+            isOneToOne: false
+            referencedRelation: "resources"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "resource_review_events_result_version_fkey"
+            columns: ["resource_id", "result_version_id"]
+            isOneToOne: false
+            referencedRelation: "resource_versions"
+            referencedColumns: ["resource_id", "id"]
+          },
+          {
+            foreignKeyName: "resource_review_events_target_version_fkey"
+            columns: ["resource_id", "target_version_id"]
+            isOneToOne: false
+            referencedRelation: "resource_versions"
+            referencedColumns: ["resource_id", "id"]
+          },
+        ]
+      }
       resource_version_editorial_metadata: {
         Row: {
           created_at: string
