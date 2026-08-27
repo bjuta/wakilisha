@@ -384,3 +384,36 @@ A focused regression test requires this ordering:
 5. RLS table DDL
 
 The repaired candidate must be replay-proven again from K2 on a disposable preview containing at least one committed legacy lifecycle row before production is retried.
+
+## Repaired production-shaped native replay proof
+
+After the production-only deferred-trigger failure, the repaired K4A migration was replayed again on a fresh disposable preview created directly from the still-K2 production main.
+
+Repair preview:
+
+`dgyyisflgklfajzufjeg`
+
+Repair preview branch id:
+
+`d278391e-1e14-49c7-b0e9-e32296f8916f`
+
+Before K4A, the preview was deliberately seeded with one committed legacy Article lifecycle event through the canonical Article Resource provisioning path.
+
+This creates the exact condition that the original empty preview lacked: K4A historical backfill inserts at least one shared lifecycle event and therefore queues the deferrable sequence-integrity constraint trigger before the migration reaches the RLS table DDL.
+
+The repaired migration then passed through the native Supabase CLI and proved:
+
+1. exact K2 baseline at 53 migrations
+2. exactly one pending K4A migration
+3. one committed legacy Article lifecycle source row before K4A
+4. repaired K4A native push succeeds
+5. migration ledger advances 53 -> 54 exactly
+6. post-push native dry-run reports zero pending
+7. permanent K4A verifier passes
+8. the legacy Article event is preserved
+9. exactly one canonical shared lifecycle row is backfilled for that legacy source identity
+10. RLS is enabled on both shared event ledgers
+11. anon, authenticated, and service_role retain no direct INSERT privilege
+12. canonical replay proof and schema snapshot are regenerated from the repaired migration bytes and this production-shaped preview
+
+This production-shaped replay supersedes the original empty-preview replay for production promotion confidence.

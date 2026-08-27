@@ -1,9 +1,9 @@
 {
   "migration_file": "supabase/migrations/20260827095753_phase_7a_k4a_resource_event_authority.sql",
-  "migration_sha256": "7d8d77623a4ce186ed7b7f996b5ca7fde436bf76e520f3f31abbace8a9cd3ed4",
-  "base_main_sha": "9f4669b7e067cb716d5485894b3197caf5f9fe75",
-  "preview_project_ref": "rrkcxarqscjfwtbrsjks",
-  "preview_branch_id": "aa0f1da9-ce6e-4e48-b11f-b5c3d3cc2ebf",
+  "migration_sha256": "5a13eff4f62ce9877ba0ee8fffc6144f5aafdf2600cf0a18148aa0d744f6bcb8",
+  "base_main_sha": "80312bcbe5beb5089d966728ada80a8a66dbf66a",
+  "preview_project_ref": "dgyyisflgklfajzufjeg",
+  "preview_branch_id": "d278391e-1e14-49c7-b0e9-e32296f8916f",
   "preview_migration_head": "20260827095753",
   "baseline_replay": "pass",
   "candidate_apply": "pass",
@@ -12,5 +12,5 @@
   "schema_types_sha256": "c0c2ab8280b6fa00b64b404e4334a334928514f0efd3c72184ee46a2852ee567",
   "schema_migration_count": 54,
   "schema_migration_head": "20260827095753",
-  "verified_at": "2026-08-27T10:28:23.170Z"
+  "verified_at": "2026-08-27T11:27:34.385Z"
 }
