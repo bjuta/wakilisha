@@ -1,0 +1,16 @@
+{
+  "migration_file": "supabase/migrations/20260828120229_phase_7a_k4c_a1_audio_shared_event_convergence.sql",
+  "migration_sha256": "81bcde64ed132559708bfe143e296d6fe403c5525c2b4bd3fa019721376c96c9",
+  "base_main_sha": "3d8d5f6ff1fdb0f07a3b4c193b34f840787785d6",
+  "preview_project_ref": "uojfovzbfqwrugiogibn",
+  "preview_branch_id": "483e8f97-5396-46bc-9fd8-17d66b11f4b8",
+  "preview_migration_head": "20260828120229",
+  "baseline_replay": "pass",
+  "candidate_apply": "pass",
+  "verifier": "pass",
+  "verifier_file": "scripts/control-plane/verify-phase-7a-k4c-a1-audio-shared-event-convergence.sql",
+  "schema_types_sha256": "b881539a4d8b8d09c3eb44301757320d80b820222c79c37634145a9b9b6acb3f",
+  "schema_migration_count": 59,
+  "schema_migration_head": "20260828120229",
+  "verified_at": "2026-08-28T13:06:56.693Z"
+}
