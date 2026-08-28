@@ -2483,83 +2483,27 @@ export type Database = {
       }
       playlist_resources: {
         Row: {
-          current_approved_version_id: string | null
-          current_published_version_id: string | null
-          current_submitted_version_id: string | null
-          current_working_version_id: string | null
           playlist_id: string
           resource_id: string
           resource_kind: string
         }
         Insert: {
-          current_approved_version_id?: string | null
-          current_published_version_id?: string | null
-          current_submitted_version_id?: string | null
-          current_working_version_id?: string | null
           playlist_id: string
           resource_id: string
           resource_kind?: string
         }
         Update: {
-          current_approved_version_id?: string | null
-          current_published_version_id?: string | null
-          current_submitted_version_id?: string | null
-          current_working_version_id?: string | null
           playlist_id?: string
           resource_id?: string
           resource_kind?: string
         }
         Relationships: [
           {
-            foreignKeyName: "playlist_resources_approved_version_fkey"
-            columns: [
-              "current_approved_version_id",
-              "resource_id",
-              "playlist_id",
-            ]
-            isOneToOne: false
-            referencedRelation: "playlist_versions"
-            referencedColumns: ["id", "resource_id", "playlist_id"]
-          },
-          {
-            foreignKeyName: "playlist_resources_published_version_fkey"
-            columns: [
-              "current_published_version_id",
-              "resource_id",
-              "playlist_id",
-            ]
-            isOneToOne: false
-            referencedRelation: "playlist_versions"
-            referencedColumns: ["id", "resource_id", "playlist_id"]
-          },
-          {
             foreignKeyName: "playlist_resources_resource_fkey"
             columns: ["resource_id", "resource_kind"]
             isOneToOne: false
             referencedRelation: "resources"
             referencedColumns: ["id", "resource_kind"]
-          },
-          {
-            foreignKeyName: "playlist_resources_submitted_version_fkey"
-            columns: [
-              "current_submitted_version_id",
-              "resource_id",
-              "playlist_id",
-            ]
-            isOneToOne: false
-            referencedRelation: "playlist_versions"
-            referencedColumns: ["id", "resource_id", "playlist_id"]
-          },
-          {
-            foreignKeyName: "playlist_resources_working_version_fkey"
-            columns: [
-              "current_working_version_id",
-              "resource_id",
-              "playlist_id",
-            ]
-            isOneToOne: false
-            referencedRelation: "playlist_versions"
-            referencedColumns: ["id", "resource_id", "playlist_id"]
           },
         ]
       }
