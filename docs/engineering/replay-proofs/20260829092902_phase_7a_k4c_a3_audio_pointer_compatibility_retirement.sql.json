@@ -1,0 +1,16 @@
+{
+  "migration_file": "supabase/migrations/20260829092902_phase_7a_k4c_a3_audio_pointer_compatibility_retirement.sql",
+  "migration_sha256": "a5419ac98008e9e8fd7f782fd69a974bbd846d7d9ba873043d7f944e39d20015",
+  "base_main_sha": "d444d95a625ea19f920d08a4ad637a2a9392a72f",
+  "preview_project_ref": "ypnjfbesuqtiugtqvmqq",
+  "preview_branch_id": "22be33da-7f73-4ce4-9c80-f53fd61bed82",
+  "preview_migration_head": "20260829092902",
+  "baseline_replay": "pass",
+  "candidate_apply": "pass",
+  "verifier": "pass",
+  "verifier_file": "scripts/control-plane/verify-phase-7a-k4c-a3-audio-pointer-compatibility-retirement.sql",
+  "schema_types_sha256": "f5d7e92d437cffa9f8b7baa55996f5e94f39886de9317b29fde641702a7a1a67",
+  "schema_migration_count": 61,
+  "schema_migration_head": "20260829092902",
+  "verified_at": "2026-08-29T09:43:33.190Z"
+}

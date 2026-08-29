@@ -10,7 +10,7 @@ export type Database = {
   // Allows to automatically instantiate createClient with right options
   // instead of createClient<Database, { PostgrestVersion: 'XX' }>(URL, KEY)
   __InternalSupabase: {
-    PostgrestVersion: "14.17"
+    PostgrestVersion: "14.5"
   }
   editorial: {
     Tables: {
@@ -556,28 +556,16 @@ export type Database = {
       }
       audio_publication_resources: {
         Row: {
-          current_approved_version_id: string | null
-          current_published_version_id: string | null
-          current_submitted_version_id: string | null
-          current_working_version_id: string | null
           publication_id: string
           resource_id: string
           resource_kind: string
         }
         Insert: {
-          current_approved_version_id?: string | null
-          current_published_version_id?: string | null
-          current_submitted_version_id?: string | null
-          current_working_version_id?: string | null
           publication_id: string
           resource_id: string
           resource_kind: string
         }
         Update: {
-          current_approved_version_id?: string | null
-          current_published_version_id?: string | null
-          current_submitted_version_id?: string | null
-          current_working_version_id?: string | null
           publication_id?: string
           resource_id?: string
           resource_kind?: string
