@@ -1113,7 +1113,7 @@ begin
   perform editorial.append_resource_review_event(
     v_resource.id,
     v_thread.target_version_id,
-    v_new_version_id,
+    null,
     'changes_requested',
     v_prior_status,
     'draft',
