@@ -177,6 +177,9 @@ describe("Phase 7A K4C-AR1 Article review/editorial event convergence", () => {
     expect(body).toContain("v_thread.target_version_id");
     expect(body).toContain("v_new_version_id");
     expect(body).toContain("editorial.append_resource_review_event");
+    expect(body).toContain(
+      "v_thread.target_version_id,\n    null,\n    'changes_requested'",
+    );
     expect(body).not.toContain("insert into editorial.article_lifecycle_events");
   });
 
