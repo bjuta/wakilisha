@@ -1193,6 +1193,42 @@ end;
 $function$;
 
 
+-- CREATE OR REPLACE on Supabase preview may reapply exposed-schema default
+-- function privileges. Restore the accepted production RPC perimeter
+-- explicitly after all five AR1 replacements.
+revoke execute
+on function public.submit_article_for_review(uuid,bigint,text)
+from public, anon;
+
+revoke execute
+on function public.request_article_changes(uuid,uuid,text)
+from public, anon;
+
+revoke execute
+on function public.approve_article_version(uuid,uuid,text)
+from public, anon;
+
+revoke execute
+on function public.accept_article_suggestion(uuid,bigint,text)
+from public, anon;
+
+grant execute
+on function public.submit_article_for_review(uuid,bigint,text)
+to authenticated, service_role;
+
+grant execute
+on function public.request_article_changes(uuid,uuid,text)
+to authenticated, service_role;
+
+grant execute
+on function public.approve_article_version(uuid,uuid,text)
+to authenticated, service_role;
+
+grant execute
+on function public.accept_article_suggestion(uuid,bigint,text)
+to authenticated, service_role;
+
+
 create or replace function public.list_article_lifecycle_events(
   p_article_id uuid,
   p_limit integer default 50
@@ -1267,6 +1303,14 @@ begin
   limit v_limit;
 end;
 $function$;
+
+revoke execute
+on function public.list_article_lifecycle_events(uuid,integer)
+from public, anon;
+
+grant execute
+on function public.list_article_lifecycle_events(uuid,integer)
+to authenticated, service_role;
 
 
 do $phase_7a_k4c_ar1_postflight$
