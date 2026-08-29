@@ -261,7 +261,10 @@ It now adds:
 - shared lifecycle `changes_requested`
 - shared review `changes_requested`
 - target version = submitted review-round target
-- result version = newly applied working version
+- review result version = `NULL`, preserving the accepted K4A rule that only
+  `approved` review events may carry `result_version_id`
+- applied working-version identity remains in the existing suggestion audit and
+  lifecycle metadata
 - lifecycle metadata retaining suggestion identity and review-round closure facts
 - one completed internal receipt
 
