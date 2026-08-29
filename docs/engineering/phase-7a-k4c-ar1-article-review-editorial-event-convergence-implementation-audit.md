@@ -157,6 +157,22 @@ The helper:
 This does not claim externally idempotent legacy Article RPC behavior. A retry
 is still a new legacy invocation.
 
+## Public RPC ACL preservation
+
+A native disposable-preview apply exposed a Supabase/Postgres privilege side
+effect that the permanent verifier correctly rejected: the five replaced public
+Article functions acquired explicit `anon` execute while accepted production
+has only `authenticated` and `service_role` execute.
+
+The canonical migration now restores the accepted production perimeter
+explicitly after replacement:
+
+- revoke `PUBLIC` and `anon`
+- grant `authenticated` and `service_role`
+
+This is not a browser contract change. It prevents an unintended widening and
+makes the accepted production ACL an explicit migration invariant.
+
 ## AR1 command vocabulary
 
 The candidate registers exactly four enabled command types:
