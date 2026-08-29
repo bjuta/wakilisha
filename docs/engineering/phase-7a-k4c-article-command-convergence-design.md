@@ -341,9 +341,12 @@ AR1 must preserve that behavior.
 Its shared review event should bind:
 
 - target version: the submitted review-round target
-- result version: the newly applied working version
+- result version: `NULL`; K4A permits non-null review result identity only for
+  `approved` events
 - action: `changes_requested`
 - reason/note: the accepted suggestion decision note or the existing fallback
+- applied working-version identity remains in the existing suggestion audit and
+  canonical lifecycle metadata
 - correlation metadata: suggestion identity remains in canonical lifecycle
   metadata
 
