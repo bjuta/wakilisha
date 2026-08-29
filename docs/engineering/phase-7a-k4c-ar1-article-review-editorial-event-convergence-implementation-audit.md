@@ -1,6 +1,6 @@
 # Phase 7A K4C-AR1: Article Review and Editorial Event Convergence Implementation Audit
 
-Status: LOCAL CANDIDATE BUILT. PREVIEW NOT YET APPLIED.
+Status: PREVIEW SCHEMA + RUNTIME ACCEPTED. WAITING CANONICAL NATIVE MIGRATION PUSH.
 
 Opened: 29 August 2026
 
@@ -357,44 +357,228 @@ Acceptance marker:
 
 `PHASE_7A_K4C_AR1_ARTICLE_REVIEW_EDITORIAL_EVENT_CONVERGENCE_PASS`
 
-## Preview acceptance plan
+## Preview findings and runtime proof
+
+Disposable preview v2:
+
+- branch id: `19b53356-9909-41fa-81b4-92e31e70a603`
+- project ref: `jmdljplffkuumpeireht`
+- hourly cost: `$0.01344`
+- baseline history: exact `61`
+- baseline head:
+  `20260829092902_phase_7a_k4c_a3_audio_pointer_compatibility_retirement`
+- A3 permanent verifier: PASS before AR1 candidate execution
+
+The first disposable preview was discarded after MCP `apply_migration` minted
+a competing preview-only migration version instead of the canonical CLI-minted
+`20260829114236` identity. That preview was deleted rather than normalized.
+
+Preview v2 intentionally uses direct SQL for schema/runtime proof so migration
+history remains exact 61/A3 until the canonical native CLI push.
+
+### K4A review-result shape correction
+
+Before preview apply, shared review constraints proved that only `approved`
+events may carry non-null `result_version_id`.
+
+The first candidate had mapped accepted suggestions as
+`changes_requested` with the newly applied working version in
+`result_version_id`.
+
+AR1 was corrected before preview acceptance:
+
+- review target = submitted review-round version
+- review result = `NULL`
+- applied working version remains in the existing suggestion audit and shared
+  lifecycle metadata
+
+No shared primitive or constraint was widened.
+
+### Preview ACL provisioning drift
+
+A fresh 61/A3 Supabase preview provisions the five Article RPCs with explicit
+`anon` execute even though production does not.
+
+The permanent AR1 verifier rejected that broader perimeter.
+
+The canonical migration now explicitly restores production-equivalent ACLs
+after replacement:
+
+- `PUBLIC`: no execute
+- `anon`: no execute
+- `authenticated`: execute
+- `service_role`: execute
+
+The corrected candidate passes the permanent verifier with this perimeter.
+
+### Permanent verifier result
+
+Preview v2 result:
+
+`PHASE_7A_K4C_AR1_ARTICLE_REVIEW_EDITORIAL_EVENT_CONVERGENCE_PASS`
+
+Observed static authority after AR1 candidate schema apply:
+
+- typed Article lifecycle writers remaining: `6`
+- remaining writer set: exactly AR2 publication/scheduling functions
+- typed Article lifecycle rows in no-data preview: `0`
+- shared Article lifecycle rows before runtime fixtures: `0`
+- shared Article review rows before runtime fixtures: `0`
+
+### Submit runtime fixture
+
+Rollback-safe authenticated administrator fixture proved:
+
+- Article status: `draft -> pending`
+- draft version: `1 -> 2`
+- auto-provisioned Article Resource owner: fixture editor
+- canonical submitted pointer: populated
+- typed Article lifecycle writes: `0`
+- shared lifecycle events: one `submitted`
+- shared review events: one `submitted`
+- lifecycle/review command receipt identity: same receipt
+- correlation identity: non-null and shared
+- command receipt status: `succeeded`
+- command type: `article.review.submit`
+
+### Changes-requested + resubmit + approve fixture
+
+Rollback-safe runtime path proved the sequence:
+
+`submitted -> changes_requested -> submitted -> approved`
+
+All four command receipts completed as `succeeded`.
+
+Review-event shape proved:
+
+- submit result version: `NULL`
+- changes-requested result version: `NULL`
+- approved target: exact submitted version
+- approved result: new immutable approved version
+
+Typed Article lifecycle writes remained `0`.
+
+### Accepted-suggestion fixture
+
+Rollback-safe accepted suggestion proved:
+
+- Article returns `pending -> draft`
+- content changes to proposed snapshot
+- draft version increments
+- accepted suggestion stores `applied_version_id`
+- suggestion thread resolves
+- `article.review.suggestion.accept` receipt succeeds
+- shared lifecycle appends `changes_requested`
+- lifecycle metadata preserves:
+  - suggestion id
+  - applied working version id
+  - decision
+  - review-round closure
+- shared review appends `changes_requested`
+- review target = submitted review-round version
+- review result = `NULL`
+- typed Article lifecycle writes remain `0`
+
+### Stale-suggestion fixture
+
+Rollback-safe stale-path proof deliberately invalidated the active submitted
+pointer after creating the review suggestion.
+
+Observed behavior:
+
+- suggestion becomes `stale`
+- thread resolves
+- no `article.review.suggestion.accept` receipt is created
+- no additional lifecycle event is created
+- no additional review event is created
+- only the original submit receipt/event remains
+
+This preserves the pre-existing stale branch rather than inventing lifecycle
+history for a stale suggestion.
+
+### Lifecycle list runtime proof
+
+The stale-path fixture called
+`public.list_article_lifecycle_events(uuid,integer)` after submit.
+
+It returned the shared `submitted` lifecycle event, proving the public reader
+works against canonical shared history at runtime.
+
+### Fixture residue
+
+Post-rollback residue proof:
+
+- fixture auth users: `0`
+- fixture Articles: `0`
+- fixture review threads: `0`
+- fixture suggestions: `0`
+- typed Article lifecycle rows: `0`
+- shared Article lifecycle rows: `0`
+- shared Article review rows: `0`
+- preview migration count: `61`
+- preview migration head: `20260829092902`
+
+### Advisor delta
+
+AR1-specific security advisor comparison is clean.
+
+Production and preview both report the same five existing
+`authenticated_security_definer_function_executable` WARN findings for the
+five public Article RPCs. Those warnings are intentional existing API exposure
+and are not new in AR1.
+
+There is no AR1-specific performance advisor finding.
+
+The preview has broader project-wide `anon` advisor noise caused by Supabase
+preview ACL provisioning. The five AR1 RPCs are explicitly corrected to the
+production perimeter by the migration and permanent verifier.
+
+## Remaining preview acceptance plan
 
 Before any production mutation:
 
-1. create a fresh paid disposable Supabase preview from production
-2. require the preview to reach exact 61/A3 baseline first
-3. run full candidate migration transactionally with terminal commit replaced by
-   rollback
-4. prove no schema/history residue
-5. apply the byte-identical canonical migration natively
-6. run the permanent verifier
-7. run authenticated rollback-safe Article fixtures for:
+Completed before canonical native migration push:
+
+1. fresh paid disposable preview from production
+2. exact 61/A3 baseline
+3. full transactional candidate dry-run
+4. corrected candidate schema apply through untracked direct SQL
+5. permanent verifier PASS
+6. authenticated rollback-safe runtime fixtures:
    - submit
    - changes requested
    - approve
    - accepted suggestion
    - stale suggestion
    - lifecycle listing
-8. prove typed Article history count/fingerprint unchanged
-9. prove new shared lifecycle/review rows and completed receipts
-10. prove zero fixture residue after rollback
-11. compare security/performance advisors to production
-12. regenerate database types and require no semantic schema change
-13. record replay proof and live-schema baseline
-14. run focused tests, critical suite, application build, replay contract,
-    live-schema contract, and exact-scope diff
-15. commit/push only preview-proven bytes
-16. open protected PR
-17. promote only after CI and preview acceptance
-18. rerun production verifier
-19. compare production/preview advisor and migration parity
-20. delete the paid preview only after the production seal
+7. zero fixture residue
+8. advisor delta
+
+Remaining:
+
+1. reset preview v2 to clean 61/A3 schema
+2. native CLI push of exact canonical
+   `20260829114236_phase_7a_k4c_ar1_article_review_editorial_event_convergence.sql`
+3. require exact 62/AR1 migration history
+4. rerun permanent verifier
+5. rerun focused runtime smoke after canonical push
+6. regenerate database types and require no semantic schema change outside
+   intended function/command authority
+7. record replay proof and live-schema baseline
+8. run focused tests, critical suite, application build, replay contract,
+   live-schema contract, and exact-scope diff
+9. commit/push only preview-proven bytes
+10. open protected PR
+11. promote only after green CI and sealed preview
+12. rerun production verifier after SQL promotion
+13. compare production/preview advisor and migration parity
+14. delete the paid preview only after the production seal
 
 ## Current boundary
 
 Production remains untouched at 61/A3.
 
-AR1 is not yet preview-proven.
+AR1 schema/runtime behavior is preview-proven. Canonical migration-history stamping is still pending.
 
 No Edge Function deployment is required.
 
