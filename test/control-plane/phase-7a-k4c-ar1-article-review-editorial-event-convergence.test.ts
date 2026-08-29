@@ -231,6 +231,22 @@ describe("Phase 7A K4C-AR1 Article review/editorial event convergence", () => {
     }
   });
 
+  it("restores the accepted public Article RPC ACL after replacements", () => {
+    for (const signature of [
+      "public.submit_article_for_review(uuid,bigint,text)",
+      "public.request_article_changes(uuid,uuid,text)",
+      "public.approve_article_version(uuid,uuid,text)",
+      "public.accept_article_suggestion(uuid,bigint,text)",
+      "public.list_article_lifecycle_events(uuid,integer)",
+    ]) {
+      expect(migration).toContain(signature);
+    }
+
+    expect(migration).toContain("from public, anon;");
+    expect(migration).toContain("to authenticated, service_role;");
+    expect(verifier).toContain("Article public RPC execution perimeter drifted");
+  });
+
   it("keeps AR1 command vocabulary narrow and explicit", () => {
     for (const command of [
       "article.review.submit",
