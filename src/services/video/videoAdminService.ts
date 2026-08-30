@@ -70,6 +70,17 @@ export interface VideoAdminVocabularyItem {
   description: string;
 }
 
+export interface VideoNativeMediaContext {
+  assetId: string;
+  title: string | null;
+  primaryDeliveryUrl: string | null;
+  deliveryReady: boolean;
+  mimeType: string | null;
+  durationSeconds: number | null;
+  posterFrameUrl: string | null;
+  thumbnailUrl: string | null;
+}
+
 export interface VideoAdminIndex {
   publications: VideoPublicationSummary[];
   shows: VideoShowSummary[];
@@ -122,6 +133,7 @@ export interface VideoPublicationWorkspace {
   show: VideoShowSummary | null;
   showEpisode: VideoShowEpisodeSummary | null;
   selectedSource: VideoSourceSummary | null;
+  selectedMedia: VideoNativeMediaContext | null;
   poster: { usageLinkId: string; assetId: string; assetRevisionId: string } | null;
   transcript: { usageLinkId: string; assetId: string; assetRevisionId: string } | null;
   captions: VideoCaptionTrack[];
@@ -327,6 +339,19 @@ export async function fetchVideoPublicationWorkspace(
   const poster = object(root.poster);
   const transcript = object(root.transcript);
   const capabilities = object(root.capabilities);
+  const selectedSource = parseSource(root.selected_source);
+  const mediaAsset = selectedSource?.sourceKind === "native_media" && selectedSource.mediaAssetId
+    ? await getAdminMediaAssetById(selectedSource.mediaAssetId)
+    : null;
+  const mediaMetadata = object(mediaAsset?.metadata);
+  const transcodeMetadata = object(
+    mediaAsset?.selected_derivatives?.video_transcode?.technical_metadata,
+  );
+  const durationCandidate =
+    mediaMetadata.duration_seconds
+    ?? mediaMetadata.duration
+    ?? transcodeMetadata.duration_seconds
+    ?? transcodeMetadata.duration;
 
   return {
     publication: {
@@ -355,7 +380,23 @@ export async function fetchVideoPublicationWorkspace(
     },
     show: parseShow(root.show),
     showEpisode: parseEpisode(root.show_episode),
-    selectedSource: parseSource(root.selected_source),
+    selectedSource,
+    selectedMedia: mediaAsset
+      ? {
+          assetId: mediaAsset.id,
+          title: mediaAsset.title ?? null,
+          primaryDeliveryUrl: mediaAsset.primary_delivery_url ?? mediaAsset.url ?? null,
+          deliveryReady: mediaAsset.delivery_ready === true,
+          mimeType: mediaAsset.mime_type ?? null,
+          durationSeconds: durationCandidate == null
+            ? null
+            : numberValue(durationCandidate),
+          posterFrameUrl:
+            mediaAsset.selected_derivatives?.poster_frame?.url ?? null,
+          thumbnailUrl:
+            mediaAsset.selected_derivatives?.thumbnail?.url ?? null,
+        }
+      : null,
     poster: poster.asset_id
       ? {
           usageLinkId: text(poster.usage_link_id),
