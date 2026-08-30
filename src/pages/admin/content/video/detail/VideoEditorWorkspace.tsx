@@ -29,6 +29,7 @@ import {
   formatMediaTime,
 } from "@/components/design-system/editorial/MediaTransport";
 import { VideoTrustWorkspace } from "./VideoTrustWorkspace";
+import { VideoCorrectionProvenanceWorkspace } from "./VideoCorrectionProvenanceWorkspace";
 import {
   createEditorialTaxonomyTerm,
   fetchEditorialDiscovery,
@@ -65,6 +66,7 @@ type WorkspaceView =
   | "chapters"
   | "discovery"
   | "trust"
+  | "corrections"
   | "review"
   | "history";
 
@@ -723,6 +725,7 @@ export function VideoEditorWorkspace({
           {
             label: "Govern",
             items: [
+              { id: "corrections", label: "Corrections" },
               { id: "review", label: "Review" },
               { id: "history", label: "History" },
             ],
@@ -1353,6 +1356,10 @@ export function VideoEditorWorkspace({
           workspace={workspace}
           onReload={reload}
         />
+      ) : null}
+
+      {view === "corrections" ? (
+        <VideoCorrectionProvenanceWorkspace workspace={workspace} />
       ) : null}
 
       {view === "review" ? (
