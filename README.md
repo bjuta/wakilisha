@@ -16,12 +16,14 @@ docs/roadmap/wakilisha-master-programme-map.md
 docs/institute/two-workspace-pilot-audit-and-build-plan.md
 ```
 
-As of 20 August 2026:
+As of 30 August 2026:
 
-- Phases 0 through 5 are complete.
-- Phase 5 Playlist closed after the first real governed Playlist was reviewed and published end to end.
-- The Community, onboarding, Personal Playlist, identity, Organization, and reliability work completed afterward is recorded as the Post-Phase-5 Interlude.
-- The next numbered programme phase is **Phase 6: Audio**.
+- Phases 0 through 6 are complete.
+- Phase 7A Video publication authority is current.
+- The Resource-kernel convergence and post-kernel hardening are closed.
+- K5A governed Video editorial commands/admin reads are production accepted.
+- K5B purpose-built Video Editor composition is production accepted at 67 migrations, head `20260830102151_phase_7a_k5b_video_editor_shared_show_catalog`.
+- Phase 7A remains open until one real Video satisfies the canonical internal publication-authority exit gate.
 
 The roadmap is an orientation tool. Building WAKILISHA naturally exposes adjacent work, and those detours can materially improve the platform. When they do, record what changed and reconcile the map so the project remains understandable.
 

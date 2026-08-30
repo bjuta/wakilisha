@@ -2,25 +2,20 @@
 
 ## Current Phase 7A resume state — 30 August 2026
 
-The Resource-kernel detour is complete. See
-`docs/engineering/phase-7a-kernel-closure-record.md`.
+The Resource-kernel detour and post-kernel hardening are closed.
 
-Do not reopen K0, K1, K4A, or K4C while resuming Video.
+K5A governed Video editorial commands/admin reads are production accepted.
 
-The finalized kernel gives Video canonical Resource Version identity, lifecycle
-position, shared lifecycle/review event authority, and command concurrency
-without typed lifecycle mirrors or a typed Video event ledger.
+**K5B Video Editor Composition is CLOSED and production accepted** at migration count `67`, head `20260830102151_phase_7a_k5b_video_editor_shared_show_catalog`, and production application commit `aec43c23b8186f917905ae883a4754260d24d912`.
 
-A bounded post-kernel hardening candidate is being accepted separately and does
-not change the Video architecture.
+The live Video Admin Studio now composes the governed Video boundary without private-table browser reads or a Video-owned series model. `AdminModeComposer`, `MediaTransport`, and `MediaTimeline` earned canonical promotion through real Video second-consumer use. `EditorialCommentEditor` and `EditorialCreditPicker` remain candidates because their matching governed Video authority does not yet exist.
 
-The next Video product boundary is the governed editorial command/admin-read
-surface required by the internal Video Editor. The later Video UI must reuse
-canonical primitives and, where Video becomes the second real consumer of a
-candidate primitive, promote/extend-or-promote it in the same milestone.
+Do not reopen K0, K1, K4A, K4C, K5A, or K5B.
+
+The next Video work is a fresh bounded Phase 7A authority milestone for the remaining exit-gate gaps, then one real Video through immutable review and governed publication.
 
 
-Status: OPEN — AUDIT COMPLETE, ARCHITECTURE LOCKED, SCHEMA DESIGN IN REVIEW
+Status: OPEN — K5B VIDEO EDITOR ACCEPTED; EXIT-GATE AUTHORITY + REAL WORK REMAIN
 
 Opened: 25 August 2026
 
