@@ -1,8 +1,8 @@
 {
   "projectRef": "pgzizndxdyhqmtyywjmt",
   "schema": "public,editorial",
-  "generatedAt": "2026-08-30T12:52:00Z",
-  "typesSha256": "82cc6bbacce519b62c5c7b5cf0725ddaf4c143f158da422427c2268a6ec7339b",
+  "generatedAt": "2026-08-30T13:30:00Z",
+  "typesSha256": "0d02caa9a284151da427581151fbf7e25dd8c42cd456bbcfa9a3700426b6732b",
   "authoritativeMigrationDirectory": "supabase/migrations",
   "migrationCount": 68,
   "latestMigration": "20260830124903_phase_7a_k5c_video_version_trust_convergence.sql",
