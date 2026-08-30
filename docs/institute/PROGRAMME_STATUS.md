@@ -12,26 +12,31 @@ The Resource-kernel movement and bounded post-kernel hardening are **closed**.
 
 **K5C Video Version Trust Convergence is CLOSED and production accepted.**
 
-Current production authority after K5C:
+**K5D Video Correction Target + Provenance Convergence is CLOSED and production accepted.**
 
-- accepted production application commit: `00bf46ff356a45f0a4a914e1a7b263a722ec51d5`
-- production migration count: `68`
-- production migration head: `20260830124903_phase_7a_k5c_video_version_trust_convergence`
-- production frontend entry: `assets/index-D-kLB0iu.js`
-- production frontend entry SHA-256: `edfbff02c523628ae5ec25281ea4477e8a6a11c184bef0b05eff98e886b11dae`
+Current production authority after K5D:
 
-K5C converged Video onto shared exact-version Credits and Citations, preserved Trust across immutable Video snapshots, and promoted `EditorialCreditPicker` only after genuine Audio + Video second-consumer proof.
+- accepted production/frontend main: `af76d476053e9037382feb862efc55972c9049f8`
+- production migration count: `69`
+- production migration head: `20260830144945_phase_7a_k5d_video_correction_provenance_convergence`
+- production frontend entry: `assets/index-XyI8oImS.js`
+- production frontend entry SHA-256: `4dd81faa3ddee8b52c6a8cc18ab731262eff5d6de817aaaafc4a3f39e34172d7`
 
-Canonical K5C closure record:
+K5C converged Video onto shared exact-version Credits and Citations and promoted `EditorialCreditPicker` only after genuine Audio + Video second-consumer proof.
 
-`docs/engineering/phase-7a-k5c-video-version-trust-convergence-closure-record.md`
+K5D converged shared Correction targeting onto canonical Resource Version identity, preserved Article as an existing consumer, and added governed read-only Video Correction provenance without creating a Video-owned Correction subsystem.
 
-Phase 7A is **not** closed. Credits/Citations are no longer an exit-gate gap.
+Canonical closure records:
 
-The immediate numbered work is the remaining real-Video exit-gate authority: Corrections/provenance continuity, Registry relationships where required by the real Video, any missing Media/lifecycle relationship exposed by real use, and then one real Video through immutable review and governed publication.
+- `docs/engineering/phase-7a-k5c-video-version-trust-convergence-closure-record.md`
+- `docs/engineering/phase-7a-k5d-video-correction-provenance-convergence-closure-record.md`
+
+Phase 7A is **not** closed. Credits/Citations and Corrections/provenance continuity are no longer exit-gate gaps.
+
+The immediate numbered work is the real Video exit-gate instrument: move the existing real Video through working snapshot, immutable review, approval, and governed publication. Add Registry relationships or Media/lifecycle authority only if that real workflow proves they are required.
 
 
-Status date: 25 August 2026
+Status date: 30 August 2026
 
 Phase 6A production authority baseline: `fd0580e3a1a19e3d1f06a9c8466a37c84cd26a8b`
 
@@ -41,9 +46,9 @@ Documentation closure gate: PR #699, `Reconcile Phase 6B milestone closure recor
 
 Production runtime application baseline: `dae3de2dc9fb021496eb0fe0c4d4f0338f676a88`
 
-Current production migration head: `20260830124903`
+Current production migration head: `20260830144945`
 
-Current production migration count: `68`
+Current production migration count: `69`
 
 ## Status authority
 
@@ -219,7 +224,7 @@ Use the long-form plan's existing PR 7A contract:
 - Citations
 - governed immutable versions, Review, publication, Corrections and provenance
 
-The authority audit, schema/kernel convergence, K5A governed command/admin-read boundary, K5B purpose-built Video Editor composition, and K5C shared Credits/Citations convergence are complete. The immediate implementation is a fresh bounded Phase 7A authority slice for the remaining exit-gate gaps: Corrections/provenance, Registry links where required by the real Video, and any still-missing governed lifecycle or Media relationships needed to take one real Video through immutable review and publication.
+The authority audit, schema/kernel convergence, K5A governed command/admin-read boundary, K5B purpose-built Video Editor composition, K5C shared Credits/Citations convergence, and K5D shared Corrections/provenance convergence are complete. The immediate implementation is the real Video exit-gate instrument: take the existing real Video through working snapshot, immutable review, approval, and governed publication, closing only Registry, Media, readiness, or lifecycle gaps that the real workflow actually exposes.
 
 Phase 7B remains the public Video product.
 
