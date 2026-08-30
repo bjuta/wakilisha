@@ -1,6 +1,6 @@
 # Phase 7A K4C-AR3: Article Cross-System Reader Convergence and Typed-Event Retirement Implementation Audit
 
-Status: LOCAL CANDIDATE REPAIRED. PREVIEW TRANSACTIONAL ACCEPTANCE IN PROGRESS.
+Status: PREVIEW SCHEMA + RUNTIME ACCEPTED. WAITING CANONICAL NATIVE MIGRATION PUSH.
 
 Opened: 30 August 2026
 
@@ -383,3 +383,160 @@ No Edge Function deployment is required.
 No frontend deployment is required.
 
 No Readdy update is required.
+
+
+## Preview schema/runtime acceptance
+
+Disposable preview v1:
+
+- branch id: `aa012186-eb38-4ac1-8e1c-bdb07add663b`
+- project ref: `dofqvxhcatqbqlaguqyz`
+- hourly cost: `$0.01344`
+- baseline history: exact `63/AR2`
+- AR2 permanent verifier at baseline: PASS
+- no-data typed Article rows: `0`
+- no-data typed fingerprint:
+  `d41d8cd98f00b204e9800998ecf8427e`
+- no-data shared Article lifecycle rows: `0`
+
+The first transactional candidate attempt stopped before mutation because the
+initial candidate incorrectly required the production 35-row historical
+fingerprint on a no-data preview. The candidate was repaired to accept only the
+two legitimate environments:
+
+- production: `35/dd7ac00209d19f3f369fb0d9b3e1e6a1`
+- disposable no-data preview: `0/d41d8cd98f00b204e9800998ecf8427e`
+
+Any other row count remains a hard stop.
+
+The corrected full candidate transactional dry-run then passed and rolled back.
+
+Candidate schema was subsequently applied through direct SQL without migration
+history stamping for runtime acceptance.
+
+Permanent AR3 verifier result:
+
+`PHASE_7A_K4C_AR3_ARTICLE_CROSS_SYSTEM_READER_CONVERGENCE_TYPED_EVENT_RETIREMENT_PASS`
+
+Observed on candidate schema:
+
+- live typed Article dependency count: `0`
+- typed Article rows: `0`
+- shared Article lifecycle rows before fixtures: `0`
+- typed historical table remained physically present
+- no function/view/materialized-view/RLS-policy live dependency remained
+
+## Publishing reader runtime proof
+
+A rollback-safe owned Publishing-item fixture proved the rewritten
+`editorial.derive_publishing_editorial_state(uuid)` behavior from shared
+Resource lifecycle history.
+
+Observed:
+
+- `NULL` Resource -> `not_linked`
+- draft Article Resource before lifecycle override -> `draft`
+- shared `changes_requested` latest event ->
+  `changes_requested`
+- typed Article lifecycle writes: `0`
+
+The fixture transaction rolled back.
+
+## Corrections publication-proof runtime proof
+
+A governed rollback-safe Corrections fixture drove a published Article through:
+
+1. internal correction-case creation
+2. triage against the current published Article Version
+3. investigator assignment
+4. linked evidence creation
+5. evidence-ready investigation update
+6. submit for decision
+7. `correction_required` decision
+8. `apply_article_correction`
+
+All governed commands required for the final application succeeded.
+
+The successful application intentionally did not change the published pointer;
+the case reached `applied` while the correction version remained working
+authority. Therefore publication proof correctly remained absent before a
+matching corrected publication existed.
+
+To isolate the AR3 reader contract without altering the mature Corrections
+workflow, the rollback fixture then placed the correction version into the
+canonical published state using existing primitives:
+
+- `editorial.copy_article_lifecycle_version`
+- `editorial.publish_article_snapshot`
+- canonical Resource `current_published_version_id`
+- one shared `published` Resource lifecycle event
+
+The published copy preserved the correction version content fingerprint.
+
+The rewritten
+`editorial.correction_article_publication_proof(uuid)`
+then returned the exact expected:
+
+- case Resource id
+- application id
+- affected Article Resource id
+- Article id
+- challenged Article Version id
+- correction application resulting Version id
+- corrected published Version id
+- matching content fingerprint
+- Article slug
+
+Observed:
+
+- correction apply command: `succeeded`
+- application fingerprint = published fingerprint
+- shared `published` event satisfied publication proof
+- typed Article lifecycle writes: `0`
+
+The entire fixture transaction rolled back.
+
+### Pre-existing correction republish behavior outside AR3
+
+A normal post-correction review-submit/approve/publish fixture did not satisfy
+the correction publication proof because the existing review submission path
+recomputes Article snapshot fingerprint after changing `wp_status` to
+`pending`. The later lifecycle copies preserve that recomputed fingerprint,
+which can differ from the correction-version fingerprint.
+
+This behavior predates AR3 and is not caused by the typed-to-shared reader
+substitution. AR3 does not modify Corrections application, review, or
+publication commands to hide that mismatch. Any repair belongs to a separate
+bounded Corrections/publication milestone.
+
+## Preview residue, advisor, and generated-schema acceptance
+
+After all rollback-safe fixtures:
+
+- fixture users: `0`
+- fixture Articles: `0`
+- typed Article lifecycle rows: `0`
+- shared Article lifecycle rows: `0`
+- preview migration count/head remained exact `63/AR2`
+- live typed Article dependency count on candidate schema: `0`
+
+AR3-relevant security advisor surface matched production:
+
+- historical typed-table RLS/no-policy INFO: identical
+- existing Article lifecycle-list SECURITY DEFINER WARN: identical
+- no AR3-specific new security WARN/ERROR
+
+AR3-relevant performance advisor surface matched production:
+
+- two historical typed-table unindexed-FK INFO findings: identical
+- no AR3-specific new performance WARN/ERROR
+
+Generated TypeScript database types:
+
+- production byte length: `618219`
+- preview byte length: `618219`
+- exact equality: PASS
+
+Because preview v1 contains direct-SQL candidate schema without canonical
+migration-history stamping, it must be deleted rather than reset/reused for
+native migration promotion.
