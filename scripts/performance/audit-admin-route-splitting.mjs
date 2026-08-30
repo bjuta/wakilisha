@@ -73,9 +73,13 @@ const lazyImportCount = (
  * - AdminAudioPage
  * - AdminAudioDetailPage
  *
- * The current authority is therefore 95 lazy imports.
+ * Phase 7A K5B adds two canonical Video Admin Content routes:
+ * - AdminVideoPage
+ * - AdminVideoDetailPage
+ *
+ * The current authority is therefore 97 lazy imports.
  */
-const expectedLazyImportCount = 95;
+const expectedLazyImportCount = 97;
 
 if (lazyImportCount !== expectedLazyImportCount) {
   fail(
@@ -108,6 +112,8 @@ for (const marker of [
   "AdminArtistClaimsPage",
   "AdminAudioPage",
   "AdminAudioDetailPage",
+  "AdminVideoPage",
+  "AdminVideoDetailPage",
   "AdminPlaylistsPage",
   "AdminNewPlaylistPage",
   "AdminPlaylistDetailPage",
