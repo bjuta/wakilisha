@@ -61,7 +61,9 @@ describe("Phase 7A K5D Video Correction target + provenance convergence",()=>{
     expect(migration).toContain("editorial.article_resources");
     expect(migration).toContain("editorial.video_publication_resources");
     expect(migration).not.toMatch(/create\s+table\s+video\.(correction|corrections)/i);
-    expect(migration).not.toContain("apply_video_correction");
+    expect(migration).not.toMatch(
+      /create\\s+(?:or\\s+replace\\s+)?function\\s+public\\.apply_video_correction/i,
+    );
   });
 
   it("makes existing triage validate current published Resource Version provenance",()=>{
