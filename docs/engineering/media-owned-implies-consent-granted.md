@@ -1,6 +1,6 @@
 # Media Owned Rights -> Granted Consent Conditional
 
-Status: PREVIEW ACCEPTED — AWAITING PROTECTED CI
+Status: PRODUCTION DATABASE ACCEPTED — FRONTEND ACTIVATION PENDING
 
 Date: 30 August 2026
 
@@ -106,3 +106,47 @@ Schema/type disposition:
 ## Protected CI
 
 Pending.
+
+
+## Protected CI acceptance
+
+PR #751 passed protected Critical Control Plane #702 and merged at:
+
+`ffa2ebb35816e39955f4437ca7f93e7faded903e`
+
+The first PR run correctly stopped because the replay proof omitted the mandatory migration SHA and `baseline_replay = pass`. The proof metadata was repaired without changing runtime code, and #702 then passed the full protected control plane.
+
+## Production promotion
+
+The accepted migration bytes were promoted separately to production.
+
+Production state:
+
+- migration count: `73`
+- authoritative production head: `20260830185526_media_owned_implies_consent_granted`
+- permanent verifier: `MEDIA_OWNED_CONSENT_RULE_PASS`
+- rule-specific Security Advisor findings: none
+- rule-specific Performance Advisor findings: none
+
+The production apply recorded the already-accepted migration bytes at Supabase's production timestamp `20260830185526`, rather than the preview timestamp `20260830185038`.
+
+The repository migration filename and replay proof are rebound to the authoritative production timestamp. Migration bytes are unchanged and SQL is not replayed.
+
+The paid preview retains its accepted preview history at `20260830185038`; its verifier continues to pass. This timestamp difference is preview metadata only. Production and repository history are the control-plane authority from this point forward.
+
+No TypeScript database surface changed. The accepted `public,editorial` type SHA remains:
+
+`97cd758416514afcf6b0e4f9bb140c2012074af4d38905ff5f4eae3cb80d17ce`
+
+## Real Media state after production promotion
+
+The real `IMG_0133.MOV` Media asset was not mutated by deployment.
+
+It remains on governance version 1 with:
+
+- Rights: Unknown
+- Consent: Unknown
+- Source protection: Internal
+- Public safety: Internal
+
+The next content action must use the governed Media editor after exact-main frontend activation. Selecting Rights = Owned will derive Consent = Granted automatically.
