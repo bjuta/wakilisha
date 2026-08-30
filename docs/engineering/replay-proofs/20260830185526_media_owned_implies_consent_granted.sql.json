@@ -1,0 +1,57 @@
+{
+  "migration_file": "supabase/migrations/20260830185526_media_owned_implies_consent_granted.sql",
+  "base_main_sha": "ffa2ebb35816e39955f4437ca7f93e7faded903e",
+  "preview_project_ref": "osxkuuqlfhbmiykdwena",
+  "preview_branch_id": "d44a1d1c-6200-42b9-89a8-96ba7367484f",
+  "preview_branch_name": "media-owned-consent-production-parity",
+  "baseline_migration_count": 72,
+  "baseline_migration_head": "20260830173552",
+  "candidate_apply": "pass",
+  "preview_migration_count": 73,
+  "preview_migration_head": "20260830185526",
+  "verifier": "pass",
+  "verifier_marker": "MEDIA_OWNED_CONSENT_RULE_PASS",
+  "verifier_file": "scripts/control-plane/verify-media-owned-consent-rule.sql",
+  "behavioral_fixture": "MEDIA_OWNED_CONSENT_RULE_BEHAVIOR_PASS",
+  "fixture_terminal_state": "ROLLBACK",
+  "schema_types_sha256": "97cd758416514afcf6b0e4f9bb140c2012074af4d38905ff5f4eae3cb80d17ce",
+  "schema_migration_count": 73,
+  "schema_migration_head": "20260830185526",
+  "product_rule": {
+    "condition": "rights_status = owned",
+    "derived_state": "consent_status = granted",
+    "enforcement_layers": [
+      "media.asset_governance_versions trigger",
+      "Media editor derived state",
+      "browser governance command normalization"
+    ],
+    "historical_rewrite": false
+  },
+  "advisor_summary": {
+    "security_new_findings": [],
+    "performance_new_findings": []
+  },
+  "verified_at": "2026-08-30T19:00:00Z",
+  "migration_sha256": "10587f3f37fa44e3cb7298929f832579b9293ac29d42322fb613a8ba0145ec87",
+  "baseline_replay": "pass",
+  "preview_original_migration_head": "20260830185038",
+  "production_migration_head": "20260830185526",
+  "production_migration_count": 73,
+  "production_verifier": "pass",
+  "production_security_new_findings": [],
+  "production_performance_new_findings": [],
+  "timestamp_rebind": {
+    "reason": "Supabase production apply recorded the accepted migration bytes at its authoritative production timestamp 20260830185526.",
+    "accepted_preview_timestamp": "20260830185038",
+    "production_timestamp": "20260830185526",
+    "migration_bytes_unchanged": true,
+    "sql_replayed_after_success": false
+  },
+  "production_replay_preview": {
+    "project_ref": "osxkuuqlfhbmiykdwena",
+    "branch_id": "d44a1d1c-6200-42b9-89a8-96ba7367484f",
+    "migration_count": 73,
+    "migration_head": "20260830185526",
+    "exact_production_history": true
+  }
+}
