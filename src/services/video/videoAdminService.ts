@@ -133,6 +133,26 @@ export interface VideoTrustCredit {
   roleLabel: string | null;
 }
 
+export interface VideoCorrectionProvenanceCase {
+  caseResourceId: string;
+  caseReference: string;
+  caseState: string;
+  correctionKind: string | null;
+  priority: string | null;
+  targetId: string;
+  targetVersionId: string;
+  targetVersionType: string;
+  targetRole: string;
+  targetSummary: string | null;
+  observedContentFingerprint: string | null;
+  versionKind: string;
+  versionNumber: number;
+  currentDecisionOutcome: string | null;
+  currentDecisionPublicSafeExplanation: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
 export interface VideoPublicationWorkspace {
   publication: {
     id: string;
@@ -170,6 +190,10 @@ export interface VideoPublicationWorkspace {
     creditRevision: number;
     citations: VideoTrustCitation[];
     credits: VideoTrustCredit[];
+  };
+  correctionProvenance: {
+    canView: boolean;
+    cases: VideoCorrectionProvenanceCase[];
   };
   classifications: VideoAdminVocabularyItem[];
   sourceProviders: VideoAdminVocabularyItem[];
@@ -370,6 +394,7 @@ export async function fetchVideoPublicationWorkspace(
   const transcript = object(root.transcript);
   const capabilities = object(root.capabilities);
   const trust = object(root.trust);
+  const correctionProvenance = object(root.correction_provenance);
   const selectedSource = parseSource(root.selected_source);
   const mediaAsset = selectedSource?.sourceKind === "native_media" && selectedSource.mediaAssetId
     ? await getAdminMediaAssetById(selectedSource.mediaAssetId)
@@ -497,6 +522,33 @@ export async function fetchVideoPublicationWorkspace(
           creditRole: text(item.credit_role),
           displayName: text(item.display_name),
           roleLabel: nullableText(item.role_label),
+        };
+      }),
+    },
+    correctionProvenance: {
+      canView: bool(correctionProvenance.can_view),
+      cases: array(correctionProvenance.cases).map((value) => {
+        const item = object(value);
+        return {
+          caseResourceId: text(item.case_resource_id),
+          caseReference: text(item.case_reference),
+          caseState: text(item.case_state),
+          correctionKind: nullableText(item.correction_kind),
+          priority: nullableText(item.priority),
+          targetId: text(item.target_id),
+          targetVersionId: text(item.target_version_id),
+          targetVersionType: text(item.target_version_type),
+          targetRole: text(item.target_role),
+          targetSummary: nullableText(item.target_summary),
+          observedContentFingerprint: nullableText(item.observed_content_fingerprint),
+          versionKind: text(item.version_kind),
+          versionNumber: numberValue(item.version_number),
+          currentDecisionOutcome: nullableText(item.current_decision_outcome),
+          currentDecisionPublicSafeExplanation: nullableText(
+            item.current_decision_public_safe_explanation,
+          ),
+          createdAt: text(item.created_at),
+          updatedAt: text(item.updated_at),
         };
       }),
     },

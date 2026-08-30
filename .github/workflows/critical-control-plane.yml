@@ -61,6 +61,9 @@ jobs:
       - name: Enforce Phase 7A K5C Video version Trust convergence
         run: npx vitest run test/video/phase-7a-k5c-video-version-trust-convergence.test.ts
 
+      - name: Enforce Phase 7A K5D Video correction provenance convergence
+        run: npx vitest run test/video/phase-7a-k5d-video-correction-provenance-convergence.test.ts
+
       - name: Require Supabase control-plane access
         run: |
           if [ -z "$SUPABASE_ACCESS_TOKEN" ]; then
