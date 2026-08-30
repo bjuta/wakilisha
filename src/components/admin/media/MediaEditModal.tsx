@@ -947,12 +947,16 @@ export function MediaEditModal({
                           Rights
                           <select
                             value={governanceDraft.rightsStatus}
-                            onChange={(event) =>
+                            onChange={(event) => {
+                              const nextRights = event.target.value as MediaGovernanceDraft["rightsStatus"];
                               setGovernanceDraft((current) => current
-                                ? { ...current, rightsStatus: event.target.value as MediaGovernanceDraft["rightsStatus"] }
+                                ? {
+                                    ...current,
+                                    rightsStatus: nextRights, consentStatus: nextRights === "owned" ? "granted" : current.consentStatus,
+                                  }
                                 : current
-                              )
-                            }
+                              );
+                            }}
                             className="mt-1.5 w-full rounded-lg border border-wk-border bg-wk-surface px-2.5 py-1.5 text-[12px] text-wk-text outline-none focus:border-wk-brand/50"
                           >
                             <option value="unknown">Unknown</option>
@@ -969,13 +973,14 @@ export function MediaEditModal({
                           Consent
                           <select
                             value={governanceDraft.consentStatus}
+                            disabled={governanceDraft.rightsStatus === "owned"}
                             onChange={(event) =>
                               setGovernanceDraft((current) => current
                                 ? { ...current, consentStatus: event.target.value as MediaGovernanceDraft["consentStatus"] }
                                 : current
                               )
                             }
-                            className="mt-1.5 w-full rounded-lg border border-wk-border bg-wk-surface px-2.5 py-1.5 text-[12px] text-wk-text outline-none focus:border-wk-brand/50"
+                            className="mt-1.5 w-full rounded-lg border border-wk-border bg-wk-surface px-2.5 py-1.5 text-[12px] text-wk-text outline-none focus:border-wk-brand/50 disabled:cursor-not-allowed disabled:opacity-60"
                           >
                             <option value="unknown">Unknown</option>
                             <option value="not_required">Not required</option>
@@ -985,6 +990,11 @@ export function MediaEditModal({
                             <option value="declined">Declined</option>
                             <option value="withdrawn">Withdrawn</option>
                           </select>
+                          {governanceDraft.rightsStatus === "owned" ? (
+                            <span className="mt-1 block text-[10px] font-medium text-wk-text-faint">
+                              Granted automatically because Rights is Owned.
+                            </span>
+                          ) : null}
                         </label>
                       </div>
 
