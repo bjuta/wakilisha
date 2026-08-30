@@ -4,17 +4,17 @@
 
 The Resource-kernel detour and post-kernel hardening are closed.
 
-K5A governed Video command/admin-read authority, K5B Video Editor composition, and K5C exact-version shared Credits/Citations are production accepted.
+K5A governed Video command/admin-read authority, K5B Video Editor composition, K5C exact-version shared Credits/Citations, and K5D shared Corrections/provenance convergence are production accepted.
 
 Current production authority:
 
-- migrations: `68`
-- head: `20260830124903_phase_7a_k5c_video_version_trust_convergence`
-- application commit: `00bf46ff356a45f0a4a914e1a7b263a722ec51d5`
+- migrations: `69`
+- head: `20260830144945_phase_7a_k5d_video_correction_provenance_convergence`
+- accepted production/frontend main: `af76d476053e9037382feb862efc55972c9049f8`
 
-The schema decisions below remain historical design authority. Do not reopen already accepted K0/K1/K5A/K5B/K5C boundaries.
+The schema decisions below remain historical design authority. Do not reopen already accepted K0/K1/K5A/K5B/K5C/K5D boundaries.
 
-The next implementation must be driven only by the remaining real-Video exit-gate gaps: Corrections/provenance, Registry links where required, any missing Media/lifecycle relationship exposed by real use, and one real Video through immutable review and governed publication.
+The next implementation must be driven by the real Video exit-gate instrument itself: take the existing real Video through working snapshot, immutable review, approval, and governed publication. Add Registry, Media, readiness, lifecycle, or rich review-comment authority only if that real path exposes a concrete gap.
 
 
 Status: PROPOSED IMPLEMENTATION CONTRACT
@@ -1000,7 +1000,6 @@ This design document changes no runtime.
 
 Treat this document as accepted historical schema design, not as a request to recreate already-live Video foundations.
 
-K5A, K5B, and K5C are production accepted. The next schema work, if any, must arise from the remaining real-Video exit gate only: Corrections/provenance, required Registry links, missing Media/lifecycle relationships, and operational proof through immutable review and publication.
-## Next action
+K5A, K5B, K5C, and K5D are production accepted. Shared Credits/Citations and Corrections/provenance continuity are closed.
 
-Merge this design contract through protected CI, then implement the smallest first Video authority migration, permanent verifier, and focused contract tests byte-for-byte from the accepted design.
+The next schema work, if any, must arise from the real Video publication path. Use the existing real Video through working snapshot, immutable review, approval, and governed publication, and add only the specific Registry, Media, readiness, lifecycle, or review authority that the real workflow proves is missing.

@@ -6,17 +6,17 @@ The Resource-kernel detour and post-kernel hardening are closed.
 
 The K0/K1 lifecycle reconciliation described below is accepted production baseline.
 
-K5A governed Video commands/admin reads, K5B Video Editor composition, and K5C exact-version shared Credits/Citations are also production accepted.
+K5A governed Video commands/admin reads, K5B Video Editor composition, K5C exact-version shared Credits/Citations, and K5D shared Corrections/provenance convergence are also production accepted.
 
 Current production authority:
 
-- migrations: `68`
-- head: `20260830124903_phase_7a_k5c_video_version_trust_convergence`
-- application commit: `00bf46ff356a45f0a4a914e1a7b263a722ec51d5`
+- migrations: `69`
+- head: `20260830144945_phase_7a_k5d_video_correction_provenance_convergence`
+- accepted production/frontend main: `af76d476053e9037382feb862efc55972c9049f8`
 
 Do not reopen the lifecycle-pointer reconciliation while continuing Video.
 
-The next Video work is limited to the remaining real-Video exit-gate authority.
+The next Video work is the real exit-gate instrument itself. Add lifecycle, Media, Registry, readiness, or review authority only where the existing real Video publication path proves a concrete gap.
 
 
 Status: K0/K1 DEPENDENCY ADDENDUM

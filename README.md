@@ -22,8 +22,10 @@ As of 30 August 2026:
 - Phase 7A Video publication authority is current.
 - The Resource-kernel convergence and post-kernel hardening are closed.
 - K5A governed Video editorial commands/admin reads are production accepted.
-- K5B purpose-built Video Editor composition is production accepted at 67 migrations, head `20260830102151_phase_7a_k5b_video_editor_shared_show_catalog`.
-- Phase 7A remains open until one real Video satisfies the canonical internal publication-authority exit gate.
+- K5B purpose-built Video Editor composition is production accepted.
+- K5C exact-version shared Credits/Citations is production accepted.
+- K5D shared Corrections/provenance convergence is production accepted at 69 migrations, head `20260830144945_phase_7a_k5d_video_correction_provenance_convergence`, with accepted production/frontend main `af76d476053e9037382feb862efc55972c9049f8`.
+- Phase 7A remains open until one real Video satisfies the canonical internal publication-authority exit gate. The next step is that real Video workflow itself, with Registry, Media, readiness, lifecycle, or review work added only if real use exposes a concrete gap.
 
 The roadmap is an orientation tool. Building WAKILISHA naturally exposes adjacent work, and those detours can materially improve the platform. When they do, record what changed and reconcile the map so the project remains understandable.
 

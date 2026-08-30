@@ -1,6 +1,6 @@
 # Phase 7A K5D Video Correction Target + Provenance Convergence Implementation Audit
 
-Status: PREVIEW ACCEPTED — AWAITING PROTECTED CI
+Status: CLOSED — PRODUCTION ACCEPTED
 
 Date: 30 August 2026
 
@@ -141,23 +141,59 @@ K5D adds no new performance advisor finding.
 
 ### Schema seal
 
-Committed `public,editorial` TypeScript snapshot SHA-256:
+Committed production `public,editorial` TypeScript snapshot SHA-256:
 
-`75ae8e38975db6adc9e8239f87b2cc9c7211da1a7ef4ce0e109e17e743eb6a04`
+`b02d200f6a29b04ab1f7b951259b7ea4b5a8ebe6346476e18baa0e8cab06ac28`
 
 Schema baseline:
 
 - migration count: `69`
 - head: `20260830144945`
-- source preview: `npnlsdzjvtnecnxrrdhc`
-- base main: `413b0a738a60b1bad6ac1d7712c8d7d7200f1d6e`
+- source: production `pgzizndxdyhqmtyywjmt`
+- accepted main after schema-seal repair: `af76d476053e9037382feb862efc55972c9049f8`
 
 Replay proof:
 
 `docs/engineering/replay-proofs/20260830144945_phase_7a_k5d_video_correction_provenance_convergence.sql.json`
 
+## Production acceptance
+
+K5D implementation merged through PR #743 at:
+
+`5afb83eed12f16a47f0637112e5b9d899c7ff91f`
+
+Production promotion advanced the live database exactly from 68 to 69 migrations with head:
+
+`20260830144945_phase_7a_k5d_video_correction_provenance_convergence`
+
+The permanent verifier passed independently on production and preview. No K5D SQL was replayed after the successful production promotion.
+
+Repository-native schema verification then exposed one stale generated Correction-target relationship. PR #744 repaired only the generated TypeScript schema snapshot and production schema baseline. No live database authority changed.
+
+Accepted repaired main:
+
+`af76d476053e9037382feb862efc55972c9049f8`
+
+Merged-main Critical Control Plane run #682 passed.
+
+Exact-main frontend activation then passed with:
+
+- production entry: `assets/index-XyI8oImS.js`
+- entry SHA-256: `4dd81faa3ddee8b52c6a8cc18ab731262eff5d6de817aaaafc4a3f39e34172d7`
+- index SHA-256: `b425f28f3e9e7f24310f7726aba433fc5a7b243990be24909d35bb74f5178352`
+- remote checksum parity: PASS
+- HTTPS home and Video Admin: `200`
+
+Authenticated rendered production acceptance used the real Video Episode `Monday Morning in September` and proved the governed `Corrections` rail item, the `Corrections and Provenance` workspace, the exact immutable Resource Version explanation, and the empty state `No correction cases target this Video.`
+
+No production content was changed for rendered acceptance.
+
+Canonical closure record:
+
+`docs/engineering/phase-7a-k5d-video-correction-provenance-convergence-closure-record.md`
+
 ## Preview disposition
 
-Keep the preview alive through protected CI, merge, separate production promotion, independent production verification, exact-main frontend acceptance, and K5D closure.
+Keep the K5D preview only until this closure and programme-status reconciliation merge through protected CI.
 
-Delete it only after production closure merges.
+Delete it immediately after merged-main closure CI passes.
