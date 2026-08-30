@@ -19,6 +19,7 @@ import { AdminWorkspaceSection } from "@/components/design-system/admin/AdminWor
 import { EditorialWorkflowRail } from "@/components/design-system/editorial/EditorialWorkflowRail";
 import {
   EditorialDecisionWorkspace,
+  type EditorialDecisionDescriptor,
   type EditorialDecisionEvent,
 } from "@/components/design-system/editorial/EditorialDecisionWorkspace";
 import { EditorialMetadataWorkspace } from "@/components/design-system/editorial/EditorialMetadataWorkspace";
@@ -251,10 +252,14 @@ export function VideoEditorWorkspace({
 
   const decisionEvents = useMemo<EditorialDecisionEvent[]>(() => {
     if (!workspace) return [];
-    const mapEvent = (value: JsonObject, prefix: string): EditorialDecisionEvent => ({
+    const mapEvent = (
+      value: JsonObject,
+      prefix: string,
+      index: number,
+    ): EditorialDecisionEvent => ({
       id:
         eventValue(value, "id", "event_id") ||
-        `${prefix}-${Math.random().toString(36).slice(2)}`,
+        `${prefix}-${index}`,
       action: eventValue(value, "action", "event_type") || prefix,
       priorStatus: eventValue(value, "prior_status", "prior_state"),
       resultingStatus: eventValue(value, "resulting_status", "resulting_state"),
@@ -263,8 +268,12 @@ export function VideoEditorWorkspace({
       createdAt: eventValue(value, "created_at"),
     });
     return [
-      ...workspace.reviewEvents.map((event) => mapEvent(event, "review")),
-      ...workspace.lifecycleEvents.map((event) => mapEvent(event, "lifecycle")),
+      ...workspace.reviewEvents.map((event, index) =>
+        mapEvent(event, "review", index)
+      ),
+      ...workspace.lifecycleEvents.map((event, index) =>
+        mapEvent(event, "lifecycle", index)
+      ),
     ];
   }, [workspace]);
 
@@ -610,7 +619,7 @@ export function VideoEditorWorkspace({
     });
   }
 
-  const reviewActions = [];
+  const reviewActions: EditorialDecisionDescriptor[] = [];
   if (workspace.capabilities.canManageReview && workspace.resource.versions.submitted) {
     reviewActions.push(
       {
