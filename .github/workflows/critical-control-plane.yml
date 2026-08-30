@@ -55,6 +55,9 @@ jobs:
       - name: Enforce Phase 7A K5A Video editorial boundary
         run: npx vitest run test/video/phase-7a-k5a-video-editorial-command-read-boundary.test.ts
 
+      - name: Enforce Phase 7A K5B Video Editor composition
+        run: npx vitest run test/video/phase-7a-k5b-video-editor-composition.test.ts
+
       - name: Require Supabase control-plane access
         run: |
           if [ -z "$SUPABASE_ACCESS_TOKEN" ]; then
