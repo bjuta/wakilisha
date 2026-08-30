@@ -62,6 +62,101 @@ export type MediaRightsStatus =
   | "needs_clearance"
   | "restricted";
 
+export type MediaConsentStatus =
+  | "unknown"
+  | "not_required"
+  | "requested"
+  | "granted"
+  | "limited"
+  | "declined"
+  | "withdrawn";
+
+export type MediaSensitivity =
+  | "none"
+  | "low"
+  | "moderate"
+  | "high"
+  | "extreme";
+
+export type MediaEmbargoState =
+  | "none"
+  | "scheduled"
+  | "active"
+  | "released";
+
+export type MediaSourceProtectionClass =
+  | "public"
+  | "public_redacted"
+  | "internal"
+  | "restricted"
+  | "confidential";
+
+export type MediaPreservationState =
+  | "unassessed"
+  | "working_copy"
+  | "preservation_candidate"
+  | "preserved"
+  | "at_risk"
+  | "lost";
+
+export type MediaRetentionState =
+  | "retain"
+  | "review_required"
+  | "purge_requested"
+  | "purge_approved"
+  | "purged";
+
+export type MediaPublicSafetyState =
+  | "internal"
+  | "review_required"
+  | "approved_public"
+  | "approved_redacted"
+  | "blocked";
+
+export interface MediaGovernanceState {
+  assetId: string;
+  authorityRevision: number;
+  currentRevisionId: string | null;
+  currentGovernanceVersionId: string;
+  versionNumber: number;
+  rightsStatus: MediaRightsStatus;
+  rightsBasis: string | null;
+  rightsHolder: string | null;
+  licenceIdentifier: string | null;
+  licenceTerms: string | null;
+  consentStatus: MediaConsentStatus;
+  consentScope: string | null;
+  sensitivity: MediaSensitivity;
+  embargoState: MediaEmbargoState;
+  embargoUntil: string | null;
+  sourceProtectionClass: MediaSourceProtectionClass;
+  preservationState: MediaPreservationState;
+  retentionState: MediaRetentionState;
+  publicSafetyState: MediaPublicSafetyState;
+  internalReason: string | null;
+  approvedBy: string | null;
+  createdBy: string | null;
+  createdAt: string | null;
+}
+
+export interface MediaGovernanceDraft {
+  rightsStatus: MediaRightsStatus;
+  rightsBasis?: string | null;
+  rightsHolder?: string | null;
+  licenceIdentifier?: string | null;
+  licenceTerms?: string | null;
+  consentStatus: MediaConsentStatus;
+  consentScope?: string | null;
+  sensitivity: MediaSensitivity;
+  embargoState: MediaEmbargoState;
+  embargoUntil?: string | null;
+  sourceProtectionClass: MediaSourceProtectionClass;
+  preservationState: MediaPreservationState;
+  retentionState: Extract<MediaRetentionState, "retain" | "review_required">;
+  publicSafetyState: MediaPublicSafetyState;
+  internalReason?: string | null;
+}
+
 export interface MediaFolder {
   id: string;
   parent_id: string | null;
@@ -385,6 +480,38 @@ function objectValue(
   return value as Record<string, unknown>;
 }
 
+async function invokeMediaRead(
+  functionName: string,
+  args: Record<string, unknown>,
+): Promise<Record<string, unknown>> {
+  const client = supabase as unknown as {
+    rpc: (
+      name: string,
+      payload: Record<string, unknown>,
+    ) => PromiseLike<MediaWriteRpcResponse>;
+  };
+
+  const { data, error } = await client.rpc(
+    functionName,
+    args,
+  );
+
+  if (error) {
+    throw new Error(
+      `We could not load Media governance: ${error.message}`,
+    );
+  }
+
+  const result = objectValue(data);
+  if (!result) {
+    throw new Error(
+      "We could not confirm the current Media governance state.",
+    );
+  }
+
+  return result;
+}
+
 async function invokeMediaWrite(
   functionName: string,
   args: Record<string, unknown>,
@@ -586,6 +713,116 @@ export function getMediaAssetDeliveryUrl(
 // ─── Service ──────────────────────────────────────────────────
 
 export const mediaService = {
+  // ════════════════════════════════════════════════════════════
+  // CANONICAL MEDIA GOVERNANCE
+  // ════════════════════════════════════════════════════════════
+
+  async getGovernance(
+    assetId: string,
+  ): Promise<MediaGovernanceState> {
+    const result = await invokeMediaRead(
+      "get_media_asset_governance_admin",
+      { p_asset_id: assetId },
+    );
+
+    const requiredNumber = (key: string): number => {
+      const value = Number(result[key]);
+      if (!Number.isInteger(value) || value < 1) {
+        throw new Error("Media governance returned an invalid version.");
+      }
+      return value;
+    };
+
+    const requiredText = (key: string): string => {
+      const value = result[key];
+      if (typeof value !== "string" || !value) {
+        throw new Error("Media governance returned an incomplete state.");
+      }
+      return value;
+    };
+
+    const nullableText = (key: string): string | null => {
+      const value = result[key];
+      return typeof value === "string" && value ? value : null;
+    };
+
+    return {
+      assetId: requiredText("asset_id"),
+      authorityRevision: requiredNumber("authority_revision"),
+      currentRevisionId: nullableText("current_revision_id"),
+      currentGovernanceVersionId: requiredText(
+        "current_governance_version_id",
+      ),
+      versionNumber: requiredNumber("version_number"),
+      rightsStatus: requiredText("rights_status") as MediaRightsStatus,
+      rightsBasis: nullableText("rights_basis"),
+      rightsHolder: nullableText("rights_holder"),
+      licenceIdentifier: nullableText("licence_identifier"),
+      licenceTerms: nullableText("licence_terms"),
+      consentStatus: requiredText("consent_status") as MediaConsentStatus,
+      consentScope: nullableText("consent_scope"),
+      sensitivity: requiredText("sensitivity") as MediaSensitivity,
+      embargoState: requiredText("embargo_state") as MediaEmbargoState,
+      embargoUntil: nullableText("embargo_until"),
+      sourceProtectionClass: requiredText(
+        "source_protection_class",
+      ) as MediaSourceProtectionClass,
+      preservationState: requiredText(
+        "preservation_state",
+      ) as MediaPreservationState,
+      retentionState: requiredText(
+        "retention_state",
+      ) as MediaRetentionState,
+      publicSafetyState: requiredText(
+        "public_safety_state",
+      ) as MediaPublicSafetyState,
+      internalReason: nullableText("internal_reason"),
+      approvedBy: nullableText("approved_by"),
+      createdBy: nullableText("created_by"),
+      createdAt: nullableText("created_at"),
+    };
+  },
+
+  async createGovernanceVersion(
+    assetId: string,
+    expectedAuthorityRevision: number,
+    governance: MediaGovernanceDraft,
+    reason: string,
+  ): Promise<MediaGovernanceState> {
+    const trimmedReason = reason.trim();
+    if (!trimmedReason) {
+      throw new Error("Explain why this Media governance state is changing.");
+    }
+
+    await invokeMediaWrite(
+      "create_media_governance_version",
+      {
+        p_asset_id: assetId,
+        p_expected_authority_revision: expectedAuthorityRevision,
+        p_governance: {
+          rights_status: governance.rightsStatus,
+          rights_basis: governance.rightsBasis?.trim() || null,
+          rights_holder: governance.rightsHolder?.trim() || null,
+          licence_identifier: governance.licenceIdentifier?.trim() || null,
+          licence_terms: governance.licenceTerms?.trim() || null,
+          consent_status: governance.consentStatus,
+          consent_scope: governance.consentScope?.trim() || null,
+          sensitivity: governance.sensitivity,
+          embargo_state: governance.embargoState,
+          embargo_until: governance.embargoUntil || null,
+          source_protection_class: governance.sourceProtectionClass,
+          preservation_state: governance.preservationState,
+          retention_state: governance.retentionState,
+          public_safety_state: governance.publicSafetyState,
+        },
+        p_reason: trimmedReason,
+        p_correlation_id: crypto.randomUUID(),
+      },
+    );
+
+    return this.getGovernance(assetId);
+  },
+
   // ════════════════════════════════════════════════════════════
   // RESUMABLE AUDIO / VIDEO MASTER WORKFLOW
   // ════════════════════════════════════════════════════════════
