@@ -1,6 +1,6 @@
 # Video Publish Deferred Binding Integrity Repair
 
-Status: CANDIDATE — REAL PUBLISH FAILURE PROVED IN PRODUCTION
+Status: PREVIEW ACCEPTED — AWAITING PROTECTED CI
 
 Date: 30 August 2026
 
@@ -78,3 +78,42 @@ The same shared binding integrity function covers Article, Playlist, Audio, Pers
 - frontend deploy: No
 - Readdy Finish: No
 - production content mutation before acceptance: No
+
+
+## Preview acceptance
+
+Accepted preview:
+
+- project ref: `osxkuuqlfhbmiykdwena`
+- branch id: `d44a1d1c-6200-42b9-89a8-96ba7367484f`
+- migration count: `74`
+- head: `20260830193925_video_publish_deferred_binding_integrity`
+
+Migration SHA-256:
+
+`b6dd5da6fa841612c8724b699ee421f85230ce8ef9274fbdc23b844450ae1d67`
+
+Permanent verifier:
+
+`VIDEO_PUBLISH_DEFERRED_BINDING_INTEGRITY_PASS`
+
+Verifier SHA-256:
+
+`f316d9cb6033d3836ca41373903aa64af18e40fcf5eaf36cc0ece861e7d632e0`
+
+Rollback-only behavior proof:
+
+`VIDEO_PUBLISH_DEFERRED_BINDING_INTEGRITY_BEHAVIOR_PASS`
+
+The behavior proof inserted one rollback-only standalone Video Resource + typed publication binding, switched to the authenticated role, and forced all deferred constraints immediate. The shared binding trigger successfully read the private Video binding table under internal authority.
+
+Advisor disposition:
+
+- no repair-specific Security Advisor finding
+- no repair-specific Performance Advisor finding
+
+No TypeScript database surface changed.
+
+## Protected CI
+
+Pending.
