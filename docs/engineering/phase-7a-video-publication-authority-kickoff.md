@@ -8,16 +8,18 @@ K5A governed Video editorial commands/admin reads are production accepted.
 
 K5B Video Editor Composition is closed and production accepted.
 
-**K5C Video Version Trust Convergence is CLOSED and production accepted** at migration count `68`, head `20260830124903_phase_7a_k5c_video_version_trust_convergence`, and production application commit `00bf46ff356a45f0a4a914e1a7b263a722ec51d5`.
+**K5C Video Version Trust Convergence is CLOSED and production accepted.**
 
-The live Video Admin Studio now composes governed exact-version Credits and Citations through shared Trust authority. `EditorialCreditPicker` is canonical after real Audio + Video second-consumer proof. `EditorialCommentEditor` remains candidate because matching governed Video review-comment authority does not yet exist.
+**K5D Video Correction Target + Provenance Convergence is CLOSED and production accepted** at migration count `69`, head `20260830144945_phase_7a_k5d_video_correction_provenance_convergence`, and accepted production/frontend main `af76d476053e9037382feb862efc55972c9049f8`.
 
-Do not reopen K0, K1, K4A, K4C, K5A, K5B, or K5C.
+The live Video Admin Studio now composes governed exact-version Credits/Citations and read-only Correction provenance through shared authority. `EditorialCreditPicker` is canonical after real Audio + Video second-consumer proof. `EditorialCommentEditor` remains candidate because matching governed Video review-comment authority does not yet exist.
 
-The next Video work is a fresh bounded Phase 7A milestone for the remaining real-Video exit-gate authority: Corrections/provenance, Registry links where required, any missing Media/lifecycle relationship exposed by real use, then one real Video through immutable review and governed publication.
+Do not reopen K0, K1, K4A, K4C, K5A, K5B, K5C, or K5D.
+
+The next Video work is the real Phase 7A exit-gate instrument itself: take the existing real Video through working snapshot, immutable review, approval, and governed publication. Add Registry relationships or Media/lifecycle authority only if that real workflow exposes a concrete need.
 
 
-Status: OPEN — K5C TRUST ACCEPTED; REMAINING EXIT-GATE AUTHORITY + REAL WORK REMAIN
+Status: OPEN — K5D CORRECTIONS/PROVENANCE ACCEPTED; REAL VIDEO EXIT GATE REMAINS
 
 Opened: 25 August 2026
 
@@ -27,9 +29,9 @@ Programme documentation baseline: `8f6bd2be1f4159fb21a34b71290c8879931cdd49`
 
 Production runtime application baseline: `dae3de2dc9fb021496eb0fe0c4d4f0338f676a88`
 
-Current production migration head: `20260830124903`
+Current production migration head: `20260830144945`
 
-Current production migration count: `68`
+Current production migration count: `69`
 
 Predecessor closure:
 
@@ -360,13 +362,25 @@ This schema-design step is documentation only.
 
 ## Next action
 
-Do not reopen K5A, K5B, or K5C.
+Do not reopen K5A, K5B, K5C, or K5D.
 
-Credits and Citations are closed for Video.
+Credits/Citations and Corrections/provenance continuity are closed for Video.
 
-Open the smallest remaining Phase 7A authority slice required by the real Video exit gate: Corrections/provenance first where required, Registry relationships only where real content needs them, and any Media/lifecycle gap exposed by the existing real Video. Then move one real Video through immutable review and governed publication.
+Use the existing real Video as the Phase 7A exit-gate instrument:
+
+1. save a working snapshot
+2. submit the immutable review version
+3. perform governed review using existing authority
+4. approve
+5. publish through governed lifecycle authority
+6. record any real Registry, Media, readiness, or lifecycle gap exposed by that path
+7. close only those proved gaps
+8. complete the real Video publication
+
+Do not create a synthetic Registry milestone or new Video-owned authority merely to extend the programme. `EditorialCommentEditor` remains candidate unless real Video review proves matching rich comment authority is needed.
 
 Phase 7B remains the public Video product.
-## Next action
 
-Merge `docs/engineering/phase-7a-video-authority-schema-design.md` through protected CI, then implement the smallest first Video authority migration, permanent verifier, and focused contract tests from that accepted design before creating a disposable preview.
+Canonical K5D closure record:
+
+`docs/engineering/phase-7a-k5d-video-correction-provenance-convergence-closure-record.md`
