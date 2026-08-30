@@ -578,10 +578,91 @@ Remaining:
 
 Production remains untouched at 61/A3.
 
-AR1 schema/runtime behavior is preview-proven. Canonical migration-history stamping is still pending.
+AR1 canonical preview migration, schema/runtime behavior, permanent verifier, advisor delta, and post-push runtime smoke are proven. Repository replay/live-schema sealing remains.
 
 No Edge Function deployment is required.
 
 No frontend deployment is required.
 
 No Readdy Finish update is required.
+
+
+## Canonical native preview push
+
+Canonical CLI-native preview promotion completed on preview v3.
+
+Preview v3:
+
+- branch id: `b629663f-0bae-46fa-aaab-e2d94d02874a`
+- project ref: `prewofyufkculzxqbyac`
+- baseline before push: exact `61/A3`
+- canonical pending migration count before push: `1`
+- canonical pending migration:
+  `20260829114236_phase_7a_k4c_ar1_article_review_editorial_event_convergence.sql`
+- migration SHA-256:
+  `43c347967718a6a06e598c3ecddecb6ef10239674e772e82a214cb2f8365696c`
+- focused AR1 static tests: `14/14 PASS`
+- application build: PASS
+- native `supabase db push --linked`: PASS
+- preview migration count after push: `62`
+- preview migration head after push: `20260829114236`
+- preview pending migrations after push: `0`
+- production mutation: none
+
+A first native-push handoff stopped falsely before mutation because Supabase CLI
+2.107.0 emits dry-run status lines on stderr and the shell gate captured stdout
+only. Independent preview history remained 61/A3. The corrected resume captured
+stdout and stderr together, proved exactly one pending canonical migration, and
+then pushed the same migration bytes.
+
+## Independent canonical preview seal
+
+After canonical native push, independent control-plane checks against
+`prewofyufkculzxqbyac` proved:
+
+- permanent AR1 verifier:
+  `PHASE_7A_K4C_AR1_ARTICLE_REVIEW_EDITORIAL_EVENT_CONVERGENCE_PASS`
+- typed Article lifecycle writer count: `6`
+- production migration count/head: `61/A3`
+- preview migration count/head: `62/AR1`
+- first 61 migration versions: exact production/preview parity
+- AR1-only security advisor findings: `0`
+- AR1-only performance advisor findings: `0`
+- generated TypeScript database types: byte-identical between production and
+  preview
+- generated type byte length: `618219` in both environments
+
+The five existing authenticated `SECURITY DEFINER` Article RPC advisor WARNs
+are identical between production and preview and remain intentional existing API
+exposure. AR1 introduces no additional Article-relevant advisor finding.
+
+## Canonical post-push runtime smoke
+
+A fresh rollback-safe authenticated administrator fixture was executed after
+the canonical migration was stamped as preview migration 62.
+
+Decision path:
+
+`submitted -> changes_requested -> submitted -> approved`
+
+Observed:
+
+- all four command receipts: `succeeded`
+- approved review event target: exact submitted version
+- approved review event result: immutable approved version
+- non-approved review event result versions: `NULL`
+- typed Article lifecycle writes: `0`
+
+Accepted-suggestion path:
+
+- submit receipt: `succeeded`
+- suggestion-accept receipt: `succeeded`
+- Article status after acceptance: `draft`
+- Article draft version after acceptance: `3`
+- Article content: accepted revised snapshot
+- shared review sequence:
+  `submitted -> changes_requested`
+- suggestion `changes_requested` review result version: `NULL`
+- typed Article lifecycle writes: `0`
+
+The entire canonical post-push smoke transaction rolled back.
