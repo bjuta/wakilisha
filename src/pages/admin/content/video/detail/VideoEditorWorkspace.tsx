@@ -1495,7 +1495,9 @@ export function VideoEditorWorkspace({
             ? ["video"]
             : picker === "poster"
               ? ["image"]
-              : ["document"]
+              : picker === "transcript"
+                ? ["transcript"]
+                : ["caption"]
         }
         selectionPurpose={
           picker === "transcript" ? "transcript" : "media"
