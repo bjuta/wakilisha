@@ -25,19 +25,44 @@ begin
   if (
     select count(*)
     from editorial.article_lifecycle_events
-  ) <> 35
-     or (
-       select md5(
-         coalesce(
-           string_agg(to_jsonb(e)::text, E'\n' order by e.id::text),
-           ''
-         )
-       )
-       from editorial.article_lifecycle_events e
-     ) <> 'dd7ac00209d19f3f369fb0d9b3e1e6a1'
-  then
+  ) = 0 then
+    if (
+      select md5(
+        coalesce(
+          string_agg(to_jsonb(e)::text, E'\n' order by e.id::text),
+          ''
+        )
+      )
+      from editorial.article_lifecycle_events e
+    ) <> 'd41d8cd98f00b204e9800998ecf8427e'
+    then
+      raise exception
+        'PHASE_7A_K4C_AR3_FAIL: no-data preview typed Article fingerprint drifted';
+    end if;
+  elsif (
+    select count(*)
+    from editorial.article_lifecycle_events
+  ) = 35 then
+    if (
+      select md5(
+        coalesce(
+          string_agg(to_jsonb(e)::text, E'\n' order by e.id::text),
+          ''
+        )
+      )
+      from editorial.article_lifecycle_events e
+    ) <> 'dd7ac00209d19f3f369fb0d9b3e1e6a1'
+    then
+      raise exception
+        'PHASE_7A_K4C_AR3_FAIL: production typed Article fingerprint drifted';
+    end if;
+  else
     raise exception
-      'PHASE_7A_K4C_AR3_FAIL: typed Article historical compatibility identity drifted';
+      'PHASE_7A_K4C_AR3_FAIL: unexpected typed Article historical row count %',
+      (
+        select count(*)
+        from editorial.article_lifecycle_events
+      );
   end if;
 
   if exists (
