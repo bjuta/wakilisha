@@ -21,25 +21,26 @@ Phases 0 through 6 are closed.
 
 Phase 6B Public Audio closed on 25 August 2026 by explicit programme decision after its public Audio authority and post-M2 convergence baseline were accepted in production. The former real-podcast exercise remains a useful non-blocking Audio operational acceptance task and is not represented as completed.
 
-K5A governed Video editorial commands/admin reads and K5B purpose-built Video Editor composition are production accepted.
+K5A governed Video editorial commands/admin reads, K5B purpose-built Video Editor composition, and **K5C exact-version shared Credits/Citations are production accepted**.
 
-The immediate next implementation is a fresh bounded **Phase 7A remaining-authority milestone**. It must close the shared Credits/Citations, Registry relationships where required, Corrections/provenance, and any missing governed lifecycle or Media relationships needed for one real Video to satisfy the internal Phase 7A exit gate.
+The immediate next implementation is a fresh bounded **Phase 7A remaining exit-gate milestone**. Credits/Citations are closed. The next work must close Corrections/provenance, Registry relationships where the real Video requires them, and any missing governed lifecycle or Media relationship exposed by real use, then move one real Video through immutable review and governed publication.
 
 This plan is reconciled against protected main at:
 
-`aec43c23b8186f917905ae883a4754260d24d912`
+`00bf46ff356a45f0a4a914e1a7b263a722ec51d5`
 
 Current production schema authority:
 
-- 67 authoritative repository migrations
-- latest migration `20260830102151_phase_7a_k5b_video_editor_shared_show_catalog.sql`
-- zero known pending K5B repository migrations
+- 68 authoritative repository migrations
+- latest migration `20260830124903_phase_7a_k5c_video_version_trust_convergence.sql`
+- zero pending repository migrations
+- production schema snapshot sealed against the production project
 
 Current navigation/status authorities:
 
 - `docs/institute/PROGRAMME_STATUS.md`
 - `docs/roadmap/wakilisha-master-programme-map.md`
-- `docs/engineering/phase-6b-closure-record.md`
+- `docs/engineering/phase-7a-k5c-video-version-trust-convergence-closure-record.md`
 - `docs/engineering/phase-7a-video-publication-authority-kickoff.md`
 
 The existing detailed Phase 7 contract later in this document remains authoritative: PR 7A owns Video publication authority and PR 7B owns the public Video product.

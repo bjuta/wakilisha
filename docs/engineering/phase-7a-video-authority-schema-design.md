@@ -2,22 +2,19 @@
 
 ## Current Phase 7A resume state — 30 August 2026
 
-The Resource-kernel detour is complete. See
-`docs/engineering/phase-7a-kernel-closure-record.md`.
+The Resource-kernel detour and post-kernel hardening are closed.
 
-Do not reopen K0, K1, K4A, or K4C while resuming Video.
+K5A governed Video command/admin-read authority, K5B Video Editor composition, and K5C exact-version shared Credits/Citations are production accepted.
 
-The finalized kernel gives Video canonical Resource Version identity, lifecycle
-position, shared lifecycle/review event authority, and command concurrency
-without typed lifecycle mirrors or a typed Video event ledger.
+Current production authority:
 
-A bounded post-kernel hardening candidate is being accepted separately and does
-not change the Video architecture.
+- migrations: `68`
+- head: `20260830124903_phase_7a_k5c_video_version_trust_convergence`
+- application commit: `00bf46ff356a45f0a4a914e1a7b263a722ec51d5`
 
-The next Video product boundary is the governed editorial command/admin-read
-surface required by the internal Video Editor. The later Video UI must reuse
-canonical primitives and, where Video becomes the second real consumer of a
-candidate primitive, promote/extend-or-promote it in the same milestone.
+The schema decisions below remain historical design authority. Do not reopen already accepted K0/K1/K5A/K5B/K5C boundaries.
+
+The next implementation must be driven only by the remaining real-Video exit-gate gaps: Corrections/provenance, Registry links where required, any missing Media/lifecycle relationship exposed by real use, and one real Video through immutable review and governed publication.
 
 
 Status: PROPOSED IMPLEMENTATION CONTRACT
@@ -999,6 +996,11 @@ This design document changes no runtime.
 - Frontend deploy needed: No
 - production runtime change needed: No
 
+## Next action
+
+Treat this document as accepted historical schema design, not as a request to recreate already-live Video foundations.
+
+K5A, K5B, and K5C are production accepted. The next schema work, if any, must arise from the remaining real-Video exit gate only: Corrections/provenance, required Registry links, missing Media/lifecycle relationships, and operational proof through immutable review and publication.
 ## Next action
 
 Merge this design contract through protected CI, then implement the smallest first Video authority migration, permanent verifier, and focused contract tests byte-for-byte from the accepted design.

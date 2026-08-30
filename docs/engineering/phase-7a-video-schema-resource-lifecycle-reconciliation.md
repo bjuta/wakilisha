@@ -2,22 +2,21 @@
 
 ## Current Phase 7A resume state — 30 August 2026
 
-The Resource-kernel detour is complete. See
-`docs/engineering/phase-7a-kernel-closure-record.md`.
+The Resource-kernel detour and post-kernel hardening are closed.
 
-Do not reopen K0, K1, K4A, or K4C while resuming Video.
+The K0/K1 lifecycle reconciliation described below is accepted production baseline.
 
-The finalized kernel gives Video canonical Resource Version identity, lifecycle
-position, shared lifecycle/review event authority, and command concurrency
-without typed lifecycle mirrors or a typed Video event ledger.
+K5A governed Video commands/admin reads, K5B Video Editor composition, and K5C exact-version shared Credits/Citations are also production accepted.
 
-A bounded post-kernel hardening candidate is being accepted separately and does
-not change the Video architecture.
+Current production authority:
 
-The next Video product boundary is the governed editorial command/admin-read
-surface required by the internal Video Editor. The later Video UI must reuse
-canonical primitives and, where Video becomes the second real consumer of a
-candidate primitive, promote/extend-or-promote it in the same milestone.
+- migrations: `68`
+- head: `20260830124903_phase_7a_k5c_video_version_trust_convergence`
+- application commit: `00bf46ff356a45f0a4a914e1a7b263a722ec51d5`
+
+Do not reopen the lifecycle-pointer reconciliation while continuing Video.
+
+The next Video work is limited to the remaining real-Video exit-gate authority.
 
 
 Status: K0/K1 DEPENDENCY ADDENDUM

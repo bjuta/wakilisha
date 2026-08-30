@@ -1,6 +1,6 @@
 # Phase 7A K5C Video Version Trust Convergence Implementation Audit
 
-Status: PREVIEW ACCEPTED — AWAITING PROTECTED CI
+Status: CLOSED — PRODUCTION ACCEPTED
 
 Date: 30 August 2026
 
@@ -154,3 +154,41 @@ Replay proof:
 Keep the preview alive through protected CI, merge, separate production promotion, independent production verification, production/preview parity, and any required frontend acceptance.
 
 Delete it only after K5C production closure.
+
+
+## Production closure
+
+Canonical closure record:
+
+`docs/engineering/phase-7a-k5c-video-version-trust-convergence-closure-record.md`
+
+K5C product PR #740 merged before production promotion.
+
+The production schema is accepted at:
+
+- migrations: `68`
+- head: `20260830124903_phase_7a_k5c_video_version_trust_convergence`
+
+The native migration-history correction and the later generated-type snapshot correction are recorded explicitly in the closure record. Neither correction changed K5C product semantics.
+
+Final production application commit:
+
+`00bf46ff356a45f0a4a914e1a7b263a722ec51d5`
+
+Final production frontend entry:
+
+`assets/index-D-kLB0iu.js`
+
+Final production entry SHA-256:
+
+`edfbff02c523628ae5ec25281ea4477e8a6a11c184bef0b05eff98e886b11dae`
+
+Authenticated governed backend smoke:
+
+`PHASE_7A_K5C_AUTHENTICATED_VIDEO_TRUST_RPC_SMOKE_PASS`
+
+Authenticated rendered production acceptance passed on the real Video Episode `Monday Morning in September` without mutating production content.
+
+The rendered Trust workspace correctly blocks Trust editing until a working Video version exists.
+
+K5C is closed. Do not reopen it for remaining Phase 7A work.
