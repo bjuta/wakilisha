@@ -20721,12 +20721,6 @@ export type Database = {
           version_number: number
         }[]
       }
-      get_media_asset_governance_admin: {
-        Args: {
-          p_asset_id: string
-        }
-        Returns: Json
-      }
       create_media_upload_session_v1: {
         Args: {
           p_correlation_id?: string
@@ -21351,6 +21345,10 @@ export type Database = {
           version_id: string
           version_number: number
         }[]
+      }
+      get_media_asset_governance_admin: {
+        Args: { p_asset_id: string }
+        Returns: Json
       }
       get_media_asset_v2: { Args: { p_asset_id: string }; Returns: Json }
       get_media_private_delivery_target_v1: {
