@@ -794,7 +794,14 @@ export const mediaService = {
       throw new Error("Explain why this Media governance state is changing.");
     }
 
-    await invokeMediaWrite(
+    const client = supabase as unknown as {
+      rpc: (
+        name: string,
+        payload: Record<string, unknown>,
+      ) => PromiseLike<MediaWriteRpcResponse>;
+    };
+
+    const { error } = await client.rpc(
       "create_media_governance_version",
       {
         p_asset_id: assetId,
@@ -819,6 +826,12 @@ export const mediaService = {
         p_correlation_id: crypto.randomUUID(),
       },
     );
+
+    if (error) {
+      throw new Error(
+        `We could not save Media governance: ${error.message}`,
+      );
+    }
 
     return this.getGovernance(assetId);
   },
