@@ -58,7 +58,8 @@ function parseDiscovery(value: unknown): EditorialDiscoveryValue {
   const targetVersionType = text(row.target_version_type);
   if (
     targetVersionType !== "playlist_version" &&
-    targetVersionType !== "audio_publication_version"
+    targetVersionType !== "audio_publication_version" &&
+    targetVersionType !== "video_publication_version"
   ) {
     throw new Error("Discovery returned an unsupported version type.");
   }
