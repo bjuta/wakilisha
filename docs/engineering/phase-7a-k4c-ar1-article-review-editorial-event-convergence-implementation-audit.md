@@ -1,6 +1,6 @@
 # Phase 7A K4C-AR1: Article Review and Editorial Event Convergence Implementation Audit
 
-Status: PREVIEW + REPLAY/SCHEMA SEALED. READY FOR PR/CI.
+Status: PRODUCTION SEALED. CLOSED.
 
 Opened: 29 August 2026
 
@@ -692,3 +692,73 @@ Canonical repository replay/schema seal completed from accepted preview v3.
 - no Readdy update
 
 AR1 is repository-sealed and ready for PR/CI.
+
+
+## Production promotion and closure
+
+AR1 was promoted from accepted merged main:
+
+`2e4bc2c2b4729281eabc17cbce07fd6bbfd8cea1`
+
+Canonical migration:
+
+`20260829114236_phase_7a_k4c_ar1_article_review_editorial_event_convergence.sql`
+
+Canonical migration SHA-256:
+
+`43c347967718a6a06e598c3ecddecb6ef10239674e772e82a214cb2f8365696c`
+
+Production native CLI promotion proved:
+
+- production prestate: exact `61/A3`
+- exactly one pending migration: canonical AR1
+- production poststate: exact `62/AR1`
+- pending migrations after push: `0`
+- accepted merged main remained clean
+- production project link remained explicit
+- no Edge Function deployment
+- no frontend deployment
+- no Readdy update
+
+Independent post-promotion production seal proved:
+
+- permanent verifier:
+  `PHASE_7A_K4C_AR1_ARTICLE_REVIEW_EDITORIAL_EVENT_CONVERGENCE_PASS`
+- typed Article lifecycle rows: `35`
+- shared Article lifecycle rows: `35`
+- shared Article review rows: `0`
+- remaining typed Article lifecycle writers: `6`
+- remaining typed Article lifecycle readers: `2`
+- enabled AR1 Article command types: `4`
+- internal legacy Article receipt bridge: present
+- anon execute across the five public AR1 RPCs: `0`
+- production/preview migration histories: exact `62/AR1` parity
+- generated database types: byte-identical production/preview
+- all six AR1 function definitions: production/preview MD5 parity
+- AR1-specific security advisor delta: none
+- AR1-specific performance advisor delta: none
+
+The five authenticated `SECURITY DEFINER` Article RPC advisor WARNs remain
+identical to the accepted preview and are intentional existing browser API
+authority, not a new AR1 regression.
+
+Disposable preview cleanup:
+
+- preview project ref: `prewofyufkculzxqbyac`
+- preview branch id: `b629663f-0bae-46fa-aaab-e2d94d02874a`
+- deleted only after production verifier, migration parity, advisor parity,
+  generated-type parity, and function-definition parity all passed
+- Supabase branch listing after deletion: production `main` only
+
+AR1 is closed.
+
+The next bounded milestone is:
+
+**Phase 7A K4C-AR2 Article Publication and Scheduling Event Convergence**
+
+from the exact production boundary:
+
+- production migration count: `62`
+- production head: `20260829114236`
+- AR1 permanent verifier: PASS
+- pending migrations: `0`
