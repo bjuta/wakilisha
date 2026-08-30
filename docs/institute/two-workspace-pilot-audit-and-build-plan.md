@@ -21,17 +21,19 @@ Phases 0 through 6 are closed.
 
 Phase 6B Public Audio closed on 25 August 2026 by explicit programme decision after its public Audio authority and post-M2 convergence baseline were accepted in production. The former real-podcast exercise remains a useful non-blocking Audio operational acceptance task and is not represented as completed.
 
-The immediate next implementation is the **Phase 7A existing Video authority and surface audit**, followed by the smallest canonical Video publication-authority candidate justified by that audit.
+K5A governed Video editorial commands/admin reads and K5B purpose-built Video Editor composition are production accepted.
+
+The immediate next implementation is a fresh bounded **Phase 7A remaining-authority milestone**. It must close the shared Credits/Citations, Registry relationships where required, Corrections/provenance, and any missing governed lifecycle or Media relationships needed for one real Video to satisfy the internal Phase 7A exit gate.
 
 This plan is reconciled against protected main at:
 
-`dae3de2dc9fb021496eb0fe0c4d4f0338f676a88`
+`aec43c23b8186f917905ae883a4754260d24d912`
 
 Current production schema authority:
 
-- 50 authoritative repository migrations
-- latest migration `20260825102000_track_lyrics_structured_stanza_authority.sql`
-- zero known pending repository migrations at the Phase 7A opening boundary
+- 67 authoritative repository migrations
+- latest migration `20260830102151_phase_7a_k5b_video_editor_shared_show_catalog.sql`
+- zero known pending K5B repository migrations
 
 Current navigation/status authorities:
 
@@ -875,7 +877,7 @@ Completion proof:
 
 ## Video
 
-Video supports standalone videos, series, episodes, documentaries, interviews, performances, explainers, and field footage.
+Video supports standalone videos and Video Episodes bound to the shared Show / Show Episode authority, including documentaries, interviews, performances, explainers, and field footage.
 
 Required capabilities:
 
@@ -1868,20 +1870,24 @@ Exit gate:
 
 ### PR 7A: Video publication authority
 
-Build:
+Accepted foundation through K5B:
 
-- standalone videos
-- series
-- episodes
-- documentary, interview, performance, explainer, and field-footage classifications
-- Video Editor
-- master and derivative management
-- posters
-- chapters
-- captions
-- transcript
-- credits
-- citations
+- standalone Video and Video Episode identity
+- shared Show / Show Episode binding without a Video-owned series authority
+- documentary, interview, performance, explainer, field-footage, and related classifications
+- governed Video collection and purpose-built Video Editor
+- native/provider source selection
+- canonical Media source, poster, transcript, caption, and chapter composition
+- immutable snapshots, review transitions, publication command path, and reconstructable History
+- evidence-driven primitive promotion
+
+Remaining before the Phase 7A exit gate:
+
+- shared Credits and Citations on governed Video versions
+- Registry relationships where the real Video requires them
+- Corrections and public/internal provenance continuity
+- any missing governed lifecycle or Media relationship exposed by real Video production
+- one real Video through immutable review and governed publication
 
 ### PR 7B: Public Video product
 

@@ -1,6 +1,6 @@
 # Phase 7A K5B Video Editor Composition Implementation Audit
 
-Status: PREVIEW ACCEPTED, AWAITING PROTECTED CI
+Status: CLOSED — PRODUCTION ACCEPTED
 
 Date: 30 August 2026
 
@@ -250,40 +250,104 @@ Picker kinds are constrained semantically:
 
 The server remains final authority for exact Media kind, revision, governance, and usage validation.
 
+## Production acceptance and closure
+
+K5B merged through PR #735. Two stale route-audit contracts exposed only during the exact merged-main production build were repaired narrowly through PR #737 and PR #738. Neither repair changed Video product behavior.
+
+Accepted production application commit:
+
+`aec43c23b8186f917905ae883a4754260d24d912`
+
+Production database authority:
+
+- migration count: `67`
+- head: `20260830102151_phase_7a_k5b_video_editor_shared_show_catalog`
+- zero K5B migration drift
+
+Independent permanent verifier:
+
+`PHASE_7A_K5B_VIDEO_EDITOR_SHARED_SHOW_CATALOG_PASS`
+
+Observed production counts at closure:
+
+- Shows: `1`
+- Show Episodes: `1`
+- Video Episode shared links: `0`
+
+Disposable preview permanent verifier also passes with zero fixture residue.
+
+Production/preview closure parity:
+
+- migration count: `67 / 67`
+- migration head: identical
+- generated TypeScript type length: `624122 / 624122`
+- generated TypeScript types: byte-identical
+- K5B-sensitive security advisor findings: `31 / 31`, identical
+- K5B-sensitive performance advisor findings: `32 / 32`, identical
+
+Authenticated production backend smoke:
+
+`PHASE_7A_K5B_AUTHENTICATED_ADMIN_INDEX_SMOKE_PASS`
+
+The authenticated index returned:
+
+- Video publications: `0`
+- Shows: `1`
+- Show Episodes: `1`
+- classifications: `6`
+- source providers: `2`
+- caption track kinds: `3`
+
+Final exact-main frontend build:
+
+- complete `npm run build`: PASS
+- Admin lazy-route authority: `97`
+- total route-path authority: `171`
+- preserved pre-M1 route sequence: `165`
+- production build files: `4477`
+- production index SHA-256: `0e1851f20f2d3e8614d71b63fc623e9903c6d4f753755b6675dc823116680d16`
+- production entry: `assets/index-Bey4osEA.js`
+- production entry SHA-256: `19805cde2b529f09e0e0b8df7a5654156a35a8efa0f966563c1e3856fc154184`
+- rollback snapshot: `/opt/wakilisha-react-backups/phase7a-k5b-video-editor-20260830T113914Z-aec43c23`
+- Nginx validation: PASS
+- public HTTPS home: `200`
+- public HTTPS Video Admin route: `200`
+- remote live checksums: exact accepted-build match
+
+Authenticated rendered production acceptance passed on the Video collection/composer:
+
+- Content & Editorial -> Video renders
+- zero-production-record empty state renders
+- Standalone Video composer renders Title, Summary, and populated Classification
+- Video Episode composer resolves the canonical shared Show `The Sounds of Nairobi`
+- its unbound shared Episode `1. Monday Morning in September` resolves correctly
+- no Video record was created merely for acceptance
+
+The detail-editor operational proof is intentionally left to the real-Video Phase 7A exit-gate exercise rather than manufacturing disposable production content.
+
+Merged-main Critical Control Plane run #669 passed on the deployed commit.
+
+Canonical closure record:
+
+`docs/engineering/phase-7a-k5b-video-editor-composition-closure-record.md`
+
 ## Deployment checklist
 
-- SQL migration needed: **Yes**, the bounded shared Show catalog extension
+- SQL migration needed: **No; K5B SQL is already live at 67**
 - Edge Function deployment needed: **No**
 - Readdy Finish update needed: **No**
-- Frontend deployment needed: **Yes, only after merged-main acceptance**
-- PR needed now: **After focused static gate and replay seal**
-- Next test: **K5B focused test, primitive compounding, critical suites, live-schema contract, application build**
-
-## Local execution constraint
-
-This environment cannot resolve GitHub from the local container, so it cannot truthfully claim a local `npm` test or build.
-
-Protected GitHub CI is therefore the repository execution/build gate after the preview and static repository gates are sealed.
+- Frontend deployment needed: **No; exact accepted frontend is live**
+- PR needed now: **Documentation closure only**
+- Next test: **fresh bounded Phase 7A remaining-authority milestone, then one real Video through the canonical internal workflow**
 
 ## Preview disposition
 
-Preview authority for the K5B SQL extension is accepted.
-
-Do not promote to production until:
-
-1. K5B focused CI is green
-2. primitive compounding is green
-3. critical security/lifecycle suites are green
-4. application build is green
-5. exact branch scope remains bounded
-6. PR merges
-7. production SQL promotion advances history exactly from 66 to 67
-8. the permanent K5B verifier passes independently on production
-9. the merged-main live-schema/build run is green
-10. the disposable preview is deleted only after production acceptance
+The K5B preview is no longer an acceptance dependency. Delete it after this closure record is merged and the final documentation-only protected CI is green.
 
 ## Acceptance statement
 
-K5B preview evidence supports the following statement:
+K5B is production accepted.
 
-> WAKILISHA can compose a purpose-built Video Admin Studio over the accepted Video service boundary while preserving canonical Media, Resource lifecycle, and shared Show Episode authority, and while promoting only interaction primitives proven by real second-domain use.
+> WAKILISHA now has a live purpose-built Video Admin Studio over the accepted Video service boundary while preserving canonical Media, Resource lifecycle, and shared Show Episode authority, and while promoting only interaction primitives proven by real second-domain use.
+
+K5B does **not** close Phase 7A. The phase remains open until one real Video satisfies the internal publication-authority exit gate.

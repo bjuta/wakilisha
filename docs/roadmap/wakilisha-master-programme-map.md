@@ -6,13 +6,17 @@
 
 The Resource-kernel movement and bounded post-kernel hardening are **closed**.
 
+K5A Video Editorial Command and Admin Read Boundary is production accepted.
+
+**K5B Video Editor Composition is CLOSED and production accepted** at migration count `67`, head `20260830102151_phase_7a_k5b_video_editor_shared_show_catalog`, with production application commit `aec43c23b8186f917905ae883a4754260d24d912`.
+
+The purpose-built Video Admin Studio is now live over the governed Video boundary. It preserves canonical Media and shared Show / Show Episode authority, and K5B promoted `AdminModeComposer`, `MediaTransport`, and `MediaTimeline` only after genuine Video second-consumer proof.
+
 Canonical closure record:
 
-`docs/engineering/phase-7a-kernel-closure-record.md`
+`docs/engineering/phase-7a-k5b-video-editor-composition-closure-record.md`
 
-**K5A Video Editorial Command and Admin Read Boundary is production accepted** at migration count `66`, head `20260830094459_phase_7a_k5a_video_editorial_command_read_boundary`.
-
-The governed Video database/application boundary is now available for standalone Video and Video Episodes bound to the shared Show/Show Episode authority. The immediate Phase 7A work is the purpose-built **Video Editor**, with primitive promotion driven only by real second-domain UI use.
+Phase 7A remains open because the programme exit gate is a **real governed Video**, not an editor shell. The next bounded milestone must close the remaining Video exit-gate authority such as shared Credits/Citations, Registry relationships where required, Corrections/provenance, and any missing governed lifecycle or Media relationships, then use one real Video as operational acceptance.
 
 
 Status date: 25 August 2026
@@ -257,12 +261,14 @@ Build Inquiry as a capability across canonical editors, then the public Inquiry 
 
 ## Immediate next step
 
-Compose the **Phase 7A purpose-built Video Editor** over the production-accepted K5A command/admin-read boundary.
+Open a fresh bounded **Phase 7A remaining-authority milestone** from the K5B production-accepted baseline.
 
-The Editor must consume `src/services/video/videoAdminService.ts` rather than private Video tables. Reuse canonical admin/editorial primitives where their semantics match. Promote candidate primitives such as MediaTimeline, MediaTransport, EditorialCommentEditor, EditorialCreditPicker, or AdminModeComposer only when real Video UI behavior proves second-consumer reuse.
+Do not rebuild the Video collection or editor shell. Close only the authority still required by the Phase 7A exit gate, including shared Credits/Citations, Registry relationships where real Video work requires them, Corrections/provenance, and any missing governed lifecycle or Media relationship needed for one real Video to survive immutable review and publication.
+
+`EditorialCommentEditor` and `EditorialCreditPicker` remain candidates until the matching governed Video authority exists. Do not promote them through local-only state or Audio-specific commands.
 
 Do not create a Video-owned series authority. Video Episodes remain bound to the shared Show/Show Episode identity.
 
-Canonical K5A acceptance record:
+Canonical K5B closure record:
 
-`docs/engineering/phase-7a-k5a-video-editorial-command-read-boundary-implementation-audit.md`
+`docs/engineering/phase-7a-k5b-video-editor-composition-closure-record.md`

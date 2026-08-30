@@ -6,15 +6,29 @@
 
 The Resource-kernel movement and bounded post-kernel hardening are **closed**.
 
-Canonical closure record:
+**K5A Video Editorial Command and Admin Read Boundary is production accepted.**
 
-`docs/engineering/phase-7a-kernel-closure-record.md`
+**K5B Video Editor Composition is now CLOSED and production accepted.**
 
-The first resumed Video product slice, **K5A Video Editorial Command and Admin Read Boundary**, is now production accepted at migration count `66`, head `20260830094459_phase_7a_k5a_video_editorial_command_read_boundary`.
+K5B production authority is:
 
-K5A proves governed Video creation/editing, native/provider source selection, exact Media relationships, captions, chapters, immutable snapshots, shared Show Episode binding, and reconstructable admin reads without reopening the Resource kernel or creating competing Video lifecycle/series authority.
+- accepted production application commit: `aec43c23b8186f917905ae883a4754260d24d912`
+- production migration count: `67`
+- production migration head: `20260830102151_phase_7a_k5b_video_editor_shared_show_catalog`
+- production frontend entry: `assets/index-Bey4osEA.js`
+- production frontend entry SHA-256: `19805cde2b529f09e0e0b8df7a5654156a35a8efa0f966563c1e3856fc154184`
 
-The immediate Phase 7A implementation is now the purpose-built **Video Editor** composed over that accepted boundary. This is where real Video UI consumption must drive primitive reuse and second-consumer promotion under the Primitive Compounding Contract.
+K5B established the purpose-built internal Video collection and editor over the governed Video service boundary, preserved shared Show / Show Episode identity, and promoted only the interaction primitives proven by real Video second-consumer use.
+
+Production acceptance includes the permanent K5B verifier, authenticated backend catalogue smoke, exact production/preview migration and generated-type parity, K5B-sensitive advisor parity, exact merged-main production build/deployment, and authenticated rendered collection/composer acceptance.
+
+Canonical K5B closure record:
+
+`docs/engineering/phase-7a-k5b-video-editor-composition-closure-record.md`
+
+Phase 7A is **not** closed. Its exit gate still requires one real Video publication to move through the canonical internal workflow with exact Media authority, shared Credits/Citations, immutable review versions, governed publication, Corrections/provenance, and reconstructable History.
+
+The next Phase 7A implementation must therefore open as a fresh bounded milestone for the **remaining exit-gate authority**, not as more speculative editor-shell work. Close the missing shared editorial relationships and lifecycle gaps required for a real Video, then use one real Video as operational acceptance.
 
 
 Status date: 25 August 2026
@@ -27,9 +41,9 @@ Documentation closure gate: PR #699, `Reconcile Phase 6B milestone closure recor
 
 Production runtime application baseline: `dae3de2dc9fb021496eb0fe0c4d4f0338f676a88`
 
-Current production migration head: `20260830094459`
+Current production migration head: `20260830102151`
 
-Current production migration count: `66`
+Current production migration count: `67`
 
 ## Status authority
 
@@ -205,7 +219,7 @@ Use the long-form plan's existing PR 7A contract:
 - Citations
 - governed immutable versions, Review, publication, Corrections and provenance
 
-The authority audit, schema/kernel convergence, and K5A governed command/admin-read boundary are complete. The immediate implementation is the canonical Video Editor over `videoAdminService.ts`, reusing existing admin/editorial primitives where semantics match and promoting candidates only when Video becomes a real second UI consumer.
+The authority audit, schema/kernel convergence, K5A governed command/admin-read boundary, and K5B purpose-built Video Editor composition are complete. The immediate implementation is a fresh bounded Phase 7A authority slice for the remaining exit-gate gaps: shared Credits/Citations, Registry links where required, Corrections/provenance, and any still-missing governed lifecycle or Media relationships needed to take one real Video through immutable review and publication.
 
 Phase 7B remains the public Video product.
 
