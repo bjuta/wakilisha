@@ -19182,7 +19182,6 @@ export type Database = {
           show_episode_resource_id: string
         }[]
       }
-
       briefing_cron_generate: { Args: never; Returns: undefined }
       bulk_delete_taxonomy_terms: {
         Args: { p_term_ids: string[] }
@@ -20993,7 +20992,6 @@ export type Database = {
           result_payload: Json
         }[]
       }
-
       current_user_can_edit_playlist_id: {
         Args: { p_playlist_id: string }
         Returns: boolean
@@ -21230,7 +21228,6 @@ export type Database = {
         Args: { p_publication_id: string }
         Returns: Json
       }
-
       get_article_review_workspace: {
         Args: { p_article_id: string }
         Returns: Json
@@ -21763,7 +21760,6 @@ export type Database = {
       }
       list_admin_audio_publications: { Args: never; Returns: Json }
       list_admin_video_publications: { Args: never; Returns: Json }
-
       list_article_lifecycle_events: {
         Args: { p_article_id: string; p_limit?: number }
         Returns: {
@@ -22626,7 +22622,6 @@ export type Database = {
           source_id: string
         }[]
       }
-
       registry_get_public_track_playback_providers: {
         Args: { p_provider_key?: string; p_track_ids: string[] }
         Returns: {
@@ -22980,7 +22975,6 @@ export type Database = {
           result_payload: Json
         }[]
       }
-
       replace_video_publication_chapters: {
         Args: {
           p_chapters: Json
@@ -23000,7 +22994,6 @@ export type Database = {
           result_payload: Json
         }[]
       }
-
       request_article_changes: {
         Args: { p_article_id: string; p_note?: string; p_version_id?: string }
         Returns: {
@@ -23852,7 +23845,6 @@ export type Database = {
           usage_link_id: string
         }[]
       }
-
       set_video_publication_source: {
         Args: {
           p_correlation_id?: string
@@ -23872,7 +23864,6 @@ export type Database = {
           source_id: string
         }[]
       }
-
       set_video_publication_transcript: {
         Args: {
           p_asset_id: string
@@ -23894,7 +23885,6 @@ export type Database = {
           usage_link_id: string
         }[]
       }
-
       show_limit: { Args: never; Returns: number }
       show_trgm: { Args: { "": string }; Returns: string[] }
       signal_os_label_for_score: { Args: { p_score: number }; Returns: string }
@@ -24545,7 +24535,6 @@ export type Database = {
           result_payload: Json
         }[]
       }
-
       upsert_user_scope_admin: {
         Args: {
           target_can_edit?: boolean

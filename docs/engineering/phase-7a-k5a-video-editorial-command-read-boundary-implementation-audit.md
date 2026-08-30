@@ -1,6 +1,6 @@
 # Phase 7A K5A Video Editorial Command and Admin Read Boundary Implementation Audit
 
-Status: PREVIEW ACCEPTED, AWAITING PROTECTED CI
+Status: PRODUCTION ACCEPTED
 
 Date: 30 August 2026
 
@@ -19,9 +19,9 @@ K5A repository branch:
 
 `phase-7a-k5a-video-editorial-command-read-boundary`
 
-Current branch head when this audit was written:
+Preview acceptance branch head:
 
-`e45188dd4840d8c256293895d160415d0927fab0`
+`c95fea689c33e71d68010f1bb7b454502d439f16`
 
 ## Preview
 
@@ -295,8 +295,57 @@ Migration SHA-256:
 
 `a921c6c8f2522ce6891eb4a3e8b017e23a00dda1ef88c022e391fca9f383912d`
 
-Committed `public,editorial` database types SHA-256:
+Committed `public,editorial` database types SHA-256 at preview seal:
 
 `8aea541cd224628e7a730b40fa8740b865c61d9caf21201a7f578e50c3fa2a51`
 
 The new RPC signatures were taken from the preview Supabase generator and spliced into the already sealed `public,editorial` type snapshot. Private `video` schema types remain intentionally outside that repository schema surface.
+
+
+## Production acceptance
+
+PR #733 was fully green before merge, including:
+
+- migration replay contract
+- primitive compounding contract
+- Phase 7A kernel closure
+- K5A focused test
+- critical security/lifecycle suites
+- live schema and migration-history checks
+- application build
+
+PR #733 was squash-merged to protected main at:
+
+`d19bfd3516c4464a55aa349c26829a102251500b`
+
+Production database promotion was executed as a separate gate from the sealed preview.
+
+Production migration history advanced exactly:
+
+- before: `65`
+- after: `66`
+- head: `20260830094459_phase_7a_k5a_video_editorial_command_read_boundary`
+
+The permanent production verifier passed independently:
+
+`PHASE_7A_K5A_VIDEO_EDITORIAL_COMMAND_READ_BOUNDARY_PASS`
+
+Production K5A counts at acceptance:
+
+- Video publications: `0`
+- Video sources: `0`
+- Video Resource Versions: `0`
+
+Supabase production reached `FUNCTIONS_DEPLOYED`.
+
+The first merged-main push CI run crossed the database promotion window and observed migration history at 65 immediately before the promotion completed. Its live-schema gate therefore failed on a timing race. A settled-state rerun removed that race and exposed only formatting-only blank lines in the committed generated TypeScript RPC snapshot. This production-closure patch removes those blank lines and seals the exact production-generated formatting.
+
+Final production `public,editorial` database types SHA-256:
+
+`b51ab962c300453655f1e9e1a56382609d49da888899c92f4c684b4c0ac57c90`
+
+No frontend deployment is required for K5A. The milestone adds a service boundary and database authority but no mounted React surface, public Video route, or Edge Function.
+
+No Readdy Finish update is required.
+
+K5A is closed. The next Phase 7A implementation is the purpose-built Video Editor composition over this accepted boundary.
