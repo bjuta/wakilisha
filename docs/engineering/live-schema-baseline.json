@@ -1,16 +1,14 @@
 {
   "projectRef": "pgzizndxdyhqmtyywjmt",
   "schema": "public,editorial",
-  "generatedAt": "2026-08-30T16:43:00Z",
+  "generatedAt": "2026-08-30T16:50:00Z",
   "typesSha256": "baab022f1fd3329a77dbeb7cf72e71d9cd418b4f4ba5459d26e57e1ce3db7ae1",
   "authoritativeMigrationDirectory": "supabase/migrations",
   "migrationCount": 70,
   "latestMigration": "20260830163814_phase_7a_k5e_real_video_media_governance_boundary.sql",
   "schemaSeal": {
-    "mode": "preview",
-    "sourceProjectRef": "kqmxcluhahxvqjnjggoy",
-    "migrationHead": "20260830163814",
-    "baseMainSha": "6fc86e38f360372bd394ac68b9603e8ce7e0b354",
-    "previewBranchId": "bc5e0a19-cf27-4940-8aa5-aeeda160e4cd"
+    "mode": "production",
+    "sourceProjectRef": "pgzizndxdyhqmtyywjmt",
+    "migrationHead": "20260830163814"
   }
 }
