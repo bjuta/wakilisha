@@ -63,23 +63,42 @@ begin
   if (
     select typed_count
     from phase_7a_k4c_ar3_baseline
-  ) <> 35
-     or (
-       select typed_fingerprint
-       from phase_7a_k4c_ar3_baseline
-     ) <> 'dd7ac00209d19f3f369fb0d9b3e1e6a1'
-  then
-    raise exception
-      'STOP: K4C-AR3 typed Article historical compatibility baseline drifted';
-  end if;
-
-  if (
-    select shared_article_count
+  ) = 0 then
+    if (
+      select typed_fingerprint
+      from phase_7a_k4c_ar3_baseline
+    ) <> 'd41d8cd98f00b204e9800998ecf8427e'
+       or (
+         select shared_article_count
+         from phase_7a_k4c_ar3_baseline
+       ) <> 0
+    then
+      raise exception
+        'STOP: K4C-AR3 no-data preview historical baseline drifted';
+    end if;
+  elsif (
+    select typed_count
     from phase_7a_k4c_ar3_baseline
-  ) < 35
-  then
+  ) = 35 then
+    if (
+      select typed_fingerprint
+      from phase_7a_k4c_ar3_baseline
+    ) <> 'dd7ac00209d19f3f369fb0d9b3e1e6a1'
+       or (
+         select shared_article_count
+         from phase_7a_k4c_ar3_baseline
+       ) < 35
+    then
+      raise exception
+        'STOP: K4C-AR3 production historical compatibility baseline drifted';
+    end if;
+  else
     raise exception
-      'STOP: K4C-AR3 shared Article lifecycle history is incomplete';
+      'STOP: K4C-AR3 historical compatibility baseline has unexpected row count %',
+      (
+        select typed_count
+        from phase_7a_k4c_ar3_baseline
+      );
   end if;
 
   if md5(
@@ -753,21 +772,47 @@ begin
   end if;
 
   if (
-    select count(*)
-    from editorial.article_lifecycle_events
-  ) <> 35
-     or (
-       select md5(
-         coalesce(
-           string_agg(to_jsonb(e)::text, E'\n' order by e.id::text),
-           ''
+    select typed_count
+    from phase_7a_k4c_ar3_baseline
+  ) = 35 then
+    if (
+      select count(*)
+      from editorial.article_lifecycle_events
+    ) <> 35
+       or (
+         select md5(
+           coalesce(
+             string_agg(to_jsonb(e)::text, E'\n' order by e.id::text),
+             ''
+           )
          )
-       )
-       from editorial.article_lifecycle_events e
-     ) <> 'dd7ac00209d19f3f369fb0d9b3e1e6a1'
-  then
-    raise exception
-      'STOP: K4C-AR3 typed Article historical compatibility identity changed';
+         from editorial.article_lifecycle_events e
+       ) <> 'dd7ac00209d19f3f369fb0d9b3e1e6a1'
+    then
+      raise exception
+        'STOP: K4C-AR3 production typed Article historical identity changed';
+    end if;
+  elsif (
+    select typed_count
+    from phase_7a_k4c_ar3_baseline
+  ) = 0 then
+    if (
+      select count(*)
+      from editorial.article_lifecycle_events
+    ) <> 0
+       or (
+         select md5(
+           coalesce(
+             string_agg(to_jsonb(e)::text, E'\n' order by e.id::text),
+             ''
+           )
+         )
+         from editorial.article_lifecycle_events e
+       ) <> 'd41d8cd98f00b204e9800998ecf8427e'
+    then
+      raise exception
+        'STOP: K4C-AR3 no-data preview typed Article historical identity changed';
+    end if;
   end if;
 
   if not (
