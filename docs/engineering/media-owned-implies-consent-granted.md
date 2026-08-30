@@ -1,6 +1,6 @@
 # Media Owned Rights -> Granted Consent Conditional
 
-Status: CANDIDATE — REAL VIDEO EXIT-GATE BUSINESS RULE
+Status: PREVIEW ACCEPTED — AWAITING PROTECTED CI
 
 Date: 30 August 2026
 
@@ -66,3 +66,43 @@ For the existing `IMG_0133.MOV` Media asset:
 - Readdy Finish update needed: No
 - frontend deploy needed: Yes
 - production content mutation before acceptance: No
+
+
+## Preview acceptance
+
+Accepted preview:
+
+- project ref: `kqmxcluhahxvqjnjggoy`
+- branch id: `bc5e0a19-cf27-4940-8aa5-aeeda160e4cd`
+- migration count: `73`
+- head: `20260830185038_media_owned_implies_consent_granted`
+
+Permanent verifier:
+
+`MEDIA_OWNED_CONSENT_RULE_PASS`
+
+Rollback-only behavior proof:
+
+`MEDIA_OWNED_CONSENT_RULE_BEHAVIOR_PASS`
+
+The accepted behavior proof demonstrates:
+
+- inserting `rights_status = owned` with a conflicting consent value is normalized to `consent_status = granted`
+- a non-owned rights state preserves its explicit consent status
+- no historical governance row is rewritten
+- the fixture rolls back completely
+
+Advisor disposition:
+
+- no rule-specific Security Advisor finding
+- no rule-specific Performance Advisor finding
+
+Schema/type disposition:
+
+- no browser RPC signature or generated TypeScript database surface changed
+- the existing production `public,editorial` type SHA remains unchanged
+- preview schema history advances only to migration 73 / `20260830185038`
+
+## Protected CI
+
+Pending.
