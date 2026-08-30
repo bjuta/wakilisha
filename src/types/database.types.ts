@@ -21252,6 +21252,10 @@ export type Database = {
         Args: { p_track_id: string }
         Returns: Json
       }
+      get_admin_video_correction_provenance: {
+        Args: { p_resource_id: string }
+        Returns: Json
+      }
       get_admin_video_publication_workspace: {
         Args: { p_publication_id: string }
         Returns: Json
