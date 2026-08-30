@@ -1,6 +1,6 @@
 # Phase 7A K5E Real Video Media Governance Boundary Implementation Audit
 
-Status: PREVIEW ACCEPTED — AWAITING PROTECTED CI
+Status: PRODUCTION DATABASE ACCEPTED — FRONTEND ACTIVATION PENDING
 
 Date: 30 August 2026
 
@@ -173,7 +173,45 @@ Schema type seal:
 
 ## Protected CI gate
 
-Pending.
+PR #746 protected Critical Control Plane run #687 passed.
+
+Accepted implementation main:
+
+`ee902c6b06ee096b624f0a1fd778a06786deebb5`
+
+## Production promotion
+
+The accepted K5E Supabase preview was merged separately into production after PR #746 merged.
+
+Production advanced exactly:
+
+- migration count: `69 -> 70`
+- prior head: `20260830144945_phase_7a_k5d_video_correction_provenance_convergence`
+- accepted head: `20260830163814_phase_7a_k5e_real_video_media_governance_boundary`
+
+Independent production verifier:
+
+`PHASE_7A_K5E_REAL_VIDEO_MEDIA_GOVERNANCE_BOUNDARY_PASS`
+
+Production K5E-specific advisor disposition remains clean:
+
+- Security Advisor: no K5E-specific finding
+- Performance Advisor: no K5E-specific finding
+
+The production schema now matches the accepted preview authority. No frontend has been activated yet.
+
+## Production schema seal
+
+The repository TypeScript schema remains the accepted `public,editorial` snapshot with only the K5E RPC delta.
+
+Production schema baseline:
+
+- project ref: `pgzizndxdyhqmtyywjmt`
+- migration count: `70`
+- migration head: `20260830163814`
+- TypeScript schema SHA-256: `baab022f1fd3329a77dbeb7cf72e71d9cd418b4f4ba5459d26e57e1ce3db7ae1`
+
+A production-seal PR must pass live schema/migration drift before frontend activation.
 
 ## Deployment classification
 
