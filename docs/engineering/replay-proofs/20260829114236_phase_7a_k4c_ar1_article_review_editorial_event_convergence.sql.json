@@ -1,0 +1,16 @@
+{
+  "migration_file": "supabase/migrations/20260829114236_phase_7a_k4c_ar1_article_review_editorial_event_convergence.sql",
+  "migration_sha256": "43c347967718a6a06e598c3ecddecb6ef10239674e772e82a214cb2f8365696c",
+  "base_main_sha": "a668d8113316b27307b474f7b961d6f2bcdd8506",
+  "preview_project_ref": "prewofyufkculzxqbyac",
+  "preview_branch_id": "b629663f-0bae-46fa-aaab-e2d94d02874a",
+  "preview_migration_head": "20260829114236",
+  "baseline_replay": "pass",
+  "candidate_apply": "pass",
+  "verifier": "pass",
+  "verifier_file": "scripts/control-plane/verify-phase-7a-k4c-ar1-article-review-editorial-event-convergence.sql",
+  "schema_types_sha256": "f5d7e92d437cffa9f8b7baa55996f5e94f39886de9317b29fde641702a7a1a67",
+  "schema_migration_count": 62,
+  "schema_migration_head": "20260829114236",
+  "verified_at": "2026-08-30T06:20:14.007Z"
+}
