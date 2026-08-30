@@ -1,6 +1,6 @@
 # Phase 7A K5E Real Video Media Governance Boundary Implementation Audit
 
-Status: FRONTEND ACCEPTED — NATIVE SOURCE INTEGRITY FOLLOW-THROUGH IN PREVIEW
+Status: NATIVE SOURCE FOLLOW-THROUGH PREVIEW ACCEPTED — AWAITING PROTECTED CI
 
 Date: 30 August 2026
 
@@ -272,6 +272,59 @@ The follow-through changes only `video.enforce_source_integrity()` so native sou
 Public-use rights, consent, source protection, retention, embargo, and public safety remain enforced by the unchanged K4B publication gate.
 
 No frontend change is required for this follow-through.
+
+## Native source follow-through preview acceptance
+
+Accepted follow-through migration:
+
+`20260830173011_phase_7a_k5e_native_source_integrity_convergence.sql`
+
+Migration SHA-256:
+
+`e922509d9c151b889038112ec479f792184d5d48afba680c389d1cc9569b9f32`
+
+Accepted preview state:
+
+- project ref: `kqmxcluhahxvqjnjggoy`
+- branch id: `bc5e0a19-cf27-4940-8aa5-aeeda160e4cd`
+- migration count: `71`
+- head: `20260830173011_phase_7a_k5e_native_source_integrity_convergence`
+
+Permanent verifier:
+
+`PHASE_7A_K5E_NATIVE_SOURCE_INTEGRITY_CONVERGENCE_PASS`
+
+Permanent verifier SHA-256:
+
+`1eb4b76f2ed0d00ea1d449860b09ac346f835588f98364a5cfc1375e5b031480`
+
+Rollback-only behavior proof:
+
+`PHASE_7A_K5E_NATIVE_SOURCE_INTEGRITY_BEHAVIOR_PASS`
+
+The accepted rollback proof demonstrated:
+
+- one active internal Video Media asset with one exact verified revision can now be inserted as a native Video source
+- the same internal-only Media remains blocked by `video.assert_publishable_media_revision`
+- no public-use governance gate moved earlier into source registration
+- the fixture rolls back completely
+
+The first follow-through fixture attempt stopped safely because the fixture omitted the verification actor required by the existing Media file verification constraint. The corrected fixture added only the required rollback-only actor identity. Runtime code was unchanged.
+
+Advisor disposition:
+
+- no follow-through-specific Security Advisor finding
+- no follow-through-specific Performance Advisor finding
+
+Schema/type disposition:
+
+- no browser RPC or TypeScript database surface changes
+- committed production `public,editorial` type seal remains unchanged
+- preview schema baseline advances only migration count/head to 71 / `20260830173011`
+
+## Follow-through protected CI
+
+Pending.
 
 ## Deployment classification
 
