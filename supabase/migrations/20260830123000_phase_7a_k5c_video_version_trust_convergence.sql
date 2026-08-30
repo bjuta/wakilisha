@@ -323,13 +323,13 @@ begin
     raise exception 'Immutable Video Trust copy authorization is invalid.';
   end;
 
-  select authorization.*
+  select copy_auth.*
   into v_authorization
-  from platform_private.video_trust_copy_authorizations authorization
-  where authorization.authorization_token=v_token
-    and authorization.backend_pid=pg_backend_pid()
-    and authorization.transaction_id=txid_current()
-    and authorization.target_version_id=new.target_version_id;
+  from platform_private.video_trust_copy_authorizations copy_auth
+  where copy_auth.authorization_token=v_token
+    and copy_auth.backend_pid=pg_backend_pid()
+    and copy_auth.transaction_id=txid_current()
+    and copy_auth.target_version_id=new.target_version_id;
 
   if not found then
     raise exception 'Immutable Video Trust copy authorization is invalid.';
