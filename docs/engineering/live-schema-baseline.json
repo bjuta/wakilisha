@@ -1,8 +1,8 @@
 {
   "projectRef": "pgzizndxdyhqmtyywjmt",
   "schema": "public,editorial",
-  "generatedAt": "2026-08-30T16:50:00Z",
-  "typesSha256": "baab022f1fd3329a77dbeb7cf72e71d9cd418b4f4ba5459d26e57e1ce3db7ae1",
+  "generatedAt": "2026-08-30T16:53:00Z",
+  "typesSha256": "97cd758416514afcf6b0e4f9bb140c2012074af4d38905ff5f4eae3cb80d17ce",
   "authoritativeMigrationDirectory": "supabase/migrations",
   "migrationCount": 70,
   "latestMigration": "20260830163814_phase_7a_k5e_real_video_media_governance_boundary.sql",
