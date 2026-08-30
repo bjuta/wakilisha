@@ -32,5 +32,15 @@
     "performance_new_findings": [],
     "performance_disposition": "No K5E-specific Performance Advisor finding."
   },
-  "verified_at": "2026-08-30T16:44:00Z"
+  "verified_at": "2026-08-30T16:44:00Z",
+  "post_production_promotion": {
+    "production_migration_count": 70,
+    "production_migration_head": "20260830163814",
+    "production_verifier": "pass",
+    "production_verifier_marker": "PHASE_7A_K5E_REAL_VIDEO_MEDIA_GOVERNANCE_BOUNDARY_PASS",
+    "production_security_k5e_findings": [],
+    "production_performance_k5e_findings": [],
+    "sql_replayed": false,
+    "promotion_method": "accepted Supabase preview branch merge"
+  }
 }
