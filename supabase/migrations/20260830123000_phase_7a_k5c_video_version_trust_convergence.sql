@@ -676,7 +676,7 @@ begin
 
   return new;
 end;
-$function$
+$function$;
 
 
 CREATE OR REPLACE FUNCTION video.insert_current_publication_snapshot(p_publication_id uuid, p_expected_authority_revision bigint, p_version_kind text, p_actor_id uuid)
@@ -912,7 +912,7 @@ begin
   content_fingerprint := v_fingerprint;
   return next;
 end;
-$function$
+$function$;
 
 
 CREATE OR REPLACE FUNCTION video.copy_publication_version_snapshot(p_source_version_id uuid, p_version_kind text, p_actor_id uuid)
@@ -1045,7 +1045,7 @@ begin
   content_fingerprint := v_source.content_fingerprint;
   return next;
 end;
-$function$
+$function$;
 
 
 create function public.replace_video_publication_version_citations(
@@ -1733,7 +1733,7 @@ begin
     )
   );
 end;
-$function$
+$function$;
 
 
 revoke all
