@@ -20,9 +20,10 @@ const NAV_GROUPS: NavGroup[] = [
   { label: "Community", icon: "MessageSquare", visible: (can) => can("moderate_community"), items: [
     { path: "/admin/community", label: "Moderation", icon: "MessageSquare", requiredCapability: "moderate_community", badgeKey: "pendingReports" },
   ] },
-  { label: "Content & Editorial", icon: "FileText", visible: (can) => can("edit_own_articles") || can("edit_own_playlists") || can("view_playlists") || can("view_audio") || can("edit_own_audio") || can("edit_others_audio"), items: [
+  { label: "Content & Editorial", icon: "FileText", visible: (can) => can("edit_own_articles") || can("edit_own_playlists") || can("view_playlists") || can("view_audio") || can("edit_own_audio") || can("edit_others_audio") || can("view_video") || can("edit_own_video") || can("edit_others_video"), items: [
     { path: "/admin/content/articles", label: "Articles", icon: "FileText", requiredCapability: "edit_own_articles" },
     { path: "/admin/content/audio", label: "Audio", icon: "Radio", requiredCapability: "view_audio" },
+    { path: "/admin/content/video", label: "Video", icon: "Clapperboard", requiredCapability: "view_video" },
     { path: "/admin/content/playlists", label: "Playlists", icon: "ListMusic", requiredCapability: "edit_own_playlists" },
     { path: "/admin/content/guides", label: "Guides", icon: "BookOpen", requiredCapability: "edit_guides" },
     { path: "/admin/content/pages", label: "Pages", icon: "Layout", requiredCapability: "edit_pages" },
