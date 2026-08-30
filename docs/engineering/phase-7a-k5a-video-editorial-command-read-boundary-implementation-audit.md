@@ -249,8 +249,8 @@ No advisor result invalidated the K5A authority model.
 
 Generated preview TypeScript schema:
 
-- SHA-256: `db6ddcebb59ad9aa2da22afa305b1f87ceeac9cc4e808707a59fef1a33a85e98`
-- generated text length: `602474`
+- SHA-256: `8aea541cd224628e7a730b40fa8740b865c61d9caf21201a7f578e50c3fa2a51`
+- generated `public,editorial` snapshot hash bound to the committed `database.types.ts` file
 
 ## Repository execution gate
 
@@ -283,3 +283,20 @@ Do not promote to production until:
 K5A preview acceptance proves:
 
 > An authenticated WAKILISHA editor can operate and reconstruct complete working Video publication authority through governed commands without direct private-table access, while canonical Media, shared Resource lifecycle, and shared Show Episode authority remain singular.
+
+
+## Replay contract seal
+
+Replay proof:
+
+`docs/engineering/replay-proofs/20260830094459_phase_7a_k5a_video_editorial_command_read_boundary.sql.json`
+
+Migration SHA-256:
+
+`a921c6c8f2522ce6891eb4a3e8b017e23a00dda1ef88c022e391fca9f383912d`
+
+Committed `public,editorial` database types SHA-256:
+
+`8aea541cd224628e7a730b40fa8740b865c61d9caf21201a7f578e50c3fa2a51`
+
+The new RPC signatures were taken from the preview Supabase generator and spliced into the already sealed `public,editorial` type snapshot. Private `video` schema types remain intentionally outside that repository schema surface.

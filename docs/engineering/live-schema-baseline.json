@@ -1,16 +1,16 @@
 {
   "projectRef": "pgzizndxdyhqmtyywjmt",
   "schema": "public,editorial",
-  "generatedAt": "2026-08-30T08:47:33Z",
-  "typesSha256": "f5d7e92d437cffa9f8b7baa55996f5e94f39886de9317b29fde641702a7a1a67",
+  "generatedAt": "2026-08-30T09:54:30Z",
+  "typesSha256": "8aea541cd224628e7a730b40fa8740b865c61d9caf21201a7f578e50c3fa2a51",
   "authoritativeMigrationDirectory": "supabase/migrations",
-  "migrationCount": 65,
-  "latestMigration": "20260830082941_phase_7a_post_kernel_business_logic_and_historical_event_hardening.sql",
+  "migrationCount": 66,
+  "latestMigration": "20260830094459_phase_7a_k5a_video_editorial_command_read_boundary.sql",
   "schemaSeal": {
     "mode": "preview",
-    "sourceProjectRef": "nwtsdoqkggyktyfdjmdd",
-    "migrationHead": "20260830082941",
-    "baseMainSha": "abd973378615c36c2f0dc1908fe04ef8345f4b28",
-    "previewBranchId": "666a8ad3-f939-4f5b-81b2-892a369f875d"
+    "sourceProjectRef": "rlgutjvtrcupuewemdxz",
+    "migrationHead": "20260830094459",
+    "baseMainSha": "bd5cb925985c56b8e9f006c7b5b8151073cfe3d2",
+    "previewBranchId": "8640a8df-fc38-4370-baad-dccfe5c1c44b"
   }
 }

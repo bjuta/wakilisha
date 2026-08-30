@@ -19163,6 +19163,26 @@ export type Database = {
           usage_revision: number
         }[]
       }
+      bind_video_publication_show_episode: {
+        Args: {
+          p_correlation_id?: string
+          p_expected_authority_revision: number
+          p_idempotency_key: string
+          p_publication_id: string
+          p_show_episode_resource_id: string
+        }
+        Returns: {
+          authority_revision: number
+          command_receipt_id: string
+          idempotent_replay: boolean
+          publication_id: string
+          receipt_status: string
+          resource_id: string
+          result_payload: Json
+          show_episode_resource_id: string
+        }[]
+      }
+
       briefing_cron_generate: { Args: never; Returns: undefined }
       bulk_delete_taxonomy_terms: {
         Args: { p_term_ids: string[] }
@@ -20949,6 +20969,31 @@ export type Database = {
           updated_at: string
         }[]
       }
+      create_video_publication: {
+        Args: {
+          p_classification: string
+          p_correlation_id?: string
+          p_idempotency_key: string
+          p_metadata?: Json
+          p_publication_kind: string
+          p_show_episode_resource_id?: string
+          p_slug: string
+          p_summary?: string
+          p_title: string
+          p_visibility?: string
+        }
+        Returns: {
+          authority_revision: number
+          command_receipt_id: string
+          idempotent_replay: boolean
+          publication_id: string
+          receipt_status: string
+          resource_id: string
+          resource_kind: string
+          result_payload: Json
+        }[]
+      }
+
       current_user_can_edit_playlist_id: {
         Args: { p_playlist_id: string }
         Returns: boolean
@@ -21181,6 +21226,11 @@ export type Database = {
         Args: { p_track_id: string }
         Returns: Json
       }
+      get_admin_video_publication_workspace: {
+        Args: { p_publication_id: string }
+        Returns: Json
+      }
+
       get_article_review_workspace: {
         Args: { p_article_id: string }
         Returns: Json
@@ -21712,6 +21762,8 @@ export type Database = {
         }[]
       }
       list_admin_audio_publications: { Args: never; Returns: Json }
+      list_admin_video_publications: { Args: never; Returns: Json }
+
       list_article_lifecycle_events: {
         Args: { p_article_id: string; p_limit?: number }
         Returns: {
@@ -22549,6 +22601,32 @@ export type Database = {
           variant_id: string
         }[]
       }
+      register_video_source: {
+        Args: {
+          p_canonical_url?: string
+          p_correlation_id?: string
+          p_expected_authority_revision: number
+          p_idempotency_key: string
+          p_media_asset_id?: string
+          p_media_asset_revision_id?: string
+          p_provider_key?: string
+          p_provider_object_id?: string
+          p_publication_id: string
+          p_source_kind: string
+          p_source_metadata?: Json
+        }
+        Returns: {
+          authority_revision: number
+          command_receipt_id: string
+          idempotent_replay: boolean
+          publication_id: string
+          receipt_status: string
+          resource_id: string
+          result_payload: Json
+          source_id: string
+        }[]
+      }
+
       registry_get_public_track_playback_providers: {
         Args: { p_provider_key?: string; p_track_ids: string[] }
         Returns: {
@@ -22883,6 +22961,46 @@ export type Database = {
         }
         Returns: Json
       }
+      replace_video_publication_captions: {
+        Args: {
+          p_correlation_id?: string
+          p_expected_authority_revision: number
+          p_idempotency_key: string
+          p_publication_id: string
+          p_tracks: Json
+        }
+        Returns: {
+          authority_revision: number
+          caption_count: number
+          command_receipt_id: string
+          idempotent_replay: boolean
+          publication_id: string
+          receipt_status: string
+          resource_id: string
+          result_payload: Json
+        }[]
+      }
+
+      replace_video_publication_chapters: {
+        Args: {
+          p_chapters: Json
+          p_correlation_id?: string
+          p_expected_authority_revision: number
+          p_idempotency_key: string
+          p_publication_id: string
+        }
+        Returns: {
+          authority_revision: number
+          chapter_count: number
+          command_receipt_id: string
+          idempotent_replay: boolean
+          publication_id: string
+          receipt_status: string
+          resource_id: string
+          result_payload: Json
+        }[]
+      }
+
       request_article_changes: {
         Args: { p_article_id: string; p_note?: string; p_version_id?: string }
         Returns: {
@@ -23713,6 +23831,70 @@ export type Database = {
           result_payload: Json
         }[]
       }
+      set_video_publication_poster: {
+        Args: {
+          p_asset_id: string
+          p_asset_revision_id: string
+          p_correlation_id?: string
+          p_expected_authority_revision: number
+          p_idempotency_key: string
+          p_placement_data: Json
+          p_publication_id: string
+        }
+        Returns: {
+          authority_revision: number
+          command_receipt_id: string
+          idempotent_replay: boolean
+          publication_id: string
+          receipt_status: string
+          resource_id: string
+          result_payload: Json
+          usage_link_id: string
+        }[]
+      }
+
+      set_video_publication_source: {
+        Args: {
+          p_correlation_id?: string
+          p_expected_authority_revision: number
+          p_idempotency_key: string
+          p_publication_id: string
+          p_source_id: string
+        }
+        Returns: {
+          authority_revision: number
+          command_receipt_id: string
+          idempotent_replay: boolean
+          publication_id: string
+          receipt_status: string
+          resource_id: string
+          result_payload: Json
+          source_id: string
+        }[]
+      }
+
+      set_video_publication_transcript: {
+        Args: {
+          p_asset_id: string
+          p_asset_revision_id: string
+          p_correlation_id?: string
+          p_expected_authority_revision: number
+          p_idempotency_key: string
+          p_placement_data: Json
+          p_publication_id: string
+        }
+        Returns: {
+          authority_revision: number
+          command_receipt_id: string
+          idempotent_replay: boolean
+          publication_id: string
+          receipt_status: string
+          resource_id: string
+          result_payload: Json
+          usage_link_id: string
+        }[]
+      }
+
       show_limit: { Args: never; Returns: number }
       show_trgm: { Args: { "": string }; Returns: string[] }
       signal_os_label_for_score: { Args: { p_score: number }; Returns: string }
@@ -24345,6 +24527,25 @@ export type Database = {
             }
             Returns: undefined
           }
+      update_video_publication_metadata: {
+        Args: {
+          p_correlation_id?: string
+          p_expected_authority_revision: number
+          p_idempotency_key: string
+          p_payload: Json
+          p_publication_id: string
+        }
+        Returns: {
+          authority_revision: number
+          command_receipt_id: string
+          idempotent_replay: boolean
+          publication_id: string
+          receipt_status: string
+          resource_id: string
+          result_payload: Json
+        }[]
+      }
+
       upsert_user_scope_admin: {
         Args: {
           target_can_edit?: boolean
