@@ -1,5 +1,25 @@
 # WAKILISHA Programme Status
 
+## Current programme reconciliation — 30 August 2026
+
+**Current numbered work remains Phase 7A: Video publication authority.**
+
+The Resource-kernel movement that interrupted Video implementation is **closed**
+at the accepted production kernel baseline **64/AR3**.
+
+Canonical closure record:
+
+`docs/engineering/phase-7a-kernel-closure-record.md`
+
+A bounded post-kernel hardening candidate fixes two deliberately deferred
+business-logic defects and freezes retained typed event evidence. This does not
+reopen or extend the kernel programme.
+
+After that hardening is accepted, resume Video from the finalized kernel at the
+missing governed Video editorial command/admin-read boundary, then compose the
+purpose-built Video Editor while enforcing the Primitive Compounding Contract.
+
+
 Status date: 25 August 2026
 
 Phase 6A production authority baseline: `fd0580e3a1a19e3d1f06a9c8466a37c84cd26a8b`

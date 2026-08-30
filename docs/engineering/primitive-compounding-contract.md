@@ -1,5 +1,18 @@
 # Primitive Compounding Contract
 
+## Kernel closure consequence — 30 August 2026
+
+The Phase 7A Resource-kernel detour is closed. Resource Version identity,
+lifecycle position, and lifecycle/review event meaning are now finalized shared
+authority primitives across Article, Playlist, Audio, and Video.
+
+See `docs/engineering/phase-7a-kernel-closure-record.md`.
+
+This strengthens rather than relaxes this contract: Video must reuse those
+authority primitives and must still provide real second-domain evidence before
+promoting candidate interaction primitives.
+
+
 Status: active control-plane doctrine
 
 Effective: 21 August 2026

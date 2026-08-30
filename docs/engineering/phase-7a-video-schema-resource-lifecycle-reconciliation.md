@@ -1,5 +1,25 @@
 # Phase 7A Video Schema / Resource Lifecycle Reconciliation
 
+## Current Phase 7A resume state — 30 August 2026
+
+The Resource-kernel detour is complete. See
+`docs/engineering/phase-7a-kernel-closure-record.md`.
+
+Do not reopen K0, K1, K4A, or K4C while resuming Video.
+
+The finalized kernel gives Video canonical Resource Version identity, lifecycle
+position, shared lifecycle/review event authority, and command concurrency
+without typed lifecycle mirrors or a typed Video event ledger.
+
+A bounded post-kernel hardening candidate is being accepted separately and does
+not change the Video architecture.
+
+The next Video product boundary is the governed editorial command/admin-read
+surface required by the internal Video Editor. The later Video UI must reuse
+canonical primitives and, where Video becomes the second real consumer of a
+candidate primitive, promote/extend-or-promote it in the same milestone.
+
+
 Status: K0/K1 DEPENDENCY ADDENDUM
 
 Applies to:
