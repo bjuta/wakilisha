@@ -26,6 +26,7 @@ export interface VideoShowSummary {
   title: string;
   description?: string | null;
   authorityRevision?: number;
+  lifecycleState?: string;
 }
 
 export interface VideoShowEpisodeSummary {
@@ -36,6 +37,8 @@ export interface VideoShowEpisodeSummary {
   summary?: string | null;
   episodeNumber: number | null;
   authorityRevision?: number;
+  lifecycleState?: string;
+  videoPublicationId?: string | null;
 }
 
 export interface VideoPublicationSummary {
@@ -69,6 +72,8 @@ export interface VideoAdminVocabularyItem {
 
 export interface VideoAdminIndex {
   publications: VideoPublicationSummary[];
+  shows: VideoShowSummary[];
+  showEpisodes: VideoShowEpisodeSummary[];
   classifications: VideoAdminVocabularyItem[];
   sourceProviders: VideoAdminVocabularyItem[];
   captionTrackKinds: VideoAdminVocabularyItem[];
@@ -222,6 +227,7 @@ function parseShow(value: unknown): VideoShowSummary | null {
     title: text(show.title),
     description: nullableText(show.description),
     authorityRevision: numberValue(show.authority_revision, 1),
+    lifecycleState: nullableText(show.lifecycle_state) ?? undefined,
   };
 }
 
@@ -238,6 +244,8 @@ function parseEpisode(value: unknown): VideoShowEpisodeSummary | null {
       ? null
       : numberValue(episode.episode_number),
     authorityRevision: numberValue(episode.authority_revision, 1),
+    lifecycleState: nullableText(episode.lifecycle_state) ?? undefined,
+    videoPublicationId: nullableText(episode.video_publication_id),
   };
 }
 
@@ -296,6 +304,8 @@ export async function fetchVideoAdminIndex(): Promise<VideoAdminIndex> {
   const root = object(data);
   return {
     publications: array(root.publications).map(parseSummary),
+    shows: array(root.shows).map(parseShow).filter((value): value is VideoShowSummary => Boolean(value)),
+    showEpisodes: array(root.show_episodes).map(parseEpisode).filter((value): value is VideoShowEpisodeSummary => Boolean(value)),
     classifications: vocabulary(root.classifications, "classification"),
     sourceProviders: vocabulary(root.source_providers, "provider_key"),
     captionTrackKinds: vocabulary(root.caption_track_kinds, "track_kind"),
