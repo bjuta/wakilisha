@@ -1,3 +1,6 @@
+-- HISTORICAL CHECKPOINT VERIFIER ONLY.
+-- This script proves the named migration checkpoint, not the current post-kernel end state.
+-- For current authority use scripts/control-plane/verify-phase-7a-kernel-closure.sql.
 begin;
 set local transaction read only;
 set local statement_timeout = '120s';

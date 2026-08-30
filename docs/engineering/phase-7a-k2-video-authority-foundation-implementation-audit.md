@@ -1,5 +1,31 @@
 # Phase 7A K2 Video Authority Foundation — Implementation Audit
 
+## Current-state reconciliation — 30 August 2026
+
+**The kernel movement described in this document is closed.**
+
+Current authority is recorded in
+`docs/engineering/phase-7a-kernel-closure-record.md`.
+
+The accepted kernel baseline is production **64/AR3**:
+`20260830070752_phase_7a_k4c_ar3_article_cross_system_reader_convergence_typed_event_retirement`.
+
+Playlist and Audio typed lifecycle pointer compatibility is physically retired.
+Playlist/Audio typed event writers are retired.
+Article typed lifecycle readers/writers are retired.
+Video uses the shared Resource kernel directly and has no typed lifecycle/review ledger.
+
+A bounded post-kernel hardening candidate at commit
+`79b26e4c8db83fe178459c4c497c8fbc8714bb2b`
+repairs two separately tracked business-logic defects and freezes retained typed
+event tables as inaccessible historical evidence. It does **not** reopen this
+kernel milestone.
+
+Any older `Status`, `Current boundary`, `Next test`, production migration
+count, or preview instruction below is historical evidence for that checkpoint,
+not the current programme state.
+
+
 Status: PREVIEW SEALED — LOCAL PRE-PR GATES PASSED
 
 Implementation date: 26 August 2026
