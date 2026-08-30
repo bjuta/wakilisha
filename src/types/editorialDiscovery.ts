@@ -1,6 +1,6 @@
 export type EditorialDiscoveryVersionType =
   | "playlist_version"
-  | "audio_publication_version";
+  | "audio_publication_version"\n  | "video_publication_version";
 
 export type EditorialTaxonomy = "category" | "post_tag";
 
