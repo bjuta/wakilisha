@@ -1,6 +1,6 @@
 # Phase 7A K4C-AR2: Article Publication and Scheduling Event Convergence Implementation Audit
 
-Status: PREVIEW SCHEMA + RUNTIME ACCEPTED. WAITING CANONICAL NATIVE MIGRATION PUSH.
+Status: PREVIEW + REPLAY/SCHEMA SEALED. READY FOR PR/CI.
 
 Opened: 30 August 2026
 
@@ -695,3 +695,29 @@ The entire canonical post-push smoke transaction rolled back.
 AR2 canonical preview authority is accepted.
 
 Repository replay/live-schema sealing remains before PR.
+
+
+## Repository replay/schema seal
+
+Canonical repository replay/schema seal completed from accepted AR2 preview v2.
+
+- preview project ref: `omahdqzycllbquwbweyc`
+- preview branch id: `9775c2d4-b37e-48fe-92f9-86b7a0c348bd`
+- preview migration head: `20260830063344`
+- migration SHA-256: `03fd7fd9581fb607af752026cad513aa3187584d56a20c3d66492728f9d28607`
+- permanent verifier SHA-256: `7e93a756125a9a384709ae227f2a94faabdcff0a1a929fc17653d5ed76653dea`
+- generated database types SHA-256: `f5d7e92d437cffa9f8b7baa55996f5e94f39886de9317b29fde641702a7a1a67`
+- live-schema baseline SHA-256: `affff205687b010f7198e58dc1c46ce4c51c367830e5e2aa2a525f235b6c24b4`
+- replay proof SHA-256: `7b8ace7579e88a25f2d65c3fedc5d38d6caa972235dd0b1ea875959c7c9b52a0`
+- migration replay contract: PASS
+- live-schema preview-seal contract: PASS
+- focused AR2 test: PASS
+- critical control-plane suite: PASS
+- application build: PASS
+- production remains `62/AR1`
+- production pending migrations: exactly one, canonical AR2
+- no Edge Function deployment
+- no frontend deployment
+- no Readdy update
+
+AR2 is repository-sealed and ready for PR/CI.
