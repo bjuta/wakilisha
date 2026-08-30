@@ -1,6 +1,6 @@
 # Phase 7A K5E Real Video Media Governance Boundary Implementation Audit
 
-Status: PRODUCTION DATABASE ACCEPTED — FRONTEND ACTIVATION PENDING
+Status: NATIVE SOURCE FOLLOW-THROUGH PREVIEW ACCEPTED — AWAITING PROTECTED CI
 
 Date: 30 August 2026
 
@@ -213,7 +213,118 @@ Production schema baseline:
 
 The first production-seal CI run correctly stopped because the K5E RPC type signature had the right semantics but the wrong native generator position/format. The repair moved only `get_media_asset_governance_admin(uuid)` to the exact generated location and shape. No SQL or runtime authority changed.
 
-A production-seal PR must pass live schema/migration drift before frontend activation.
+Production schema-seal PR #747 merged after protected Critical Control Plane #693 passed live schema/migration drift and the complete application build.
+
+## Exact-main frontend activation
+
+Accepted frontend main:
+
+`eca91f58ed7b5aee000e01c1b2942177016e85e7`
+
+Accepted production build:
+
+- index SHA-256: `a88b96f32af01d33a882cd8a687b5d52bbeb8565d67c14e3c7faa3fbe5293fc8`
+- entry: `assets/index-CSjTEG7Y.js`
+- entry SHA-256: `a320700cb93b6813f14ac58e6b4f44b10c9dce64a4b9d09725a407e388a04329`
+- CSS: `assets/index-BInaPbmW.css`
+- CSS SHA-256: `3206bff9cb7fa3148d8146d28a0bf4fda025575e19a51f4ea0d01c324cfbf8d9`
+- files: `4477`
+- protected critical suite: `259 / 259` PASS
+- K5B composition regression suite: `9 / 9` PASS
+- production build: PASS
+- remote checksum parity: PASS
+- HTTPS home and Video Admin: `200`
+
+The reused deployment runner retained historical K5B/K5C/K5D display labels. The exact deployment identity was the accepted K5E main above and the outer K5E wrapper completed successfully.
+
+## Second real rendered failure
+
+The same existing uploaded Media asset was selected again after K5E frontend activation. No duplicate upload was performed.
+
+The rendered Video Editor then failed with a different message:
+
+`Current Media governance does not permit the native Video source.`
+
+That message originates from the older K2 `video.enforce_source_integrity()` trigger on `video.sources`.
+
+The first K5E migration correctly removed premature public-governance checks from `video.assert_exact_media_revision`, but K2 still duplicated the same public-use decision at source-row insertion time.
+
+The failed second attempt also left no partial Video authority:
+
+- selected source: null
+- current working version: null
+- Video version count: 0
+- active working `video_master` usage count: 0
+
+The real Media remains active, verified, revision 1, and internal-only governance version 1.
+
+## K5E native source integrity follow-through
+
+This is the same K5E business-logic boundary, not a new generic Video milestone.
+
+The follow-through changes only `video.enforce_source_integrity()` so native source registration requires:
+
+- active Media asset
+- asset kind `video`
+- exact revision belongs to that asset
+- exact revision's file object is verified
+
+Public-use rights, consent, source protection, retention, embargo, and public safety remain enforced by the unchanged K4B publication gate.
+
+No frontend change is required for this follow-through.
+
+## Native source follow-through preview acceptance
+
+Accepted follow-through migration:
+
+`20260830173011_phase_7a_k5e_native_source_integrity_convergence.sql`
+
+Migration SHA-256:
+
+`e922509d9c151b889038112ec479f792184d5d48afba680c389d1cc9569b9f32`
+
+Accepted preview state:
+
+- project ref: `kqmxcluhahxvqjnjggoy`
+- branch id: `bc5e0a19-cf27-4940-8aa5-aeeda160e4cd`
+- migration count: `71`
+- head: `20260830173011_phase_7a_k5e_native_source_integrity_convergence`
+
+Permanent verifier:
+
+`PHASE_7A_K5E_NATIVE_SOURCE_INTEGRITY_CONVERGENCE_PASS`
+
+Permanent verifier SHA-256:
+
+`1eb4b76f2ed0d00ea1d449860b09ac346f835588f98364a5cfc1375e5b031480`
+
+Rollback-only behavior proof:
+
+`PHASE_7A_K5E_NATIVE_SOURCE_INTEGRITY_BEHAVIOR_PASS`
+
+The accepted rollback proof demonstrated:
+
+- one active internal Video Media asset with one exact verified revision can now be inserted as a native Video source
+- the same internal-only Media remains blocked by `video.assert_publishable_media_revision`
+- no public-use governance gate moved earlier into source registration
+- the fixture rolls back completely
+
+The first follow-through fixture attempt stopped safely because the fixture omitted the verification actor required by the existing Media file verification constraint. The corrected fixture added only the required rollback-only actor identity. Runtime code was unchanged.
+
+Advisor disposition:
+
+- no follow-through-specific Security Advisor finding
+- no follow-through-specific Performance Advisor finding
+
+Schema/type disposition:
+
+- no browser RPC or TypeScript database surface changes
+- committed production `public,editorial` type seal remains unchanged
+- preview schema baseline advances only migration count/head to 71 / `20260830173011`
+
+## Follow-through protected CI
+
+Pending.
 
 ## Deployment classification
 
