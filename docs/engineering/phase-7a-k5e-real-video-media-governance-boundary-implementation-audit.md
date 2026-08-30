@@ -1,6 +1,6 @@
 # Phase 7A K5E Real Video Media Governance Boundary Implementation Audit
 
-Status: NATIVE SOURCE FOLLOW-THROUGH PREVIEW ACCEPTED — AWAITING PROTECTED CI
+Status: PRODUCTION AUTHORITY ACCEPTED — MIGRATION-HISTORY PARITY PR PENDING
 
 Date: 30 August 2026
 
@@ -333,3 +333,45 @@ Pending.
 - Readdy Finish update needed: No
 - frontend deploy needed: Yes, after production SQL acceptance
 - production content mutation before acceptance: No additional mutation
+
+
+## Production follow-through promotion
+
+PR #748 passed protected Critical Control Plane #695 and merged at:
+
+`b4415ddd59f987f1c221c1e515cefd4c0a7f2675`
+
+The accepted preview merge recorded production migration `20260830173011`, but the first independent production verifier still saw the older K2 source-integrity body. A subsequent direct production application of the already-accepted K5E follow-through body corrected the live function and recorded a second migration-history timestamp:
+
+`20260830173552_phase_7a_k5e_native_source_integrity_convergence`
+
+Production then had:
+
+- migration count: `72`
+- migration head: `20260830173552`
+- `video.enforce_source_integrity()`: converged
+- permanent K5E native-source verifier: PASS
+
+No user content was mutated by either production promotion step.
+
+The second timestamp is a migration-history duplication of the same idempotent `CREATE OR REPLACE FUNCTION` authority. It created no duplicate table, trigger, function, policy, or application authority.
+
+## Migration-history parity repair
+
+Production history cannot be left ahead of repository history.
+
+The repository therefore records:
+
+`20260830173552_phase_7a_k5e_native_source_integrity_convergence.sql`
+
+as an intentional no-op parity migration. Fresh replay applies the real authority once at `20260830173011`; the later parity timestamp does nothing because the production second application did not change the final schema beyond reapplying the same function body.
+
+The existing paid K5E preview was reset to exact production history through `20260830173552` and reverified:
+
+`PHASE_7A_K5E_NATIVE_SOURCE_INTEGRITY_CONVERGENCE_PASS`
+
+No TypeScript database surface changed. The production `public,editorial` type seal remains:
+
+`97cd758416514afcf6b0e4f9bb140c2012074af4d38905ff5f4eae3cb80d17ce`
+
+No frontend redeploy is required because the follow-through is SQL-only.
