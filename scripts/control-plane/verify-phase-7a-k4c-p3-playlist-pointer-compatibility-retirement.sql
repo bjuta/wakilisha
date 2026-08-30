@@ -1,3 +1,6 @@
+-- HISTORICAL CHECKPOINT VERIFIER ONLY.
+-- This script proves the named migration checkpoint, not the current post-kernel end state.
+-- For current authority use scripts/control-plane/verify-phase-7a-kernel-closure.sql.
 -- Phase 7A K4C-P3 permanent read-only verifier.
 
 do $phase_7a_k4c_p3_verify$

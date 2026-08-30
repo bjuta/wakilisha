@@ -1,3 +1,6 @@
+-- HISTORICAL CHECKPOINT VERIFIER ONLY.
+-- This script proves the named migration checkpoint, not the current post-kernel end state.
+-- For current authority use scripts/control-plane/verify-phase-7a-kernel-closure.sql.
 -- Permanent read-only verifier for Phase 7A K1 Resource lifecycle convergence.
 
 begin;
