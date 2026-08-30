@@ -209,7 +209,9 @@ Production schema baseline:
 - project ref: `pgzizndxdyhqmtyywjmt`
 - migration count: `70`
 - migration head: `20260830163814`
-- TypeScript schema SHA-256: `baab022f1fd3329a77dbeb7cf72e71d9cd418b4f4ba5459d26e57e1ce3db7ae1`
+- TypeScript schema SHA-256: `97cd758416514afcf6b0e4f9bb140c2012074af4d38905ff5f4eae3cb80d17ce`
+
+The first production-seal CI run correctly stopped because the K5E RPC type signature had the right semantics but the wrong native generator position/format. The repair moved only `get_media_asset_governance_admin(uuid)` to the exact generated location and shape. No SQL or runtime authority changed.
 
 A production-seal PR must pass live schema/migration drift before frontend activation.
 
