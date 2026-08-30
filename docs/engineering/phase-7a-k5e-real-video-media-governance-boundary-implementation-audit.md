@@ -1,6 +1,6 @@
 # Phase 7A K5E Real Video Media Governance Boundary Implementation Audit
 
-Status: LOCAL CANDIDATE — REAL EXIT-GATE GAP PROVED IN PRODUCTION
+Status: PREVIEW ACCEPTED — AWAITING PROTECTED CI
 
 Date: 30 August 2026
 
@@ -13,7 +13,16 @@ Production baseline:
 - migrations: `69`
 - head: `20260830144945_phase_7a_k5d_video_correction_provenance_convergence`
 - K5D: closed
-- disposable previews: none
+- disposable previews before K5E: none
+
+Accepted K5E preview:
+
+- branch id: `bc5e0a19-cf27-4940-8aa5-aeeda160e4cd`
+- project ref: `kqmxcluhahxvqjnjggoy`
+- branch name: `phase-7a-k5e-real-video-media-governance-boundary`
+- cost: `$0.01344/hour`
+- accepted preview prestate: `69` migrations
+- accepted preview prestate head: `20260830144945_phase_7a_k5d_video_correction_provenance_convergence`
 
 ## Real production failure
 
@@ -109,6 +118,62 @@ This is shared authority reuse plus a missing canonical Media control surface.
 16. exact-main frontend activation
 17. retry the same uploaded `IMG_0133.MOV` through native source selection
 18. create the first real immutable working Video snapshot
+
+## Preview acceptance
+
+Repository migration:
+
+`20260830163814_phase_7a_k5e_real_video_media_governance_boundary.sql`
+
+Migration SHA-256:
+
+`3253a5b4b85cd0e1dc36a9e3a97004b21d9db4e012be90edc5cda477586b6042`
+
+Preview migration result:
+
+- migrations: `70`
+- head: `20260830163814_phase_7a_k5e_real_video_media_governance_boundary`
+- pending repository migration mismatch: none after aligning the repository filename to the accepted preview history
+
+Permanent verifier:
+
+`PHASE_7A_K5E_REAL_VIDEO_MEDIA_GOVERNANCE_BOUNDARY_PASS`
+
+Permanent verifier SHA-256:
+
+`9edfe6770669fa3662292e1fc30f2bf4ff5947d9bb915e2538b6837839136a35`
+
+Rollback-only behavior proof:
+
+`PHASE_7A_K5E_REAL_VIDEO_MEDIA_GOVERNANCE_BEHAVIOR_PASS`
+
+The rollback proof demonstrated all of the intended separation on one fixture:
+
+- exact active verified internal Video Media passes the working exact-revision guard
+- that same internal Media remains blocked by the existing public publishability guard
+- the governed current Media governance reader returns the internal state
+- the existing canonical `create_media_governance_version` command appends a new public-use governance version
+- the same exact Media revision then passes the unchanged public publishability guard
+- the entire fixture transaction rolls back
+
+The first proof attempt stopped safely on a wrong fixture storage-provider key. The second stopped safely when forcing all deferred constraints immediate triggered unrelated Person provisioning integrity. The accepted proof corrected only those fixture assumptions and did not change K5E runtime code.
+
+Advisor disposition:
+
+- no K5E-specific Security Advisor finding for `get_media_asset_governance_admin`
+- no K5E-specific Performance Advisor finding
+- unrelated baseline advisor noise remains outside K5E scope
+
+Schema type seal:
+
+- preview schema: `public,editorial`
+- preview TypeScript schema SHA-256: `baab022f1fd3329a77dbeb7cf72e71d9cd418b4f4ba5459d26e57e1ce3db7ae1`
+- the connector's unfiltered generator omitted the repository's `editorial` schema surface, so it was not accepted as a whole-file replacement
+- the committed seal preserves the accepted 69-migration `public,editorial` snapshot and adds only the newly generated public RPC signature for `get_media_asset_governance_admin(uuid)`
+
+## Protected CI gate
+
+Pending.
 
 ## Deployment classification
 
