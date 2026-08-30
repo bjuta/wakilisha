@@ -165,10 +165,13 @@ Current machine-registry proof includes:
 - `AdminSaveState`
 - `AdminWorkspaceSection`
 - `AdminCollectionHeader`
+- `AdminModeComposer`
 - `EditorialWorkflowRail`
 - `EditorialDecisionWorkspace`
 - `EditorialTextDiff`
 - `EditorialMetadataWorkspace` / Discovery Workspace
+- `MediaTransport`
+- `MediaTimeline`
 
 These are already proven by at least two governed domain consumers and should be reused directly where their meaning applies.
 
@@ -176,13 +179,12 @@ These are already proven by at least two governed domain consumers and should be
 
 The machine registry currently identifies:
 
-- `AdminModeComposer`
 - `EditorialCommentEditor`
-- `MediaTransport`
-- `MediaTimeline`
 - `EditorialCreditPicker`
 
-These are deliberately not canonical merely because their implementation is generic. Video is the next real domain expected to prove, extend, reject, or promote them.
+`AdminModeComposer`, `MediaTransport`, and `MediaTimeline` were promoted to canonical during the Phase 7A K5B Video Editor composition after Video became their second real domain consumer.
+
+`EditorialCommentEditor` and `EditorialCreditPicker` remain candidates. K5B does not fabricate Video discussion or Credit attachment state merely to force reuse; those primitives may only be promoted after governed Video authority exists for the corresponding behavior.
 
 ### Authority candidates outside the interaction registry
 
