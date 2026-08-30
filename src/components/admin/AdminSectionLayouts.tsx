@@ -18,7 +18,7 @@ function makeLayout(capabilities: Capability[], label: string) {
   };
 }
 
-export const AdminContentLayout = makeLayout(["edit_own_articles", "edit_others_articles", "view_playlists", "edit_own_playlists", "edit_others_playlists", "view_audio", "edit_own_audio", "edit_others_audio"], "content");
+export const AdminContentLayout = makeLayout(["edit_own_articles", "edit_others_articles", "view_playlists", "edit_own_playlists", "edit_others_playlists", "view_audio", "edit_own_audio", "edit_others_audio", "view_video", "edit_own_video", "edit_others_video"], "content");
 export const AdminUsersLayout = makeLayout(["manage_users"], "users");
 export const AdminRegistryLayout = makeLayout(["view_registry", "manage_registry"], "registry");
 export const AdminMediaLayout = makeLayout(["upload_media", "manage_media_library"], "media");
