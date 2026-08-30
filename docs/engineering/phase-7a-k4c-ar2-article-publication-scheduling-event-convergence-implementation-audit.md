@@ -1,6 +1,6 @@
 # Phase 7A K4C-AR2: Article Publication and Scheduling Event Convergence Implementation Audit
 
-Status: LOCAL CANDIDATE BUILT. PREVIEW NOT YET APPLIED.
+Status: PREVIEW SCHEMA + RUNTIME ACCEPTED. WAITING CANONICAL NATIVE MIGRATION PUSH.
 
 Opened: 30 August 2026
 
@@ -508,3 +508,105 @@ No Edge Function deployment is required.
 No frontend deployment is required.
 
 No Readdy update is required.
+
+
+## Preview schema/runtime acceptance
+
+Disposable preview v1:
+
+- branch id: `2f66c8d6-cba0-4de0-bd07-364cdf869fa1`
+- project ref: `xttbjbkifwemztcqewyt`
+- hourly cost: `$0.01344`
+- baseline history: exact `62`
+- baseline head: `20260829114236`
+- AR1 permanent verifier at baseline: PASS
+- candidate transactional dry-run: PASS
+- candidate schema apply through direct SQL: PASS
+- migration history remained `62/AR1`
+
+Permanent AR2 verifier result:
+
+`PHASE_7A_K4C_AR2_ARTICLE_PUBLICATION_SCHEDULING_EVENT_CONVERGENCE_PASS`
+
+Observed after candidate schema apply:
+
+- typed Article lifecycle writer count: `0`
+- remaining typed Article lifecycle reader count: `2`
+- remaining readers: exact AR3 pair
+- typed Article lifecycle rows in no-data preview: `0`
+- shared Article lifecycle rows before fixtures: `0`
+
+## Rollback-safe runtime acceptance
+
+One authenticated administrator fixture proved the direct publication lifecycle:
+
+`submitted -> approved -> published -> unpublished -> archived -> restored`
+
+Observed:
+
+- direct publish receipt: `succeeded`
+- unpublish receipt: `succeeded`
+- archive receipt: `succeeded`
+- restore receipt: `succeeded`
+- final Article status: `draft`
+- final Resource lifecycle state: `draft`
+- final Resource visibility: `private`
+- typed lifecycle writes: `0`
+
+A second Article proved scheduling and service-path due publication:
+
+`submitted -> approved -> scheduled -> published`
+
+Observed:
+
+- scheduler successfully used the repaired `version.version_kind` check
+- schedule row remained authoritative and reached `status = 'published'`
+- schedule UUID was retained in shared lifecycle metadata
+- exactly one `article.publication.schedule` receipt succeeded
+- exactly one `article.publication.publish_scheduled` receipt succeeded
+- scheduled publish service principal:
+  `service:service_role`
+- scheduled publish actor:
+  `NULL`
+- service receipt idempotency key was derived from the schedule UUID
+- scheduled publication shared lifecycle event actor:
+  `NULL`
+- Article `wp_status` reached `publish`
+- Resource lifecycle state reached `published`
+- Resource visibility reached `public`
+- exactly one active publication snapshot existed
+- typed lifecycle writes: `0`
+
+The entire fixture transaction rolled back.
+
+Post-rollback residue:
+
+- fixture users: `0`
+- fixture Articles: `0`
+- fixture schedules: `0`
+- typed Article lifecycle rows: `0`
+- shared Article lifecycle rows: `0`
+- preview migration count/head remained exact `62/AR1`
+
+## Advisor and generated-schema parity
+
+AR2-target security advisor findings match production exactly:
+
+- six existing
+  `authenticated_security_definer_function_executable` WARN findings
+- no AR2-only security finding
+
+AR2-target performance advisor findings:
+
+- production: none
+- preview: none
+
+Generated TypeScript database types:
+
+- production byte length: `618219`
+- preview byte length: `618219`
+- exact equality: PASS
+
+Because preview v1 contains direct-SQL candidate schema without canonical
+migration-history stamping, it must be deleted rather than reused for native
+migration promotion.
