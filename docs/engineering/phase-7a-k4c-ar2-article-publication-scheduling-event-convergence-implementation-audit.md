@@ -1,6 +1,6 @@
 # Phase 7A K4C-AR2: Article Publication and Scheduling Event Convergence Implementation Audit
 
-Status: PREVIEW + REPLAY/SCHEMA SEALED. READY FOR PR/CI.
+Status: PRODUCTION SEALED. CLOSED.
 
 Opened: 30 August 2026
 
@@ -721,3 +721,76 @@ Canonical repository replay/schema seal completed from accepted AR2 preview v2.
 - no Readdy update
 
 AR2 is repository-sealed and ready for PR/CI.
+
+
+## Production promotion and closure
+
+AR2 was promoted from accepted merged main:
+
+`0db2c7c2d6ab433d9f498c0c0c34d4f52f82a48b`
+
+Canonical migration:
+
+`20260830063344_phase_7a_k4c_ar2_article_publication_scheduling_event_convergence.sql`
+
+Canonical migration SHA-256:
+
+`03fd7fd9581fb607af752026cad513aa3187584d56a20c3d66492728f9d28607`
+
+Production native CLI promotion proved:
+
+- production prestate: exact `62/AR1`
+- exactly one pending migration: canonical AR2
+- production poststate: exact `63/AR2`
+- pending migrations after push: `0`
+- accepted merged main remained clean
+- production project link remained explicit
+- no Edge Function deployment
+- no frontend deployment
+- no Readdy update
+
+Independent post-promotion production seal proved:
+
+- permanent verifier:
+  `PHASE_7A_K4C_AR2_ARTICLE_PUBLICATION_SCHEDULING_EVENT_CONVERGENCE_PASS`
+- typed Article lifecycle rows: `35`
+- shared Article lifecycle rows: `35`
+- remaining typed Article lifecycle writers: `0`
+- remaining typed Article lifecycle readers: `2`
+- enabled AR2 Article command types: `6`
+- internal scheduled service Article receipt bridge: present
+- anon execute across the six public AR2 RPCs: `0`
+- production/preview migration histories: exact `63/AR2` parity
+- generated database types: byte-identical production/preview
+- all eight AR2 function definitions: production/preview MD5 parity
+- normalized function ACLs and security metadata: production/preview parity
+- AR2-specific security advisor findings: identical production/preview
+- AR2-specific performance advisor findings: none
+
+The six authenticated `SECURITY DEFINER` Article publication RPC advisor WARNs
+remain identical to the accepted preview and are intentional existing browser API
+authority, not a new AR2 regression.
+
+Disposable preview cleanup:
+
+- preview project ref: `omahdqzycllbquwbweyc`
+- preview branch id: `9775c2d4-b37e-48fe-92f9-86b7a0c348bd`
+- deleted only after production verifier, migration parity, advisor parity,
+  generated-type parity, function-definition parity, and normalized ACL parity
+  all passed
+- Supabase branch listing after deletion: production `main` only
+
+AR2 is closed.
+
+The next bounded milestone is:
+
+**Phase 7A K4C-AR3 Article Cross-System Reader Convergence and Typed-Event Retirement**
+
+from the exact production boundary:
+
+- production migration count: `63`
+- production head: `20260830063344`
+- AR2 permanent verifier: PASS
+- remaining typed Article lifecycle writers: `0`
+- remaining typed Article lifecycle readers: `2`
+- pending migrations: `0`
