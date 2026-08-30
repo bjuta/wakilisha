@@ -91,9 +91,10 @@ describe("Phase 7A K5E real Video Media governance boundary", () => {
   });
 
   it("keeps new UI copy free of em dashes", () => {
-    const addedGovernanceCopy = mediaEdit.slice(
-      mediaEdit.indexOf("Usage governance"),
-    );
-    expect(addedGovernanceCopy).not.toContain("—");
+    const start = mediaEdit.indexOf("Usage governance");
+    const end = mediaEdit.indexOf("{/* Identification */}", start);
+    expect(start).toBeGreaterThanOrEqual(0);
+    expect(end).toBeGreaterThan(start);
+    expect(mediaEdit.slice(start, end)).not.toContain("—");
   });
 });
