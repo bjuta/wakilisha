@@ -31,5 +31,7 @@
     "security_new_findings": [],
     "performance_new_findings": []
   },
-  "verified_at": "2026-08-30T18:52:00Z"
+  "verified_at": "2026-08-30T18:52:00Z",
+  "migration_sha256": "10587f3f37fa44e3cb7298929f832579b9293ac29d42322fb613a8ba0145ec87",
+  "baseline_replay": "pass"
 }
