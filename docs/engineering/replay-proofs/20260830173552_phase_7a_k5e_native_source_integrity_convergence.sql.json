@@ -24,5 +24,17 @@
     "production_function_verified": true,
     "production_content_mutation": false
   },
-  "verified_at": "2026-08-30T17:38:00Z"
+  "verified_at": "2026-08-30T17:38:00Z",
+  "post_production_parity_closure": {
+    "production_migration_count": 72,
+    "production_migration_head": "20260830173552",
+    "repository_history_parity": true,
+    "verifier": "pass",
+    "verifier_marker": "PHASE_7A_K5E_NATIVE_SOURCE_INTEGRITY_CONVERGENCE_PASS",
+    "parity_pr": 749,
+    "parity_ci_run": 697,
+    "parity_merge_sha": "915755df8b25d4a0f68397255916e477686e5a33",
+    "sql_replayed_after_acceptance": false,
+    "frontend_redeploy_required": false
+  }
 }
