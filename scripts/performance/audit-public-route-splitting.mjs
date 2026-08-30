@@ -392,14 +392,24 @@ const routePaths = [
  * Public Audio directory convergence adds one public route:
  * - /audio
  *
- * The current authority is therefore 169 paths. Removing all four declared
- * public Audio and Show paths must still reproduce the exact 165-path pre-M1 sequence.
+ * Phase 7A K5B adds two internal Admin Content paths:
+ * - video
+ * - video/:publicationId
+ *
+ * These are Admin Studio routes only. They must not change the preserved
+ * pre-M1 public route sequence.
+ *
+ * The current authority is therefore 171 paths. Removing the four declared
+ * public Audio and Show paths plus the two K5B Admin Video paths must still
+ * reproduce the exact 165-path pre-M1 sequence.
  */
-const expectedRoutePathCount = 169;
+const expectedRoutePathCount = 171;
 const publicAudioIndexPath = "/audio";
 const publicAudioPath = "/audio/:slug";
 const publicShowPath = "/shows/:showSlug";
 const publicShowEpisodePath = "/shows/:showSlug/:episodeSlug";
+const adminVideoIndexPath = "video";
+const adminVideoDetailPath = "video/:publicationId";
 
 if (routePaths.length !== expectedRoutePathCount) {
   fail(
@@ -412,12 +422,14 @@ for (const [routePath, label] of [
   [publicAudioPath, "Standalone Audio"],
   [publicShowPath, "Show"],
   [publicShowEpisodePath, "Show Episode"],
+  [adminVideoIndexPath, "Admin Video Directory"],
+  [adminVideoDetailPath, "Admin Video Detail"],
 ]) {
   if (
     routePaths.filter((candidate) => candidate === routePath).length !== 1
   ) {
     fail(
-      `Public Audio and Show authority must retain exactly one ${label} route at ${routePath}`,
+      `Declared Audio, Show, and K5B Video authority must retain exactly one ${label} route at ${routePath}`,
     );
   }
 }
@@ -436,7 +448,9 @@ const preM1RoutePaths = routePaths.filter(
     routePath !== publicAudioIndexPath &&
     routePath !== publicAudioPath &&
     routePath !== publicShowPath &&
-    routePath !== publicShowEpisodePath,
+    routePath !== publicShowEpisodePath &&
+    routePath !== adminVideoIndexPath &&
+    routePath !== adminVideoDetailPath,
 );
 
 if (preM1RoutePaths.length !== 165) {
