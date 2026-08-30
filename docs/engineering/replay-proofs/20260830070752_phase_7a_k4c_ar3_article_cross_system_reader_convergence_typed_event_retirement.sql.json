@@ -1,0 +1,16 @@
+{
+  "migration_file": "supabase/migrations/20260830070752_phase_7a_k4c_ar3_article_cross_system_reader_convergence_typed_event_retirement.sql",
+  "migration_sha256": "432bb3e9a769cfab1359840133380452fe24a80933621b185912de7d32f17d9c",
+  "base_main_sha": "f7c321827db21f2a878d3ec231d93c44f4079caa",
+  "preview_project_ref": "ktaufbpkeqcajrdrwcye",
+  "preview_branch_id": "0c2d4630-b3ea-48f1-8b14-71ede252bf14",
+  "preview_migration_head": "20260830070752",
+  "baseline_replay": "pass",
+  "candidate_apply": "pass",
+  "verifier": "pass",
+  "verifier_file": "scripts/control-plane/verify-phase-7a-k4c-ar3-article-cross-system-reader-convergence-typed-event-retirement.sql",
+  "schema_types_sha256": "f5d7e92d437cffa9f8b7baa55996f5e94f39886de9317b29fde641702a7a1a67",
+  "schema_migration_count": 64,
+  "schema_migration_head": "20260830070752",
+  "verified_at": "2026-08-30T07:41:11.334Z"
+}
