@@ -42,5 +42,12 @@
     "production_performance_k5e_findings": [],
     "sql_replayed": false,
     "promotion_method": "accepted Supabase preview branch merge"
+  },
+  "post_production_schema_type_seal": {
+    "preview_era_schema_types_sha256": "baab022f1fd3329a77dbeb7cf72e71d9cd418b4f4ba5459d26e57e1ce3db7ae1",
+    "corrected_production_schema_types_sha256": "97cd758416514afcf6b0e4f9bb140c2012074af4d38905ff5f4eae3cb80d17ce",
+    "first_production_seal_ci": "failed on native generator order/format only",
+    "correction_reason": "K5E RPC signature was committed in the wrong generated position and expanded Args formatting; production live type diff proved exact native placement and shape",
+    "sql_replayed": false
   }
 }
