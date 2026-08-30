@@ -149,3 +149,18 @@ The real Video remains:
 - Media governance: public-ready
 
 The next gate is the same real Publish action.
+
+
+## Production-history replay preview
+
+The prior preview carried the accepted pre-production timestamp `20260830193925`, so it was replaced after production promotion with one fresh disposable preview from production.
+
+Fresh parity preview:
+
+- branch id: `0685ed7a-787c-4ec3-b468-9c011236d1fd`
+- project ref: `kpnnfyvinusnbqzgnwrh`
+- branch name: `video-publish-production-parity`
+- migrations: `74`
+- head: `20260830194344_video_publish_deferred_binding_integrity`
+
+This preview replays the exact authoritative production migration history.
