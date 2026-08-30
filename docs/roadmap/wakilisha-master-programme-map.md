@@ -10,18 +10,21 @@ K5A Video Editorial Command and Admin Read Boundary is production accepted.
 
 K5B Video Editor Composition is closed and production accepted.
 
-**K5C Video Version Trust Convergence is CLOSED and production accepted** at migration count `68`, head `20260830124903_phase_7a_k5c_video_version_trust_convergence`, with production application commit `00bf46ff356a45f0a4a914e1a7b263a722ec51d5`.
+**K5C Video Version Trust Convergence is CLOSED and production accepted.**
 
-The live Video Admin Studio now carries shared exact-version Credits and Citations through the governed Video boundary. `EditorialCreditPicker` is canonical after genuine Audio + Video use. `EditorialCommentEditor` remains candidate and Audio-only.
+**K5D Video Correction Target + Provenance Convergence is CLOSED and production accepted** at migration count `69`, head `20260830144945_phase_7a_k5d_video_correction_provenance_convergence`, with accepted production/frontend main `af76d476053e9037382feb862efc55972c9049f8`.
 
-Canonical closure record:
+The live Video Admin Studio now carries shared exact-version Credits/Citations and governed read-only Correction provenance through canonical shared authority. `EditorialCreditPicker` is canonical after genuine Audio + Video use. `EditorialCommentEditor` remains candidate and Audio-only.
 
-`docs/engineering/phase-7a-k5c-video-version-trust-convergence-closure-record.md`
+Canonical closure records:
 
-Phase 7A remains open because the exit gate is one real governed Video through immutable review and publication. Credits/Citations are closed. The next bounded work is Corrections/provenance, Registry links where the real Video requires them, and any missing Media/lifecycle authority exposed by the real workflow.
+- `docs/engineering/phase-7a-k5c-video-version-trust-convergence-closure-record.md`
+- `docs/engineering/phase-7a-k5d-video-correction-provenance-convergence-closure-record.md`
+
+Phase 7A remains open because the exit gate is one real governed Video through immutable review and publication. Credits/Citations and Corrections/provenance continuity are closed. The next bounded work is the real Video exit-gate instrument itself, with Registry, Media, readiness, or lifecycle work added only if that real workflow exposes a concrete gap.
 
 
-Status date: 25 August 2026
+Status date: 30 August 2026
 
 Phase 6A production authority baseline: `fd0580e3a1a19e3d1f06a9c8466a37c84cd26a8b`
 
@@ -31,9 +34,9 @@ Documentation closure gate: PR #699, `Reconcile Phase 6B milestone closure recor
 
 Production runtime application baseline: `dae3de2dc9fb021496eb0fe0c4d4f0338f676a88`
 
-Current production migration head: `20260830124903`
+Current production migration head: `20260830144945`
 
-Current production migration count: `68`
+Current production migration count: `69`
 
 ## Purpose
 
@@ -263,23 +266,30 @@ Build Inquiry as a capability across canonical editors, then the public Inquiry 
 
 ## Immediate next step
 
-Open a fresh bounded **Phase 7A remaining exit-gate milestone** from the K5C production-accepted baseline.
+Run the **real Phase 7A Video exit-gate instrument** from the K5D production-accepted baseline.
 
-Do not rebuild the Video collection, editor shell, or shared Trust. Credits/Citations are closed.
+Do not rebuild the Video collection, editor shell, shared Trust, or Corrections. Credits/Citations and Corrections/provenance continuity are closed.
 
-Close only the authority still required by the real Video exit gate:
+Use the existing real Video and:
 
-- Corrections/provenance continuity
-- Registry relationships where the real Video requires them
-- any missing Media relationship or readiness rule exposed by real use
-- any missing governed lifecycle behavior exposed by the real workflow
-- one real Video through working snapshot, immutable review, approval, and governed publication
+1. save a working snapshot
+2. submit the immutable review version
+3. perform governed review using existing authority
+4. approve
+5. publish through governed lifecycle authority
+6. record any concrete Registry, Media, readiness, or lifecycle gap exposed by that path
+7. close only those proved gaps
+8. complete the real Video publication
 
 `EditorialCreditPicker` is canonical with Audio + Video consumers.
 
-`EditorialCommentEditor` remains candidate until matching governed Video review-comment authority exists.
+`EditorialCommentEditor` remains candidate until matching governed Video review-comment authority is proven necessary by real use.
 
 Do not create a Video-owned series authority. Video Episodes remain bound to shared Show/Show Episode identity.
+
+Canonical K5D closure record:
+
+`docs/engineering/phase-7a-k5d-video-correction-provenance-convergence-closure-record.md`
 
 Canonical K5C closure record:
 
