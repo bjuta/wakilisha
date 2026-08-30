@@ -1619,11 +1619,11 @@ export type Database = {
             referencedColumns: ["id", "resource_kind"]
           },
           {
-            foreignKeyName: "correction_targets_version_fkey"
-            columns: ["target_version_id"]
+            foreignKeyName: "correction_targets_resource_version_fkey"
+            columns: ["target_resource_id", "target_version_id"]
             isOneToOne: false
-            referencedRelation: "article_versions"
-            referencedColumns: ["id"]
+            referencedRelation: "resource_versions"
+            referencedColumns: ["resource_id", "id"]
           },
         ]
       }
