@@ -7,8 +7,10 @@
   "migrationCount": 74,
   "latestMigration": "20260830194344_video_publish_deferred_binding_integrity.sql",
   "schemaSeal": {
-    "mode": "production",
-    "sourceProjectRef": "pgzizndxdyhqmtyywjmt",
-    "migrationHead": "20260830194344"
+    "mode": "preview",
+    "sourceProjectRef": "kpnnfyvinusnbqzgnwrh",
+    "migrationHead": "20260830194344",
+    "baseMainSha": "16c5e59c3cac850c97ff5fb3c1afaa32d68ef57d",
+    "previewBranchId": "0685ed7a-787c-4ec3-b468-9c011236d1fd"
   }
 }
