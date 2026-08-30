@@ -540,3 +540,106 @@ Generated TypeScript database types:
 Because preview v1 contains direct-SQL candidate schema without canonical
 migration-history stamping, it must be deleted rather than reset/reused for
 native migration promotion.
+
+## Canonical native preview and repository seal
+
+Canonical AR3 migration bytes were promoted natively to fresh disposable
+preview v2.
+
+Preview v2:
+
+- branch id: `0c2d4630-b3ea-48f1-8b14-71ede252bf14`
+- project ref: `ktaufbpkeqcajrdrwcye`
+- baseline before push: exact `63/AR2`
+- canonical pending migration count before push: `1`
+- canonical migration:
+  `20260830070752_phase_7a_k4c_ar3_article_cross_system_reader_convergence_typed_event_retirement.sql`
+- migration SHA-256:
+  `432bb3e9a769cfab1359840133380452fe24a80933621b185912de7d32f17d9c`
+- focused AR3 tests before push: `14/14 PASS`
+- application build before push: PASS
+- native `supabase db push --linked`: PASS
+- preview migration count after push: `64`
+- preview migration head after push: `20260830070752`
+- preview pending migrations after push: `0`
+- production mutation: none
+
+Independent post-stamp preview verification proved:
+
+- permanent AR3 verifier:
+  `PHASE_7A_K4C_AR3_ARTICLE_CROSS_SYSTEM_READER_CONVERGENCE_TYPED_EVENT_RETIREMENT_PASS`
+- typed Article lifecycle rows in no-data preview: `0`
+- shared Article lifecycle rows in no-data preview: `0`
+- remaining live typed Article dependencies: `0`
+- Corrections proof ACL:
+  - `PUBLIC`: no EXECUTE
+  - `anon`: no EXECUTE
+  - `authenticated`: no EXECUTE
+  - `service_role`: EXECUTE
+- Publishing state ACL:
+  - `PUBLIC`: no EXECUTE
+  - `anon`: no EXECUTE
+  - `authenticated`: EXECUTE
+  - `service_role`: EXECUTE
+- historical typed Article table remains inaccessible to
+  `anon`, `authenticated`, and `service_role`
+
+A fresh rollback-safe post-stamp Publishing fixture proved:
+
+- `NULL` Resource -> `not_linked`
+- draft Article Resource -> `draft`
+- shared latest `changes_requested` event -> `changes_requested`
+- typed Article lifecycle writes: `0`
+- fixture residue after rollback: `0`
+
+Post-stamp advisor parity:
+
+- AR3-relevant security advisor findings: identical production/preview
+- AR3-relevant performance advisor findings: identical production/preview
+- no AR3-specific new security or performance finding
+
+Generated TypeScript database types remained byte-identical between production
+and preview:
+
+- production length: `618219`
+- preview length: `618219`
+- equality: PASS
+
+Canonical repository replay/schema seal then completed from preview v2.
+
+Repository seal identities:
+
+- database types SHA-256:
+  `f5d7e92d437cffa9f8b7baa55996f5e94f39886de9317b29fde641702a7a1a67`
+- live-schema baseline SHA-256:
+  `3d435793db6e429b55f2e3ed52a7774c776cfb7dfa2a5f43a7963c3a4ea0e321`
+- replay proof SHA-256:
+  `0617f328087147d66db74a7d71ff13ef13aa71339f0352401a55cba8073bcab2`
+- migration replay contract: PASS
+- repository schema snapshot:
+  exact `64` active migrations at canonical AR3
+- production migration history:
+  exact `63/AR2`
+- production pending set:
+  exactly one forward-only canonical AR3 migration
+- focused AR3 test:
+  `14/14 PASS`
+- critical control-plane suite:
+  `24` files / `259` tests PASS
+- application build:
+  PASS
+- exact repository changed-file perimeter:
+  six files
+- production mutation:
+  none
+- Edge Function deployment:
+  none
+- frontend deployment:
+  none
+- Readdy update:
+  none
+
+AR3 is repository-sealed and ready for protected PR/CI.
+
+Production remains exact `63/AR2` with canonical AR3 as the sole pending
+migration.
