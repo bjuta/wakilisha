@@ -1,6 +1,6 @@
 # Phase 7A K5E Real Video Media Governance Boundary Implementation Audit
 
-Status: PRODUCTION AUTHORITY ACCEPTED — MIGRATION-HISTORY PARITY PR PENDING
+Status: PRODUCTION AUTHORITY + HISTORY PARITY ACCEPTED — REAL SOURCE RETRY PENDING
 
 Date: 30 August 2026
 
@@ -375,3 +375,27 @@ No TypeScript database surface changed. The production `public,editorial` type s
 `97cd758416514afcf6b0e4f9bb140c2012074af4d38905ff5f4eae3cb80d17ce`
 
 No frontend redeploy is required because the follow-through is SQL-only.
+
+
+## Production parity closure
+
+Migration-history parity PR #749 passed protected Critical Control Plane #697 and merged at:
+
+`915755df8b25d4a0f68397255916e477686e5a33`
+
+The repository now carries all 72 authoritative production migration timestamps through:
+
+`20260830173552_phase_7a_k5e_native_source_integrity_convergence.sql`
+
+Production and repository history are aligned. The later duplicate production timestamp is represented as a no-op replay parity migration because its live effect was only to reapply the already-accepted idempotent source-integrity function definition.
+
+Final production authority before the real source retry:
+
+- migrations: `72`
+- head: `20260830173552`
+- native source integrity verifier: PASS
+- TypeScript schema SHA-256: `97cd758416514afcf6b0e4f9bb140c2012074af4d38905ff5f4eae3cb80d17ce`
+- frontend remains the accepted exact-main K5E build from `eca91f58ed7b5aee000e01c1b2942177016e85e7`
+- no additional frontend deployment is required for the SQL-only source-integrity follow-through
+
+The next gate is to retry the same existing `IMG_0133.MOV` native Media asset through `Use Video`. Do not upload it again.
