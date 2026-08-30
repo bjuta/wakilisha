@@ -1,0 +1,28 @@
+{
+  "migration_file": "supabase/migrations/20260830193925_video_publish_deferred_binding_integrity.sql",
+  "migration_sha256": "b6dd5da6fa841612c8724b699ee421f85230ce8ef9274fbdc23b844450ae1d67",
+  "base_main_sha": "9f88bd0f58f5480009777cb9069474fe5d07ccc9",
+  "preview_project_ref": "osxkuuqlfhbmiykdwena",
+  "preview_branch_id": "d44a1d1c-6200-42b9-89a8-96ba7367484f",
+  "preview_branch_name": "media-owned-consent-production-parity",
+  "baseline_migration_count": 73,
+  "baseline_migration_head": "20260830185526",
+  "baseline_replay": "pass",
+  "candidate_apply": "pass",
+  "preview_migration_count": 74,
+  "preview_migration_head": "20260830193925",
+  "verifier": "pass",
+  "verifier_marker": "VIDEO_PUBLISH_DEFERRED_BINDING_INTEGRITY_PASS",
+  "verifier_file": "scripts/control-plane/verify-video-publish-deferred-binding-integrity.sql",
+  "verifier_sha256": "f316d9cb6033d3836ca41373903aa64af18e40fcf5eaf36cc0ece861e7d632e0",
+  "behavioral_fixture": "VIDEO_PUBLISH_DEFERRED_BINDING_INTEGRITY_BEHAVIOR_PASS",
+  "fixture_terminal_state": "ROLLBACK",
+  "schema_types_sha256": "97cd758416514afcf6b0e4f9bb140c2012074af4d38905ff5f4eae3cb80d17ce",
+  "schema_migration_count": 74,
+  "schema_migration_head": "20260830193925",
+  "advisor_summary": {
+    "security_new_findings": [],
+    "performance_new_findings": []
+  },
+  "verified_at": "2026-08-30T19:40:00Z"
+}
