@@ -1,5 +1,4 @@
 {
-  "migration": "20260830124903_phase_7a_k5c_video_version_trust_convergence.sql",
   "migration_sha256": "76710d5f6e6ef5ec7899ae4968b4fad00004758cc29d1813ea2ee8139f7a4343",
   "base_main_sha": "88988e687f19b9a8e9d00d7a03cf77e59b0c18fe",
   "preview_project_ref": "vlddstensgmaccioldqp",
@@ -11,7 +10,7 @@
   "candidate_apply": "pass",
   "preview_migration_count": 68,
   "preview_migration_head": "20260830124903",
-  "verifier": "PHASE_7A_K5C_VIDEO_VERSION_TRUST_CONVERGENCE_PASS",
+  "verifier": "pass",
   "verifier_file": "scripts/control-plane/verify-phase-7a-k5c-video-version-trust-convergence.sql",
   "behavioral_fixture": "PHASE_7A_K5C_VIDEO_TRUST_BEHAVIOR_PASS",
   "fixture_terminal_state": "ROLLBACK",
@@ -42,5 +41,7 @@
     ],
     "performance_disposition": "no K5C WARN/ERROR performance finding"
   },
-  "verified_at": "2026-08-30T12:52:00Z"
+  "verified_at": "2026-08-30T12:52:00Z",
+  "migration_file": "supabase/migrations/20260830124903_phase_7a_k5c_video_version_trust_convergence.sql",
+  "verifier_marker": "PHASE_7A_K5C_VIDEO_VERSION_TRUST_CONVERGENCE_PASS"
 }
