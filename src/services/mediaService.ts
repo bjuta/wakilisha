@@ -812,7 +812,7 @@ export const mediaService = {
           rights_holder: governance.rightsHolder?.trim() || null,
           licence_identifier: governance.licenceIdentifier?.trim() || null,
           licence_terms: governance.licenceTerms?.trim() || null,
-          consent_status: governance.consentStatus,
+          consent_status: governance.rightsStatus === "owned" ? "granted" : governance.consentStatus,
           consent_scope: governance.consentScope?.trim() || null,
           sensitivity: governance.sensitivity,
           embargo_state: governance.embargoState,
