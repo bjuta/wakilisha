@@ -450,3 +450,22 @@ K5A closes when:
 > an authenticated editor can operate and read the complete working Video publication authority through governed commands, without React code or direct private-table writes, and Video Episode behavior proves shared Show Episode authority as a real second media consumer.
 
 The next Phase 7A slice may then compose the canonical Video Editor over this boundary and perform actual UI primitive promotion from real Video use.
+
+
+## Implementation vocabulary reconciliation
+
+K2 already reserved the exact command vocabulary that K5A now activates.
+
+The implementation uses these existing names verbatim:
+
+- `video.publication.create`
+- `video.publication.metadata.update`
+- `video.source.register`
+- `video.publication.source.set`
+- `video.publication.show_episode.bind`
+- `video.publication.poster.set`
+- `video.publication.transcript.set`
+- `video.publication.captions.replace`
+- `video.publication.chapters.replace`
+
+Any earlier shorthand such as “source create” describes the product action only and does not establish a second command type.
