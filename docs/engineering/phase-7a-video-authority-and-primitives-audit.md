@@ -8,16 +8,18 @@ K5A governed Video editorial commands/admin reads are production accepted.
 
 K5B Video Editor Composition is closed and production accepted.
 
-**K5C Video Version Trust Convergence is CLOSED and production accepted** at migration count `68`, head `20260830124903_phase_7a_k5c_video_version_trust_convergence`, and production application commit `00bf46ff356a45f0a4a914e1a7b263a722ec51d5`.
+**K5C Video Version Trust Convergence is CLOSED and production accepted.**
 
-The live Video Admin Studio now reuses shared exact-version Credits and Citations. `EditorialCreditPicker` is canonical through genuine Audio + Video use. `EditorialCommentEditor` remains candidate and Audio-only.
+**K5D Video Correction Target + Provenance Convergence is CLOSED and production accepted** at migration count `69`, head `20260830144945_phase_7a_k5d_video_correction_provenance_convergence`, and accepted production/frontend main `af76d476053e9037382feb862efc55972c9049f8`.
 
-Do not reopen K0, K1, K4A, K4C, K5A, K5B, or K5C.
+The live Video Admin Studio now reuses shared exact-version Credits/Citations and governed read-only Correction provenance. `EditorialCreditPicker` is canonical through genuine Audio + Video use. `EditorialCommentEditor` remains candidate and Audio-only.
 
-The next Video work is the remaining real-Video exit-gate authority: Corrections/provenance, Registry links where required, any missing Media/lifecycle relationship exposed by real use, then immutable review and publication of one real Video.
+Do not reopen K0, K1, K4A, K4C, K5A, K5B, K5C, or K5D.
+
+The next Video work is the real Phase 7A exit-gate instrument: take the existing real Video through working snapshot, immutable review, approval, and governed publication, adding Registry relationships or Media/lifecycle authority only where that real workflow proves a concrete need.
 
 
-Status: ARCHITECTURE LOCK — K5C IMPLEMENTED AND PRODUCTION ACCEPTED
+Status: ARCHITECTURE LOCK — K5D IMPLEMENTED AND PRODUCTION ACCEPTED
 
 Audit date: 26 August 2026
 
@@ -642,9 +644,8 @@ This audit is documentation/governance only.
 
 The architectural decisions in this audit remain locked.
 
-K5A, K5B, and K5C are production accepted. Shared Credits/Citations are no longer a remaining Video gap.
+K5A, K5B, K5C, and K5D are production accepted. Shared Credits/Citations and Corrections/provenance continuity are no longer remaining Video gaps.
 
-Continue only with the authority still required by the real Phase 7A exit proof: Corrections/provenance, Registry relationships where real content requires them, any missing Media/lifecycle relationship exposed by real use, and one real Video through immutable review and governed publication.
-## Next action
+Use the existing real Video as the Phase 7A exit proof. Save a working snapshot, submit the immutable review version, perform governed review, approve, and publish. Add Registry, Media, readiness, lifecycle, or rich review-comment authority only if that real path exposes a concrete gap.
 
-Reconcile the Phase 7A kickoff against this audit, then design the smallest typed Video authority migration and permanent verifier before creating a disposable preview.
+Do not manufacture another generic Video subsystem merely to extend the milestone sequence.
