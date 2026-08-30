@@ -610,3 +610,88 @@ Generated TypeScript database types:
 Because preview v1 contains direct-SQL candidate schema without canonical
 migration-history stamping, it must be deleted rather than reused for native
 migration promotion.
+
+
+## Canonical native preview push
+
+Canonical CLI-native preview promotion completed on disposable preview v2.
+
+Preview v2:
+
+- branch id: `9775c2d4-b37e-48fe-92f9-86b7a0c348bd`
+- project ref: `omahdqzycllbquwbweyc`
+- baseline before push: exact `62/AR1`
+- canonical pending migration count before push: `1`
+- canonical pending migration:
+  `20260830063344_phase_7a_k4c_ar2_article_publication_scheduling_event_convergence.sql`
+- migration SHA-256:
+  `03fd7fd9581fb607af752026cad513aa3187584d56a20c3d66492728f9d28607`
+- focused AR2 tests: `15/15 PASS`
+- application build: PASS
+- native `supabase db push --linked`: PASS
+- preview migration count after push: `63`
+- preview migration head after push: `20260830063344`
+- preview pending migrations after push: `0`
+- production mutation: none
+
+## Independent canonical preview seal
+
+After canonical native push, independent control-plane checks against
+`omahdqzycllbquwbweyc` proved:
+
+- permanent AR2 verifier:
+  `PHASE_7A_K4C_AR2_ARTICLE_PUBLICATION_SCHEDULING_EVENT_CONVERGENCE_PASS`
+- typed Article lifecycle writer count: `0`
+- remaining typed Article lifecycle reader count: `2`
+- production migration count/head: `62/AR1`
+- preview migration count/head: `63/AR2`
+- first 62 migration versions: exact production/preview parity
+- AR2-target security advisor findings: identical production/preview
+- AR2-target performance advisor findings: none in production or preview
+- generated TypeScript database types: byte-identical production/preview
+- generated type byte length: `618219` in both environments
+
+The six existing authenticated `SECURITY DEFINER` Article publication RPC
+advisor WARNs are identical between production and preview and remain intentional
+existing API exposure.
+
+## Canonical post-push runtime smoke
+
+A fresh rollback-safe authenticated administrator fixture was executed after
+the canonical AR2 migration was stamped as preview migration 63.
+
+Direct path:
+
+`submitted -> approved -> published -> unpublished -> archived -> restored`
+
+Observed:
+
+- review submit receipt: `succeeded`
+- review approve receipt: `succeeded`
+- direct publish receipt: `succeeded`
+- unpublish receipt: `succeeded`
+- archive receipt: `succeeded`
+- restore receipt: `succeeded`
+- typed Article lifecycle writes: `0`
+
+Scheduled path:
+
+`submitted -> approved -> scheduled -> published`
+
+Observed:
+
+- schedule row status after due execution: `published`
+- `article.publication.schedule` receipt: `succeeded`
+- `article.publication.publish_scheduled` receipt: `succeeded`
+- scheduled publish principal: `service:service_role`
+- scheduled publish actor: `NULL`
+- schedule-scoped service idempotency key preserved
+- schedule UUID retained in shared lifecycle metadata
+- exactly one active public publication snapshot
+- typed Article lifecycle writes: `0`
+
+The entire canonical post-push smoke transaction rolled back.
+
+AR2 canonical preview authority is accepted.
+
+Repository replay/live-schema sealing remains before PR.
