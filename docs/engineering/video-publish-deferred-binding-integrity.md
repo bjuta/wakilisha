@@ -1,6 +1,6 @@
 # Video Publish Deferred Binding Integrity Repair
 
-Status: PREVIEW ACCEPTED — AWAITING PROTECTED CI
+Status: PRODUCTION DATABASE ACCEPTED — REAL PUBLISH RETRY PENDING
 
 Date: 30 August 2026
 
@@ -116,4 +116,36 @@ No TypeScript database surface changed.
 
 ## Protected CI
 
-Pending.
+PR #753 passed protected Critical Control Plane #709 and merged at:
+
+`16c5e59c3cac850c97ff5fb3c1afaa32d68ef57d`
+
+## Production promotion
+
+The accepted migration bytes were promoted separately to production.
+
+Production now has:
+
+- migration count: `74`
+- head: `20260830194344_video_publish_deferred_binding_integrity`
+- permanent verifier: `VIDEO_PUBLISH_DEFERRED_BINDING_INTEGRITY_PASS`
+
+Supabase recorded the accepted bytes at production timestamp `20260830194344`, while the preview had recorded `20260830193925`. The repository filename and replay proof are rebound to the production timestamp without changing migration bytes or replaying SQL.
+
+The accepted preview timestamp bytes are preserved under:
+
+`docs/engineering/replay-baseline/retired-active-migrations/20260830193925_video_publish_deferred_binding_integrity.sql`
+
+No frontend redeploy is required.
+
+## Real Video state before retry
+
+The failed Publish attempt did not create a published version.
+
+The real Video remains:
+
+- approved version: `7ebd6ce4-1855-4886-9549-f3a880335308`
+- published pointer: null
+- Media governance: public-ready
+
+The next gate is the same real Publish action.
