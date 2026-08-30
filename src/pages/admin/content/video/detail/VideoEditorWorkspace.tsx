@@ -580,7 +580,7 @@ export function VideoEditorWorkspace({
 
   const source = workspace.selectedSource;
   const nativeUrl = workspace.selectedMedia?.primaryDeliveryUrl || null;
-  const providerUrl = providerEmbedUrl(
+  const providerEmbed = providerEmbedUrl(
     source?.providerKey || null,
     source?.providerObjectId || null,
     source?.canonicalUrl || null,
@@ -870,11 +870,11 @@ export function VideoEditorWorkspace({
                   </span>
                 </div>
               </div>
-            ) : source?.sourceKind === "external_provider" && providerUrl ? (
+            ) : source?.sourceKind === "external_provider" && providerEmbed ? (
               <div className="space-y-3">
                 <div className="overflow-hidden rounded-xl border border-wk-border bg-black">
                   <iframe
-                    src={providerUrl}
+                    src={providerEmbed}
                     title={workspace.publication.title}
                     className="aspect-video w-full"
                     allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
