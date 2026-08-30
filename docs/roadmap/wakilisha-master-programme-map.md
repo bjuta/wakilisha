@@ -4,20 +4,15 @@
 
 **Current numbered work remains Phase 7A: Video publication authority.**
 
-The Resource-kernel movement that interrupted Video implementation is **closed**
-at the accepted production kernel baseline **64/AR3**.
+The Resource-kernel movement and bounded post-kernel hardening are **closed**.
 
 Canonical closure record:
 
 `docs/engineering/phase-7a-kernel-closure-record.md`
 
-A bounded post-kernel hardening candidate fixes two deliberately deferred
-business-logic defects and freezes retained typed event evidence. This does not
-reopen or extend the kernel programme.
+**K5A Video Editorial Command and Admin Read Boundary is production accepted** at migration count `66`, head `20260830094459_phase_7a_k5a_video_editorial_command_read_boundary`.
 
-After that hardening is accepted, resume Video from the finalized kernel at the
-missing governed Video editorial command/admin-read boundary, then compose the
-purpose-built Video Editor while enforcing the Primitive Compounding Contract.
+The governed Video database/application boundary is now available for standalone Video and Video Episodes bound to the shared Show/Show Episode authority. The immediate Phase 7A work is the purpose-built **Video Editor**, with primitive promotion driven only by real second-domain UI use.
 
 
 Status date: 25 August 2026
@@ -223,7 +218,7 @@ The machine-enforced contract is documented in `docs/engineering/primitive-compo
 
 ### Phase 7A: Video publication authority
 
-Build standalone Video, series, episodes, classifications, the canonical Video Editor, master/derivative authority, posters, chapters, captions, transcript, Credits, Citations, immutable versions, Review, publication, Corrections and provenance.
+Build standalone Video and Video Episodes bound to the shared Show/Show Episode authority, classifications, the canonical Video Editor, master/derivative authority, posters, chapters, captions, transcript, Credits, Citations, immutable versions, Review, publication, Corrections and provenance.
 
 ### Phase 7B: Public Video product
 
@@ -262,10 +257,12 @@ Build Inquiry as a capability across canonical editors, then the public Inquiry 
 
 ## Immediate next step
 
-Begin **Phase 7A existing Video authority and surface audit** from exact protected main `dae3de2dc9fb021496eb0fe0c4d4f0338f676a88`.
+Compose the **Phase 7A purpose-built Video Editor** over the production-accepted K5A command/admin-read boundary.
 
-Do not reopen Phase 6B. Do not start by designing a fresh Video schema. First inventory existing Video-like data, routes, components, Media kinds, upload/processing seams and public residue; classify each as reuse, migrate, retire or preserve.
+The Editor must consume `src/services/video/videoAdminService.ts` rather than private Video tables. Reuse canonical admin/editorial primitives where their semantics match. Promote candidate primitives such as MediaTimeline, MediaTransport, EditorialCommentEditor, EditorialCreditPicker, or AdminModeComposer only when real Video UI behavior proves second-consumer reuse.
 
-Canonical kickoff:
+Do not create a Video-owned series authority. Video Episodes remain bound to the shared Show/Show Episode identity.
 
-`docs/engineering/phase-7a-video-publication-authority-kickoff.md`
+Canonical K5A acceptance record:
+
+`docs/engineering/phase-7a-k5a-video-editorial-command-read-boundary-implementation-audit.md`

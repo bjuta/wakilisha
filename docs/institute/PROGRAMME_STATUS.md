@@ -4,20 +4,17 @@
 
 **Current numbered work remains Phase 7A: Video publication authority.**
 
-The Resource-kernel movement that interrupted Video implementation is **closed**
-at the accepted production kernel baseline **64/AR3**.
+The Resource-kernel movement and bounded post-kernel hardening are **closed**.
 
 Canonical closure record:
 
 `docs/engineering/phase-7a-kernel-closure-record.md`
 
-A bounded post-kernel hardening candidate fixes two deliberately deferred
-business-logic defects and freezes retained typed event evidence. This does not
-reopen or extend the kernel programme.
+The first resumed Video product slice, **K5A Video Editorial Command and Admin Read Boundary**, is now production accepted at migration count `66`, head `20260830094459_phase_7a_k5a_video_editorial_command_read_boundary`.
 
-After that hardening is accepted, resume Video from the finalized kernel at the
-missing governed Video editorial command/admin-read boundary, then compose the
-purpose-built Video Editor while enforcing the Primitive Compounding Contract.
+K5A proves governed Video creation/editing, native/provider source selection, exact Media relationships, captions, chapters, immutable snapshots, shared Show Episode binding, and reconstructable admin reads without reopening the Resource kernel or creating competing Video lifecycle/series authority.
+
+The immediate Phase 7A implementation is now the purpose-built **Video Editor** composed over that accepted boundary. This is where real Video UI consumption must drive primitive reuse and second-consumer promotion under the Primitive Compounding Contract.
 
 
 Status date: 25 August 2026
@@ -30,9 +27,9 @@ Documentation closure gate: PR #699, `Reconcile Phase 6B milestone closure recor
 
 Production runtime application baseline: `dae3de2dc9fb021496eb0fe0c4d4f0338f676a88`
 
-Current production migration head: `20260825102000`
+Current production migration head: `20260830094459`
 
-Current production migration count: `50`
+Current production migration count: `66`
 
 ## Status authority
 
@@ -208,7 +205,7 @@ Use the long-form plan's existing PR 7A contract:
 - Citations
 - governed immutable versions, Review, publication, Corrections and provenance
 
-The first implementation action is an audit of existing Video authority and surfaces from protected main. Do not design new Video SQL until that audit classifies existing seams as reuse, migrate, retire, or preserve.
+The authority audit, schema/kernel convergence, and K5A governed command/admin-read boundary are complete. The immediate implementation is the canonical Video Editor over `videoAdminService.ts`, reusing existing admin/editorial primitives where semantics match and promoting candidates only when Video becomes a real second UI consumer.
 
 Phase 7B remains the public Video product.
 
