@@ -40,9 +40,12 @@ describe("Phase 7A K4C-AR3 Article reader convergence", () => {
     expect(migration).toContain("f89b6060e68ae2e1154f689a741dc831");
   });
 
-  it("keeps the 35-row typed table physically present and byte-identified", () => {
+  it("keeps the typed table physically present and pins production plus no-data preview history", () => {
     expect(migration).toContain("editorial.article_lifecycle_events");
     expect(migration).toContain("dd7ac00209d19f3f369fb0d9b3e1e6a1");
+    expect(migration).toContain("d41d8cd98f00b204e9800998ecf8427e");
+    expect(verifier).toContain("dd7ac00209d19f3f369fb0d9b3e1e6a1");
+    expect(verifier).toContain("d41d8cd98f00b204e9800998ecf8427e");
     expect(migration).not.toMatch(
       /drop\s+table\s+(if\s+exists\s+)?editorial\.article_lifecycle_events/i,
     );
