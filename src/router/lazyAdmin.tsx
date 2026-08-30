@@ -26,6 +26,14 @@ export const AdminAudioDetailPage = lazy(() =>
   import("../pages/admin/content/audio/detail/page"),
 );
 
+export const AdminVideoPage = lazy(() =>
+  import("../pages/admin/content/video/page"),
+);
+
+export const AdminVideoDetailPage = lazy(() =>
+  import("../pages/admin/content/video/detail/page"),
+);
+
 export const AdminPlaylistsPage = lazy(() =>
   import("../pages/admin/content/playlists/page"),
 );
