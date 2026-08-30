@@ -1,0 +1,36 @@
+{
+  "migration_file": "supabase/migrations/20260830163814_phase_7a_k5e_real_video_media_governance_boundary.sql",
+  "migration_sha256": "3253a5b4b85cd0e1dc36a9e3a97004b21d9db4e012be90edc5cda477586b6042",
+  "base_main_sha": "6fc86e38f360372bd394ac68b9603e8ce7e0b354",
+  "preview_project_ref": "kqmxcluhahxvqjnjggoy",
+  "preview_branch_id": "bc5e0a19-cf27-4940-8aa5-aeeda160e4cd",
+  "preview_branch_name": "phase-7a-k5e-real-video-media-governance-boundary",
+  "baseline_migration_count": 69,
+  "baseline_migration_head": "20260830144945",
+  "baseline_replay": "pass",
+  "candidate_apply": "pass",
+  "preview_migration_count": 70,
+  "preview_migration_head": "20260830163814",
+  "verifier": "pass",
+  "verifier_marker": "PHASE_7A_K5E_REAL_VIDEO_MEDIA_GOVERNANCE_BOUNDARY_PASS",
+  "verifier_file": "scripts/control-plane/verify-phase-7a-k5e-real-video-media-governance-boundary.sql",
+  "behavioral_fixture": "PHASE_7A_K5E_REAL_VIDEO_MEDIA_GOVERNANCE_BEHAVIOR_PASS",
+  "fixture_terminal_state": "ROLLBACK",
+  "fixture_residue": {
+    "auth_users": 0,
+    "media_assets": 0,
+    "media_asset_revisions": 0,
+    "media_governance_versions": 0,
+    "media_file_objects": 0
+  },
+  "schema_types_sha256": "baab022f1fd3329a77dbeb7cf72e71d9cd418b4f4ba5459d26e57e1ce3db7ae1",
+  "schema_migration_count": 70,
+  "schema_migration_head": "20260830163814",
+  "advisor_summary": {
+    "security_new_findings": [],
+    "security_disposition": "No K5E-specific Security Advisor finding. Governed Media governance read remains authenticated and capability checked; canonical governance write authority is unchanged.",
+    "performance_new_findings": [],
+    "performance_disposition": "No K5E-specific Performance Advisor finding."
+  },
+  "verified_at": "2026-08-30T16:44:00Z"
+}

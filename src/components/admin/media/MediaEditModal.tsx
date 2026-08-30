@@ -6,6 +6,8 @@ import {
   type MediaAsset,
   type MediaAssetMetadata,
   type MediaFolder,
+  type MediaGovernanceDraft,
+  type MediaGovernanceState,
   type ReferencedEntity,
 } from "@/services/mediaService";
 
@@ -19,6 +21,55 @@ function isImageAsset(asset: MediaAsset): boolean {
 
 function fileIconClass(asset: MediaAsset): string {
   return assetFileKind(asset) === "document" ? "ri-file-pdf-2-line" : "ri-file-line";
+}
+
+function governanceDraftFrom(
+  state: MediaGovernanceState,
+): MediaGovernanceDraft {
+  return {
+    rightsStatus: state.rightsStatus,
+    rightsBasis: state.rightsBasis,
+    rightsHolder: state.rightsHolder,
+    licenceIdentifier: state.licenceIdentifier,
+    licenceTerms: state.licenceTerms,
+    consentStatus: state.consentStatus,
+    consentScope: state.consentScope,
+    sensitivity: state.sensitivity,
+    embargoState: state.embargoState,
+    embargoUntil: state.embargoUntil,
+    sourceProtectionClass: state.sourceProtectionClass,
+    preservationState: state.preservationState,
+    retentionState:
+      state.retentionState === "retain" ? "retain" : "review_required",
+    publicSafetyState: state.publicSafetyState,
+    internalReason: state.internalReason,
+  };
+}
+
+function governanceAllowsPublicUse(
+  draft: MediaGovernanceDraft | null,
+): boolean {
+  if (!draft) return false;
+  const embargoBlocked =
+    draft.embargoState === "active"
+    || (
+      draft.embargoState === "scheduled"
+      && draft.embargoUntil
+      && new Date(draft.embargoUntil).getTime() > Date.now()
+    );
+
+  return (
+    ["owned", "licensed", "public_domain", "fair_use"].includes(
+      draft.rightsStatus,
+    )
+    && ["granted", "not_required"].includes(draft.consentStatus)
+    && ["public", "public_redacted"].includes(draft.sourceProtectionClass)
+    && ["retain", "review_required"].includes(draft.retentionState)
+    && ["approved_public", "approved_redacted"].includes(
+      draft.publicSafetyState,
+    )
+    && !embargoBlocked
+  );
 }
 
 interface MediaEditModalProps {
@@ -113,6 +164,13 @@ export function MediaEditModal({
   const [tagsText, setTagsText] = useState((asset.tags ?? []).join(", "));
   const [internalNotes, setInternalNotes] = useState(asset.internal_notes || "");
 
+  const [governance, setGovernance] = useState<MediaGovernanceState | null>(null);
+  const [governanceDraft, setGovernanceDraft] = useState<MediaGovernanceDraft | null>(null);
+  const [governanceReason, setGovernanceReason] = useState("");
+  const [governanceLoading, setGovernanceLoading] = useState(true);
+  const [governanceSaving, setGovernanceSaving] = useState(false);
+  const [governanceError, setGovernanceError] = useState<string | null>(null);
+
   const [saving, setSaving] = useState(false);
   const [savingStatus, setSavingStatus] = useState(false);
   const [deleteConfirm, setDeleteConfirm] = useState(false);
@@ -139,6 +197,36 @@ export function MediaEditModal({
       alive = false;
     };
   }, []);
+
+  useEffect(() => {
+    let alive = true;
+    setGovernanceLoading(true);
+    setGovernanceError(null);
+
+    mediaService.getGovernance(asset.id)
+      .then((state) => {
+        if (!alive) return;
+        setGovernance(state);
+        setGovernanceDraft(governanceDraftFrom(state));
+      })
+      .catch((error) => {
+        if (!alive) return;
+        setGovernance(null);
+        setGovernanceDraft(null);
+        setGovernanceError(
+          error instanceof Error
+            ? error.message
+            : "Media governance could not load.",
+        );
+      })
+      .finally(() => {
+        if (alive) setGovernanceLoading(false);
+      });
+
+    return () => {
+      alive = false;
+    };
+  }, [asset.id]);
 
   const handleImageEdited = (blob: Blob, width: number, height: number) => {
     setEditedBlob(blob);
@@ -237,6 +325,37 @@ export function MediaEditModal({
       showToast("error", err instanceof Error ? err.message : "Update failed.");
     } finally {
       setSavingStatus(false);
+    }
+  };
+
+  const handleSaveGovernance = async () => {
+    if (!governance || !governanceDraft) return;
+
+    setGovernanceSaving(true);
+    setGovernanceError(null);
+    try {
+      const next = await mediaService.createGovernanceVersion(
+        asset.id,
+        governance.authorityRevision,
+        governanceDraft,
+        governanceReason,
+      );
+      setGovernance(next);
+      setGovernanceDraft(governanceDraftFrom(next));
+      setGovernanceReason("");
+
+      const refreshed = await mediaService.getById(asset.id);
+      if (refreshed) onSave(refreshed);
+
+      showToast("success", "Media governance version saved.");
+    } catch (err) {
+      const message = err instanceof Error
+        ? err.message
+        : "Media governance could not be saved.";
+      setGovernanceError(message);
+      showToast("error", message);
+    } finally {
+      setGovernanceSaving(false);
     }
   };
 
@@ -786,6 +905,162 @@ export function MediaEditModal({
                       </div>
                     </div>
                   </div>
+                </section>
+
+                <section>
+                  <div className="mb-3 flex items-start justify-between gap-3">
+                    <div>
+                      <h4 className="text-[10px] font-black uppercase tracking-wider text-wk-text-faint">
+                        Usage governance
+                      </h4>
+                      <p className="mt-1 text-[11px] text-wk-text-muted">
+                        Draft Media may stay internal. Public Video publication still requires explicit rights, consent, source protection, and public safety approval.
+                      </p>
+                    </div>
+                    {governanceDraft ? (
+                      <span
+                        className={`shrink-0 rounded-full px-2 py-1 text-[9px] font-black uppercase ${
+                          governanceAllowsPublicUse(governanceDraft)
+                            ? "bg-wk-success-soft text-wk-success"
+                            : "bg-wk-warning-soft text-wk-warning"
+                        }`}
+                      >
+                        {governanceAllowsPublicUse(governanceDraft)
+                          ? "Public ready"
+                          : "Internal only"}
+                      </span>
+                    ) : null}
+                  </div>
+
+                  {governanceLoading ? (
+                    <p className="text-[11px] text-wk-text-muted">
+                      Loading governance…
+                    </p>
+                  ) : governanceError && !governanceDraft ? (
+                    <div className="rounded-lg border border-wk-warning/25 bg-wk-warning-soft px-3 py-2 text-[11px] text-wk-warning">
+                      {governanceError}
+                    </div>
+                  ) : governance && governanceDraft ? (
+                    <div className="space-y-3 rounded-xl border border-wk-border bg-wk-surface/60 p-3">
+                      <div className="grid grid-cols-2 gap-2">
+                        <label className="block text-[11px] font-semibold text-wk-text-soft">
+                          Rights
+                          <select
+                            value={governanceDraft.rightsStatus}
+                            onChange={(event) =>
+                              setGovernanceDraft((current) => current
+                                ? { ...current, rightsStatus: event.target.value as MediaGovernanceDraft["rightsStatus"] }
+                                : current
+                              )
+                            }
+                            className="mt-1.5 w-full rounded-lg border border-wk-border bg-wk-surface px-2.5 py-1.5 text-[12px] text-wk-text outline-none focus:border-wk-brand/50"
+                          >
+                            <option value="unknown">Unknown</option>
+                            <option value="owned">Owned</option>
+                            <option value="licensed">Licensed</option>
+                            <option value="public_domain">Public domain</option>
+                            <option value="fair_use">Fair use</option>
+                            <option value="needs_clearance">Needs clearance</option>
+                            <option value="restricted">Restricted</option>
+                          </select>
+                        </label>
+
+                        <label className="block text-[11px] font-semibold text-wk-text-soft">
+                          Consent
+                          <select
+                            value={governanceDraft.consentStatus}
+                            onChange={(event) =>
+                              setGovernanceDraft((current) => current
+                                ? { ...current, consentStatus: event.target.value as MediaGovernanceDraft["consentStatus"] }
+                                : current
+                              )
+                            }
+                            className="mt-1.5 w-full rounded-lg border border-wk-border bg-wk-surface px-2.5 py-1.5 text-[12px] text-wk-text outline-none focus:border-wk-brand/50"
+                          >
+                            <option value="unknown">Unknown</option>
+                            <option value="not_required">Not required</option>
+                            <option value="requested">Requested</option>
+                            <option value="granted">Granted</option>
+                            <option value="limited">Limited</option>
+                            <option value="declined">Declined</option>
+                            <option value="withdrawn">Withdrawn</option>
+                          </select>
+                        </label>
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-2">
+                        <label className="block text-[11px] font-semibold text-wk-text-soft">
+                          Source protection
+                          <select
+                            value={governanceDraft.sourceProtectionClass}
+                            onChange={(event) =>
+                              setGovernanceDraft((current) => current
+                                ? { ...current, sourceProtectionClass: event.target.value as MediaGovernanceDraft["sourceProtectionClass"] }
+                                : current
+                              )
+                            }
+                            className="mt-1.5 w-full rounded-lg border border-wk-border bg-wk-surface px-2.5 py-1.5 text-[12px] text-wk-text outline-none focus:border-wk-brand/50"
+                          >
+                            <option value="internal">Internal</option>
+                            <option value="public">Public</option>
+                            <option value="public_redacted">Public redacted</option>
+                            <option value="restricted">Restricted</option>
+                            <option value="confidential">Confidential</option>
+                          </select>
+                        </label>
+
+                        <label className="block text-[11px] font-semibold text-wk-text-soft">
+                          Public safety
+                          <select
+                            value={governanceDraft.publicSafetyState}
+                            onChange={(event) =>
+                              setGovernanceDraft((current) => current
+                                ? { ...current, publicSafetyState: event.target.value as MediaGovernanceDraft["publicSafetyState"] }
+                                : current
+                              )
+                            }
+                            className="mt-1.5 w-full rounded-lg border border-wk-border bg-wk-surface px-2.5 py-1.5 text-[12px] text-wk-text outline-none focus:border-wk-brand/50"
+                          >
+                            <option value="internal">Internal</option>
+                            <option value="review_required">Review required</option>
+                            <option value="approved_public">Approved public</option>
+                            <option value="approved_redacted">Approved redacted</option>
+                            <option value="blocked">Blocked</option>
+                          </select>
+                        </label>
+                      </div>
+
+                      <label className="block text-[11px] font-semibold text-wk-text-soft">
+                        Governance reason
+                        <textarea
+                          value={governanceReason}
+                          onChange={(event) => setGovernanceReason(event.target.value)}
+                          rows={2}
+                          placeholder="Why this governance state is correct"
+                          className="mt-1.5 w-full resize-none rounded-lg border border-wk-border bg-wk-surface px-3 py-1.5 text-[12px] text-wk-text outline-none focus:border-wk-brand/50"
+                        />
+                      </label>
+
+                      {governanceError ? (
+                        <div className="rounded-lg border border-wk-danger/20 bg-wk-danger-soft px-3 py-2 text-[11px] text-wk-danger">
+                          {governanceError}
+                        </div>
+                      ) : null}
+
+                      <button
+                        type="button"
+                        onClick={() => void handleSaveGovernance()}
+                        disabled={governanceSaving || !governanceReason.trim()}
+                        className="w-full rounded-lg bg-wk-brand px-3 py-2 text-[12px] font-bold text-wk-brand-on disabled:opacity-40"
+                      >
+                        {governanceSaving ? "Saving governance..." : "Save Governance Version"}
+                      </button>
+
+                      <p className="text-[10px] text-wk-text-faint">
+                        Governance version {governance.versionNumber}. Sensitivity, embargo, preservation, and retention stay at their current canonical values in this bounded control.
+                      </p>
+                    </div>
+                  ) : null}
                 </section>
 
                 {/* Identification */}
