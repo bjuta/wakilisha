@@ -150,3 +150,26 @@ It remains on governance version 1 with:
 - Public safety: Internal
 
 The next content action must use the governed Media editor after exact-main frontend activation. Selecting Rights = Owned will derive Consent = Granted automatically.
+
+
+## Production-history replay preview
+
+The original K5E preview was deleted after production promotion and replaced with one fresh disposable preview at the same already-authorized hourly rate. This avoided carrying preview-only migration history forward.
+
+Fresh replay preview:
+
+- branch id: `d44a1d1c-6200-42b9-89a8-96ba7367484f`
+- project ref: `osxkuuqlfhbmiykdwena`
+- branch name: `media-owned-consent-production-parity`
+- migration count: `73`
+- migration head: `20260830185526_media_owned_implies_consent_granted`
+
+Fresh replay proof:
+
+- exact production migration history: PASS
+- permanent verifier: `MEDIA_OWNED_CONSENT_RULE_PASS`
+- rollback behavior proof: `MEDIA_OWNED_CONSENT_RULE_BEHAVIOR_PASS`
+- migration bytes: unchanged from the accepted preview candidate
+- historical preview timestamp `20260830185038` preserved byte-for-byte under `docs/engineering/replay-baseline/retired-active-migrations/`
+
+This fresh preview is the authoritative replay proof for the production timestamp seal.
