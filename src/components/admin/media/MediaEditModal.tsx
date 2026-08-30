@@ -914,7 +914,7 @@ export function MediaEditModal({
                         Usage governance
                       </h4>
                       <p className="mt-1 text-[11px] text-wk-text-muted">
-                        Working Media can stay internal. Public Video publication still requires explicit rights, consent, protection, and safety approval.
+                        Draft Media may stay internal. Public Video publication still requires explicit rights, consent, source protection, and public safety approval.
                       </p>
                     </div>
                     {governanceDraft ? (
@@ -1030,158 +1030,6 @@ export function MediaEditModal({
                         </label>
                       </div>
 
-                      <div className="grid grid-cols-2 gap-2">
-                        <label className="block text-[11px] font-semibold text-wk-text-soft">
-                          Sensitivity
-                          <select
-                            value={governanceDraft.sensitivity}
-                            onChange={(event) =>
-                              setGovernanceDraft((current) => current
-                                ? { ...current, sensitivity: event.target.value as MediaGovernanceDraft["sensitivity"] }
-                                : current
-                              )
-                            }
-                            className="mt-1.5 w-full rounded-lg border border-wk-border bg-wk-surface px-2.5 py-1.5 text-[12px] text-wk-text outline-none focus:border-wk-brand/50"
-                          >
-                            <option value="none">None</option>
-                            <option value="low">Low</option>
-                            <option value="moderate">Moderate</option>
-                            <option value="high">High</option>
-                            <option value="extreme">Extreme</option>
-                          </select>
-                        </label>
-
-                        <label className="block text-[11px] font-semibold text-wk-text-soft">
-                          Retention
-                          <select
-                            value={governanceDraft.retentionState}
-                            onChange={(event) =>
-                              setGovernanceDraft((current) => current
-                                ? { ...current, retentionState: event.target.value as MediaGovernanceDraft["retentionState"] }
-                                : current
-                              )
-                            }
-                            className="mt-1.5 w-full rounded-lg border border-wk-border bg-wk-surface px-2.5 py-1.5 text-[12px] text-wk-text outline-none focus:border-wk-brand/50"
-                          >
-                            <option value="retain">Retain</option>
-                            <option value="review_required">Review required</option>
-                          </select>
-                        </label>
-                      </div>
-
-                      <div className="grid grid-cols-2 gap-2">
-                        <label className="block text-[11px] font-semibold text-wk-text-soft">
-                          Preservation
-                          <select
-                            value={governanceDraft.preservationState}
-                            onChange={(event) =>
-                              setGovernanceDraft((current) => current
-                                ? { ...current, preservationState: event.target.value as MediaGovernanceDraft["preservationState"] }
-                                : current
-                              )
-                            }
-                            className="mt-1.5 w-full rounded-lg border border-wk-border bg-wk-surface px-2.5 py-1.5 text-[12px] text-wk-text outline-none focus:border-wk-brand/50"
-                          >
-                            <option value="unassessed">Unassessed</option>
-                            <option value="working_copy">Working copy</option>
-                            <option value="preservation_candidate">Preservation candidate</option>
-                            <option value="preserved">Preserved</option>
-                            <option value="at_risk">At risk</option>
-                            <option value="lost">Lost</option>
-                          </select>
-                        </label>
-
-                        <label className="block text-[11px] font-semibold text-wk-text-soft">
-                          Embargo
-                          <select
-                            value={governanceDraft.embargoState}
-                            onChange={(event) =>
-                              setGovernanceDraft((current) => current
-                                ? { ...current, embargoState: event.target.value as MediaGovernanceDraft["embargoState"] }
-                                : current
-                              )
-                            }
-                            className="mt-1.5 w-full rounded-lg border border-wk-border bg-wk-surface px-2.5 py-1.5 text-[12px] text-wk-text outline-none focus:border-wk-brand/50"
-                          >
-                            <option value="none">None</option>
-                            <option value="scheduled">Scheduled</option>
-                            <option value="active">Active</option>
-                            <option value="released">Released</option>
-                          </select>
-                        </label>
-                      </div>
-
-                      {["scheduled", "active"].includes(governanceDraft.embargoState) ? (
-                        <label className="block text-[11px] font-semibold text-wk-text-soft">
-                          Embargo until
-                          <input
-                            type="datetime-local"
-                            value={
-                              governanceDraft.embargoUntil
-                                ? governanceDraft.embargoUntil.slice(0, 16)
-                                : ""
-                            }
-                            onChange={(event) =>
-                              setGovernanceDraft((current) => current
-                                ? { ...current, embargoUntil: event.target.value || null }
-                                : current
-                              )
-                            }
-                            className="mt-1.5 w-full rounded-lg border border-wk-border bg-wk-surface px-3 py-1.5 text-[12px] text-wk-text outline-none focus:border-wk-brand/50"
-                          />
-                        </label>
-                      ) : null}
-
-                      <div className="grid grid-cols-2 gap-2">
-                        <label className="block text-[11px] font-semibold text-wk-text-soft">
-                          Rights basis
-                          <input
-                            type="text"
-                            value={governanceDraft.rightsBasis || ""}
-                            onChange={(event) =>
-                              setGovernanceDraft((current) => current
-                                ? { ...current, rightsBasis: event.target.value }
-                                : current
-                              )
-                            }
-                            placeholder="How rights are established"
-                            className="mt-1.5 w-full rounded-lg border border-wk-border bg-wk-surface px-3 py-1.5 text-[12px] text-wk-text outline-none focus:border-wk-brand/50"
-                          />
-                        </label>
-
-                        <label className="block text-[11px] font-semibold text-wk-text-soft">
-                          Rights holder
-                          <input
-                            type="text"
-                            value={governanceDraft.rightsHolder || ""}
-                            onChange={(event) =>
-                              setGovernanceDraft((current) => current
-                                ? { ...current, rightsHolder: event.target.value }
-                                : current
-                              )
-                            }
-                            placeholder="Person or organization"
-                            className="mt-1.5 w-full rounded-lg border border-wk-border bg-wk-surface px-3 py-1.5 text-[12px] text-wk-text outline-none focus:border-wk-brand/50"
-                          />
-                        </label>
-                      </div>
-
-                      <label className="block text-[11px] font-semibold text-wk-text-soft">
-                        Consent scope
-                        <input
-                          type="text"
-                          value={governanceDraft.consentScope || ""}
-                          onChange={(event) =>
-                            setGovernanceDraft((current) => current
-                              ? { ...current, consentScope: event.target.value }
-                              : current
-                            )
-                          }
-                          placeholder="What use the consent covers"
-                          className="mt-1.5 w-full rounded-lg border border-wk-border bg-wk-surface px-3 py-1.5 text-[12px] text-wk-text outline-none focus:border-wk-brand/50"
-                        />
-                      </label>
-
                       <label className="block text-[11px] font-semibold text-wk-text-soft">
                         Governance reason
                         <textarea
@@ -1209,7 +1057,7 @@ export function MediaEditModal({
                       </button>
 
                       <p className="text-[10px] text-wk-text-faint">
-                        Governance version {governance.versionNumber}. Changes append immutable governance history.
+                        Governance version {governance.versionNumber}. Sensitivity, embargo, preservation, and retention stay at their current canonical values in this bounded control.
                       </p>
                     </div>
                   ) : null}
