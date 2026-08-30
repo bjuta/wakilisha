@@ -1,6 +1,6 @@
 # Phase 7A K4C-AR3: Article Cross-System Reader Convergence and Typed-Event Retirement Implementation Audit
 
-Status: LOCAL CANDIDATE BUILT. PREVIEW NOT YET APPLIED.
+Status: LOCAL CANDIDATE REPAIRED. PREVIEW TRANSACTIONAL ACCEPTANCE IN PROGRESS.
 
 Opened: 30 August 2026
 
@@ -86,6 +86,28 @@ Production dependency scan also proved:
 - RLS policies referencing typed history: `0`
 
 AR3 exit requires all persisted live dependency counts to reach `0`.
+
+## No-data preview baseline rule
+
+Supabase disposable preview branches replay schema/migration history without
+production content rows.
+
+Therefore AR3 accepts exactly two historical-data baselines:
+
+- production: `35` typed rows, fingerprint
+  `dd7ac00209d19f3f369fb0d9b3e1e6a1`, and at least 35 shared Article rows
+- no-data disposable preview: `0` typed rows, empty fingerprint
+  `d41d8cd98f00b204e9800998ecf8427e`, and `0` shared Article rows
+
+Any other typed row count is a hard stop.
+
+In both environments AR3 snapshots the starting typed row count/fingerprint and
+requires them to remain byte-identical after the migration.
+
+The first transactional preview attempt stopped before mutation because the
+initial candidate incorrectly required the production 35-row fingerprint on a
+no-data preview. That false environmental assumption was repaired before any
+candidate schema apply or canonical migration-history stamp.
 
 ## Historical typed table identity
 
