@@ -120,11 +120,12 @@
       "id": "admin.mode-composer",
       "path": "src/components/design-system/admin/AdminModeComposer.tsx",
       "kind": "interaction",
-      "maturity": "candidate",
+      "maturity": "canonical",
       "concept": "one creation surface with explicit domain modes",
       "authorityOwner": "consumer",
       "consumers": [
-        "admin:audio"
+        "admin:audio",
+        "admin:video"
       ]
     },
     {
@@ -180,22 +181,24 @@
       "id": "editorial.media-transport",
       "path": "src/components/design-system/editorial/MediaTransport.tsx",
       "kind": "interaction",
-      "maturity": "candidate",
+      "maturity": "canonical",
       "concept": "time-based media playback transport",
       "authorityOwner": "consumer",
       "consumers": [
-        "admin:audio"
+        "admin:audio",
+        "admin:video"
       ]
     },
     {
       "id": "editorial.media-timeline",
       "path": "src/components/design-system/editorial/MediaTimeline.tsx",
       "kind": "interaction",
-      "maturity": "candidate",
+      "maturity": "canonical",
       "concept": "time-coordinate media navigation and point/range annotation",
       "authorityOwner": "consumer",
       "consumers": [
-        "admin:audio"
+        "admin:audio",
+        "admin:video"
       ],
       "competingImplementationPatterns": [
         "(?:function|const)\\s+(?:AudioTimeline|VideoTimeline|WaveformTimeline|MediaTimeline)\\b"
