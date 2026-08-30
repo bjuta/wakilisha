@@ -28,6 +28,7 @@ import {
   MediaTransport,
   formatMediaTime,
 } from "@/components/design-system/editorial/MediaTransport";
+import { VideoTrustWorkspace } from "./VideoTrustWorkspace";
 import {
   createEditorialTaxonomyTerm,
   fetchEditorialDiscovery,
@@ -63,6 +64,7 @@ type WorkspaceView =
   | "captions"
   | "chapters"
   | "discovery"
+  | "trust"
   | "review"
   | "history";
 
@@ -713,7 +715,10 @@ export function VideoEditorWorkspace({
           },
           {
             label: "Prepare",
-            items: [{ id: "discovery", label: "Discovery" }],
+            items: [
+              { id: "discovery", label: "Discovery" },
+              { id: "trust", label: "Credits & Citations" },
+            ],
           },
           {
             label: "Govern",
@@ -1343,6 +1348,13 @@ export function VideoEditorWorkspace({
         </AdminWorkspaceSection>
       ) : null}
 
+      {view === "trust" ? (
+        <VideoTrustWorkspace
+          workspace={workspace}
+          onReload={reload}
+        />
+      ) : null}
+
       {view === "review" ? (
         <EditorialDecisionWorkspace
           title="Video editorial decision"
@@ -1373,6 +1385,8 @@ export function VideoEditorWorkspace({
                 ["Poster", workspace.poster ? "Attached" : "Not attached"],
                 ["Captions", workspace.captions.length ? `${workspace.captions.length} track(s)` : "None"],
                 ["Chapters", workspace.chapters.length ? `${workspace.chapters.length}` : "None"],
+                ["Credits", workspace.trust.credits.length ? `${workspace.trust.credits.length}` : "None"],
+                ["Citations", workspace.trust.citations.length ? `${workspace.trust.citations.length}` : "None"],
               ].map(([label, value]) => (
                 <div
                   key={label}

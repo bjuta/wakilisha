@@ -60,6 +60,12 @@ const roles = fs.readFileSync(
   path.resolve("src/services/userRoles.ts"),
   "utf8",
 );
+const implementationAudit = fs.readFileSync(
+  path.resolve(
+    "docs/engineering/phase-7a-k5b-video-editor-composition-implementation-audit.md",
+  ),
+  "utf8",
+);
 
 function primitive(id: string) {
   const value = registry.primitives.find((item) => item.id === id);
@@ -170,17 +176,13 @@ describe("Phase 7A K5B Video Editor composition", () => {
     }
   });
 
-  it("does not falsely promote Credits or rich editorial comments before Video has matching authority", () => {
-    expect(workspace).not.toContain("EditorialCreditPicker");
-    expect(workspace).not.toContain("EditorialCommentEditor");
-
-    for (const id of [
-      "editorial.comment-editor",
-      "trust.editorial-credit-picker",
-    ]) {
-      expect(primitive(id).maturity).toBe("candidate");
-      expect(primitive(id).consumers).toEqual(["admin:audio"]);
-    }
+  it("records K5B's deliberate Credit/comment deferral without freezing later milestones", () => {
+    expect(implementationAudit).toContain("EditorialCommentEditor");
+    expect(implementationAudit).toContain("EditorialCreditPicker");
+    expect(implementationAudit).toContain("Deliberately not promoted");
+    expect(implementationAudit).toContain(
+      "These deferrals are authority gaps, not UI omissions to paper over.",
+    );
   });
 
   it("keeps new Video Admin Studio copy free of em dashes", () => {

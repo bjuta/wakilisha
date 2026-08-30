@@ -216,11 +216,12 @@
       "id": "trust.editorial-credit-picker",
       "path": "src/components/design-system/trust/EditorialCreditPicker.tsx",
       "kind": "interaction",
-      "maturity": "candidate",
+      "maturity": "canonical",
       "concept": "canonical credited-party selection plus semantic Credit role",
       "authorityOwner": "consumer",
       "consumers": [
-        "admin:audio"
+        "admin:audio",
+        "admin:video"
       ]
     },
     {

@@ -109,6 +109,30 @@ export interface VideoChapter {
   description: string | null;
 }
 
+export interface VideoTrustCitation {
+  attachmentId: string;
+  citationId: string;
+  citationPurpose: string;
+  targetAnchorType: string;
+  targetAnchorData: JsonObject;
+  displayOrder: number;
+  publicSafe: boolean;
+  publicLabel: string | null;
+  quotation: string | null;
+  citationState: string;
+}
+
+export interface VideoTrustCredit {
+  attachmentId: string;
+  creditId: string;
+  displayOrder: number;
+  isPrimary: boolean;
+  publicSafe: boolean;
+  creditRole: string;
+  displayName: string;
+  roleLabel: string | null;
+}
+
 export interface VideoPublicationWorkspace {
   publication: {
     id: string;
@@ -141,6 +165,12 @@ export interface VideoPublicationWorkspace {
   versionHistory: JsonObject[];
   reviewEvents: JsonObject[];
   lifecycleEvents: JsonObject[];
+  trust: {
+    citationRevision: number;
+    creditRevision: number;
+    citations: VideoTrustCitation[];
+    credits: VideoTrustCredit[];
+  };
   classifications: VideoAdminVocabularyItem[];
   sourceProviders: VideoAdminVocabularyItem[];
   captionTrackKinds: VideoAdminVocabularyItem[];
@@ -339,6 +369,7 @@ export async function fetchVideoPublicationWorkspace(
   const poster = object(root.poster);
   const transcript = object(root.transcript);
   const capabilities = object(root.capabilities);
+  const trust = object(root.trust);
   const selectedSource = parseSource(root.selected_source);
   const mediaAsset = selectedSource?.sourceKind === "native_media" && selectedSource.mediaAssetId
     ? await getAdminMediaAssetById(selectedSource.mediaAssetId)
@@ -437,6 +468,38 @@ export async function fetchVideoPublicationWorkspace(
     versionHistory: array(root.version_history).map(object),
     reviewEvents: array(root.review_events).map(object),
     lifecycleEvents: array(root.lifecycle_events).map(object),
+    trust: {
+      citationRevision: numberValue(trust.citation_revision, 1),
+      creditRevision: numberValue(trust.credit_revision, 1),
+      citations: array(trust.citations).map((value) => {
+        const item = object(value);
+        return {
+          attachmentId: text(item.attachment_id),
+          citationId: text(item.citation_id),
+          citationPurpose: text(item.citation_purpose, "supports"),
+          targetAnchorType: text(item.target_anchor_type, "whole_version"),
+          targetAnchorData: object(item.target_anchor_data),
+          displayOrder: numberValue(item.display_order),
+          publicSafe: bool(item.public_safe),
+          publicLabel: nullableText(item.public_label),
+          quotation: nullableText(item.quotation),
+          citationState: text(item.citation_state),
+        };
+      }),
+      credits: array(trust.credits).map((value) => {
+        const item = object(value);
+        return {
+          attachmentId: text(item.attachment_id),
+          creditId: text(item.credit_id),
+          displayOrder: numberValue(item.display_order),
+          isPrimary: bool(item.is_primary),
+          publicSafe: bool(item.public_safe),
+          creditRole: text(item.credit_role),
+          displayName: text(item.display_name),
+          roleLabel: nullableText(item.role_label),
+        };
+      }),
+    },
     classifications: vocabulary(root.classifications, "classification"),
     sourceProviders: vocabulary(root.source_providers, "provider_key"),
     captionTrackKinds: vocabulary(root.caption_track_kinds, "track_kind"),
@@ -682,6 +745,48 @@ export function replaceVideoPublicationChapters(
     p_idempotency_key: idempotency("video-chapters"),
     p_correlation_id: crypto.randomUUID(),
   }, "Video chapters could not be saved.");
+}
+
+export function replaceVideoPublicationVersionCitations(
+  workspace: VideoPublicationWorkspace,
+  citationIds: string[],
+): Promise<JsonObject> {
+  if (!workspace.resource.versions.working) {
+    throw new Error("Save a working Video version before changing Citations.");
+  }
+  return command("replace_video_publication_version_citations", {
+    p_publication_version_id: workspace.resource.versions.working,
+    p_attachments: citationIds.map((citationId) => ({
+      citation_id: citationId,
+      citation_purpose: "supports",
+      target_anchor_type: "whole_version",
+      target_anchor_data: {},
+      public_safe: true,
+    })),
+    p_expected_citation_revision: workspace.trust.citationRevision,
+    p_idempotency_key: idempotency("video-citations-replace"),
+    p_correlation_id: crypto.randomUUID(),
+  }, "Video Citations could not be saved.");
+}
+
+export function replaceVideoPublicationVersionCredits(
+  workspace: VideoPublicationWorkspace,
+  creditIds: string[],
+): Promise<JsonObject> {
+  if (!workspace.resource.versions.working) {
+    throw new Error("Save a working Video version before changing Credits.");
+  }
+  return command("replace_video_publication_version_credits", {
+    p_publication_version_id: workspace.resource.versions.working,
+    p_attachments: creditIds.map((creditId) => ({
+      credit_id: creditId,
+      is_primary: false,
+      public_safe: true,
+    })),
+    p_expected_credit_revision: workspace.trust.creditRevision,
+    p_idempotency_key: idempotency("video-credits-replace"),
+    p_correlation_id: crypto.randomUUID(),
+  }, "Video Credits could not be saved.");
 }
 
 export function snapshotVideoPublicationWorkingVersion(

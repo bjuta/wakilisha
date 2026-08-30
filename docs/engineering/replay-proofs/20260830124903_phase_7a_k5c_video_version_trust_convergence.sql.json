@@ -1,0 +1,47 @@
+{
+  "migration_sha256": "76710d5f6e6ef5ec7899ae4968b4fad00004758cc29d1813ea2ee8139f7a4343",
+  "base_main_sha": "88988e687f19b9a8e9d00d7a03cf77e59b0c18fe",
+  "preview_project_ref": "vlddstensgmaccioldqp",
+  "preview_branch_id": "841a0cc5-bedf-4845-b8fa-9e226676a9eb",
+  "preview_branch_name": "phase-7a-k5c-video-version-trust-convergence-v2",
+  "baseline_migration_count": 67,
+  "baseline_migration_head": "20260830102151",
+  "baseline_replay": "pass",
+  "candidate_apply": "pass",
+  "preview_migration_count": 68,
+  "preview_migration_head": "20260830124903",
+  "verifier": "pass",
+  "verifier_file": "scripts/control-plane/verify-phase-7a-k5c-video-version-trust-convergence.sql",
+  "behavioral_fixture": "PHASE_7A_K5C_VIDEO_TRUST_BEHAVIOR_PASS",
+  "fixture_terminal_state": "ROLLBACK",
+  "fixture_residue": {
+    "auth_users": 0,
+    "video_publications": 0,
+    "video_versions": 0,
+    "video_trust_revisions": 0,
+    "video_credits": 0,
+    "video_citations": 0,
+    "sources": 0,
+    "external_contributors": 0
+  },
+  "schema_types_sha256": "82cc6bbacce519b62c5c7b5cf0725ddaf4c143f158da422427c2268a6ec7339b",
+  "schema_migration_count": 68,
+  "schema_migration_head": "20260830124903",
+  "advisor_summary": {
+    "security_candidate_findings": [
+      "INFO rls_enabled_no_policy on editorial.video_publication_version_trust_revisions",
+      "WARN authenticated SECURITY DEFINER RPC: list_video_trust_attachment_candidates",
+      "WARN authenticated SECURITY DEFINER RPC: replace_video_publication_version_citations",
+      "WARN authenticated SECURITY DEFINER RPC: replace_video_publication_version_credits"
+    ],
+    "security_disposition": "intentional governed boundary; direct private-table authority remains revoked",
+    "performance_candidate_findings": [
+      "INFO unindexed updated_by FK on editorial.video_publication_version_trust_revisions",
+      "INFO unindexed source/target version FKs on transaction-scoped platform_private.video_trust_copy_authorizations"
+    ],
+    "performance_disposition": "no K5C WARN/ERROR performance finding"
+  },
+  "verified_at": "2026-08-30T12:52:00Z",
+  "migration_file": "supabase/migrations/20260830124903_phase_7a_k5c_video_version_trust_convergence.sql",
+  "verifier_marker": "PHASE_7A_K5C_VIDEO_VERSION_TRUST_CONVERGENCE_PASS"
+}
