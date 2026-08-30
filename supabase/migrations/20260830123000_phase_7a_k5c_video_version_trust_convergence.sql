@@ -1127,9 +1127,9 @@ begin
   values(p_publication_version_id)
   on conflict do nothing;
 
-  select * into v_revision
-  from editorial.video_publication_version_trust_revisions
-  where publication_version_id=p_publication_version_id
+  select revision_row.* into v_revision
+  from editorial.video_publication_version_trust_revisions revision_row
+  where revision_row.publication_version_id=p_publication_version_id
   for update;
 
   select * into v_begin
@@ -1322,9 +1322,9 @@ begin
   values(p_publication_version_id)
   on conflict do nothing;
 
-  select * into v_revision
-  from editorial.video_publication_version_trust_revisions
-  where publication_version_id=p_publication_version_id
+  select revision_row.* into v_revision
+  from editorial.video_publication_version_trust_revisions revision_row
+  where revision_row.publication_version_id=p_publication_version_id
   for update;
 
   select * into v_begin
