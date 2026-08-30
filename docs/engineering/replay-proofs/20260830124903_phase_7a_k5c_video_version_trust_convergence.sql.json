@@ -43,5 +43,26 @@
   },
   "verified_at": "2026-08-30T12:52:00Z",
   "migration_file": "supabase/migrations/20260830124903_phase_7a_k5c_video_version_trust_convergence.sql",
-  "verifier_marker": "PHASE_7A_K5C_VIDEO_VERSION_TRUST_CONVERGENCE_PASS"
+  "verifier_marker": "PHASE_7A_K5C_VIDEO_VERSION_TRUST_CONVERGENCE_PASS",
+  "post_production_migration_history_repair": {
+    "erroneous_live_version": "20260830130035",
+    "accepted_version": "20260830124903",
+    "erroneous_version_status": "reverted",
+    "accepted_version_status": "applied",
+    "sql_replayed": false,
+    "production_migration_count": 68,
+    "production_migration_head": "20260830124903",
+    "dry_run": "pass",
+    "pending_migrations": 0,
+    "production_preview_history_parity": "identical"
+  },
+  "post_production_schema_type_seal": {
+    "preview_era_schema_types_sha256": "82cc6bbacce519b62c5c7b5cf0725ddaf4c143f158da422427c2268a6ec7339b",
+    "corrected_production_schema_types_sha256": "0d02caa9a284151da427581151fbf7e25dd8c42cd456bbcfa9a3700426b6732b",
+    "repair_pr": 741,
+    "accepted_main_sha": "00bf46ff356a45f0a4a914e1a7b263a722ec51d5",
+    "production_schema_verify": "pass",
+    "production_preview_generated_api_types": "byte-identical",
+    "correction_reason": "preview-era committed type snapshot omitted the editorial Video Trust copy helper and did not preserve native generator order"
+  }
 }

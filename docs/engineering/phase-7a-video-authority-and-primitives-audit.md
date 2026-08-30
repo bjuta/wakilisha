@@ -6,16 +6,18 @@ The Resource-kernel detour and post-kernel hardening are closed.
 
 K5A governed Video editorial commands/admin reads are production accepted.
 
-**K5B Video Editor Composition is CLOSED and production accepted** at migration count `67`, head `20260830102151_phase_7a_k5b_video_editor_shared_show_catalog`, and production application commit `aec43c23b8186f917905ae883a4754260d24d912`.
+K5B Video Editor Composition is closed and production accepted.
 
-The live Video Admin Studio now composes the governed Video boundary without private-table browser reads or a Video-owned series model. `AdminModeComposer`, `MediaTransport`, and `MediaTimeline` earned canonical promotion through real Video second-consumer use. `EditorialCommentEditor` and `EditorialCreditPicker` remain candidates because their matching governed Video authority does not yet exist.
+**K5C Video Version Trust Convergence is CLOSED and production accepted** at migration count `68`, head `20260830124903_phase_7a_k5c_video_version_trust_convergence`, and production application commit `00bf46ff356a45f0a4a914e1a7b263a722ec51d5`.
 
-Do not reopen K0, K1, K4A, K4C, K5A, or K5B.
+The live Video Admin Studio now reuses shared exact-version Credits and Citations. `EditorialCreditPicker` is canonical through genuine Audio + Video use. `EditorialCommentEditor` remains candidate and Audio-only.
 
-The next Video work is a fresh bounded Phase 7A authority milestone for the remaining exit-gate gaps, then one real Video through immutable review and governed publication.
+Do not reopen K0, K1, K4A, K4C, K5A, K5B, or K5C.
+
+The next Video work is the remaining real-Video exit-gate authority: Corrections/provenance, Registry links where required, any missing Media/lifecycle relationship exposed by real use, then immutable review and publication of one real Video.
 
 
-Status: ARCHITECTURE LOCK — K5B IMPLEMENTED AND PRODUCTION ACCEPTED
+Status: ARCHITECTURE LOCK — K5C IMPLEMENTED AND PRODUCTION ACCEPTED
 
 Audit date: 26 August 2026
 
@@ -636,6 +638,13 @@ This audit is documentation/governance only.
 - Frontend deploy needed: No
 - production runtime change needed: No
 
+## Next action
+
+The architectural decisions in this audit remain locked.
+
+K5A, K5B, and K5C are production accepted. Shared Credits/Citations are no longer a remaining Video gap.
+
+Continue only with the authority still required by the real Phase 7A exit proof: Corrections/provenance, Registry relationships where real content requires them, any missing Media/lifecycle relationship exposed by real use, and one real Video through immutable review and governed publication.
 ## Next action
 
 Reconcile the Phase 7A kickoff against this audit, then design the smallest typed Video authority migration and permanent verifier before creating a disposable preview.
