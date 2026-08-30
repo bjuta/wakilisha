@@ -4803,6 +4803,10 @@ export type Database = {
         }
         Returns: undefined
       }
+      copy_video_version_trust_to_version: {
+        Args: { p_source_version_id: string; p_target_version_id: string }
+        Returns: undefined
+      }
       correction_article_publication_proof: {
         Args: { p_application_id: string }
         Returns: {
@@ -21826,7 +21830,6 @@ export type Database = {
         }[]
       }
       list_audio_trust_attachment_candidates: { Args: never; Returns: Json }
-      list_video_trust_attachment_candidates: { Args: never; Returns: Json }
       list_correction_case_events: {
         Args: {
           p_after_event_number?: number
@@ -22111,6 +22114,7 @@ export type Database = {
           subject_user_label: string
         }[]
       }
+      list_video_trust_attachment_candidates: { Args: never; Returns: Json }
       mark_article_suggestion_stale: {
         Args: { p_note?: string; p_suggestion_id: string }
         Returns: {
@@ -22981,42 +22985,6 @@ export type Database = {
         }
         Returns: Json
       }
-      replace_video_publication_version_citations: {
-        Args: {
-          p_attachments: Json
-          p_correlation_id?: string
-          p_expected_citation_revision: number
-          p_idempotency_key: string
-          p_publication_version_id: string
-        }
-        Returns: {
-          attachment_count: number
-          citation_revision: number
-          command_receipt_id: string
-          idempotent_replay: boolean
-          publication_version_id: string
-          receipt_status: string
-          result_payload: Json
-        }[]
-      }
-      replace_video_publication_version_credits: {
-        Args: {
-          p_attachments: Json
-          p_correlation_id?: string
-          p_expected_credit_revision: number
-          p_idempotency_key: string
-          p_publication_version_id: string
-        }
-        Returns: {
-          attachment_count: number
-          command_receipt_id: string
-          credit_revision: number
-          idempotent_replay: boolean
-          publication_version_id: string
-          receipt_status: string
-          result_payload: Json
-        }[]
-      }
       replace_video_publication_captions: {
         Args: {
           p_correlation_id?: string
@@ -23052,6 +23020,42 @@ export type Database = {
           publication_id: string
           receipt_status: string
           resource_id: string
+          result_payload: Json
+        }[]
+      }
+      replace_video_publication_version_citations: {
+        Args: {
+          p_attachments: Json
+          p_correlation_id?: string
+          p_expected_citation_revision: number
+          p_idempotency_key: string
+          p_publication_version_id: string
+        }
+        Returns: {
+          attachment_count: number
+          citation_revision: number
+          command_receipt_id: string
+          idempotent_replay: boolean
+          publication_version_id: string
+          receipt_status: string
+          result_payload: Json
+        }[]
+      }
+      replace_video_publication_version_credits: {
+        Args: {
+          p_attachments: Json
+          p_correlation_id?: string
+          p_expected_credit_revision: number
+          p_idempotency_key: string
+          p_publication_version_id: string
+        }
+        Returns: {
+          attachment_count: number
+          command_receipt_id: string
+          credit_revision: number
+          idempotent_replay: boolean
+          publication_version_id: string
+          receipt_status: string
           result_payload: Json
         }[]
       }
