@@ -24,7 +24,6 @@ declare
   v_primary_artist_slugs text[];
   v_conflicting_paths bigint;
   v_relationship_rows bigint := 0;
-  v_entity_index_rows bigint := 0;
   v_follow_rows bigint := 0;
   v_block_rows bigint := 0;
   v_chart_rows bigint := 0;
@@ -161,17 +160,6 @@ begin
     updated_at = now()
   where id = p_track_id;
 
-  update public.registry_entity_index
-  set
-    slug = p_new_slug,
-    name = p_new_title
-  where entity_type = 'track'
-    and (
-      canonical_source_id = p_track_id
-      or entity_id = p_track_id
-    );
-  get diagnostics v_entity_index_rows = row_count;
-
   update public.registry_entity_relationships
   set
     source_slug = p_new_slug,
@@ -258,7 +246,7 @@ begin
       'evidence', coalesce(p_evidence, '{}'::jsonb),
       'redirect_scopes', to_jsonb(v_primary_artist_slugs),
       'synced_rows', jsonb_build_object(
-        'registry_entity_index', v_entity_index_rows,
+        'registry_entity_index', 'derived_from_registry_tracks',
         'registry_entity_relationships', v_relationship_rows,
         'community_follows', v_follow_rows,
         'community_blocks', v_block_rows,
@@ -282,7 +270,7 @@ begin
     'rule_key', p_rule_key,
     'rule_version', p_rule_version,
     'synced_rows', jsonb_build_object(
-      'registry_entity_index', v_entity_index_rows,
+      'registry_entity_index', 'derived_from_registry_tracks',
       'registry_entity_relationships', v_relationship_rows,
       'community_follows', v_follow_rows,
       'community_blocks', v_block_rows,
