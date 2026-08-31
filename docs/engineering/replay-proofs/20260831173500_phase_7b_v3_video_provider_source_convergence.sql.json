@@ -40,5 +40,15 @@
     "preview_branch_reset_retry_count": 0,
     "exact_candidate_history_rebound_to_canonical_version": true
   },
-  "verified_at": "2026-08-31T18:45:00Z"
+  "verified_at": "2026-08-31T18:45:00Z",
+  "production_migration_count": 77,
+  "production_migration_head": "20260831173500",
+  "production_history_rebound_from": "20260831185936",
+  "production_sql_replayed_after_history_rebind": false,
+  "production_verifier": "pass",
+  "production_edge_function": "public-content-read",
+  "production_edge_function_version": 76,
+  "production_edge_source_match": "exact",
+  "production_edge_verify_jwt": true,
+  "production_promoted_at": "2026-08-31T19:02:24Z"
 }
