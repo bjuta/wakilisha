@@ -17,34 +17,25 @@ describe("Mobile chrome scroll convergence", () => {
       layout.match(/useScrollDirection\(\)/g)?.length,
     ).toBe(1);
     expect(layout).toContain(
-      "const scrollVisible = useScrollDirection();",
+      "const scrollChrome = useScrollDirection();",
     );
     expect(layout).toContain(
       "<MobileTopBar",
     );
     expect(layout).toContain(
-      "scrollVisible={scrollVisible}",
+      "scrollVisible={scrollChrome.topVisible}",
     );
     expect(layout).toContain(
-      "MobileMiniPlayer scrollVisible={scrollVisible}",
-    );
-    expect(layout).toContain(
-      "MobileBottomNav scrollVisible={scrollVisible}",
+      "scrollVisible={scrollChrome.visible}",
     );
   });
 
-  it("moves the collapsed player with the same scroll signal as bottom navigation", () => {
+  it("keeps top chrome transient while bottom navigation keeps the shared scroll signal", () => {
     expect(layout).toContain(
-      "function MobileMiniPlayer({ scrollVisible }",
+      "scrollChrome.topVisible",
     );
     expect(layout).toContain(
-      'visibility: scrollVisible ? "visible" : "hidden"',
-    );
-    expect(layout).toContain(
-      'opacity: scrollVisible ? 1 : 0',
-    );
-    expect(layout).toContain(
-      'transform: scrollVisible ? "translateY(0) translateZ(0)" : "translateY(16px) translateZ(0)"',
+      "scrollChrome.visible",
     );
     expect(layout).toContain(
       "scrollVisible || moreOpen",
@@ -75,7 +66,10 @@ describe("Mobile chrome scroll convergence", () => {
     );
   });
 
-  it("leaves the middle of mobile top chrome empty", () => {
+  it("keeps top chrome out of content flow and leaves its middle empty", () => {
+    expect(topBar).toContain(
+      "pointer-events-none fixed inset-x-0 top-0",
+    );
     expect(topBar).not.toContain("sectionLabel");
     expect(topBar).not.toContain("{label}");
     expect(topBar).not.toContain(

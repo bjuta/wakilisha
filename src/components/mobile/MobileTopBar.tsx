@@ -37,7 +37,7 @@ export function MobileTopBar({ scrollVisible }: { scrollVisible: boolean }) {
   return (
     <>
       <div
-        className="pointer-events-none sticky top-0 z-[78] w-full px-4"
+        className="pointer-events-none fixed inset-x-0 top-0 z-[78] w-full px-4"
         style={{
           paddingTop: "max(env(safe-area-inset-top), 12px)",
           visibility: visible ? "visible" : "hidden",

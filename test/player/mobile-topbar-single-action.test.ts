@@ -35,7 +35,7 @@ describe("Mobile top bar single action grammar", () => {
     );
     expect(topBar).toContain("translateY(-16px)");
     expect(topBar).toContain(
-      "pointer-events-none sticky top-0",
+      "pointer-events-none fixed inset-x-0 top-0",
     );
   });
 

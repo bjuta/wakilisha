@@ -16,6 +16,9 @@ const watching = read(
 );
 const indexPage = read("src/pages/video/page.tsx");
 const detailPage = read("src/pages/video/detail/page.tsx");
+const mobileLayout = read("src/components/mobile/MobileAppLayout.tsx");
+const mobileTopBar = read("src/components/mobile/MobileTopBar.tsx");
+const scrollDirection = read("src/hooks/useScrollDirection.ts");
 
 describe("Phase 7B V2 public Video experience convergence", () => {
   it("uses one playback canvas for canonical and legacy Video presentation", () => {
@@ -36,16 +39,19 @@ describe("Phase 7B V2 public Video experience convergence", () => {
     expect(indexPage).toContain("<PublicVideoCard");
   });
 
-  it("makes native captions first class instead of browser-menu metadata", () => {
-    expect(canvas).toContain('aria-label="Captions"');
-    expect(canvas).toContain(">CC<");
+  it("keeps captions governed and moves them into player settings", () => {
+    expect(canvas).toContain('aria-label="Video settings"');
+    expect(canvas).toContain("Settings");
+    expect(canvas).toContain("Captions");
     expect(canvas).toContain("caption.label");
     expect(canvas).toContain('crossOrigin="anonymous"');
     expect(canvas).toContain("onLoad={syncCaptionTracks}");
     expect(canvas).toContain("textTrack.mode =");
     expect(canvas).toContain('"showing"');
     expect(canvas).toContain('"disabled"');
-    expect(watching).toContain("defaultCaption.label");
+    expect(canvas).not.toContain('aria-label="Captions"');
+    expect(watching).not.toContain("defaultCaption.label");
+    expect(watching).not.toContain(">CC<");
     expect(watching).not.toContain("caption track");
     expect(watching).not.toContain("caption tracks");
   });
@@ -56,7 +62,8 @@ describe("Phase 7B V2 public Video experience convergence", () => {
     expect(canvas).toContain("<iframe");
     expect(canvas).toContain("Rewind 10 seconds");
     expect(canvas).toContain("Forward 10 seconds");
-    expect(canvas).toContain("Change playback speed");
+    expect(canvas).toContain("Playback speed");
+    expect(canvas).toContain("Set playback speed to");
     expect(canvas).toContain("Enter fullscreen");
     expect(canvas).toContain("Video progress");
   });
@@ -70,7 +77,7 @@ describe("Phase 7B V2 public Video experience convergence", () => {
     expect(canvas).toContain('aria-label="Close video"');
   });
 
-  it("puts watching ahead of metadata and keeps publication provenance subordinate", () => {
+  it("puts watching at the top with no Video-specific header", () => {
     const playerIndex = watching.indexOf("<VideoPlaybackCanvas");
     const titleIndex = watching.indexOf("<h1");
     const recordIndex = watching.indexOf("<PublicationRecord");
@@ -79,6 +86,17 @@ describe("Phase 7B V2 public Video experience convergence", () => {
     expect(recordIndex).toBeGreaterThan(titleIndex);
     expect(watching).toContain("<details");
     expect(watching).toContain("Publication record");
+    expect(watching).not.toContain('className="sticky top-0 z-40');
+    expect(watching).not.toContain("Back to Video");
+  });
+
+  it("keeps global top chrome transient while preserving the shared bottom-navigation signal", () => {
+    expect(scrollDirection).toContain("topVisible");
+    expect(scrollDirection).toContain("850");
+    expect(scrollDirection).toContain("setTopVisible(false)");
+    expect(mobileLayout).toContain("scrollChrome.topVisible");
+    expect(mobileLayout).toContain("scrollChrome.visible");
+    expect(mobileTopBar).toContain("scrollVisible || searchOpen || accountOpen");
   });
 
   it("keeps the Video directory aligned to existing public page conventions", () => {
