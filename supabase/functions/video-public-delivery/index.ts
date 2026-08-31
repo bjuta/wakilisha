@@ -45,13 +45,14 @@ function response(
   });
 }
 
-function notFound(method: string): Response {
+function notFound(method: string, stage = "not_found"): Response {
   return response(
     method === "HEAD" ? null : "Not found\n",
     404,
     {
       "Content-Type": "text/plain; charset=utf-8",
       "Cache-Control": "public, max-age=30",
+      "X-Wakilisha-Delivery-Stage": stage,
     },
   );
 }
@@ -209,7 +210,7 @@ serve(async (request) => {
       has_error: Boolean(error),
       has_data: Boolean(data),
     });
-    return notFound(method);
+    return notFound(method, "caption_target_rpc_failed");
   }
 
   const target = objectValue(data);
@@ -225,7 +226,7 @@ serve(async (request) => {
       mime_type: mimeType,
       byte_size_valid: Number.isFinite(byteSize) && byteSize > 0,
     });
-    return notFound(method);
+    return notFound(method, "caption_target_invalid");
   }
 
   let storagePath: string;
@@ -233,7 +234,7 @@ serve(async (request) => {
     storagePath = privateCaptionPath(target.storage_path);
   } catch {
     console.warn("VIDEO_PUBLIC_DELIVERY_STAGE=caption_path_invalid");
-    return notFound(method);
+    return notFound(method, "caption_path_invalid");
   }
 
   const signedUrl = await protectedCaptionUrl(storagePath);
@@ -249,7 +250,7 @@ serve(async (request) => {
       status: mediaResponse.status,
       status_text: mediaResponse.statusText,
     });
-    return notFound(method);
+    return notFound(method, "caption_origin_failed");
   }
 
   const upstreamType = (
@@ -264,7 +265,7 @@ serve(async (request) => {
     console.warn("VIDEO_PUBLIC_DELIVERY_STAGE=caption_origin_type_invalid", {
       content_type: upstreamType,
     });
-    return notFound(method);
+    return notFound(method, "caption_origin_type_invalid");
   }
 
   const etag = `"${stringValue(target.sha256)}"`;
