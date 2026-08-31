@@ -85,8 +85,8 @@ export default function VideoDetailPage() {
           publication.summary
           || `Watch ${publication.title} on WAKILISHA.`
         }
-        canonicalPath={publication.canonicalPath}
-        image={publication.poster?.url || undefined}
+        url={`https://wakilisha.africa${publication.canonicalPath}`}
+        imageUrl={publication.poster?.url || undefined}
       />
       <PublicVideoWatchingSurface publication={publication} />
     </>
