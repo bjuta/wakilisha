@@ -12,6 +12,10 @@ const migration = read(
 const verifier = read(
   "scripts/control-plane/verify-phase-7b-v1-public-video-read-delivery.sql",
 );
+const behavior = read(
+  "scripts/control-plane/verify-phase-7b-v1-public-video-read-delivery-behavior.sql",
+);
+const databaseTypes = read("src/types/database.types.ts");
 const edge = read(
   "supabase/functions/video-public-delivery/index.ts",
 );
@@ -71,6 +75,16 @@ describe("Phase 7B V1 public Video read and delivery", () => {
     );
   });
 
+  it("keeps a rollback-only anonymous behavior proof", () => {
+    expect(behavior).toContain("set local role anon;");
+    expect(behavior).toContain("public.get_public_video_publication");
+    expect(behavior).toContain("public.get_public_video_index");
+    expect(behavior).toContain(
+      "PHASE_7B_V1_PUBLIC_VIDEO_READ_DELIVERY_BEHAVIOR_PASS",
+    );
+    expect(behavior).toContain("rollback;");
+  });
+
   it("keeps the permanent verifier read-only", () => {
     expect(verifier).toMatch(/^-- Permanent read-only verifier/);
     expect(verifier).toContain("set local transaction read only;");
@@ -113,6 +127,14 @@ describe("Phase 7B V1 public Video read and delivery", () => {
     expect(surface).toContain("videoRef.current.currentTime");
     expect(surface).toContain("<PublicTrustSummary");
     expect(model).toContain('"captions" | "subtitles" | "forced_subtitles"');
+  });
+
+  it("seals the generated public RPC surface", () => {
+    expect(databaseTypes).toContain(
+      "get_public_video_caption_delivery_target",
+    );
+    expect(databaseTypes).toContain("get_public_video_index");
+    expect(databaseTypes).toContain("get_public_video_publication");
   });
 
   it("mounts stable public Video index, standalone and Show Episode routes", () => {
