@@ -163,6 +163,20 @@ Embeddings may retrieve or suggest proximity. They may not establish influence, 
 
 An Inquiry may gather and assess knowledge. An article may explain knowledge. A playlist may express knowledge. None of them may become a separate source of truth when the result is reusable across WAKILISHA.
 
+## MIZIZI stewardship authority
+
+MIZIZI is the Registry-owned Cultural Data Steward.
+
+MIZIZI is not a new source of truth. It is a permanent data-hygiene capability that reads Registry authority and keeps canonical cultural identity clean across Registry records, public routes, APIs, charts, search, analytics, and future datasets.
+
+MIZIZI may automatically repair a field only when typed Registry authority already proves the answer, the change is reversible, collision checks pass, the prior public path is preserved when identity changes, and a canonical write event records the before state, after state, rule, confidence, and downstream impact.
+
+Ambiguous changes remain Registry review work. This includes canonical title changes, unresolved credits, culturally meaningful version labels, identity collisions, and disagreements where source presentation may legitimately differ from canonical presentation.
+
+Provider payloads, historical values, aliases, and observations remain evidence. Canonical cleanup must never erase provenance.
+
+The permanent MIZIZI contract is documented in `docs/registry/MIZIZI_CULTURAL_DATA_STEWARD.md`.
+
 ## Knowledge layers
 
 ### Layer 1: Canonical records
