@@ -745,11 +745,23 @@ components:
         duration: { type: string }
         songUrl: { type: string }
 
+    VideoProviderSource:
+      type: object
+      properties:
+        sourceId: { type: string }
+        providerKey: { type: string }
+        providerObjectId: { type: string }
+        canonicalUrl: { type: string }
+
     VideoRef:
       type: object
       properties:
         id: { type: string }
         title: { type: string }
+        sourceId: { type: string }
+        providerKey: { type: string }
+        providerObjectId: { type: string }
+        canonicalUrl: { type: string }
         url: { type: string }
         thumbnail: { type: string }
         platform: { type: string }
