@@ -166,11 +166,26 @@ describe("Phase 7A K5B Video Editor composition", () => {
     );
     expect(workspace).toContain("workingVersionNumber > publishedVersionNumber");
     expect(workspace).toContain(
+      "workingVersionNumber > submittedVersionNumber",
+    );
+    expect(workspace).toContain(
+      "workingVersionNumber > approvedVersionNumber",
+    );
+    expect(workspace).toContain("hasPendingSubmittedVersion");
+    expect(workspace).toContain("submittedVersionNumber > publishedVersionNumber");
+    expect(workspace).toContain("submittedVersionNumber > approvedVersionNumber");
+    expect(workspace).toContain("hasPendingApprovedVersion");
+    expect(workspace).toContain("approvedVersionNumber > publishedVersionNumber");
+    expect(workspace).toContain(
       '["ready_for_review", "in_review"].includes(workspace.resource.lifecycleState)',
+    );
+    expect(workspace).toContain(
+      'workspace.resource.lifecycleState === "published"',
     );
     expect(workspace).toContain(
       'workspace.resource.lifecycleState === "approved"',
     );
+    expect(workspace).toContain("{canSubmitWorkingVersion ? (");
   });
 
   it("promotes only candidates with real Video second-consumer imports", () => {
