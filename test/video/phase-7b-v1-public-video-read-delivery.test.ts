@@ -7,7 +7,7 @@ function read(file: string): string {
 }
 
 const migration = read(
-  "supabase/migrations/20260831103348_phase_7b_v1_public_video_read_delivery_authority.sql",
+  "supabase/migrations/20260831110438_phase_7b_v1_public_video_read_delivery_authority.sql",
 );
 const verifier = read(
   "scripts/control-plane/verify-phase-7b-v1-public-video-read-delivery.sql",
