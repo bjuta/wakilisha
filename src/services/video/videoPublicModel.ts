@@ -5,7 +5,7 @@ export interface PublicVideoShow {
   slug: string;
   title: string;
   description: string | null;
-  canonicalPath: string;
+  canonicalPath: string | null;
 }
 
 export interface PublicVideoEpisode {
@@ -167,8 +167,8 @@ function decodeShow(value: unknown): PublicVideoShow | null {
   const resourceId = stringValue(input.resource_id);
   const slug = stringValue(input.slug);
   const title = stringValue(input.title);
-  const canonicalPath = stringValue(input.canonical_path);
-  if (!resourceId || !slug || !title || !canonicalPath) return null;
+  const canonicalPath = nullableString(input.canonical_path);
+  if (!resourceId || !slug || !title) return null;
   return {
     resourceId,
     slug,
