@@ -352,7 +352,7 @@ function MobileBottomNav({ scrollVisible }: { scrollVisible: boolean }) {
 
 export function MobileAppLayout() {
   const location = useLocation();
-  const scrollVisible = useScrollDirection();
+  const scrollChrome = useScrollDirection();
   const { currentTrack } = usePlayer();
   const authUser = useAuthUser();
   const showMobileChrome =
@@ -386,7 +386,7 @@ export function MobileAppLayout() {
     >
       {showMobileChrome && (
         <MobileTopBar
-          scrollVisible={scrollVisible}
+          scrollVisible={scrollChrome.topVisible}
         />
       )}
       <main className="flex-1">
@@ -395,7 +395,7 @@ export function MobileAppLayout() {
       {showMobileChrome && (
         <Portal>
           <MobileBottomNav
-            scrollVisible={scrollVisible}
+            scrollVisible={scrollChrome.visible}
           />
         </Portal>
       )}
