@@ -1,25 +1,35 @@
 # Phase 7A Video Publication Authority Kickoff
 
-## Current Phase 7A resume state — 30 August 2026
+## Current Phase 7A state - CLOSED 31 August 2026
 
-The Resource-kernel detour and post-kernel hardening are closed.
+Phase 7A Video publication authority is production accepted.
 
-K5A governed Video editorial commands/admin reads are production accepted.
+The real exit-gate Video `Monday Morning in September` completed the canonical internal workflow through:
 
-K5B Video Editor Composition is closed and production accepted.
+- working v5
+- submitted v6
+- approved v7
+- published v8
 
-**K5C Video Version Trust Convergence is CLOSED and production accepted.**
+The final published v8 carries exact native Video Media authority and one governed Sheng closed-caption track using `und-x-sheng`, while the earlier published v4 remains preserved in immutable history.
 
-**K5D Video Correction Target + Provenance Convergence is CLOSED and production accepted** at migration count `69`, head `20260830144945_phase_7a_k5d_video_correction_provenance_convergence`, and accepted production/frontend main `af76d476053e9037382feb862efc55972c9049f8`.
+The real workflow exposed and closed bounded gaps in Media governance placement, native source integrity, deferred Resource binding authority, post-publication revision UI, review-action lineage, and private-use caption language tags.
 
-The live Video Admin Studio now composes governed exact-version Credits/Citations and read-only Correction provenance through shared authority. `EditorialCreditPicker` is canonical after real Audio + Video second-consumer proof. `EditorialCommentEditor` remains candidate because matching governed Video review-comment authority does not yet exist.
+Final production authority:
 
-Do not reopen K0, K1, K4A, K4C, K5A, K5B, K5C, or K5D.
+- accepted production/frontend main: `a8e10350dccd5a5b1cd5b49001a4cf8839a76bd9`
+- migrations: `75`
+- head: `20260831080826_video_caption_language_private_use_tags`
+- frontend entry: `assets/index-S6v7xwyD.js`
+- frontend entry SHA-256: `e878fec7815bfd014c50d3f3273259f5f74e5aeb63a3f918060bb1f0eb16ae74`
 
-The next Video work is the real Phase 7A exit-gate instrument itself: take the existing real Video through working snapshot, immutable review, approval, and governed publication. Add Registry relationships or Media/lifecycle authority only if that real workflow exposes a concrete need.
+Canonical closure record:
 
+`docs/engineering/phase-7a-closure-record.md`
 
-Status: OPEN — K5D CORRECTIONS/PROVENANCE ACCEPTED; REAL VIDEO EXIT GATE REMAINS
+Do not reopen Phase 7A to build public Video presentation. The next numbered phase is Phase 7B Public Video product.
+
+Status: CLOSED - PRODUCTION ACCEPTED
 
 Opened: 25 August 2026
 
@@ -29,9 +39,9 @@ Programme documentation baseline: `8f6bd2be1f4159fb21a34b71290c8879931cdd49`
 
 Production runtime application baseline: `dae3de2dc9fb021496eb0fe0c4d4f0338f676a88`
 
-Current production migration head: `20260830144945`
+Current production migration head: `20260831080826`
 
-Current production migration count: `69`
+Current production migration count: `75`
 
 Predecessor closure:
 
