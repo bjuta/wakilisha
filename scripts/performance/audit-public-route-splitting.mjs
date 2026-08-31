@@ -181,9 +181,13 @@ const directLazyImports = [
  * Public Audio directory convergence adds one direct lazy public import:
  * - ../pages/audio/page
  *
- * The current authority is therefore 65 direct lazy imports.
+ * Phase 7B V1 adds two public Video imports:
+ * - ../pages/video/page
+ * - ../pages/video/detail/page
+ *
+ * The current authority is therefore 67 direct lazy imports.
  */
-const expectedDirectLazyImportCount = 65;
+const expectedDirectLazyImportCount = 67;
 
 if (
   directLazyImports.length !==
@@ -251,6 +255,8 @@ for (const requiredModule of [
   "../pages/audio/detail/page",
   "../pages/shows/detail/page",
   "../pages/shows/episode/page",
+  "../pages/video/page",
+  "../pages/video/detail/page",
   "../pages/people/detail/page",
   "../pages/organizations/detail/page",
   "../pages/artists/detail/page",
@@ -399,17 +405,26 @@ const routePaths = [
  * These are Admin Studio routes only. They must not change the preserved
  * pre-M1 public route sequence.
  *
- * The current authority is therefore 171 paths. Removing the four declared
- * public Audio and Show paths plus the two K5B Admin Video paths must still
- * reproduce the exact 165-path pre-M1 sequence.
+ * Phase 7B V1 adds three public Video routes:
+ * - /video
+ * - /video/:showSlug/:episodeSlug
+ * - /video/:slug
+ *
+ * The current authority is therefore 174 paths. Removing the four declared
+ * public Audio and Show paths, the two K5B Admin Video paths, and the three
+ * Phase 7B public Video paths must still reproduce the exact 165-path
+ * pre-M1 sequence.
  */
-const expectedRoutePathCount = 171;
+const expectedRoutePathCount = 174;
 const publicAudioIndexPath = "/audio";
 const publicAudioPath = "/audio/:slug";
 const publicShowPath = "/shows/:showSlug";
 const publicShowEpisodePath = "/shows/:showSlug/:episodeSlug";
 const adminVideoIndexPath = "video";
 const adminVideoDetailPath = "video/:publicationId";
+const publicVideoIndexPath = "/video";
+const publicVideoEpisodePath = "/video/:showSlug/:episodeSlug";
+const publicVideoStandalonePath = "/video/:slug";
 
 if (routePaths.length !== expectedRoutePathCount) {
   fail(
@@ -424,12 +439,15 @@ for (const [routePath, label] of [
   [publicShowEpisodePath, "Show Episode"],
   [adminVideoIndexPath, "Admin Video Directory"],
   [adminVideoDetailPath, "Admin Video Detail"],
+  [publicVideoIndexPath, "Public Video Directory"],
+  [publicVideoEpisodePath, "Public Video Episode"],
+  [publicVideoStandalonePath, "Public Standalone Video"],
 ]) {
   if (
     routePaths.filter((candidate) => candidate === routePath).length !== 1
   ) {
     fail(
-      `Declared Audio, Show, and K5B Video authority must retain exactly one ${label} route at ${routePath}`,
+      `Declared Audio, Show, Admin Video, and public Video authority must retain exactly one ${label} route at ${routePath}`,
     );
   }
 }
@@ -450,7 +468,10 @@ const preM1RoutePaths = routePaths.filter(
     routePath !== publicShowPath &&
     routePath !== publicShowEpisodePath &&
     routePath !== adminVideoIndexPath &&
-    routePath !== adminVideoDetailPath,
+    routePath !== adminVideoDetailPath &&
+    routePath !== publicVideoIndexPath &&
+    routePath !== publicVideoEpisodePath &&
+    routePath !== publicVideoStandalonePath,
 );
 
 if (preM1RoutePaths.length !== 165) {
