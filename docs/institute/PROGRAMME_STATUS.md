@@ -1,54 +1,43 @@
 # WAKILISHA Programme Status
 
-## Current programme reconciliation — 30 August 2026
+## Current programme reconciliation - 31 August 2026
 
-**Current numbered work remains Phase 7A: Video publication authority.**
+**Phase 7A Video publication authority is CLOSED and production accepted.**
 
-The Resource-kernel movement and bounded post-kernel hardening are **closed**.
+The Resource-kernel movement, post-kernel hardening, K5A, K5B, K5C, K5D, K5E, and the real Video exit-gate follow-through are accepted baseline.
 
-**K5A Video Editorial Command and Admin Read Boundary is production accepted.**
+The real Phase 7A exit-gate Video is `Monday Morning in September`.
 
-**K5B Video Editor Composition is CLOSED and production accepted.**
+Final immutable lifecycle:
 
-**K5C Video Version Trust Convergence is CLOSED and production accepted.**
+- working v5
+- submitted v6
+- approved v7
+- published v8
 
-**K5D Video Correction Target + Provenance Convergence is CLOSED and production accepted.**
+The final published v8 preserves exact native Media source authority and one governed Sheng closed-caption track with language tag `und-x-sheng`.
 
-Current production authority after K5D:
+Final production authority:
 
-- accepted production/frontend main: `af76d476053e9037382feb862efc55972c9049f8`
-- production migration count: `69`
-- production migration head: `20260830144945_phase_7a_k5d_video_correction_provenance_convergence`
-- production frontend entry: `assets/index-XyI8oImS.js`
-- production frontend entry SHA-256: `4dd81faa3ddee8b52c6a8cc18ab731262eff5d6de817aaaafc4a3f39e34172d7`
+- accepted production/frontend main: `a8e10350dccd5a5b1cd5b49001a4cf8839a76bd9`
+- production migration count: `75`
+- production migration head: `20260831080826_video_caption_language_private_use_tags`
+- production frontend entry: `assets/index-S6v7xwyD.js`
+- production frontend entry SHA-256: `e878fec7815bfd014c50d3f3273259f5f74e5aeb63a3f918060bb1f0eb16ae74`
 
-K5C converged Video onto shared exact-version Credits and Citations and promoted `EditorialCreditPicker` only after genuine Audio + Video second-consumer proof.
+The real exit path exposed bounded gaps in Media governance placement, native source integrity, deferred Resource binding authority, post-publication revision UI, review-action lineage, and private-use caption language tags. Each was repaired without creating competing Video-owned authority or weakening the publish safety gate.
 
-K5D converged shared Correction targeting onto canonical Resource Version identity, preserved Article as an existing consumer, and added governed read-only Video Correction provenance without creating a Video-owned Correction subsystem.
+Canonical Phase 7A closure record:
 
-Canonical closure records:
+- `docs/engineering/phase-7a-closure-record.md`
 
-- `docs/engineering/phase-7a-k5c-video-version-trust-convergence-closure-record.md`
-- `docs/engineering/phase-7a-k5d-video-correction-provenance-convergence-closure-record.md`
+The immediate numbered work is now **Phase 7B: Public Video product**.
 
-Phase 7A is **not** closed. Credits/Citations and Corrections/provenance continuity are no longer exit-gate gaps.
+Status date: 31 August 2026
 
-The immediate numbered work is the real Video exit-gate instrument: move the existing real Video through working snapshot, immutable review, approval, and governed publication. Add Registry relationships or Media/lifecycle authority only if that real workflow proves they are required.
+Current production migration head: `20260831080826`
 
-
-Status date: 30 August 2026
-
-Phase 6A production authority baseline: `fd0580e3a1a19e3d1f06a9c8466a37c84cd26a8b`
-
-Phase 6B governance gate: PR #684, `Enforce primitive compounding and open Phase 6B`
-
-Documentation closure gate: PR #699, `Reconcile Phase 6B milestone closure records`
-
-Production runtime application baseline: `dae3de2dc9fb021496eb0fe0c4d4f0338f676a88`
-
-Current production migration head: `20260830144945`
-
-Current production migration count: `69`
+Current production migration count: `75`
 
 ## Status authority
 
@@ -62,9 +51,9 @@ The compact navigation view is `docs/roadmap/wakilisha-master-programme-map.md`.
 
 ## Current numbered work
 
-**Phase 7A: Video publication authority**
+**Phase 7B: Public Video product**
 
-Phases 0 through 6 are closed.
+Phases 0 through 7A are closed.
 
 Phase 6B Public Audio closed by explicit programme decision on 25 August 2026. The former real-podcast exercise is retained as non-blocking Audio operational acceptance and is not falsely recorded as completed.
 
