@@ -86,7 +86,7 @@ describe("Phase 7B V2 public Video experience convergence", () => {
     expect(recordIndex).toBeGreaterThan(titleIndex);
     expect(watching).toContain("<details");
     expect(watching).toContain("Publication record");
-    expect(watching).not.toContain("WAKILISHA Video");
+    expect(watching).not.toContain('className="sticky top-0 z-40');
     expect(watching).not.toContain("Back to Video");
   });
 
