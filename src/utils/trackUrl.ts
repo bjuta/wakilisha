@@ -29,3 +29,25 @@ export function releaseTrackUrl(
 
   return `/releases/${normalizedArtist}/${normalizedRelease}/${normalizedTrack}`;
 }
+
+export function canonicalTrackUrl(
+  artistSlug: string,
+  trackSlug: string,
+  releaseSlug?: string | null,
+  releaseTrackCount?: number | null,
+): string {
+  const count = Number(releaseTrackCount || 0);
+
+  if (count > 1 && String(releaseSlug || "").trim()) {
+    return releaseTrackUrl(
+      artistSlug,
+      String(releaseSlug),
+      trackSlug,
+    );
+  }
+
+  return trackUrl(
+    trackSlug,
+    artistSlug ? [artistSlug] : [],
+  );
+}

@@ -975,8 +975,14 @@ async function listReleasesFromRegistry(): Promise<PublicRelease[]> {
     }
   }
 
-  // 5. Build PublicRelease objects
-  return releases.map((row) => {
+  // 5. Public Release identity starts at two active Track memberships.
+  // One-track provider packages remain Registry provenance but surface publicly as Tracks.
+  return releases
+    .filter((row) => {
+      const id = textValue(row, ["id"]);
+      return (trackCountByRelease.get(id) || 0) > 1;
+    })
+    .map((row) => {
     const id = textValue(row, ["id"]);
     const slug = textValue(row, ["slug"]);
     const title = textValue(row, ["title"]);
@@ -1023,7 +1029,7 @@ export interface PaginatedReleasesResult {
 export interface ReleasePaginatedParams {
   offset: number;
   limit: number;
-  typeFilter?: string;   // "Album" | "EP" | "Single" | undefined (All)
+  typeFilter?: string;   // "Album" | "EP" | undefined (All)
   yearFilter?: string;
   artistFilter?: string;
   search?: string;
@@ -1036,9 +1042,7 @@ export async function listReleasesPaginated(params: ReleasePaginatedParams): Pro
   const allReleases = await listReleasesFromRegistry();
   let filtered = allReleases;
 
-  if (typeFilter === "Single") {
-    filtered = filtered.filter((r) => r.trackCount <= 1);
-  } else if (typeFilter === "EP") {
+  if (typeFilter === "EP") {
     filtered = filtered.filter((r) => r.trackCount >= 2 && r.trackCount <= 6);
   } else if (typeFilter === "Album") {
     filtered = filtered.filter((r) => r.trackCount >= 7);
@@ -1083,16 +1087,14 @@ export interface ReleaseCatalogStats {
   total: number;
   albums: number;
   eps: number;
-  singles: number;
 }
 
 export async function getReleaseCatalogStats(): Promise<ReleaseCatalogStats> {
   const allReleases = await listReleasesFromRegistry();
   const total = allReleases.length;
-  const singles = allReleases.filter((r) => r.trackCount <= 1).length;
   const eps = allReleases.filter((r) => r.trackCount >= 2 && r.trackCount <= 6).length;
   const albums = allReleases.filter((r) => r.trackCount >= 7).length;
-  return { total, albums, eps, singles };
+  return { total, albums, eps };
 }
 
 export async function getReleaseFilterArtists(limit = 30): Promise<string[]> {

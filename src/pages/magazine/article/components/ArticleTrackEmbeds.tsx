@@ -97,7 +97,7 @@ export async function resolveTrackMarkers(
   const slugs = markers.map((mk) => mk.slug);
   const { data: trackRows } = await supabase
     .from("registry_tracks")
-    .select("id, slug, title, duration_ms, preview_url, artwork_url, metadata, release_id")
+    .select("id, slug, title, duration_ms, preview_url, artwork_url, metadata")
     .eq("status", "active")
     .in("slug", slugs);
 
@@ -127,8 +127,35 @@ export async function resolveTrackMarkers(
     }
   });
 
+  // Fetch Release context through the canonical Track membership table.
+  const releaseIdByTrackId = new Map<string, string>();
+  const { data: releaseMemberships } = await supabase
+    .from("registry_release_tracks")
+    .select("track_id, release_id")
+    .in("track_id", trackIds)
+    .eq("status", "active")
+    .order("disc_number", { ascending: true })
+    .order("track_number", { ascending: true });
+
+  for (const membership of releaseMemberships || []) {
+    const trackId = String(membership.track_id || "");
+    const releaseId = String(membership.release_id || "");
+
+    if (
+      !trackId ||
+      !releaseId ||
+      releaseIdByTrackId.has(trackId)
+    ) {
+      continue;
+    }
+
+    releaseIdByTrackId.set(trackId, releaseId);
+  }
+
   // Fetch label info from releases
-  const releaseIds = [...new Set(trackRows.map((t) => t.release_id).filter(Boolean))];
+  const releaseIds = [
+    ...new Set(releaseIdByTrackId.values()),
+  ];
   let releaseLabelMap: Record<string, string> = {};
   if (releaseIds.length > 0) {
     const { data: releases } = await supabase
@@ -187,7 +214,9 @@ export async function resolveTrackMarkers(
       appleMusicCatalogId,
       artworkUrl: row.artwork_url || undefined,
       primaryGenre,
-      labelName: row.release_id ? (releaseLabelMap[row.release_id] || undefined) : undefined,
+      labelName: releaseIdByTrackId.get(row.id)
+        ? (releaseLabelMap[releaseIdByTrackId.get(row.id)!] || undefined)
+        : undefined,
     };
 
     const trackIdx = newTracks.length;

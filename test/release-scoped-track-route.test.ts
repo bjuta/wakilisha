@@ -2,6 +2,7 @@ import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 
 import {
+  canonicalTrackUrl,
   releaseTrackUrl,
   trackUrl,
 } from "../src/utils/trackUrl";
@@ -19,10 +20,32 @@ describe("release-scoped track routes", () => {
     );
   });
 
-  it("keeps the standalone track route available", () => {
+  it("makes one-track provider packages canonical Tracks", () => {
     expect(
       trackUrl("Valle", ["Matata"]),
     ).toBe("/tracks/matata/valle");
+
+    expect(
+      canonicalTrackUrl(
+        "bee-thee-artiste",
+        "nervous",
+        "nervous-single",
+        1,
+      ),
+    ).toBe(
+      "/tracks/bee-thee-artiste/nervous",
+    );
+
+    expect(
+      canonicalTrackUrl(
+        "nyashinski",
+        "legendary",
+        "lucky-you",
+        12,
+      ),
+    ).toBe(
+      "/releases/nyashinski/lucky-you/legendary",
+    );
   });
 
   it("wires release pages and the public gateway to release context", () => {
@@ -69,7 +92,13 @@ describe("release-scoped track routes", () => {
       "releaseTrackUrl(artistSlug, releaseSlug, track.slug)",
     );
     expect(trackPage).toContain(
-      "getReleaseTrack(artistSlug, releaseSlug, trackSlug)",
+      "getReleaseTrack(",
+    );
+    expect(trackPage).toContain(
+      "releaseSlug,",
+    );
+    expect(trackPage).toContain(
+      "trackSlug,",
     );
     expect(trackPage).toContain(
       "{ releaseSlug },",
@@ -179,7 +208,7 @@ describe("release-scoped track routes", () => {
     }
   });
 
-  it("makes release-connected tracks own release-scoped canonical URLs", () => {
+  it("makes only multi-track Releases own release-scoped canonical URLs", () => {
     const trackPage = readFileSync(
       "src/pages/tracks/detail/page.tsx",
       "utf8",
@@ -198,10 +227,16 @@ describe("release-scoped track routes", () => {
     );
 
     expect(trackPage).toContain(
-      "!releaseSlug &&",
+      "nextTrack.albumTotalTracks > 1",
+    );
+    expect(trackPage).toContain(
+      "const standalonePath = trackUrl(",
     );
     expect(trackPage).toContain(
       "const scopedPath = releaseTrackUrl(",
+    );
+    expect(trackPage).toContain(
+      "const canonicalPath = canonicalTrackUrl(",
     );
     expect(trackPage).toContain(
       "url={canonicalAbsoluteUrl}",
@@ -225,10 +260,16 @@ describe("release-scoped track routes", () => {
       '.from("registry_release_tracks")',
     );
     expect(sitemapFunction).toContain(
+      "releaseTrackCountByReleaseId",
+    );
+    expect(sitemapFunction).toContain(
       "path: `/releases/${releaseArtistSlug}/${releaseSlug}/${row.slug}`",
     );
     expect(sitemapFunction).toContain(
       "if (scopedItems.length)",
+    );
+    expect(sitemapFunction).toContain(
+      "releaseTrackCountByReleaseId.get(membership.releaseId)",
     );
     expect(sitemapFunction).toContain(
       'action === "xml_live"',
@@ -277,4 +318,38 @@ describe("release-scoped track routes", () => {
     );
   });
 
+});
+
+
+describe("public Release boundary", () => {
+  it("keeps one-track packages off the Release shelf", () => {
+    const service = readFileSync(
+      "src/services/publicContent/client.ts",
+      "utf8",
+    );
+    const releasePage = readFileSync(
+      "src/pages/releases/page.tsx",
+      "utf8",
+    );
+    const gateway = readFileSync(
+      "supabase/functions/public-content-read/index.ts",
+      "utf8",
+    );
+
+    expect(service).toContain(
+      "return (trackCountByRelease.get(id) || 0) > 1;",
+    );
+    expect(releasePage).not.toContain(
+      '"All", "Album", "EP", "Single"',
+    );
+    expect(releasePage).not.toContain(
+      "Albums, EPs & singles",
+    );
+    expect(gateway).toContain(
+      "(trackCountByRelease.get(String(release.id)) || 0) > 1",
+    );
+    expect(gateway).toContain(
+      "releaseScopedMembership ?? null",
+    );
+  });
 });

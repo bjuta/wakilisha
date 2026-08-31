@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { useParams, Link } from "react-router-dom";
+import { useParams, Link, useNavigate } from "react-router-dom";
 import { WkIcon } from "@/components/design-system/Icon";
 import { PlayableArtwork } from "@/components/design-system/music/PlayableArtwork";
 import { TrackActionsMenu } from "@/components/tracks/TrackActionsMenu";
@@ -8,7 +8,7 @@ import { ReleaseSaveButton } from "@/components/releases/ReleaseSaveButton";
 import { MetaTags } from "@/components/seo/MetaTags";
 import { usePlayer } from "@/context/PlayerContext";
 import { getRelease, slugify, listReleases, type PublicReleaseDetail, type PublicRelease } from "@/services/publicContent/client";
-import { releaseTrackUrl } from "@/utils/trackUrl";
+import { releaseTrackUrl, trackUrl } from "@/utils/trackUrl";
 import { useScrollDepthTracking } from "@/hooks/useScrollDepthTracking";
 import { MobileShareButton } from "@/components/design-system/share/ShareSheet";
 import { CommunitySection } from "@/pages/magazine/article/components/CommunitySection";
@@ -109,6 +109,7 @@ function buildDescription(opts: {
 
 export default function MobileReleaseDetail() {
   const { artistSlug, releaseSlug } = useParams<{ artistSlug: string; releaseSlug: string }>();
+  const navigate = useNavigate();
   const user = useAuthUser();
 
   useScrollDepthTracking({
@@ -143,6 +144,16 @@ export default function MobileReleaseDetail() {
           setError("This release does not exist in the catalog.");
           return;
         }
+        if (data.trackCount <= 1 && data.tracks[0]) {
+          navigate(
+            trackUrl(
+              data.tracks[0].slug,
+              artistSlug ? [artistSlug] : [],
+            ),
+            { replace: true },
+          );
+          return;
+        }
         setRelease(data);
         const rel = allReleases
           .filter((r) => r.slug !== releaseSlug && (r.artist === data.artist || r.labelName === data.labelName))
@@ -156,7 +167,7 @@ export default function MobileReleaseDetail() {
         setStatus("error");
       });
     return () => { alive = false; };
-  }, [artistSlug, releaseSlug]);
+  }, [artistSlug, releaseSlug, navigate]);
 
   useEffect(() => {
     setArtworkFailed(false);
