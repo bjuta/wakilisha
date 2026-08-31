@@ -73,6 +73,9 @@ jobs:
       - name: Enforce Phase 7B V3 Video provider source convergence
         run: npx vitest run test/video/phase-7b-v3-video-provider-source-convergence.test.ts
 
+      - name: Enforce Mlinzi Registry Steward
+        run: npx vitest run test/registry/mlinzi-registry-steward.test.ts
+
       - name: Require Supabase control-plane access
         run: |
           if [ -z "$SUPABASE_ACCESS_TOKEN" ]; then
