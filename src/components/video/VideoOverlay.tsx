@@ -1,6 +1,7 @@
 import { useState, useCallback, useEffect, useRef } from "react";
 import { createPortal } from "react-dom";
 import { useScrollLock } from "@/hooks/useScrollLock";
+import { VideoPlaybackCanvas } from "./VideoPlaybackCanvas";
 import { platformIcon } from "./types";
 import type { VideoEmbedData, VideoMode } from "./types";
 
@@ -344,14 +345,14 @@ export function VideoOverlay({
                 transition: "transform 500ms cubic-bezier(0.4, 0, 0.2, 1), border-radius 500ms cubic-bezier(0.4, 0, 0.2, 1), box-shadow 500ms cubic-bezier(0.4, 0, 0.2, 1)",
               }}
             >
-              <iframe
-                key={video.url}
-                src={video.url}
+              <VideoPlaybackCanvas
+                source={{
+                  kind: "provider",
+                  embedUrl: video.url,
+                  providerKey: video.platform,
+                }}
                 title={video.title}
-                className="absolute inset-0 h-full w-full"
-                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
-                allowFullScreen
-                referrerPolicy="strict-origin-when-cross-origin"
+                className="absolute inset-0"
               />
             </div>
 
