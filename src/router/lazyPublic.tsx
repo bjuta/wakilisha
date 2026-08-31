@@ -68,6 +68,14 @@ export const PublicAudioDetailPage = lazy(
   () => import("../pages/audio/detail/page"),
 );
 
+export const PublicVideoPage = lazy(
+  () => import("../pages/video/page"),
+);
+
+export const PublicVideoDetailPage = lazy(
+  () => import("../pages/video/detail/page"),
+);
+
 export const PublicShowPage = lazy(
   () => import("../pages/shows/detail/page"),
 );
