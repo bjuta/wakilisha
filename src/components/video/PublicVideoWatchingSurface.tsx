@@ -158,12 +158,16 @@ export function PublicVideoWatchingSurface({
             {publication.show ? (
               <>
                 <span aria-hidden="true">/</span>
-                <Link
-                  to={publication.show.canonicalPath}
-                  className="transition hover:text-wk-brand"
-                >
-                  {publication.show.title}
-                </Link>
+                {publication.show.canonicalPath ? (
+                  <Link
+                    to={publication.show.canonicalPath}
+                    className="transition hover:text-wk-brand"
+                  >
+                    {publication.show.title}
+                  </Link>
+                ) : (
+                  <span>{publication.show.title}</span>
+                )}
               </>
             ) : null}
           </div>
