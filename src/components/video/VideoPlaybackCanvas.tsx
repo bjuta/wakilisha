@@ -1,4 +1,5 @@
 import {
+  type KeyboardEvent,
   type RefObject,
   useCallback,
   useEffect,
@@ -168,7 +169,7 @@ export function VideoPlaybackCanvas({
     await shell.requestFullscreen();
   };
 
-  const handleKeyboard = (event: React.KeyboardEvent<HTMLDivElement>) => {
+  const handleKeyboard = (event: KeyboardEvent<HTMLDivElement>) => {
     if (source.kind !== "native") return;
     if (event.key === " " || event.key.toLowerCase() === "k") {
       event.preventDefault();
@@ -381,7 +382,8 @@ export function VideoPlaybackCanvas({
               step={0.1}
               value={Math.min(currentTime, duration || 0)}
               onChange={(event) => seek(Number(event.target.value))}
-              className="h-1.5 w-full cursor-pointer accent-[var(--wk-brand)]"
+              className="h-1.5 w-full cursor-pointer"
+              style={{ accentColor: "var(--wk-brand)" }}
               aria-label="Video progress"
             />
             <div className="mt-1 flex justify-between text-[10px] font-semibold text-white/75">
