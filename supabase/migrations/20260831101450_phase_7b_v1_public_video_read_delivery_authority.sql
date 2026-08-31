@@ -75,7 +75,6 @@ begin
       on show_resource.id = show_row.resource_id
      and show_resource.resource_kind = 'show'
      and show_resource.lifecycle_state = 'active'
-     and show_resource.visibility = 'public'
     join editorial.show_episodes episode_row
       on episode_row.resource_id = version_row.show_episode_resource_id
      and episode_row.show_resource_id = show_row.resource_id
@@ -84,7 +83,6 @@ begin
       on episode_resource.id = episode_row.resource_id
      and episode_resource.resource_kind = 'show_episode'
      and episode_resource.lifecycle_state = 'active'
-     and episode_resource.visibility = 'public'
     limit 1;
   end if;
 
@@ -119,7 +117,6 @@ begin
       on show_resource.id = show_row.resource_id
      and show_resource.resource_kind = 'show'
      and show_resource.lifecycle_state = 'active'
-     and show_resource.visibility = 'public'
     where show_row.resource_id = v_version.show_resource_id
       and show_row.slug = v_show_slug;
 
@@ -130,7 +127,6 @@ begin
       on episode_resource.id = episode_row.resource_id
      and episode_resource.resource_kind = 'show_episode'
      and episode_resource.lifecycle_state = 'active'
-     and episode_resource.visibility = 'public'
     where episode_row.resource_id = v_version.show_episode_resource_id
       and episode_row.show_resource_id = v_show.resource_id
       and episode_row.slug = v_slug;
