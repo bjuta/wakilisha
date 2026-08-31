@@ -10,6 +10,10 @@ import {
   albumArtistCreditIncludesArtist,
   resolveReleaseArtistCredit,
 } from "./releaseArtistCredit.ts";
+import {
+  canonicalizeIncomingTrackIdentity,
+  REGISTRY_STEWARD_RULE_VERSION,
+} from "../_shared/registry-steward.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -871,9 +875,12 @@ Deno.serve(async (req: Request) => {
         const tracksData = album.relationships?.tracks?.data ?? [];
         for (const track of tracksData) {
           const tAttrs = track.attributes ?? {};
-          const trackTitle = tAttrs.name ?? "Untitled";
+          const sourceTrackTitle = tAttrs.name ?? "Untitled";
+          const stewardIdentity =
+            canonicalizeIncomingTrackIdentity(sourceTrackTitle);
+          const trackTitle = stewardIdentity.title;
           const trackIsrc = tAttrs.isrc ? String(tAttrs.isrc).trim().toUpperCase() : null;
-          const rawTrackSlug = slugify(trackTitle);
+          const rawTrackSlug = stewardIdentity.slug;
           const discNum = tAttrs.discNumber ?? 1;
           const trackNum = tAttrs.trackNumber ?? null;
           const durationMs = tAttrs.durationInMillis ?? null;
@@ -901,10 +908,17 @@ Deno.serve(async (req: Request) => {
             seenTrackIds.add(trackId);
             trackRows.push({
               id: trackId, slug: trackSlug, title: trackTitle,
-              normalized_title: slugify(trackTitle).replace(/-/g, " "),
+              normalized_title: stewardIdentity.normalizedTitle,
               isrc: trackIsrc, release_id: null, duration_ms: durationMs, explicit,
               track_number: trackNum, disc_number: discNum, artwork_url: trackAwUrl, preview_url: previewUrl, status: "active",
-              metadata: { apple_music_track_id: track.id, apple_music_album_id: album.id, source: "apple_music_ingest" },
+              metadata: {
+                apple_music_track_id: track.id,
+                apple_music_album_id: album.id,
+                source: "apple_music_ingest",
+                source_title: stewardIdentity.sourceTitle,
+                registry_steward_rule_version: REGISTRY_STEWARD_RULE_VERSION,
+                structural_featured_names: stewardIdentity.structuralFeaturedNames,
+              },
             });
           }
           releaseTrackRows.push({
