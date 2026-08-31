@@ -46,7 +46,7 @@ describe("Mobile top bar flow convergence", () => {
     expect(mainIndex).toBeGreaterThan(topBarIndex);
   });
 
-  it("uses one scroll signal for top bar, mini player, and bottom navigation", () => {
+  it("uses one scroll signal with separate top and bottom chrome visibility", () => {
     expect(
       layoutSource.match(
         /useScrollDirection\(\)/g,
@@ -54,13 +54,10 @@ describe("Mobile top bar flow convergence", () => {
     ).toBe(1);
 
     expect(nonAuthShell).toContain(
-      "scrollVisible={scrollVisible}",
+      "scrollVisible={scrollChrome.topVisible}",
     );
     expect(layoutSource).toContain(
-      "MobileMiniPlayer scrollVisible={scrollVisible}",
-    );
-    expect(layoutSource).toContain(
-      "MobileBottomNav scrollVisible={scrollVisible}",
+      "scrollVisible={scrollChrome.visible}",
     );
     expect(topBar).not.toContain(
       "useScrollDirection()",
@@ -70,7 +67,7 @@ describe("Mobile top bar flow convergence", () => {
     );
   });
 
-  it("keeps persistent mobile top chrome to account left and Notifications right", () => {
+  it("keeps transient mobile top chrome to account left and Notifications right", () => {
     expect(topBar).toContain(
       "Open account menu",
     );
