@@ -18,6 +18,12 @@ const languageTagMigration = fs.readFileSync(
   ),
   "utf8",
 );
+const languageTagVerifier = fs.readFileSync(
+  path.resolve(
+    "scripts/control-plane/verify-phase-7a-video-caption-language-private-use.sql",
+  ),
+  "utf8",
+);
 const verifier = fs.readFileSync(
   path.resolve("scripts/control-plane/verify-phase-7a-k5a-video-editorial-command-read-boundary.sql"),
   "utf8",
@@ -132,6 +138,13 @@ describe("Phase 7A K5A Video editorial command/read boundary", () => {
     expect(languageTagMigration).toContain("replace_video_publication_captions");
     expect(languageTagMigration).not.toContain(
       "^[a-z]{2,3}(?:-[a-z0-9]{2,8})*$",
+    );
+    expect(languageTagVerifier).toContain("und-x-sheng");
+    expect(languageTagVerifier).toContain("VIDEO_CAPTION_LANGUAGE_PRIVATE_USE_PASS");
+    expect(languageTagVerifier).toMatch(/^-- Permanent read-only verifier/);
+    expect(languageTagVerifier).toContain("set local transaction read only;");
+    expect(languageTagVerifier).not.toMatch(
+      /^\s*(insert|update|delete|alter|drop|create|grant|revoke)\b/im,
     );
   });
 
