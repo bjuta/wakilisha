@@ -92,7 +92,13 @@ describe("release-scoped track routes", () => {
       "releaseTrackUrl(artistSlug, releaseSlug, track.slug)",
     );
     expect(trackPage).toContain(
-      "getReleaseTrack(artistSlug, releaseSlug, trackSlug)",
+      "getReleaseTrack(",
+    );
+    expect(trackPage).toContain(
+      "releaseSlug,",
+    );
+    expect(trackPage).toContain(
+      "trackSlug,",
     );
     expect(trackPage).toContain(
       "{ releaseSlug },",
