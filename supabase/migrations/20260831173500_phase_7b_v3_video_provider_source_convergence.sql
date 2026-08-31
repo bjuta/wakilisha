@@ -43,7 +43,7 @@ article_provider_ids as (
   from published_articles article
   cross join lateral regexp_matches(
     article.content_html,
-    '(?:youtube\\.com/watch\\?[^"''<> ]*v=)([A-Za-z0-9_-]{11})',
+    '(?:youtube\.com/watch\?[^"''<> ]*v=)([A-Za-z0-9_-]{11})',
     'gi'
   ) match_row
 
@@ -53,7 +53,7 @@ article_provider_ids as (
   from published_articles article
   cross join lateral regexp_matches(
     article.content_html,
-    '(?:youtube(?:-nocookie)?\\.com/embed/)([A-Za-z0-9_-]{11})',
+    '(?:youtube(?:-nocookie)?\.com/embed/)([A-Za-z0-9_-]{11})',
     'gi'
   ) match_row
 
@@ -63,7 +63,7 @@ article_provider_ids as (
   from published_articles article
   cross join lateral regexp_matches(
     article.content_html,
-    '(?:youtube\\.com/shorts/)([A-Za-z0-9_-]{11})',
+    '(?:youtube\.com/shorts/)([A-Za-z0-9_-]{11})',
     'gi'
   ) match_row
 
@@ -73,7 +73,7 @@ article_provider_ids as (
   from published_articles article
   cross join lateral regexp_matches(
     article.content_html,
-    '(?:youtu\\.be/)([A-Za-z0-9_-]{11})',
+    '(?:youtu\.be/)([A-Za-z0-9_-]{11})',
     'gi'
   ) match_row
 ),
@@ -110,22 +110,22 @@ artist_provider_ids as (
     coalesce(
       (regexp_match(
         raw_value,
-        '(?:youtube\\.com/watch\\?[^ ]*v=)([A-Za-z0-9_-]{11})',
+        '(?:youtube\.com/watch\?[^ ]*v=)([A-Za-z0-9_-]{11})',
         'i'
       ))[1],
       (regexp_match(
         raw_value,
-        '(?:youtube(?:-nocookie)?\\.com/embed/)([A-Za-z0-9_-]{11})',
+        '(?:youtube(?:-nocookie)?\.com/embed/)([A-Za-z0-9_-]{11})',
         'i'
       ))[1],
       (regexp_match(
         raw_value,
-        '(?:youtube\\.com/shorts/)([A-Za-z0-9_-]{11})',
+        '(?:youtube\.com/shorts/)([A-Za-z0-9_-]{11})',
         'i'
       ))[1],
       (regexp_match(
         raw_value,
-        '(?:youtu\\.be/)([A-Za-z0-9_-]{11})',
+        '(?:youtu\.be/)([A-Za-z0-9_-]{11})',
         'i'
       ))[1],
       case
