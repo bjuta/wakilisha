@@ -15,6 +15,7 @@ as $function$
 declare
   v_slug text := nullif(lower(btrim(p_slug)), '');
   v_show_slug text := nullif(lower(btrim(p_show_slug)), '');
+  v_version_id uuid;
   v_binding editorial.video_publication_resources%rowtype;
   v_resource editorial.resources%rowtype;
   v_version video.publication_versions%rowtype;
@@ -33,8 +34,8 @@ begin
   end if;
 
   if v_show_slug is null then
-    select binding_row, resource_row, version_row
-    into v_binding, v_resource, v_version
+    select version_row.id
+    into v_version_id
     from editorial.video_publication_resources binding_row
     join editorial.resources resource_row
       on resource_row.id = binding_row.resource_id
@@ -51,8 +52,8 @@ begin
      and version_row.slug_snapshot = v_slug
     limit 1;
   else
-    select binding_row, resource_row, version_row, show_row, episode_row
-    into v_binding, v_resource, v_version, v_show, v_episode
+    select version_row.id
+    into v_version_id
     from editorial.video_publication_resources binding_row
     join editorial.resources resource_row
       on resource_row.id = binding_row.resource_id
@@ -87,8 +88,52 @@ begin
     limit 1;
   end if;
 
-  if not found then
+  if v_version_id is null then
     return null;
+  end if;
+
+  select version_row.*
+  into strict v_version
+  from video.publication_versions version_row
+  where version_row.id = v_version_id;
+
+  select binding_row.*
+  into strict v_binding
+  from editorial.video_publication_resources binding_row
+  where binding_row.publication_id = v_version.publication_id
+    and binding_row.resource_id = v_version.resource_id;
+
+  select resource_row.*
+  into strict v_resource
+  from editorial.resources resource_row
+  where resource_row.id = v_binding.resource_id
+    and resource_row.current_published_version_id = v_version.id
+    and resource_row.lifecycle_state = 'published'
+    and resource_row.visibility = 'public';
+
+  if v_version.publication_kind = 'episode' then
+    select show_row.*
+    into strict v_show
+    from editorial.shows show_row
+    join editorial.resources show_resource
+      on show_resource.id = show_row.resource_id
+     and show_resource.resource_kind = 'show'
+     and show_resource.lifecycle_state = 'active'
+     and show_resource.visibility = 'public'
+    where show_row.resource_id = v_version.show_resource_id
+      and show_row.slug = v_show_slug;
+
+    select episode_row.*
+    into strict v_episode
+    from editorial.show_episodes episode_row
+    join editorial.resources episode_resource
+      on episode_resource.id = episode_row.resource_id
+     and episode_resource.resource_kind = 'show_episode'
+     and episode_resource.lifecycle_state = 'active'
+     and episode_resource.visibility = 'public'
+    where episode_row.resource_id = v_version.show_episode_resource_id
+      and episode_row.show_resource_id = v_show.resource_id
+      and episode_row.slug = v_slug;
   end if;
 
   begin
@@ -99,13 +144,9 @@ begin
   end;
 
   select source_row.*
-  into v_source
+  into strict v_source
   from video.sources source_row
   where source_row.id = v_version.source_id;
-
-  if not found then
-    return null;
-  end if;
 
   if v_source.source_kind = 'native_media' then
     select jsonb_build_object(
@@ -136,9 +177,7 @@ begin
 
     select jsonb_build_object(
       'url', file_row.delivery_url,
-      'mime_type', file_row.mime_type,
-      'width', nullif(file_row.technical_metadata->>'width', '')::integer,
-      'height', nullif(file_row.technical_metadata->>'height', '')::integer
+      'mime_type', file_row.mime_type
     )
     into v_poster
     from media.usage_links usage_row
@@ -164,9 +203,7 @@ begin
     if v_poster is null then
       select jsonb_build_object(
         'url', file_row.delivery_url,
-        'mime_type', file_row.mime_type,
-        'width', nullif(file_row.technical_metadata->>'width', '')::integer,
-        'height', nullif(file_row.technical_metadata->>'height', '')::integer
+        'mime_type', file_row.mime_type
       )
       into v_poster
       from media.variants variant_row
@@ -190,28 +227,12 @@ begin
     );
   end if;
 
-  if v_version.publication_kind = 'episode' then
-    if v_show.resource_id is null then
-      select show_row.*, episode_row.*
-      into v_show, v_episode
-      from editorial.shows show_row
-      join editorial.show_episodes episode_row
-        on episode_row.show_resource_id = show_row.resource_id
-       and episode_row.resource_id = v_version.show_episode_resource_id
-      where show_row.resource_id = v_version.show_resource_id;
-    end if;
-
-    if v_show.resource_id is null
-       or v_episode.resource_id is null
-    then
-      return null;
-    end if;
-
-    v_canonical_path :=
-      '/video/' || v_show.slug || '/' || v_episode.slug;
-  else
-    v_canonical_path := '/video/' || v_version.slug_snapshot;
-  end if;
+  v_canonical_path :=
+    case
+      when v_version.publication_kind = 'episode'
+      then '/video/' || v_show.slug || '/' || v_episode.slug
+      else '/video/' || v_version.slug_snapshot
+    end;
 
   select min(event_row.created_at)
   into v_first_published_at
@@ -432,6 +453,9 @@ begin
         and source_row.current_approved_version_id = citation.source_version_id
     ), '[]'::jsonb)
   );
+exception
+  when no_data_found then
+    return null;
 end;
 $function$;
 
