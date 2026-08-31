@@ -45,14 +45,13 @@ function response(
   });
 }
 
-function notFound(method: string, stage = "not_found"): Response {
+function notFound(method: string): Response {
   return response(
     method === "HEAD" ? null : "Not found\n",
     404,
     {
       "Content-Type": "text/plain; charset=utf-8",
       "Cache-Control": "public, max-age=30",
-      "X-Wakilisha-Delivery-Stage": stage,
     },
   );
 }
@@ -206,11 +205,7 @@ serve(async (request) => {
   );
 
   if (error || !data || typeof data !== "object") {
-    console.warn("VIDEO_PUBLIC_DELIVERY_STAGE=caption_target_rpc_failed", {
-      has_error: Boolean(error),
-      has_data: Boolean(data),
-    });
-    return notFound(method, "caption_target_rpc_failed");
+    return notFound(method);
   }
 
   const target = objectValue(data);
@@ -222,19 +217,14 @@ serve(async (request) => {
     || !Number.isFinite(byteSize)
     || byteSize <= 0
   ) {
-    console.warn("VIDEO_PUBLIC_DELIVERY_STAGE=caption_target_invalid", {
-      mime_type: mimeType,
-      byte_size_valid: Number.isFinite(byteSize) && byteSize > 0,
-    });
-    return notFound(method, "caption_target_invalid");
+    return notFound(method);
   }
 
   let storagePath: string;
   try {
     storagePath = privateCaptionPath(target.storage_path);
   } catch {
-    console.warn("VIDEO_PUBLIC_DELIVERY_STAGE=caption_path_invalid");
-    return notFound(method, "caption_path_invalid");
+    return notFound(method);
   }
 
   const signedUrl = await protectedCaptionUrl(storagePath);
@@ -246,11 +236,7 @@ serve(async (request) => {
   });
 
   if (!mediaResponse.ok) {
-    console.warn("VIDEO_PUBLIC_DELIVERY_STAGE=caption_origin_failed", {
-      status: mediaResponse.status,
-      status_text: mediaResponse.statusText,
-    });
-    return notFound(method, "caption_origin_failed");
+    return notFound(method);
   }
 
   const etag = `"${stringValue(target.sha256)}"`;
