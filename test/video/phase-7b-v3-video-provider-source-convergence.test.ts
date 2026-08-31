@@ -23,6 +23,8 @@ const artistVideos = read(
 const desktopArticle = read("src/pages/magazine/article/page.tsx");
 const mobileArticle = read("src/pages/mobile/magazine/article/page.tsx");
 const publicContent = read("supabase/functions/public-content-read/index.ts");
+const publicContentSpec = read("src/data/api-specs/public-content-read.ts");
+const publicContentOpenApi = read("docs/openapi/public-content-read.yaml");
 
 describe("Phase 7B V3 Video provider source convergence", () => {
   it("backfills immutable YouTube source identity without rewriting legacy content", () => {
@@ -99,6 +101,15 @@ describe("Phase 7B V3 Video provider source convergence", () => {
     expect(artistVideos).toContain("<VideoOverlay");
     expect(overlay).toContain('mode === "pip"');
     expect(overlay).toContain('mode === "lightbox"');
+  });
+
+  it("documents canonical provider identity in the public read contract", () => {
+    for (const source of [publicContentSpec, publicContentOpenApi]) {
+      expect(source).toContain("sourceId");
+      expect(source).toContain("providerKey");
+      expect(source).toContain("providerObjectId");
+      expect(source).toContain("canonicalUrl");
+    }
   });
 
   it("records playback analytics against source and provider identity", () => {
