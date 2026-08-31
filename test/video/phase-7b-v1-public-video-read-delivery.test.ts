@@ -108,6 +108,11 @@ describe("Phase 7B V1 public Video read and delivery", () => {
     expect(edge).toContain(
       '"Content-Type": "text/vtt; charset=utf-8"',
     );
+    expect(edge).toContain(
+      "`${expires}\\n${storagePath}`",
+    );
+    expect(edge).toContain('mimeType !== "text/vtt"');
+    expect(edge).not.toContain("mediaResponse.headers");
     expect(edge).toContain('"Access-Control-Allow-Origin": "*"');
     expect(service).toContain(
       "/functions/v1/video-public-delivery",
