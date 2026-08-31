@@ -16,16 +16,15 @@ docs/roadmap/wakilisha-master-programme-map.md
 docs/institute/two-workspace-pilot-audit-and-build-plan.md
 ```
 
-As of 30 August 2026:
+As of 31 August 2026:
 
-- Phases 0 through 6 are complete.
-- Phase 7A Video publication authority is current.
-- The Resource-kernel convergence and post-kernel hardening are closed.
-- K5A governed Video editorial commands/admin reads are production accepted.
-- K5B purpose-built Video Editor composition is production accepted.
-- K5C exact-version shared Credits/Citations is production accepted.
-- K5D shared Corrections/provenance convergence is production accepted at 69 migrations, head `20260830144945_phase_7a_k5d_video_correction_provenance_convergence`, with accepted production/frontend main `af76d476053e9037382feb862efc55972c9049f8`.
-- Phase 7A remains open until one real Video satisfies the canonical internal publication-authority exit gate. The next step is that real Video workflow itself, with Registry, Media, readiness, lifecycle, or review work added only if real use exposes a concrete gap.
+- Phases 0 through 7A are complete.
+- Phase 7A Video publication authority is closed and production accepted.
+- The real exit-gate Video `Monday Morning in September` reached immutable published v8 with a governed Sheng closed-caption track.
+- Final production authority is 75 migrations at head `20260831080826_video_caption_language_private_use_tags`.
+- The accepted frontend main is `a8e10350dccd5a5b1cd5b49001a4cf8839a76bd9`, with the exact production entry `assets/index-S6v7xwyD.js`.
+- Phase 7B Public Video product is now the next numbered phase. Public responsive Video routes, discovery, SEO, and public caption delivery UX remain 7B work.
+- Canonical Phase 7A closure record: `docs/engineering/phase-7a-closure-record.md`.
 
 The roadmap is an orientation tool. Building WAKILISHA naturally exposes adjacent work, and those detours can materially improve the platform. When they do, record what changed and reconcile the map so the project remains understandable.
 
