@@ -31,7 +31,7 @@ function toVideoEmbedData(video: PublicArtistVideo): VideoEmbedData | null {
     providerObjectId,
     canonicalUrl: video.canonicalUrl || legacy?.canonicalUrl || null,
     title: video.title,
-    platform: video.platform || providerLabel(providerKey),
+    platform: providerLabel(providerKey),
     thumbnail: video.thumbnail || null,
   };
 }
