@@ -14,7 +14,7 @@ function readMigration(): string {
 const migration = readMigration();
 const languageTagMigration = fs.readFileSync(
   path.resolve(
-    "supabase/migrations/20260831075437_video_caption_language_private_use_tags.sql",
+    "supabase/migrations/20260831080826_video_caption_language_private_use_tags.sql",
   ),
   "utf8",
 );
