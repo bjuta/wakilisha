@@ -7,6 +7,7 @@ import {
 import { MetaTags } from "@/components/seo/MetaTags";
 import { PublicVideoWatchingSurface } from "@/components/video/PublicVideoWatchingSurface";
 import {
+  getPublicVideoIndex,
   getPublicVideoPublication,
 } from "@/services/video/videoPublicService";
 import type {
@@ -24,6 +25,7 @@ export default function VideoDetailPage() {
   const resolvedShowSlug = episodeSlug ? showSlug || null : null;
   const [publication, setPublication] =
     useState<PublicVideoPublication | null>(null);
+  const [related, setRelated] = useState<PublicVideoPublication[]>([]);
   const [loading, setLoading] = useState(true);
   const [notFound, setNotFound] = useState(false);
 
@@ -32,18 +34,31 @@ export default function VideoDetailPage() {
     setLoading(true);
     setNotFound(false);
     setPublication(null);
+    setRelated([]);
 
-    getPublicVideoPublication(
-      resolvedSlug,
-      resolvedShowSlug,
-    )
-      .then((value) => {
+    Promise.all([
+      getPublicVideoPublication(
+        resolvedSlug,
+        resolvedShowSlug,
+      ),
+      getPublicVideoIndex(24).catch(() => ({ items: [] })),
+    ])
+      .then(([value, index]) => {
         if (!alive) return;
         if (!value) {
           setNotFound(true);
           return;
         }
         setPublication(value);
+        setRelated(
+          index.items.filter((item) => {
+            if (item.versionId === value.versionId) return false;
+            if (value.show?.resourceId) {
+              return item.show?.resourceId === value.show.resourceId;
+            }
+            return true;
+          }),
+        );
       })
       .catch(() => {
         if (alive) setNotFound(true);
@@ -59,11 +74,17 @@ export default function VideoDetailPage() {
 
   if (loading) {
     return (
-      <main className="min-h-screen bg-wk-bg px-4 py-12 text-wk-text sm:px-6">
-        <div className="mx-auto max-w-6xl">
-          <div className="h-4 w-36 animate-pulse rounded bg-wk-surface" />
-          <div className="mt-5 h-14 max-w-2xl animate-pulse rounded-2xl bg-wk-surface" />
-          <div className="mt-8 aspect-video animate-pulse rounded-[28px] bg-black/80" />
+      <main className="min-h-screen bg-[var(--wk-bg)] text-[var(--wk-text)]">
+        <div className="border-b border-[var(--wk-border)]">
+          <div className="mx-auto h-14 max-w-[1180px] px-4 sm:px-6" />
+        </div>
+        <div className="mx-auto max-w-[1180px] sm:px-6">
+          <div className="aspect-video animate-pulse bg-black/85 sm:mt-6 sm:rounded-[24px]" />
+          <div className="px-5 py-7 sm:px-0">
+            <div className="h-3 w-36 animate-pulse rounded bg-[var(--wk-surface)]" />
+            <div className="mt-3 h-12 max-w-xl animate-pulse rounded-xl bg-[var(--wk-surface)]" />
+            <div className="mt-4 h-4 max-w-sm animate-pulse rounded bg-[var(--wk-surface)]" />
+          </div>
         </div>
       </main>
     );
@@ -88,7 +109,10 @@ export default function VideoDetailPage() {
         url={`https://wakilisha.africa${publication.canonicalPath}`}
         imageUrl={publication.poster?.url || undefined}
       />
-      <PublicVideoWatchingSurface publication={publication} />
+      <PublicVideoWatchingSurface
+        publication={publication}
+        related={related}
+      />
     </>
   );
 }
