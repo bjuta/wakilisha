@@ -5,8 +5,9 @@ import {
   VideoCard,
   VideoOverlay,
   useVideoPlayer,
-  detectPlatform,
-  getThumbnail,
+  parseLegacyProviderUrl,
+  providerLabel,
+  providerSourceKey,
   type VideoEmbedData,
   type VideoPlayEvent,
 } from "@/components/video";
@@ -16,31 +17,46 @@ interface ArtistVideosProps {
   artistSlug?: string;
 }
 
-function toVideoEmbedData(video: PublicArtistVideo): VideoEmbedData {
+function toVideoEmbedData(video: PublicArtistVideo): VideoEmbedData | null {
+  const legacy = video.url ? parseLegacyProviderUrl(video.url) : null;
+  const providerKey = video.providerKey || legacy?.providerKey || "";
+  const providerObjectId =
+    video.providerObjectId || legacy?.providerObjectId || "";
+
+  if (!providerKey || !providerObjectId) return null;
+
   return {
-    url: video.url,
+    sourceId: video.sourceId || legacy?.sourceId || null,
+    providerKey,
+    providerObjectId,
+    canonicalUrl: video.canonicalUrl || legacy?.canonicalUrl || null,
     title: video.title,
-    platform: video.platform || detectPlatform(video.url),
-    thumbnail: video.thumbnail || getThumbnail(video.url),
+    platform: video.platform || providerLabel(providerKey),
+    thumbnail: video.thumbnail || null,
   };
 }
 
 export function ArtistVideos({ videos, artistSlug }: ArtistVideosProps) {
-  const videoEmbeds = videos.map(toVideoEmbedData);
+  const videoEmbeds = videos
+    .map(toVideoEmbedData)
+    .filter((video): video is VideoEmbedData => video !== null);
 
-  const handleVideoEvent = (ev: VideoPlayEvent) => {
+  const handleVideoEvent = (event: VideoPlayEvent) => {
     trackEvent("video_play", {
       pageType: "artist_detail",
       entitySlug: artistSlug,
       entityType: "artist",
       context: {
-        action: ev.action,
-        video_url: ev.videoUrl,
-        platform: ev.platform,
-        video_title: ev.videoTitle,
-        video_index: ev.index,
-        total_videos: videos.length,
-        opened_at: ev.openedAt,
+        action: event.action,
+        video_source_id: event.videoSourceId,
+        provider_key: event.providerKey,
+        provider_object_id: event.providerObjectId,
+        canonical_url: event.canonicalUrl,
+        platform: event.platform,
+        video_title: event.videoTitle,
+        video_index: event.index,
+        total_videos: videoEmbeds.length,
+        opened_at: event.openedAt,
         source_section: "artist_videos",
       },
     });
@@ -55,9 +71,10 @@ export function ArtistVideos({ videos, artistSlug }: ArtistVideosProps) {
   } = useVideoPlayer(videoEmbeds, handleVideoEvent);
   const { ref, revealed } = useScrollReveal<HTMLElement>(0.1);
 
-  const activeVideo = activeIndex !== null ? videoEmbeds[activeIndex] : null;
+  const activeVideo =
+    activeIndex !== null ? videoEmbeds[activeIndex] : null;
 
-  if (!videos || videos.length === 0) return null;
+  if (videoEmbeds.length === 0) return null;
 
   return (
     <section
@@ -74,16 +91,16 @@ export function ArtistVideos({ videos, artistSlug }: ArtistVideosProps) {
 
         <span className="inline-flex items-center gap-2 rounded-full border border-[var(--wk-border)] bg-[var(--wk-surface)] px-4 py-2 text-[12px] font-bold text-[var(--wk-text-muted)]">
           <i className="ri-film-line text-[13px]" />
-          {videos.length} {videos.length === 1 ? "video" : "videos"}
+          {videoEmbeds.length} {videoEmbeds.length === 1 ? "video" : "videos"}
         </span>
       </div>
 
       <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3">
-        {videoEmbeds.map((video, idx) => (
+        {videoEmbeds.map((video, index) => (
           <VideoCard
-            key={video.url}
+            key={video.sourceId || providerSourceKey(video)}
             video={video}
-            index={idx}
+            index={index}
             total={videoEmbeds.length}
             onPlay={handlePlay}
             className=""
@@ -91,7 +108,7 @@ export function ArtistVideos({ videos, artistSlug }: ArtistVideosProps) {
         ))}
       </div>
 
-      {activeVideo && (
+      {activeVideo ? (
         <VideoOverlay
           video={activeVideo}
           videos={videoEmbeds}
@@ -99,7 +116,7 @@ export function ArtistVideos({ videos, artistSlug }: ArtistVideosProps) {
           onChangeMode={handleChangeMode}
           onNavigate={handleNavigate}
         />
-      )}
+      ) : null}
     </section>
   );
 }
