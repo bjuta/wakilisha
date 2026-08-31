@@ -1,6 +1,6 @@
 # Phase 7B V3 Video Provider Source Convergence Implementation Audit
 
-Status: CANDIDATE BUILT, PREVIEW AUTHORITY NOT YET SEALED
+Status: PREVIEW AUTHORITY SEALED, LOCAL PRE-PR GATES PENDING
 
 Accepted base main: `b6886d9fb6695e33494036e04118ed6e7b9d6ad7`
 
@@ -201,22 +201,74 @@ Focused regression:
 
 Critical Control Plane now has an explicit V3 enforcement step after V2.
 
-## Preview gate
+## Preview proof
 
-The candidate has not yet been applied to a disposable Supabase preview.
+The existing disposable Phase 7B preview was reused rather than creating redundant infrastructure.
 
-The next required gate is the established WAKILISHA preview workflow:
+Preview ref:
 
-1. Price and explicitly approve one disposable branch.
-2. Create a fresh preview.
-3. Prove the existing 76-migration baseline replays cleanly.
-4. Stop if baseline replay fails.
-5. Apply the V3 candidate only after healthy baseline.
-6. Run the permanent verifier.
-7. Verify the current provider evidence coverage.
-8. Regenerate any schema seal required by the control plane.
-9. Run focused tests and the application build.
-10. Only then open the PR.
+`qibfvikjievhmcpjlvfb`
+
+The preview began at the accepted production baseline:
+
+- 76 migrations
+- migration head `20260831111643`
+- no external provider rows in `video.sources`
+
+A disposable Article fixture exercised four YouTube shapes:
+
+- watch URL: `AbCdEfGhI12`
+- YouTube nocookie embed: `QwErTyUiO34`
+- short link: `ZxCvBnMmN56`
+- Shorts URL: `XyZaBcDeF90`
+
+A disposable Artist fixture exercised:
+
+- direct provider object ID: `QwErTyUiO34`
+- watch URL: `LmNoPqRsT78`
+- object URL field: `NmOpQrStU91`
+
+The overlap makes the expected fixture union six provider identities.
+
+The first migration rehearsal exposed a candidate defect: SQL regular expressions in both the migration and verifier contained doubled backslashes. Only the direct Artist ID migrated, and the verifier falsely passed because it repeated the same faulty parser.
+
+The stopped state was diagnosed before any retry. The migration and verifier were repaired in source, and the focused V3 test now ratchets the SQL escape shape to prevent recurrence.
+
+A platform branch reset was attempted once and failed inside the Supabase branch-action workflow. It was not retried. The exact three candidate artifacts on the disposable preview were rewound surgically: the one candidate source row, the resolver function, and the preview-only migration-history entry. The preview was independently confirmed back at the 76-migration baseline with fixtures preserved.
+
+The repaired, byte-current candidate then passed:
+
+- six of six fixture provider identities materialized
+- Article and Artist evidence flags were correct
+- resolver returned six of six requested identities
+- anonymous resolver execution: denied
+- authenticated resolver execution: denied
+- service-role resolver execution: allowed
+- permanent read-only verifier: PASS
+
+The candidate `public-content-read` Edge Function was then deployed to the preview as version 76 with its prior JWT setting preserved.
+
+Runtime smoke through the preview Edge Function passed:
+
+- fixture Article endpoint: HTTP 200
+- Article response preserved legacy HTML and returned four canonical `videoSources`
+- fixture Artist endpoint: HTTP 200
+- Artist response returned three canonical Video source descriptors
+
+Supabase security and performance advisors were run after the candidate DDL. No advisor finding references the new resolver. The only findings involving `video.sources` are pre-existing informational notices: RLS enabled with no table policy, consistent with the private authority boundary, and an unrelated native Media foreign-key indexing advisory.
+
+The preview remains intentionally available until the promotion and production smoke gates are complete. Disposable fixtures will disappear with final preview deletion rather than weakening immutable governance to delete them individually.
+
+## Remaining pre-PR gate
+
+Preview authority is sealed. The remaining gate before PR is repository-local verification:
+
+1. focused V1, V2, and V3 Video tests
+2. directly affected analytics/public-content checks
+3. changed-copy mechanical checks
+4. `git diff --check`
+5. `npm run build:app`
+6. exact changed-scope inspection
 
 ## Production impact
 
