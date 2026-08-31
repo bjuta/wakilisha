@@ -40,8 +40,10 @@ type AuditCandidate = {
   primaryArtistSlugs: string[];
   featuredCredits: TrackFeaturedCredit[];
   proposal: TrackStewardProposal;
+  effectiveProposal: TrackStewardProposal;
   automatic: boolean;
   blockedReason: string | null;
+  routeDeferredReason: string | null;
   redirectConflict: string | null;
 };
 
@@ -217,6 +219,7 @@ async function auditTrackPage(
     deferred: number;
     collisionBlocked: number;
     redirectBlocked: number;
+    routeDeferred: number;
     missingPrimaryArtist: number;
   };
 }> {
@@ -252,6 +255,7 @@ async function auditTrackPage(
         deferred: 0,
         collisionBlocked: 0,
         redirectBlocked: 0,
+        routeDeferred: 0,
         missingPrimaryArtist: 0,
       },
     };
@@ -423,6 +427,7 @@ async function auditTrackPage(
     deferred: 0,
     collisionBlocked: 0,
     redirectBlocked: 0,
+    routeDeferred: 0,
     missingPrimaryArtist: 0,
   };
 
@@ -430,7 +435,9 @@ async function auditTrackPage(
     (item) => {
       let automatic =
         item.proposal.decision === "auto_apply";
+      let effectiveProposal = item.proposal;
       let blockedReason: string | null = null;
+      let routeDeferredReason: string | null = null;
       let redirectConflict: string | null = null;
 
       if (item.proposal.decision === "noop") {
@@ -467,31 +474,64 @@ async function auditTrackPage(
         });
 
         if (collision) {
-          automatic = false;
-          blockedReason = "same_artist_slug_collision";
-          counts.collisionBlocked += 1;
+          if (item.proposal.evidence.titleChanged) {
+            effectiveProposal = {
+              ...item.proposal,
+              proposedSlug: item.track.slug,
+              evidence: {
+                ...item.proposal.evidence,
+                currentSlugMatchesCanonical: false,
+                slugChanged: false,
+              },
+            };
+            routeDeferredReason =
+              "same_artist_slug_collision";
+            counts.routeDeferred += 1;
+          } else {
+            automatic = false;
+            blockedReason =
+              "same_artist_slug_collision";
+            counts.collisionBlocked += 1;
+          }
         }
       }
 
       if (
         automatic &&
-        item.track.slug !== item.proposal.proposedSlug
+        item.track.slug !== effectiveProposal.proposedSlug
       ) {
         for (const artistSlug of item.primaryArtistSlugs) {
           const oldPath =
             `/tracks/${artistSlug}/${item.track.slug}`;
           const expectedNewPath =
-            `/tracks/${artistSlug}/${item.proposal.proposedSlug}`;
+            `/tracks/${artistSlug}/${effectiveProposal.proposedSlug}`;
           const existing = redirectsByPath.get(oldPath);
 
           if (
             existing?.new_path &&
             existing.new_path !== expectedNewPath
           ) {
-            automatic = false;
-            blockedReason = "redirect_conflict";
             redirectConflict = oldPath;
-            counts.redirectBlocked += 1;
+
+            if (item.proposal.evidence.titleChanged) {
+              effectiveProposal = {
+                ...item.proposal,
+                proposedSlug: item.track.slug,
+                evidence: {
+                  ...item.proposal.evidence,
+                  currentSlugMatchesCanonical: false,
+                  slugChanged: false,
+                },
+              };
+              routeDeferredReason =
+                "redirect_conflict";
+              counts.routeDeferred += 1;
+            } else {
+              automatic = false;
+              blockedReason = "redirect_conflict";
+              counts.redirectBlocked += 1;
+            }
+
             break;
           }
         }
@@ -506,8 +546,10 @@ async function auditTrackPage(
         primaryArtistSlugs: item.primaryArtistSlugs,
         featuredCredits: item.featuredCredits,
         proposal: item.proposal,
+        effectiveProposal,
         automatic,
         blockedReason,
+        routeDeferredReason,
         redirectConflict,
       };
     },
@@ -551,13 +593,16 @@ async function applyTrackCandidates(
         p_track_id: candidate.trackId,
         p_expected_slug: candidate.slug,
         p_expected_title: candidate.title,
-        p_new_slug: candidate.proposal.proposedSlug,
-        p_new_title: candidate.proposal.proposedTitle,
+        p_new_slug:
+          candidate.effectiveProposal.proposedSlug,
+        p_new_title:
+          candidate.effectiveProposal.proposedTitle,
         p_new_normalized_title:
-          candidate.proposal.proposedNormalizedTitle,
-        p_rule_key: candidate.proposal.ruleKey,
+          candidate.effectiveProposal.proposedNormalizedTitle,
+        p_rule_key:
+          candidate.effectiveProposal.ruleKey,
         p_rule_version:
-          candidate.proposal.ruleVersion,
+          candidate.effectiveProposal.ruleVersion,
         p_evidence: {
           structural_featured_names:
             candidate.proposal.structuralFeaturedNames,
@@ -565,6 +610,10 @@ async function applyTrackCandidates(
             candidate.featuredCredits,
           primary_artist_slugs:
             candidate.primaryArtistSlugs,
+          canonical_proposed_slug:
+            candidate.proposal.proposedSlug,
+          route_deferred_reason:
+            candidate.routeDeferredReason,
           decision_source:
             "registry-steward-v1",
         },
