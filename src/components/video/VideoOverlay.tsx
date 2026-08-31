@@ -3,6 +3,7 @@ import { createPortal } from "react-dom";
 import { useScrollLock } from "@/hooks/useScrollLock";
 import { VideoPlaybackCanvas } from "./VideoPlaybackCanvas";
 import { platformIcon } from "./types";
+import { providerSourceKey } from "./providerSource";
 import type { VideoEmbedData, VideoMode } from "./types";
 
 interface VideoOverlayProps {
@@ -183,7 +184,10 @@ export function VideoOverlay({
     };
   }, [dragging]);
 
-  const currentIndex = videos.findIndex((v) => v.url === video.url);
+  const currentKey = providerSourceKey(video);
+  const currentIndex = videos.findIndex(
+    (candidate) => providerSourceKey(candidate) === currentKey,
+  );
   const hasPrev = currentIndex > 0;
   const hasNext = currentIndex < videos.length - 1;
 
@@ -348,8 +352,10 @@ export function VideoOverlay({
               <VideoPlaybackCanvas
                 source={{
                   kind: "provider",
-                  embedUrl: video.url,
-                  providerKey: video.platform,
+                  sourceId: video.sourceId,
+                  providerKey: video.providerKey,
+                  providerObjectId: video.providerObjectId,
+                  canonicalUrl: video.canonicalUrl,
                 }}
                 title={video.title}
                 className="absolute inset-0"
