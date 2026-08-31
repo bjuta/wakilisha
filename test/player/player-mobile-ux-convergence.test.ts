@@ -92,10 +92,10 @@ describe("Player and mobile media UX convergence", () => {
       "<MobileTopBar",
     );
     expect(mobileLayout).toContain(
-      "scrollVisible={scrollVisible}",
+      "scrollVisible={scrollChrome.topVisible}",
     );
     expect(mobileLayout).toContain(
-      "const scrollVisible = useScrollDirection();",
+      "const scrollChrome = useScrollDirection();",
     );
     expect(mobileTopBar).not.toContain("useScrollDirection()");
     expect(mobileTopBar).toContain("translateY(-16px)");
@@ -125,6 +125,7 @@ describe("Player and mobile media UX convergence", () => {
 
   it("makes expanded Player top chrome use the same mobile scroll formula", () => {
     expect(topBar).toContain("useScrollDirection()");
+    expect(topBar).toContain("scrollChrome.topVisible");
     expect(topBar).toContain("translateY(-16px)");
     expect(topBar).toContain("pointer-events-none");
     expect(topBar).toContain("bg-black/20");
