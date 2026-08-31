@@ -43,9 +43,6 @@ export function PublicVideoCard({
         duration={duration}
         compact={compact}
       />
-      {compact ? (
-        <div className="ml-[144px] -mt-8 hidden min-w-0 sm:ml-[168px]" />
-      ) : null}
     </Link>
   );
 }
