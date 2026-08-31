@@ -93,6 +93,9 @@ export function VideoPlaybackCanvas({
   const [duration, setDuration] = useState(0);
   const [playbackRate, setPlaybackRate] = useState(1);
   const [fullscreen, setFullscreen] = useState(false);
+  const [controlsVisible, setControlsVisible] = useState(true);
+  const [activeCueLines, setActiveCueLines] = useState<string[]>([]);
+  const controlsHideTimerRef = useRef<number | null>(null);
 
   const syncCaptionTracks = useCallback(() => {
     const element = videoRef.current;
@@ -102,7 +105,7 @@ export function VideoPlaybackCanvas({
       const caption = captions[index];
       textTrack.mode =
         caption && caption.trackNumber === activeCaptionTrack
-          ? "showing"
+          ? "hidden"
           : "disabled";
     }
   }, [activeCaptionTrack, captions, videoRef]);
@@ -110,6 +113,124 @@ export function VideoPlaybackCanvas({
   useEffect(() => {
     syncCaptionTracks();
   }, [syncCaptionTracks]);
+
+  useEffect(() => {
+    const element = videoRef.current;
+    if (!element || source.kind !== "native") {
+      setActiveCueLines([]);
+      return;
+    }
+
+    const readActiveCues = () => {
+      if (activeCaptionTrack === null) {
+        setActiveCueLines([]);
+        return;
+      }
+
+      const selectedIndex = captions.findIndex(
+        (caption) => caption.trackNumber === activeCaptionTrack,
+      );
+      const selectedTrack =
+        selectedIndex >= 0
+          ? element.textTracks[selectedIndex]
+          : null;
+      const activeCues = selectedTrack?.activeCues;
+
+      if (!selectedTrack || !activeCues) {
+        setActiveCueLines([]);
+        return;
+      }
+
+      const lines: string[] = [];
+      for (let index = 0; index < activeCues.length; index += 1) {
+        const cue = activeCues[index];
+        if (cue && "text" in cue) {
+          const vttCue = cue as VTTCue;
+          const htmlText =
+            typeof vttCue.getCueAsHTML === "function"
+              ? vttCue.getCueAsHTML().textContent
+              : null;
+          const text = (htmlText || vttCue.text || "").trim();
+          if (text) lines.push(text);
+        }
+      }
+      setActiveCueLines(lines);
+    };
+
+    const bindCueListeners = () => {
+      syncCaptionTracks();
+      for (let index = 0; index < element.textTracks.length; index += 1) {
+        element.textTracks[index].removeEventListener(
+          "cuechange",
+          readActiveCues,
+        );
+        element.textTracks[index].addEventListener(
+          "cuechange",
+          readActiveCues,
+        );
+      }
+      readActiveCues();
+    };
+
+    bindCueListeners();
+    element.textTracks.addEventListener("addtrack", bindCueListeners);
+
+    return () => {
+      element.textTracks.removeEventListener("addtrack", bindCueListeners);
+      for (let index = 0; index < element.textTracks.length; index += 1) {
+        element.textTracks[index].removeEventListener(
+          "cuechange",
+          readActiveCues,
+        );
+      }
+    };
+  }, [
+    activeCaptionTrack,
+    captions,
+    source.kind,
+    syncCaptionTracks,
+    videoRef,
+  ]);
+
+  const clearControlsHideTimer = useCallback(() => {
+    if (controlsHideTimerRef.current !== null) {
+      window.clearTimeout(controlsHideTimerRef.current);
+      controlsHideTimerRef.current = null;
+    }
+  }, []);
+
+  const revealControls = useCallback(() => {
+    setControlsVisible(true);
+    clearControlsHideTimer();
+    if (playing && !settingsOpen && !compact) {
+      controlsHideTimerRef.current = window.setTimeout(() => {
+        setControlsVisible(false);
+        controlsHideTimerRef.current = null;
+      }, 2400);
+    }
+  }, [
+    clearControlsHideTimer,
+    compact,
+    playing,
+    settingsOpen,
+  ]);
+
+  useEffect(() => {
+    if (!playing || settingsOpen || compact) {
+      clearControlsHideTimer();
+      setControlsVisible(true);
+      return;
+    }
+
+    revealControls();
+    return clearControlsHideTimer;
+  }, [
+    clearControlsHideTimer,
+    compact,
+    playing,
+    revealControls,
+    settingsOpen,
+  ]);
 
   useEffect(() => {
     const onFullscreenChange = () => {
@@ -187,6 +308,7 @@ export function VideoPlaybackCanvas({
     } else if (event.key === "Escape" && settingsOpen) {
       setSettingsOpen(false);
     }
+    revealControls();
   };
 
   if (source.kind === "provider") {
@@ -253,6 +375,9 @@ export function VideoPlaybackCanvas({
       ref={shellRef}
       tabIndex={0}
       onKeyDown={handleKeyboard}
+      onPointerMove={revealControls}
+      onPointerDown={revealControls}
+      onFocus={revealControls}
       className={joinClasses(
         "group relative h-full w-full overflow-hidden bg-black text-white outline-none",
         className,
@@ -266,7 +391,13 @@ export function VideoPlaybackCanvas({
         preload="metadata"
         poster={source.poster || undefined}
         className="block max-h-[78svh] min-h-[220px] w-full bg-black object-contain sm:max-h-[76vh]"
-        onClick={() => void togglePlay()}
+        onClick={() => {
+          if (!controlsVisible && playing) {
+            revealControls();
+            return;
+          }
+          void togglePlay();
+        }}
         onLoadedMetadata={(event) => {
           setDuration(event.currentTarget.duration || 0);
           setMuted(event.currentTarget.muted);
@@ -288,14 +419,32 @@ export function VideoPlaybackCanvas({
             src={caption.src}
             srcLang={caption.languageTag}
             label={caption.label}
-            default={caption.isDefault}
-            onLoad={syncCaptionTracks}
+            onLoad={() => {
+              syncCaptionTracks();
+              revealControls();
+            }}
           />
         ))}
         Your browser does not support HTML video.
       </video>
 
-      {!compact && onCollapse ? (
+      {activeCueLines.length ? (
+        <div
+          className={joinClasses(
+            "pointer-events-none absolute inset-x-0 z-20 flex justify-center px-5 transition-[bottom] duration-200",
+            controlsVisible || settingsOpen || !playing
+              ? "bottom-24 sm:bottom-28"
+              : "bottom-6",
+          )}
+          data-wk-video-captions="active"
+        >
+          <div className="max-w-[88%] whitespace-pre-line rounded-lg bg-black/78 px-3 py-1.5 text-center text-[16px] font-semibold leading-snug text-white shadow-lg [text-shadow:0_1px_2px_rgba(0,0,0,0.95)] sm:max-w-[72%] sm:text-[18px]">
+            {activeCueLines.join("\n")}
+          </div>
+        </div>
+      ) : null}
+
+      {!compact && onCollapse && (controlsVisible || settingsOpen || !playing) ? (
         <div className="pointer-events-none absolute inset-x-0 top-0 bg-gradient-to-b from-black/60 via-black/10 to-transparent p-3 sm:p-4">
           <button
             type="button"
@@ -388,7 +537,15 @@ export function VideoPlaybackCanvas({
         </div>
       ) : null}
 
-      <div className="pointer-events-none absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/90 via-black/55 to-transparent px-3 pb-3 pt-16 sm:px-4 sm:pb-4">
+      <div
+        className={joinClasses(
+          "pointer-events-none absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/90 via-black/55 to-transparent px-3 pb-3 pt-16 transition-opacity duration-200 sm:px-4 sm:pb-4",
+          controlsVisible || settingsOpen || !playing
+            ? "opacity-100"
+            : "opacity-0",
+        )}
+        aria-hidden={playing && !controlsVisible && !settingsOpen}
+      >
         {!compact ? (
           <div className="pointer-events-auto mb-3">
             <input

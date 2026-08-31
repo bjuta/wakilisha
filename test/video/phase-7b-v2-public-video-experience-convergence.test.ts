@@ -45,10 +45,16 @@ describe("Phase 7B V2 public Video experience convergence", () => {
     expect(canvas).toContain("Captions");
     expect(canvas).toContain("caption.label");
     expect(canvas).toContain('crossOrigin="anonymous"');
-    expect(canvas).toContain("onLoad={syncCaptionTracks}");
+    expect(canvas).toContain("onLoad={() => {");
+    expect(canvas).toContain("syncCaptionTracks();");
     expect(canvas).toContain("textTrack.mode =");
-    expect(canvas).toContain('"showing"');
+    expect(canvas).toContain('"hidden"');
     expect(canvas).toContain('"disabled"');
+    expect(canvas).toContain("activeCueLines");
+    expect(canvas).toContain('data-wk-video-captions="active"');
+    expect(canvas).toContain('activeCues[index]');
+    expect(canvas).not.toContain('"showing"');
+    expect(canvas).not.toContain("default={caption.isDefault}");
     expect(canvas).not.toContain('aria-label="Captions"');
     expect(watching).not.toContain("defaultCaption.label");
     expect(watching).not.toContain(">CC<");
@@ -66,6 +72,11 @@ describe("Phase 7B V2 public Video experience convergence", () => {
     expect(canvas).toContain("Set playback speed to");
     expect(canvas).toContain("Enter fullscreen");
     expect(canvas).toContain("Video progress");
+    expect(canvas).toContain("controlsHideTimerRef");
+    expect(canvas).toContain("2400");
+    expect(canvas).toContain('"opacity-0"');
+    expect(canvas).toContain("onPointerMove={revealControls}");
+    expect(canvas).toContain("onPointerDown={revealControls}");
   });
 
   it("compounds the existing collapse and expand interaction into canonical Video", () => {
