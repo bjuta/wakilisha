@@ -21474,6 +21474,15 @@ export type Database = {
         Returns: Json
       }
       get_public_track_lyrics: { Args: { p_track_id: string }; Returns: Json }
+      get_public_video_caption_delivery_target: {
+        Args: { p_publication_version_id: string; p_track_number: number }
+        Returns: Json
+      }
+      get_public_video_index: { Args: { p_limit?: number }; Returns: Json }
+      get_public_video_publication: {
+        Args: { p_show_slug?: string; p_slug: string }
+        Returns: Json
+      }
       get_release_artists_for_anon: {
         Args: { p_artist_slug: string }
         Returns: {
