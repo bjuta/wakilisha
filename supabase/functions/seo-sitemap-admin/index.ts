@@ -949,12 +949,19 @@ async function buildInternalItems(db: ReturnType<typeof createClient>): Promise<
       discNumber: number;
     }>
   >();
+  const releaseTrackCountByReleaseId =
+    new Map<string, number>();
 
   for (const row of releaseTracks.data ?? []) {
     const trackId = String(row.track_id || "").trim();
     const releaseId = String(row.release_id || "").trim();
 
     if (!trackId || !releaseId) continue;
+
+    releaseTrackCountByReleaseId.set(
+      releaseId,
+      (releaseTrackCountByReleaseId.get(releaseId) || 0) + 1,
+    );
 
     const memberships =
       releaseMembershipsByTrackId.get(trackId) || [];
@@ -990,6 +997,12 @@ async function buildInternalItems(db: ReturnType<typeof createClient>): Promise<
   }
 
   for (const row of releases.data ?? []) {
+    if (
+      (releaseTrackCountByReleaseId.get(String(row.id)) || 0) <= 1
+    ) {
+      continue;
+    }
+
     const meta = (row.metadata || {}) as Record<string, unknown>;
     const linkedArtist = releaseArtistByReleaseId.get(String(row.id));
     const artistSlug = String(meta.primary_artist_slug || meta.artist_slug || linkedArtist?.slug || "").trim();
@@ -1027,6 +1040,12 @@ async function buildInternalItems(db: ReturnType<typeof createClient>): Promise<
     }> = [];
 
     for (const membership of memberships) {
+      if (
+        (releaseTrackCountByReleaseId.get(membership.releaseId) || 0) <= 1
+      ) {
+        continue;
+      }
+
       const release =
         releaseById.get(membership.releaseId);
       const releaseSlug =

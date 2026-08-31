@@ -1,5 +1,5 @@
 import { useEffect, useState, useCallback } from "react";
-import { useParams, Link } from "react-router-dom";
+import { useParams, Link, useNavigate } from "react-router-dom";
 import { WkIcon } from "@/components/design-system/Icon";
 import { WkButton } from "@/components/design-system/primitives/Button";
 import { MetaTags } from "@/components/seo/MetaTags";
@@ -9,6 +9,7 @@ import { useScrollReveal } from "@/hooks/useScrollReveal";
 import { useScrollDepthTracking } from "@/hooks/useScrollDepthTracking";
 import { getRelease, listReleases, releaseUrl, slugify, type PublicReleaseDetail, type PublicRelease } from "@/services/publicContent/client";
 import { buildReleaseSeoDescription, releaseEmptyStateCopy } from "@/services/cultureContext/releaseAdapters";
+import { trackUrl } from "@/utils/trackUrl";
 import ReleaseDetailHero from "./components/ReleaseDetailHero";
 import ReleaseTracklist from "./components/ReleaseTracklist";
 import ReleaseMetadata from "./components/ReleaseMetadata";
@@ -27,6 +28,7 @@ import { useAuthUser } from "@/hooks/useAuthUser";
 
 export default function ReleaseDetail() {
   const { artistSlug, releaseSlug } = useParams<{ artistSlug: string; releaseSlug: string }>();
+  const navigate = useNavigate();
   const user = useAuthUser();
 
   useScrollDepthTracking({
@@ -57,6 +59,17 @@ export default function ReleaseDetail() {
         listReleases(),
       ]);
       if (data) {
+        if (data.trackCount <= 1 && data.tracks[0]) {
+          navigate(
+            trackUrl(
+              data.tracks[0].slug,
+              [artistSlug],
+            ),
+            { replace: true },
+          );
+          return;
+        }
+
         setRelease(data);
         const rel = allReleases
           .filter((r) => r.slug !== releaseSlug && (r.artist === data.artist || r.labelName === data.labelName || r.releaseType === data.releaseType))
@@ -70,7 +83,7 @@ export default function ReleaseDetail() {
     }
     setStatus("error");
     setError("We do not have this release page ready yet.");
-  }, [artistSlug, releaseSlug]);
+  }, [artistSlug, releaseSlug, navigate]);
 
   useEffect(() => {
     let alive = true;

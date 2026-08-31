@@ -12,7 +12,7 @@ import TrackLyricsSection from "./components/TrackLyricsSection";
 import TrackRelatedTracks from "./components/TrackRelatedTracks";
 import TrackReleaseTracklist from "./components/TrackReleaseTracklist";
 import { releaseUrl } from "@/utils/releaseUrl";
-import { releaseTrackUrl, trackUrl } from "@/utils/trackUrl";
+import { canonicalTrackUrl, releaseTrackUrl, trackUrl } from "@/utils/trackUrl";
 import { WkIcon } from "@/components/design-system/Icon";
 import { PlayableArtwork } from "@/components/design-system/music/PlayableArtwork";
 import { TrackActionsMenu } from "@/components/tracks/TrackActionsMenu";
@@ -455,11 +455,14 @@ function TrackAlbumContextSection({
   isPlaying: boolean;
   canPlay: boolean;
 }) {
-  if (!vm.albumTitle) return null;
+  if (!vm.albumTitle || vm.albumTotalTracks <= 1) return null;
 
-  const trackActionsHref = vm.albumSlug && (vm.albumArtistSlug || vm.artistSlug)
-    ? releaseTrackUrl(vm.albumArtistSlug || vm.artistSlug, vm.albumSlug, vm.slug)
-    : trackUrl(vm.slug, vm.artistSlug ? [vm.artistSlug] : []);
+  const trackActionsHref = canonicalTrackUrl(
+    vm.albumArtistSlug || vm.artistSlug,
+    vm.slug,
+    vm.albumSlug,
+    vm.albumTotalTracks,
+  );
   const artistNames = vm.artists.length > 0
     ? vm.artists.map((artist) => artist.name).filter(Boolean).join(", ")
     : vm.artist;
@@ -596,9 +599,10 @@ function ChartKpiGrid({ vm }: { vm: TrackViewModel }) {
 function TrackSidebar({ vm }: { vm: TrackViewModel }) {
   const hasChartData = vm.weeksOnChart > 0 || vm.peakPosition > 0;
   const released = vm.releaseDate ? formatDate(vm.releaseDate) : vm.releaseYear || "Unknown";
-  const trackNumber = vm.albumTrackNumber > 0
-    ? `${vm.albumTrackNumber}${vm.albumTotalTracks > 0 ? ` of ${vm.albumTotalTracks}` : ""}`
-    : "Unknown";
+  const trackNumber =
+    vm.albumTotalTracks > 1 && vm.albumTrackNumber > 0
+      ? `${vm.albumTrackNumber} of ${vm.albumTotalTracks}`
+      : "";
 
   return (
     <aside className="space-y-5 lg:sticky lg:top-[88px] lg:self-start">
@@ -610,7 +614,7 @@ function TrackSidebar({ vm }: { vm: TrackViewModel }) {
         <div className="space-y-3 text-[12px] font-semibold text-[var(--wk-text-muted)]">
           {vm.duration > 0 && <InfoRow label="Duration" value={formatDuration(vm.duration)} />}
           <InfoRow label="Released" value={released} />
-          <InfoRow label="Track" value={trackNumber} />
+          {trackNumber && <InfoRow label="Track" value={trackNumber} />}
           {vm.genre && vm.genre !== "Unknown" && <InfoRow label="Sound" value={vm.genre} />}
           {vm.label && vm.label !== "Unknown" && <InfoRow label="Label" value={vm.label} />}
         </div>
@@ -833,7 +837,18 @@ export default function TrackDetail() {
     setTrackSaved(false);
     setTrackSaveError(null);
     const request = releaseSlug
-      ? getReleaseTrack(artistSlug, releaseSlug, trackSlug)
+      ? getReleaseTrack(
+          artistSlug,
+          releaseSlug,
+          trackSlug,
+        ).then(
+          async (scopedTrack) =>
+            scopedTrack ||
+            getTrack(
+              artistSlug,
+              trackSlug,
+            ),
+        )
       : getTrack(artistSlug, trackSlug);
 
     request
@@ -901,8 +916,30 @@ export default function TrackDetail() {
           nextTrack.slug ||
           trackSlug;
 
+        const standalonePath = trackUrl(
+          scopedTrackSlug,
+          scopedArtistSlug
+            ? [scopedArtistSlug]
+            : [],
+        );
+        const hasPublicRelease =
+          nextTrack.albumTotalTracks > 1;
+
+        if (
+          releaseSlug &&
+          !hasPublicRelease &&
+          standalonePath !== location.pathname
+        ) {
+          navigate(
+            `${standalonePath}${location.search || ""}${location.hash || ""}`,
+            { replace: true },
+          );
+          return;
+        }
+
         if (
           !releaseSlug &&
+          hasPublicRelease &&
           scopedArtistSlug &&
           nextTrack.albumSlug &&
           scopedTrackSlug
@@ -984,19 +1021,12 @@ export default function TrackDetail() {
     track.albumSlug ||
     releaseSlug ||
     "";
-  const canonicalPath =
-    canonicalReleaseSlug && canonicalArtistSlug
-      ? releaseTrackUrl(
-          canonicalArtistSlug,
-          canonicalReleaseSlug,
-          canonicalTrackSlug,
-        )
-      : trackUrl(
-          canonicalTrackSlug,
-          canonicalArtistSlug
-            ? [canonicalArtistSlug]
-            : [],
-        );
+  const canonicalPath = canonicalTrackUrl(
+    canonicalArtistSlug,
+    canonicalTrackSlug,
+    canonicalReleaseSlug,
+    track.albumTotalTracks,
+  );
   const canonicalAbsoluteUrl =
     typeof window !== "undefined"
       ? `${window.location.origin}${canonicalPath}`
@@ -1099,13 +1129,19 @@ export default function TrackDetail() {
           image: track.artworkUrl,
           duration: track.duration > 0 ? `PT${String(Math.floor(track.duration / 60))}M${String(track.duration % 60)}S` : undefined,
           datePublished: track.releaseDate || track.releaseYear,
-          inAlbum: track.albumTitle ? {
-            "@type": "MusicAlbum",
-            name: track.albumTitle,
-            url: canonicalReleaseSlug && canonicalArtistSlug
-              ? `/releases/${canonicalArtistSlug}/${canonicalReleaseSlug}`
+          inAlbum:
+            track.albumTitle &&
+            track.albumTotalTracks > 1
+              ? {
+                  "@type": "MusicAlbum",
+                  name: track.albumTitle,
+                  url:
+                    canonicalReleaseSlug &&
+                    canonicalArtistSlug
+                      ? `/releases/${canonicalArtistSlug}/${canonicalReleaseSlug}`
+                      : undefined,
+                }
               : undefined,
-          } : undefined,
           genre: track.genres.length > 0 ? track.genres : undefined,
           isrcCode: track.isrc || undefined,
           url: canonicalAbsoluteUrl,
@@ -1309,13 +1345,15 @@ export default function TrackDetail() {
               canPlay={hasPlayableSource}
             />
 
-            {/* Tracklist from the release */}
-            <TrackReleaseTracklist
-              artistSlug={track.artistSlug}
-              currentTrackSlug={track.slug}
-              albumTitle={track.albumTitle}
-              tracks={track.releaseTracks}
-            />
+            {/* Multi-track Release context only. */}
+            {track.albumTotalTracks > 1 && (
+              <TrackReleaseTracklist
+                artistSlug={track.artistSlug}
+                currentTrackSlug={track.slug}
+                albumTitle={track.albumTitle}
+                tracks={track.releaseTracks}
+              />
+            )}
 
             <TrackListeningSignalPanel signal={listeningSignal} />
             <TrackMomentSummary entity={communityEntity} />

@@ -91,6 +91,18 @@ Examples:
 
 These tables should not be duplicated into a generic graph merely for consistency.
 
+### Public music identity boundary
+
+Provider packaging does not determine WAKILISHA public identity.
+
+Public music routing is derived from active `registry_release_tracks` membership:
+
+- Exactly one active Track membership surfaces as a Track at `/tracks/{artist-slug}/{track-slug}`.
+- Two or more active Track memberships may surface as a Release at `/releases/{artist-slug}/{release-slug}`.
+- A one-track provider Release record may remain in the Registry for provenance, provider identifiers, artwork, label, and release-date metadata.
+- `registry_tracks.release_id` is a compatibility pointer, not Release membership authority.
+- Existing one-track Release URLs should converge to the canonical Track route rather than create a second public identity.
+
 ### Rule 3: General cultural relationships belong to the Registry graph
 
 `registry_entity_relationships` becomes the flexible graph for relationships that do not deserve dedicated structural tables.

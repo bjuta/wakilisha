@@ -24,7 +24,6 @@ type TrackRow = {
   artwork_url: string | null;
   preview_url: string | null;
   metadata: Record<string, unknown> | null;
-  release_id: string | null;
 };
 
 type TrackArtistRow = {
@@ -76,7 +75,7 @@ export function useTrackSearchData(enabled = true) {
       try {
         const { data: tracksRaw, error: err } = await supabase
           .from("registry_tracks")
-          .select("id, slug, title, artwork_url, preview_url, metadata, release_id")
+          .select("id, slug, title, artwork_url, preview_url, metadata")
           .eq("status", "active")
           .order("title");
 
@@ -97,7 +96,35 @@ export function useTrackSearchData(enabled = true) {
         }
 
         const trackIds = tracks.map((t) => t.id).filter(Boolean);
-        const releaseIds = [...new Set(tracks.map((t) => t.release_id).filter(Boolean))] as string[];
+        const releaseIdByTrackId = new Map<string, string>();
+
+        for (const batchIds of chunks(trackIds)) {
+          const { data: memberships, error: membershipErr } = await supabase
+            .from("registry_release_tracks")
+            .select("track_id, release_id")
+            .in("track_id", batchIds)
+            .eq("status", "active")
+            .order("disc_number", { ascending: true })
+            .order("track_number", { ascending: true });
+
+          if (membershipErr) {
+            console.error("Failed to fetch Track Release memberships:", membershipErr.message);
+            continue;
+          }
+
+          for (const membership of memberships || []) {
+            if (!releaseIdByTrackId.has(membership.track_id)) {
+              releaseIdByTrackId.set(
+                membership.track_id,
+                membership.release_id,
+              );
+            }
+          }
+        }
+
+        const releaseIds = [
+          ...new Set(releaseIdByTrackId.values()),
+        ];
 
         const trackArtists: TrackArtistRow[] = [];
 
@@ -206,7 +233,11 @@ export function useTrackSearchData(enabled = true) {
           const artistSlug = artistInfo?.slug || "";
           const artist = artistInfo?.name || "Unknown";
           const genre = artistGenreMap[artistSlug] || "";
-          const label = t.release_id ? releaseLabelMap[t.release_id] || "" : "";
+          const releaseId =
+            releaseIdByTrackId.get(t.id) || "";
+          const label = releaseId
+            ? releaseLabelMap[releaseId] || ""
+            : "";
           const contextText = buildTrackSearchSnippet({
             title: t.title || "Untitled track",
             artist,

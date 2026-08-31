@@ -23,7 +23,7 @@ import {
 
 type Release = PublicRelease;
 type SortKey = "newest" | "updated" | "artist" | "title";
-type ReleaseTypeFilter = "All" | "Album" | "EP" | "Single";
+type ReleaseTypeFilter = "All" | "Album" | "EP";
 
 const ALL = "All";
 const INITIAL_LIMIT = 30;
@@ -49,7 +49,7 @@ export default function Releases() {
 
   const [releases, setReleases] = useState<Release[]>([]);
   const [totalCount, setTotalCount] = useState(0);
-  const [stats, setStats] = useState<ReleaseCatalogStats>({ total: 0, albums: 0, eps: 0, singles: 0 });
+  const [stats, setStats] = useState<ReleaseCatalogStats>({ total: 0, albums: 0, eps: 0 });
   const [filterArtists, setFilterArtists] = useState<string[]>([]);
   const [filterYears, setFilterYears] = useState<string[]>([]);
   const [featuredReleases, setFeaturedReleases] = useState<Release[]>([]);
@@ -214,13 +214,12 @@ export default function Releases() {
     }
   }, [releases.length, totalCount, isLoadingMore, typeFilter, yearFilter, artistFilter, debouncedSearch, sortKey]);
 
-  const releaseTypes: ReleaseTypeFilter[] = useMemo(() => ["All", "Album", "EP", "Single"], []);
+  const releaseTypes: ReleaseTypeFilter[] = useMemo(() => ["All", "Album", "EP"], []);
 
   const typeCounts: Record<ReleaseTypeFilter, number> = useMemo(() => ({
     All: stats.total,
     Album: stats.albums,
     EP: stats.eps,
-    Single: stats.singles,
   }), [stats]);
 
   const hasMore = releases.length < totalCount && totalCount > 0;
@@ -556,7 +555,7 @@ function FeaturedReleaseCarousel({ releases, catalogStats, onPreview }: { releas
                 <WkIcon name="Sparkles" size={13} /> Release shelf
               </div>
               <h1 className="font-[var(--wk-font-display)] text-[clamp(56px,9vw,128px)] font-black leading-[0.82] tracking-[-0.075em] text-white drop-shadow-2xl">
-                Albums, EPs & singles
+                Albums, EPs, and projects
               </h1>
               <p className="mt-6 max-w-2xl text-[17px] font-semibold leading-[1.75] text-white/74 md:text-[19px]">
                 Browse the records moving through WAKILISHA. New drops, older gems, and releases that deserve more love.
