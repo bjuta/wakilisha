@@ -253,21 +253,6 @@ serve(async (request) => {
     return notFound(method, "caption_origin_failed");
   }
 
-  const upstreamType = (
-    mediaResponse.headers
-      .get("content-type")
-      ?.split(";")[0]
-      ?.trim()
-    || ""
-  );
-
-  if (upstreamType && upstreamType !== "text/vtt") {
-    console.warn("VIDEO_PUBLIC_DELIVERY_STAGE=caption_origin_type_invalid", {
-      content_type: upstreamType,
-    });
-    return notFound(method, "caption_origin_type_invalid");
-  }
-
   const etag = `"${stringValue(target.sha256)}"`;
 
   return response(
