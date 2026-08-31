@@ -1,11 +1,28 @@
-import { useState, useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 
-export function useScrollDirection() {
+export interface ScrollChromeState {
+  visible: boolean;
+  topVisible: boolean;
+}
+
+export function useScrollDirection(): ScrollChromeState {
   const [visible, setVisible] = useState(true);
+  const [topVisible, setTopVisible] = useState(false);
   const lastY = useRef(0);
   const ticking = useRef(false);
+  const topHideTimer = useRef<number | null>(null);
 
   useEffect(() => {
+    const hideTopSoon = () => {
+      if (topHideTimer.current !== null) {
+        window.clearTimeout(topHideTimer.current);
+      }
+      topHideTimer.current = window.setTimeout(() => {
+        setTopVisible(false);
+        topHideTimer.current = null;
+      }, 850);
+    };
+
     const onScroll = () => {
       if (ticking.current) return;
       ticking.current = true;
@@ -15,10 +32,22 @@ export function useScrollDirection() {
 
         if (y <= 32) {
           setVisible(true);
+          setTopVisible(false);
+          if (topHideTimer.current !== null) {
+            window.clearTimeout(topHideTimer.current);
+            topHideTimer.current = null;
+          }
         } else if (delta < -12) {
           setVisible(true);
+          setTopVisible(true);
+          hideTopSoon();
         } else if (delta > 12) {
           setVisible(false);
+          setTopVisible(false);
+          if (topHideTimer.current !== null) {
+            window.clearTimeout(topHideTimer.current);
+            topHideTimer.current = null;
+          }
         }
 
         lastY.current = y;
@@ -27,8 +56,16 @@ export function useScrollDirection() {
     };
 
     window.addEventListener("scroll", onScroll, { passive: true });
-    return () => window.removeEventListener("scroll", onScroll);
+    return () => {
+      window.removeEventListener("scroll", onScroll);
+      if (topHideTimer.current !== null) {
+        window.clearTimeout(topHideTimer.current);
+      }
+    };
   }, []);
 
-  return visible;
+  return {
+    visible,
+    topVisible,
+  };
 }
