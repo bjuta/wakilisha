@@ -1,5 +1,9 @@
 // ── SHARED BLOCK (Phase A) ──
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.1";
+import {
+  canonicalizeIncomingTrackIdentity,
+  REGISTRY_STEWARD_RULE_VERSION,
+} from "../_shared/registry-steward.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
@@ -366,13 +370,223 @@ async function fetchProviderSource(provider: string, sourceUrl: string, market: 
 function anchorToMonday(dateStr: string): string { const d = new Date(dateStr); if (Number.isNaN(d.getTime())) return dateStr.slice(0, 10); const day = d.getUTCDay(); const diff = day === 0 ? 6 : day - 1; d.setUTCDate(d.getUTCDate() - diff); d.setUTCHours(0, 0, 0, 0); return d.toISOString().split("T")[0]; }
 
 // REGISTRY RESOLUTION HELPERS
-async function findOrCreateRegistryTrack(db: ReturnType<typeof createClient>, trackTitle: string, artistDisplay: string, isrc: string | null, artworkUrl: string | null, releaseDate: string | null, now: string, previewUrl: string | null = null): Promise<{ trackId: string; trackSlug: string; created: boolean }> {
-  if (isrc) { const { data: byIsrc } = await db.from("registry_tracks").select("id, slug, preview_url").eq("isrc", isrc).maybeSingle(); if (byIsrc) { if (previewUrl && !byIsrc.preview_url) { await db.from("registry_tracks").update({ preview_url: previewUrl, updated_at: now }).eq("id", byIsrc.id); } return { trackId: byIsrc.id as string, trackSlug: byIsrc.slug as string, created: false }; } }
-  const nk = build_normalized_key(trackTitle, artistDisplay);
-  if (nk) { const nt = normalize_title(trackTitle); const lk = lead_artist_key(artistDisplay); const { data: byTitle } = await db.from("registry_tracks").select("id, slug, normalized_title, preview_url").eq("normalized_title", nt).limit(5); if (byTitle && byTitle.length > 0) { for (const t of byTitle) { const { data: tas } = await db.from("registry_track_artists").select("artist_id").eq("track_id", t.id).limit(1); if (tas && tas.length > 0) { const { data: artist } = await db.from("registry_artists").select("slug, normalized_name").eq("id", tas[0].artist_id).maybeSingle(); if (artist) { const an = (artist.normalized_name as string) || ""; if (an === lk || an.includes(lk) || lk.includes(an)) { if (previewUrl && !t.preview_url) { await db.from("registry_tracks").update({ preview_url: previewUrl, updated_at: now }).eq("id", t.id); } return { trackId: t.id as string, trackSlug: t.slug as string, created: false }; } } } } } }
-  const { data: exactTitle } = await db.from("registry_tracks").select("id, slug, preview_url").eq("title", trackTitle).limit(5); if (exactTitle && exactTitle.length > 0) { for (const t of exactTitle) { const { data: tas } = await db.from("registry_track_artists").select("artist_id").eq("track_id", t.id).limit(1); if (tas && tas.length > 0) { const { data: artist } = await db.from("registry_artists").select("display_name").eq("id", tas[0].artist_id).maybeSingle(); if (artist) { const pa = artistDisplay.split(/\s+(?:feat\.?|ft\.?|featuring)\s+/i)[0].split(/\s*,\s*/)[0].trim(); const ra = (artist.display_name as string) || ""; if (pa.toLowerCase() === ra.toLowerCase()) { if (previewUrl && !t.preview_url) { await db.from("registry_tracks").update({ preview_url: previewUrl, updated_at: now }).eq("id", t.id); } return { trackId: t.id as string, trackSlug: t.slug as string, created: false }; } } } } }
-  const trackSlug = await uniqueTrackSlug(db, generateTrackSlug(trackTitle)); const trackId = crypto.randomUUID(); const sanitizedRd = sanitizeDate(releaseDate); const { error: insErr } = await db.from("registry_tracks").insert({ id: trackId, slug: trackSlug, title: trackTitle, normalized_title: normalize_title(trackTitle), isrc: isrc || null, artwork_url: artworkUrl || null, preview_url: previewUrl || null, status: "active", metadata: { source: "chart_ingest", created_at: now }, created_at: now, updated_at: now }); if (insErr) { const fallbackSlug = trackSlug + "-" + crypto.randomUUID().slice(0, 8); const { error: fbErr } = await db.from("registry_tracks").insert({ id: trackId, slug: fallbackSlug, title: trackTitle, normalized_title: normalize_title(trackTitle), isrc: isrc || null, artwork_url: artworkUrl || null, preview_url: previewUrl || null, status: "active", metadata: { source: "chart_ingest", created_at: now }, created_at: now, updated_at: now }); if (fbErr) throw new Error("Failed to create registry track: "+fbErr.message); return { trackId, trackSlug: fallbackSlug, created: true }; } return { trackId, trackSlug, created: true };
+async function findOrCreateRegistryTrack(
+  db: ReturnType<typeof createClient>,
+  trackTitle: string,
+  artistDisplay: string,
+  isrc: string | null,
+  artworkUrl: string | null,
+  releaseDate: string | null,
+  now: string,
+  previewUrl: string | null = null,
+): Promise<{ trackId: string; trackSlug: string; created: boolean }> {
+  const identity = canonicalizeIncomingTrackIdentity(trackTitle);
+  const canonicalTitle = identity.title;
+
+  if (isrc) {
+    const { data: byIsrc } = await db
+      .from("registry_tracks")
+      .select("id, slug, preview_url")
+      .eq("isrc", isrc)
+      .maybeSingle();
+
+    if (byIsrc) {
+      if (previewUrl && !byIsrc.preview_url) {
+        await db
+          .from("registry_tracks")
+          .update({ preview_url: previewUrl, updated_at: now })
+          .eq("id", byIsrc.id);
+      }
+
+      return {
+        trackId: byIsrc.id as string,
+        trackSlug: byIsrc.slug as string,
+        created: false,
+      };
+    }
+  }
+
+  const normalizedKey = build_normalized_key(
+    canonicalTitle,
+    artistDisplay,
+  );
+
+  if (normalizedKey) {
+    const normalizedTitle = normalize_title(canonicalTitle);
+    const leadArtistKey = lead_artist_key(artistDisplay);
+    const { data: byTitle } = await db
+      .from("registry_tracks")
+      .select("id, slug, normalized_title, preview_url")
+      .eq("normalized_title", normalizedTitle)
+      .limit(5);
+
+    for (const track of byTitle ?? []) {
+      const { data: trackArtists } = await db
+        .from("registry_track_artists")
+        .select("artist_id")
+        .eq("track_id", track.id)
+        .limit(1);
+
+      if (!trackArtists?.[0]?.artist_id) continue;
+
+      const { data: artist } = await db
+        .from("registry_artists")
+        .select("slug, normalized_name")
+        .eq("id", trackArtists[0].artist_id)
+        .maybeSingle();
+
+      const artistName = String(
+        artist?.normalized_name || "",
+      );
+
+      if (
+        artist &&
+        (
+          artistName === leadArtistKey ||
+          artistName.includes(leadArtistKey) ||
+          leadArtistKey.includes(artistName)
+        )
+      ) {
+        if (previewUrl && !track.preview_url) {
+          await db
+            .from("registry_tracks")
+            .update({
+              preview_url: previewUrl,
+              updated_at: now,
+            })
+            .eq("id", track.id);
+        }
+
+        return {
+          trackId: track.id as string,
+          trackSlug: track.slug as string,
+          created: false,
+        };
+      }
+    }
+  }
+
+  const { data: exactTitle } = await db
+    .from("registry_tracks")
+    .select("id, slug, preview_url")
+    .eq("title", canonicalTitle)
+    .limit(5);
+
+  for (const track of exactTitle ?? []) {
+    const { data: trackArtists } = await db
+      .from("registry_track_artists")
+      .select("artist_id")
+      .eq("track_id", track.id)
+      .limit(1);
+
+    if (!trackArtists?.[0]?.artist_id) continue;
+
+    const { data: artist } = await db
+      .from("registry_artists")
+      .select("display_name")
+      .eq("id", trackArtists[0].artist_id)
+      .maybeSingle();
+
+    const primaryArtist = artistDisplay
+      .split(/\s+(?:feat\.?|ft\.?|featuring)\s+/i)[0]
+      .split(/\s*,\s*/)[0]
+      .trim();
+
+    if (
+      artist &&
+      primaryArtist.toLowerCase() ===
+        String(artist.display_name || "").toLowerCase()
+    ) {
+      if (previewUrl && !track.preview_url) {
+        await db
+          .from("registry_tracks")
+          .update({
+            preview_url: previewUrl,
+            updated_at: now,
+          })
+          .eq("id", track.id);
+      }
+
+      return {
+        trackId: track.id as string,
+        trackSlug: track.slug as string,
+        created: false,
+      };
+    }
+  }
+
+  const trackSlug = await uniqueTrackSlug(
+    db,
+    identity.slug || generateTrackSlug(canonicalTitle),
+  );
+  const trackId = crypto.randomUUID();
+  const metadata = {
+    source: "chart_ingest",
+    created_at: now,
+    source_title: identity.sourceTitle,
+    registry_steward_rule_version:
+      REGISTRY_STEWARD_RULE_VERSION,
+    structural_featured_names:
+      identity.structuralFeaturedNames,
+  };
+
+  const { error: insertError } = await db
+    .from("registry_tracks")
+    .insert({
+      id: trackId,
+      slug: trackSlug,
+      title: canonicalTitle,
+      normalized_title: identity.normalizedTitle,
+      isrc: isrc || null,
+      artwork_url: artworkUrl || null,
+      preview_url: previewUrl || null,
+      status: "active",
+      metadata,
+      created_at: now,
+      updated_at: now,
+    });
+
+  if (!insertError) {
+    return {
+      trackId,
+      trackSlug,
+      created: true,
+    };
+  }
+
+  const fallbackSlug =
+    `${trackSlug}-${crypto.randomUUID().slice(0, 8)}`;
+
+  const { error: fallbackError } = await db
+    .from("registry_tracks")
+    .insert({
+      id: trackId,
+      slug: fallbackSlug,
+      title: canonicalTitle,
+      normalized_title: identity.normalizedTitle,
+      isrc: isrc || null,
+      artwork_url: artworkUrl || null,
+      preview_url: previewUrl || null,
+      status: "active",
+      metadata,
+      created_at: now,
+      updated_at: now,
+    });
+
+  if (fallbackError) {
+    throw new Error(
+      "Failed to create registry track: " +
+        fallbackError.message,
+    );
+  }
+
+  return {
+    trackId,
+    trackSlug: fallbackSlug,
+    created: true,
+  };
 }
+
 async function uniqueTrackSlug(db: ReturnType<typeof createClient>, base: string): Promise<string> { const { data } = await db.from("registry_tracks").select("slug").eq("slug", base).maybeSingle(); if (!data) return base; return base + "-" + crypto.randomUUID().slice(0, 6); }
 async function findOrCreateRegistryArtist(db: ReturnType<typeof createClient>, artistName: string, now: string): Promise<{ artistId: string; artistSlug: string; created: boolean }> { const normalized = artistName.split(/\s+(?:feat\.?|ft\.?|featuring)\s+/i)[0].split(/\s*,\s*/)[0].trim(); const nameSlug = generateArtistSlug(normalized); const { data: bySlug } = await db.from("registry_artists").select("id, slug").eq("slug", nameSlug).maybeSingle(); if (bySlug) return { artistId: bySlug.id as string, artistSlug: bySlug.slug as string, created: false }; const { data: byName } = await db.from("registry_artists").select("id, slug").eq("display_name", normalized).maybeSingle(); if (byName) return { artistId: byName.id as string, artistSlug: byName.slug as string, created: false }; const { data: byCi } = await db.from("registry_artists").select("id, slug, display_name").ilike("display_name", normalized).limit(3); if (byCi && byCi.length > 0) { const exact = byCi.find(a => ((a.display_name as string) || "").toLowerCase() === normalized.toLowerCase()); if (exact) return { artistId: exact.id as string, artistSlug: exact.slug as string, created: false }; return { artistId: byCi[0].id as string, artistSlug: byCi[0].slug as string, created: false }; } const artistSlug = await uniqueArtistSlug(db, nameSlug); const artistId = crypto.randomUUID(); const { error: insErr } = await db.from("registry_artists").insert({ id: artistId, slug: artistSlug, display_name: normalized, normalized_name: normalizeCore(normalized), sort_name: normalized, status: "draft", metadata: { source: "chart_ingest", created_at: now }, created_at: now, updated_at: now }); if (insErr) { const fallbackSlug = artistSlug + "-" + crypto.randomUUID().slice(0, 8); const { error: fbErr } = await db.from("registry_artists").insert({ id: artistId, slug: fallbackSlug, display_name: normalized, normalized_name: normalizeCore(normalized), sort_name: normalized, status: "draft", metadata: { source: "chart_ingest", created_at: now }, created_at: now, updated_at: now }); if (fbErr) throw new Error("Failed to create registry artist: "+fbErr.message); return { artistId, artistSlug: fallbackSlug, created: true }; } return { artistId, artistSlug, created: true }; }
 async function uniqueArtistSlug(db: ReturnType<typeof createClient>, base: string): Promise<string> { const { data } = await db.from("registry_artists").select("slug").eq("slug", base).maybeSingle(); if (!data) return base; return base + "-" + crypto.randomUUID().slice(0, 6); }
