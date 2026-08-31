@@ -36,7 +36,7 @@ export default function VideoIndexPage() {
       <MetaTags
         title="Video | WAKILISHA"
         description="Watch documentaries, performances, interviews, field footage and other cultural Video from WAKILISHA."
-        canonicalPath="/video"
+        url="https://wakilisha.africa/video"
       />
 
       <main className="min-h-screen bg-wk-bg text-wk-text">
