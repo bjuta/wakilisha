@@ -120,6 +120,21 @@ function eventValue(event: JsonObject, ...keys: string[]): string | null {
   return null;
 }
 
+function versionNumber(
+  history: JsonObject[],
+  versionId: string | null,
+): number | null {
+  if (!versionId) return null;
+  const match = history.find((item) => text(item.id) === versionId);
+  const value = match?.version_number;
+  if (typeof value === "number" && Number.isFinite(value)) return value;
+  if (typeof value === "string" && value.trim()) {
+    const parsed = Number(value);
+    return Number.isFinite(parsed) ? parsed : null;
+  }
+  return null;
+}
+
 export function VideoEditorWorkspace({
   publicationId,
 }: {
@@ -240,8 +255,27 @@ export function VideoEditorWorkspace({
 
   const editable = Boolean(
     workspace?.capabilities.canEdit &&
-      ["draft", "changes_requested"].includes(
+      ["draft", "changes_requested", "published"].includes(
         workspace?.resource.lifecycleState || "",
+      ),
+  );
+
+  const workingVersionNumber = workspace
+    ? versionNumber(workspace.versionHistory, workspace.resource.versions.working)
+    : null;
+  const publishedVersionNumber = workspace
+    ? versionNumber(workspace.versionHistory, workspace.resource.versions.published)
+    : null;
+  const canSubmitWorkingVersion = Boolean(
+    editable &&
+      workspace?.resource.versions.working &&
+      (
+        workspace.resource.lifecycleState !== "published" ||
+        (
+          workingVersionNumber !== null &&
+          publishedVersionNumber !== null &&
+          workingVersionNumber > publishedVersionNumber
+        )
       ),
   );
 
@@ -609,10 +643,7 @@ export function VideoEditorWorkspace({
     },
   ];
 
-  if (
-    editable &&
-    workspace.resource.versions.working
-  ) {
+  if (canSubmitWorkingVersion) {
     headerActions.push({
       key: "submit",
       label: "Send to Review",
@@ -624,7 +655,11 @@ export function VideoEditorWorkspace({
   }
 
   const reviewActions: EditorialDecisionDescriptor[] = [];
-  if (workspace.capabilities.canManageReview && workspace.resource.versions.submitted) {
+  if (
+    workspace.capabilities.canManageReview &&
+    workspace.resource.versions.submitted &&
+    ["ready_for_review", "in_review"].includes(workspace.resource.lifecycleState)
+  ) {
     reviewActions.push(
       {
         key: "request_changes",
@@ -643,7 +678,11 @@ export function VideoEditorWorkspace({
       },
     );
   }
-  if (workspace.capabilities.canPublish && workspace.resource.versions.approved) {
+  if (
+    workspace.capabilities.canPublish &&
+    workspace.resource.versions.approved &&
+    workspace.resource.lifecycleState === "approved"
+  ) {
     reviewActions.push({
       key: "publish",
       label: "Publish",

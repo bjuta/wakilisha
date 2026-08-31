@@ -160,6 +160,19 @@ describe("Phase 7A K5B Video Editor composition", () => {
     }
   });
 
+  it("keeps published Video revisions governed without reusing stale lifecycle pointers", () => {
+    expect(workspace).toContain(
+      '["draft", "changes_requested", "published"]',
+    );
+    expect(workspace).toContain("workingVersionNumber > publishedVersionNumber");
+    expect(workspace).toContain(
+      '["ready_for_review", "in_review"].includes(workspace.resource.lifecycleState)',
+    );
+    expect(workspace).toContain(
+      'workspace.resource.lifecycleState === "approved"',
+    );
+  });
+
   it("promotes only candidates with real Video second-consumer imports", () => {
     const promoted = [
       ["admin.mode-composer", "AdminModeComposer", collection],
