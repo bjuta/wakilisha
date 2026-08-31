@@ -3,10 +3,7 @@ import {
   useRef,
   useState,
 } from "react";
-import {
-  Link,
-  useNavigate,
-} from "react-router-dom";
+import { Link } from "react-router-dom";
 import { PublicVideoCard } from "./PublicVideoCard";
 import {
   VideoPlaybackCanvas,
@@ -209,21 +206,16 @@ export function PublicVideoWatchingSurface({
   publication: PublicVideoPublication;
   related?: PublicVideoPublication[];
 }) {
-  const navigate = useNavigate();
   const videoRef = useRef<HTMLVideoElement>(null);
   const playerAnchorRef = useRef<HTMLDivElement>(null);
   const [playerDocked, setPlayerDocked] = useState(false);
   const [anchorHeight, setAnchorHeight] = useState<number | null>(null);
   const [descriptionExpanded, setDescriptionExpanded] = useState(false);
-  const [shareDone, setShareDone] = useState(false);
 
   const publishedDate = formatDate(publication.provenance.publishedAt);
   const duration = publication.delivery.kind === "native_media"
     ? formatDuration(publication.delivery.durationSeconds)
     : "";
-  const defaultCaption = publication.captions.find((caption) => caption.isDefault)
-    || publication.captions[0]
-    || null;
 
   const source = useMemo<VideoPlaybackSource | null>(() => {
     if (publication.delivery.kind === "native_media") {
@@ -276,24 +268,6 @@ export function PublicVideoWatchingSurface({
     setPlayerDocked(false);
   };
 
-  const share = async () => {
-    const url = window.location.href;
-    try {
-      if (navigator.share) {
-        await navigator.share({
-          title: publication.title,
-          url,
-        });
-      } else {
-        await navigator.clipboard.writeText(url);
-      }
-      setShareDone(true);
-      window.setTimeout(() => setShareDone(false), 1800);
-    } catch {
-      return;
-    }
-  };
-
   const jumpToChapter = (startSeconds: number) => {
     const element = videoRef.current;
     if (!element) return;
@@ -304,33 +278,6 @@ export function PublicVideoWatchingSurface({
 
   return (
     <main className="min-h-screen bg-[var(--wk-bg)] text-[var(--wk-text)]">
-      <div className="sticky top-0 z-40 border-b border-[var(--wk-border)] bg-[var(--wk-bg)]/95 backdrop-blur-md">
-        <div className="mx-auto flex h-14 max-w-[1180px] items-center gap-3 px-4 sm:px-6">
-          <button
-            type="button"
-            onClick={() => navigate("/video")}
-            className="flex h-9 w-9 items-center justify-center rounded-full text-[var(--wk-text)] transition hover:bg-[var(--wk-surface)]"
-            aria-label="Back to Video"
-          >
-            <i className="ri-arrow-left-line text-lg" />
-          </button>
-          <Link
-            to="/video"
-            className="min-w-0 flex-1 truncate text-center text-[11px] font-black uppercase tracking-[0.18em] text-[var(--wk-text)]"
-          >
-            WAKILISHA Video
-          </Link>
-          <button
-            type="button"
-            onClick={() => void share()}
-            className="flex h-9 min-w-9 items-center justify-center rounded-full px-2 text-[var(--wk-text)] transition hover:bg-[var(--wk-surface)]"
-            aria-label="Share video"
-          >
-            <i className={shareDone ? "ri-check-line text-lg" : "ri-share-line text-lg"} />
-          </button>
-        </div>
-      </div>
-
       <section className="mx-auto max-w-[1180px] px-0 pb-12 sm:px-6 lg:pb-16">
         <div
           ref={playerAnchorRef}
@@ -406,14 +353,6 @@ export function PublicVideoWatchingSurface({
                   <span className="inline-flex items-center gap-1.5">
                     <i className="ri-time-line" />
                     {duration}
-                  </span>
-                ) : null}
-                {defaultCaption ? (
-                  <span className="inline-flex items-center gap-1.5 font-black text-[var(--wk-text)]">
-                    <span className="rounded bg-[var(--wk-brand)] px-1.5 py-0.5 text-[9px] text-[var(--wk-brand-on)]">
-                      CC
-                    </span>
-                    {defaultCaption.label}
                   </span>
                 ) : null}
               </div>
