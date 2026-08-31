@@ -1,10 +1,17 @@
 import {
   useMemo,
   useRef,
+  useState,
 } from "react";
-import { Link } from "react-router-dom";
-import { WkIcon } from "@/components/design-system/Icon";
-import { PublicTrustSummary } from "@/components/design-system/trust/PublicTrustSummary";
+import {
+  Link,
+  useNavigate,
+} from "react-router-dom";
+import { PublicVideoCard } from "./PublicVideoCard";
+import {
+  VideoPlaybackCanvas,
+  type VideoPlaybackSource,
+} from "./VideoPlaybackCanvas";
 import {
   publicVideoCaptionUrl,
 } from "@/services/video/videoPublicService";
@@ -38,74 +45,15 @@ function formatDate(value: string | null): string {
   if (Number.isNaN(date.getTime())) return "";
   return new Intl.DateTimeFormat("en", {
     year: "numeric",
-    month: "long",
+    month: "short",
     day: "numeric",
   }).format(date);
-}
-
-function creditHref(credit: PublicVideoCredit): string | null {
-  if (credit.authorSlug) return `/people/${credit.authorSlug}`;
-  return credit.username ? `/u/${credit.username}` : null;
-}
-
-function locatorScalar(value: unknown): string | null {
-  if (typeof value === "string" && value.trim()) return value.trim();
-  if (typeof value === "number" && Number.isFinite(value)) return String(value);
-  return null;
-}
-
-function citationLocatorLabel(citation: PublicVideoCitation): string | null {
-  const timestamp =
-    typeof citation.locator.seconds === "number"
-      ? citation.locator.seconds
-      : typeof citation.locator.timestamp_seconds === "number"
-        ? citation.locator.timestamp_seconds
-        : null;
-
-  if (timestamp !== null && Number.isFinite(timestamp)) {
-    return `At ${formatDuration(timestamp)}`;
-  }
-
-  for (const key of ["chapter", "section", "page", "paragraph"]) {
-    const value = locatorScalar(citation.locator[key]);
-    if (value) return `${humanize(key)} ${value}`;
-  }
-
-  return citation.locatorType === "whole_source" || !citation.locatorType
-    ? null
-    : humanize(citation.locatorType);
-}
-
-function buildTrustPresentation(publication: PublicVideoPublication) {
-  return {
-    credits: publication.credits.map((credit) => ({
-      id: credit.creditId,
-      displayName: credit.displayName,
-      roleLabel: credit.roleLabel ?? humanize(credit.role || "contributor"),
-      note: credit.note,
-      href: creditHref(credit),
-      contextLabel: null,
-    })),
-    sources: publication.citations.map((citation) => ({
-      id: citation.citationId,
-      label: citation.publicLabel ?? citation.source.title,
-      title: citation.source.title,
-      creator: citation.source.creator,
-      publisher: citation.source.publisher,
-      url: citation.source.url,
-      publicationDate: citation.source.publicationDate,
-      creditLine: citation.source.creditLine,
-      locatorLabel: citationLocatorLabel(citation),
-      contextLabel: null,
-    })),
-  };
 }
 
 function providerEmbedUrl(
   publication: PublicVideoPublication,
 ): string | null {
   if (publication.delivery.kind !== "provider") return null;
-
   const id = publication.delivery.providerObjectId;
   if (publication.delivery.providerKey === "youtube" && id) {
     return `https://www.youtube.com/embed/${encodeURIComponent(id)}`;
@@ -116,204 +64,466 @@ function providerEmbedUrl(
   return null;
 }
 
-function trackKind(
-  kind: string,
-): "captions" | "subtitles" {
-  return kind === "captions" ? "captions" : "subtitles";
+function creditHref(credit: PublicVideoCredit): string | null {
+  if (credit.authorSlug) return `/people/${credit.authorSlug}`;
+  return credit.username ? `/u/${credit.username}` : null;
 }
 
-export function PublicVideoWatchingSurface({
+function locatorLabel(citation: PublicVideoCitation): string | null {
+  const seconds =
+    typeof citation.locator.seconds === "number"
+      ? citation.locator.seconds
+      : typeof citation.locator.timestamp_seconds === "number"
+        ? citation.locator.timestamp_seconds
+        : null;
+
+  if (seconds !== null && Number.isFinite(seconds)) {
+    return `At ${formatDuration(seconds)}`;
+  }
+
+  for (const key of ["chapter", "section", "page", "paragraph"]) {
+    const raw = citation.locator[key];
+    if (typeof raw === "string" && raw.trim()) {
+      return `${humanize(key)} ${raw.trim()}`;
+    }
+    if (typeof raw === "number" && Number.isFinite(raw)) {
+      return `${humanize(key)} ${raw}`;
+    }
+  }
+
+  return null;
+}
+
+function PublicationRecord({
   publication,
 }: {
   publication: PublicVideoPublication;
 }) {
-  const videoRef = useRef<HTMLVideoElement>(null);
-  const trust = useMemo(
-    () => buildTrustPresentation(publication),
-    [publication],
+  const published = formatDate(publication.provenance.firstPublishedAt);
+  const current = formatDate(publication.provenance.publishedAt);
+
+  return (
+    <details className="group rounded-2xl border border-[var(--wk-border)] bg-[var(--wk-surface)]">
+      <summary className="flex cursor-pointer list-none items-center justify-between gap-4 px-4 py-4 sm:px-5">
+        <span>
+          <span className="block text-[10px] font-black uppercase tracking-[0.18em] text-[var(--wk-brand)]">
+            Record
+          </span>
+          <span className="mt-1 block text-[14px] font-black text-[var(--wk-text)]">
+            Publication record
+          </span>
+        </span>
+        <i className="ri-arrow-down-s-line text-lg text-[var(--wk-text-muted)] transition-transform group-open:rotate-180" />
+      </summary>
+
+      <div className="border-t border-[var(--wk-border)] px-4 pb-5 pt-4 sm:px-5">
+        <div className="flex flex-wrap gap-x-5 gap-y-2 text-[12px] text-[var(--wk-text-muted)]">
+          {published ? (
+            <span>
+              Published <strong className="text-[var(--wk-text)]">{published}</strong>
+            </span>
+          ) : null}
+          {current ? (
+            <span>
+              Current edition <strong className="text-[var(--wk-text)]">{current}</strong>
+            </span>
+          ) : null}
+          <span className="rounded-full bg-[var(--wk-bg)] px-2.5 py-1 text-[10px] font-black text-[var(--wk-text-soft)]">
+            Version {publication.versionNumber}
+          </span>
+        </div>
+
+        {publication.credits.length ? (
+          <div className="mt-5 border-t border-[var(--wk-border)] pt-4">
+            <p className="text-[10px] font-black uppercase tracking-[0.16em] text-[var(--wk-text-faint)]">
+              Credits
+            </p>
+            <div className="mt-2 flex flex-wrap gap-2">
+              {publication.credits.map((credit) => {
+                const href = creditHref(credit);
+                const label = credit.roleLabel || humanize(credit.role || "Contributor");
+                const body = (
+                  <span className="inline-flex items-center gap-1.5 rounded-full border border-[var(--wk-border)] px-3 py-1.5 text-[11px] font-semibold text-[var(--wk-text-soft)]">
+                    <strong className="text-[var(--wk-text)]">{credit.displayName}</strong>
+                    <span>{label}</span>
+                  </span>
+                );
+                return href ? (
+                  <Link key={credit.creditId} to={href}>
+                    {body}
+                  </Link>
+                ) : (
+                  <span key={credit.creditId}>{body}</span>
+                );
+              })}
+            </div>
+          </div>
+        ) : null}
+
+        {publication.citations.length ? (
+          <div className="mt-5 border-t border-[var(--wk-border)] pt-4">
+            <p className="text-[10px] font-black uppercase tracking-[0.16em] text-[var(--wk-text-faint)]">
+              Sources
+            </p>
+            <div className="mt-2 space-y-2">
+              {publication.citations.map((citation) => {
+                const label = citation.publicLabel || citation.source.title;
+                const locator = locatorLabel(citation);
+                return citation.source.url ? (
+                  <a
+                    key={citation.citationId}
+                    href={citation.source.url}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="flex items-center justify-between gap-3 rounded-xl border border-[var(--wk-border)] px-3 py-2 text-[12px] font-semibold text-[var(--wk-text)] transition hover:border-[var(--wk-brand)]"
+                  >
+                    <span className="min-w-0 truncate">{label}</span>
+                    <span className="shrink-0 text-[10px] text-[var(--wk-text-faint)]">
+                      {locator || "Source"}
+                    </span>
+                  </a>
+                ) : (
+                  <div
+                    key={citation.citationId}
+                    className="flex items-center justify-between gap-3 rounded-xl border border-[var(--wk-border)] px-3 py-2 text-[12px] font-semibold text-[var(--wk-text)]"
+                  >
+                    <span className="min-w-0 truncate">{label}</span>
+                    <span className="shrink-0 text-[10px] text-[var(--wk-text-faint)]">
+                      {locator || "Source"}
+                    </span>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        ) : null}
+      </div>
+    </details>
   );
-  const providerUrl = providerEmbedUrl(publication);
+}
+
+export function PublicVideoWatchingSurface({
+  publication,
+  related = [],
+}: {
+  publication: PublicVideoPublication;
+  related?: PublicVideoPublication[];
+}) {
+  const navigate = useNavigate();
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const playerAnchorRef = useRef<HTMLDivElement>(null);
+  const [playerDocked, setPlayerDocked] = useState(false);
+  const [anchorHeight, setAnchorHeight] = useState<number | null>(null);
+  const [descriptionExpanded, setDescriptionExpanded] = useState(false);
+  const [shareDone, setShareDone] = useState(false);
+
   const publishedDate = formatDate(publication.provenance.publishedAt);
   const duration = publication.delivery.kind === "native_media"
     ? formatDuration(publication.delivery.durationSeconds)
     : "";
+  const defaultCaption = publication.captions.find((caption) => caption.isDefault)
+    || publication.captions[0]
+    || null;
+
+  const source = useMemo<VideoPlaybackSource | null>(() => {
+    if (publication.delivery.kind === "native_media") {
+      return {
+        kind: "native",
+        url: publication.delivery.url,
+        mimeType: publication.delivery.mimeType,
+        poster: publication.poster?.url || null,
+        captions: publication.captions.map((caption) => ({
+          trackNumber: caption.trackNumber,
+          languageTag: caption.languageTag,
+          label: caption.label,
+          kind: caption.trackKind,
+          src: publicVideoCaptionUrl(publication, caption.trackNumber),
+          isDefault: caption.isDefault,
+        })),
+      };
+    }
+
+    const embedUrl = providerEmbedUrl(publication);
+    return embedUrl
+      ? {
+          kind: "provider",
+          embedUrl,
+          providerKey: publication.delivery.providerKey,
+        }
+      : null;
+  }, [publication]);
+
+  const collapsePlayer = () => {
+    const anchor = playerAnchorRef.current;
+    if (anchor) {
+      setAnchorHeight(anchor.getBoundingClientRect().height);
+    }
+    setPlayerDocked(true);
+  };
+
+  const expandPlayer = () => {
+    setPlayerDocked(false);
+    requestAnimationFrame(() => {
+      playerAnchorRef.current?.scrollIntoView({
+        behavior: "smooth",
+        block: "start",
+      });
+    });
+  };
+
+  const closeDockedPlayer = () => {
+    videoRef.current?.pause();
+    setPlayerDocked(false);
+  };
+
+  const share = async () => {
+    const url = window.location.href;
+    try {
+      if (navigator.share) {
+        await navigator.share({
+          title: publication.title,
+          url,
+        });
+      } else {
+        await navigator.clipboard.writeText(url);
+      }
+      setShareDone(true);
+      window.setTimeout(() => setShareDone(false), 1800);
+    } catch {
+      return;
+    }
+  };
 
   const jumpToChapter = (startSeconds: number) => {
-    if (!videoRef.current) return;
-    videoRef.current.currentTime = startSeconds;
-    void videoRef.current.play();
+    const element = videoRef.current;
+    if (!element) return;
+    element.currentTime = startSeconds;
+    void element.play();
+    if (playerDocked) expandPlayer();
   };
 
   return (
-    <main className="min-h-screen bg-wk-bg text-wk-text">
-      <section className="wk-container-wide px-4 pb-8 pt-7 sm:px-6 lg:px-8 lg:pb-12 lg:pt-10">
-        <div className="mx-auto max-w-6xl">
-          <div className="flex flex-wrap items-center gap-2 text-[11px] font-bold uppercase tracking-[0.16em] text-wk-text-faint">
-            <Link
-              to="/video"
-              className="transition hover:text-wk-brand"
-            >
-              WAKILISHA Video
-            </Link>
-            {publication.show ? (
-              <>
-                <span aria-hidden="true">/</span>
-                {publication.show.canonicalPath ? (
-                  <Link
-                    to={publication.show.canonicalPath}
-                    className="transition hover:text-wk-brand"
-                  >
-                    {publication.show.title}
-                  </Link>
-                ) : (
-                  <span>{publication.show.title}</span>
-                )}
-              </>
-            ) : null}
-          </div>
+    <main className="min-h-screen bg-[var(--wk-bg)] text-[var(--wk-text)]">
+      <div className="sticky top-0 z-40 border-b border-[var(--wk-border)] bg-[var(--wk-bg)]/95 backdrop-blur-md">
+        <div className="mx-auto flex h-14 max-w-[1180px] items-center gap-3 px-4 sm:px-6">
+          <button
+            type="button"
+            onClick={() => navigate("/video")}
+            className="flex h-9 w-9 items-center justify-center rounded-full text-[var(--wk-text)] transition hover:bg-[var(--wk-surface)]"
+            aria-label="Back to Video"
+          >
+            <i className="ri-arrow-left-line text-lg" />
+          </button>
+          <Link
+            to="/video"
+            className="min-w-0 flex-1 truncate text-center text-[11px] font-black uppercase tracking-[0.18em] text-[var(--wk-text)]"
+          >
+            WAKILISHA Video
+          </Link>
+          <button
+            type="button"
+            onClick={() => void share()}
+            className="flex h-9 min-w-9 items-center justify-center rounded-full px-2 text-[var(--wk-text)] transition hover:bg-[var(--wk-surface)]"
+            aria-label="Share video"
+          >
+            <i className={shareDone ? "ri-check-line text-lg" : "ri-share-line text-lg"} />
+          </button>
+        </div>
+      </div>
 
-          <div className="mt-4 grid gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(280px,380px)] lg:items-end">
+      <section className="mx-auto max-w-[1180px] px-0 pb-12 sm:px-6 lg:pb-16">
+        <div
+          ref={playerAnchorRef}
+          className="relative scroll-mt-16"
+          style={playerDocked && anchorHeight ? { minHeight: anchorHeight } : undefined}
+        >
+          {source ? (
+            <div
+              className={
+                playerDocked
+                  ? "fixed bottom-[calc(5.25rem+env(safe-area-inset-bottom))] left-3 right-3 z-[250] overflow-hidden rounded-2xl border border-white/10 bg-black shadow-2xl sm:bottom-6 sm:left-auto sm:right-6 sm:w-[360px]"
+                  : "relative overflow-hidden bg-black sm:mt-6 sm:rounded-[24px] sm:border sm:border-[var(--wk-border)] sm:shadow-sm"
+              }
+            >
+              <VideoPlaybackCanvas
+                source={source}
+                title={publication.title}
+                videoRef={videoRef}
+                compact={playerDocked}
+                collapsed={playerDocked}
+                onCollapse={playerDocked ? undefined : collapsePlayer}
+                onExpand={playerDocked ? expandPlayer : undefined}
+                onClose={playerDocked ? closeDockedPlayer : undefined}
+              />
+            </div>
+          ) : (
+            <div className="flex min-h-[320px] items-center justify-center bg-black p-8 text-center text-sm text-white/70 sm:mt-6 sm:rounded-[24px]">
+              This Video provider does not have an embeddable public player.
+            </div>
+          )}
+        </div>
+
+        <div className="px-5 pt-6 sm:px-0 sm:pt-8">
+          <div className="grid gap-8 lg:grid-cols-[minmax(0,1fr)_340px] lg:items-start">
             <div>
-              <p className="text-xs font-black uppercase tracking-[0.18em] text-wk-brand">
+              <p className="text-[10px] font-black uppercase tracking-[0.18em] text-[var(--wk-brand)]">
                 {humanize(publication.classification)}
                 {publication.episode?.episodeNumber
                   ? ` · Episode ${publication.episode.episodeNumber}`
                   : ""}
               </p>
-              <h1 className="mt-2 max-w-4xl text-4xl font-black tracking-[-0.045em] sm:text-5xl lg:text-6xl">
+
+              <h1 className="mt-2 max-w-4xl text-[34px] font-black leading-[0.98] tracking-[-0.045em] sm:text-[46px] lg:text-[54px]">
                 {publication.title}
               </h1>
-            </div>
 
-            <div className="lg:pb-1">
-              {publication.summary ? (
-                <p className="text-[15px] leading-7 text-wk-text-muted">
-                  {publication.summary}
-                </p>
+              {publication.show ? (
+                <div className="mt-4">
+                  {publication.show.canonicalPath ? (
+                    <Link
+                      to={publication.show.canonicalPath}
+                      className="inline-flex items-center gap-1.5 text-[14px] font-bold text-[var(--wk-text)] transition hover:text-[var(--wk-brand)]"
+                    >
+                      {publication.show.title}
+                      <i className="ri-arrow-right-s-line text-base" />
+                    </Link>
+                  ) : (
+                    <span className="text-[14px] font-bold text-[var(--wk-text)]">
+                      {publication.show.title}
+                    </span>
+                  )}
+                </div>
               ) : null}
-              <div className="mt-4 flex flex-wrap gap-x-4 gap-y-2 text-xs font-bold text-wk-text-faint">
-                {publishedDate ? <span>{publishedDate}</span> : null}
-                {duration ? <span>{duration}</span> : null}
-                {publication.captions.length ? (
-                  <span>
-                    {publication.captions.length}
-                    {" "}
-                    {publication.captions.length === 1
-                      ? "caption track"
-                      : "caption tracks"}
+
+              <div className="mt-5 flex flex-wrap items-center gap-x-4 gap-y-2 text-[12px] font-semibold text-[var(--wk-text-muted)]">
+                {publishedDate ? (
+                  <span className="inline-flex items-center gap-1.5">
+                    <i className="ri-calendar-line" />
+                    {publishedDate}
+                  </span>
+                ) : null}
+                {duration ? (
+                  <span className="inline-flex items-center gap-1.5">
+                    <i className="ri-time-line" />
+                    {duration}
+                  </span>
+                ) : null}
+                {defaultCaption ? (
+                  <span className="inline-flex items-center gap-1.5 font-black text-[var(--wk-text)]">
+                    <span className="rounded bg-[var(--wk-brand)] px-1.5 py-0.5 text-[9px] text-[var(--wk-brand-on)]">
+                      CC
+                    </span>
+                    {defaultCaption.label}
                   </span>
                 ) : null}
               </div>
+
+              {publication.summary ? (
+                <div className="mt-6 max-w-2xl">
+                  <p
+                    className={
+                      descriptionExpanded
+                        ? "text-[15px] leading-7 text-[var(--wk-text-muted)]"
+                        : "line-clamp-3 text-[15px] leading-7 text-[var(--wk-text-muted)]"
+                    }
+                  >
+                    {publication.summary}
+                  </p>
+                  {publication.summary.length > 180 ? (
+                    <button
+                      type="button"
+                      onClick={() => setDescriptionExpanded((expanded) => !expanded)}
+                      className="mt-2 inline-flex items-center gap-1 text-[11px] font-black uppercase tracking-[0.08em] text-[var(--wk-brand)]"
+                    >
+                      {descriptionExpanded ? "Show less" : "Show more"}
+                      <i className={descriptionExpanded ? "ri-arrow-up-s-line" : "ri-arrow-down-s-line"} />
+                    </button>
+                  ) : null}
+                </div>
+              ) : null}
+            </div>
+
+            <div className="lg:pt-1">
+              <PublicationRecord publication={publication} />
             </div>
           </div>
 
-          <div className="mt-8 overflow-hidden rounded-[28px] border border-wk-border bg-black shadow-sm">
-            {publication.delivery.kind === "native_media" ? (
-              <video
-                ref={videoRef}
-                controls
-                playsInline
-                preload="metadata"
-                poster={publication.poster?.url || undefined}
-                className="mx-auto block max-h-[78vh] min-h-[240px] w-full bg-black object-contain"
-              >
-                <source
-                  src={publication.delivery.url}
-                  type={publication.delivery.mimeType}
-                />
-                {publication.captions.map((caption) => (
-                  <track
-                    key={caption.trackNumber}
-                    kind={trackKind(caption.trackKind)}
-                    src={publicVideoCaptionUrl(
-                      publication,
-                      caption.trackNumber,
-                    )}
-                    srcLang={caption.languageTag}
-                    label={caption.label}
-                    default={caption.isDefault}
+          {publication.chapters.length ? (
+            <section className="mt-10 border-t border-[var(--wk-border)] pt-8">
+              <div className="flex items-end justify-between gap-4">
+                <div>
+                  <p className="text-[10px] font-black uppercase tracking-[0.18em] text-[var(--wk-brand)]">
+                    Chapters
+                  </p>
+                  <h2 className="mt-1 text-[22px] font-black tracking-[-0.025em]">
+                    Move through the film
+                  </h2>
+                </div>
+              </div>
+
+              <div className="mt-4 divide-y divide-[var(--wk-border)] border-y border-[var(--wk-border)]">
+                {publication.chapters.map((chapter) => (
+                  <button
+                    key={chapter.chapterNumber}
+                    type="button"
+                    onClick={() => jumpToChapter(chapter.startSeconds)}
+                    disabled={publication.delivery.kind !== "native_media"}
+                    className="group flex w-full items-start gap-4 py-4 text-left disabled:cursor-default"
+                  >
+                    <span className="w-12 shrink-0 pt-0.5 font-mono text-[11px] font-black text-[var(--wk-brand)]">
+                      {formatDuration(chapter.startSeconds)}
+                    </span>
+                    <span className="min-w-0 flex-1">
+                      <span className="block text-[13px] font-black text-[var(--wk-text)] group-hover:text-[var(--wk-brand)]">
+                        {chapter.title}
+                      </span>
+                      {chapter.description ? (
+                        <span className="mt-1 block text-[12px] leading-5 text-[var(--wk-text-muted)]">
+                          {chapter.description}
+                        </span>
+                      ) : null}
+                    </span>
+                    {publication.delivery.kind === "native_media" ? (
+                      <i className="ri-play-fill mt-0.5 text-sm text-[var(--wk-text-faint)] group-hover:text-[var(--wk-brand)]" />
+                    ) : null}
+                  </button>
+                ))}
+              </div>
+            </section>
+          ) : null}
+
+          {related.length ? (
+            <section className="mt-10 border-t border-[var(--wk-border)] pt-8">
+              <div className="flex items-end justify-between gap-4">
+                <div>
+                  <p className="text-[10px] font-black uppercase tracking-[0.18em] text-[var(--wk-brand)]">
+                    Keep watching
+                  </p>
+                  <h2 className="mt-1 text-[22px] font-black tracking-[-0.025em]">
+                    More from {publication.show?.title || "WAKILISHA Video"}
+                  </h2>
+                </div>
+                <Link
+                  to="/video"
+                  className="shrink-0 text-[11px] font-black text-[var(--wk-brand)]"
+                >
+                  View all
+                </Link>
+              </div>
+
+              <div className="mt-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                {related.slice(0, 6).map((item) => (
+                  <PublicVideoCard
+                    key={item.versionId}
+                    publication={item}
+                    compact
                   />
                 ))}
-                Your browser does not support HTML video.
-              </video>
-            ) : providerUrl ? (
-              <div className="aspect-video w-full">
-                <iframe
-                  src={providerUrl}
-                  title={publication.title}
-                  className="h-full w-full border-0"
-                  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
-                  allowFullScreen
-                  referrerPolicy="strict-origin-when-cross-origin"
-                />
               </div>
-            ) : (
-              <div className="flex min-h-[320px] items-center justify-center p-8 text-center text-sm text-white/70">
-                This Video provider does not have an embeddable public player.
-              </div>
-            )}
-          </div>
+            </section>
+          ) : null}
         </div>
       </section>
-
-      {publication.chapters.length ? (
-        <section className="wk-container-wide px-4 py-10 sm:px-6 lg:px-8">
-          <div className="mx-auto max-w-6xl">
-            <div className="max-w-2xl">
-              <p className="text-xs font-black uppercase tracking-[0.18em] text-wk-brand">
-                Chapters
-              </p>
-              <h2 className="mt-2 text-3xl font-black tracking-[-0.035em]">
-                Move through the film
-              </h2>
-            </div>
-
-            <div className="mt-6 divide-y divide-wk-border border-y border-wk-border">
-              {publication.chapters.map((chapter) => (
-                <button
-                  key={chapter.chapterNumber}
-                  type="button"
-                  onClick={() => jumpToChapter(chapter.startSeconds)}
-                  disabled={publication.delivery.kind !== "native_media"}
-                  className="group flex w-full items-start gap-4 py-4 text-left disabled:cursor-default"
-                >
-                  <span className="w-14 shrink-0 pt-0.5 font-mono text-xs font-bold text-wk-brand">
-                    {formatDuration(chapter.startSeconds)}
-                  </span>
-                  <span className="min-w-0 flex-1">
-                    <span className="block text-sm font-black group-hover:text-wk-brand">
-                      {chapter.title}
-                    </span>
-                    {chapter.description ? (
-                      <span className="mt-1 block text-sm leading-6 text-wk-text-muted">
-                        {chapter.description}
-                      </span>
-                    ) : null}
-                  </span>
-                  {publication.delivery.kind === "native_media" ? (
-                    <WkIcon
-                      name="Play"
-                      size={15}
-                      className="mt-0.5 text-wk-text-faint group-hover:text-wk-brand"
-                    />
-                  ) : null}
-                </button>
-              ))}
-            </div>
-          </div>
-        </section>
-      ) : null}
-
-      <PublicTrustSummary
-        provenance={{
-          firstPublishedAt: publication.provenance.firstPublishedAt,
-          publishedAt: publication.provenance.publishedAt,
-          versionNumber: publication.provenance.versionNumber,
-        }}
-        credits={trust.credits}
-        sources={trust.sources}
-        corrections={[]}
-      />
     </main>
   );
 }
