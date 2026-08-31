@@ -228,6 +228,27 @@ export function proposeTrackStewardRepair(input: {
   const slugChanged =
     proposedSlug !== currentSlug;
 
+  if (!proposedSlug) {
+    return {
+      decision: "defer",
+      ruleKey: "track.structural_credit_unproven.v1",
+      ruleVersion: REGISTRY_STEWARD_RULE_VERSION,
+      currentTitle,
+      currentSlug,
+      proposedTitle: currentTitle,
+      proposedNormalizedTitle:
+        normalizeRegistryIdentityText(currentTitle),
+      proposedSlug: currentSlug,
+      structuralFeaturedNames: structural.featuredNames,
+      evidence: {
+        featuredCreditCoverage,
+        currentSlugMatchesCanonical: true,
+        titleChanged: false,
+        slugChanged: false,
+      },
+    };
+  }
+
   if (!titleChanged && !slugChanged) {
     return {
       decision: "noop",
