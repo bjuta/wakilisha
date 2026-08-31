@@ -122,11 +122,11 @@ async function protectedCaptionUrl(storagePath: string): Promise<string> {
   const expires = Math.floor(Date.now() / 1000) + 60;
   const token = await hmacSha256Hex(
     MEDIA_PRIVATE_DELIVERY_SECRET,
-    \`\${expires}\\n\${storagePath}\`,
+    `${expires}\\n${storagePath}`,
   );
 
   const url = new URL(
-    \`https://media.wakilisha.africa/__private/media-file/\${encodeStoragePath(storagePath)}\`,
+    `https://media.wakilisha.africa/__private/media-file/${encodeStoragePath(storagePath)}`,
   );
   url.searchParams.set("expires", String(expires));
   url.searchParams.set("token", token);
@@ -249,7 +249,7 @@ serve(async (request) => {
     return notFound(method);
   }
 
-  const etag = \`"\${stringValue(target.sha256)}"\`;
+  const etag = `"${stringValue(target.sha256)}"`;
 
   return response(
     method === "HEAD" ? null : mediaResponse.body,
