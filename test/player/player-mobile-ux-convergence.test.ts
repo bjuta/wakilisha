@@ -100,7 +100,7 @@ describe("Player and mobile media UX convergence", () => {
     expect(mobileTopBar).not.toContain("useScrollDirection()");
     expect(mobileTopBar).toContain("translateY(-16px)");
     expect(mobileTopBar).toContain(
-      "pointer-events-none sticky top-0",
+      "pointer-events-none fixed inset-x-0 top-0",
     );
     expect(mobileTopBar).not.toContain("border-b");
     expect(mobileTopBar).not.toContain('to="/profile"');
