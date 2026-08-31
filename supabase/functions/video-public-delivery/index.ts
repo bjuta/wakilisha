@@ -205,6 +205,10 @@ serve(async (request) => {
   );
 
   if (error || !data || typeof data !== "object") {
+    console.warn("VIDEO_PUBLIC_DELIVERY_STAGE=caption_target_rpc_failed", {
+      has_error: Boolean(error),
+      has_data: Boolean(data),
+    });
     return notFound(method);
   }
 
@@ -217,6 +221,10 @@ serve(async (request) => {
     || !Number.isFinite(byteSize)
     || byteSize <= 0
   ) {
+    console.warn("VIDEO_PUBLIC_DELIVERY_STAGE=caption_target_invalid", {
+      mime_type: mimeType,
+      byte_size_valid: Number.isFinite(byteSize) && byteSize > 0,
+    });
     return notFound(method);
   }
 
@@ -224,6 +232,7 @@ serve(async (request) => {
   try {
     storagePath = privateCaptionPath(target.storage_path);
   } catch {
+    console.warn("VIDEO_PUBLIC_DELIVERY_STAGE=caption_path_invalid");
     return notFound(method);
   }
 
@@ -235,7 +244,13 @@ serve(async (request) => {
     },
   });
 
-  if (!mediaResponse.ok) return notFound(method);
+  if (!mediaResponse.ok) {
+    console.warn("VIDEO_PUBLIC_DELIVERY_STAGE=caption_origin_failed", {
+      status: mediaResponse.status,
+      status_text: mediaResponse.statusText,
+    });
+    return notFound(method);
+  }
 
   const upstreamType = (
     mediaResponse.headers
@@ -246,6 +261,9 @@ serve(async (request) => {
   );
 
   if (upstreamType && upstreamType !== "text/vtt") {
+    console.warn("VIDEO_PUBLIC_DELIVERY_STAGE=caption_origin_type_invalid", {
+      content_type: upstreamType,
+    });
     return notFound(method);
   }
 
