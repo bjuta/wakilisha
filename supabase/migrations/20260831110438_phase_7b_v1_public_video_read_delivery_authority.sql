@@ -279,7 +279,19 @@ begin
           'slug', v_show.slug,
           'title', v_show.title,
           'description', v_show.description,
-          'canonical_path', '/shows/' || v_show.slug
+          'canonical_path',
+            case
+              when exists (
+                select 1
+                from editorial.resources show_resource
+                where show_resource.id = v_show.resource_id
+                  and show_resource.resource_kind = 'show'
+                  and show_resource.lifecycle_state = 'active'
+                  and show_resource.visibility = 'public'
+              )
+              then '/shows/' || v_show.slug
+              else null
+            end
         )
         else null
       end,
