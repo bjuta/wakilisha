@@ -7,6 +7,7 @@ import {
   useRef,
   useState,
 } from "react";
+import { providerEmbedUrl } from "./providerSource";
 
 export interface VideoPlaybackCaption {
   trackNumber: number;
@@ -27,8 +28,10 @@ export type VideoPlaybackSource =
     }
   | {
       kind: "provider";
-      embedUrl: string;
-      providerKey?: string | null;
+      sourceId?: string | null;
+      providerKey: string;
+      providerObjectId: string;
+      canonicalUrl?: string | null;
     };
 
 interface VideoPlaybackCanvasProps {
@@ -312,6 +315,7 @@ export function VideoPlaybackCanvas({
   };
 
   if (source.kind === "provider") {
+    const embedUrl = providerEmbedUrl(source);
     return (
       <div
         ref={shellRef}
@@ -319,15 +323,23 @@ export function VideoPlaybackCanvas({
           "relative h-full w-full overflow-hidden bg-black",
           className,
         )}
+        data-wk-video-source-id={source.sourceId || undefined}
+        data-wk-video-provider={source.providerKey}
       >
-        <iframe
-          src={source.embedUrl}
-          title={title}
-          className="absolute inset-0 h-full w-full border-0"
-          allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
-          allowFullScreen
-          referrerPolicy="strict-origin-when-cross-origin"
-        />
+        {embedUrl ? (
+          <iframe
+            src={embedUrl}
+            title={title}
+            className="absolute inset-0 h-full w-full border-0"
+            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+            allowFullScreen
+            referrerPolicy="strict-origin-when-cross-origin"
+          />
+        ) : (
+          <div className="absolute inset-0 flex items-center justify-center p-6 text-center text-sm text-white/70">
+            This Video provider does not have an embeddable public player.
+          </div>
+        )}
         {collapsed ? (
           <div className="pointer-events-none absolute inset-x-0 top-0 flex items-center justify-between bg-gradient-to-b from-black/85 to-transparent p-2">
             <span className="truncate pr-3 text-[11px] font-bold text-white/90">

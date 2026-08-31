@@ -1,4 +1,13 @@
 export type { VideoEmbedData, VideoMode } from "./types";
+export type { CanonicalVideoProviderSource } from "./providerSource";
+export {
+  canonicalProviderUrl,
+  parseLegacyProviderUrl,
+  providerEmbedUrl,
+  providerLabel,
+  providerSourceKey,
+  providerThumbnailUrl,
+} from "./providerSource";
 export {
   getYouTubeId,
   getVimeoId,

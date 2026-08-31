@@ -39,7 +39,10 @@ export function ArticleContentRenderer({
       entityType: "article",
       context: {
         action: ev.action,
-        video_url: ev.videoUrl,
+        video_source_id: ev.videoSourceId,
+        provider_key: ev.providerKey,
+        provider_object_id: ev.providerObjectId,
+        canonical_url: ev.canonicalUrl,
         platform: ev.platform,
         video_title: ev.videoTitle,
         video_index: ev.index,

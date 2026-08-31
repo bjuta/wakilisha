@@ -23282,6 +23282,15 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      resolve_video_provider_sources_for_service: {
+        Args: { p_provider_key: string; p_provider_object_ids: string[] }
+        Returns: {
+          canonical_url: string
+          provider_key: string
+          provider_object_id: string
+          source_id: string
+        }[]
+      }
       restore_article_from_archive: {
         Args: { p_article_id: string; p_note?: string }
         Returns: {

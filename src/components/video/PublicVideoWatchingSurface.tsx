@@ -47,20 +47,6 @@ function formatDate(value: string | null): string {
   }).format(date);
 }
 
-function providerEmbedUrl(
-  publication: PublicVideoPublication,
-): string | null {
-  if (publication.delivery.kind !== "provider") return null;
-  const id = publication.delivery.providerObjectId;
-  if (publication.delivery.providerKey === "youtube" && id) {
-    return `https://www.youtube.com/embed/${encodeURIComponent(id)}`;
-  }
-  if (publication.delivery.providerKey === "vimeo" && id) {
-    return `https://player.vimeo.com/video/${encodeURIComponent(id)}`;
-  }
-  return null;
-}
-
 function creditHref(credit: PublicVideoCredit): string | null {
   if (credit.authorSlug) return `/people/${credit.authorSlug}`;
   return credit.username ? `/u/${credit.username}` : null;
@@ -235,14 +221,14 @@ export function PublicVideoWatchingSurface({
       };
     }
 
-    const embedUrl = providerEmbedUrl(publication);
-    return embedUrl
-      ? {
-          kind: "provider",
-          embedUrl,
-          providerKey: publication.delivery.providerKey,
-        }
-      : null;
+    if (!publication.delivery.providerObjectId) return null;
+
+    return {
+      kind: "provider",
+      providerKey: publication.delivery.providerKey,
+      providerObjectId: publication.delivery.providerObjectId,
+      canonicalUrl: publication.delivery.canonicalUrl,
+    };
   }, [publication]);
 
   const collapsePlayer = () => {

@@ -1,9 +1,12 @@
 import { useState, useCallback, useRef } from "react";
-import type { VideoMode } from "./types";
+import type { VideoEmbedData, VideoMode } from "./types";
 
 export interface VideoPlayEvent {
   action: "open" | "close";
-  videoUrl: string;
+  videoSourceId: string | null;
+  providerKey: string;
+  providerObjectId: string;
+  canonicalUrl: string | null;
   platform: string;
   videoTitle: string;
   index: number;
@@ -21,8 +24,27 @@ export interface VideoPlayerState {
   close: () => void;
 }
 
+function buildPlayEvent(
+  video: VideoEmbedData,
+  action: VideoPlayEvent["action"],
+  index: number,
+  openedAt?: number,
+): VideoPlayEvent {
+  return {
+    action,
+    videoSourceId: video.sourceId,
+    providerKey: video.providerKey,
+    providerObjectId: video.providerObjectId,
+    canonicalUrl: video.canonicalUrl,
+    platform: video.platform,
+    videoTitle: video.title,
+    index,
+    openedAt,
+  };
+}
+
 export function useVideoPlayer(
-  videos?: { url: string; platform: string; title: string }[],
+  videos?: VideoEmbedData[],
   onPlayEvent?: VideoPlayEventHandler,
 ): VideoPlayerState {
   const [activeIndex, setActiveIndex] = useState<number | null>(null);
@@ -35,16 +57,9 @@ export function useVideoPlayer(
       setMode("lightbox");
       const now = Date.now();
       openedAtRef.current = now;
-      const vid = videos?.[idx];
-      if (vid && onPlayEvent) {
-        onPlayEvent({
-          action: "open",
-          videoUrl: vid.url,
-          platform: vid.platform,
-          videoTitle: vid.title,
-          index: idx,
-          openedAt: now,
-        });
+      const video = videos?.[idx];
+      if (video && onPlayEvent) {
+        onPlayEvent(buildPlayEvent(video, "open", idx, now));
       }
     },
     [videos, onPlayEvent],
@@ -52,35 +67,30 @@ export function useVideoPlayer(
 
   const handleNavigate = useCallback(
     (dir: -1 | 1) => {
-      setActiveIndex((prev) => {
-        if (prev === null) return prev;
-        const next = prev + dir;
-        if (videos && (next < 0 || next >= videos.length)) return prev;
-        // Fire close for current, open for next
-        const currentVid = videos?.[prev];
-        const nextVid = videos?.[next];
-        if (currentVid && onPlayEvent) {
-          onPlayEvent({
-            action: "close",
-            videoUrl: currentVid.url,
-            platform: currentVid.platform,
-            videoTitle: currentVid.title,
-            index: prev,
-            openedAt: openedAtRef.current ?? undefined,
-          });
+      setActiveIndex((previous) => {
+        if (previous === null) return previous;
+        const next = previous + dir;
+        if (videos && (next < 0 || next >= videos.length)) return previous;
+
+        const currentVideo = videos?.[previous];
+        const nextVideo = videos?.[next];
+        if (currentVideo && onPlayEvent) {
+          onPlayEvent(
+            buildPlayEvent(
+              currentVideo,
+              "close",
+              previous,
+              openedAtRef.current ?? undefined,
+            ),
+          );
         }
+
         const now = Date.now();
         openedAtRef.current = now;
-        if (nextVid && onPlayEvent && next >= 0) {
-          onPlayEvent({
-            action: "open",
-            videoUrl: nextVid.url,
-            platform: nextVid.platform,
-            videoTitle: nextVid.title,
-            index: next,
-            openedAt: now,
-          });
+        if (nextVideo && onPlayEvent && next >= 0) {
+          onPlayEvent(buildPlayEvent(nextVideo, "open", next, now));
         }
+
         return next;
       });
     },
@@ -88,23 +98,24 @@ export function useVideoPlayer(
   );
 
   const handleChangeMode = useCallback(
-    (m: VideoMode) => {
-      if (m === "closed" && activeIndex !== null && onPlayEvent) {
-        const vid = videos?.[activeIndex];
-        if (vid) {
-          onPlayEvent({
-            action: "close",
-            videoUrl: vid.url,
-            platform: vid.platform,
-            videoTitle: vid.title,
-            index: activeIndex,
-            openedAt: openedAtRef.current ?? undefined,
-          });
+    (nextMode: VideoMode) => {
+      if (nextMode === "closed" && activeIndex !== null && onPlayEvent) {
+        const video = videos?.[activeIndex];
+        if (video) {
+          onPlayEvent(
+            buildPlayEvent(
+              video,
+              "close",
+              activeIndex,
+              openedAtRef.current ?? undefined,
+            ),
+          );
         }
         openedAtRef.current = null;
       }
-      setMode(m);
-      if (m === "closed") {
+
+      setMode(nextMode);
+      if (nextMode === "closed") {
         setActiveIndex(null);
       }
     },
@@ -113,19 +124,20 @@ export function useVideoPlayer(
 
   const close = useCallback(() => {
     if (activeIndex !== null && onPlayEvent) {
-      const vid = videos?.[activeIndex];
-      if (vid) {
-        onPlayEvent({
-          action: "close",
-          videoUrl: vid.url,
-          platform: vid.platform,
-          videoTitle: vid.title,
-          index: activeIndex,
-          openedAt: openedAtRef.current ?? undefined,
-        });
+      const video = videos?.[activeIndex];
+      if (video) {
+        onPlayEvent(
+          buildPlayEvent(
+            video,
+            "close",
+            activeIndex,
+            openedAtRef.current ?? undefined,
+          ),
+        );
       }
       openedAtRef.current = null;
     }
+
     setMode("closed");
     setActiveIndex(null);
   }, [activeIndex, videos, onPlayEvent]);

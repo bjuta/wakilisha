@@ -1,5 +1,13 @@
-export interface VideoEmbedData {
-  url: string;
+import {
+  parseLegacyProviderUrl,
+  providerLabel,
+  providerSourceKey,
+  type CanonicalVideoProviderSource,
+} from "./providerSource";
+
+export interface VideoEmbedData extends CanonicalVideoProviderSource {
+  sourceId: string | null;
+  canonicalUrl: string | null;
   title: string;
   platform: string;
   thumbnail: string | null;
@@ -8,67 +16,78 @@ export interface VideoEmbedData {
 export type VideoMode = "lightbox" | "pip" | "closed";
 
 export function getYouTubeId(url: string): string | null {
-  const patterns = [
-    /(?:youtube\.com\/watch\?v=|youtu\.be\/|youtube\.com\/embed\/)([a-zA-Z0-9_-]{11})/,
-  ];
-  for (const p of patterns) {
-    const m = url.match(p);
-    if (m) return m[1];
-  }
-  return null;
+  const source = parseLegacyProviderUrl(url);
+  return source?.providerKey === "youtube"
+    ? source.providerObjectId
+    : null;
 }
 
 export function getVimeoId(url: string): string | null {
-  const m = url.match(/vimeo\.com\/(\d+)/);
-  return m ? m[1] : null;
+  const source = parseLegacyProviderUrl(url);
+  return source?.providerKey === "vimeo"
+    ? source.providerObjectId
+    : null;
 }
 
 export function detectPlatform(url: string): string {
-  if (getYouTubeId(url)) return "YouTube";
-  if (getVimeoId(url)) return "Vimeo";
-  return "Video";
+  const source = parseLegacyProviderUrl(url);
+  return source ? providerLabel(source.providerKey) : "Video";
 }
 
 export function getThumbnail(_url: string): string | null {
-  // Avoid noisy 404s from old/private/deleted YouTube thumbnails.
-  // VideoCard already renders a branded platform fallback when no thumbnail is present.
+  // Avoid noisy 404s from old, private, or deleted provider thumbnails.
+  // Provider-backed surfaces may supply a known thumbnail explicitly.
   return null;
 }
 
 export function platformIcon(platform: string): string {
   switch (platform) {
-    case "YouTube": return "ri-youtube-fill";
-    case "Vimeo": return "ri-vimeo-fill";
-    default: return "ri-film-line";
+    case "YouTube":
+      return "ri-youtube-fill";
+    case "Vimeo":
+      return "ri-vimeo-fill";
+    default:
+      return "ri-film-line";
   }
 }
 
 export const VIDEO_MARKER_PREFIX = "WK_VIDEO_";
 
 /**
- * Transforms article HTML by replacing iframe embeds with comment markers
- * and extracting video metadata. Returns the marked HTML and a list of videos.
+ * Preserves legacy Article HTML as historical content while resolving supported
+ * provider iframes into canonical Video source identity for presentation.
  */
-export function transformArticleHtmlForVideoEmbeds(html: string): {
+export function transformArticleHtmlForVideoEmbeds(
+  html: string,
+  canonicalSources: CanonicalVideoProviderSource[] = [],
+): {
   markedHtml: string;
   videos: VideoEmbedData[];
 } {
   if (!html) return { markedHtml: "", videos: [] };
 
+  const sourceByKey = new Map(
+    canonicalSources.map((source) => [providerSourceKey(source), source]),
+  );
   const parser = new DOMParser();
   const doc = parser.parseFromString(html, "text/html");
   const iframes = doc.querySelectorAll("iframe");
   const videos: VideoEmbedData[] = [];
 
-  iframes.forEach((iframe, idx) => {
+  iframes.forEach((iframe) => {
     const src = iframe.getAttribute("src") || "";
-    if (!src) return;
+    const legacySource = parseLegacyProviderUrl(src);
+    if (!legacySource) return;
 
-    const title = iframe.getAttribute("title") || `${detectPlatform(src)} video`;
-    const platform = detectPlatform(src);
-    const thumbnail = getThumbnail(src);
-
-    const marker = doc.createComment(`${VIDEO_MARKER_PREFIX}${idx}`);
+    const resolvedSource =
+      sourceByKey.get(providerSourceKey(legacySource)) ?? legacySource;
+    const title =
+      iframe.getAttribute("title") ||
+      `${providerLabel(resolvedSource.providerKey)} video`;
+    const markerIndex = videos.length;
+    const marker = doc.createComment(
+      `${VIDEO_MARKER_PREFIX}${markerIndex}`,
+    );
 
     const parent = iframe.parentElement;
     if (
@@ -82,7 +101,15 @@ export function transformArticleHtmlForVideoEmbeds(html: string): {
       iframe.replaceWith(marker);
     }
 
-    videos.push({ url: src, title, platform, thumbnail });
+    videos.push({
+      sourceId: resolvedSource.sourceId ?? null,
+      providerKey: resolvedSource.providerKey,
+      providerObjectId: resolvedSource.providerObjectId,
+      canonicalUrl: resolvedSource.canonicalUrl ?? null,
+      title,
+      platform: providerLabel(resolvedSource.providerKey),
+      thumbnail: getThumbnail(src),
+    });
   });
 
   return { markedHtml: doc.body.innerHTML, videos };
