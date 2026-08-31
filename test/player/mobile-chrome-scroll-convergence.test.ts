@@ -66,7 +66,10 @@ describe("Mobile chrome scroll convergence", () => {
     );
   });
 
-  it("leaves the middle of mobile top chrome empty", () => {
+  it("keeps top chrome out of content flow and leaves its middle empty", () => {
+    expect(topBar).toContain(
+      "pointer-events-none fixed inset-x-0 top-0",
+    );
     expect(topBar).not.toContain("sectionLabel");
     expect(topBar).not.toContain("{label}");
     expect(topBar).not.toContain(
