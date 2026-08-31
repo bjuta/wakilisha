@@ -1,0 +1,32 @@
+{
+  "migration_file": "supabase/migrations/20260831080826_video_caption_language_private_use_tags.sql",
+  "migration_sha256": "c91dcb613c80a4efacbc75f3b0160e6db18b8f6dd23e3e60ccbf041ebce33270",
+  "base_main_sha": "3f85c1a7213481a64ce4d3cd760576f7b7f7760d",
+  "preview_project_ref": "kpnnfyvinusnbqzgnwrh",
+  "preview_branch_id": "0685ed7a-787c-4ec3-b468-9c011236d1fd",
+  "preview_branch_name": "video-publish-production-parity",
+  "baseline_migration_count": 74,
+  "baseline_migration_head": "20260830194344",
+  "baseline_replay": "pass",
+  "candidate_apply": "pass",
+  "preview_migration_count": 75,
+  "preview_migration_head": "20260831080826",
+  "verifier": "pass",
+  "verifier_marker": "VIDEO_CAPTION_LANGUAGE_PRIVATE_USE_PASS",
+  "verifier_file": "scripts/control-plane/verify-phase-7a-video-caption-language-private-use.sql",
+  "schema_types_sha256": "97cd758416514afcf6b0e4f9bb140c2012074af4d38905ff5f4eae3cb80d17ce",
+  "schema_migration_count": 75,
+  "schema_migration_head": "20260831080826",
+  "behavioral_fixture": "und-x-sheng accepted; malformed private-use tags rejected; existing en and sw-ke retained",
+  "fixture_terminal_state": "READ_ONLY",
+  "verified_at": "2026-08-31T08:12:00Z",
+  "production_migration_count": 75,
+  "production_migration_head": "20260831080826",
+  "production_verifier": "pass",
+  "timestamp_rebind": {
+    "accepted_preview_timestamp": "20260831075437",
+    "production_timestamp": "20260831080826",
+    "migration_bytes_unchanged": true,
+    "sql_replayed_after_success": false
+  }
+}
