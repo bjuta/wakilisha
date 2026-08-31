@@ -263,9 +263,33 @@ export function VideoEditorWorkspace({
   const workingVersionNumber = workspace
     ? versionNumber(workspace.versionHistory, workspace.resource.versions.working)
     : null;
+  const submittedVersionNumber = workspace
+    ? versionNumber(workspace.versionHistory, workspace.resource.versions.submitted)
+    : null;
+  const approvedVersionNumber = workspace
+    ? versionNumber(workspace.versionHistory, workspace.resource.versions.approved)
+    : null;
   const publishedVersionNumber = workspace
     ? versionNumber(workspace.versionHistory, workspace.resource.versions.published)
     : null;
+  const hasPendingSubmittedVersion = Boolean(
+    submittedVersionNumber !== null &&
+      (
+        publishedVersionNumber === null ||
+        submittedVersionNumber > publishedVersionNumber
+      ) &&
+      (
+        approvedVersionNumber === null ||
+        submittedVersionNumber > approvedVersionNumber
+      ),
+  );
+  const hasPendingApprovedVersion = Boolean(
+    approvedVersionNumber !== null &&
+      (
+        publishedVersionNumber === null ||
+        approvedVersionNumber > publishedVersionNumber
+      ),
+  );
   const canSubmitWorkingVersion = Boolean(
     editable &&
       workspace?.resource.versions.working &&
@@ -274,7 +298,15 @@ export function VideoEditorWorkspace({
         (
           workingVersionNumber !== null &&
           publishedVersionNumber !== null &&
-          workingVersionNumber > publishedVersionNumber
+          workingVersionNumber > publishedVersionNumber &&
+          (
+            submittedVersionNumber === null ||
+            workingVersionNumber > submittedVersionNumber
+          ) &&
+          (
+            approvedVersionNumber === null ||
+            workingVersionNumber > approvedVersionNumber
+          )
         )
       ),
   );
@@ -658,7 +690,13 @@ export function VideoEditorWorkspace({
   if (
     workspace.capabilities.canManageReview &&
     workspace.resource.versions.submitted &&
-    ["ready_for_review", "in_review"].includes(workspace.resource.lifecycleState)
+    (
+      ["ready_for_review", "in_review"].includes(workspace.resource.lifecycleState) ||
+      (
+        workspace.resource.lifecycleState === "published" &&
+        hasPendingSubmittedVersion
+      )
+    )
   ) {
     reviewActions.push(
       {
@@ -681,7 +719,13 @@ export function VideoEditorWorkspace({
   if (
     workspace.capabilities.canPublish &&
     workspace.resource.versions.approved &&
-    workspace.resource.lifecycleState === "approved"
+    (
+      workspace.resource.lifecycleState === "approved" ||
+      (
+        workspace.resource.lifecycleState === "published" &&
+        hasPendingApprovedVersion
+      )
+    )
   ) {
     reviewActions.push({
       key: "publish",
@@ -1447,7 +1491,7 @@ export function VideoEditorWorkspace({
                 </div>
               ))}
             </div>
-            {editable && workspace.resource.versions.working ? (
+            {canSubmitWorkingVersion ? (
               <div className="mt-4 border-t border-wk-border pt-4">
                 <button
                   type="button"
