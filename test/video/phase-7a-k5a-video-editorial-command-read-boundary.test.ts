@@ -12,6 +12,18 @@ function readMigration(): string {
 }
 
 const migration = readMigration();
+const languageTagMigration = fs.readFileSync(
+  path.resolve(
+    "supabase/migrations/20260831075437_video_caption_language_private_use_tags.sql",
+  ),
+  "utf8",
+);
+const languageTagVerifier = fs.readFileSync(
+  path.resolve(
+    "scripts/control-plane/verify-phase-7a-video-caption-language-private-use.sql",
+  ),
+  "utf8",
+);
 const verifier = fs.readFileSync(
   path.resolve("scripts/control-plane/verify-phase-7a-k5a-video-editorial-command-read-boundary.sql"),
   "utf8",
@@ -112,6 +124,28 @@ describe("Phase 7A K5A Video editorial command/read boundary", () => {
       expect(migration).not.toContain(primitive);
       expect(service).not.toContain(primitive);
     }
+  });
+
+  it("accepts normalized private-use caption language tags without weakening the existing Video boundary", () => {
+    const privateUsePattern =
+      "^[a-z]{2,3}(?:-[a-z0-9]{2,8})*(?:-x(?:-[a-z0-9]{1,8})+)?$";
+
+    expect(languageTagMigration.split(privateUsePattern).length - 1).toBe(3);
+    expect(languageTagMigration).toContain("caption_tracks_language_tag_check");
+    expect(languageTagMigration).toContain(
+      "publication_version_caption_tracks_language_tag_check",
+    );
+    expect(languageTagMigration).toContain("replace_video_publication_captions");
+    expect(languageTagMigration).not.toContain(
+      "^[a-z]{2,3}(?:-[a-z0-9]{2,8})*$",
+    );
+    expect(languageTagVerifier).toContain("und-x-sheng");
+    expect(languageTagVerifier).toContain("VIDEO_CAPTION_LANGUAGE_PRIVATE_USE_PASS");
+    expect(languageTagVerifier).toMatch(/^-- Permanent read-only verifier/);
+    expect(languageTagVerifier).toContain("set local transaction read only;");
+    expect(languageTagVerifier).not.toMatch(
+      /^\s*(insert|update|delete|alter|drop|create|grant|revoke)\b/im,
+    );
   });
 
   it("keeps the permanent verifier read-only", () => {
