@@ -245,6 +245,30 @@ A collision becomes a review item.
 
 MIZIZI must not solve collisions by appending arbitrary numbers unless an accepted identity policy explicitly authorizes that suffix.
 
+## Current-pointer and historical-observation policy
+
+A canonical slug change can affect other products, but not every stored slug should be rewritten.
+
+MIZIZI distinguishes:
+
+- current pointers that are expected to follow canonical identity
+- historical observations that record what existed at the time
+
+Current Track pointers currently include saved Track presentation and discussion-thread presentation. When a safe Track slug is applied, MIZIZI updates current saves by canonical Track ID and updates a discussion thread only when its stored URL proves that the thread belongs to the Track being changed.
+
+Historical analytics, activity, contribution, notification, provider, and resolution records are not rewritten. Their old strings remain evidence and can be resolved through canonical IDs, aliases, and redirects during analysis.
+
+The production audit also exposed Community primitive debt:
+
+- 82 active Track slug values are shared by more than one active Track
+- those duplicate slug groups contain 187 active Tracks
+- 50 duplicate slug groups already have a Track discussion thread
+- `community_threads` still has global uniqueness on Track `entity_slug`
+
+This means a slug alone cannot be a durable Track discussion identity. MIZIZI v1 refuses a Track write when a current thread target collides or when an old thread cannot be tied to the Track by its stored URL.
+
+The long-term Community repair is to make canonical Registry Track ID the thread identity authority and keep slug only as presentation and compatibility data.
+
 ## Route policy
 
 Old public routes are institutional memory.

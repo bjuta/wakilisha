@@ -238,6 +238,8 @@ async function assertRequiredTables(
     "wk_slug_redirects",
     "registry_review_items",
     "registry_canonical_write_events",
+    "community_saves",
+    "community_threads",
   ];
 
   for (const table of required) {
@@ -738,6 +740,35 @@ async function currentScopeCollision(
     );
   }
 
+  const communityThreadCollision =
+    await pool.query(
+      `
+      select id::text
+      from public.community_threads
+      where entity_type = 'track'
+        and (
+          entity_slug = $1
+          or entity_id = $1
+        )
+        and coalesce(entity_slug, '') <> $2
+      order by id
+      limit 1
+      `,
+      [
+        proposedSlug,
+        row.slug,
+      ],
+    );
+
+  if (communityThreadCollision.rowCount) {
+    return (
+      "candidate_slug_collides_with_current_community_thread:" +
+      String(
+        communityThreadCollision.rows[0].id,
+      )
+    );
+  }
+
   return "";
 }
 
@@ -959,6 +990,214 @@ async function ensureRedirect(
   );
 }
 
+async function communityThreadOwnershipConflict(
+  pool: ReturnType<typeof createRegistryPool>,
+  oldSlug: string,
+  paths: Array<{
+    scopeSlug: string;
+    oldPath: string;
+    newPath: string;
+  }>,
+): Promise<string> {
+  const result =
+    await pool.query(
+      `
+      select
+        id::text,
+        entity_url
+      from public.community_threads
+      where entity_type = 'track'
+        and entity_slug = $1
+      order by id
+      limit 1
+      `,
+      [oldSlug],
+    );
+
+  if (!result.rowCount) {
+    return "";
+  }
+
+  const thread =
+    result.rows[0];
+  const entityUrl =
+    String(
+      thread.entity_url || "",
+    );
+  const ownershipProven =
+    paths.some(
+      (path) =>
+        entityUrl.includes(
+          path.oldPath,
+        ),
+    );
+
+  return ownershipProven
+    ? ""
+    : (
+        "current_community_thread_ownership_ambiguous:" +
+        String(thread.id)
+      );
+}
+
+async function repairCurrentTrackPointers(
+  pool: ReturnType<typeof createRegistryPool>,
+  row: TrackRow,
+  oldSlug: string,
+  newSlug: string,
+  paths: Array<{
+    scopeSlug: string;
+    oldPath: string;
+    newPath: string;
+  }>,
+): Promise<{
+  savesUpdated: number;
+  saveUrlsUpdated: number;
+  threadsUpdated: number;
+  ambiguousThreadsSkipped: number;
+}> {
+  const saveSlugUpdate =
+    await pool.query(
+      `
+      update public.community_saves
+      set entity_slug = $1
+      where entity_type = 'track'
+        and entity_id = $2
+        and entity_slug
+            is distinct from $1
+      `,
+      [
+        newSlug,
+        row.id,
+      ],
+    );
+
+  let saveUrlsUpdated = 0;
+
+  for (const path of paths) {
+    const updated =
+      await pool.query(
+        `
+        update public.community_saves
+        set entity_url =
+          replace(
+            entity_url,
+            $1,
+            $2
+          )
+        where entity_type = 'track'
+          and entity_id = $3
+          and entity_url is not null
+          and position(
+            $1 in entity_url
+          ) > 0
+        `,
+        [
+          path.oldPath,
+          path.newPath,
+          row.id,
+        ],
+      );
+
+    saveUrlsUpdated +=
+      updated.rowCount || 0;
+  }
+
+  const threadResult =
+    await pool.query(
+      `
+      select
+        id::text,
+        entity_id,
+        entity_slug,
+        entity_url
+      from public.community_threads
+      where entity_type = 'track'
+        and entity_slug = $1
+      order by id
+      limit 1
+      `,
+      [oldSlug],
+    );
+
+  if (!threadResult.rowCount) {
+    return {
+      savesUpdated:
+        saveSlugUpdate.rowCount || 0,
+      saveUrlsUpdated,
+      threadsUpdated: 0,
+      ambiguousThreadsSkipped: 0,
+    };
+  }
+
+  const thread =
+    threadResult.rows[0];
+  const entityUrl =
+    String(
+      thread.entity_url || "",
+    );
+  const matchedPath =
+    paths.find(
+      (path) =>
+        entityUrl.includes(
+          path.oldPath,
+        ),
+    );
+
+  if (!matchedPath) {
+    return {
+      savesUpdated:
+        saveSlugUpdate.rowCount || 0,
+      saveUrlsUpdated,
+      threadsUpdated: 0,
+      ambiguousThreadsSkipped: 1,
+    };
+  }
+
+  const threadUpdate =
+    await pool.query(
+      `
+      update public.community_threads
+      set
+        entity_id = case
+          when entity_id = $1
+            then $2
+          else entity_id
+        end,
+        entity_slug = $2,
+        entity_url = case
+          when entity_url is null
+            then entity_url
+          else replace(
+            entity_url,
+            $3,
+            $4
+          )
+        end,
+        updated_at = now()
+      where id = $5::uuid
+        and entity_type = 'track'
+        and entity_slug = $1
+      `,
+      [
+        oldSlug,
+        newSlug,
+        matchedPath.oldPath,
+        matchedPath.newPath,
+        String(thread.id),
+      ],
+    );
+
+  return {
+    savesUpdated:
+      saveSlugUpdate.rowCount || 0,
+    saveUrlsUpdated,
+    threadsUpdated:
+      threadUpdate.rowCount || 0,
+    ambiguousThreadsSkipped: 0,
+  };
+}
+
 async function applyTrackSlug(
   pool: ReturnType<typeof createRegistryPool>,
   row: TrackRow,
@@ -1042,6 +1281,23 @@ async function applyTrackSlug(
         finding.proposedValue,
       );
 
+    const threadOwnershipConflict =
+      await communityThreadOwnershipConflict(
+        pool,
+        finding.currentValue,
+        paths,
+      );
+
+    if (threadOwnershipConflict) {
+      await pool.query("rollback");
+
+      return {
+        outcome: "collision",
+        reason:
+          threadOwnershipConflict,
+      };
+    }
+
     for (const path of paths) {
       await ensureRedirect(
         pool,
@@ -1095,6 +1351,15 @@ async function applyTrackSlug(
         ],
       );
 
+    const currentPointers =
+      await repairCurrentTrackPointers(
+        pool,
+        row,
+        finding.currentValue,
+        finding.proposedValue,
+        paths,
+      );
+
     await writeCanonicalEvent(
       pool,
       finding,
@@ -1103,6 +1368,14 @@ async function applyTrackSlug(
           paths.length,
         chartEntriesUpdated:
           chartUpdate.rowCount || 0,
+        communitySavesUpdated:
+          currentPointers.savesUpdated,
+        communitySaveUrlsUpdated:
+          currentPointers.saveUrlsUpdated,
+        communityThreadsUpdated:
+          currentPointers.threadsUpdated,
+        ambiguousCommunityThreadsSkipped:
+          currentPointers.ambiguousThreadsSkipped,
       },
     );
 

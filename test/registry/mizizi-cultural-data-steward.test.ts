@@ -315,5 +315,23 @@ describe("MIZIZI Cultural Data Steward", () => {
     expect(runner).toContain(
       "pg_advisory_xact_lock(",
     );
+    expect(runner).toContain(
+      "repairCurrentTrackPointers",
+    );
+    expect(runner).toContain(
+      "communityThreadOwnershipConflict",
+    );
+    expect(runner).toContain(
+      "community_saves",
+    );
+    expect(runner).toContain(
+      "community_threads",
+    );
+    expect(runner).not.toContain(
+      "community_activity",
+    );
+    expect(runner).not.toContain(
+      "analytics_events",
+    );
   });
 });
