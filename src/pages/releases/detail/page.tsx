@@ -63,7 +63,7 @@ export default function ReleaseDetail() {
           navigate(
             trackUrl(
               data.tracks[0].slug,
-              [artistSlug],
+              artistSlug ? [artistSlug] : [],
             ),
             { replace: true },
           );

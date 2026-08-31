@@ -148,7 +148,7 @@ export default function MobileReleaseDetail() {
           navigate(
             trackUrl(
               data.tracks[0].slug,
-              [artistSlug],
+              artistSlug ? [artistSlug] : [],
             ),
             { replace: true },
           );

@@ -138,12 +138,18 @@ export async function resolveTrackMarkers(
     .order("track_number", { ascending: true });
 
   for (const membership of releaseMemberships || []) {
-    if (!releaseIdByTrackId.has(membership.track_id)) {
-      releaseIdByTrackId.set(
-        membership.track_id,
-        membership.release_id,
-      );
+    const trackId = String(membership.track_id || "");
+    const releaseId = String(membership.release_id || "");
+
+    if (
+      !trackId ||
+      !releaseId ||
+      releaseIdByTrackId.has(trackId)
+    ) {
+      continue;
     }
+
+    releaseIdByTrackId.set(trackId, releaseId);
   }
 
   // Fetch label info from releases
