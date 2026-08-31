@@ -42,6 +42,18 @@ describe("Phase 7B V3 Video provider source convergence", () => {
     expect(migration).not.toContain("670");
   });
 
+  it("keeps SQL provider evidence regexes replay-safe", () => {
+    for (const source of [migration, verifier]) {
+      expect(source).toContain("youtube\\.com/watch\\?");
+      expect(source).toContain("youtube(?:-nocookie)?\\.com/embed/");
+      expect(source).toContain("youtube\\.com/shorts/");
+      expect(source).toContain("youtu\\.be/");
+      expect(source).not.toContain("youtube\\\\.com");
+      expect(source).not.toContain("watch\\\\?");
+      expect(source).not.toContain("youtu\\\\.be");
+    }
+  });
+
   it("keeps provider resolution server-owned and service-role-only", () => {
     expect(migration).toContain(
       "public.resolve_video_provider_sources_for_service",
