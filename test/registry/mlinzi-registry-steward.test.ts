@@ -17,6 +17,12 @@ function read(file: string): string {
 const runner = read(
   "scripts/registry/mlinzi-registry-steward.ts",
 );
+const machineMemoryMigration = read(
+  "supabase/migrations/20260831221500_mlinzi_registry_steward_machine_memory.sql",
+);
+const machineMemoryVerifier = read(
+  "scripts/control-plane/verify-mlinzi-registry-steward-machine-memory.sql",
+);
 const packageJson = read("package.json");
 const criticalControlPlane = read(
   ".github/workflows/critical-control-plane.yml",
@@ -258,6 +264,45 @@ describe("Mlinzi Registry Steward", () => {
     );
     expect(runner).toContain(
       "'mlinzi_structural_parity'",
+    );
+  });
+
+  it("persists machine retry memory without creating a human review queue", () => {
+    expect(machineMemoryMigration).toContain(
+      "platform_private.registry_steward_findings",
+    );
+    expect(machineMemoryMigration).toContain(
+      "platform_private.registry_steward_checkpoints",
+    );
+    expect(machineMemoryMigration).toContain(
+      "This is not an administrator review queue",
+    );
+    expect(machineMemoryMigration).toContain(
+      "from public, anon, authenticated",
+    );
+    expect(machineMemoryMigration).toContain(
+      "to service_role",
+    );
+    expect(machineMemoryVerifier).toContain(
+      "browser roles can read private steward state",
+    );
+    expect(runner).toContain(
+      "readFindingState",
+    );
+    expect(runner).toContain(
+      "rememberFinding",
+    );
+    expect(runner).toContain(
+      "loadCheckpoint",
+    );
+    expect(runner).toContain(
+      "saveCheckpoint",
+    );
+    expect(runner).toContain(
+      "finding.next_retry_at <= now()",
+    );
+    expect(runner).not.toContain(
+      "registry_enrichment_suggestions",
     );
   });
 

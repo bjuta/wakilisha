@@ -43,6 +43,16 @@ type Options = {
   since: string | null;
 };
 
+type MlinziCheckpoint = {
+  watermarkTime: string | null;
+  watermarkKey: string | null;
+};
+
+type MlinziFindingState = {
+  retryCount: number;
+  publicBreakage: boolean;
+};
+
 function parseOptions(argv: string[]): Options {
   let apply = false;
   let limit = 5000;
@@ -162,9 +172,306 @@ async function releaseAgentLock(client: pg.PoolClient): Promise<void> {
   );
 }
 
+function slugFindingKey(trackId: string): string {
+  return `track:${trackId}:slug_hygiene`;
+}
+
+async function readFindingState(
+  pool: pg.Pool,
+  findingKey: string,
+): Promise<MlinziFindingState> {
+  const result = await pool.query<{
+    retry_count: number;
+    public_breakage: boolean;
+  }>(
+    `
+      select
+        retry_count,
+        public_breakage
+      from platform_private.registry_steward_findings
+      where finding_key = $1
+        and steward_key = $2
+      limit 1
+    `,
+    [findingKey, MLINZI_ACTOR],
+  );
+
+  return {
+    retryCount: Number(result.rows[0]?.retry_count || 0),
+    publicBreakage: Boolean(
+      result.rows[0]?.public_breakage,
+    ),
+  };
+}
+
+async function rememberFinding(
+  pool: pg.Pool,
+  input: {
+    findingKey: string;
+    entityType: string;
+    entityId: string;
+    fieldName: string;
+    rule: string;
+    disposition: "defer" | "human_required";
+    publicBreakage: boolean;
+    context: Record<string, unknown>;
+  },
+): Promise<void> {
+  const existing = await readFindingState(
+    pool,
+    input.findingKey,
+  );
+  const nextRetryCount = existing.retryCount + 1;
+  const retryHours = Math.min(
+    168,
+    2 ** Math.min(nextRetryCount, 7),
+  );
+
+  await pool.query(
+    `
+      insert into platform_private.registry_steward_findings (
+        finding_key,
+        steward_key,
+        entity_type,
+        entity_id,
+        field_name,
+        rule,
+        disposition,
+        retry_count,
+        public_breakage,
+        context,
+        first_seen_at,
+        last_seen_at,
+        next_retry_at,
+        human_required_at,
+        resolved_at,
+        resolution
+      )
+      values (
+        $1,
+        $2,
+        $3,
+        $4,
+        $5,
+        $6,
+        $7,
+        $8,
+        $9,
+        $10::jsonb,
+        now(),
+        now(),
+        case
+          when $7 = 'human_required' then null
+          else now() + make_interval(hours => $11)
+        end,
+        case
+          when $7 = 'human_required' then now()
+          else null
+        end,
+        null,
+        null
+      )
+      on conflict (finding_key)
+      do update
+      set
+        rule = excluded.rule,
+        disposition = excluded.disposition,
+        retry_count = excluded.retry_count,
+        public_breakage =
+          platform_private.registry_steward_findings.public_breakage
+          or excluded.public_breakage,
+        context = excluded.context,
+        last_seen_at = now(),
+        next_retry_at = excluded.next_retry_at,
+        human_required_at =
+          case
+            when excluded.disposition = 'human_required'
+              then coalesce(
+                platform_private.registry_steward_findings.human_required_at,
+                now()
+              )
+            else null
+          end,
+        resolved_at = null,
+        resolution = null
+    `,
+    [
+      input.findingKey,
+      MLINZI_ACTOR,
+      input.entityType,
+      input.entityId,
+      input.fieldName,
+      input.rule,
+      input.disposition,
+      nextRetryCount,
+      input.publicBreakage,
+      JSON.stringify(input.context),
+      retryHours,
+    ],
+  );
+}
+
+async function resolveFinding(
+  pool: pg.Pool,
+  findingKey: string,
+  resolution: string,
+): Promise<void> {
+  await pool.query(
+    `
+      update platform_private.registry_steward_findings
+      set
+        disposition = 'resolved',
+        resolved_at = now(),
+        resolution = $3,
+        next_retry_at = null,
+        human_required_at = null,
+        last_seen_at = now()
+      where finding_key = $1
+        and steward_key = $2
+        and disposition <> 'resolved'
+    `,
+    [findingKey, MLINZI_ACTOR, resolution],
+  );
+}
+
+async function loadCheckpoint(
+  pool: pg.Pool,
+  passKey: string,
+): Promise<MlinziCheckpoint> {
+  const result = await pool.query<{
+    watermark_time: string | null;
+    watermark_key: string | null;
+  }>(
+    `
+      select
+        watermark_time::text,
+        watermark_key
+      from platform_private.registry_steward_checkpoints
+      where steward_key = $1
+        and pass_key = $2
+      limit 1
+    `,
+    [MLINZI_ACTOR, passKey],
+  );
+
+  return {
+    watermarkTime:
+      result.rows[0]?.watermark_time || null,
+    watermarkKey:
+      result.rows[0]?.watermark_key || null,
+  };
+}
+
+async function saveCheckpoint(
+  pool: pg.Pool,
+  passKey: string,
+  rows: TrackAuditRow[],
+): Promise<void> {
+  if (rows.length === 0) {
+    await pool.query(
+      `
+        insert into platform_private.registry_steward_checkpoints (
+          steward_key,
+          pass_key,
+          rows_scanned,
+          last_run_started_at,
+          last_run_completed_at
+        )
+        values ($1, $2, 0, now(), now())
+        on conflict (steward_key, pass_key)
+        do update
+        set
+          last_run_completed_at = now()
+      `,
+      [MLINZI_ACTOR, passKey],
+    );
+    return;
+  }
+
+  const last = rows.reduce((best, row) => {
+    const bestTime = new Date(best.updated_at).getTime();
+    const rowTime = new Date(row.updated_at).getTime();
+
+    if (rowTime > bestTime) return row;
+    if (
+      rowTime === bestTime &&
+      row.id.localeCompare(best.id) > 0
+    ) {
+      return row;
+    }
+    return best;
+  }, rows[0]);
+
+  await pool.query(
+    `
+      insert into platform_private.registry_steward_checkpoints (
+        steward_key,
+        pass_key,
+        watermark_time,
+        watermark_key,
+        rows_scanned,
+        last_run_started_at,
+        last_run_completed_at
+      )
+      values (
+        $1,
+        $2,
+        $3::timestamptz,
+        $4,
+        $5,
+        now(),
+        now()
+      )
+      on conflict (steward_key, pass_key)
+      do update
+      set
+        watermark_time =
+          case
+            when platform_private.registry_steward_checkpoints.watermark_time is null
+              or excluded.watermark_time >
+                 platform_private.registry_steward_checkpoints.watermark_time
+              or (
+                excluded.watermark_time =
+                  platform_private.registry_steward_checkpoints.watermark_time
+                and coalesce(excluded.watermark_key, '') >
+                    coalesce(platform_private.registry_steward_checkpoints.watermark_key, '')
+              )
+            then excluded.watermark_time
+            else platform_private.registry_steward_checkpoints.watermark_time
+          end,
+        watermark_key =
+          case
+            when platform_private.registry_steward_checkpoints.watermark_time is null
+              or excluded.watermark_time >
+                 platform_private.registry_steward_checkpoints.watermark_time
+              or (
+                excluded.watermark_time =
+                  platform_private.registry_steward_checkpoints.watermark_time
+                and coalesce(excluded.watermark_key, '') >
+                    coalesce(platform_private.registry_steward_checkpoints.watermark_key, '')
+              )
+            then excluded.watermark_key
+            else platform_private.registry_steward_checkpoints.watermark_key
+          end,
+        rows_scanned =
+          platform_private.registry_steward_checkpoints.rows_scanned
+          + excluded.rows_scanned,
+        last_run_completed_at = now()
+    `,
+    [
+      MLINZI_ACTOR,
+      passKey,
+      last.updated_at,
+      last.id,
+      rows.length,
+    ],
+  );
+}
+
 async function listTrackAuditRows(
   pool: pg.Pool,
   options: Options,
+  checkpoint: MlinziCheckpoint | null,
 ): Promise<TrackAuditRow[]> {
   const result = await pool.query<TrackAuditRow>(
     `
@@ -206,8 +513,34 @@ async function listTrackAuditRows(
         on artist.id = credit.artist_id
       where track.status = 'active'
         and (
-          $1::timestamptz is null
-          or track.updated_at >= $1::timestamptz
+          (
+            $1::timestamptz is not null
+            and track.updated_at >= $1::timestamptz
+          )
+          or (
+            $1::timestamptz is null
+            and (
+              $3::timestamptz is null
+              or track.updated_at > $3::timestamptz
+              or (
+                track.updated_at = $3::timestamptz
+                and track.id::text > coalesce($4, '')
+              )
+              or exists (
+                select 1
+                from platform_private.registry_steward_findings finding
+                where finding.steward_key = 'mlinzi'
+                  and finding.entity_type = 'track'
+                  and finding.entity_id = track.id::text
+                  and finding.field_name = 'slug'
+                  and finding.disposition = 'defer'
+                  and (
+                    finding.next_retry_at is null
+                    or finding.next_retry_at <= now()
+                  )
+              )
+            )
+          )
         )
       group by
         track.id,
@@ -217,7 +550,12 @@ async function listTrackAuditRows(
       order by track.updated_at asc, track.id asc
       limit $2::int
     `,
-    [options.since, options.limit],
+    [
+      options.since,
+      options.limit,
+      checkpoint?.watermarkTime || null,
+      checkpoint?.watermarkKey || null,
+    ],
   );
 
   return result.rows;
@@ -867,7 +1205,15 @@ async function runSlugPass(
   pool: pg.Pool,
   options: Options,
 ): Promise<Record<string, number>> {
-  const rows = await listTrackAuditRows(pool, options);
+  const checkpoint =
+    options.apply && !options.since
+      ? await loadCheckpoint(pool, "track_slug_hygiene")
+      : null;
+  const rows = await listTrackAuditRows(
+    pool,
+    options,
+    checkpoint,
+  );
   const summary = {
     scanned: rows.length,
     clean: 0,
@@ -879,25 +1225,71 @@ async function runSlugPass(
   };
 
   for (const row of rows) {
+    const findingKey = slugFindingKey(row.id);
+    const findingState =
+      options.apply
+        ? await readFindingState(pool, findingKey)
+        : { retryCount: 0, publicBreakage: false };
     const assessment = assessTrackSlug({
       trackId: row.id,
       title: row.title,
       currentSlug: row.slug,
       credits: toCredits(row),
+      retryCount: findingState.retryCount,
+      publicBreakage: findingState.publicBreakage,
     });
 
     if (assessment.disposition === "leave") {
       summary.clean += 1;
+      if (options.apply) {
+        await resolveFinding(
+          pool,
+          findingKey,
+          "Current canonical slug no longer has a steward finding.",
+        );
+      }
       continue;
     }
 
     if (assessment.disposition === "human_required") {
       summary.humanRequired += 1;
+      if (options.apply) {
+        await rememberFinding(pool, {
+          findingKey,
+          entityType: "track",
+          entityId: row.id,
+          fieldName: "slug",
+          rule: assessment.rule,
+          disposition: "human_required",
+          publicBreakage: findingState.publicBreakage,
+          context: {
+            currentSlug: row.slug,
+            candidateSlug: assessment.candidateSlug,
+            reasons: assessment.reasons,
+          },
+        });
+      }
       continue;
     }
 
     if (assessment.disposition === "defer") {
       summary.deferred += 1;
+      if (options.apply) {
+        await rememberFinding(pool, {
+          findingKey,
+          entityType: "track",
+          entityId: row.id,
+          fieldName: "slug",
+          rule: assessment.rule,
+          disposition: "defer",
+          publicBreakage: findingState.publicBreakage,
+          context: {
+            currentSlug: row.slug,
+            candidateSlug: assessment.candidateSlug,
+            reasons: assessment.reasons,
+          },
+        });
+      }
       continue;
     }
 
@@ -932,10 +1324,38 @@ async function runSlugPass(
       credits: toCredits(row),
       routeCollisionCount: collisionCount,
       redirectConflict,
+      retryCount: findingState.retryCount,
+      publicBreakage: findingState.publicBreakage,
     });
 
     if (finalAssessment.disposition !== "auto_repair") {
-      summary.deferred += 1;
+      if (finalAssessment.disposition === "human_required") {
+        summary.humanRequired += 1;
+      } else {
+        summary.deferred += 1;
+      }
+
+      if (options.apply) {
+        await rememberFinding(pool, {
+          findingKey,
+          entityType: "track",
+          entityId: row.id,
+          fieldName: "slug",
+          rule: finalAssessment.rule,
+          disposition:
+            finalAssessment.disposition === "human_required"
+              ? "human_required"
+              : "defer",
+          publicBreakage: findingState.publicBreakage,
+          context: {
+            currentSlug: row.slug,
+            candidateSlug: finalAssessment.candidateSlug,
+            collisionCount,
+            redirectConflict,
+            reasons: finalAssessment.reasons,
+          },
+        });
+      }
       continue;
     }
 
@@ -944,9 +1364,40 @@ async function runSlugPass(
     if (!options.apply) continue;
 
     const result = await applyTrackSlugRepair(pool, row);
-    if (result === "applied") summary.applied += 1;
-    if (result === "deferred") summary.deferred += 1;
+    if (result === "applied") {
+      summary.applied += 1;
+      await resolveFinding(
+        pool,
+        findingKey,
+        "Deterministic slug repair applied with permanent redirect provenance.",
+      );
+    }
+    if (result === "deferred") {
+      summary.deferred += 1;
+      await rememberFinding(pool, {
+        findingKey,
+        entityType: "track",
+        entityId: row.id,
+        fieldName: "slug",
+        rule: finalAssessment.rule,
+        disposition: "defer",
+        publicBreakage: findingState.publicBreakage,
+        context: {
+          currentSlug: row.slug,
+          candidateSlug: finalAssessment.candidateSlug,
+          reasons: ["Mutation-time authority changed or became unsafe."],
+        },
+      });
+    }
     if (result === "stale") summary.stale += 1;
+  }
+
+  if (options.apply && !options.since) {
+    await saveCheckpoint(
+      pool,
+      "track_slug_hygiene",
+      rows,
+    );
   }
 
   return summary;

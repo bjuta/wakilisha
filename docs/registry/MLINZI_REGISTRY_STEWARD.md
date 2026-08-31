@@ -259,6 +259,36 @@ Across the distinct Chart Track IDs, 64 resolve to active Registry Tracks, 112 c
 
 Mlinzi does not rewrite the Chart evidence rows. Public Chart presentation now prefers an active canonical Registry Track and active canonical Artist identity when that authority resolves, and falls back to the source evidence when it does not. This is the provenance boundary in practice: historical evidence remains inspectable while current public identity stays clean.
 
+## Durable machine memory
+
+Mlinzi does not turn uncertainty into admin work merely because a single run could not resolve it.
+
+Private machine state lives in:
+
+- `platform_private.registry_steward_findings`
+- `platform_private.registry_steward_checkpoints`
+
+These tables are not browser-readable and are not an administrator review queue.
+
+A deferred finding records:
+
+- deterministic finding key
+- affected canonical entity and field
+- steward rule
+- retry count
+- whether public breakage has been independently observed
+- current evidence context
+- next automatic retry time
+- first and last observation times
+
+Retry delay grows exponentially and caps at seven days. New canonical evidence or a due retry can bring an older finding back into the bounded scan even when the underlying entity has not changed.
+
+A finding can become `human_required` only after the pure Mlinzi policy says the conflict is persistent and materially public. Merely being old, unusual, or unresolved does not create human work.
+
+Checkpoints hold a composite `updated_at + entity id` watermark. This lets a future billion-row Registry continue from the last proven boundary instead of rescanning the full corpus every time. Due deferred findings are explicitly reintroduced independently of that watermark.
+
+Audit mode remains read-only with respect to canonical and steward state. Apply mode can write safe canonical repairs and private steward memory.
+
 ## Runtime
 
 Runner:
