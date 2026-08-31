@@ -1,5 +1,9 @@
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.1";
+import {
+  canonicalizeIncomingTrackIdentity,
+  REGISTRY_STEWARD_RULE_VERSION,
+} from "../_shared/registry-steward.ts";
 
 const SITE_BASE = "https://wakilisha.africa";
 
@@ -772,7 +776,9 @@ async function writeScrapeToRegistry(
       const track = tracks[i];
       if (!track.title) continue;
 
-      const trackTitleSlug = slugify(track.title);
+      const stewardIdentity =
+        canonicalizeIncomingTrackIdentity(track.title);
+      const trackTitleSlug = stewardIdentity.slug;
       let trackId: string | undefined;
 
       if (track.isrc) trackId = existingTrackByIsrc.get(track.isrc);
@@ -795,8 +801,8 @@ async function writeScrapeToRegistry(
         const newTrack = {
           id: newId,
           slug: trackSlug,
-          title: track.title,
-          normalized_title: slugify(track.title).replace(/-/g, " "),
+          title: stewardIdentity.title,
+          normalized_title: stewardIdentity.normalizedTitle,
           isrc: track.isrc || null,
           release_id: releaseId,
           duration_ms: track.duration_ms,
@@ -808,6 +814,11 @@ async function writeScrapeToRegistry(
             source: "wakilisha_scraper",
             scraped_artist: data.slug,
             preview_url: track.previewUrl || null,
+            source_title: stewardIdentity.sourceTitle,
+            registry_steward_rule_version:
+              REGISTRY_STEWARD_RULE_VERSION,
+            structural_featured_names:
+              stewardIdentity.structuralFeaturedNames,
           },
         };
 
@@ -826,8 +837,8 @@ async function writeScrapeToRegistry(
       } else if (options.overwrite) {
         if (!options.dryRun) {
           const overwritePatch: Record<string, unknown> = {
-            title: track.title,
-            normalized_title: slugify(track.title).replace(/-/g, " "),
+            title: stewardIdentity.title,
+            normalized_title: stewardIdentity.normalizedTitle,
             isrc: track.isrc || null,
             release_id: releaseId,
             duration_ms: track.duration_ms,
@@ -846,7 +857,8 @@ async function writeScrapeToRegistry(
         stats.tracks_upserted++;
       }
 
-      const normKey = normalizeForMatch(track.title);
+      const normKey =
+        normalizeForMatch(stewardIdentity.title);
       if (normKey && !trackNormTitleToSlug.has(normKey)) {
         trackNormTitleToSlug.set(normKey, existingTrackBySlug.get(trackTitleSlug) || trackTitleSlug);
       }
@@ -952,7 +964,9 @@ async function writeScrapeToRegistry(
       const track = tracks[i];
       if (!track.title) continue;
 
-      const trackTitleSlug = slugify(track.title);
+      const stewardIdentity =
+        canonicalizeIncomingTrackIdentity(track.title);
+      const trackTitleSlug = stewardIdentity.slug;
       let trackId: string | undefined;
 
       if (track.isrc) trackId = existingTrackByIsrc.get(track.isrc);
@@ -985,8 +999,8 @@ async function writeScrapeToRegistry(
         const newTrack = {
           id: newId,
           slug: trackSlug,
-          title: track.title,
-          normalized_title: slugify(track.title).replace(/-/g, " "),
+          title: stewardIdentity.title,
+          normalized_title: stewardIdentity.normalizedTitle,
           isrc: track.isrc || null,
           release_id: releaseId,
           duration_ms: track.duration_ms,
@@ -998,6 +1012,11 @@ async function writeScrapeToRegistry(
             source: "wakilisha_scraper",
             scraped_artist: data.slug,
             preview_url: track.previewUrl || null,
+            source_title: stewardIdentity.sourceTitle,
+            registry_steward_rule_version:
+              REGISTRY_STEWARD_RULE_VERSION,
+            structural_featured_names:
+              stewardIdentity.structuralFeaturedNames,
           },
         };
 
@@ -1015,7 +1034,8 @@ async function writeScrapeToRegistry(
         stats.tracks_upserted++;
       }
 
-      const normKey = normalizeForMatch(track.title);
+      const normKey =
+        normalizeForMatch(stewardIdentity.title);
       if (normKey && !trackNormTitleToSlug.has(normKey)) {
         trackNormTitleToSlug.set(normKey, existingTrackBySlug.get(trackTitleSlug) || trackTitleSlug);
       }
@@ -1124,25 +1144,34 @@ async function writeScrapeToRegistry(
 
     for (let i = 0; i < data.topSongs.length; i++) {
       const ts = data.topSongs[i];
-      const normKey = normalizeForMatch(ts.title);
+      const stewardIdentity =
+        canonicalizeIncomingTrackIdentity(ts.title);
+      const normKey =
+        normalizeForMatch(stewardIdentity.title);
       if (!normKey) continue;
 
       let matchedTrackSlug = trackNormTitleToSlug.get(normKey);
 
       if (!matchedTrackSlug) {
         if (options.dryRun) {
-          const syntheticSlug = dedupeSlug(slugify(ts.title), seenTrackSlugs);
+          const syntheticSlug = dedupeSlug(
+            stewardIdentity.slug,
+            seenTrackSlugs,
+          );
           matchedTrackSlug = syntheticSlug;
           trackNormTitleToSlug.set(normKey, syntheticSlug);
           stats.tracks_upserted++;
         } else {
           const trackId = crypto.randomUUID();
-          const trackSlug = dedupeSlug(slugify(ts.title), seenTrackSlugs);
+          const trackSlug = dedupeSlug(
+            stewardIdentity.slug,
+            seenTrackSlugs,
+          );
           const newTrack = {
             id: trackId,
             slug: trackSlug,
-            title: ts.title,
-            normalized_title: slugify(ts.title).replace(/-/g, " "),
+            title: stewardIdentity.title,
+            normalized_title: stewardIdentity.normalizedTitle,
             isrc: null,
             release_id: null,
             duration_ms: null,
@@ -1156,6 +1185,11 @@ async function writeScrapeToRegistry(
               scraped_artist: data.slug,
               scraped_at: now,
               rank: i + 1,
+              source_title: stewardIdentity.sourceTitle,
+              registry_steward_rule_version:
+                REGISTRY_STEWARD_RULE_VERSION,
+              structural_featured_names:
+                stewardIdentity.structuralFeaturedNames,
             },
           };
 
