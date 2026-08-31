@@ -122,8 +122,11 @@ export default function ArticlePage() {
     [rawContentHtml]
   );
   const { markedHtml: videoMarked, videos: videoEmbeds } = useMemo(
-    () => transformArticleHtmlForVideoEmbeds(shortcodeMarked),
-    [shortcodeMarked]
+    () => transformArticleHtmlForVideoEmbeds(
+      shortcodeMarked,
+      article?.videoSources ?? [],
+    ),
+    [shortcodeMarked, article?.videoSources]
   );
   const { markedHtml: finalMarked, releases: releaseEmbeds } = useMemo(
     () => transformArticleHtmlForReleaseEmbeds(videoMarked),
