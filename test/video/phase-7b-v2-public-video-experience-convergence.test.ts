@@ -40,6 +40,8 @@ describe("Phase 7B V2 public Video experience convergence", () => {
     expect(canvas).toContain('aria-label="Captions"');
     expect(canvas).toContain(">CC<");
     expect(canvas).toContain("caption.label");
+    expect(canvas).toContain('crossOrigin="anonymous"');
+    expect(canvas).toContain("onLoad={syncCaptionTracks}");
     expect(canvas).toContain("textTrack.mode =");
     expect(canvas).toContain('"showing"');
     expect(canvas).toContain('"disabled"');
