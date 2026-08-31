@@ -111,8 +111,11 @@ export default function MobileArticle() {
     [contentHtml]
   );
   const { markedHtml: videoMarked, videos: videoEmbeds } = useMemo(
-    () => transformArticleHtmlForVideoEmbeds(shortcodeMarked),
-    [shortcodeMarked]
+    () => transformArticleHtmlForVideoEmbeds(
+      shortcodeMarked,
+      article?.videoSources ?? [],
+    ),
+    [shortcodeMarked, article?.videoSources]
   );
   const { markedHtml: releaseMarked, releases: releaseEmbeds } = useMemo(
     () => transformArticleHtmlForReleaseEmbeds(videoMarked),
