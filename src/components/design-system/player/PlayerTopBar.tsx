@@ -16,9 +16,9 @@ export function PlayerTopBar({
   onClose: () => void;
   onMore: () => void;
 }) {
-  const scrollVisible = useScrollDirection();
+  const scrollChrome = useScrollDirection();
   const mobile = mode === "mobile";
-  const visible = !mobile || scrollVisible;
+  const visible = !mobile || scrollChrome.topVisible;
 
   return (
     <div
