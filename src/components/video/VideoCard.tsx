@@ -1,5 +1,4 @@
 import { VideoCardFrame } from "./VideoCardFrame";
-import { platformIcon } from "./types";
 import type { VideoEmbedData } from "./types";
 
 interface VideoCardProps {
@@ -30,9 +29,6 @@ export function VideoCard({
         badge={video.platform}
         counter={total > 1 ? `${index + 1} / ${total}` : null}
       />
-      <span className="sr-only">
-        <i className={platformIcon(video.platform)} aria-hidden="true" />
-      </span>
     </button>
   );
 }
