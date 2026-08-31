@@ -1,8 +1,24 @@
 # Phase 7A K5E Real Video Media Governance Boundary Implementation Audit
 
-Status: PRODUCTION AUTHORITY + HISTORY PARITY ACCEPTED — REAL SOURCE RETRY PENDING
+Status: CLOSED - PRODUCTION ACCEPTED; REAL VIDEO SOURCE AND PUBLICATION PROVEN
 
-Date: 30 August 2026
+Date: 31 August 2026
+
+## Final real-work outcome
+
+The same uploaded `IMG_0133.MOV` became the canonical native source for the real Phase 7A exit-gate Video without re-uploading or weakening Media governance.
+
+Final native source authority:
+
+- source id: `32e32961-8156-4fbe-9ce2-f52712b25c38`
+- Media asset id: `f35f5416-920a-45f1-995b-65492a48a144`
+- Media revision id: `678e502b-c049-4b1b-81b1-08d4399868ff`
+- exact version-bound `video_master` usage: proven
+- source Media public governance: owned, granted, public, approved_public, retain
+
+The real Video later completed immutable publication and replacement publication. Final published v8 is recorded in `docs/engineering/phase-7a-closure-record.md`.
+
+The K5E boundary is therefore no longer pending a source retry. The real workflow proved the intended separation: internal exact verified Media can compose working Video state, while public-use governance remains enforced at Publish.
 
 Accepted base:
 
