@@ -1,6 +1,6 @@
 # Phase 7B V1 Public Video Read and Delivery Implementation Audit
 
-Status: PREVIEW ACCEPTED, PROTECTED CI PENDING
+Status: PRODUCTION SQL ACCEPTED, EDGE + FRONTEND ACTIVATION PENDING
 
 Date: 31 August 2026
 
@@ -150,7 +150,7 @@ Only after baseline replay completed did V1 apply.
 
 Accepted preview candidate:
 
-- migration: `20260831111000_phase_7b_v1_public_video_read_delivery_authority.sql`
+- accepted preview migration: `20260831111000_phase_7b_v1_public_video_read_delivery_authority.sql`
 - preview migration count: `76`
 - preview head: `20260831111000`
 - migration SHA-256: `623198ec0e856b731ab5758434519dfcf0900d8aadd5a9ab21635d7485482fb7`
@@ -212,3 +212,51 @@ Before production:
 - frontend deploy needed: Yes, after merge and production backend proof
 - PR needed now: Yes, for protected CI because the candidate is preview-sealed
 - next test: focused V1 test, route audit, application build, then protected CI
+
+
+## Production SQL acceptance
+
+PR #761 merged at:
+
+`5549aed17e1a14c26f1f32d8c0ec9690ad50de3f`
+
+The exact preview-proven SQL was promoted once to production.
+
+Production recorded the migration under:
+
+`20260831111643_phase_7b_v1_public_video_read_delivery_authority.sql`
+
+Production state:
+
+- migration count: `76`
+- migration head: `20260831111643`
+- repository SQL and production-applied SQL byte equality: PASS
+- SQL SHA-256: `623198ec0e856b731ab5758434519dfcf0900d8aadd5a9ab21635d7485482fb7`
+- merged production read-only verifier: PASS
+- SQL replay after successful promotion: No
+
+The real production Video read also passed as `anon`.
+
+Real route authority:
+
+`/video/the-sounds-of-nairobi/monday-morning-in-september`
+
+Real published payload resolved:
+
+- published v8
+- native public `video_transcode` derivative
+- poster derivative
+- governed `und-x-sheng` caption relationship
+- public provenance dates
+- shared Show identity without a dead public Show link
+
+Production history is being rebound in a documentation/control-plane-only seal. No SQL is replayed during that seal.
+
+## Updated deployment checklist
+
+- SQL migration needed: No, production SQL is already live
+- Supabase Edge Function deploy needed: Yes, after production-history seal merges
+- Readdy Finish update needed: No
+- frontend deploy needed: Yes, after Edge acceptance
+- PR needed now: production-history seal only
+- next test: protected CI on production-history seal, then deploy `video-public-delivery`
