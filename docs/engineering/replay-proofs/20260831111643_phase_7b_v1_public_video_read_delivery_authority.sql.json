@@ -1,7 +1,7 @@
 {
   "migration_file": "supabase/migrations/20260831111643_phase_7b_v1_public_video_read_delivery_authority.sql",
   "migration_sha256": "623198ec0e856b731ab5758434519dfcf0900d8aadd5a9ab21635d7485482fb7",
-  "base_main_sha": "b6bbe5ac2a09d5bbe345f7c91936eb62e4f6fee1",
+  "base_main_sha": "5549aed17e1a14c26f1f32d8c0ec9690ad50de3f",
   "preview_project_ref": "qibfvikjievhmcpjlvfb",
   "preview_branch_id": "c26d4168-dd8a-4a0d-820a-a47af96e3ef0",
   "preview_branch_name": "phase-7b-v1-public-video-read-delivery-sealed",
@@ -10,7 +10,7 @@
   "baseline_replay": "pass",
   "candidate_apply": "pass",
   "preview_migration_count": 76,
-  "preview_migration_head": "20260831111000",
+  "preview_migration_head": "20260831111643",
   "verifier": "pass",
   "verifier_marker": "PHASE_7B_V1_PUBLIC_VIDEO_READ_DELIVERY_PASS",
   "verifier_file": "scripts/control-plane/verify-phase-7b-v1-public-video-read-delivery.sql",
@@ -22,10 +22,10 @@
   "edge_function_preview_sha256": "c033259e2cafbf1dc48859efc7b64a3b1a36b520cd63e2b158332d905886b64e",
   "schema_types_sha256": "5705f68dc149a9f05d3f89a9509842b303ae05d9622cad2746b7c2c7954cdd5f",
   "schema_migration_count": 76,
-  "schema_migration_head": "20260831111000",
+  "schema_migration_head": "20260831111643",
   "behavioral_fixture": "rollback-only anonymous provider-backed published Video resolves through public publication and index readers; missing slug remains hidden",
   "fixture_terminal_state": "ROLLBACK",
-  "verified_at": "2026-08-31T11:20:00Z",
+  "verified_at": "2026-08-31T11:23:00Z",
   "clean_preview_replay": true,
   "preview_sql_byte_equal": true,
   "preview_behavior_verified": true,
@@ -44,5 +44,6 @@
     "production_timestamp": "20260831111643",
     "migration_bytes_unchanged": true,
     "sql_replayed_after_success": false
-  }
+  },
+  "preview_history_rebound_to_production_timestamp": true
 }
