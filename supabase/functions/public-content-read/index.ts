@@ -233,6 +233,85 @@ function readAppleMusicCatalogId(row: any): string | null {
 
 function normalizePath(raw: string): string { const withoutPrefix = raw.replace(/^(\/functions\/v1)?\/public-content-read/, ""); return withoutPrefix.replace(/\/$/, "") || "/"; }
 
+type PublicVideoProviderSource = {
+  sourceId: string;
+  providerKey: string;
+  providerObjectId: string;
+  canonicalUrl: string;
+};
+
+function extractYouTubeProviderObjectIds(raw: string): string[] {
+  const ids = new Set<string>();
+  const patterns = [
+    /youtube\.com\/watch\?(?:[^#"'< >]*&)?v=([A-Za-z0-9_-]{11})/gi,
+    /youtube(?:-nocookie)?\.com\/embed\/([A-Za-z0-9_-]{11})/gi,
+    /youtube\.com\/shorts\/([A-Za-z0-9_-]{11})/gi,
+    /youtu\.be\/([A-Za-z0-9_-]{11})/gi,
+  ];
+
+  for (const pattern of patterns) {
+    let match: RegExpExecArray | null;
+    while ((match = pattern.exec(raw)) !== null) {
+      if (match[1]) ids.add(match[1]);
+    }
+  }
+
+  if (/^[A-Za-z0-9_-]{11}$/.test(raw.trim())) {
+    ids.add(raw.trim());
+  }
+
+  return [...ids];
+}
+
+async function resolveVideoProviderSources(
+  supabase: ReturnType<typeof createClient>,
+  providerKey: string,
+  providerObjectIds: string[],
+): Promise<PublicVideoProviderSource[]> {
+  const uniqueIds = [...new Set(providerObjectIds.filter(Boolean))];
+  if (uniqueIds.length === 0) return [];
+
+  const { data, error } = await supabase.rpc(
+    "resolve_video_provider_sources_for_service",
+    {
+      p_provider_key: providerKey,
+      p_provider_object_ids: uniqueIds,
+    },
+  );
+
+  if (error) {
+    console.error(
+      "Failed to resolve canonical Video provider sources:",
+      error.message,
+    );
+    return [];
+  }
+
+  return (data ?? []).flatMap((row: any) => {
+    const sourceId = String(row.source_id || "").trim();
+    const resolvedProviderKey = String(row.provider_key || "").trim();
+    const providerObjectId = String(row.provider_object_id || "").trim();
+    const canonicalUrl = String(row.canonical_url || "").trim();
+
+    if (
+      !sourceId ||
+      !resolvedProviderKey ||
+      !providerObjectId ||
+      !canonicalUrl
+    ) {
+      return [];
+    }
+
+    return [{
+      sourceId,
+      providerKey: resolvedProviderKey,
+      providerObjectId,
+      canonicalUrl,
+    }];
+  });
+}
+
+
 const WP_AUTHOR_MAP: Record<string, string> = { "1": "Wakilisha Staff", "37": "Muiruri Beautah", "38": "Shalom Kendi Mbae", "39": "Michael Mburu", "40": "Kambura Matiri", "41": "Kiuta Faith", "42": "gatwiri_c", "43": "Mary Gathoni", "44": "Timothy Muiruri", "47": "Sarah Wambi", "48": "Frank Njugi", "52": "Victor Muia", "54": "Hafare Segelan", "179": "Wangari Karume" };
 function resolveAuthor(article: Record<string, unknown>): string { const storedAuthor = String(article.author || "").trim(); if (storedAuthor && storedAuthor !== "Wakilisha") return storedAuthor; const rawMeta = (article.raw_meta || {}) as Record<string, unknown>; const wpAuthorId = rawMeta.post_author ? String(rawMeta.post_author) : ""; if (wpAuthorId && WP_AUTHOR_MAP[wpAuthorId]) return WP_AUTHOR_MAP[wpAuthorId]; return "Wakilisha Staff"; }
 function authorSlugFromName(name: string): string { return name.trim().toLowerCase().replace(/[\s_-]+/g, "-").replace(/[^a-z0-9-]/g, ""); }
@@ -1203,6 +1282,13 @@ Deno.serve(async (req) => {
         String(article.slug || ""),
       );
 
+      const previewContentHtml = String(article.content_html || "");
+      const previewVideoSources = await resolveVideoProviderSources(
+        supabase,
+        "youtube",
+        extractYouTubeProviderObjectIds(previewContentHtml),
+      );
+
       data = {
         article: {
           ...buildArticleIdentityResponse(
@@ -1210,7 +1296,8 @@ Deno.serve(async (req) => {
             authorPaths,
             authorOrganizationPaths,
           ),
-          contentHtml: String(article.content_html || ""),
+          contentHtml: previewContentHtml,
+          videoSources: previewVideoSources,
           seo: (article.seo || {}) as Record<string, unknown>,
           categories: parseCategoryNames(article.categories),
           wpStatus: String(article.wp_status || "draft"),
@@ -1272,6 +1359,13 @@ Deno.serve(async (req) => {
         console.error("Failed to load public Article trust:", trustError.message);
       }
 
+      const publishedContentHtml = String(article.content_html || "");
+      const publishedVideoSources = await resolveVideoProviderSources(
+        supabase,
+        "youtube",
+        extractYouTubeProviderObjectIds(publishedContentHtml),
+      );
+
       data = {
         article: {
           ...buildArticleIdentityResponse(
@@ -1279,7 +1373,8 @@ Deno.serve(async (req) => {
             authorPaths,
             authorOrganizationPaths,
           ),
-          contentHtml: String(article.content_html || ""),
+          contentHtml: publishedContentHtml,
+          videoSources: publishedVideoSources,
           seo: (article.seo || {}) as Record<string, unknown>,
           categories: parseCategoryNames(article.categories),
           trust: trustError
@@ -1322,14 +1417,107 @@ Deno.serve(async (req) => {
       const tagline = String(meta.tagline || "");
       const shortBio = tagline || stripHtml(wpBio).split(".")[0] + "." || "";
       const fullBio = wpBio || (tagline ? `<p>${tagline}</p>` : "");
-      const videos: any[] = []; const youtubeVideos = meta.youtube_videos;
-      if (Array.isArray(youtubeVideos)) { for (const item of youtubeVideos) { let videoId = ""; let title = ""; if (typeof item === "string") { const ytMatch = item.match(/youtube\.com\/watch\?v=([^&]+)/) || item.match(/youtu\.be\/([^?&]+)/); if (ytMatch) videoId = ytMatch[1]; } else if (item && typeof item === "object") { videoId = String((item as any).youtubeId || ""); title = String((item as any).title || ""); } if (videoId) videos.push({ id: videoId, title, url: "https://www.youtube.com/embed/" + videoId + "?rel=0&modestbranding=1", thumbnail: "https://img.youtube.com/vi/" + videoId + "/mqdefault.jpg", platform: "youtube" }); } }
-      if (videos.length === 0) { const videoUrlsRaw = meta.video_urls; if (typeof videoUrlsRaw === "string" && videoUrlsRaw) { try { const parsed = JSON.parse(videoUrlsRaw); const urls = Array.isArray(parsed) ? parsed : []; for (const vid of urls) { const videoUrl = String(vid.url || vid || ""); const ytMatch = videoUrl.match(/youtube\.com\/watch\?v=([^&]+)/) || videoUrl.match(/youtu\.be\/([^?&]+)/); if (ytMatch) { const videoId = ytMatch[1]; videos.push({ id: videoId, title: String(vid.title || ""), url: "https://www.youtube.com/embed/" + videoId + "?rel=0&modestbranding=1", thumbnail: "https://img.youtube.com/vi/" + videoId + "/mqdefault.jpg", platform: "youtube" }); } } } catch { /* ignore */ } } }
+      const videos: any[] = [];
+      const youtubeVideos = meta.youtube_videos;
+      if (Array.isArray(youtubeVideos)) {
+        for (const item of youtubeVideos) {
+          let videoId = "";
+          let title = "";
+          if (typeof item === "string") {
+            videoId = extractYouTubeProviderObjectIds(item)[0] || "";
+          } else if (item && typeof item === "object") {
+            const objectItem = item as any;
+            const rawIdentity = String(
+              objectItem.youtubeId ||
+              objectItem.youtube_id ||
+              objectItem.url ||
+              "",
+            );
+            videoId = extractYouTubeProviderObjectIds(rawIdentity)[0] || "";
+            title = String(objectItem.title || "");
+          }
+
+          if (videoId) {
+            videos.push({
+              id: videoId,
+              title,
+              providerKey: "youtube",
+              providerObjectId: videoId,
+              canonicalUrl: `https://www.youtube.com/watch?v=${videoId}`,
+              sourceId: "",
+              url: `https://www.youtube.com/embed/${videoId}?rel=0&modestbranding=1`,
+              thumbnail: `https://img.youtube.com/vi/${videoId}/mqdefault.jpg`,
+              platform: "youtube",
+            });
+          }
+        }
+      }
+
+      if (videos.length === 0) {
+        const videoUrlsRaw = meta.video_urls;
+        if (typeof videoUrlsRaw === "string" && videoUrlsRaw) {
+          try {
+            const parsed = JSON.parse(videoUrlsRaw);
+            const urls = Array.isArray(parsed) ? parsed : [];
+            for (const item of urls) {
+              const videoUrl = String(item.url || item || "");
+              const videoId =
+                extractYouTubeProviderObjectIds(videoUrl)[0] || "";
+              if (!videoId) continue;
+              videos.push({
+                id: videoId,
+                title: String(item.title || ""),
+                providerKey: "youtube",
+                providerObjectId: videoId,
+                canonicalUrl: `https://www.youtube.com/watch?v=${videoId}`,
+                sourceId: "",
+                url: `https://www.youtube.com/embed/${videoId}?rel=0&modestbranding=1`,
+                thumbnail: `https://img.youtube.com/vi/${videoId}/mqdefault.jpg`,
+                platform: "youtube",
+              });
+            }
+          } catch {
+            // Legacy fallback stays non-authoritative and must not block Artist reads.
+          }
+        }
+      }
+
       if (videos.length > 0) {
-        const untitled = videos.filter((v: any) => !v.title);
+        const canonicalSources = await resolveVideoProviderSources(
+          supabase,
+          "youtube",
+          videos.map((video: any) => String(video.providerObjectId || "")),
+        );
+        const sourceByObjectId = new Map(
+          canonicalSources.map((source) => [
+            source.providerObjectId,
+            source,
+          ]),
+        );
+
+        for (const video of videos) {
+          const source = sourceByObjectId.get(video.providerObjectId);
+          if (!source) continue;
+          video.sourceId = source.sourceId;
+          video.canonicalUrl = source.canonicalUrl;
+        }
+
+        const untitled = videos.filter((video: any) => !video.title);
         if (untitled.length > 0) {
-          await Promise.all(untitled.map(async (v: any) => {
-            try { const resp = await fetch(`https://www.youtube.com/oembed?url=https://www.youtube.com/watch?v=${v.id}&format=json`); if (resp.ok) { const j = await resp.json(); v.title = String(j.title || "YouTube Video"); } else { v.title = "YouTube Video"; } } catch { v.title = "YouTube Video"; }
+          await Promise.all(untitled.map(async (video: any) => {
+            try {
+              const response = await fetch(
+                `https://www.youtube.com/oembed?url=${video.canonicalUrl}&format=json`,
+              );
+              if (response.ok) {
+                const body = await response.json();
+                video.title = String(body.title || "YouTube Video");
+              } else {
+                video.title = "YouTube Video";
+              }
+            } catch {
+              video.title = "YouTube Video";
+            }
           }));
         }
       }
