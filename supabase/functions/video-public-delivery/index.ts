@@ -122,7 +122,7 @@ async function protectedCaptionUrl(storagePath: string): Promise<string> {
   const expires = Math.floor(Date.now() / 1000) + 60;
   const token = await hmacSha256Hex(
     MEDIA_PRIVATE_DELIVERY_SECRET,
-    `${expires}\\n${storagePath}`,
+    `${expires}\n${storagePath}`,
   );
 
   const url = new URL(
