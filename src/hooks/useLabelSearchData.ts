@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { supabase } from "@/lib/supabase";
+import { listLabels } from "@/services/publicContent/client";
 import { buildLabelSearchSnippet } from "@/services/cultureContext/searchAdapters";
 import { normalizeCountry } from "@/services/cultureContext/formatters";
 
@@ -22,44 +22,17 @@ export function useLabelSearchData() {
     const fetchData = async () => {
       setLoading(true);
       try {
-        const { data: labels, error: err } = await supabase
-          .from("registry_labels")
-          .select("slug, name, country_code")
-          .eq("status", "active")
-          .order("name");
+        const labels = await listLabels();
 
         if (!alive) return;
-        if (err) {
-          console.error("Failed to fetch labels for search:", err.message);
-          setError(err.message);
-          return;
-        }
 
-        // Count releases per label from release metadata.record_label
-        let releaseCountsByLabel: Record<string, number> = {};
-        if (labels && labels.length > 0) {
-          const labelNames = labels.map((l) => l.name.toLowerCase());
-          const { data: releases } = await supabase
-            .from("registry_releases")
-            .select("metadata")
-            .eq("status", "active");
-
-          (releases || []).forEach((r) => {
-            const meta = (r.metadata as Record<string, unknown>) || {};
-            const recordLabel = typeof meta.record_label === "string" ? meta.record_label.toLowerCase() : "";
-            if (recordLabel && labelNames.includes(recordLabel)) {
-              releaseCountsByLabel[recordLabel] = (releaseCountsByLabel[recordLabel] || 0) + 1;
-            }
-          });
-        }
-
-        const mapped: LabelSearchItem[] = (labels || []).map((l) => {
+        const mapped: LabelSearchItem[] = labels.map((label) => {
           const item = {
-            slug: l.slug,
-            name: l.name,
-            country: normalizeCountry(l.country_code) || "",
-            artistCount: 0,
-            releaseCount: releaseCountsByLabel[l.name.toLowerCase()] || 0,
+            slug: label.slug,
+            name: label.name,
+            country: normalizeCountry(label.country) || "",
+            artistCount: label.artistCount,
+            releaseCount: label.releaseCount,
           };
 
           return {

@@ -140,8 +140,8 @@ function createPool(): pg.Pool {
   });
 }
 
-async function acquireAgentLock(pool: pg.Pool): Promise<boolean> {
-  const result = await pool.query<{ locked: boolean }>(
+async function acquireAgentLock(client: pg.PoolClient): Promise<boolean> {
+  const result = await client.query<{ locked: boolean }>(
     `
       select pg_try_advisory_lock(
         hashtext('wakilisha:mlinzi:registry-steward')
@@ -152,8 +152,8 @@ async function acquireAgentLock(pool: pg.Pool): Promise<boolean> {
   return Boolean(result.rows[0]?.locked);
 }
 
-async function releaseAgentLock(pool: pg.Pool): Promise<void> {
-  await pool.query(
+async function releaseAgentLock(client: pg.PoolClient): Promise<void> {
+  await client.query(
     `
       select pg_advisory_unlock(
         hashtext('wakilisha:mlinzi:registry-steward')
@@ -984,6 +984,7 @@ async function runRelationshipPass(
 async function main(): Promise<void> {
   const options = parseOptions(process.argv.slice(2));
   const pool = createPool();
+  const lockClient = await pool.connect();
 
   console.log("\nMLINZI REGISTRY STEWARD");
   console.log("=".repeat(80));
@@ -998,7 +999,7 @@ async function main(): Promise<void> {
   );
 
   try {
-    if (!(await acquireAgentLock(pool))) {
+    if (!(await acquireAgentLock(lockClient))) {
       throw new Error(
         "Another Mlinzi Registry Steward run already holds the agent lock.",
       );
@@ -1030,9 +1031,11 @@ async function main(): Promise<void> {
     );
   } finally {
     try {
-      await releaseAgentLock(pool);
+      await releaseAgentLock(lockClient);
     } catch {
-      // The connection may already be closed after an earlier failure.
+      // The lock connection may already be closed after an earlier failure.
+    } finally {
+      lockClient.release();
     }
     await pool.end();
   }

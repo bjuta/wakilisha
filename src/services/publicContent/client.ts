@@ -1545,6 +1545,44 @@ async function resolveArtistOriginsBySlug(artistSlugs: string[]): Promise<Map<st
   return origins;
 }
 
+async function resolvePublicMultiTrackReleaseIds(
+  releaseIds: string[],
+): Promise<Set<string>> {
+  const uniqueIds = [...new Set(releaseIds.filter(Boolean))];
+  const counts = new Map<string, number>();
+
+  for (const ids of chunkArray(uniqueIds)) {
+    const { data, error } = await supabase
+      .from("registry_release_tracks")
+      .select("release_id, track_id")
+      .in("release_id", ids)
+      .eq("status", "active");
+
+    if (error) {
+      console.warn(
+        `Public Release membership lookup failed: ${error.message}`,
+      );
+      continue;
+    }
+
+    for (const row of data || []) {
+      const releaseId = String(row.release_id || "");
+      const trackId = String(row.track_id || "");
+      if (!releaseId || !trackId) continue;
+      counts.set(
+        releaseId,
+        (counts.get(releaseId) || 0) + 1,
+      );
+    }
+  }
+
+  return new Set(
+    [...counts.entries()]
+      .filter(([, count]) => count > 1)
+      .map(([releaseId]) => releaseId),
+  );
+}
+
 export async function listLabelsPaginated(
   params: LabelPaginatedParams,
 ): Promise<PaginatedLabelsResult> {
@@ -1560,6 +1598,11 @@ export async function listLabelsPaginated(
     return { labels: [], totalCount: 0 };
   }
 
+  const publicReleaseIds =
+    await resolvePublicMultiTrackReleaseIds(
+      (releaseRows || []).map((row) => String(row.id || "")),
+    );
+
   const releaseIdsByLabelName = new Map<string, string[]>();
   const releaseIdsByLabelId = new Map<string, string[]>();
   const activeLabelIds = new Set<string>();
@@ -1569,6 +1612,7 @@ export async function listLabelsPaginated(
     metadata: Record<string, unknown> | null;
     label_id: string | null;
   }>) {
+    if (!publicReleaseIds.has(String(r.id))) continue;
     if (r.label_id) {
       activeLabelIds.add(r.label_id);
       const ids = releaseIdsByLabelId.get(r.label_id) || [];
@@ -1746,6 +1790,11 @@ export async function getLabelCatalogStats(): Promise<LabelCatalogStats> {
     };
   }
 
+  const publicReleaseIds =
+    await resolvePublicMultiTrackReleaseIds(
+      (releaseRows || []).map((row) => String(row.id || "")),
+    );
+
   const releaseIdsByLabelName = new Map<string, string[]>();
   const releaseIdsByLabelId = new Map<string, string[]>();
   const activeLabelIds = new Set<string>();
@@ -1755,6 +1804,7 @@ export async function getLabelCatalogStats(): Promise<LabelCatalogStats> {
     metadata: Record<string, unknown> | null;
     label_id: string | null;
   }>) {
+    if (!publicReleaseIds.has(String(r.id))) continue;
     if (r.label_id) {
       activeLabelIds.add(r.label_id);
       const ids = releaseIdsByLabelId.get(r.label_id) || [];

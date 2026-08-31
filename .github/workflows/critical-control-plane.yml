@@ -74,7 +74,7 @@ jobs:
         run: npx vitest run test/video/phase-7b-v3-video-provider-source-convergence.test.ts
 
       - name: Enforce Mlinzi Registry Steward
-        run: npx vitest run test/registry/mlinzi-registry-steward.test.ts
+        run: npx vitest run test/registry/mlinzi-registry-steward.test.ts test/registry/cultural-provenance-public-projection.test.ts
 
       - name: Require Supabase control-plane access
         run: |

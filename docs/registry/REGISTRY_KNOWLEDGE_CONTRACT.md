@@ -103,6 +103,16 @@ Public music routing is derived from active `registry_release_tracks` membership
 - `registry_tracks.release_id` is a compatibility pointer, not Release membership authority.
 - Existing one-track Release URLs should converge to the canonical Track route rather than create a second public identity.
 
+### Chart evidence and public identity
+
+Chart rows preserve what the source observed. They are evidence, not a second canonical Registry.
+
+When a published Chart entry resolves to an active canonical Registry Track or Artist, public endpoints and UI should present the active canonical title, slug, artwork, and Artist identity while leaving the Chart row unchanged.
+
+If the linked canonical entity is not active or no longer resolves, public presentation may fall back to the original Chart evidence. Mlinzi may later reconcile the linkage when stronger evidence exists.
+
+This means a historical source can remain verbatim even after the Registry becomes cleaner. Provenance and clean public presentation are complementary, not competing goals.
+
 ### Rule 3: General cultural relationships belong to the Registry graph
 
 `registry_entity_relationships` becomes the flexible graph for relationships that do not deserve dedicated structural tables.

@@ -245,6 +245,20 @@ Preliminary slug audit:
 
 The 488 number is deliberately not called an automatic-repair count yet. Mlinzi must prove each candidate against canonical credits and route safety before mutation.
 
+Published Chart provenance audit:
+
+- 1,800 published Chart entry rows preserve source Track title, Artist text, and source-facing slug evidence
+- all 1,800 rows currently carry a `canonical_track_id`
+- 759 published rows resolve to an active canonical Registry Track
+- among those active resolutions, 161 source slugs differ from the canonical Registry Track slug
+- 118 source titles differ from the canonical Registry Track title
+- 58 source Artist display strings differ from the active canonical Registry Artist display name where a direct canonical Artist ID resolves
+- one source Artist slug differs from the active canonical Registry Artist slug where a direct canonical Artist ID resolves
+
+Across the distinct Chart Track IDs, 64 resolve to active Registry Tracks, 112 currently resolve to `needs_review`, four are archived, and one no longer resolves.
+
+Mlinzi does not rewrite the Chart evidence rows. Public Chart presentation now prefers an active canonical Registry Track and active canonical Artist identity when that authority resolves, and falls back to the source evidence when it does not. This is the provenance boundary in practice: historical evidence remains inspectable while current public identity stays clean.
+
 ## Runtime
 
 Runner:
