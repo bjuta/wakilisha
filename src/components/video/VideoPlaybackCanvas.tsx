@@ -265,6 +265,7 @@ export function VideoPlaybackCanvas({
     >
       <video
         ref={videoRef}
+        crossOrigin="anonymous"
         playsInline
         preload="metadata"
         poster={source.poster || undefined}
@@ -292,6 +293,7 @@ export function VideoPlaybackCanvas({
             srcLang={caption.languageTag}
             label={caption.label}
             default={caption.isDefault}
+            onLoad={syncCaptionTracks}
           />
         ))}
         Your browser does not support HTML video.
