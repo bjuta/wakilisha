@@ -130,7 +130,7 @@ describe("Phase 7B V1 public Video read and delivery", () => {
     expect(playbackCanvas).toContain('preload="metadata"');
     expect(playbackCanvas).toContain("<track");
     expect(playbackCanvas).toContain("srcLang={caption.languageTag}");
-    expect(playbackCanvas).toContain("default={caption.isDefault}");
+    expect(playbackCanvas).toContain("captions.find((caption) => caption.isDefault)");
     expect(surface).toContain("publicVideoCaptionUrl");
     expect(surface).toContain("element.currentTime = startSeconds");
     expect(surface).toContain("Publication record");
