@@ -179,18 +179,32 @@ export function analyzeTrackIdentity(input: TrackIdentityInput): MiziziFinding[]
   const featureCleanup = stripFeatureCreditNoise(input.title);
   const proposedSlug = slugifyIdentity(featureCleanup.coreTitle);
 
-  const reasons = [
-    featureMarkerInSlug(input.slug) ? "feature_credit_marker_in_slug" : "",
-    primaryArtistPrefixInSlug(input.slug, input.primaryArtistSlug)
+  const strongNoiseReasons = [
+    featureMarkerInSlug(input.slug)
+      ? "feature_credit_marker_in_slug"
+      : "",
+    primaryArtistPrefixInSlug(
+      input.slug,
+      input.primaryArtistSlug,
+    )
       ? "primary_artist_repeated_inside_slug"
       : "",
-    containsFeaturedArtistSlug(input.slug, input.featuredArtists)
+    containsFeaturedArtistSlug(
+      input.slug,
+      input.featuredArtists,
+    )
       ? "featured_artist_repeated_inside_slug"
       : "",
-    proposedSlug && proposedSlug !== input.slug ? "slug_not_minimal_title_identity" : "",
   ].filter(Boolean);
 
-  if (proposedSlug && proposedSlug !== input.slug && reasons.length > 0) {
+  const slugDiffers =
+    Boolean(proposedSlug) &&
+    proposedSlug !== input.slug;
+
+  if (
+    slugDiffers &&
+    strongNoiseReasons.length > 0
+  ) {
     findings.push(makeFinding({
       ruleId: "track_slug_identity_noise",
       entityType: "track",
@@ -200,19 +214,53 @@ export function analyzeTrackIdentity(input: TrackIdentityInput): MiziziFinding[]
       proposedValue: proposedSlug,
       confidence:
         featureMarkerInSlug(input.slug) ||
-        primaryArtistPrefixInSlug(input.slug, input.primaryArtistSlug)
+        primaryArtistPrefixInSlug(
+          input.slug,
+          input.primaryArtistSlug,
+        )
           ? 0.99
           : 0.95,
       severity: "high",
       disposition: "auto_fix_candidate",
-      reason: reasons.join(","),
+      reason: [
+        ...strongNoiseReasons,
+        "slug_not_minimal_title_identity",
+      ].join(","),
       evidence: {
         title: input.title,
-        coreTitle: featureCleanup.coreTitle,
-        removedFragments: featureCleanup.removedFragments,
-        primaryArtistSlug: input.primaryArtistSlug || "",
-        primaryArtistName: input.primaryArtistName || "",
-        featuredArtists: input.featuredArtists || [],
+        coreTitle:
+          featureCleanup.coreTitle,
+        removedFragments:
+          featureCleanup.removedFragments,
+        primaryArtistSlug:
+          input.primaryArtistSlug || "",
+        primaryArtistName:
+          input.primaryArtistName || "",
+        featuredArtists:
+          input.featuredArtists || [],
+      },
+    }));
+  } else if (slugDiffers) {
+    findings.push(makeFinding({
+      ruleId: "track_slug_identity_mismatch",
+      entityType: "track",
+      entityId: input.id,
+      fieldName: "slug",
+      currentValue: input.slug,
+      proposedValue: proposedSlug,
+      confidence: 0.6,
+      severity: "medium",
+      disposition: "review",
+      reason:
+        "slug_differs_from_minimal_title_identity_without_structural_noise_proof",
+      evidence: {
+        title: input.title,
+        coreTitle:
+          featureCleanup.coreTitle,
+        primaryArtistSlug:
+          input.primaryArtistSlug || "",
+        primaryArtistName:
+          input.primaryArtistName || "",
       },
     }));
   }

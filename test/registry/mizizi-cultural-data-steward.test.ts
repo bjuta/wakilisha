@@ -125,6 +125,38 @@ describe("MIZIZI Cultural Data Steward", () => {
     });
   });
 
+  it("keeps an unexplained slug mismatch under review", () => {
+    const findings =
+      analyzeTrackIdentity({
+        id: "track-review-1",
+        slug: "song-legacy",
+        title: "Song",
+        primaryArtistSlug:
+          "lead-artist",
+        primaryArtistName:
+          "Lead Artist",
+        featuredArtists: [],
+      });
+
+    expect(findings).toEqual([
+      expect.objectContaining({
+        ruleId:
+          "track_slug_identity_mismatch",
+        fieldName: "slug",
+        proposedValue: "song",
+        disposition: "review",
+        confidence: 0.6,
+      }),
+    ]);
+    expect(
+      findings.some(
+        (finding) =>
+          finding.disposition ===
+          "auto_fix_candidate",
+      ),
+    ).toBe(false);
+  });
+
   it("treats exact provider Release packaging as reviewable metadata", () => {
     expect(
       stripReleasePackagingSuffix(

@@ -89,7 +89,8 @@ MIZIZI may auto-fix only when the Registry already proves the answer and the cha
 Examples:
 
 - a Track slug contains feature-credit noise and the clean candidate is collision-free in its canonical scope
-- a Track slug repeats the primary artist inside an artist-scoped route
+- a Track slug repeats the explicit primary artist inside an artist-scoped route
+- a Track slug contains a structured featured artist credit that has leaked into identity
 - a chart entry has a canonical Track ID and its stored Track slug differs from that canonical Track
 
 Auto-fixes must:
@@ -135,7 +136,15 @@ Detects:
 
 The candidate slug is derived from the title after removing only featured-credit notation.
 
+Automatic repair requires at least one positive structural noise signal. A mere difference between the current slug and a title-derived slug is not enough.
+
 Non-credit version information such as `Remix` is preserved.
+
+### `track_slug_identity_mismatch`
+
+Detects a Track slug that differs from the minimal title-derived candidate without a positive structural noise signal.
+
+This is review-only in v1. The mismatch may encode collision history, transliteration, a version distinction, or an earlier editorial choice that string cleanup cannot safely interpret.
 
 ### `track_title_credit_noise`
 
@@ -178,8 +187,10 @@ This remains review-only in v1 because chart source presentation may intentional
 Read-only production audit:
 
 - 2,101 active Tracks
-- 526 Track slug changes proposed by the conservative v1 identity rule
-- 496 proposed Track slug changes currently collision-free
+- 526 active Tracks whose current slug differs from the minimal title-derived candidate
+- 514 of those mismatches have a positive structural noise signal and may enter the automatic-candidate pipeline
+- 12 mismatch-only cases remain review work
+- 11 strong-signal cases lack an explicit active primary-artist credit and therefore cannot be auto-applied
 - 490 Track slugs containing `feat`, `ft`, or `featuring`
 - 37 Track slugs repeating the primary artist with a double-hyphen prefix
 - 841 active Releases
