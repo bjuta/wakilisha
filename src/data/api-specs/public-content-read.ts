@@ -11,7 +11,8 @@ const TrackReleaseRef = { type: "object", properties: { slug: { type: "string" }
 const ChartAppearance = { type: "object", properties: { editionSlug: { type: "string" }, editionLabel: { type: "string" }, date: { type: "string" }, rank: { type: "integer" }, movement: { type: "string" } } } as const;
 const TrackDetail = { type: "object", properties: { id: { type: "string" }, slug: { type: "string" }, title: { type: "string" }, durationMs: { type: "integer" }, artworkUrl: { type: "string" }, isrc: { type: "string", nullable: true }, explicit: { type: "boolean" }, trackNumber: { type: "integer" }, discNumber: { type: "integer" }, status: { type: "string" }, previewUrl: { type: "string", nullable: true }, movement: { type: "string" }, movementAmount: { type: "integer" }, firstChartedDate: { type: "string" } } } as const;
 const TopSong = { type: "object", properties: { title: { type: "string" }, artists: { type: "string" }, image: { type: "string" }, duration: { type: "string" }, songUrl: { type: "string" } } } as const;
-const VideoRef = { type: "object", properties: { id: { type: "string" }, title: { type: "string" }, url: { type: "string" }, thumbnail: { type: "string" }, platform: { type: "string" } } } as const;
+const VideoProviderSource = { type: "object", properties: { sourceId: { type: "string" }, providerKey: { type: "string" }, providerObjectId: { type: "string" }, canonicalUrl: { type: "string" } } } as const;
+const VideoRef = { type: "object", properties: { id: { type: "string" }, title: { type: "string" }, sourceId: { type: "string" }, providerKey: { type: "string" }, providerObjectId: { type: "string" }, canonicalUrl: { type: "string" }, url: { type: "string" }, thumbnail: { type: "string" }, platform: { type: "string" } } } as const;
 const RelatedArtist = { type: "object", properties: { slug: { type: "string" }, name: { type: "string" }, imageUrl: { type: "string" }, score: { type: "integer" }, sharedTracksAll: { type: "integer" }, sharedChartTracks: { type: "integer" }, featuresThem: { type: "integer" }, theyFeature: { type: "integer" }, sharedTitles: { type: "array", items: { type: "string" } } } } as const;
 const GenreSummary = { type: "object", properties: { id: { type: "string" }, slug: { type: "string" }, name: { type: "string" }, artistCount: { type: "integer" }, trackCount: { type: "integer" }, representativeArtists: { type: "array", items: { type: "string" } } } } as const;
 const GenreDetail = { type: "object", properties: { id: { type: "string" }, slug: { type: "string" }, name: { type: "string" }, description: { type: "string", nullable: true } } } as const;
@@ -73,7 +74,7 @@ export const publicContentReadSpec = {
       ArtistSummary, ArtistDetail, ArtistRef, RelatedArtist,
       ReleaseSummary, ReleaseDetail, ReleaseWithTracks, TrackOut,
       TrackRef, TrackDetail, TrackArtistRole, TrackReleaseRef,
-      ChartAppearance, TopSong, VideoRef,
+      ChartAppearance, TopSong, VideoProviderSource, VideoRef,
       GenreSummary, GenreDetail, GenreRef, ChartTrackRef,
       LabelSummary, LabelDetail, LabelRef,
       ChartProgram, ChartEditionSummary, ChartEntry, ChartEntryRef,
