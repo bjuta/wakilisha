@@ -24,6 +24,9 @@ const service = read("src/services/video/videoPublicService.ts");
 const surface = read(
   "src/components/video/PublicVideoWatchingSurface.tsx",
 );
+const playbackCanvas = read(
+  "src/components/video/VideoPlaybackCanvas.tsx",
+);
 const indexPage = read("src/pages/video/page.tsx");
 const detailPage = read("src/pages/video/detail/page.tsx");
 const lazyPublic = read("src/router/lazyPublic.tsx");
@@ -122,15 +125,15 @@ describe("Phase 7B V1 public Video read and delivery", () => {
   });
 
   it("renders responsive native Video with governed captions and chapter seeking", () => {
-    expect(surface).toContain("<video");
-    expect(surface).toContain("controls");
-    expect(surface).toContain("playsInline");
-    expect(surface).toContain('preload="metadata"');
-    expect(surface).toContain("<track");
-    expect(surface).toContain("srcLang={caption.languageTag}");
-    expect(surface).toContain("default={caption.isDefault}");
-    expect(surface).toContain("videoRef.current.currentTime");
-    expect(surface).toContain("<PublicTrustSummary");
+    expect(playbackCanvas).toContain("<video");
+    expect(playbackCanvas).toContain("playsInline");
+    expect(playbackCanvas).toContain('preload="metadata"');
+    expect(playbackCanvas).toContain("<track");
+    expect(playbackCanvas).toContain("srcLang={caption.languageTag}");
+    expect(playbackCanvas).toContain("default={caption.isDefault}");
+    expect(surface).toContain("publicVideoCaptionUrl");
+    expect(surface).toContain("element.currentTime = startSeconds");
+    expect(surface).toContain("Publication record");
     expect(model).toContain('"captions" | "subtitles" | "forced_subtitles"');
   });
 

@@ -67,6 +67,9 @@ jobs:
       - name: Enforce Phase 7B V1 public Video read and delivery
         run: npx vitest run test/video/phase-7b-v1-public-video-read-delivery.test.ts
 
+      - name: Enforce Phase 7B V2 public Video experience convergence
+        run: npx vitest run test/video/phase-7b-v2-public-video-experience-convergence.test.ts
+
       - name: Require Supabase control-plane access
         run: |
           if [ -z "$SUPABASE_ACCESS_TOKEN" ]; then
