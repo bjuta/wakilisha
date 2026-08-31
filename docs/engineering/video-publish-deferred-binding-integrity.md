@@ -1,8 +1,25 @@
 # Video Publish Deferred Binding Integrity Repair
 
-Status: PRODUCTION DATABASE ACCEPTED — REAL PUBLISH RETRY PENDING
+Status: CLOSED - PRODUCTION ACCEPTED; REAL PUBLISH PROVEN
 
-Date: 30 August 2026
+Date: 31 August 2026
+
+## Final real-work outcome
+
+The repaired deferred shared Resource-binding integrity authority passed the same real authenticated Publish path that originally failed.
+
+The first successful real Video publication created published v4.
+
+The later captioned post-publication cycle also completed through approved v7 to published v8 without reopening the deferred-binding failure.
+
+Final published v8:
+
+- version id: `959651c7-d058-44ae-9ad6-b797c5c0f7b8`
+- content fingerprint: `228e93ca257f031106e7cc0f083b0fec3ff9964a27399e39c64044fd9e3bfe4e`
+- prior published version retained: v4
+- final Video authority revision: `9`
+
+The repair is therefore proven by real production publication, not only rollback fixture coverage.
 
 Accepted base:
 
