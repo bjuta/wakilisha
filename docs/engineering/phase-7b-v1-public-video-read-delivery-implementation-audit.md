@@ -1,6 +1,6 @@
 # Phase 7B V1 Public Video Read and Delivery Implementation Audit
 
-Status: PRODUCTION SQL ACCEPTED, EDGE + FRONTEND ACTIVATION PENDING
+Status: RUNTIME ACTIVATED, DESKTOP + MOBILE VISUAL ACCEPTANCE PENDING
 
 Date: 31 August 2026
 
@@ -252,11 +252,61 @@ Real published payload resolved:
 
 Production history is being rebound in a documentation/control-plane-only seal. No SQL is replayed during that seal.
 
-## Updated deployment checklist
+## Runtime activation acceptance
 
-- SQL migration needed: No, production SQL is already live
-- Supabase Edge Function deploy needed: Yes, after production-history seal merges
+Production runtime is now activated through accepted main:
+
+`eabbfac4571b412d4de3c49253fb818811165414`
+
+Caption transport correction:
+
+- PR #763: merged
+- protected Critical Control Plane: #750 PASS
+- production `video-public-delivery`: version 7 ACTIVE
+- deployed Edge SHA-256: `ffacaa7abb5ce6ce9c3c9f87d7231b416b59f07af94f0f5ab54c4094a236cc28`
+- real governed caption endpoint: HTTP 200
+- response MIME: `text/vtt; charset=utf-8`
+- exact accepted caption SHA-256: `c724f7dfb6bef10963d17d2c3a8325a589299e48b138490796c0040a7bb30c2c`
+- real VTT contains the accepted Sheng cues `Inajistabilize?` and `Mmh`
+
+The transport defect was bounded to the Edge adapter:
+
+- the HMAC signing message used a literal backslash-n sequence instead of the established newline-delimited private Media signing message
+- the adapter also rejected the protected origin's generic response MIME even though canonical Media authority had already verified the exact file as `text/vtt`
+
+No SQL, Video authority, Media record, Nginx rule, Cloudflare rule, or frontend product code was changed to fix the caption path.
+
+Exact-main frontend activation then passed from the same accepted main.
+
+Accepted build identity:
+
+- production main: `eabbfac4571b412d4de3c49253fb818811165414`
+- production migration count: `76`
+- production migration head: `20260831111643`
+- index SHA-256: `f6819487797cdd133e075282f04ca00fd920a7fc25b43a08fc287367f6416cfe`
+- entry: `assets/index-szMdscZv.js`
+- entry SHA-256: `bb712b89d7a9640e7c4e843c10b58c09dc00f3e8433db1b22da2e7a58c98c56c`
+- CSS: `assets/index-Cl8rs1Pv.css`
+- CSS SHA-256: `56b63941cbc11f27dcdb046bea273ade39cb66bc63556721788dafd234d79a8c`
+- files: `4480`
+- rollback snapshot: `/opt/wakilisha-react-backups/phase7a-k5b-video-editor-20260831T122059Z-eabbfac4`
+
+Independent post-activation HTTP proof:
+
+- `/video`: HTTP 200 and serves `assets/index-szMdscZv.js`
+- `/video/the-sounds-of-nairobi/monday-morning-in-september`: HTTP 200 and serves `assets/index-szMdscZv.js`
+- real Video derivative: HTTP 206 `video/mp4`, byte range `0-0/8314044`
+- real poster derivative: HTTP 206 `image/jpeg`
+- governed Sheng caption transport: HTTP 200 `text/vtt; charset=utf-8`
+
+The historical inner Lightsail runner still prints stale K5B display labels and an old K5B migration-head line at its terminal summary. Those lines are display-only. Independent production control-plane verification after activation proves the authoritative database state is `76 / 20260831111643`.
+
+## Current deployment checklist
+
+- SQL migration needed: No; production is already `76 / 20260831111643`
+- Supabase Edge Function deploy needed: No; `video-public-delivery` v7 is ACTIVE and live-proven
 - Readdy Finish update needed: No
-- frontend deploy needed: Yes, after Edge acceptance
-- PR needed now: production-history seal only
-- next test: protected CI on production-history seal, then deploy `video-public-delivery`
+- frontend deploy needed: No; exact accepted frontend is live
+- PR needed now: documentation reconciliation only
+- preview cleanup: Not yet; retain until rendered desktop/mobile acceptance
+- next test: real Video rendered desktop and mobile acceptance, including playback and governed captions
