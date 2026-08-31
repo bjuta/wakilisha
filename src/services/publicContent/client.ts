@@ -112,20 +112,28 @@ export type PublicReleaseDetail = PublicRelease & {
   } | null;
 };
 
+export type PublicVideoProviderSource = {
+  sourceId: string;
+  providerKey: string;
+  providerObjectId: string;
+  canonicalUrl: string;
+};
+
 export type PublicArticleDetail = PublicStory & {
   contentHtml: string;
   tags: string[];
   seo?: Record<string, unknown>;
   categories: string[];
   trust: PublicArticleTrust;
+  videoSources: PublicVideoProviderSource[];
 };
 
-export type PublicArtistVideo = {
+export type PublicArtistVideo = PublicVideoProviderSource & {
   id: string;
   title: string;
-  url: string;
   thumbnail: string;
   platform: string;
+  url?: string;
 };
 
 export type PublicArtistDetail = PublicArtist & {
@@ -1190,7 +1198,12 @@ export async function getArtist(slug: string): Promise<PublicArtistDetail | null
     })),
     videos: artist.videos?.map((video) => ({
       ...video,
-      thumbnail: image(video.thumbnail, { id: video.id, slug: video.url, name: video.title, type: "track" }),
+      thumbnail: image(video.thumbnail, {
+        id: video.sourceId || video.id,
+        slug: video.canonicalUrl || video.providerObjectId,
+        name: video.title,
+        type: "track",
+      }),
     })),
   };
   return await enrichArtistMedia(mapped) as PublicArtistDetail;
