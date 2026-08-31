@@ -1,42 +1,34 @@
 # WAKILISHA Master Programme Map
 
-## Current programme reconciliation — 30 August 2026
+## Current programme reconciliation - 31 August 2026
 
-**Current numbered work remains Phase 7A: Video publication authority.**
+**Phase 7A Video publication authority is CLOSED and production accepted.**
 
-The Resource-kernel movement and bounded post-kernel hardening are **closed**.
+The real exit-gate Video `Monday Morning in September` completed the canonical internal workflow through immutable working v5, submitted v6, approved v7, and published v8 after the original published v4 remained intact in history.
 
-K5A Video Editorial Command and Admin Read Boundary is production accepted.
+Final Phase 7A production authority:
 
-K5B Video Editor Composition is closed and production accepted.
+- accepted production/frontend main: `a8e10350dccd5a5b1cd5b49001a4cf8839a76bd9`
+- production migration count: `75`
+- production migration head: `20260831080826_video_caption_language_private_use_tags`
+- production frontend entry: `assets/index-S6v7xwyD.js`
+- production frontend entry SHA-256: `e878fec7815bfd014c50d3f3273259f5f74e5aeb63a3f918060bb1f0eb16ae74`
 
-**K5C Video Version Trust Convergence is CLOSED and production accepted.**
+The final published v8 carries one governed Sheng closed-caption track using exact Media revision `49427742-501d-44a0-951e-da56e51992ae` with language tag `und-x-sheng`.
 
-**K5D Video Correction Target + Provenance Convergence is CLOSED and production accepted** at migration count `69`, head `20260830144945_phase_7a_k5d_video_correction_provenance_convergence`, with accepted production/frontend main `af76d476053e9037382feb862efc55972c9049f8`.
+The real workflow exposed and closed bounded Media governance, native source integrity, deferred Resource-binding integrity, post-publication revision UI, post-publication review action lineage, and private-use caption language-tag gaps without creating competing authority.
 
-The live Video Admin Studio now carries shared exact-version Credits/Citations and governed read-only Correction provenance through canonical shared authority. `EditorialCreditPicker` is canonical after genuine Audio + Video use. `EditorialCommentEditor` remains candidate and Audio-only.
+Canonical Phase 7A closure record:
 
-Canonical closure records:
+- `docs/engineering/phase-7a-closure-record.md`
 
-- `docs/engineering/phase-7a-k5c-video-version-trust-convergence-closure-record.md`
-- `docs/engineering/phase-7a-k5d-video-correction-provenance-convergence-closure-record.md`
+The numbered programme now advances to **Phase 7B: Public Video product**.
 
-Phase 7A remains open because the exit gate is one real governed Video through immutable review and publication. Credits/Citations and Corrections/provenance continuity are closed. The next bounded work is the real Video exit-gate instrument itself, with Registry, Media, readiness, or lifecycle work added only if that real workflow exposes a concrete gap.
+Status date: 31 August 2026
 
+Current production migration head: `20260831080826`
 
-Status date: 30 August 2026
-
-Phase 6A production authority baseline: `fd0580e3a1a19e3d1f06a9c8466a37c84cd26a8b`
-
-Phase 6B governance gate: PR #684, `Enforce primitive compounding and open Phase 6B`
-
-Documentation closure gate: PR #699, `Reconcile Phase 6B milestone closure records`
-
-Production runtime application baseline: `dae3de2dc9fb021496eb0fe0c4d4f0338f676a88`
-
-Current production migration head: `20260830144945`
-
-Current production migration count: `69`
+Current production migration count: `75`
 
 ## Purpose
 
@@ -50,11 +42,11 @@ The detailed architectural and product doctrine remains in `docs/institute/two-w
 
 ## Current programme position
 
-**Phase 6A and Phase 6B are complete.**
+**Phases 6A, 6B, and 7A are complete.**
 
 The numbered programme now continues at:
 
-**Phase 7A: Video publication authority**
+**Phase 7B: Public Video product**
 
 Phase 6B closed on 25 August 2026 by explicit programme decision after its production authority and post-M2 convergence baseline were accepted through PR #706. The former real-podcast exercise remains useful non-blocking Audio operational acceptance; it is not represented as completed.
 
@@ -78,8 +70,8 @@ Phase 7A opens from production runtime baseline `dae3de2dc9fb021496eb0fe0c4d4f03
 | 5 | Playlist | Complete | One real Playlist reviewed and published end to end |
 | 6A | Audio publication authority and internal editorial product | Complete | Governed Audio authority, Admin Studio workbench, submitted-version review, and production acceptance |
 | 6B | Public Audio product | Complete | Public Audio authority accepted; former real-podcast exercise retained as non-blocking operational acceptance |
-| 7A | Video publication authority | Current | One real Video publication reaches immutable governed publication through the canonical internal workflow |
-| 7B | Public Video product | Planned | One real captioned Video publishes across desktop and mobile |
+| 7A | Video publication authority | Complete | Real Video reached immutable published v8 with governed Sheng captions and preserved prior publication history |
+| 7B | Public Video product | Current | One real captioned Video publishes across desktop and mobile |
 | 8 | Field Capture | Planned | Weak-network capture survives intake, private review, and safe promotion |
 | 9 | Public delivery, search, and SEO at scale | Planned | Public delivery no longer depends on giant read or whole-corpus build paths |
 | 10 | Registry, Charts, and evidence consolidation | Planned | Shared Trust used without competing evidence authorities |
@@ -227,11 +219,11 @@ The machine-enforced contract is documented in `docs/engineering/primitive-compo
 
 ### Phase 7A: Video publication authority
 
-Build standalone Video and Video Episodes bound to the shared Show/Show Episode authority, classifications, the canonical Video Editor, master/derivative authority, posters, chapters, captions, transcript, Credits, Citations, immutable versions, Review, publication, Corrections and provenance.
+**Closed 31 August 2026.** Canonical internal Video authority is production accepted. The real exit-gate Video reached immutable published v8 with exact governed Media source and Sheng caption authority, governed review and approval, replacement publication, and preserved prior published history. See `docs/engineering/phase-7a-closure-record.md`.
 
 ### Phase 7B: Public Video product
 
-Compose the public Video experience over 7A authority. Exit Phase 7 through one real captioned Video publication across desktop and mobile.
+**Current.** Compose the public Video experience over the accepted 7A authority. Exit Phase 7 through one real captioned Video publication across desktop and mobile.
 
 ### Phase 8: Field Capture
 

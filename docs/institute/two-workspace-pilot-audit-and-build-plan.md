@@ -15,24 +15,24 @@ All future work on Articles, Playlists, Audio, Video, Media, Registry, Charts, c
 
 ## Programme status
 
-Current phase: **Phase 7A: Video publication authority**.
+Current phase: **Phase 7B: Public Video product**.
 
-Phases 0 through 6 are closed.
+Phases 0 through 7A are closed.
 
-Phase 6B Public Audio closed on 25 August 2026 by explicit programme decision after its public Audio authority and post-M2 convergence baseline were accepted in production. The former real-podcast exercise remains a useful non-blocking Audio operational acceptance task and is not represented as completed.
+Phase 7A Video publication authority closed on 31 August 2026 after the real Video `Monday Morning in September` completed the canonical internal workflow through immutable working v5, submitted v6, approved v7, and published v8.
 
-K5A governed Video editorial commands/admin reads, K5B purpose-built Video Editor composition, **K5C exact-version shared Credits/Citations**, and **K5D shared Corrections/provenance convergence are production accepted**.
+The final v8 carries exact native Video Media authority and one governed Sheng closed-caption track using language tag `und-x-sheng`. The earlier published v4 remains preserved in immutable history.
 
-The immediate next implementation is the **real Phase 7A Video exit-gate instrument**. Credits/Citations and Corrections/provenance continuity are closed. Use the existing real Video through working snapshot, immutable review, approval, and governed publication, and add Registry relationships or Media/lifecycle/readiness authority only if that real path proves they are needed.
+The real exit path exposed and closed bounded Media governance placement, native source integrity, deferred Resource-binding integrity, post-publication revision UI, post-publication review action lineage, and private-use caption language-tag gaps without creating duplicate authority or weakening the publish safety boundary.
 
 This plan is reconciled against protected main at:
 
-`af76d476053e9037382feb862efc55972c9049f8`
+`a8e10350dccd5a5b1cd5b49001a4cf8839a76bd9`
 
 Current production schema authority:
 
-- 69 authoritative repository migrations
-- latest migration `20260830144945_phase_7a_k5d_video_correction_provenance_convergence.sql`
+- 75 authoritative repository migrations
+- latest migration `20260831080826_video_caption_language_private_use_tags.sql`
 - zero pending repository migrations
 - production schema snapshot sealed against the production project
 
@@ -40,10 +40,10 @@ Current navigation/status authorities:
 
 - `docs/institute/PROGRAMME_STATUS.md`
 - `docs/roadmap/wakilisha-master-programme-map.md`
-- `docs/engineering/phase-7a-k5d-video-correction-provenance-convergence-closure-record.md`
+- `docs/engineering/phase-7a-closure-record.md`
 - `docs/engineering/phase-7a-video-publication-authority-kickoff.md`
 
-The existing detailed Phase 7 contract later in this document remains authoritative: PR 7A owns Video publication authority and PR 7B owns the public Video product.
+The existing detailed Phase 7 contract later in this document remains authoritative: Phase 7A owns internal Video publication authority and Phase 7B owns the public Video product.
 
 ## Decision
 
