@@ -92,24 +92,24 @@ begin
       p_track_id;
   end if;
 
-  if exists (
-    select 1
-    from public.registry_tracks other_track
-    join public.registry_track_artists other_credit
-      on other_credit.track_id = other_track.id
-     and other_credit.status = 'active'
-     and coalesce(other_credit.is_primary, false)
-    where other_track.id <> p_track_id
-      and other_track.status in ('active', 'draft', 'needs_review')
-      and other_track.slug = p_new_slug
-      and other_credit.artist_slug = any(v_primary_artist_slugs)
-  ) then
-    raise exception
-      'Automatic repair blocked: proposed Track slug % collides inside a primary Artist scope.',
-      p_new_slug;
-  end if;
-
   if p_expected_slug <> p_new_slug then
+    if exists (
+      select 1
+      from public.registry_tracks other_track
+      join public.registry_track_artists other_credit
+        on other_credit.track_id = other_track.id
+       and other_credit.status = 'active'
+       and coalesce(other_credit.is_primary, false)
+      where other_track.id <> p_track_id
+        and other_track.status in ('active', 'draft', 'needs_review')
+        and other_track.slug = p_new_slug
+        and other_credit.artist_slug = any(v_primary_artist_slugs)
+    ) then
+      raise exception
+        'Automatic repair blocked: proposed Track slug % collides inside a primary Artist scope.',
+        p_new_slug;
+    end if;
+
     select count(*)
     into v_conflicting_paths
     from unnest(v_primary_artist_slugs) primary_artist_slug
