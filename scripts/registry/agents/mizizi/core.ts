@@ -297,14 +297,10 @@ export function analyzeReleaseIdentity(input: ReleaseIdentityInput): MiziziFindi
     }));
   }
 
-  const packagingType =
-    canonicalTaxonomy ||
-    normalizedStoredType ||
-    null;
   const cleanup =
     stripReleasePackagingSuffix(
       input.title,
-      packagingType,
+      input.releaseType,
     );
 
   if (!cleanup.removedSuffix) {
@@ -329,8 +325,6 @@ export function analyzeReleaseIdentity(input: ReleaseIdentityInput): MiziziFindi
     reason: "provider_package_type_is_structural_metadata_not_release_title",
     evidence: {
       releaseType: input.releaseType || "",
-      canonicalReleaseType:
-        canonicalTaxonomy || "",
       removedSuffix: cleanup.removedSuffix,
     },
   }));
@@ -352,8 +346,6 @@ export function analyzeReleaseIdentity(input: ReleaseIdentityInput): MiziziFindi
       reason: "provider_package_type_is_not_slug_identity",
       evidence: {
         releaseType: input.releaseType || "",
-        canonicalReleaseType:
-          canonicalTaxonomy || "",
         sourceTitle: input.title,
         coreTitle: cleanup.coreTitle,
       },
