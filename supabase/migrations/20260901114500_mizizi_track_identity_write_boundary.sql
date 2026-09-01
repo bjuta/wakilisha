@@ -505,14 +505,18 @@ commit;
     if v_feature_suffix_match is not null then
       v_feature_suffix := v_feature_suffix_match[1];
 
-      if exists (
-        select 1
-        from unnest(v_featured_artist_names) featured_name
-        where position(
-          lower(featured_name)
-          in lower(v_feature_suffix)
-        ) > 0
-      ) then
+      if position('(' in v_feature_suffix) = 0
+         and position('[' in v_feature_suffix) = 0
+         and position('{' in v_feature_suffix) = 0
+         and exists (
+           select 1
+           from unnest(v_featured_artist_names) featured_name
+           where position(
+             lower(featured_name)
+             in lower(v_feature_suffix)
+           ) > 0
+         )
+      then
         v_slug_title := left(
           v_slug_title,
           greatest(
