@@ -2,6 +2,7 @@ import { deepDecode } from "@/utils/decodeHtmlEntities";
 import type {
   PublicGenreDetail,
   PublicLabelDetail,
+  PublicTrackAliasResolution,
   PublicTrackDetail,
 } from "./types";
 
@@ -74,11 +75,20 @@ export function getLabel(
 }
 
 export function getTrack(
-  artistSlug: string,
+  routeScope: string,
   trackSlug: string
 ): Promise<PublicTrackDetail | null> {
   return fetchPublic<PublicTrackDetail | null>(
-    `/tracks/${encodeURIComponent(artistSlug)}/${encodeURIComponent(trackSlug)}`
+    `/tracks/${encodeURIComponent(routeScope)}/${encodeURIComponent(trackSlug)}`
+  );
+}
+
+export function resolveTrackAlias(
+  artistSlug: string,
+  trackSlug: string
+): Promise<PublicTrackAliasResolution> {
+  return fetchPublic<PublicTrackAliasResolution>(
+    `/track-aliases/${encodeURIComponent(artistSlug)}/${encodeURIComponent(trackSlug)}`
   );
 }
 
