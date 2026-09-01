@@ -809,7 +809,7 @@ export default function AdminSettingsSeoPage() {
       detail:
         action === "pro_update"
           ? "Pro-Sitemaps update request sent. Check Pro-Sitemaps history for crawl completion."
-          : "Snapshot saved. The root static sitemap must still be regenerated/deployed for production if you want a static file refresh.",
+          : "Snapshot saved. Production builds refresh the root sitemap automatically from the live internal authority.",
     });
 
     await loadStatus();
@@ -929,7 +929,7 @@ export default function AdminSettingsSeoPage() {
             Internal sitemap generation writes an audited snapshot to Supabase. The public Edge XML endpoint can always rebuild from live data if no snapshot exists.
           </p>
           <p>
-            For today’s static production launch, regenerate the root <code className="font-mono text-[var(--wk-text)]">public/sitemap.xml</code> from the Edge XML endpoint, commit it, and deploy frontend.
+            Production builds fetch <code className="font-mono text-[var(--wk-text)]">xml_live</code> after Vite compilation and replace the bootstrap <code className="font-mono text-[var(--wk-text)]">dist/sitemap.xml</code> before prerendering. Dynamic music routes come from Registry membership authority, not a checked-in sitemap snapshot.
           </p>
           <p>
             Pro-Sitemaps must never be the only source of truth. It is useful for external crawling and validation, but WAKILISHA owns the fallback.
