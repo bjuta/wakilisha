@@ -20,6 +20,7 @@ let ARTIST_METADATA_BY_PATH = new Map();
 let RELEASE_METADATA_BY_PATH = new Map();
 let TRACK_METADATA_BY_PATH = new Map();
 let CHART_METADATA_BY_PATH = new Map();
+const NON_CANONICAL_PUBLIC_PATHS = new Set();
 
 const EXTRA_NOINDEX_PATHS = [
   "/search",
@@ -834,6 +835,22 @@ async function fetchReleaseMetadataManifest() {
       const release = payload?.data?.release || payload?.release;
       if (!release) return;
 
+      const releaseTrackCount = Number(
+        release.trackCount ??
+        release.track_count ??
+        0,
+      );
+
+      if (
+        !Number.isFinite(releaseTrackCount) ||
+        releaseTrackCount <= 1
+      ) {
+        NON_CANONICAL_PUBLIC_PATHS.add(
+          cleanPath(pagePath),
+        );
+        return;
+      }
+
       const parts = pagePath.split("/").filter(Boolean);
       const artistSlugFromPath = parts[1];
 
@@ -845,7 +862,7 @@ async function fetchReleaseMetadataManifest() {
         image: firstNonEmpty(release.artworkUrl, release.imageUrl, release.coverImageUrl),
         releaseType: firstNonEmpty(release.releaseType),
         labelName: firstNonEmpty(release.labelName),
-        trackCount: release.trackCount,
+        trackCount: releaseTrackCount,
         tracks: Array.isArray(release.tracks) ? release.tracks : [],
       });
     } catch {
@@ -896,6 +913,27 @@ async function fetchTrackMetadataManifest() {
       const artistSlugFromPath = parts[1];
       const primaryArtist = data?.artist || {};
       const release = data?.release || {};
+      const releaseTrackCount = Number(
+        release.trackCount ??
+        release.track_count ??
+        0,
+      );
+      const isReleaseScopedTrack =
+        parts[0] === "releases" &&
+        parts.length >= 4;
+
+      if (
+        isReleaseScopedTrack &&
+        (
+          !Number.isFinite(releaseTrackCount) ||
+          releaseTrackCount <= 1
+        )
+      ) {
+        NON_CANONICAL_PUBLIC_PATHS.add(
+          cleanPath(pagePath),
+        );
+        return;
+      }
 
       metadataByPath.set(cleanPath(pagePath), {
         title: firstNonEmpty(track.title),
@@ -909,6 +947,10 @@ async function fetchTrackMetadataManifest() {
         releaseSlug: firstNonEmpty(release.slug),
         releaseDate: firstNonEmpty(release.releaseDate),
         releaseType: firstNonEmpty(release.releaseType),
+        releaseTrackCount:
+          Number.isFinite(releaseTrackCount)
+            ? releaseTrackCount
+            : 0,
       });
     } catch {
       return;
@@ -1071,12 +1113,24 @@ function pageSchema(model, url) {
       description: model.description,
       image: image || undefined,
       byArtist,
-      inAlbum: trackMeta.releaseTitle ? {
-        "@type": "MusicAlbum",
-        name: trackMeta.releaseTitle,
-        url: trackMeta.releaseSlug && releaseArtistSlug ? canonicalUrl(`/releases/${releaseArtistSlug}/${trackMeta.releaseSlug}`) : undefined,
-        datePublished: trackMeta.releaseDate || undefined,
-      } : undefined,
+      inAlbum:
+        trackMeta.releaseTitle &&
+        Number(trackMeta.releaseTrackCount || 0) > 1
+          ? {
+              "@type": "MusicAlbum",
+              name: trackMeta.releaseTitle,
+              url:
+                trackMeta.releaseSlug &&
+                releaseArtistSlug
+                  ? canonicalUrl(
+                      `/releases/${releaseArtistSlug}/${trackMeta.releaseSlug}`,
+                    )
+                  : undefined,
+              datePublished:
+                trackMeta.releaseDate ||
+                undefined,
+            }
+          : undefined,
       duration: isoDurationFromSecondsOrMs(trackMeta.duration),
       isrcCode: trackMeta.isrc || undefined,
     });
@@ -1687,7 +1741,26 @@ async function main() {
   CHART_METADATA_BY_PATH = await fetchChartMetadataManifest();
 
   const baseHtml = fs.readFileSync(INDEX_PATH, "utf8");
-  const paths = [...new Set([...readSitemapPaths(), ...DB_METADATA_BY_PATH.keys()].filter(isCanonicalPublicPath))];
+  const candidatePaths = [
+    ...new Set(
+      [
+        ...readSitemapPaths(),
+        ...DB_METADATA_BY_PATH.keys(),
+      ].filter(isCanonicalPublicPath),
+    ),
+  ];
+  const paths = candidatePaths.filter(
+    (pagePath) =>
+      !NON_CANONICAL_PUBLIC_PATHS.has(
+        cleanPath(pagePath),
+      ),
+  );
+
+  console.log(
+    `SEO canonicalization suppressed ${(
+      candidatePaths.length - paths.length
+    ).toLocaleString()} non-canonical one-track paths.`,
+  );
 
   let written = 0;
 
