@@ -2,6 +2,7 @@ import fs from "node:fs";
 import path from "node:path";
 
 const siteOrigin = "https://wakilisha.africa";
+const REGISTRY_TRACK_ID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const distDir = path.resolve("dist");
 const sitemapXmlPath = path.join(distDir, "sitemap.xml");
 const indexHtmlPath = path.join(distDir, "index.html");
@@ -62,7 +63,14 @@ function isCanonicalPublicUrl(url) {
   const parts = pathname.split("/").filter(Boolean);
 
   if (parts[0] === "tracks") {
-    return parts.length >= 3;
+    return (
+      parts.length >= 3 &&
+      REGISTRY_TRACK_ID_PATTERN.test(parts[1] || "")
+    );
+  }
+
+  if (parts[0] === "releases" && parts.length >= 4) {
+    return false;
   }
 
   return true;
@@ -73,7 +81,14 @@ function isShortTrackUrl(url) {
     const pathname = new URL(url).pathname;
     const parts = pathname.split("/").filter(Boolean);
 
-    return parts[0] === "tracks" && parts.length === 2;
+    if (parts[0] === "tracks") {
+      return !(
+        parts.length >= 3 &&
+        REGISTRY_TRACK_ID_PATTERN.test(parts[1] || "")
+      );
+    }
+
+    return parts[0] === "releases" && parts.length >= 4;
   } catch {
     return false;
   }
@@ -89,8 +104,11 @@ function removeNonCanonicalTrackUrlsFromXml(xml) {
 }
 
 function shortTrackUrlsFromXml(xml) {
-  return Array.from(xml.matchAll(/<loc>(https:\/\/wakilisha\.africa\/tracks\/[^\/<]+)<\/loc>/g))
-    .map((match) => match[1]);
+  return Array.from(
+    xml.matchAll(/<loc>(https:\/\/wakilisha\.africa\/[^<]+)<\/loc>/g),
+  )
+    .map((match) => match[1])
+    .filter((url) => isShortTrackUrl(url));
 }
 
 function publicUrlFromDistIndex(filePath) {
