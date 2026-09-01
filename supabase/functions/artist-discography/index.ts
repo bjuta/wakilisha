@@ -101,6 +101,7 @@ Deno.serve(async (req) => {
             .from("registry_release_tracks")
             .select("track_id, track_number, disc_number")
             .eq("release_id", rel.id)
+            .eq("status", "active")
             .order("disc_number")
             .order("track_number");
 
@@ -153,6 +154,8 @@ Deno.serve(async (req) => {
               .filter(Boolean);
           }
 
+          if (tracks.length <= 1) continue;
+
           ownReleases.push({
             slug: rel.slug,
             title: rel.title,
@@ -181,7 +184,8 @@ Deno.serve(async (req) => {
       const { data: featuredReleaseTracks } = await db
         .from("registry_release_tracks")
         .select("release_id, track_id")
-        .in("track_id", featuredTrackIds);
+        .in("track_id", featuredTrackIds)
+        .eq("status", "active");
 
       if (featuredReleaseTracks && featuredReleaseTracks.length > 0) {
         const featuredReleaseIds = [...new Set(featuredReleaseTracks.map((rt) => rt.release_id))]
@@ -211,9 +215,18 @@ Deno.serve(async (req) => {
                 .eq("status", "active")
                 .maybeSingle();
 
-              const releaseTrackIds = (featuredReleaseTracks ?? [])
-                .filter((rt) => rt.release_id === rel.id)
+              const { data: releaseMemberships } = await db
+                .from("registry_release_tracks")
+                .select("track_id, track_number, disc_number")
+                .eq("release_id", rel.id)
+                .eq("status", "active")
+                .order("disc_number")
+                .order("track_number");
+
+              const releaseTrackIds = (releaseMemberships ?? [])
                 .map((rt) => rt.track_id);
+
+              if (releaseTrackIds.length <= 1) continue;
 
               let tracks = [];
               if (releaseTrackIds.length > 0) {
