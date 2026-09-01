@@ -995,36 +995,29 @@ async function writeScrapeToRegistry(
       const track = tracks[i];
       if (!track.title) continue;
 
-      const trackTitleSlug = slugify(track.title);
+      const trackTitleSlug =
+        canonicalTrackSlugCandidate(track.title);
       let trackId: string | undefined;
 
       if (track.isrc) trackId = existingTrackByIsrc.get(track.isrc);
 
       if (!trackId) {
-        const ownerScopedSlug = `${releaseOwnerSlug}--${trackTitleSlug}`;
-        trackId = existingTrackBySlug.get(ownerScopedSlug);
-        if (!trackId) {
-          const scrapedScopedSlug = `${data.slug}--${trackTitleSlug}`;
-          trackId = existingTrackBySlug.get(scrapedScopedSlug);
-        }
-      }
-
-      if (!trackId) {
-        const slugMatchId = existingTrackBySlug.get(trackTitleSlug);
-        if (slugMatchId) {
-          const scrapedSlug = slugify(data.name);
-          if (
-            existingTrackArtistSet.has(`${slugMatchId}:${releaseOwnerSlug}`) ||
-            existingTrackArtistSet.has(`${slugMatchId}:${scrapedSlug}`)
-          ) {
-            trackId = slugMatchId;
-          }
+        try {
+          trackId = resolveTrackInArtistScope(
+            releaseOwnerSlug,
+            trackTitleSlug,
+          );
+        } catch (error) {
+          errors.push(
+            error instanceof Error ? error.message : String(error),
+          );
+          continue;
         }
       }
 
       if (!trackId) {
         const newId = crypto.randomUUID();
-        const trackSlug = dedupeSlug(trackTitleSlug, seenTrackSlugs);
+        const trackSlug = trackTitleSlug;
         const newTrack = {
           id: newId,
           slug: trackSlug,
@@ -1054,13 +1047,15 @@ async function writeScrapeToRegistry(
 
         trackId = newId;
         existingTrackBySlug.set(trackSlug, newId);
+        existingTrackIdToSlug.set(newId, trackSlug);
+        existingTrackIdToTitle.set(newId, track.title);
+        registerTrackScopeAlias(
+          releaseOwnerSlug,
+          trackSlug,
+          newId,
+        );
         if (track.isrc) existingTrackByIsrc.set(track.isrc, newId);
         stats.tracks_upserted++;
-      }
-
-      const normKey = normalizeForMatch(track.title);
-      if (normKey && !trackNormTitleToSlug.has(normKey)) {
-        trackNormTitleToSlug.set(normKey, existingTrackBySlug.get(trackTitleSlug) || trackTitleSlug);
       }
 
       const rtKey = `${releaseId}:${trackId}`;
