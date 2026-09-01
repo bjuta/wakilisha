@@ -4,14 +4,14 @@ import {
   normalizeIdentityText,
   slugifyIdentity,
   stripFeatureCreditNoise,
-} from "../../../supabase/functions/_shared/registry-track-identity.ts";
+} from "../../../../supabase/functions/_shared/registry-track-identity.ts";
 
 export {
   canonicalTrackSlugCandidate,
   normalizeIdentityText,
   slugifyIdentity,
   stripFeatureCreditNoise,
-} from "../../../supabase/functions/_shared/registry-track-identity.ts";
+} from "../../../../supabase/functions/_shared/registry-track-identity.ts";
 
 export const MIZIZI_AGENT_KEY = "mizizi";
 export const MIZIZI_AGENT_LABEL = "MIZIZI Cultural Data Steward";
