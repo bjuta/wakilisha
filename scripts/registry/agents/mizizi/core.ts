@@ -250,7 +250,7 @@ export function analyzeTrackIdentity(input: TrackIdentityInput): MiziziFinding[]
       proposedValue: proposedSlug,
       confidence: 0.6,
       severity: "medium",
-      disposition: "review",
+      disposition: "observe",
       reason:
         "slug_differs_from_minimal_title_identity_without_structural_noise_proof",
       evidence: {
@@ -275,7 +275,7 @@ export function analyzeTrackIdentity(input: TrackIdentityInput): MiziziFinding[]
       proposedValue: featureCleanup.coreTitle,
       confidence: (input.featuredArtists || []).length > 0 ? 0.95 : 0.75,
       severity: "medium",
-      disposition: "review",
+      disposition: "observe",
       reason: "featured_artist_credit_is_structural_data_not_title_identity",
       evidence: {
         removedFragments: featureCleanup.removedFragments,
@@ -302,7 +302,7 @@ export function analyzeReleaseIdentity(input: ReleaseIdentityInput): MiziziFindi
       proposedValue: cleanup.coreTitle,
       confidence: 0.99,
       severity: "medium",
-      disposition: "review",
+      disposition: "observe",
       reason: "provider_package_type_is_structural_metadata_not_release_title",
       evidence: {
         releaseType: input.releaseType || "",
@@ -321,7 +321,7 @@ export function analyzeReleaseIdentity(input: ReleaseIdentityInput): MiziziFindi
       proposedValue: proposedSlug,
       confidence: 0.99,
       severity: "medium",
-      disposition: "review",
+      disposition: "observe",
       reason: "provider_package_type_is_not_slug_identity",
       evidence: {
         releaseType: input.releaseType || "",
@@ -371,7 +371,7 @@ export function analyzeChartIdentity(input: ChartIdentityInput): MiziziFinding[]
       proposedValue: input.canonicalPrimaryArtistSlug,
       confidence: 0.9,
       severity: "medium",
-      disposition: "review",
+      disposition: "observe",
       reason: "chart_artist_slug_differs_from_registry_primary_artist",
       evidence: { canonicalTrackId: input.canonicalTrackId || "" },
     }));
