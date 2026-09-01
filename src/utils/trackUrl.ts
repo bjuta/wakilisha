@@ -1,17 +1,21 @@
-function normalizeSlug(value: string): string {
-  return value
-    .toLowerCase()
-    .replace(/\s+/g, "-")
-    .replace(/[^a-z0-9-]+/g, "-")
-    .replace(/^-+|-+$/g, "")
-    .replace(/-+/g, "-");
-}
+import {
+  isRegistryTrackId,
+  legacyArtistTrackUrl,
+  legacyReleaseTrackUrl,
+  normalizePublicTrackSlug,
+  registryTrackUrl,
+} from "../../shared/registry/public-track-route";
+
+export {
+  isRegistryTrackId,
+  legacyArtistTrackUrl,
+  legacyReleaseTrackUrl,
+  normalizePublicTrackSlug,
+  registryTrackUrl,
+};
 
 export function trackUrl(slug: string, artistSlugs: string[]): string {
-  const normalizedSlug = normalizeSlug(slug);
-  const primaryArtist = normalizeSlug(artistSlugs[0] || "");
-  if (!primaryArtist) return `/tracks/${normalizedSlug}`;
-  return `/tracks/${primaryArtist}/${normalizedSlug}`;
+  return legacyArtistTrackUrl(artistSlugs[0] || "", slug);
 }
 
 export function releaseTrackUrl(
@@ -19,35 +23,19 @@ export function releaseTrackUrl(
   releaseSlug: string,
   trackSlug: string,
 ): string {
-  const normalizedArtist = normalizeSlug(artistSlug);
-  const normalizedRelease = normalizeSlug(releaseSlug);
-  const normalizedTrack = normalizeSlug(trackSlug);
-
-  if (!normalizedArtist || !normalizedRelease) {
-    return trackUrl(normalizedTrack, normalizedArtist ? [normalizedArtist] : []);
-  }
-
-  return `/releases/${normalizedArtist}/${normalizedRelease}/${normalizedTrack}`;
+  return legacyReleaseTrackUrl(
+    artistSlug,
+    releaseSlug,
+    trackSlug,
+  );
 }
 
 export function canonicalTrackUrl(
-  artistSlug: string,
+  registryTrackId: string,
   trackSlug: string,
-  releaseSlug?: string | null,
-  releaseTrackCount?: number | null,
 ): string {
-  const count = Number(releaseTrackCount || 0);
-
-  if (count > 1 && String(releaseSlug || "").trim()) {
-    return releaseTrackUrl(
-      artistSlug,
-      String(releaseSlug),
-      trackSlug,
-    );
-  }
-
-  return trackUrl(
+  return registryTrackUrl(
+    registryTrackId,
     trackSlug,
-    artistSlug ? [artistSlug] : [],
   );
 }
