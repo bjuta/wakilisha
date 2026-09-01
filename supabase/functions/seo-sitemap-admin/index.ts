@@ -945,6 +945,12 @@ async function buildInternalItems(db: ReturnType<typeof createClient>): Promise<
     releaseById.set(String(row.id), row as Record<string, any>);
   }
 
+  const activeTrackIds = new Set(
+    (tracks.data ?? [])
+      .map((track: any) => String(track.id || "").trim())
+      .filter(Boolean),
+  );
+
   const releaseMembershipsByTrackId = new Map<
     string,
     Array<{
@@ -960,7 +966,7 @@ async function buildInternalItems(db: ReturnType<typeof createClient>): Promise<
     const trackId = String(row.track_id || "").trim();
     const releaseId = String(row.release_id || "").trim();
 
-    if (!trackId || !releaseId) continue;
+    if (!trackId || !releaseId || !activeTrackIds.has(trackId)) continue;
 
     releaseTrackCountByReleaseId.set(
       releaseId,

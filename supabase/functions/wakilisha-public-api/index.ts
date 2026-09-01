@@ -591,10 +591,33 @@ Deno.serve(async (req) => {
             .eq("status", "active")
         : { data: [] };
 
+      const membershipTrackIds = [
+        ...new Set(
+          (memberships ?? [])
+            .map((membership: any) => String(membership.track_id || ""))
+            .filter(Boolean),
+        ),
+      ];
+      const { data: activeMembershipTracks } = membershipTrackIds.length > 0
+        ? await supabase
+            .from("registry_tracks")
+            .select("id")
+            .in("id", membershipTrackIds)
+            .eq("status", "active")
+        : { data: [] };
+      const activeMembershipTrackIds = new Set(
+        (activeMembershipTracks ?? []).map((track: any) => String(track.id)),
+      );
+
       const trackCountByRelease = new Map<string, number>();
       for (const membership of memberships ?? []) {
         const releaseId = String(membership.release_id || "");
-        if (!releaseId) continue;
+        const trackId = String(membership.track_id || "");
+        if (
+          !releaseId ||
+          !trackId ||
+          !activeMembershipTrackIds.has(trackId)
+        ) continue;
         trackCountByRelease.set(
           releaseId,
           (trackCountByRelease.get(releaseId) || 0) + 1,

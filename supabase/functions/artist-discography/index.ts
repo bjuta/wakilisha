@@ -115,7 +115,8 @@ Deno.serve(async (req) => {
             const { data: trackRows } = await db
               .from("registry_tracks")
               .select("id, title, slug, duration_ms, preview_url")
-              .in("id", trackIds);
+              .in("id", trackIds)
+              .eq("status", "active");
 
             const { data: trackArtists } = await db
               .from("registry_track_artists")
@@ -162,6 +163,8 @@ Deno.serve(async (req) => {
               })
               .filter(Boolean);
           }
+
+          if (tracks.length === 0) continue;
 
           ownReleases.push({
             slug: rel.slug,
@@ -238,7 +241,8 @@ Deno.serve(async (req) => {
                 const { data: trackRows } = await db
                   .from("registry_tracks")
                   .select("id, title, slug, duration_ms, preview_url")
-                  .in("id", releaseTrackIds);
+                  .in("id", releaseTrackIds)
+                  .eq("status", "active");
 
                 const { data: allTrackArtists } = await db
                   .from("registry_track_artists")
@@ -281,6 +285,8 @@ Deno.serve(async (req) => {
                   };
                 });
               }
+
+              if (tracks.length === 0) continue;
 
               appearsOn.push({
                 slug: rel.slug,
