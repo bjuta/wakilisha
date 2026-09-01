@@ -809,26 +809,30 @@ async function writeScrapeToRegistry(
       const track = tracks[i];
       if (!track.title) continue;
 
-      const trackTitleSlug = slugify(track.title);
+      const trackTitleSlug =
+        canonicalTrackSlugCandidate(track.title);
+      const trackArtistScope = slugify(data.name);
       let trackId: string | undefined;
 
       if (track.isrc) trackId = existingTrackByIsrc.get(track.isrc);
 
       if (!trackId) {
-        const scopedSlug = `${artistScopedSlugPrefix}${trackTitleSlug}`;
-        trackId = existingTrackBySlug.get(scopedSlug);
-      }
-
-      if (!trackId) {
-        const slugMatchId = existingTrackBySlug.get(trackTitleSlug);
-        if (slugMatchId && existingTrackArtistSet.has(`${slugMatchId}:${slugify(data.name)}`)) {
-          trackId = slugMatchId;
+        try {
+          trackId = resolveTrackInArtistScope(
+            trackArtistScope,
+            trackTitleSlug,
+          );
+        } catch (error) {
+          errors.push(
+            error instanceof Error ? error.message : String(error),
+          );
+          continue;
         }
       }
 
       if (!trackId) {
         const newId = crypto.randomUUID();
-        const trackSlug = dedupeSlug(trackTitleSlug, seenTrackSlugs);
+        const trackSlug = trackTitleSlug;
         const newTrack = {
           id: newId,
           slug: trackSlug,
@@ -858,6 +862,13 @@ async function writeScrapeToRegistry(
 
         trackId = newId;
         existingTrackBySlug.set(trackSlug, newId);
+        existingTrackIdToSlug.set(newId, trackSlug);
+        existingTrackIdToTitle.set(newId, track.title);
+        registerTrackScopeAlias(
+          trackArtistScope,
+          trackSlug,
+          newId,
+        );
         if (track.isrc) existingTrackByIsrc.set(track.isrc, newId);
         stats.tracks_upserted++;
       } else if (options.overwrite) {
@@ -881,11 +892,6 @@ async function writeScrapeToRegistry(
             .eq("id", trackId);
         }
         stats.tracks_upserted++;
-      }
-
-      const normKey = normalizeForMatch(track.title);
-      if (normKey && !trackNormTitleToSlug.has(normKey)) {
-        trackNormTitleToSlug.set(normKey, existingTrackBySlug.get(trackTitleSlug) || trackTitleSlug);
       }
 
       const rtKey = `${releaseId}:${trackId}`;
