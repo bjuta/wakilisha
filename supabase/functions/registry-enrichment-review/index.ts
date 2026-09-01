@@ -1,5 +1,6 @@
 // ── SHARED BLOCK (Phase A) ──
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.1";
+import { canonicalTrackSlugCandidate } from "../_shared/registry-track-identity.ts";
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 const ALLOWED_ORIGINS = ["https://wakilisha.africa","https://www.wakilisha.africa","https://staging.wakilisha.africa","https://wakilisha.africa","https://wakilisha.africa","https://wakilisha.africa","http://localhost:5173","http://localhost:3000"];
@@ -12,12 +13,16 @@ function slugify(s:string):string{return s.toLowerCase().normalize("NFKD").repla
 
 function parseArtistNames(artistName: string): { primary: string; featured: string[] } {
   if (!artistName) return { primary: "", featured: [] };
-  const parts = artistName.split(/\s*&\s*/);
-  const firstPart = parts[0] ?? "";
-  const firstCommaParts = firstPart.split(/\s*,\s*/);
-  const primary = firstCommaParts[0]?.trim() ?? "";
-  const featured = [...firstCommaParts.slice(1), ...parts.slice(1)].map((s) => s.trim()).filter(Boolean);
-  return { primary, featured };
+  const names = artistName
+    .split(
+      /\s*,\s*|\s*&\s*|\s+(?:feat\.?|ft\.?|featuring|and|x)\s+/i,
+    )
+    .map((name) => name.trim())
+    .filter(Boolean);
+  return {
+    primary: names[0] ?? "",
+    featured: names.slice(1),
+  };
 }
 
 async function findOrCreateArtist(db: ReturnType<typeof createClient>, artistName: string, now: string): Promise<string | null> {
@@ -62,37 +67,521 @@ async function ensureEntityRelationship(db: ReturnType<typeof createClient>, sou
   if (error) console.error(`[ensureEntityRelationship] failed ${sourceType}/${sourceSlug} -> ${targetType}/${targetSlug}:`, error.message);
 }
 
-async function writeTracksToRelease(db: ReturnType<typeof createClient>, releaseId: string, releaseSlug: string, shellTracks: Array<Record<string, unknown>>, primaryArtistName: string, primaryArtistSlug: string, now: string): Promise<{ tracksCreated: number; trackJoinsCreated: number; trackArtistsCreated: number; featuredArtistsCreated: number; entityRelationshipsCreated: number; errors: string[] }> {
+async function findTrackByArtistAndSlug(
+  db: ReturnType<typeof createClient>,
+  artistSlug: string,
+  trackSlug: string,
+): Promise<{ id: string; slug: string } | null> {
+  if (!artistSlug || !trackSlug) return null;
+
+  const { data: links, error: linksError } =
+    await db
+      .from("registry_track_artists")
+      .select("track_id")
+      .eq("artist_slug", artistSlug)
+      .eq("status", "active")
+      .eq("is_primary", true)
+      .limit(100);
+
+  if (linksError) {
+    throw new Error(
+      "Track scope lookup failed: " +
+        linksError.message,
+    );
+  }
+
+  const trackIds = [
+    ...new Set(
+      (links ?? []).map(
+        (link) =>
+          String(link.track_id),
+      ),
+    ),
+  ];
+
+  if (trackIds.length === 0) {
+    return null;
+  }
+
+  const { data: tracks, error: tracksError } =
+    await db
+      .from("registry_tracks")
+      .select("id, slug")
+      .in("id", trackIds)
+      .eq("slug", trackSlug)
+      .eq("status", "active")
+      .limit(2);
+
+  if (tracksError) {
+    throw new Error(
+      "Track identity lookup failed: " +
+        tracksError.message,
+    );
+  }
+
+  if ((tracks ?? []).length > 1) {
+    throw new Error(
+      "Ambiguous Track identity in artist scope: " +
+        artistSlug +
+        "/" +
+        trackSlug,
+    );
+  }
+
+  const match = tracks?.[0];
+  return match
+    ? {
+        id: String(match.id),
+        slug: String(match.slug),
+      }
+    : null;
+}
+
+async function writeTracksToRelease(
+  db: ReturnType<typeof createClient>,
+  releaseId: string,
+  releaseSlug: string,
+  shellTracks: Array<Record<string, unknown>>,
+  primaryArtistName: string,
+  primaryArtistSlug: string,
+  now: string,
+): Promise<{
+  tracksCreated: number;
+  trackJoinsCreated: number;
+  trackArtistsCreated: number;
+  featuredArtistsCreated: number;
+  entityRelationshipsCreated: number;
+  errors: string[];
+}> {
   const errors: string[] = [];
-  let tracksCreated = 0, trackJoinsCreated = 0, trackArtistsCreated = 0, featuredArtistsCreated = 0, entityRelationshipsCreated = 0;
-  await db.from("registry_release_tracks").delete().eq("release_id", releaseId);
+  let tracksCreated = 0;
+  let trackJoinsCreated = 0;
+  let trackArtistsCreated = 0;
+  let featuredArtistsCreated = 0;
+  let entityRelationshipsCreated = 0;
+
+  void releaseSlug;
+
+  await db
+    .from("registry_release_tracks")
+    .delete()
+    .eq("release_id", releaseId);
+
   for (let i = 0; i < shellTracks.length; i++) {
-    const t = shellTracks[i]; const trackTitle = (t.title as string) || "Untitled"; const isrc = (t.isrc as string) || null;
-    const trackSlug = slugify(trackTitle); const scopedTrackSlug = `${primaryArtistSlug}--${trackSlug}`;
-    const trackNumber = (t.trackNumber as number) ?? (i + 1);
-    const rawArtistName = (t.artistName as string) || primaryArtistName || "Unknown";
-    const { primary: parsedPrimary, featured: parsedFeatured } = parseArtistNames(rawArtistName);
+    const t = shellTracks[i];
+    const trackTitle =
+      (t.title as string) || "Untitled";
+    const isrc =
+      (t.isrc as string) || null;
+    const trackNumber =
+      (t.trackNumber as number) ??
+      (i + 1);
+    const rawArtistName =
+      (t.artistName as string) ||
+      primaryArtistName ||
+      "Unknown";
+    const {
+      primary: parsedPrimary,
+      featured: parsedFeatured,
+    } = parseArtistNames(
+      rawArtistName,
+    );
+    const trackPrimaryArtistSlug =
+      slugify(
+        parsedPrimary ||
+          primaryArtistName,
+      ) || primaryArtistSlug;
+    const candidateTrackSlug =
+      canonicalTrackSlugCandidate(
+        trackTitle,
+        {
+          featuredArtistNames:
+            parsedFeatured,
+        },
+      );
+
     let trackId: string;
+    let resolvedTrackSlug =
+      candidateTrackSlug;
+
     if (isrc) {
-      const { data: byIsrc } = await db.from("registry_tracks").select("id").eq("isrc", isrc).maybeSingle();
-      if (byIsrc) { trackId = byIsrc.id as string; await db.from("registry_tracks").update({ title: trackTitle, slug: scopedTrackSlug, duration_ms: (t.durationMs as number) ?? null, preview_url: (t.previewUrl as string) ?? null, artwork_url: (t.artworkUrl as string) ?? null, track_number: trackNumber, disc_number: 1, updated_at: now }).eq("id", trackId); }
-      else {
-        const { data: bySlug } = await db.from("registry_tracks").select("id").eq("slug", scopedTrackSlug).maybeSingle();
-        if (bySlug) { trackId = bySlug.id as string; await db.from("registry_tracks").update({ title: trackTitle, isrc, duration_ms: (t.durationMs as number) ?? null, preview_url: (t.previewUrl as string) ?? null, artwork_url: (t.artworkUrl as string) ?? null, track_number: trackNumber, disc_number: 1, updated_at: now }).eq("id", trackId); }
-        else { trackId = crypto.randomUUID(); const { error: insErr } = await db.from("registry_tracks").insert({ id: trackId, slug: scopedTrackSlug, title: trackTitle, isrc, duration_ms: (t.durationMs as number) ?? null, preview_url: (t.previewUrl as string) ?? null, artwork_url: (t.artworkUrl as string) ?? null, track_number: trackNumber, disc_number: 1, status: "active", metadata: {}, created_at: now, updated_at: now }); if (insErr) { errors.push(`insert "${trackTitle}": ${insErr.message}`); continue; } tracksCreated++; }
+      const { data: byIsrc } =
+        await db
+          .from("registry_tracks")
+          .select("id, slug")
+          .eq("isrc", isrc)
+          .maybeSingle();
+
+      if (byIsrc) {
+        trackId =
+          String(byIsrc.id);
+        resolvedTrackSlug =
+          String(byIsrc.slug);
+
+        await db
+          .from("registry_tracks")
+          .update({
+            title: trackTitle,
+            duration_ms:
+              (t.durationMs as number) ??
+              null,
+            preview_url:
+              (t.previewUrl as string) ??
+              null,
+            artwork_url:
+              (t.artworkUrl as string) ??
+              null,
+            track_number:
+              trackNumber,
+            disc_number: 1,
+            updated_at: now,
+          })
+          .eq("id", trackId);
+      } else {
+        const scopedMatch =
+          await findTrackByArtistAndSlug(
+            db,
+            trackPrimaryArtistSlug,
+            candidateTrackSlug,
+          );
+
+        if (scopedMatch) {
+          trackId = scopedMatch.id;
+          resolvedTrackSlug =
+            scopedMatch.slug;
+
+          await db
+            .from("registry_tracks")
+            .update({
+              title: trackTitle,
+              isrc,
+              duration_ms:
+                (t.durationMs as number) ??
+                null,
+              preview_url:
+                (t.previewUrl as string) ??
+                null,
+              artwork_url:
+                (t.artworkUrl as string) ??
+                null,
+              track_number:
+                trackNumber,
+              disc_number: 1,
+              updated_at: now,
+            })
+            .eq("id", trackId);
+        } else {
+          trackId =
+            crypto.randomUUID();
+
+          const { error: insertError } =
+            await db
+              .from("registry_tracks")
+              .insert({
+                id: trackId,
+                slug:
+                  candidateTrackSlug,
+                title: trackTitle,
+                isrc,
+                duration_ms:
+                  (t.durationMs as number) ??
+                  null,
+                preview_url:
+                  (t.previewUrl as string) ??
+                  null,
+                artwork_url:
+                  (t.artworkUrl as string) ??
+                  null,
+                track_number:
+                  trackNumber,
+                disc_number: 1,
+                status: "active",
+                metadata: {},
+                created_at: now,
+                updated_at: now,
+              });
+
+          if (insertError) {
+            errors.push(
+              `insert "${trackTitle}": ${insertError.message}`,
+            );
+            continue;
+          }
+
+          tracksCreated++;
+        }
       }
     } else {
-      const { data: bySlug2 } = await db.from("registry_tracks").select("id").eq("slug", scopedTrackSlug).maybeSingle();
-      if (bySlug2) { trackId = bySlug2.id as string; await db.from("registry_tracks").update({ title: trackTitle, duration_ms: (t.durationMs as number) ?? null, preview_url: (t.previewUrl as string) ?? null, artwork_url: (t.artworkUrl as string) ?? null, track_number: trackNumber, disc_number: 1, updated_at: now }).eq("id", trackId); }
-      else { trackId = crypto.randomUUID(); const { error: insErr } = await db.from("registry_tracks").insert({ id: trackId, slug: scopedTrackSlug, title: trackTitle, duration_ms: (t.durationMs as number) ?? null, preview_url: (t.previewUrl as string) ?? null, artwork_url: (t.artworkUrl as string) ?? null, track_number: trackNumber, disc_number: 1, status: "active", metadata: {}, created_at: now, updated_at: now }); if (insErr) { errors.push(`insert (no isrc) "${trackTitle}": ${insErr.message}`); continue; } tracksCreated++; }
+      const scopedMatch =
+        await findTrackByArtistAndSlug(
+          db,
+          trackPrimaryArtistSlug,
+          candidateTrackSlug,
+        );
+
+      if (scopedMatch) {
+        trackId = scopedMatch.id;
+        resolvedTrackSlug =
+          scopedMatch.slug;
+
+        await db
+          .from("registry_tracks")
+          .update({
+            title: trackTitle,
+            duration_ms:
+              (t.durationMs as number) ??
+              null,
+            preview_url:
+              (t.previewUrl as string) ??
+              null,
+            artwork_url:
+              (t.artworkUrl as string) ??
+              null,
+            track_number:
+              trackNumber,
+            disc_number: 1,
+            updated_at: now,
+          })
+          .eq("id", trackId);
+      } else {
+        trackId =
+          crypto.randomUUID();
+
+        const { error: insertError } =
+          await db
+            .from("registry_tracks")
+            .insert({
+              id: trackId,
+              slug:
+                candidateTrackSlug,
+              title: trackTitle,
+              duration_ms:
+                (t.durationMs as number) ??
+                null,
+              preview_url:
+                (t.previewUrl as string) ??
+                null,
+              artwork_url:
+                (t.artworkUrl as string) ??
+                null,
+              track_number:
+                trackNumber,
+              disc_number: 1,
+              status: "active",
+              metadata: {},
+              created_at: now,
+              updated_at: now,
+            });
+
+        if (insertError) {
+          errors.push(
+            `insert (no isrc) "${trackTitle}": ${insertError.message}`,
+          );
+          continue;
+        }
+
+        tracksCreated++;
+      }
     }
-    const { error: rtErr } = await db.from("registry_release_tracks").insert({ id: crypto.randomUUID(), release_id: releaseId, track_id: trackId, disc_number: 1, track_number: trackNumber, source: "provider_intake", confidence: 90, status: "active", metadata: {}, created_at: now, updated_at: now });
-    if (rtErr) { errors.push(`join: ${rtErr.message}`); continue; }
+
+    const { error: releaseTrackError } =
+      await db
+        .from("registry_release_tracks")
+        .insert({
+          id: crypto.randomUUID(),
+          release_id: releaseId,
+          track_id: trackId,
+          disc_number: 1,
+          track_number: trackNumber,
+          source: "provider_intake",
+          confidence: 90,
+          status: "active",
+          metadata: {},
+          created_at: now,
+          updated_at: now,
+        });
+
+    if (releaseTrackError) {
+      errors.push(
+        "join: " +
+          releaseTrackError.message,
+      );
+      continue;
+    }
+
     trackJoinsCreated++;
-    if (parsedPrimary) { const pSlug = slugify(parsedPrimary); const { data: pa } = await db.from("registry_artists").select("id").eq("slug", pSlug).in("status", ["active", "draft"]).maybeSingle(); let paId = pa ? pa.id as string : await findOrCreateArtist(db, parsedPrimary, now); if (paId) { const { data: existTa } = await db.from("registry_track_artists").select("id").eq("track_id", trackId).eq("artist_id", paId).maybeSingle(); if (!existTa) { await db.from("registry_track_artists").insert({ id: crypto.randomUUID(), track_id: trackId, artist_id: paId, artist_slug: pSlug, artist_name_text: parsedPrimary, role: "primary", is_primary: true, is_featured: false, credit_order: 0, source: "provider_intake", confidence: 85, status: "active", metadata: {}, created_at: now, updated_at: now }); trackArtistsCreated++; } await ensureEntityRelationship(db, "track", scopedTrackSlug, "artist", pSlug, "PERFORMED_BY", "primary", 90, 0, now); entityRelationshipsCreated++; } }
-    for (let fi = 0; fi < parsedFeatured.length; fi++) { const fname = parsedFeatured[fi]; const fslug = slugify(fname); if (!fslug) continue; const { data: fa } = await db.from("registry_artists").select("id").eq("slug", fslug).in("status", ["active", "draft"]).maybeSingle(); let faId = fa ? fa.id as string : await findOrCreateArtist(db, fname, now); if (faId) { const { data: existFa } = await db.from("registry_track_artists").select("id").eq("track_id", trackId).eq("artist_id", faId).maybeSingle(); if (!existFa) { await db.from("registry_track_artists").insert({ id: crypto.randomUUID(), track_id: trackId, artist_id: faId, artist_slug: fslug, artist_name_text: fname, role: "featured", is_primary: false, is_featured: true, credit_order: fi + 1, source: "provider_intake", confidence: 85, status: "active", metadata: {}, created_at: now, updated_at: now }); featuredArtistsCreated++; } await ensureEntityRelationship(db, "track", scopedTrackSlug, "artist", fslug, "FEATURED_ON", "featured", 85, fi + 1, now); entityRelationshipsCreated++; } }
+
+    if (parsedPrimary) {
+      const primarySlug =
+        slugify(parsedPrimary);
+      const { data: primaryArtist } =
+        await db
+          .from("registry_artists")
+          .select("id")
+          .eq("slug", primarySlug)
+          .in(
+            "status",
+            ["active", "draft"],
+          )
+          .maybeSingle();
+      const primaryArtistId =
+        primaryArtist
+          ? String(primaryArtist.id)
+          : await findOrCreateArtist(
+              db,
+              parsedPrimary,
+              now,
+            );
+
+      if (primaryArtistId) {
+        const { data: existingLink } =
+          await db
+            .from("registry_track_artists")
+            .select("id")
+            .eq("track_id", trackId)
+            .eq(
+              "artist_id",
+              primaryArtistId,
+            )
+            .maybeSingle();
+
+        if (!existingLink) {
+          await db
+            .from("registry_track_artists")
+            .insert({
+              id: crypto.randomUUID(),
+              track_id: trackId,
+              artist_id:
+                primaryArtistId,
+              artist_slug:
+                primarySlug,
+              artist_name_text:
+                parsedPrimary,
+              role: "primary",
+              is_primary: true,
+              is_featured: false,
+              credit_order: 0,
+              source:
+                "provider_intake",
+              confidence: 85,
+              status: "active",
+              metadata: {},
+              created_at: now,
+              updated_at: now,
+            });
+          trackArtistsCreated++;
+        }
+
+        await ensureEntityRelationship(
+          db,
+          "track",
+          resolvedTrackSlug,
+          "artist",
+          primarySlug,
+          "PERFORMED_BY",
+          "primary",
+          90,
+          0,
+          now,
+        );
+        entityRelationshipsCreated++;
+      }
+    }
+
+    for (
+      let fi = 0;
+      fi < parsedFeatured.length;
+      fi++
+    ) {
+      const featuredName =
+        parsedFeatured[fi];
+      const featuredSlug =
+        slugify(featuredName);
+      if (!featuredSlug) continue;
+
+      const { data: featuredArtist } =
+        await db
+          .from("registry_artists")
+          .select("id")
+          .eq("slug", featuredSlug)
+          .in(
+            "status",
+            ["active", "draft"],
+          )
+          .maybeSingle();
+      const featuredArtistId =
+        featuredArtist
+          ? String(featuredArtist.id)
+          : await findOrCreateArtist(
+              db,
+              featuredName,
+              now,
+            );
+
+      if (featuredArtistId) {
+        const { data: existingLink } =
+          await db
+            .from("registry_track_artists")
+            .select("id")
+            .eq("track_id", trackId)
+            .eq(
+              "artist_id",
+              featuredArtistId,
+            )
+            .maybeSingle();
+
+        if (!existingLink) {
+          await db
+            .from("registry_track_artists")
+            .insert({
+              id: crypto.randomUUID(),
+              track_id: trackId,
+              artist_id:
+                featuredArtistId,
+              artist_slug:
+                featuredSlug,
+              artist_name_text:
+                featuredName,
+              role: "featured",
+              is_primary: false,
+              is_featured: true,
+              credit_order: fi + 1,
+              source:
+                "provider_intake",
+              confidence: 85,
+              status: "active",
+              metadata: {},
+              created_at: now,
+              updated_at: now,
+            });
+          featuredArtistsCreated++;
+        }
+
+        await ensureEntityRelationship(
+          db,
+          "track",
+          resolvedTrackSlug,
+          "artist",
+          featuredSlug,
+          "FEATURED_ON",
+          "featured",
+          85,
+          fi + 1,
+          now,
+        );
+        entityRelationshipsCreated++;
+      }
+    }
   }
-  return { tracksCreated, trackJoinsCreated, trackArtistsCreated, featuredArtistsCreated, entityRelationshipsCreated, errors };
+
+  return {
+    tracksCreated,
+    trackJoinsCreated,
+    trackArtistsCreated,
+    featuredArtistsCreated,
+    entityRelationshipsCreated,
+    errors,
+  };
 }
 
 Deno.serve(async (req) => {

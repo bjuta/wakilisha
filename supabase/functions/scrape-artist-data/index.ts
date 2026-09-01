@@ -1,5 +1,6 @@
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.1";
+import { canonicalTrackSlugCandidate } from "../_shared/registry-track-identity.ts";
 
 const SITE_BASE = "https://wakilisha.africa";
 
@@ -596,22 +597,12 @@ async function writeScrapeToRegistry(
   const existingTrackBySlug = new Map<string, string>(
     existingTracks.map((t) => [t.slug, t.id])
   );
-
-  const artistScopedSlugPrefix = `${data.slug}--`;
-
-  const trackNormTitleToSlug = new Map<string, string>();
-  for (const t of existingTracks) {
-    const key = normalizeForMatch(t.title as string);
-    if (key) trackNormTitleToSlug.set(key, t.slug);
-  }
-
-  for (const t of existingTracks) {
-    const slug = t.slug as string;
-    if (slug.startsWith(artistScopedSlugPrefix)) {
-      const key = normalizeForMatch(t.title as string);
-      if (key) trackNormTitleToSlug.set(key, slug);
-    }
-  }
+  const existingTrackIdToSlug = new Map<string, string>(
+    existingTracks.map((t) => [t.id, t.slug])
+  );
+  const existingTrackIdToTitle = new Map<string, string>(
+    existingTracks.map((t) => [t.id, t.title])
+  );
 
   const existingReleaseArtists = await fetchAllRows<{ release_id: string; artist_id: string; artist_slug: string }>(
     "registry_release_artists", "release_id, artist_id, artist_slug",
@@ -628,16 +619,85 @@ async function writeScrapeToRegistry(
     existingReleaseTracks.map((r) => `${r.release_id}:${r.track_id}`)
   );
 
-  const existingTrackArtists = await fetchAllRows<{ track_id: string; artist_slug: string }>(
-    "registry_track_artists", "track_id, artist_slug",
+  const existingTrackArtists = await fetchAllRows<{
+    track_id: string;
+    artist_slug: string;
+    artist_name_text: string | null;
+    is_featured: boolean | null;
+  }>(
+    "registry_track_artists",
+    "track_id, artist_slug, artist_name_text, is_featured",
     { col: "status", val: "active" }
   );
   const existingTrackArtistSet = new Set<string>(
     existingTrackArtists.map((r) => `${r.track_id}:${r.artist_slug}`)
   );
+  const featuredArtistNamesByTrack = new Map<string, string[]>();
+  for (const link of existingTrackArtists) {
+    if (!link.is_featured) continue;
+    const name =
+      link.artist_name_text ||
+      link.artist_slug;
+    if (!featuredArtistNamesByTrack.has(link.track_id)) {
+      featuredArtistNamesByTrack.set(link.track_id, []);
+    }
+    featuredArtistNamesByTrack.get(link.track_id)!.push(name);
+  }
+  const existingTrackByArtistAndSlug = new Map<string, string>();
+  const ambiguousTrackScopeKeys = new Set<string>();
+
+  const registerTrackScopeAlias = (
+    artistSlug: string,
+    trackSlug: string,
+    trackId: string,
+  ) => {
+    if (!artistSlug || !trackSlug || !trackId) return;
+    const key = `${artistSlug}:${trackSlug}`;
+    if (ambiguousTrackScopeKeys.has(key)) return;
+    const existingId = existingTrackByArtistAndSlug.get(key);
+    if (existingId && existingId !== trackId) {
+      existingTrackByArtistAndSlug.delete(key);
+      ambiguousTrackScopeKeys.add(key);
+      return;
+    }
+    existingTrackByArtistAndSlug.set(key, trackId);
+  };
+
+  for (const link of existingTrackArtists) {
+    const actualSlug = existingTrackIdToSlug.get(link.track_id);
+    if (actualSlug) {
+      registerTrackScopeAlias(link.artist_slug, actualSlug, link.track_id);
+    }
+    const existingTitle = existingTrackIdToTitle.get(link.track_id);
+    if (existingTitle) {
+      registerTrackScopeAlias(
+        link.artist_slug,
+        canonicalTrackSlugCandidate(
+          existingTitle,
+          {
+            featuredArtistNames:
+              featuredArtistNamesByTrack.get(link.track_id) || [],
+          },
+        ),
+        link.track_id,
+      );
+    }
+  }
+
+  const resolveTrackInArtistScope = (
+    artistSlug: string,
+    trackSlug: string,
+  ): string | undefined => {
+    const key = `${artistSlug}:${trackSlug}`;
+    if (ambiguousTrackScopeKeys.has(key)) {
+      throw new Error(
+        `Ambiguous Track identity in artist scope: ${artistSlug}/${trackSlug}`,
+      );
+    }
+    return existingTrackByArtistAndSlug.get(key);
+  };
 
   const seenReleaseSlugs = new Set<string>(existingReleaseBySlug.keys());
-  const seenTrackSlugs = new Set<string>(existingTrackBySlug.keys());
 
   const ensureRelease = async (
     title: string,
@@ -772,26 +832,43 @@ async function writeScrapeToRegistry(
       const track = tracks[i];
       if (!track.title) continue;
 
-      const trackTitleSlug = slugify(track.title);
+      const trackArtistScope = slugify(data.name);
+      const structuredTrackArtists =
+        splitTrackArtists(track.artist || data.name);
+      const structuredFeaturedArtistNames =
+        structuredTrackArtists.filter(
+          (name) =>
+            slugify(name) !== trackArtistScope,
+        );
+      const trackTitleSlug =
+        canonicalTrackSlugCandidate(
+          track.title,
+          {
+            featuredArtistNames:
+              structuredFeaturedArtistNames,
+          },
+        );
       let trackId: string | undefined;
 
       if (track.isrc) trackId = existingTrackByIsrc.get(track.isrc);
 
       if (!trackId) {
-        const scopedSlug = `${artistScopedSlugPrefix}${trackTitleSlug}`;
-        trackId = existingTrackBySlug.get(scopedSlug);
-      }
-
-      if (!trackId) {
-        const slugMatchId = existingTrackBySlug.get(trackTitleSlug);
-        if (slugMatchId && existingTrackArtistSet.has(`${slugMatchId}:${slugify(data.name)}`)) {
-          trackId = slugMatchId;
+        try {
+          trackId = resolveTrackInArtistScope(
+            trackArtistScope,
+            trackTitleSlug,
+          );
+        } catch (error) {
+          errors.push(
+            error instanceof Error ? error.message : String(error),
+          );
+          continue;
         }
       }
 
       if (!trackId) {
         const newId = crypto.randomUUID();
-        const trackSlug = dedupeSlug(trackTitleSlug, seenTrackSlugs);
+        const trackSlug = trackTitleSlug;
         const newTrack = {
           id: newId,
           slug: trackSlug,
@@ -821,6 +898,13 @@ async function writeScrapeToRegistry(
 
         trackId = newId;
         existingTrackBySlug.set(trackSlug, newId);
+        existingTrackIdToSlug.set(newId, trackSlug);
+        existingTrackIdToTitle.set(newId, track.title);
+        registerTrackScopeAlias(
+          trackArtistScope,
+          trackSlug,
+          newId,
+        );
         if (track.isrc) existingTrackByIsrc.set(track.isrc, newId);
         stats.tracks_upserted++;
       } else if (options.overwrite) {
@@ -844,11 +928,6 @@ async function writeScrapeToRegistry(
             .eq("id", trackId);
         }
         stats.tracks_upserted++;
-      }
-
-      const normKey = normalizeForMatch(track.title);
-      if (normKey && !trackNormTitleToSlug.has(normKey)) {
-        trackNormTitleToSlug.set(normKey, existingTrackBySlug.get(trackTitleSlug) || trackTitleSlug);
       }
 
       const rtKey = `${releaseId}:${trackId}`;
@@ -952,36 +1031,39 @@ async function writeScrapeToRegistry(
       const track = tracks[i];
       if (!track.title) continue;
 
-      const trackTitleSlug = slugify(track.title);
+      const structuredTrackArtists =
+        splitTrackArtists(
+          track.artist || releaseOwnerName,
+        );
+      const trackTitleSlug =
+        canonicalTrackSlugCandidate(
+          track.title,
+          {
+            featuredArtistNames:
+              structuredTrackArtists.slice(1),
+          },
+        );
       let trackId: string | undefined;
 
       if (track.isrc) trackId = existingTrackByIsrc.get(track.isrc);
 
       if (!trackId) {
-        const ownerScopedSlug = `${releaseOwnerSlug}--${trackTitleSlug}`;
-        trackId = existingTrackBySlug.get(ownerScopedSlug);
-        if (!trackId) {
-          const scrapedScopedSlug = `${data.slug}--${trackTitleSlug}`;
-          trackId = existingTrackBySlug.get(scrapedScopedSlug);
-        }
-      }
-
-      if (!trackId) {
-        const slugMatchId = existingTrackBySlug.get(trackTitleSlug);
-        if (slugMatchId) {
-          const scrapedSlug = slugify(data.name);
-          if (
-            existingTrackArtistSet.has(`${slugMatchId}:${releaseOwnerSlug}`) ||
-            existingTrackArtistSet.has(`${slugMatchId}:${scrapedSlug}`)
-          ) {
-            trackId = slugMatchId;
-          }
+        try {
+          trackId = resolveTrackInArtistScope(
+            releaseOwnerSlug,
+            trackTitleSlug,
+          );
+        } catch (error) {
+          errors.push(
+            error instanceof Error ? error.message : String(error),
+          );
+          continue;
         }
       }
 
       if (!trackId) {
         const newId = crypto.randomUUID();
-        const trackSlug = dedupeSlug(trackTitleSlug, seenTrackSlugs);
+        const trackSlug = trackTitleSlug;
         const newTrack = {
           id: newId,
           slug: trackSlug,
@@ -1011,13 +1093,15 @@ async function writeScrapeToRegistry(
 
         trackId = newId;
         existingTrackBySlug.set(trackSlug, newId);
+        existingTrackIdToSlug.set(newId, trackSlug);
+        existingTrackIdToTitle.set(newId, track.title);
+        registerTrackScopeAlias(
+          releaseOwnerSlug,
+          trackSlug,
+          newId,
+        );
         if (track.isrc) existingTrackByIsrc.set(track.isrc, newId);
         stats.tracks_upserted++;
-      }
-
-      const normKey = normalizeForMatch(track.title);
-      if (normKey && !trackNormTitleToSlug.has(normKey)) {
-        trackNormTitleToSlug.set(normKey, existingTrackBySlug.get(trackTitleSlug) || trackTitleSlug);
       }
 
       const rtKey = `${releaseId}:${trackId}`;
@@ -1119,25 +1203,44 @@ async function writeScrapeToRegistry(
 
   if (data.topSongs.length > 0) {
     const now = new Date().toISOString();
-
     const topSongTaSet = new Set<string>();
+    const artistScrapedSlug = slugify(data.name);
 
     for (let i = 0; i < data.topSongs.length; i++) {
       const ts = data.topSongs[i];
-      const normKey = normalizeForMatch(ts.title);
-      if (!normKey) continue;
+      const structuredTopSongArtists =
+        splitTrackArtists(ts.artist || data.name);
+      const trackSlugCandidate =
+        canonicalTrackSlugCandidate(
+          ts.title,
+          {
+            featuredArtistNames:
+              structuredTopSongArtists.slice(1),
+          },
+        );
+      let matchedTrackId: string | undefined;
 
-      let matchedTrackSlug = trackNormTitleToSlug.get(normKey);
+      try {
+        matchedTrackId = resolveTrackInArtistScope(
+          artistScrapedSlug,
+          trackSlugCandidate,
+        );
+      } catch (error) {
+        errors.push(
+          error instanceof Error ? error.message : String(error),
+        );
+        continue;
+      }
 
-      if (!matchedTrackSlug) {
-        if (options.dryRun) {
-          const syntheticSlug = dedupeSlug(slugify(ts.title), seenTrackSlugs);
-          matchedTrackSlug = syntheticSlug;
-          trackNormTitleToSlug.set(normKey, syntheticSlug);
-          stats.tracks_upserted++;
-        } else {
-          const trackId = crypto.randomUUID();
-          const trackSlug = dedupeSlug(slugify(ts.title), seenTrackSlugs);
+      let matchedTrackSlug = matchedTrackId
+        ? existingTrackIdToSlug.get(matchedTrackId)
+        : undefined;
+
+      if (!matchedTrackId) {
+        const trackId = crypto.randomUUID();
+        const trackSlug = trackSlugCandidate;
+
+        if (!options.dryRun) {
           const newTrack = {
             id: trackId,
             slug: trackSlug,
@@ -1164,18 +1267,31 @@ async function writeScrapeToRegistry(
             .insert(newTrack);
 
           if (trackErr) {
-            errors.push(`Top-song track insert error "${ts.title}": ${trackErr.message}`);
+            errors.push(
+              `Top-song track insert error "${ts.title}": ${trackErr.message}`,
+            );
             continue;
           }
+        }
 
-          matchedTrackSlug = trackSlug;
-          existingTrackBySlug.set(trackSlug, trackId);
-          trackNormTitleToSlug.set(normKey, trackSlug);
-          stats.tracks_upserted++;
+        matchedTrackId = trackId;
+        matchedTrackSlug = trackSlug;
+        existingTrackBySlug.set(trackSlug, trackId);
+        existingTrackIdToSlug.set(trackId, trackSlug);
+        existingTrackIdToTitle.set(trackId, ts.title);
+        registerTrackScopeAlias(
+          artistScrapedSlug,
+          trackSlug,
+          trackId,
+        );
+        stats.tracks_upserted++;
 
-          const artistScrapedSlug = slugify(data.name);
-          const taKey = `${trackId}:${artistScrapedSlug}`;
-          if (!existingTrackArtistSet.has(taKey) && !topSongTaSet.has(taKey)) {
+        const taKey = `${trackId}:${artistScrapedSlug}`;
+        if (
+          !existingTrackArtistSet.has(taKey) &&
+          !topSongTaSet.has(taKey)
+        ) {
+          if (!options.dryRun) {
             const { error: taErr } = await supabase
               .from("registry_track_artists")
               .insert({
@@ -1190,18 +1306,31 @@ async function writeScrapeToRegistry(
                 source: "wakilisha_scraper_top_song",
                 confidence: 80,
                 status: "active",
-                metadata: { scraped_from: data.slug, scraped_at: now, rank: i + 1 },
+                metadata: {
+                  scraped_from: data.slug,
+                  scraped_at: now,
+                  rank: i + 1,
+                },
               });
 
             if (taErr) {
-              errors.push(`Top-song track-artist error "${ts.title}": ${taErr.message}`);
-            } else {
-              stats.track_artists_upserted++;
-              topSongTaSet.add(taKey);
-              existingTrackArtistSet.add(taKey);
+              errors.push(
+                `Top-song track-artist error "${ts.title}": ${taErr.message}`,
+              );
             }
           }
+
+          stats.track_artists_upserted++;
+          topSongTaSet.add(taKey);
+          existingTrackArtistSet.add(taKey);
         }
+      }
+
+      if (!matchedTrackSlug) {
+        errors.push(
+          `Top-song Track identity missing slug for "${ts.title}"`,
+        );
+        continue;
       }
 
       const relationshipEntry: Record<string, unknown> = {

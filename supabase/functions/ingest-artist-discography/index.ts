@@ -1,5 +1,6 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.1";
 import { SignJWT } from "npm:jose@5.9.6";
+import { canonicalTrackSlugCandidate } from "../_shared/registry-track-identity.ts";
 import { resolveScopedTrackIdentity } from "./trackIdentity.ts";
 import {
   appleAlbumIdForRelease,
@@ -872,8 +873,28 @@ Deno.serve(async (req: Request) => {
         for (const track of tracksData) {
           const tAttrs = track.attributes ?? {};
           const trackTitle = tAttrs.name ?? "Untitled";
+          const rawTrackArtistName = (tAttrs.artistName ?? "").trim();
+          const trackArtistNames = splitArtistNames(
+            rawTrackArtistName || artistName,
+          );
+          const structuredFeaturedArtistNames =
+            trackArtistNames.filter((name) => {
+              const nameKey = name.toLowerCase().trim();
+              const nameSlug = slugify(name);
+              return (
+                nameKey !== artistNameLower &&
+                nameSlug !== artistSlug
+              );
+            });
           const trackIsrc = tAttrs.isrc ? String(tAttrs.isrc).trim().toUpperCase() : null;
-          const rawTrackSlug = slugify(trackTitle);
+          const rawTrackSlug =
+            canonicalTrackSlugCandidate(
+              trackTitle,
+              {
+                featuredArtistNames:
+                  structuredFeaturedArtistNames,
+              },
+            );
           const discNum = tAttrs.discNumber ?? 1;
           const trackNum = tAttrs.trackNumber ?? null;
           const durationMs = tAttrs.durationInMillis ?? null;
@@ -913,8 +934,6 @@ Deno.serve(async (req: Request) => {
             metadata: { apple_music_track_id: track.id, apple_music_album_id: album.id },
           });
 
-          const rawTrackArtistName = (tAttrs.artistName ?? "").trim();
-          const trackArtistNames = splitArtistNames(rawTrackArtistName || artistName);
           const seenOnThisTrack = new Set<string>();
 
           for (const tArtist of trackArtistNames) {

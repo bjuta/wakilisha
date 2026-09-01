@@ -1,0 +1,39 @@
+{
+  "migration_file": "supabase/migrations/20260901114500_mizizi_track_identity_write_boundary.sql",
+  "migration_sha256": "30761295ea5cd375ef47ceb78489c285e7569dcd0e4e224e5ad1c25afd5036cb",
+  "base_main_sha": "a9f4f0152ac301e8a3e58a05ad473f96690fdd27",
+  "preview_project_ref": "xnjeojzusltpruchqzfx",
+  "preview_branch_id": "d0b24b25-30bf-453d-9ed3-8b78fdf91b0a",
+  "preview_branch_name": "mizizi-track-identity-preview-20260901",
+  "baseline_migration_count": 77,
+  "baseline_migration_head": "20260831173500",
+  "baseline_replay": "pass",
+  "candidate_apply": "pass",
+  "preview_migration_count": 78,
+  "preview_migration_head": "20260901114500",
+  "verifier": "pass",
+  "verifier_file": "scripts/control-plane/verify-mizizi-track-identity-write-boundary.sql",
+  "behavioral_fixture": "Transactional Track Intake authority fixture covering cross-Artist route reuse, same-Artist collision fail-closed, structured featured-credit cleanup, Ft. Lauderdale preservation, version-bearing suffix preservation, and duplicate ISRC rejection.",
+  "fixture_terminal_state": "ROLLED_BACK_CLEAN",
+  "schema_types_sha256": "e50acaa34813de0eac2ba8dfc7e13038f1c6f135a800f80ecae67816fc3f2160",
+  "schema_migration_count": 78,
+  "schema_migration_head": "20260901114500",
+  "advisor_summary": {
+    "security_new_findings_for_changed_rpc": [],
+    "security_existing_findings_for_changed_rpc": [
+      "authenticated_security_definer_function_executable"
+    ],
+    "security_disposition": "The authenticated SECURITY DEFINER advisory is unchanged from production and intentional: the RPC performs its own administrator/manage_registry capability check. Anonymous EXECUTE remains revoked and was proven by the permanent verifier.",
+    "performance_new_findings_for_changed_rpc": [],
+    "performance_disposition": "No performance advisory targets the changed Track Intake RPC in production or preview. Global advisor inventories differ on fresh preview branches and are not treated as a meaningful migration delta."
+  },
+  "rehearsal_repair": {
+    "initial_failure": "The PR candidate migration file was structurally spliced with stale legacy SQL before preview application.",
+    "candidate_sql_replayed_after_repair": true,
+    "same_failed_mutation_rerun": false,
+    "preview_branch_reset_retry_count": 0,
+    "preview_history_rebound_from": "20260901101324",
+    "exact_candidate_history_rebound_to_canonical_version": true
+  },
+  "verified_at": "2026-09-01T10:23:00Z"
+}

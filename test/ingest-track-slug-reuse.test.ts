@@ -1,6 +1,9 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  canonicalTrackSlugCandidate,
+} from "../supabase/functions/_shared/registry-track-identity.ts";
+import {
   resolveScopedTrackIdentity,
   type ScopedTrackIdentityMaps,
 } from "../supabase/functions/ingest-artist-discography/trackIdentity.ts";
@@ -22,6 +25,89 @@ function createSequentialIdFactory(): () => string {
     return id;
   };
 }
+
+describe("canonical Track slug candidate", () => {
+  it("keeps structurally proven feature credits out of Track route identity", () => {
+    expect(
+      canonicalTrackSlugCandidate(
+        "FICHA WHITE (feat. Jovie Jovv, Shappaman & KXOBIE)",
+        {
+          featuredArtistNames: [
+            "Jovie Jovv",
+            "Shappaman",
+            "KXOBIE",
+          ],
+        },
+      ),
+    ).toBe("ficha-white");
+
+    expect(
+      canonicalTrackSlugCandidate(
+        "Song ft. Artist B",
+        {
+          featuredArtistNames: [
+            "Artist B",
+          ],
+        },
+      ),
+    ).toBe("song");
+  });
+
+  it("does not infer feature-credit structure from title text alone", () => {
+    expect(
+      canonicalTrackSlugCandidate(
+        "Song ft. Artist B",
+      ),
+    ).toBe("song-ft-artist-b");
+
+    expect(
+      canonicalTrackSlugCandidate(
+        "Road to Ft. Lauderdale",
+        {
+          featuredArtistNames: [
+            "Someone Else",
+          ],
+        },
+      ),
+    ).toBe(
+      "road-to-ft-lauderdale",
+    );
+
+    expect(
+      canonicalTrackSlugCandidate(
+        "Road to Ft. Lauderdale (feat. Someone Else)",
+        {
+          featuredArtistNames: [
+            "Someone Else",
+          ],
+        },
+      ),
+    ).toBe(
+      "road-to-ft-lauderdale",
+    );
+
+    expect(
+      canonicalTrackSlugCandidate(
+        "Song feat. Artist B (Remix)",
+        {
+          featuredArtistNames: [
+            "Artist B",
+          ],
+        },
+      ),
+    ).toBe(
+      "song-feat-artist-b-remix",
+    );
+  });
+
+  it("preserves culturally meaningful version wording", () => {
+    expect(
+      canonicalTrackSlugCandidate(
+        "Song (Remix)",
+      ),
+    ).toBe("song-remix");
+  });
+});
 
 describe("resolveScopedTrackIdentity", () => {
   it("reuses a track staged earlier for the same artist and title", () => {
