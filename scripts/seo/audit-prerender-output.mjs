@@ -7,6 +7,35 @@ const SITE_NAME = "WAKILISHA";
 
 const hardErrors = [];
 const warnings = [];
+let metadataManifestCache = null;
+
+function readMetadataManifest() {
+  if (metadataManifestCache) return metadataManifestCache;
+
+  if (!fs.existsSync(METADATA_PATH)) {
+    metadataManifestCache = {};
+    return metadataManifestCache;
+  }
+
+  metadataManifestCache = JSON.parse(readText(METADATA_PATH));
+  return metadataManifestCache;
+}
+
+function isDynamicMusicRoute(route) {
+  const parts = String(route || "")
+    .split("/")
+    .filter(Boolean);
+
+  if (parts[0] === "tracks") {
+    return parts.length >= 3;
+  }
+
+  if (parts[0] === "releases") {
+    return parts.length >= 3;
+  }
+
+  return false;
+}
 
 function readText(filePath) {
   return fs.readFileSync(filePath, "utf8");
@@ -60,7 +89,7 @@ function auditMetadataManifest() {
     return;
   }
 
-  const manifest = JSON.parse(readText(METADATA_PATH));
+  const manifest = readMetadataManifest();
   const entries = Object.entries(manifest);
 
   for (const [route, rawEntry] of entries) {
@@ -217,6 +246,16 @@ function auditSchemaEntity(route, node) {
 function auditHtmlFile(filePath) {
   const route = routeFromHtmlPath(filePath);
   const html = readText(filePath);
+
+  if (isDynamicMusicRoute(route)) {
+    const manifest = readMetadataManifest();
+
+    if (!manifest[route]) {
+      reportError(
+        `${route}: dynamic music prerender is not present in canonical SEO metadata authority.`,
+      );
+    }
+  }
 
   const titleMatch = html.match(/<title>([\s\S]*?)<\/title>/i);
   const pageTitle = cleanWhitespace(titleMatch?.[1] || "");
