@@ -1,4 +1,5 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.1";
+import { releaseTypeLabelFromActiveTrackCount } from "../_shared/release-taxonomy.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -23,6 +24,8 @@ function extractYear(dateStr) {
 }
 
 interface TrackOut {
+  slug?: string;
+  artistSlug?: string;
   title: string;
   duration: string;
   artists?: string;
@@ -122,10 +125,14 @@ Deno.serve(async (req) => {
               .order("credit_order");
 
             const artistsByTrack = new Map();
+            const primaryArtistSlugByTrack = new Map();
             for (const ta of (trackArtists ?? [])) {
               const list = artistsByTrack.get(ta.track_id) || [];
               list.push(ta.artist_name_text);
               artistsByTrack.set(ta.track_id, list);
+              if (ta.artist_slug && (ta.is_primary || !primaryArtistSlugByTrack.has(ta.track_id))) {
+                primaryArtistSlugByTrack.set(ta.track_id, ta.artist_slug);
+              }
             }
 
             const trackMetaMap = new Map();
@@ -145,6 +152,8 @@ Deno.serve(async (req) => {
                 const nonPageArtist = trackArtistsList.filter((a) => a !== artist.display_name);
                 const artists = nonPageArtist.length > 0 ? nonPageArtist.join(", ") : undefined;
                 return {
+                  slug: t.slug || "",
+                  artistSlug: primaryArtistSlugByTrack.get(t.id) || artistSlug,
                   title: t.title || "",
                   duration: formatDuration(meta?.durationMs ?? null),
                   artists,
@@ -154,12 +163,10 @@ Deno.serve(async (req) => {
               .filter(Boolean);
           }
 
-          if (tracks.length <= 1) continue;
-
           ownReleases.push({
             slug: rel.slug,
             title: rel.title,
-            releaseType: rel.release_type || "album",
+            releaseType: releaseTypeLabelFromActiveTrackCount(tracks.length) || "Release",
             year: extractYear(rel.release_date),
             releaseDate: rel.release_date || "",
             trackCount: tracks.length,
@@ -226,8 +233,6 @@ Deno.serve(async (req) => {
               const releaseTrackIds = (releaseMemberships ?? [])
                 .map((rt) => rt.track_id);
 
-              if (releaseTrackIds.length <= 1) continue;
-
               let tracks = [];
               if (releaseTrackIds.length > 0) {
                 const { data: trackRows } = await db
@@ -237,16 +242,20 @@ Deno.serve(async (req) => {
 
                 const { data: allTrackArtists } = await db
                   .from("registry_track_artists")
-                  .select("track_id, artist_name_text, credit_order")
+                  .select("track_id, artist_slug, artist_name_text, is_primary, credit_order")
                   .in("track_id", releaseTrackIds)
                   .eq("status", "active")
                   .order("credit_order");
 
                 const artistsByTrack = new Map();
+                const primaryArtistSlugByTrack = new Map();
                 for (const ta of (allTrackArtists ?? [])) {
                   const list = artistsByTrack.get(ta.track_id) || [];
                   list.push(ta.artist_name_text);
                   artistsByTrack.set(ta.track_id, list);
+                  if (ta.artist_slug && (ta.is_primary || !primaryArtistSlugByTrack.has(ta.track_id))) {
+                    primaryArtistSlugByTrack.set(ta.track_id, ta.artist_slug);
+                  }
                 }
 
                 const trackMetaMap = new Map();
@@ -263,6 +272,8 @@ Deno.serve(async (req) => {
                   const nonPageArtist = trackArtistsList.filter((a) => a !== artist.display_name);
                   const artistsStr = nonPageArtist.length > 0 ? nonPageArtist.join(", ") : undefined;
                   return {
+                    slug: t.slug || "",
+                    artistSlug: primaryArtistSlugByTrack.get(t.id) || primaryArtistLink?.artist_slug || "",
                     title: t.title || "",
                     duration: formatDuration(meta?.durationMs ?? null),
                     artists: artistsStr,
@@ -274,7 +285,7 @@ Deno.serve(async (req) => {
               appearsOn.push({
                 slug: rel.slug,
                 title: rel.title,
-                releaseType: rel.release_type || "album",
+                releaseType: releaseTypeLabelFromActiveTrackCount(tracks.length) || "Release",
                 year: extractYear(rel.release_date),
                 releaseDate: rel.release_date || "",
                 trackCount: tracks.length,
