@@ -399,4 +399,79 @@ describe("public Release boundary", () => {
       '.from("registry_tracks").select("id, release_id, title, slug").in("release_id", releaseIds)',
     );
   });
+
+  it("makes canonical Registry metadata the only dynamic music prerender authority", () => {
+    const prerender = readFileSync(
+      "scripts/seo/prerender-metadata.mjs",
+      "utf8",
+    );
+    const refresh = readFileSync(
+      "scripts/seo/refresh-public-sitemap.mjs",
+      "utf8",
+    );
+    const bootstrapSitemap = readFileSync(
+      "public/sitemap.xml",
+      "utf8",
+    );
+    const pkg = JSON.parse(
+      readFileSync("package.json", "utf8"),
+    ) as {
+      scripts?: Record<string, string>;
+    };
+
+    expect(refresh).toContain(
+      "seo-sitemap-admin?action=xml_live",
+    );
+    expect(refresh).toContain(
+      'fs.writeFileSync(OUTPUT_PATH, result.xml);',
+    );
+    expect(refresh).toContain(
+      'parsed.hostname !== SITE_HOST',
+    );
+    expect(refresh).toContain(
+      'parsed.pathname.includes("/admin")',
+    );
+
+    expect(pkg.scripts?.build).toContain(
+      "npm run seo:refresh-sitemap && node scripts/seo/prerender-metadata.mjs",
+    );
+    expect(pkg.scripts?.["seo:refresh-sitemap"]).toBe(
+      "node scripts/seo/refresh-public-sitemap.mjs",
+    );
+
+    expect(prerender).toContain(
+      "function isDynamicMusicIdentityPath(pagePath)",
+    );
+    expect(prerender).toContain(
+      "function canonicalPrerenderPaths()",
+    );
+    expect(prerender).toContain(
+      ".filter((pagePath) => !isDynamicMusicIdentityPath(pagePath))",
+    );
+    expect(prerender).toContain(
+      "const metadataPaths = [...DB_METADATA_BY_PATH.keys()]",
+    );
+    expect(prerender).toContain(
+      "const paths = canonicalPrerenderPaths();",
+    );
+    expect(prerender).not.toContain(
+      "[...readSitemapPaths(), ...DB_METADATA_BY_PATH.keys()]",
+    );
+
+    expect(bootstrapSitemap).not.toContain(
+      "/releases/ywaya-tajiri/nervous-single",
+    );
+    expect(bootstrapSitemap).not.toMatch(
+      /<loc>https:\/\/wakilisha\.africa\/releases\/[^<]+\/[^<]+<\/loc>/,
+    );
+    expect(bootstrapSitemap).not.toMatch(
+      /<loc>https:\/\/wakilisha\.africa\/tracks\/[^<]+\/[^<]+<\/loc>/,
+    );
+    expect(bootstrapSitemap).toContain(
+      "<loc>https://wakilisha.africa/releases</loc>",
+    );
+    expect(bootstrapSitemap).toContain(
+      "<loc>https://wakilisha.africa/artists</loc>",
+    );
+  });
 });
