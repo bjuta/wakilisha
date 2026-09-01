@@ -409,6 +409,10 @@ describe("public Release boundary", () => {
       "scripts/seo/refresh-public-sitemap.mjs",
       "utf8",
     );
+    const seoAudit = readFileSync(
+      "scripts/seo/audit-prerender-output.mjs",
+      "utf8",
+    );
     const bootstrapSitemap = readFileSync(
       "public/sitemap.xml",
       "utf8",
@@ -456,6 +460,13 @@ describe("public Release boundary", () => {
     );
     expect(prerender).not.toContain(
       "[...readSitemapPaths(), ...DB_METADATA_BY_PATH.keys()]",
+    );
+
+    expect(seoAudit).toContain(
+      "function isDynamicMusicRoute(route)",
+    );
+    expect(seoAudit).toContain(
+      "dynamic music prerender is not present in canonical SEO metadata authority.",
     );
 
     expect(bootstrapSitemap).not.toContain(
