@@ -64,6 +64,7 @@ type RunStats = {
   findings: number;
   applied: number;
   queued: number;
+  observed: number;
   stale: number;
   rowsScanned: Record<"track" | "release" | "chart", number>;
   byRule: Map<string, number>;
@@ -81,6 +82,7 @@ function newStats(): RunStats {
     findings: 0,
     applied: 0,
     queued: 0,
+    observed: 0,
     stale: 0,
     rowsScanned: {
       track: 0,
@@ -106,6 +108,10 @@ function recordFinding(
     finding.ruleId,
     (stats.byRule.get(finding.ruleId) || 0) + 1,
   );
+
+  if (finding.disposition === "observe") {
+    stats.observed += 1;
+  }
 
   if (stats.sample.length < MAX_SAMPLE_FINDINGS) {
     stats.sample.push(finding);
@@ -1631,6 +1637,13 @@ async function scanTracks(
 
         if (
           finding.disposition ===
+          "observe"
+        ) {
+          continue;
+        }
+
+        if (
+          finding.disposition ===
           "review"
         ) {
           await queueReview(
@@ -1820,7 +1833,9 @@ async function scanReleases(
         );
 
         if (
-          options.mode === "apply"
+          options.mode === "apply" &&
+          finding.disposition ===
+            "review"
         ) {
           await queueReview(
             pool,
@@ -1999,7 +2014,10 @@ async function scanCharts(
           } else {
             stats.stale += 1;
           }
-        } else {
+        } else if (
+          finding.disposition ===
+            "review"
+        ) {
           await queueReview(
             pool,
             finding,
@@ -2092,6 +2110,8 @@ function printStats(
         stats.applied,
       queued_for_review:
         stats.queued,
+      observed_findings:
+        stats.observed,
       stale:
         stats.stale,
       tracks_scanned:
