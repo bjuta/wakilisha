@@ -175,6 +175,8 @@ Ambiguity is not itself a queue trigger. MIZIZI observes passive ambiguity and c
 
 Provider payloads, historical values, aliases, and observations remain evidence. Canonical cleanup must never erase provenance.
 
+MIZIZI also owns a preventive write-boundary contract. Live automatic Track writers reuse one shared route-identity rule. Reviewed SQL Track creation follows the same artist-scoped identity policy. Feature-credit presentation is removed only when structured featured-Artist evidence proves the matching fragment. Same-slug Tracks may exist under different Artists. A same-Artist route collision fails closed instead of inventing a numeric or random suffix.
+
 The permanent MIZIZI contract is documented in `docs/registry/MIZIZI_CULTURAL_DATA_STEWARD.md`.
 
 ## Knowledge layers
