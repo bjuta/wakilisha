@@ -1,6 +1,7 @@
 // ── Public Content Read Gateway v18 — public API, no JWT required ──
 // v18: Published Article trust enrichment through the server-owned read contract
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { isRegistryTrackId, registryTrackUrl } from "../../../shared/registry/public-track-route.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
@@ -97,14 +98,14 @@ function cleanPublicMusicSlug(storedSlugRaw: unknown, titleRaw: unknown, artistS
   return storedSlug;
 }
 
-async function findTrackByScopedPublicSlug(
+async function findTracksByScopedPublicSlug(
   supabase: ReturnType<typeof createClient>,
   artistSlugRaw: string | null,
   publicSlugRaw: string,
-): Promise<any | null> {
+): Promise<any[]> {
   const artistSlug = slugify(String(artistSlugRaw || ""));
   const publicSlug = slugify(String(publicSlugRaw || ""));
-  if (!artistSlug || !publicSlug) return null;
+  if (!artistSlug || !publicSlug) return [];
 
   const { data: links } = await supabase
     .from("registry_track_artists")
@@ -115,8 +116,14 @@ async function findTrackByScopedPublicSlug(
     .order("credit_order", { ascending: true })
     .limit(500);
 
-  const trackIds = [...new Set((links ?? []).map((row: any) => String(row.track_id)).filter(Boolean))];
-  if (trackIds.length === 0) return null;
+  const trackIds = [
+    ...new Set(
+      (links ?? [])
+        .map((row: any) => String(row.track_id))
+        .filter(Boolean),
+    ),
+  ];
+  if (trackIds.length === 0) return [];
 
   const { data: tracks } = await supabase
     .from("registry_tracks")
@@ -126,18 +133,50 @@ async function findTrackByScopedPublicSlug(
 
   const matches = (tracks ?? []).filter((track: any) => {
     const registrySlug = slugify(String(track.slug || ""));
-    const publicTrackSlug = cleanPublicMusicSlug(track.slug, track.title, artistSlug);
-    return registrySlug === publicSlug || publicTrackSlug === publicSlug;
+    const publicTrackSlug = cleanPublicMusicSlug(
+      track.slug,
+      track.title,
+      artistSlug,
+    );
+    return (
+      registrySlug === publicSlug ||
+      publicTrackSlug === publicSlug
+    );
   });
 
   return matches.sort((a: any, b: any) => {
-    const aClean = cleanPublicMusicSlug(a.slug, a.title, artistSlug) === publicSlug ? 0 : 1;
-    const bClean = cleanPublicMusicSlug(b.slug, b.title, artistSlug) === publicSlug ? 0 : 1;
+    const aClean =
+      cleanPublicMusicSlug(a.slug, a.title, artistSlug) === publicSlug
+        ? 0
+        : 1;
+    const bClean =
+      cleanPublicMusicSlug(b.slug, b.title, artistSlug) === publicSlug
+        ? 0
+        : 1;
     if (aClean !== bClean) return aClean - bClean;
 
-    const statusRank = (status: string) => status === "active" ? 0 : status === "needs_review" ? 1 : 2;
-    return statusRank(String(a.status || "")) - statusRank(String(b.status || ""));
-  })[0] ?? null;
+    const statusRank = (status: string) =>
+      status === "active" ? 0 : status === "needs_review" ? 1 : 2;
+    const statusDelta =
+      statusRank(String(a.status || "")) -
+      statusRank(String(b.status || ""));
+    if (statusDelta !== 0) return statusDelta;
+
+    return String(a.id).localeCompare(String(b.id));
+  });
+}
+
+async function findTrackByScopedPublicSlug(
+  supabase: ReturnType<typeof createClient>,
+  artistSlugRaw: string | null,
+  publicSlugRaw: string,
+): Promise<any | null> {
+  const matches = await findTracksByScopedPublicSlug(
+    supabase,
+    artistSlugRaw,
+    publicSlugRaw,
+  );
+  return matches[0] ?? null;
 }
 
 async function findReleaseByScopedPublicSlug(
@@ -2150,6 +2189,143 @@ Deno.serve(async (req) => {
 
     else if (path === "/labels" || path === "/labels/") { const { data: labels } = await supabase.from("registry_labels").select("id, slug, name, country_code, description, status").eq("status", "active").order("name", { ascending: true }).limit(500); data = { labels: (labels ?? []).map((l: any) => ({ id: String(l.id), slug: String(l.slug), name: String(l.name), country: l.country_code || null, logoUrl: null, artistCount: 0, releaseCount: 0, featuredArtists: [], isFeatured: false, description: l.description || null })) }; }
 
+    else if (path.startsWith("/track-aliases/")) {
+      const aliasSegments = path
+        .replace(/^\/track-aliases\//, "")
+        .split("/")
+        .filter(Boolean);
+      const aliasArtistSlug = aliasSegments[0] || "";
+      const aliasTrackSlug = aliasSegments[1] || "";
+
+      if (!aliasArtistSlug || !aliasTrackSlug) {
+        return jsonResponse(
+          {
+            data: {
+              kind: "not_found",
+              artistSlug: aliasArtistSlug,
+              trackSlug: aliasTrackSlug,
+              candidates: [],
+            },
+          },
+          origin,
+          200,
+        );
+      }
+
+      const matches = await findTracksByScopedPublicSlug(
+        supabase,
+        aliasArtistSlug,
+        aliasTrackSlug,
+      );
+
+      if (matches.length === 0) {
+        return jsonResponse(
+          {
+            data: {
+              kind: "not_found",
+              artistSlug: aliasArtistSlug,
+              trackSlug: aliasTrackSlug,
+              candidates: [],
+            },
+          },
+          origin,
+          200,
+        );
+      }
+
+      const matchIds = matches.map((track: any) => String(track.id));
+      const { data: membershipRows } = await supabase
+        .from("registry_release_tracks")
+        .select("track_id, release_id, track_number, disc_number")
+        .in("track_id", matchIds)
+        .eq("status", "active")
+        .limit(500);
+
+      const releaseIds = [
+        ...new Set(
+          (membershipRows ?? [])
+            .map((row: any) => String(row.release_id || ""))
+            .filter(Boolean),
+        ),
+      ];
+      const { data: releaseRows } = releaseIds.length > 0
+        ? await supabase
+            .from("registry_releases")
+            .select("id, slug, title, release_type, release_date, artwork_url")
+            .in("id", releaseIds)
+            .in("status", ["active", "draft"])
+        : { data: [] };
+
+      const releaseById = new Map(
+        (releaseRows ?? []).map((release: any) => [
+          String(release.id),
+          release,
+        ]),
+      );
+      const releasesByTrackId = new Map<string, any[]>();
+
+      for (const membership of membershipRows ?? []) {
+        const trackId = String(membership.track_id || "");
+        const release = releaseById.get(String(membership.release_id || ""));
+        if (!trackId || !release) continue;
+        if (!releasesByTrackId.has(trackId)) {
+          releasesByTrackId.set(trackId, []);
+        }
+        releasesByTrackId.get(trackId)!.push({
+          id: String(release.id),
+          slug: String(release.slug || ""),
+          title: String(release.title || ""),
+          releaseType: String(release.release_type || ""),
+          releaseDate: release.release_date || "",
+          artworkUrl: release.artwork_url || "",
+          trackNumber: Number(membership.track_number || 0),
+          discNumber: Number(membership.disc_number || 0),
+        });
+      }
+
+      const candidates = matches.map((track: any) => {
+        const publicSlug = cleanPublicMusicSlug(
+          track.slug,
+          track.title,
+          aliasArtistSlug,
+        );
+        return {
+          id: String(track.id),
+          slug: publicSlug,
+          title: String(track.title || ""),
+          isrc: track.isrc || null,
+          artworkUrl: track.artwork_url || "",
+          canonicalPath: registryTrackUrl(
+            String(track.id),
+            publicSlug,
+          ),
+          releases: releasesByTrackId.get(String(track.id)) || [],
+        };
+      });
+
+      return jsonResponse(
+        {
+          data: matches.length === 1
+            ? {
+                kind: "unique",
+                artistSlug: aliasArtistSlug,
+                trackSlug: aliasTrackSlug,
+                candidate: candidates[0],
+                candidates,
+              }
+            : {
+                kind: "ambiguous",
+                artistSlug: aliasArtistSlug,
+                trackSlug: aliasTrackSlug,
+                candidate: null,
+                candidates,
+              },
+        },
+        origin,
+        200,
+      );
+    }
+
     else if (path.startsWith("/tracks/") || isReleaseTrackPath) {
       const tSegments = isReleaseTrackPath
         ? releasePathSegments
@@ -2157,10 +2333,17 @@ Deno.serve(async (req) => {
       const trackSlug = tSegments[tSegments.length - 1] || "";
       const urlArtistSlug = tSegments.length > 1 ? tSegments[0] : null;
       const urlReleaseSlug = isReleaseTrackPath ? tSegments[1] || null : null;
+      const routeRegistryTrackId =
+        !isReleaseTrackPath &&
+        urlArtistSlug &&
+        isRegistryTrackId(urlArtistSlug)
+          ? urlArtistSlug.toLowerCase()
+          : null;
       let track: any = null;
       let releaseScopedMembership: any = null;
       const isIsrcLookup =
         !isReleaseTrackPath &&
+        !routeRegistryTrackId &&
         trackSlug.toLowerCase().startsWith("isrc:");
 
       if (isReleaseTrackPath) {
@@ -2271,6 +2454,15 @@ Deno.serve(async (req) => {
               (row: any) => String(row.track_id) === String(track.id),
             ) ?? null;
         }
+      } else if (routeRegistryTrackId) {
+        const { data: byId } = await supabase
+          .from("registry_tracks")
+          .select(MUSIC_ENTITY_SELECT)
+          .eq("id", routeRegistryTrackId)
+          .in("status", ["active", "needs_review", "draft"])
+          .limit(1);
+
+        track = byId && byId.length > 0 ? byId[0] : null;
       } else if (isIsrcLookup) {
         const isrc = trackSlug.slice(5);
         const { data: byIsrc } = await supabase
@@ -2394,7 +2586,12 @@ Deno.serve(async (req) => {
       }
 
       if (!track) return jsonResponse({ data: null }, origin, 404);
-      if (urlArtistSlug && !isIsrcLookup && !isReleaseTrackPath) {
+      if (
+        urlArtistSlug &&
+        !routeRegistryTrackId &&
+        !isIsrcLookup &&
+        !isReleaseTrackPath
+      ) {
         const normalizedUrlArtistSlug = slugify(urlArtistSlug);
         const trackMeta = (track.metadata || {}) as Record<string, unknown>;
         const metadataArtistSlug = String(trackMeta.primary_artist_slug || "").trim();
