@@ -9,7 +9,7 @@ import { useScrollReveal } from "@/hooks/useScrollReveal";
 import { useScrollDepthTracking } from "@/hooks/useScrollDepthTracking";
 import { getRelease, listReleases, releaseUrl, slugify, type PublicReleaseDetail, type PublicRelease } from "@/services/publicContent/client";
 import { buildReleaseSeoDescription, releaseEmptyStateCopy } from "@/services/cultureContext/releaseAdapters";
-import { trackUrl } from "@/utils/trackUrl";
+import { canonicalTrackUrl } from "@/utils/trackUrl";
 import ReleaseDetailHero from "./components/ReleaseDetailHero";
 import ReleaseTracklist from "./components/ReleaseTracklist";
 import ReleaseMetadata from "./components/ReleaseMetadata";
@@ -61,9 +61,9 @@ export default function ReleaseDetail() {
       if (data) {
         if (data.trackCount <= 1 && data.tracks[0]) {
           navigate(
-            trackUrl(
+            canonicalTrackUrl(
+              data.tracks[0].id,
               data.tracks[0].slug,
-              artistSlug ? [artistSlug] : [],
             ),
             { replace: true },
           );
