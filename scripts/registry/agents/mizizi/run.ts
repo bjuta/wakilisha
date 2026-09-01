@@ -5,6 +5,7 @@ import {
   MIZIZI_AGENT_KEY,
   MIZIZI_AGENT_LABEL,
   MIZIZI_RULESET_VERSION,
+  releaseTaxonomyFromActiveTrackCount,
   slugifyIdentity,
   stripFeatureCreditNoise,
   type MiziziFinding,
@@ -41,6 +42,7 @@ type ReleaseRow = {
   slug: string;
   title: string;
   release_type: string | null;
+  resolvable_active_track_count: number;
   updated_at: string;
 };
 
@@ -1402,6 +1404,151 @@ async function applyTrackSlug(
   }
 }
 
+async function applyReleaseTaxonomy(
+  pool: ReturnType<typeof createRegistryPool>,
+  row: ReleaseRow,
+  finding: MiziziFinding,
+): Promise<"applied" | "stale"> {
+  await pool.query(
+    "begin isolation level serializable",
+  );
+
+  try {
+    await pool.query(
+      `
+      select pg_advisory_xact_lock(
+        hashtextextended(
+          'mizizi:release-taxonomy:' || $1,
+          0
+        )
+      )
+      `,
+      [row.id],
+    );
+
+    const locked =
+      await pool.query(
+        `
+        select release_type
+        from public.registry_releases
+        where id = $1::uuid
+          and status = 'active'
+        for update
+        `,
+        [row.id],
+      );
+
+    if (
+      !locked.rowCount ||
+      String(
+        locked.rows[0].release_type || "",
+      ).trim() !== finding.currentValue
+    ) {
+      await pool.query("rollback");
+      return "stale";
+    }
+
+    const trackCountResult =
+      await pool.query(
+        `
+        select count(*)::integer
+          as resolvable_active_track_count
+        from public.registry_release_tracks rt
+        join public.registry_tracks t
+          on t.id = rt.track_id
+         and t.status = 'active'
+        where rt.release_id = $1::uuid
+          and rt.status = 'active'
+        `,
+        [row.id],
+      );
+
+    const currentTrackCount =
+      Number(
+        trackCountResult.rows[0]
+          ?.resolvable_active_track_count ||
+        0,
+      );
+    const expectedTrackCount =
+      Number(
+        finding.evidence
+          .resolvableActiveTrackCount ||
+        0,
+      );
+    const currentTaxonomy =
+      releaseTaxonomyFromActiveTrackCount(
+        currentTrackCount,
+      );
+
+    if (
+      currentTrackCount !== expectedTrackCount ||
+      !currentTaxonomy ||
+      currentTaxonomy !==
+        finding.proposedValue
+    ) {
+      await pool.query("rollback");
+      return "stale";
+    }
+
+    const updated =
+      await pool.query(
+        `
+        update public.registry_releases
+        set
+          release_type = $1,
+          updated_at = now()
+        where id = $2::uuid
+          and status = 'active'
+          and coalesce(
+            btrim(release_type),
+            ''
+          ) = $3
+        returning id
+        `,
+        [
+          finding.proposedValue,
+          row.id,
+          finding.currentValue,
+        ],
+      );
+
+    if (!updated.rowCount) {
+      await pool.query("rollback");
+      return "stale";
+    }
+
+    await writeCanonicalEvent(
+      pool,
+      finding,
+      {
+        resolvableActiveTrackCount:
+          currentTrackCount,
+      },
+    );
+
+    await pool.query("commit");
+    return "applied";
+  } catch (error) {
+    await pool
+      .query("rollback")
+      .catch(() => undefined);
+
+    if (
+      error &&
+      typeof error === "object" &&
+      "code" in error &&
+      String(
+        (error as { code?: string })
+          .code || "",
+      ) === "40001"
+    ) {
+      return "stale";
+    }
+
+    throw error;
+  }
+}
+
 async function applyChartSlug(
   pool: ReturnType<typeof createRegistryPool>,
   finding: MiziziFinding,
@@ -1761,39 +1908,48 @@ async function scanReleases(
       await pool.query(
         `
         select
-          id::text,
-          slug,
-          title,
-          release_type,
-          updated_at::text
-        from public.registry_releases
-        where status = 'active'
+          r.id::text,
+          r.slug,
+          r.title,
+          r.release_type,
+          (
+            select count(*)::integer
+            from public.registry_release_tracks rt
+            join public.registry_tracks t
+              on t.id = rt.track_id
+             and t.status = 'active'
+            where rt.release_id = r.id
+              and rt.status = 'active'
+          ) as resolvable_active_track_count,
+          r.updated_at::text
+        from public.registry_releases r
+        where r.status = 'active'
           and (
             $1::timestamptz is null
-            or updated_at >=
+            or r.updated_at >=
                $1::timestamptz
           )
           and (
             $2::timestamptz is null
-            or updated_at >
+            or r.updated_at >
                $2::timestamptz
             or (
-              updated_at =
+              r.updated_at =
                 $2::timestamptz
-              and id::text > $3
+              and r.id::text > $3
             )
           )
           and mod(
             hashtextextended(
-              id::text,
+              r.id::text,
               0
             )::numeric +
               9223372036854775808,
             $4::numeric
           ) = $5::numeric
         order by
-          updated_at,
-          id
+          r.updated_at,
+          r.id
         limit $6
         `,
         [
@@ -1821,6 +1977,8 @@ async function scanReleases(
           title: row.title,
           releaseType:
             row.release_type,
+          activeTrackCount:
+            row.resolvable_active_track_count,
         });
 
       for (
@@ -1833,7 +1991,41 @@ async function scanReleases(
         );
 
         if (
-          options.mode === "apply" &&
+          options.mode !== "apply"
+        ) {
+          continue;
+        }
+
+        if (
+          finding.disposition ===
+          "observe"
+        ) {
+          continue;
+        }
+
+        if (
+          finding.ruleId ===
+            "release_taxonomy_drift" &&
+          finding.disposition ===
+            "auto_fix_candidate"
+        ) {
+          const outcome =
+            await applyReleaseTaxonomy(
+              pool,
+              row,
+              finding,
+            );
+
+          if (outcome === "applied") {
+            stats.applied += 1;
+          } else {
+            stats.stale += 1;
+          }
+
+          continue;
+        }
+
+        if (
           finding.disposition ===
             "review"
         ) {

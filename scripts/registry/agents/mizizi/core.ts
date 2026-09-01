@@ -5,6 +5,9 @@ import {
   slugifyIdentity,
   stripFeatureCreditNoise,
 } from "../../../../supabase/functions/_shared/registry-track-identity.ts";
+import {
+  releaseTaxonomyFromActiveTrackCount,
+} from "../../../../supabase/functions/_shared/release-taxonomy.ts";
 
 export {
   canonicalTrackSlugCandidate,
@@ -12,10 +15,13 @@ export {
   slugifyIdentity,
   stripFeatureCreditNoise,
 } from "../../../../supabase/functions/_shared/registry-track-identity.ts";
+export {
+  releaseTaxonomyFromActiveTrackCount,
+} from "../../../../supabase/functions/_shared/release-taxonomy.ts";
 
 export const MIZIZI_AGENT_KEY = "mizizi";
 export const MIZIZI_AGENT_LABEL = "MIZIZI Cultural Data Steward";
-export const MIZIZI_RULESET_VERSION = "1.0.0";
+export const MIZIZI_RULESET_VERSION = "1.1.0";
 
 export type MiziziEntityType = "track" | "release" | "chart_entry";
 export type MiziziDisposition = "auto_fix_candidate" | "review" | "observe";
@@ -50,6 +56,7 @@ export type ReleaseIdentityInput = {
   slug: string;
   title: string;
   releaseType?: string | null;
+  activeTrackCount?: number | null;
 };
 
 export type ChartIdentityInput = {
@@ -254,30 +261,84 @@ export function analyzeTrackIdentity(input: TrackIdentityInput): MiziziFinding[]
 }
 
 export function analyzeReleaseIdentity(input: ReleaseIdentityInput): MiziziFinding[] {
-  const cleanup = stripReleasePackagingSuffix(input.title, input.releaseType);
-  if (!cleanup.removedSuffix) return [];
+  const findings: MiziziFinding[] = [];
+  const storedReleaseType =
+    String(input.releaseType || "").trim();
+  const normalizedStoredType =
+    storedReleaseType.toLowerCase();
+  const canonicalTaxonomy =
+    releaseTaxonomyFromActiveTrackCount(
+      input.activeTrackCount,
+    );
 
-  const proposedSlug = slugifyIdentity(cleanup.coreTitle);
-  const findings: MiziziFinding[] = [
-    makeFinding({
-      ruleId: "release_title_provider_packaging",
+  if (
+    canonicalTaxonomy &&
+    normalizedStoredType !== canonicalTaxonomy
+  ) {
+    findings.push(makeFinding({
+      ruleId: "release_taxonomy_drift",
       entityType: "release",
       entityId: input.id,
-      fieldName: "title",
-      currentValue: input.title,
-      proposedValue: cleanup.coreTitle,
-      confidence: 0.99,
-      severity: "medium",
-      disposition: "observe",
-      reason: "provider_package_type_is_structural_metadata_not_release_title",
+      fieldName: "release_type",
+      currentValue: storedReleaseType,
+      proposedValue: canonicalTaxonomy,
+      confidence: 1,
+      severity: "high",
+      disposition: "auto_fix_candidate",
+      reason:
+        "release_type_differs_from_resolvable_active_track_membership_taxonomy",
       evidence: {
-        releaseType: input.releaseType || "",
-        removedSuffix: cleanup.removedSuffix,
+        resolvableActiveTrackCount:
+          Number(input.activeTrackCount || 0),
+        storedReleaseType,
+        canonicalReleaseType:
+          canonicalTaxonomy,
       },
-    }),
-  ];
+    }));
+  }
 
-  if (proposedSlug && proposedSlug !== input.slug) {
+  const packagingType =
+    canonicalTaxonomy ||
+    normalizedStoredType ||
+    null;
+  const cleanup =
+    stripReleasePackagingSuffix(
+      input.title,
+      packagingType,
+    );
+
+  if (!cleanup.removedSuffix) {
+    return findings;
+  }
+
+  const proposedSlug =
+    slugifyIdentity(
+      cleanup.coreTitle,
+    );
+
+  findings.push(makeFinding({
+    ruleId: "release_title_provider_packaging",
+    entityType: "release",
+    entityId: input.id,
+    fieldName: "title",
+    currentValue: input.title,
+    proposedValue: cleanup.coreTitle,
+    confidence: 0.99,
+    severity: "medium",
+    disposition: "observe",
+    reason: "provider_package_type_is_structural_metadata_not_release_title",
+    evidence: {
+      releaseType: input.releaseType || "",
+      canonicalReleaseType:
+        canonicalTaxonomy || "",
+      removedSuffix: cleanup.removedSuffix,
+    },
+  }));
+
+  if (
+    proposedSlug &&
+    proposedSlug !== input.slug
+  ) {
     findings.push(makeFinding({
       ruleId: "release_slug_provider_packaging",
       entityType: "release",
@@ -291,6 +352,8 @@ export function analyzeReleaseIdentity(input: ReleaseIdentityInput): MiziziFindi
       reason: "provider_package_type_is_not_slug_identity",
       evidence: {
         releaseType: input.releaseType || "",
+        canonicalReleaseType:
+          canonicalTaxonomy || "",
         sourceTitle: input.title,
         coreTitle: cleanup.coreTitle,
       },
