@@ -55,6 +55,30 @@ function resolveAuthor(article: Record<string, unknown>): string { const storedA
 function authorSlugFromName(name: string): string { return name.trim().toLowerCase().replace(/[\s_-]+/g, "-").replace(/[^a-z0-9-]/g, ""); }
 function buildArticleResponse(a: any) { const catNames = parseCategoryNames(a.categories); const section = catNames.length > 0 ? catNames[0] : "Music"; const contentText = stripHtml(String(a.content_html || "")); const tagNames = parseTagNames(a.tags); const dek = resolveDek(a, 280); let heroUrl = String(a.hero_image_url || ""); if (!heroUrl && a.content_html) heroUrl = extractFirstImgSrc(String(a.content_html)); const authorName = resolveAuthor(a); return { id: String(a.id), slug: String(a.slug), title: String(a.title), section, dek, author: authorName, authorSlug: authorSlugFromName(authorName), date: a.published_at ? String(a.published_at).split("T")[0] : "", readingTime: Math.max(1, Math.ceil(contentText.length / 1500)), heroUrl, tags: tagNames }; }
 function slugify(text: string): string { return text.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-$/g, "").slice(0, 200); }
+function cleanPublicMusicSlug(storedSlugRaw: unknown, titleRaw: unknown, artistSlugRaw: unknown): string {
+  const storedSlug = slugify(String(storedSlugRaw || ""));
+  const titleSlug = slugify(String(titleRaw || ""));
+  const artistSlug = slugify(String(artistSlugRaw || ""));
+
+  if (!storedSlug && titleSlug) return titleSlug;
+  if (!storedSlug || !titleSlug || !artistSlug) return storedSlug || titleSlug;
+  if (storedSlug === titleSlug) return titleSlug;
+
+  const titleThenArtist = `${titleSlug}-${artistSlug}`;
+  const artistThenTitle = `${artistSlug}-${titleSlug}`;
+
+  if (
+    storedSlug === titleThenArtist ||
+    storedSlug.startsWith(`${titleThenArtist}-`)
+  ) return titleSlug;
+
+  if (
+    storedSlug === artistThenTitle ||
+    storedSlug.startsWith(`${artistThenTitle}-`)
+  ) return titleSlug;
+
+  return storedSlug;
+}
 function normalizeTitleForDedup(title: string): string { return title.toLowerCase().replace(/[^a-z0-9]/g, "").trim(); }
 
 type ReleaseEntry = { slug: string; title: string; releaseType: string; year: string; releaseDate: string; trackCount: number; artworkUrl: string; labelName?: string; genres?: string[]; tracks: Array<{ title: string; duration: string; previewUrl?: string }> };
@@ -502,9 +526,17 @@ Deno.serve(async (req) => {
       const { data: releaseArtists } = await supabase.from("registry_release_artists").select("artist_id, artist_name_text, is_primary, artist_slug").eq("release_id", releaseId).eq("status", "active").order("credit_order", { ascending: true }).limit(5);
       const primaryArtist = (releaseArtists ?? []).find((ra: any) => ra.is_primary) || (releaseArtists ?? [])[0];
       const artistName = primaryArtist ? String(primaryArtist.artist_name_text || primaryArtist.artist_slug || "Unknown") : "Unknown";
-      let publicIdentity: { kind: "release" | "track"; canonicalPath: string } = {
+      const releaseArtistSlug = String(
+        primaryArtist?.artist_slug || "",
+      ).trim();
+      let publicIdentity: {
+        kind: "release" | "track";
+        canonicalPath: string | null;
+      } = {
         kind: "release",
-        canonicalPath: `/releases/${String(primaryArtist?.artist_slug || "").trim()}/${String(release.slug)}`,
+        canonicalPath: releaseArtistSlug
+          ? `/releases/${releaseArtistSlug}/${String(release.slug)}`
+          : null,
       };
       if (trackList.length === 1 && trackList[0]?.id) {
         const { data: identityArtists } = await supabase
@@ -521,9 +553,17 @@ Deno.serve(async (req) => {
           || primaryArtist?.artist_slug
           || "",
         ).trim();
+        const canonicalTrackSlug = cleanPublicMusicSlug(
+          trackList[0].slug,
+          trackList[0].title,
+          canonicalArtistSlug,
+        );
         publicIdentity = {
           kind: "track",
-          canonicalPath: `/tracks/${canonicalArtistSlug}/${String(trackList[0].slug)}`,
+          canonicalPath:
+            canonicalArtistSlug && canonicalTrackSlug
+              ? `/tracks/${canonicalArtistSlug}/${canonicalTrackSlug}`
+              : null,
         };
       }
       const { data: label } = release.label_id ? await supabase.from("registry_labels").select("id, slug, name, country_code").eq("id", String(release.label_id)).maybeSingle() : { data: null };
