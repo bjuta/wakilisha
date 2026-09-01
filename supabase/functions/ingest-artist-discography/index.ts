@@ -1,6 +1,7 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.1";
 import { SignJWT } from "npm:jose@5.9.6";
 import { canonicalTrackSlugCandidate } from "../_shared/registry-track-identity.ts";
+import { parseArtistCreditLine } from "../_shared/registry-artist-credit-grammar.ts";
 import { resolveScopedTrackIdentity } from "./trackIdentity.ts";
 import {
   appleAlbumIdForRelease,
@@ -125,45 +126,10 @@ function formatDuration(ms: number): string {
 }
 
 function splitArtistNames(raw: string): string[] {
-  if (!raw) return [];
-  return raw.split(/\s*,\s*|\s+&\s+|\s+and\s+|\s+x\s+|\s+\+\s+/i).map((s) => s.trim()).filter(Boolean);
-}
-
-function parseFeaturedFromTitle(title: string): string[] {
-  if (!title) return [];
-  const featured: string[] = [];
-  const seen = new Set<string>();
-
-  function addNames(inner: string) {
-    const names = splitArtistNames(inner);
-    for (const n of names) {
-      const key = n.toLowerCase();
-      if (!seen.has(key)) { seen.add(key); featured.push(n); }
-    }
-  }
-
-  const parenMatch = title.match(/\((?:feat\.?|ft\.?|featuring|with|w\/)\s+([^)]+)\)/i);
-  if (parenMatch) addNames(parenMatch[1]);
-
-  const bracketMatch = title.match(/\[(?:feat\.?|ft\.?|featuring|with|w\/)\s+([^\]]+)\]/i);
-  if (bracketMatch) addNames(bracketMatch[1]);
-
-  const dashMatch = title.match(/\s[-\u2013\u2014]\s*(?:feat\.?|ft\.?|featuring|with|w\/)\s+(.+)$/i);
-  if (dashMatch) addNames(dashMatch[1]);
-
-  const xMatch = title.match(/\s+x\s+([A-Z][^,\(\[]+?)(?:\s*[,&]\s*[A-Z][^,\(\[]+?)*\s*$/i);
-  if (!xMatch) {
-    const xMatch2 = title.match(/\s+x\s+([A-Z][^,\(\[]+)$/i);
-    if (xMatch2) addNames(xMatch2[1]);
-  } else addNames(xMatch[1]);
-
-  const plusMatch = title.match(/\s+\+\s+([A-Z][^,\(\[]+?)(?:\s*[,&]\s*[A-Z][^,\(\[]+?)*\s*$/i);
-  if (!plusMatch) {
-    const plusMatch2 = title.match(/\s+\+\s+([A-Z][^,\(\[]+)$/i);
-    if (plusMatch2) addNames(plusMatch2[1]);
-  } else addNames(plusMatch[1]);
-
-  return featured;
+  return parseArtistCreditLine(raw)
+    .participants
+    .map((participant) => participant.name)
+    .filter(Boolean);
 }
 
 async function createAppleMusicToken(teamId: string, keyId: string, privateKeyRaw: string): Promise<string> {
@@ -874,25 +840,30 @@ Deno.serve(async (req: Request) => {
           const tAttrs = track.attributes ?? {};
           const trackTitle = tAttrs.name ?? "Untitled";
           const rawTrackArtistName = (tAttrs.artistName ?? "").trim();
-          const trackArtistNames = splitArtistNames(
-            rawTrackArtistName || artistName,
-          );
-          const structuredFeaturedArtistNames =
-            trackArtistNames.filter((name) => {
-              const nameKey = name.toLowerCase().trim();
-              const nameSlug = slugify(name);
-              return (
-                nameKey !== artistNameLower &&
-                nameSlug !== artistSlug
-              );
-            });
+          const parsedTrackCredit =
+            parseArtistCreditLine(
+              rawTrackArtistName || artistName,
+            );
+          const trackArtistNames =
+            parsedTrackCredit.participants;
+          const structuredCreditArtistNames =
+            trackArtistNames
+              .map((participant) => participant.name)
+              .filter((name) => {
+                const nameKey = name.toLowerCase().trim();
+                const nameSlug = slugify(name);
+                return (
+                  nameKey !== artistNameLower &&
+                  nameSlug !== artistSlug
+                );
+              });
           const trackIsrc = tAttrs.isrc ? String(tAttrs.isrc).trim().toUpperCase() : null;
           const rawTrackSlug =
             canonicalTrackSlugCandidate(
               trackTitle,
               {
-                featuredArtistNames:
-                  structuredFeaturedArtistNames,
+                creditArtistNames:
+                  structuredCreditArtistNames,
               },
             );
           const discNum = tAttrs.discNumber ?? 1;
@@ -936,71 +907,82 @@ Deno.serve(async (req: Request) => {
 
           const seenOnThisTrack = new Set<string>();
 
-          for (const tArtist of trackArtistNames) {
+          for (const participant of trackArtistNames) {
+            const tArtist = participant.name;
             const taKey = tArtist.toLowerCase().trim();
             const taSlug = slugify(tArtist);
 
             if (taKey === artistNameLower || taSlug === artistSlug) {
               trackArtistRows.push({
-                track_id: trackId, artist_id: artistId, artist_slug: artistSlug, artist_name_text: artistName,
-                role: "primary_artist", is_primary: true, is_featured: false, credit_order: 1,
-                source: "apple_music_ingest", confidence: 90, status: "active",
-                metadata: { apple_music_track_id: track.id, apple_music_album_id: album.id },
+                track_id: trackId,
+                artist_id: artistId,
+                artist_slug: artistSlug,
+                artist_name_text: artistName,
+                role: "primary_artist",
+                is_primary: true,
+                is_featured: false,
+                credit_order: 1,
+                source: "apple_music_ingest",
+                confidence: 90,
+                status: "active",
+                metadata: {
+                  apple_music_track_id: track.id,
+                  apple_music_album_id: album.id,
+                  credit_separator_kind: participant.separatorKind,
+                  credit_separator_token: participant.separatorToken,
+                },
               });
               seenOnThisTrack.add(artistSlug);
               continue;
             }
 
-            const matchedArtist = artistByName.get(taKey) || artistBySlug.get(taSlug);
-            const resolvedSlug = matchedArtist?.slug ?? taSlug;
+            const matchedArtist =
+              artistByName.get(taKey) ||
+              artistBySlug.get(taSlug);
+            const resolvedSlug =
+              matchedArtist?.slug ?? taSlug;
             if (seenOnThisTrack.has(resolvedSlug)) continue;
             seenOnThisTrack.add(resolvedSlug);
+
+            const explicitlyFeatured =
+              participant.roleHint === "featured";
 
             trackArtistRows.push({
               track_id: trackId,
               artist_id: matchedArtist?.id ?? null,
               artist_slug: resolvedSlug,
-              artist_name_text: matchedArtist?.display_name ?? tArtist,
-              role: "featured_artist",
+              artist_name_text:
+                matchedArtist?.display_name ?? tArtist,
+              role: explicitlyFeatured
+                ? "featured_artist"
+                : "credited_artist",
               is_primary: false,
-              is_featured: true,
+              is_featured: explicitlyFeatured,
               credit_order: 2 + seenOnThisTrack.size,
               source: "apple_music_ingest",
               confidence: matchedArtist ? 85 : 50,
               status: "active",
-              metadata: { apple_music_track_id: track.id, apple_music_album_id: album.id, resolved_by: matchedArtist ? "name_match" : "text_only" },
+              metadata: {
+                apple_music_track_id: track.id,
+                apple_music_album_id: album.id,
+                resolved_by: matchedArtist
+                  ? "name_match"
+                  : "text_only",
+                credit_separator_kind:
+                  participant.separatorKind,
+                credit_separator_token:
+                  participant.separatorToken,
+                role_source: explicitlyFeatured
+                  ? "structured_artist_line_feature_marker"
+                  : "structured_artist_line_participant_only",
+              },
             });
-            featLinksCreated++;
+
+            if (explicitlyFeatured) {
+              featLinksCreated++;
+            }
           }
 
-          const featNames = parseFeaturedFromTitle(trackTitle);
-          for (let fi = 0; fi < featNames.length; fi++) {
-            const featName = featNames[fi];
-            const featNameKey = featName.toLowerCase().trim();
-            const featSlug = slugify(featName);
-
-            if (featNameKey === artistNameLower || featSlug === artistSlug) continue;
-            if (seenOnThisTrack.has(featSlug)) continue;
-            seenOnThisTrack.add(featSlug);
-
-            const matchedArtist = artistByName.get(featNameKey) || artistBySlug.get(featSlug);
-
-            trackArtistRows.push({
-              track_id: trackId,
-              artist_id: matchedArtist?.id ?? null,
-              artist_slug: matchedArtist?.slug ?? featSlug,
-              artist_name_text: matchedArtist?.display_name ?? featName,
-              role: "featured_artist",
-              is_primary: false,
-              is_featured: true,
-              credit_order: 2 + seenOnThisTrack.size,
-              source: "apple_music_ingest",
-              confidence: matchedArtist ? 85 : 50,
-              status: "active",
-              metadata: { apple_music_track_id: track.id, apple_music_album_id: album.id, resolved_by: matchedArtist ? "name_match" : "text_only" },
-            });
-            featLinksCreated++;
-          }
         }
       }
 
