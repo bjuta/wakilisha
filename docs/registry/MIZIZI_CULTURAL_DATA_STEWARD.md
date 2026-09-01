@@ -4,11 +4,31 @@
 
 MIZIZI is the permanent WAKILISHA Registry data-hygiene agent.
 
-Current state: PR #772 candidate. Not production accepted. The apply command has not been run.
+Current state: PR #772 merged and the preventive Track identity write boundary is production accepted. The historical MIZIZI apply command has not been run.
 
 Agent key: `mizizi`
 
 Rule-set version: `1.0.0`
+
+## Production acceptance, 1 September 2026
+
+The preventive write boundary is live in production.
+
+- canonical migration history: 78 migrations through `20260901114500_mizizi_track_identity_write_boundary.sql`
+- permanent SQL verifier: pass in production
+- `ingest-artist-discography`: production version 58, exact merged source
+- `registry-enrichment-review`: production version 33, exact merged source
+- `chart-ingest-api`: production version 82, exact merged source
+- `scrape-artist-data`: production version 46, exact merged source
+- shared `registry-track-identity.ts` helper: exact merged source in all four deployed bundles
+- JWT behavior preserved: true / true / true / false respectively
+- active Track count after promotion: 2,101
+- MIZIZI review items after promotion: 0
+- MIZIZI canonical write events after promotion: 0
+- historical MIZIZI apply run: no
+
+Production promotion changed the canonical Track creation boundary and the four automatic Track writers. It did **not** rewrite historical Registry rows, create review work, or run the steward against the existing cultural corpus.
+
 
 ## Why MIZIZI exists
 
