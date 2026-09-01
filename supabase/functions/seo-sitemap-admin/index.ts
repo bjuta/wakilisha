@@ -742,6 +742,7 @@ async function buildInternalItems(db: ReturnType<typeof createClient>): Promise<
           .select(
             "release_id, track_id, track_number, disc_number",
           )
+          .eq("status", "active")
           .order("release_id", { ascending: true })
           .order("track_id", { ascending: true })
           .range(from, to),
