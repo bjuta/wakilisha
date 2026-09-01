@@ -2,7 +2,7 @@ import { deepDecode } from "@/utils/decodeHtmlEntities";
 import { withPlaceholderImage } from "@/utils/imagePlaceholders";
 import { supabase } from "@/lib/supabase";
 import { resolvePublicContentApiBase } from "@/services/publicContent/runtimeBase";
-import { releaseUrl, slugify } from "@/utils/releaseUrl";
+import { releaseUrl, releaseTypeLabelFromActiveTrackCount, slugify } from "@/utils/releaseUrl";
 import { normalizeGenres } from "@/services/publicContent/genreNormalization";
 import {
   normalizePublicArticleTrust,
@@ -55,11 +55,14 @@ export type PublicRelease = {
   slug: string;
   title: string;
   artist: string;
+  artistSlug?: string;
   year: string;
   releaseType: string;
   labelName: string;
   artworkUrl: string;
   trackCount: number;
+  singleTrackSlug?: string | null;
+  singleTrackArtistSlug?: string | null;
   description?: string;
 };
 
@@ -206,7 +209,14 @@ export interface RegistryDiscographyRelease {
   releaseDate: string;
   trackCount: number;
   artworkUrl: string;
-  tracks: Array<{ title: string; duration: string; artists?: string; previewUrl?: string }>;
+  tracks: Array<{
+    slug?: string;
+    artistSlug?: string;
+    title: string;
+    duration: string;
+    artists?: string;
+    previewUrl?: string;
+  }>;
 }
 
 export interface RegistryAppearsOnRelease extends RegistryDiscographyRelease {
@@ -417,12 +427,6 @@ function yearFromDate(value: string | null | undefined): string {
   if (!value) return "Unknown year";
   const year = String(value).match(/\d{4}/)?.[0];
   return year || "Unknown year";
-}
-
-function releaseTypeFromTrackCount(trackCount: number): string {
-  if (trackCount <= 1) return "Single";
-  if (trackCount <= 6) return "EP";
-  return "Album";
 }
 
 type ResolvedReleaseArtist = { name: string; slug: string };
@@ -936,12 +940,12 @@ async function listReleasesFromRegistry(): Promise<PublicRelease[]> {
   }
   const artistsByRelease = await resolvePrimaryArtistsForReleases(releaseIds, releaseMetadataById);
 
-  // 3. Fetch track counts for all releases, chunked to avoid oversized Supabase REST URLs.
-  const trackRows: Array<{ release_id: string }> = [];
+  // 3. Fetch active Track memberships for all releases, chunked to avoid oversized Supabase REST URLs.
+  const trackRows: Array<{ release_id: string; track_id: string }> = [];
   for (const ids of chunkArray(releaseIds)) {
     const { data, error } = await supabase
       .from("registry_release_tracks")
-      .select("release_id")
+      .select("release_id, track_id")
       .in("release_id", ids)
       .eq("status", "active");
 
@@ -950,13 +954,60 @@ async function listReleasesFromRegistry(): Promise<PublicRelease[]> {
       continue;
     }
 
-    trackRows.push(...((data || []) as Array<{ release_id: string }>));
+    trackRows.push(...((data || []) as Array<{ release_id: string; track_id: string }>));
   }
 
   const trackCountByRelease = new Map<string, number>();
+  const trackIdsByRelease = new Map<string, string[]>();
+
   for (const row of trackRows) {
     const rid = row.release_id;
     trackCountByRelease.set(rid, (trackCountByRelease.get(rid) || 0) + 1);
+
+    const ids = trackIdsByRelease.get(rid) || [];
+    ids.push(row.track_id);
+    trackIdsByRelease.set(rid, ids);
+  }
+
+  const singleTrackIds = [...trackIdsByRelease.entries()]
+    .filter(([, ids]) => ids.length === 1)
+    .map(([, ids]) => ids[0])
+    .filter(Boolean);
+
+  const singleTrackSlugById = new Map<string, string>();
+  const singleTrackArtistSlugById = new Map<string, string>();
+
+  for (const ids of chunkArray(singleTrackIds)) {
+    const { data: singleTracks } = await supabase
+      .from("registry_tracks")
+      .select("id, slug")
+      .in("id", ids)
+      .eq("status", "active");
+
+    for (const row of singleTracks || []) {
+      singleTrackSlugById.set(String(row.id), String(row.slug || ""));
+    }
+
+    const { data: credits } = await supabase
+      .from("registry_track_artists")
+      .select("track_id, artist_slug, is_primary, credit_order")
+      .in("track_id", ids)
+      .eq("status", "active")
+      .order("credit_order", { ascending: true });
+
+    for (const credit of credits || []) {
+      const trackId = String(credit.track_id || "");
+      const artistSlug = String(credit.artist_slug || "");
+
+      if (!trackId || !artistSlug) continue;
+
+      if (
+        credit.is_primary ||
+        !singleTrackArtistSlugById.has(trackId)
+      ) {
+        singleTrackArtistSlugById.set(trackId, artistSlug);
+      }
+    }
   }
 
   // 4. Fetch label names for label_id references
@@ -975,19 +1026,18 @@ async function listReleasesFromRegistry(): Promise<PublicRelease[]> {
     }
   }
 
-  // 5. Public Release identity starts at two active Track memberships.
-  // One-track provider packages remain Registry provenance but surface publicly as Tracks.
+  // 5. Releases is the collective public catalogue.
+  // Singles stay in the collection but resolve to their one canonical Track.
   return releases
     .filter((row) => {
       const id = textValue(row, ["id"]);
-      return (trackCountByRelease.get(id) || 0) > 1;
+      return (trackCountByRelease.get(id) || 0) > 0;
     })
     .map((row) => {
     const id = textValue(row, ["id"]);
     const slug = textValue(row, ["slug"]);
     const title = textValue(row, ["title"]);
     const releaseDate = textValue(row, ["release_date"]);
-    const releaseType = textValue(row, ["release_type"]);
     const artworkUrl = textValue(row, ["artwork_url"]);
     const labelId = textValue(row, ["label_id"]);
     const meta = (row.metadata || {}) as Record<string, unknown>;
@@ -1003,19 +1053,35 @@ async function listReleasesFromRegistry(): Promise<PublicRelease[]> {
     }
     if (!labelName) labelName = "Independent";
 
-    // Determine release type from track count if not set
-    const resolvedType = releaseType || releaseTypeFromTrackCount(trackCount);
+    const resolvedType =
+      releaseTypeLabelFromActiveTrackCount(trackCount) ||
+      "Release";
+    const singleTrackId =
+      trackCount === 1
+        ? (trackIdsByRelease.get(id) || [])[0]
+        : "";
+    const singleTrackSlug =
+      singleTrackId
+        ? singleTrackSlugById.get(singleTrackId) || null
+        : null;
+    const singleTrackArtistSlug =
+      singleTrackId
+        ? singleTrackArtistSlugById.get(singleTrackId) || artist.slug || null
+        : null;
 
     return {
       id,
       slug,
       title,
       artist: artist.name,
+      artistSlug: artist.slug,
       year,
       releaseType: resolvedType,
       labelName,
       artworkUrl: artworkUrl || generatedReleaseArtwork(title, artist.name),
       trackCount,
+      singleTrackSlug,
+      singleTrackArtistSlug,
       description: textValue(row, ["description"]),
     };
   });
@@ -1042,7 +1108,9 @@ export async function listReleasesPaginated(params: ReleasePaginatedParams): Pro
   const allReleases = await listReleasesFromRegistry();
   let filtered = allReleases;
 
-  if (typeFilter === "EP") {
+  if (typeFilter === "Single") {
+    filtered = filtered.filter((r) => r.trackCount === 1);
+  } else if (typeFilter === "EP") {
     filtered = filtered.filter((r) => r.trackCount >= 2 && r.trackCount <= 6);
   } else if (typeFilter === "Album") {
     filtered = filtered.filter((r) => r.trackCount >= 7);
@@ -1085,6 +1153,7 @@ export async function listReleasesPaginated(params: ReleasePaginatedParams): Pro
 
 export interface ReleaseCatalogStats {
   total: number;
+  singles: number;
   albums: number;
   eps: number;
 }
@@ -1092,9 +1161,10 @@ export interface ReleaseCatalogStats {
 export async function getReleaseCatalogStats(): Promise<ReleaseCatalogStats> {
   const allReleases = await listReleasesFromRegistry();
   const total = allReleases.length;
+  const singles = allReleases.filter((r) => r.trackCount === 1).length;
   const eps = allReleases.filter((r) => r.trackCount >= 2 && r.trackCount <= 6).length;
   const albums = allReleases.filter((r) => r.trackCount >= 7).length;
-  return { total, albums, eps };
+  return { total, singles, albums, eps };
 }
 
 export async function getReleaseFilterArtists(limit = 30): Promise<string[]> {
@@ -1369,7 +1439,9 @@ async function getReleaseFromRegistry(artistSlug: string, releaseSlug: string): 
 
   const totalDuration = tracks.reduce((sum, t) => sum + (t.duration || 0), 0);
   const trackCount = tracks.length;
-  const releaseType = releaseTypeFromTrackCount(trackCount);
+  const releaseType =
+    releaseTypeLabelFromActiveTrackCount(trackCount) ||
+    "Release";
 
   const releaseDate = releaseRow.release_date || "";
   const year = yearFromDate(releaseDate);

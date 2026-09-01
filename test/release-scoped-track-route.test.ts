@@ -421,7 +421,7 @@ describe("release-scoped track routes", () => {
 
 
 describe("public Release boundary", () => {
-  it("keeps one-track packages off the Release shelf", () => {
+  it("keeps Singles on the Release shelf while reserving Release detail pages for multi-track Releases", () => {
     const service = readFileSync(
       "src/services/publicContent/client.ts",
       "utf8",
@@ -436,13 +436,16 @@ describe("public Release boundary", () => {
     );
 
     expect(service).toContain(
-      "return (trackCountByRelease.get(id) || 0) > 1;",
+      "return (trackCountByRelease.get(id) || 0) > 0;",
     );
-    expect(releasePage).not.toContain(
-      '"All", "Album", "EP", "Single"',
+    expect(service).toContain(
+      "releaseTypeLabelFromActiveTrackCount(trackCount)",
     );
-    expect(releasePage).not.toContain(
-      "Albums, EPs & singles",
+    expect(releasePage).toContain(
+      '"All", "Single", "EP", "Album"',
+    );
+    expect(releasePage).toContain(
+      "Singles, EPs, and albums",
     );
     expect(gateway).toContain(
       "(trackCountByRelease.get(String(release.id)) || 0) > 1",
