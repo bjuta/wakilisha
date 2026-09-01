@@ -1,5 +1,6 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.1";
 import { SignJWT } from "npm:jose@5.9.6";
+import { canonicalTrackSlugCandidate } from "../_shared/registry-track-identity.ts";
 import { resolveScopedTrackIdentity } from "./trackIdentity.ts";
 import {
   appleAlbumIdForRelease,
@@ -873,7 +874,10 @@ Deno.serve(async (req: Request) => {
           const tAttrs = track.attributes ?? {};
           const trackTitle = tAttrs.name ?? "Untitled";
           const trackIsrc = tAttrs.isrc ? String(tAttrs.isrc).trim().toUpperCase() : null;
-          const rawTrackSlug = slugify(trackTitle);
+          const rawTrackSlug =
+            canonicalTrackSlugCandidate(
+              trackTitle,
+            );
           const discNum = tAttrs.discNumber ?? 1;
           const trackNum = tAttrs.trackNumber ?? null;
           const durationMs = tAttrs.durationInMillis ?? null;
