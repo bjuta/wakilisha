@@ -8,7 +8,7 @@ import { ReleaseSaveButton } from "@/components/releases/ReleaseSaveButton";
 import { MetaTags } from "@/components/seo/MetaTags";
 import { usePlayer } from "@/context/PlayerContext";
 import { getRelease, slugify, listReleases, type PublicReleaseDetail, type PublicRelease } from "@/services/publicContent/client";
-import { canonicalTrackUrl, trackUrl } from "@/utils/trackUrl";
+import { canonicalTrackUrl } from "@/utils/trackUrl";
 import { useScrollDepthTracking } from "@/hooks/useScrollDepthTracking";
 import { MobileShareButton } from "@/components/design-system/share/ShareSheet";
 import { CommunitySection } from "@/pages/magazine/article/components/CommunitySection";
@@ -146,9 +146,9 @@ export default function MobileReleaseDetail() {
         }
         if (data.trackCount <= 1 && data.tracks[0]) {
           navigate(
-            trackUrl(
+            canonicalTrackUrl(
+              data.tracks[0].id,
               data.tracks[0].slug,
-              artistSlug ? [artistSlug] : [],
             ),
             { replace: true },
           );
@@ -502,10 +502,8 @@ export default function MobileReleaseDetail() {
                 const isCurrentTrack = currentTrack?.id === track.id;
                 const isThisPlaying = isCurrentTrack && isPlaying;
                 const trackHref = canonicalTrackUrl(
-                  artistSlug,
+                  track.id,
                   track.slug,
-                  releaseSlug,
-                  release.trackCount,
                 );
                 return (
                   <div key={track.id} className="flex items-center gap-3 px-4 py-3 border-b border-[var(--wk-divider)] last:border-b-0 active:bg-[var(--wk-surface-raised)] transition-colors">
