@@ -180,7 +180,16 @@ function candidateSongIdentityKey(candidate: Record<string, unknown>): string {
   return `candidate:${candidate.id || crypto.randomUUID()}`;
 }
 
-function generateTrackSlug(title: string): string { return canonicalTrackSlugCandidate(title).slice(0, 200); }
+function generateTrackSlug(title: string, artistDisplay: string): string {
+  const artistNames = parseArtists(artistDisplay);
+  return canonicalTrackSlugCandidate(
+    title,
+    {
+      featuredArtistNames:
+        artistNames.slice(1),
+    },
+  ).slice(0, 200);
+}
 function generateArtistSlug(name: string): string { return name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/-+$/, "").replace(/^-+/, "").slice(0, 200) || "unknown-artist"; }
 function normalizeSlug(raw: string): string { if (!raw || !raw.trim()) return ""; return raw.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/-+$/, "").replace(/^-+/, "").slice(0, 200); }
 function normalizeIso2(raw: string): string { const u = raw.toUpperCase(); const fixes: Record<string, string> = { "KENYA":"KE","HAITI":"HT","UK":"GB","CANADA":"CA","USA":"US","FRANCE":"FR","GERMANY":"DE","NIGERIA":"NG","TANZANIA":"TZ","UGANDA":"UG","GHANA":"GH" }; return fixes[u] || u; }
@@ -372,7 +381,10 @@ async function findOrCreateRegistryTrack(db: ReturnType<typeof createClient>, tr
   const nk = build_normalized_key(trackTitle, artistDisplay);
   if (nk) { const nt = normalize_title(trackTitle); const lk = lead_artist_key(artistDisplay); const { data: byTitle } = await db.from("registry_tracks").select("id, slug, normalized_title, preview_url").eq("normalized_title", nt).limit(5); if (byTitle && byTitle.length > 0) { for (const t of byTitle) { const { data: tas } = await db.from("registry_track_artists").select("artist_id").eq("track_id", t.id).limit(1); if (tas && tas.length > 0) { const { data: artist } = await db.from("registry_artists").select("slug, normalized_name").eq("id", tas[0].artist_id).maybeSingle(); if (artist) { const an = (artist.normalized_name as string) || ""; if (an === lk || an.includes(lk) || lk.includes(an)) { if (previewUrl && !t.preview_url) { await db.from("registry_tracks").update({ preview_url: previewUrl, updated_at: now }).eq("id", t.id); } return { trackId: t.id as string, trackSlug: t.slug as string, created: false }; } } } } } }
   const { data: exactTitle } = await db.from("registry_tracks").select("id, slug, preview_url").eq("title", trackTitle).limit(5); if (exactTitle && exactTitle.length > 0) { for (const t of exactTitle) { const { data: tas } = await db.from("registry_track_artists").select("artist_id").eq("track_id", t.id).limit(1); if (tas && tas.length > 0) { const { data: artist } = await db.from("registry_artists").select("display_name").eq("id", tas[0].artist_id).maybeSingle(); if (artist) { const pa = artistDisplay.split(/\s+(?:feat\.?|ft\.?|featuring)\s+/i)[0].split(/\s*,\s*/)[0].trim(); const ra = (artist.display_name as string) || ""; if (pa.toLowerCase() === ra.toLowerCase()) { if (previewUrl && !t.preview_url) { await db.from("registry_tracks").update({ preview_url: previewUrl, updated_at: now }).eq("id", t.id); } return { trackId: t.id as string, trackSlug: t.slug as string, created: false }; } } } } }
-  const trackSlug = generateTrackSlug(trackTitle);
+  const trackSlug = generateTrackSlug(
+    trackTitle,
+    artistDisplay,
+  );
   const collision = await trackSlugCollisionInArtistScope(
     db,
     trackSlug,
