@@ -1,6 +1,8 @@
 import { createHash } from "node:crypto";
 import {
   normalizeIdentityText,
+  canonicalTrackSlugCandidate,
+  canonicalTrackSlugCandidate,
   slugifyIdentity,
   stripFeatureCreditNoise,
 } from "../../../supabase/functions/_shared/registry-track-identity.ts";
@@ -124,10 +126,27 @@ function makeFinding(input: Omit<MiziziFinding, "fingerprint" | "ruleVersion">):
 export function analyzeTrackIdentity(input: TrackIdentityInput): MiziziFinding[] {
   const findings: MiziziFinding[] = [];
   const featureCleanup = stripFeatureCreditNoise(input.title);
-  const proposedSlug = slugifyIdentity(featureCleanup.coreTitle);
+  const structuredFeaturedArtists =
+    (input.featuredArtists || [])
+      .map((artist) =>
+        artist.name || artist.slug || "",
+      )
+      .filter(Boolean);
+  const proposedSlug =
+    canonicalTrackSlugCandidate(
+      input.title,
+      {
+        featuredArtistNames:
+          structuredFeaturedArtists,
+      },
+    );
+  const featureCreditStructurallyProven =
+    proposedSlug !==
+    slugifyIdentity(input.title);
 
   const strongNoiseReasons = [
-    featureMarkerInSlug(input.slug)
+    featureMarkerInSlug(input.slug) &&
+    featureCreditStructurallyProven
       ? "feature_credit_marker_in_slug"
       : "",
     primaryArtistPrefixInSlug(
