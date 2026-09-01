@@ -6,7 +6,10 @@ import {
   type CommunityComment,
   type CommunityEntity,
 } from "@/services/community";
-import type { PlayerTrack } from "@/context/PlayerContext";
+import {
+  playerTrackIdentity,
+  type PlayerTrack,
+} from "@/context/PlayerContext";
 import { WkIcon } from "@/components/design-system/Icon";
 
 type PlaybackMoment = {
@@ -52,7 +55,7 @@ function buildTrackEntity(track: PlayerTrack): CommunityEntity | null {
 
   return {
     type: "track",
-    id: trackSlug,
+    id: playerTrackIdentity(track),
     slug: trackSlug,
     url,
     title: track.title,
