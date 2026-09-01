@@ -154,14 +154,21 @@ The public product/identity layer owns whether a Release receives a dedicated pa
 
 MIZIZI owns Registry hygiene underneath that model.
 
-The accepted next MIZIZI extension is deterministic Release taxonomy drift:
+The deterministic Release taxonomy extension is implemented in MIZIZI rule-set v1.1.0.
 
-- derive canonical taxonomy from resolvable active Track membership
-- preserve provider classification as evidence
-- expected-value lock before write
-- record canonical write provenance
-- do not create review work for a deterministic mismatch
-- do not touch zero-resolvable Releases automatically
+It:
+
+- derives canonical taxonomy from resolvable active Track membership
+- preserves provider classification and broken relationship rows as evidence
+- expected-value locks the stored type
+- re-counts resolvable active Track targets before writing
+- records canonical write provenance
+- creates no review work for a deterministic mismatch
+- emits no taxonomy candidate for zero-resolvable Releases
+
+The first read-only production audit found exactly 32 candidates: 11 EP to Single, 19 Album to EP, and 2 EP to Album.
+
+No taxonomy apply has been run.
 
 Historical Track-slug apply remains separately unrun.
 
