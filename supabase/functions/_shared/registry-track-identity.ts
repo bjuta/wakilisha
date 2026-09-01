@@ -114,49 +114,103 @@ export type CanonicalTrackSlugOptions = {
   featuredArtistNames?: string[];
 };
 
-function featureCreditHasStructuralProof(
-  removedFragments: string[],
+function fragmentHasStructuredFeaturedArtist(
+  fragment: string,
   featuredArtistNames: string[],
 ): boolean {
-  const artistSlugs = featuredArtistNames
-    .map((name) => slugifyIdentity(name))
-    .filter(Boolean);
+  const fragmentSlug =
+    slugifyIdentity(fragment);
 
-  if (artistSlugs.length === 0) {
-    return false;
-  }
+  return featuredArtistNames.some(
+    (name) => {
+      const artistSlug =
+        slugifyIdentity(name);
+      if (!artistSlug) {
+        return false;
+      }
 
-  return removedFragments.some((fragment) => {
-    const fragmentSlug = slugifyIdentity(fragment);
-
-    return artistSlugs.some(
-      (artistSlug) =>
+      return (
         fragmentSlug === artistSlug ||
         fragmentSlug.includes(
           "-" + artistSlug + "-",
         ) ||
         fragmentSlug.endsWith(
           "-" + artistSlug,
-        ),
+        )
+      );
+    },
+  );
+}
+
+function stripStructurallyProvenFeatureCredits(
+  value: string,
+  featuredArtistNames: string[],
+): string {
+  let next =
+    normalizeIdentityText(value);
+
+  if (
+    featuredArtistNames.length === 0
+  ) {
+    return next;
+  }
+
+  const bracketPatterns = [
+    /\([^)]*\b(?:feat(?:uring)?|ft)\.?\s+[^)]*\)/gi,
+    /\[[^\]]*\b(?:feat(?:uring)?|ft)\.?\s+[^\]]*\]/gi,
+    /\{[^}]*\b(?:feat(?:uring)?|ft)\.?\s+[^}]*\}/gi,
+  ];
+
+  for (
+    const pattern of bracketPatterns
+  ) {
+    next = next.replace(
+      pattern,
+      (fragment) =>
+        fragmentHasStructuredFeaturedArtist(
+          fragment,
+          featuredArtistNames,
+        )
+          ? " "
+          : fragment,
     );
-  });
+  }
+
+  const suffix =
+    /\s+(?:-|:)?\s*\b(?:feat(?:uring)?|ft)\.?\s+(.+)$/i;
+  const suffixMatch =
+    next.match(suffix);
+
+  if (
+    suffixMatch &&
+    fragmentHasStructuredFeaturedArtist(
+      suffixMatch[0],
+      featuredArtistNames,
+    )
+  ) {
+    const index =
+      suffixMatch.index ??
+      next.length;
+    next = next.slice(
+      0,
+      index,
+    );
+  }
+
+  return next
+    .replace(/\s+/g, " ")
+    .trim();
 }
 
 export function canonicalTrackSlugCandidate(
   title: string,
   options: CanonicalTrackSlugOptions = {},
 ): string {
-  const featureCleanup =
-    stripFeatureCreditNoise(title);
-  const hasFeatureProof =
-    featureCreditHasStructuralProof(
-      featureCleanup.removedFragments,
+  const identityTitle =
+    stripStructurallyProvenFeatureCredits(
+      title,
       options.featuredArtistNames || [],
     );
-  const identityTitle =
-    hasFeatureProof
-      ? featureCleanup.coreTitle
-      : normalizeIdentityText(title);
 
   return (
     slugifyIdentity(identityTitle) ||
