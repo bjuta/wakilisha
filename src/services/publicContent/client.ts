@@ -957,10 +957,32 @@ async function listReleasesFromRegistry(): Promise<PublicRelease[]> {
     trackRows.push(...((data || []) as Array<{ release_id: string; track_id: string }>));
   }
 
+  const membershipTrackIds = [
+    ...new Set(
+      trackRows
+        .map((row) => String(row.track_id || ""))
+        .filter(Boolean),
+    ),
+  ];
+  const activeMembershipTrackIds = new Set<string>();
+
+  for (const ids of chunkArray(membershipTrackIds)) {
+    const { data: activeTracks } = await supabase
+      .from("registry_tracks")
+      .select("id")
+      .in("id", ids)
+      .eq("status", "active");
+
+    for (const track of activeTracks || []) {
+      activeMembershipTrackIds.add(String(track.id));
+    }
+  }
+
   const trackCountByRelease = new Map<string, number>();
   const trackIdsByRelease = new Map<string, string[]>();
 
   for (const row of trackRows) {
+    if (!activeMembershipTrackIds.has(String(row.track_id || ""))) continue;
     const rid = row.release_id;
     trackCountByRelease.set(rid, (trackCountByRelease.get(rid) || 0) + 1);
 

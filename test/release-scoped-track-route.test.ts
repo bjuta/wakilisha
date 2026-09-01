@@ -310,6 +310,12 @@ describe("release-scoped track routes", () => {
       "releaseTrackCountByReleaseId",
     );
     expect(sitemapFunction).toContain(
+      "const activeTrackIds = new Set(",
+    );
+    expect(sitemapFunction).toContain(
+      "!activeTrackIds.has(trackId)",
+    );
+    expect(sitemapFunction).toContain(
       "path: `/releases/${releaseArtistSlug}/${releaseSlug}/${row.slug}`",
     );
     expect(sitemapFunction).toContain(
@@ -427,6 +433,9 @@ describe("release-scoped track routes", () => {
     expect(artistDiscography).toContain(
       "releaseTypeLabelFromActiveTrackCount(tracks.length)",
     );
+    expect(artistDiscography).toContain(
+      "if (tracks.length === 0) continue;",
+    );
   });
 
 });
@@ -453,6 +462,9 @@ describe("public Release boundary", () => {
     expect(service).toContain(
       "releaseTypeLabelFromActiveTrackCount(trackCount)",
     );
+    expect(service).toContain(
+      "const activeMembershipTrackIds = new Set<string>();",
+    );
     expect(releasePage).toContain(
       '"All", "Single", "EP", "Album"',
     );
@@ -467,6 +479,9 @@ describe("public Release boundary", () => {
     );
     expect(gateway).toContain(
       "(trackCountByRelease.get(String(release.id)) || 0) > 0",
+    );
+    expect(gateway).toContain(
+      "const activeMembershipTrackIds = new Set(",
     );
     expect(gateway).toContain(
       "releaseScopedMembership ?? null",
@@ -496,6 +511,9 @@ describe("public Release boundary", () => {
     );
     expect(legacyApi).toContain(
       "(trackCountByRelease.get(String(release.id)) || 0) > 0",
+    );
+    expect(legacyApi).toContain(
+      "const activeMembershipTrackIds = new Set(",
     );
     expect(legacyApi).toContain(
       "if (releaseTrackCount > 0) releaseCountByArtist.set",
