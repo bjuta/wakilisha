@@ -12,6 +12,5278 @@ export type Database = {
   __InternalSupabase: {
     PostgrestVersion: "14.5"
   }
+  editorial: {
+    Tables: {
+      article_lifecycle_events: {
+        Row: {
+          action: string
+          actor_id: string | null
+          article_id: string
+          created_at: string
+          id: string
+          metadata: Json
+          note: string | null
+          prior_status: string | null
+          resource_id: string
+          resulting_status: string | null
+          version_id: string | null
+        }
+        Insert: {
+          action: string
+          actor_id?: string | null
+          article_id: string
+          created_at?: string
+          id?: string
+          metadata?: Json
+          note?: string | null
+          prior_status?: string | null
+          resource_id: string
+          resulting_status?: string | null
+          version_id?: string | null
+        }
+        Update: {
+          action?: string
+          actor_id?: string | null
+          article_id?: string
+          created_at?: string
+          id?: string
+          metadata?: Json
+          note?: string | null
+          prior_status?: string | null
+          resource_id?: string
+          resulting_status?: string | null
+          version_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "article_lifecycle_events_resource_id_fkey"
+            columns: ["resource_id"]
+            isOneToOne: false
+            referencedRelation: "resources"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "article_lifecycle_events_version_id_fkey"
+            columns: ["version_id"]
+            isOneToOne: false
+            referencedRelation: "article_versions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      article_resources: {
+        Row: {
+          article_id: string
+          resource_id: string
+          resource_kind: string
+        }
+        Insert: {
+          article_id: string
+          resource_id: string
+          resource_kind?: string
+        }
+        Update: {
+          article_id?: string
+          resource_id?: string
+          resource_kind?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "article_resources_resource_fkey"
+            columns: ["resource_id", "resource_kind"]
+            isOneToOne: false
+            referencedRelation: "resources"
+            referencedColumns: ["id", "resource_kind"]
+          },
+        ]
+      }
+      article_review_comments: {
+        Row: {
+          body_text: string
+          created_at: string
+          created_by: string | null
+          deleted_at: string | null
+          edited_at: string | null
+          id: string
+          thread_id: string
+        }
+        Insert: {
+          body_text: string
+          created_at?: string
+          created_by?: string | null
+          deleted_at?: string | null
+          edited_at?: string | null
+          id?: string
+          thread_id: string
+        }
+        Update: {
+          body_text?: string
+          created_at?: string
+          created_by?: string | null
+          deleted_at?: string | null
+          edited_at?: string | null
+          id?: string
+          thread_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "article_review_comments_thread_id_fkey"
+            columns: ["thread_id"]
+            isOneToOne: false
+            referencedRelation: "article_review_threads"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      article_review_threads: {
+        Row: {
+          anchor_from: number | null
+          anchor_kind: string
+          anchor_prefix: string | null
+          anchor_quote: string | null
+          anchor_suffix: string | null
+          anchor_to: number | null
+          article_id: string
+          created_at: string
+          created_by: string | null
+          id: string
+          resolved_at: string | null
+          resolved_by: string | null
+          resource_id: string
+          status: string
+          target_field: string
+          target_version_id: string
+          thread_kind: string
+          updated_at: string
+        }
+        Insert: {
+          anchor_from?: number | null
+          anchor_kind?: string
+          anchor_prefix?: string | null
+          anchor_quote?: string | null
+          anchor_suffix?: string | null
+          anchor_to?: number | null
+          article_id: string
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          resolved_at?: string | null
+          resolved_by?: string | null
+          resource_id: string
+          status?: string
+          target_field?: string
+          target_version_id: string
+          thread_kind: string
+          updated_at?: string
+        }
+        Update: {
+          anchor_from?: number | null
+          anchor_kind?: string
+          anchor_prefix?: string | null
+          anchor_quote?: string | null
+          anchor_suffix?: string | null
+          anchor_to?: number | null
+          article_id?: string
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          resolved_at?: string | null
+          resolved_by?: string | null
+          resource_id?: string
+          status?: string
+          target_field?: string
+          target_version_id?: string
+          thread_kind?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "article_review_threads_resource_id_fkey"
+            columns: ["resource_id"]
+            isOneToOne: false
+            referencedRelation: "resources"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "article_review_threads_target_version_id_fkey"
+            columns: ["target_version_id"]
+            isOneToOne: false
+            referencedRelation: "article_versions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      article_scheduled_publications: {
+        Row: {
+          article_id: string
+          created_at: string
+          created_by: string | null
+          id: string
+          note: string | null
+          resource_id: string
+          run_after: string
+          status: string
+          updated_at: string
+          version_id: string
+        }
+        Insert: {
+          article_id: string
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          note?: string | null
+          resource_id: string
+          run_after: string
+          status?: string
+          updated_at?: string
+          version_id: string
+        }
+        Update: {
+          article_id?: string
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          note?: string | null
+          resource_id?: string
+          run_after?: string
+          status?: string
+          updated_at?: string
+          version_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "article_scheduled_publications_resource_id_fkey"
+            columns: ["resource_id"]
+            isOneToOne: false
+            referencedRelation: "resources"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "article_scheduled_publications_version_id_fkey"
+            columns: ["version_id"]
+            isOneToOne: false
+            referencedRelation: "article_versions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      article_suggestion_events: {
+        Row: {
+          action: string
+          actor_id: string | null
+          applied_version_id: string | null
+          created_at: string
+          id: string
+          note: string | null
+          suggestion_id: string
+        }
+        Insert: {
+          action: string
+          actor_id?: string | null
+          applied_version_id?: string | null
+          created_at?: string
+          id?: string
+          note?: string | null
+          suggestion_id: string
+        }
+        Update: {
+          action?: string
+          actor_id?: string | null
+          applied_version_id?: string | null
+          created_at?: string
+          id?: string
+          note?: string | null
+          suggestion_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "article_suggestion_events_applied_version_id_fkey"
+            columns: ["applied_version_id"]
+            isOneToOne: false
+            referencedRelation: "article_versions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "article_suggestion_events_suggestion_id_fkey"
+            columns: ["suggestion_id"]
+            isOneToOne: false
+            referencedRelation: "article_suggestions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      article_suggestions: {
+        Row: {
+          applied_version_id: string | null
+          created_at: string
+          decided_at: string | null
+          decided_by: string | null
+          decision_note: string | null
+          id: string
+          operation_kind: string
+          original_text: string
+          proposed_content_html: string
+          replacement_text: string
+          status: string
+          target_version_fingerprint: string
+          thread_id: string
+          updated_at: string
+        }
+        Insert: {
+          applied_version_id?: string | null
+          created_at?: string
+          decided_at?: string | null
+          decided_by?: string | null
+          decision_note?: string | null
+          id?: string
+          operation_kind: string
+          original_text?: string
+          proposed_content_html: string
+          replacement_text?: string
+          status?: string
+          target_version_fingerprint: string
+          thread_id: string
+          updated_at?: string
+        }
+        Update: {
+          applied_version_id?: string | null
+          created_at?: string
+          decided_at?: string | null
+          decided_by?: string | null
+          decision_note?: string | null
+          id?: string
+          operation_kind?: string
+          original_text?: string
+          proposed_content_html?: string
+          replacement_text?: string
+          status?: string
+          target_version_fingerprint?: string
+          thread_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "article_suggestions_applied_version_id_fkey"
+            columns: ["applied_version_id"]
+            isOneToOne: false
+            referencedRelation: "article_versions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "article_suggestions_thread_id_fkey"
+            columns: ["thread_id"]
+            isOneToOne: true
+            referencedRelation: "article_review_threads"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      article_taxonomy_terms: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          resource_id: string
+          taxonomy: string
+          term_id: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          resource_id: string
+          taxonomy: string
+          term_id: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          resource_id?: string
+          taxonomy?: string
+          term_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "article_taxonomy_terms_resource_fkey"
+            columns: ["resource_id"]
+            isOneToOne: false
+            referencedRelation: "resources"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      article_version_trust_revisions: {
+        Row: {
+          article_version_id: string
+          citation_revision: number
+          credit_revision: number
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          article_version_id: string
+          citation_revision?: number
+          credit_revision?: number
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          article_version_id?: string
+          citation_revision?: number
+          credit_revision?: number
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "article_version_trust_revisions_version_fkey"
+            columns: ["article_version_id"]
+            isOneToOne: true
+            referencedRelation: "article_versions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      article_versions: {
+        Row: {
+          article_id: string
+          author_display: string | null
+          category_snapshot: Json
+          content_fingerprint: string
+          content_html: string | null
+          created_at: string
+          created_by: string | null
+          excerpt: string | null
+          hero_image_id: string | null
+          hero_image_url: string | null
+          id: string
+          lifecycle_state: string | null
+          owner_id: string | null
+          published_at: string | null
+          resource_id: string
+          seo: Json
+          slug: string
+          source_draft_version: number
+          tag_snapshot: Json
+          title: string | null
+          version_kind: string
+          version_number: number
+          wp_status: string | null
+        }
+        Insert: {
+          article_id: string
+          author_display?: string | null
+          category_snapshot?: Json
+          content_fingerprint: string
+          content_html?: string | null
+          created_at?: string
+          created_by?: string | null
+          excerpt?: string | null
+          hero_image_id?: string | null
+          hero_image_url?: string | null
+          id?: string
+          lifecycle_state?: string | null
+          owner_id?: string | null
+          published_at?: string | null
+          resource_id: string
+          seo?: Json
+          slug: string
+          source_draft_version: number
+          tag_snapshot?: Json
+          title?: string | null
+          version_kind: string
+          version_number: number
+          wp_status?: string | null
+        }
+        Update: {
+          article_id?: string
+          author_display?: string | null
+          category_snapshot?: Json
+          content_fingerprint?: string
+          content_html?: string | null
+          created_at?: string
+          created_by?: string | null
+          excerpt?: string | null
+          hero_image_id?: string | null
+          hero_image_url?: string | null
+          id?: string
+          lifecycle_state?: string | null
+          owner_id?: string | null
+          published_at?: string | null
+          resource_id?: string
+          seo?: Json
+          slug?: string
+          source_draft_version?: number
+          tag_snapshot?: Json
+          title?: string | null
+          version_kind?: string
+          version_number?: number
+          wp_status?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "article_versions_resource_fkey"
+            columns: ["resource_id"]
+            isOneToOne: false
+            referencedRelation: "resources"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      audio_episode_shared_links: {
+        Row: {
+          audio_publication_id: string
+          created_at: string
+          show_episode_resource_id: string
+        }
+        Insert: {
+          audio_publication_id: string
+          created_at?: string
+          show_episode_resource_id: string
+        }
+        Update: {
+          audio_publication_id?: string
+          created_at?: string
+          show_episode_resource_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "audio_episode_shared_links_show_episode_resource_id_fkey"
+            columns: ["show_episode_resource_id"]
+            isOneToOne: true
+            referencedRelation: "show_episodes"
+            referencedColumns: ["resource_id"]
+          },
+        ]
+      }
+      audio_publication_resources: {
+        Row: {
+          publication_id: string
+          resource_id: string
+          resource_kind: string
+        }
+        Insert: {
+          publication_id: string
+          resource_id: string
+          resource_kind: string
+        }
+        Update: {
+          publication_id?: string
+          resource_id?: string
+          resource_kind?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "audio_publication_resources_resource_fkey"
+            columns: ["resource_id", "resource_kind"]
+            isOneToOne: false
+            referencedRelation: "resources"
+            referencedColumns: ["id", "resource_kind"]
+          },
+        ]
+      }
+      audio_publication_version_trust_revisions: {
+        Row: {
+          citation_revision: number
+          credit_revision: number
+          publication_version_id: string
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          citation_revision?: number
+          credit_revision?: number
+          publication_version_id: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          citation_revision?: number
+          credit_revision?: number
+          publication_version_id?: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: []
+      }
+      audio_season_resources: {
+        Row: {
+          resource_id: string
+          resource_kind: string
+          season_id: string
+        }
+        Insert: {
+          resource_id: string
+          resource_kind?: string
+          season_id: string
+        }
+        Update: {
+          resource_id?: string
+          resource_kind?: string
+          season_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "audio_season_resources_resource_fkey"
+            columns: ["resource_id", "resource_kind"]
+            isOneToOne: false
+            referencedRelation: "resources"
+            referencedColumns: ["id", "resource_kind"]
+          },
+        ]
+      }
+      audio_show_resources: {
+        Row: {
+          resource_id: string
+          resource_kind: string
+          show_id: string
+        }
+        Insert: {
+          resource_id: string
+          resource_kind?: string
+          show_id: string
+        }
+        Update: {
+          resource_id?: string
+          resource_kind?: string
+          show_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "audio_show_resources_resource_fkey"
+            columns: ["resource_id", "resource_kind"]
+            isOneToOne: false
+            referencedRelation: "resources"
+            referencedColumns: ["id", "resource_kind"]
+          },
+        ]
+      }
+      audio_show_shared_links: {
+        Row: {
+          audio_show_id: string
+          created_at: string
+          show_resource_id: string
+        }
+        Insert: {
+          audio_show_id: string
+          created_at?: string
+          show_resource_id: string
+        }
+        Update: {
+          audio_show_id?: string
+          created_at?: string
+          show_resource_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "audio_show_shared_links_show_resource_id_fkey"
+            columns: ["show_resource_id"]
+            isOneToOne: true
+            referencedRelation: "shows"
+            referencedColumns: ["resource_id"]
+          },
+        ]
+      }
+      citation_locator_types: {
+        Row: {
+          created_at: string
+          description: string
+          enabled: boolean
+          label: string
+          locator_type: string
+          sort_order: number
+        }
+        Insert: {
+          created_at?: string
+          description: string
+          enabled?: boolean
+          label: string
+          locator_type: string
+          sort_order?: number
+        }
+        Update: {
+          created_at?: string
+          description?: string
+          enabled?: boolean
+          label?: string
+          locator_type?: string
+          sort_order?: number
+        }
+        Relationships: []
+      }
+      citations: {
+        Row: {
+          citation_state: string
+          created_at: string
+          created_by: string | null
+          editor_note: string | null
+          id: string
+          locator_data: Json
+          locator_type: string
+          public_label: string | null
+          public_safe: boolean
+          quotation: string | null
+          source_id: string
+          source_version_id: string
+        }
+        Insert: {
+          citation_state?: string
+          created_at?: string
+          created_by?: string | null
+          editor_note?: string | null
+          id?: string
+          locator_data?: Json
+          locator_type: string
+          public_label?: string | null
+          public_safe?: boolean
+          quotation?: string | null
+          source_id: string
+          source_version_id: string
+        }
+        Update: {
+          citation_state?: string
+          created_at?: string
+          created_by?: string | null
+          editor_note?: string | null
+          id?: string
+          locator_data?: Json
+          locator_type?: string
+          public_label?: string | null
+          public_safe?: boolean
+          quotation?: string | null
+          source_id?: string
+          source_version_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "citations_locator_type_fkey"
+            columns: ["locator_type"]
+            isOneToOne: false
+            referencedRelation: "citation_locator_types"
+            referencedColumns: ["locator_type"]
+          },
+          {
+            foreignKeyName: "citations_source_fkey"
+            columns: ["source_id"]
+            isOneToOne: false
+            referencedRelation: "sources"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "citations_source_version_fkey"
+            columns: ["source_version_id"]
+            isOneToOne: false
+            referencedRelation: "source_versions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      correction_applications: {
+        Row: {
+          adapter_type: string
+          application_summary: string
+          applied_at: string
+          applied_by: string
+          case_resource_id: string
+          challenged_version_id: string
+          command_receipt_id: string
+          command_type: string
+          correlation_id: string
+          decision_id: string
+          expected_published_version_id: string
+          expected_working_fingerprint: string | null
+          expected_working_version_id: string | null
+          id: string
+          resulting_version_id: string
+          target_id: string
+          target_resource_id: string
+        }
+        Insert: {
+          adapter_type?: string
+          application_summary: string
+          applied_at?: string
+          applied_by: string
+          case_resource_id: string
+          challenged_version_id: string
+          command_receipt_id: string
+          command_type?: string
+          correlation_id: string
+          decision_id: string
+          expected_published_version_id: string
+          expected_working_fingerprint?: string | null
+          expected_working_version_id?: string | null
+          id?: string
+          resulting_version_id: string
+          target_id: string
+          target_resource_id: string
+        }
+        Update: {
+          adapter_type?: string
+          application_summary?: string
+          applied_at?: string
+          applied_by?: string
+          case_resource_id?: string
+          challenged_version_id?: string
+          command_receipt_id?: string
+          command_type?: string
+          correlation_id?: string
+          decision_id?: string
+          expected_published_version_id?: string
+          expected_working_fingerprint?: string | null
+          expected_working_version_id?: string | null
+          id?: string
+          resulting_version_id?: string
+          target_id?: string
+          target_resource_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "correction_applications_case_fkey"
+            columns: ["case_resource_id"]
+            isOneToOne: false
+            referencedRelation: "correction_cases"
+            referencedColumns: ["resource_id"]
+          },
+          {
+            foreignKeyName: "correction_applications_challenged_version_fkey"
+            columns: ["challenged_version_id"]
+            isOneToOne: false
+            referencedRelation: "article_versions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "correction_applications_decision_fkey"
+            columns: ["decision_id"]
+            isOneToOne: true
+            referencedRelation: "correction_decisions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "correction_applications_expected_published_version_fkey"
+            columns: ["expected_published_version_id"]
+            isOneToOne: false
+            referencedRelation: "article_versions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "correction_applications_expected_working_version_fkey"
+            columns: ["expected_working_version_id"]
+            isOneToOne: false
+            referencedRelation: "article_versions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "correction_applications_resource_fkey"
+            columns: ["target_resource_id"]
+            isOneToOne: false
+            referencedRelation: "resources"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "correction_applications_resulting_version_fkey"
+            columns: ["resulting_version_id"]
+            isOneToOne: false
+            referencedRelation: "article_versions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "correction_applications_target_fkey"
+            columns: ["target_id"]
+            isOneToOne: false
+            referencedRelation: "correction_targets"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      correction_cases: {
+        Row: {
+          assigned_at: string | null
+          assigned_investigator_id: string | null
+          assignment_reason: string | null
+          case_number: number
+          case_state: string
+          closed_at: string | null
+          closed_by: string | null
+          closed_reason: string | null
+          contributor_follow_up_disposition: string | null
+          contributor_follow_up_job_id: string | null
+          contributor_follow_up_reason: string | null
+          contributor_follow_up_requested_at: string | null
+          correction_kind: string
+          created_at: string
+          created_by: string | null
+          current_application_id: string | null
+          current_decision_id: string | null
+          current_revision: number
+          evidence_ready: boolean
+          investigation_summary: string | null
+          investigator_recommendation: string | null
+          origin_contribution_id: string | null
+          origin_submitted_at: string | null
+          origin_submitter_user_id: string | null
+          origin_summary_snapshot: string
+          origin_type: string
+          origin_type_snapshot: string | null
+          priority: string
+          public_note_disposition: string | null
+          public_note_no_note_reason: string | null
+          resource_id: string
+          resource_kind: string
+          submitted_for_decision_at: string | null
+          submitted_for_decision_by: string | null
+          triage_reason: string | null
+          triaged_at: string | null
+          triaged_by: string | null
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          assigned_at?: string | null
+          assigned_investigator_id?: string | null
+          assignment_reason?: string | null
+          case_number?: never
+          case_state?: string
+          closed_at?: string | null
+          closed_by?: string | null
+          closed_reason?: string | null
+          contributor_follow_up_disposition?: string | null
+          contributor_follow_up_job_id?: string | null
+          contributor_follow_up_reason?: string | null
+          contributor_follow_up_requested_at?: string | null
+          correction_kind: string
+          created_at?: string
+          created_by?: string | null
+          current_application_id?: string | null
+          current_decision_id?: string | null
+          current_revision?: number
+          evidence_ready?: boolean
+          investigation_summary?: string | null
+          investigator_recommendation?: string | null
+          origin_contribution_id?: string | null
+          origin_submitted_at?: string | null
+          origin_submitter_user_id?: string | null
+          origin_summary_snapshot: string
+          origin_type: string
+          origin_type_snapshot?: string | null
+          priority?: string
+          public_note_disposition?: string | null
+          public_note_no_note_reason?: string | null
+          resource_id: string
+          resource_kind?: string
+          submitted_for_decision_at?: string | null
+          submitted_for_decision_by?: string | null
+          triage_reason?: string | null
+          triaged_at?: string | null
+          triaged_by?: string | null
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          assigned_at?: string | null
+          assigned_investigator_id?: string | null
+          assignment_reason?: string | null
+          case_number?: never
+          case_state?: string
+          closed_at?: string | null
+          closed_by?: string | null
+          closed_reason?: string | null
+          contributor_follow_up_disposition?: string | null
+          contributor_follow_up_job_id?: string | null
+          contributor_follow_up_reason?: string | null
+          contributor_follow_up_requested_at?: string | null
+          correction_kind?: string
+          created_at?: string
+          created_by?: string | null
+          current_application_id?: string | null
+          current_decision_id?: string | null
+          current_revision?: number
+          evidence_ready?: boolean
+          investigation_summary?: string | null
+          investigator_recommendation?: string | null
+          origin_contribution_id?: string | null
+          origin_submitted_at?: string | null
+          origin_submitter_user_id?: string | null
+          origin_summary_snapshot?: string
+          origin_type?: string
+          origin_type_snapshot?: string | null
+          priority?: string
+          public_note_disposition?: string | null
+          public_note_no_note_reason?: string | null
+          resource_id?: string
+          resource_kind?: string
+          submitted_for_decision_at?: string | null
+          submitted_for_decision_by?: string | null
+          triage_reason?: string | null
+          triaged_at?: string | null
+          triaged_by?: string | null
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "correction_cases_correction_kind_fkey"
+            columns: ["correction_kind"]
+            isOneToOne: false
+            referencedRelation: "correction_kinds"
+            referencedColumns: ["correction_kind"]
+          },
+          {
+            foreignKeyName: "correction_cases_current_application_fkey"
+            columns: ["current_application_id"]
+            isOneToOne: false
+            referencedRelation: "correction_applications"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "correction_cases_current_decision_fkey"
+            columns: ["current_decision_id"]
+            isOneToOne: false
+            referencedRelation: "correction_decisions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "correction_cases_resource_fkey"
+            columns: ["resource_id", "resource_kind"]
+            isOneToOne: false
+            referencedRelation: "resources"
+            referencedColumns: ["id", "resource_kind"]
+          },
+        ]
+      }
+      correction_decisions: {
+        Row: {
+          case_resource_id: string
+          case_revision_observed: number
+          correlation_id: string | null
+          created_at: string
+          decided_by: string
+          decision_number: number
+          duplicate_of_case_resource_id: string | null
+          id: string
+          outcome: string
+          private_analysis: string | null
+          public_safe_explanation: string | null
+          reason: string
+          supersedes_decision_id: string | null
+          target_state_observed: Json
+        }
+        Insert: {
+          case_resource_id: string
+          case_revision_observed: number
+          correlation_id?: string | null
+          created_at?: string
+          decided_by: string
+          decision_number: number
+          duplicate_of_case_resource_id?: string | null
+          id?: string
+          outcome: string
+          private_analysis?: string | null
+          public_safe_explanation?: string | null
+          reason: string
+          supersedes_decision_id?: string | null
+          target_state_observed?: Json
+        }
+        Update: {
+          case_resource_id?: string
+          case_revision_observed?: number
+          correlation_id?: string | null
+          created_at?: string
+          decided_by?: string
+          decision_number?: number
+          duplicate_of_case_resource_id?: string | null
+          id?: string
+          outcome?: string
+          private_analysis?: string | null
+          public_safe_explanation?: string | null
+          reason?: string
+          supersedes_decision_id?: string | null
+          target_state_observed?: Json
+        }
+        Relationships: [
+          {
+            foreignKeyName: "correction_decisions_case_fkey"
+            columns: ["case_resource_id"]
+            isOneToOne: false
+            referencedRelation: "correction_cases"
+            referencedColumns: ["resource_id"]
+          },
+          {
+            foreignKeyName: "correction_decisions_duplicate_case_fkey"
+            columns: ["duplicate_of_case_resource_id"]
+            isOneToOne: false
+            referencedRelation: "correction_cases"
+            referencedColumns: ["resource_id"]
+          },
+          {
+            foreignKeyName: "correction_decisions_supersedes_fkey"
+            columns: ["supersedes_decision_id"]
+            isOneToOne: false
+            referencedRelation: "correction_decisions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      correction_event_types: {
+        Row: {
+          created_at: string
+          description: string
+          enabled: boolean
+          event_type: string
+          label: string
+          public_eligible: boolean
+          sort_order: number
+        }
+        Insert: {
+          created_at?: string
+          description: string
+          enabled?: boolean
+          event_type: string
+          label: string
+          public_eligible?: boolean
+          sort_order?: number
+        }
+        Update: {
+          created_at?: string
+          description?: string
+          enabled?: boolean
+          event_type?: string
+          label?: string
+          public_eligible?: boolean
+          sort_order?: number
+        }
+        Relationships: []
+      }
+      correction_events: {
+        Row: {
+          actor_id: string | null
+          application_id: string | null
+          case_resource_id: string
+          case_revision_after: number
+          case_revision_before: number
+          command_receipt_id: string | null
+          correlation_id: string | null
+          created_at: string
+          decision_id: string | null
+          event_number: number
+          event_type: string
+          evidence_link_id: string | null
+          id: string
+          metadata: Json
+          prior_state: string | null
+          public_note_id: string | null
+          reason: string | null
+          related_resource_review_id: string | null
+          resulting_state: string | null
+          target_id: string | null
+        }
+        Insert: {
+          actor_id?: string | null
+          application_id?: string | null
+          case_resource_id: string
+          case_revision_after: number
+          case_revision_before: number
+          command_receipt_id?: string | null
+          correlation_id?: string | null
+          created_at?: string
+          decision_id?: string | null
+          event_number: number
+          event_type: string
+          evidence_link_id?: string | null
+          id?: string
+          metadata?: Json
+          prior_state?: string | null
+          public_note_id?: string | null
+          reason?: string | null
+          related_resource_review_id?: string | null
+          resulting_state?: string | null
+          target_id?: string | null
+        }
+        Update: {
+          actor_id?: string | null
+          application_id?: string | null
+          case_resource_id?: string
+          case_revision_after?: number
+          case_revision_before?: number
+          command_receipt_id?: string | null
+          correlation_id?: string | null
+          created_at?: string
+          decision_id?: string | null
+          event_number?: number
+          event_type?: string
+          evidence_link_id?: string | null
+          id?: string
+          metadata?: Json
+          prior_state?: string | null
+          public_note_id?: string | null
+          reason?: string | null
+          related_resource_review_id?: string | null
+          resulting_state?: string | null
+          target_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "correction_events_application_fkey"
+            columns: ["application_id"]
+            isOneToOne: false
+            referencedRelation: "correction_applications"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "correction_events_case_fkey"
+            columns: ["case_resource_id"]
+            isOneToOne: false
+            referencedRelation: "correction_cases"
+            referencedColumns: ["resource_id"]
+          },
+          {
+            foreignKeyName: "correction_events_decision_fkey"
+            columns: ["decision_id"]
+            isOneToOne: false
+            referencedRelation: "correction_decisions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "correction_events_event_type_fkey"
+            columns: ["event_type"]
+            isOneToOne: false
+            referencedRelation: "correction_event_types"
+            referencedColumns: ["event_type"]
+          },
+          {
+            foreignKeyName: "correction_events_public_note_fkey"
+            columns: ["public_note_id"]
+            isOneToOne: false
+            referencedRelation: "correction_public_notes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "correction_events_related_review_fkey"
+            columns: ["related_resource_review_id"]
+            isOneToOne: false
+            referencedRelation: "correction_related_resource_reviews"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "correction_events_target_fkey"
+            columns: ["target_id"]
+            isOneToOne: false
+            referencedRelation: "correction_targets"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      correction_evidence_links: {
+        Row: {
+          case_resource_id: string
+          citation_id: string | null
+          created_at: string
+          created_by: string | null
+          evidence_role: string
+          id: string
+          internal_note: string | null
+          source_id: string
+          source_version_id: string
+        }
+        Insert: {
+          case_resource_id: string
+          citation_id?: string | null
+          created_at?: string
+          created_by?: string | null
+          evidence_role: string
+          id?: string
+          internal_note?: string | null
+          source_id: string
+          source_version_id: string
+        }
+        Update: {
+          case_resource_id?: string
+          citation_id?: string | null
+          created_at?: string
+          created_by?: string | null
+          evidence_role?: string
+          id?: string
+          internal_note?: string | null
+          source_id?: string
+          source_version_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "correction_evidence_links_case_fkey"
+            columns: ["case_resource_id"]
+            isOneToOne: false
+            referencedRelation: "correction_cases"
+            referencedColumns: ["resource_id"]
+          },
+          {
+            foreignKeyName: "correction_evidence_links_citation_fkey"
+            columns: ["citation_id"]
+            isOneToOne: false
+            referencedRelation: "citations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "correction_evidence_links_role_fkey"
+            columns: ["evidence_role"]
+            isOneToOne: false
+            referencedRelation: "correction_evidence_roles"
+            referencedColumns: ["evidence_role"]
+          },
+          {
+            foreignKeyName: "correction_evidence_links_source_fkey"
+            columns: ["source_id"]
+            isOneToOne: false
+            referencedRelation: "sources"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "correction_evidence_links_source_version_fkey"
+            columns: ["source_version_id"]
+            isOneToOne: false
+            referencedRelation: "source_versions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      correction_evidence_roles: {
+        Row: {
+          created_at: string
+          description: string
+          enabled: boolean
+          evidence_role: string
+          label: string
+          sort_order: number
+        }
+        Insert: {
+          created_at?: string
+          description: string
+          enabled?: boolean
+          evidence_role: string
+          label: string
+          sort_order?: number
+        }
+        Update: {
+          created_at?: string
+          description?: string
+          enabled?: boolean
+          evidence_role?: string
+          label?: string
+          sort_order?: number
+        }
+        Relationships: []
+      }
+      correction_kinds: {
+        Row: {
+          correction_kind: string
+          created_at: string
+          description: string
+          enabled: boolean
+          label: string
+          sort_order: number
+        }
+        Insert: {
+          correction_kind: string
+          created_at?: string
+          description: string
+          enabled?: boolean
+          label: string
+          sort_order?: number
+        }
+        Update: {
+          correction_kind?: string
+          created_at?: string
+          description?: string
+          enabled?: boolean
+          label?: string
+          sort_order?: number
+        }
+        Relationships: []
+      }
+      correction_public_notes: {
+        Row: {
+          affected_resource_id: string
+          affected_resource_kind: string
+          application_id: string
+          case_resource_id: string
+          challenged_version_id: string
+          corrected_version_id: string
+          id: string
+          note_fingerprint: string
+          note_text: string
+          published_at: string
+          published_by: string | null
+          supersedes_note_id: string | null
+        }
+        Insert: {
+          affected_resource_id: string
+          affected_resource_kind: string
+          application_id: string
+          case_resource_id: string
+          challenged_version_id: string
+          corrected_version_id: string
+          id?: string
+          note_fingerprint: string
+          note_text: string
+          published_at?: string
+          published_by?: string | null
+          supersedes_note_id?: string | null
+        }
+        Update: {
+          affected_resource_id?: string
+          affected_resource_kind?: string
+          application_id?: string
+          case_resource_id?: string
+          challenged_version_id?: string
+          corrected_version_id?: string
+          id?: string
+          note_fingerprint?: string
+          note_text?: string
+          published_at?: string
+          published_by?: string | null
+          supersedes_note_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "correction_public_notes_application_fkey"
+            columns: ["application_id"]
+            isOneToOne: false
+            referencedRelation: "correction_applications"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "correction_public_notes_case_fkey"
+            columns: ["case_resource_id"]
+            isOneToOne: false
+            referencedRelation: "correction_cases"
+            referencedColumns: ["resource_id"]
+          },
+          {
+            foreignKeyName: "correction_public_notes_challenged_version_fkey"
+            columns: ["challenged_version_id"]
+            isOneToOne: false
+            referencedRelation: "article_versions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "correction_public_notes_corrected_version_fkey"
+            columns: ["corrected_version_id"]
+            isOneToOne: false
+            referencedRelation: "article_versions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "correction_public_notes_resource_fkey"
+            columns: ["affected_resource_id", "affected_resource_kind"]
+            isOneToOne: false
+            referencedRelation: "resources"
+            referencedColumns: ["id", "resource_kind"]
+          },
+          {
+            foreignKeyName: "correction_public_notes_supersedes_fkey"
+            columns: ["supersedes_note_id"]
+            isOneToOne: true
+            referencedRelation: "correction_public_notes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      correction_related_resource_reviews: {
+        Row: {
+          case_resource_id: string
+          created_at: string
+          created_by: string | null
+          disposition: string | null
+          id: string
+          linked_correction_case_resource_id: string | null
+          reason: string | null
+          related_resource_id: string
+          related_resource_kind: string
+          resolved_at: string | null
+          resolved_by: string | null
+          review_revision: number
+          review_state: string
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          case_resource_id: string
+          created_at?: string
+          created_by?: string | null
+          disposition?: string | null
+          id?: string
+          linked_correction_case_resource_id?: string | null
+          reason?: string | null
+          related_resource_id: string
+          related_resource_kind: string
+          resolved_at?: string | null
+          resolved_by?: string | null
+          review_revision?: number
+          review_state?: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          case_resource_id?: string
+          created_at?: string
+          created_by?: string | null
+          disposition?: string | null
+          id?: string
+          linked_correction_case_resource_id?: string | null
+          reason?: string | null
+          related_resource_id?: string
+          related_resource_kind?: string
+          resolved_at?: string | null
+          resolved_by?: string | null
+          review_revision?: number
+          review_state?: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "correction_related_reviews_case_fkey"
+            columns: ["case_resource_id"]
+            isOneToOne: false
+            referencedRelation: "correction_cases"
+            referencedColumns: ["resource_id"]
+          },
+          {
+            foreignKeyName: "correction_related_reviews_linked_case_fkey"
+            columns: ["linked_correction_case_resource_id"]
+            isOneToOne: false
+            referencedRelation: "correction_cases"
+            referencedColumns: ["resource_id"]
+          },
+          {
+            foreignKeyName: "correction_related_reviews_resource_fkey"
+            columns: ["related_resource_id", "related_resource_kind"]
+            isOneToOne: false
+            referencedRelation: "resources"
+            referencedColumns: ["id", "resource_kind"]
+          },
+        ]
+      }
+      correction_targets: {
+        Row: {
+          case_resource_id: string
+          created_at: string
+          created_by: string | null
+          id: string
+          observed_content_fingerprint: string | null
+          observed_resource_revision: number | null
+          target_resource_id: string
+          target_resource_kind: string
+          target_role: string
+          target_summary: string | null
+          target_version_id: string
+          target_version_type: string
+        }
+        Insert: {
+          case_resource_id: string
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          observed_content_fingerprint?: string | null
+          observed_resource_revision?: number | null
+          target_resource_id: string
+          target_resource_kind: string
+          target_role?: string
+          target_summary?: string | null
+          target_version_id: string
+          target_version_type: string
+        }
+        Update: {
+          case_resource_id?: string
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          observed_content_fingerprint?: string | null
+          observed_resource_revision?: number | null
+          target_resource_id?: string
+          target_resource_kind?: string
+          target_role?: string
+          target_summary?: string | null
+          target_version_id?: string
+          target_version_type?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "correction_targets_case_fkey"
+            columns: ["case_resource_id"]
+            isOneToOne: false
+            referencedRelation: "correction_cases"
+            referencedColumns: ["resource_id"]
+          },
+          {
+            foreignKeyName: "correction_targets_resource_fkey"
+            columns: ["target_resource_id", "target_resource_kind"]
+            isOneToOne: false
+            referencedRelation: "resources"
+            referencedColumns: ["id", "resource_kind"]
+          },
+          {
+            foreignKeyName: "correction_targets_resource_version_fkey"
+            columns: ["target_resource_id", "target_version_id"]
+            isOneToOne: false
+            referencedRelation: "resource_versions"
+            referencedColumns: ["resource_id", "id"]
+          },
+        ]
+      }
+      credit_governance: {
+        Row: {
+          credit_id: string
+          credit_state: string
+          governance_revision: number
+          public_safe: boolean
+          reason: string | null
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          credit_id: string
+          credit_state?: string
+          governance_revision?: number
+          public_safe?: boolean
+          reason?: string | null
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          credit_id?: string
+          credit_state?: string
+          governance_revision?: number
+          public_safe?: boolean
+          reason?: string | null
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "credit_governance_credit_id_fkey"
+            columns: ["credit_id"]
+            isOneToOne: true
+            referencedRelation: "credits"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      credit_roles: {
+        Row: {
+          created_at: string
+          credit_role: string
+          description: string
+          enabled: boolean
+          label: string
+          sort_order: number
+        }
+        Insert: {
+          created_at?: string
+          credit_role: string
+          description: string
+          enabled?: boolean
+          label: string
+          sort_order?: number
+        }
+        Update: {
+          created_at?: string
+          credit_role?: string
+          description?: string
+          enabled?: boolean
+          label?: string
+          sort_order?: number
+        }
+        Relationships: []
+      }
+      credits: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          credit_note: string | null
+          credit_role: string
+          display_name_snapshot: string
+          external_contributor_id: string | null
+          id: string
+          organization_resource_id: string | null
+          registry_author_id: string | null
+          registry_author_slug_snapshot: string | null
+          role_label_snapshot: string | null
+          user_id: string | null
+          user_username_snapshot: string | null
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          credit_note?: string | null
+          credit_role: string
+          display_name_snapshot: string
+          external_contributor_id?: string | null
+          id?: string
+          organization_resource_id?: string | null
+          registry_author_id?: string | null
+          registry_author_slug_snapshot?: string | null
+          role_label_snapshot?: string | null
+          user_id?: string | null
+          user_username_snapshot?: string | null
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          credit_note?: string | null
+          credit_role?: string
+          display_name_snapshot?: string
+          external_contributor_id?: string | null
+          id?: string
+          organization_resource_id?: string | null
+          registry_author_id?: string | null
+          registry_author_slug_snapshot?: string | null
+          role_label_snapshot?: string | null
+          user_id?: string | null
+          user_username_snapshot?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "credits_credit_role_fkey"
+            columns: ["credit_role"]
+            isOneToOne: false
+            referencedRelation: "credit_roles"
+            referencedColumns: ["credit_role"]
+          },
+          {
+            foreignKeyName: "credits_external_contributor_id_fkey"
+            columns: ["external_contributor_id"]
+            isOneToOne: false
+            referencedRelation: "external_contributors"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "credits_organization_resource_id_fkey"
+            columns: ["organization_resource_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["resource_id"]
+          },
+        ]
+      }
+      external_contributors: {
+        Row: {
+          consent_status: string
+          contact_email: string | null
+          contact_phone: string | null
+          contributor_state: string
+          created_at: string
+          created_by: string | null
+          display_name: string
+          id: string
+          internal_notes: string | null
+          location_text: string | null
+          public_role: string | null
+          public_safe: boolean
+          public_url: string | null
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          consent_status?: string
+          contact_email?: string | null
+          contact_phone?: string | null
+          contributor_state?: string
+          created_at?: string
+          created_by?: string | null
+          display_name: string
+          id?: string
+          internal_notes?: string | null
+          location_text?: string | null
+          public_role?: string | null
+          public_safe?: boolean
+          public_url?: string | null
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          consent_status?: string
+          contact_email?: string | null
+          contact_phone?: string | null
+          contributor_state?: string
+          created_at?: string
+          created_by?: string | null
+          display_name?: string
+          id?: string
+          internal_notes?: string | null
+          location_text?: string | null
+          public_role?: string | null
+          public_safe?: boolean
+          public_url?: string | null
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: []
+      }
+      media_asset_resources: {
+        Row: {
+          asset_id: string
+          resource_id: string
+          resource_kind: string
+        }
+        Insert: {
+          asset_id: string
+          resource_id: string
+          resource_kind?: string
+        }
+        Update: {
+          asset_id?: string
+          resource_id?: string
+          resource_kind?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "media_asset_resources_resource_fkey"
+            columns: ["resource_id", "resource_kind"]
+            isOneToOne: false
+            referencedRelation: "resources"
+            referencedColumns: ["id", "resource_kind"]
+          },
+        ]
+      }
+      organization_registry_label_links: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          link_reason: string
+          link_state: string
+          organization_resource_id: string
+          registry_label_id: string
+          retired_at: string | null
+          retired_by: string | null
+          retired_reason: string | null
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          link_reason: string
+          link_state?: string
+          organization_resource_id: string
+          registry_label_id: string
+          retired_at?: string | null
+          retired_by?: string | null
+          retired_reason?: string | null
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          link_reason?: string
+          link_state?: string
+          organization_resource_id?: string
+          registry_label_id?: string
+          retired_at?: string | null
+          retired_by?: string | null
+          retired_reason?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "organization_registry_label_links_org_fkey"
+            columns: ["organization_resource_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["resource_id"]
+          },
+        ]
+      }
+      organization_type_assignments: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          display_order: number
+          is_primary: boolean
+          organization_resource_id: string
+          organization_type: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          display_order?: number
+          is_primary?: boolean
+          organization_resource_id: string
+          organization_type: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          display_order?: number
+          is_primary?: boolean
+          organization_resource_id?: string
+          organization_type?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "organization_type_assignments_org_fkey"
+            columns: ["organization_resource_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["resource_id"]
+          },
+          {
+            foreignKeyName: "organization_type_assignments_type_fkey"
+            columns: ["organization_type"]
+            isOneToOne: false
+            referencedRelation: "organization_types"
+            referencedColumns: ["organization_type"]
+          },
+        ]
+      }
+      organization_types: {
+        Row: {
+          created_at: string
+          description: string
+          enabled: boolean
+          label: string
+          organization_type: string
+          sort_order: number
+        }
+        Insert: {
+          created_at?: string
+          description: string
+          enabled?: boolean
+          label: string
+          organization_type: string
+          sort_order?: number
+        }
+        Update: {
+          created_at?: string
+          description?: string
+          enabled?: boolean
+          label?: string
+          organization_type?: string
+          sort_order?: number
+        }
+        Relationships: []
+      }
+      organizations: {
+        Row: {
+          cover_url: string | null
+          created_at: string
+          created_by: string | null
+          description: string | null
+          display_name: string
+          location_text: string | null
+          logo_url: string | null
+          organization_state: string
+          resource_id: string
+          resource_kind: string
+          updated_at: string
+          updated_by: string | null
+          website_url: string | null
+        }
+        Insert: {
+          cover_url?: string | null
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          display_name: string
+          location_text?: string | null
+          logo_url?: string | null
+          organization_state?: string
+          resource_id: string
+          resource_kind?: string
+          updated_at?: string
+          updated_by?: string | null
+          website_url?: string | null
+        }
+        Update: {
+          cover_url?: string | null
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          display_name?: string
+          location_text?: string | null
+          logo_url?: string | null
+          organization_state?: string
+          resource_id?: string
+          resource_kind?: string
+          updated_at?: string
+          updated_by?: string | null
+          website_url?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "organizations_resource_fkey"
+            columns: ["resource_id", "resource_kind"]
+            isOneToOne: false
+            referencedRelation: "resources"
+            referencedColumns: ["id", "resource_kind"]
+          },
+        ]
+      }
+      people: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          identity_revision: number
+          merged_into_person_resource_id: string | null
+          person_state: string
+          preferred_identity_link_id: string | null
+          resource_id: string
+          resource_kind: string
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          identity_revision?: number
+          merged_into_person_resource_id?: string | null
+          person_state?: string
+          preferred_identity_link_id?: string | null
+          resource_id: string
+          resource_kind?: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          identity_revision?: number
+          merged_into_person_resource_id?: string | null
+          person_state?: string
+          preferred_identity_link_id?: string | null
+          resource_id?: string
+          resource_kind?: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "people_merged_into_fkey"
+            columns: ["merged_into_person_resource_id"]
+            isOneToOne: false
+            referencedRelation: "people"
+            referencedColumns: ["resource_id"]
+          },
+          {
+            foreignKeyName: "people_preferred_identity_link_fkey"
+            columns: ["preferred_identity_link_id", "resource_id"]
+            isOneToOne: false
+            referencedRelation: "person_identity_links"
+            referencedColumns: ["id", "person_resource_id"]
+          },
+          {
+            foreignKeyName: "people_resource_fkey"
+            columns: ["resource_id", "resource_kind"]
+            isOneToOne: true
+            referencedRelation: "resources"
+            referencedColumns: ["id", "resource_kind"]
+          },
+        ]
+      }
+      person_follow_merge_transfers: {
+        Row: {
+          created_at: string
+          id: string
+          merge_event_id: string
+          source_follow_created_at: string
+          source_follow_id: string
+          source_person_resource_id: string
+          target_follow_id: string
+          target_follow_preexisted: boolean
+          target_person_resource_id: string
+          transfer_mode: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          merge_event_id: string
+          source_follow_created_at: string
+          source_follow_id: string
+          source_person_resource_id: string
+          target_follow_id: string
+          target_follow_preexisted: boolean
+          target_person_resource_id: string
+          transfer_mode: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          merge_event_id?: string
+          source_follow_created_at?: string
+          source_follow_id?: string
+          source_person_resource_id?: string
+          target_follow_id?: string
+          target_follow_preexisted?: boolean
+          target_person_resource_id?: string
+          transfer_mode?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "person_follow_merge_transfers_merge_event_fkey"
+            columns: ["merge_event_id"]
+            isOneToOne: false
+            referencedRelation: "person_identity_events"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "person_follow_merge_transfers_source_person_fkey"
+            columns: ["source_person_resource_id"]
+            isOneToOne: false
+            referencedRelation: "people"
+            referencedColumns: ["resource_id"]
+          },
+          {
+            foreignKeyName: "person_follow_merge_transfers_target_person_fkey"
+            columns: ["target_person_resource_id"]
+            isOneToOne: false
+            referencedRelation: "people"
+            referencedColumns: ["resource_id"]
+          },
+        ]
+      }
+      person_identity_events: {
+        Row: {
+          actor_id: string | null
+          correlation_id: string | null
+          created_at: string
+          event_type: string
+          id: string
+          identity_link_id: string | null
+          person_resource_id: string
+          prior_identity_revision: number | null
+          reason: string | null
+          related_person_resource_id: string | null
+          resulting_identity_revision: number
+        }
+        Insert: {
+          actor_id?: string | null
+          correlation_id?: string | null
+          created_at?: string
+          event_type: string
+          id?: string
+          identity_link_id?: string | null
+          person_resource_id: string
+          prior_identity_revision?: number | null
+          reason?: string | null
+          related_person_resource_id?: string | null
+          resulting_identity_revision: number
+        }
+        Update: {
+          actor_id?: string | null
+          correlation_id?: string | null
+          created_at?: string
+          event_type?: string
+          id?: string
+          identity_link_id?: string | null
+          person_resource_id?: string
+          prior_identity_revision?: number | null
+          reason?: string | null
+          related_person_resource_id?: string | null
+          resulting_identity_revision?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "person_identity_events_link_fkey"
+            columns: ["identity_link_id"]
+            isOneToOne: false
+            referencedRelation: "person_identity_links"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "person_identity_events_person_fkey"
+            columns: ["person_resource_id"]
+            isOneToOne: false
+            referencedRelation: "people"
+            referencedColumns: ["resource_id"]
+          },
+          {
+            foreignKeyName: "person_identity_events_related_person_fkey"
+            columns: ["related_person_resource_id"]
+            isOneToOne: false
+            referencedRelation: "people"
+            referencedColumns: ["resource_id"]
+          },
+        ]
+      }
+      person_identity_links: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          external_contributor_id: string | null
+          id: string
+          link_method: string
+          link_reason: string
+          link_state: string
+          person_resource_id: string
+          person_resource_kind: string
+          registry_author_id: string | null
+          retired_at: string | null
+          retired_by: string | null
+          retired_reason: string | null
+          retired_user_id_snapshot: string | null
+          superseded_by_link_id: string | null
+          supersedes_link_id: string | null
+          user_id: string | null
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          external_contributor_id?: string | null
+          id?: string
+          link_method: string
+          link_reason: string
+          link_state?: string
+          person_resource_id: string
+          person_resource_kind?: string
+          registry_author_id?: string | null
+          retired_at?: string | null
+          retired_by?: string | null
+          retired_reason?: string | null
+          retired_user_id_snapshot?: string | null
+          superseded_by_link_id?: string | null
+          supersedes_link_id?: string | null
+          user_id?: string | null
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          external_contributor_id?: string | null
+          id?: string
+          link_method?: string
+          link_reason?: string
+          link_state?: string
+          person_resource_id?: string
+          person_resource_kind?: string
+          registry_author_id?: string | null
+          retired_at?: string | null
+          retired_by?: string | null
+          retired_reason?: string | null
+          retired_user_id_snapshot?: string | null
+          superseded_by_link_id?: string | null
+          supersedes_link_id?: string | null
+          user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "person_identity_links_external_contributor_fkey"
+            columns: ["external_contributor_id"]
+            isOneToOne: false
+            referencedRelation: "external_contributors"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "person_identity_links_person_fkey"
+            columns: ["person_resource_id", "person_resource_kind"]
+            isOneToOne: false
+            referencedRelation: "people"
+            referencedColumns: ["resource_id", "resource_kind"]
+          },
+          {
+            foreignKeyName: "person_identity_links_retired_user_snapshot_fkey"
+            columns: ["retired_user_id_snapshot"]
+            isOneToOne: false
+            referencedRelation: "retired_account_identities"
+            referencedColumns: ["user_id"]
+          },
+          {
+            foreignKeyName: "person_identity_links_superseded_by_fkey"
+            columns: ["superseded_by_link_id"]
+            isOneToOne: false
+            referencedRelation: "person_identity_links"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "person_identity_links_supersedes_fkey"
+            columns: ["supersedes_link_id"]
+            isOneToOne: false
+            referencedRelation: "person_identity_links"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      playlist_item_resources: {
+        Row: {
+          playlist_item_id: string
+          resource_id: string
+          resource_kind: string
+        }
+        Insert: {
+          playlist_item_id: string
+          resource_id: string
+          resource_kind?: string
+        }
+        Update: {
+          playlist_item_id?: string
+          resource_id?: string
+          resource_kind?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "playlist_item_resources_resource_fkey"
+            columns: ["resource_id", "resource_kind"]
+            isOneToOne: false
+            referencedRelation: "resources"
+            referencedColumns: ["id", "resource_kind"]
+          },
+        ]
+      }
+      playlist_lifecycle_events: {
+        Row: {
+          action: string
+          actor_id: string | null
+          command_receipt_id: string
+          created_at: string
+          event_number: number
+          id: string
+          metadata: Json
+          note: string | null
+          playlist_id: string
+          prior_status: string | null
+          resource_id: string
+          resulting_status: string
+          version_id: string | null
+        }
+        Insert: {
+          action: string
+          actor_id?: string | null
+          command_receipt_id: string
+          created_at?: string
+          event_number: number
+          id?: string
+          metadata?: Json
+          note?: string | null
+          playlist_id: string
+          prior_status?: string | null
+          resource_id: string
+          resulting_status: string
+          version_id?: string | null
+        }
+        Update: {
+          action?: string
+          actor_id?: string | null
+          command_receipt_id?: string
+          created_at?: string
+          event_number?: number
+          id?: string
+          metadata?: Json
+          note?: string | null
+          playlist_id?: string
+          prior_status?: string | null
+          resource_id?: string
+          resulting_status?: string
+          version_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "playlist_lifecycle_events_binding_fkey"
+            columns: ["resource_id", "playlist_id"]
+            isOneToOne: false
+            referencedRelation: "playlist_resources"
+            referencedColumns: ["resource_id", "playlist_id"]
+          },
+          {
+            foreignKeyName: "playlist_lifecycle_events_version_fkey"
+            columns: ["version_id", "resource_id", "playlist_id"]
+            isOneToOne: false
+            referencedRelation: "playlist_versions"
+            referencedColumns: ["id", "resource_id", "playlist_id"]
+          },
+        ]
+      }
+      playlist_publication_snapshots: {
+        Row: {
+          command_receipt_id: string
+          content_fingerprint: string
+          cover_alt_text: string | null
+          cover_caption: string | null
+          cover_credit: string | null
+          cover_url: string | null
+          created_at: string
+          curator_label: string | null
+          description: string | null
+          first_published_at: string
+          id: string
+          item_count: number
+          payload: Json
+          playlist_id: string
+          published_at: string
+          published_by: string | null
+          resource_id: string
+          slug: string
+          title: string
+          version_id: string
+        }
+        Insert: {
+          command_receipt_id: string
+          content_fingerprint: string
+          cover_alt_text?: string | null
+          cover_caption?: string | null
+          cover_credit?: string | null
+          cover_url?: string | null
+          created_at?: string
+          curator_label?: string | null
+          description?: string | null
+          first_published_at: string
+          id?: string
+          item_count: number
+          payload: Json
+          playlist_id: string
+          published_at: string
+          published_by?: string | null
+          resource_id: string
+          slug: string
+          title: string
+          version_id: string
+        }
+        Update: {
+          command_receipt_id?: string
+          content_fingerprint?: string
+          cover_alt_text?: string | null
+          cover_caption?: string | null
+          cover_credit?: string | null
+          cover_url?: string | null
+          created_at?: string
+          curator_label?: string | null
+          description?: string | null
+          first_published_at?: string
+          id?: string
+          item_count?: number
+          payload?: Json
+          playlist_id?: string
+          published_at?: string
+          published_by?: string | null
+          resource_id?: string
+          slug?: string
+          title?: string
+          version_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "playlist_publication_snapshots_binding_fkey"
+            columns: ["resource_id", "playlist_id"]
+            isOneToOne: false
+            referencedRelation: "playlist_resources"
+            referencedColumns: ["resource_id", "playlist_id"]
+          },
+          {
+            foreignKeyName: "playlist_publication_snapshots_version_fkey"
+            columns: ["version_id", "resource_id", "playlist_id"]
+            isOneToOne: false
+            referencedRelation: "playlist_versions"
+            referencedColumns: ["id", "resource_id", "playlist_id"]
+          },
+        ]
+      }
+      playlist_resources: {
+        Row: {
+          playlist_id: string
+          resource_id: string
+          resource_kind: string
+        }
+        Insert: {
+          playlist_id: string
+          resource_id: string
+          resource_kind?: string
+        }
+        Update: {
+          playlist_id?: string
+          resource_id?: string
+          resource_kind?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "playlist_resources_resource_fkey"
+            columns: ["resource_id", "resource_kind"]
+            isOneToOne: false
+            referencedRelation: "resources"
+            referencedColumns: ["id", "resource_kind"]
+          },
+        ]
+      }
+      playlist_review_events: {
+        Row: {
+          action: string
+          actor_id: string | null
+          command_receipt_id: string
+          correlation_id: string
+          created_at: string
+          event_number: number
+          id: string
+          playlist_id: string
+          prior_status: string
+          reason: string | null
+          resource_id: string
+          result_version_id: string | null
+          resulting_status: string
+          target_version_id: string
+        }
+        Insert: {
+          action: string
+          actor_id?: string | null
+          command_receipt_id: string
+          correlation_id: string
+          created_at?: string
+          event_number: number
+          id?: string
+          playlist_id: string
+          prior_status: string
+          reason?: string | null
+          resource_id: string
+          result_version_id?: string | null
+          resulting_status: string
+          target_version_id: string
+        }
+        Update: {
+          action?: string
+          actor_id?: string | null
+          command_receipt_id?: string
+          correlation_id?: string
+          created_at?: string
+          event_number?: number
+          id?: string
+          playlist_id?: string
+          prior_status?: string
+          reason?: string | null
+          resource_id?: string
+          result_version_id?: string | null
+          resulting_status?: string
+          target_version_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "playlist_review_events_resource_playlist_fkey"
+            columns: ["resource_id", "playlist_id"]
+            isOneToOne: false
+            referencedRelation: "playlist_resources"
+            referencedColumns: ["resource_id", "playlist_id"]
+          },
+          {
+            foreignKeyName: "playlist_review_events_result_version_fkey"
+            columns: ["result_version_id", "resource_id", "playlist_id"]
+            isOneToOne: false
+            referencedRelation: "playlist_versions"
+            referencedColumns: ["id", "resource_id", "playlist_id"]
+          },
+          {
+            foreignKeyName: "playlist_review_events_target_version_fkey"
+            columns: ["target_version_id", "resource_id", "playlist_id"]
+            isOneToOne: false
+            referencedRelation: "playlist_versions"
+            referencedColumns: ["id", "resource_id", "playlist_id"]
+          },
+        ]
+      }
+      playlist_scheduled_publications: {
+        Row: {
+          command_receipt_id: string
+          created_at: string
+          created_by: string | null
+          failure_reason: string | null
+          id: string
+          note: string | null
+          playlist_id: string
+          published_at: string | null
+          resource_id: string
+          run_after: string
+          status: string
+          updated_at: string
+          version_id: string
+        }
+        Insert: {
+          command_receipt_id: string
+          created_at?: string
+          created_by?: string | null
+          failure_reason?: string | null
+          id?: string
+          note?: string | null
+          playlist_id: string
+          published_at?: string | null
+          resource_id: string
+          run_after: string
+          status?: string
+          updated_at?: string
+          version_id: string
+        }
+        Update: {
+          command_receipt_id?: string
+          created_at?: string
+          created_by?: string | null
+          failure_reason?: string | null
+          id?: string
+          note?: string | null
+          playlist_id?: string
+          published_at?: string | null
+          resource_id?: string
+          run_after?: string
+          status?: string
+          updated_at?: string
+          version_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "playlist_scheduled_publications_binding_fkey"
+            columns: ["resource_id", "playlist_id"]
+            isOneToOne: false
+            referencedRelation: "playlist_resources"
+            referencedColumns: ["resource_id", "playlist_id"]
+          },
+          {
+            foreignKeyName: "playlist_scheduled_publications_version_fkey"
+            columns: ["version_id", "resource_id", "playlist_id"]
+            isOneToOne: false
+            referencedRelation: "playlist_versions"
+            referencedColumns: ["id", "resource_id", "playlist_id"]
+          },
+        ]
+      }
+      playlist_version_items: {
+        Row: {
+          artist_names: string[]
+          artwork_url: string | null
+          duration_ms: number | null
+          isrc: string | null
+          match_confidence: number | null
+          match_status: string
+          normalization_payload: Json
+          notes: string | null
+          playlist_item_id: string
+          playlist_item_resource_id: string
+          playlist_version_id: string
+          position: number
+          preview_url: string | null
+          provider_key: string | null
+          provider_track_id: string | null
+          provider_url: string | null
+          registry_release_id: string | null
+          registry_track_id: string | null
+          release_title: string | null
+          title: string | null
+        }
+        Insert: {
+          artist_names?: string[]
+          artwork_url?: string | null
+          duration_ms?: number | null
+          isrc?: string | null
+          match_confidence?: number | null
+          match_status: string
+          normalization_payload?: Json
+          notes?: string | null
+          playlist_item_id: string
+          playlist_item_resource_id: string
+          playlist_version_id: string
+          position: number
+          preview_url?: string | null
+          provider_key?: string | null
+          provider_track_id?: string | null
+          provider_url?: string | null
+          registry_release_id?: string | null
+          registry_track_id?: string | null
+          release_title?: string | null
+          title?: string | null
+        }
+        Update: {
+          artist_names?: string[]
+          artwork_url?: string | null
+          duration_ms?: number | null
+          isrc?: string | null
+          match_confidence?: number | null
+          match_status?: string
+          normalization_payload?: Json
+          notes?: string | null
+          playlist_item_id?: string
+          playlist_item_resource_id?: string
+          playlist_version_id?: string
+          position?: number
+          preview_url?: string | null
+          provider_key?: string | null
+          provider_track_id?: string | null
+          provider_url?: string | null
+          registry_release_id?: string | null
+          registry_track_id?: string | null
+          release_title?: string | null
+          title?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "playlist_version_items_item_identity_fkey"
+            columns: ["playlist_item_resource_id", "playlist_item_id"]
+            isOneToOne: false
+            referencedRelation: "playlist_item_resources"
+            referencedColumns: ["resource_id", "playlist_item_id"]
+          },
+          {
+            foreignKeyName: "playlist_version_items_version_fkey"
+            columns: ["playlist_version_id"]
+            isOneToOne: false
+            referencedRelation: "playlist_versions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      playlist_version_trust_revisions: {
+        Row: {
+          citation_revision: number
+          credit_revision: number
+          playlist_version_id: string
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          citation_revision?: number
+          credit_revision?: number
+          playlist_version_id: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          citation_revision?: number
+          credit_revision?: number
+          playlist_version_id?: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "playlist_version_trust_revisions_playlist_version_id_fkey"
+            columns: ["playlist_version_id"]
+            isOneToOne: true
+            referencedRelation: "playlist_versions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      playlist_versions: {
+        Row: {
+          content_fingerprint: string
+          cover_alt_text_snapshot: string | null
+          cover_asset_id: string | null
+          cover_asset_revision_id: string | null
+          cover_caption_snapshot: string | null
+          cover_credit_snapshot: string | null
+          cover_display_order: number
+          cover_placement_data: Json
+          created_at: string
+          created_by: string | null
+          curator_label: string | null
+          description: string | null
+          id: string
+          item_count: number
+          metadata: Json
+          playlist_id: string
+          resource_id: string
+          slug: string
+          source_authority_revision: number
+          status: string
+          title: string
+          version_kind: string
+          version_number: number
+        }
+        Insert: {
+          content_fingerprint: string
+          cover_alt_text_snapshot?: string | null
+          cover_asset_id?: string | null
+          cover_asset_revision_id?: string | null
+          cover_caption_snapshot?: string | null
+          cover_credit_snapshot?: string | null
+          cover_display_order?: number
+          cover_placement_data?: Json
+          created_at?: string
+          created_by?: string | null
+          curator_label?: string | null
+          description?: string | null
+          id?: string
+          item_count: number
+          metadata?: Json
+          playlist_id: string
+          resource_id: string
+          slug: string
+          source_authority_revision: number
+          status: string
+          title: string
+          version_kind: string
+          version_number: number
+        }
+        Update: {
+          content_fingerprint?: string
+          cover_alt_text_snapshot?: string | null
+          cover_asset_id?: string | null
+          cover_asset_revision_id?: string | null
+          cover_caption_snapshot?: string | null
+          cover_credit_snapshot?: string | null
+          cover_display_order?: number
+          cover_placement_data?: Json
+          created_at?: string
+          created_by?: string | null
+          curator_label?: string | null
+          description?: string | null
+          id?: string
+          item_count?: number
+          metadata?: Json
+          playlist_id?: string
+          resource_id?: string
+          slug?: string
+          source_authority_revision?: number
+          status?: string
+          title?: string
+          version_kind?: string
+          version_number?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "playlist_versions_resource_playlist_fkey"
+            columns: ["resource_id", "playlist_id"]
+            isOneToOne: false
+            referencedRelation: "playlist_resources"
+            referencedColumns: ["resource_id", "playlist_id"]
+          },
+        ]
+      }
+      publishing_channels: {
+        Row: {
+          channel_key: string
+          created_at: string
+          description: string
+          enabled: boolean
+          label: string
+          sort_order: number
+          updated_at: string
+        }
+        Insert: {
+          channel_key: string
+          created_at?: string
+          description: string
+          enabled?: boolean
+          label: string
+          sort_order?: number
+          updated_at?: string
+        }
+        Update: {
+          channel_key?: string
+          created_at?: string
+          description?: string
+          enabled?: boolean
+          label?: string
+          sort_order?: number
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      publishing_content_kinds: {
+        Row: {
+          canonical_resource_kind: string | null
+          created_at: string
+          description: string
+          enabled: boolean
+          kind: string
+          label: string
+          sort_order: number
+          updated_at: string
+        }
+        Insert: {
+          canonical_resource_kind?: string | null
+          created_at?: string
+          description: string
+          enabled?: boolean
+          kind: string
+          label: string
+          sort_order?: number
+          updated_at?: string
+        }
+        Update: {
+          canonical_resource_kind?: string | null
+          created_at?: string
+          description?: string
+          enabled?: boolean
+          kind?: string
+          label?: string
+          sort_order?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "publishing_content_kinds_canonical_resource_kind_fkey"
+            columns: ["canonical_resource_kind"]
+            isOneToOne: false
+            referencedRelation: "resource_kinds"
+            referencedColumns: ["kind"]
+          },
+        ]
+      }
+      publishing_item_assignees: {
+        Row: {
+          assigned_by: string | null
+          assignment_role: string
+          created_at: string
+          item_id: string
+          user_id: string
+        }
+        Insert: {
+          assigned_by?: string | null
+          assignment_role: string
+          created_at?: string
+          item_id: string
+          user_id: string
+        }
+        Update: {
+          assigned_by?: string | null
+          assignment_role?: string
+          created_at?: string
+          item_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "publishing_item_assignees_item_id_fkey"
+            columns: ["item_id"]
+            isOneToOne: false
+            referencedRelation: "publishing_items"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      publishing_item_channels: {
+        Row: {
+          channel_key: string
+          created_at: string
+          created_by: string | null
+          is_primary: boolean
+          item_id: string
+        }
+        Insert: {
+          channel_key: string
+          created_at?: string
+          created_by?: string | null
+          is_primary?: boolean
+          item_id: string
+        }
+        Update: {
+          channel_key?: string
+          created_at?: string
+          created_by?: string | null
+          is_primary?: boolean
+          item_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "publishing_item_channels_channel_key_fkey"
+            columns: ["channel_key"]
+            isOneToOne: false
+            referencedRelation: "publishing_channels"
+            referencedColumns: ["channel_key"]
+          },
+          {
+            foreignKeyName: "publishing_item_channels_item_id_fkey"
+            columns: ["item_id"]
+            isOneToOne: false
+            referencedRelation: "publishing_items"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      publishing_item_events: {
+        Row: {
+          action: string
+          actor_id: string | null
+          created_at: string
+          id: string
+          item_id: string
+          metadata: Json
+          note: string | null
+          prior_record_version: number
+          prior_values: Json
+          resulting_record_version: number
+          resulting_values: Json
+        }
+        Insert: {
+          action: string
+          actor_id?: string | null
+          created_at?: string
+          id?: string
+          item_id: string
+          metadata?: Json
+          note?: string | null
+          prior_record_version: number
+          prior_values?: Json
+          resulting_record_version: number
+          resulting_values?: Json
+        }
+        Update: {
+          action?: string
+          actor_id?: string | null
+          created_at?: string
+          id?: string
+          item_id?: string
+          metadata?: Json
+          note?: string | null
+          prior_record_version?: number
+          prior_values?: Json
+          resulting_record_version?: number
+          resulting_values?: Json
+        }
+        Relationships: [
+          {
+            foreignKeyName: "publishing_item_events_item_id_fkey"
+            columns: ["item_id"]
+            isOneToOne: false
+            referencedRelation: "publishing_items"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      publishing_items: {
+        Row: {
+          brief: string | null
+          content_kind: string
+          created_at: string
+          created_by: string | null
+          id: string
+          owner_id: string | null
+          planned_publish_at: string | null
+          planning_state: string
+          priority: string
+          production_deadline: string | null
+          production_stage: string
+          record_version: number
+          resource_id: string | null
+          title: string
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          brief?: string | null
+          content_kind: string
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          owner_id?: string | null
+          planned_publish_at?: string | null
+          planning_state?: string
+          priority?: string
+          production_deadline?: string | null
+          production_stage?: string
+          record_version?: number
+          resource_id?: string | null
+          title: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          brief?: string | null
+          content_kind?: string
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          owner_id?: string | null
+          planned_publish_at?: string | null
+          planning_state?: string
+          priority?: string
+          production_deadline?: string | null
+          production_stage?: string
+          record_version?: number
+          resource_id?: string | null
+          title?: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "publishing_items_content_kind_fkey"
+            columns: ["content_kind"]
+            isOneToOne: false
+            referencedRelation: "publishing_content_kinds"
+            referencedColumns: ["kind"]
+          },
+          {
+            foreignKeyName: "publishing_items_resource_id_fkey"
+            columns: ["resource_id"]
+            isOneToOne: false
+            referencedRelation: "resources"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      registry_artist_resources: {
+        Row: {
+          artist_id: string
+          resource_id: string
+          resource_kind: string
+        }
+        Insert: {
+          artist_id: string
+          resource_id: string
+          resource_kind?: string
+        }
+        Update: {
+          artist_id?: string
+          resource_id?: string
+          resource_kind?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "registry_artist_resources_resource_fkey"
+            columns: ["resource_id", "resource_kind"]
+            isOneToOne: false
+            referencedRelation: "resources"
+            referencedColumns: ["id", "resource_kind"]
+          },
+        ]
+      }
+      resource_aliases: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          id: string
+          is_canonical: boolean
+          path: string
+          redirect_status: number
+          replacement_alias_id: string | null
+          resource_id: string
+          retired_at: string | null
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          is_canonical?: boolean
+          path: string
+          redirect_status?: number
+          replacement_alias_id?: string | null
+          resource_id: string
+          retired_at?: string | null
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          is_canonical?: boolean
+          path?: string
+          redirect_status?: number
+          replacement_alias_id?: string | null
+          resource_id?: string
+          retired_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "resource_aliases_replacement_fkey"
+            columns: ["replacement_alias_id", "resource_id"]
+            isOneToOne: false
+            referencedRelation: "resource_aliases"
+            referencedColumns: ["id", "resource_id"]
+          },
+          {
+            foreignKeyName: "resource_aliases_resource_fkey"
+            columns: ["resource_id"]
+            isOneToOne: false
+            referencedRelation: "resources"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      resource_citations: {
+        Row: {
+          citation_id: string
+          citation_purpose: string
+          created_at: string
+          created_by: string | null
+          display_order: number
+          id: string
+          public_safe: boolean
+          resource_id: string
+          resource_kind: string
+          target_anchor_data: Json
+          target_anchor_type: string
+          target_version_id: string
+          target_version_type: string
+        }
+        Insert: {
+          citation_id: string
+          citation_purpose?: string
+          created_at?: string
+          created_by?: string | null
+          display_order?: number
+          id?: string
+          public_safe?: boolean
+          resource_id: string
+          resource_kind: string
+          target_anchor_data?: Json
+          target_anchor_type?: string
+          target_version_id: string
+          target_version_type: string
+        }
+        Update: {
+          citation_id?: string
+          citation_purpose?: string
+          created_at?: string
+          created_by?: string | null
+          display_order?: number
+          id?: string
+          public_safe?: boolean
+          resource_id?: string
+          resource_kind?: string
+          target_anchor_data?: Json
+          target_anchor_type?: string
+          target_version_id?: string
+          target_version_type?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "resource_citations_citation_fkey"
+            columns: ["citation_id"]
+            isOneToOne: false
+            referencedRelation: "citations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "resource_citations_resource_fkey"
+            columns: ["resource_id", "resource_kind"]
+            isOneToOne: false
+            referencedRelation: "resources"
+            referencedColumns: ["id", "resource_kind"]
+          },
+        ]
+      }
+      resource_credits: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          credit_id: string
+          display_order: number
+          id: string
+          is_primary: boolean
+          public_safe: boolean
+          resource_id: string
+          resource_kind: string
+          target_version_id: string
+          target_version_type: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          credit_id: string
+          display_order?: number
+          id?: string
+          is_primary?: boolean
+          public_safe?: boolean
+          resource_id: string
+          resource_kind: string
+          target_version_id: string
+          target_version_type: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          credit_id?: string
+          display_order?: number
+          id?: string
+          is_primary?: boolean
+          public_safe?: boolean
+          resource_id?: string
+          resource_kind?: string
+          target_version_id?: string
+          target_version_type?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "resource_credits_credit_fkey"
+            columns: ["credit_id"]
+            isOneToOne: false
+            referencedRelation: "credits"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "resource_credits_resource_fkey"
+            columns: ["resource_id", "resource_kind"]
+            isOneToOne: false
+            referencedRelation: "resources"
+            referencedColumns: ["id", "resource_kind"]
+          },
+        ]
+      }
+      resource_kinds: {
+        Row: {
+          created_at: string
+          description: string
+          enabled: boolean
+          kind: string
+          label: string
+        }
+        Insert: {
+          created_at?: string
+          description: string
+          enabled?: boolean
+          kind: string
+          label: string
+        }
+        Update: {
+          created_at?: string
+          description?: string
+          enabled?: boolean
+          kind?: string
+          label?: string
+        }
+        Relationships: []
+      }
+      resource_lifecycle_actions: {
+        Row: {
+          action: string
+          created_at: string
+          description: string
+          enabled: boolean
+        }
+        Insert: {
+          action: string
+          created_at?: string
+          description: string
+          enabled?: boolean
+        }
+        Update: {
+          action?: string
+          created_at?: string
+          description?: string
+          enabled?: boolean
+        }
+        Relationships: []
+      }
+      resource_lifecycle_events: {
+        Row: {
+          action: string
+          actor_id: string | null
+          command_receipt_id: string | null
+          correlation_id: string | null
+          created_at: string
+          event_number: number
+          id: string
+          legacy_source_authority: string | null
+          legacy_source_event_id: string | null
+          metadata: Json
+          note: string | null
+          prior_status: string | null
+          resource_id: string
+          resulting_status: string | null
+          version_id: string | null
+        }
+        Insert: {
+          action: string
+          actor_id?: string | null
+          command_receipt_id?: string | null
+          correlation_id?: string | null
+          created_at?: string
+          event_number: number
+          id?: string
+          legacy_source_authority?: string | null
+          legacy_source_event_id?: string | null
+          metadata?: Json
+          note?: string | null
+          prior_status?: string | null
+          resource_id: string
+          resulting_status?: string | null
+          version_id?: string | null
+        }
+        Update: {
+          action?: string
+          actor_id?: string | null
+          command_receipt_id?: string | null
+          correlation_id?: string | null
+          created_at?: string
+          event_number?: number
+          id?: string
+          legacy_source_authority?: string | null
+          legacy_source_event_id?: string | null
+          metadata?: Json
+          note?: string | null
+          prior_status?: string | null
+          resource_id?: string
+          resulting_status?: string | null
+          version_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "resource_lifecycle_events_action_fkey"
+            columns: ["action"]
+            isOneToOne: false
+            referencedRelation: "resource_lifecycle_actions"
+            referencedColumns: ["action"]
+          },
+          {
+            foreignKeyName: "resource_lifecycle_events_resource_fkey"
+            columns: ["resource_id"]
+            isOneToOne: false
+            referencedRelation: "resources"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "resource_lifecycle_events_version_fkey"
+            columns: ["resource_id", "version_id"]
+            isOneToOne: false
+            referencedRelation: "resource_versions"
+            referencedColumns: ["resource_id", "id"]
+          },
+        ]
+      }
+      resource_review_actions: {
+        Row: {
+          action: string
+          created_at: string
+          description: string
+          enabled: boolean
+        }
+        Insert: {
+          action: string
+          created_at?: string
+          description: string
+          enabled?: boolean
+        }
+        Update: {
+          action?: string
+          created_at?: string
+          description?: string
+          enabled?: boolean
+        }
+        Relationships: []
+      }
+      resource_review_events: {
+        Row: {
+          action: string
+          actor_id: string | null
+          command_receipt_id: string | null
+          correlation_id: string | null
+          created_at: string
+          event_number: number
+          id: string
+          legacy_source_authority: string | null
+          legacy_source_event_id: string | null
+          prior_status: string
+          reason: string | null
+          resource_id: string
+          result_version_id: string | null
+          resulting_status: string
+          target_version_id: string
+        }
+        Insert: {
+          action: string
+          actor_id?: string | null
+          command_receipt_id?: string | null
+          correlation_id?: string | null
+          created_at?: string
+          event_number: number
+          id?: string
+          legacy_source_authority?: string | null
+          legacy_source_event_id?: string | null
+          prior_status: string
+          reason?: string | null
+          resource_id: string
+          result_version_id?: string | null
+          resulting_status: string
+          target_version_id: string
+        }
+        Update: {
+          action?: string
+          actor_id?: string | null
+          command_receipt_id?: string | null
+          correlation_id?: string | null
+          created_at?: string
+          event_number?: number
+          id?: string
+          legacy_source_authority?: string | null
+          legacy_source_event_id?: string | null
+          prior_status?: string
+          reason?: string | null
+          resource_id?: string
+          result_version_id?: string | null
+          resulting_status?: string
+          target_version_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "resource_review_events_action_fkey"
+            columns: ["action"]
+            isOneToOne: false
+            referencedRelation: "resource_review_actions"
+            referencedColumns: ["action"]
+          },
+          {
+            foreignKeyName: "resource_review_events_resource_fkey"
+            columns: ["resource_id"]
+            isOneToOne: false
+            referencedRelation: "resources"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "resource_review_events_result_version_fkey"
+            columns: ["resource_id", "result_version_id"]
+            isOneToOne: false
+            referencedRelation: "resource_versions"
+            referencedColumns: ["resource_id", "id"]
+          },
+          {
+            foreignKeyName: "resource_review_events_target_version_fkey"
+            columns: ["resource_id", "target_version_id"]
+            isOneToOne: false
+            referencedRelation: "resource_versions"
+            referencedColumns: ["resource_id", "id"]
+          },
+        ]
+      }
+      resource_version_editorial_metadata: {
+        Row: {
+          created_at: string
+          focus_keyword: string | null
+          metadata_revision: number
+          resource_id: string
+          resource_kind: string
+          seo_description: string | null
+          seo_keywords: string[]
+          seo_title: string | null
+          target_version_id: string
+          target_version_type: string
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          created_at?: string
+          focus_keyword?: string | null
+          metadata_revision?: number
+          resource_id: string
+          resource_kind: string
+          seo_description?: string | null
+          seo_keywords?: string[]
+          seo_title?: string | null
+          target_version_id: string
+          target_version_type: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          created_at?: string
+          focus_keyword?: string | null
+          metadata_revision?: number
+          resource_id?: string
+          resource_kind?: string
+          seo_description?: string | null
+          seo_keywords?: string[]
+          seo_title?: string | null
+          target_version_id?: string
+          target_version_type?: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "resource_version_editorial_metadata_resource_id_fkey"
+            columns: ["resource_id"]
+            isOneToOne: false
+            referencedRelation: "resources"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      resource_version_taxonomy_terms: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          display_order: number
+          resource_id: string
+          resource_kind: string
+          target_version_id: string
+          target_version_type: string
+          taxonomy: string
+          taxonomy_term_id: string
+          term_name_snapshot: string
+          term_slug_snapshot: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          display_order?: number
+          resource_id: string
+          resource_kind: string
+          target_version_id: string
+          target_version_type: string
+          taxonomy: string
+          taxonomy_term_id: string
+          term_name_snapshot: string
+          term_slug_snapshot: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          display_order?: number
+          resource_id?: string
+          resource_kind?: string
+          target_version_id?: string
+          target_version_type?: string
+          taxonomy?: string
+          taxonomy_term_id?: string
+          term_name_snapshot?: string
+          term_slug_snapshot?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "resource_version_taxonomy_terms_resource_id_fkey"
+            columns: ["resource_id"]
+            isOneToOne: false
+            referencedRelation: "resources"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      resource_version_type_kinds: {
+        Row: {
+          created_at: string
+          resource_kind: string
+          version_type: string
+        }
+        Insert: {
+          created_at?: string
+          resource_kind: string
+          version_type: string
+        }
+        Update: {
+          created_at?: string
+          resource_kind?: string
+          version_type?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "resource_version_type_kinds_resource_kind_fkey"
+            columns: ["resource_kind"]
+            isOneToOne: false
+            referencedRelation: "resource_kinds"
+            referencedColumns: ["kind"]
+          },
+          {
+            foreignKeyName: "resource_version_type_kinds_version_type_fkey"
+            columns: ["version_type"]
+            isOneToOne: false
+            referencedRelation: "resource_version_types"
+            referencedColumns: ["version_type"]
+          },
+        ]
+      }
+      resource_version_types: {
+        Row: {
+          created_at: string
+          description: string
+          enabled: boolean
+          label: string
+          source_table_name: string
+          source_table_schema: string
+          version_type: string
+        }
+        Insert: {
+          created_at?: string
+          description: string
+          enabled?: boolean
+          label: string
+          source_table_name: string
+          source_table_schema: string
+          version_type: string
+        }
+        Update: {
+          created_at?: string
+          description?: string
+          enabled?: boolean
+          label?: string
+          source_table_name?: string
+          source_table_schema?: string
+          version_type?: string
+        }
+        Relationships: []
+      }
+      resource_versions: {
+        Row: {
+          content_fingerprint: string
+          created_at: string
+          created_by: string | null
+          id: string
+          registered_at: string
+          resource_id: string
+          resource_kind: string
+          version_kind: string
+          version_number: number
+          version_type: string
+        }
+        Insert: {
+          content_fingerprint: string
+          created_at: string
+          created_by?: string | null
+          id: string
+          registered_at?: string
+          resource_id: string
+          resource_kind: string
+          version_kind: string
+          version_number: number
+          version_type: string
+        }
+        Update: {
+          content_fingerprint?: string
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          registered_at?: string
+          resource_id?: string
+          resource_kind?: string
+          version_kind?: string
+          version_number?: number
+          version_type?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "resource_versions_resource_fkey"
+            columns: ["resource_id", "resource_kind"]
+            isOneToOne: false
+            referencedRelation: "resources"
+            referencedColumns: ["id", "resource_kind"]
+          },
+          {
+            foreignKeyName: "resource_versions_type_kind_fkey"
+            columns: ["version_type", "resource_kind"]
+            isOneToOne: false
+            referencedRelation: "resource_version_type_kinds"
+            referencedColumns: ["version_type", "resource_kind"]
+          },
+        ]
+      }
+      resources: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          current_approved_version_id: string | null
+          current_published_version_id: string | null
+          current_submitted_version_id: string | null
+          current_working_version_id: string | null
+          id: string
+          lifecycle_state: string
+          owner_id: string | null
+          resource_kind: string
+          updated_at: string
+          visibility: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          current_approved_version_id?: string | null
+          current_published_version_id?: string | null
+          current_submitted_version_id?: string | null
+          current_working_version_id?: string | null
+          id?: string
+          lifecycle_state: string
+          owner_id?: string | null
+          resource_kind: string
+          updated_at?: string
+          visibility: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          current_approved_version_id?: string | null
+          current_published_version_id?: string | null
+          current_submitted_version_id?: string | null
+          current_working_version_id?: string | null
+          id?: string
+          lifecycle_state?: string
+          owner_id?: string | null
+          resource_kind?: string
+          updated_at?: string
+          visibility?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "resources_current_approved_resource_version_fkey"
+            columns: ["id", "current_approved_version_id"]
+            isOneToOne: false
+            referencedRelation: "resource_versions"
+            referencedColumns: ["resource_id", "id"]
+          },
+          {
+            foreignKeyName: "resources_current_published_resource_version_fkey"
+            columns: ["id", "current_published_version_id"]
+            isOneToOne: false
+            referencedRelation: "resource_versions"
+            referencedColumns: ["resource_id", "id"]
+          },
+          {
+            foreignKeyName: "resources_current_submitted_resource_version_fkey"
+            columns: ["id", "current_submitted_version_id"]
+            isOneToOne: false
+            referencedRelation: "resource_versions"
+            referencedColumns: ["resource_id", "id"]
+          },
+          {
+            foreignKeyName: "resources_current_working_resource_version_fkey"
+            columns: ["id", "current_working_version_id"]
+            isOneToOne: false
+            referencedRelation: "resource_versions"
+            referencedColumns: ["resource_id", "id"]
+          },
+          {
+            foreignKeyName: "resources_resource_kind_fkey"
+            columns: ["resource_kind"]
+            isOneToOne: false
+            referencedRelation: "resource_kinds"
+            referencedColumns: ["kind"]
+          },
+        ]
+      }
+      retired_account_identities: {
+        Row: {
+          command_receipt_id: string
+          correlation_id: string | null
+          created_at: string
+          identity_link_id: string
+          person_resource_id: string
+          reason: string
+          retired_at: string
+          retired_by: string | null
+          user_id: string
+          username_snapshot: string | null
+        }
+        Insert: {
+          command_receipt_id: string
+          correlation_id?: string | null
+          created_at?: string
+          identity_link_id: string
+          person_resource_id: string
+          reason: string
+          retired_at?: string
+          retired_by?: string | null
+          user_id: string
+          username_snapshot?: string | null
+        }
+        Update: {
+          command_receipt_id?: string
+          correlation_id?: string | null
+          created_at?: string
+          identity_link_id?: string
+          person_resource_id?: string
+          reason?: string
+          retired_at?: string
+          retired_by?: string | null
+          user_id?: string
+          username_snapshot?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "retired_account_identities_link_fkey"
+            columns: ["identity_link_id"]
+            isOneToOne: true
+            referencedRelation: "person_identity_links"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "retired_account_identities_person_fkey"
+            columns: ["person_resource_id"]
+            isOneToOne: false
+            referencedRelation: "people"
+            referencedColumns: ["resource_id"]
+          },
+        ]
+      }
+      show_episodes: {
+        Row: {
+          authority_revision: number
+          created_at: string
+          created_by: string | null
+          episode_number: number | null
+          resource_id: string
+          resource_kind: string
+          show_resource_id: string
+          slug: string
+          summary: string | null
+          title: string
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          authority_revision?: number
+          created_at?: string
+          created_by?: string | null
+          episode_number?: number | null
+          resource_id: string
+          resource_kind?: string
+          show_resource_id: string
+          slug: string
+          summary?: string | null
+          title: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          authority_revision?: number
+          created_at?: string
+          created_by?: string | null
+          episode_number?: number | null
+          resource_id?: string
+          resource_kind?: string
+          show_resource_id?: string
+          slug?: string
+          summary?: string | null
+          title?: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "show_episodes_resource_fkey"
+            columns: ["resource_id", "resource_kind"]
+            isOneToOne: false
+            referencedRelation: "resources"
+            referencedColumns: ["id", "resource_kind"]
+          },
+          {
+            foreignKeyName: "show_episodes_show_resource_id_fkey"
+            columns: ["show_resource_id"]
+            isOneToOne: false
+            referencedRelation: "shows"
+            referencedColumns: ["resource_id"]
+          },
+        ]
+      }
+      shows: {
+        Row: {
+          authority_revision: number
+          created_at: string
+          created_by: string | null
+          description: string | null
+          resource_id: string
+          resource_kind: string
+          slug: string
+          title: string
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          authority_revision?: number
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          resource_id: string
+          resource_kind?: string
+          slug: string
+          title: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          authority_revision?: number
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          resource_id?: string
+          resource_kind?: string
+          slug?: string
+          title?: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "shows_resource_fkey"
+            columns: ["resource_id", "resource_kind"]
+            isOneToOne: false
+            referencedRelation: "resources"
+            referencedColumns: ["id", "resource_kind"]
+          },
+        ]
+      }
+      source_registry_links: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          registry_entity_id: string
+          registry_entity_type: string
+          relationship_role: string
+          source_id: string
+          source_version_id: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          registry_entity_id: string
+          registry_entity_type: string
+          relationship_role?: string
+          source_id: string
+          source_version_id: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          registry_entity_id?: string
+          registry_entity_type?: string
+          relationship_role?: string
+          source_id?: string
+          source_version_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "source_registry_links_source_fkey"
+            columns: ["source_id"]
+            isOneToOne: false
+            referencedRelation: "sources"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "source_registry_links_source_version_fkey"
+            columns: ["source_version_id"]
+            isOneToOne: false
+            referencedRelation: "source_versions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      source_review_events: {
+        Row: {
+          action: string
+          actor_id: string | null
+          correlation_id: string | null
+          created_at: string
+          id: string
+          prior_exposure_class: string | null
+          prior_review_status: string | null
+          prior_source_state: string | null
+          reason: string | null
+          resulting_exposure_class: string | null
+          resulting_review_status: string | null
+          resulting_source_state: string | null
+          source_id: string
+          source_version_id: string | null
+        }
+        Insert: {
+          action: string
+          actor_id?: string | null
+          correlation_id?: string | null
+          created_at?: string
+          id?: string
+          prior_exposure_class?: string | null
+          prior_review_status?: string | null
+          prior_source_state?: string | null
+          reason?: string | null
+          resulting_exposure_class?: string | null
+          resulting_review_status?: string | null
+          resulting_source_state?: string | null
+          source_id: string
+          source_version_id?: string | null
+        }
+        Update: {
+          action?: string
+          actor_id?: string | null
+          correlation_id?: string | null
+          created_at?: string
+          id?: string
+          prior_exposure_class?: string | null
+          prior_review_status?: string | null
+          prior_source_state?: string | null
+          reason?: string | null
+          resulting_exposure_class?: string | null
+          resulting_review_status?: string | null
+          resulting_source_state?: string | null
+          source_id?: string
+          source_version_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "source_review_events_source_id_fkey"
+            columns: ["source_id"]
+            isOneToOne: false
+            referencedRelation: "sources"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "source_review_events_source_version_id_fkey"
+            columns: ["source_version_id"]
+            isOneToOne: false
+            referencedRelation: "source_versions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      source_types: {
+        Row: {
+          created_at: string
+          description: string
+          enabled: boolean
+          label: string
+          sort_order: number
+          source_type: string
+        }
+        Insert: {
+          created_at?: string
+          description: string
+          enabled?: boolean
+          label: string
+          sort_order?: number
+          source_type: string
+        }
+        Update: {
+          created_at?: string
+          description?: string
+          enabled?: boolean
+          label?: string
+          sort_order?: number
+          source_type?: string
+        }
+        Relationships: []
+      }
+      source_versions: {
+        Row: {
+          archive_identifier: string | null
+          capture_date: string | null
+          consent_status: string
+          content_fingerprint: string
+          country_code: string | null
+          created_at: string
+          created_by: string | null
+          creator_display: string | null
+          credit_line: string | null
+          id: string
+          internal_notes: string | null
+          language_code: string | null
+          media_asset_id: string | null
+          place_text: string | null
+          publication_date: string | null
+          publisher_display: string | null
+          reliability_note: string | null
+          retrieval_date: string | null
+          rights_status: string
+          sensitivity: string
+          source_id: string
+          source_type: string
+          source_url: string | null
+          title: string
+          version_number: number
+        }
+        Insert: {
+          archive_identifier?: string | null
+          capture_date?: string | null
+          consent_status: string
+          content_fingerprint: string
+          country_code?: string | null
+          created_at?: string
+          created_by?: string | null
+          creator_display?: string | null
+          credit_line?: string | null
+          id?: string
+          internal_notes?: string | null
+          language_code?: string | null
+          media_asset_id?: string | null
+          place_text?: string | null
+          publication_date?: string | null
+          publisher_display?: string | null
+          reliability_note?: string | null
+          retrieval_date?: string | null
+          rights_status: string
+          sensitivity: string
+          source_id: string
+          source_type: string
+          source_url?: string | null
+          title: string
+          version_number: number
+        }
+        Update: {
+          archive_identifier?: string | null
+          capture_date?: string | null
+          consent_status?: string
+          content_fingerprint?: string
+          country_code?: string | null
+          created_at?: string
+          created_by?: string | null
+          creator_display?: string | null
+          credit_line?: string | null
+          id?: string
+          internal_notes?: string | null
+          language_code?: string | null
+          media_asset_id?: string | null
+          place_text?: string | null
+          publication_date?: string | null
+          publisher_display?: string | null
+          reliability_note?: string | null
+          retrieval_date?: string | null
+          rights_status?: string
+          sensitivity?: string
+          source_id?: string
+          source_type?: string
+          source_url?: string | null
+          title?: string
+          version_number?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "source_versions_source_id_fkey"
+            columns: ["source_id"]
+            isOneToOne: false
+            referencedRelation: "sources"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "source_versions_source_type_fkey"
+            columns: ["source_type"]
+            isOneToOne: false
+            referencedRelation: "source_types"
+            referencedColumns: ["source_type"]
+          },
+        ]
+      }
+      sources: {
+        Row: {
+          archive_identifier: string | null
+          capture_date: string | null
+          consent_status: string
+          country_code: string | null
+          created_at: string
+          created_by: string | null
+          creator_display: string | null
+          credit_line: string | null
+          current_approved_version_id: string | null
+          current_submitted_version_id: string | null
+          current_working_version_id: string | null
+          exposure_class: string
+          id: string
+          internal_notes: string | null
+          language_code: string | null
+          media_asset_id: string | null
+          place_text: string | null
+          publication_date: string | null
+          publisher_display: string | null
+          reliability_note: string | null
+          retrieval_date: string | null
+          review_status: string
+          reviewed_at: string | null
+          reviewed_by: string | null
+          rights_status: string
+          sensitivity: string
+          source_state: string
+          source_type: string
+          source_url: string | null
+          title: string
+          updated_at: string
+          updated_by: string | null
+          withdrawal_public_mode: string
+          withdrawal_reason: string | null
+          withdrawn_at: string | null
+          withdrawn_by: string | null
+          working_revision: number
+        }
+        Insert: {
+          archive_identifier?: string | null
+          capture_date?: string | null
+          consent_status?: string
+          country_code?: string | null
+          created_at?: string
+          created_by?: string | null
+          creator_display?: string | null
+          credit_line?: string | null
+          current_approved_version_id?: string | null
+          current_submitted_version_id?: string | null
+          current_working_version_id?: string | null
+          exposure_class?: string
+          id?: string
+          internal_notes?: string | null
+          language_code?: string | null
+          media_asset_id?: string | null
+          place_text?: string | null
+          publication_date?: string | null
+          publisher_display?: string | null
+          reliability_note?: string | null
+          retrieval_date?: string | null
+          review_status?: string
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          rights_status?: string
+          sensitivity?: string
+          source_state?: string
+          source_type: string
+          source_url?: string | null
+          title: string
+          updated_at?: string
+          updated_by?: string | null
+          withdrawal_public_mode?: string
+          withdrawal_reason?: string | null
+          withdrawn_at?: string | null
+          withdrawn_by?: string | null
+          working_revision?: number
+        }
+        Update: {
+          archive_identifier?: string | null
+          capture_date?: string | null
+          consent_status?: string
+          country_code?: string | null
+          created_at?: string
+          created_by?: string | null
+          creator_display?: string | null
+          credit_line?: string | null
+          current_approved_version_id?: string | null
+          current_submitted_version_id?: string | null
+          current_working_version_id?: string | null
+          exposure_class?: string
+          id?: string
+          internal_notes?: string | null
+          language_code?: string | null
+          media_asset_id?: string | null
+          place_text?: string | null
+          publication_date?: string | null
+          publisher_display?: string | null
+          reliability_note?: string | null
+          retrieval_date?: string | null
+          review_status?: string
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          rights_status?: string
+          sensitivity?: string
+          source_state?: string
+          source_type?: string
+          source_url?: string | null
+          title?: string
+          updated_at?: string
+          updated_by?: string | null
+          withdrawal_public_mode?: string
+          withdrawal_reason?: string | null
+          withdrawn_at?: string | null
+          withdrawn_by?: string | null
+          working_revision?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "sources_current_approved_version_fkey"
+            columns: ["current_approved_version_id"]
+            isOneToOne: false
+            referencedRelation: "source_versions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "sources_current_submitted_version_fkey"
+            columns: ["current_submitted_version_id"]
+            isOneToOne: false
+            referencedRelation: "source_versions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "sources_current_working_version_fkey"
+            columns: ["current_working_version_id"]
+            isOneToOne: false
+            referencedRelation: "source_versions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "sources_source_type_fkey"
+            columns: ["source_type"]
+            isOneToOne: false
+            referencedRelation: "source_types"
+            referencedColumns: ["source_type"]
+          },
+        ]
+      }
+      track_lyrics_contributions: {
+        Row: {
+          acceptance_mode: string | null
+          accepted_version_id: string | null
+          contribution_kind: string
+          contributor_id: string | null
+          created_at: string
+          id: string
+          language_code: string
+          lines: Json
+          plain_text: string
+          review_note: string | null
+          reviewed_at: string | null
+          reviewed_by: string | null
+          source_description: string | null
+          status: string
+          timing_mode: string
+          track_id: string
+        }
+        Insert: {
+          acceptance_mode?: string | null
+          accepted_version_id?: string | null
+          contribution_kind?: string
+          contributor_id?: string | null
+          created_at?: string
+          id?: string
+          language_code?: string
+          lines: Json
+          plain_text: string
+          review_note?: string | null
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          source_description?: string | null
+          status?: string
+          timing_mode?: string
+          track_id: string
+        }
+        Update: {
+          acceptance_mode?: string | null
+          accepted_version_id?: string | null
+          contribution_kind?: string
+          contributor_id?: string | null
+          created_at?: string
+          id?: string
+          language_code?: string
+          lines?: Json
+          plain_text?: string
+          review_note?: string | null
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          source_description?: string | null
+          status?: string
+          timing_mode?: string
+          track_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "track_lyrics_contributions_accepted_version_id_fkey"
+            columns: ["accepted_version_id"]
+            isOneToOne: false
+            referencedRelation: "track_lyrics_versions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      track_lyrics_documents: {
+        Row: {
+          authority_revision: number
+          created_at: string
+          current_published_version_id: string | null
+          current_working_version_id: string | null
+          track_id: string
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          authority_revision?: number
+          created_at?: string
+          current_published_version_id?: string | null
+          current_working_version_id?: string | null
+          track_id: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          authority_revision?: number
+          created_at?: string
+          current_published_version_id?: string | null
+          current_working_version_id?: string | null
+          track_id?: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "track_lyrics_documents_published_fkey"
+            columns: ["current_published_version_id", "track_id"]
+            isOneToOne: false
+            referencedRelation: "track_lyrics_versions"
+            referencedColumns: ["id", "track_id"]
+          },
+          {
+            foreignKeyName: "track_lyrics_documents_working_fkey"
+            columns: ["current_working_version_id", "track_id"]
+            isOneToOne: false
+            referencedRelation: "track_lyrics_versions"
+            referencedColumns: ["id", "track_id"]
+          },
+        ]
+      }
+      track_lyrics_versions: {
+        Row: {
+          community_revision_mode: string | null
+          created_at: string
+          created_by: string | null
+          id: string
+          language_code: string
+          lines: Json
+          plain_text: string
+          rights_note: string | null
+          source_contribution_id: string | null
+          source_contributor_id: string | null
+          source_contributor_label: string | null
+          source_kind: string
+          timing_mode: string
+          track_id: string
+          version_number: number
+        }
+        Insert: {
+          community_revision_mode?: string | null
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          language_code?: string
+          lines: Json
+          plain_text: string
+          rights_note?: string | null
+          source_contribution_id?: string | null
+          source_contributor_id?: string | null
+          source_contributor_label?: string | null
+          source_kind?: string
+          timing_mode?: string
+          track_id: string
+          version_number: number
+        }
+        Update: {
+          community_revision_mode?: string | null
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          language_code?: string
+          lines?: Json
+          plain_text?: string
+          rights_note?: string | null
+          source_contribution_id?: string | null
+          source_contributor_id?: string | null
+          source_contributor_label?: string | null
+          source_kind?: string
+          timing_mode?: string
+          track_id?: string
+          version_number?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "track_lyrics_versions_source_contribution_fkey"
+            columns: ["source_contribution_id"]
+            isOneToOne: false
+            referencedRelation: "track_lyrics_contributions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      video_episode_shared_links: {
+        Row: {
+          created_at: string
+          show_episode_resource_id: string
+          video_publication_id: string
+        }
+        Insert: {
+          created_at?: string
+          show_episode_resource_id: string
+          video_publication_id: string
+        }
+        Update: {
+          created_at?: string
+          show_episode_resource_id?: string
+          video_publication_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "video_episode_shared_links_show_episode_resource_id_fkey"
+            columns: ["show_episode_resource_id"]
+            isOneToOne: true
+            referencedRelation: "show_episodes"
+            referencedColumns: ["resource_id"]
+          },
+        ]
+      }
+      video_publication_resources: {
+        Row: {
+          publication_id: string
+          resource_id: string
+          resource_kind: string
+        }
+        Insert: {
+          publication_id: string
+          resource_id: string
+          resource_kind: string
+        }
+        Update: {
+          publication_id?: string
+          resource_id?: string
+          resource_kind?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "video_publication_resources_resource_fkey"
+            columns: ["resource_id", "resource_kind"]
+            isOneToOne: false
+            referencedRelation: "resources"
+            referencedColumns: ["id", "resource_kind"]
+          },
+        ]
+      }
+      video_publication_version_trust_revisions: {
+        Row: {
+          citation_revision: number
+          credit_revision: number
+          publication_version_id: string
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          citation_revision?: number
+          credit_revision?: number
+          publication_version_id: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          citation_revision?: number
+          credit_revision?: number
+          publication_version_id?: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: []
+      }
+    }
+    Views: {
+      [_ in never]: never
+    }
+    Functions: {
+      allocate_person_path: {
+        Args: { p_person_resource_id: string; p_seed: string }
+        Returns: string
+      }
+      append_playlist_lifecycle_event: {
+        Args: {
+          p_action: string
+          p_actor_id: string
+          p_command_receipt_id: string
+          p_metadata?: Json
+          p_note: string
+          p_playlist_id: string
+          p_prior_status: string
+          p_resource_id: string
+          p_resulting_status: string
+          p_version_id: string
+        }
+        Returns: string
+      }
+      append_resource_lifecycle_event: {
+        Args: {
+          p_action: string
+          p_actor_id: string
+          p_command_receipt_id: string
+          p_correlation_id: string
+          p_metadata: Json
+          p_note: string
+          p_prior_status: string
+          p_resource_id: string
+          p_resulting_status: string
+          p_version_id: string
+        }
+        Returns: string
+      }
+      append_resource_review_event: {
+        Args: {
+          p_action: string
+          p_actor_id: string
+          p_command_receipt_id: string
+          p_correlation_id: string
+          p_prior_status: string
+          p_reason: string
+          p_resource_id: string
+          p_result_version_id: string
+          p_resulting_status: string
+          p_target_version_id: string
+        }
+        Returns: string
+      }
+      apply_article_review_snapshot: {
+        Args: {
+          p_article_id: string
+          p_content_html: string
+          p_expected_draft_version: number
+          p_resource_id: string
+        }
+        Returns: {
+          article_id: string
+          article_slug: string
+          draft_version: number
+          version_id: string
+          version_number: number
+        }[]
+      }
+      article_snapshot_fingerprint: {
+        Args: {
+          p_author_display: string
+          p_categories: Json
+          p_content_html: string
+          p_excerpt: string
+          p_hero_image_id: string
+          p_hero_image_url: string
+          p_published_at: string
+          p_seo: Json
+          p_slug: string
+          p_tags: Json
+          p_title: string
+          p_wp_status: string
+        }
+        Returns: string
+      }
+      artist_music_submission_review_due_at: {
+        Args: { p_submitted_at: string }
+        Returns: string
+      }
+      artist_representation_defaults: {
+        Args: { p_role: string }
+        Returns: {
+          can_manage_profile: boolean
+          can_manage_team: boolean
+          can_post_updates: boolean
+          can_submit_releases: boolean
+        }[]
+      }
+      assert_citation_command_actor: { Args: never; Returns: string }
+      assert_credit_command_actor: { Args: never; Returns: string }
+      assert_playlist_curator_credit: {
+        Args: { p_credit_id: string }
+        Returns: {
+          credit_id: string
+          display_name: string
+          registry_author_slug: string
+          user_username: string
+        }[]
+      }
+      assert_source_command_actor: {
+        Args: { p_capability: string }
+        Returns: string
+      }
+      copy_article_lifecycle_version: {
+        Args: {
+          p_lifecycle_state: string
+          p_published_at?: string
+          p_source_version_id: string
+          p_version_kind: string
+          p_wp_status: string
+        }
+        Returns: {
+          version_id: string
+          version_number: number
+        }[]
+      }
+      copy_audio_version_trust_to_version: {
+        Args: { p_source_version_id: string; p_target_version_id: string }
+        Returns: undefined
+      }
+      copy_playlist_lifecycle_version: {
+        Args: {
+          p_actor_id: string
+          p_source_version_id: string
+          p_target_version_kind: string
+        }
+        Returns: {
+          content_fingerprint: string
+          item_count: number
+          version_id: string
+          version_number: number
+        }[]
+      }
+      copy_playlist_published_version: {
+        Args: { p_actor_id: string; p_source_version_id: string }
+        Returns: {
+          content_fingerprint: string
+          item_count: number
+          version_id: string
+          version_number: number
+        }[]
+      }
+      copy_playlist_version_snapshot: {
+        Args: { p_actor_id: string; p_source_version_id: string }
+        Returns: {
+          content_fingerprint: string
+          item_count: number
+          version_id: string
+          version_number: number
+        }[]
+      }
+      copy_playlist_working_trust_to_version: {
+        Args: {
+          p_resource_id: string
+          p_source_working_version_id: string
+          p_target_version_id: string
+        }
+        Returns: undefined
+      }
+      copy_playlist_working_trust_to_working_successor: {
+        Args: {
+          p_resource_id: string
+          p_source_working_version_id: string
+          p_target_working_version_id: string
+        }
+        Returns: undefined
+      }
+      copy_resource_version_editorial_metadata: {
+        Args: {
+          p_actor_id: string
+          p_source_version_id: string
+          p_source_version_type: string
+          p_target_version_id: string
+          p_target_version_type: string
+        }
+        Returns: undefined
+      }
+      copy_video_version_trust_to_version: {
+        Args: { p_source_version_id: string; p_target_version_id: string }
+        Returns: undefined
+      }
+      correction_article_publication_proof: {
+        Args: { p_application_id: string }
+        Returns: {
+          affected_resource_id: string
+          application_id: string
+          application_resulting_version_id: string
+          article_id: string
+          article_slug: string
+          case_resource_id: string
+          challenged_version_id: string
+          content_fingerprint: string
+          corrected_version_id: string
+        }[]
+      }
+      correction_public_note_fingerprint: {
+        Args: {
+          p_affected_resource_id: string
+          p_application_id: string
+          p_case_resource_id: string
+          p_challenged_version_id: string
+          p_corrected_version_id: string
+          p_note_text: string
+        }
+        Returns: string
+      }
+      create_person_for_identity: {
+        Args: {
+          p_external_contributor_id: string
+          p_link_method: string
+          p_link_reason: string
+          p_registry_author_id: string
+          p_user_id: string
+        }
+        Returns: string
+      }
+      current_artist_representation: {
+        Args: { p_artist_id: string }
+        Returns: Database["public"]["Tables"]["artist_representations"]["Row"]
+        SetofOptions: {
+          from: "*"
+          to: "artist_representations"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      current_person_post_actor: { Args: never; Returns: string }
+      current_user_can_apply_correction: {
+        Args: { p_case_resource_id: string }
+        Returns: boolean
+      }
+      current_user_can_decide_correction: {
+        Args: { p_case_resource_id: string }
+        Returns: boolean
+      }
+      current_user_can_edit_article: {
+        Args: { p_resource_id: string }
+        Returns: boolean
+      }
+      current_user_can_edit_audio: {
+        Args: { p_resource_id: string }
+        Returns: boolean
+      }
+      current_user_can_edit_playlist: {
+        Args: { p_resource_id: string }
+        Returns: boolean
+      }
+      current_user_can_edit_video: {
+        Args: { p_resource_id: string }
+        Returns: boolean
+      }
+      current_user_can_investigate_correction: {
+        Args: { p_case_resource_id: string }
+        Returns: boolean
+      }
+      current_user_can_manage_personal_playlist: {
+        Args: { p_include_archived?: boolean; p_playlist_id: string }
+        Returns: boolean
+      }
+      current_user_can_manage_publishing: { Args: never; Returns: boolean }
+      current_user_can_participate_article_review: {
+        Args: { p_resource_id: string }
+        Returns: boolean
+      }
+      current_user_can_participate_audio_review: {
+        Args: { p_resource_id: string }
+        Returns: boolean
+      }
+      current_user_can_participate_playlist_review: {
+        Args: { p_resource_id: string }
+        Returns: boolean
+      }
+      current_user_can_participate_video_review: {
+        Args: { p_resource_id: string }
+        Returns: boolean
+      }
+      current_user_can_publish_article: { Args: never; Returns: boolean }
+      current_user_can_publish_audio: {
+        Args: { p_resource_id: string }
+        Returns: boolean
+      }
+      current_user_can_publish_correction_note: {
+        Args: { p_case_resource_id: string }
+        Returns: boolean
+      }
+      current_user_can_publish_playlist: {
+        Args: { p_resource_id: string }
+        Returns: boolean
+      }
+      current_user_can_publish_video: {
+        Args: { p_resource_id: string }
+        Returns: boolean
+      }
+      current_user_can_review_article: { Args: never; Returns: boolean }
+      current_user_can_review_artist_claims: { Args: never; Returns: boolean }
+      current_user_can_triage_correction: {
+        Args: { p_case_resource_id: string }
+        Returns: boolean
+      }
+      current_user_can_use_credit_identity: { Args: never; Returns: boolean }
+      current_user_can_view_audio: {
+        Args: { p_resource_id: string }
+        Returns: boolean
+      }
+      current_user_can_view_correction: {
+        Args: { p_case_resource_id: string }
+        Returns: boolean
+      }
+      current_user_can_view_playlist: {
+        Args: { p_resource_id: string }
+        Returns: boolean
+      }
+      current_user_can_view_playlist_id: {
+        Args: { p_playlist_id: string }
+        Returns: boolean
+      }
+      current_user_can_view_publishing_item: {
+        Args: { p_item_id: string }
+        Returns: boolean
+      }
+      current_user_can_view_video: {
+        Args: { p_resource_id: string }
+        Returns: boolean
+      }
+      current_user_owns_personal_playlist: {
+        Args: { p_include_archived?: boolean; p_playlist_id: string }
+        Returns: boolean
+      }
+      derive_publishing_editorial_state: {
+        Args: { p_resource_id: string }
+        Returns: string
+      }
+      derive_publishing_publication_state: {
+        Args: { p_item_id: string }
+        Returns: string
+      }
+      discovery_fingerprint_fragment: {
+        Args: { p_discovery: Json }
+        Returns: Json
+      }
+      ensure_article_resource_identity: {
+        Args: { p_article_id: string; p_owner_id?: string }
+        Returns: string
+      }
+      ensure_audio_episode_shared_identity: {
+        Args: { p_audio_publication_id: string }
+        Returns: string
+      }
+      ensure_audio_show_shared_identity: {
+        Args: { p_audio_show_id: string }
+        Returns: string
+      }
+      ensure_person_for_external_contributor: {
+        Args: { p_external_contributor_id: string }
+        Returns: string
+      }
+      ensure_person_for_registry_author: {
+        Args: { p_registry_author_id: string }
+        Returns: string
+      }
+      ensure_person_for_user: { Args: { p_user_id: string }; Returns: string }
+      ensure_playlist_registry_intake_item: {
+        Args: { p_suggestion_id: string }
+        Returns: string
+      }
+      insert_article_lifecycle_version_from_article: {
+        Args: {
+          p_article: Database["public"]["Tables"]["wk_articles"]["Row"]
+          p_lifecycle_state: string
+          p_resource: Database["editorial"]["Tables"]["resources"]["Row"]
+          p_version_kind: string
+        }
+        Returns: {
+          version_id: string
+          version_number: number
+        }[]
+      }
+      insert_playlist_current_snapshot: {
+        Args: {
+          p_actor_id: string
+          p_expected_authority_revision: number
+          p_playlist_id: string
+          p_snapshot_status: string
+          p_version_kind: string
+        }
+        Returns: {
+          content_fingerprint: string
+          item_count: number
+          version_id: string
+          version_number: number
+        }[]
+      }
+      insert_source_registry_links: {
+        Args: {
+          p_actor_id: string
+          p_registry_links: Json
+          p_source_id: string
+          p_source_version_id: string
+        }
+        Returns: undefined
+      }
+      list_current_public_person_work: {
+        Args: { p_person_resource_id: string }
+        Returns: {
+          canonical_path: string
+          image_url: string
+          is_primary: boolean
+          published_at: string
+          resource_id: string
+          resource_kind: string
+          roles: Json
+          summary: string
+          title: string
+        }[]
+      }
+      materialize_playlist_publication_snapshot: {
+        Args: {
+          p_command_receipt_id: string
+          p_published_at: string
+          p_published_by: string
+          p_version_id: string
+        }
+        Returns: string
+      }
+      next_article_version_number: {
+        Args: { p_resource_id: string }
+        Returns: number
+      }
+      next_playlist_position_with_registry_intake: {
+        Args: { p_exclude_item_id?: string; p_playlist_id: string }
+        Returns: number
+      }
+      normalize_person_slug: { Args: { p_seed: string }; Returns: string }
+      normalize_source_metadata: { Args: { p_metadata: Json }; Returns: Json }
+      normalize_source_registry_links: {
+        Args: { p_registry_links: Json }
+        Returns: Json
+      }
+      normalize_track_lyrics_payload: {
+        Args: { p_lines: Json; p_timing_mode: string }
+        Returns: Json
+      }
+      personal_playlist_command_context: {
+        Args: { p_include_archived?: boolean; p_playlist_id: string }
+        Returns: {
+          actor_id: string
+          authority_revision: number
+          lifecycle_state: string
+          owner_id: string
+          playlist_status: string
+          resource_id: string
+          visibility: string
+        }[]
+      }
+      personal_playlist_is_public: {
+        Args: { p_playlist_id: string }
+        Returns: boolean
+      }
+      personal_playlist_payload: {
+        Args: { p_playlist_id: string; p_public_view?: boolean }
+        Returns: Json
+      }
+      playlist_current_content_fingerprint: {
+        Args: { p_playlist_id: string }
+        Returns: string
+      }
+      playlist_duplicate_item_ids: {
+        Args: {
+          p_artist_names: string[]
+          p_exclude_item_id: string
+          p_playlist_id: string
+          p_provider_key: string
+          p_provider_track_id: string
+          p_registry_track_id: string
+          p_title: string
+        }
+        Returns: string[]
+      }
+      playlist_version_content_fingerprint_with_discovery: {
+        Args: { p_discovery: Json; p_version_id: string }
+        Returns: string
+      }
+      playlist_version_public_presentation_json: {
+        Args: { p_version_id: string }
+        Returns: Json
+      }
+      playlist_version_snapshot_json: {
+        Args: { p_version_id: string }
+        Returns: Json
+      }
+      playlist_working_trust_target: {
+        Args: { p_playlist_version_id: string; p_target_resource_id: string }
+        Returns: {
+          playlist_id: string
+          root_resource_id: string
+          target_resource_kind: string
+        }[]
+      }
+      publish_article_snapshot: {
+        Args: {
+          p_material_update?: boolean
+          p_published_at: string
+          p_version_id: string
+        }
+        Returns: string
+      }
+      publishing_item_snapshot: {
+        Args: {
+          p_item: Database["editorial"]["Tables"]["publishing_items"]["Row"]
+        }
+        Returns: Json
+      }
+      record_artist_representation_event: {
+        Args: {
+          p_artist_id: string
+          p_claim_id?: string
+          p_event_type: string
+          p_metadata?: Json
+          p_representation_id?: string
+          p_subject_user_id?: string
+        }
+        Returns: string
+      }
+      refresh_person_visibility: {
+        Args: { p_person_resource_id: string }
+        Returns: undefined
+      }
+      refresh_registry_artist_username_reservations: {
+        Args: never
+        Returns: Json
+      }
+      register_resource_version: {
+        Args: {
+          p_content_fingerprint: string
+          p_created_at: string
+          p_created_by: string
+          p_resource_id: string
+          p_version_id: string
+          p_version_kind: string
+          p_version_number: number
+          p_version_type: string
+        }
+        Returns: string
+      }
+      resequence_playlist_with_registry_intake: {
+        Args: { p_playlist_id: string }
+        Returns: undefined
+      }
+      resolve_credit_organization: {
+        Args: { p_credit_id: string }
+        Returns: string
+      }
+      resolve_credit_person: { Args: { p_credit_id: string }; Returns: string }
+      resolve_person_follow_target: {
+        Args: { p_person_resource_id: string }
+        Returns: {
+          canonical_path: string
+          followable: boolean
+          person_resource_id: string
+        }[]
+      }
+      resolve_person_presentation: {
+        Args: { p_person_resource_id: string }
+        Returns: Json
+      }
+      resolve_playlist_curator_credit: {
+        Args: {
+          p_actor_id: string
+          p_registry_author_id: string
+          p_user_id: string
+        }
+        Returns: {
+          credit_id: string
+          display_name: string
+          registry_author_slug: string
+          user_username: string
+        }[]
+      }
+      resolve_resource_version_identity: {
+        Args: { p_target_version_id: string; p_target_version_type: string }
+        Returns: {
+          resource_id: string
+          resource_kind: string
+          version_kind: string
+        }[]
+      }
+      resource_version_discovery_content_json: {
+        Args: { p_target_version_id: string; p_target_version_type: string }
+        Returns: Json
+      }
+      resource_version_editorial_metadata_json: {
+        Args: { p_target_version_id: string; p_target_version_type: string }
+        Returns: Json
+      }
+      seed_registry_track_intake_provider_observations: {
+        Args: { p_suggestion_id: string }
+        Returns: undefined
+      }
+      source_content_fingerprint: {
+        Args: { p_metadata: Json; p_registry_links: Json }
+        Returns: string
+      }
+      source_snapshot_fingerprint: {
+        Args: {
+          p_archive_identifier: string
+          p_capture_date: string
+          p_consent_status: string
+          p_country_code: string
+          p_creator_display: string
+          p_credit_line: string
+          p_internal_notes: string
+          p_language_code: string
+          p_media_asset_id: string
+          p_place_text: string
+          p_publication_date: string
+          p_publisher_display: string
+          p_reliability_note: string
+          p_retrieval_date: string
+          p_rights_status: string
+          p_sensitivity: string
+          p_source_type: string
+          p_source_url: string
+          p_title: string
+        }
+        Returns: string
+      }
+      sync_account_person_handle: {
+        Args: { p_user_id: string }
+        Returns: string
+      }
+      sync_artist_portal_roles: {
+        Args: { p_user_id: string }
+        Returns: undefined
+      }
+      username_is_registry_artist_reserved: {
+        Args: { p_username: string }
+        Returns: boolean
+      }
+      validate_citation_locator: {
+        Args: { p_locator_data: Json; p_locator_type: string }
+        Returns: undefined
+      }
+      validate_citation_target_anchor: {
+        Args: { p_anchor_data: Json; p_anchor_type: string }
+        Returns: undefined
+      }
+      validate_correction_case_history: {
+        Args: { p_case_resource_id: string }
+        Returns: undefined
+      }
+    }
+    Enums: {
+      [_ in never]: never
+    }
+    CompositeTypes: {
+      [_ in never]: never
+    }
+  }
   public: {
     Tables: {
       admin_account_recovery_events: {
@@ -13249,7 +18521,15 @@ export type Database = {
           updated_by: string | null
           updated_by_label: string | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "publishing_items_content_kind_fkey"
+            columns: ["content_kind"]
+            isOneToOne: false
+            referencedRelation: "wk_publishing_content_kinds"
+            referencedColumns: ["kind"]
+          },
+        ]
       }
       wk_resource_index: {
         Row: {
@@ -19575,6 +24855,9 @@ export type CompositeTypes<
     : never
 
 export const Constants = {
+  editorial: {
+    Enums: {},
+  },
   public: {
     Enums: {},
   },
