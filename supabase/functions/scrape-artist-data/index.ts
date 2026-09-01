@@ -1157,25 +1157,36 @@ async function writeScrapeToRegistry(
 
   if (data.topSongs.length > 0) {
     const now = new Date().toISOString();
-
     const topSongTaSet = new Set<string>();
+    const artistScrapedSlug = slugify(data.name);
 
     for (let i = 0; i < data.topSongs.length; i++) {
       const ts = data.topSongs[i];
-      const normKey = normalizeForMatch(ts.title);
-      if (!normKey) continue;
+      const trackSlugCandidate =
+        canonicalTrackSlugCandidate(ts.title);
+      let matchedTrackId: string | undefined;
 
-      let matchedTrackSlug = trackNormTitleToSlug.get(normKey);
+      try {
+        matchedTrackId = resolveTrackInArtistScope(
+          artistScrapedSlug,
+          trackSlugCandidate,
+        );
+      } catch (error) {
+        errors.push(
+          error instanceof Error ? error.message : String(error),
+        );
+        continue;
+      }
 
-      if (!matchedTrackSlug) {
-        if (options.dryRun) {
-          const syntheticSlug = dedupeSlug(slugify(ts.title), seenTrackSlugs);
-          matchedTrackSlug = syntheticSlug;
-          trackNormTitleToSlug.set(normKey, syntheticSlug);
-          stats.tracks_upserted++;
-        } else {
-          const trackId = crypto.randomUUID();
-          const trackSlug = dedupeSlug(slugify(ts.title), seenTrackSlugs);
+      let matchedTrackSlug = matchedTrackId
+        ? existingTrackIdToSlug.get(matchedTrackId)
+        : undefined;
+
+      if (!matchedTrackId) {
+        const trackId = crypto.randomUUID();
+        const trackSlug = trackSlugCandidate;
+
+        if (!options.dryRun) {
           const newTrack = {
             id: trackId,
             slug: trackSlug,
@@ -1202,18 +1213,31 @@ async function writeScrapeToRegistry(
             .insert(newTrack);
 
           if (trackErr) {
-            errors.push(`Top-song track insert error "${ts.title}": ${trackErr.message}`);
+            errors.push(
+              `Top-song track insert error "${ts.title}": ${trackErr.message}`,
+            );
             continue;
           }
+        }
 
-          matchedTrackSlug = trackSlug;
-          existingTrackBySlug.set(trackSlug, trackId);
-          trackNormTitleToSlug.set(normKey, trackSlug);
-          stats.tracks_upserted++;
+        matchedTrackId = trackId;
+        matchedTrackSlug = trackSlug;
+        existingTrackBySlug.set(trackSlug, trackId);
+        existingTrackIdToSlug.set(trackId, trackSlug);
+        existingTrackIdToTitle.set(trackId, ts.title);
+        registerTrackScopeAlias(
+          artistScrapedSlug,
+          trackSlug,
+          trackId,
+        );
+        stats.tracks_upserted++;
 
-          const artistScrapedSlug = slugify(data.name);
-          const taKey = `${trackId}:${artistScrapedSlug}`;
-          if (!existingTrackArtistSet.has(taKey) && !topSongTaSet.has(taKey)) {
+        const taKey = `${trackId}:${artistScrapedSlug}`;
+        if (
+          !existingTrackArtistSet.has(taKey) &&
+          !topSongTaSet.has(taKey)
+        ) {
+          if (!options.dryRun) {
             const { error: taErr } = await supabase
               .from("registry_track_artists")
               .insert({
@@ -1228,18 +1252,31 @@ async function writeScrapeToRegistry(
                 source: "wakilisha_scraper_top_song",
                 confidence: 80,
                 status: "active",
-                metadata: { scraped_from: data.slug, scraped_at: now, rank: i + 1 },
+                metadata: {
+                  scraped_from: data.slug,
+                  scraped_at: now,
+                  rank: i + 1,
+                },
               });
 
             if (taErr) {
-              errors.push(`Top-song track-artist error "${ts.title}": ${taErr.message}`);
-            } else {
-              stats.track_artists_upserted++;
-              topSongTaSet.add(taKey);
-              existingTrackArtistSet.add(taKey);
+              errors.push(
+                `Top-song track-artist error "${ts.title}": ${taErr.message}`,
+              );
             }
           }
+
+          stats.track_artists_upserted++;
+          topSongTaSet.add(taKey);
+          existingTrackArtistSet.add(taKey);
         }
+      }
+
+      if (!matchedTrackSlug) {
+        errors.push(
+          `Top-song Track identity missing slug for "${ts.title}"`,
+        );
+        continue;
       }
 
       const relationshipEntry: Record<string, unknown> = {
