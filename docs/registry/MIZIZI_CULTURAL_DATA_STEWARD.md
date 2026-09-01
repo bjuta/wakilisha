@@ -29,6 +29,44 @@ The preventive write boundary is live in production.
 
 Production promotion changed the canonical Track creation boundary and the four automatic Track writers. It did **not** rewrite historical Registry rows, create review work, or run the steward against the existing cultural corpus.
 
+## Release taxonomy and public identity, accepted 1 September 2026
+
+Release taxonomy is now an explicit WAKILISHA cultural-data invariant:
+
+- exactly 1 resolvable active Track means Single
+- 2 through 6 resolvable active Tracks means EP
+- 7 or more resolvable active Tracks means Album
+
+"Resolvable active Track" means an active `registry_release_tracks` membership whose target is an active `registry_tracks` row. A relationship row whose Track target is missing or inactive remains Registry evidence but must not manufacture public Release identity.
+
+Public page policy is separate from MIZIZI:
+
+- Releases is the collective domain for Singles, EPs, and Albums
+- Singles remain in Releases, Artist Discography, and Appears On
+- a Single does not own a dedicated Release detail page
+- a Single resolves publicly to its one canonical Track route
+- EPs and Albums own Release detail pages
+- canonical Track public routes remain `/tracks/{artist-slug}/{track-slug}`
+- Registry Track UUID remains internal identity
+
+MIZIZI's role is to keep Registry data consistent with this accepted model, not to own React routing or sitemap policy.
+
+The first read-only production audit against resolvable active Track membership found:
+
+- 841 active Releases
+- 13 active Releases with zero resolvable active Tracks
+- 673 canonical Singles by Track count
+- 53 canonical EPs by Track count
+- 102 canonical Albums by Track count
+- 32 active stored Release-type mismatches
+  - 11 stored EPs resolve to Singles
+  - 19 stored Albums resolve to EPs
+  - 2 stored EPs resolve to Albums
+- 18 bad active Release-membership relationships across 13 active Releases
+
+The public readers and sitemap authority now ignore those bad relationship rows when deriving public Release identity. The rows themselves have not been deleted or rewritten.
+
+The Release taxonomy rule is accepted product/Registry policy but is not yet part of MIZIZI rule-set v1.0.0 apply behavior. The next MIZIZI rule-set change should add a deterministic `release_taxonomy_drift` rule, prove expected-value write behavior and provenance, then audit before any production apply.
 
 ## Why MIZIZI exists
 
@@ -226,8 +264,12 @@ Read-only production audit:
 - 37 Track slugs repeating the primary artist with a double-hyphen prefix
 - 82 active duplicate Track-slug groups containing 187 Tracks
 - 841 active Releases
-- 685 one-Track Releases
-- 156 multi-Track Releases
+- 673 Singles by resolvable active Track count
+- 53 EPs by resolvable active Track count
+- 102 Albums by resolvable active Track count
+- 13 active Releases with zero resolvable active Tracks
+- 32 active stored Release-type mismatches against the accepted 1 / 2-6 / 7+ taxonomy
+- 18 bad active Release-membership relationships across those 13 zero-resolvable Releases
 - 739 Release slugs carrying provider packaging suffixes
 - 738 Release titles carrying provider packaging suffixes
 - 56 multi-Track Release slugs carrying provider packaging suffixes

@@ -1,6 +1,28 @@
 # WAKILISHA Master Programme Map
 
-## Current programme reconciliation - 31 August 2026
+## Current production reconciliation - 1 September 2026
+
+Latest production-accepted application main:
+
+`1dc7277d75256b109b485a3cc98c02229e9ccce4`
+
+Production is at 78 migrations through `20260901114500_mizizi_track_identity_write_boundary.sql`.
+
+Phase 7B remains the current numbered phase. The September Release taxonomy, one-track public identity, sitemap-authority, and MIZIZI work is an accepted adjacent Registry/public-delivery detour, not a new numbered phase.
+
+Accepted Release taxonomy:
+
+- Single: exactly 1 resolvable active Track
+- EP: 2 through 6 resolvable active Tracks
+- Album: 7 or more resolvable active Tracks
+
+A Single remains a Release in the Registry and in public collections, but its public detail destination is its one Track rather than a duplicate Release page.
+
+Current acceptance record:
+
+`docs/engineering/release-taxonomy-membership-integrity-closure-record.md`
+
+## Phase 7A closure reconciliation - 31 August 2026
 
 **Phase 7A Video publication authority is CLOSED and production accepted.**
 
@@ -26,9 +48,9 @@ The numbered programme now advances to **Phase 7B: Public Video product**.
 
 Status date: 31 August 2026
 
-Current production migration head: `20260831080826`
+Phase 7A closure migration head: `20260831080826`
 
-Current production migration count: `75`
+Phase 7A closure migration count: `75`
 
 ## Purpose
 
@@ -56,7 +78,7 @@ Current references:
 - `docs/engineering/phase-7a-video-publication-authority-kickoff.md`
 - `docs/engineering/primitive-compounding-contract.md`
 
-Phase 7A opens from production runtime baseline `dae3de2dc9fb021496eb0fe0c4d4f0338f676a88`, migration count `50`, head `20260825102000`.
+Phase 7A opened from production runtime baseline `dae3de2dc9fb021496eb0fe0c4d4f0338f676a88`, migration count `50`, head `20260825102000`.
 
 ## Programme map
 
