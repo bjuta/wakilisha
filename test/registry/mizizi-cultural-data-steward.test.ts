@@ -378,6 +378,41 @@ describe("MIZIZI Cultural Data Steward", () => {
     );
   });
 
+  it("seals reviewed Track Intake route identity in SQL", () => {
+    const migration =
+      readFileSync(
+        "supabase/migrations/20260901114500_mizizi_track_identity_write_boundary.sql",
+        "utf8",
+      );
+    const verifier =
+      readFileSync(
+        "scripts/control-plane/verify-mizizi-track-identity-write-boundary.sql",
+        "utf8",
+      );
+
+    expect(migration).toContain(
+      "v_slug := v_title_slug",
+    );
+    expect(migration).toContain(
+      "v_featured_artist_names",
+    );
+    expect(migration).toContain(
+      "artist_credit.credit_role = 'featured'",
+    );
+    expect(migration).toContain(
+      "track_artist.is_primary is true",
+    );
+    expect(migration).not.toContain(
+      "|| '--'\n    || v_title_slug",
+    );
+    expect(migration).not.toContain(
+      "left(replace(v_track_id::text, '-', ''), 8)",
+    );
+    expect(verifier).toContain(
+      "MIZIZI Track Intake write boundary is structurally sealed",
+    );
+  });
+
   it("keeps the runtime bounded, review-aware, and provenance-preserving", () => {
     const runner =
       readFileSync(
