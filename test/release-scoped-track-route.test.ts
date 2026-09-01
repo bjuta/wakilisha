@@ -1,3 +1,4 @@
+import { execFileSync } from "node:child_process";
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 
@@ -398,6 +399,19 @@ describe("public Release boundary", () => {
     expect(legacyApi).not.toContain(
       '.from("registry_tracks").select("id, release_id, title, slug").in("release_id", releaseIds)',
     );
+  });
+
+  it("syntax-checks the production sitemap refresh primitive", () => {
+    expect(() =>
+      execFileSync(
+        process.execPath,
+        [
+          "--check",
+          "scripts/seo/refresh-public-sitemap.mjs",
+        ],
+        { stdio: "pipe" },
+      ),
+    ).not.toThrow();
   });
 
   it("makes canonical Registry metadata the only dynamic music prerender authority", () => {
