@@ -263,6 +263,15 @@ describe("release-scoped track routes", () => {
       "const standalonePath = trackUrl(",
     );
     expect(trackPage).toContain(
+      "!hasPublicRelease &&",
+    );
+    expect(trackPage).not.toContain(
+      "releaseSlug &&\n          !hasPublicRelease",
+    );
+    expect(trackPage).toContain(
+      "hasPublicRelease &&\n          scopedArtistSlug",
+    );
+    expect(trackPage).toContain(
       "const scopedPath = releaseTrackUrl(",
     );
     expect(trackPage).toContain(
