@@ -4,6 +4,8 @@
 
 MIZIZI is the permanent WAKILISHA Registry data-hygiene agent.
 
+Current state: PR #772 candidate. Not production accepted. The apply command has not been run.
+
 Agent key: `mizizi`
 
 Rule-set version: `1.0.0`
@@ -146,9 +148,9 @@ Detects:
 - featured-artist slugs repeated inside the Track slug
 - primary-artist prefixes repeated inside the Track slug
 
-The candidate slug is derived from the title after removing only featured-credit notation.
+The candidate slug is derived from the title. Feature-credit presentation is removed from route identity only when a structured featured-Artist credit proves that the matching fragment is a credit rather than cultural title text.
 
-Automatic repair requires at least one positive structural noise signal. A mere difference between the current slug and a title-derived slug is not enough.
+Automatic repair requires at least one positive structural noise signal. Feature syntax in a string is not structural proof by itself. A mere difference between the current slug and a title-derived slug is not enough.
 
 Non-credit version information such as `Remix` is preserved.
 
@@ -194,24 +196,28 @@ Flags chart artist-slug disagreement with the canonical Registry primary artist.
 
 This remains observe-only in v1 because chart source presentation may intentionally differ from Registry primary-credit presentation. A difference alone is not an admin task.
 
-## Current production baseline, 31 August 2026
+## Current production baseline, 1 September 2026
 
 Read-only production audit:
 
 - 2,101 active Tracks
-- 526 active Tracks whose current slug differs from the minimal title-derived candidate
-- 514 of those mismatches have a positive structural noise signal and may enter the automatic-candidate pipeline
-- 12 mismatch-only cases remain observed debt rather than automatic admin work
-- 11 strong-signal cases lack an explicit active primary-artist credit and therefore cannot be auto-applied; only a blocked repair may escalate
 - 490 Track slugs containing `feat`, `ft`, or `featuring`
+- 492 Track titles containing feature-credit notation
 - 37 Track slugs repeating the primary artist with a double-hyphen prefix
+- 82 active duplicate Track-slug groups containing 187 Tracks
 - 841 active Releases
-- 739 Release slugs carrying packaging suffixes such as `-single`
-- 1,788 chart entries linked to canonical Tracks
+- 685 one-Track Releases
+- 156 multi-Track Releases
+- 739 Release slugs carrying provider packaging suffixes
+- 738 Release titles carrying provider packaging suffixes
+- 56 multi-Track Release slugs carrying provider packaging suffixes
+- 1,800 chart entries linked to canonical Tracks
 - 161 chart entries whose Track slug differs from the linked canonical Track slug
 - 95 chart Track slugs containing feature-credit markers
+- 91 chart artist slugs differing from canonical primary-Artist presentation
+- zero MIZIZI review items in production because MIZIZI apply has never run
 
-These numbers are a baseline, not an automatic mutation plan.
+These numbers are a baseline, not an automatic mutation plan. Passive findings do not become admin work merely because they exist.
 
 ## Scale contract
 
@@ -238,6 +244,32 @@ At high scale, MIZIZI should run in two ways:
 2. asynchronous stewardship passes for historical and cross-system drift
 
 The pure rule engine must remain shared between both paths.
+
+## Write-boundary contract
+
+MIZIZI is preventive as well as corrective.
+
+The same pure Track route-identity rule is shared by the live automatic Registry writers that can create Track identity:
+
+- `ingest-artist-discography`
+- `registry-enrichment-review`
+- `chart-ingest-api`
+- `scrape-artist-data`
+
+The reviewed SQL creation authority `admin_create_registry_track_from_intake_enriched` is sealed separately by migration `20260901114500_mizizi_track_identity_write_boundary.sql`.
+
+The write boundary follows these rules:
+
+1. a Track route slug is title-scoped inside its canonical Artist route, not globally unique
+2. primary Artist identity is never repeated inside a new Track slug
+3. random or arbitrary collision suffixes are not canonical identity policy
+4. feature-credit presentation leaves route identity only when structured featured-Artist evidence proves the matching fragment
+5. the same clean Track slug may exist under different Artists
+6. the same clean Track slug under the same primary Artist fails closed as an identity collision
+7. ISRC matches preserve existing canonical Track slugs instead of rewriting them from a new provider title
+8. old dirty identities remain resolvable evidence and are repaired through MIZIZI plus redirects, not destructive source rewriting
+
+The SQL migration replaces the existing function definition only. Applying the migration does not rewrite an existing Registry row.
 
 ## Provenance contract
 
