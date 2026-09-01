@@ -1,5 +1,6 @@
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.1";
+import { canonicalTrackSlugCandidate } from "../_shared/registry-track-identity.ts";
 
 const SITE_BASE = "https://wakilisha.africa";
 
@@ -596,22 +597,12 @@ async function writeScrapeToRegistry(
   const existingTrackBySlug = new Map<string, string>(
     existingTracks.map((t) => [t.slug, t.id])
   );
-
-  const artistScopedSlugPrefix = `${data.slug}--`;
-
-  const trackNormTitleToSlug = new Map<string, string>();
-  for (const t of existingTracks) {
-    const key = normalizeForMatch(t.title as string);
-    if (key) trackNormTitleToSlug.set(key, t.slug);
-  }
-
-  for (const t of existingTracks) {
-    const slug = t.slug as string;
-    if (slug.startsWith(artistScopedSlugPrefix)) {
-      const key = normalizeForMatch(t.title as string);
-      if (key) trackNormTitleToSlug.set(key, slug);
-    }
-  }
+  const existingTrackIdToSlug = new Map<string, string>(
+    existingTracks.map((t) => [t.id, t.slug])
+  );
+  const existingTrackIdToTitle = new Map<string, string>(
+    existingTracks.map((t) => [t.id, t.title])
+  );
 
   const existingReleaseArtists = await fetchAllRows<{ release_id: string; artist_id: string; artist_slug: string }>(
     "registry_release_artists", "release_id, artist_id, artist_slug",
@@ -635,9 +626,55 @@ async function writeScrapeToRegistry(
   const existingTrackArtistSet = new Set<string>(
     existingTrackArtists.map((r) => `${r.track_id}:${r.artist_slug}`)
   );
+  const existingTrackByArtistAndSlug = new Map<string, string>();
+  const ambiguousTrackScopeKeys = new Set<string>();
+
+  const registerTrackScopeAlias = (
+    artistSlug: string,
+    trackSlug: string,
+    trackId: string,
+  ) => {
+    if (!artistSlug || !trackSlug || !trackId) return;
+    const key = `${artistSlug}:${trackSlug}`;
+    if (ambiguousTrackScopeKeys.has(key)) return;
+    const existingId = existingTrackByArtistAndSlug.get(key);
+    if (existingId && existingId !== trackId) {
+      existingTrackByArtistAndSlug.delete(key);
+      ambiguousTrackScopeKeys.add(key);
+      return;
+    }
+    existingTrackByArtistAndSlug.set(key, trackId);
+  };
+
+  for (const link of existingTrackArtists) {
+    const actualSlug = existingTrackIdToSlug.get(link.track_id);
+    if (actualSlug) {
+      registerTrackScopeAlias(link.artist_slug, actualSlug, link.track_id);
+    }
+    const existingTitle = existingTrackIdToTitle.get(link.track_id);
+    if (existingTitle) {
+      registerTrackScopeAlias(
+        link.artist_slug,
+        canonicalTrackSlugCandidate(existingTitle),
+        link.track_id,
+      );
+    }
+  }
+
+  const resolveTrackInArtistScope = (
+    artistSlug: string,
+    trackSlug: string,
+  ): string | undefined => {
+    const key = `${artistSlug}:${trackSlug}`;
+    if (ambiguousTrackScopeKeys.has(key)) {
+      throw new Error(
+        `Ambiguous Track identity in artist scope: ${artistSlug}/${trackSlug}`,
+      );
+    }
+    return existingTrackByArtistAndSlug.get(key);
+  };
 
   const seenReleaseSlugs = new Set<string>(existingReleaseBySlug.keys());
-  const seenTrackSlugs = new Set<string>(existingTrackBySlug.keys());
 
   const ensureRelease = async (
     title: string,
