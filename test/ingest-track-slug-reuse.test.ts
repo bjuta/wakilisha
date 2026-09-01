@@ -85,6 +85,19 @@ describe("canonical Track slug candidate", () => {
     ).toBe(
       "road-to-ft-lauderdale",
     );
+
+    expect(
+      canonicalTrackSlugCandidate(
+        "Song feat. Artist B (Remix)",
+        {
+          featuredArtistNames: [
+            "Artist B",
+          ],
+        },
+      ),
+    ).toBe(
+      "song-feat-artist-b-remix",
+    );
   });
 
   it("preserves culturally meaningful version wording", () => {
