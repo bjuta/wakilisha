@@ -1,3 +1,6 @@
 # Extra public routes that must receive prerendered metadata even when they are not part of Registry sitemap authority.
 # One route per line. Keep these as root-relative paths.
-# Current public routes are covered by STATIC_ROUTES and seo-sitemap-admin.
+# Do not use this file for dynamic music-detail URLs.
+
+/briefings
+/playlists
