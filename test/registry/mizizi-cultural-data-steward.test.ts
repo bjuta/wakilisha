@@ -310,6 +310,57 @@ describe("MIZIZI Cultural Data Steward", () => {
     );
   });
 
+  it("binds live Registry Track writers to the shared identity rule", () => {
+    const sharedRule =
+      readFileSync(
+        "supabase/functions/_shared/registry-track-identity.ts",
+        "utf8",
+      );
+    const discography =
+      readFileSync(
+        "supabase/functions/ingest-artist-discography/index.ts",
+        "utf8",
+      );
+    const enrichment =
+      readFileSync(
+        "supabase/functions/registry-enrichment-review/index.ts",
+        "utf8",
+      );
+    const chartIngest =
+      readFileSync(
+        "supabase/functions/chart-ingest-api/index.ts",
+        "utf8",
+      );
+
+    expect(sharedRule).toContain(
+      "canonicalTrackSlugCandidate",
+    );
+    expect(discography).toContain(
+      'from "../_shared/registry-track-identity.ts"',
+    );
+    expect(discography).toContain(
+      "canonicalTrackSlugCandidate",
+    );
+    expect(enrichment).toContain(
+      'from "../_shared/registry-track-identity.ts"',
+    );
+    expect(enrichment).toContain(
+      "findTrackByArtistAndSlug",
+    );
+    expect(enrichment).not.toContain(
+      "scopedTrackSlug",
+    );
+    expect(chartIngest).toContain(
+      'from "../_shared/registry-track-identity.ts"',
+    );
+    expect(chartIngest).toContain(
+      "trackSlugCollisionInArtistScope",
+    );
+    expect(chartIngest).not.toContain(
+      "uniqueTrackSlug",
+    );
+  });
+
   it("keeps the runtime bounded, review-aware, and provenance-preserving", () => {
     const runner =
       readFileSync(
