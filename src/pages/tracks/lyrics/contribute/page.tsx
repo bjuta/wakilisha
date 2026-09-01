@@ -17,6 +17,7 @@ import { trackEvent } from "@/services/analytics";
 import {
   getReleaseTrack,
   getTrack,
+  resolveTrackAlias,
 } from "@/services/publicApi/client";
 import { resolveScopedSlugRedirect } from "@/services/slugRedirects";
 import {
@@ -25,6 +26,8 @@ import {
 } from "@/services/player/trackLyricsService";
 import {
   canonicalTrackUrl,
+  isRegistryTrackId,
+  legacyArtistTrackUrl,
 } from "@/utils/trackUrl";
 
 interface TrackData {
@@ -220,136 +223,185 @@ export default function LyricContribution() {
     setLoading(true);
     setError(null);
 
-    const request = releaseSlug
-      ? getReleaseTrack(artistSlug, releaseSlug, trackSlug)
-      : getTrack(artistSlug, trackSlug);
+    const loadCanonicalTrack = async () => {
+      if (!releaseSlug && !isRegistryTrackId(artistSlug)) {
+        const resolution = await resolveTrackAlias(
+          artistSlug,
+          trackSlug,
+        );
 
-    request
-      .then(async (apiData) => {
         if (!alive) return;
-
-        if (!apiData) {
-          const redirect = await resolveScopedSlugRedirect(
-            "track",
-            artistSlug,
-            trackSlug,
-            { releaseSlug },
-          );
-
-          if (!alive) return;
-
-          const redirectedLyricsPath = redirect
-            ? `${redirect.newPath}/lyrics/contribute`
-            : "";
-
-          if (
-            redirectedLyricsPath &&
-            redirectedLyricsPath !== location.pathname
-          ) {
-            navigate(
-              `${redirectedLyricsPath}${location.search || ""}${location.hash || ""}`,
-              { replace: true },
-            );
-            return;
-          }
-
-          setLoading(false);
-          setError("Track not found.");
-          return;
-        }
-
-        const raw = apiData as any;
-        const trackData = raw.track ?? raw;
-        const artistData = raw.artist ?? {};
-        const rawArtists = Array.isArray(raw.artists) ? raw.artists : [];
-        const primaryArtist =
-          rawArtists.find((artist: any) => artist.isPrimary) ||
-          rawArtists[0] ||
-          artistData;
-        const registryTrackId = String(
-          trackData.id ?? raw.id ?? "",
-        ).trim();
-
-        if (!registryTrackId) {
-          setLoading(false);
-          setError("This Track is missing its Registry identity.");
-          return;
-        }
-
-        const duration = trackData.durationMs
-          ? Math.round(trackData.durationMs / 1000)
-          : Number(trackData.duration || 0);
-        const previewUrl: string | null =
-          raw.previewUrl || trackData.previewUrl || null;
-
-        const resolvedArtistSlug =
-          primaryArtist?.slug ||
-          artistData?.slug ||
-          artistSlug;
-        const releaseData =
-          raw.release &&
-          typeof raw.release === "object"
-            ? raw.release
-            : null;
-        const releaseTrackCount =
-          releaseData
-            ? Number(
-                releaseData.trackCount ??
-                releaseData.track_count ??
-                0,
-              )
-            : undefined;
-        const resolvedReleaseSlug =
-          String(
-            releaseData?.slug ||
-            releaseSlug ||
-            "",
-          ).trim();
 
         if (
-          releaseSlug &&
-          releaseData &&
-          Number(releaseTrackCount || 0) <= 1
+          resolution.kind === "unique" &&
+          resolution.candidate?.canonicalPath
         ) {
-          const standaloneLyricsPath =
-            `${canonicalTrackUrl(
-              resolvedArtistSlug,
-              trackData.slug,
-              resolvedReleaseSlug,
-              releaseTrackCount,
-            )}/lyrics/contribute`;
-
-          if (
-            standaloneLyricsPath !== location.pathname
-          ) {
-            navigate(
-              `${standaloneLyricsPath}${location.search || ""}${location.hash || ""}`,
-              { replace: true },
-            );
-            return;
-          }
+          navigate(
+            `${resolution.candidate.canonicalPath}/lyrics/contribute${location.search || ""}${location.hash || ""}`,
+            { replace: true },
+          );
+          return;
         }
 
-        setTrack({
-          registryTrackId,
-          slug: trackData.slug,
-          title: trackData.title,
-          artist: primaryArtist?.name || artistData?.name || "WAKILISHA",
-          artistSlug: resolvedArtistSlug,
-          artworkUrl: trackData.artworkUrl || "",
-          duration,
-          isPlayable: Boolean(previewUrl),
-          previewUrl,
-          releaseSlug: resolvedReleaseSlug || undefined,
-          releaseTrackCount,
-        });
-        setLoading(false);
-      })
-      .catch(() => {
+        if (resolution.kind === "ambiguous") {
+          navigate(
+            `${legacyArtistTrackUrl(artistSlug, trackSlug)}${location.search || ""}${location.hash || ""}`,
+            { replace: true },
+          );
+          return;
+        }
+
+        const redirect = await resolveScopedSlugRedirect(
+          "track",
+          artistSlug,
+          trackSlug,
+        );
+
         if (!alive) return;
+
+        if (redirect?.newPath) {
+          navigate(
+            `${redirect.newPath}${location.search || ""}${location.hash || ""}`,
+            { replace: true },
+          );
+          return;
+        }
+
         setLoading(false);
-        setError("Could not load Track.");
+        setError("Track not found.");
+        return;
+      }
+
+      const apiData = releaseSlug
+        ? await getReleaseTrack(
+            artistSlug,
+            releaseSlug,
+            trackSlug,
+          )
+        : await getTrack(
+            artistSlug,
+            trackSlug,
+          );
+
+      if (!alive) return;
+
+      if (!apiData) {
+        const redirect = await resolveScopedSlugRedirect(
+          "track",
+          artistSlug,
+          trackSlug,
+          { releaseSlug },
+        );
+
+        if (!alive) return;
+
+        const redirectedLyricsPath = redirect
+          ? `${redirect.newPath}/lyrics/contribute`
+          : "";
+
+        if (
+          redirectedLyricsPath &&
+          redirectedLyricsPath !== location.pathname
+        ) {
+          navigate(
+            `${redirectedLyricsPath}${location.search || ""}${location.hash || ""}`,
+            { replace: true },
+          );
+          return;
+        }
+
+        setLoading(false);
+        setError("Track not found.");
+        return;
+      }
+
+      const raw = apiData as any;
+      const trackData = raw.track ?? raw;
+      const artistData = raw.artist ?? {};
+      const rawArtists = Array.isArray(raw.artists)
+        ? raw.artists
+        : [];
+      const primaryArtist =
+        rawArtists.find((artist: any) => artist.isPrimary) ||
+        rawArtists[0] ||
+        artistData;
+      const registryTrackId = String(
+        trackData.id ?? raw.id ?? "",
+      ).trim();
+
+      if (!registryTrackId) {
+        setLoading(false);
+        setError("This Track is missing its Registry identity.");
+        return;
+      }
+
+      const canonicalLyricsPath =
+        `${canonicalTrackUrl(
+          registryTrackId,
+          String(trackData.slug || trackSlug),
+        )}/lyrics/contribute`;
+
+      if (
+        canonicalLyricsPath &&
+        canonicalLyricsPath !== location.pathname
+      ) {
+        navigate(
+          `${canonicalLyricsPath}${location.search || ""}${location.hash || ""}`,
+          { replace: true },
+        );
+        return;
+      }
+
+      const duration = trackData.durationMs
+        ? Math.round(trackData.durationMs / 1000)
+        : Number(trackData.duration || 0);
+      const previewUrl: string | null =
+        raw.previewUrl || trackData.previewUrl || null;
+
+      const resolvedArtistSlug =
+        primaryArtist?.slug ||
+        artistData?.slug ||
+        "";
+      const releaseData =
+        raw.release &&
+        typeof raw.release === "object"
+          ? raw.release
+          : null;
+      const releaseTrackCount =
+        releaseData
+          ? Number(
+              releaseData.trackCount ??
+              releaseData.track_count ??
+              0,
+            )
+          : undefined;
+      const resolvedReleaseSlug =
+        String(releaseData?.slug || "").trim();
+
+      setTrack({
+        registryTrackId,
+        slug: trackData.slug,
+        title: trackData.title,
+        artist:
+          primaryArtist?.name ||
+          artistData?.name ||
+          "WAKILISHA",
+        artistSlug: resolvedArtistSlug,
+        artworkUrl: trackData.artworkUrl || "",
+        duration,
+        isPlayable: Boolean(previewUrl),
+        previewUrl,
+        releaseSlug: resolvedReleaseSlug || undefined,
+        releaseTrackCount,
       });
+      setLoading(false);
+    };
+
+    void loadCanonicalTrack().catch(() => {
+      if (!alive) return;
+      setLoading(false);
+      setError("Could not load Track.");
+    });
 
     return () => {
       alive = false;
@@ -366,10 +418,11 @@ export default function LyricContribution() {
   ]);
 
   const canonicalTrackPath = canonicalTrackUrl(
-    track?.artistSlug || artistSlug || "",
+    track?.registryTrackId ||
+      (isRegistryTrackId(artistSlug || "")
+        ? artistSlug || ""
+        : ""),
     track?.slug || trackSlug || "",
-    track?.releaseSlug || releaseSlug || null,
-    track?.releaseTrackCount ?? null,
   );
 
   const isThisTrackPlaying =
