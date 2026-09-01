@@ -8,7 +8,7 @@ import { ReleaseSaveButton } from "@/components/releases/ReleaseSaveButton";
 import { MetaTags } from "@/components/seo/MetaTags";
 import { usePlayer } from "@/context/PlayerContext";
 import { getRelease, slugify, listReleases, type PublicReleaseDetail, type PublicRelease } from "@/services/publicContent/client";
-import { releaseTrackUrl, trackUrl } from "@/utils/trackUrl";
+import { canonicalTrackUrl, trackUrl } from "@/utils/trackUrl";
 import { useScrollDepthTracking } from "@/hooks/useScrollDepthTracking";
 import { MobileShareButton } from "@/components/design-system/share/ShareSheet";
 import { CommunitySection } from "@/pages/magazine/article/components/CommunitySection";
@@ -501,6 +501,12 @@ export default function MobileReleaseDetail() {
               {release.tracks.map((track, index) => {
                 const isCurrentTrack = currentTrack?.id === track.id;
                 const isThisPlaying = isCurrentTrack && isPlaying;
+                const trackHref = canonicalTrackUrl(
+                  artistSlug,
+                  track.slug,
+                  releaseSlug,
+                  release.trackCount,
+                );
                 return (
                   <div key={track.id} className="flex items-center gap-3 px-4 py-3 border-b border-[var(--wk-divider)] last:border-b-0 active:bg-[var(--wk-surface-raised)] transition-colors">
                     <PlayableArtwork
@@ -525,7 +531,7 @@ export default function MobileReleaseDetail() {
                         </div>
                       )}
                     </PlayableArtwork>
-                    <Link to={releaseTrackUrl(artistSlug, releaseSlug, track.slug)} className="min-w-0 flex-1">
+                    <Link to={trackHref} className="min-w-0 flex-1">
                       <div className="line-clamp-2 text-[13px] font-bold leading-tight text-[var(--wk-text)]">{track.title}</div>
                       <div className="mt-1 truncate text-[11px] text-[var(--wk-text-muted)]">{track.artist}</div>
                     </Link>
@@ -537,7 +543,7 @@ export default function MobileReleaseDetail() {
                       artistSlug={artistSlug}
                       artworkUrl={track.artworkUrl || release.artworkUrl}
                       trackSlug={track.slug}
-                      trackHref={releaseTrackUrl(artistSlug, releaseSlug, track.slug)}
+                      trackHref={trackHref}
                     />
                   </div>
                 );
