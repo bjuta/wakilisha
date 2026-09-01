@@ -35,5 +35,53 @@
     "preview_history_rebound_from": "20260901101324",
     "exact_candidate_history_rebound_to_canonical_version": true
   },
-  "verified_at": "2026-09-01T10:23:00Z"
+  "verified_at": "2026-09-01T10:23:00Z",
+  "production_migration_count": 78,
+  "production_migration_head": "20260901114500",
+  "production_history_rebound_from": "20260901102347",
+  "production_sql_replayed_after_history_rebind": false,
+  "production_verifier": "pass",
+  "production_types_source_match": "exact",
+  "production_edge_functions": {
+    "ingest-artist-discography": {
+      "version": 58,
+      "status": "ACTIVE",
+      "source_match": "exact",
+      "shared_helper_match": "exact",
+      "verify_jwt": true
+    },
+    "registry-enrichment-review": {
+      "version": 33,
+      "status": "ACTIVE",
+      "source_match": "exact",
+      "shared_helper_match": "exact",
+      "verify_jwt": true
+    },
+    "chart-ingest-api": {
+      "version": 82,
+      "status": "ACTIVE",
+      "source_match": "exact",
+      "shared_helper_match": "exact",
+      "verify_jwt": true
+    },
+    "scrape-artist-data": {
+      "version": 46,
+      "status": "ACTIVE",
+      "source_match": "exact",
+      "shared_helper_match": "exact",
+      "verify_jwt": false
+    }
+  },
+  "production_acceptance": {
+    "active_tracks": 2101,
+    "mizizi_review_items": 0,
+    "mizizi_canonical_write_events": 0,
+    "old_artist_prefix_logic_present": false,
+    "old_uuid_suffix_logic_present": false,
+    "clean_slug_assignment_present": true,
+    "anonymous_rpc_execute": false,
+    "authenticated_rpc_execute": true,
+    "historical_apply_run": false
+  },
+  "production_promoted_at": "2026-09-01T10:26:09Z"
 }
