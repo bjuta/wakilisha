@@ -13,12 +13,16 @@ function slugify(s:string):string{return s.toLowerCase().normalize("NFKD").repla
 
 function parseArtistNames(artistName: string): { primary: string; featured: string[] } {
   if (!artistName) return { primary: "", featured: [] };
-  const parts = artistName.split(/\s*&\s*/);
-  const firstPart = parts[0] ?? "";
-  const firstCommaParts = firstPart.split(/\s*,\s*/);
-  const primary = firstCommaParts[0]?.trim() ?? "";
-  const featured = [...firstCommaParts.slice(1), ...parts.slice(1)].map((s) => s.trim()).filter(Boolean);
-  return { primary, featured };
+  const names = artistName
+    .split(
+      /\s*,\s*|\s*&\s*|\s+(?:feat\.?|ft\.?|featuring|and|x)\s+/i,
+    )
+    .map((name) => name.trim())
+    .filter(Boolean);
+  return {
+    primary: names[0] ?? "",
+    featured: names.slice(1),
+  };
 }
 
 async function findOrCreateArtist(db: ReturnType<typeof createClient>, artistName: string, now: string): Promise<string | null> {
@@ -190,6 +194,10 @@ async function writeTracksToRelease(
     const candidateTrackSlug =
       canonicalTrackSlugCandidate(
         trackTitle,
+        {
+          featuredArtistNames:
+            parsedFeatured,
+        },
       );
 
     let trackId: string;
