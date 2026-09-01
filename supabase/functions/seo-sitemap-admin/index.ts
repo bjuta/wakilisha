@@ -114,6 +114,36 @@ type SitemapItem = {
   source_row?: Record<string, unknown>;
 };
 
+type ArtistIdentityChoice = {
+  slug: string;
+  name: string;
+  isPrimary: boolean;
+  creditOrder: number;
+};
+
+function chooseArtistIdentity(
+  existing: ArtistIdentityChoice | undefined,
+  candidate: ArtistIdentityChoice,
+): ArtistIdentityChoice {
+  if (!existing) return candidate;
+
+  if (existing.isPrimary !== candidate.isPrimary) {
+    return candidate.isPrimary
+      ? candidate
+      : existing;
+  }
+
+  if (existing.creditOrder !== candidate.creditOrder) {
+    return candidate.creditOrder < existing.creditOrder
+      ? candidate
+      : existing;
+  }
+
+  return candidate.slug.localeCompare(existing.slug) < 0
+    ? candidate
+    : existing;
+}
+
 function uniqByLoc(items: SitemapItem[]) {
   const seen = new Set<string>();
   const out: SitemapItem[] = [];
@@ -918,22 +948,24 @@ async function buildInternalItems(db: ReturnType<typeof createClient>): Promise<
     });
   }
 
-  const releaseArtistByReleaseId = new Map<string, { slug: string; name: string }>();
+  const releaseArtistByReleaseId = new Map<string, ArtistIdentityChoice>();
   for (const row of releaseArtists.data ?? []) {
     const releaseId = String(row.release_id || "").trim();
     const slug = String(row.artist_slug || "").trim();
     if (!releaseId || !slug) continue;
 
     const existing = releaseArtistByReleaseId.get(releaseId);
-    const isPrimary = Boolean(row.is_primary);
-    const creditOrder = Number(row.credit_order || 999);
+    const candidate: ArtistIdentityChoice = {
+      slug,
+      name: String(row.artist_name_text || slug).trim(),
+      isPrimary: Boolean(row.is_primary),
+      creditOrder: Number(row.credit_order ?? 999),
+    };
 
-    if (!existing || isPrimary || creditOrder === 1) {
-      releaseArtistByReleaseId.set(releaseId, {
-        slug,
-        name: String(row.artist_name_text || slug).trim(),
-      });
-    }
+    releaseArtistByReleaseId.set(
+      releaseId,
+      chooseArtistIdentity(existing, candidate),
+    );
   }
 
   const releaseById = new Map<string, Record<string, any>>();
@@ -978,22 +1010,24 @@ async function buildInternalItems(db: ReturnType<typeof createClient>): Promise<
     );
   }
 
-  const trackArtistByTrackId = new Map<string, { slug: string; name: string }>();
+  const trackArtistByTrackId = new Map<string, ArtistIdentityChoice>();
   for (const row of trackArtists.data ?? []) {
     const trackId = String(row.track_id || "").trim();
     const slug = String(row.artist_slug || "").trim();
     if (!trackId || !slug) continue;
 
     const existing = trackArtistByTrackId.get(trackId);
-    const isPrimary = Boolean(row.is_primary);
-    const creditOrder = Number(row.credit_order || 999);
+    const candidate: ArtistIdentityChoice = {
+      slug,
+      name: String(row.artist_name_text || slug).trim(),
+      isPrimary: Boolean(row.is_primary),
+      creditOrder: Number(row.credit_order ?? 999),
+    };
 
-    if (!existing || isPrimary || creditOrder === 1) {
-      trackArtistByTrackId.set(trackId, {
-        slug,
-        name: String(row.artist_name_text || slug).trim(),
-      });
-    }
+    trackArtistByTrackId.set(
+      trackId,
+      chooseArtistIdentity(existing, candidate),
+    );
   }
 
   for (const row of releases.data ?? []) {
@@ -1785,8 +1819,8 @@ function buildSeoMetadataEntry(
 }
 
 async function buildRelationshipArtistMaps(db: ReturnType<typeof createClient>, releaseIds: string[], trackIds: string[]) {
-  const releaseArtistByReleaseId = new Map<string, { slug: string; name: string }>();
-  const trackArtistByTrackId = new Map<string, { slug: string; name: string }>();
+  const releaseArtistByReleaseId = new Map<string, ArtistIdentityChoice>();
+  const trackArtistByTrackId = new Map<string, ArtistIdentityChoice>();
 
   if (releaseIds.length) {
     const { data } = await db
@@ -1802,15 +1836,17 @@ async function buildRelationshipArtistMaps(db: ReturnType<typeof createClient>, 
       if (!releaseId || !slug) continue;
 
       const existing = releaseArtistByReleaseId.get(releaseId);
-      const isPrimary = Boolean(row.is_primary);
-      const creditOrder = Number(row.credit_order || 999);
+      const candidate: ArtistIdentityChoice = {
+        slug,
+        name: String(row.artist_name_text || slug).trim(),
+        isPrimary: Boolean(row.is_primary),
+        creditOrder: Number(row.credit_order ?? 999),
+      };
 
-      if (!existing || isPrimary || creditOrder === 1) {
-        releaseArtistByReleaseId.set(releaseId, {
-          slug,
-          name: String(row.artist_name_text || slug).trim(),
-        });
-      }
+      releaseArtistByReleaseId.set(
+        releaseId,
+        chooseArtistIdentity(existing, candidate),
+      );
     }
   }
 
@@ -1828,15 +1864,17 @@ async function buildRelationshipArtistMaps(db: ReturnType<typeof createClient>, 
       if (!trackId || !slug) continue;
 
       const existing = trackArtistByTrackId.get(trackId);
-      const isPrimary = Boolean(row.is_primary);
-      const creditOrder = Number(row.credit_order || 999);
+      const candidate: ArtistIdentityChoice = {
+        slug,
+        name: String(row.artist_name_text || slug).trim(),
+        isPrimary: Boolean(row.is_primary),
+        creditOrder: Number(row.credit_order ?? 999),
+      };
 
-      if (!existing || isPrimary || creditOrder === 1) {
-        trackArtistByTrackId.set(trackId, {
-          slug,
-          name: String(row.artist_name_text || slug).trim(),
-        });
-      }
+      trackArtistByTrackId.set(
+        trackId,
+        chooseArtistIdentity(existing, candidate),
+      );
     }
   }
 
