@@ -470,7 +470,7 @@ async function getArtistDiscography(supabase: ReturnType<typeof createClient>, a
     const releaseIds = [...new Set(releaseArtistRows.map((r: any) => String(r.release_id)))];
     const { data: relRows } = await supabase.from("registry_releases").select("id, slug, title, release_type, release_date, artwork_url, label_id, metadata").in("id", releaseIds).in("status", ["active", "draft"]).order("release_date", { ascending: false });
     if (relRows && relRows.length > 0) {
-      const { data: releaseTracks } = await supabase.from("registry_release_tracks").select("release_id, track_id, track_number").in("release_id", releaseIds).order("track_number", { ascending: true });
+      const { data: releaseTracks } = await supabase.from("registry_release_tracks").select("release_id, track_id, track_number").in("release_id", releaseIds).eq("status", "active").order("track_number", { ascending: true });
       const tracksByRelease = new Map<string, Array<{ track_id: string; track_number: number }>>();
       for (const rt of (releaseTracks ?? [])) { const rid = String(rt.release_id); if (!tracksByRelease.has(rid)) tracksByRelease.set(rid, []); tracksByRelease.get(rid)!.push({ track_id: String(rt.track_id), track_number: Number(rt.track_number || 0) }); }
       const trackIds = (releaseTracks ?? []).map((rt: any) => String(rt.track_id));
@@ -1189,7 +1189,7 @@ Deno.serve(async (req) => {
         const labelMap = await fetchLabelMapForReleases(supabase, releases ?? []);
         if (releases) {
           for (const rel of releases as any[]) {
-            const { data: relTracks } = await supabase.from("registry_release_tracks").select("track_id, track_number, disc_number").eq("release_id", rel.id).order("disc_number").order("track_number");
+            const { data: relTracks } = await supabase.from("registry_release_tracks").select("track_id, track_number, disc_number").eq("release_id", rel.id).eq("status", "active").order("disc_number").order("track_number");
             const trackIds = (relTracks ?? []).map((rt: any) => rt.track_id);
             let tracks: TrackOut[] = [];
             if (trackIds.length > 0) {
@@ -1213,7 +1213,7 @@ Deno.serve(async (req) => {
       const { data: featuredTrackArtists } = await supabase.from("registry_track_artists").select("track_id").eq("artist_slug", artistSlug).eq("is_primary", false).eq("status", "active");
       if (featuredTrackArtists && featuredTrackArtists.length > 0) {
         const featuredTrackIds = featuredTrackArtists.map((t: any) => t.track_id);
-        const { data: featuredReleaseTracks } = await supabase.from("registry_release_tracks").select("release_id").in("track_id", featuredTrackIds);
+        const { data: featuredReleaseTracks } = await supabase.from("registry_release_tracks").select("release_id").in("track_id", featuredTrackIds).eq("status", "active");
         for (const frt of (featuredReleaseTracks ?? [])) { const rid = String(frt.release_id); if (!primaryReleaseIds.includes(rid)) featuredReleaseIdsFromBoth.add(rid); }
       }
 
@@ -1229,7 +1229,7 @@ Deno.serve(async (req) => {
             if (seenTitles2.has(titleKey)) continue;
             seenTitles2.add(titleKey);
             const { data: primaryArtistLink } = await supabase.from("registry_release_artists").select("artist_name_text, artist_slug").eq("release_id", rel.id).eq("is_primary", true).eq("status", "active").maybeSingle();
-            const { data: relTrackData } = await supabase.from("registry_release_tracks").select("track_id").eq("release_id", rel.id);
+            const { data: relTrackData } = await supabase.from("registry_release_tracks").select("track_id").eq("release_id", rel.id).eq("status", "active");
             const releaseTrackIds = (relTrackData ?? []).map((rt: any) => rt.track_id);
             let tracks: TrackOut[] = [];
             if (releaseTrackIds.length > 0) {
@@ -1825,7 +1825,7 @@ Deno.serve(async (req) => {
       if (urlArtistSlug) { const { data: releaseArtist } = await supabase.from("registry_release_artists").select("artist_slug").eq("release_id", String(release.id)).eq("artist_slug", urlArtistSlug).eq("status", "active").maybeSingle(); if (!releaseArtist) return jsonResponse({ data: null, meta: { reason: "release_not_found_for_artist" } }, origin, 404); }
       const releaseId = String(release.id);
       const releaseMeta = (release.metadata || {}) as Record<string, unknown>;
-      const { data: releaseTracks } = await supabase.from("registry_release_tracks").select("track_id, track_number, disc_number").eq("release_id", releaseId).order("track_number", { ascending: true });
+      const { data: releaseTracks } = await supabase.from("registry_release_tracks").select("track_id, track_number, disc_number").eq("release_id", releaseId).eq("status", "active").order("track_number", { ascending: true });
       const { data: releaseArtists } = await supabase.from("registry_release_artists").select("artist_id, artist_name_text, is_primary, is_featured, artist_slug").eq("release_id", releaseId).eq("status", "active").order("credit_order", { ascending: true }).limit(20);
       const primaryArtistRow = (releaseArtists ?? []).find((ra: any) => ra.is_primary) || (releaseArtists ?? [])[0];
       const artistName = primaryArtistRow ? String(primaryArtistRow.artist_name_text || primaryArtistRow.artist_slug || "Unknown") : "Unknown";
@@ -2431,6 +2431,7 @@ Deno.serve(async (req) => {
           .from("registry_release_tracks")
           .select("release_id, track_number, disc_number")
           .eq("track_id", trackId)
+          .eq("status", "active")
           .order("disc_number", { ascending: true })
           .order("track_number", { ascending: true })
           .limit(20);
@@ -2488,12 +2489,12 @@ Deno.serve(async (req) => {
         : { data: null };
       const { data: label } = release && release.label_id ? await supabase.from("registry_labels").select("slug, name, country_code").eq("id", String(release.label_id)).maybeSingle() : { data: null };
       const { data: trackArtists } = await supabase.from("registry_track_artists").select("artist_id, artist_name_text, artist_slug, is_primary, is_featured, credit_order, role").eq("track_id", trackId).in("status", ["active", "needs_review", "draft"]).order("credit_order", { ascending: true });
-      const releaseTrackCountResult = releaseIdFromMembership ? await supabase.from("registry_release_tracks").select("id", { count: "exact", head: true }).eq("release_id", releaseIdFromMembership) : { count: 0 };
+      const releaseTrackCountResult = releaseIdFromMembership ? await supabase.from("registry_release_tracks").select("id", { count: "exact", head: true }).eq("release_id", releaseIdFromMembership).eq("status", "active") : { count: 0 };
 
       let releaseTracks: any[] = [];
       if (release) {
         const releaseId = String(release.id);
-        const { data: relTrackRows } = await supabase.from("registry_release_tracks").select("track_id, track_number, disc_number").eq("release_id", releaseId).order("track_number", { ascending: true });
+        const { data: relTrackRows } = await supabase.from("registry_release_tracks").select("track_id, track_number, disc_number").eq("release_id", releaseId).eq("status", "active").order("track_number", { ascending: true });
         if (relTrackRows && relTrackRows.length > 0) {
           const relTrackIds = relTrackRows.map((rt: any) => String(rt.track_id));
           const { data: relTracks } = await supabase.from("registry_tracks").select("id, slug, title, duration_ms, artwork_url, preview_url").in("id", relTrackIds).eq("status", "active");
