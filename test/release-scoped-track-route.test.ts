@@ -352,4 +352,51 @@ describe("public Release boundary", () => {
       "releaseScopedMembership ?? null",
     );
   });
+
+  it("converges the legacy public API on canonical Release membership", () => {
+    const legacyApi = readFileSync(
+      "supabase/functions/wakilisha-public-api/index.ts",
+      "utf8",
+    );
+
+    expect(legacyApi).toContain(
+      'from("registry_release_tracks")',
+    );
+    expect(legacyApi).toContain(
+      "if (trackCount <= 1) continue;",
+    );
+    expect(legacyApi).toContain(
+      "const publicReleases = (releases ?? []).filter",
+    );
+    expect(legacyApi).toContain(
+      "(trackCountByRelease.get(String(release.id)) || 0) > 1",
+    );
+    expect(legacyApi).toContain(
+      "if (releaseTrackCount > 1) releaseCountByArtist.set",
+    );
+    expect(legacyApi).toContain(
+      "let releaseMembership: { release_id: string; track_number?: number; disc_number?: number } | null = null;",
+    );
+    expect(legacyApi).toContain(
+      "const releaseIdFromMembership = releaseMembership?.release_id",
+    );
+    expect(legacyApi).toContain(
+      "if (!releaseMembership && track.release_id)",
+    );
+    expect(legacyApi).toContain(
+      'kind: "track"',
+    );
+    expect(legacyApi).toContain(
+      "const canonicalTrackSlug = cleanPublicMusicSlug(",
+    );
+    expect(legacyApi).toContain(
+      "canonicalArtistSlug && canonicalTrackSlug",
+    );
+    expect(legacyApi).toContain(
+      "`/tracks/${canonicalArtistSlug}/${canonicalTrackSlug}`",
+    );
+    expect(legacyApi).not.toContain(
+      '.from("registry_tracks").select("id, release_id, title, slug").in("release_id", releaseIds)',
+    );
+  });
 });
