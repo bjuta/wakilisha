@@ -52,7 +52,7 @@
     "performance:audit:public-routes": "node scripts/performance/audit-public-route-splitting.mjs",
     "performance:audit:public-routes:dist": "node scripts/performance/audit-public-route-build-output.mjs",
     "performance:audit:routes:dist": "node scripts/performance/audit-admin-route-build-output.mjs",
-    "build": "npm run performance:audit && npm run performance:audit:routes && npm run performance:audit:images && npm run performance:audit:public-routes && npm run analytics:audit && vite build && npm run performance:audit:routes:dist && npm run performance:audit:public-routes:dist && npm run analytics:audit:dist && node scripts/seo/prerender-metadata.mjs && node scripts/seo/build-public-magazine-fallback.mjs && node scripts/seo/build-public-sitemap-html.mjs && node scripts/seo/audit-prerender-output.mjs",
+    "build": "npm run performance:audit && npm run performance:audit:routes && npm run performance:audit:images && npm run performance:audit:public-routes && npm run analytics:audit && vite build && npm run performance:audit:routes:dist && npm run performance:audit:public-routes:dist && npm run analytics:audit:dist && npm run seo:refresh-sitemap && node scripts/seo/prerender-metadata.mjs && node scripts/seo/build-public-magazine-fallback.mjs && node scripts/seo/build-public-sitemap-html.mjs && node scripts/seo/audit-prerender-output.mjs",
     "charts:generate-public-csv-data": "tsx scripts/charts/generate-public-csv-data.ts",
     "charts:v2-api-fixture-check": "tsx scripts/charts/compare-v2-api-fixtures.ts",
     "charts:v2-api-fixtures": "tsx scripts/charts/generate-v2-api-fixtures.ts",
@@ -109,7 +109,8 @@
     "schema:verify": "node scripts/control-plane/verify-live-migration-history.mjs && bash scripts/control-plane/verify-live-schema.sh",
     "test:critical": "npm run control-plane:verify && npx vitest run test/control-plane/request-context.test.ts test/security/rls-policies.test.ts test/institute/assistant-jobs.test.ts test/institute/evidence-reader.test.ts test/institute/how-this-learned.test.ts test/institute/question-clinic.test.ts test/institute/relationship-mapper.test.ts test/artist-discography-release-credit.test.ts test/ingest-track-slug-reuse.test.ts test/release-scoped-track-route.test.ts test/playlists/playlist-track-intake-provider-selection.test.ts test/playlists/playlist-canonical-artist-presentation.test.ts test/people/person-public-surface.test.ts test/registry/artist-structural-proximity.test.ts test/onboarding/registry-led-onboarding.test.ts test/seo/public-vertical-seo-contract.test.ts test/artists/claimed-artist-experience.test.ts test/artists/artist-updates-following.test.ts test/artists/artist-music-submission-registry-review.test.ts test/artists/artist-launch-tools-analytics.test.ts test/community/posts-social-layer.test.ts test/following/guest-follow-intent.test.ts test/playlists/personal-playlists-m8c1-reach.test.ts test/playlists/personal-playlists-m8c-authority.test.ts test/registry/mizizi-cultural-data-steward.test.ts",
     "registry:mizizi:audit": "tsx scripts/registry/agents/mizizi/run.ts --mode=audit",
-    "registry:mizizi:apply": "tsx scripts/registry/agents/mizizi/run.ts --mode=apply"
+    "registry:mizizi:apply": "tsx scripts/registry/agents/mizizi/run.ts --mode=apply",
+    "seo:refresh-sitemap": "node scripts/seo/refresh-public-sitemap.mjs"
   },
   "type": "module",
   "version": "0.1.0"
