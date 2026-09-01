@@ -387,7 +387,13 @@ describe("public Release boundary", () => {
       'kind: "track"',
     );
     expect(legacyApi).toContain(
-      "canonicalPath: `/tracks/${canonicalArtistSlug}/${String(trackList[0].slug)}`",
+      "const canonicalTrackSlug = cleanPublicMusicSlug(",
+    );
+    expect(legacyApi).toContain(
+      "canonicalArtistSlug && canonicalTrackSlug",
+    );
+    expect(legacyApi).toContain(
+      "`/tracks/${canonicalArtistSlug}/${canonicalTrackSlug}`",
     );
     expect(legacyApi).not.toContain(
       '.from("registry_tracks").select("id, release_id, title, slug").in("release_id", releaseIds)',
