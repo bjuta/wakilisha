@@ -1,3 +1,8 @@
+import {
+  titleCreditFragmentPatterns,
+  titleCreditSuffixPattern,
+} from "./registry-artist-credit-grammar.ts";
+
 export function normalizeIdentityText(value: string): string {
   return String(value || "")
     .normalize("NFKD")
@@ -15,47 +20,40 @@ export function slugifyIdentity(value: string): string {
     .replace(/-+/g, "-");
 }
 
-const FEATURE_TOKEN = "(?:feat(?:uring)?|ft)";
-
-function stripFeatureBracketSegments(
+export function stripArtistCreditPresentationNoise(
   value: string,
-): { value: string; removed: string[] } {
-  let next = value;
+): {
+  coreTitle: string;
+  removedFragments: string[];
+} {
+  let core = normalizeIdentityText(value);
   const removed: string[] = [];
-  const patterns = [
-    new RegExp(
-      "\\(([^)]*\\b" +
-        FEATURE_TOKEN +
-        "\\.?\\s+[^)]*)\\)",
-      "gi",
-    ),
-    new RegExp(
-      "\\[([^\\]]*\\b" +
-        FEATURE_TOKEN +
-        "\\.?\\s+[^\\]]*)\\]",
-      "gi",
-    ),
-    new RegExp(
-      "\\{([^}]*\\b" +
-        FEATURE_TOKEN +
-        "\\.?\\s+[^}]*)\\}",
-      "gi",
-    ),
-  ];
 
-  for (const pattern of patterns) {
-    next = next.replace(
+  for (const pattern of titleCreditFragmentPatterns()) {
+    core = core.replace(
       pattern,
-      (match) => {
-        removed.push(match.trim());
+      (fragment) => {
+        removed.push(String(fragment).trim());
         return " ";
       },
     );
   }
 
+  const suffix = titleCreditSuffixPattern();
+  const suffixMatch = core.match(suffix);
+
+  if (suffixMatch) {
+    const index = suffixMatch.index ?? core.length;
+    removed.push(core.slice(index).trim());
+    core = core.slice(0, index);
+  }
+
   return {
-    value: next,
-    removed,
+    coreTitle: core
+      .replace(/\s+/g, " ")
+      .replace(/\s+([,;:])/g, "$1")
+      .trim(),
+    removedFragments: removed.filter(Boolean),
   };
 }
 
@@ -65,63 +63,22 @@ export function stripFeatureCreditNoise(
   coreTitle: string;
   removedFragments: string[];
 } {
-  const normalized =
-    normalizeIdentityText(value);
-  const bracketed =
-    stripFeatureBracketSegments(
-      normalized,
-    );
-  let core = bracketed.value;
-  const removed = [
-    ...bracketed.removed,
-  ];
-  const suffix = new RegExp(
-    "\\s+(?:-|:)?\\s*\\b" +
-      FEATURE_TOKEN +
-      "\\.?\\s+(.+)$",
-    "i",
-  );
-  const suffixMatch =
-    core.match(suffix);
-
-  if (suffixMatch) {
-    const index =
-      suffixMatch.index ??
-      core.length;
-    removed.push(
-      core.slice(index).trim(),
-    );
-    core = core.slice(
-      0,
-      index,
-    );
-  }
-
-  return {
-    coreTitle: core
-      .replace(/\s+/g, " ")
-      .replace(
-        /\s+([,;:])/g,
-        "$1",
-      )
-      .trim(),
-    removedFragments:
-      removed.filter(Boolean),
-  };
+  return stripArtistCreditPresentationNoise(value);
 }
 
 export type CanonicalTrackSlugOptions = {
   featuredArtistNames?: string[];
+  creditArtistNames?: string[];
 };
 
-function fragmentHasStructuredFeaturedArtist(
+function fragmentHasStructuredCreditArtist(
   fragment: string,
-  featuredArtistNames: string[],
+  creditArtistNames: string[],
 ): boolean {
   const fragmentSlug =
     slugifyIdentity(fragment);
 
-  return featuredArtistNames.some(
+  return creditArtistNames.some(
     (name) => {
       const artistSlug =
         slugifyIdentity(name);
@@ -142,24 +99,21 @@ function fragmentHasStructuredFeaturedArtist(
   );
 }
 
-function stripStructurallyProvenFeatureCredits(
+function stripStructurallyProvenArtistCredits(
   value: string,
-  featuredArtistNames: string[],
+  creditArtistNames: string[],
 ): string {
   let next =
     normalizeIdentityText(value);
 
   if (
-    featuredArtistNames.length === 0
+    creditArtistNames.length === 0
   ) {
     return next;
   }
 
-  const bracketPatterns = [
-    /\([^)]*\b(?:feat(?:uring)?|ft)\.?\s+[^)]*\)/gi,
-    /\[[^\]]*\b(?:feat(?:uring)?|ft)\.?\s+[^\]]*\]/gi,
-    /\{[^}]*\b(?:feat(?:uring)?|ft)\.?\s+[^}]*\}/gi,
-  ];
+  const bracketPatterns =
+    titleCreditFragmentPatterns();
 
   for (
     const pattern of bracketPatterns
@@ -167,9 +121,9 @@ function stripStructurallyProvenFeatureCredits(
     next = next.replace(
       pattern,
       (fragment) =>
-        fragmentHasStructuredFeaturedArtist(
+        fragmentHasStructuredCreditArtist(
           fragment,
-          featuredArtistNames,
+          creditArtistNames,
         )
           ? " "
           : fragment,
@@ -177,16 +131,16 @@ function stripStructurallyProvenFeatureCredits(
   }
 
   const suffix =
-    /\s+(?:-|:)?\s*\b(?:feat(?:uring)?|ft)\.?\s+(.+)$/i;
+    titleCreditSuffixPattern();
   const suffixMatch =
     next.match(suffix);
 
   if (
     suffixMatch &&
     !/[()[\]{}]/.test(suffixMatch[0]) &&
-    fragmentHasStructuredFeaturedArtist(
+    fragmentHasStructuredCreditArtist(
       suffixMatch[0],
-      featuredArtistNames,
+      creditArtistNames,
     )
   ) {
     const index =
@@ -207,10 +161,15 @@ export function canonicalTrackSlugCandidate(
   title: string,
   options: CanonicalTrackSlugOptions = {},
 ): string {
+  const creditArtistNames = [
+    ...(options.featuredArtistNames || []),
+    ...(options.creditArtistNames || []),
+  ].filter(Boolean);
+
   const identityTitle =
-    stripStructurallyProvenFeatureCredits(
+    stripStructurallyProvenArtistCredits(
       title,
-      options.featuredArtistNames || [],
+      [...new Set(creditArtistNames)],
     );
 
   return (
