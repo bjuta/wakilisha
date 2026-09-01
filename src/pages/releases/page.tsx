@@ -23,7 +23,7 @@ import {
 
 type Release = PublicRelease;
 type SortKey = "newest" | "updated" | "artist" | "title";
-type ReleaseTypeFilter = "All" | "Album" | "EP";
+type ReleaseTypeFilter = "All" | "Single" | "EP" | "Album";
 
 const ALL = "All";
 const INITIAL_LIMIT = 30;
@@ -49,7 +49,7 @@ export default function Releases() {
 
   const [releases, setReleases] = useState<Release[]>([]);
   const [totalCount, setTotalCount] = useState(0);
-  const [stats, setStats] = useState<ReleaseCatalogStats>({ total: 0, albums: 0, eps: 0 });
+  const [stats, setStats] = useState<ReleaseCatalogStats>({ total: 0, singles: 0, albums: 0, eps: 0 });
   const [filterArtists, setFilterArtists] = useState<string[]>([]);
   const [filterYears, setFilterYears] = useState<string[]>([]);
   const [featuredReleases, setFeaturedReleases] = useState<Release[]>([]);
@@ -214,12 +214,13 @@ export default function Releases() {
     }
   }, [releases.length, totalCount, isLoadingMore, typeFilter, yearFilter, artistFilter, debouncedSearch, sortKey]);
 
-  const releaseTypes: ReleaseTypeFilter[] = useMemo(() => ["All", "Album", "EP"], []);
+  const releaseTypes: ReleaseTypeFilter[] = useMemo(() => ["All", "Single", "EP", "Album"], []);
 
   const typeCounts: Record<ReleaseTypeFilter, number> = useMemo(() => ({
     All: stats.total,
-    Album: stats.albums,
+    Single: stats.singles,
     EP: stats.eps,
+    Album: stats.albums,
   }), [stats]);
 
   const hasMore = releases.length < totalCount && totalCount > 0;
@@ -228,6 +229,7 @@ export default function Releases() {
   const catalogStats = useMemo(() => ({
     total: stats.total,
     visible: totalCount,
+    singles: stats.singles,
     albums: stats.albums,
     eps: stats.eps,
   }), [stats, totalCount]);
@@ -263,8 +265,9 @@ export default function Releases() {
         <div className="chart-stats-strip mb-10">
           <Stat value={stats.total} label="Releases" />
           <Stat value={totalCount} label="Showing" />
-          <Stat value={stats.albums} label="Albums" />
+          <Stat value={stats.singles} label="Singles" />
           <Stat value={stats.eps} label="EPs" />
+          <Stat value={stats.albums} label="Albums" />
         </div>
 
         <section className="mb-10 rounded-2xl border border-[var(--wk-border)] bg-[var(--wk-surface)] p-4 md:p-5">
@@ -456,15 +459,17 @@ function ReleaseArtworkCard({ release, onPreview }: { release: Release; onPrevie
             </span>
           </div>
         )}
-        <div className="absolute inset-0 flex items-center justify-center bg-black/0 group-hover:bg-black/30 transition-colors duration-300">
-          <button
-            onClick={(e) => { e.preventDefault(); onPreview(release); }}
-            className="opacity-0 group-hover:opacity-100 translate-y-1 group-hover:translate-y-0 transition-all duration-200 inline-flex items-center gap-1.5 rounded-full bg-white/90 px-3.5 py-2 text-[11px] font-extrabold text-black backdrop-blur cursor-pointer whitespace-nowrap"
-          >
-            <WkIcon name="Eye" size={12} />
-            Look inside
-          </button>
-        </div>
+        {release.trackCount > 1 ? (
+          <div className="absolute inset-0 flex items-center justify-center bg-black/0 group-hover:bg-black/30 transition-colors duration-300">
+            <button
+              onClick={(e) => { e.preventDefault(); onPreview(release); }}
+              className="opacity-0 group-hover:opacity-100 translate-y-1 group-hover:translate-y-0 transition-all duration-200 inline-flex items-center gap-1.5 rounded-full bg-white/90 px-3.5 py-2 text-[11px] font-extrabold text-black backdrop-blur cursor-pointer whitespace-nowrap"
+            >
+              <WkIcon name="Eye" size={12} />
+              Look inside
+            </button>
+          </div>
+        ) : null}
       </Link>
 
       <Link to={href} className="text-[13px] font-extrabold text-[var(--wk-text)] group-hover:text-[var(--wk-brand)] transition-colors leading-tight truncate">
@@ -524,7 +529,7 @@ function ReleaseArtworkImage({ release }: { release: Release }) {
   );
 }
 
-function FeaturedReleaseCarousel({ releases, catalogStats, onPreview }: { releases: Release[]; catalogStats: { total: number; visible: number; albums: number; eps: number }; onPreview: (release: Release) => void }) {
+function FeaturedReleaseCarousel({ releases, catalogStats, onPreview }: { releases: Release[]; catalogStats: { total: number; visible: number; singles: number; albums: number; eps: number }; onPreview: (release: Release) => void }) {
   const [activeIndex, setActiveIndex] = useState(0);
   const scrollerRef = useRef<HTMLDivElement>(null);
   const active = releases[activeIndex] || releases[0];
@@ -555,7 +560,7 @@ function FeaturedReleaseCarousel({ releases, catalogStats, onPreview }: { releas
                 <WkIcon name="Sparkles" size={13} /> Release shelf
               </div>
               <h1 className="font-[var(--wk-font-display)] text-[clamp(56px,9vw,128px)] font-black leading-[0.82] tracking-[-0.075em] text-white drop-shadow-2xl">
-                Albums, EPs, and projects
+                Singles, EPs, and albums
               </h1>
               <p className="mt-6 max-w-2xl text-[17px] font-semibold leading-[1.75] text-white/74 md:text-[19px]">
                 Browse the records moving through WAKILISHA. New drops, older gems, and releases that deserve more love.
@@ -568,10 +573,13 @@ function FeaturedReleaseCarousel({ releases, catalogStats, onPreview }: { releas
                   <WkIcon name="ListFilter" size={14} /> {catalogStats.visible} showing
                 </span>
                 <span className="inline-flex items-center gap-2 rounded-full border border-white/16 bg-white/10 px-3 py-2 backdrop-blur">
-                  <WkIcon name="Album" size={14} /> {catalogStats.albums} albums
+                  <WkIcon name="Music" size={14} /> {catalogStats.singles} singles
                 </span>
                 <span className="inline-flex items-center gap-2 rounded-full border border-white/16 bg-white/10 px-3 py-2 backdrop-blur">
                   <WkIcon name="ListMusic" size={14} /> {catalogStats.eps} EPs
+                </span>
+                <span className="inline-flex items-center gap-2 rounded-full border border-white/16 bg-white/10 px-3 py-2 backdrop-blur">
+                  <WkIcon name="Album" size={14} /> {catalogStats.albums} albums
                 </span>
               </div>
             </div>
@@ -589,11 +597,13 @@ function FeaturedReleaseCarousel({ releases, catalogStats, onPreview }: { releas
                   {activeIntro}
                 </p>
                 <div className="mt-4 flex flex-wrap gap-2">
-                  <button onClick={() => onPreview(active)} className="wk-button wk-button-primary cursor-pointer whitespace-nowrap">
-                    <WkIcon name="Eye" size={15} /> Look inside
-                  </button>
+                  {active.trackCount > 1 ? (
+                    <button onClick={() => onPreview(active)} className="wk-button wk-button-primary cursor-pointer whitespace-nowrap">
+                      <WkIcon name="Eye" size={15} /> Look inside
+                    </button>
+                  ) : null}
                   <Link to={releaseUrl(active)} className="wk-button wk-button-ghost border-white/20 bg-white/10 text-white hover:bg-white/16 whitespace-nowrap">
-                    <WkIcon name="ArrowUpRight" size={15} /> Open
+                    <WkIcon name="ArrowUpRight" size={15} /> {active.trackCount === 1 ? "Open track" : "Open"}
                   </Link>
                   <ShareButton item={{ title: active.title, subtitle: active.artist, description: shareDescription, imageUrl: active.artworkUrl, type: "album" }} />
                 </div>

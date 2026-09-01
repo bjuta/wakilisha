@@ -1,6 +1,7 @@
 
 // ── SHARED BLOCK (Phase A — public API variant: open CORS, no auth, original response shape) ──
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { releaseTypeLabelFromActiveTrackCount } from "../_shared/release-taxonomy.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
@@ -103,17 +104,16 @@ async function getArtistDiscography(supabase: ReturnType<typeof createClient>, a
         const releaseTrackList = tracksByRelease.get(String(r.id)) ?? [];
         const tracks = releaseTrackList.sort((a, b) => (a.track_number || 0) - (b.track_number || 0)).map((rt) => { const t = trackById.get(rt.track_id); if (!t) return null; const dms = Number(t.duration_ms || 0); const minutes = Math.floor(dms / 60000); const seconds = Math.floor((dms % 60000) / 1000); return { title: String(t.title || ""), duration: dms > 0 ? `${minutes}:${String(seconds).padStart(2, "0")}` : "", previewUrl: t.preview_url || undefined }; }).filter(Boolean) as Array<{ title: string; duration: string; previewUrl?: string }>;
         const trackCount = tracks.length || releaseTrackList.length;
-        if (trackCount <= 1) continue;
         const releaseMeta = (r.metadata || {}) as Record<string, unknown>;
         const labelName = r.label_id ? (labelById.get(String(r.label_id)) || String(releaseMeta.record_label || "") || "Independent") : (String(releaseMeta.record_label || "") || "Independent");
         const genres = Array.isArray(releaseMeta.genre_names) ? (releaseMeta.genre_names as string[]).map(String) : [];
         seenTitles.add(normalizeTitleForDedup(String(r.title)));
-        releases.push({ slug: String(r.slug), title: String(r.title), releaseType: String(r.release_type || "album"), year: r.release_date ? String(r.release_date).split("-")[0] : "", releaseDate: r.release_date || "", trackCount, artworkUrl: String(r.artwork_url || ""), labelName, genres, tracks });
+        releases.push({ slug: String(r.slug), title: String(r.title), releaseType: releaseTypeLabelFromActiveTrackCount(trackCount) || "Release", year: r.release_date ? String(r.release_date).split("-")[0] : "", releaseDate: r.release_date || "", trackCount, artworkUrl: String(r.artwork_url || ""), labelName, genres, tracks });
       }
     }
   }
-  for (const al of metadataAlbums) { const title = String(al.title || ""); if (!title) continue; const trackCount = Number(al.track_count || al.trackCount || 0); if (trackCount <= 1) continue; const key = normalizeTitleForDedup(title); if (seenTitles.has(key)) continue; seenTitles.add(key); releases.push({ slug: slugify(title), title, releaseType: "Album", year: extractYear(String(al.release_date || al.year || "")), releaseDate: String(al.release_date || al.year || ""), trackCount, artworkUrl: String(al.image || al.artwork || al.artworkUrl || al.artwork_url || ""), tracks: Array.isArray(al.tracks) ? al.tracks.map((tr: any) => ({ title: String(tr.title || ""), duration: String(tr.duration || "") })) : [] }); }
-  for (const ep of metadataEps) { const title = String(ep.title || ""); if (!title) continue; const trackCount = Number(ep.track_count || ep.trackCount || 0); if (trackCount <= 1) continue; const key = normalizeTitleForDedup(title); if (seenTitles.has(key)) continue; seenTitles.add(key); releases.push({ slug: slugify(title), title, releaseType: "EP", year: extractYear(String(ep.release_date || ep.year || "")), releaseDate: String(ep.release_date || ep.year || ""), trackCount, artworkUrl: String(ep.image || ep.artwork || ep.artworkUrl || ep.artwork_url || ""), tracks: Array.isArray(ep.tracks) ? ep.tracks.map((tr: any) => ({ title: String(tr.title || ""), duration: String(tr.duration || "") })) : [] }); }
+  for (const al of metadataAlbums) { const title = String(al.title || ""); if (!title) continue; const trackCount = Number(al.track_count || al.trackCount || 0); if (trackCount === 0) continue; const key = normalizeTitleForDedup(title); if (seenTitles.has(key)) continue; seenTitles.add(key); releases.push({ slug: slugify(title), title, releaseType: releaseTypeLabelFromActiveTrackCount(trackCount) || "Release", year: extractYear(String(al.release_date || al.year || "")), releaseDate: String(al.release_date || al.year || ""), trackCount, artworkUrl: String(al.image || al.artwork || al.artworkUrl || al.artwork_url || ""), tracks: Array.isArray(al.tracks) ? al.tracks.map((tr: any) => ({ title: String(tr.title || ""), duration: String(tr.duration || "") })) : [] }); }
+  for (const ep of metadataEps) { const title = String(ep.title || ""); if (!title) continue; const trackCount = Number(ep.track_count || ep.trackCount || 0); if (trackCount === 0) continue; const key = normalizeTitleForDedup(title); if (seenTitles.has(key)) continue; seenTitles.add(key); releases.push({ slug: slugify(title), title, releaseType: releaseTypeLabelFromActiveTrackCount(trackCount) || "Release", year: extractYear(String(ep.release_date || ep.year || "")), releaseDate: String(ep.release_date || ep.year || ""), trackCount, artworkUrl: String(ep.image || ep.artwork || ep.artworkUrl || ep.artwork_url || ""), tracks: Array.isArray(ep.tracks) ? ep.tracks.map((tr: any) => ({ title: String(tr.title || ""), duration: String(tr.duration || "") })) : [] }); }
   return releases;
 }
 
@@ -505,7 +505,7 @@ Deno.serve(async (req) => {
           const { data: releaseTracks } = await supabase.from("registry_release_tracks").select("release_id, track_id").in("release_id", releaseIds).eq("status", "active");
           const trackCountByRelease = new Map<string, number>();
           for (const rt of (releaseTracks ?? [])) { const rid = String(rt.release_id); trackCountByRelease.set(rid, (trackCountByRelease.get(rid) || 0) + 1); }
-          for (const ra of releaseArtistRows) { const aid = String(ra.artist_id); const rid = String(ra.release_id); const releaseTrackCount = trackCountByRelease.get(rid) || 0; trackCountByArtist.set(aid, (trackCountByArtist.get(aid) || 0) + releaseTrackCount); if (releaseTrackCount > 1) releaseCountByArtist.set(aid, (releaseCountByArtist.get(aid) || 0) + 1); }
+          for (const ra of releaseArtistRows) { const aid = String(ra.artist_id); const rid = String(ra.release_id); const releaseTrackCount = trackCountByRelease.get(rid) || 0; trackCountByArtist.set(aid, (trackCountByArtist.get(aid) || 0) + releaseTrackCount); if (releaseTrackCount > 0) releaseCountByArtist.set(aid, (releaseCountByArtist.get(aid) || 0) + 1); }
         }
         const { data: chartArtistSlugs } = await supabase.from("wk_chart_entries_v2").select("artist_slug").in("artist_slug", slugs).limit(1000);
         const chartArtistSet = new Set((chartArtistSlugs ?? []).map((e: any) => String(e.artist_slug)));
@@ -570,7 +570,7 @@ Deno.serve(async (req) => {
       const totalDuration = trackList.reduce((sum: number, tr: any) => sum + (Number(tr.duration) || 0), 0);
       const labelName = label?.name || String(releaseMeta.record_label || releaseMeta.wp_label || "Independent");
       let description = release.description || ""; if (!description || description.trim().length === 0) { const rType = releaseTypeLabel(String(release.release_type || "album")); const niceDate = formatDateNicely(String(release.release_date || "")); const yearOnly = release.release_date ? String(release.release_date).split("-")[0] : ""; let desc = release.title + " is " + articleize(rType) + " by " + artistName; if (niceDate && niceDate !== yearOnly) desc += ", released on " + niceDate; else if (yearOnly) desc += ", released in " + yearOnly; if (labelName && labelName !== "Independent" && labelName !== "Unknown") desc += " through " + labelName; desc += "."; description = desc; try { await supabase.from("registry_releases").update({ description }).eq("id", releaseId); } catch { /* ignore */ } }
-      data = { release: { id: releaseId, slug: String(release.slug), title: String(release.title), artist: artistName, year: release.release_date ? String(release.release_date).split("-")[0] : "", releaseDate: release.release_date || "", releaseType: String(release.release_type || "album"), labelName, labelSlug: label?.slug || "", artworkUrl: release.artwork_url || "", trackCount: trackList.length, tracks: trackList, totalDuration, description, metadata: { ...releaseMeta, wpLabel: releaseMeta.wp_label || null, wpDistributor: releaseMeta.wp_distributor || null, wpWriters: releaseMeta.wp_writers || null, wpProducers: releaseMeta.wp_producers || null } }, publicIdentity };
+      data = { release: { id: releaseId, slug: String(release.slug), title: String(release.title), artist: artistName, year: release.release_date ? String(release.release_date).split("-")[0] : "", releaseDate: release.release_date || "", releaseType: releaseTypeLabelFromActiveTrackCount(trackList.length) || "Release", labelName, labelSlug: label?.slug || "", artworkUrl: release.artwork_url || "", trackCount: trackList.length, tracks: trackList, totalDuration, description, metadata: { ...releaseMeta, wpLabel: releaseMeta.wp_label || null, wpDistributor: releaseMeta.wp_distributor || null, wpWriters: releaseMeta.wp_writers || null, wpProducers: releaseMeta.wp_producers || null } }, publicIdentity };
     }
 
     // ── RELEASE LIST ──
@@ -603,7 +603,7 @@ Deno.serve(async (req) => {
 
       const publicReleases = (releases ?? []).filter(
         (release: any) =>
-          (trackCountByRelease.get(String(release.id)) || 0) > 1,
+          (trackCountByRelease.get(String(release.id)) || 0) > 0,
       );
       const publicReleaseIds = publicReleases.map(
         (release: any) => String(release.id),
@@ -652,7 +652,10 @@ Deno.serve(async (req) => {
           year: release.release_date
             ? String(release.release_date).split("-")[0]
             : "",
-          releaseType: String(release.release_type || "album"),
+          releaseType:
+            releaseTypeLabelFromActiveTrackCount(
+              trackCountByRelease.get(String(release.id)) || 0,
+            ) || "Release",
           labelName: labelMap.get(String(release.label_id)) || "Independent",
           artworkUrl: release.artwork_url || "",
           trackCount: trackCountByRelease.get(String(release.id)) || 0,

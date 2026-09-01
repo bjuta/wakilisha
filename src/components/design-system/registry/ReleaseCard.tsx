@@ -14,6 +14,8 @@ export interface ReleaseCardProps {
   releaseType?: string;
   year?: string | number;
   trackCount?: number;
+  singleTrackSlug?: string | null;
+  singleTrackArtistSlug?: string | null;
   labelName?: string;
   contextText?: string;
   onQuickView?: () => void;
@@ -31,6 +33,8 @@ export function ReleaseCard({
   releaseType,
   year,
   trackCount,
+  singleTrackSlug,
+  singleTrackArtistSlug,
   labelName,
   contextText,
   onQuickView,
@@ -65,7 +69,19 @@ export function ReleaseCard({
 
   return (
     <div className="group relative rounded-xl border border-[var(--wk-border)] bg-[var(--wk-surface)] overflow-hidden transition-all hover:border-[var(--wk-border-2)]">
-      <Link to={releaseUrl({ slug, artist })} onClick={handleClick} className="block">
+      <Link
+        to={releaseUrl({
+          slug,
+          artist,
+          artistSlug,
+          releaseType,
+          trackCount,
+          singleTrackSlug,
+          singleTrackArtistSlug,
+        })}
+        onClick={handleClick}
+        className="block"
+      >
         <div className="relative aspect-square bg-[var(--wk-surface-raised)]">
           {artworkUrl ? (
             <img

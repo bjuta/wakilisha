@@ -15,7 +15,14 @@ interface DiscoRelease {
   trackCount?: number;
   releaseDate?: string;
   labelName?: string;
-  tracks?: Array<{ title: string; duration: string; artists?: string; previewUrl?: string }>;
+  tracks?: Array<{
+    slug?: string;
+    artistSlug?: string;
+    title: string;
+    duration: string;
+    artists?: string;
+    previewUrl?: string;
+  }>;
 }
 
 interface ArtistDiscographyProps {
@@ -38,7 +45,17 @@ function formatYear(dateStr?: string, year?: string | number): string {
 function DiscographyCard({ release, artistName }: { release: DiscoRelease; artistName?: string }) {
   const displayYear = formatYear(release.releaseDate, release.year);
   const releaseArtist = release.artist || artistName || "";
-  const href = releaseUrl({ slug: release.slug, artist: releaseArtist });
+  const singleTrack =
+    release.trackCount === 1
+      ? release.tracks?.[0]
+      : undefined;
+  const href = releaseUrl({
+    slug: release.slug,
+    artist: releaseArtist,
+    trackCount: release.trackCount,
+    singleTrackSlug: singleTrack?.slug,
+    singleTrackArtistSlug: singleTrack?.artistSlug,
+  });
 
   return (
     <Link

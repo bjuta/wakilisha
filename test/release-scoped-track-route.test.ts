@@ -387,16 +387,25 @@ describe("release-scoped track routes", () => {
       "function isMusicDetailUrl(url)",
     );
     expect(sitemapBuilder).toContain(
-      "const distUrlSet = new Set(distUrls);",
+      'const metadataManifestPath = path.join(distDir, "seo-metadata-manifest.json");',
     );
     expect(sitemapBuilder).toContain(
-      "!isMusicDetailUrl(url) ||",
+      "const canonicalManifestUrlSet = new Set(",
     );
     expect(sitemapBuilder).toContain(
-      "distUrlSet.has(url)",
+      "const unexpectedMusicDistUrls = distUrls.filter(",
     );
     expect(sitemapBuilder).toContain(
+      "const missingMusicPrerenders = canonicalManifestUrls.filter(",
+    );
+    expect(sitemapBuilder).not.toContain(
       "const resurrectedMusicUrls = sitemapUrls.filter(",
+    );
+    expect(prerender).not.toContain(
+      "function readSitemapPaths()",
+    );
+    expect(prerender).toContain(
+      "function readCanonicalSeedPaths()",
     );
 
     expect(sitemapFunction).toContain(
@@ -409,11 +418,14 @@ describe("release-scoped track routes", () => {
     expect(artistDiscography).toContain(
       '.eq("status", "active")',
     );
-    expect(artistDiscography).toContain(
+    expect(artistDiscography).not.toContain(
       "if (tracks.length <= 1) continue;",
     );
-    expect(artistDiscography).toContain(
+    expect(artistDiscography).not.toContain(
       "if (releaseTrackIds.length <= 1) continue;",
+    );
+    expect(artistDiscography).toContain(
+      "releaseTypeLabelFromActiveTrackCount(tracks.length)",
     );
   });
 
@@ -421,7 +433,7 @@ describe("release-scoped track routes", () => {
 
 
 describe("public Release boundary", () => {
-  it("keeps one-track packages off the Release shelf", () => {
+  it("keeps Singles on the Release shelf while reserving Release detail pages for multi-track Releases", () => {
     const service = readFileSync(
       "src/services/publicContent/client.ts",
       "utf8",
@@ -436,16 +448,25 @@ describe("public Release boundary", () => {
     );
 
     expect(service).toContain(
-      "return (trackCountByRelease.get(id) || 0) > 1;",
+      "return (trackCountByRelease.get(id) || 0) > 0;",
     );
-    expect(releasePage).not.toContain(
-      '"All", "Album", "EP", "Single"',
+    expect(service).toContain(
+      "releaseTypeLabelFromActiveTrackCount(trackCount)",
     );
-    expect(releasePage).not.toContain(
-      "Albums, EPs & singles",
+    expect(releasePage).toContain(
+      '"All", "Single", "EP", "Album"',
+    );
+    expect(releasePage).toContain(
+      "Singles, EPs, and albums",
+    );
+    expect(releasePage).toContain(
+      "release.trackCount > 1",
+    );
+    expect(releasePage).toContain(
+      'active.trackCount === 1 ? "Open track" : "Open"',
     );
     expect(gateway).toContain(
-      "(trackCountByRelease.get(String(release.id)) || 0) > 1",
+      "(trackCountByRelease.get(String(release.id)) || 0) > 0",
     );
     expect(gateway).toContain(
       "releaseScopedMembership ?? null",
@@ -467,17 +488,17 @@ describe("public Release boundary", () => {
     expect(legacyApi).toContain(
       'from("registry_release_tracks")',
     );
-    expect(legacyApi).toContain(
+    expect(legacyApi).not.toContain(
       "if (trackCount <= 1) continue;",
     );
     expect(legacyApi).toContain(
       "const publicReleases = (releases ?? []).filter",
     );
     expect(legacyApi).toContain(
-      "(trackCountByRelease.get(String(release.id)) || 0) > 1",
+      "(trackCountByRelease.get(String(release.id)) || 0) > 0",
     );
     expect(legacyApi).toContain(
-      "if (releaseTrackCount > 1) releaseCountByArtist.set",
+      "if (releaseTrackCount > 0) releaseCountByArtist.set",
     );
     expect(legacyApi).toContain(
       "let releaseMembership: { release_id: string; track_number?: number; disc_number?: number } | null = null;",
