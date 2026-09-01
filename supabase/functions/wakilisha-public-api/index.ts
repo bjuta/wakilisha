@@ -1,6 +1,7 @@
 
 // ── SHARED BLOCK (Phase A — public API variant: open CORS, no auth, original response shape) ──
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { isRegistryTrackId, registryTrackUrl } from "../../../shared/registry/public-track-route.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
@@ -561,8 +562,11 @@ Deno.serve(async (req) => {
         publicIdentity = {
           kind: "track",
           canonicalPath:
-            canonicalArtistSlug && canonicalTrackSlug
-              ? `/tracks/${canonicalArtistSlug}/${canonicalTrackSlug}`
+            canonicalTrackSlug
+              ? registryTrackUrl(
+                  String(trackList[0].id),
+                  canonicalTrackSlug,
+                )
               : null,
         };
       }
@@ -810,10 +814,108 @@ Deno.serve(async (req) => {
     else if (path.startsWith("/tracks/")) {
       const tSegments = path.replace(/^\/tracks\//, "").split("/").filter(Boolean);
       const tSlug = tSegments[tSegments.length - 1] || "";
+      const routeScope = tSegments.length > 1 ? tSegments[0] || "" : "";
+      const routeRegistryTrackId =
+        routeScope && isRegistryTrackId(routeScope)
+          ? routeScope.toLowerCase()
+          : null;
       let track: any = null;
-      const isIsrcLookup = tSlug.toLowerCase().startsWith("isrc:");
-      if (isIsrcLookup) { const isrc = tSlug.slice(5); const { data: byIsrc } = await supabase.from("registry_tracks").select("id, slug, title, duration_ms, artwork_url, isrc, explicit, track_number, disc_number, release_id, metadata, status, preview_url").eq("isrc", isrc).order("status", { ascending: true }).order("slug", { ascending: true }).limit(1); track = byIsrc && byIsrc.length > 0 ? byIsrc[0] : null; }
-      else { const { data: bySlug } = await supabase.from("registry_tracks").select("id, slug, title, duration_ms, artwork_url, isrc, explicit, track_number, disc_number, release_id, metadata, status, preview_url").eq("slug", tSlug).maybeSingle(); track = bySlug; }
+      const trackSelect = "id, slug, title, duration_ms, artwork_url, isrc, explicit, track_number, disc_number, release_id, metadata, status, preview_url";
+      const isIsrcLookup =
+        !routeRegistryTrackId &&
+        tSlug.toLowerCase().startsWith("isrc:");
+
+      if (routeRegistryTrackId) {
+        const { data: byId } = await supabase
+          .from("registry_tracks")
+          .select(trackSelect)
+          .eq("id", routeRegistryTrackId)
+          .in("status", ["active", "needs_review", "draft"])
+          .limit(1);
+        track = byId && byId.length > 0 ? byId[0] : null;
+      } else if (isIsrcLookup) {
+        const isrc = tSlug.slice(5);
+        const { data: byIsrc } = await supabase
+          .from("registry_tracks")
+          .select(trackSelect)
+          .eq("isrc", isrc)
+          .order("status", { ascending: true })
+          .order("slug", { ascending: true })
+          .limit(1);
+        track = byIsrc && byIsrc.length > 0 ? byIsrc[0] : null;
+      } else if (routeScope) {
+        const { data: artistLinks } = await supabase
+          .from("registry_track_artists")
+          .select("track_id")
+          .eq("artist_slug", routeScope)
+          .eq("status", "active")
+          .limit(500);
+        const candidateIds = [
+          ...new Set(
+            (artistLinks ?? [])
+              .map((row: any) => String(row.track_id || ""))
+              .filter(Boolean),
+          ),
+        ];
+        const { data: candidates } = candidateIds.length > 0
+          ? await supabase
+              .from("registry_tracks")
+              .select(trackSelect)
+              .in("id", candidateIds)
+              .eq("status", "active")
+          : { data: [] };
+        const normalizedRequested = slugify(tSlug);
+        const scopedMatches = (candidates ?? []).filter((candidate: any) => {
+          const candidateSlug = cleanPublicMusicSlug(
+            candidate.slug,
+            candidate.title,
+            routeScope,
+          );
+          return (
+            slugify(String(candidate.slug || "")) === normalizedRequested ||
+            candidateSlug === normalizedRequested
+          );
+        });
+
+        if (scopedMatches.length > 1) {
+          return jsonResponse({
+            data: null,
+            meta: {
+              reason: "ambiguous_legacy_track_alias",
+              candidates: scopedMatches.map((candidate: any) => ({
+                id: String(candidate.id),
+                slug: String(candidate.slug || ""),
+                title: String(candidate.title || ""),
+                isrc: candidate.isrc || null,
+                canonicalPath: registryTrackUrl(
+                  String(candidate.id),
+                  String(candidate.slug || ""),
+                ),
+              })),
+            },
+          }, 409);
+        }
+
+        track = scopedMatches[0] ?? null;
+      } else {
+        const { data: bySlug } = await supabase
+          .from("registry_tracks")
+          .select(trackSelect)
+          .eq("slug", tSlug)
+          .eq("status", "active")
+          .limit(2);
+
+        if ((bySlug ?? []).length > 1) {
+          return jsonResponse({
+            data: null,
+            meta: {
+              reason: "ambiguous_global_track_slug",
+            },
+          }, 409);
+        }
+
+        track = bySlug && bySlug.length > 0 ? bySlug[0] : null;
+      }
       if (!track) return jsonResponse({ data: null }, 404);
       const trackId = String(track.id);
       let releaseMembership: { release_id: string; track_number?: number; disc_number?: number } | null = null;
@@ -923,7 +1025,7 @@ Deno.serve(async (req) => {
       const firstChartedDate = (historyEntries ?? []).length > 0 ? (historyEntries as any[])[0].release_date || "" : "";
       const sourceProviders: string[] = Array.isArray(trackMeta.source_providers) ? (trackMeta.source_providers as string[]) : [];
       const artistsWithRoles = (trackArtists ?? []).map((ta: any) => ({ name: String(ta.artist_name_text || ta.artist_slug || ""), slug: String(ta.artist_slug || ""), isPrimary: Boolean(ta.is_primary), isFeatured: Boolean(ta.is_featured), creditOrder: Number(ta.credit_order || 0), role: String(ta.role || "primary") }));
-      data = { track: { id: String(track.id), slug: String(track.slug), title: String(track.title), durationMs: track.duration_ms || 0, artworkUrl: track.artwork_url || "", isrc: track.isrc || null, explicit: track.explicit || false, trackNumber: track.track_number || 0, discNumber: track.disc_number || 0, metadata: track.metadata || {}, status: track.status || "active", previewUrl: track.preview_url || null }, artists: artistsWithRoles, artist: artistsWithRoles.length > 0 ? { slug: artistsWithRoles[0].slug, name: artistsWithRoles[0].name, imageUrl: bestEntry?.artwork_url || "" } : { slug: artistSlugFromEntry, name: artistName, imageUrl: bestEntry?.artwork_url || "" }, release: release ? { slug: String(release.slug), title: String(release.title), releaseDate: release.release_date || "", releaseType: String(release.release_type || "single"), artworkUrl: release.artwork_url || "", trackCount: releaseTrackCount?.count || Number(release.track_count || 0), labelName: label?.name || "", labelSlug: label?.slug || "" } : null, label: label ? { slug: String(label.slug), name: String(label.name), countryCode: label.country_code || null } : null, genres, chartHistory: chartHistoryUnique, chartAppearances: allChartAppearances, chartAppearanceCount: allChartAppearances.length, peakRank, weeksOnChart: historyEntries ? historyEntries.length : 0, currentRank: bestEntry ? Number(bestEntry.rank) : null, previousRank: prevRank, movement, movementAmount, previewUrl: track.preview_url || null, firstChartedDate, editionLabels, sourceProviders };
+      data = { track: { id: String(track.id), slug: String(track.slug), title: String(track.title), durationMs: track.duration_ms || 0, artworkUrl: track.artwork_url || "", isrc: track.isrc || null, explicit: track.explicit || false, trackNumber: track.track_number || 0, discNumber: track.disc_number || 0, metadata: track.metadata || {}, status: track.status || "active", previewUrl: track.preview_url || null }, publicIdentity: { kind: "track", canonicalPath: registryTrackUrl(String(track.id), String(track.slug || "")) }, artists: artistsWithRoles, artist: artistsWithRoles.length > 0 ? { slug: artistsWithRoles[0].slug, name: artistsWithRoles[0].name, imageUrl: bestEntry?.artwork_url || "" } : { slug: artistSlugFromEntry, name: artistName, imageUrl: bestEntry?.artwork_url || "" }, release: release ? { slug: String(release.slug), title: String(release.title), releaseDate: release.release_date || "", releaseType: String(release.release_type || "single"), artworkUrl: release.artwork_url || "", trackCount: releaseTrackCount?.count || Number(release.track_count || 0), labelName: label?.name || "", labelSlug: label?.slug || "" } : null, label: label ? { slug: String(label.slug), name: String(label.name), countryCode: label.country_code || null } : null, genres, chartHistory: chartHistoryUnique, chartAppearances: allChartAppearances, chartAppearanceCount: allChartAppearances.length, peakRank, weeksOnChart: historyEntries ? historyEntries.length : 0, currentRank: bestEntry ? Number(bestEntry.rank) : null, previousRank: prevRank, movement, movementAmount, previewUrl: track.preview_url || null, firstChartedDate, editionLabels, sourceProviders };
     }
 
     // ── CHARTS LIST ──
