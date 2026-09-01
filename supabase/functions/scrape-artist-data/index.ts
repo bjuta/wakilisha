@@ -619,13 +619,30 @@ async function writeScrapeToRegistry(
     existingReleaseTracks.map((r) => `${r.release_id}:${r.track_id}`)
   );
 
-  const existingTrackArtists = await fetchAllRows<{ track_id: string; artist_slug: string }>(
-    "registry_track_artists", "track_id, artist_slug",
+  const existingTrackArtists = await fetchAllRows<{
+    track_id: string;
+    artist_slug: string;
+    artist_name_text: string | null;
+    is_featured: boolean | null;
+  }>(
+    "registry_track_artists",
+    "track_id, artist_slug, artist_name_text, is_featured",
     { col: "status", val: "active" }
   );
   const existingTrackArtistSet = new Set<string>(
     existingTrackArtists.map((r) => `${r.track_id}:${r.artist_slug}`)
   );
+  const featuredArtistNamesByTrack = new Map<string, string[]>();
+  for (const link of existingTrackArtists) {
+    if (!link.is_featured) continue;
+    const name =
+      link.artist_name_text ||
+      link.artist_slug;
+    if (!featuredArtistNamesByTrack.has(link.track_id)) {
+      featuredArtistNamesByTrack.set(link.track_id, []);
+    }
+    featuredArtistNamesByTrack.get(link.track_id)!.push(name);
+  }
   const existingTrackByArtistAndSlug = new Map<string, string>();
   const ambiguousTrackScopeKeys = new Set<string>();
 
@@ -655,7 +672,13 @@ async function writeScrapeToRegistry(
     if (existingTitle) {
       registerTrackScopeAlias(
         link.artist_slug,
-        canonicalTrackSlugCandidate(existingTitle),
+        canonicalTrackSlugCandidate(
+          existingTitle,
+          {
+            featuredArtistNames:
+              featuredArtistNamesByTrack.get(link.track_id) || [],
+          },
+        ),
         link.track_id,
       );
     }
@@ -809,9 +832,22 @@ async function writeScrapeToRegistry(
       const track = tracks[i];
       if (!track.title) continue;
 
-      const trackTitleSlug =
-        canonicalTrackSlugCandidate(track.title);
       const trackArtistScope = slugify(data.name);
+      const structuredTrackArtists =
+        splitTrackArtists(track.artist || data.name);
+      const structuredFeaturedArtistNames =
+        structuredTrackArtists.filter(
+          (name) =>
+            slugify(name) !== trackArtistScope,
+        );
+      const trackTitleSlug =
+        canonicalTrackSlugCandidate(
+          track.title,
+          {
+            featuredArtistNames:
+              structuredFeaturedArtistNames,
+          },
+        );
       let trackId: string | undefined;
 
       if (track.isrc) trackId = existingTrackByIsrc.get(track.isrc);
@@ -995,8 +1031,18 @@ async function writeScrapeToRegistry(
       const track = tracks[i];
       if (!track.title) continue;
 
+      const structuredTrackArtists =
+        splitTrackArtists(
+          track.artist || releaseOwnerName,
+        );
       const trackTitleSlug =
-        canonicalTrackSlugCandidate(track.title);
+        canonicalTrackSlugCandidate(
+          track.title,
+          {
+            featuredArtistNames:
+              structuredTrackArtists.slice(1),
+          },
+        );
       let trackId: string | undefined;
 
       if (track.isrc) trackId = existingTrackByIsrc.get(track.isrc);
@@ -1162,8 +1208,16 @@ async function writeScrapeToRegistry(
 
     for (let i = 0; i < data.topSongs.length; i++) {
       const ts = data.topSongs[i];
+      const structuredTopSongArtists =
+        splitTrackArtists(ts.artist || data.name);
       const trackSlugCandidate =
-        canonicalTrackSlugCandidate(ts.title);
+        canonicalTrackSlugCandidate(
+          ts.title,
+          {
+            featuredArtistNames:
+              structuredTopSongArtists.slice(1),
+          },
+        );
       let matchedTrackId: string | undefined;
 
       try {
