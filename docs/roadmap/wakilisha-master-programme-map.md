@@ -22,7 +22,7 @@ Current acceptance record:
 
 `docs/engineering/release-taxonomy-membership-integrity-closure-record.md`
 
-## Current programme reconciliation - 31 August 2026
+## Phase 7A closure reconciliation - 31 August 2026
 
 **Phase 7A Video publication authority is CLOSED and production accepted.**
 
@@ -48,9 +48,9 @@ The numbered programme now advances to **Phase 7B: Public Video product**.
 
 Status date: 31 August 2026
 
-Current production migration head: `20260831080826`
+Phase 7A closure migration head: `20260831080826`
 
-Current production migration count: `75`
+Phase 7A closure migration count: `75`
 
 ## Purpose
 
@@ -78,7 +78,7 @@ Current references:
 - `docs/engineering/phase-7a-video-publication-authority-kickoff.md`
 - `docs/engineering/primitive-compounding-contract.md`
 
-Phase 7A opens from production runtime baseline `dae3de2dc9fb021496eb0fe0c4d4f0338f676a88`, migration count `50`, head `20260825102000`.
+Phase 7A opened from production runtime baseline `dae3de2dc9fb021496eb0fe0c4d4f0338f676a88`, migration count `50`, head `20260825102000`.
 
 ## Programme map
 

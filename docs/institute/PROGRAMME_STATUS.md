@@ -38,7 +38,7 @@ Production acceptance is recorded in:
 
 Historical MIZIZI apply remains unrun.
 
-## Current programme reconciliation - 31 August 2026
+## Phase 7A closure reconciliation - 31 August 2026
 
 **Phase 7A Video publication authority is CLOSED and production accepted.**
 
@@ -73,9 +73,9 @@ The immediate numbered work is now **Phase 7B: Public Video product**.
 
 Status date: 31 August 2026
 
-Current production migration head: `20260831080826`
+Phase 7A closure migration head: `20260831080826`
 
-Current production migration count: `75`
+Phase 7A closure migration count: `75`
 
 ## Status authority
 
