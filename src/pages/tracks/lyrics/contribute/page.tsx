@@ -24,8 +24,7 @@ import {
   submitTrackLyricsContribution,
 } from "@/services/player/trackLyricsService";
 import {
-  releaseTrackUrl,
-  trackUrl,
+  canonicalTrackUrl,
 } from "@/utils/trackUrl";
 
 interface TrackData {
@@ -38,6 +37,8 @@ interface TrackData {
   duration: number;
   isPlayable: boolean;
   previewUrl: string | null;
+  releaseSlug?: string;
+  releaseTrackCount?: number;
 }
 
 export default function LyricContribution() {
@@ -281,16 +282,66 @@ export default function LyricContribution() {
         const previewUrl: string | null =
           raw.previewUrl || trackData.previewUrl || null;
 
+        const resolvedArtistSlug =
+          primaryArtist?.slug ||
+          artistData?.slug ||
+          artistSlug;
+        const releaseData =
+          raw.release &&
+          typeof raw.release === "object"
+            ? raw.release
+            : null;
+        const releaseTrackCount =
+          releaseData
+            ? Number(
+                releaseData.trackCount ??
+                releaseData.track_count ??
+                0,
+              )
+            : undefined;
+        const resolvedReleaseSlug =
+          String(
+            releaseData?.slug ||
+            releaseSlug ||
+            "",
+          ).trim();
+
+        if (
+          releaseSlug &&
+          releaseData &&
+          Number(releaseTrackCount || 0) <= 1
+        ) {
+          const standaloneLyricsPath =
+            `${canonicalTrackUrl(
+              resolvedArtistSlug,
+              trackData.slug,
+              resolvedReleaseSlug,
+              releaseTrackCount,
+            )}/lyrics/contribute`;
+
+          if (
+            standaloneLyricsPath !== location.pathname
+          ) {
+            navigate(
+              `${standaloneLyricsPath}${location.search || ""}${location.hash || ""}`,
+              { replace: true },
+            );
+            return;
+          }
+        }
+
         setTrack({
           registryTrackId,
           slug: trackData.slug,
           title: trackData.title,
           artist: primaryArtist?.name || artistData?.name || "WAKILISHA",
-          artistSlug: primaryArtist?.slug || artistData?.slug || artistSlug,
+          artistSlug: resolvedArtistSlug,
           artworkUrl: trackData.artworkUrl || "",
           duration,
           isPlayable: Boolean(previewUrl),
           previewUrl,
+          releaseSlug: resolvedReleaseSlug || undefined,
+          releaseTrackCount,
         });
         setLoading(false);
       })
@@ -314,9 +365,12 @@ export default function LyricContribution() {
     currentTrack,
   ]);
 
-  const canonicalTrackPath = releaseSlug
-    ? releaseTrackUrl(artistSlug, releaseSlug, trackSlug)
-    : trackUrl(trackSlug, [artistSlug]);
+  const canonicalTrackPath = canonicalTrackUrl(
+    track?.artistSlug || artistSlug || "",
+    track?.slug || trackSlug || "",
+    track?.releaseSlug || releaseSlug || null,
+    track?.releaseTrackCount ?? null,
+  );
 
   const isThisTrackPlaying =
     currentTrack?.registryTrackId === track?.registryTrackId &&
