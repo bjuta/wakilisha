@@ -43,7 +43,6 @@ declare
   v_track_id uuid := gen_random_uuid();
   v_slug text;
   v_primary_artist_id uuid;
-  v_primary_artist_slug text;
   v_existing_track_id uuid;
   v_artist_count integer := 0;
   v_unresolved_artist_count integer := 0;
@@ -137,11 +136,9 @@ begin
   end if;
 
   select
-    artist_credit.registry_artist_id,
-    artist.slug
+    artist_credit.registry_artist_id
   into
-    v_primary_artist_id,
-    v_primary_artist_slug
+    v_primary_artist_id
   from public.registry_provider_track_suggestion_artists artist_credit
   join public.registry_artists artist
     on artist.id = artist_credit.registry_artist_id
@@ -206,7 +203,46 @@ begin
 
     v_feature_suffix_match := regexp_match(
       v_slug_title,
-      '([[:space:]]+(-|:)?[[:space:]]*(feat[.]?|featuring|ft[.]?)[[:space:]]+.+)  select coalesce(
+      '([[:space:]]+(-|:)?[[:space:]]*(feat[.]?|featuring|ft[.]?)[[:space:]]+.+)$',
+      'i'
+    );
+
+    if v_feature_suffix_match is not null then
+      v_feature_suffix := v_feature_suffix_match[1];
+
+      if position('(' in v_feature_suffix) = 0
+         and position('[' in v_feature_suffix) = 0
+         and position('{' in v_feature_suffix) = 0
+         and exists (
+           select 1
+           from unnest(v_featured_artist_names) featured_name
+           where nullif(public.wk_slugify_text(featured_name), '') is not null
+             and (
+               '-' || public.wk_slugify_text(v_feature_suffix) || '-'
+             ) like (
+               '%-' || public.wk_slugify_text(featured_name) || '-%'
+             )
+         )
+      then
+        v_slug_title := left(
+          v_slug_title,
+          greatest(
+            length(v_slug_title) - length(v_feature_suffix),
+            0
+          )
+        );
+      end if;
+    end if;
+  end if;
+
+  v_title_slug := public.wk_slugify_text(v_slug_title);
+
+  if nullif(v_title_slug, '') is null then
+    raise exception
+      'Canonical track title cannot produce a valid Registry slug.';
+  end if;
+
+  select coalesce(
     jsonb_object_agg(
       suggestion.field_name,
       suggestion.suggested_value
@@ -472,332 +508,6 @@ comment on function public.admin_create_registry_track_from_intake_enriched(
 )
 is
   'Creates one canonical Registry track from reviewed Track Intake evidence, derives route identity without Artist-prefix or random collision noise, removes feature-credit presentation only when reviewed featured-Artist evidence proves it, then atomically applies accepted enrichment and resolves the same Playlist item.';
-
-revoke all
-on function public.admin_create_registry_track_from_intake_enriched(
-  uuid,
-  text,
-  text
-)
-from public;
-
-revoke all
-on function public.admin_create_registry_track_from_intake_enriched(
-  uuid,
-  text,
-  text
-)
-from anon;
-
-grant execute
-on function public.admin_create_registry_track_from_intake_enriched(
-  uuid,
-  text,
-  text
-)
-to authenticated;
-
-commit;
-,
-      'i'
-    );
-
-    if v_feature_suffix_match is not null then
-      v_feature_suffix := v_feature_suffix_match[1];
-
-      if position('(' in v_feature_suffix) = 0
-         and position('[' in v_feature_suffix) = 0
-         and position('{' in v_feature_suffix) = 0
-         and exists (
-           select 1
-           from unnest(v_featured_artist_names) featured_name
-           where position(
-             lower(featured_name)
-             in lower(v_feature_suffix)
-           ) > 0
-         )
-      then
-        v_slug_title := left(
-          v_slug_title,
-          greatest(
-            length(v_slug_title) - length(v_feature_suffix),
-            0
-          )
-        );
-      end if;
-    end if;
-  end if;
-
-  v_title_slug := public.wk_slugify_text(v_slug_title);
-
-  if nullif(v_title_slug, '') is null then
-    raise exception
-      'Canonical track title cannot produce a valid Registry slug.';
-  end if;
-
-  select coalesce(
-    jsonb_object_agg(
-      suggestion.field_name,
-      suggestion.suggested_value
-    ),
-    '{}'::jsonb
-  )
-  into v_fields
-  from public.registry_enrichment_suggestions suggestion
-  where suggestion.registry_entity_type = 'track'
-    and suggestion.registry_entity_id = p_suggestion_id::text
-    and suggestion.decision_status = 'approved';
-
-  v_isrc := nullif(btrim(v_fields ->> 'isrc'), '');
-
-  if v_isrc is not null then
-    select track.id
-    into v_existing_track_id
-    from public.registry_tracks track
-    where track.isrc = v_isrc
-      and track.status <> 'archived'
-    order by track.created_at
-    limit 1;
-
-    if v_existing_track_id is not null then
-      raise exception
-        'A Registry track with accepted ISRC % already exists (%). Select that canonical track instead.',
-        v_isrc,
-        v_existing_track_id;
-    end if;
-  end if;
-
-  v_existing_track_id := null;
-
-  select track.id
-  into v_existing_track_id
-  from public.registry_tracks track
-  join public.registry_track_artists track_artist
-    on track_artist.track_id = track.id
-   and track_artist.artist_id = v_primary_artist_id
-   and track_artist.status = 'active'
-  where track.normalized_title = v_normalized_title
-    and track.status <> 'archived'
-  order by track.created_at
-  limit 1;
-
-  if v_existing_track_id is not null then
-    raise exception
-      'A Registry track with this reviewed title and primary artist already exists (%). Select that canonical track instead.',
-      v_existing_track_id;
-  end if;
-
-  v_slug :=
-    coalesce(
-      nullif(btrim(v_primary_artist_slug), ''),
-      'track'
-    )
-    || '--'
-    || v_title_slug;
-
-  if exists (
-    select 1
-    from public.registry_tracks track
-    where track.slug = v_slug
-      and track.status <> 'archived'
-  ) then
-    v_slug :=
-      v_slug
-      || '--'
-      || left(replace(v_track_id::text, '-', ''), 8);
-  end if;
-
-  insert into public.registry_tracks (
-    id,
-    slug,
-    title,
-    normalized_title,
-    release_id,
-    status,
-    metadata,
-    created_at,
-    updated_at
-  )
-  values (
-    v_track_id,
-    v_slug,
-    v_title,
-    v_normalized_title,
-    null,
-    'active',
-    jsonb_strip_nulls(
-      jsonb_build_object(
-        'track_intake_source_suggestion_id',
-          p_suggestion_id::text,
-        'track_intake_created_at',
-          now(),
-        'release_evidence',
-          jsonb_strip_nulls(
-            jsonb_build_object(
-              'title',
-                nullif(
-                  btrim(v_fields ->> 'release_title'),
-                  ''
-                ),
-              'release_date',
-                nullif(
-                  btrim(v_fields ->> 'release_date'),
-                  ''
-                ),
-              'release_date_precision',
-                nullif(
-                  btrim(
-                    v_fields ->> 'release_date_precision'
-                  ),
-                  ''
-                ),
-              'artwork_url',
-                nullif(
-                  btrim(
-                    v_fields ->> 'release_artwork_url'
-                  ),
-                  ''
-                ),
-              'label_name',
-                nullif(
-                  btrim(v_fields ->> 'label_name'),
-                  ''
-                ),
-              'imprint_name',
-                nullif(
-                  btrim(v_fields ->> 'imprint_name'),
-                  ''
-                ),
-              'upc',
-                nullif(btrim(v_fields ->> 'upc'), ''),
-              'copyright_text',
-                nullif(
-                  btrim(v_fields ->> 'copyright_text'),
-                  ''
-                )
-            )
-          )
-      )
-    ),
-    now(),
-    now()
-  );
-
-  insert into public.registry_track_artists (
-    track_id,
-    artist_id,
-    artist_slug,
-    artist_name_text,
-    role,
-    is_primary,
-    is_featured,
-    credit_order,
-    display_credit,
-    source,
-    confidence,
-    status,
-    metadata,
-    created_at,
-    updated_at
-  )
-  select
-    v_track_id,
-    artist.id,
-    artist.slug,
-    artist.display_name,
-    case
-      when artist_credit.credit_role = 'featured'
-        then 'featured_artist'
-      else 'primary_artist'
-    end,
-    artist_credit.credit_role = 'primary',
-    artist_credit.credit_role = 'featured',
-    artist_credit.credit_order,
-    artist.display_name,
-    'track_intake_review',
-    100,
-    'active',
-    jsonb_build_object(
-      'source_suggestion_id',
-        p_suggestion_id::text,
-      'observed_name',
-        artist_credit.observed_name
-    ),
-    now(),
-    now()
-  from public.registry_provider_track_suggestion_artists artist_credit
-  join public.registry_artists artist
-    on artist.id = artist_credit.registry_artist_id
-  where artist_credit.suggestion_id = p_suggestion_id
-    and artist_credit.resolution_mode = 'existing_artist'
-    and artist.status = 'active'
-  order by artist_credit.credit_order, artist_credit.id;
-
-  select public.admin_resolve_registry_track_intake_enriched(
-    p_suggestion_id,
-    v_track_id,
-    p_review_note,
-    false
-  )
-  into v_result;
-
-  select to_jsonb(track)
-  into v_after
-  from public.registry_tracks track
-  where track.id = v_track_id;
-
-  insert into public.registry_canonical_write_events (
-    registry_entity_type,
-    registry_entity_id,
-    source_suggestion_id,
-    source_table,
-    field_name,
-    target_path,
-    before_value,
-    after_value,
-    action,
-    status,
-    error_message,
-    actor,
-    created_at
-  )
-  values (
-    'track',
-    v_track_id::text,
-    p_suggestion_id::text,
-    'registry_provider_track_suggestions',
-    'canonical_identity',
-    'registry_tracks',
-    null,
-    v_after,
-    'create_from_track_intake',
-    'applied',
-    null,
-    auth.uid()::text,
-    now()
-  );
-
-  return coalesce(v_result, '{}'::jsonb)
-    || jsonb_build_object(
-      'created_registry_track_id',
-        v_track_id,
-      'created_registry_track_title',
-        v_title,
-      'created_registry_track_slug',
-        v_slug,
-      'created',
-        true
-    );
-end;
-$function$;
-
-comment on function public.admin_create_registry_track_from_intake_enriched(
-  uuid,
-  text,
-  text
-)
-is
-  'Creates one canonical Registry track from reviewed Track Intake evidence using only pre-resolved existing artist identities, then atomically applies accepted enrichment and resolves the same Playlist item.';
 
 revoke all
 on function public.admin_create_registry_track_from_intake_enriched(
