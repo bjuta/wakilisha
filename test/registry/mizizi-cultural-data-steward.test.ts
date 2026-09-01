@@ -60,7 +60,7 @@ describe("MIZIZI Cultural Data Steward", () => {
     );
   });
 
-  it("proposes a clean Track slug but keeps title cleanup under review", () => {
+  it("proposes a clean Track slug while observing title presentation noise", () => {
     const findings =
       analyzeTrackIdentity({
         id: "0672f196-59b6-4099-bb92-0ef41d37c78b",
@@ -121,11 +121,11 @@ describe("MIZIZI Cultural Data Steward", () => {
     expect(titleFinding).toMatchObject({
       fieldName: "title",
       proposedValue: "FICHA WHITE",
-      disposition: "review",
+      disposition: "observe",
     });
   });
 
-  it("keeps an unexplained slug mismatch under review", () => {
+  it("observes an unexplained slug mismatch without creating review work", () => {
     const findings =
       analyzeTrackIdentity({
         id: "track-review-1",
@@ -144,7 +144,7 @@ describe("MIZIZI Cultural Data Steward", () => {
           "track_slug_identity_mismatch",
         fieldName: "slug",
         proposedValue: "song",
-        disposition: "review",
+        disposition: "observe",
         confidence: 0.6,
       }),
     ]);
@@ -157,7 +157,7 @@ describe("MIZIZI Cultural Data Steward", () => {
     ).toBe(false);
   });
 
-  it("treats exact provider Release packaging as reviewable metadata", () => {
+  it("observes exact provider Release packaging without creating review work", () => {
     expect(
       stripReleasePackagingSuffix(
         "Balance - Single",
@@ -182,13 +182,13 @@ describe("MIZIZI Cultural Data Steward", () => {
           ruleId:
             "release_title_provider_packaging",
           proposedValue: "Balance",
-          disposition: "review",
+          disposition: "observe",
         }),
         expect.objectContaining({
           ruleId:
             "release_slug_provider_packaging",
           proposedValue: "balance",
-          disposition: "review",
+          disposition: "observe",
         }),
       ]),
     );
@@ -245,7 +245,7 @@ describe("MIZIZI Cultural Data Steward", () => {
     });
   });
 
-  it("keeps chart artist disagreement under review", () => {
+  it("observes chart artist disagreement without creating review work", () => {
     const findings =
       analyzeChartIdentity({
         id: "chart-entry-2",
@@ -266,7 +266,7 @@ describe("MIZIZI Cultural Data Steward", () => {
           "chart_artist_slug_drift",
         proposedValue:
           "agent-mgumbe",
-        disposition: "review",
+        disposition: "observe",
       }),
     ]);
   });
@@ -334,6 +334,12 @@ describe("MIZIZI Cultural Data Steward", () => {
     );
     expect(runner).toContain(
       "registry_review_items",
+    );
+    expect(runner).toContain(
+      'finding.disposition ===\n          "observe"',
+    );
+    expect(runner).toContain(
+      "observed_findings",
     );
     expect(runner).toContain(
       "registry_canonical_write_events",
