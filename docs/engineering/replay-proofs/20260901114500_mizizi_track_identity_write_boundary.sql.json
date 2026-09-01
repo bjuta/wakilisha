@@ -42,7 +42,7 @@
   "production_history_rebound_from": "20260901102347",
   "production_sql_replayed_after_history_rebind": false,
   "production_verifier": "pass",
-  "production_types_source_match": "expected_exact_after_restoring_last_production_accepted_public_editorial_snapshot",
+  "production_types_source_match": "exact",
   "production_edge_functions": {
     "ingest-artist-discography": {
       "version": 58,
@@ -85,5 +85,8 @@
     "historical_apply_run": false
   },
   "production_promoted_at": "2026-09-01T10:26:09Z",
-  "production_types_sha256": "7df6bde56aa9ad76a3af34ea056f621ada0536903046f1692e5353f97b173bcf"
+  "production_types_sha256": "7df6bde56aa9ad76a3af34ea056f621ada0536903046f1692e5353f97b173bcf",
+  "production_schema_and_history_drift_gate": "pass",
+  "production_types_scope": "public,editorial",
+  "production_closure_verified_at": "2026-09-01T10:33:00Z"
 }
