@@ -145,6 +145,35 @@ export interface PublicTrackGenreRef {
   name: string;
 }
 
+export interface PublicTrackAliasReleaseContext {
+  id: string;
+  slug: string;
+  title: string;
+  releaseType: string;
+  releaseDate: string;
+  artworkUrl: string;
+  trackNumber: number;
+  discNumber: number;
+}
+
+export interface PublicTrackAliasCandidate {
+  id: string;
+  slug: string;
+  title: string;
+  isrc: string | null;
+  artworkUrl: string;
+  canonicalPath: string;
+  releases: PublicTrackAliasReleaseContext[];
+}
+
+export interface PublicTrackAliasResolution {
+  kind: "unique" | "ambiguous" | "not_found";
+  artistSlug: string;
+  trackSlug: string;
+  candidate?: PublicTrackAliasCandidate | null;
+  candidates: PublicTrackAliasCandidate[];
+}
+
 export interface PublicTrackDetail {
   track: PublicTrackRecord;
   // v28: structured per-role artist list (primary, featured, etc.)
