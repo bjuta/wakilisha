@@ -1,6 +1,7 @@
 // ── SHARED BLOCK (Phase A) ──
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.1";
 import { canonicalTrackSlugCandidate } from "../_shared/registry-track-identity.ts";
+import { parseArtistCreditLine } from "../_shared/registry-artist-credit-grammar.ts";
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 const ALLOWED_ORIGINS = ["https://wakilisha.africa","https://www.wakilisha.africa","https://staging.wakilisha.africa","https://wakilisha.africa","https://wakilisha.africa","https://wakilisha.africa","http://localhost:5173","http://localhost:3000"];
@@ -11,18 +12,8 @@ function jRaw(data:unknown,cors:Record<string,string>,s=200):Response{return new
 function slugify(s:string):string{return s.toLowerCase().normalize("NFKD").replace(/[\u0300-\u036f]/g,"").replace(/[^a-z0-9]+/g,"-").replace(/^-+|-+$/g,"").slice(0,160);}
 // ── END SHARED BLOCK ──
 
-function parseArtistNames(artistName: string): { primary: string; featured: string[] } {
-  if (!artistName) return { primary: "", featured: [] };
-  const names = artistName
-    .split(
-      /\s*,\s*|\s*&\s*|\s+(?:feat\.?|ft\.?|featuring|and|x)\s+/i,
-    )
-    .map((name) => name.trim())
-    .filter(Boolean);
-  return {
-    primary: names[0] ?? "",
-    featured: names.slice(1),
-  };
+function parseArtistNames(artistName: string) {
+  return parseArtistCreditLine(artistName);
 }
 
 async function findOrCreateArtist(db: ReturnType<typeof createClient>, artistName: string, now: string): Promise<string | null> {
@@ -180,12 +171,14 @@ async function writeTracksToRelease(
       (t.artistName as string) ||
       primaryArtistName ||
       "Unknown";
-    const {
-      primary: parsedPrimary,
-      featured: parsedFeatured,
-    } = parseArtistNames(
-      rawArtistName,
-    );
+    const parsedArtistCredit =
+      parseArtistNames(
+        rawArtistName,
+      );
+    const parsedPrimary =
+      parsedArtistCredit.leadName;
+    const parsedParticipants =
+      parsedArtistCredit.participants.slice(1);
     const trackPrimaryArtistSlug =
       slugify(
         parsedPrimary ||
@@ -195,8 +188,11 @@ async function writeTracksToRelease(
       canonicalTrackSlugCandidate(
         trackTitle,
         {
-          featuredArtistNames:
-            parsedFeatured,
+          creditArtistNames:
+            parsedParticipants.map(
+              (participant) =>
+                participant.name,
+            ),
         },
       );
 
@@ -489,36 +485,38 @@ async function writeTracksToRelease(
     }
 
     for (
-      let fi = 0;
-      fi < parsedFeatured.length;
-      fi++
+      let pi = 0;
+      pi < parsedParticipants.length;
+      pi++
     ) {
-      const featuredName =
-        parsedFeatured[fi];
-      const featuredSlug =
-        slugify(featuredName);
-      if (!featuredSlug) continue;
+      const participant =
+        parsedParticipants[pi];
+      const participantName =
+        participant.name;
+      const participantSlug =
+        slugify(participantName);
+      if (!participantSlug) continue;
 
-      const { data: featuredArtist } =
+      const { data: participantArtist } =
         await db
           .from("registry_artists")
           .select("id")
-          .eq("slug", featuredSlug)
+          .eq("slug", participantSlug)
           .in(
             "status",
             ["active", "draft"],
           )
           .maybeSingle();
-      const featuredArtistId =
-        featuredArtist
-          ? String(featuredArtist.id)
+      const participantArtistId =
+        participantArtist
+          ? String(participantArtist.id)
           : await findOrCreateArtist(
               db,
-              featuredName,
+              participantName,
               now,
             );
 
-      if (featuredArtistId) {
+      if (participantArtistId) {
         const { data: existingLink } =
           await db
             .from("registry_track_artists")
@@ -526,9 +524,13 @@ async function writeTracksToRelease(
             .eq("track_id", trackId)
             .eq(
               "artist_id",
-              featuredArtistId,
+              participantArtistId,
             )
             .maybeSingle();
+
+        const explicitlyFeatured =
+          participant.roleHint ===
+          "featured";
 
         if (!existingLink) {
           await db
@@ -537,24 +539,39 @@ async function writeTracksToRelease(
               id: crypto.randomUUID(),
               track_id: trackId,
               artist_id:
-                featuredArtistId,
+                participantArtistId,
               artist_slug:
-                featuredSlug,
+                participantSlug,
               artist_name_text:
-                featuredName,
-              role: "featured",
+                participantName,
+              role: explicitlyFeatured
+                ? "featured"
+                : "credited_artist",
               is_primary: false,
-              is_featured: true,
-              credit_order: fi + 1,
+              is_featured:
+                explicitlyFeatured,
+              credit_order: pi + 1,
               source:
                 "provider_intake",
               confidence: 85,
               status: "active",
-              metadata: {},
+              metadata: {
+                credit_separator_kind:
+                  participant.separatorKind,
+                credit_separator_token:
+                  participant.separatorToken,
+                role_source:
+                  explicitlyFeatured
+                    ? "structured_artist_line_feature_marker"
+                    : "structured_artist_line_participant_only",
+              },
               created_at: now,
               updated_at: now,
             });
-          featuredArtistsCreated++;
+
+          if (explicitlyFeatured) {
+            featuredArtistsCreated++;
+          }
         }
 
         await ensureEntityRelationship(
@@ -562,11 +579,15 @@ async function writeTracksToRelease(
           "track",
           resolvedTrackSlug,
           "artist",
-          featuredSlug,
-          "FEATURED_ON",
-          "featured",
+          participantSlug,
+          explicitlyFeatured
+            ? "FEATURED_ON"
+            : "PERFORMED_BY",
+          explicitlyFeatured
+            ? "featured"
+            : "credited",
           85,
-          fi + 1,
+          pi + 1,
           now,
         );
         entityRelationshipsCreated++;
