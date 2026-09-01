@@ -103,20 +103,32 @@ Auto-fixes must:
 
 ### Review
 
-MIZIZI sends changes to review when they may alter cultural meaning.
+Review is an escalation, not the default destination for untidy data.
+
+MIZIZI creates review work only when a human decision is required to unblock a material canonical repair or protect public correctness.
 
 Examples:
 
-- removing `feat.` text from a canonical Track title
-- resolving a slug collision
-- deciding whether a remix, live version, edit, language marker, or movement label is part of the work's identity
-- changing a Release title
-- changing a chart artist when source presentation and Registry primary-artist authority disagree
-- adding a missing credit
+- a collision blocks an otherwise safe canonical slug repair
+- explicit primary-artist scope is missing for an artist-scoped Track repair
+- a current pointer cannot be tied safely to the canonical Track being repaired
+- two plausible canonical identities remain after typed Registry authority and provider evidence are exhausted
+- a culturally meaningful title or version distinction must actually be changed now
 
 Review uses the existing Registry review system.
 
 ### Observe
+
+Observe is the default for findings that are useful to measure but do not require a human decision now.
+
+Observed findings do not create Registry review items.
+
+Examples:
+
+- featured-credit notation inside a display title
+- provider packaging inside a Release title or non-public Release slug
+- an unexplained legacy slug mismatch that is not safe to auto-repair
+- chart artist presentation that differs from Registry primary-credit presentation
 
 Provider payloads, raw source labels, historical aliases, and old values remain evidence.
 
@@ -144,13 +156,13 @@ Non-credit version information such as `Remix` is preserved.
 
 Detects a Track slug that differs from the minimal title-derived candidate without a positive structural noise signal.
 
-This is review-only in v1. The mismatch may encode collision history, transliteration, a version distinction, or an earlier editorial choice that string cleanup cannot safely interpret.
+This is observe-only in v1. The mismatch may encode collision history, transliteration, a version distinction, or an earlier editorial choice that string cleanup cannot safely interpret. It does not create review work unless a later material repair is blocked by it.
 
 ### `track_title_credit_noise`
 
 Detects featured-credit notation inside the canonical Track title.
 
-This is review-only in v1 because titles are cultural data.
+This is observe-only in v1 because titles are cultural data. MIZIZI records the pattern without creating an admin task.
 
 ### `release_title_provider_packaging`
 
@@ -160,7 +172,7 @@ Detects exact provider packaging suffixes such as:
 - ` - EP`
 - ` - Album`
 
-This is review-only in v1.
+This is observe-only in v1. Provider packaging is measured without creating an admin task.
 
 Phrases such as `The Album` are not treated as provider suffixes.
 
@@ -168,7 +180,7 @@ Phrases such as `The Album` are not treated as provider suffixes.
 
 Proposes a minimal Release slug when an exact provider packaging suffix has been identified in the title.
 
-This is review-only in v1.
+This is observe-only in v1. MIZIZI does not create a second review item for a derived slug while Release rewrite and redirect policy remains unsealed.
 
 ### `chart_track_slug_drift`
 
@@ -180,7 +192,7 @@ This is an auto-fix candidate.
 
 Flags chart artist-slug disagreement with the canonical Registry primary artist.
 
-This remains review-only in v1 because chart source presentation may intentionally differ from Registry primary-credit presentation.
+This remains observe-only in v1 because chart source presentation may intentionally differ from Registry primary-credit presentation. A difference alone is not an admin task.
 
 ## Current production baseline, 31 August 2026
 
@@ -189,8 +201,8 @@ Read-only production audit:
 - 2,101 active Tracks
 - 526 active Tracks whose current slug differs from the minimal title-derived candidate
 - 514 of those mismatches have a positive structural noise signal and may enter the automatic-candidate pipeline
-- 12 mismatch-only cases remain review work
-- 11 strong-signal cases lack an explicit active primary-artist credit and therefore cannot be auto-applied
+- 12 mismatch-only cases remain observed debt rather than automatic admin work
+- 11 strong-signal cases lack an explicit active primary-artist credit and therefore cannot be auto-applied; only a blocked repair may escalate
 - 490 Track slugs containing `feat`, `ft`, or `featuring`
 - 37 Track slugs repeating the primary artist with a double-hyphen prefix
 - 841 active Releases
@@ -287,6 +299,17 @@ Old public routes are institutional memory.
 When canonical slug identity changes, the old path must continue to resolve permanently.
 
 No silent 404 migration is acceptable.
+
+## Outtray budget
+
+MIZIZI must not turn a hygiene scan into a work generator.
+
+A passive finding is telemetry until one of two things is true:
+
+1. typed Registry authority proves a reversible repair, in which case MIZIZI applies it automatically
+2. a human decision is genuinely required to unblock a material repair or protect public correctness, in which case MIZIZI creates one idempotent review item
+
+This means title observations, Release packaging observations, unexplained low-risk mismatches, and chart artist presentation differences do not create review items by default.
 
 ## Safety policy
 
