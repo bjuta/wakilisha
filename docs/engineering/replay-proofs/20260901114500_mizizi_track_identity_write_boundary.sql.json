@@ -1,6 +1,6 @@
 {
   "migration_file": "supabase/migrations/20260901114500_mizizi_track_identity_write_boundary.sql",
-  "migration_sha256": "3035af8acbfc4b463b9912789051400e5ff3228b4bd39ecf4252e4dcdfb11e0e",
+  "migration_sha256": "30761295ea5cd375ef47ceb78489c285e7569dcd0e4e224e5ad1c25afd5036cb",
   "base_main_sha": "a9f4f0152ac301e8a3e58a05ad473f96690fdd27",
   "preview_project_ref": "xnjeojzusltpruchqzfx",
   "preview_branch_id": "d0b24b25-30bf-453d-9ed3-8b78fdf91b0a",
@@ -35,5 +35,5 @@
     "preview_history_rebound_from": "20260901101324",
     "exact_candidate_history_rebound_to_canonical_version": true
   },
-  "verified_at": "2026-09-01T10:18:00Z"
+  "verified_at": "2026-09-01T10:23:00Z"
 }
