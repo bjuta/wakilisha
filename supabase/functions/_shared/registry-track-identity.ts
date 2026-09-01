@@ -183,6 +183,7 @@ function stripStructurallyProvenFeatureCredits(
 
   if (
     suffixMatch &&
+    !/[()[\]{}]/.test(suffixMatch[0]) &&
     fragmentHasStructuredFeaturedArtist(
       suffixMatch[0],
       featuredArtistNames,
