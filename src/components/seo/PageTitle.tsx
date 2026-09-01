@@ -1,5 +1,6 @@
 import { useEffect } from "react";
 import { useLocation } from "react-router-dom";
+import { isRegistryTrackId } from "@/utils/trackUrl";
 
 const SITE_NAME = "WAKILISHA";
 const SITE_URL = "https://wakilisha.africa";
@@ -359,13 +360,21 @@ function modelFromPath(pathname: string): SeoModel {
   }
 
   if (section === "tracks" && parts.length >= 3) {
-    const artist = titleCase(parts[1]);
     const track = titleCase(parts[2]);
+    const canonicalRegistryRoute =
+      isRegistryTrackId(parts[1] || "");
+
     return {
-      title: `${track} by ${artist}`,
-      description: firstSentence(`Explore ${track} by ${artist} on WAKILISHA, including chart context, credits, and music metadata.`),
+      title: track,
+      description: firstSentence(
+        canonicalRegistryRoute
+          ? `Explore ${track} on WAKILISHA, including credits, Release context, charts, and cultural metadata.`
+          : `This historical WAKILISHA Track link resolves to canonical Registry identity.`,
+      ),
       canonicalPath: path,
-      robots: "index, follow",
+      robots: canonicalRegistryRoute
+        ? "index, follow"
+        : "noindex, follow",
       ogType: "music.song",
       kind: "track",
       jsonLd: [],
@@ -373,13 +382,13 @@ function modelFromPath(pathname: string): SeoModel {
   }
 
   if (section === "releases" && parts.length >= 4) {
-    const artist = titleCase(parts[1]);
     const track = titleCase(parts[3]);
     return {
-      title: `${track} by ${artist}`,
-      description: firstSentence(`Explore ${track} by ${artist} on WAKILISHA, including release context, credits, chart context, and music metadata.`),
+      title: track,
+      description:
+        "This historical Release-scoped Track link resolves to canonical Registry Track identity.",
       canonicalPath: path,
-      robots: "index, follow",
+      robots: "noindex, follow",
       ogType: "music.song",
       kind: "track",
       jsonLd: [],
