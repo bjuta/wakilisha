@@ -926,7 +926,6 @@ export default function TrackDetail() {
           nextTrack.albumTotalTracks > 1;
 
         if (
-          releaseSlug &&
           !hasPublicRelease &&
           standalonePath !== location.pathname
         ) {
@@ -938,7 +937,6 @@ export default function TrackDetail() {
         }
 
         if (
-          !releaseSlug &&
           hasPublicRelease &&
           scopedArtistSlug &&
           nextTrack.albumSlug &&
