@@ -1,7 +1,15 @@
 import { useEffect, useState, type ReactNode } from "react";
 import { useParams, Link, useNavigate, useLocation } from "react-router-dom";
 import { usePlayer } from "@/context/PlayerContext";
-import { getReleaseTrack, getTrack, type PublicTrackDetail } from "@/services/publicApi/client";
+import {
+  getReleaseTrack,
+  getTrack,
+  resolveTrackAlias,
+} from "@/services/publicApi/client";
+import type {
+  PublicTrackAliasResolution,
+  PublicTrackDetail,
+} from "@/services/publicApi/types";
 import { resolveScopedSlugRedirect } from "@/services/slugRedirects";
 import { buildTrackHeroIntro, buildTrackSeoDescription } from "@/services/cultureContext/trackAdapters";
 import { TrackChartSparkline } from "@/components/charts/TrackChartSparkline";
@@ -11,8 +19,12 @@ import type { MusicRecordingSchema } from "@/components/seo/SchemaOrg";
 import TrackLyricsSection from "./components/TrackLyricsSection";
 import TrackRelatedTracks from "./components/TrackRelatedTracks";
 import TrackReleaseTracklist from "./components/TrackReleaseTracklist";
+import TrackAliasDisambiguation from "./components/TrackAliasDisambiguation";
 import { releaseUrl } from "@/utils/releaseUrl";
-import { canonicalTrackUrl, releaseTrackUrl, trackUrl } from "@/utils/trackUrl";
+import {
+  canonicalTrackUrl,
+  isRegistryTrackId,
+} from "@/utils/trackUrl";
 import { WkIcon } from "@/components/design-system/Icon";
 import { PlayableArtwork } from "@/components/design-system/music/PlayableArtwork";
 import { TrackActionsMenu } from "@/components/tracks/TrackActionsMenu";
@@ -458,10 +470,8 @@ function TrackAlbumContextSection({
   if (!vm.albumTitle || vm.albumTotalTracks <= 1) return null;
 
   const trackActionsHref = canonicalTrackUrl(
-    vm.albumArtistSlug || vm.artistSlug,
+    vm.id,
     vm.slug,
-    vm.albumSlug,
-    vm.albumTotalTracks,
   );
   const artistNames = vm.artists.length > 0
     ? vm.artists.map((artist) => artist.name).filter(Boolean).join(", ")
@@ -717,6 +727,8 @@ export default function TrackDetail() {
   const user = useAuthUser();
   const { save: saveEntityAction, loading: entityActionLoading } = useEntityActions(user.id || undefined);
   const [track, setTrack] = useState<TrackViewModel | null>(null);
+  const [aliasResolution, setAliasResolution] =
+    useState<PublicTrackAliasResolution | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [trackSaved, setTrackSaved] = useState(false);
@@ -732,19 +744,6 @@ export default function TrackDetail() {
     entitySlug: trackSlug,
     entityType: "track",
   });
-
-  useEffect(() => {
-    const cleanedTrackSlug = cleanDirtyTrackSlug(artistSlug, trackSlug);
-    if (!artistSlug || !trackSlug || !cleanedTrackSlug || cleanedTrackSlug === trackSlug) return;
-
-    const cleanedPath = releaseSlug
-      ? releaseTrackUrl(artistSlug, releaseSlug, cleanedTrackSlug)
-      : trackUrl(cleanedTrackSlug, [artistSlug]);
-
-    navigate(`${cleanedPath}${location.search || ""}${location.hash || ""}`, {
-      replace: true,
-    });
-  }, [artistSlug, releaseSlug, trackSlug, navigate, location.search, location.hash]);
 
   useEffect(() => {
     const syncApplePlaybackState = () => {
@@ -826,148 +825,182 @@ export default function TrackDetail() {
 
   useEffect(() => {
     let alive = true;
-    if (!artistSlug || !trackSlug) {
+
+    const failNotFound = async () => {
+      const redirect = await resolveScopedSlugRedirect(
+        "track",
+        artistSlug || "",
+        trackSlug || "",
+        { releaseSlug },
+      );
+
+      if (!alive) return;
+
+      if (
+        redirect &&
+        redirect.newPath !== location.pathname
+      ) {
+        navigate(
+          `${redirect.newPath}${location.search || ""}${location.hash || ""}`,
+          { replace: true },
+        );
+        return;
+      }
+
+      trackEvent("page_not_found", {
+        pageType: "404",
+        entityType: "broken_page",
+        entitySlug: releaseSlug
+          ? `${artistSlug || "unknown"}/${releaseSlug}/${trackSlug || "unknown"}`
+          : `${artistSlug || "unknown"}/${trackSlug || "unknown"}`,
+        context: {
+          status_code: 404,
+          not_found_path: location.pathname,
+          not_found_search: location.search || "",
+          not_found_hash: location.hash || "",
+          route_guess: "missing_track",
+          soft_404_surface: "track_detail",
+          artist_slug: artistSlug || "",
+          release_slug: releaseSlug || "",
+          track_slug: trackSlug || "",
+        },
+      });
+
+      setError("Track not found.");
       setLoading(false);
-      setError("No track slug provided");
-      return;
-    }
+    };
 
-    setLoading(true);
-    setError(null);
-    setTrackSaved(false);
-    setTrackSaveError(null);
-    const request = releaseSlug
-      ? getReleaseTrack(
-          artistSlug,
-          releaseSlug,
-          trackSlug,
-        ).then(
-          async (scopedTrack) =>
-            scopedTrack ||
-            getTrack(
-              artistSlug,
-              trackSlug,
-            ),
-        )
-      : getTrack(artistSlug, trackSlug);
+    const run = async () => {
+      if (!artistSlug || !trackSlug) {
+        setLoading(false);
+        setError("No Track identity provided.");
+        return;
+      }
 
-    request
-      .then(async (apiData) => {
-        if (!alive) return;
-        if (!apiData) {
-          const redirect = await resolveScopedSlugRedirect(
-            "track",
+      setLoading(true);
+      setError(null);
+      setAliasResolution(null);
+      setTrackSaved(false);
+      setTrackSaveError(null);
+
+      try {
+        if (releaseSlug) {
+          const scopedTrack = await getReleaseTrack(
             artistSlug,
+            releaseSlug,
             trackSlug,
-            { releaseSlug },
           );
 
           if (!alive) return;
 
-          if (redirect && redirect.newPath !== location.pathname) {
-            navigate(
-              `${redirect.newPath}${location.search || ""}${location.hash || ""}`,
-              { replace: true },
-            );
+          if (!scopedTrack) {
+            await failNotFound();
             return;
           }
 
-          trackEvent("page_not_found", {
-            pageType: "404",
-            entityType: "broken_page",
-            entitySlug: releaseSlug
-              ? `${artistSlug || "unknown"}/${releaseSlug}/${trackSlug || "unknown"}`
-              : `${artistSlug || "unknown"}/${trackSlug || "unknown"}`,
-            context: {
-              status_code: 404,
-              not_found_path: location.pathname,
-              not_found_search: location.search || "",
-              not_found_hash: location.hash || "",
-              route_guess: "missing_track",
-              suggested_fix: cleanDirtyTrackSlug(artistSlug, trackSlug)
-                ? releaseSlug
-                  ? releaseTrackUrl(
-                      artistSlug,
-                      releaseSlug,
-                      cleanDirtyTrackSlug(artistSlug, trackSlug),
-                    )
-                  : trackUrl(
-                      cleanDirtyTrackSlug(artistSlug, trackSlug),
-                      [artistSlug],
-                    )
-                : "",
-              soft_404_surface: "track_detail",
-              artist_slug: artistSlug,
-              release_slug: releaseSlug || "",
-              track_slug: trackSlug,
-            },
-          });
+          const canonicalPath = canonicalTrackUrl(
+            String(scopedTrack.track.id),
+            String(scopedTrack.track.slug || trackSlug),
+          );
 
-          setError("Track not found.");
-          setLoading(false);
-          return;
-        }
-        const nextTrack = apiToViewModel(apiData);
-        const scopedArtistSlug =
-          nextTrack.albumArtistSlug ||
-          nextTrack.artistSlug ||
-          artistSlug;
-        const scopedTrackSlug =
-          nextTrack.slug ||
-          trackSlug;
+          if (!canonicalPath) {
+            setError("Track identity is incomplete.");
+            setLoading(false);
+            return;
+          }
 
-        const standalonePath = trackUrl(
-          scopedTrackSlug,
-          scopedArtistSlug
-            ? [scopedArtistSlug]
-            : [],
-        );
-        const hasPublicRelease =
-          nextTrack.albumTotalTracks > 1;
-
-        if (
-          !hasPublicRelease &&
-          standalonePath !== location.pathname
-        ) {
           navigate(
-            `${standalonePath}${location.search || ""}${location.hash || ""}`,
+            `${canonicalPath}${location.search || ""}${location.hash || ""}`,
             { replace: true },
           );
           return;
         }
 
-        if (
-          hasPublicRelease &&
-          scopedArtistSlug &&
-          nextTrack.albumSlug &&
-          scopedTrackSlug
-        ) {
-          const scopedPath = releaseTrackUrl(
-            scopedArtistSlug,
-            nextTrack.albumSlug,
-            scopedTrackSlug,
+        if (!isRegistryTrackId(artistSlug)) {
+          const resolution = await resolveTrackAlias(
+            artistSlug,
+            trackSlug,
           );
 
-          if (scopedPath !== location.pathname) {
+          if (!alive) return;
+
+          if (
+            resolution.kind === "unique" &&
+            resolution.candidate?.canonicalPath
+          ) {
             navigate(
-              `${scopedPath}${location.search || ""}${location.hash || ""}`,
+              `${resolution.candidate.canonicalPath}${location.search || ""}${location.hash || ""}`,
               { replace: true },
             );
             return;
           }
+
+          if (
+            resolution.kind === "ambiguous" &&
+            resolution.candidates.length > 1
+          ) {
+            setAliasResolution(resolution);
+            setTrack(null);
+            setLoading(false);
+            return;
+          }
+
+          await failNotFound();
+          return;
+        }
+
+        const apiData = await getTrack(
+          artistSlug,
+          trackSlug,
+        );
+
+        if (!alive) return;
+
+        if (!apiData) {
+          await failNotFound();
+          return;
+        }
+
+        const nextTrack = apiToViewModel(apiData);
+        const canonicalPath = canonicalTrackUrl(
+          nextTrack.id,
+          nextTrack.slug || trackSlug,
+        );
+
+        if (
+          canonicalPath &&
+          canonicalPath !== location.pathname
+        ) {
+          navigate(
+            `${canonicalPath}${location.search || ""}${location.hash || ""}`,
+            { replace: true },
+          );
+          return;
         }
 
         setTrack(nextTrack);
         setLoading(false);
-      })
-      .catch((err) => {
+      } catch {
         if (!alive) return;
-        setError("Could not load track.");
+        setError("Could not load Track.");
         setLoading(false);
-      });
+      }
+    };
 
-    return () => { alive = false; };
-  }, [artistSlug, releaseSlug, trackSlug, navigate, location.pathname, location.search, location.hash]);
+    void run();
+
+    return () => {
+      alive = false;
+    };
+  }, [
+    artistSlug,
+    releaseSlug,
+    trackSlug,
+    navigate,
+    location.pathname,
+    location.search,
+    location.hash,
+  ]);
 
   if (loading) {
     return (
@@ -977,6 +1010,14 @@ export default function TrackDetail() {
           <p className="text-[15px] font-semibold text-[var(--wk-text-muted)]">Loading track&hellip;</p>
         </div>
       </main>
+    );
+  }
+
+  if (aliasResolution?.kind === "ambiguous") {
+    return (
+      <TrackAliasDisambiguation
+        resolution={aliasResolution}
+      />
     );
   }
 
@@ -1020,10 +1061,8 @@ export default function TrackDetail() {
     releaseSlug ||
     "";
   const canonicalPath = canonicalTrackUrl(
-    canonicalArtistSlug,
+    track.id,
     canonicalTrackSlug,
-    canonicalReleaseSlug,
-    track.albumTotalTracks,
   );
   const canonicalAbsoluteUrl =
     typeof window !== "undefined"
