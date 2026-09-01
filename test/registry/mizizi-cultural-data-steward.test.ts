@@ -331,6 +331,11 @@ describe("MIZIZI Cultural Data Steward", () => {
         "supabase/functions/chart-ingest-api/index.ts",
         "utf8",
       );
+    const scraper =
+      readFileSync(
+        "supabase/functions/scrape-artist-data/index.ts",
+        "utf8",
+      );
 
     expect(sharedRule).toContain(
       "canonicalTrackSlugCandidate",
@@ -358,6 +363,18 @@ describe("MIZIZI Cultural Data Steward", () => {
     );
     expect(chartIngest).not.toContain(
       "uniqueTrackSlug",
+    );
+    expect(scraper).toContain(
+      'from "../_shared/registry-track-identity.ts"',
+    );
+    expect(scraper).toContain(
+      "resolveTrackInArtistScope",
+    );
+    expect(scraper).not.toContain(
+      "artistScopedSlugPrefix",
+    );
+    expect(scraper).not.toContain(
+      "seenTrackSlugs",
     );
   });
 
