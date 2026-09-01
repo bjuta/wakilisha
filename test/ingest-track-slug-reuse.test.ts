@@ -27,18 +27,51 @@ function createSequentialIdFactory(): () => string {
 }
 
 describe("canonical Track slug candidate", () => {
-  it("keeps provider feature credits out of Track route identity", () => {
+  it("keeps structurally proven feature credits out of Track route identity", () => {
     expect(
       canonicalTrackSlugCandidate(
         "FICHA WHITE (feat. Jovie Jovv, Shappaman & KXOBIE)",
+        {
+          featuredArtistNames: [
+            "Jovie Jovv",
+            "Shappaman",
+            "KXOBIE",
+          ],
+        },
       ),
     ).toBe("ficha-white");
 
     expect(
       canonicalTrackSlugCandidate(
         "Song ft. Artist B",
+        {
+          featuredArtistNames: [
+            "Artist B",
+          ],
+        },
       ),
     ).toBe("song");
+  });
+
+  it("does not infer feature-credit structure from title text alone", () => {
+    expect(
+      canonicalTrackSlugCandidate(
+        "Song ft. Artist B",
+      ),
+    ).toBe("song-ft-artist-b");
+
+    expect(
+      canonicalTrackSlugCandidate(
+        "Road to Ft. Lauderdale",
+        {
+          featuredArtistNames: [
+            "Someone Else",
+          ],
+        },
+      ),
+    ).toBe(
+      "road-to-ft-lauderdale",
+    );
   });
 
   it("preserves culturally meaningful version wording", () => {
