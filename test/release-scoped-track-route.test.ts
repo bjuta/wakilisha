@@ -387,16 +387,25 @@ describe("release-scoped track routes", () => {
       "function isMusicDetailUrl(url)",
     );
     expect(sitemapBuilder).toContain(
-      "const distUrlSet = new Set(distUrls);",
+      'const metadataManifestPath = path.join(distDir, "seo-metadata-manifest.json");',
     );
     expect(sitemapBuilder).toContain(
-      "!isMusicDetailUrl(url) ||",
+      "const canonicalManifestUrlSet = new Set(",
     );
     expect(sitemapBuilder).toContain(
-      "distUrlSet.has(url)",
+      "const unexpectedMusicDistUrls = distUrls.filter(",
     );
     expect(sitemapBuilder).toContain(
+      "const missingMusicPrerenders = canonicalManifestUrls.filter(",
+    );
+    expect(sitemapBuilder).not.toContain(
       "const resurrectedMusicUrls = sitemapUrls.filter(",
+    );
+    expect(prerender).not.toContain(
+      "function readSitemapPaths()",
+    );
+    expect(prerender).toContain(
+      "function readCanonicalSeedPaths()",
     );
 
     expect(sitemapFunction).toContain(

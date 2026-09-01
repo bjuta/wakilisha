@@ -9,7 +9,6 @@ const DEFAULT_DESCRIPTION =
 
 const DIST_DIR = path.resolve("dist");
 const INDEX_PATH = path.join(DIST_DIR, "index.html");
-const SITEMAP_PATH = path.join(DIST_DIR, "sitemap.xml");
 const ROUTE_MANIFEST_PATH = path.resolve("public/seo-prerender-routes.txt");
 const DB_METADATA_OUTPUT_PATH = path.join(DIST_DIR, "seo-metadata-manifest.json");
 
@@ -40,6 +39,13 @@ const STATIC_ROUTES = {
     robots: "index, follow",
     ogType: "website",
     kind: "home",
+  },
+  "/magazine": {
+    title: "African music stories and culture",
+    description: DEFAULT_DESCRIPTION,
+    robots: "index, follow",
+    ogType: "website",
+    kind: "collection",
   },
   "/charts": {
     title: "African music charts",
@@ -774,7 +780,7 @@ async function fetchPublicContentJson(apiBase, anonKey, pagePath) {
 }
 
 function structuredDataTargetPaths(section) {
-  return [...new Set([...readSitemapPaths(), ...DB_METADATA_BY_PATH.keys()].filter(isCanonicalPublicPath))]
+  return [...new Set([...readCanonicalSeedPaths(), ...DB_METADATA_BY_PATH.keys()].filter(isCanonicalPublicPath))]
     .map(cleanPath)
     .filter((pagePath) => pagePath.startsWith(`/${section}/`));
 }
@@ -887,7 +893,7 @@ async function fetchTrackMetadataManifest() {
   const paths = [
     ...new Set(
       [
-        ...readSitemapPaths(),
+        ...readCanonicalSeedPaths(),
         ...DB_METADATA_BY_PATH.keys(),
       ]
         .filter(isCanonicalPublicPath)
@@ -1658,32 +1664,16 @@ function isCanonicalPublicPath(pagePath) {
   return true;
 }
 
-function readSitemapPaths() {
-  if (!fs.existsSync(SITEMAP_PATH)) {
-    throw new Error("dist/sitemap.xml was not found. Build must copy public/sitemap.xml first.");
-  }
-
-  const xml = fs.readFileSync(SITEMAP_PATH, "utf8");
-  const matches = [...xml.matchAll(/<loc>(.*?)<\/loc>/gims)]
-    .map((match) => match[1]?.trim())
-    .filter(Boolean);
-
-  const paths = matches
-    .map((loc) => {
-      try {
-        const url = new URL(loc);
-        if (url.hostname !== "wakilisha.africa") return null;
-        return cleanPath(url.pathname);
-      } catch {
-        return null;
-      }
-    })
-    .filter(Boolean)
-    .filter((page) => !page.includes("/admin") && !page.includes("/auth") && !page.includes("/preview"))
-    .filter(isCanonicalPublicPath);
-
+function readCanonicalSeedPaths() {
   const extraPaths = readExtraRouteManifest();
-  return [...new Set(["/", ...paths, ...extraPaths, ...EXTRA_NOINDEX_PATHS.map(cleanPath)])];
+
+  return [
+    ...new Set([
+      ...Object.keys(STATIC_ROUTES).map(cleanPath),
+      ...extraPaths,
+      ...EXTRA_NOINDEX_PATHS.map(cleanPath),
+    ]),
+  ];
 }
 
 async function main() {
@@ -1744,7 +1734,7 @@ async function main() {
   const candidatePaths = [
     ...new Set(
       [
-        ...readSitemapPaths(),
+        ...readCanonicalSeedPaths(),
         ...DB_METADATA_BY_PATH.keys(),
       ].filter(isCanonicalPublicPath),
     ),

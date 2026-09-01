@@ -667,6 +667,7 @@ async function fetchPublicOrganizations(
 async function buildInternalItems(db: ReturnType<typeof createClient>): Promise<SitemapItem[]> {
   const items: SitemapItem[] = [
     { loc: makeUrl("/"), url_type: "static" },
+    { loc: makeUrl("/magazine"), url_type: "static" },
     { loc: makeUrl("/charts"), url_type: "static" },
     { loc: makeUrl("/artists"), url_type: "static" },
     { loc: makeUrl("/releases"), url_type: "static" },
@@ -674,6 +675,8 @@ async function buildInternalItems(db: ReturnType<typeof createClient>): Promise<
     { loc: makeUrl("/genres"), url_type: "static" },
     { loc: makeUrl("/labels"), url_type: "static" },
     { loc: makeUrl("/guides"), url_type: "static" },
+    { loc: makeUrl("/briefings"), url_type: "static" },
+    { loc: makeUrl("/api-docs"), url_type: "static" },
     { loc: makeUrl("/categories"), url_type: "static" },
     { loc: makeUrl("/tags"), url_type: "static" },
     { loc: makeUrl("/about"), url_type: "static" },

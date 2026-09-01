@@ -4,6 +4,7 @@ import path from "node:path";
 const siteOrigin = "https://wakilisha.africa";
 const distDir = path.resolve("dist");
 const sitemapXmlPath = path.join(distDir, "sitemap.xml");
+const metadataManifestPath = path.join(distDir, "seo-metadata-manifest.json");
 const indexHtmlPath = path.join(distDir, "index.html");
 const sitemapHtmlPath = path.join(distDir, "sitemap.html");
 
@@ -159,34 +160,56 @@ function ensureUrlInSitemap(xml, url) {
   return xml.replace("</urlset>", `${block}</urlset>`);
 }
 
-const sitemapXml = readRequired(sitemapXmlPath);
+const metadataManifest = JSON.parse(
+  readRequired(metadataManifestPath),
+);
 const indexHtml = readRequired(indexHtmlPath);
 
-const sitemapUrls = Array.from(sitemapXml.matchAll(/<loc>(.*?)<\/loc>/g))
-  .map((match) => match[1].trim())
-  .filter((url) => url.startsWith(siteOrigin));
+const canonicalManifestUrls = Object.keys(metadataManifest)
+  .map((pathname) => {
+    const clean = String(pathname || "").trim();
+    if (!clean || !clean.startsWith("/")) return null;
+    return `${siteOrigin}${clean === "/" ? "" : clean}`;
+  })
+  .filter(Boolean);
+
+const canonicalManifestUrlSet = new Set(
+  canonicalManifestUrls,
+);
 
 const distUrls = findDistIndexFiles(distDir)
   .map(publicUrlFromDistIndex)
   .filter(Boolean);
 
 const distUrlSet = new Set(distUrls);
-const canonicalSitemapUrls = sitemapUrls.filter(
-  (url) =>
-    !isMusicDetailUrl(url) ||
-    distUrlSet.has(url),
-);
-const droppedStaleMusicUrls =
-  sitemapUrls.length -
-  canonicalSitemapUrls.length;
 
-console.log(
-  `Public sitemap dropped ${droppedStaleMusicUrls.toLocaleString()} stale music-detail URLs that current prerender no longer owns.`,
+const unexpectedMusicDistUrls = distUrls.filter(
+  (url) =>
+    isMusicDetailUrl(url) &&
+    !canonicalManifestUrlSet.has(url),
 );
+
+if (unexpectedMusicDistUrls.length) {
+  fail(
+    `Prerender emitted music-detail URLs outside current Registry sitemap authority: ${unexpectedMusicDistUrls.slice(0, 10).join(", ")}`,
+  );
+}
+
+const missingMusicPrerenders = canonicalManifestUrls.filter(
+  (url) =>
+    isMusicDetailUrl(url) &&
+    !distUrlSet.has(url),
+);
+
+if (missingMusicPrerenders.length) {
+  fail(
+    `Current Registry sitemap authority is missing prerender output for music-detail URLs: ${missingMusicPrerenders.slice(0, 10).join(", ")}`,
+  );
+}
 
 const urls = uniqueSorted([
-  ...canonicalSitemapUrls,
-  ...distUrls,
+  ...canonicalManifestUrls,
+  ...distUrls.filter((url) => !isMusicDetailUrl(url)),
   `${siteOrigin}/sitemap.html`,
 ])
   .filter(isCanonicalPublicUrl)
@@ -336,18 +359,16 @@ if (shortTrackXmlUrls.length) {
   fail(`sitemap.xml still contains non-canonical short track URLs: ${shortTrackXmlUrls.slice(0, 10).join(", ")}`);
 }
 
-const resurrectedMusicUrls = sitemapUrls.filter(
-  (url) =>
-    isMusicDetailUrl(url) &&
-    !distUrlSet.has(url) &&
-    finalSitemapXml.includes(
-      `<loc>${url}</loc>`,
-    ),
+const finalMusicUrls = sitemapXmlUrls.filter(
+  isMusicDetailUrl,
+);
+const nonAuthorityMusicUrls = finalMusicUrls.filter(
+  (url) => !canonicalManifestUrlSet.has(url),
 );
 
-if (resurrectedMusicUrls.length) {
+if (nonAuthorityMusicUrls.length) {
   fail(
-    `sitemap.xml resurrected stale music-detail URLs: ${resurrectedMusicUrls.slice(0, 10).join(", ")}`,
+    `sitemap.xml contains music-detail URLs outside current Registry authority: ${nonAuthorityMusicUrls.slice(0, 10).join(", ")}`,
   );
 }
 

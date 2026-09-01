@@ -1,6 +1,3 @@
-# Extra public routes that must receive prerendered metadata even if the current sitemap misses them.
+# Extra public routes that must receive prerendered metadata even when they are not part of Registry sitemap authority.
 # One route per line. Keep these as root-relative paths.
-
-/releases/bien/alusa-why-are-you-topless
-/briefings
-/playlists
+# Current public routes are covered by STATIC_ROUTES and seo-sitemap-admin.
