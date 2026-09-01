@@ -459,15 +459,17 @@ function ReleaseArtworkCard({ release, onPreview }: { release: Release; onPrevie
             </span>
           </div>
         )}
-        <div className="absolute inset-0 flex items-center justify-center bg-black/0 group-hover:bg-black/30 transition-colors duration-300">
-          <button
-            onClick={(e) => { e.preventDefault(); onPreview(release); }}
-            className="opacity-0 group-hover:opacity-100 translate-y-1 group-hover:translate-y-0 transition-all duration-200 inline-flex items-center gap-1.5 rounded-full bg-white/90 px-3.5 py-2 text-[11px] font-extrabold text-black backdrop-blur cursor-pointer whitespace-nowrap"
-          >
-            <WkIcon name="Eye" size={12} />
-            Look inside
-          </button>
-        </div>
+        {release.trackCount > 1 ? (
+          <div className="absolute inset-0 flex items-center justify-center bg-black/0 group-hover:bg-black/30 transition-colors duration-300">
+            <button
+              onClick={(e) => { e.preventDefault(); onPreview(release); }}
+              className="opacity-0 group-hover:opacity-100 translate-y-1 group-hover:translate-y-0 transition-all duration-200 inline-flex items-center gap-1.5 rounded-full bg-white/90 px-3.5 py-2 text-[11px] font-extrabold text-black backdrop-blur cursor-pointer whitespace-nowrap"
+            >
+              <WkIcon name="Eye" size={12} />
+              Look inside
+            </button>
+          </div>
+        ) : null}
       </Link>
 
       <Link to={href} className="text-[13px] font-extrabold text-[var(--wk-text)] group-hover:text-[var(--wk-brand)] transition-colors leading-tight truncate">
@@ -595,11 +597,13 @@ function FeaturedReleaseCarousel({ releases, catalogStats, onPreview }: { releas
                   {activeIntro}
                 </p>
                 <div className="mt-4 flex flex-wrap gap-2">
-                  <button onClick={() => onPreview(active)} className="wk-button wk-button-primary cursor-pointer whitespace-nowrap">
-                    <WkIcon name="Eye" size={15} /> Look inside
-                  </button>
+                  {active.trackCount > 1 ? (
+                    <button onClick={() => onPreview(active)} className="wk-button wk-button-primary cursor-pointer whitespace-nowrap">
+                      <WkIcon name="Eye" size={15} /> Look inside
+                    </button>
+                  ) : null}
                   <Link to={releaseUrl(active)} className="wk-button wk-button-ghost border-white/20 bg-white/10 text-white hover:bg-white/16 whitespace-nowrap">
-                    <WkIcon name="ArrowUpRight" size={15} /> Open
+                    <WkIcon name="ArrowUpRight" size={15} /> {active.trackCount === 1 ? "Open track" : "Open"}
                   </Link>
                   <ShareButton item={{ title: active.title, subtitle: active.artist, description: shareDescription, imageUrl: active.artworkUrl, type: "album" }} />
                 </div>

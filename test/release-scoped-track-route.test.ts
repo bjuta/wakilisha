@@ -459,6 +459,12 @@ describe("public Release boundary", () => {
     expect(releasePage).toContain(
       "Singles, EPs, and albums",
     );
+    expect(releasePage).toContain(
+      "release.trackCount > 1",
+    );
+    expect(releasePage).toContain(
+      'active.trackCount === 1 ? "Open track" : "Open"',
+    );
     expect(gateway).toContain(
       "(trackCountByRelease.get(String(release.id)) || 0) > 0",
     );

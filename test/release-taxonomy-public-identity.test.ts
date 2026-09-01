@@ -37,6 +37,17 @@ describe("Release taxonomy and public identity", () => {
     ).toBe("/tracks/ywaya-tajiri/nervous");
   });
 
+  it("fails closed instead of manufacturing a Single Release detail URL", () => {
+    expect(
+      releaseUrl({
+        slug: "nervous-single",
+        artist: "Ywaya Tajiri",
+        releaseType: "Single",
+        trackCount: 1,
+      }),
+    ).toBe("/releases");
+  });
+
   it("keeps EP and Album cards on Release detail routes", () => {
     expect(
       releaseUrl({

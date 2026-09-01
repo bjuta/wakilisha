@@ -24,6 +24,7 @@ export type PublicReleaseRouteInput = {
   artist: string;
   artistSlug?: string;
   trackCount?: number;
+  releaseType?: string | null;
   singleTrackSlug?: string | null;
   singleTrackArtistSlug?: string | null;
 };
@@ -33,9 +34,12 @@ export function releaseUrl(release: PublicReleaseRouteInput): string {
     release.artistSlug ||
     slugify(release.artist);
   const trackCount = Number(release.trackCount || 0);
+  const isSingle =
+    trackCount === 1 ||
+    String(release.releaseType || "").trim().toLowerCase() === "single";
 
   if (
-    trackCount === 1 &&
+    isSingle &&
     release.singleTrackSlug
   ) {
     const trackArtistSlug =
@@ -45,6 +49,13 @@ export function releaseUrl(release: PublicReleaseRouteInput): string {
     if (trackArtistSlug) {
       return `/tracks/${trackArtistSlug}/${release.singleTrackSlug}`;
     }
+  }
+
+  // A Single never owns a dedicated Release detail page.
+  // If a producer lacks canonical Track identity, fail closed to the
+  // Releases collection instead of manufacturing a ghost Release URL.
+  if (isSingle) {
+    return "/releases";
   }
 
   return `/releases/${artistSlug}/${release.slug}`;

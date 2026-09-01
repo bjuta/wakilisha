@@ -7,7 +7,7 @@ import { AddToPlaylistButton } from "@/components/playlists/AddToPlaylistButton"
 import { ReleaseSaveButton } from "@/components/releases/ReleaseSaveButton";
 import { MetaTags } from "@/components/seo/MetaTags";
 import { usePlayer } from "@/context/PlayerContext";
-import { getRelease, slugify, listReleases, type PublicReleaseDetail, type PublicRelease } from "@/services/publicContent/client";
+import { getRelease, slugify, listReleases, releaseUrl, type PublicReleaseDetail, type PublicRelease } from "@/services/publicContent/client";
 import { canonicalTrackUrl, trackUrl } from "@/utils/trackUrl";
 import { useScrollDepthTracking } from "@/hooks/useScrollDepthTracking";
 import { MobileShareButton } from "@/components/design-system/share/ShareSheet";
@@ -637,7 +637,7 @@ export default function MobileReleaseDetail() {
               {related.slice(0, 6).map((r) => (
                 <Link
                   key={r.slug}
-                  to={`/releases/${slugify(r.artist)}/${r.slug}`}
+                  to={releaseUrl(r)}
                   className="group flex flex-col"
                 >
                   <div className="aspect-square rounded-xl overflow-hidden bg-[var(--wk-bg)] border border-[var(--wk-border)] mb-2">
