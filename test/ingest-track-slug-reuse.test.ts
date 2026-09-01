@@ -72,6 +72,19 @@ describe("canonical Track slug candidate", () => {
     ).toBe(
       "road-to-ft-lauderdale",
     );
+
+    expect(
+      canonicalTrackSlugCandidate(
+        "Road to Ft. Lauderdale (feat. Someone Else)",
+        {
+          featuredArtistNames: [
+            "Someone Else",
+          ],
+        },
+      ),
+    ).toBe(
+      "road-to-ft-lauderdale",
+    );
   });
 
   it("preserves culturally meaningful version wording", () => {
