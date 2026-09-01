@@ -79,6 +79,25 @@ function isShortTrackUrl(url) {
   }
 }
 
+function isMusicDetailUrl(url) {
+  try {
+    const pathname = new URL(url).pathname;
+    const parts = pathname.split("/").filter(Boolean);
+
+    if (parts[0] === "tracks") {
+      return parts.length >= 3;
+    }
+
+    if (parts[0] === "releases") {
+      return parts.length === 3 || parts.length === 4;
+    }
+
+    return false;
+  } catch {
+    return false;
+  }
+}
+
 function removeNonCanonicalTrackUrlsFromXml(xml) {
   return xml.replace(/\s*<url>[\s\S]*?<\/url>/g, (block) => {
     const match = block.match(/<loc>(.*?)<\/loc>/i);
@@ -151,7 +170,25 @@ const distUrls = findDistIndexFiles(distDir)
   .map(publicUrlFromDistIndex)
   .filter(Boolean);
 
-const urls = uniqueSorted([...sitemapUrls, ...distUrls, `${siteOrigin}/sitemap.html`])
+const distUrlSet = new Set(distUrls);
+const canonicalSitemapUrls = sitemapUrls.filter(
+  (url) =>
+    !isMusicDetailUrl(url) ||
+    distUrlSet.has(url),
+);
+const droppedStaleMusicUrls =
+  sitemapUrls.length -
+  canonicalSitemapUrls.length;
+
+console.log(
+  `Public sitemap dropped ${droppedStaleMusicUrls.toLocaleString()} stale music-detail URLs that current prerender no longer owns.`,
+);
+
+const urls = uniqueSorted([
+  ...canonicalSitemapUrls,
+  ...distUrls,
+  `${siteOrigin}/sitemap.html`,
+])
   .filter(isCanonicalPublicUrl)
   .filter((url) => {
     const pathname = new URL(url).pathname;
@@ -297,6 +334,21 @@ const shortTrackXmlUrls = shortTrackUrlsFromXml(finalSitemapXml);
 
 if (shortTrackXmlUrls.length) {
   fail(`sitemap.xml still contains non-canonical short track URLs: ${shortTrackXmlUrls.slice(0, 10).join(", ")}`);
+}
+
+const resurrectedMusicUrls = sitemapUrls.filter(
+  (url) =>
+    isMusicDetailUrl(url) &&
+    !distUrlSet.has(url) &&
+    finalSitemapXml.includes(
+      `<loc>${url}</loc>`,
+    ),
+);
+
+if (resurrectedMusicUrls.length) {
+  fail(
+    `sitemap.xml resurrected stale music-detail URLs: ${resurrectedMusicUrls.slice(0, 10).join(", ")}`,
+  );
 }
 
 console.log(`Public sitemap generated: ${sitemapHtmlPath}`);

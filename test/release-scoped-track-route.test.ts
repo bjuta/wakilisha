@@ -255,6 +255,14 @@ describe("release-scoped track routes", () => {
       "supabase/functions/seo-sitemap-admin/index.ts",
       "utf8",
     );
+    const sitemapBuilder = readFileSync(
+      "scripts/seo/build-public-sitemap-html.mjs",
+      "utf8",
+    );
+    const artistDiscography = readFileSync(
+      "supabase/functions/artist-discography/index.ts",
+      "utf8",
+    );
 
     expect(trackPage).toContain(
       "nextTrack.albumTotalTracks > 1",
@@ -355,6 +363,58 @@ describe("release-scoped track routes", () => {
     expect(prerender).toContain(
       'clean === "/sitemap.html"',
     );
+
+    expect(prerender).toContain(
+      "const NON_CANONICAL_PUBLIC_PATHS = new Set();",
+    );
+    expect(prerender).toContain(
+      "releaseTrackCount <= 1",
+    );
+    expect(prerender).toContain(
+      "const isReleaseScopedTrack =",
+    );
+    expect(prerender).toContain(
+      "NON_CANONICAL_PUBLIC_PATHS.add(",
+    );
+    expect(prerender).toContain(
+      "Number(trackMeta.releaseTrackCount || 0) > 1",
+    );
+    expect(prerender).toContain(
+      "!NON_CANONICAL_PUBLIC_PATHS.has(",
+    );
+
+    expect(sitemapBuilder).toContain(
+      "function isMusicDetailUrl(url)",
+    );
+    expect(sitemapBuilder).toContain(
+      "const distUrlSet = new Set(distUrls);",
+    );
+    expect(sitemapBuilder).toContain(
+      "!isMusicDetailUrl(url) ||",
+    );
+    expect(sitemapBuilder).toContain(
+      "distUrlSet.has(url)",
+    );
+    expect(sitemapBuilder).toContain(
+      "const resurrectedMusicUrls = sitemapUrls.filter(",
+    );
+
+    expect(sitemapFunction).toContain(
+      '.eq("status", "active")',
+    );
+
+    expect(artistDiscography).toContain(
+      '.from("registry_release_tracks")',
+    );
+    expect(artistDiscography).toContain(
+      '.eq("status", "active")',
+    );
+    expect(artistDiscography).toContain(
+      "if (tracks.length <= 1) continue;",
+    );
+    expect(artistDiscography).toContain(
+      "if (releaseTrackIds.length <= 1) continue;",
+    );
   });
 
 });
@@ -389,6 +449,12 @@ describe("public Release boundary", () => {
     );
     expect(gateway).toContain(
       "releaseScopedMembership ?? null",
+    );
+    expect(gateway).toContain(
+      '.eq("status", "active")',
+    );
+    expect(gateway).toContain(
+      '.select("id", { count: "exact", head: true }).eq("release_id", releaseIdFromMembership).eq("status", "active")',
     );
   });
 
