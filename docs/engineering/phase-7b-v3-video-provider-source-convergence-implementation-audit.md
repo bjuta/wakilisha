@@ -1,6 +1,14 @@
 # Phase 7B V3 Video Provider Source Convergence Implementation Audit
 
-Status: PREVIEW AUTHORITY SEALED, LOCAL PRE-PR GATES PENDING
+## Historical status note - 1 September 2026
+
+The status line below is preserved as the implementation-audit checkpoint at which this file was written.
+
+V3 subsequently merged through PR #769. Production migration history was sealed through PR #770, and the V3 provider-source convergence is now accepted baseline for the current Phase 7B public Video product.
+
+Do not use the older pre-PR status line below as current programme state. Use `docs/institute/PROGRAMME_STATUS.md` and `docs/roadmap/wakilisha-master-programme-map.md`.
+
+Status at this historical checkpoint: PREVIEW AUTHORITY SEALED, LOCAL PRE-PR GATES PENDING
 
 Accepted base main: `b6886d9fb6695e33494036e04118ed6e7b9d6ad7`
 

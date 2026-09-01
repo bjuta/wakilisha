@@ -1,5 +1,43 @@
 # WAKILISHA Programme Status
 
+## Current production reconciliation - 1 September 2026
+
+The latest production-accepted application main is:
+
+`1dc7277d75256b109b485a3cc98c02229e9ccce4`
+
+Current production authority:
+
+- migrations: `78`
+- migration head: `20260901114500_mizizi_track_identity_write_boundary.sql`
+- frontend entry: `assets/index-CU1jyD6_.js`
+- frontend entry SHA-256: `b430d0b6aa5b1f84d00a13b2bd088745b67a52f60e86e2d1c739581d9bacb10c`
+- frontend index SHA-256: `01d6defd6bf05f6b05ec0bb0782d349696027a73a6e9e34b513129dc843fec85`
+- rollback snapshot: `/opt/wakilisha-react-backups/release-membership-integrity-20260901T162124Z-1dc7277d`
+
+The current accepted adjacent Registry/public-identity work includes:
+
+- one-track public identity convergence through PRs #771, #775, #777, #778, and #780
+- MIZIZI preventive Track identity authority through PRs #772 and #774
+- Release taxonomy and Single public-destination convergence through PR #781
+- orphan Release-membership target integrity through PR #782
+- canonical Track public route remains `/tracks/{artist-slug}/{track-slug}`
+- Registry UUID remains internal identity and does not replace the public Track route grammar
+
+Release taxonomy is now:
+
+- 1 resolvable active Track: Single
+- 2 through 6 resolvable active Tracks: EP
+- 7 or more resolvable active Tracks: Album
+
+Singles remain Release records and remain visible in Releases, Artist Discography, and Appears On, but they do not own a dedicated Release detail page. Their public destination is the one canonical Track.
+
+Production acceptance is recorded in:
+
+- `docs/engineering/release-taxonomy-membership-integrity-closure-record.md`
+
+Historical MIZIZI apply remains unrun.
+
 ## Current programme reconciliation - 31 August 2026
 
 **Phase 7A Video publication authority is CLOSED and production accepted.**
@@ -195,27 +233,23 @@ The WIP closes only after the soak bundle is analyzed into a Green / Amber / Red
 
 ## Immediate numbered programme work
 
-**Phase 7A: Video publication authority is OPEN.**
+**Phase 7B: Public Video product remains CURRENT.**
 
-Use the long-form plan's existing PR 7A contract:
+Phase 7A is closed. Do not reopen it.
 
-- standalone Video
-- series
-- episodes
-- documentary/interview/performance/explainer/field-footage classifications
-- Video Editor
-- master and derivative/rendition management
-- posters
-- chapters
-- captions
-- transcript
-- Credits
-- Citations
-- governed immutable versions, Review, publication, Corrections and provenance
+Phase 7B V1 through V3 and the subsequent public Video corrections are accepted baseline. No dedicated Phase 7B closure record exists yet, so this status overlay does not claim Phase 7B is closed.
 
-The authority audit, schema/kernel convergence, K5A governed command/admin-read boundary, K5B purpose-built Video Editor composition, K5C shared Credits/Citations convergence, and K5D shared Corrections/provenance convergence are complete. The immediate implementation is the real Video exit-gate instrument: take the existing real Video through working snapshot, immutable review, approval, and governed publication, closing only Registry, Media, readiness, or lifecycle gaps that the real workflow actually exposes.
+The September Registry/public-identity detour is also accepted baseline. It does not create a new numbered phase.
 
-Phase 7B remains the public Video product.
+Immediate adjacent Registry work is:
+
+1. extend MIZIZI with the accepted Release taxonomy invariant without changing public route grammar
+2. audit the 32 active Release taxonomy mismatches against resolvable active Track membership
+3. preserve the 18 bad active Release-membership relationships across 13 active Releases as evidence while preventing them from manufacturing public identity
+4. run the existing MIZIZI historical Track audit before any historical apply
+5. do not run `MIZIZI_APPLY` until the exact safe candidate set and collision behavior are proved
+
+Phase 7B product work can continue independently where public Video use exposes gaps.
 
 ## Primitive compounding rule
 
