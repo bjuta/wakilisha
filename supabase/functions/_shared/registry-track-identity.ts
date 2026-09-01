@@ -110,16 +110,56 @@ export function stripFeatureCreditNoise(
   };
 }
 
+export type CanonicalTrackSlugOptions = {
+  featuredArtistNames?: string[];
+};
+
+function featureCreditHasStructuralProof(
+  removedFragments: string[],
+  featuredArtistNames: string[],
+): boolean {
+  const artistSlugs = featuredArtistNames
+    .map((name) => slugifyIdentity(name))
+    .filter(Boolean);
+
+  if (artistSlugs.length === 0) {
+    return false;
+  }
+
+  return removedFragments.some((fragment) => {
+    const fragmentSlug = slugifyIdentity(fragment);
+
+    return artistSlugs.some(
+      (artistSlug) =>
+        fragmentSlug === artistSlug ||
+        fragmentSlug.includes(
+          "-" + artistSlug + "-",
+        ) ||
+        fragmentSlug.endsWith(
+          "-" + artistSlug,
+        ),
+    );
+  });
+}
+
 export function canonicalTrackSlugCandidate(
   title: string,
+  options: CanonicalTrackSlugOptions = {},
 ): string {
-  const coreTitle =
-    stripFeatureCreditNoise(
-      title,
-    ).coreTitle;
+  const featureCleanup =
+    stripFeatureCreditNoise(title);
+  const hasFeatureProof =
+    featureCreditHasStructuralProof(
+      featureCleanup.removedFragments,
+      options.featuredArtistNames || [],
+    );
+  const identityTitle =
+    hasFeatureProof
+      ? featureCleanup.coreTitle
+      : normalizeIdentityText(title);
 
   return (
-    slugifyIdentity(coreTitle) ||
+    slugifyIdentity(identityTitle) ||
     "untitled"
   );
 }
