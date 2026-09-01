@@ -11,6 +11,7 @@ const DIST_DIR = path.resolve("dist");
 const INDEX_PATH = path.join(DIST_DIR, "index.html");
 const SITEMAP_PATH = path.join(DIST_DIR, "sitemap.xml");
 const ROUTE_MANIFEST_PATH = path.resolve("public/seo-prerender-routes.txt");
+const REGISTRY_TRACK_ID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const DB_METADATA_OUTPUT_PATH = path.join(DIST_DIR, "seo-metadata-manifest.json");
 
 let DB_METADATA_BY_PATH = new Map();
@@ -880,8 +881,9 @@ async function fetchTrackMetadataManifest() {
     const parts = pagePath.split("/").filter(Boolean);
 
     return (
-      (parts[0] === "tracks" && parts.length >= 3) ||
-      (parts[0] === "releases" && parts.length >= 4)
+      parts[0] === "tracks" &&
+      parts.length >= 3 &&
+      REGISTRY_TRACK_ID_PATTERN.test(parts[1] || "")
     );
   });
 
@@ -893,7 +895,10 @@ async function fetchTrackMetadataManifest() {
       if (!track) return;
 
       const parts = pagePath.split("/").filter(Boolean);
-      const artistSlugFromPath = parts[1];
+      const artistSlugFromPath =
+        REGISTRY_TRACK_ID_PATTERN.test(parts[1] || "")
+          ? ""
+          : parts[1];
       const primaryArtist = data?.artist || {};
       const release = data?.release || {};
 
@@ -1059,7 +1064,10 @@ function pageSchema(model, url) {
   if (model.kind === "track") {
     const trackMeta = TRACK_METADATA_BY_PATH.get(cleanPath(model.canonicalPath)) || {};
     const parts = cleanPath(model.canonicalPath).split("/").filter(Boolean);
-    const artistSlugFromPath = parts[1];
+    const artistSlugFromPath =
+      REGISTRY_TRACK_ID_PATTERN.test(parts[1] || "")
+        ? ""
+        : parts[1];
     const image = firstNonEmpty(model.image, trackMeta.image, socialImageForModel(model));
     const byArtist = schemaArtistEntitiesFromCredits(trackMeta.artists, trackMeta.primaryArtistName, trackMeta.primaryArtistSlug || artistSlugFromPath);
     const releaseArtistSlug = firstNonEmpty(trackMeta.primaryArtistSlug, artistSlugFromPath);
@@ -1274,7 +1282,7 @@ function pageSchema(model, url) {
       itemListElement: entries.map((entry) => {
         const artistSlug = Array.isArray(entry.artistSlugs) ? entry.artistSlugs[0] : "";
         const artistName = Array.isArray(entry.artistNames) ? entry.artistNames.join(", ") : "";
-        const trackUrl = artistSlug && entry.trackSlug ? canonicalUrl(`/tracks/${artistSlug}/${entry.trackSlug}`) : undefined;
+        const trackUrl = entry.canonicalTrackId && entry.trackSlug ? canonicalUrl(`/tracks/${entry.canonicalTrackId}/${entry.trackSlug}`) : undefined;
 
         return compactSchema({
           "@type": "ListItem",
@@ -1385,26 +1393,34 @@ function modelFromPath(pagePath) {
   }
 
   if (section === "tracks" && parts.length >= 3) {
-    const artist = titleCase(parts[1]);
     const track = titleCase(parts[2]);
+    const canonicalRegistryRoute =
+      REGISTRY_TRACK_ID_PATTERN.test(parts[1] || "");
+
     return {
-      title: `${track} by ${artist}`,
-      description: firstSentence(`Explore ${track} by ${artist} on WAKILISHA, including chart context, credits, and music metadata.`),
+      title: track,
+      description: firstSentence(
+        canonicalRegistryRoute
+          ? `Explore ${track} on WAKILISHA, including credits, Release context, charts, and cultural metadata.`
+          : "This historical WAKILISHA Track link resolves to canonical Registry identity.",
+      ),
       canonicalPath: page,
-      robots: "index, follow",
+      robots: canonicalRegistryRoute
+        ? "index, follow"
+        : "noindex, follow",
       ogType: "music.song",
       kind: "track",
     };
   }
 
   if (section === "releases" && parts.length >= 4) {
-    const artist = titleCase(parts[1]);
     const track = titleCase(parts[3]);
     return {
-      title: `${track} by ${artist}`,
-      description: firstSentence(`Explore ${track} by ${artist} on WAKILISHA, including release context, credits, chart context, and music metadata.`),
+      title: track,
+      description:
+        "This historical Release-scoped Track link resolves to canonical Registry Track identity.",
       canonicalPath: page,
-      robots: "index, follow",
+      robots: "noindex, follow",
       ogType: "music.song",
       kind: "track",
     };
@@ -1598,7 +1614,14 @@ function isCanonicalPublicPath(pagePath) {
   }
 
   if (parts[0] === "tracks") {
-    return parts.length >= 3;
+    return (
+      parts.length >= 3 &&
+      REGISTRY_TRACK_ID_PATTERN.test(parts[1] || "")
+    );
+  }
+
+  if (parts[0] === "releases" && parts.length >= 4) {
+    return false;
   }
 
   return true;
