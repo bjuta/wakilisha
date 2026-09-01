@@ -772,9 +772,41 @@ async function fetchPublicContentJson(apiBase, anonKey, pagePath) {
   return response.json();
 }
 
-function structuredDataTargetPaths(section) {
-  return [...new Set([...readSitemapPaths(), ...DB_METADATA_BY_PATH.keys()].filter(isCanonicalPublicPath))]
+function isDynamicMusicIdentityPath(pagePath) {
+  const parts = cleanPath(pagePath)
+    .split("/")
+    .filter(Boolean);
+
+  if (parts[0] === "tracks") {
+    return parts.length >= 3;
+  }
+
+  if (parts[0] === "releases") {
+    return parts.length >= 3;
+  }
+
+  return false;
+}
+
+function canonicalPrerenderPaths() {
+  const sitemapPaths = readSitemapPaths()
     .map(cleanPath)
+    .filter((pagePath) => !isDynamicMusicIdentityPath(pagePath));
+
+  const metadataPaths = [...DB_METADATA_BY_PATH.keys()]
+    .map(cleanPath)
+    .filter(isCanonicalPublicPath);
+
+  return [
+    ...new Set(
+      [...sitemapPaths, ...metadataPaths]
+        .filter(isCanonicalPublicPath),
+    ),
+  ];
+}
+
+function structuredDataTargetPaths(section) {
+  return canonicalPrerenderPaths()
     .filter((pagePath) => pagePath.startsWith(`/${section}/`));
 }
 
@@ -867,16 +899,8 @@ async function fetchTrackMetadataManifest() {
     return metadataByPath;
   }
 
-  const paths = [
-    ...new Set(
-      [
-        ...readSitemapPaths(),
-        ...DB_METADATA_BY_PATH.keys(),
-      ]
-        .filter(isCanonicalPublicPath)
-        .map(cleanPath),
-    ),
-  ].filter((pagePath) => {
+  const paths = canonicalPrerenderPaths()
+    .filter((pagePath) => {
     const parts = pagePath.split("/").filter(Boolean);
 
     return (
@@ -1606,7 +1630,7 @@ function isCanonicalPublicPath(pagePath) {
 
 function readSitemapPaths() {
   if (!fs.existsSync(SITEMAP_PATH)) {
-    throw new Error("dist/sitemap.xml was not found. Build must copy public/sitemap.xml first.");
+    throw new Error("dist/sitemap.xml was not found. The canonical sitemap refresh must run before prerender.");
   }
 
   const xml = fs.readFileSync(SITEMAP_PATH, "utf8");
@@ -1687,7 +1711,7 @@ async function main() {
   CHART_METADATA_BY_PATH = await fetchChartMetadataManifest();
 
   const baseHtml = fs.readFileSync(INDEX_PATH, "utf8");
-  const paths = [...new Set([...readSitemapPaths(), ...DB_METADATA_BY_PATH.keys()].filter(isCanonicalPublicPath))];
+  const paths = canonicalPrerenderPaths();
 
   let written = 0;
 
