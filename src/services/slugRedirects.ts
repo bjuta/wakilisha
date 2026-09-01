@@ -44,14 +44,28 @@ function isSafeTargetPath(
   newPath: string,
   context: ScopedSlugRedirectContext,
 ): boolean {
-  const expectedPrefix = buildScopedRoutePrefix(
-    entityType,
-    scopeSlug,
-    context,
-  );
+  const expectedPrefixes = [
+    buildScopedRoutePrefix(
+      entityType,
+      scopeSlug,
+      context,
+    ),
+  ];
+
+  if (
+    entityType === "track" &&
+    cleanRouteSegment(context.releaseSlug || "")
+  ) {
+    expectedPrefixes.push(
+      `/tracks/${scopeSlug}/`,
+    );
+  }
 
   return (
-    newPath.startsWith(expectedPrefix) &&
+    expectedPrefixes.some(
+      (expectedPrefix) =>
+        newPath.startsWith(expectedPrefix),
+    ) &&
     !newPath.includes("?") &&
     !newPath.includes("#")
   );

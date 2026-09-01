@@ -86,10 +86,22 @@ describe("release-scoped track routes", () => {
       "/releases/:artistSlug/:releaseSlug/:trackSlug",
     );
     expect(desktopRelease).toContain(
-      "releaseTrackUrl(artistSlug, release.slug, track.slug)",
+      "const trackHref = canonicalTrackUrl(",
+    );
+    expect(desktopRelease).toContain(
+      "release.trackCount,",
+    );
+    expect(desktopRelease).not.toContain(
+      "releaseTrackUrl(",
     );
     expect(mobileRelease).toContain(
-      "releaseTrackUrl(artistSlug, releaseSlug, track.slug)",
+      "const trackHref = canonicalTrackUrl(",
+    );
+    expect(mobileRelease).toContain(
+      "release.trackCount,",
+    );
+    expect(mobileRelease).not.toContain(
+      "releaseTrackUrl(",
     );
     expect(trackPage).toContain(
       "getReleaseTrack(",
@@ -109,11 +121,29 @@ describe("release-scoped track routes", () => {
     expect(lyricsPage).toContain(
       "`${redirect.newPath}/lyrics/contribute`",
     );
+    expect(lyricsPage).toContain(
+      "const standaloneLyricsPath =",
+    );
+    expect(lyricsPage).toContain(
+      "canonicalTrackUrl(",
+    );
+    expect(lyricsPage).toContain(
+      "Number(releaseTrackCount || 0) <= 1",
+    );
+    expect(lyricsPage).not.toContain(
+      "releaseTrackUrl(",
+    );
     expect(redirectService).toContain(
       "releaseSlug?: string",
     );
     expect(redirectService).toContain(
       "return `/releases/${scopeSlug}/${releaseSlug}/`;",
+    );
+    expect(redirectService).toContain(
+      "expectedPrefixes.push(",
+    );
+    expect(redirectService).toContain(
+      "`/tracks/${scopeSlug}/`",
     );
     expect(publicClient).toContain(
       "/releases/${encodeURIComponent(artistSlug)}/${encodeURIComponent(releaseSlug)}/${encodeURIComponent(trackSlug)}",

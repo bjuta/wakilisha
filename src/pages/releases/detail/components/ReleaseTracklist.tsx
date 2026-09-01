@@ -4,7 +4,7 @@ import { PlayableArtwork } from "@/components/design-system/music/PlayableArtwor
 import { TrackActionsMenu } from "@/components/tracks/TrackActionsMenu";
 import { useScrollReveal } from "@/hooks/useScrollReveal";
 import { usePlayer } from "@/context/PlayerContext";
-import { releaseTrackUrl } from "@/utils/trackUrl";
+import { canonicalTrackUrl } from "@/utils/trackUrl";
 import type { PublicReleaseDetail } from "@/services/publicContent/client";
 
 function formatDuration(seconds: number): string {
@@ -96,6 +96,12 @@ export default function ReleaseTracklist({
           {tracks.map((track, index) => {
             const isCurrentTrack = currentTrack?.id === track.id;
             const isThisPlaying = isCurrentTrack && isPlaying;
+            const trackHref = canonicalTrackUrl(
+              artistSlug,
+              track.slug,
+              release.slug,
+              release.trackCount,
+            );
 
             return (
               <div
@@ -132,7 +138,7 @@ export default function ReleaseTracklist({
 
                 {/* Track info — clicking navigates to track detail */}
                 <Link
-                  to={releaseTrackUrl(artistSlug, release.slug, track.slug)}
+                  to={trackHref}
                   className="min-w-0 block"
                   onClick={(e) => {
                     // Don't navigate if we're interacting with the play button area
@@ -162,7 +168,7 @@ export default function ReleaseTracklist({
                   artistSlug={artistSlug}
                   artworkUrl={track.artworkUrl || release.artworkUrl}
                   trackSlug={track.slug}
-                  trackHref={releaseTrackUrl(artistSlug, release.slug, track.slug)}
+                  trackHref={trackHref}
                   onDiscuss={
                     onDiscussTrack
                       ? () => onDiscussTrack(track, index)

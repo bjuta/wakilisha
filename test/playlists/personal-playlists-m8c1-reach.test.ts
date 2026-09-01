@@ -50,12 +50,12 @@ describe("M8C.1 Track curation reach", () => {
   it("covers Release discovery without treating a multi-track Release as one Track", () => {
     expect(releaseTracklist).toContain("registryTrackId={track.id}");
     expect(releaseTracklist).toContain("<TrackActionsMenu");
-    expect(releaseTracklist).toContain("trackHref={releaseTrackUrl(artistSlug, release.slug, track.slug)}");
+    expect(releaseTracklist).toContain("trackHref={trackHref}");
     expect(releaseTracklist).not.toContain("Personal Playlist curation");
     expect(releaseTracklist).not.toContain("Chevron to detail page");
     expect(mobileRelease).toContain("registryTrackId={track.id}");
     expect(mobileRelease).toContain("<TrackActionsMenu");
-    expect(mobileRelease).toContain("trackHref={releaseTrackUrl(artistSlug, releaseSlug, track.slug)}");
+    expect(mobileRelease).toContain("trackHref={trackHref}");
     expect(mobileRelease).toContain("trackId={release.tracks[0].id}");
     expect(siblingTracks).toContain("trackId={track.id}");
     expect(releaseHero).toContain("tracks.length === 1");
