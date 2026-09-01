@@ -273,6 +273,18 @@ describe("release-scoped track routes", () => {
       "releaseTrackCountByReleaseId.get(membership.releaseId)",
     );
     expect(sitemapFunction).toContain(
+      "function chooseArtistIdentity(",
+    );
+    expect(sitemapFunction).toContain(
+      "Number(row.credit_order ?? 999)",
+    );
+    expect(sitemapFunction).not.toContain(
+      "Number(row.credit_order || 999)",
+    );
+    expect(sitemapFunction).not.toContain(
+      "if (!existing || isPrimary || creditOrder === 1)",
+    );
+    expect(sitemapFunction).toContain(
       'action === "xml_live"',
     );
     expect(sitemapFunction).toContain(
