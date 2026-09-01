@@ -8,7 +8,7 @@ Current state: PR #772 merged and the preventive Track identity write boundary i
 
 Agent key: `mizizi`
 
-Rule-set version: `1.0.0`
+Rule-set version: `1.1.0`
 
 ## Production acceptance, 1 September 2026
 
@@ -66,7 +66,20 @@ The first read-only production audit against resolvable active Track membership 
 
 The public readers and sitemap authority now ignore those bad relationship rows when deriving public Release identity. The rows themselves have not been deleted or rewritten.
 
-The Release taxonomy rule is accepted product/Registry policy but is not yet part of MIZIZI rule-set v1.0.0 apply behavior. The next MIZIZI rule-set change should add a deterministic `release_taxonomy_drift` rule, prove expected-value write behavior and provenance, then audit before any production apply.
+The Release taxonomy rule is now implemented in MIZIZI rule-set v1.1.0 as deterministic `release_taxonomy_drift` authority.
+
+The rule:
+
+- uses the shared Release-taxonomy primitive
+- counts only active Release memberships whose target is an active Registry Track
+- emits no taxonomy candidate when zero active Track targets resolve
+- treats a stored type mismatch as an automatic-fix candidate
+- uses expected-value locking and re-counts resolvable active Tracks before a write
+- records canonical write provenance through the existing `registry_canonical_write_events` primitive
+- does not create review work for deterministic taxonomy drift
+- leaves Release title/slug provider-packaging rules observe-only
+
+The first production audit found exactly 32 automatic taxonomy candidates. Historical MIZIZI apply remains unrun.
 
 ## Why MIZIZI exists
 
@@ -194,7 +207,7 @@ Provider payloads, raw source labels, historical aliases, and old values remain 
 
 Cleaning canonical identity must never mean destroying source memory.
 
-## Rule set v1
+## Rule set v1.1
 
 ### `track_slug_identity_noise`
 
@@ -223,6 +236,22 @@ This is observe-only in v1. The mismatch may encode collision history, translite
 Detects featured-credit notation inside the canonical Track title.
 
 This is observe-only in v1 because titles are cultural data. MIZIZI records the pattern without creating an admin task.
+
+### `release_taxonomy_drift`
+
+Derives canonical Release taxonomy from resolvable active Track membership:
+
+- 1 active Track target: `single`
+- 2 through 6 active Track targets: `ep`
+- 7 or more active Track targets: `album`
+
+A relationship row whose Track target is missing or inactive does not count.
+
+If at least one active Track target resolves and the stored `registry_releases.release_type` differs from the derived taxonomy, the finding is an automatic-fix candidate with confidence 1.
+
+Apply behavior is expected-value guarded. MIZIZI re-locks the Release row, re-counts resolvable active Track targets inside a serializable transaction, verifies that the candidate still matches the shared taxonomy primitive, and only then updates `release_type` and writes canonical provenance.
+
+Zero-resolvable Releases produce no taxonomy mutation candidate. Broken relationship evidence is preserved for separate integrity work.
 
 ### `release_title_provider_packaging`
 

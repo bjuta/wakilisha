@@ -5,6 +5,7 @@ import {
   analyzeChartIdentity,
   analyzeReleaseIdentity,
   analyzeTrackIdentity,
+  MIZIZI_RULESET_VERSION,
   slugifyIdentity,
   stripFeatureCreditNoise,
   stripReleasePackagingSuffix,
@@ -155,6 +156,82 @@ describe("MIZIZI Cultural Data Steward", () => {
           "auto_fix_candidate",
       ),
     ).toBe(false);
+  });
+
+  it("derives Release taxonomy from resolvable active Track count", () => {
+    const single =
+      analyzeReleaseIdentity({
+        id: "release-single",
+        slug: "one-song",
+        title: "One Song",
+        releaseType: "ep",
+        activeTrackCount: 1,
+      });
+
+    expect(single).toContainEqual(
+      expect.objectContaining({
+        ruleId:
+          "release_taxonomy_drift",
+        fieldName: "release_type",
+        currentValue: "ep",
+        proposedValue: "single",
+        disposition:
+          "auto_fix_candidate",
+        confidence: 1,
+      }),
+    );
+
+    const ep =
+      analyzeReleaseIdentity({
+        id: "release-ep",
+        slug: "project",
+        title: "Project",
+        releaseType: "album",
+        activeTrackCount: 6,
+      });
+
+    expect(ep).toContainEqual(
+      expect.objectContaining({
+        ruleId:
+          "release_taxonomy_drift",
+        proposedValue: "ep",
+      }),
+    );
+
+    const album =
+      analyzeReleaseIdentity({
+        id: "release-album",
+        slug: "project-two",
+        title: "Project Two",
+        releaseType: "ep",
+        activeTrackCount: 7,
+      });
+
+    expect(album).toContainEqual(
+      expect.objectContaining({
+        ruleId:
+          "release_taxonomy_drift",
+        proposedValue: "album",
+      }),
+    );
+  });
+
+  it("does not invent Release taxonomy when no active Track target resolves", () => {
+    expect(
+      analyzeReleaseIdentity({
+        id: "release-unresolved",
+        slug: "unresolved",
+        title: "Unresolved",
+        releaseType: "ep",
+        activeTrackCount: 0,
+      }),
+    ).toEqual([]);
+  });
+
+  it("uses MIZIZI rule-set 1.1.0 for Release taxonomy authority", () => {
+    expect(MIZIZI_RULESET_VERSION).toBe(
+      "1.1.0",
+    );
   });
 
   it("observes exact provider Release packaging without creating review work", () => {
@@ -467,6 +544,21 @@ describe("MIZIZI Cultural Data Steward", () => {
     );
     expect(runner).toContain(
       "community_threads",
+    );
+    expect(runner).toContain(
+      "resolvable_active_track_count",
+    );
+    expect(runner).toContain(
+      "applyReleaseTaxonomy",
+    );
+    expect(runner).toContain(
+      "begin isolation level serializable",
+    );
+    expect(runner).toContain(
+      "releaseTaxonomyFromActiveTrackCount",
+    );
+    expect(runner).toContain(
+      "coalesce(\n            btrim(release_type),",
     );
     expect(runner).not.toContain(
       "community_activity",

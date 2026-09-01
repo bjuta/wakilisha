@@ -243,11 +243,11 @@ The September Registry/public-identity detour is also accepted baseline. It does
 
 Immediate adjacent Registry work is:
 
-1. extend MIZIZI with the accepted Release taxonomy invariant without changing public route grammar
-2. audit the 32 active Release taxonomy mismatches against resolvable active Track membership
+1. MIZIZI v1.1.0 now implements the accepted Release taxonomy invariant without changing public route grammar
+2. the first read-only production audit proves exactly 32 deterministic Release taxonomy candidates: 11 EP to Single, 19 Album to EP, and 2 EP to Album
 3. preserve the 18 bad active Release-membership relationships across 13 active Releases as evidence while preventing them from manufacturing public identity
-4. run the existing MIZIZI historical Track audit before any historical apply
-5. do not run `MIZIZI_APPLY` until the exact safe candidate set and collision behavior are proved
+4. Release taxonomy apply remains unrun
+5. run the existing MIZIZI historical Track audit before any historical Track apply
 
 Phase 7B product work can continue independently where public Video use exposes gaps.
 
