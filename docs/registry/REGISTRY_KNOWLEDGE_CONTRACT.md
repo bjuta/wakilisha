@@ -171,7 +171,7 @@ MIZIZI is not a new source of truth. It is a permanent data-hygiene capability t
 
 MIZIZI may automatically repair a field only when typed Registry authority already proves the answer, the change is reversible, collision checks pass, the prior public path is preserved when identity changes, and a canonical write event records the before state, after state, rule, confidence, and downstream impact.
 
-Ambiguous changes remain Registry review work. This includes canonical title changes, unresolved credits, culturally meaningful version labels, identity collisions, and disagreements where source presentation may legitimately differ from canonical presentation.
+Ambiguity is not itself a queue trigger. MIZIZI observes passive ambiguity and creates Registry review work only when a human decision is required to unblock a material canonical repair or protect public correctness. Collisions, unresolved authority, and culturally meaningful distinctions may therefore be observed without generating admin work until a real decision is needed.
 
 Provider payloads, historical values, aliases, and observations remain evidence. Canonical cleanup must never erase provenance.
 
