@@ -1,13 +1,13 @@
 import { createHash } from "node:crypto";
 import {
+  canonicalTrackSlugCandidate,
   normalizeIdentityText,
-  canonicalTrackSlugCandidate,
-  canonicalTrackSlugCandidate,
   slugifyIdentity,
   stripFeatureCreditNoise,
 } from "../../../supabase/functions/_shared/registry-track-identity.ts";
 
 export {
+  canonicalTrackSlugCandidate,
   normalizeIdentityText,
   slugifyIdentity,
   stripFeatureCreditNoise,
