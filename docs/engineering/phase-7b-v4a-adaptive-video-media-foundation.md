@@ -1,16 +1,14 @@
-# Phase 7B V4A: Adaptive Video Media Foundation
+# Phase 7B V4A: Media Processing-Profile Convergence and Adaptive Video Foundation
 
 Date: 2 September 2026
 
 ## Status
 
-Milestone candidate. Not production accepted.
+Milestone candidate. Not preview accepted. Not production accepted. No PR.
 
-## Problem layer
+## Why V4A exists
 
-Media processing and delivery authority.
-
-Phase 7B cannot close against the authoritative programme exit proof yet.
+Phase 7B cannot close against the authoritative programme exit proof while the real published Video still has only one MP4 delivery derivative.
 
 The real published Video, `Monday Morning in September`, currently has:
 
@@ -21,50 +19,125 @@ The real published Video, `Monday Morning in September`, currently has:
 - no adaptive rendition ladder
 - no HLS or DASH manifest
 - no governed transcript
-- no Video correction application/public-note proof
+- no real Video correction-handling proof
 
-This milestone addresses only the adaptive Media foundation.
+V4A addresses only the adaptive Media layer.
 
-## Objective
+## Primitive-compounding decision
 
-Add bounded adaptive Video processing by compounding the accepted Phase 4 Media processor rather than creating another streaming system.
+This milestone is governed by the Primitive Compounding Contract.
 
-V4A establishes:
+Phase 6A Audio already introduced the first real additive publication-specific Media processing profile:
 
-- one additive processing profile: `video-adaptive-v1`
-- two bounded HLS renditions
-- one deterministic HLS master playlist
-- single-file byte-range HLS media per rendition
-- five governed immutable Media outputs total
-- one authenticated submission adapter
-- one service-role output-registration adapter
-- permanent read-only verification
+- `audio-publication-v1`
+- `submit_audio_delivery_processing_v1`
+- `register_audio_delivery_processing_outputs_v1`
 
-V4A does not switch public Video playback to HLS.
+At one domain consumer, that was a legitimate candidate pattern.
 
-## Existing authority remains authoritative
+Adaptive Video is the second real domain exposing the same semantic concept:
 
-V4A does not create another:
+> Process one exact governed Media revision through a named immutable derivative profile, using the existing command/job/lease/retry/file/variant authority.
 
-- uploader
-- Media asset identity
-- Media revision model
-- processing queue
-- processing worker
-- lease or retry ledger
-- dead-letter system
-- file-object table
-- variant table
-- variant-selection table
-- delivery origin
+Therefore V4A must not create:
 
-The existing `media.process_revision` command and `wakilisha-media-processor` remain authoritative.
+- `submit_video_adaptive_processing_v1`
+- `register_video_adaptive_processing_outputs_v1`
+- another Video processing queue
+- another Video derivative registry
 
-## Preserve `video-v1`
+The second-domain proof requires **extract -> converge -> migrate**.
 
-The accepted Phase 4 profile `video-v1` remains an immutable transformation contract.
+## Primitive impact declaration
 
-It continues to produce exactly:
+### Reused foundation primitives
+
+V4A reuses without replacement:
+
+- Media logical asset identity
+- immutable Media file objects
+- exact Media revisions
+- Media usage links
+- Media variant roles
+- immutable derivative variants
+- current variant selections
+- Media events
+- `media.process_revision` command identity
+- command receipts
+- idempotency
+- durable jobs
+- outbox events
+- lease renewal
+- retry/dead-letter handling
+- Media CDN delivery origin
+- Resource binding for Media assets
+
+### Candidate promoted to canonical authority
+
+V4A promotes the cross-domain concept:
+
+**Media processing profile**
+
+Canonical authority becomes:
+
+- `media.processing_profiles`
+- `media.processing_profile_outputs`
+- `public.submit_media_processing_profile_v1(...)`
+- `public.register_media_processing_profile_outputs_v1(...)`
+
+Audio is the first proven consumer.
+
+Adaptive Video is the second proven consumer.
+
+The profile authority owns:
+
+- profile identity
+- required Media asset kind
+- generator identity/version
+- required governed usage binding
+- exact expected output roles
+- exact filenames
+- exact MIME types
+- exact transformation contract
+
+It does not own domain publication lifecycle.
+
+### Existing candidate migrated
+
+The accepted Audio-specific functions remain as compatibility entry points only:
+
+- `submit_audio_delivery_processing_v1`
+- `register_audio_delivery_processing_outputs_v1`
+
+After V4A they delegate to the canonical Media processing-profile authority and no longer implement independent receipt/job/file/variant semantics.
+
+The Media worker itself stops using the Audio-specific registration adapter.
+
+### Intentionally domain-specific implementation
+
+The actual transformation producer remains profile-specific inside the shared Media processor.
+
+That is correct.
+
+Audio delivery and adaptive Video encode different bytes and have different transformation specifications. Compounding requires one meaning for the shared processing authority; it does not require flattening distinct transforms into a universal encoder configuration language.
+
+The following remain domain/profile-specific:
+
+- Audio MP3 delivery transformation
+- Video HLS rendition construction
+- Video bitrate/resolution ladder
+- HLS manifest composition
+
+## Preserve Phase 4 base profiles
+
+The accepted Phase 4 profiles remain immutable contracts.
+
+`audio-v1` continues to produce exactly:
+
+- `audio_preview`
+- `waveform_data`
+
+`video-v1` continues to produce exactly:
 
 - `video_transcode`
 - `poster_frame`
@@ -75,7 +148,78 @@ V4A does not replace or broaden:
 - `public.submit_media_processing_command_v1`
 - `public.register_media_processing_outputs_v1`
 
-## Adaptive processing profile
+The new canonical profile authority is additive.
+
+## Canonical profile authority
+
+`media.processing_profiles` stores one enabled named processing contract.
+
+For each profile it records:
+
+- profile version
+- Media asset kind
+- generator name/version
+- required usage authority
+- required usage target kind
+- required usage role
+- whether a version-bound usage target is required
+- required target-version kind where applicable
+
+`media.processing_profile_outputs` stores the exact output contract:
+
+- ordered output membership
+- variant role
+- immutable filename
+- MIME type
+- exact transformation specification
+
+The first two registered profiles are:
+
+- `audio-publication-v1`
+- `video-adaptive-v1`
+
+This is evidence-driven convergence, not a speculative universal profile engine.
+
+## Shared submission boundary
+
+`public.submit_media_processing_profile_v1(...)`:
+
+- requires authenticated administrator or `manage_media_assets`
+- resolves one enabled canonical profile
+- requires an active Media asset of the profile's asset kind
+- requires one exact revision
+- requires one verified protected Lightsail master
+- requires the profile's governed exact-revision usage binding
+- writes the existing `media.process_revision` command receipt
+- writes the existing durable job
+- writes the existing accepted outbox event
+- preserves existing idempotency semantics
+
+For Audio, the required usage is the active current `audio_master`.
+
+For adaptive Video, the required usage is an active exact version-bound `video_master`.
+
+## Shared output-registration boundary
+
+`public.register_media_processing_profile_outputs_v1(...)`:
+
+- is service-role-only
+- requires an actively leased ordinary `media.process_revision` job
+- resolves the profile from the job payload
+- requires exactly the registered output count
+- rejects unregistered or duplicate roles
+- requires exact transformation JSON
+- requires exact generator identity
+- requires exact immutable storage/public paths
+- requires exact MIME type
+- reuses `media.insert_verified_file_object_v2`
+- reuses `media.variants`
+- reuses `media.variant_selections`
+- reuses `media.events`
+
+No profile-specific output-registration authority remains necessary.
+
+## Adaptive Video profile
 
 V4A adds:
 
@@ -85,7 +229,7 @@ Generator version:
 
 `phase7b-v4a-v1`
 
-The profile creates exactly five outputs:
+It creates exactly five governed outputs:
 
 1. `video_hls_master.m3u8`
 2. `video_hls_360p_playlist.m3u8`
@@ -93,201 +237,149 @@ The profile creates exactly five outputs:
 4. `video_hls_720p_playlist.m3u8`
 5. `video_hls_720p_media.ts`
 
-The two rendition contracts are bounded as follows.
-
-360p box:
+### 360p rendition
 
 - max width: 640
 - max height: 360
-- H.264 video
-- 800 kbps target/max video bitrate
-- AAC audio
-- 96 kbps audio bitrate
+- H.264
+- 800 kbps video
+- AAC
+- 96 kbps audio
 
-720p box:
+### 720p rendition
 
 - max width: 1280
 - max height: 720
-- H.264 video
-- 2500 kbps target/max video bitrate
-- AAC audio
-- 128 kbps audio bitrate
+- H.264
+- 2500 kbps video
+- AAC
+- 128 kbps audio
 
-Shared HLS contract:
+### Shared HLS contract
 
 - HLS version 6
-- 4-second target segments
-- VOD playlist
+- 4-second segment target
+- VOD
 - independent segments
-- single-file byte-range media
+- single-file byte-range media per rendition
 - deterministic key-frame schedule
 - one encoder thread
 - bit-exact FFmpeg flags
 - stripped source metadata
 
-Single-file byte-range HLS is deliberate. Each rendition has one immutable media file rather than a directory full of segment objects. Two rendition playlists plus two media files plus one master playlist fit the existing five-output Media registration ceiling.
+Single-file byte-range HLS is deliberate.
 
-## Immutable paths
+Two rendition playlists + two rendition media files + one master playlist produce exactly five immutable file objects, fitting the existing Media processing output ceiling while avoiding per-segment database identity.
 
-All V4A derivatives retain the accepted Media path law:
+## Immutable path law
 
-`derived-objects/{asset-id}/{revision-id}/video-adaptive-v1/{source-file-id}/{role}.{extension}`
+All outputs preserve the existing Media derivative law:
 
-Public aliases remain under:
+`derived-objects/{asset-id}/{revision-id}/{profile}/{source-file-id}/{filename}`
 
-`https://media.wakilisha.africa/derivatives/{asset-id}/{revision-id}/video-adaptive-v1/{source-file-id}/{role}.{extension}`
+Public delivery remains:
 
-The Media worker hashes generated bytes before immutable activation.
+`https://media.wakilisha.africa/derivatives/{asset-id}/{revision-id}/{profile}/{source-file-id}/{filename}`
 
-A retry that generates different bytes for the same immutable path fails closed.
+A retry that produces different bytes at the same immutable path fails closed.
 
-## Submission boundary
+## Determinism finding
 
-V4A adds:
+The first unconstrained HLS experiment was not byte-stable across repeated runs.
 
-`public.submit_video_adaptive_processing_v1(...)`
+That candidate was rejected.
 
-It requires:
+The final candidate uses deterministic key-frame scheduling, one encoder thread, bit-exact flags, and zero mux delay/preload. Repeated synthetic processing produced matching hashes for both media renditions and both media playlists. The master playlist is deterministic text.
 
-- an authenticated administrator or actor with `manage_media_assets`
-- an active Video Media asset
-- an exact revision belonging to that asset
-- a verified protected Lightsail Video master
-- at least one active exact-revision, version-bound `video_master` usage for that asset revision
+Preview and production must still prove the exact deployed FFmpeg environment.
 
-It writes the existing:
+## Public product boundary
 
-- command receipt
-- `media.process_revision` durable job
-- accepted outbox event
+V4A does **not** change the public Video read model or player.
 
-Idempotency remains command-receipt authority.
+Public Video remains on the accepted MP4 `video_transcode` during this milestone.
 
-## Output registration boundary
-
-V4A adds:
-
-`public.register_video_adaptive_processing_outputs_v1(...)`
-
-It is service-role-only and requires:
-
-- an actively leased `media.process_revision` job
-- profile `video-adaptive-v1`
-- exactly five outputs
-- exact role membership
-- exact immutable paths
-- exact MIME types
-- exact transformation metadata
-- exact generator identity
-
-Registration reuses:
-
-- `media.file_objects`
-- `media.variants`
-- `media.variant_selections`
-- `media.events`
-
-## Determinism proof
-
-Before repository promotion, a synthetic 12-second 1280x720 source was processed twice with the proposed HLS command.
-
-With the final bit-exact profile, both passes produced identical SHA-256 values for:
-
-- 360p playlist
-- 360p media file
-- 720p playlist
-- 720p media file
-
-The master playlist is deterministic text.
-
-The first unconstrained experiment was not byte-stable. That version was rejected and is not the candidate profile.
-
-## Production processor compatibility
-
-The accepted Phase 4 production Media processor records FFmpeg/FFprobe `6.1.1-3ubuntu5`.
-
-The V4A command uses FFmpeg HLS options available in that generation.
-
-Preview and production acceptance must still prove the exact deployed worker environment rather than relying on a development-container FFmpeg version.
+The next bounded slice may prefer HLS only after V4A is production accepted.
 
 ## Explicit non-goals
 
 V4A does not:
 
-- change `video-v1`
-- change the public Video read model
-- change `PublicVideoWatchingSurface`
+- change Phase 4 `audio-v1`
+- change Phase 4 `video-v1`
+- add Video-specific processing RPCs
+- create another processing queue or worker
+- create another derivative store
+- change public Video playback
 - add `hls.js`
-- make HLS the public playback source
-- remove the MP4 fallback
+- remove MP4 fallback
 - add or manufacture a transcript
-- add Video correction submission or correction history
+- add Video correction submission/history
 - change captions
-- change chapters
-- change Video publishing lifecycle
-- add a second Media CDN
-- create a second Media worker
+- change Chapters
+- change Video lifecycle
 - close Phase 7B
 
 ## Local/static acceptance
 
 Before preview:
 
-1. worker Python syntax passes
-2. focused V4A structural tests pass
-3. accepted Phase 4 Media processing tests pass
-4. accepted Phase 6A Audio delivery tests pass
-5. `video-v1` remains unchanged in authority
-6. HLS output set is exactly five files
-7. HLS rendition generation is byte-stable across repeated synthetic processing
-8. permanent verifier is read-only
-9. branch diff is limited to V4A authority, worker, verifier, tests, and this design
-10. no PR is opened
+1. Primitive Compounding verifier passes.
+2. Primitive Compounding tests pass.
+3. Python worker syntax passes.
+4. Phase 4 Media processing contracts pass.
+5. Phase 6A Audio delivery contracts pass.
+6. V4A focused contract passes.
+7. no Video-specific processing RPC is defined.
+8. Audio compatibility functions delegate to shared profile authority.
+9. worker routes both additive profiles through shared registration.
+10. base `audio-v1` and `video-v1` authorities remain unmodified.
+11. HLS output set is exactly five files.
+12. HLS generation remains deterministic.
+13. permanent V4A verifier is read-only.
+14. no PR is opened.
 
 ## Preview acceptance
 
-A fresh disposable Supabase preview must first prove the entire existing migration history replays cleanly.
+A fresh disposable Supabase preview must prove the full accepted migration history first.
 
 Only after healthy baseline replay:
 
-1. apply the V4A migration byte-identically
-2. run the permanent V4A verifier
-3. create a disposable exact Video Media fixture
-4. prove adaptive submission creates one ordinary `media.process_revision` job
-5. prove idempotent replay creates no duplicate receipt or job
-6. prove wrong Media kind/revision/master usage fails closed
-7. register the exact five-output fixture as service role
-8. prove all five file objects, variants, and selections are exact
-9. prove duplicate registration is idempotent
-10. prove incomplete or wrong-role output packages fail closed
-11. prove accepted `video-v1` processing authority remains unchanged
-12. remove preview fixtures before deleting preview
-
-The worker bytes must also be exercised with the proposed HLS profile against an isolated synthetic master before production promotion.
+1. apply the exact V4A migration
+2. prove processing-profile tables and RLS posture
+3. run the permanent V4A verifier
+4. prove Audio compatibility submission still creates the same ordinary Media job
+5. prove Audio compatibility registration delegates without semantic drift
+6. prove shared direct Audio profile submission behaves identically
+7. prove adaptive Video submission through the shared profile function
+8. reject wrong asset kind, wrong revision, missing usage, and wrong target-version shape
+9. register the exact five adaptive outputs through the shared registration function
+10. reject incomplete, duplicate-role, wrong-role, wrong-transform, wrong-generator, wrong-path, and wrong-MIME packages
+11. prove idempotent replay
+12. prove old `video-v1` remains intact
+13. remove fixtures before preview deletion
 
 ## Production order
 
-After PR merge and production SQL authority:
+After preview acceptance and PR merge:
 
 1. apply the exact merged migration
-2. independently run the permanent verifier
-3. deploy only the Media processor worker
-4. verify worker byte identity and service health
-5. submit `video-adaptive-v1` processing for the existing real Video master
-6. accept exactly five adaptive variants for that revision
-7. verify immutable URLs, MIME, byte ranges, and manifest references
-8. keep public Video on the existing MP4 delivery in V4A
-9. record production acceptance
+2. independently run permanent verification
+3. verify Audio compatibility remains intact
+4. deploy only the Media processor worker
+5. verify worker byte identity and service health
+6. run `video-adaptive-v1` for the existing real Video master through the canonical shared submit function
+7. accept exactly five adaptive variants through the canonical shared registration function
+8. verify immutable URLs, byte ranges, manifests, MIME types, and selected variants
+9. keep public Video on MP4
+10. record V4A production acceptance
 
-Only after V4A production acceptance should the next Phase 7B slice make public Video prefer the HLS master with MP4 fallback.
+## Remaining Phase 7B exit work
 
-## Remaining Phase 7B exit work after V4A
-
-V4A does not close the authoritative Phase 7B exit proof.
-
-Remaining work still includes:
+After V4A:
 
 - public adaptive playback on desktop and mobile
 - governed transcript authority and public transcript presentation
 - public Video correction continuity and real correction-handling proof
-- final real-Video exit acceptance and Phase 7B closure record
+- final real-Video exit acceptance
+- Phase 7B closure record
