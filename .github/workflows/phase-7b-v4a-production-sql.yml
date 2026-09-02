@@ -1,0 +1,56 @@
+name: Phase 7B V4A Production SQL
+
+on:
+  push:
+    branches:
+      - ops/phase-7b-v4a-production-sql
+
+permissions:
+  contents: read
+
+concurrency:
+  group: phase-7b-v4a-production-sql
+  cancel-in-progress: false
+
+jobs:
+  promote:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    env:
+      SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+      SUPABASE_PROJECT_REF: pgzizndxdyhqmtyywjmt
+      EXPECTED_MAIN_SHA: a2331f8b521ed19b451f148c8b53721e51747aca
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Use Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Prepare pinned Supabase CLI
+        run: |
+          mkdir -p /tmp/wakilisha-bin
+          cat > /tmp/wakilisha-bin/supabase <<'SH'
+          #!/usr/bin/env bash
+          exec npx --yes supabase@2.107.0 "$@"
+          SH
+          chmod +x /tmp/wakilisha-bin/supabase
+          echo "/tmp/wakilisha-bin" >> "$GITHUB_PATH"
+
+      - name: Checkout exact accepted main
+        run: |
+          git fetch origin main
+          test "$(git rev-parse origin/main)" = "$EXPECTED_MAIN_SHA"
+          git checkout -B main origin/main
+          test "$(git rev-parse HEAD)" = "$EXPECTED_MAIN_SHA"
+          test -z "$(git status --porcelain)"
+
+      - name: Promote repository migration natively
+        run: bash scripts/control-plane/promote-repository-migrations.sh
