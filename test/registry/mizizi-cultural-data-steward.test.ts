@@ -490,6 +490,62 @@ describe("MIZIZI Cultural Data Steward", () => {
     );
   });
 
+  it("routes production Track apply through the governed control plane", () => {
+    const workflow =
+      readFileSync(
+        ".github/workflows/mizizi-track-production-control-plane.yml",
+        "utf8",
+      );
+    const controlPlane =
+      readFileSync(
+        "scripts/control-plane/mizizi-track-production-control-plane.mjs",
+        "utf8",
+      );
+
+    expect(workflow).toContain(
+      "workflow_dispatch",
+    );
+    expect(workflow).toContain(
+      "SUPABASE_ACCESS_TOKEN",
+    );
+    expect(workflow).toContain(
+      "MIZIZI_TRACK_PRODUCTION_APPLY",
+    );
+    expect(workflow).toContain(
+      "node scripts/control-plane/mizizi-track-production-control-plane.mjs",
+    );
+    expect(controlPlane).toContain(
+      "options', '-c jit=on'",
+    );
+    expect(controlPlane).toContain(
+      "role:'postgres'",
+    );
+    expect(controlPlane).toContain(
+      "EXPECTED_FINGERPRINT",
+    );
+    expect(controlPlane).toContain(
+      "EXPECTED_BLOBS",
+    );
+    expect(controlPlane).toContain(
+      "MIZIZI_EXPECTED_MAIN_SHA",
+    );
+    expect(controlPlane).toContain(
+      "MIZIZI_TRACK_PRODUCTION_APPLY",
+    );
+    expect(controlPlane).toContain(
+      "originalState",
+    );
+    expect(controlPlane).toContain(
+      "originalRoles",
+    );
+    expect(controlPlane).not.toContain(
+      "database password",
+    );
+    expect(controlPlane).not.toContain(
+      "mizizi_production_runner_",
+    );
+  });
+
   it("keeps the runtime bounded, review-aware, and provenance-preserving", () => {
     const runner =
       readFileSync(
