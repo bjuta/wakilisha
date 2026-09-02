@@ -1,0 +1,47 @@
+name: Phase 7B V4B Dependency Seal
+
+on:
+  push:
+    branches:
+      - feat/phase-7b-v4b-public-adaptive-video-playback
+
+permissions:
+  contents: write
+
+concurrency:
+  group: phase-7b-v4b-dependency-seal
+  cancel-in-progress: false
+
+jobs:
+  seal:
+    if: ${{ !contains(github.event.head_commit.message, '[v4b-deps]') }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Check out candidate
+        uses: actions/checkout@v4
+        with:
+          ref: feat/phase-7b-v4b-public-adaptive-video-playback
+          fetch-depth: 0
+
+      - name: Use Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Generate exact dependency lock
+        run: |
+          npm install hls.js@1.7.1 --save-exact --package-lock-only
+          node -e "const p=require('./package.json'); if(p.dependencies['hls.js']!=='1.7.1') process.exit(1)"
+          node -e "const p=require('./package-lock.json'); if(p.packages['node_modules/hls.js']?.version!=='1.7.1') process.exit(1)"
+          git diff --check
+          git diff -- package.json package-lock.json
+
+      - name: Commit dependency seal
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add package.json package-lock.json
+          git diff --cached --quiet && exit 0
+          git commit -m "Pin hls.js for V4B [v4b-deps]"
+          git push origin HEAD:feat/phase-7b-v4b-public-adaptive-video-playback
