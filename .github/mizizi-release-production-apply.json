@@ -1,0 +1,6 @@
+{
+  "operation": "mizizi_release_taxonomy_production_apply",
+  "confirm": "MIZIZI_RELEASE_TAXONOMY_PRODUCTION_APPLY",
+  "expected_authority_fingerprint": "cf71fc24d54bb71d64a469e159daaf06b137680f294efe4542b1b691aee68b16",
+  "expected_candidate_fingerprint": "238a817a5e342f8311ac04fc9a6bc978f67276cb664046cddc9e375bc323e9c4"
+}
