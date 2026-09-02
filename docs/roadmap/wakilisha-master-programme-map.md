@@ -2,11 +2,11 @@
 
 ## Current production reconciliation - 2 September 2026
 
-Latest production-accepted application main:
+Latest production-accepted runtime main:
 
-`75b42377a8bc676ae78588c588356ab4a6995bd4`
+`a2331f8b521ed19b451f148c8b53721e51747aca`
 
-Production is at 79 migrations through `20260901170500_community_track_registry_identity.sql`.
+Production is at 80 migrations through `20260902205000_phase_7b_v4a_adaptive_video_media_foundation.sql`.
 
 The accepted frontend entry is `assets/index-CIyckr53.js` with SHA-256 `66d5d645025d048693d4d8b24809bfbb9f30ffaf68be3dac376b6d4bd13ce93e`.
 
@@ -35,6 +35,34 @@ Current acceptance records:
 - `docs/engineering/community-track-registry-identity-production-closure-record.md`
 - `docs/engineering/mizizi-historical-track-production-closure-record.md`
 - `docs/engineering/mizizi-historical-release-taxonomy-production-closure-record.md`
+
+## Phase 7B V4A production reconciliation - 2 September 2026
+
+**V4A adaptive Video Media foundation is CLOSED / production accepted.**
+
+Accepted runtime main:
+
+`a2331f8b521ed19b451f148c8b53721e51747aca`
+
+Accepted production authority:
+
+- migration count: 80
+- migration head: `20260902205000`
+- PR #800 merged
+- PR Critical #911: PASS
+- protected-main Critical #912: PASS
+- Primitive Compounding: PASS
+- shared Media processing-profile authority accepted
+- Media processor worker SHA-256:
+  `cfc176d6c77cbcba92a1bc92dab41aa02e42614adcaa5a1f26d1643e30f96079`
+- real `Monday Morning in September` adaptive job succeeded on attempt 1
+- five adaptive variants / five selections
+- five registration events / five activation events
+- HLS master, 360p, and 720p public byte acceptance: PASS
+- public HTTP range delivery: PASS
+- public v8 reader remains on MP4 by design
+
+V4A does not close Phase 7B.
 
 ## Phase 7A closure reconciliation - 31 August 2026
 
@@ -259,7 +287,35 @@ The machine-enforced contract is documented in `docs/engineering/primitive-compo
 
 ### Phase 7B: Public Video product
 
-**Current.** Compose the public Video experience over the accepted 7A authority. Exit Phase 7 through one real captioned Video publication across desktop and mobile.
+**Current.** Compose the public Video experience over the accepted 7A authority.
+
+Accepted Phase 7B baseline now includes V1 through V3, the subsequent public Video corrections, and **V4A adaptive Video Media foundation**.
+
+V4A production acceptance established:
+
+- one canonical cross-domain Media processing-profile authority
+- Audio publication processing migrated as a compatibility consumer
+- adaptive Video as the second-domain proof
+- no Video-specific processing RPC
+- two deterministic HLS renditions plus master playlist
+- exactly five governed adaptive derivatives for the real published Video
+- exact public HTTP bytes and byte-range delivery
+- production Media processor worker accepted at the exact merged-main SHA
+- public reader intentionally retained the existing MP4 fallback
+
+V4A canonical record:
+
+- `docs/engineering/phase-7b-v4a-adaptive-video-media-foundation.md`
+
+Remaining Phase 7B work is product-facing rather than Media-foundation work:
+
+- expose HLS in the public Video read model
+- cross-browser adaptive playback with MP4 fallback
+- real desktop/mobile acceptance
+- governed transcript presentation
+- public Video correction continuity and real correction-handling proof
+
+Exit Phase 7 through one real captioned Video publication across desktop and mobile with the required transcript/provenance/correction proof.
 
 ### Phase 8: Field Capture
 
@@ -294,7 +350,7 @@ Build Inquiry as a capability across canonical editors, then the public Inquiry 
 
 ## Immediate next step
 
-Continue **Phase 7B: Public Video product** from the production-accepted V1-through-V3 baseline and subsequent public Video corrections.
+Continue **Phase 7B: Public Video product** from the production-accepted V1-through-V3 baseline, subsequent public Video corrections, and closed V4A adaptive Media foundation.
 
 Do not reopen Phase 7A.
 
