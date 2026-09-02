@@ -45,7 +45,12 @@ describe("MIZIZI Release production control plane", () => {
     expect(controlPlane).toContain("-c jit=true");
     expect(controlPlane).toMatch(/role:\s*['"]postgres['"]/);
     expect(controlPlane).toContain("createJitPoolWithRetry");
+    expect(controlPlane).toContain("streamReadOnlyAuditWithRetry");
     expect(controlPlane).toContain("EJITREQUESTFAILED");
+    expect(controlPlane).toContain(
+      "await streamCommand('npm',['run','registry:mizizi:apply'",
+    );
+    expect(controlPlane).not.toContain("streamApplyWithRetry");
     expect(controlPlane).toContain("PRE_APPLY_BASELINE");
     expect(controlPlane).toContain("POST_APPLY_BASELINE");
     expect(controlPlane).toContain("refusing repeat production mutation");
