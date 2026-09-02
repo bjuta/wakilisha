@@ -521,7 +521,7 @@ describe("MIZIZI Cultural Data Steward", () => {
       "node scripts/control-plane/mizizi-track-production-control-plane.mjs",
     );
     expect(controlPlane).toContain(
-      "options', '-c jit=on'",
+      "options', '-c jit=true'",
     );
     expect(controlPlane).toContain(
       "supabase/.temp/pooler-url",
