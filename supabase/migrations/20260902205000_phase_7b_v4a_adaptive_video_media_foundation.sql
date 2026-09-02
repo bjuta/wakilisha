@@ -737,14 +737,14 @@ begin
 
     v_spec := v_output -> 'transformation_spec';
 
-    if v_spec ->> 'profile' <> 'video-adaptive-v1'
+    if v_spec ->> 'profile' is distinct from 'video-adaptive-v1'
        or nullif(v_spec ->> 'hls_version', '')::integer <> 6
        or nullif(v_spec ->> 'segment_seconds', '')::integer <> 4
-       or v_spec ->> 'segment_mode' <> 'single_file_byte_range'
+       or v_spec ->> 'segment_mode' is distinct from 'single_file_byte_range'
        or v_output ->> 'generator_name'
-            <> 'wakilisha-media-processor'
+            is distinct from 'wakilisha-media-processor'
        or v_output ->> 'generator_version'
-            <> 'phase7b-v4a-v1'
+            is distinct from 'phase7b-v4a-v1'
     then
       raise exception
         'Adaptive Video processing profile metadata is invalid for role %.',
@@ -754,7 +754,7 @@ begin
     if (
       v_role = 'video_hls_master'
       and (
-        v_spec ->> 'kind' <> 'master_playlist'
+        v_spec ->> 'kind' is distinct from 'master_playlist'
         or nullif(v_spec ->> 'rendition_count', '')::integer <> 2
       )
     ) or (
@@ -763,7 +763,8 @@ begin
         'video_hls_360p_media'
       )
       and (
-        v_spec ->> 'kind' not in ('media_playlist', 'media')
+        v_spec ->> 'kind' is null
+        or v_spec ->> 'kind' not in ('media_playlist', 'media')
         or nullif(v_spec ->> 'max_width', '')::integer <> 640
         or nullif(v_spec ->> 'max_height', '')::integer <> 360
         or nullif(v_spec ->> 'video_bitrate_kbps', '')::integer <> 800
@@ -775,7 +776,8 @@ begin
         'video_hls_720p_media'
       )
       and (
-        v_spec ->> 'kind' not in ('media_playlist', 'media')
+        v_spec ->> 'kind' is null
+        or v_spec ->> 'kind' not in ('media_playlist', 'media')
         or nullif(v_spec ->> 'max_width', '')::integer <> 1280
         or nullif(v_spec ->> 'max_height', '')::integer <> 720
         or nullif(v_spec ->> 'video_bitrate_kbps', '')::integer <> 2500
@@ -787,9 +789,9 @@ begin
         'video_hls_720p_media'
       )
       and (
-        v_spec ->> 'container' <> 'mpegts'
-        or v_spec ->> 'video_codec' <> 'h264'
-        or v_spec ->> 'audio_codec' <> 'aac'
+        v_spec ->> 'container' is distinct from 'mpegts'
+        or v_spec ->> 'video_codec' is distinct from 'h264'
+        or v_spec ->> 'audio_codec' is distinct from 'aac'
       )
     ) then
       raise exception
@@ -800,13 +802,13 @@ begin
     v_file := v_output -> 'file';
 
     if v_file ->> 'storage_provider'
-         <> 'lightsail_media'
+         is distinct from 'lightsail_media'
        or coalesce(
             v_file ->> 'storage_namespace',
             ''
           ) <> 'lightsail-media'
        or v_file ->> 'mime_type'
-            <> v_expected_mime
+            is distinct from v_expected_mime
     then
       raise exception
         'Adaptive Video output file authority is invalid for role %.',
