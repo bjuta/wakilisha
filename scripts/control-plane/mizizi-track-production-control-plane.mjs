@@ -210,7 +210,7 @@ const fingerprintSql = `with payload as (
 
 const baselineSql = `select
  (select count(*)::int from public.registry_tracks where status='active') active_tracks,
- (select count(*)::int from public.registry_canonical_write_events where actor='mizizi') events,
+ (select count(*)::int from public.registry_canonical_write_events where actor='mizizi' and registry_entity_type='track') events,
  (select count(*)::int from public.registry_review_items where review_type='mizizi_data_hygiene' and status='open') reviews,
  (select count(*)::int from public.wk_slug_redirects where entity_type='track') redirects,
  (select count(*)::int from public.wk_slug_redirects where entity_type='track' and created_by='mizizi:1.1.0') mizizi_redirects,
@@ -255,6 +255,84 @@ select jsonb_build_object(
 
 function assertFields(actual, expected, label) {
   for (const [k, v] of Object.entries(expected)) if (String(actual?.[k]) !== String(v)) throw new Error(`${label} ${k}=${actual?.[k]} expected ${v}`);
+}
+
+const PRE_APPLY_BASELINE = {
+  active_tracks:2101,
+  events:0,
+  reviews:0,
+  redirects:291,
+  mizizi_redirects:0,
+  ledger_count:79,
+  ledger_head:'20260901170500',
+};
+
+const POST_APPLY_BASELINE = {
+  active_tracks:2101,
+  events:440,
+  reviews:66,
+  redirects:1148,
+  mizizi_redirects:857,
+  ledger_count:79,
+  ledger_head:'20260901170500',
+};
+
+function fieldsMatch(actual, expected) {
+  return Object.entries(expected).every(
+    ([key, value]) => String(actual?.[key]) === String(value),
+  );
+}
+
+function classifyTrackProductionState(state) {
+  if (fieldsMatch(state, PRE_APPLY_BASELINE)) return 'pre_apply';
+  if (fieldsMatch(state, POST_APPLY_BASELINE)) return 'post_apply';
+  return 'unexpected';
+}
+
+function assertAcceptedPostApply(state) {
+  assertFields(
+    state,
+    {
+      active_tracks:2101,
+      events:440,
+      unique_fingerprints:440,
+      event_track_matches:440,
+      reviews:66,
+      blocked_still_old:66,
+      review_tracks:66,
+      redirects:1148,
+      mizizi_redirects:857,
+      chart_mismatches:0,
+      save_mismatches:0,
+      ledger_count:79,
+      ledger_head:'20260901170500',
+    },
+    'acceptance',
+  );
+  assertFields(
+    state.impact,
+    {
+      redirects:857,
+      chart_rows:7,
+      save_slug_rows:3,
+      save_url_rows:3,
+      thread_rows:162,
+    },
+    'impact',
+  );
+  assertFields(
+    state.classes,
+    {
+      thread_collision:28,
+      track_collision:26,
+      missing_primary:6,
+      ambiguous_thread:6,
+    },
+    'reviews',
+  );
+  if (state.classes?.unexpected) {
+    throw new Error(`unexpected review class=${state.classes.unexpected}`);
+  }
 }
 
 function assertAudit(text, before) {
@@ -379,10 +457,50 @@ async function main() {
     console.log(`::add-mask::${url}`);
     const pool = await createJitPoolWithRetry(url);
     try {
-      console.log('\n=== 3. PRODUCTION BASELINE + REHEARSAL FINGERPRINT ===');
+      console.log('\n=== 3. PRODUCTION TRACK STATE ===');
       const { rows:[baseline] } = await pool.query(baselineSql);
-      assertFields(baseline,{active_tracks:2101,events:0,reviews:0,redirects:291,mizizi_redirects:0,ledger_count:79,ledger_head:'20260901170500'},'baseline');
+      const productionState = classifyTrackProductionState(baseline);
+      if (productionState === 'unexpected') {
+        throw new Error(
+          `production Track state is neither accepted pre-apply nor accepted post-apply: ${JSON.stringify(baseline)}`,
+        );
+      }
       fs.writeFileSync(`${ARTIFACT_DIR}/state-before.json`,JSON.stringify(baseline,null,2)+'\n');
+
+      if (productionState === 'post_apply') {
+        console.log('PASS: accepted historical Track post-apply baseline detected');
+
+        console.log('\n=== 4. EXACT POST-APPLY ACCEPTANCE ===');
+        const { rows:[row] } = await pool.query(acceptanceSql);
+        const acceptedState = row.state;
+        assertAcceptedPostApply(acceptedState);
+        fs.writeFileSync(
+          `${ARTIFACT_DIR}/state-after.json`,
+          JSON.stringify(acceptedState,null,2)+'\n',
+        );
+        console.log('PASS: production acceptance exact 440 / 66 / 857 with exact downstream impact');
+
+        console.log('\n=== 5. FRESH POST-APPLY READ-ONLY AUDIT ===');
+        const auditCurrent = `${ARTIFACT_DIR}/post-apply-audit.txt`;
+        await streamCommand(
+          'npm',
+          ['run','registry:mizizi:audit','--','--entity=track','--limit=0'],
+          {DATABASE_URL:url},
+          auditCurrent,
+        );
+        assertAudit(fs.readFileSync(auditCurrent,'utf8'),false);
+        console.log('PASS: fresh post-apply audit = 561 findings / 66 blocked candidates / 495 observe-only / 2101 Tracks');
+
+        if (MODE === 'apply') {
+          throw new Error('historical Track apply is already accepted; refusing repeat production mutation');
+        }
+
+        console.log('\n=== MIZIZI PRODUCTION CONTROL-PLANE POST-APPLY PREFLIGHT PASS ===');
+        console.log('Registry mutation: NO');
+        return;
+      }
+
+      console.log('PASS: accepted historical Track pre-apply baseline detected');
       const { rows:[fp] } = await pool.query(fingerprintSql);
       if (fp.fingerprint !== EXPECTED_FINGERPRINT) throw new Error(`accepted-rehearsal input fingerprint drift: ${fp.fingerprint}`);
       console.log(`PASS: exact full-row input fingerprint ${fp.fingerprint}`);
@@ -394,7 +512,7 @@ async function main() {
       console.log('PASS: fresh production audit = 1001 findings / 506 candidates / 495 observe-only / 2101 Tracks');
 
       if (MODE === 'preflight') {
-        console.log('\n=== MIZIZI PRODUCTION CONTROL-PLANE PREFLIGHT PASS ===');
+        console.log('\n=== MIZIZI PRODUCTION CONTROL-PLANE PRE-APPLY PREFLIGHT PASS ===');
         console.log('Registry mutation: NO');
         return;
       }
@@ -405,10 +523,7 @@ async function main() {
       console.log('\n=== 6. EXACT PRODUCTION ACCEPTANCE ===');
       const { rows:[row] } = await pool.query(acceptanceSql);
       const s = row.state;
-      assertFields(s,{active_tracks:2101,events:440,unique_fingerprints:440,event_track_matches:440,reviews:66,blocked_still_old:66,review_tracks:66,redirects:1148,mizizi_redirects:857,chart_mismatches:0,save_mismatches:0,ledger_count:79,ledger_head:'20260901170500'},'acceptance');
-      assertFields(s.impact,{redirects:857,chart_rows:7,save_slug_rows:3,save_url_rows:3,thread_rows:162},'impact');
-      assertFields(s.classes,{thread_collision:28,track_collision:26,missing_primary:6,ambiguous_thread:6},'reviews');
-      if (s.classes?.unexpected) throw new Error(`unexpected review class=${s.classes.unexpected}`);
+      assertAcceptedPostApply(s);
       fs.writeFileSync(`${ARTIFACT_DIR}/state-after.json`,JSON.stringify(s,null,2)+'\n');
       console.log('PASS: production acceptance exact 440 / 66 / 857 with exact downstream impact');
 
