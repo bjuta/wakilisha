@@ -4,7 +4,7 @@ on:
   pull_request:
     paths:
       - ".github/workflows/mizizi-track-production-control-plane.yml"
-      - "scripts/control-plane/run-mizizi-track-production-control-plane.sh"
+      - "scripts/control-plane/mizizi-track-production-control-plane.mjs"
       - "test/registry/mizizi-cultural-data-steward.test.ts"
       - "docs/registry/MIZIZI_CULTURAL_DATA_STEWARD.md"
   workflow_dispatch:
@@ -54,7 +54,7 @@ jobs:
         run: npm ci
 
       - name: Run MIZIZI production control plane
-        run: bash scripts/control-plane/run-mizizi-track-production-control-plane.sh
+        run: node scripts/control-plane/mizizi-track-production-control-plane.mjs
 
       - name: Upload MIZIZI control-plane evidence
         if: always()
