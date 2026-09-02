@@ -91,7 +91,24 @@ async function waitForDatabaseHealth() {
   for (let attempt = 1; attempt <= 36; attempt += 1) {
     try {
       const health = await api('GET',`/v1/projects/${PROJECT_REF}/health?services=db&timeout_ms=5000`);
-      if (Array.isArray(health) && health.some(item => item?.name === 'db' && item?.healthy === true)) {
+      const services =
+        Array.isArray(health)
+          ? health
+          : Array.isArray(health?.services)
+            ? health.services
+            : Array.isArray(health?.data)
+              ? health.data
+              : [];
+      if (
+        services.some(
+          item =>
+            item?.name === 'db' &&
+            (
+              item?.healthy === true ||
+              String(item?.status || '').toUpperCase() === 'ACTIVE_HEALTHY'
+            ),
+        )
+      ) {
         return;
       }
     } catch {}
