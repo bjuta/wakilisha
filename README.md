@@ -24,10 +24,11 @@ As of 2 September 2026:
 - The latest production-accepted frontend application main is `75b42377a8bc676ae78588c588356ab4a6995bd4`.
 - The accepted production frontend entry is `assets/index-CIyckr53.js`, SHA-256 `66d5d645025d048693d8b24809bfbb9f30ffaf68be3dac376b6d4bd13ce93e`.
 - Release taxonomy and public identity are production accepted: Releases is the collective domain; one resolvable active Track is a Single, two through six is an EP, and seven or more is an Album. Singles remain in Release collections and Artist discographies but do not own a second Release detail page.
-- MIZIZI preventive Track identity authority is live. The historical Track identity apply is production accepted at 440 repairs / 66 blocked reviews / 857 MIZIZI redirects. The separate historical Release taxonomy apply remains unrun.
+- MIZIZI preventive Track identity authority is live. The historical Track identity apply is production accepted at 440 repairs / 66 blocked reviews / 857 MIZIZI redirects, and the separate historical Release taxonomy apply is production accepted at 32 writes: 11 EP to Single / 19 Album to EP / 2 EP to Album.
 - Canonical Phase 7A closure remains `docs/engineering/phase-7a-closure-record.md`.
 - Current Release taxonomy acceptance record: `docs/engineering/release-taxonomy-membership-integrity-closure-record.md`.
 - Historical MIZIZI Track production closure record: `docs/engineering/mizizi-historical-track-production-closure-record.md`.
+- Historical MIZIZI Release taxonomy production closure record: `docs/engineering/mizizi-historical-release-taxonomy-production-closure-record.md`.
 
 The roadmap is an orientation tool. Building WAKILISHA naturally exposes adjacent work, and those detours can materially improve the platform. When they do, record what changed and reconcile the map so the project remains understandable.
 

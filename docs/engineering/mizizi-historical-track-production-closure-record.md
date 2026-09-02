@@ -203,3 +203,13 @@ Passed.
 Historical MIZIZI Track apply is closed.
 
 Historical Release taxonomy apply remains a separate, unrun production mutation.
+
+## Subsequent Release taxonomy closure - 2 September 2026
+
+The separate historical Release taxonomy mutation referenced by this Track-only closure was subsequently production accepted through reviewed trigger PR #797 and governed Release control-plane run #9.
+
+Canonical subsequent closure record:
+
+- `docs/engineering/mizizi-historical-release-taxonomy-production-closure-record.md`
+
+The Track closure remains unchanged at 440 canonical repairs / 66 blocked reviews / 857 MIZIZI redirects.

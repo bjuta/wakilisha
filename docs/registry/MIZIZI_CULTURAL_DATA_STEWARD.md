@@ -4,7 +4,7 @@
 
 MIZIZI is the permanent WAKILISHA Registry data-hygiene agent.
 
-Current state: the preventive Track identity write boundary is production accepted, and the historical Track identity apply is production accepted through PR #793 and governed run #28. The separate historical Release taxonomy apply remains unrun.
+Current state: the preventive Track identity write boundary is production accepted. The historical Track identity apply is production accepted through PR #793 and governed run #28, and the historical Release taxonomy apply is production accepted through PR #797 and governed run #9.
 
 Agent key: `mizizi`
 
@@ -79,7 +79,58 @@ The rule:
 - does not create review work for deterministic taxonomy drift
 - leaves Release title/slug provider-packaging rules observe-only
 
-The first production audit found exactly 32 automatic taxonomy candidates. Historical Release taxonomy apply remains unrun. The historical Track identity apply is accepted separately below.
+The first production audit found exactly 32 automatic taxonomy candidates. The historical Release taxonomy apply is now production accepted and closed. The historical Track identity apply is accepted separately below.
+
+## Historical Release taxonomy apply, accepted 2 September 2026
+
+The historical Release taxonomy pass is production accepted.
+
+Canonical closure record:
+
+- `docs/engineering/mizizi-historical-release-taxonomy-production-closure-record.md`
+
+Accepted production authority:
+
+- Release control-plane infrastructure PR: #796
+- reviewed trigger PR: #797
+- production apply main: `2be4da08001bc0b01d2e419120fc2046585865a2`
+- governed control-plane run: #9 / `33659753091`
+- rule set: `1.1.0`
+- active Releases: 841
+- zero-resolvable active Releases: 13
+- pre-apply audit: 1,448 findings
+  - 32 Release taxonomy candidates
+  - 1,416 observations
+- canonical Release taxonomy writes: 32
+- transition split: 11 EP to Single / 19 Album to EP / 2 EP to Album
+- canonical write events: 32
+- unique canonical finding fingerprints: 32
+- canonical event-to-current Release matches: 32
+- remaining taxonomy candidates: 0
+- Release-specific MIZIZI review items: 0
+
+Preserved Release-membership evidence:
+
+- 18 bad active Release-membership relationships
+- 13 affected active Releases
+- those rows remain unchanged evidence and do not manufacture taxonomy
+
+Fresh post-apply audit:
+
+- 1,430 findings
+- 1,430 observations
+- 0 automatic taxonomy candidates
+- 841 Releases scanned
+- no Registry mutation
+
+Production database authority remained:
+
+- 79 migrations
+- head `20260901170500_community_track_registry_identity.sql`
+
+Production temporary database access is disabled at rest after the governed run.
+
+The Release apply changed only `registry_releases.release_type` for the 32 accepted candidates. It did not rewrite Release title/slug packaging, membership evidence, redirects, public routes, or Track identity.
 
 ## Historical Track identity apply, accepted 2 September 2026
 

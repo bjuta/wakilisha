@@ -21,6 +21,7 @@ The current accepted adjacent Registry/public-identity work includes:
 - one-track public identity convergence through PRs #771, #775, #777, #778, and #780
 - MIZIZI preventive Track identity authority through PRs #772 and #774
 - historical MIZIZI Track identity apply accepted through PR #793 and governed run #28: 440 repairs / 66 blocked reviews / 857 MIZIZI redirects
+- historical MIZIZI Release taxonomy apply accepted through PR #797 and governed run #9: 32 writes / 0 remaining candidates / 11 EP to Single / 19 Album to EP / 2 EP to Album
 - Release taxonomy and Single public-destination convergence through PR #781
 - orphan Release-membership target integrity through PR #782
 - canonical Track public route remains `/tracks/{artist-slug}/{track-slug}`
@@ -42,11 +43,12 @@ Production acceptance is recorded in:
 
 - `docs/engineering/release-taxonomy-membership-integrity-closure-record.md`
 
-Historical MIZIZI Track apply is production accepted and closed. Historical Release taxonomy apply remains unrun.
+Historical MIZIZI Track apply and historical Release taxonomy apply are both production accepted and closed.
 
-Canonical Track-apply closure record:
+Canonical historical MIZIZI closure records:
 
 - `docs/engineering/mizizi-historical-track-production-closure-record.md`
+- `docs/engineering/mizizi-historical-release-taxonomy-production-closure-record.md`
 
 ## Phase 7A closure reconciliation - 31 August 2026
 
@@ -256,8 +258,8 @@ Immediate adjacent Registry state is:
 1. MIZIZI v1.1.0 implements the accepted Release taxonomy invariant without changing public route grammar
 2. the historical Track identity apply is production accepted: 440 canonical repairs, 66 blocked review items, and 857 MIZIZI redirects
 3. the fresh post-apply Track audit is 561 findings: 66 blocked slug candidates, 492 title-credit observations, and 3 unexplained slug mismatches
-4. preserve the 18 bad active Release-membership relationships across 13 active Releases as evidence while preventing them from manufacturing public identity
-5. the separate historical Release taxonomy apply remains unrun; its accepted candidate set remains exactly 32: 11 EP to Single, 19 Album to EP, and 2 EP to Album
+4. the historical Release taxonomy apply is production accepted: 32 canonical writes, 0 remaining taxonomy candidates, and exact transition split 11 EP to Single / 19 Album to EP / 2 EP to Album
+5. preserve the 18 bad active Release-membership relationships across 13 active Releases as evidence while preventing them from manufacturing public identity; the fresh Release post-apply audit is 1,430 observations with 0 taxonomy candidates
 
 Phase 7B product work can continue independently where public Video use exposes gaps.
 

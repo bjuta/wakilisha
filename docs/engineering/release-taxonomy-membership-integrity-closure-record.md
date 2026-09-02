@@ -181,3 +181,14 @@ Historical Track-slug apply remains separately unrun.
 - Registry data mutation: No
 - MIZIZI historical apply: No
 
+## Subsequent historical MIZIZI apply - 2 September 2026
+
+The 32 deterministic Release taxonomy mismatches documented above were subsequently applied and production accepted through reviewed trigger PR #797 and governed MIZIZI Release Production Control Plane run #9.
+
+That later historical data mutation does not change this closure's Release taxonomy, membership-integrity, or public-identity decisions. It changes only the stored `registry_releases.release_type` values for the accepted 32-row set.
+
+Canonical subsequent closure record:
+
+- `docs/engineering/mizizi-historical-release-taxonomy-production-closure-record.md`
+
+The 18 bad active Release-membership relationships across 13 active Releases remain preserved evidence.
