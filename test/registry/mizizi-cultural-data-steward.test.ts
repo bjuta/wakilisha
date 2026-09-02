@@ -527,7 +527,7 @@ describe("MIZIZI Cultural Data Steward", () => {
       "role:'postgres'",
     );
     expect(controlPlane).toContain(
-      "{user_id:userId,user_roles:roles}",
+      "{user_id:userId,roles}",
     );
     expect(controlPlane).toContain(
       "/ssl-enforcement",
@@ -543,6 +543,12 @@ describe("MIZIZI Cultural Data Steward", () => {
     );
     expect(controlPlane).toContain(
       "queryViaLinkedCli",
+    );
+    expect(controlPlane).toContain(
+      "production temporary access disabled at rest",
+    );
+    expect(controlPlane).toContain(
+      "mappingChanged",
     );
     expect(controlPlane).toContain(
       "EXPECTED_FINGERPRINT",
