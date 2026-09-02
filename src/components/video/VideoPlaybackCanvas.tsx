@@ -23,6 +23,8 @@ export type VideoPlaybackSource =
       kind: "native";
       url: string;
       mimeType: string;
+      adaptiveUrl?: string | null;
+      adaptiveMimeType?: string | null;
       poster?: string | null;
       captions?: VideoPlaybackCaption[];
     }
@@ -98,6 +100,9 @@ export function VideoPlaybackCanvas({
   const [fullscreen, setFullscreen] = useState(false);
   const [controlsVisible, setControlsVisible] = useState(true);
   const [activeCueLines, setActiveCueLines] = useState<string[]>([]);
+  const [deliveryMode, setDeliveryMode] = useState<
+    "mp4" | "hls-native" | "hls-mse"
+  >("mp4");
   const controlsHideTimerRef = useRef<number | null>(null);
 
   const syncCaptionTracks = useCallback(() => {
@@ -116,6 +121,106 @@ export function VideoPlaybackCanvas({
   useEffect(() => {
     syncCaptionTracks();
   }, [syncCaptionTracks]);
+
+  useEffect(() => {
+    const element = videoRef.current;
+
+    if (!element || source.kind !== "native") {
+      setDeliveryMode("mp4");
+      return;
+    }
+
+    let cancelled = false;
+    let hlsInstance: {
+      destroy: () => void;
+    } | null = null;
+
+    const fallbackToMp4 = () => {
+      if (cancelled) return;
+
+      const resumeTime = Number.isFinite(element.currentTime)
+        ? element.currentTime
+        : 0;
+      const resumePlayback = !element.paused;
+
+      hlsInstance?.destroy();
+      hlsInstance = null;
+
+      const restorePlayback = () => {
+        if (resumeTime > 0 && Number.isFinite(element.duration)) {
+          element.currentTime = Math.min(
+            resumeTime,
+            Math.max(0, element.duration - 0.1),
+          );
+        }
+        if (resumePlayback) {
+          void element.play().catch(() => undefined);
+        }
+      };
+
+      element.src = source.url;
+      element.load();
+      element.addEventListener(
+        "loadedmetadata",
+        restorePlayback,
+        { once: true },
+      );
+      setDeliveryMode("mp4");
+    };
+
+    const adaptiveUrl = source.adaptiveUrl?.trim() || "";
+    const adaptiveMimeType =
+      source.adaptiveMimeType?.trim() || "";
+
+    if (
+      !adaptiveUrl
+      || adaptiveMimeType !== "application/vnd.apple.mpegurl"
+    ) {
+      element.src = source.url;
+      setDeliveryMode("mp4");
+      return;
+    }
+
+    if (element.canPlayType(adaptiveMimeType)) {
+      element.src = adaptiveUrl;
+      setDeliveryMode("hls-native");
+      return;
+    }
+
+    void import("hls.js")
+      .then(({ default: Hls }) => {
+        if (cancelled) return;
+
+        if (!Hls.isSupported()) {
+          fallbackToMp4();
+          return;
+        }
+
+        const hls = new Hls();
+        hlsInstance = hls;
+
+        hls.on(Hls.Events.ERROR, (_event, data) => {
+          if (data.fatal) {
+            fallbackToMp4();
+          }
+        });
+
+        hls.loadSource(adaptiveUrl);
+        hls.attachMedia(element);
+        setDeliveryMode("hls-mse");
+      })
+      .catch(() => {
+        fallbackToMp4();
+      });
+
+    return () => {
+      cancelled = true;
+      hlsInstance?.destroy();
+    };
+  }, [
+    source,
+    videoRef,
+  ]);
 
   useEffect(() => {
     const element = videoRef.current;
@@ -395,6 +500,7 @@ export function VideoPlaybackCanvas({
         className,
       )}
       aria-label={`Video player for ${title}`}
+      data-wk-video-delivery={deliveryMode}
     >
       <video
         ref={videoRef}
@@ -423,7 +529,9 @@ export function VideoPlaybackCanvas({
         onVolumeChange={(event) => setMuted(event.currentTarget.muted)}
         onRateChange={(event) => setPlaybackRate(event.currentTarget.playbackRate)}
       >
-        <source src={source.url} type={source.mimeType} />
+        {!source.adaptiveUrl ? (
+          <source src={source.url} type={source.mimeType} />
+        ) : null}
         {captions.map((caption) => (
           <track
             key={caption.trackNumber}

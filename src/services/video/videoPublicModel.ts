@@ -36,6 +36,16 @@ export type PublicVideoDelivery =
   | PublicVideoNativeDelivery
   | PublicVideoProviderDelivery;
 
+export interface PublicVideoAdaptiveDelivery {
+  kind: "hls";
+  url: string;
+  mimeType: "application/vnd.apple.mpegurl";
+  byteSize: number;
+  sha256: string;
+  profileVersion: "video-adaptive-v1";
+  renditionCount: number;
+}
+
 export interface PublicVideoPoster {
   url: string;
   mimeType: string;
@@ -120,6 +130,7 @@ export interface PublicVideoPublication {
   show: PublicVideoShow | null;
   episode: PublicVideoEpisode | null;
   delivery: PublicVideoDelivery;
+  adaptiveDelivery: PublicVideoAdaptiveDelivery | null;
   poster: PublicVideoPoster | null;
   captions: PublicVideoCaption[];
   chapters: PublicVideoChapter[];
@@ -225,6 +236,40 @@ function decodeDelivery(value: unknown): PublicVideoDelivery | null {
   }
 
   return null;
+}
+
+function decodeAdaptiveDelivery(
+  value: unknown,
+): PublicVideoAdaptiveDelivery | null {
+  if (!value) return null;
+  const input = record(value);
+  const kind = stringValue(input.kind);
+  const url = stringValue(input.url);
+  const mimeType = stringValue(input.mime_type);
+  const sha256 = stringValue(input.sha256);
+  const profileVersion = stringValue(input.profile_version);
+  const renditionCount = numberValue(input.rendition_count);
+
+  if (
+    kind !== "hls"
+    || !url
+    || mimeType !== "application/vnd.apple.mpegurl"
+    || !sha256
+    || profileVersion !== "video-adaptive-v1"
+    || renditionCount < 1
+  ) {
+    return null;
+  }
+
+  return {
+    kind,
+    url,
+    mimeType,
+    byteSize: numberValue(input.byte_size),
+    sha256,
+    profileVersion,
+    renditionCount,
+  };
 }
 
 function decodeCaption(value: unknown): PublicVideoCaption | null {
@@ -389,6 +434,7 @@ export function decodePublicVideoPublication(
     show: decodeShow(input.show),
     episode: decodeEpisode(input.episode),
     delivery,
+    adaptiveDelivery: decodeAdaptiveDelivery(input.adaptive_delivery),
     poster: decodePoster(input.poster),
     captions: array(input.captions)
       .map(decodeCaption)

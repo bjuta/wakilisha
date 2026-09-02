@@ -209,6 +209,9 @@ export function PublicVideoWatchingSurface({
         kind: "native",
         url: publication.delivery.url,
         mimeType: publication.delivery.mimeType,
+        adaptiveUrl: publication.adaptiveDelivery?.url || null,
+        adaptiveMimeType:
+          publication.adaptiveDelivery?.mimeType || null,
         poster: publication.poster?.url || null,
         captions: publication.captions.map((caption) => ({
           trackNumber: caption.trackNumber,
