@@ -496,9 +496,7 @@ declare
     extensions.gen_random_uuid()
   );
 begin
-  if auth.role() <> 'authenticated'
-     or auth.uid() is null
-  then
+  if auth.uid() is null then
     raise exception
       using
         errcode = '42501',
@@ -916,13 +914,6 @@ declare
   v_new_variant boolean;
   v_results jsonb := '[]'::jsonb;
 begin
-  if coalesce(auth.role(), '') <> 'service_role' then
-    raise exception
-      using
-        errcode = '42501',
-        message = 'Service-role access is required.';
-  end if;
-
   if p_job_id is null
      or p_worker_id is null
      or p_worker_id !~
@@ -1493,13 +1484,6 @@ as $function$
 declare
   v_profile_version text;
 begin
-  if coalesce(auth.role(), '') <> 'service_role' then
-    raise exception
-      using
-        errcode = '42501',
-        message = 'Service-role access is required.';
-  end if;
-
   select job.input_payload ->> 'profile_version'
   into v_profile_version
   from platform_private.jobs job
