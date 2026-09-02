@@ -137,6 +137,63 @@ function databaseUrl() {
   return u.toString();
 }
 
+function isTransientJitError(error) {
+  const code = String(error?.code || '');
+  const message = String(error?.message || error || '').toLowerCase();
+
+  return (
+    code === 'EJITREQUESTFAILED' ||
+    code === '28P01' ||
+    code === 'XX000' ||
+    message.includes('jit provider') ||
+    message.includes('temporary access') ||
+    message.includes('password authentication failed')
+  );
+}
+
+async function createJitPoolWithRetry(url) {
+  const attempts = 12;
+
+  for (let attempt = 1; attempt <= attempts; attempt += 1) {
+    const pool = new pg.Pool({
+      connectionString:url,
+      ssl:{rejectUnauthorized:false},
+      max:2,
+      connectionTimeoutMillis:10000,
+      query_timeout:30000,
+      statement_timeout:30000,
+    });
+
+    try {
+      const { rows:[session] } = await pool.query(
+        'select current_user as database_user, current_database() as database_name',
+      );
+
+      if (session.database_user !== 'postgres' || session.database_name !== 'postgres') {
+        throw new Error(
+          `unexpected JIT database session ${session.database_user}@${session.database_name}`,
+        );
+      }
+
+      console.log(`PASS: JIT database session ready on attempt ${attempt}/${attempts}`);
+      return pool;
+    } catch (error) {
+      await pool.end().catch(()=>{});
+
+      if (!isTransientJitError(error) || attempt === attempts) {
+        throw error;
+      }
+
+      console.log(
+        `JIT session not ready on attempt ${attempt}/${attempts}; retrying after transient ${error?.code || 'UNKNOWN'}`,
+      );
+      await sleep(5000);
+    }
+  }
+
+  throw new Error('JIT database session readiness exhausted');
+}
+
 const fingerprintSql = `with payload as (
  select jsonb_build_object(
   'tracks',coalesce((select jsonb_agg(to_jsonb(t) order by t.id) from public.registry_tracks t where t.status='active'),'[]'::jsonb),
@@ -320,7 +377,7 @@ async function main() {
 
     const url = databaseUrl();
     console.log(`::add-mask::${url}`);
-    const pool = new pg.Pool({ connectionString:url, ssl:{rejectUnauthorized:false}, max:2, connectionTimeoutMillis:10000, query_timeout:30000, statement_timeout:30000 });
+    const pool = await createJitPoolWithRetry(url);
     try {
       console.log('\n=== 3. PRODUCTION BASELINE + REHEARSAL FINGERPRINT ===');
       const { rows:[baseline] } = await pool.query(baselineSql);
