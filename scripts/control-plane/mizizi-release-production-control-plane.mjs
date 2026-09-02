@@ -264,6 +264,23 @@ async function streamCommand(cmd,args,env,logPath,pool) {
   if (code !== 0) throw new Error(cmd+' exited '+code);
 }
 
+async function streamReadOnlyAuditWithRetry(args,env,logPath) {
+  const attempts = 4;
+  for (let attempt=1; attempt<=attempts; attempt+=1) {
+    try {
+      await streamCommand('npm',args,env,logPath);
+      return;
+    } catch (error) {
+      const output = fs.existsSync(logPath) ? fs.readFileSync(logPath,'utf8') : '';
+      const transient = output.includes('EJITREQUESTFAILED');
+      if (!transient || attempt === attempts) throw error;
+      console.log('Read-only Release audit hit transient JIT access on attempt '+attempt+'/'+attempts+'; retrying');
+      await sleep(5000);
+    }
+  }
+  throw new Error('read-only Release audit retry budget exhausted');
+}
+
 async function main() {
   console.log('\n=== 1. REPOSITORY + ACCEPTED RELEASE RUNTIME ===');
   run('git',['fetch','--prune','origin','main']);
@@ -340,7 +357,7 @@ async function main() {
         console.log('PASS: production Release taxonomy acceptance exact 32 / 0 remaining with 18 bad memberships preserved');
 
         const auditCurrent = ARTIFACT_DIR+'/post-apply-audit.txt';
-        await streamCommand('npm',['run','registry:mizizi:audit','--','--entity=release','--limit=0'],{DATABASE_URL:url},auditCurrent);
+        await streamReadOnlyAuditWithRetry(['run','registry:mizizi:audit','--','--entity=release','--limit=0'],{DATABASE_URL:url},auditCurrent);
         assertReleaseAudit(fs.readFileSync(auditCurrent,'utf8'),0);
 
         if (MODE === 'apply') {
@@ -361,7 +378,7 @@ async function main() {
 
       console.log('\n=== 4. FRESH READ-ONLY PRODUCTION AUDIT ===');
       const auditBefore = ARTIFACT_DIR+'/pre-apply-audit.txt';
-      await streamCommand('npm',['run','registry:mizizi:audit','--','--entity=release','--limit=0'],{DATABASE_URL:url},auditBefore);
+      await streamReadOnlyAuditWithRetry(['run','registry:mizizi:audit','--','--entity=release','--limit=0'],{DATABASE_URL:url},auditBefore);
       assertReleaseAudit(fs.readFileSync(auditBefore,'utf8'),32);
 
       const {rows:[afterAudit]} = await pool.query(releaseStateSql);
@@ -389,7 +406,7 @@ async function main() {
 
       console.log('\n=== 7. FRESH POST-APPLY AUDIT ===');
       const auditAfter = ARTIFACT_DIR+'/post-apply-audit.txt';
-      await streamCommand('npm',['run','registry:mizizi:audit','--','--entity=release','--limit=0'],{DATABASE_URL:url},auditAfter);
+      await streamReadOnlyAuditWithRetry(['run','registry:mizizi:audit','--','--entity=release','--limit=0'],{DATABASE_URL:url},auditAfter);
       assertReleaseAudit(fs.readFileSync(auditAfter,'utf8'),0);
       console.log('\n=== MIZIZI HISTORICAL RELEASE TAXONOMY PRODUCTION APPLY PASS ===');
     } finally {
