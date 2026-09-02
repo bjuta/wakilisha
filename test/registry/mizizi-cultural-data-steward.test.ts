@@ -560,6 +560,15 @@ describe("MIZIZI Cultural Data Steward", () => {
       "mappingChanged",
     );
     expect(controlPlane).toContain(
+      "createJitPoolWithRetry",
+    );
+    expect(controlPlane).toContain(
+      "EJITREQUESTFAILED",
+    );
+    expect(controlPlane).toContain(
+      "JIT database session ready",
+    );
+    expect(controlPlane).toContain(
       "EXPECTED_FINGERPRINT",
     );
     expect(controlPlane).toContain(
