@@ -38,7 +38,7 @@ describe("MIZIZI Release production control plane", () => {
       "production temporary access disabled at rest",
     );
     expect(controlPlane).toContain("-c jit=true");
-    expect(controlPlane).toContain("role:'postgres'");
+    expect(controlPlane).toContain("role: 'postgres'");
     expect(controlPlane).toContain("createJitPoolWithRetry");
     expect(controlPlane).toContain("EJITREQUESTFAILED");
     expect(controlPlane).toContain("PRE_APPLY_BASELINE");
