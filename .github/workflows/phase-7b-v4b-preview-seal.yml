@@ -1,0 +1,93 @@
+name: Phase 7B V4B Preview Seal
+
+on:
+  push:
+    branches:
+      - feat/phase-7b-v4b-public-adaptive-video-playback
+
+permissions:
+  contents: write
+
+concurrency:
+  group: phase-7b-v4b-preview-seal
+  cancel-in-progress: false
+
+jobs:
+  seal:
+    if: ${{ !contains(github.event.head_commit.message, '[v4b-seal-artifacts]') }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    env:
+      SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+      SUPABASE_CLI_VERSION: "2.107.0"
+      SUPABASE_TARGET_PROJECT_REF: pgzizndxdyhqmtyywjmt
+      PREVIEW_PROJECT_REF: fvhwlsowffbzksevcufe
+      PREVIEW_BRANCH_ID: 08d63f42-adad-43cb-8130-789f3aefa762
+      MIGRATION_FILE: supabase/migrations/20260902220000_phase_7b_v4b_public_adaptive_video_playback.sql
+      VERIFIER_FILE: scripts/control-plane/verify-phase-7b-v4b-public-adaptive-video-playback.sql
+
+    steps:
+      - name: Check out candidate
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ref: feat/phase-7b-v4b-public-adaptive-video-playback
+
+      - name: Use Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Link exact disposable preview
+        run: |
+          npx --yes "supabase@${SUPABASE_CLI_VERSION}" link \
+            --project-ref "${PREVIEW_PROJECT_REF}"
+          test "$(cat supabase/.temp/project-ref)" = "${PREVIEW_PROJECT_REF}"
+
+      - name: Prove exact pending migration set
+        run: |
+          OUT="$(npx --yes "supabase@${SUPABASE_CLI_VERSION}" db push --dry-run --linked 2>&1)"
+          printf '%s\n' "$OUT"
+          printf '%s\n' "$OUT" | grep -F "$(basename "${MIGRATION_FILE}")"
+          COUNT="$(printf '%s\n' "$OUT" | grep -Eo '[0-9]{14}_[A-Za-z0-9_-]+\.sql' | sort -u | wc -l | tr -d '[:space:]')"
+          test "$COUNT" = "1"
+
+      - name: Apply candidate natively
+        run: |
+          npx --yes "supabase@${SUPABASE_CLI_VERSION}" db push --linked
+
+      - name: Prove zero pending after native apply
+        run: |
+          OUT="$(npx --yes "supabase@${SUPABASE_CLI_VERSION}" db push --dry-run --linked 2>&1)"
+          printf '%s\n' "$OUT"
+          COUNT="$( { printf '%s\n' "$OUT" | grep -Eo '[0-9]{14}_[A-Za-z0-9_-]+\.sql' || true; } | sort -u | wc -l | tr -d '[:space:]')"
+          test "$COUNT" = "0"
+
+      - name: Run permanent V4B verifier
+        run: |
+          npx --yes "supabase@${SUPABASE_CLI_VERSION}" db query \
+            --linked \
+            --file "${VERIFIER_FILE}" \
+            | tee /tmp/v4b-verifier.log
+          grep -F "PASS: Phase 7B V4B public adaptive Video read authority is intact." /tmp/v4b-verifier.log
+
+      - name: Generate replay proof and preview schema seal
+        run: |
+          node scripts/control-plane/record-migration-replay-proof.mjs \
+            --migration "${MIGRATION_FILE}" \
+            --preview-project-ref "${PREVIEW_PROJECT_REF}" \
+            --preview-branch-id "${PREVIEW_BRANCH_ID}" \
+            --verifier-file "${VERIFIER_FILE}"
+
+      - name: Commit generated replay artifacts
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add \
+            src/types/database.types.ts \
+            docs/engineering/live-schema-baseline.json \
+            "docs/engineering/replay-proofs/$(basename "${MIGRATION_FILE}").json"
+          git diff --cached --check
+          git diff --cached --quiet && exit 0
+          git commit -m "Seal V4B preview replay [v4b-seal-artifacts]"
+          git push origin HEAD:feat/phase-7b-v4b-public-adaptive-video-playback
