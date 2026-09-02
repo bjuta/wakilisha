@@ -160,7 +160,7 @@ const releaseStateSql = [
 " (select max(version) from supabase_migrations.schema_migrations) ledger_head,",
 " (select encode(digest(convert_to(body::text,'UTF8'),'sha256'),'hex') from authority_payload) release_authority_fingerprint,",
 " (select encode(digest(convert_to(body::text,'UTF8'),'sha256'),'hex') from candidate_payload) release_candidate_fingerprint",
-].join('\\n');
+].join('\n');
 
 const releaseAcceptanceSql = [
 "with e as (",
@@ -176,7 +176,7 @@ const releaseAcceptanceSql = [
 " count(*) filter(where lower(before_value->>'value')='ep' and lower(after_value->>'value')='album')::int ep_to_album_events,",
 " (select count(*)::int from e join public.registry_releases r on r.id::text=e.registry_entity_id::text and r.status='active' where lower(coalesce(btrim(r.release_type::text),''))=lower(e.after_value->>'value')) event_release_matches",
 "from e",
-].join('\\n');
+].join('\n');
 
 const PRE_APPLY_BASELINE = {
   active_releases:841,
@@ -265,7 +265,7 @@ async function streamCommand(cmd,args,env,logPath,pool) {
 }
 
 async function main() {
-  console.log('\\n=== 1. REPOSITORY + ACCEPTED RELEASE RUNTIME ===');
+  console.log('\n=== 1. REPOSITORY + ACCEPTED RELEASE RUNTIME ===');
   run('git',['fetch','--prune','origin','main']);
   if (run('git',['status','--porcelain'],{capture:true})) throw new Error('worktree is not clean');
   for (const [path,sha] of Object.entries(EXPECTED_BLOBS)) {
@@ -294,7 +294,7 @@ async function main() {
     'test/registry/mizizi-release-production-control-plane.test.ts',
   ]);
 
-  console.log('\\n=== 2. EXISTING SUPABASE CONTROL PLANE + TEMPORARY ACCESS ===');
+  console.log('\n=== 2. EXISTING SUPABASE CONTROL PLANE + TEMPORARY ACCESS ===');
   run('npx',['--yes','supabase@2.107.0','link','--project-ref',PROJECT_REF]);
 
   const userId = profileId(await api('GET','/v1/profile'));
@@ -325,18 +325,18 @@ async function main() {
     const pool = await createJitPoolWithRetry(url);
 
     try {
-      console.log('\\n=== 3. PRODUCTION RELEASE STATE ===');
+      console.log('\n=== 3. PRODUCTION RELEASE STATE ===');
       const {rows:[baseline]} = await pool.query(releaseStateSql);
       const productionState = classifyReleaseProductionState(baseline);
       if (productionState === 'unexpected') {
         throw new Error('production Release state is neither accepted pre-apply nor accepted post-apply: '+JSON.stringify(baseline));
       }
-      fs.writeFileSync(ARTIFACT_DIR+'/state-before.json',JSON.stringify(baseline,null,2)+'\\n');
+      fs.writeFileSync(ARTIFACT_DIR+'/state-before.json',JSON.stringify(baseline,null,2)+'\n');
 
       if (productionState === 'post_apply') {
         console.log('PASS: accepted historical Release taxonomy post-apply baseline detected');
         await assertAcceptedPostApply(pool,baseline);
-        fs.writeFileSync(ARTIFACT_DIR+'/state-after.json',JSON.stringify(baseline,null,2)+'\\n');
+        fs.writeFileSync(ARTIFACT_DIR+'/state-after.json',JSON.stringify(baseline,null,2)+'\n');
         console.log('PASS: production Release taxonomy acceptance exact 32 / 0 remaining with 18 bad memberships preserved');
 
         const auditCurrent = ARTIFACT_DIR+'/post-apply-audit.txt';
@@ -346,7 +346,7 @@ async function main() {
         if (MODE === 'apply') {
           throw new Error('historical Release taxonomy apply is already accepted; refusing repeat production mutation');
         }
-        console.log('\\n=== MIZIZI RELEASE PRODUCTION CONTROL-PLANE POST-APPLY PREFLIGHT PASS ===');
+        console.log('\n=== MIZIZI RELEASE PRODUCTION CONTROL-PLANE POST-APPLY PREFLIGHT PASS ===');
         console.log('Registry mutation: NO');
         return;
       }
@@ -359,7 +359,7 @@ async function main() {
       console.log('PASS: exact Release authority fingerprint '+baseline.release_authority_fingerprint);
       console.log('PASS: exact Release candidate-set fingerprint '+baseline.release_candidate_fingerprint);
 
-      console.log('\\n=== 4. FRESH READ-ONLY PRODUCTION AUDIT ===');
+      console.log('\n=== 4. FRESH READ-ONLY PRODUCTION AUDIT ===');
       const auditBefore = ARTIFACT_DIR+'/pre-apply-audit.txt';
       await streamCommand('npm',['run','registry:mizizi:audit','--','--entity=release','--limit=0'],{DATABASE_URL:url},auditBefore);
       assertReleaseAudit(fs.readFileSync(auditBefore,'utf8'),32);
@@ -373,25 +373,25 @@ async function main() {
       console.log('PASS: fresh production audit = 32 deterministic Release taxonomy candidates and no Registry mutation');
 
       if (MODE === 'preflight') {
-        console.log('\\n=== MIZIZI RELEASE PRODUCTION CONTROL-PLANE PRE-APPLY PREFLIGHT PASS ===');
+        console.log('\n=== MIZIZI RELEASE PRODUCTION CONTROL-PLANE PRE-APPLY PREFLIGHT PASS ===');
         console.log('Registry mutation: NO');
         return;
       }
 
-      console.log('\\n=== 5. REAL MIZIZI RELEASE TAXONOMY APPLY - PRODUCTION ===');
+      console.log('\n=== 5. REAL MIZIZI RELEASE TAXONOMY APPLY - PRODUCTION ===');
       await streamCommand('npm',['run','registry:mizizi:apply','--','--entity=release','--limit=0','--confirm=MIZIZI_APPLY'],{DATABASE_URL:url},ARTIFACT_DIR+'/apply.txt',pool);
 
-      console.log('\\n=== 6. EXACT PRODUCTION ACCEPTANCE ===');
+      console.log('\n=== 6. EXACT PRODUCTION ACCEPTANCE ===');
       const {rows:[accepted]} = await pool.query(releaseStateSql);
       await assertAcceptedPostApply(pool,accepted);
-      fs.writeFileSync(ARTIFACT_DIR+'/state-after.json',JSON.stringify(accepted,null,2)+'\\n');
+      fs.writeFileSync(ARTIFACT_DIR+'/state-after.json',JSON.stringify(accepted,null,2)+'\n');
       console.log('PASS: production Release taxonomy acceptance exact 32 applied / 0 remaining / 18 bad memberships preserved');
 
-      console.log('\\n=== 7. FRESH POST-APPLY AUDIT ===');
+      console.log('\n=== 7. FRESH POST-APPLY AUDIT ===');
       const auditAfter = ARTIFACT_DIR+'/post-apply-audit.txt';
       await streamCommand('npm',['run','registry:mizizi:audit','--','--entity=release','--limit=0'],{DATABASE_URL:url},auditAfter);
       assertReleaseAudit(fs.readFileSync(auditAfter,'utf8'),0);
-      console.log('\\n=== MIZIZI HISTORICAL RELEASE TAXONOMY PRODUCTION APPLY PASS ===');
+      console.log('\n=== MIZIZI HISTORICAL RELEASE TAXONOMY PRODUCTION APPLY PASS ===');
     } finally {
       await pool.end().catch(()=>{});
     }
@@ -419,6 +419,6 @@ async function main() {
 }
 
 main().catch(error=>{
-  console.error('\\nMIZIZI Release production control plane failed: '+(error?.message||error));
+  console.error('\nMIZIZI Release production control plane failed: '+(error?.message||error));
   process.exitCode = 1;
 });
