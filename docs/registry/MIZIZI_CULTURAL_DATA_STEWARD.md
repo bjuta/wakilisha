@@ -448,6 +448,33 @@ MIZIZI must not:
 - use AI similarity as identity authority
 - write production changes in audit mode
 
+## Production execution authority
+
+Historical MIZIZI production mutation must not be run from an operator laptop with an ad hoc database password, a temporary custom Postgres role, or a hand-built pooler credential.
+
+Production Track apply authority is:
+
+`.github/workflows/mizizi-track-production-control-plane.yml`
+
+The workflow:
+
+1. uses the existing repository `SUPABASE_ACCESS_TOKEN` control-plane secret
+2. temporarily enables Supabase JIT database access only when required
+3. temporarily maps the executing Supabase platform identity to the existing `postgres` role
+4. connects through the shared pooler with `jit=on`
+5. pins the exact accepted MIZIZI runtime blobs
+6. pins the full-row fingerprint of every production input subset used by the accepted rehearsal
+7. runs a fresh read-only production Track audit before mutation
+8. requires an exact merged-main SHA and the explicit `MIZIZI_TRACK_PRODUCTION_APPLY` manual confirmation
+9. runs the unchanged preview-proven MIZIZI Track apply
+10. verifies the exact accepted 440 repair / 66 review / 857 redirect outcome and downstream impact
+11. runs a fresh read-only post-apply audit
+12. restores the caller's prior JIT mapping and the project's prior temporary-access state in cleanup
+
+Pull-request execution of this workflow is preflight-only and must not mutate Registry rows.
+
+The direct `registry:mizizi:apply` command remains a runtime primitive for governed environments. It is not the production operator deployment surface.
+
 ## Commands
 
 Audit only:
