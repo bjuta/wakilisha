@@ -25,8 +25,8 @@ permissions:
   contents: read
 
 concurrency:
-  group: mizizi-release-production-control-plane
-  cancel-in-progress: false
+  group: mizizi-production-jit-control-plane
+  queue: max
 
 jobs:
   control-plane:
