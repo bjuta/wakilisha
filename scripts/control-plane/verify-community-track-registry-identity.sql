@@ -95,7 +95,12 @@ begin
      ) = 0
      or position(
        'thread.entity_id = v_canonical_track_id::text' in
-       v_write_def
+       regexp_replace(
+         v_write_def,
+         '[[:space:]]+',
+         ' ',
+         'g'
+       )
      ) = 0 then
     raise exception
       'Track thread create authority is not Registry-ID-first';
