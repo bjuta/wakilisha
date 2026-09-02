@@ -1751,13 +1751,12 @@ def process_job(job):
         profile = job["input_payload"].get(
             "profile_version"
         )
-        if profile == "audio-publication-v1":
+        if profile in (
+            "audio-publication-v1",
+            "video-adaptive-v1",
+        ):
             registration_rpc = (
-                "register_audio_delivery_processing_outputs_v1"
-            )
-        elif profile == "video-adaptive-v1":
-            registration_rpc = (
-                "register_video_adaptive_processing_outputs_v1"
+                "register_media_processing_profile_outputs_v1"
             )
         else:
             registration_rpc = (
