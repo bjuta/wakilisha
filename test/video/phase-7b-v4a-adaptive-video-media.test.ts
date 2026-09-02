@@ -21,7 +21,7 @@ const migrationFile = readdirSync(
 
 if (!migrationFile) {
   throw new Error(
-    "Phase 7B V4A adaptive Video migration is missing.",
+    "Phase 7B V4A migration is missing.",
   );
 }
 
@@ -46,60 +46,120 @@ const design = readFileSync(
 );
 
 describe(
-  "Phase 7B V4A adaptive Video Media foundation",
+  "Phase 7B V4A Media processing-profile convergence",
   () => {
     it(
-      "preserves accepted video-v1 and adds an additive adaptive profile",
+      "promotes one canonical shared Media processing-profile authority",
       () => {
-        expect(migration).not.toContain(
-          "create or replace function public.submit_media_processing_command_v1",
+        expect(migration).toContain(
+          "create table media.processing_profiles",
         );
-        expect(migration).not.toContain(
-          "create or replace function public.register_media_processing_outputs_v1",
+        expect(migration).toContain(
+          "create table media.processing_profile_outputs",
         );
-        expect(design).toContain("Preserve");
+        expect(migration).toContain(
+          "public.submit_media_processing_profile_v1",
+        );
+        expect(migration).toContain(
+          "public.register_media_processing_profile_outputs_v1",
+        );
+        expect(design).toContain(
+          "Candidate promoted to canonical authority",
+        );
+        expect(design).toContain(
+          "Audio is the first proven consumer.",
+        );
+        expect(design).toContain(
+          "Adaptive Video is the second proven consumer.",
+        );
+      },
+    );
+
+    it(
+      "does not create Video-specific processing authority",
+      () => {
+        expect(migration).not.toMatch(
+          /create or replace function\s+public\.submit_video_adaptive_processing_v1/i,
+        );
+        expect(migration).not.toMatch(
+          /create or replace function\s+public\.register_video_adaptive_processing_outputs_v1/i,
+        );
+        expect(worker).not.toContain(
+          "register_video_adaptive_processing_outputs_v1",
+        );
+        expect(verifier).toContain(
+          "competing Video-specific processing authority exists",
+        );
+      },
+    );
+
+    it(
+      "migrates Audio candidate authority into compatibility wrappers",
+      () => {
+        expect(migration).toMatch(
+          /create or replace function[\s\S]+public\.submit_audio_delivery_processing_v1[\s\S]+submit_media_processing_profile_v1/i,
+        );
+        expect(migration).toMatch(
+          /create or replace function[\s\S]+public\.register_audio_delivery_processing_outputs_v1[\s\S]+register_media_processing_profile_outputs_v1/i,
+        );
+        expect(worker).not.toContain(
+          "register_audio_delivery_processing_outputs_v1",
+        );
+        expect(design).toContain(
+          "Existing candidate migrated",
+        );
+      },
+    );
+
+    it(
+      "preserves accepted Phase 4 base processing functions",
+      () => {
+        expect(migration).not.toMatch(
+          /create or replace function\s+public\.submit_media_processing_command_v1/i,
+        );
+        expect(migration).not.toMatch(
+          /create or replace function\s+public\.register_media_processing_outputs_v1/i,
+        );
         expect(worker).toContain(
           "if profile == \"video-v1\":",
         );
         expect(worker).toContain(
-          "if profile == \"video-adaptive-v1\":",
+          "if profile == \"audio-v1\":",
+        );
+      },
+    );
+
+    it(
+      "routes both proven additive profiles through the shared registration primitive",
+      () => {
+        expect(worker).toContain(
+          "\"audio-publication-v1\",",
         );
         expect(worker).toContain(
-          "VIDEO_ADAPTIVE_PROFILE_GENERATOR_VERSION = \"phase7b-v4a-v1\"",
+          "\"video-adaptive-v1\",",
+        );
+        expect(worker).toContain(
+          "\"register_media_processing_profile_outputs_v1\"",
+        );
+        expect(worker).toContain(
+          "\"register_media_processing_outputs_v1\"",
         );
       },
     );
 
     it(
-      "reuses the accepted Media durable job and registration authorities",
+      "registers exact Audio and adaptive Video profile contracts",
       () => {
         expect(migration).toContain(
-          "public.submit_video_adaptive_processing_v1",
+          "'audio-publication-v1'",
         );
         expect(migration).toContain(
-          "public.register_video_adaptive_processing_outputs_v1",
+          "'audio_delivery'",
         );
         expect(migration).toContain(
-          "'media.process_revision'",
+          "'video-adaptive-v1'",
         );
-        expect(migration).toContain(
-          "'media.processing.accepted'",
-        );
-        expect(migration).toContain(
-          "media.insert_verified_file_object_v2",
-        );
-        expect(migration).toContain(
-          "media.variant_selections",
-        );
-        expect(migration).not.toMatch(
-          /create table\s+(media|video)\.(processing|streaming)/i,
-        );
-      },
-    );
 
-    it(
-      "requires one exact five-file single-file-byte-range HLS package",
-      () => {
         for (const role of [
           "video_hls_master",
           "video_hls_360p_playlist",
@@ -111,13 +171,12 @@ describe(
           expect(worker).toContain(role);
           expect(verifier).toContain(role);
         }
+      },
+    );
 
-        expect(migration).toContain(
-          "jsonb_array_length(p_outputs) <> 5",
-        );
-        expect(migration).toContain(
-          "single_file_byte_range",
-        );
+    it(
+      "keeps the adaptive package single-file, bounded, and retry-safe",
+      () => {
         expect(worker).toContain(
           "independent_segments+single_file",
         );
@@ -127,70 +186,32 @@ describe(
         expect(worker).toContain(
           "\"#EXT-X-VERSION:6\"",
         );
-      },
-    );
-
-    it(
-      "keeps adaptive rendition bytes retry-safe",
-      () => {
-        expect(worker).toContain("\"-threads\",");
-        expect(worker).toContain("\"1\",");
-        expect(worker).toContain("\"-fflags\",");
-        expect(worker).toContain("\"+bitexact\",");
-        expect(worker).toContain("\"-flags:v\",");
-        expect(worker).toContain("\"-flags:a\",");
-        expect(worker).toContain("\"-muxdelay\",");
-        expect(worker).toContain("\"-muxpreload\",");
         expect(worker).toContain(
           "\"expr:gte(t,n_forced*4)\"",
         );
         expect(worker).toContain(
+          "\"-threads\",",
+        );
+        expect(worker).toContain(
+          "\"+bitexact\",",
+        );
+        expect(worker).toContain(
           "Adaptive Video HLS playlist leaked a staging filename.",
         );
+      },
+    );
+
+    it(
+      "keeps domain transforms distinct while sharing authority semantics",
+      () => {
         expect(design).toContain(
-          "fails closed",
+          "Intentionally domain-specific implementation",
         );
-      },
-    );
-
-    it(
-      "routes only the new profile through its additive registration adapter",
-      () => {
-        expect(worker).toContain(
-          "\"register_video_adaptive_processing_outputs_v1\"",
+        expect(design).toContain(
+          "Compounding requires one meaning for the shared processing authority",
         );
-        expect(worker).toContain(
-          "elif profile == \"video-adaptive-v1\":",
-        );
-        expect(worker).toContain(
-          "\"register_audio_delivery_processing_outputs_v1\"",
-        );
-        expect(worker).toContain(
-          "\"register_media_processing_outputs_v1\"",
-        );
-      },
-    );
-
-    it(
-      "requires exact version-bound Video master authority before submission",
-      () => {
-        expect(migration).toContain(
-          "usage.target_authority = 'video'",
-        );
-        expect(migration).toContain(
-          "usage.target_kind = 'video_publication'",
-        );
-        expect(migration).toContain(
-          "usage.target_version_kind = 'video_publication_version'",
-        );
-        expect(migration).toContain(
-          "usage.usage_role = 'video_master'",
-        );
-        expect(migration).toContain(
-          "usage.resolution_mode = 'exact_revision'",
-        );
-        expect(migration).toContain(
-          "'^masters/video/'",
+        expect(design).toContain(
+          "it does not require flattening distinct transforms",
         );
       },
     );
@@ -199,19 +220,13 @@ describe(
       "keeps V4A out of public playback, transcript, and correction scope",
       () => {
         expect(design).toContain(
-          "- change the public Video read model",
-        );
-        expect(design).toContain(
-          "- add",
-        );
-        expect(design).toContain(
-          "- make HLS the public playback source",
+          "does **not** change the public Video read model or player",
         );
         expect(design).toContain(
           "- add or manufacture a transcript",
         );
         expect(design).toContain(
-          "- add Video correction submission or correction history",
+          "- add Video correction submission/history",
         );
       },
     );
@@ -234,7 +249,7 @@ describe(
         }
 
         expect(verifier).toContain(
-          "PASS: Phase 7B V4A adaptive Video Media processing authority is intact.",
+          "PASS: Phase 7B V4A canonical Media processing-profile and adaptive Video authority is intact.",
         );
       },
     );
