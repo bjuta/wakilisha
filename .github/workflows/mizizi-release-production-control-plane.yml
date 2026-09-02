@@ -5,6 +5,9 @@ on:
     paths:
       - ".github/workflows/mizizi-release-production-control-plane.yml"
       - "scripts/control-plane/mizizi-release-production-control-plane.mjs"
+      - "scripts/registry/agents/mizizi/run.ts"
+      - "scripts/registry/agents/mizizi/core.ts"
+      - "supabase/functions/_shared/release-taxonomy.ts"
       - "test/registry/mizizi-release-production-control-plane.test.ts"
       - "test/registry/mizizi-cultural-data-steward.test.ts"
       - "test/release-taxonomy-public-identity.test.ts"
