@@ -4,7 +4,7 @@
 
 MIZIZI is the permanent WAKILISHA Registry data-hygiene agent.
 
-Current state: PR #772 merged and the preventive Track identity write boundary is production accepted. The historical MIZIZI apply command has not been run.
+Current state: the preventive Track identity write boundary is production accepted, and the historical Track identity apply is production accepted through PR #793 and governed run #28. The separate historical Release taxonomy apply remains unrun.
 
 Agent key: `mizizi`
 
@@ -79,7 +79,70 @@ The rule:
 - does not create review work for deterministic taxonomy drift
 - leaves Release title/slug provider-packaging rules observe-only
 
-The first production audit found exactly 32 automatic taxonomy candidates. Historical MIZIZI apply remains unrun.
+The first production audit found exactly 32 automatic taxonomy candidates. Historical Release taxonomy apply remains unrun. The historical Track identity apply is accepted separately below.
+
+## Historical Track identity apply, accepted 2 September 2026
+
+The historical Track identity pass is production accepted.
+
+Canonical closure record:
+
+- `docs/engineering/mizizi-historical-track-production-closure-record.md`
+
+Accepted production authority:
+
+- reviewed trigger PR: #793
+- production apply main: `8d96a2805458e75d55b9ce69db841b05c74d7393`
+- governed control-plane run: #28 / `33652839751`
+- rule set: `1.1.0`
+- active Tracks: 2,101
+- pre-apply audit: 1,001 findings
+  - 506 Track slug identity candidates
+  - 492 title-credit observations
+  - 3 unexplained slug mismatches
+- canonical Track repairs: 440
+- blocked review rows: 66
+- MIZIZI-created permanent redirects: 857
+- total Track redirects after apply: 1,148
+- canonical write events: 440
+- unique canonical finding fingerprints: 440
+- canonical event-to-current Track matches: 440
+
+Blocked review split:
+
+- current Community thread collision: 28
+- Track identity collision: 26
+- missing explicit primary-Artist scope: 6
+- ambiguous current Community thread ownership: 6
+- unexpected review class: 0
+
+Exact downstream impact:
+
+- permanent redirects: 857
+- chart rows repaired: 7
+- Community save slug rows repaired: 3
+- Community save URL rows repaired: 3
+- Community thread rows repaired: 162
+- chart mismatches after apply: 0
+- Community save mismatches after apply: 0
+
+Fresh post-apply audit:
+
+- 561 findings
+- 66 remaining `track_slug_identity_noise` candidates, matching the blocked review set
+- 492 title-credit observations
+- 3 unexplained slug mismatches
+- 2,101 Tracks scanned
+- no Registry mutation
+
+Production database authority remained:
+
+- 79 migrations
+- head `20260901170500_community_track_registry_identity.sql`
+
+The disposable rehearsal preview is absent, and production temporary database access is disabled at rest after the governed run.
+
+This acceptance is Track-only. It does not apply the 32 historical Release taxonomy candidates or rewrite the 18 bad active Release-membership relationships across 13 active Releases.
 
 ## Why MIZIZI exists
 
@@ -283,7 +346,7 @@ Flags chart artist-slug disagreement with the canonical Registry primary artist.
 
 This remains observe-only in v1 because chart source presentation may intentionally differ from Registry primary-credit presentation. A difference alone is not an admin task.
 
-## Current production baseline, 1 September 2026
+## Pre-apply production baseline, 1 September 2026
 
 Read-only production audit:
 
