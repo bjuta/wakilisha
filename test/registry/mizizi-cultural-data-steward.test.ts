@@ -513,6 +513,12 @@ describe("MIZIZI Cultural Data Steward", () => {
       "ta.is_primary is true",
     );
     expect(runner).toContain(
+      "order by ta.artist_slug, t.id::text",
+    );
+    expect(runner).not.toContain(
+      "order by ta.artist_slug, t.id\n",
+    );
+    expect(runner).toContain(
       "registry_review_items",
     );
     expect(runner).toContain(

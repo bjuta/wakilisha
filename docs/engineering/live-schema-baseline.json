@@ -2,7 +2,7 @@
   "projectRef": "pgzizndxdyhqmtyywjmt",
   "schema": "public,editorial",
   "generatedAt": "2026-09-02T07:04:32Z",
-  "typesSha256": "7df6bde56aa9ad76a3af34ea056f621ada0536903046f1692e5353f97b173bcf",
+  "typesSha256": "f18eacfa117b128a8251b1b472d6921924f04a7efd001e7ff293a57acd179570",
   "authoritativeMigrationDirectory": "supabase/migrations",
   "migrationCount": 79,
   "latestMigration": "20260901170500_community_track_registry_identity.sql",
