@@ -569,6 +569,24 @@ describe("MIZIZI Cultural Data Steward", () => {
       "JIT database session ready",
     );
     expect(controlPlane).toContain(
+      "PRE_APPLY_BASELINE",
+    );
+    expect(controlPlane).toContain(
+      "POST_APPLY_BASELINE",
+    );
+    expect(controlPlane).toContain(
+      "accepted historical Track post-apply baseline detected",
+    );
+    expect(controlPlane).toContain(
+      "POST-APPLY PREFLIGHT PASS",
+    );
+    expect(controlPlane).toContain(
+      "refusing repeat production mutation",
+    );
+    expect(controlPlane).toContain(
+      "registry_entity_type='track'",
+    );
+    expect(controlPlane).toContain(
       "EXPECTED_FINGERPRINT",
     );
     expect(controlPlane).toContain(
