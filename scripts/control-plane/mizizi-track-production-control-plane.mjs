@@ -7,7 +7,7 @@ const REGION = process.env.SUPABASE_REGION || 'eu-west-2';
 const TOKEN = process.env.SUPABASE_ACCESS_TOKEN || '';
 const MODE = process.env.MIZIZI_CONTROL_PLANE_MODE || 'preflight';
 const EXPECTED_MAIN = process.env.MIZIZI_EXPECTED_MAIN_SHA || '';
-const CONFIRM = process.env.MIZIZI_PRODUCTION_CONFIRM || '';
+const TRIGGER_FILE = process.env.MIZIZI_TRIGGER_FILE || '';
 const ARTIFACT_DIR = process.env.MIZIZI_ARTIFACT_DIR || 'artifacts/mizizi-track-production-control-plane';
 const EXPECTED_FINGERPRINT = '551b29431700536937c26ecb1e396c3cf9314edefd88c589284cf330c9d1bb9a';
 const EXPECTED_BLOBS = {
@@ -47,6 +47,57 @@ function profileId(raw) {
 
 function configState(raw) {
   return String(raw?.state || raw?.data?.state || raw?.config?.state || '').toLowerCase();
+}
+
+function sleep(ms) {
+  return new Promise(resolve => setTimeout(resolve, ms));
+}
+
+function findPayload(value, depth = 0) {
+  if (depth > 14) return null;
+  if (typeof value === 'string') {
+    try { return findPayload(JSON.parse(value), depth + 1); } catch { return null; }
+  }
+  if (Array.isArray(value)) {
+    for (const item of value) {
+      const found = findPayload(item, depth + 1);
+      if (found !== null) return found;
+    }
+    return null;
+  }
+  if (value && typeof value === 'object') {
+    if (value.payload !== undefined) return value.payload;
+    for (const child of Object.values(value)) {
+      const found = findPayload(child, depth + 1);
+      if (found !== null) return found;
+    }
+  }
+  return null;
+}
+
+function queryViaLinkedCli(sql) {
+  const wrapped = `select to_jsonb(q) as payload from (${sql.replace(/;\\s*$/, '')}) q`;
+  const raw = run(
+    'npx',
+    ['--yes','supabase@2.107.0','db','query','--linked','--agent=no','-o','json',wrapped],
+    { capture:true },
+  );
+  const payload = findPayload(JSON.parse(raw));
+  if (payload === null) throw new Error('linked Supabase CLI query did not return a parseable payload');
+  return payload;
+}
+
+async function waitForDatabaseHealth() {
+  for (let attempt = 1; attempt <= 36; attempt += 1) {
+    try {
+      const health = await api('GET',`/v1/projects/${PROJECT_REF}/health?services=db&timeout_ms=5000`);
+      if (Array.isArray(health) && health.some(item => item?.name === 'db' && item?.healthy === true)) {
+        return;
+      }
+    } catch {}
+    await sleep(5000);
+  }
+  throw new Error('database did not return healthy after SSL enforcement change');
 }
 
 function databaseUrl() {
@@ -152,9 +203,25 @@ async function main() {
   run('git',['fetch','--prune','origin','main']);
   if (run('git',['status','--porcelain'],{capture:true})) throw new Error('worktree is not clean');
   for (const [path,sha] of Object.entries(EXPECTED_BLOBS)) assertFields({sha:run('git',['hash-object',path],{capture:true})},{sha},path);
+  let trigger = null;
   if (MODE === 'apply') {
-    if (CONFIRM !== 'MIZIZI_TRACK_PRODUCTION_APPLY' || !EXPECTED_MAIN) throw new Error('manual production gate is not exact');
-    assertFields({head:run('git',['rev-parse','HEAD'],{capture:true}),main:run('git',['rev-parse','origin/main'],{capture:true})},{head:EXPECTED_MAIN,main:EXPECTED_MAIN},'main');
+    if (!EXPECTED_MAIN || !TRIGGER_FILE) throw new Error('reviewed production trigger is missing');
+    trigger = JSON.parse(fs.readFileSync(TRIGGER_FILE, 'utf8'));
+    assertFields(
+      trigger,
+      {
+        operation:'mizizi_track_production_apply',
+        confirm:'MIZIZI_TRACK_PRODUCTION_APPLY',
+        expected_input_fingerprint:EXPECTED_FINGERPRINT,
+        enable_ssl_enforcement:true,
+      },
+      'production trigger',
+    );
+    assertFields(
+      {head:run('git',['rev-parse','HEAD'],{capture:true}),main:run('git',['rev-parse','origin/main'],{capture:true})},
+      {head:EXPECTED_MAIN,main:EXPECTED_MAIN},
+      'main',
+    );
   }
   console.log('PASS: accepted-preview MIZIZI runtime bytes exact');
   run('npx',['vitest','run','test/registry/mizizi-cultural-data-steward.test.ts']);
@@ -164,14 +231,44 @@ async function main() {
   const profile = await api('GET','/v1/profile');
   const userId = profileId(profile);
   if (!userId) throw new Error('Supabase profile did not expose a JIT user id');
-  const config = await api('GET',`/v1/projects/${PROJECT_REF}/jit-access`);
-  const originalState = configState(config);
+  const initialConfig = await api('GET',`/v1/projects/${PROJECT_REF}/jit-access`);
+  let originalState = configState(initialConfig);
+
   if (originalState === 'unavailable') {
     const ssl = await api('GET',`/v1/projects/${PROJECT_REF}/ssl-enforcement`);
     const enforced = Boolean(ssl?.currentConfig?.database);
-    throw new Error(`temporary access unavailable; ssl_enforced=${enforced}`);
+
+    if (MODE === 'preflight') {
+      if (enforced) throw new Error('temporary access unavailable even though SSL enforcement is enabled');
+      const baseline = queryViaLinkedCli(baselineSql);
+      assertFields(baseline,{active_tracks:2101,events:0,reviews:0,redirects:291,mizizi_redirects:0,ledger_count:79,ledger_head:'20260901170500'},'baseline');
+      const fp = queryViaLinkedCli(fingerprintSql);
+      if (fp.fingerprint !== EXPECTED_FINGERPRINT) throw new Error(`accepted-rehearsal input fingerprint drift: ${fp.fingerprint}`);
+      console.log('PASS: production baseline and full-row rehearsal fingerprint exact through existing Supabase control plane');
+      console.log('PASS: SSL enforcement bootstrap is the only remaining raw-session prerequisite');
+      console.log('\n=== MIZIZI PRODUCTION CONTROL-PLANE STRUCTURAL PREFLIGHT PASS ===');
+      console.log('Registry mutation: NO');
+      return;
+    }
+
+    if (!trigger?.enable_ssl_enforcement) throw new Error('production trigger does not authorize permanent SSL enforcement');
+    console.log('\n=== 2A. PERMANENT PRODUCTION SSL ENFORCEMENT ===');
+    const baseline = queryViaLinkedCli(baselineSql);
+    assertFields(baseline,{active_tracks:2101,events:0,reviews:0,redirects:291,mizizi_redirects:0,ledger_count:79,ledger_head:'20260901170500'},'pre-SSL baseline');
+    const fp = queryViaLinkedCli(fingerprintSql);
+    if (fp.fingerprint !== EXPECTED_FINGERPRINT) throw new Error(`pre-SSL rehearsal fingerprint drift: ${fp.fingerprint}`);
+    await api('PUT',`/v1/projects/${PROJECT_REF}/ssl-enforcement`,{requestedConfig:{database:true}});
+    await waitForDatabaseHealth();
+    console.log('PASS: production SSL enforcement enabled and database healthy');
+
+    for (let attempt = 1; attempt <= 24; attempt += 1) {
+      originalState = configState(await api('GET',`/v1/projects/${PROJECT_REF}/jit-access`));
+      if (['enabled','disabled'].includes(originalState)) break;
+      await sleep(5000);
+    }
   }
-  if (!['enabled','disabled'].includes(originalState)) throw new Error(`unknown JIT state ${originalState}`);
+
+  if (!['enabled','disabled'].includes(originalState)) throw new Error(`temporary access did not become available after SSL enforcement: ${originalState}`);
   const list = rowsFromJitList(await api('GET',`/v1/projects/${PROJECT_REF}/database/jit/list`));
   const existing = list.find(x => String(x.user_id || x.id || x.gotrue_id || '') === userId) || null;
   const originalRoles = existing && Array.isArray(existing.user_roles) ? existing.user_roles : [];
