@@ -179,6 +179,21 @@ describe(
         expect(canvas).toContain(
           'data-wk-video-delivery={deliveryMode}',
         );
+        expect(canvas).toContain(
+          "document.fullscreenEnabled",
+        );
+        expect(canvas).toContain(
+          "webkitRequestFullscreen",
+        );
+        expect(canvas).toContain(
+          "webkitEnterFullscreen",
+        );
+        expect(canvas).toContain(
+          "webkitbeginfullscreen",
+        );
+        expect(canvas).toContain(
+          "webkitendfullscreen",
+        );
         expect(canvas).not.toContain(
           "export function AdaptiveVideoPlayer",
         );

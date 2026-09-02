@@ -48,6 +48,22 @@ interface VideoPlaybackCanvasProps {
   className?: string;
 }
 
+type FullscreenVideoElement = HTMLVideoElement & {
+  webkitDisplayingFullscreen?: boolean;
+  webkitSupportsFullscreen?: boolean;
+  webkitEnterFullscreen?: () => void;
+  webkitExitFullscreen?: () => void;
+};
+
+type FullscreenElement = HTMLElement & {
+  webkitRequestFullscreen?: () => void | Promise<void>;
+};
+
+type FullscreenDocument = Document & {
+  webkitFullscreenElement?: Element | null;
+  webkitExitFullscreen?: () => void | Promise<void>;
+};
+
 function formatTime(seconds: number): string {
   if (!Number.isFinite(seconds) || seconds < 0) return "0:00";
   const whole = Math.floor(seconds);
@@ -341,12 +357,55 @@ export function VideoPlaybackCanvas({
   ]);
 
   useEffect(() => {
-    const onFullscreenChange = () => {
-      setFullscreen(document.fullscreenElement === shellRef.current);
+    const element = videoRef.current as FullscreenVideoElement | null;
+    const fullscreenDocument = document as FullscreenDocument;
+
+    const syncFullscreenState = () => {
+      const shell = shellRef.current;
+      const wrapperFullscreen = Boolean(
+        shell
+        && (
+          document.fullscreenElement === shell
+          || fullscreenDocument.webkitFullscreenElement === shell
+        ),
+      );
+      const nativeVideoFullscreen = Boolean(
+        element?.webkitDisplayingFullscreen,
+      );
+      setFullscreen(wrapperFullscreen || nativeVideoFullscreen);
     };
-    document.addEventListener("fullscreenchange", onFullscreenChange);
-    return () => document.removeEventListener("fullscreenchange", onFullscreenChange);
-  }, []);
+
+    document.addEventListener("fullscreenchange", syncFullscreenState);
+    document.addEventListener(
+      "webkitfullscreenchange",
+      syncFullscreenState as EventListener,
+    );
+    element?.addEventListener(
+      "webkitbeginfullscreen",
+      syncFullscreenState as EventListener,
+    );
+    element?.addEventListener(
+      "webkitendfullscreen",
+      syncFullscreenState as EventListener,
+    );
+    syncFullscreenState();
+
+    return () => {
+      document.removeEventListener("fullscreenchange", syncFullscreenState);
+      document.removeEventListener(
+        "webkitfullscreenchange",
+        syncFullscreenState as EventListener,
+      );
+      element?.removeEventListener(
+        "webkitbeginfullscreen",
+        syncFullscreenState as EventListener,
+      );
+      element?.removeEventListener(
+        "webkitendfullscreen",
+        syncFullscreenState as EventListener,
+      );
+    };
+  }, [videoRef]);
 
   const togglePlay = async () => {
     const element = videoRef.current;
@@ -387,13 +446,66 @@ export function VideoPlaybackCanvas({
   };
 
   const toggleFullscreen = async () => {
-    const shell = shellRef.current;
-    if (!shell) return;
-    if (document.fullscreenElement) {
-      await document.exitFullscreen();
+    const shell = shellRef.current as FullscreenElement | null;
+    const element = videoRef.current as FullscreenVideoElement | null;
+    if (!shell || !element) return;
+
+    const fullscreenDocument = document as FullscreenDocument;
+    const wrapperFullscreen =
+      document.fullscreenElement === shell
+      || fullscreenDocument.webkitFullscreenElement === shell;
+
+    if (wrapperFullscreen) {
+      if (typeof document.exitFullscreen === "function") {
+        await document.exitFullscreen();
+      } else if (typeof fullscreenDocument.webkitExitFullscreen === "function") {
+        await Promise.resolve(fullscreenDocument.webkitExitFullscreen());
+      }
       return;
     }
-    await shell.requestFullscreen();
+
+    if (element.webkitDisplayingFullscreen) {
+      element.webkitExitFullscreen?.();
+      return;
+    }
+
+    const canUseWrapperFullscreen =
+      document.fullscreenEnabled
+      && typeof shell.requestFullscreen === "function";
+
+    if (canUseWrapperFullscreen) {
+      try {
+        await shell.requestFullscreen();
+        return;
+      } catch {
+        // Fall through to WebKit-native video fullscreen.
+      }
+    }
+
+    if (
+      !document.fullscreenEnabled
+      && element.webkitSupportsFullscreen !== false
+      && typeof element.webkitEnterFullscreen === "function"
+    ) {
+      element.webkitEnterFullscreen();
+      return;
+    }
+
+    if (typeof shell.webkitRequestFullscreen === "function") {
+      try {
+        await Promise.resolve(shell.webkitRequestFullscreen());
+        return;
+      } catch {
+        // Fall through to WebKit-native video fullscreen.
+      }
+    }
+
+    if (
+      element.webkitSupportsFullscreen !== false
+      && typeof element.webkitEnterFullscreen === "function"
+    ) {
+      element.webkitEnterFullscreen();
+    }
   };
 
   const handleKeyboard = (event: KeyboardEvent<HTMLDivElement>) => {
