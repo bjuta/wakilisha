@@ -506,6 +506,12 @@ describe("MIZIZI Cultural Data Steward", () => {
       "workflow_dispatch",
     );
     expect(workflow).toContain(
+      "push:",
+    );
+    expect(workflow).toContain(
+      ".github/mizizi-track-production-apply.json",
+    );
+    expect(workflow).toContain(
       "SUPABASE_ACCESS_TOKEN",
     );
     expect(workflow).toContain(
@@ -525,6 +531,15 @@ describe("MIZIZI Cultural Data Steward", () => {
     );
     expect(controlPlane).toContain(
       "/ssl-enforcement",
+    );
+    expect(controlPlane).toContain(
+      "requestedConfig:{database:true}",
+    );
+    expect(controlPlane).toContain(
+      "reviewed production trigger",
+    );
+    expect(controlPlane).toContain(
+      "queryViaLinkedCli",
     );
     expect(controlPlane).toContain(
       "EXPECTED_FINGERPRINT",
