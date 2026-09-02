@@ -94,6 +94,18 @@ describe("Community Track Registry identity", () => {
     );
   });
 
+  it("fails closed when canonical Track UUID disagrees with the supplied route", () => {
+    expect(migration).toContain(
+      "Canonical Registry Track identity does not match the supplied Track route",
+    );
+    expect(migration).toContain(
+      "and v_canonical_track_id is null",
+    );
+    expect(migration).toContain(
+      "using errcode = '22023'",
+    );
+  });
+
   it("preserves the public read and authenticated write boundaries", () => {
     expect(migration).toContain(
       "to anon, authenticated, service_role",
