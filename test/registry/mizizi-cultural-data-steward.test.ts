@@ -524,6 +524,15 @@ describe("MIZIZI Cultural Data Steward", () => {
       "options', '-c jit=true'",
     );
     expect(controlPlane).toContain(
+      "supabase/.temp/pooler-url",
+    );
+    expect(controlPlane).toContain(
+      "postgres.${PROJECT_REF}",
+    );
+    expect(controlPlane).not.toContain(
+      "aws-0-",
+    );
+    expect(controlPlane).toContain(
       "role:'postgres'",
     );
     expect(controlPlane).toContain(
@@ -536,10 +545,19 @@ describe("MIZIZI Cultural Data Steward", () => {
       "requestedConfig:{database:true}",
     );
     expect(controlPlane).toContain(
+      "ACTIVE_HEALTHY",
+    );
+    expect(controlPlane).toContain(
       "reviewed production trigger",
     );
     expect(controlPlane).toContain(
       "queryViaLinkedCli",
+    );
+    expect(controlPlane).toContain(
+      "production temporary access disabled at rest",
+    );
+    expect(controlPlane).toContain(
+      "mappingChanged",
     );
     expect(controlPlane).toContain(
       "EXPECTED_FINGERPRINT",

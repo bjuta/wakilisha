@@ -91,7 +91,24 @@ async function waitForDatabaseHealth() {
   for (let attempt = 1; attempt <= 36; attempt += 1) {
     try {
       const health = await api('GET',`/v1/projects/${PROJECT_REF}/health?services=db&timeout_ms=5000`);
-      if (Array.isArray(health) && health.some(item => item?.name === 'db' && item?.healthy === true)) {
+      const services =
+        Array.isArray(health)
+          ? health
+          : Array.isArray(health?.services)
+            ? health.services
+            : Array.isArray(health?.data)
+              ? health.data
+              : [];
+      if (
+        services.some(
+          item =>
+            item?.name === 'db' &&
+            (
+              item?.healthy === true ||
+              String(item?.status || '').toUpperCase() === 'ACTIVE_HEALTHY'
+            ),
+        )
+      ) {
         return;
       }
     } catch {}
@@ -101,9 +118,22 @@ async function waitForDatabaseHealth() {
 }
 
 function databaseUrl() {
-  const u = new URL(`postgresql://postgres.${PROJECT_REF}:x@aws-0-${REGION}.pooler.supabase.com:5432/postgres`);
+  const poolerPath = 'supabase/.temp/pooler-url';
+  if (!fs.existsSync(poolerPath)) throw new Error(`linked Supabase CLI did not create ${poolerPath}`);
+
+  const linkedPooler = fs.readFileSync(poolerPath, 'utf8').trim();
+  const sanitized = linkedPooler.replace(/:\/\/([^:]+):[^@]*@/, '://$1:x@');
+  const u = new URL(sanitized);
+  if (!u.hostname.endsWith('.pooler.supabase.com')) {
+    throw new Error(`linked Supabase CLI returned unexpected pooler host ${u.hostname}`);
+  }
+
+  u.username = `postgres.${PROJECT_REF}`;
   u.password = TOKEN;
+  u.port = '5432';
+  u.search = '';
   u.searchParams.set('options', '-c jit=true');
+  console.log(`Using linked Supabase pooler host: ${u.hostname}:5432`);
   return u.toString();
 }
 
@@ -269,16 +299,24 @@ async function main() {
   }
 
   if (!['enabled','disabled'].includes(originalState)) throw new Error(`temporary access did not become available after SSL enforcement: ${originalState}`);
-  const list = rowsFromJitList(await api('GET',`/v1/projects/${PROJECT_REF}/database/jit/list`));
-  const existing = list.find(x => String(x.user_id || x.id || x.gotrue_id || '') === userId) || null;
-  const originalRoles = existing && Array.isArray(existing.user_roles) ? existing.user_roles : [];
-  let touched = false;
+  console.log(`Temporary access at entry: ${originalState}`);
+
+  let existing = null;
+  let originalRoles = [];
+  let mappingChanged = false;
   try {
-    if (originalState === 'disabled') await api('PUT',`/v1/projects/${PROJECT_REF}/jit-access`,{state:'enabled'});
+    const list = rowsFromJitList(await api('GET',`/v1/projects/${PROJECT_REF}/database/jit/list`));
+    existing = list.find(x => String(x.user_id || x.id || x.gotrue_id || '') === userId) || null;
+    originalRoles = existing && Array.isArray(existing.user_roles) ? existing.user_roles : [];
+
+    if (originalState === 'disabled') {
+      await api('PUT',`/v1/projects/${PROJECT_REF}/jit-access`,{state:'enabled'});
+    }
+
     const roles = originalRoles.filter(r => String(r.role || '') !== 'postgres');
     roles.push({ role:'postgres', expires_at: Date.now() + 60*60*1000 });
-    await api(existing ? 'PUT' : 'POST',`/v1/projects/${PROJECT_REF}/database/jit`,{user_id:userId,roles});
-    touched = true;
+    await api('PUT',`/v1/projects/${PROJECT_REF}/database/jit`,{user_id:userId,roles});
+    mappingChanged = true;
 
     const url = databaseUrl();
     console.log(`::add-mask::${url}`);
@@ -326,12 +364,28 @@ async function main() {
       await pool.end().catch(()=>{});
     }
   } finally {
-    if (touched) {
-      if (existing) await api('PUT',`/v1/projects/${PROJECT_REF}/database/jit`,{user_id:userId,roles:originalRoles});
-      else await api('DELETE',`/v1/projects/${PROJECT_REF}/database/jit/${userId}`);
-      if (originalState === 'disabled') await api('PUT',`/v1/projects/${PROJECT_REF}/jit-access`,{state:'disabled'});
-      console.log('PASS: temporary JIT access restored to its original state');
+    const cleanupErrors = [];
+
+    if (mappingChanged) {
+      try {
+        if (existing) {
+          await api('PUT',`/v1/projects/${PROJECT_REF}/database/jit`,{user_id:userId,roles:originalRoles});
+        } else {
+          await api('DELETE',`/v1/projects/${PROJECT_REF}/database/jit/${userId}`);
+        }
+      } catch (error) {
+        cleanupErrors.push(`mapping cleanup failed: ${error?.message || error}`);
+      }
     }
+
+    try {
+      await api('PUT',`/v1/projects/${PROJECT_REF}/jit-access`,{state:'disabled'});
+    } catch (error) {
+      cleanupErrors.push(`temporary-access cleanup failed: ${error?.message || error}`);
+    }
+
+    if (cleanupErrors.length) throw new Error(cleanupErrors.join('; '));
+    console.log('PASS: JIT mapping restored and production temporary access disabled at rest');
   }
 }
 
