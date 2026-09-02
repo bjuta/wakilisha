@@ -19,6 +19,11 @@ describe("MIZIZI Release production control plane", () => {
     expect(workflow).toContain(
       "node scripts/control-plane/mizizi-release-production-control-plane.mjs",
     );
+    expect(workflow).toContain("scripts/registry/agents/mizizi/run.ts");
+    expect(workflow).toContain("scripts/registry/agents/mizizi/core.ts");
+    expect(workflow).toContain(
+      "supabase/functions/_shared/release-taxonomy.ts",
+    );
 
     expect(controlPlane).toContain("MIZIZI_RELEASE_TAXONOMY_PRODUCTION_APPLY");
     expect(controlPlane).toContain("EXPECTED_AUTHORITY_FINGERPRINT");
@@ -38,7 +43,7 @@ describe("MIZIZI Release production control plane", () => {
       "production temporary access disabled at rest",
     );
     expect(controlPlane).toContain("-c jit=true");
-    expect(controlPlane).toContain("role: 'postgres'");
+    expect(controlPlane).toMatch(/role:\s*['"]postgres['"]/);
     expect(controlPlane).toContain("createJitPoolWithRetry");
     expect(controlPlane).toContain("EJITREQUESTFAILED");
     expect(controlPlane).toContain("PRE_APPLY_BASELINE");
