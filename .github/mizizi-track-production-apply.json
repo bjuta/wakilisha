@@ -1,0 +1,11 @@
+{
+  "operation": "mizizi_track_production_apply",
+  "confirm": "MIZIZI_TRACK_PRODUCTION_APPLY",
+  "expected_input_fingerprint": "551b29431700536937c26ecb1e396c3cf9314edefd88c589284cf330c9d1bb9a",
+  "enable_ssl_enforcement": true,
+  "scope": "historical_track_only",
+  "expected_repairs": 440,
+  "expected_blocked_reviews": 66,
+  "expected_mizizi_redirects": 857,
+  "control_plane_main": "25670508a099268f144c837182cab19f65d82580"
+}
