@@ -20,19 +20,21 @@ Accepted Release taxonomy:
 
 A Single remains a Release in the Registry and in public collections, but its public detail destination is its one Track rather than a duplicate Release page.
 
-Historical MIZIZI Track identity apply is production accepted:
+Historical MIZIZI applies are production accepted:
 
-- 440 canonical Track repairs
-- 66 blocked review items
-- 857 MIZIZI-created permanent redirects
+- Track identity: 440 canonical repairs / 66 blocked review items / 857 MIZIZI-created permanent redirects
 - fresh post-apply Track audit: 561 findings
-- separate historical Release taxonomy apply: still unrun
+- Release taxonomy: 32 canonical writes / 0 remaining candidates
+- Release transition split: 11 EP to Single / 19 Album to EP / 2 EP to Album
+- fresh post-apply Release audit: 1,430 observations / 0 taxonomy candidates
+- 18 bad active Release-membership relationships across 13 active Releases remain preserved evidence
 
 Current acceptance records:
 
 - `docs/engineering/release-taxonomy-membership-integrity-closure-record.md`
 - `docs/engineering/community-track-registry-identity-production-closure-record.md`
 - `docs/engineering/mizizi-historical-track-production-closure-record.md`
+- `docs/engineering/mizizi-historical-release-taxonomy-production-closure-record.md`
 
 ## Phase 7A closure reconciliation - 31 August 2026
 
@@ -302,7 +304,7 @@ The September Registry/public-identity detour is accepted adjacent baseline:
 - Community Track Registry-ID-first identity is accepted
 - historical MIZIZI Track identity apply is closed at 440 repairs / 66 blocked reviews / 857 MIZIZI redirects
 - the remaining 66 Track slug candidates are governed review work, not permission to invent identity
-- the separate historical Release taxonomy apply remains unrun with the accepted 32-candidate set
+- historical MIZIZI Release taxonomy apply is closed at 32 canonical writes with exact split 11 EP to Single / 19 Album to EP / 2 EP to Album and 0 remaining taxonomy candidates
 - the 18 bad active Release-membership relationships across 13 active Releases remain preserved evidence
 
 Canonical adjacent closure records:
@@ -311,4 +313,4 @@ Canonical adjacent closure records:
 - `docs/engineering/community-track-registry-identity-production-closure-record.md`
 - `docs/engineering/mizizi-historical-track-production-closure-record.md`
 
-Phase 7B product work can continue independently while the remaining Registry review and Release taxonomy mutation stay separately governed.
+Phase 7B product work can continue independently while the remaining 66 Track review candidates and preserved Release-membership evidence stay governed without reopening either historical MIZIZI apply.
