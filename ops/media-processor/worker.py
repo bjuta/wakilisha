@@ -87,6 +87,7 @@ FFPROBE = os.environ.get("FFPROBE_BIN", "/usr/bin/ffprobe")
 GENERATOR_NAME = "wakilisha-media-processor"
 PROFILE_GENERATOR_VERSION = "m2-v1"
 AUDIO_PUBLICATION_PROFILE_GENERATOR_VERSION = "phase6a-m2-v1"
+VIDEO_ADAPTIVE_PROFILE_GENERATOR_VERSION = "phase7b-v4a-v1"
 PUBLIC_MEDIA_ORIGIN = "https://media.wakilisha.africa"
 
 
@@ -875,6 +876,160 @@ def video_transcode(
     )
 
 
+
+def video_hls_variant(
+    source,
+    playlist_destination,
+    media_destination,
+    final_media_filename,
+    width,
+    height,
+    video_bitrate_kbps,
+    audio_bitrate_kbps,
+):
+    playlist_destination.unlink(
+        missing_ok=True
+    )
+    media_destination.unlink(
+        missing_ok=True
+    )
+
+    run_process(
+        [
+            FFMPEG,
+            "-nostdin",
+            "-hide_banner",
+            "-loglevel",
+            "error",
+            "-i",
+            str(source),
+            "-map",
+            "0:v:0",
+            "-map",
+            "0:a:0?",
+            "-map_metadata",
+            "-1",
+            "-vf",
+            (
+                "scale="
+                f"w='min({width},iw)':"
+                f"h='min({height},ih)':"
+                "force_original_aspect_ratio=decrease:"
+                "force_divisible_by=2"
+            ),
+            "-c:v",
+            "libx264",
+            "-preset",
+            "medium",
+            "-b:v",
+            f"{video_bitrate_kbps}k",
+            "-maxrate",
+            f"{video_bitrate_kbps}k",
+            "-bufsize",
+            f"{video_bitrate_kbps * 2}k",
+            "-pix_fmt",
+            "yuv420p",
+            "-threads",
+            "1",
+            "-c:a",
+            "aac",
+            "-b:a",
+            f"{audio_bitrate_kbps}k",
+            "-force_key_frames",
+            "expr:gte(t,n_forced*4)",
+            "-fflags",
+            "+bitexact",
+            "-flags:v",
+            "+bitexact",
+            "-flags:a",
+            "+bitexact",
+            "-muxdelay",
+            "0",
+            "-muxpreload",
+            "0",
+            "-hls_time",
+            "4",
+            "-hls_playlist_type",
+            "vod",
+            "-hls_flags",
+            "independent_segments+single_file",
+            "-hls_segment_filename",
+            str(media_destination),
+            str(playlist_destination),
+        ],
+        capture_output=False,
+    )
+
+    if (
+        not playlist_destination.is_file()
+        or not media_destination.is_file()
+    ):
+        raise TerminalProcessingError(
+            "Adaptive Video HLS rendition is incomplete."
+        )
+
+    playlist = playlist_destination.read_text(
+        encoding="utf-8"
+    )
+
+    if (
+        "#EXT-X-BYTERANGE:" not in playlist
+        or media_destination.name not in playlist
+    ):
+        raise TerminalProcessingError(
+            "Adaptive Video HLS playlist lacks single-file byte ranges."
+        )
+
+    playlist = playlist.replace(
+        media_destination.name,
+        final_media_filename,
+    )
+
+    if ".tmp." in playlist:
+        raise TerminalProcessingError(
+            "Adaptive Video HLS playlist leaked a staging filename."
+        )
+
+    playlist_destination.write_text(
+        playlist,
+        encoding="utf-8",
+    )
+
+    with playlist_destination.open(
+        "rb"
+    ) as handle:
+        os.fsync(
+            handle.fileno()
+        )
+
+
+def write_video_hls_master(destination):
+    destination.unlink(
+        missing_ok=True
+    )
+
+    destination.write_text(
+        "\n".join(
+            [
+                "#EXTM3U",
+                "#EXT-X-VERSION:6",
+                "#EXT-X-STREAM-INF:BANDWIDTH=1000000",
+                "video_hls_360p_playlist.m3u8",
+                "#EXT-X-STREAM-INF:BANDWIDTH=2800000",
+                "video_hls_720p_playlist.m3u8",
+                "",
+            ]
+        ),
+        encoding="utf-8",
+    )
+
+    with destination.open(
+        "rb"
+    ) as handle:
+        os.fsync(
+            handle.fileno()
+        )
+
 def jpeg_frame(
     source,
     destination,
@@ -1281,6 +1436,228 @@ def build_outputs(job):
             thumbnail,
         ]
 
+
+    if profile == "video-adaptive-v1":
+        has_video = any(
+            stream.get("codec_type")
+            == "video"
+            for stream in probe.get(
+                "streams",
+                [],
+            )
+        )
+
+        if not has_video:
+            raise TerminalProcessingError(
+                "Adaptive Video profile source has no video stream."
+            )
+
+        media_360_stage = staging_path(
+            payload["_job_id"],
+            "video_hls_360p_media",
+            "ts",
+        )
+
+        playlist_360 = output_contract(
+            payload,
+            probe,
+            "video_hls_360p_playlist",
+            "m3u8",
+            "application/vnd.apple.mpegurl",
+            {
+                "profile":
+                    "video-adaptive-v1",
+                "kind":
+                    "media_playlist",
+                "hls_version":
+                    6,
+                "segment_seconds":
+                    4,
+                "segment_mode":
+                    "single_file_byte_range",
+                "max_width":
+                    640,
+                "max_height":
+                    360,
+                "video_bitrate_kbps":
+                    800,
+                "audio_bitrate_kbps":
+                    96,
+            },
+            lambda stage:
+                video_hls_variant(
+                    source,
+                    stage,
+                    media_360_stage,
+                    "video_hls_360p_media.ts",
+                    640,
+                    360,
+                    800,
+                    96,
+                ),
+            generator_version=(
+                VIDEO_ADAPTIVE_PROFILE_GENERATOR_VERSION
+            ),
+        )
+
+        media_360 = output_contract(
+            payload,
+            probe,
+            "video_hls_360p_media",
+            "ts",
+            "video/mp2t",
+            {
+                "profile":
+                    "video-adaptive-v1",
+                "kind":
+                    "media",
+                "container":
+                    "mpegts",
+                "hls_version":
+                    6,
+                "segment_seconds":
+                    4,
+                "segment_mode":
+                    "single_file_byte_range",
+                "max_width":
+                    640,
+                "max_height":
+                    360,
+                "video_codec":
+                    "h264",
+                "audio_codec":
+                    "aac",
+                "video_bitrate_kbps":
+                    800,
+                "audio_bitrate_kbps":
+                    96,
+            },
+            lambda stage: None,
+            generator_version=(
+                VIDEO_ADAPTIVE_PROFILE_GENERATOR_VERSION
+            ),
+        )
+
+        media_720_stage = staging_path(
+            payload["_job_id"],
+            "video_hls_720p_media",
+            "ts",
+        )
+
+        playlist_720 = output_contract(
+            payload,
+            probe,
+            "video_hls_720p_playlist",
+            "m3u8",
+            "application/vnd.apple.mpegurl",
+            {
+                "profile":
+                    "video-adaptive-v1",
+                "kind":
+                    "media_playlist",
+                "hls_version":
+                    6,
+                "segment_seconds":
+                    4,
+                "segment_mode":
+                    "single_file_byte_range",
+                "max_width":
+                    1280,
+                "max_height":
+                    720,
+                "video_bitrate_kbps":
+                    2500,
+                "audio_bitrate_kbps":
+                    128,
+            },
+            lambda stage:
+                video_hls_variant(
+                    source,
+                    stage,
+                    media_720_stage,
+                    "video_hls_720p_media.ts",
+                    1280,
+                    720,
+                    2500,
+                    128,
+                ),
+            generator_version=(
+                VIDEO_ADAPTIVE_PROFILE_GENERATOR_VERSION
+            ),
+        )
+
+        media_720 = output_contract(
+            payload,
+            probe,
+            "video_hls_720p_media",
+            "ts",
+            "video/mp2t",
+            {
+                "profile":
+                    "video-adaptive-v1",
+                "kind":
+                    "media",
+                "container":
+                    "mpegts",
+                "hls_version":
+                    6,
+                "segment_seconds":
+                    4,
+                "segment_mode":
+                    "single_file_byte_range",
+                "max_width":
+                    1280,
+                "max_height":
+                    720,
+                "video_codec":
+                    "h264",
+                "audio_codec":
+                    "aac",
+                "video_bitrate_kbps":
+                    2500,
+                "audio_bitrate_kbps":
+                    128,
+            },
+            lambda stage: None,
+            generator_version=(
+                VIDEO_ADAPTIVE_PROFILE_GENERATOR_VERSION
+            ),
+        )
+
+        master = output_contract(
+            payload,
+            probe,
+            "video_hls_master",
+            "m3u8",
+            "application/vnd.apple.mpegurl",
+            {
+                "profile":
+                    "video-adaptive-v1",
+                "kind":
+                    "master_playlist",
+                "hls_version":
+                    6,
+                "rendition_count":
+                    2,
+                "segment_seconds":
+                    4,
+                "segment_mode":
+                    "single_file_byte_range",
+            },
+            write_video_hls_master,
+            generator_version=(
+                VIDEO_ADAPTIVE_PROFILE_GENERATOR_VERSION
+            ),
+        )
+
+        return [
+            master,
+            playlist_360,
+            media_360,
+            playlist_720,
+            media_720,
+        ]
+
     raise TerminalProcessingError(
         f"Unsupported processing profile: {profile}"
     )
@@ -1374,11 +1751,17 @@ def process_job(job):
         profile = job["input_payload"].get(
             "profile_version"
         )
-        registration_rpc = (
-            "register_audio_delivery_processing_outputs_v1"
-            if profile == "audio-publication-v1"
-            else "register_media_processing_outputs_v1"
-        )
+        if profile in (
+            "audio-publication-v1",
+            "video-adaptive-v1",
+        ):
+            registration_rpc = (
+                "register_media_processing_profile_outputs_v1"
+            )
+        else:
+            registration_rpc = (
+                "register_media_processing_outputs_v1"
+            )
 
         registration = rpc(
             registration_rpc,
