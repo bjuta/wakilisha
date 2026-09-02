@@ -132,7 +132,7 @@ function databaseUrl() {
   u.password = TOKEN;
   u.port = '5432';
   u.search = '';
-  u.searchParams.set('options', '-c jit=on');
+  u.searchParams.set('options', '-c jit=true');
   console.log(`Using linked Supabase pooler host: ${u.hostname}:5432`);
   return u.toString();
 }
