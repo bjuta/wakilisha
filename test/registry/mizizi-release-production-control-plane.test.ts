@@ -29,11 +29,13 @@ describe("MIZIZI Release production control plane", () => {
     expect(workflow).toContain("queue: max");
     expect(trackWorkflow).toContain("queue: max");
     expect(workflow).not.toContain(
-      "mizizi-release-production-control-plane\n  cancel-in-progress",
+      "group: mizizi-release-production-control-plane",
     );
     expect(trackWorkflow).not.toContain(
-      "mizizi-track-production-control-plane\n  cancel-in-progress",
+      "group: mizizi-track-production-control-plane",
     );
+    expect(workflow).not.toContain("cancel-in-progress:");
+    expect(trackWorkflow).not.toContain("cancel-in-progress:");
     expect(workflow).toContain(
       "node scripts/control-plane/mizizi-release-production-control-plane.mjs",
     );
