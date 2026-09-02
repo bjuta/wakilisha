@@ -248,7 +248,7 @@ async function main() {
   const profile = await api('GET','/v1/profile');
   const userId = profileId(profile);
   if (!userId) throw new Error('Supabase profile did not expose a JIT user id');
-  const initialConfig = await api('GET',`/v1/projects/${PROJECT_REF}/database/jit-access`);
+  const initialConfig = await api('GET',`/v1/projects/${PROJECT_REF}/jit-access`);
   let originalState = configState(initialConfig);
 
   if (originalState === 'unavailable') {
@@ -279,7 +279,7 @@ async function main() {
     console.log('PASS: production SSL enforcement enabled and database healthy');
 
     for (let attempt = 1; attempt <= 24; attempt += 1) {
-      originalState = configState(await api('GET',`/v1/projects/${PROJECT_REF}/database/jit-access`));
+      originalState = configState(await api('GET',`/v1/projects/${PROJECT_REF}/jit-access`));
       if (['enabled','disabled'].includes(originalState)) break;
       await sleep(5000);
     }
@@ -291,7 +291,7 @@ async function main() {
   const originalRoles = existing && Array.isArray(existing.user_roles) ? existing.user_roles : [];
   let touched = false;
   try {
-    if (originalState === 'disabled') await api('PUT',`/v1/projects/${PROJECT_REF}/database/jit-access`,{state:'enabled'});
+    if (originalState === 'disabled') await api('PUT',`/v1/projects/${PROJECT_REF}/jit-access`,{state:'enabled'});
     const roles = originalRoles.filter(r => String(r.role || '') !== 'postgres');
     roles.push({ role:'postgres', expires_at: Date.now() + 60*60*1000 });
     await api('PUT',`/v1/projects/${PROJECT_REF}/database/jit`,{user_id:userId,user_roles:roles});
@@ -346,7 +346,7 @@ async function main() {
     if (touched) {
       if (existing) await api('PUT',`/v1/projects/${PROJECT_REF}/database/jit`,{user_id:userId,user_roles:originalRoles});
       else await api('DELETE',`/v1/projects/${PROJECT_REF}/database/jit/${userId}`);
-      if (originalState === 'disabled') await api('PUT',`/v1/projects/${PROJECT_REF}/database/jit-access`,{state:'disabled'});
+      if (originalState === 'disabled') await api('PUT',`/v1/projects/${PROJECT_REF}/jit-access`,{state:'disabled'});
       console.log('PASS: temporary JIT access restored to its original state');
     }
   }
