@@ -15,7 +15,10 @@ import {
   type ReactionType,
   type TrackMomentSummaryItem,
 } from "@/services/community";
-import type { PlayerTrack } from "@/context/PlayerContext";
+import {
+  playerTrackIdentity,
+  type PlayerTrack,
+} from "@/context/PlayerContext";
 import { CommentCard } from "@/components/feature/community/CommentCard";
 import { CommentComposer, LoginToComment } from "@/components/feature/community/CommentComposer";
 import { WkIcon } from "@/components/design-system/Icon";
@@ -33,13 +36,15 @@ function formatMomentTimeFromMs(ms: number): string {
 
 function buildTrackEntity(track: PlayerTrack): CommunityEntity {
   const trackSlug = track.trackSlug || track.id;
+  const trackIdentity =
+    playerTrackIdentity(track);
   const url = track.artistSlug && trackSlug
     ? `/tracks/${track.artistSlug}/${trackSlug}`
     : `/tracks/${trackSlug}`;
 
   return {
     type: "track",
-    id: trackSlug,
+    id: trackIdentity,
     slug: trackSlug,
     url,
     title: track.title,
