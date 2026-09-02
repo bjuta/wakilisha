@@ -22625,6 +22625,10 @@ export type Database = {
         Args: { p_job_id: string; p_outputs: Json; p_worker_id: string }
         Returns: Json
       }
+      register_media_processing_profile_outputs_v1: {
+        Args: { p_job_id: string; p_outputs: Json; p_worker_id: string }
+        Returns: Json
+      }
       register_media_variant: {
         Args: {
           p_asset_id: string
@@ -24120,6 +24124,22 @@ export type Database = {
         }[]
       }
       submit_media_processing_command_v1: {
+        Args: {
+          p_asset_id: string
+          p_asset_revision_id: string
+          p_correlation_id?: string
+          p_idempotency_key: string
+          p_profile_version: string
+        }
+        Returns: {
+          accepted_event_id: string
+          command_receipt_id: string
+          idempotent_replay: boolean
+          job_id: string
+          receipt_status: string
+        }[]
+      }
+      submit_media_processing_profile_v1: {
         Args: {
           p_asset_id: string
           p_asset_revision_id: string
