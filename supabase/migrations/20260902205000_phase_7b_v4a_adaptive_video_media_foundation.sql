@@ -1,9 +1,12 @@
--- Phase 7B V4A: adaptive Video Media processing foundation.
+-- Phase 7B V4A: Media processing-profile convergence + adaptive Video.
 --
--- Adds an additive Video publication processing profile without changing
--- the accepted Phase 4 video-v1 processing contract or public Video delivery.
--- Reuses existing Media command receipts, durable jobs, leases, retries,
--- file objects, variants, selections, events, and the Media CDN.
+-- Primitive rule:
+-- Audio supplied the first real additive publication-processing profile.
+-- Video is the second domain proving the same Media concept.
+-- V4A therefore promotes one canonical Media processing-profile authority
+-- rather than adding Video-specific submission or registration adapters.
+--
+-- The accepted Phase 4 audio-v1/video-v1 RPC contracts remain untouched.
 
 begin;
 
@@ -20,16 +23,17 @@ declare
   v_video_v1_register text;
 begin
   if to_regclass('media.assets') is null
+     or to_regclass('media.asset_kinds') is null
      or to_regclass('media.asset_revisions') is null
      or to_regclass('media.file_objects') is null
      or to_regclass('media.variants') is null
      or to_regclass('media.variant_selections') is null
      or to_regclass('media.variant_roles') is null
      or to_regclass('media.usage_links') is null
+     or to_regclass('media.usage_roles') is null
      or to_regclass('media.events') is null
      or to_regclass('editorial.resources') is null
      or to_regclass('editorial.media_asset_resources') is null
-     or to_regclass('platform_private.command_types') is null
      or to_regclass('platform_private.command_receipts') is null
      or to_regclass('platform_private.jobs') is null
      or to_regclass('platform_private.outbox_events') is null
@@ -43,6 +47,12 @@ begin
      ) is null
      or to_regprocedure(
        'public.register_media_processing_outputs_v1(uuid,text,jsonb)'
+     ) is null
+     or to_regprocedure(
+       'public.submit_audio_delivery_processing_v1(uuid,uuid,text,uuid)'
+     ) is null
+     or to_regprocedure(
+       'public.register_audio_delivery_processing_outputs_v1(uuid,text,jsonb)'
      ) is null
      or to_regprocedure(
        'public.complete_media_processing_job_v1(uuid,text,jsonb)'
@@ -61,6 +71,30 @@ begin
       'STOP: required Media command or registration helper is missing';
   end if;
 
+  if to_regclass('media.processing_profiles') is not null
+     or to_regclass('media.processing_profile_outputs') is not null
+     or to_regprocedure(
+       'public.submit_media_processing_profile_v1(uuid,uuid,text,text,uuid)'
+     ) is not null
+     or to_regprocedure(
+       'public.register_media_processing_profile_outputs_v1(uuid,text,jsonb)'
+     ) is not null
+  then
+    raise exception
+      'STOP: canonical Media processing-profile authority already exists';
+  end if;
+
+  if to_regprocedure(
+       'public.submit_video_adaptive_processing_v1(uuid,uuid,text,uuid)'
+     ) is not null
+     or to_regprocedure(
+       'public.register_video_adaptive_processing_outputs_v1(uuid,text,jsonb)'
+     ) is not null
+  then
+    raise exception
+      'STOP: competing Video-specific processing adapters already exist';
+  end if;
+
   if exists (
     select 1
     from media.variant_roles
@@ -76,17 +110,6 @@ begin
       'STOP: one or more V4A adaptive Video variant roles already exist';
   end if;
 
-  if to_regprocedure(
-       'public.submit_video_adaptive_processing_v1(uuid,uuid,text,uuid)'
-     ) is not null
-     or to_regprocedure(
-       'public.register_video_adaptive_processing_outputs_v1(uuid,text,jsonb)'
-     ) is not null
-  then
-    raise exception
-      'STOP: one or more V4A adaptive Video processing adapters already exist';
-  end if;
-
   v_video_v1_submit := pg_get_functiondef(
     'public.submit_media_processing_command_v1(uuid,uuid,text,text,uuid)'::regprocedure
   );
@@ -95,8 +118,16 @@ begin
   );
 
   if position(
+       'audio-publication-v1'
+       in v_video_v1_submit
+     ) > 0
+     or position(
        'video-adaptive-v1'
        in v_video_v1_submit
+     ) > 0
+     or position(
+       'audio-publication-v1'
+       in v_video_v1_register
      ) > 0
      or position(
        'video-adaptive-v1'
@@ -104,10 +135,110 @@ begin
      ) > 0
   then
     raise exception
-      'STOP: accepted Phase 4 video-v1 processing functions already changed semantics';
+      'STOP: accepted Phase 4 v1 processing functions were broadened';
   end if;
 end;
 $phase_7b_v4a_preflight$;
+
+-- ---------------------------------------------------------------------------
+-- Canonical Media processing-profile authority.
+-- ---------------------------------------------------------------------------
+
+create table media.processing_profiles (
+  profile_version text primary key,
+  label text not null,
+  description text not null,
+  asset_kind text not null
+    references media.asset_kinds(asset_kind)
+    on update cascade
+    on delete restrict,
+  generator_name text not null,
+  generator_version text not null,
+  required_usage_authority text not null,
+  required_usage_target_kind text not null,
+  required_usage_role text not null
+    references media.usage_roles(usage_role)
+    on update cascade
+    on delete restrict,
+  required_usage_target_version_kind text,
+  require_usage_target_version boolean not null,
+  enabled boolean not null default true,
+  created_at timestamptz not null default now(),
+  check (
+    profile_version ~ '^[a-z][a-z0-9-]{2,79}$'
+  ),
+  check (
+    nullif(btrim(label), '') is not null
+    and nullif(btrim(description), '') is not null
+  ),
+  check (
+    nullif(btrim(generator_name), '') is not null
+    and nullif(btrim(generator_version), '') is not null
+  ),
+  check (
+    nullif(btrim(required_usage_authority), '') is not null
+    and nullif(btrim(required_usage_target_kind), '') is not null
+  ),
+  check (
+    require_usage_target_version
+      =
+    (required_usage_target_version_kind is not null)
+  )
+);
+
+alter table media.processing_profiles
+  enable row level security;
+
+revoke all on media.processing_profiles
+  from public, anon, authenticated, service_role;
+
+create table media.processing_profile_outputs (
+  profile_version text not null
+    references media.processing_profiles(profile_version)
+    on update cascade
+    on delete restrict,
+  output_order integer not null
+    check (output_order >= 1),
+  variant_role text not null
+    references media.variant_roles(variant_role)
+    on update cascade
+    on delete restrict,
+  filename text not null,
+  mime_type text not null,
+  transformation_spec jsonb not null,
+  primary key (
+    profile_version,
+    variant_role
+  ),
+  unique (
+    profile_version,
+    output_order
+  ),
+  unique (
+    profile_version,
+    filename
+  ),
+  check (
+    filename ~ '^[a-z0-9][a-z0-9_.-]{1,199}$'
+    and filename !~ '[.][.]'
+  ),
+  check (
+    nullif(btrim(mime_type), '') is not null
+  ),
+  check (
+    jsonb_typeof(transformation_spec) = 'object'
+  )
+);
+
+alter table media.processing_profile_outputs
+  enable row level security;
+
+revoke all on media.processing_profile_outputs
+  from public, anon, authenticated, service_role;
+
+-- ---------------------------------------------------------------------------
+-- Adaptive Video vocabulary.
+-- ---------------------------------------------------------------------------
 
 insert into media.variant_roles (
   variant_role,
@@ -153,10 +284,176 @@ values
     85
   );
 
+-- Audio is the first real consumer of the additive processing-profile concept.
+-- Video is the second. Register both in the promoted shared authority.
+
+insert into media.processing_profiles (
+  profile_version,
+  label,
+  description,
+  asset_kind,
+  generator_name,
+  generator_version,
+  required_usage_authority,
+  required_usage_target_kind,
+  required_usage_role,
+  required_usage_target_version_kind,
+  require_usage_target_version
+)
+values
+  (
+    'audio-publication-v1',
+    'Audio publication delivery v1',
+    'Full-length Audio publication derivative over an exact active Audio master.',
+    'audio',
+    'wakilisha-media-processor',
+    'phase6a-m2-v1',
+    'editorial',
+    'audio_publication',
+    'audio_master',
+    null,
+    false
+  ),
+  (
+    'video-adaptive-v1',
+    'Adaptive Video publication v1',
+    'Bounded two-rendition HLS package over an exact version-bound Video master.',
+    'video',
+    'wakilisha-media-processor',
+    'phase7b-v4a-v1',
+    'video',
+    'video_publication',
+    'video_master',
+    'video_publication_version',
+    true
+  );
+
+insert into media.processing_profile_outputs (
+  profile_version,
+  output_order,
+  variant_role,
+  filename,
+  mime_type,
+  transformation_spec
+)
+values
+  (
+    'audio-publication-v1',
+    1,
+    'audio_delivery',
+    'audio_delivery.mp3',
+    'audio/mpeg',
+    jsonb_build_object(
+      'profile', 'audio-publication-v1',
+      'full_length', true,
+      'codec', 'mp3',
+      'bitrate_kbps', 128,
+      'channels', 2
+    )
+  ),
+  (
+    'video-adaptive-v1',
+    1,
+    'video_hls_master',
+    'video_hls_master.m3u8',
+    'application/vnd.apple.mpegurl',
+    jsonb_build_object(
+      'profile', 'video-adaptive-v1',
+      'kind', 'master_playlist',
+      'hls_version', 6,
+      'rendition_count', 2,
+      'segment_seconds', 4,
+      'segment_mode', 'single_file_byte_range'
+    )
+  ),
+  (
+    'video-adaptive-v1',
+    2,
+    'video_hls_360p_playlist',
+    'video_hls_360p_playlist.m3u8',
+    'application/vnd.apple.mpegurl',
+    jsonb_build_object(
+      'profile', 'video-adaptive-v1',
+      'kind', 'media_playlist',
+      'hls_version', 6,
+      'segment_seconds', 4,
+      'segment_mode', 'single_file_byte_range',
+      'max_width', 640,
+      'max_height', 360,
+      'video_bitrate_kbps', 800,
+      'audio_bitrate_kbps', 96
+    )
+  ),
+  (
+    'video-adaptive-v1',
+    3,
+    'video_hls_360p_media',
+    'video_hls_360p_media.ts',
+    'video/mp2t',
+    jsonb_build_object(
+      'profile', 'video-adaptive-v1',
+      'kind', 'media',
+      'container', 'mpegts',
+      'hls_version', 6,
+      'segment_seconds', 4,
+      'segment_mode', 'single_file_byte_range',
+      'max_width', 640,
+      'max_height', 360,
+      'video_codec', 'h264',
+      'audio_codec', 'aac',
+      'video_bitrate_kbps', 800,
+      'audio_bitrate_kbps', 96
+    )
+  ),
+  (
+    'video-adaptive-v1',
+    4,
+    'video_hls_720p_playlist',
+    'video_hls_720p_playlist.m3u8',
+    'application/vnd.apple.mpegurl',
+    jsonb_build_object(
+      'profile', 'video-adaptive-v1',
+      'kind', 'media_playlist',
+      'hls_version', 6,
+      'segment_seconds', 4,
+      'segment_mode', 'single_file_byte_range',
+      'max_width', 1280,
+      'max_height', 720,
+      'video_bitrate_kbps', 2500,
+      'audio_bitrate_kbps', 128
+    )
+  ),
+  (
+    'video-adaptive-v1',
+    5,
+    'video_hls_720p_media',
+    'video_hls_720p_media.ts',
+    'video/mp2t',
+    jsonb_build_object(
+      'profile', 'video-adaptive-v1',
+      'kind', 'media',
+      'container', 'mpegts',
+      'hls_version', 6,
+      'segment_seconds', 4,
+      'segment_mode', 'single_file_byte_range',
+      'max_width', 1280,
+      'max_height', 720,
+      'video_codec', 'h264',
+      'audio_codec', 'aac',
+      'video_bitrate_kbps', 2500,
+      'audio_bitrate_kbps', 128
+    )
+  );
+
+-- ---------------------------------------------------------------------------
+-- Canonical additive processing-profile submission.
+-- ---------------------------------------------------------------------------
+
 create or replace function
-  public.submit_video_adaptive_processing_v1(
+  public.submit_media_processing_profile_v1(
     p_asset_id uuid,
     p_asset_revision_id uuid,
+    p_profile_version text,
     p_idempotency_key text,
     p_correlation_id uuid default null
   )
@@ -180,7 +477,7 @@ set search_path to
 as $function$
 declare
   v_command_type constant text := 'media.process_revision';
-  v_profile_version constant text := 'video-adaptive-v1';
+  v_profile media.processing_profiles%rowtype;
   v_actor record;
   v_asset media.assets%rowtype;
   v_revision media.asset_revisions%rowtype;
@@ -220,6 +517,7 @@ begin
 
   if p_asset_id is null
      or p_asset_revision_id is null
+     or nullif(btrim(p_profile_version), '') is null
      or p_idempotency_key is null
      or p_idempotency_key !~
        '^[A-Za-z0-9][A-Za-z0-9._:-]{7,127}$'
@@ -227,7 +525,20 @@ begin
     raise exception
       using
         errcode = '22023',
-        message = 'Adaptive Video processing request is invalid.';
+        message = 'Media processing-profile request is invalid.';
+  end if;
+
+  select profile.*
+  into v_profile
+  from media.processing_profiles profile
+  where profile.profile_version = btrim(p_profile_version)
+    and profile.enabled;
+
+  if not found then
+    raise exception
+      using
+        errcode = '22023',
+        message = 'Media processing profile is unavailable.';
   end if;
 
   select *
@@ -237,12 +548,13 @@ begin
 
   if not found
      or v_asset.lifecycle_state <> 'active'
-     or v_asset.asset_kind <> 'video'
+     or v_asset.asset_kind <> v_profile.asset_kind
   then
     raise exception
       using
         errcode = '55000',
-        message = 'Adaptive Video processing requires an active Video Media asset.';
+        message =
+          'Media processing profile does not match an active Media asset.';
   end if;
 
   select *
@@ -255,7 +567,8 @@ begin
     raise exception
       using
         errcode = 'P0002',
-        message = 'Media revision does not belong to the requested Video asset.';
+        message =
+          'Media revision does not belong to the requested asset.';
   end if;
 
   select *
@@ -267,15 +580,18 @@ begin
      or v_source.verification_state <> 'verified'
      or v_source.storage_provider <> 'lightsail_media'
      or v_source.storage_path is null
-     or v_source.storage_path !~ '^masters/video/'
+     or v_source.storage_path !~
+          ('^masters/' || v_profile.asset_kind || '/')
      or v_source.sha256 is null
      or v_source.byte_size is null
-     or v_source.mime_type not like 'video/%'
+     or v_source.mime_type not like
+          (v_profile.asset_kind || '/%')
   then
     raise exception
       using
         errcode = '55000',
-        message = 'Adaptive Video processing requires a verified protected Video master.';
+        message =
+          'Media processing profile requires a verified protected matching master.';
   end if;
 
   if not exists (
@@ -284,18 +600,32 @@ begin
     where usage.asset_id = p_asset_id
       and usage.asset_revision_id = p_asset_revision_id
       and usage.resolution_mode = 'exact_revision'
-      and usage.target_authority = 'video'
-      and usage.target_kind = 'video_publication'
-      and usage.target_version_kind = 'video_publication_version'
-      and usage.target_version_id is not null
-      and usage.usage_role = 'video_master'
+      and usage.target_authority =
+            v_profile.required_usage_authority
+      and usage.target_kind =
+            v_profile.required_usage_target_kind
+      and usage.usage_role =
+            v_profile.required_usage_role
       and usage.usage_state = 'active'
+      and (
+        (
+          not v_profile.require_usage_target_version
+          and usage.target_version_kind is null
+          and usage.target_version_id is null
+        )
+        or (
+          v_profile.require_usage_target_version
+          and usage.target_version_kind =
+                v_profile.required_usage_target_version_kind
+          and usage.target_version_id is not null
+        )
+      )
   ) then
     raise exception
       using
         errcode = '55000',
         message =
-          'Adaptive Video processing requires an active version-bound Video master attachment.';
+          'Media processing profile requires its governed exact-revision usage binding.';
   end if;
 
   select resource_kind
@@ -339,7 +669,7 @@ begin
        )
     then
       raise exception
-        'Video Media Resource binding is invalid.';
+        'Media Resource binding is invalid.';
     end if;
   end if;
 
@@ -356,7 +686,7 @@ begin
     'source_byte_size', v_source.byte_size,
     'source_mime_type', v_source.mime_type,
     'asset_kind', v_asset.asset_kind,
-    'profile_version', v_profile_version,
+    'profile_version', v_profile.profile_version,
     'correlation_id', v_correlation_id
   );
 
@@ -413,7 +743,7 @@ begin
 
     if not found then
       raise exception
-        'Adaptive Video processing idempotency receipt disappeared.';
+        'Media processing-profile idempotency receipt disappeared.';
     end if;
 
     if v_existing_fingerprint <> v_request_fingerprint then
@@ -440,7 +770,7 @@ begin
        or v_event_id is null
     then
       raise exception
-        'Accepted adaptive Video processing command is missing its durable job or event.';
+        'Accepted Media processing-profile command is missing its durable job or event.';
     end if;
 
     return query
@@ -497,7 +827,7 @@ begin
       'asset_id', p_asset_id,
       'asset_revision_id', p_asset_revision_id,
       'source_file_object_id', v_source.id,
-      'profile_version', v_profile_version,
+      'profile_version', v_profile.profile_version,
       'principal_key', v_actor.principal_key,
       'correlation_id', v_correlation_id,
       'accepted_at', now()
@@ -517,25 +847,31 @@ end;
 $function$;
 
 revoke all
-  on function public.submit_video_adaptive_processing_v1(
+  on function public.submit_media_processing_profile_v1(
     uuid,
     uuid,
+    text,
     text,
     uuid
   )
   from public, anon, service_role;
 
 grant execute
-  on function public.submit_video_adaptive_processing_v1(
+  on function public.submit_media_processing_profile_v1(
     uuid,
     uuid,
+    text,
     text,
     uuid
   )
   to authenticated;
 
+-- ---------------------------------------------------------------------------
+-- Canonical processing-profile output registration.
+-- ---------------------------------------------------------------------------
+
 create or replace function
-  public.register_video_adaptive_processing_outputs_v1(
+  public.register_media_processing_profile_outputs_v1(
     p_job_id uuid,
     p_worker_id text,
     p_outputs jsonb
@@ -554,6 +890,8 @@ as $function$
 declare
   v_job platform_private.jobs%rowtype;
   v_receipt platform_private.command_receipts%rowtype;
+  v_profile media.processing_profiles%rowtype;
+  v_expected_count integer;
   v_actor_id uuid;
   v_asset_id uuid;
   v_revision_id uuid;
@@ -561,10 +899,9 @@ declare
   v_correlation_id uuid;
   v_output jsonb;
   v_file jsonb;
+  v_contract media.processing_profile_outputs%rowtype;
   v_role text;
   v_seen_roles text[] := array[]::text[];
-  v_expected_filename text;
-  v_expected_mime text;
   v_storage_path text;
   v_delivery_url text;
   v_expected_storage_path text;
@@ -578,7 +915,6 @@ declare
   v_selection_revision bigint;
   v_new_variant boolean;
   v_results jsonb := '[]'::jsonb;
-  v_spec jsonb;
 begin
   if coalesce(auth.role(), '') <> 'service_role' then
     raise exception
@@ -593,13 +929,12 @@ begin
        '^[A-Za-z0-9][A-Za-z0-9._:-]{2,127}$'
      or p_outputs is null
      or jsonb_typeof(p_outputs) <> 'array'
-     or jsonb_array_length(p_outputs) <> 5
   then
     raise exception
       using
         errcode = '22023',
         message =
-          'Adaptive Video registration requires one leased job and exactly five outputs.';
+          'Media processing-profile registration request is invalid.';
   end if;
 
   select job.*
@@ -615,14 +950,38 @@ begin
      or v_job.locked_by is distinct from p_worker_id
      or v_job.lease_expires_at is null
      or v_job.lease_expires_at <= now()
-     or v_job.input_payload ->> 'profile_version'
-          <> 'video-adaptive-v1'
   then
     raise exception
       using
         errcode = '55000',
         message =
-          'The adaptive Video processing job is not actively leased to this worker.';
+          'The Media processing-profile job is not actively leased to this worker.';
+  end if;
+
+  select profile.*
+  into v_profile
+  from media.processing_profiles profile
+  where profile.profile_version =
+          nullif(v_job.input_payload ->> 'profile_version', '')
+    and profile.enabled;
+
+  if not found then
+    raise exception
+      'Leased Media job does not identify an enabled canonical processing profile.';
+  end if;
+
+  select count(*)
+  into v_expected_count
+  from media.processing_profile_outputs output_contract
+  where output_contract.profile_version =
+    v_profile.profile_version;
+
+  if v_expected_count < 1
+     or jsonb_array_length(p_outputs) <> v_expected_count
+  then
+    raise exception
+      'Processing output count does not match canonical profile %.'
+      , v_profile.profile_version;
   end if;
 
   select receipt.*
@@ -638,7 +997,7 @@ begin
       using
         errcode = '55000',
         message =
-          'Adaptive Video processing receipt actor or state is invalid.';
+          'Media processing-profile receipt actor or state is invalid.';
   end if;
 
   v_actor_id := v_receipt.actor_user_id;
@@ -673,14 +1032,16 @@ begin
        where revision.id = v_revision_id
          and revision.asset_id = v_asset_id
          and revision.original_file_object_id = v_source_file_id
-         and asset.asset_kind = 'video'
+         and asset.asset_kind = v_profile.asset_kind
          and source_file.verification_state = 'verified'
          and source_file.storage_provider = 'lightsail_media'
-         and source_file.storage_path ~ '^masters/video/'
+         and source_file.storage_path !~ '[.][.]'
+         and source_file.storage_path ~
+              ('^masters/' || v_profile.asset_kind || '/')
      )
   then
     raise exception
-      'Adaptive Video processing source authority changed or is invalid.';
+      'Media processing-profile source authority changed or is invalid.';
   end if;
 
   for v_output in
@@ -693,7 +1054,7 @@ begin
        or jsonb_typeof(v_output -> 'technical_metadata') <> 'object'
     then
       raise exception
-        'Every adaptive Video output must contain file, transformation, and technical metadata objects.';
+        'Every Media processing-profile output must contain file, transformation, and technical metadata objects.';
     end if;
 
     v_role := nullif(
@@ -705,7 +1066,20 @@ begin
        or v_role = any(v_seen_roles)
     then
       raise exception
-        'Adaptive Video variant roles must be present and unique.';
+        'Media processing-profile variant roles must be present and unique.';
+    end if;
+
+    select contract.*
+    into v_contract
+    from media.processing_profile_outputs contract
+    where contract.profile_version = v_profile.profile_version
+      and contract.variant_role = v_role;
+
+    if not found then
+      raise exception
+        'Variant role % is not permitted for processing profile %.',
+        v_role,
+        v_profile.profile_version;
     end if;
 
     v_seen_roles := array_append(
@@ -713,89 +1087,19 @@ begin
       v_role
     );
 
-    case v_role
-      when 'video_hls_master' then
-        v_expected_filename := 'video_hls_master.m3u8';
-        v_expected_mime := 'application/vnd.apple.mpegurl';
-      when 'video_hls_360p_playlist' then
-        v_expected_filename := 'video_hls_360p_playlist.m3u8';
-        v_expected_mime := 'application/vnd.apple.mpegurl';
-      when 'video_hls_360p_media' then
-        v_expected_filename := 'video_hls_360p_media.ts';
-        v_expected_mime := 'video/mp2t';
-      when 'video_hls_720p_playlist' then
-        v_expected_filename := 'video_hls_720p_playlist.m3u8';
-        v_expected_mime := 'application/vnd.apple.mpegurl';
-      when 'video_hls_720p_media' then
-        v_expected_filename := 'video_hls_720p_media.ts';
-        v_expected_mime := 'video/mp2t';
-      else
-        raise exception
-          'Variant role % is not permitted for video-adaptive-v1.',
-          v_role;
-    end case;
-
-    v_spec := v_output -> 'transformation_spec';
-
-    if v_spec ->> 'profile' is distinct from 'video-adaptive-v1'
-       or nullif(v_spec ->> 'hls_version', '')::integer <> 6
-       or nullif(v_spec ->> 'segment_seconds', '')::integer <> 4
-       or v_spec ->> 'segment_mode' is distinct from 'single_file_byte_range'
+    if v_output -> 'transformation_spec'
+         is distinct from v_contract.transformation_spec
        or v_output ->> 'generator_name'
-            is distinct from 'wakilisha-media-processor'
+            is distinct from v_profile.generator_name
        or v_output ->> 'generator_version'
-            is distinct from 'phase7b-v4a-v1'
+            is distinct from v_profile.generator_version
+       or v_output -> 'technical_metadata' ->> 'processing_profile'
+            is distinct from v_profile.profile_version
+       or v_output -> 'technical_metadata' ->> 'source_file_object_id'
+            is distinct from v_source_file_id::text
     then
       raise exception
-        'Adaptive Video processing profile metadata is invalid for role %.',
-        v_role;
-    end if;
-
-    if (
-      v_role = 'video_hls_master'
-      and (
-        v_spec ->> 'kind' is distinct from 'master_playlist'
-        or nullif(v_spec ->> 'rendition_count', '')::integer <> 2
-      )
-    ) or (
-      v_role in (
-        'video_hls_360p_playlist',
-        'video_hls_360p_media'
-      )
-      and (
-        v_spec ->> 'kind' is null
-        or v_spec ->> 'kind' not in ('media_playlist', 'media')
-        or nullif(v_spec ->> 'max_width', '')::integer <> 640
-        or nullif(v_spec ->> 'max_height', '')::integer <> 360
-        or nullif(v_spec ->> 'video_bitrate_kbps', '')::integer <> 800
-        or nullif(v_spec ->> 'audio_bitrate_kbps', '')::integer <> 96
-      )
-    ) or (
-      v_role in (
-        'video_hls_720p_playlist',
-        'video_hls_720p_media'
-      )
-      and (
-        v_spec ->> 'kind' is null
-        or v_spec ->> 'kind' not in ('media_playlist', 'media')
-        or nullif(v_spec ->> 'max_width', '')::integer <> 1280
-        or nullif(v_spec ->> 'max_height', '')::integer <> 720
-        or nullif(v_spec ->> 'video_bitrate_kbps', '')::integer <> 2500
-        or nullif(v_spec ->> 'audio_bitrate_kbps', '')::integer <> 128
-      )
-    ) or (
-      v_role in (
-        'video_hls_360p_media',
-        'video_hls_720p_media'
-      )
-      and (
-        v_spec ->> 'container' is distinct from 'mpegts'
-        or v_spec ->> 'video_codec' is distinct from 'h264'
-        or v_spec ->> 'audio_codec' is distinct from 'aac'
-      )
-    ) then
-      raise exception
-        'Adaptive Video transformation contract is invalid for role %.',
+        'Processing-profile transformation or generator contract is invalid for role %.',
         v_role;
     end if;
 
@@ -806,12 +1110,12 @@ begin
        or coalesce(
             v_file ->> 'storage_namespace',
             ''
-          ) <> 'lightsail-media'
+          ) is distinct from 'lightsail-media'
        or v_file ->> 'mime_type'
-            is distinct from v_expected_mime
+            is distinct from v_contract.mime_type
     then
       raise exception
-        'Adaptive Video output file authority is invalid for role %.',
+        'Processing-profile file authority is invalid for role %.',
         v_role;
     end if;
 
@@ -838,17 +1142,17 @@ begin
       'derived-objects/' ||
       v_asset_id::text || '/' ||
       v_revision_id::text || '/' ||
-      'video-adaptive-v1/' ||
+      v_profile.profile_version || '/' ||
       v_source_file_id::text || '/' ||
-      v_expected_filename;
+      v_contract.filename;
 
     v_expected_delivery_url :=
       'https://media.wakilisha.africa/derivatives/' ||
       v_asset_id::text || '/' ||
       v_revision_id::text || '/' ||
-      'video-adaptive-v1/' ||
+      v_profile.profile_version || '/' ||
       v_source_file_id::text || '/' ||
-      v_expected_filename;
+      v_contract.filename;
 
     if v_storage_path is distinct from
          v_expected_storage_path
@@ -860,7 +1164,7 @@ begin
        or v_byte_size < 1
     then
       raise exception
-        'Adaptive Video immutable file identity is invalid for role %.',
+        'Processing-profile immutable file identity is invalid for role %.',
         v_role;
     end if;
 
@@ -876,11 +1180,11 @@ begin
       if v_existing_file.verification_state <> 'verified'
          or v_existing_file.sha256 <> v_sha256
          or v_existing_file.byte_size <> v_byte_size
-         or v_existing_file.mime_type <> v_expected_mime
+         or v_existing_file.mime_type <> v_contract.mime_type
          or v_existing_file.delivery_url <> v_delivery_url
       then
         raise exception
-          'Immutable adaptive Video storage collision does not match registered bytes.';
+          'Immutable processing-profile storage collision does not match registered bytes.';
       end if;
 
       v_file_object_id := v_existing_file.id;
@@ -928,8 +1232,8 @@ begin
         v_role,
         v_output -> 'transformation_spec',
         v_output -> 'technical_metadata',
-        'wakilisha-media-processor',
-        'phase7b-v4a-v1',
+        v_profile.generator_name,
+        v_profile.generator_version,
         v_actor_id
       );
 
@@ -951,12 +1255,12 @@ begin
         v_file_object_id,
         'variant_registered',
         v_actor_id,
-        'Immutable adaptive Video derivative registered',
+        'Immutable canonical Media processing-profile derivative registered',
         jsonb_build_object(
           'variant_role', v_role,
           'source_file_object_id', v_source_file_id,
           'derived_file_object_id', v_file_object_id,
-          'processing_profile', 'video-adaptive-v1'
+          'processing_profile', v_profile.profile_version
         ),
         v_correlation_id
       );
@@ -1009,10 +1313,11 @@ begin
         v_file_object_id,
         'variant_activated',
         v_actor_id,
-        'Adaptive Video derivative activated',
+        'Canonical Media processing-profile derivative activated',
         jsonb_build_object(
           'variant_role', v_role,
-          'selection_revision', v_selection_revision
+          'selection_revision', v_selection_revision,
+          'processing_profile', v_profile.profile_version
         ),
         v_correlation_id
       );
@@ -1048,10 +1353,11 @@ begin
         v_file_object_id,
         'variant_activated',
         v_actor_id,
-        'Adaptive Video derivative activation advanced',
+        'Canonical Media processing-profile derivative activation advanced',
         jsonb_build_object(
           'variant_role', v_role,
-          'selection_revision', v_selection_revision
+          'selection_revision', v_selection_revision,
+          'processing_profile', v_profile.profile_version
         ),
         v_correlation_id
       );
@@ -1071,15 +1377,21 @@ begin
       );
   end loop;
 
-  if cardinality(v_seen_roles) <> 5
-     or not ('video_hls_master' = any(v_seen_roles))
-     or not ('video_hls_360p_playlist' = any(v_seen_roles))
-     or not ('video_hls_360p_media' = any(v_seen_roles))
-     or not ('video_hls_720p_playlist' = any(v_seen_roles))
-     or not ('video_hls_720p_media' = any(v_seen_roles))
+  if cardinality(v_seen_roles) <> v_expected_count
+     or exists (
+       select 1
+       from media.processing_profile_outputs contract
+       where contract.profile_version =
+             v_profile.profile_version
+         and not (
+           contract.variant_role =
+             any(v_seen_roles)
+         )
+     )
   then
     raise exception
-      'Adaptive Video processing output set is incomplete.';
+      'Processing-profile output set is incomplete for %.',
+      v_profile.profile_version;
   end if;
 
   return jsonb_build_object(
@@ -1087,7 +1399,7 @@ begin
     'asset_id', v_asset_id,
     'asset_revision_id', v_revision_id,
     'source_file_object_id', v_source_file_id,
-    'profile_version', 'video-adaptive-v1',
+    'profile_version', v_profile.profile_version,
     'correlation_id', v_correlation_id,
     'outputs', v_results
   );
@@ -1095,7 +1407,7 @@ end;
 $function$;
 
 revoke all
-  on function public.register_video_adaptive_processing_outputs_v1(
+  on function public.register_media_processing_profile_outputs_v1(
     uuid,
     text,
     jsonb
@@ -1103,7 +1415,121 @@ revoke all
   from public, anon, authenticated;
 
 grant execute
-  on function public.register_video_adaptive_processing_outputs_v1(
+  on function public.register_media_processing_profile_outputs_v1(
+    uuid,
+    text,
+    jsonb
+  )
+  to service_role;
+
+-- ---------------------------------------------------------------------------
+-- Migrate the first-domain Audio candidate to compatibility wrappers.
+-- These names remain for backward compatibility; they no longer own authority.
+-- ---------------------------------------------------------------------------
+
+create or replace function
+  public.submit_audio_delivery_processing_v1(
+    p_asset_id uuid,
+    p_asset_revision_id uuid,
+    p_idempotency_key text,
+    p_correlation_id uuid default null
+  )
+returns table(
+  command_receipt_id uuid,
+  job_id uuid,
+  accepted_event_id uuid,
+  receipt_status text,
+  idempotent_replay boolean
+)
+language sql
+security definer
+set search_path to
+  'pg_catalog',
+  'public'
+as $function$
+  select *
+  from public.submit_media_processing_profile_v1(
+    p_asset_id,
+    p_asset_revision_id,
+    'audio-publication-v1',
+    p_idempotency_key,
+    p_correlation_id
+  );
+$function$;
+
+revoke all
+  on function public.submit_audio_delivery_processing_v1(
+    uuid,
+    uuid,
+    text,
+    uuid
+  )
+  from public, anon, service_role;
+
+grant execute
+  on function public.submit_audio_delivery_processing_v1(
+    uuid,
+    uuid,
+    text,
+    uuid
+  )
+  to authenticated;
+
+create or replace function
+  public.register_audio_delivery_processing_outputs_v1(
+    p_job_id uuid,
+    p_worker_id text,
+    p_outputs jsonb
+  )
+returns jsonb
+language plpgsql
+security definer
+set search_path to
+  'pg_catalog',
+  'public',
+  'auth',
+  'platform_private'
+as $function$
+declare
+  v_profile_version text;
+begin
+  if coalesce(auth.role(), '') <> 'service_role' then
+    raise exception
+      using
+        errcode = '42501',
+        message = 'Service-role access is required.';
+  end if;
+
+  select job.input_payload ->> 'profile_version'
+  into v_profile_version
+  from platform_private.jobs job
+  where job.id = p_job_id;
+
+  if v_profile_version is distinct from
+       'audio-publication-v1'
+  then
+    raise exception
+      'Audio delivery compatibility registration accepts only audio-publication-v1.';
+  end if;
+
+  return public.register_media_processing_profile_outputs_v1(
+    p_job_id,
+    p_worker_id,
+    p_outputs
+  );
+end;
+$function$;
+
+revoke all
+  on function public.register_audio_delivery_processing_outputs_v1(
+    uuid,
+    text,
+    jsonb
+  )
+  from public, anon, authenticated;
+
+grant execute
+  on function public.register_audio_delivery_processing_outputs_v1(
     uuid,
     text,
     jsonb
