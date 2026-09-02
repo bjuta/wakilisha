@@ -383,3 +383,201 @@ After V4A:
 - public Video correction continuity and real correction-handling proof
 - final real-Video exit acceptance
 - Phase 7B closure record
+
+## Accepted preview evidence — 2 September 2026
+
+Disposable Supabase preview:
+
+- branch id: `c6d454ec-37f7-48c0-a3db-20cb87445703`
+- project ref: `qbzvovteagnoqrywkozo`
+- branch name: `phase-7b-v4a-adaptive-video-media-sealed`
+- production data copied: no
+- hourly branch cost: `$0.01344`
+
+### Baseline replay
+
+The preview was not accepted while provisioning was still replaying migrations.
+
+An early read observed 48 migrations at `20260823181332`; Postgres logs simultaneously showed `20260824061359_track_lyrics_review_provenance.sql` still applying. That was correctly treated as a mid-replay snapshot, not a failed baseline.
+
+Accepted baseline after replay settled:
+
+- migration count: 79
+- migration head: `20260901170500`
+- accepted Audio publication processing adapters present
+- accepted public Video reader present
+- preview status: `FUNCTIONS_DEPLOYED` / `ACTIVE_HEALTHY`
+
+No V4A SQL was applied before that baseline was exact.
+
+### Full migration rollback rehearsal
+
+The complete candidate migration was executed on the accepted 79-migration preview with only terminal `COMMIT` replaced by `ROLLBACK`.
+
+Result: PASS.
+
+After rehearsal:
+
+- migration count remained 79
+- migration head remained `20260901170500`
+- `media.processing_profiles`: absent
+- `media.processing_profile_outputs`: absent
+- shared processing-profile RPCs: absent
+- adaptive Video variant roles: 0
+
+No rehearsal residue remained.
+
+### Native candidate application
+
+The candidate was promoted to the preview only through native repository migration authority.
+
+Native dry-run before apply:
+
+- pending migrations: exactly 1
+- pending file:
+  `20260902205000_phase_7b_v4a_adaptive_video_media_foundation.sql`
+
+Native `supabase db push --linked`: PASS.
+
+Native dry-run after apply:
+
+- pending migrations: 0
+
+Accepted preview state:
+
+- migration count: 80
+- migration head: `20260902205000`
+- permanent V4A verifier: PASS
+
+Migration SHA-256:
+
+`266def2527d55c0afc5e061acecf5036a5cc7edeccac08e1a39aaeb92742aa04`
+
+### Canonical processing-profile state
+
+Accepted canonical profiles:
+
+`audio-publication-v1`
+
+- asset kind: audio
+- generator: `wakilisha-media-processor`
+- generator version: `phase6a-m2-v1`
+- required usage: editorial / audio_publication / audio_master
+- version-bound target required: no
+- outputs: 1
+
+`video-adaptive-v1`
+
+- asset kind: video
+- generator: `wakilisha-media-processor`
+- generator version: `phase7b-v4a-v1`
+- required usage: video / video_publication / video_master
+- target version kind: `video_publication_version`
+- version-bound target required: yes
+- outputs: 5
+
+### Security and callable perimeter proof
+
+Rollback-safe preview boundary proof passed:
+
+- anon direct table read: denied
+- anon shared submit EXECUTE: denied
+- authenticated shared submit EXECUTE: allowed
+- authenticated null-identity call: rejected with
+  `Authenticated Media processing actor is required.`
+- authenticated shared registrar EXECUTE: denied
+- service-role shared registrar EXECUTE: allowed
+- service-role invalid registration call: rejected with
+  `Media processing-profile registration request is invalid.`
+- Audio compatibility submit remains authenticated-only
+- Audio compatibility registrar remains service-role-only
+
+No fixture residue was retained.
+
+### Advisor disposition
+
+V4A-specific Security Advisor findings:
+
+1. `media.processing_profiles`: RLS enabled with no policy — INFO
+2. `media.processing_profile_outputs`: RLS enabled with no policy — INFO
+3. authenticated `SECURITY DEFINER` shared submit — WARN
+
+Disposition:
+
+- the two profile tables intentionally expose no direct application table API:
+  RLS is enabled and direct privileges are revoked from public, anon,
+  authenticated, and service_role
+- the shared submit is intentionally an authenticated command endpoint and
+  preserves WAKILISHA's governed command pattern:
+  explicit `auth.uid()`, `manage_media_assets` / administrator capability,
+  fixed search path, default EXECUTE revoked, anon denied
+- V4A introduced no `auth.role()` checks
+
+V4A-specific Performance Advisor findings:
+
+- three unindexed foreign-key INFO notices on static processing-profile vocabulary
+
+Disposition:
+
+- no index is added speculatively because these are tiny configuration tables,
+  not high-volume lookup or deletion paths
+- the canonical primary/unique keys already cover normal profile resolution
+
+No advisor finding indicates public row exposure, privilege broadening, or a
+new production query-path performance defect.
+
+### Replay/schema seal
+
+Replay proof:
+
+`docs/engineering/replay-proofs/20260902205000_phase_7b_v4a_adaptive_video_media_foundation.sql.json`
+
+Accepted seal:
+
+- base main:
+  `6af61b3bf6eb0acd671f5b354334291e9d65b94d`
+- preview project:
+  `qbzvovteagnoqrywkozo`
+- preview branch:
+  `c6d454ec-37f7-48c0-a3db-20cb87445703`
+- schema migration count: 80
+- schema migration head: `20260902205000`
+- generated type SHA-256:
+  `be5ff86a3c1f93d7feeac2db63de3ccb7cf71cde8aeeacad5162628b93885b2c`
+- baseline replay: PASS
+- candidate apply: PASS
+- verifier: PASS
+
+### Candidate Critical Control Plane
+
+Branch-sealed Critical Control Plane run:
+
+- run id: `33666447348`
+- result: PASS
+- migration replay contract: PASS
+- migration replay tests: PASS
+- Primitive Compounding contract: PASS
+- Phase 7A kernel/K5A/K5B/K5C/K5D gates: PASS
+- Phase 7B V1/V2/V3 gates: PASS
+- V4A adaptive Video Media foundation gate: PASS
+- full security/lifecycle suite: PASS
+- live schema/migration-history drift check: PASS
+- application build: PASS
+
+The temporary branch-only preview-seal workflow was removed after generating
+the canonical replay artifacts. It is not part of the permanent milestone.
+
+## Preview exit decision
+
+V4A preview authority is sealed.
+
+The candidate may now proceed to PR/CI.
+
+Production remains unchanged at 79 migrations / `20260901170500`.
+
+No Media processor worker deployment has occurred.
+
+No adaptive Video derivatives exist in production.
+
+Public Video still uses the accepted MP4 `video_transcode`.
+
