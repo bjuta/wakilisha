@@ -514,7 +514,7 @@ describe("MIZIZI Cultural Data Steward", () => {
     expect(workflow).toContain(
       "SUPABASE_ACCESS_TOKEN",
     );
-    expect(workflow).toContain(
+    expect(controlPlane).toContain(
       "MIZIZI_TRACK_PRODUCTION_APPLY",
     );
     expect(workflow).toContain(
