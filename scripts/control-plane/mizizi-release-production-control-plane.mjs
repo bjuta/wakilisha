@@ -234,12 +234,42 @@ async function assertAcceptedPostApply(pool,state) {
 
 function assertReleaseAudit(text,expectedCandidates) {
   const clean = text.replace(/\x1b\[[0-9;]*m/g,'');
-  if (expectedCandidates > 0) {
-    const row = new RegExp("'release_taxonomy_drift'\\\\s*│\\\\s*"+expectedCandidates+"\\\\s*│");
-    if (!row.test(clean)) throw new Error('release_taxonomy_drift expected '+expectedCandidates);
-  } else if (clean.includes("'release_taxonomy_drift'")) {
-    throw new Error('post-apply Release audit still reports release_taxonomy_drift');
-  }
+  const summary = clean.match(
+    /│\s*0\s*│\s*(\d+)\s*│\s*(\d+)\s*│\s*(\d+)\s*│\s*(\d+)\s*│\s*(\d+)\s*│\s*(\d+)\s*│\s*(\d+)\s*│\s*(\d+)\s*│\s*'audit'\s*│\s*'1\.1\.0'\s*│/,
+  );
+  if (!summary) throw new Error('Release audit summary was not parseable');
+  const [
+    ,
+    findings,
+    applied,
+    queuedForReview,
+    observedFindings,
+    stale,
+    tracksScanned,
+    releasesScanned,
+    chartEntriesScanned,
+  ] = summary.map(Number);
+  assertFields(
+    {
+      applied,
+      queued_for_review:queuedForReview,
+      stale,
+      tracks_scanned:tracksScanned,
+      releases_scanned:releasesScanned,
+      chart_entries_scanned:chartEntriesScanned,
+      taxonomy_candidates:findings-observedFindings,
+    },
+    {
+      applied:0,
+      queued_for_review:0,
+      stale:0,
+      tracks_scanned:0,
+      releases_scanned:841,
+      chart_entries_scanned:0,
+      taxonomy_candidates:expectedCandidates,
+    },
+    'Release audit summary',
+  );
   if (!clean.includes('Audit mode completed. No Registry rows were changed.')) {
     throw new Error('Release audit did not prove read-only completion');
   }
