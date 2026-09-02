@@ -1,0 +1,63 @@
+name: MIZIZI Track Production Control Plane
+
+on:
+  pull_request:
+    paths:
+      - ".github/workflows/mizizi-track-production-control-plane.yml"
+      - "scripts/control-plane/mizizi-track-production-control-plane.mjs"
+      - "test/registry/mizizi-cultural-data-steward.test.ts"
+      - "docs/registry/MIZIZI_CULTURAL_DATA_STEWARD.md"
+      - ".github/mizizi-track-production-apply.json"
+  push:
+    branches:
+      - main
+    paths:
+      - ".github/mizizi-track-production-apply.json"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: mizizi-track-production-control-plane
+  cancel-in-progress: false
+
+jobs:
+  control-plane:
+    name: control-plane
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    env:
+      SUPABASE_PROJECT_REF: pgzizndxdyhqmtyywjmt
+      SUPABASE_REGION: eu-west-2
+      SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+      MIZIZI_CONTROL_PLANE_MODE: ${{ github.event_name == 'push' && 'apply' || 'preflight' }}
+      MIZIZI_EXPECTED_MAIN_SHA: ${{ github.event_name == 'push' && github.sha || '' }}
+      MIZIZI_TRIGGER_FILE: ${{ github.event_name == 'push' && '.github/mizizi-track-production-apply.json' || '' }}
+      MIZIZI_ARTIFACT_DIR: artifacts/mizizi-track-production-control-plane
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Use Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run MIZIZI production control plane
+        run: node scripts/control-plane/mizizi-track-production-control-plane.mjs
+
+      - name: Upload MIZIZI control-plane evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: mizizi-track-production-control-plane-${{ github.run_id }}
+          path: artifacts/mizizi-track-production-control-plane
+          if-no-files-found: ignore
+          retention-days: 30

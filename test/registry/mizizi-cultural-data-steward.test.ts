@@ -490,6 +490,83 @@ describe("MIZIZI Cultural Data Steward", () => {
     );
   });
 
+  it("routes production Track apply through the governed control plane", () => {
+    const workflow =
+      readFileSync(
+        ".github/workflows/mizizi-track-production-control-plane.yml",
+        "utf8",
+      );
+    const controlPlane =
+      readFileSync(
+        "scripts/control-plane/mizizi-track-production-control-plane.mjs",
+        "utf8",
+      );
+
+    expect(workflow).toContain(
+      "workflow_dispatch",
+    );
+    expect(workflow).toContain(
+      "push:",
+    );
+    expect(workflow).toContain(
+      ".github/mizizi-track-production-apply.json",
+    );
+    expect(workflow).toContain(
+      "SUPABASE_ACCESS_TOKEN",
+    );
+    expect(controlPlane).toContain(
+      "MIZIZI_TRACK_PRODUCTION_APPLY",
+    );
+    expect(workflow).toContain(
+      "node scripts/control-plane/mizizi-track-production-control-plane.mjs",
+    );
+    expect(controlPlane).toContain(
+      "options', '-c jit=true'",
+    );
+    expect(controlPlane).toContain(
+      "role:'postgres'",
+    );
+    expect(controlPlane).toContain(
+      "{user_id:userId,roles}",
+    );
+    expect(controlPlane).toContain(
+      "/ssl-enforcement",
+    );
+    expect(controlPlane).toContain(
+      "requestedConfig:{database:true}",
+    );
+    expect(controlPlane).toContain(
+      "reviewed production trigger",
+    );
+    expect(controlPlane).toContain(
+      "queryViaLinkedCli",
+    );
+    expect(controlPlane).toContain(
+      "EXPECTED_FINGERPRINT",
+    );
+    expect(controlPlane).toContain(
+      "EXPECTED_BLOBS",
+    );
+    expect(controlPlane).toContain(
+      "MIZIZI_EXPECTED_MAIN_SHA",
+    );
+    expect(controlPlane).toContain(
+      "MIZIZI_TRACK_PRODUCTION_APPLY",
+    );
+    expect(controlPlane).toContain(
+      "originalState",
+    );
+    expect(controlPlane).toContain(
+      "originalRoles",
+    );
+    expect(controlPlane).not.toContain(
+      "database password",
+    );
+    expect(controlPlane).not.toContain(
+      "mizizi_production_runner_",
+    );
+  });
+
   it("keeps the runtime bounded, review-aware, and provenance-preserving", () => {
     const runner =
       readFileSync(
