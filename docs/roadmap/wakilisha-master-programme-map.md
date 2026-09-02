@@ -1,14 +1,16 @@
 # WAKILISHA Master Programme Map
 
-## Current production reconciliation - 1 September 2026
+## Current production reconciliation - 2 September 2026
 
 Latest production-accepted application main:
 
-`1dc7277d75256b109b485a3cc98c02229e9ccce4`
+`75b42377a8bc676ae78588c588356ab4a6995bd4`
 
-Production is at 78 migrations through `20260901114500_mizizi_track_identity_write_boundary.sql`.
+Production is at 79 migrations through `20260901170500_community_track_registry_identity.sql`.
 
-Phase 7B remains the current numbered phase. The September Release taxonomy, one-track public identity, sitemap-authority, and MIZIZI work is an accepted adjacent Registry/public-delivery detour, not a new numbered phase.
+The accepted frontend entry is `assets/index-CIyckr53.js` with SHA-256 `66d5d645025d048693d4d8b24809bfbb9f30ffaf68be3dac376b6d4bd13ce93e`.
+
+Phase 7B remains the current numbered phase. The September Release taxonomy, one-track public identity, Community Track Registry identity, sitemap-authority, and MIZIZI work is an accepted adjacent Registry/public-delivery detour, not a new numbered phase.
 
 Accepted Release taxonomy:
 
@@ -18,9 +20,10 @@ Accepted Release taxonomy:
 
 A Single remains a Release in the Registry and in public collections, but its public detail destination is its one Track rather than a duplicate Release page.
 
-Current acceptance record:
+Current acceptance records:
 
-`docs/engineering/release-taxonomy-membership-integrity-closure-record.md`
+- `docs/engineering/release-taxonomy-membership-integrity-closure-record.md`
+- `docs/engineering/community-track-registry-identity-production-closure-record.md`
 
 ## Phase 7A closure reconciliation - 31 August 2026
 
