@@ -1,14 +1,110 @@
--- Permanent read-only verifier for Phase 7B V4A adaptive Video Media authority.
+-- Permanent read-only verifier for Phase 7B V4A
+-- Media processing-profile convergence + adaptive Video authority.
 
 begin;
 
 do $phase_7b_v4a_verify$
 declare
-  v_video_v1_submit text;
-  v_video_v1_register text;
-  v_submit text;
-  v_register text;
+  v_base_submit text;
+  v_base_register text;
+  v_shared_submit text;
+  v_shared_register text;
+  v_audio_submit text;
+  v_audio_register text;
 begin
+  if to_regclass('media.processing_profiles') is null
+     or to_regclass('media.processing_profile_outputs') is null
+     or to_regprocedure(
+       'public.submit_media_processing_profile_v1(uuid,uuid,text,text,uuid)'
+     ) is null
+     or to_regprocedure(
+       'public.register_media_processing_profile_outputs_v1(uuid,text,jsonb)'
+     ) is null
+  then
+    raise exception
+      'V4A verification failed: canonical Media processing-profile authority is missing';
+  end if;
+
+  if exists (
+    select 1
+    from pg_class relation
+    where relation.oid in (
+      'media.processing_profiles'::regclass,
+      'media.processing_profile_outputs'::regclass
+    )
+      and not relation.relrowsecurity
+  ) then
+    raise exception
+      'V4A verification failed: processing-profile authority lacks RLS';
+  end if;
+
+  if exists (
+    select 1
+    from (
+      values
+        (
+          'audio-publication-v1',
+          'audio',
+          'phase6a-m2-v1',
+          'editorial',
+          'audio_publication',
+          'audio_master',
+          null::text,
+          false,
+          1
+        ),
+        (
+          'video-adaptive-v1',
+          'video',
+          'phase7b-v4a-v1',
+          'video',
+          'video_publication',
+          'video_master',
+          'video_publication_version',
+          true,
+          5
+        )
+    ) expected(
+      profile_version,
+      asset_kind,
+      generator_version,
+      usage_authority,
+      usage_target_kind,
+      usage_role,
+      target_version_kind,
+      require_target_version,
+      output_count
+    )
+    left join media.processing_profiles profile
+      on profile.profile_version = expected.profile_version
+    where profile.profile_version is null
+       or not profile.enabled
+       or profile.asset_kind is distinct from expected.asset_kind
+       or profile.generator_name
+            is distinct from 'wakilisha-media-processor'
+       or profile.generator_version
+            is distinct from expected.generator_version
+       or profile.required_usage_authority
+            is distinct from expected.usage_authority
+       or profile.required_usage_target_kind
+            is distinct from expected.usage_target_kind
+       or profile.required_usage_role
+            is distinct from expected.usage_role
+       or profile.required_usage_target_version_kind
+            is distinct from expected.target_version_kind
+       or profile.require_usage_target_version
+            is distinct from expected.require_target_version
+       or (
+         select count(*)
+         from media.processing_profile_outputs output_contract
+         where output_contract.profile_version =
+               expected.profile_version
+       ) <> expected.output_count
+  ) then
+    raise exception
+      'V4A verification failed: canonical Audio/Video profile contracts drifted';
+  end if;
+
   if exists (
     select 1
     from (
@@ -32,119 +128,103 @@ begin
 
   if to_regprocedure(
        'public.submit_video_adaptive_processing_v1(uuid,uuid,text,uuid)'
-     ) is null
+     ) is not null
      or to_regprocedure(
        'public.register_video_adaptive_processing_outputs_v1(uuid,text,jsonb)'
-     ) is null
+     ) is not null
   then
     raise exception
-      'V4A verification failed: adaptive Video processing adapters are missing';
+      'V4A verification failed: competing Video-specific processing authority exists';
   end if;
 
-  v_video_v1_submit := pg_get_functiondef(
+  v_base_submit := pg_get_functiondef(
     'public.submit_media_processing_command_v1(uuid,uuid,text,text,uuid)'::regprocedure
   );
-  v_video_v1_register := pg_get_functiondef(
+  v_base_register := pg_get_functiondef(
     'public.register_media_processing_outputs_v1(uuid,text,jsonb)'::regprocedure
   );
 
-  if position(
-       'video-adaptive-v1'
-       in v_video_v1_submit
-     ) > 0
-     or position(
-       'video-adaptive-v1'
-       in v_video_v1_register
-     ) > 0
+  if position('audio-publication-v1' in v_base_submit) > 0
+     or position('video-adaptive-v1' in v_base_submit) > 0
+     or position('audio-publication-v1' in v_base_register) > 0
+     or position('video-adaptive-v1' in v_base_register) > 0
   then
     raise exception
-      'V4A verification failed: accepted Phase 4 video-v1 functions were broadened';
+      'V4A verification failed: accepted Phase 4 base processing functions were broadened';
   end if;
 
-  v_submit := pg_get_functiondef(
-    'public.submit_video_adaptive_processing_v1(uuid,uuid,text,uuid)'::regprocedure
+  v_shared_submit := pg_get_functiondef(
+    'public.submit_media_processing_profile_v1(uuid,uuid,text,text,uuid)'::regprocedure
   );
-  v_register := pg_get_functiondef(
-    'public.register_video_adaptive_processing_outputs_v1(uuid,text,jsonb)'::regprocedure
+  v_shared_register := pg_get_functiondef(
+    'public.register_media_processing_profile_outputs_v1(uuid,text,jsonb)'::regprocedure
+  );
+  v_audio_submit := pg_get_functiondef(
+    'public.submit_audio_delivery_processing_v1(uuid,uuid,text,uuid)'::regprocedure
+  );
+  v_audio_register := pg_get_functiondef(
+    'public.register_audio_delivery_processing_outputs_v1(uuid,text,jsonb)'::regprocedure
   );
 
-  if position('video-adaptive-v1' in v_submit) = 0
-     or position('media.process_revision' in v_submit) = 0
-     or position('video_master' in v_submit) = 0
-     or position('video-adaptive-v1' in v_register) = 0
-     or position('phase7b-v4a-v1' in v_register) = 0
-     or position('single_file_byte_range' in v_register) = 0
+  if position('media.processing_profiles' in v_shared_submit) = 0
+     or position('media.usage_links' in v_shared_submit) = 0
+     or position('media.process_revision' in v_shared_submit) = 0
+     or position('media.processing_profile_outputs' in v_shared_register) = 0
+     or position('media.insert_verified_file_object_v2' in v_shared_register) = 0
+     or position('media.variant_selections' in v_shared_register) = 0
+     or position('submit_media_processing_profile_v1' in v_audio_submit) = 0
+     or position('register_media_processing_profile_outputs_v1' in v_audio_register) = 0
   then
     raise exception
-      'V4A verification failed: adaptive Video adapter contract drifted';
+      'V4A verification failed: processing-profile convergence contract drifted';
   end if;
 
   if exists (
     select 1
     from media.variants variant
+    join media.processing_profile_outputs contract
+      on contract.variant_role = variant.variant_role
+     and contract.profile_version =
+         variant.transformation_spec ->> 'profile'
+    join media.processing_profiles profile
+      on profile.profile_version = contract.profile_version
     join media.file_objects file_row
       on file_row.id = variant.derived_file_object_id
-    where variant.variant_role in (
-      'video_hls_master',
-      'video_hls_360p_playlist',
-      'video_hls_360p_media',
-      'video_hls_720p_playlist',
-      'video_hls_720p_media'
+    where contract.profile_version in (
+      'audio-publication-v1',
+      'video-adaptive-v1'
     )
       and (
         file_row.verification_state is distinct from 'verified'
         or file_row.storage_provider is distinct from 'lightsail_media'
         or coalesce(file_row.storage_namespace, '')
              is distinct from 'lightsail-media'
-        or file_row.storage_path !~
-             '^derived-objects/[0-9a-f-]+/[0-9a-f-]+/video-adaptive-v1/[0-9a-f-]+/video_hls_.+[.](m3u8|ts)$'
-        or file_row.delivery_url !~
-             '^https://media[.]wakilisha[.]africa/derivatives/[0-9a-f-]+/[0-9a-f-]+/video-adaptive-v1/[0-9a-f-]+/video_hls_.+[.](m3u8|ts)$'
-        or variant.generator_name is distinct from 'wakilisha-media-processor'
-        or variant.generator_version is distinct from 'phase7b-v4a-v1'
-        or variant.transformation_spec ->> 'profile'
-             is distinct from 'video-adaptive-v1'
-        or variant.transformation_spec ->> 'segment_mode'
-             is distinct from 'single_file_byte_range'
-        or nullif(
-             variant.transformation_spec ->> 'hls_version',
-             ''
-           )::integer is distinct from 6
-        or nullif(
-             variant.transformation_spec ->> 'segment_seconds',
-             ''
-           )::integer is distinct from 4
-        or (
-          variant.variant_role like '%playlist'
-          or variant.variant_role = 'video_hls_master'
-        ) and file_row.mime_type
-              is distinct from 'application/vnd.apple.mpegurl'
-        or variant.variant_role like '%media'
-           and file_row.mime_type is distinct from 'video/mp2t'
+        or file_row.mime_type is distinct from contract.mime_type
+        or variant.transformation_spec
+             is distinct from contract.transformation_spec
+        or variant.generator_name
+             is distinct from profile.generator_name
+        or variant.generator_version
+             is distinct from profile.generator_version
       )
   ) then
     raise exception
-      'V4A verification failed: registered adaptive Video derivative authority is invalid';
+      'V4A verification failed: registered profile derivative violates canonical contract';
   end if;
 
   if exists (
     select 1
-    from (
-      select
-        selection.asset_revision_id,
-        count(*) filter (
-          where selection.variant_role in (
-            'video_hls_master',
-            'video_hls_360p_playlist',
-            'video_hls_360p_media',
-            'video_hls_720p_playlist',
-            'video_hls_720p_media'
-          )
-        ) as selected_count,
-        count(*) filter (
-          where selection.variant_role = 'video_hls_master'
-        ) as master_count
-      from media.variant_selections selection
+    from media.variant_selections selection
+    join media.variants variant
+      on variant.id = selection.variant_id
+     and variant.variant_role = selection.variant_role
+    join media.processing_profile_outputs contract
+      on contract.variant_role = selection.variant_role
+     and contract.profile_version =
+         variant.transformation_spec ->> 'profile'
+    where contract.profile_version = 'video-adaptive-v1'
+    group by selection.asset_revision_id
+    having count(*) filter (
       where selection.variant_role in (
         'video_hls_master',
         'video_hls_360p_playlist',
@@ -152,10 +232,7 @@ begin
         'video_hls_720p_playlist',
         'video_hls_720p_media'
       )
-      group by selection.asset_revision_id
-    ) selected
-    where selected.master_count > 0
-      and selected.selected_count <> 5
+    ) not in (0, 5)
   ) then
     raise exception
       'V4A verification failed: selected adaptive Video package is incomplete';
@@ -164,7 +241,7 @@ end;
 $phase_7b_v4a_verify$;
 
 select
-  'PASS: Phase 7B V4A adaptive Video Media processing authority is intact.'
+  'PASS: Phase 7B V4A canonical Media processing-profile and adaptive Video authority is intact.'
     as verification_result;
 
 rollback;
