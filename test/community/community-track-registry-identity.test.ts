@@ -47,7 +47,7 @@ describe("Community Track Registry identity", () => {
     expect(migration).toContain(
       "where entity_type <> 'track'",
     );
-    expect(migration).toContain(
+    expect(verifier).toContain(
       "community_threads_entity_type_entity_id_key",
     );
   });
