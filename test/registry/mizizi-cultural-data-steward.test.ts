@@ -526,6 +526,9 @@ describe("MIZIZI Cultural Data Steward", () => {
     expect(controlPlane).toContain(
       "supabase/.temp/pooler-url",
     );
+    expect(controlPlane).toContain(
+      "postgres.${PROJECT_REF}",
+    );
     expect(controlPlane).not.toContain(
       "aws-0-",
     );
