@@ -66,7 +66,7 @@ parsed as (
 primary_route_match as (
   select
     parsed.id,
-    min(track.id) as track_id,
+    min(track.id::text)::uuid as track_id,
     count(distinct track.id)::integer as match_count
   from parsed
   left join public.registry_track_artists credit
@@ -82,7 +82,7 @@ primary_route_match as (
 redirect_route_match as (
   select
     parsed.id,
-    min(track.id) as track_id,
+    min(track.id::text)::uuid as track_id,
     count(distinct track.id)::integer as match_count
   from parsed
   left join public.wk_slug_redirects redirect
@@ -122,7 +122,7 @@ redirect_route_match as (
 artist_credit_match as (
   select
     parsed.id,
-    min(track.id) as track_id,
+    min(track.id::text)::uuid as track_id,
     count(distinct track.id)::integer as match_count
   from parsed
   left join public.registry_track_artists credit
@@ -140,7 +140,7 @@ artist_credit_match as (
 global_unique_slug_match as (
   select
     parsed.id,
-    min(track.id) as track_id,
+    min(track.id::text)::uuid as track_id,
     count(distinct track.id)::integer as match_count
   from parsed
   left join public.registry_tracks track
@@ -416,7 +416,7 @@ begin
     if v_entity_path <> '' then
       select
         count(*)::integer,
-        min(thread.id)
+        min(thread.id::text)::uuid
       into
         v_legacy_count,
         v_legacy_thread_id
