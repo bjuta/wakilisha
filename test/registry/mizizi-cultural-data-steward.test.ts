@@ -536,6 +536,9 @@ describe("MIZIZI Cultural Data Steward", () => {
       "requestedConfig:{database:true}",
     );
     expect(controlPlane).toContain(
+      "ACTIVE_HEALTHY",
+    );
+    expect(controlPlane).toContain(
       "reviewed production trigger",
     );
     expect(controlPlane).toContain(
