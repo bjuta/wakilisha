@@ -128,6 +128,7 @@ function databaseUrl() {
     throw new Error(`linked Supabase CLI returned unexpected pooler host ${u.hostname}`);
   }
 
+  u.username = `postgres.${PROJECT_REF}`;
   u.password = TOKEN;
   u.port = '5432';
   u.search = '';
