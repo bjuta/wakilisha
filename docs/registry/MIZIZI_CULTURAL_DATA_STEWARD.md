@@ -465,13 +465,18 @@ The workflow:
 5. pins the exact accepted MIZIZI runtime blobs
 6. pins the full-row fingerprint of every production input subset used by the accepted rehearsal
 7. runs a fresh read-only production Track audit before mutation
-8. requires an exact merged-main SHA and the explicit `MIZIZI_TRACK_PRODUCTION_APPLY` manual confirmation
-9. runs the unchanged preview-proven MIZIZI Track apply
-10. verifies the exact accepted 440 repair / 66 review / 857 redirect outcome and downstream impact
-11. runs a fresh read-only post-apply audit
-12. restores the caller's prior JIT mapping and the project's prior temporary-access state in cleanup
+8. requires production mutation intent to arrive through a separately reviewed `.github/mizizi-track-production-apply.json` trigger PR
+9. binds that trigger to the accepted input fingerprint and exact merged `main`
+10. permanently enables Postgres SSL enforcement, if it is still disabled, because Supabase Temporary Access requires SSL enforcement
+11. waits for the database to return healthy before acquiring temporary JIT access
+12. runs the unchanged preview-proven MIZIZI Track apply
+13. verifies the exact accepted 440 repair / 66 review / 857 redirect outcome and downstream impact
+14. runs a fresh read-only post-apply audit
+15. restores the caller's prior JIT mapping and disables temporary access again when it was previously disabled
 
-Pull-request execution of this workflow is preflight-only and must not mutate Registry rows.
+Pull-request execution of this workflow is preflight-only and must not mutate Registry rows. When production SSL enforcement is still disabled, PR preflight proves the exact production baseline and accepted full-row rehearsal fingerprint through the existing linked Supabase CLI, then reports SSL bootstrap as the remaining raw-session prerequisite.
+
+Production SSL enforcement is permanent infrastructure hardening, not temporary MIZIZI state. The control plane does not disable SSL enforcement after the run.
 
 The direct `registry:mizizi:apply` command remains a runtime primitive for governed environments. It is not the production operator deployment surface.
 
