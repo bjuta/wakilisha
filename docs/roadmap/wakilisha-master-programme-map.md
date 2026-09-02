@@ -312,5 +312,6 @@ Canonical adjacent closure records:
 - `docs/engineering/release-taxonomy-membership-integrity-closure-record.md`
 - `docs/engineering/community-track-registry-identity-production-closure-record.md`
 - `docs/engineering/mizizi-historical-track-production-closure-record.md`
+- `docs/engineering/mizizi-historical-release-taxonomy-production-closure-record.md`
 
 Phase 7B product work can continue independently while the remaining 66 Track review candidates and preserved Release-membership evidence stay governed without reopening either historical MIZIZI apply.
