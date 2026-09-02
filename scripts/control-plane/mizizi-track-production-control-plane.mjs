@@ -118,9 +118,21 @@ async function waitForDatabaseHealth() {
 }
 
 function databaseUrl() {
-  const u = new URL(`postgresql://postgres.${PROJECT_REF}:x@aws-0-${REGION}.pooler.supabase.com:5432/postgres`);
+  const poolerPath = 'supabase/.temp/pooler-url';
+  if (!fs.existsSync(poolerPath)) throw new Error(`linked Supabase CLI did not create ${poolerPath}`);
+
+  const linkedPooler = fs.readFileSync(poolerPath, 'utf8').trim();
+  const sanitized = linkedPooler.replace(/:\/\/([^:]+):[^@]*@/, '://$1:x@');
+  const u = new URL(sanitized);
+  if (!u.hostname.endsWith('.pooler.supabase.com')) {
+    throw new Error(`linked Supabase CLI returned unexpected pooler host ${u.hostname}`);
+  }
+
   u.password = TOKEN;
+  u.port = '5432';
+  u.search = '';
   u.searchParams.set('options', '-c jit=on');
+  console.log(`Using linked Supabase pooler host: ${u.hostname}:5432`);
   return u.toString();
 }
 
