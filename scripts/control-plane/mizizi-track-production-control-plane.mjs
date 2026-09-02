@@ -286,16 +286,24 @@ async function main() {
   }
 
   if (!['enabled','disabled'].includes(originalState)) throw new Error(`temporary access did not become available after SSL enforcement: ${originalState}`);
-  const list = rowsFromJitList(await api('GET',`/v1/projects/${PROJECT_REF}/database/jit/list`));
-  const existing = list.find(x => String(x.user_id || x.id || x.gotrue_id || '') === userId) || null;
-  const originalRoles = existing && Array.isArray(existing.user_roles) ? existing.user_roles : [];
-  let touched = false;
+  console.log(`Temporary access at entry: ${originalState}`);
+
+  let existing = null;
+  let originalRoles = [];
+  let mappingChanged = false;
   try {
-    if (originalState === 'disabled') await api('PUT',`/v1/projects/${PROJECT_REF}/jit-access`,{state:'enabled'});
+    const list = rowsFromJitList(await api('GET',`/v1/projects/${PROJECT_REF}/database/jit/list`));
+    existing = list.find(x => String(x.user_id || x.id || x.gotrue_id || '') === userId) || null;
+    originalRoles = existing && Array.isArray(existing.user_roles) ? existing.user_roles : [];
+
+    if (originalState === 'disabled') {
+      await api('PUT',`/v1/projects/${PROJECT_REF}/jit-access`,{state:'enabled'});
+    }
+
     const roles = originalRoles.filter(r => String(r.role || '') !== 'postgres');
     roles.push({ role:'postgres', expires_at: Date.now() + 60*60*1000 });
-    await api('PUT',`/v1/projects/${PROJECT_REF}/database/jit`,{user_id:userId,user_roles:roles});
-    touched = true;
+    await api('PUT',`/v1/projects/${PROJECT_REF}/database/jit`,{user_id:userId,roles});
+    mappingChanged = true;
 
     const url = databaseUrl();
     console.log(`::add-mask::${url}`);
@@ -343,12 +351,28 @@ async function main() {
       await pool.end().catch(()=>{});
     }
   } finally {
-    if (touched) {
-      if (existing) await api('PUT',`/v1/projects/${PROJECT_REF}/database/jit`,{user_id:userId,user_roles:originalRoles});
-      else await api('DELETE',`/v1/projects/${PROJECT_REF}/database/jit/${userId}`);
-      if (originalState === 'disabled') await api('PUT',`/v1/projects/${PROJECT_REF}/jit-access`,{state:'disabled'});
-      console.log('PASS: temporary JIT access restored to its original state');
+    const cleanupErrors = [];
+
+    if (mappingChanged) {
+      try {
+        if (existing) {
+          await api('PUT',`/v1/projects/${PROJECT_REF}/database/jit`,{user_id:userId,roles:originalRoles});
+        } else {
+          await api('DELETE',`/v1/projects/${PROJECT_REF}/database/jit/${userId}`);
+        }
+      } catch (error) {
+        cleanupErrors.push(`mapping cleanup failed: ${error?.message || error}`);
+      }
     }
+
+    try {
+      await api('PUT',`/v1/projects/${PROJECT_REF}/jit-access`,{state:'disabled'});
+    } catch (error) {
+      cleanupErrors.push(`temporary-access cleanup failed: ${error?.message || error}`);
+    }
+
+    if (cleanupErrors.length) throw new Error(cleanupErrors.join('; '));
+    console.log('PASS: JIT mapping restored and production temporary access disabled at rest');
   }
 }
 
