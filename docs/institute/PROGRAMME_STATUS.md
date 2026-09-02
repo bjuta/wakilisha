@@ -1,19 +1,20 @@
 # WAKILISHA Programme Status
 
-## Current production reconciliation - 1 September 2026
+## Current production reconciliation - 2 September 2026
 
 The latest production-accepted application main is:
 
-`1dc7277d75256b109b485a3cc98c02229e9ccce4`
+`75b42377a8bc676ae78588c588356ab4a6995bd4`
 
 Current production authority:
 
-- migrations: `78`
-- migration head: `20260901114500_mizizi_track_identity_write_boundary.sql`
-- frontend entry: `assets/index-CU1jyD6_.js`
-- frontend entry SHA-256: `b430d0b6aa5b1f84d00a13b2bd088745b67a52f60e86e2d1c739581d9bacb10c`
-- frontend index SHA-256: `01d6defd6bf05f6b05ec0bb0782d349696027a73a6e9e34b513129dc843fec85`
-- rollback snapshot: `/opt/wakilisha-react-backups/release-membership-integrity-20260901T162124Z-1dc7277d`
+- migrations: `79`
+- migration head: `20260901170500_community_track_registry_identity.sql`
+- frontend entry: `assets/index-CIyckr53.js`
+- frontend entry SHA-256: `66d5d645025d048693d4d8b24809bfbb9f30ffaf68be3dac376b6d4bd13ce93e`
+- frontend index SHA-256: `a6a7b5ea75a6c53b423972d92c1107d8cc6b4b96cac174124fc4fe7b3faa014c`
+- frontend dist-tree SHA-256: `d06e3d3d84caecdb38b754cc1a04f1c9b522bda98ac942b8fff5d3ebd4358e68`
+- rollback snapshot: `/opt/wakilisha-react-backups/community-track-registry-identity-75b42377`
 
 The current accepted adjacent Registry/public-identity work includes:
 
@@ -23,6 +24,10 @@ The current accepted adjacent Registry/public-identity work includes:
 - orphan Release-membership target integrity through PR #782
 - canonical Track public route remains `/tracks/{artist-slug}/{track-slug}`
 - Registry UUID remains internal identity and does not replace the public Track route grammar
+- Community Track discussion identity is now Registry-ID-first through PR #785
+- same-slug Tracks under different Artists retain distinct Community threads
+- canonical Track UUID plus mismatched Artist-scoped route fails closed
+- production Community identity acceptance is recorded in `docs/engineering/community-track-registry-identity-production-closure-record.md`
 
 Release taxonomy is now:
 
