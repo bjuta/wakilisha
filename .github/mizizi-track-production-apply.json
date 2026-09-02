@@ -7,7 +7,7 @@
   "expected_repairs": 440,
   "expected_blocked_reviews": 66,
   "expected_mizizi_redirects": 857,
-  "control_plane_main": "9e68b69763d356f3df16bc010f74064c917ac42e",
-  "attempt": 2,
-  "reason": "Retry after accepted JIT/read-only production control-plane preflight #23"
+  "control_plane_main": "97beddba4c3d50492fe997f7e13ca6b7171c7a17",
+  "attempt": 3,
+  "reason": "Retry after accepted bounded JIT session readiness preflight #26"
 }
