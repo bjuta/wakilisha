@@ -7,6 +7,10 @@ describe("MIZIZI Release production control plane", () => {
       ".github/workflows/mizizi-release-production-control-plane.yml",
       "utf8",
     );
+    const trackWorkflow = readFileSync(
+      ".github/workflows/mizizi-track-production-control-plane.yml",
+      "utf8",
+    );
     const controlPlane = readFileSync(
       "scripts/control-plane/mizizi-release-production-control-plane.mjs",
       "utf8",
@@ -16,6 +20,20 @@ describe("MIZIZI Release production control plane", () => {
     expect(workflow).toContain("push:");
     expect(workflow).toContain(".github/mizizi-release-production-apply.json");
     expect(workflow).toContain("SUPABASE_ACCESS_TOKEN");
+    expect(workflow).toContain(
+      "group: mizizi-production-jit-control-plane",
+    );
+    expect(trackWorkflow).toContain(
+      "group: mizizi-production-jit-control-plane",
+    );
+    expect(workflow).toContain("queue: max");
+    expect(trackWorkflow).toContain("queue: max");
+    expect(workflow).not.toContain(
+      "mizizi-release-production-control-plane\n  cancel-in-progress",
+    );
+    expect(trackWorkflow).not.toContain(
+      "mizizi-track-production-control-plane\n  cancel-in-progress",
+    );
     expect(workflow).toContain(
       "node scripts/control-plane/mizizi-release-production-control-plane.mjs",
     );
