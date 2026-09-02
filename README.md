@@ -16,17 +16,18 @@ docs/roadmap/wakilisha-master-programme-map.md
 docs/institute/two-workspace-pilot-audit-and-build-plan.md
 ```
 
-As of 1 September 2026:
+As of 2 September 2026:
 
 - Phases 0 through 7A are complete.
 - Phase 7B Public Video remains the current numbered phase. V1 public read/delivery, the public Video experience, caption delivery corrections, and V3 provider-source convergence are accepted baseline.
-- Production migration authority is 78 migrations through `20260901114500_mizizi_track_identity_write_boundary.sql`.
-- The latest production-accepted frontend main is `1dc7277d75256b109b485a3cc98c02229e9ccce4`.
-- The accepted production frontend entry is `assets/index-CU1jyD6_.js`, SHA-256 `b430d0b6aa5b1f84d00a13b2bd088745b67a52f60e86e2d1c739581d9bacb10c`.
+- Production migration authority is 79 migrations through `20260901170500_community_track_registry_identity.sql`.
+- The latest production-accepted frontend application main is `75b42377a8bc676ae78588c588356ab4a6995bd4`.
+- The accepted production frontend entry is `assets/index-CIyckr53.js`, SHA-256 `66d5d645025d048693d8b24809bfbb9f30ffaf68be3dac376b6d4bd13ce93e`.
 - Release taxonomy and public identity are production accepted: Releases is the collective domain; one resolvable active Track is a Single, two through six is an EP, and seven or more is an Album. Singles remain in Release collections and Artist discographies but do not own a second Release detail page.
-- MIZIZI preventive Track identity authority is live. Historical MIZIZI apply has not run.
+- MIZIZI preventive Track identity authority is live. The historical Track identity apply is production accepted at 440 repairs / 66 blocked reviews / 857 MIZIZI redirects. The separate historical Release taxonomy apply remains unrun.
 - Canonical Phase 7A closure remains `docs/engineering/phase-7a-closure-record.md`.
 - Current Release taxonomy acceptance record: `docs/engineering/release-taxonomy-membership-integrity-closure-record.md`.
+- Historical MIZIZI Track production closure record: `docs/engineering/mizizi-historical-track-production-closure-record.md`.
 
 The roadmap is an orientation tool. Building WAKILISHA naturally exposes adjacent work, and those detours can materially improve the platform. When they do, record what changed and reconcile the map so the project remains understandable.
 
