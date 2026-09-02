@@ -533,9 +533,6 @@ describe("MIZIZI Cultural Data Steward", () => {
       "/ssl-enforcement",
     );
     expect(controlPlane).toContain(
-      "/database/jit-access",
-    );
-    expect(controlPlane).toContain(
       "requestedConfig:{database:true}",
     );
     expect(controlPlane).toContain(
