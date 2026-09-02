@@ -524,7 +524,7 @@ async function loadArtistScopeCandidates(
       and ta.is_primary is true
       and t.status = 'active'
       and ta.artist_slug = any($1::text[])
-    order by ta.artist_slug, t.id
+    order by ta.artist_slug, t.id::text
     `,
     [artistSlugs],
   );
