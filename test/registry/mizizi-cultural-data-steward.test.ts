@@ -521,16 +521,19 @@ describe("MIZIZI Cultural Data Steward", () => {
       "node scripts/control-plane/mizizi-track-production-control-plane.mjs",
     );
     expect(controlPlane).toContain(
-      "options', '-c jit=true'",
+      "options', '-c jit=on'",
     );
     expect(controlPlane).toContain(
       "role:'postgres'",
     );
     expect(controlPlane).toContain(
-      "{user_id:userId,roles}",
+      "{user_id:userId,user_roles:roles}",
     );
     expect(controlPlane).toContain(
       "/ssl-enforcement",
+    );
+    expect(controlPlane).toContain(
+      "/database/jit-access",
     );
     expect(controlPlane).toContain(
       "requestedConfig:{database:true}",
