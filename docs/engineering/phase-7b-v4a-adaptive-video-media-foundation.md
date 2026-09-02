@@ -4,7 +4,11 @@ Date: 2 September 2026
 
 ## Status
 
-Milestone candidate. Not preview accepted. Not production accepted. No PR.
+**CLOSED / production accepted — 2 September 2026.**
+
+V4A is accepted as the canonical Media processing-profile convergence and adaptive Video Media foundation.
+
+Phase 7B itself remains current. Public adaptive playback, governed transcript presentation, and public Video correction continuity remain separate exit work.
 
 ## Why V4A exists
 
@@ -580,4 +584,306 @@ No Media processor worker deployment has occurred.
 No adaptive Video derivatives exist in production.
 
 Public Video still uses the accepted MP4 `video_transcode`.
+
+## Production acceptance — 2 September 2026
+
+### Merge and protected-main authority
+
+V4A merged through PR #800.
+
+Accepted merged main:
+
+`a2331f8b521ed19b451f148c8b53721e51747aca`
+
+PR-head Critical Control Plane:
+
+- run: `33666945583`
+- Critical number: #911
+- result: PASS
+- migration replay contract: PASS
+- Primitive Compounding contract: PASS
+- Phase 4 Media processing preservation: PASS
+- Phase 6A Audio delivery preservation: PASS
+- V4A focused preservation: PASS
+- full security/lifecycle suite: PASS
+- live schema/migration-history parity: PASS
+- application build: PASS
+
+Protected-main Critical Control Plane:
+
+- run: `33667192856`
+- Critical number: #912
+- exact head:
+  `a2331f8b521ed19b451f148c8b53721e51747aca`
+- result: PASS
+- migration replay contract: PASS
+- Primitive Compounding contract: PASS
+- V4A focused preservation: PASS
+- full security/lifecycle suite: PASS
+- live schema/migration-history parity: PASS
+- application build: PASS
+
+### Production SQL promotion
+
+Production SQL was promoted through WAKILISHA's native repository migration path.
+
+Governed production-SQL run:
+
+- run: `33667460563`
+- exact accepted main:
+  `a2331f8b521ed19b451f148c8b53721e51747aca`
+- repository-native migration promotion: PASS
+
+Final production migration authority:
+
+- migration count: 80
+- migration head:
+  `20260902205000_phase_7b_v4a_adaptive_video_media_foundation.sql`
+- permanent V4A verifier: PASS
+- zero duplicate migration application
+
+### Media processor worker deployment
+
+Only the existing Media processor worker was deployed.
+
+No Edge Function or frontend deployment was part of V4A.
+
+Accepted worker authority:
+
+- live path:
+  `/opt/wakilisha-media-processor/worker.py`
+- systemd service:
+  `wakilisha-media-processor`
+- exact merged-main worker SHA-256:
+  `cfc176d6c77cbcba92a1bc92dab41aa02e42614adcaa5a1f26d1643e30f96079`
+- prior worker SHA-256:
+  `f9e9dd5774e9d503196691322a79458d1bb45a901df0e882a5dccb9d24a29be3`
+- rollback backup:
+  `/opt/wakilisha-media-processor-backups/worker-phase7b-v4a-20260902T184352Z.py`
+- service active after restart: yes
+- service enabled: yes
+- FFmpeg:
+  `6.1.1-3ubuntu5`
+- FFprobe:
+  `6.1.1-3ubuntu5`
+
+The deployment preserved the accepted runtime primitive rather than introducing a new worker or service.
+
+### Real Video adaptive-processing acceptance
+
+The accepted real publication remained:
+
+`Monday Morning in September`
+
+Canonical publication/version authority:
+
+- publication/resource:
+  `114618c2-2246-4503-9202-4a6631159d96`
+- published version:
+  v8
+- version id:
+  `959651c7-d058-44ae-9ad6-b797c5c0f7b8`
+- Media asset:
+  `f35f5416-920a-45f1-995b-65492a48a144`
+- Media revision:
+  `678e502b-c049-4b1b-81b1-08d4399868ff`
+- protected master:
+  `40eb420b-217c-42db-91ea-f478a3e55df0`
+- protected master SHA-256:
+  `fa3e2f410156ffe4e698d32def0c3aade1271ec308e2a9822d2fa40a9fed7e6c`
+
+Preflight before submission:
+
+- prior `video-adaptive-v1` jobs: 0
+- prior adaptive variants: 0
+- prior adaptive selections: 0
+- canonical actor had administrator authority: yes
+- canonical actor had `manage_media_assets`: yes
+
+Submission used only:
+
+`public.submit_media_processing_profile_v1(...)`
+
+No direct job, variant, file-object, or selection insert was used.
+
+Accepted command evidence:
+
+- receipt:
+  `a524acf8-f45f-4e25-88cd-64b10c62dfde`
+- durable job:
+  `13785125-586a-4fdf-aa4f-043c6234308a`
+- accepted event:
+  `5c554dbf-4b5d-43cf-ba76-45f9216b2cf9`
+- idempotent replay: false
+- worker:
+  `media-processor:ip-172-26-14-74`
+- attempts: 1
+- final job status: succeeded
+- final receipt status: succeeded
+- error: none
+- correlation id:
+  `e70b9b14-8259-40c4-afe5-53a7d472d4c8`
+
+The job was not resubmitted while in flight.
+
+### Exact adaptive derivative authority
+
+Exactly five variants were registered and selected.
+
+All five:
+
+- are `verified`
+- use generator `wakilisha-media-processor`
+- use generator version `phase7b-v4a-v1`
+- use profile `video-adaptive-v1`
+- are selected at selection revision 1
+
+Accepted public derivative bytes:
+
+`video_hls_master.m3u8`
+
+- MIME:
+  `application/vnd.apple.mpegurl`
+- bytes: 155
+- SHA-256:
+  `1c90a8acb2aca692ca317853bd17ba314b16e56d8cff1ccf7b99b64b087672c4`
+
+`video_hls_360p_playlist.m3u8`
+
+- MIME:
+  `application/vnd.apple.mpegurl`
+- bytes: 948
+- SHA-256:
+  `8062457e275c0c39beae84f6d0505ee82277d58503eb300116e6978f15b5af87`
+
+`video_hls_360p_media.ts`
+
+- MIME:
+  `video/mp2t`
+- bytes: 5,122,060
+- SHA-256:
+  `f23c3bd0e0d4bc957f3eae71f09440420e510c7699e35cece4d451413d141b68`
+
+`video_hls_720p_playlist.m3u8`
+
+- MIME:
+  `application/vnd.apple.mpegurl`
+- bytes: 962
+- SHA-256:
+  `68a5b971eeaa8e429821548971084c17515bc6918c4e4b6aa5c821293e3fa80f`
+
+`video_hls_720p_media.ts`
+
+- MIME:
+  `video/mp2t`
+- bytes: 14,592,184
+- SHA-256:
+  `33f07321ad088c2d49b59ab6ddad861628bd746ab46e3c7818cc092d7d5b81a2`
+
+Media event provenance is exact:
+
+- `variant_registered`: 5
+- `variant_activated`: 5
+- one shared correlation id
+- no competing profile authority
+
+### Public HTTP acceptance
+
+Read-only external acceptance from the production public Media origin passed.
+
+For all five derivative URLs:
+
+- HTTP 200: PASS
+- exact database SHA-256: PASS
+- exact database byte size: PASS
+- exact MIME type: PASS
+
+Master manifest:
+
+- `#EXTM3U`: PASS
+- HLS version 6: PASS
+- exact 360p rendition reference: PASS
+- exact 720p rendition reference: PASS
+- staging filename leakage: 0
+
+Both Media playlists:
+
+- `#EXT-X-BYTERANGE`: PASS
+- `#EXT-X-INDEPENDENT-SEGMENTS`: PASS
+- exact governed sibling media reference: PASS
+- staging filename leakage: 0
+
+Public range delivery:
+
+- 360p media:
+  HTTP 206 / bytes 0-1023 / 5,122,060 total
+- 720p media:
+  HTTP 206 / bytes 0-1023 / 14,592,184 total
+
+This proves the adaptive derivatives are publicly retrievable and range-addressable from the accepted Media origin.
+
+### Public Video product boundary preserved
+
+V4A did not switch the public reader.
+
+After adaptive production acceptance, the canonical public Video reader still returns:
+
+- published version: v8
+- delivery MIME: `video/mp4`
+- delivery role: accepted `video_transcode`
+- existing MP4 URL unchanged
+
+This is intentional.
+
+Public HLS activation belongs to the next bounded Phase 7B slice.
+
+### Final production seal
+
+Final production authority:
+
+- main:
+  `a2331f8b521ed19b451f148c8b53721e51747aca`
+- migrations: 80
+- migration head:
+  `20260902205000`
+- V4A permanent verifier: PASS
+- adaptive processing job: succeeded
+- adaptive processing attempts: 1
+- adaptive variants: 5
+- adaptive selections: 5
+- registered events: 5
+- activated events: 5
+- public adaptive byte acceptance: PASS
+- public Video reader: still MP4 v8
+- Edge Function deployment: none
+- frontend deployment: none
+- Readdy Finish update: none
+
+The disposable Supabase preview was deleted after production acceptance.
+
+## V4A exit decision
+
+**Phase 7B V4A is CLOSED and production accepted.**
+
+The Primitive Compounding rule was not discounted.
+
+The milestone's reusable residue is now canonical Media authority:
+
+- one Media processing-profile registry
+- one shared profile submission primitive
+- one shared profile output-registration primitive
+- Audio retained as a compatibility consumer
+- adaptive Video accepted as the second-domain proof
+- no Video-specific processing command authority
+
+Phase 7B remains current.
+
+The next bounded product work is:
+
+1. expose the accepted HLS master through the public Video read model
+2. add cross-browser adaptive playback while preserving MP4 fallback
+3. prove the real Video on desktop and mobile
+4. establish governed transcript authority/presentation
+5. establish public Video correction continuity and a real correction-handling proof
+6. then evaluate the final Phase 7B exit gate
 

@@ -2,14 +2,14 @@
 
 ## Current production reconciliation - 2 September 2026
 
-The latest production-accepted application main is:
+The latest production-accepted runtime main is:
 
-`75b42377a8bc676ae78588c588356ab4a6995bd4`
+`a2331f8b521ed19b451f148c8b53721e51747aca`
 
 Current production authority:
 
-- migrations: `79`
-- migration head: `20260901170500_community_track_registry_identity.sql`
+- migrations: `80`
+- migration head: `20260902205000_phase_7b_v4a_adaptive_video_media_foundation.sql`
 - frontend entry: `assets/index-CIyckr53.js`
 - frontend entry SHA-256: `66d5d645025d048693d4d8b24809bfbb9f30ffaf68be3dac376b6d4bd13ce93e`
 - frontend index SHA-256: `a6a7b5ea75a6c53b423972d92c1107d8cc6b4b96cac174124fc4fe7b3faa014c`
@@ -243,13 +243,55 @@ Canonical WIP record:
 
 The WIP closes only after the soak bundle is analyzed into a Green / Amber / Red viability decision, source qualification grades, single-source-loss degradation behavior, evidence-plumbing repairs, and the recommended Kenya chart source constitution.
 
+## Phase 7B V4A adaptive Video production acceptance
+
+Phase 7B V4A is **CLOSED / production accepted**.
+
+Accepted V4A authority:
+
+- PR #800 merged at `a2331f8b521ed19b451f148c8b53721e51747aca`
+- PR Critical #911: PASS
+- protected-main Critical #912: PASS
+- Primitive Compounding contract: PASS
+- production migrations: 80
+- production migration head: `20260902205000`
+- canonical Media processing profiles are now shared authority for Audio publication delivery and adaptive Video
+- no Video-specific processing RPC was created
+- Audio compatibility functions delegate to the shared processing-profile primitive
+- production Media processor worker SHA-256:
+  `cfc176d6c77cbcba92a1bc92dab41aa02e42614adcaa5a1f26d1643e30f96079`
+- accepted FFmpeg/FFprobe: `6.1.1-3ubuntu5`
+- real Video adaptive processing: succeeded on attempt 1
+- adaptive variants: 5
+- adaptive selections: 5
+- Media `variant_registered` events: 5
+- Media `variant_activated` events: 5
+- public HLS master / 360p / 720p derivative byte acceptance: PASS
+- public byte-range delivery: PASS for both rendition media files
+- public Video reader intentionally remains on the accepted v8 MP4 during V4A
+- disposable Supabase preview deleted after production acceptance
+
+Canonical record:
+
+- `docs/engineering/phase-7b-v4a-adaptive-video-media-foundation.md`
+
+V4A closes the adaptive Media foundation only. It does **not** close Phase 7B.
+
+Remaining Phase 7B exit work:
+
+- expose the accepted HLS master through the public Video read model
+- cross-browser adaptive playback with MP4 fallback
+- desktop/mobile proof on the real Video
+- governed transcript authority and public presentation
+- public Video correction continuity and real correction-handling proof
+
 ## Immediate numbered programme work
 
 **Phase 7B: Public Video product remains CURRENT.**
 
 Phase 7A is closed. Do not reopen it.
 
-Phase 7B V1 through V3 and the subsequent public Video corrections are accepted baseline. No dedicated Phase 7B closure record exists yet, so this status overlay does not claim Phase 7B is closed.
+Phase 7B V1 through V3, the subsequent public Video corrections, and V4A adaptive Media foundation are accepted baseline. V4A is production accepted, but no dedicated Phase 7B closure record exists yet, so this status overlay does not claim Phase 7B is closed.
 
 The September Registry/public-identity detour is also accepted baseline. It does not create a new numbered phase.
 
