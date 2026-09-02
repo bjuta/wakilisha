@@ -20,10 +20,19 @@ Accepted Release taxonomy:
 
 A Single remains a Release in the Registry and in public collections, but its public detail destination is its one Track rather than a duplicate Release page.
 
+Historical MIZIZI Track identity apply is production accepted:
+
+- 440 canonical Track repairs
+- 66 blocked review items
+- 857 MIZIZI-created permanent redirects
+- fresh post-apply Track audit: 561 findings
+- separate historical Release taxonomy apply: still unrun
+
 Current acceptance records:
 
 - `docs/engineering/release-taxonomy-membership-integrity-closure-record.md`
 - `docs/engineering/community-track-registry-identity-production-closure-record.md`
+- `docs/engineering/mizizi-historical-track-production-closure-record.md`
 
 ## Phase 7A closure reconciliation - 31 August 2026
 
@@ -283,35 +292,23 @@ Build Inquiry as a capability across canonical editors, then the public Inquiry 
 
 ## Immediate next step
 
-Run the **real Phase 7A Video exit-gate instrument** from the K5D production-accepted baseline.
+Continue **Phase 7B: Public Video product** from the production-accepted V1-through-V3 baseline and subsequent public Video corrections.
 
-Do not rebuild the Video collection, editor shell, shared Trust, or Corrections. Credits/Citations and Corrections/provenance continuity are closed.
+Do not reopen Phase 7A.
 
-Use the existing real Video and:
+The September Registry/public-identity detour is accepted adjacent baseline:
 
-1. save a working snapshot
-2. submit the immutable review version
-3. perform governed review using existing authority
-4. approve
-5. publish through governed lifecycle authority
-6. record any concrete Registry, Media, readiness, or lifecycle gap exposed by that path
-7. close only those proved gaps
-8. complete the real Video publication
+- Release taxonomy and one-track public identity are accepted
+- Community Track Registry-ID-first identity is accepted
+- historical MIZIZI Track identity apply is closed at 440 repairs / 66 blocked reviews / 857 MIZIZI redirects
+- the remaining 66 Track slug candidates are governed review work, not permission to invent identity
+- the separate historical Release taxonomy apply remains unrun with the accepted 32-candidate set
+- the 18 bad active Release-membership relationships across 13 active Releases remain preserved evidence
 
-`EditorialCreditPicker` is canonical with Audio + Video consumers.
+Canonical adjacent closure records:
 
-`EditorialCommentEditor` remains candidate until matching governed Video review-comment authority is proven necessary by real use.
+- `docs/engineering/release-taxonomy-membership-integrity-closure-record.md`
+- `docs/engineering/community-track-registry-identity-production-closure-record.md`
+- `docs/engineering/mizizi-historical-track-production-closure-record.md`
 
-Do not create a Video-owned series authority. Video Episodes remain bound to shared Show/Show Episode identity.
-
-Canonical K5D closure record:
-
-`docs/engineering/phase-7a-k5d-video-correction-provenance-convergence-closure-record.md`
-
-Canonical K5C closure record:
-
-`docs/engineering/phase-7a-k5c-video-version-trust-convergence-closure-record.md`
-
-Canonical K5B closure record:
-
-`docs/engineering/phase-7a-k5b-video-editor-composition-closure-record.md`
+Phase 7B product work can continue independently while the remaining Registry review and Release taxonomy mutation stay separately governed.
