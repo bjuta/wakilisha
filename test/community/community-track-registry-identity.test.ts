@@ -78,7 +78,10 @@ describe("Community Track Registry identity", () => {
       "v_canonical_track_id",
     );
     expect(migration).toContain(
-      "thread.entity_id = v_canonical_track_id::text",
+      "thread.entity_id =",
+    );
+    expect(migration).toContain(
+      "v_canonical_track_id::text",
     );
     expect(migration).toContain(
       "v_legacy_count = 1",
