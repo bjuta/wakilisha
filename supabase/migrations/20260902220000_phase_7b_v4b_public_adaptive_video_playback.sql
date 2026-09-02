@@ -247,6 +247,11 @@ begin
         file_row.sha256,
         file_row.verification_state
       from media.variant_selections selection_row
+      join media.asset_revisions source_revision
+        on source_revision.id =
+           selection_row.asset_revision_id
+       and source_revision.asset_id =
+           v_source.media_asset_id
       join media.variants variant_row
         on variant_row.id = selection_row.variant_id
        and variant_row.asset_revision_id =
@@ -256,7 +261,7 @@ begin
        and variant_row.asset_id =
            v_source.media_asset_id
        and variant_row.source_file_object_id =
-           v_source.media_file_object_id
+           source_revision.original_file_object_id
       join media.file_objects file_row
         on file_row.id =
            variant_row.derived_file_object_id
