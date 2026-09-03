@@ -210,6 +210,12 @@ describe(
           "Accept Invitation",
         );
         expect(page).toContain(
+          "No Studio access",
+        );
+        expect(page).toContain(
+          "representedWithoutScope",
+        );
+        expect(page).toContain(
           "getArtistRepresentationState",
         );
         expect(page).not.toContain(
