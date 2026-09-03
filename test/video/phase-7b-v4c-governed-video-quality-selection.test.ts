@@ -208,6 +208,40 @@ describe(
       },
     );
 
+
+    it(
+      "keeps settings compact through hierarchical drill-down",
+      () => {
+        expect(canvas).toContain(
+          'type SettingsPanel = "root" | "quality" | "captions" | "speed"',
+        );
+        expect(canvas).toContain(
+          'data-wk-video-settings-panel={settingsPanel}',
+        );
+        expect(canvas).toContain(
+          'settingsPanel === "root"',
+        );
+        expect(canvas).toContain(
+          'settingsPanel === "quality"',
+        );
+        expect(canvas).toContain(
+          'settingsPanel === "captions"',
+        );
+        expect(canvas).toContain(
+          'settingsPanel === "speed"',
+        );
+        expect(canvas).toContain(
+          'max-h-[min(20rem,46svh)]',
+        );
+        expect(canvas).toContain(
+          'sm:w-[18rem]',
+        );
+        expect(canvas).toContain(
+          'aria-label="Back to video settings"',
+        );
+      },
+    );
+
     it(
       "adds no forbidden public copy punctuation",
       () => {
