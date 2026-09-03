@@ -16,8 +16,11 @@ function functionBody(sql: string, name: string): string {
   return sql.slice(start, next === -1 ? sql.length : next);
 }
 
-const migration = readOne(
-  "_phase_7a_k5e_native_source_integrity_convergence.sql",
+const migration = fs.readFileSync(
+  path.resolve(
+    "supabase/migrations/20260830173011_phase_7a_k5e_native_source_integrity_convergence.sql",
+  ),
+  "utf8",
 );
 const k4b = readOne(
   "_phase_7a_k4b_video_governed_lifecycle_commands.sql",
