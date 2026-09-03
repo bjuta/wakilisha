@@ -246,28 +246,60 @@ Canonical record:
 
 ## Tracked adjacent WIP: Kenya Charts public-source durability proof
 
-**WIP / PENDING 7-DAY DURABILITY PROOF.**
+**WIP / ATTEMPT 2 RUNNING.**
 
-This work is intentionally tracked outside the numbered Phase 6B milestone sequence. It is not M3 and must not be treated as programme advancement.
+This work remains intentionally outside the numbered programme sequence. It does not advance Phase 8 and must not be treated as numbered programme progress.
 
 The research is testing whether WAKILISHA can operate a long-lived Kenya-first chart from public or ordinary developer-accessible music evidence without requiring privileged DSP data relationships.
 
 Empirical access probes on 24 August 2026 established successful Kenya-specific public access for Apple, YouTube, Mdundo, Audiomack, Boomplay, and Shazam. Spotify remains optional/non-core because the tested public Kenya CSV route returned an HTML shell rather than a proved chart dataset.
 
-A seven-day unattended durability soak is now running locally across:
+The first seven-day soak attempt is formally invalidated.
 
-- Apple
-- YouTube
-- Mdundo
-- Audiomack
-- Boomplay
-- Shazam
+It started at `2026-08-24T13:52:43Z`, captured only two runs across 6.77 hours, then falsely finalized because the controller compared elapsed seconds with `7*24`, a threshold of 168 seconds instead of 604800 seconds. The two raw observations remain valid short-term accessibility evidence, but they do not constitute a durability proof.
 
-The soak began at `2026-08-24T13:52:43Z` / 16:52:43 EAT, runs approximately every six hours, and should complete after 31 August 2026 at approximately 16:52:43 EAT. Its first observation was 6/6 successful with depths of 100, 100, 100, 100, 100, and 200 respectively.
+Attempt 1 was preserved before repair. The original capture SHA-256 values are:
 
-Do not forget this work while other WAKILISHA work proceeds. Do not close or redesign the chart methodology before the seven-day evidence bundle is analyzed.
+- `20260824T135243Z.json`: `1f024bb765afb22c19b140065502650a7ecee01a3b1180e246c81594e92ff883`
+- `20260824T203856Z.json`: `d394bd450ba1f71a3155dfb8668734aec199454ab52f1855038b77d65d34ae59`
 
-Known follow-up already identified by the read-only production audit: raw observations can prove the same recording across multiple source records and providers while downstream candidate `source_count` still resolves to `1`. Repair independent observation-source identity through the existing ingestion/scoring pipeline before changing the scoring formula.
+The repaired controller now uses the exact seven-day threshold `7*24*60*60 = 604800` seconds. Before any new source request, attempt 2 passed syntax, static, plist, empty-state, not-loaded, and synthetic boundary checks including 167:59:59 false and exactly 168 hours true.
+
+Attempt 2 is now the authoritative running soak.
+
+- start UTC: `2026-09-03T12:29:31Z`
+- start Africa/Nairobi: 3 September 2026 at 15:29:31 EAT
+- seven-day boundary UTC: `2026-09-10T12:29:31Z`
+- seven-day boundary Africa/Nairobi: 10 September 2026 at 15:29:31 EAT
+- cadence: every 6 hours
+- LaunchAgent: `africa.wakilisha.chart-source-soak-v2`
+- local root: `~/Library/Application Support/WAKILISHA/chart-source-soak-v2`
+
+Attempt-2 first observation:
+
+- Apple: HTTP 200, parse pass, depth 100
+- YouTube: HTTP 200, parse pass, depth 100
+- Mdundo: HTTP 200, parse pass, depth 100
+- Audiomack: HTTP 200, parse pass, depth 100
+- Boomplay: HTTP 403, parse fail
+- Shazam: HTTP 200, parse pass, depth 200
+
+The Boomplay 403 remains in the experiment unchanged. It is evidence about source durability and must not be patched away during the soak.
+
+Controller state after the first attempt-2 capture proved:
+
+```text
+SOAK_ELAPSED_HOURS=0.01
+SOAK_RUN_COUNT=1
+SOAK_WINDOW_COMPLETE=NO
+STDERR_EMPTY=PASS
+COMPLETE_MARKER_ABSENT=PASS
+SOAK_V2_STARTED=PASS
+```
+
+Do not restart, manually trigger, reset, rewrite, or remove a source from attempt 2 unless a separate diagnosed control-plane failure requires it. Do not close or redesign the chart methodology before the completed seven-day evidence bundle is analyzed.
+
+Known follow-up remains unchanged: raw observations can prove the same recording across multiple source records and providers while downstream candidate `source_count` still resolves to `1`. Repair independent observation-source identity through the existing ingestion/scoring pipeline before changing the scoring formula.
 
 Provider genres remain non-authoritative. WAKILISHA Registry genre authority must continue to decide cultural classification and chart eligibility.
 
@@ -275,7 +307,7 @@ Canonical WIP record:
 
 - `docs/engineering/charts-public-source-accessibility-soak-wip.md`
 
-The WIP closes only after the soak bundle is analyzed into a Green / Amber / Red viability decision, source qualification grades, single-source-loss degradation behavior, evidence-plumbing repairs, and the recommended Kenya chart source constitution.
+The WIP closes only after attempt 2 is analyzed into a Green / Amber / Red viability decision, source qualification grades, single-source-loss degradation behavior, evidence-plumbing repairs, and the recommended Kenya chart source constitution.
 
 ## Phase 7B V4A adaptive Video production acceptance
 
