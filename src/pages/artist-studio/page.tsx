@@ -69,6 +69,7 @@ function CandidateCard({
   authority,
   authorityLoading,
   authLoading,
+  signedIn,
   onClaim,
   onAcceptInvitation,
 }: {
@@ -78,6 +79,7 @@ function CandidateCard({
     ArtistRepresentationState | null;
   authorityLoading: boolean;
   authLoading: boolean;
+  signedIn: boolean;
   onClaim: () => void;
   onAcceptInvitation:
     () => void;
@@ -94,6 +96,14 @@ function CandidateCard({
   const pendingInvitation =
     representation?.status ===
     "pending";
+  const canClaim =
+    !signedIn ||
+    authority?.canClaim ===
+      true;
+  const representedWithoutScope =
+    representation?.status ===
+      "active" &&
+    !canManage;
 
   const secondary =
     candidate.registryState ===
@@ -183,7 +193,11 @@ function CandidateCard({
           <span className="inline-flex min-h-10 items-center rounded-full bg-[var(--wk-brand-soft)] px-4 text-[11px] font-black text-[var(--wk-brand)]">
             Claim under review
           </span>
-        ) : (
+        ) : representedWithoutScope ? (
+          <span className="inline-flex min-h-10 items-center rounded-full border border-[var(--wk-border)] px-4 text-[11px] font-black text-[var(--wk-text-muted)]">
+            No Studio access
+          </span>
+        ) : canClaim ? (
           <button
             type="button"
             onClick={onClaim}
@@ -191,7 +205,7 @@ function CandidateCard({
           >
             Claim this Artist
           </button>
-        )}
+        ) : null}
       </div>
     </article>
   );
@@ -886,6 +900,11 @@ export default function ArtistStudioPage() {
                       }
                       authLoading={
                         authUser.loading
+                      }
+                      signedIn={
+                        Boolean(
+                          authUser.id,
+                        )
                       }
                       onClaim={() =>
                         openClaim(
