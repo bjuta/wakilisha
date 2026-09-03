@@ -206,10 +206,10 @@ begin
       'phase-7b-v1-episode',
       'phase-7b-v1-show'
     ) #>> '{canonical_path}'
-  ) <> '/video/phase-7b-v1-show/phase-7b-v1-episode'
+  ) <> '/shows/phase-7b-v1-show/phase-7b-v1-episode'
   then
     raise exception
-      'PHASE_7B_V1_BEHAVIOR_FAIL: shared Show Episode Video route is not resolved';
+      'PHASE_7B_V1_BEHAVIOR_FAIL: shared Show Episode Video is not Show-scoped';
   end if;
 
   if (
@@ -221,6 +221,50 @@ begin
   then
     raise exception
       'PHASE_7B_V1_BEHAVIOR_FAIL: bound active Show identity is not composed';
+  end if;
+
+  if not exists (
+    select 1
+    from editorial.resources resource_row
+    where resource_row.id in (
+      '00000000-0000-4000-8000-000000007b11'::uuid,
+      '00000000-0000-4000-8000-000000007b12'::uuid
+    )
+      and resource_row.visibility = 'public'
+      and resource_row.lifecycle_state = 'active'
+    group by true
+    having count(*) = 2
+  ) then
+    raise exception
+      'PHASE_7B_V1_BEHAVIOR_FAIL: published Video Episode did not promote shared Show hierarchy visibility';
+  end if;
+
+  if (
+    public.get_public_show_episode(
+      'phase-7b-v1-show',
+      'phase-7b-v1-episode'
+    ) #>> '{video,canonical_path}'
+  ) <> '/shows/phase-7b-v1-show/phase-7b-v1-episode'
+  then
+    raise exception
+      'PHASE_7B_V1_BEHAVIOR_FAIL: shared Show Episode reader did not compose published Video';
+  end if;
+
+  if (
+    public.get_public_show('phase-7b-v1-show')
+      #>> '{show,canonical_path}'
+  ) <> '/shows/phase-7b-v1-show'
+  then
+    raise exception
+      'PHASE_7B_V1_BEHAVIOR_FAIL: published Video Episode did not make its shared Show publicly resolvable';
+  end if;
+
+  if public.get_public_video_publication(
+    'phase-7b-v1-episode',
+    null
+  ) is not null then
+    raise exception
+      'PHASE_7B_V1_BEHAVIOR_FAIL: episodic Video leaked through standalone /video identity';
   end if;
 
   v_index := public.get_public_video_index(10);
