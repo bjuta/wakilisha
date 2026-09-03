@@ -15,14 +15,8 @@ import type {
 } from "@/services/video/videoPublicModel";
 
 export default function VideoDetailPage() {
-  const { slug, showSlug, episodeSlug } = useParams<{
-    slug?: string;
-    showSlug?: string;
-    episodeSlug?: string;
-  }>();
+  const { slug = "" } = useParams<{ slug?: string }>();
   const location = useLocation();
-  const resolvedSlug = episodeSlug || slug || "";
-  const resolvedShowSlug = episodeSlug ? showSlug || null : null;
   const [publication, setPublication] =
     useState<PublicVideoPublication | null>(null);
   const [related, setRelated] = useState<PublicVideoPublication[]>([]);
@@ -37,27 +31,23 @@ export default function VideoDetailPage() {
     setRelated([]);
 
     Promise.all([
-      getPublicVideoPublication(
-        resolvedSlug,
-        resolvedShowSlug,
-      ),
+      getPublicVideoPublication(slug, null),
       getPublicVideoIndex(24).catch(() => ({ items: [] })),
     ])
       .then(([value, index]) => {
         if (!alive) return;
-        if (!value) {
+        if (!value || value.publicationKind !== "standalone") {
           setNotFound(true);
           return;
         }
+
         setPublication(value);
         setRelated(
-          index.items.filter((item) => {
-            if (item.versionId === value.versionId) return false;
-            if (value.show?.resourceId) {
-              return item.show?.resourceId === value.show.resourceId;
-            }
-            return true;
-          }),
+          index.items.filter(
+            (item) =>
+              item.versionId !== value.versionId
+              && item.publicationKind === "standalone",
+          ),
         );
       })
       .catch(() => {
@@ -70,7 +60,7 @@ export default function VideoDetailPage() {
     return () => {
       alive = false;
     };
-  }, [resolvedSlug, resolvedShowSlug]);
+  }, [slug]);
 
   if (loading) {
     return (
@@ -95,7 +85,7 @@ export default function VideoDetailPage() {
   }
 
   if (publication.canonicalPath !== location.pathname) {
-    return <Navigate to={publication.canonicalPath} replace />;
+    return <Navigate to="/404" replace />;
   }
 
   return (
