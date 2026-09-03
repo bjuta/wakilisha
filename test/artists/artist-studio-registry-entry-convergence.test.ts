@@ -273,6 +273,9 @@ describe(
           expect(draft).toContain(
             "updatedAt",
           );
+          expect(draft).toContain(
+            "saved: boolean",
+          );
         }
 
         expect(
@@ -281,9 +284,19 @@ describe(
           "Saved on this device.",
         );
         expect(
+          claimSheet,
+        ).toContain(
+          "Draft saving is unavailable in this browser.",
+        );
+        expect(
           newArtistSheet,
         ).toContain(
           "Saved on this device.",
+        );
+        expect(
+          newArtistSheet,
+        ).toContain(
+          "Draft saving is unavailable in this browser.",
         );
         expect(
           claimSheet,
@@ -357,8 +370,8 @@ describe(
         );
         expect(
           migration,
-        ).toContain(
-          "active', 'draft', 'needs_review",
+        ).toMatch(
+          /'active'\s*,\s*'draft'\s*,\s*'needs_review'/,
         );
         expect(
           migration,
@@ -458,17 +471,48 @@ describe(
         expect(
           migration,
         ).toContain(
-          "artist_slug_conflict",
+          "artist_slug_invalid",
         );
+
+        const submitStart =
+          migration.indexOf(
+            "create or replace function public.community_submit_new_artist_claim",
+          );
+        const submitEnd =
+          migration.indexOf(
+            "create or replace function public.community_get_artist_representation_state",
+            submitStart,
+          );
+        const submitFunction =
+          migration.slice(
+            submitStart,
+            submitEnd,
+          );
+
+        const decideStart =
+          migration.indexOf(
+            "create or replace function public.community_admin_decide_artist_claim",
+          );
+        const decideEnd =
+          migration.indexOf(
+            "create or replace function public.community_admin_resolve_artist_claim_existing",
+            decideStart,
+          );
+        const decideFunction =
+          migration.slice(
+            decideStart,
+            decideEnd,
+          );
+
         expect(
-          migration,
-        ).toMatch(
-          /community_admin_decide_artist_claim[\s\S]*insert\s+into\s+public\.registry_artists/i,
-        );
-        expect(
-          migration,
+          submitFunction,
         ).not.toMatch(
-          /community_submit_new_artist_claim[\s\S]*insert\s+into\s+public\.registry_artists/i,
+          /insert\s+into\s+public\.registry_artists/i,
+        );
+        expect(
+          decideFunction,
+        ).toMatch(
+          /insert\s+into\s+public\.registry_artists/i,
         );
         expect(
           migration,
