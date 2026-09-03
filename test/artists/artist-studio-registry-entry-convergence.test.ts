@@ -1,3 +1,4 @@
+import crypto from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
 import {
@@ -100,6 +101,41 @@ const behavior = read(
 describe(
   "Artist Studio Registry entry convergence",
   () => {
+    it(
+      "uses the generated WAKILISHA community hero asset rather than an external stock image",
+      () => {
+        const assetPath =
+          path.join(
+            root,
+            "public/assets/artist-studio/kenyan-creative-community.webp",
+          );
+
+        expect(
+          fs.existsSync(assetPath),
+        ).toBe(true);
+
+        const bytes =
+          fs.readFileSync(
+            assetPath,
+          );
+        const digest =
+          crypto
+            .createHash("sha256")
+            .update(bytes)
+            .digest("hex");
+
+        expect(digest).toBe(
+          "6769132f83f02d6f034f83d159616f17bc4008108916455eaaf148d4b34ffaf5",
+        );
+        expect(page).toContain(
+          '"/assets/artist-studio/kenyan-creative-community.webp"',
+        );
+        expect(page).not.toContain(
+          "unsplash",
+        );
+      },
+    );
+
     it(
       "reuses viewport chrome and makes Artist Studio a first-class public route",
       () => {
