@@ -56,6 +56,8 @@ interface VideoPlaybackCanvasProps {
   className?: string;
 }
 
+type SettingsPanel = "root" | "quality" | "captions" | "speed";
+
 type FullscreenVideoElement = HTMLVideoElement & {
   webkitDisplayingFullscreen?: boolean;
   webkitSupportsFullscreen?: boolean;
@@ -128,6 +130,7 @@ export function VideoPlaybackCanvas({
     defaultCaption?.trackNumber ?? null,
   );
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [settingsPanel, setSettingsPanel] = useState<SettingsPanel>("root");
   const [playing, setPlaying] = useState(false);
   const [muted, setMuted] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
@@ -526,18 +529,32 @@ export function VideoPlaybackCanvas({
     element.muted = !element.muted;
   };
 
+  const closeSettings = () => {
+    setSettingsOpen(false);
+    setSettingsPanel("root");
+  };
+
+  const toggleSettings = () => {
+    if (settingsOpen) {
+      closeSettings();
+      return;
+    }
+    setSettingsPanel("root");
+    setSettingsOpen(true);
+  };
+
   const setSpeed = (rate: number) => {
     const element = videoRef.current;
     if (!element) return;
     element.playbackRate = rate;
     setPlaybackRate(rate);
-    setSettingsOpen(false);
+    closeSettings();
   };
 
   const selectQuality = (quality: "auto" | number) => {
     const element = videoRef.current;
     if (!element || quality === selectedQuality) {
-      setSettingsOpen(false);
+      closeSettings();
       return;
     }
 
@@ -551,7 +568,7 @@ export function VideoPlaybackCanvas({
     };
 
     setSelectedQuality(quality);
-    setSettingsOpen(false);
+    closeSettings();
   };
 
   const toggleFullscreen = async () => {
@@ -635,7 +652,11 @@ export function VideoPlaybackCanvas({
       event.preventDefault();
       setSettingsOpen((open) => !open);
     } else if (event.key === "Escape" && settingsOpen) {
-      setSettingsOpen(false);
+      if (settingsPanel === "root") {
+        closeSettings();
+      } else {
+        setSettingsPanel("root");
+      }
     }
     revealControls();
   };
@@ -804,115 +825,188 @@ export function VideoPlaybackCanvas({
       ) : null}
 
       {!compact && settingsOpen ? (
-        <div className="absolute bottom-16 right-3 z-30 w-[min(18rem,calc(100%-1.5rem))] overflow-hidden rounded-2xl border border-white/15 bg-[#171717]/98 shadow-2xl backdrop-blur-xl sm:right-4">
-          <div className="flex items-center justify-between border-b border-white/10 px-4 py-3">
-            <p className="text-[12px] font-black">Settings</p>
+        <div
+          className="absolute bottom-16 left-2 right-2 z-30 max-h-[min(20rem,46svh)] overflow-hidden rounded-2xl border border-white/15 bg-[#171717]/98 shadow-2xl backdrop-blur-xl sm:left-auto sm:right-4 sm:w-[18rem]"
+          data-wk-video-settings-panel={settingsPanel}
+        >
+          <div className="flex min-h-12 items-center gap-2 border-b border-white/10 px-3 py-2">
+            {settingsPanel !== "root" ? (
+              <button
+                type="button"
+                onClick={() => setSettingsPanel("root")}
+                className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-white/75 transition hover:bg-white/10 hover:text-white"
+                aria-label="Back to video settings"
+              >
+                <i className="ri-arrow-left-line text-[16px]" />
+              </button>
+            ) : null}
+            <p className="min-w-0 flex-1 truncate text-[12px] font-black">
+              {settingsPanel === "quality"
+                ? "Quality"
+                : settingsPanel === "captions"
+                  ? "Captions"
+                  : settingsPanel === "speed"
+                    ? "Playback speed"
+                    : "Settings"}
+            </p>
             <button
               type="button"
-              onClick={() => setSettingsOpen(false)}
-              className="flex h-7 w-7 items-center justify-center rounded-full text-white/75 transition hover:bg-white/10 hover:text-white"
+              onClick={closeSettings}
+              className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-white/75 transition hover:bg-white/10 hover:text-white"
               aria-label="Close video settings"
             >
               <i className="ri-close-line text-[15px]" />
             </button>
           </div>
 
-          {adaptiveRenditions.length ? (
-            <div className="border-b border-white/10 px-4 py-3">
-              <p className="mb-2 text-[10px] font-black uppercase tracking-[0.14em] text-white/45">
-                Quality
-              </p>
-              <div className="space-y-1">
+          {settingsPanel === "root" ? (
+            <div className="divide-y divide-white/10">
+              {adaptiveRenditions.length ? (
                 <button
                   type="button"
-                  onClick={() => selectQuality("auto")}
-                  className="flex w-full items-center justify-between rounded-lg px-2 py-2 text-left text-[12px] font-semibold transition hover:bg-white/5"
+                  onClick={() => setSettingsPanel("quality")}
+                  className="flex w-full items-center gap-3 px-4 py-3 text-left transition hover:bg-white/5"
                 >
-                  <span>Auto</span>
-                  {selectedQuality === "auto" ? (
+                  <span className="min-w-0 flex-1">
+                    <span className="block text-[12px] font-bold">Quality</span>
+                    <span className="mt-0.5 block truncate text-[11px] font-medium text-white/45">
+                      {selectedQuality === "auto"
+                        ? "Auto"
+                        : `${selectedQuality}p`}
+                    </span>
+                  </span>
+                  <i className="ri-arrow-right-s-line text-[18px] text-white/45" />
+                </button>
+              ) : null}
+
+              {captions.length ? (
+                <button
+                  type="button"
+                  onClick={() => setSettingsPanel("captions")}
+                  className="flex w-full items-center gap-3 px-4 py-3 text-left transition hover:bg-white/5"
+                >
+                  <span className="min-w-0 flex-1">
+                    <span className="block text-[12px] font-bold">Captions</span>
+                    <span className="mt-0.5 block truncate text-[11px] font-medium text-white/45">
+                      {activeCaptionTrack === null
+                        ? "Off"
+                        : captions.find(
+                            (caption) =>
+                              caption.trackNumber === activeCaptionTrack,
+                          )?.label || "On"}
+                    </span>
+                  </span>
+                  <i className="ri-arrow-right-s-line text-[18px] text-white/45" />
+                </button>
+              ) : null}
+
+              <button
+                type="button"
+                onClick={() => setSettingsPanel("speed")}
+                className="flex w-full items-center gap-3 px-4 py-3 text-left transition hover:bg-white/5"
+              >
+                <span className="min-w-0 flex-1">
+                  <span className="block text-[12px] font-bold">
+                    Playback speed
+                  </span>
+                  <span className="mt-0.5 block text-[11px] font-medium text-white/45">
+                    {playbackRate}x
+                  </span>
+                </span>
+                <i className="ri-arrow-right-s-line text-[18px] text-white/45" />
+              </button>
+            </div>
+          ) : null}
+
+          {settingsPanel === "quality" ? (
+            <div className="max-h-[min(15rem,38svh)] overflow-y-auto p-2">
+              <button
+                type="button"
+                onClick={() => selectQuality("auto")}
+                className="flex w-full items-center justify-between rounded-xl px-3 py-2.5 text-left text-[12px] font-semibold transition hover:bg-white/5"
+              >
+                <span>Auto</span>
+                {selectedQuality === "auto" ? (
+                  <i className="ri-check-line text-[var(--wk-brand)]" />
+                ) : null}
+              </button>
+              {adaptiveRenditions.map((rendition) => (
+                <button
+                  key={rendition.height}
+                  type="button"
+                  onClick={() => selectQuality(rendition.height)}
+                  className="flex w-full items-center justify-between rounded-xl px-3 py-2.5 text-left text-[12px] font-semibold transition hover:bg-white/5"
+                >
+                  <span>{rendition.label}</span>
+                  {selectedQuality === rendition.height ? (
                     <i className="ri-check-line text-[var(--wk-brand)]" />
                   ) : null}
                 </button>
-                {adaptiveRenditions.map((rendition) => (
-                  <button
-                    key={rendition.height}
-                    type="button"
-                    onClick={() => selectQuality(rendition.height)}
-                    className="flex w-full items-center justify-between rounded-lg px-2 py-2 text-left text-[12px] font-semibold transition hover:bg-white/5"
-                  >
-                    <span>{rendition.label}</span>
-                    {selectedQuality === rendition.height ? (
-                      <i className="ri-check-line text-[var(--wk-brand)]" />
-                    ) : null}
-                  </button>
-                ))}
-              </div>
+              ))}
             </div>
           ) : null}
 
-          {captions.length ? (
-            <div className="border-b border-white/10 px-4 py-3">
-              <p className="mb-2 text-[10px] font-black uppercase tracking-[0.14em] text-white/45">
-                Captions
-              </p>
-              <div className="space-y-1">
+          {settingsPanel === "captions" ? (
+            <div className="max-h-[min(15rem,38svh)] overflow-y-auto p-2">
+              <button
+                type="button"
+                onClick={() => {
+                  setActiveCaptionTrack(null);
+                  closeSettings();
+                }}
+                className="flex w-full items-center justify-between rounded-xl px-3 py-2.5 text-left text-[12px] font-semibold transition hover:bg-white/5"
+              >
+                <span>Off</span>
+                {activeCaptionTrack === null ? (
+                  <i className="ri-check-line text-[var(--wk-brand)]" />
+                ) : null}
+              </button>
+              {captions.map((caption) => (
                 <button
+                  key={caption.trackNumber}
                   type="button"
                   onClick={() => {
-                    setActiveCaptionTrack(null);
-                    setSettingsOpen(false);
+                    setActiveCaptionTrack(caption.trackNumber);
+                    closeSettings();
                   }}
-                  className="flex w-full items-center justify-between rounded-lg px-2 py-2 text-left text-[12px] font-semibold transition hover:bg-white/5"
+                  className="flex w-full items-center justify-between rounded-xl px-3 py-2.5 text-left text-[12px] font-semibold transition hover:bg-white/5"
                 >
-                  <span>Off</span>
-                  {activeCaptionTrack === null ? <i className="ri-check-line text-[var(--wk-brand)]" /> : null}
-                </button>
-                {captions.map((caption) => (
-                  <button
-                    key={caption.trackNumber}
-                    type="button"
-                    onClick={() => {
-                      setActiveCaptionTrack(caption.trackNumber);
-                      setSettingsOpen(false);
-                    }}
-                    className="flex w-full items-center justify-between rounded-lg px-2 py-2 text-left text-[12px] font-semibold transition hover:bg-white/5"
-                  >
-                    <span>
-                      <span className="block">{caption.label}</span>
-                      <span className="mt-0.5 block text-[10px] font-medium text-white/45">
-                        {caption.languageTag}
-                      </span>
+                  <span>
+                    <span className="block">{caption.label}</span>
+                    <span className="mt-0.5 block text-[10px] font-medium text-white/45">
+                      {caption.languageTag}
                     </span>
-                    {activeCaptionTrack === caption.trackNumber ? <i className="ri-check-line text-[var(--wk-brand)]" /> : null}
-                  </button>
-                ))}
-              </div>
-            </div>
-          ) : null}
-
-          <div className="px-4 py-3">
-            <p className="mb-2 text-[10px] font-black uppercase tracking-[0.14em] text-white/45">
-              Playback speed
-            </p>
-            <div className="grid grid-cols-5 gap-1">
-              {[0.75, 1, 1.25, 1.5, 2].map((rate) => (
-                <button
-                  key={rate}
-                  type="button"
-                  onClick={() => setSpeed(rate)}
-                  className={joinClasses(
-                    "rounded-lg px-1.5 py-2 text-[11px] font-black transition",
-                    playbackRate === rate
-                      ? "bg-[var(--wk-brand)] text-[var(--wk-brand-on)]"
-                      : "bg-white/5 text-white/75 hover:bg-white/10 hover:text-white",
-                  )}
-                  aria-label={`Set playback speed to ${rate}x`}
-                >
-                  {rate}x
+                  </span>
+                  {activeCaptionTrack === caption.trackNumber ? (
+                    <i className="ri-check-line text-[var(--wk-brand)]" />
+                  ) : null}
                 </button>
               ))}
             </div>
-          </div>
+          ) : null}
+
+          {settingsPanel === "speed" ? (
+            <div className="p-3">
+              <div className="grid grid-cols-3 gap-1.5">
+                {[0.75, 1, 1.25, 1.5, 2].map((rate) => (
+                  <button
+                    key={rate}
+                    type="button"
+                    onClick={() => setSpeed(rate)}
+                    className={joinClasses(
+                      "rounded-xl px-2 py-2.5 text-[11px] font-black transition",
+                      playbackRate === rate
+                        ? "bg-[var(--wk-brand)] text-[var(--wk-brand-on)]"
+                        : "bg-white/5 text-white/75 hover:bg-white/10 hover:text-white",
+                    )}
+                    aria-label={`Set playback speed to ${rate}x`}
+                  >
+                    {rate}x
+                  </button>
+                ))}
+              </div>
+            </div>
+          ) : null}
         </div>
       ) : null}
 
@@ -983,7 +1077,7 @@ export function VideoPlaybackCanvas({
             {!compact ? (
               <button
                 type="button"
-                onClick={() => setSettingsOpen((open) => !open)}
+                onClick={toggleSettings}
                 className={joinClasses(
                   "flex h-9 w-9 items-center justify-center rounded-full text-white transition hover:bg-white/10",
                   settingsOpen && "bg-white/10",
