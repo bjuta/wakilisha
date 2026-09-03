@@ -109,11 +109,10 @@ function sourceColor(table: string): string {
 
 function matchReasonLabel(reason: string): string {
   switch (reason) {
-    case "exact_slug": return "Exact slug";
-    case "exact_name": return "Exact name";
-    case "high_slug_similarity": return "High slug match";
-    case "high_name_similarity": return "High name match";
-    default: return "Partial match";
+    case "exact": return "Exact Registry match";
+    case "strong": return "Strong Registry match";
+    case "possible": return "Possible Registry match";
+    default: return "Registry match";
   }
 }
 
@@ -248,14 +247,82 @@ export default function ArtistAliasesPage() {
     });
 
     try {
-      const { data, error } = await supabase.rpc("find_similar_artists", {
-        search_slug: slug,
-        search_name: displayName,
-        similarity_threshold: 0.15,
-        max_results: 6,
-      });
+      const query =
+        (displayName || slug)
+          .trim();
+
+      const { data, error } =
+        await supabase.rpc(
+          "get_artist_studio_registry_candidates",
+          {
+            p_query: query,
+            p_limit: 6,
+          },
+        );
 
       if (error) throw error;
+
+      const suggestions:
+        SimilarArtist[] =
+        ((data || []) as Array<
+          Record<string, unknown>
+        >).flatMap(
+          (row) => {
+            const artistId =
+              typeof row.artist_id ===
+              "string"
+                ? row.artist_id
+                : "";
+            const artistSlug =
+              typeof row.slug ===
+              "string"
+                ? row.slug
+                : "";
+            const name =
+              typeof row.display_name ===
+              "string"
+                ? row.display_name
+                : "";
+            const score =
+              typeof row.match_score ===
+              "number"
+                ? row.match_score
+                : Number(
+                    row.match_score ||
+                      0,
+                  );
+            const tier =
+              typeof row.match_tier ===
+              "string"
+                ? row.match_tier
+                : "possible";
+
+            if (
+              !artistId ||
+              !artistSlug ||
+              !name
+            ) {
+              return [];
+            }
+
+            return [{
+              artist_id:
+                artistId,
+              artist_slug:
+                artistSlug,
+              display_name:
+                name,
+              similarity_score:
+                Number.isFinite(
+                  score,
+                )
+                  ? score
+                  : 0,
+              match_reason:
+                tier,
+            }];
+          },
+        );
 
       setReviewItems((prev) => {
         const next = new Map(prev);
@@ -265,7 +332,7 @@ export default function ArtistAliasesPage() {
           source_table: existing?.source_table ?? "",
           occurrence_count: existing?.occurrence_count ?? 0,
           sample_name: existing?.sample_name ?? displayName,
-          suggestions: (data as SimilarArtist[]) ?? [],
+          suggestions,
           loadingSuggestions: false,
         });
         return next;

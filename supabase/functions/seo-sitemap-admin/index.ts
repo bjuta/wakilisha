@@ -670,6 +670,7 @@ async function buildInternalItems(db: ReturnType<typeof createClient>): Promise<
     { loc: makeUrl("/magazine"), url_type: "static" },
     { loc: makeUrl("/charts"), url_type: "static" },
     { loc: makeUrl("/artists"), url_type: "static" },
+    { loc: makeUrl("/artist-studio"), url_type: "static" },
     { loc: makeUrl("/releases"), url_type: "static" },
     { loc: makeUrl("/playlists"), url_type: "static" },
     { loc: makeUrl("/genres"), url_type: "static" },

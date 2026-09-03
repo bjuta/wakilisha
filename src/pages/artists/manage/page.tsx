@@ -7,19 +7,18 @@ import {
 } from "@/components/design-system/Icon";
 import { ArtistImageField } from "@/components/artists/ArtistImageField";
 import { useAuthUser } from "@/hooks/useAuthUser";
-import { getArtist, type PublicArtistDetail } from "@/services/publicContent/client";
 import {
-  getArtistPublicPresentation,
-  getArtistRepresentationState,
+  getArtistManagementWorkspace,
   getArtistTeam,
   inviteArtistRepresentative,
   revokeArtistRepresentative,
   saveArtistPresentation,
   submitArtistRegistryCorrection,
   updateArtistRepresentative,
+  type ArtistManagementIdentity,
   type ArtistPermissionSet,
   type ArtistPresentation,
-  type ArtistRepresentationState,
+  type ArtistRepresentation,
   type ArtistTeamMember,
 } from "@/services/artists/claimedArtist";
 import {
@@ -161,8 +160,8 @@ export default function ArtistManagePage() {
   const { slug } = useParams<{ slug: string }>();
   const [searchParams, setSearchParams] = useSearchParams();
   const user = useAuthUser();
-  const [artist, setArtist] = useState<PublicArtistDetail | null>(null);
-  const [representationState, setRepresentationState] = useState<ArtistRepresentationState | null>(null);
+  const [artist, setArtist] = useState<ArtistManagementIdentity | null>(null);
+  const [activeRepresentation, setActiveRepresentation] = useState<ArtistRepresentation | null>(null);
   const [presentation, setPresentation] = useState<ArtistPresentation>(EMPTY_PRESENTATION);
   const [team, setTeam] = useState<ArtistTeamMember[]>([]);
   const [loading, setLoading] = useState(true);
@@ -206,10 +205,6 @@ export default function ArtistManagePage() {
   const [launchCampaign, setLaunchCampaign] = useState("");
   const [launchCopied, setLaunchCopied] = useState(false);
 
-  const activeRepresentation = representationState?.representation?.status === "active"
-    ? representationState.representation
-    : null;
-
   async function loadTeam(artistId: string, canManageTeam: boolean) {
     if (!canManageTeam) {
       setTeam([]);
@@ -242,67 +237,132 @@ export default function ArtistManagePage() {
 
   useEffect(() => {
     let alive = true;
+
     async function load() {
-      if (!slug || user.loading) return;
+      if (
+        !slug ||
+        user.loading
+      ) {
+        return;
+      }
+
       setLoading(true);
       setMessage(null);
+
+      if (!user.id) {
+        setArtist(null);
+        setActiveRepresentation(null);
+        setLoading(false);
+        return;
+      }
+
       try {
-        const loadedArtist = await getArtist(slug);
+        const workspace =
+          await getArtistManagementWorkspace(
+            slug,
+          );
+
         if (!alive) return;
-        if (!loadedArtist) {
-          setArtist(null);
-          return;
-        }
-        setArtist(loadedArtist);
 
-        if (!user.id) {
-          setRepresentationState(null);
-          return;
-        }
+        setArtist(
+          workspace.artist,
+        );
+        setActiveRepresentation(
+          workspace.representation,
+        );
 
-        const [state, authority] = await Promise.all([
-          getArtistRepresentationState(loadedArtist.id),
-          getArtistPublicPresentation(loadedArtist.id).catch(() => ({
-            artistId: loadedArtist.id,
-            official: false,
-            presentation: null,
-          })),
-        ]);
-        if (!alive) return;
-        setRepresentationState(state);
-        const nextPresentation = authority.presentation ?? EMPTY_PRESENTATION;
-        setPresentation(nextPresentation);
-        setBio(nextPresentation.bio ?? "");
-        setProfileImageUrl(nextPresentation.profileImageUrl ?? "");
-        setHeroImageUrl(nextPresentation.heroImageUrl ?? "");
-        setWebsiteUrl(nextPresentation.websiteUrl ?? "");
-        setPublicEmail(nextPresentation.publicEmail ?? "");
-        setSocialLinks(nextPresentation.socialLinks ?? {});
+        const nextPresentation =
+          workspace.presentation ??
+          EMPTY_PRESENTATION;
 
-        const canManageTeam = state.representation?.status === "active" && state.representation.permissions.team;
-        const canPostUpdates = state.representation?.status === "active" && state.representation.permissions.updates;
-        const canSubmitMusic = state.representation?.status === "active" && state.representation.permissions.releases;
+        setPresentation(
+          nextPresentation,
+        );
+        setBio(
+          nextPresentation.bio ??
+            "",
+        );
+        setProfileImageUrl(
+          nextPresentation.profileImageUrl ??
+            "",
+        );
+        setHeroImageUrl(
+          nextPresentation.heroImageUrl ??
+            "",
+        );
+        setWebsiteUrl(
+          nextPresentation.websiteUrl ??
+            "",
+        );
+        setPublicEmail(
+          nextPresentation.publicEmail ??
+            "",
+        );
+        setSocialLinks(
+          nextPresentation.socialLinks ??
+            {},
+        );
+
+        const isPublicArtist =
+          workspace.artist.status ===
+          "active";
+        const permissions =
+          workspace.representation
+            .permissions;
+
         await Promise.all([
-          loadTeam(loadedArtist.id, Boolean(canManageTeam)),
-          loadUpdates(loadedArtist.id, Boolean(canPostUpdates)),
-          loadMusicSubmissions(loadedArtist.id, Boolean(canSubmitMusic)),
+          loadTeam(
+            workspace.artist.id,
+            permissions.team,
+          ),
+          loadUpdates(
+            workspace.artist.id,
+            isPublicArtist &&
+              permissions.updates,
+          ),
+          loadMusicSubmissions(
+            workspace.artist.id,
+            isPublicArtist &&
+              permissions.releases,
+          ),
         ]);
       } catch (error) {
-        if (alive) setMessage({ type: "error", text: error instanceof Error ? error.message : "We could not load Artist management." });
+        if (!alive) return;
+
+        setArtist(null);
+        setActiveRepresentation(null);
+        setMessage({
+          type: "error",
+          text:
+            error instanceof Error
+              ? error.message
+              : "We could not load Artist Studio access.",
+        });
       } finally {
-        if (alive) setLoading(false);
+        if (alive) {
+          setLoading(false);
+        }
       }
     }
+
     void load();
-    return () => { alive = false; };
-  }, [slug, user.id, user.loading]);
+
+    return () => {
+      alive = false;
+    };
+  }, [
+    slug,
+    user.id,
+    user.loading,
+  ]);
 
   useEffect(() => {
     let alive = true;
 
     if (
       !artist?.id ||
-      representationState?.representation?.status !== "active"
+      artist.status !== "active" ||
+      activeRepresentation?.status !== "active"
     ) {
       setLaunchAnalytics(null);
       setLaunchAnalyticsError(null);
@@ -370,7 +430,8 @@ export default function ArtistManagePage() {
     };
   }, [
     artist?.id,
-    representationState?.representation?.status,
+    artist?.status,
+    activeRepresentation?.status,
     launchRangeDays,
   ]);
 
@@ -801,13 +862,15 @@ export default function ArtistManagePage() {
         <div className="max-w-xl rounded-3xl border border-[var(--wk-border)] bg-[var(--wk-surface)] p-7">
           <h1 className="text-[28px] font-black tracking-tight text-[var(--wk-text)]">You Cannot Manage This Artist</h1>
           <p className="mt-2 text-[14px] leading-6 text-[var(--wk-text-muted)]">Your account does not have active access to {artist.name}.</p>
-          <Link to={`/artists/${artist.slug}`} className="mt-6 inline-block"><WkButton variant="soft">Back to Artist</WkButton></Link>
+          <Link to="/artist-studio" className="mt-6 inline-block"><WkButton variant="soft">Back to Artist Studio</WkButton></Link>
         </div>
       </main>
     );
   }
 
   const permissions = activeRepresentation.permissions;
+  const isPublicArtist =
+    artist.status === "active";
 
   const requestedStudioSection =
     searchParams.get("section");
@@ -818,9 +881,13 @@ export default function ArtistManagePage() {
     requestedStudioSection === "home" ||
     (
       requestedStudioSection === "music" &&
+      isPublicArtist &&
       permissions.releases
     ) ||
-    requestedStudioSection === "insights" ||
+    (
+      requestedStudioSection === "insights" &&
+      isPublicArtist
+    ) ||
     (
       requestedStudioSection === "settings" &&
       (
@@ -845,6 +912,7 @@ export default function ArtistManagePage() {
     ) ||
     (
       requestedSettingsSection === "registry" &&
+      isPublicArtist &&
       permissions.profile
     );
 
@@ -912,13 +980,23 @@ export default function ArtistManagePage() {
       <div className="mb-8 flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
         <div>
           <Link
-            to={`/artists/${artist.slug}`}
+            to={
+              isPublicArtist
+                ? `/artists/${artist.slug}`
+                : `/artist-studio?q=${encodeURIComponent(
+                    artist.name,
+                  )}`
+            }
             className="text-[12px] font-bold text-[var(--wk-brand)] hover:underline"
           >
-            Back to {artist.name}
+            {isPublicArtist
+              ? `Back to ${artist.name}`
+              : "Back to Artist Studio"}
           </Link>
           <div className="mt-3 text-[10px] font-black uppercase tracking-[0.16em] text-[var(--wk-brand)]">
-            Official Artist
+            {isPublicArtist
+              ? "Official Artist"
+              : "Registry Artist"}
           </div>
           <h1 className="mt-1 text-[34px] font-black tracking-[-0.03em] text-[var(--wk-text)]">
             Artist Studio
@@ -928,16 +1006,22 @@ export default function ArtistManagePage() {
           </p>
         </div>
 
-        <Link
-          to={`/artists/${artist.slug}`}
-          className="inline-flex items-center gap-2 text-[12px] font-black text-[var(--wk-text-muted)] hover:text-[var(--wk-brand)]"
-        >
-          View Public Profile
-          <WkIcon
-            name="ExternalLink"
-            size={14}
-          />
-        </Link>
+        {isPublicArtist ? (
+          <Link
+            to={`/artists/${artist.slug}`}
+            className="inline-flex items-center gap-2 text-[12px] font-black text-[var(--wk-text-muted)] hover:text-[var(--wk-brand)]"
+          >
+            View Public Profile
+            <WkIcon
+              name="ExternalLink"
+              size={14}
+            />
+          </Link>
+        ) : (
+          <span className="rounded-full bg-[var(--wk-brand-soft)] px-3 py-1.5 text-[10px] font-black text-[var(--wk-brand)]">
+            Registry Review
+          </span>
+        )}
       </div>
 
       {message && (
@@ -950,9 +1034,9 @@ export default function ArtistManagePage() {
         <aside className="self-start rounded-2xl border border-[var(--wk-border)] bg-[var(--wk-surface)] p-3 lg:sticky lg:top-24">
           <div className="mb-3 flex items-center gap-3 rounded-xl bg-[var(--wk-bg)] p-3">
             <div className="h-11 w-11 shrink-0 overflow-hidden rounded-xl bg-[var(--wk-surface-raised)]">
-              {(profileImageUrl || artist.profileImageUrl || artist.imageUrl) ? (
+              {(profileImageUrl || artist.imageUrl) ? (
                 <img
-                  src={profileImageUrl || artist.profileImageUrl || artist.imageUrl}
+                  src={profileImageUrl || artist.imageUrl}
                   alt=""
                   className="h-full w-full object-cover"
                 />
@@ -983,7 +1067,8 @@ export default function ArtistManagePage() {
               onClick={() => openStudioSection("home")}
             />
 
-            {permissions.releases && (
+            {isPublicArtist &&
+            permissions.releases && (
               <StudioNavItem
                 active={studioSection === "music"}
                 icon="Music"
@@ -992,12 +1077,14 @@ export default function ArtistManagePage() {
               />
             )}
 
-            <StudioNavItem
-              active={studioSection === "insights"}
-              icon="BarChart3"
-              label="Insights"
-              onClick={() => openStudioSection("insights")}
-            />
+            {isPublicArtist ? (
+              <StudioNavItem
+                active={studioSection === "insights"}
+                icon="BarChart3"
+                label="Insights"
+                onClick={() => openStudioSection("insights")}
+              />
+            ) : null}
 
             {(permissions.profile || permissions.team) && (
               <StudioNavItem
@@ -1027,7 +1114,9 @@ export default function ArtistManagePage() {
                     You represent {artist.name} on WAKILISHA.
                   </h2>
                   <p className="mt-2 max-w-2xl text-[13px] leading-6 text-[var(--wk-text-muted)]">
-                    Keep the public profile current, share updates, submit music for Registry review, and understand what reaches people.
+                    {isPublicArtist
+                      ? "Keep the profile current, share updates, submit music for Registry review, and understand what reaches people."
+                      : "Your representation is approved. Profile and team tools are available while the Registry identity remains under review."}
                   </p>
                 </div>
 
@@ -1092,7 +1181,8 @@ export default function ArtistManagePage() {
                   </h3>
 
                   <div className="mt-4 grid gap-2">
-                    {permissions.updates && (
+                    {isPublicArtist &&
+                    permissions.updates && (
                       <Link
                         to={`/artists/${artist.slug}`}
                         className="flex items-center justify-between rounded-xl bg-[var(--wk-bg)] px-4 py-3 text-left text-[12px] font-black text-[var(--wk-text)] hover:bg-[var(--wk-surface-strong)]"
@@ -1752,7 +1842,8 @@ export default function ArtistManagePage() {
             </section>
           )}
 
-          {permissions.profile && (
+          {isPublicArtist &&
+          permissions.profile && (
             <section className={`${studioSection === "settings" && settingsSection === "registry" ? "" : "hidden"} rounded-3xl border border-[var(--wk-border)] bg-[var(--wk-surface)] p-6 md:p-7`}>
               <h2 className="text-[22px] font-black tracking-tight text-[var(--wk-text)]">Suggest a Registry Correction</h2>
               <p className="mt-1 text-[13px] leading-6 text-[var(--wk-text-muted)]">Names, country, type, credits, and discography stay under WAKILISHA review.</p>

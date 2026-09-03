@@ -7,7 +7,6 @@ import {
 import {
   Link,
   useLocation,
-  useNavigate,
 } from "react-router-dom";
 import {
   WkIcon,
@@ -21,15 +20,6 @@ import {
 import type {
   SiteIdentitySettings,
 } from "@/services/adminSettings/settingsTypes";
-import {
-  useAuthUser,
-} from "@/hooks/useAuthUser";
-import {
-  listMyArtistRepresentations,
-} from "@/services/artists/artistRepresentationChoices";
-import {
-  getArtistRepresentationState,
-} from "@/services/artists/claimedArtist";
 import { GlobalSearchSurface } from "@/components/search/GlobalSearchSurface";
 
 const MUSIC_APP_PREFIXES = [
@@ -43,103 +33,12 @@ const MUSIC_APP_PREFIXES = [
   "/genres",
   "/labels",
   "/magazine",
+  "/artist-studio",
   "/search",
 ] as const;
 
 const MUSIC_SIDEBAR_COLLAPSED_KEY =
   "wk-music-sidebar-collapsed";
-const ARTIST_STUDIO_MEMORY_KEY =
-  "wk-artist-studio-last-artist";
-
-type ArtistStudioIntent =
-  | "home"
-  | "music";
-
-type StudioArtistChoice = {
-  id: string;
-  slug: string;
-  name: string;
-  imageUrl?: string | null;
-  country?: string | null;
-  canSubmitMusic?: boolean;
-};
-
-function readStudioArtistMemory():
-  StudioArtistChoice | null {
-  try {
-    const raw =
-      window.localStorage.getItem(
-        ARTIST_STUDIO_MEMORY_KEY,
-      );
-
-    if (!raw) return null;
-
-    const parsed =
-      JSON.parse(raw) as
-        Partial<StudioArtistChoice>;
-
-    if (
-      typeof parsed.id !== "string" ||
-      typeof parsed.slug !== "string" ||
-      typeof parsed.name !== "string" ||
-      !parsed.id ||
-      !parsed.slug ||
-      !parsed.name
-    ) {
-      return null;
-    }
-
-    return {
-      id: parsed.id,
-      slug: parsed.slug,
-      name: parsed.name,
-      imageUrl:
-        typeof parsed.imageUrl ===
-        "string"
-          ? parsed.imageUrl
-          : null,
-      country:
-        typeof parsed.country ===
-        "string"
-          ? parsed.country
-          : null,
-    };
-  } catch {
-    return null;
-  }
-}
-
-function rememberStudioArtist(
-  artist: StudioArtistChoice,
-) {
-  try {
-    window.localStorage.setItem(
-      ARTIST_STUDIO_MEMORY_KEY,
-      JSON.stringify({
-        id: artist.id,
-        slug: artist.slug,
-        name: artist.name,
-        imageUrl:
-          artist.imageUrl ?? null,
-        country:
-          artist.country ?? null,
-      }),
-    );
-  } catch {
-    // Direct navigation still works if storage is unavailable.
-  }
-}
-
-function forgetStudioArtist() {
-  try {
-    window.localStorage.removeItem(
-      ARTIST_STUDIO_MEMORY_KEY,
-    );
-  } catch {
-    // No-op.
-  }
-}
-
 export function isMusicAppPath(
   pathname: string,
 ) {
@@ -272,8 +171,6 @@ export function MusicDesktopShell({
   children: ReactNode;
 }) {
   const location = useLocation();
-  const navigate = useNavigate();
-  const user = useAuthUser();
   const identity = useSiteIdentity();
   const {
     theme,
@@ -296,52 +193,9 @@ export function MusicDesktopShell({
     }
   });
   const [
-    studioLauncherOpen,
-    setStudioLauncherOpen,
-  ] = useState(false);
-  const [
     globalSearchOpen,
     setGlobalSearchOpen,
   ] = useState(false);
-  const [
-    studioIntent,
-    setStudioIntent,
-  ] =
-    useState<ArtistStudioIntent>(
-      "home",
-    );
-  const [
-    studioArtists,
-    setStudioArtists,
-  ] = useState<StudioArtistChoice[]>([]);
-  const [
-    studioSearch,
-    setStudioSearch,
-  ] = useState("");
-  const [
-    studioArtistsLoading,
-    setStudioArtistsLoading,
-  ] = useState(false);
-  const [
-    studioBusyArtistId,
-    setStudioBusyArtistId,
-  ] = useState<string | null>(
-    null,
-  );
-  const [
-    studioMessage,
-    setStudioMessage,
-  ] = useState<string | null>(
-    null,
-  );
-  const [
-    studioAccessArtist,
-    setStudioAccessArtist,
-  ] =
-    useState<StudioArtistChoice | null>(
-      null,
-    );
-
   const selectedLogoUrl =
     theme === "dark"
       ? (
@@ -405,240 +259,13 @@ export function MusicDesktopShell({
     location.pathname,
   ]);
 
-  const filteredStudioArtists =
-    useMemo(() => {
-      const query =
-        studioSearch
-          .trim()
-          .toLowerCase();
-
-      const availableArtists =
-        studioIntent === "music"
-          ? studioArtists.filter(
-              (artist) =>
-                artist.canSubmitMusic,
-            )
-          : studioArtists;
-
-      const candidates =
-        query
-          ? availableArtists.filter(
-              (artist) =>
-                artist.name
-                  .toLowerCase()
-                  .includes(query) ||
-                artist.slug
-                  .toLowerCase()
-                  .includes(query) ||
-                (
-                  artist.country ??
-                  ""
-                )
-                  .toLowerCase()
-                  .includes(query),
-            )
-          : availableArtists;
-
-      return candidates.slice(0, 8);
-    }, [
-      studioArtists,
-      studioSearch,
-      studioIntent,
-    ]);
-
-  function studioManagePath(
-    artist: StudioArtistChoice,
-    intent: ArtistStudioIntent,
-  ) {
-    const base =
-      `/artists/${artist.slug}/manage`;
-
-    return intent === "music"
-      ? `${base}?section=music`
-      : base;
-  }
-
-  async function loadStudioArtists() {
-    if (
-      studioArtists.length ||
-      studioArtistsLoading
-    ) {
-      return;
-    }
-
-    setStudioArtistsLoading(true);
-
-    try {
-      const representations =
-        await listMyArtistRepresentations();
-
-      setStudioArtists(
-        representations
-          .filter(
-            (item) =>
-              item.status === "active",
-          )
-          .map(
-            (item) => ({
-              id: item.artist.id,
-              slug: item.artist.slug,
-              name: item.artist.name,
-              imageUrl:
-                item.artist.imageUrl,
-              country: null,
-              canSubmitMusic:
-                item.permissions.releases,
-            }),
-          ),
-      );
-    } catch {
-      setStudioMessage(
-        "We could not load your Artists right now.",
-      );
-    } finally {
-      setStudioArtistsLoading(false);
-    }
-  }
-
-  function showStudioLauncher(
-    intent: ArtistStudioIntent,
-    message?: string,
-  ) {
-    setStudioIntent(intent);
-    setStudioMessage(
-      message ?? null,
-    );
-    setStudioAccessArtist(null);
-    setStudioSearch("");
-    setStudioLauncherOpen(true);
-    void loadStudioArtists();
-  }
-
-  async function openStudioArtist(
-    artist: StudioArtistChoice,
-    intent: ArtistStudioIntent,
-  ) {
-    setStudioBusyArtistId(
-      artist.id,
-    );
-    setStudioMessage(null);
-    setStudioAccessArtist(null);
-
-    try {
-      const state =
-        await getArtistRepresentationState(
-          artist.id,
-        );
-
-      const representation =
-        state.representation?.status ===
-        "active"
-          ? state.representation
-          : null;
-
-      if (!representation) {
-        forgetStudioArtist();
-        setStudioIntent(intent);
-        setStudioAccessArtist(
-          artist,
-        );
-        setStudioMessage(
-          `This account does not currently manage ${artist.name}. Open the Artist page to claim it or accept an invitation.`,
-        );
-        setStudioLauncherOpen(
-          true,
-        );
-        void loadStudioArtists();
-        return;
-      }
-
-      if (
-        intent === "music" &&
-        !representation.permissions
-          .releases
-      ) {
-        setStudioIntent(intent);
-        setStudioAccessArtist(
-          artist,
-        );
-        setStudioMessage(
-          `Your access to ${artist.name} does not include Music submissions.`,
-        );
-        setStudioLauncherOpen(
-          true,
-        );
-        void loadStudioArtists();
-        return;
-      }
-
-      rememberStudioArtist(
-        artist,
-      );
-      setStudioLauncherOpen(
-        false,
-      );
-      navigate(
-        studioManagePath(
-          artist,
-          intent,
-        ),
-      );
-    } catch {
-      setStudioMessage(
-        "We could not confirm your Artist Studio access.",
-      );
-    } finally {
-      setStudioBusyArtistId(
-        null,
-      );
-    }
-  }
-
-  async function beginStudio(
-    intent: ArtistStudioIntent,
-  ) {
-    if (user.loading) {
-      return;
-    }
-
-    if (!user.id) {
-      const returnTo =
-        location.pathname ||
-        "/music";
-
-      navigate(
-        `/auth?returnTo=${encodeURIComponent(
-          returnTo,
-        )}`,
-      );
-      return;
-    }
-
-    const remembered =
-      readStudioArtistMemory();
-
-    if (remembered) {
-      await openStudioArtist(
-        remembered,
-        intent,
-      );
-      return;
-    }
-
-    if (!remembered) {
-      showStudioLauncher(
-        intent,
-      );
-    }
-  }
-
   const activeSection =
     useMemo(() => {
       const pathname =
         location.pathname;
 
       if (pathname === "/") {
-        return "posts";
+        return "magazine";
       }
 
       if (
@@ -708,7 +335,15 @@ export function MusicDesktopShell({
           "/magazine",
         )
       ) {
-        return "posts";
+        return "magazine";
+      }
+
+      if (
+        pathname.startsWith(
+          "/artist-studio",
+        )
+      ) {
+        return "artist-studio";
       }
 
       return "music";
@@ -879,11 +514,11 @@ export function MusicDesktopShell({
           <AppNavLink
             to="/magazine"
             icon="NotebookText"
-            label="Posts"
+            label="Magazine"
             collapsed={sidebarCollapsed}
             active={
               activeSection ===
-              "posts"
+              "magazine"
             }
           />
         </nav>
@@ -945,21 +580,16 @@ export function MusicDesktopShell({
               <p className="mt-2 text-[11px] font-medium leading-relaxed text-[var(--wk-text-muted)]">
                 Put your music in front of people discovering WAKILISHA.
               </p>
-              <button
-  type="button"
-  onClick={() =>
-    void beginStudio(
-      "home",
-    )
-  }
-  className="mt-4 inline-flex items-center gap-2 rounded-lg bg-[var(--wk-surface-raised)] px-3 py-2 text-[11px] font-bold text-[var(--wk-text)] transition-colors hover:bg-[var(--wk-surface-strong)]"
->
+              <Link
+                to="/artist-studio"
+                className="mt-4 inline-flex items-center gap-2 rounded-lg bg-[var(--wk-surface-raised)] px-3 py-2 text-[11px] font-bold text-[var(--wk-text)] transition-colors hover:bg-[var(--wk-surface-strong)]"
+              >
                 Artist Studio
                 <WkIcon
                   name="ArrowUpRight"
                   size={13}
                 />
-              </button>
+              </Link>
             </div>
           ) : null}
 
@@ -1060,206 +690,6 @@ export function MusicDesktopShell({
         onClose={() => setGlobalSearchOpen(false)}
       />
 
-      {studioLauncherOpen ? (
-        <div
-          className="fixed inset-0 z-[140] flex items-center justify-center bg-black/55 p-4 backdrop-blur-sm"
-          role="presentation"
-          onMouseDown={(event) => {
-            if (
-              event.target ===
-              event.currentTarget
-            ) {
-              setStudioLauncherOpen(
-                false,
-              );
-            }
-          }}
-        >
-          <div
-            role="dialog"
-            aria-modal="true"
-            aria-labelledby="artist-studio-launcher-title"
-            className="max-h-[min(720px,88vh)] w-full max-w-[620px] overflow-hidden rounded-2xl border border-[var(--wk-border)] bg-[var(--wk-surface)] shadow-2xl"
-          >
-            <div className="flex items-start justify-between gap-4 border-b border-[var(--wk-border)] p-5">
-              <div>
-                <div className="text-[10px] font-black uppercase tracking-[0.16em] text-[var(--wk-brand)]">
-                  {studioIntent ===
-                  "music"
-                    ? "Music Submission"
-                    : "Artist Access"}
-                </div>
-                <h2
-                  id="artist-studio-launcher-title"
-                  className="mt-1 text-[22px] font-black tracking-[-0.035em] text-[var(--wk-text)]"
-                >
-                  {studioIntent ===
-                  "music"
-                    ? "Music Submission"
-                    : "Artist Studio"}
-                </h2>
-                <p className="mt-2 text-[12px] font-medium leading-relaxed text-[var(--wk-text-muted)]">
-                  Choose the Artist you represent on WAKILISHA.
-                </p>
-              </div>
-
-              <button
-                type="button"
-                onClick={() =>
-                  setStudioLauncherOpen(
-                    false,
-                  )
-                }
-                aria-label="Close Artist Studio launcher"
-                className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-[var(--wk-border)] text-[var(--wk-text-muted)] transition-colors hover:bg-[var(--wk-surface-raised)] hover:text-[var(--wk-text)]"
-              >
-                ×
-              </button>
-            </div>
-
-            <div className="p-5">
-              <label className="flex h-11 items-center gap-3 rounded-xl border border-[var(--wk-border)] bg-[var(--wk-bg-subtle)] px-3">
-                <WkIcon
-                  name="Search"
-                  size={15}
-                  className="text-[var(--wk-text-faint)]"
-                />
-                <input
-                  value={
-                    studioSearch
-                  }
-                  onChange={(event) =>
-                    setStudioSearch(
-                      event.target
-                        .value,
-                    )
-                  }
-                  placeholder="Search the Registry"
-                  className="min-w-0 flex-1 bg-transparent text-[12px] font-semibold text-[var(--wk-text)] outline-none placeholder:text-[var(--wk-text-faint)]"
-                />
-              </label>
-
-              {studioMessage ? (
-                <div className="mt-4 rounded-xl border border-[var(--wk-border)] bg-[var(--wk-bg-subtle)] p-3">
-                  <p className="text-[11px] font-semibold leading-relaxed text-[var(--wk-text-muted)]">
-                    {studioMessage}
-                  </p>
-
-                  {studioAccessArtist ? (
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setStudioLauncherOpen(
-                          false,
-                        );
-                        navigate(
-                          `/artists/${studioAccessArtist.slug}`,
-                        );
-                      }}
-                      className="mt-3 inline-flex items-center gap-2 text-[11px] font-black text-[var(--wk-brand)]"
-                    >
-                      Open {studioAccessArtist.name}
-                      <WkIcon
-                        name="ArrowRight"
-                        size={13}
-                      />
-                    </button>
-                  ) : null}
-                </div>
-              ) : null}
-
-              <div className="mt-4 max-h-[430px] space-y-2 overflow-y-auto pr-1">
-                {studioArtistsLoading ? (
-                  <div className="py-10 text-center text-[11px] font-semibold text-[var(--wk-text-muted)]">
-                    Loading the Registry...
-                  </div>
-                ) : null}
-
-                {!studioArtistsLoading &&
-                filteredStudioArtists
-                  .length === 0 ? (
-                  <div className="py-10 text-center text-[11px] font-semibold text-[var(--wk-text-muted)]">
-                    No Artists match that search.
-                  </div>
-                ) : null}
-
-                {filteredStudioArtists.map(
-                  (artist) => {
-                    const busy =
-                      studioBusyArtistId ===
-                      artist.id;
-
-                    return (
-                      <button
-                        key={
-                          artist.id
-                        }
-                        type="button"
-                        disabled={
-                          Boolean(
-                            studioBusyArtistId,
-                          )
-                        }
-                        onClick={() =>
-                          void openStudioArtist(
-                            artist,
-                            studioIntent,
-                          )
-                        }
-                        className="flex w-full items-center gap-3 rounded-xl border border-[var(--wk-border)] bg-[var(--wk-bg-subtle)] p-3 text-left transition-colors hover:bg-[var(--wk-surface-raised)] disabled:opacity-60"
-                      >
-                        <div className="h-11 w-11 shrink-0 overflow-hidden rounded-lg bg-[var(--wk-surface-raised)]">
-                          {artist.imageUrl ? (
-                            <img
-                              src={
-                                artist.imageUrl
-                              }
-                              alt=""
-                              className="h-full w-full object-cover"
-                            />
-                          ) : (
-                            <div className="flex h-full w-full items-center justify-center text-[14px] font-black text-[var(--wk-brand)]">
-                              {artist.name
-                                .slice(
-                                  0,
-                                  1,
-                                )
-                                .toUpperCase()}
-                            </div>
-                          )}
-                        </div>
-
-                        <div className="min-w-0 flex-1">
-                          <div className="truncate text-[12px] font-black text-[var(--wk-text)]">
-                            {artist.name}
-                          </div>
-                          <div className="mt-1 truncate text-[10px] font-semibold text-[var(--wk-text-muted)]">
-                            {artist.country ||
-                              "WAKILISHA Registry"}
-                          </div>
-                        </div>
-
-                        <span className="shrink-0 text-[10px] font-black text-[var(--wk-brand)]">
-                          {busy
-                            ? "Checking..."
-                            : studioIntent ===
-                                "music"
-                              ? "Add Music"
-                              : "Open"}
-                        </span>
-                      </button>
-                    );
-                  },
-                )}
-              </div>
-
-              <p className="mt-4 text-[10px] font-medium leading-relaxed text-[var(--wk-text-faint)]">
-                Artist access is checked against WAKILISHA representation authority before Studio opens.
-              </p>
-            </div>
-          </div>
-        </div>
-      ) : null}
     </div>
   );
 }

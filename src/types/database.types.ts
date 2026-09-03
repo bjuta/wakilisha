@@ -5914,9 +5914,67 @@ export type Database = {
           },
         ]
       }
+      artist_claim_proposed_identities: {
+        Row: {
+          accepted_artist_id: string | null
+          alternate_names: string[]
+          artist_type: string | null
+          claim_id: string
+          created_at: string
+          display_name: string
+          mizizi_assessment: Json
+          mizizi_fingerprint: string
+          normalized_name: string
+          origin_iso2: string | null
+          updated_at: string
+        }
+        Insert: {
+          accepted_artist_id?: string | null
+          alternate_names?: string[]
+          artist_type?: string | null
+          claim_id: string
+          created_at?: string
+          display_name: string
+          mizizi_assessment?: Json
+          mizizi_fingerprint: string
+          normalized_name: string
+          origin_iso2?: string | null
+          updated_at?: string
+        }
+        Update: {
+          accepted_artist_id?: string | null
+          alternate_names?: string[]
+          artist_type?: string | null
+          claim_id?: string
+          created_at?: string
+          display_name?: string
+          mizizi_assessment?: Json
+          mizizi_fingerprint?: string
+          normalized_name?: string
+          origin_iso2?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "artist_claim_proposed_identities_accepted_artist_id_fkey"
+            columns: ["accepted_artist_id"]
+            isOneToOne: false
+            referencedRelation: "registry_artists"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "artist_claim_proposed_identities_claim_id_fkey"
+            columns: ["claim_id"]
+            isOneToOne: true
+            referencedRelation: "artist_claim_requests"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       artist_claim_requests: {
         Row: {
-          artist_id: string
+          artist_id: string | null
+          claim_kind: string
           claimant_role: string
           claimant_user_id: string | null
           created_at: string
@@ -5930,7 +5988,8 @@ export type Database = {
           updated_at: string
         }
         Insert: {
-          artist_id: string
+          artist_id?: string | null
+          claim_kind?: string
           claimant_role: string
           claimant_user_id?: string | null
           created_at?: string
@@ -5944,7 +6003,8 @@ export type Database = {
           updated_at?: string
         }
         Update: {
-          artist_id?: string
+          artist_id?: string | null
+          claim_kind?: string
           claimant_role?: string
           claimant_user_id?: string | null
           created_at?: string
@@ -19413,6 +19473,18 @@ export type Database = {
         Args: never
         Returns: Json
       }
+      community_admin_resolve_artist_claim_existing: {
+        Args: {
+          p_artist_id: string
+          p_can_manage_profile?: boolean
+          p_can_manage_team?: boolean
+          p_can_post_updates?: boolean
+          p_can_submit_releases?: boolean
+          p_claim_id: string
+          p_reason: string
+        }
+        Returns: Json
+      }
       community_admin_revoke_artist_representation: {
         Args: { p_reason: string; p_representation_id: string }
         Returns: Json
@@ -19577,6 +19649,10 @@ export type Database = {
       }
       community_get_artist_manage_updates: {
         Args: { p_artist_id: string; p_limit?: number }
+        Returns: Json
+      }
+      community_get_artist_management_workspace: {
+        Args: { p_artist_slug: string }
         Returns: Json
       }
       community_get_artist_music_submissions: {
@@ -20186,6 +20262,18 @@ export type Database = {
           p_field_key: string
           p_proposed_value: string
           p_reason: string
+        }
+        Returns: Json
+      }
+      community_submit_new_artist_claim: {
+        Args: {
+          p_alternate_names: string[]
+          p_artist_type: string
+          p_claimant_role: string
+          p_display_name: string
+          p_evidence?: Json
+          p_origin_iso2: string
+          p_statement: string
         }
         Returns: Json
       }
@@ -21272,6 +21360,21 @@ export type Database = {
       get_article_working_version_identity: {
         Args: { p_article_id: string }
         Returns: Json
+      }
+      get_artist_studio_registry_candidates: {
+        Args: { p_limit?: number; p_query: string }
+        Returns: {
+          artist_id: string
+          artist_type: string
+          display_name: string
+          image_url: string
+          match_score: number
+          match_tier: string
+          origin_iso2: string
+          public_path: string
+          registry_state: string
+          slug: string
+        }[]
       }
       get_audio_editorial_media_context: {
         Args: { p_publication_id: string }

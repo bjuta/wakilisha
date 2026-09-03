@@ -57,6 +57,23 @@ export type ArtistRepresentationState = {
   representation: ArtistRepresentation | null;
 };
 
+export type ArtistManagementIdentity = {
+  id: string;
+  slug: string;
+  name: string;
+  status:
+    | "active"
+    | "draft"
+    | "needs_review";
+  imageUrl: string | null;
+};
+
+export type ArtistManagementWorkspace = {
+  artist: ArtistManagementIdentity;
+  presentation: ArtistPresentation | null;
+  representation: ArtistRepresentation;
+};
+
 export type ArtistTeamMember = {
   representationId: string;
   userId: string;
@@ -70,8 +87,29 @@ export type ArtistTeamMember = {
   verifiedAt: string | null;
 };
 
+export type ArtistClaimResolutionCandidate = {
+  id: string;
+  slug: string;
+  displayName: string;
+  status: string;
+  originIso2: string | null;
+};
+
+export type ArtistClaimProposedIdentity = {
+  displayName: string;
+  artistType: string | null;
+  originIso2: string | null;
+  alternateNames: string[];
+  miziziFingerprint: string;
+  miziziAssessment: Record<string, unknown>;
+  acceptedArtistId: string | null;
+};
+
 export type ArtistClaimQueueItem = {
   id: string;
+  claimKind:
+    | "existing_artist"
+    | "proposed_artist";
   status: string;
   claimantRole: string;
   statement: string;
@@ -82,7 +120,9 @@ export type ArtistClaimQueueItem = {
     id: string;
     slug: string;
     displayName: string;
-  };
+  } | null;
+  proposedIdentity:
+    ArtistClaimProposedIdentity | null;
   claimant: {
     userId: string | null;
     username: string | null;
@@ -210,6 +250,124 @@ export async function getArtistRepresentationState(artistId: string): Promise<Ar
   };
 }
 
+export async function getArtistManagementWorkspace(
+  artistSlug: string,
+): Promise<ArtistManagementWorkspace> {
+  const data = await rpc<unknown>(
+    "community_get_artist_management_workspace",
+    {
+      p_artist_slug:
+        artistSlug,
+    },
+  );
+
+  const record =
+    asRecord(data);
+  const artist =
+    asRecord(
+      record?.artist,
+    );
+  const representation =
+    asRecord(
+      record?.representation,
+    );
+
+  const artistId =
+    readString(
+      artist,
+      "id",
+    );
+  const slug =
+    readString(
+      artist,
+      "slug",
+    );
+  const name =
+    readString(
+      artist,
+      "display_name",
+    );
+  const status =
+    readString(
+      artist,
+      "status",
+    );
+  const representationId =
+    readString(
+      representation,
+      "id",
+    );
+
+  if (
+    !artistId ||
+    !slug ||
+    !name ||
+    (
+      status !== "active" &&
+      status !== "draft" &&
+      status !== "needs_review"
+    ) ||
+    !representationId
+  ) {
+    throw new Error(
+      "Artist Studio access could not be loaded.",
+    );
+  }
+
+  return {
+    artist: {
+      id:
+        artistId,
+      slug,
+      name,
+      status,
+      imageUrl:
+        readString(
+          artist,
+          "image_url",
+        ),
+    },
+    presentation:
+      mapPresentation(
+        record?.presentation,
+      ),
+    representation: {
+      id:
+        representationId,
+      role:
+        readString(
+          representation,
+          "role",
+        ) ?? "other",
+      status:
+        readString(
+          representation,
+          "status",
+        ) ?? "active",
+      permissions:
+        mapPermissions(
+          representation
+            ?.permissions,
+        ),
+      invitedAt:
+        readString(
+          representation,
+          "invited_at",
+        ),
+      acceptedAt:
+        readString(
+          representation,
+          "accepted_at",
+        ),
+      verifiedAt:
+        readString(
+          representation,
+          "verified_at",
+        ),
+    },
+  };
+}
+
 export async function submitArtistClaim(input: {
   artistId: string;
   claimantRole: string;
@@ -222,6 +380,60 @@ export async function submitArtistClaim(input: {
     p_statement: input.statement,
     p_evidence: input.evidence,
   });
+}
+
+export async function submitNewArtistClaim(input: {
+  displayName: string;
+  artistType: string;
+  originIso2: string;
+  alternateNames: string[];
+  claimantRole: string;
+  statement: string;
+  evidence: Array<{
+    type: string;
+    reference?: string | null;
+    note?: string | null;
+  }>;
+}): Promise<{ claimId: string }> {
+  const data = await rpc<unknown>(
+    "community_submit_new_artist_claim",
+    {
+      p_display_name:
+        input.displayName,
+      p_artist_type:
+        input.artistType ||
+        null,
+      p_origin_iso2:
+        input.originIso2 ||
+        null,
+      p_alternate_names:
+        input.alternateNames,
+      p_claimant_role:
+        input.claimantRole,
+      p_statement:
+        input.statement,
+      p_evidence:
+        input.evidence,
+    },
+  );
+
+  const record =
+    asRecord(data);
+  const claimId =
+    readString(
+      record,
+      "claim_id",
+    );
+
+  if (!claimId) {
+    throw new Error(
+      "WAKILISHA could not confirm the Artist claim.",
+    );
+  }
+
+  return {
+    claimId,
+  };
 }
 
 export async function acceptArtistRepresentation(representationId: string): Promise<void> {
@@ -337,42 +549,235 @@ export async function revokeArtistRepresentative(representationId: string, reaso
   });
 }
 
-export async function listArtistClaims(status = "pending", limit = 100): Promise<ArtistClaimQueueItem[]> {
-  const data = await rpc<unknown>("community_admin_get_artist_claims", {
-    p_status: status,
-    p_limit: limit,
-  });
-  if (!Array.isArray(data)) return [];
-  return data.flatMap((item) => {
-    const record = asRecord(item);
-    const artist = asRecord(record?.artist);
-    const claimant = asRecord(record?.claimant);
-    const id = readString(record, "id");
-    const artistId = readString(artist, "id");
-    const artistSlug = readString(artist, "slug");
-    const artistName = readString(artist, "display_name");
-    if (!record || !id || !artistId || !artistSlug || !artistName) return [];
-    return [{
-      id,
-      status: readString(record, "status") ?? "pending",
-      claimantRole: readString(record, "claimant_role") ?? "other",
-      statement: readString(record, "statement") ?? "",
-      submittedAt: readString(record, "submitted_at"),
-      decidedAt: readString(record, "decided_at"),
-      decisionReason: readString(record, "decision_reason"),
-      artist: {
-        id: artistId,
-        slug: artistSlug,
-        displayName: artistName,
-      },
-      claimant: {
-        userId: readString(claimant, "user_id"),
-        username: readString(claimant, "username"),
-        displayName: readString(claimant, "display_name"),
-      },
-      evidence: mapEvidence(record.evidence),
-    }];
-  });
+export async function listArtistClaims(
+  status = "pending",
+  limit = 100,
+): Promise<ArtistClaimQueueItem[]> {
+  const data = await rpc<unknown>(
+    "community_admin_get_artist_claims",
+    {
+      p_status: status,
+      p_limit: limit,
+    },
+  );
+
+  if (!Array.isArray(data)) {
+    return [];
+  }
+
+  return data.flatMap(
+    (item) => {
+      const record =
+        asRecord(item);
+      const artist =
+        asRecord(
+          record?.artist,
+        );
+      const claimant =
+        asRecord(
+          record?.claimant,
+        );
+      const proposed =
+        asRecord(
+          record?.proposed_identity,
+        );
+      const id =
+        readString(
+          record,
+          "id",
+        );
+      const claimKind =
+        readString(
+          record,
+          "claim_kind",
+        );
+
+      if (
+        !record ||
+        !id ||
+        (
+          claimKind !==
+            "existing_artist" &&
+          claimKind !==
+            "proposed_artist"
+        )
+      ) {
+        return [];
+      }
+
+      const artistId =
+        readString(
+          artist,
+          "id",
+        );
+      const artistSlug =
+        readString(
+          artist,
+          "slug",
+        );
+      const artistName =
+        readString(
+          artist,
+          "display_name",
+        );
+
+      const proposedName =
+        readString(
+          proposed,
+          "display_name",
+        );
+      const fingerprint =
+        readString(
+          proposed,
+          "mizizi_fingerprint",
+        );
+
+      if (
+        claimKind ===
+          "existing_artist" &&
+        (
+          !artistId ||
+          !artistSlug ||
+          !artistName
+        )
+      ) {
+        return [];
+      }
+
+      if (
+        claimKind ===
+          "proposed_artist" &&
+        (
+          !proposedName ||
+          !fingerprint
+        )
+      ) {
+        return [];
+      }
+
+      const alternateNamesRaw =
+        proposed?.alternate_names;
+
+      return [{
+        id,
+        claimKind,
+        status:
+          readString(
+            record,
+            "status",
+          ) ?? "pending",
+        claimantRole:
+          readString(
+            record,
+            "claimant_role",
+          ) ?? "other",
+        statement:
+          readString(
+            record,
+            "statement",
+          ) ?? "",
+        submittedAt:
+          readString(
+            record,
+            "submitted_at",
+          ),
+        decidedAt:
+          readString(
+            record,
+            "decided_at",
+          ),
+        decisionReason:
+          readString(
+            record,
+            "decision_reason",
+          ),
+        artist:
+          artistId &&
+          artistSlug &&
+          artistName
+            ? {
+                id:
+                  artistId,
+                slug:
+                  artistSlug,
+                displayName:
+                  artistName,
+              }
+            : null,
+        proposedIdentity:
+          proposedName &&
+          fingerprint
+            ? {
+                displayName:
+                  proposedName,
+                artistType:
+                  readString(
+                    proposed,
+                    "artist_type",
+                  ),
+                originIso2:
+                  readString(
+                    proposed,
+                    "origin_iso2",
+                  ),
+                alternateNames:
+                  Array.isArray(
+                    alternateNamesRaw,
+                  )
+                    ? alternateNamesRaw
+                        .filter(
+                          (
+                            value,
+                          ): value is string =>
+                            typeof value ===
+                            "string" &&
+                            value.trim()
+                              .length >
+                              0,
+                        )
+                        .map(
+                          (value) =>
+                            value.trim(),
+                        )
+                    : [],
+                miziziFingerprint:
+                  fingerprint,
+                miziziAssessment:
+                  asRecord(
+                    proposed
+                      ?.mizizi_assessment,
+                  ) ?? {},
+                acceptedArtistId:
+                  readString(
+                    proposed,
+                    "accepted_artist_id",
+                  ),
+              }
+            : null,
+        claimant: {
+          userId:
+            readString(
+              claimant,
+              "user_id",
+            ),
+          username:
+            readString(
+              claimant,
+              "username",
+            ),
+          displayName:
+            readString(
+              claimant,
+              "display_name",
+            ),
+        },
+        evidence:
+          mapEvidence(
+            record.evidence,
+          ),
+      }];
+    },
+  );
 }
 
 export async function decideArtistClaim(input: {
@@ -389,4 +794,101 @@ export async function decideArtistClaim(input: {
     p_can_post_updates: null,
     p_can_manage_team: null,
   });
+}
+
+export async function searchRegistryArtistsForClaimResolution(
+  query: string,
+  limit = 8,
+): Promise<ArtistClaimResolutionCandidate[]> {
+  const data = await rpc<unknown>(
+    "admin_search_registry_artists",
+    {
+      p_query:
+        query.trim(),
+      p_limit:
+        Math.max(
+          1,
+          Math.min(
+            limit,
+            20,
+          ),
+        ),
+    },
+  );
+
+  if (!Array.isArray(data)) {
+    return [];
+  }
+
+  return data.flatMap(
+    (item) => {
+      const record =
+        asRecord(item);
+      const id =
+        readString(
+          record,
+          "artist_id",
+        );
+      const slug =
+        readString(
+          record,
+          "artist_slug",
+        );
+      const displayName =
+        readString(
+          record,
+          "display_name",
+        );
+
+      if (
+        !id ||
+        !slug ||
+        !displayName
+      ) {
+        return [];
+      }
+
+      return [{
+        id,
+        slug,
+        displayName,
+        status:
+          readString(
+            record,
+            "status",
+          ) ?? "draft",
+        originIso2:
+          readString(
+            record,
+            "origin_iso2",
+          ),
+      }];
+    },
+  );
+}
+
+export async function resolveArtistClaimToExisting(input: {
+  claimId: string;
+  artistId: string;
+  reason: string;
+}): Promise<void> {
+  await rpc(
+    "community_admin_resolve_artist_claim_existing",
+    {
+      p_claim_id:
+        input.claimId,
+      p_artist_id:
+        input.artistId,
+      p_reason:
+        input.reason,
+      p_can_manage_profile:
+        null,
+      p_can_submit_releases:
+        null,
+      p_can_post_updates:
+        null,
+      p_can_manage_team:
+        null,
+    },
+  );
 }

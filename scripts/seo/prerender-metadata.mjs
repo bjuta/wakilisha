@@ -61,6 +61,13 @@ const STATIC_ROUTES = {
     ogType: "website",
     kind: "collection",
   },
+  "/artist-studio": {
+    title: "Artist Studio",
+    description: "Find your Artist in the WAKILISHA Registry, claim your profile, submit music, and manage your Artist presence.",
+    robots: "index, follow",
+    ogType: "website",
+    kind: "utility",
+  },
   "/releases": {
     title: "African music releases",
     description: "Browse albums, EPs, singles, and releases from artists across African music culture.",

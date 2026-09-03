@@ -32,6 +32,7 @@ const SIGNED_OUT_NAV: MobileNavItem[] = [
 ];
 
 const MORE_LINKS = [
+  { label: "Artist Studio", to: "/artist-studio", icon: "ri-user-star-line" },
   { label: "Genres", to: "/genres", icon: "ri-compass-3-line" },
   { label: "Labels", to: "/labels", icon: "ri-album-line" },
   { label: "Guides", to: "/guides", icon: "ri-map-2-line" },

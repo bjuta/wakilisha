@@ -489,6 +489,11 @@ describe(
         expect(
           musicShell,
         ).toContain(
+          'to="/artist-studio"',
+        );
+        expect(
+          musicShell,
+        ).not.toContain(
           "listMyArtistRepresentations",
         );
         expect(
