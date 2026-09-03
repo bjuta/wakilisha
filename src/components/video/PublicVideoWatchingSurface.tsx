@@ -213,6 +213,13 @@ export function PublicVideoWatchingSurface({
         adaptiveUrl: publication.adaptiveDelivery?.url || null,
         adaptiveMimeType:
           publication.adaptiveDelivery?.mimeType || null,
+        adaptiveRenditions:
+          publication.adaptiveDelivery?.renditions.map((rendition) => ({
+            height: rendition.height,
+            label: rendition.label,
+            url: rendition.url,
+            mimeType: rendition.mimeType,
+          })) || [],
         poster: publication.poster?.url || null,
         captions: publication.captions.map((caption) => ({
           trackNumber: caption.trackNumber,

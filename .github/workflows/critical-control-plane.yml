@@ -89,6 +89,13 @@ jobs:
             test/video/phase-7b-v4a-adaptive-video-media.test.ts \
             test/video/phase-7b-v4b-public-adaptive-video-playback.test.ts
 
+      - name: Enforce Phase 7B V4C governed Video quality selection
+        run: |
+          npx vitest run \
+            test/video/phase-7b-v4a-adaptive-video-media.test.ts \
+            test/video/phase-7b-v4b-public-adaptive-video-playback.test.ts \
+            test/video/phase-7b-v4c-governed-video-quality-selection.test.ts
+
       - name: Enforce shared Media presentation convergence
         run: |
           npx vitest run             test/media/media-presentation-surface.test.ts             test/player/mobile-provider-playback-contract.test.ts

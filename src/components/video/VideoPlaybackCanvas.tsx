@@ -9,6 +9,13 @@ import {
 } from "react";
 import { providerEmbedUrl } from "./providerSource";
 
+export interface VideoPlaybackRendition {
+  height: number;
+  label: string;
+  url: string;
+  mimeType: "application/vnd.apple.mpegurl";
+}
+
 export interface VideoPlaybackCaption {
   trackNumber: number;
   languageTag: string;
@@ -25,6 +32,7 @@ export type VideoPlaybackSource =
       mimeType: string;
       adaptiveUrl?: string | null;
       adaptiveMimeType?: string | null;
+      adaptiveRenditions?: VideoPlaybackRendition[];
       poster?: string | null;
       captions?: VideoPlaybackCaption[];
     }
@@ -103,7 +111,19 @@ export function VideoPlaybackCanvas({
     () => source.kind === "native" ? source.captions ?? [] : [],
     [source],
   );
+  const adaptiveRenditions = useMemo(
+    () => (
+      source.kind === "native"
+        ? [...(source.adaptiveRenditions ?? [])]
+            .sort((left, right) => left.height - right.height)
+        : []
+    ),
+    [source],
+  );
   const defaultCaption = captions.find((caption) => caption.isDefault);
+  const [selectedQuality, setSelectedQuality] = useState<"auto" | number>(
+    "auto",
+  );
   const [activeCaptionTrack, setActiveCaptionTrack] = useState<number | null>(
     defaultCaption?.trackNumber ?? null,
   );
@@ -120,6 +140,23 @@ export function VideoPlaybackCanvas({
     "mp4" | "hls-native" | "hls-mse"
   >("mp4");
   const controlsHideTimerRef = useRef<number | null>(null);
+  const qualityResumeRef = useRef<{
+    time: number;
+    shouldPlay: boolean;
+    playbackRate: number;
+    muted: boolean;
+  } | null>(null);
+
+  useEffect(() => {
+    if (
+      selectedQuality !== "auto"
+      && !adaptiveRenditions.some(
+        (rendition) => rendition.height === selectedQuality,
+      )
+    ) {
+      setSelectedQuality("auto");
+    }
+  }, [adaptiveRenditions, selectedQuality]);
 
   const syncCaptionTracks = useCallback(() => {
     const element = videoRef.current;
@@ -151,54 +188,103 @@ export function VideoPlaybackCanvas({
       destroy: () => void;
     } | null = null;
 
+    const restoreQualityResume = () => {
+      const resume = qualityResumeRef.current;
+      if (!resume || cancelled) return;
+      qualityResumeRef.current = null;
+
+      element.muted = resume.muted;
+      element.playbackRate = resume.playbackRate;
+
+      if (resume.time > 0 && Number.isFinite(element.duration)) {
+        element.currentTime = Math.min(
+          resume.time,
+          Math.max(0, element.duration - 0.1),
+        );
+      }
+
+      syncCaptionTracks();
+
+      if (resume.shouldPlay) {
+        void element.play().catch(() => undefined);
+      }
+    };
+
+    const bindQualityResume = () => {
+      if (!qualityResumeRef.current) return;
+      element.addEventListener(
+        "loadedmetadata",
+        restoreQualityResume,
+        { once: true },
+      );
+    };
+
     const fallbackToMp4 = () => {
       if (cancelled) return;
 
-      const resumeTime = Number.isFinite(element.currentTime)
-        ? element.currentTime
-        : 0;
-      const resumePlayback = !element.paused;
+      const pending = qualityResumeRef.current;
+      const resumeTime = pending?.time ?? (
+        Number.isFinite(element.currentTime)
+          ? element.currentTime
+          : 0
+      );
+      const resumePlayback =
+        pending?.shouldPlay ?? !element.paused;
+      const resumeRate =
+        pending?.playbackRate ?? element.playbackRate;
+      const resumeMuted =
+        pending?.muted ?? element.muted;
+
+      qualityResumeRef.current = {
+        time: resumeTime,
+        shouldPlay: resumePlayback,
+        playbackRate: resumeRate,
+        muted: resumeMuted,
+      };
 
       hlsInstance?.destroy();
       hlsInstance = null;
 
-      const restorePlayback = () => {
-        if (resumeTime > 0 && Number.isFinite(element.duration)) {
-          element.currentTime = Math.min(
-            resumeTime,
-            Math.max(0, element.duration - 0.1),
-          );
-        }
-        if (resumePlayback) {
-          void element.play().catch(() => undefined);
-        }
-      };
-
+      bindQualityResume();
       element.src = source.url;
       element.load();
-      element.addEventListener(
-        "loadedmetadata",
-        restorePlayback,
-        { once: true },
-      );
       setDeliveryMode("mp4");
     };
 
-    const adaptiveUrl = source.adaptiveUrl?.trim() || "";
-    const adaptiveMimeType =
-      source.adaptiveMimeType?.trim() || "";
+    const selectedRendition =
+      selectedQuality === "auto"
+        ? null
+        : adaptiveRenditions.find(
+            (rendition) => rendition.height === selectedQuality,
+          ) ?? null;
+
+    const adaptiveUrl = (
+      selectedRendition?.url
+      || source.adaptiveUrl
+      || ""
+    ).trim();
+    const adaptiveMimeType = (
+      selectedRendition?.mimeType
+      || source.adaptiveMimeType
+      || ""
+    ).trim();
 
     if (
       !adaptiveUrl
       || adaptiveMimeType !== "application/vnd.apple.mpegurl"
     ) {
+      bindQualityResume();
       element.src = source.url;
+      element.load();
       setDeliveryMode("mp4");
       return;
     }
 
+    bindQualityResume();
+
     if (element.canPlayType(adaptiveMimeType)) {
       element.src = adaptiveUrl;
+      element.load();
       setDeliveryMode("hls-native");
       return;
     }
@@ -234,7 +320,10 @@ export function VideoPlaybackCanvas({
       hlsInstance?.destroy();
     };
   }, [
+    adaptiveRenditions,
+    selectedQuality,
     source,
+    syncCaptionTracks,
     videoRef,
   ]);
 
@@ -445,6 +534,26 @@ export function VideoPlaybackCanvas({
     setSettingsOpen(false);
   };
 
+  const selectQuality = (quality: "auto" | number) => {
+    const element = videoRef.current;
+    if (!element || quality === selectedQuality) {
+      setSettingsOpen(false);
+      return;
+    }
+
+    qualityResumeRef.current = {
+      time: Number.isFinite(element.currentTime)
+        ? element.currentTime
+        : 0,
+      shouldPlay: !element.paused,
+      playbackRate: element.playbackRate,
+      muted: element.muted,
+    };
+
+    setSelectedQuality(quality);
+    setSettingsOpen(false);
+  };
+
   const toggleFullscreen = async () => {
     const shell = shellRef.current as FullscreenElement | null;
     const element = videoRef.current as FullscreenVideoElement | null;
@@ -613,6 +722,11 @@ export function VideoPlaybackCanvas({
       )}
       aria-label={`Video player for ${title}`}
       data-wk-video-delivery={deliveryMode}
+      data-wk-video-quality={
+        selectedQuality === "auto"
+          ? "auto"
+          : `${selectedQuality}p`
+      }
     >
       <video
         ref={videoRef}
@@ -702,6 +816,39 @@ export function VideoPlaybackCanvas({
               <i className="ri-close-line text-[15px]" />
             </button>
           </div>
+
+          {adaptiveRenditions.length ? (
+            <div className="border-b border-white/10 px-4 py-3">
+              <p className="mb-2 text-[10px] font-black uppercase tracking-[0.14em] text-white/45">
+                Quality
+              </p>
+              <div className="space-y-1">
+                <button
+                  type="button"
+                  onClick={() => selectQuality("auto")}
+                  className="flex w-full items-center justify-between rounded-lg px-2 py-2 text-left text-[12px] font-semibold transition hover:bg-white/5"
+                >
+                  <span>Auto</span>
+                  {selectedQuality === "auto" ? (
+                    <i className="ri-check-line text-[var(--wk-brand)]" />
+                  ) : null}
+                </button>
+                {adaptiveRenditions.map((rendition) => (
+                  <button
+                    key={rendition.height}
+                    type="button"
+                    onClick={() => selectQuality(rendition.height)}
+                    className="flex w-full items-center justify-between rounded-lg px-2 py-2 text-left text-[12px] font-semibold transition hover:bg-white/5"
+                  >
+                    <span>{rendition.label}</span>
+                    {selectedQuality === rendition.height ? (
+                      <i className="ri-check-line text-[var(--wk-brand)]" />
+                    ) : null}
+                  </button>
+                ))}
+              </div>
+            </div>
+          ) : null}
 
           {captions.length ? (
             <div className="border-b border-white/10 px-4 py-3">
