@@ -5,7 +5,10 @@ import { AdminChartsLoadingState } from "@/pages/admin/charts/components/AdminCh
 import {
   decideArtistClaim,
   listArtistClaims,
+  resolveArtistClaimToExisting,
+  searchRegistryArtistsForClaimResolution,
   type ArtistClaimQueueItem,
+  type ArtistClaimResolutionCandidate,
 } from "@/services/artists/claimedArtist";
 
 const STATUS_OPTIONS = ["pending", "verified", "rejected", "withdrawn", "revoked"] as const;
@@ -23,6 +26,9 @@ export default function AdminArtistClaimsPage() {
   const [loading, setLoading] = useState(true);
   const [busyId, setBusyId] = useState<string | null>(null);
   const [reasons, setReasons] = useState<Record<string, string>>({});
+  const [resolutionQueries, setResolutionQueries] = useState<Record<string, string>>({});
+  const [resolutionResults, setResolutionResults] = useState<Record<string, ArtistClaimResolutionCandidate[]>>({});
+  const [resolutionLoadingId, setResolutionLoadingId] = useState<string | null>(null);
   const [message, setMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
 
   const load = useCallback(async () => {
@@ -54,6 +60,59 @@ export default function AdminArtistClaimsPage() {
       await load();
     } catch (error) {
       setMessage({ type: "error", text: error instanceof Error ? error.message : "Could not decide this Artist claim." });
+    } finally {
+      setBusyId(null);
+    }
+  }
+
+  async function searchExistingArtist(claim: ArtistClaimQueueItem) {
+    const query = (resolutionQueries[claim.id] || claim.proposedIdentity?.displayName || "").trim();
+
+    if (query.length < 2) {
+      setMessage({ type: "error", text: "Enter at least two characters before searching the Registry." });
+      return;
+    }
+
+    setResolutionLoadingId(claim.id);
+    setMessage(null);
+
+    try {
+      const results = await searchRegistryArtistsForClaimResolution(query, 8);
+      setResolutionResults((current) => ({
+        ...current,
+        [claim.id]: results,
+      }));
+    } catch (error) {
+      setMessage({ type: "error", text: error instanceof Error ? error.message : "Could not search Registry Artists." });
+    } finally {
+      setResolutionLoadingId(null);
+    }
+  }
+
+  async function resolveExisting(
+    claim: ArtistClaimQueueItem,
+    artist: ArtistClaimResolutionCandidate,
+  ) {
+    const reason = (reasons[claim.id] || "").trim();
+
+    if (reason.length < 3) {
+      setMessage({ type: "error", text: "Add a short review reason before resolving this claim." });
+      return;
+    }
+
+    setBusyId(claim.id);
+    setMessage(null);
+
+    try {
+      await resolveArtistClaimToExisting({
+        claimId: claim.id,
+        artistId: artist.id,
+        reason,
+      });
+      setMessage({ type: "success", text: `Artist claim resolved to ${artist.displayName}.` });
+      await load();
+    } catch (error) {
+      setMessage({ type: "error", text: error instanceof Error ? error.message : "Could not resolve this Artist claim." });
     } finally {
       setBusyId(null);
     }
@@ -93,17 +152,54 @@ export default function AdminArtistClaimsPage() {
       </div>
 
       <div className="space-y-4">
-        {claims.map((claim) => (
+        {claims.map((claim) => {
+          const proposed = claim.proposedIdentity;
+          const displayName =
+            claim.artist?.displayName
+            || proposed?.displayName
+            || "Artist Claim";
+          const assessment =
+            proposed?.miziziAssessment ?? {};
+          const strongMatches =
+            typeof assessment.strong_match_count === "number"
+              ? assessment.strong_match_count
+              : null;
+          const candidateCount =
+            typeof assessment.candidate_count === "number"
+              ? assessment.candidate_count
+              : null;
+          const resolveResults =
+            resolutionResults[claim.id] ?? [];
+
+          return (
           <article key={claim.id} className="rounded-2xl border border-wk-border bg-white p-5 shadow-sm">
             <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
               <div>
                 <div className="flex flex-wrap items-center gap-2">
-                  <Link to={`/artists/${claim.artist.slug}`} target="_blank" className="text-[16px] font-black text-wk-text hover:text-wk-brand">
-                    {claim.artist.displayName}
-                  </Link>
+                  {claim.artist ? (
+                    <Link to={`/artists/${claim.artist.slug}`} target="_blank" className="text-[16px] font-black text-wk-text hover:text-wk-brand">
+                      {displayName}
+                    </Link>
+                  ) : (
+                    <span className="text-[16px] font-black text-wk-text">
+                      {displayName}
+                    </span>
+                  )}
+                  <span className="rounded-full bg-gray-100 px-2.5 py-1 text-[10px] font-black uppercase tracking-wider text-gray-600">
+                    {claim.claimKind === "proposed_artist" ? "New Artist" : "Existing Artist"}
+                  </span>
                   <span className="rounded-full bg-gray-100 px-2.5 py-1 text-[10px] font-black uppercase tracking-wider text-gray-600">{claim.claimantRole.replace(/_/g, " ")}</span>
                   <span className="rounded-full bg-amber-50 px-2.5 py-1 text-[10px] font-black uppercase tracking-wider text-amber-700">{claim.status}</span>
                 </div>
+
+                {proposed ? (
+                  <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-[12px] text-wk-text-muted">
+                    {proposed.artistType ? <span>Type: {proposed.artistType}</span> : null}
+                    {proposed.originIso2 ? <span>Country: {proposed.originIso2}</span> : null}
+                    {proposed.alternateNames.length ? <span>Also known as: {proposed.alternateNames.join(", ")}</span> : null}
+                  </div>
+                ) : null}
+
                 <div className="mt-1 text-[12px] text-wk-text-muted">
                   {claim.claimant.displayName || claim.claimant.username || "WAKILISHA account"}
                   {claim.claimant.username ? ` · @${claim.claimant.username}` : ""}
@@ -111,6 +207,14 @@ export default function AdminArtistClaimsPage() {
                 </div>
               </div>
             </div>
+
+            {proposed ? (
+              <div className="mt-4 rounded-xl border border-wk-border bg-gray-50 p-3 text-[11px] text-wk-text-muted">
+                <span className="font-black text-wk-text">MIZIZI identity check</span>
+                {candidateCount !== null ? <span> · {candidateCount} Registry candidates</span> : null}
+                {strongMatches !== null ? <span> · {strongMatches} close matches</span> : null}
+              </div>
+            ) : null}
 
             <p className="mt-4 whitespace-pre-wrap text-[13px] leading-6 text-wk-text">{claim.statement}</p>
 
@@ -138,9 +242,56 @@ export default function AdminArtistClaimsPage() {
                     className="w-full resize-y rounded-xl border border-gray-200 bg-white px-3 py-2 text-[13px] text-gray-900"
                   />
                 </label>
+
+                {claim.claimKind === "proposed_artist" ? (
+                  <div className="mt-4 rounded-xl border border-gray-200 bg-white p-3">
+                    <div className="text-[11px] font-black uppercase tracking-wider text-gray-500">
+                      Resolve to Existing Artist
+                    </div>
+                    <div className="mt-2 flex gap-2">
+                      <input
+                        value={resolutionQueries[claim.id] ?? proposed?.displayName ?? ""}
+                        onChange={(event) => setResolutionQueries((current) => ({ ...current, [claim.id]: event.target.value }))}
+                        placeholder="Search Registry Artists"
+                        className="min-w-0 flex-1 rounded-xl border border-gray-200 bg-white px-3 py-2 text-[13px] text-gray-900"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => void searchExistingArtist(claim)}
+                        disabled={resolutionLoadingId === claim.id}
+                        className="rounded-xl border border-wk-border px-3 py-2 text-[12px] font-bold text-wk-text disabled:opacity-50"
+                      >
+                        {resolutionLoadingId === claim.id ? "Searching…" : "Search"}
+                      </button>
+                    </div>
+
+                    {resolveResults.length > 0 ? (
+                      <div className="mt-3 space-y-2">
+                        {resolveResults.map((artist) => (
+                          <button
+                            key={artist.id}
+                            type="button"
+                            onClick={() => void resolveExisting(claim, artist)}
+                            disabled={busyId === claim.id}
+                            className="flex w-full items-center justify-between gap-3 rounded-xl border border-gray-200 px-3 py-2 text-left disabled:opacity-50"
+                          >
+                            <span>
+                              <span className="block text-[12px] font-black text-wk-text">{artist.displayName}</span>
+                              <span className="block text-[10px] font-semibold text-wk-text-muted">{artist.status}{artist.originIso2 ? ` · ${artist.originIso2}` : ""}</span>
+                            </span>
+                            <span className="text-[11px] font-black text-wk-brand">Use This Artist</span>
+                          </button>
+                        ))}
+                      </div>
+                    ) : null}
+                  </div>
+                ) : null}
+
                 <div className="mt-3 flex flex-wrap justify-end gap-2">
                   <button type="button" onClick={() => void decide(claim, "rejected")} disabled={busyId === claim.id} className="rounded-full border border-red-200 px-4 py-2 text-[12px] font-bold text-red-700 disabled:opacity-50">Reject Claim</button>
-                  <button type="button" onClick={() => void decide(claim, "verified")} disabled={busyId === claim.id} className="rounded-full bg-emerald-600 px-4 py-2 text-[12px] font-bold text-white disabled:opacity-50">Verify Claim</button>
+                  <button type="button" onClick={() => void decide(claim, "verified")} disabled={busyId === claim.id} className="rounded-full bg-emerald-600 px-4 py-2 text-[12px] font-bold text-white disabled:opacity-50">
+                    {claim.claimKind === "proposed_artist" ? "Approve New Artist" : "Verify Claim"}
+                  </button>
                 </div>
               </div>
             )}
@@ -149,7 +300,8 @@ export default function AdminArtistClaimsPage() {
               <div className="mt-4 text-[12px] text-wk-text-muted">Decision: {claim.decisionReason}</div>
             )}
           </article>
-        ))}
+          );
+        })}
 
         {claims.length === 0 && (
           <div className="rounded-2xl border border-dashed border-wk-border bg-white p-10 text-center text-[13px] text-wk-text-muted">
