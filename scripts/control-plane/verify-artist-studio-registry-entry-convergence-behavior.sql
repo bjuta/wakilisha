@@ -545,7 +545,7 @@ begin
     public.community_admin_decide_artist_claim(
       v_created_claim_id,
       'verified',
-      'Accepted as a new Registry Artist draft after duplicate review.',
+      'Accepted as a new Registry Artist after duplicate review.',
       null,
       null,
       null,
@@ -557,7 +557,7 @@ begin
 
   if v_created_artist_id is null
      or v_creation->>'artist_status' <>
-        'draft'
+        'active'
   then
     raise exception
       'ARTIST_STUDIO_BEHAVIOR_FAIL: accepted new Artist did not create one Registry draft';
@@ -581,7 +581,7 @@ begin
          and artist.display_name =
              'Taa Northbound Fixture'
          and artist.status =
-             'draft'
+             'active'
      ) <> 1
      or not exists (
        select 1
@@ -636,7 +636,7 @@ begin
   if v_workspace #>> '{artist,id}' <>
      v_created_artist_id::text
      or v_workspace #>> '{artist,status}' <>
-        'draft'
+        'active'
      or v_workspace #>> '{representation,status}' <>
         'active'
      or coalesce(
@@ -657,8 +657,9 @@ begin
     where candidate.artist_id =
           v_created_artist_id
       and candidate.registry_state =
-          'draft'
-      and candidate.public_path is null
+          'active'
+      and candidate.public_path =
+          '/artists/' || v_created_artist_slug
       and candidate.image_url is null
   ) then
     raise exception
