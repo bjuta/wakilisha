@@ -70,6 +70,14 @@ export type ArtistTeamMember = {
   verifiedAt: string | null;
 };
 
+export type ArtistClaimResolutionCandidate = {
+  id: string;
+  slug: string;
+  displayName: string;
+  status: string;
+  originIso2: string | null;
+};
+
 export type ArtistClaimProposedIdentity = {
   displayName: string;
   artistType: string | null;
@@ -651,6 +659,77 @@ export async function decideArtistClaim(input: {
     p_can_post_updates: null,
     p_can_manage_team: null,
   });
+}
+
+export async function searchRegistryArtistsForClaimResolution(
+  query: string,
+  limit = 8,
+): Promise<ArtistClaimResolutionCandidate[]> {
+  const data = await rpc<unknown>(
+    "admin_search_registry_artists",
+    {
+      p_query:
+        query.trim(),
+      p_limit:
+        Math.max(
+          1,
+          Math.min(
+            limit,
+            20,
+          ),
+        ),
+    },
+  );
+
+  if (!Array.isArray(data)) {
+    return [];
+  }
+
+  return data.flatMap(
+    (item) => {
+      const record =
+        asRecord(item);
+      const id =
+        readString(
+          record,
+          "artist_id",
+        );
+      const slug =
+        readString(
+          record,
+          "artist_slug",
+        );
+      const displayName =
+        readString(
+          record,
+          "display_name",
+        );
+
+      if (
+        !id ||
+        !slug ||
+        !displayName
+      ) {
+        return [];
+      }
+
+      return [{
+        id,
+        slug,
+        displayName,
+        status:
+          readString(
+            record,
+            "status",
+          ) ?? "draft",
+        originIso2:
+          readString(
+            record,
+            "origin_iso2",
+          ),
+      }];
+    },
+  );
 }
 
 export async function resolveArtistClaimToExisting(input: {
