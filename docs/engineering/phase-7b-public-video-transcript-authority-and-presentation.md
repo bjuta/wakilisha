@@ -4,11 +4,19 @@ Date: 3 September 2026
 
 ## Status
 
-PREVIEW SEALED. PR PENDING. PRODUCTION UNCHANGED.
+PRODUCTION ACCEPTED. REAL TRANSCRIPT PRESENTATION ACCEPTED. PREVIEW DELETED.
 
-Base main:
+Implementation base main:
 
 `e084565f9874b7c15598a485dc57f8aa4a495abc`
+
+Accepted implementation merge:
+
+`3aa6f87a346e9227b8a77e05e99695d9d8fc5942`
+
+Current Phase 7B closure runtime main:
+
+`b0ffd4718094e9cca8d66de711cdc8e27a448548`
 
 ## Problem layer
 
@@ -203,3 +211,115 @@ The candidate may proceed to PR and protected CI.
 The disposable preview remains available until production acceptance, then it is deleted as a whole. Synthetic preview-only immutable fixture rows are not individually rewritten or deleted.
 
 Production remains unchanged.
+
+
+## Production acceptance
+
+PR #807 merged the governed public Video transcript capability.
+
+Production database authority advanced exactly to:
+
+- migration count: `83`
+- migration head:
+  `20260903085155_phase_7b_public_video_transcript_authority.sql`
+- permanent verifier: PASS
+- post-promotion pending migrations: `0`
+
+Production `video-public-delivery` is ACTIVE at version `8` with `verify_jwt=false`.
+
+The exact merged-main frontend was activated in production before real transcript publication.
+
+## Real transcript publication
+
+The genuine reviewed transcript for `Monday Morning in September` was uploaded through canonical Media, governed for public use, selected in the Video Editor, and carried through new immutable Video lifecycle versions.
+
+Transcript Media identity:
+
+- asset:
+  `23c189c0-1ffd-430b-a183-b5a3c16b58ce`
+- exact revision:
+  `ffa3fc06-52bf-4875-88b5-4bd024a2ea35`
+- bytes: `157`
+- SHA-256:
+  `fb0cf3e6853b21c7428ee75d378d1943b0f6d005e75faf503beb7e01c77ce8f0`
+
+The public transcript body is:
+
+```text
+00:00.000 --> 00:03.500
+[overlapping street chatter]
+
+00:09.000 --> 00:12.000
+- Inajistabilize?
+- Mmh
+
+00:12.000 --> 00:14.000
+Wacha kuongea juu ya footage.
+```
+
+The initial transcript publication reached published v12 without backfilling the earlier immutable v8.
+
+The later governed caption correction preserved the same transcript exact revision through working v13, submitted v14, approved v15, and final published v16.
+
+Final published v16:
+
+`4ab5a5bb-b0f4-4b8b-8ea2-94fe1be8786e`
+
+The public reader returns the exact transcript relationship for v16.
+
+Production protected transcript delivery returned:
+
+- HTTP `200`
+- `text/plain; charset=utf-8`
+- `157` bytes
+- exact SHA-256:
+  `fb0cf3e6853b21c7428ee75d378d1943b0f6d005e75faf503beb7e01c77ce8f0`
+
+Public presentation of the reviewed timed text was accepted on the real Video.
+
+## Caption regression discovered during transcript presentation
+
+The transcript presentation exercise exposed one separate browser defect: the custom public caption overlay could retain the previous VTT cue after its explicit end time.
+
+The VTT bytes were correct. PR #808 repaired the frontend player by deriving visible captions from cue `startTime` / `endTime` against actual Video `currentTime` and resynchronizing on `timeupdate`.
+
+No transcript authority or caption file was rewritten by that player repair.
+
+Desktop and mobile cue-expiry acceptance both passed after production activation.
+
+## Final correction continuity
+
+The reviewed 00:12 through 00:14 spoken line was then added to a new governed caption asset and carried through the existing immutable Video lifecycle.
+
+Corrected caption:
+
+- asset:
+  `17c13145-5d34-420b-a445-d34b4f4b6570`
+- exact revision:
+  `e1bad3cf-7842-4598-929d-e0f214bea58d`
+- bytes: `165`
+- SHA-256:
+  `f9d0ca3f03868d99fc61a3a4e9bdc8972f18865a375ce784a3692d4a61ee747c`
+
+Final public v16 caption delivery returned HTTP `200` with exact bytes and SHA-256.
+
+Desktop and mobile both proved the corrected cue renders from 00:12 through 00:14 and disappears at 00:14.
+
+Historical published v12 remains stored with its original exact 110-byte caption relationship.
+
+## Preview disposition
+
+The disposable transcript preview was deleted after final real production acceptance:
+
+- project ref:
+  `fdsyuekeqvkghabgthaw`
+- branch id:
+  `8cb6cc56-5ea1-41d0-b029-48aa79d94777`
+- deletion: PASS
+- post-delete development-branch list: none
+
+The preview-only synthetic immutable fixtures disappeared with the disposable branch. They were not rewritten individually.
+
+This transcript slice is closed as part of the canonical Phase 7B closure:
+
+`docs/engineering/phase-7b-closure-record.md`
