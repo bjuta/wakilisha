@@ -410,6 +410,21 @@ describe(
         expect(
           migration,
         ).toContain(
+          "artist_claim_proposed_identities_accepted_artist_id_idx",
+        );
+        expect(
+          migration,
+        ).toContain(
+          "else 1.0 end",
+        );
+        expect(
+          migration,
+        ).not.toContain(
+          "else 100 end",
+        );
+        expect(
+          migration,
+        ).toContain(
           "community_submit_new_artist_claim",
         );
         expect(
