@@ -197,10 +197,8 @@ begin
        'platform_private.mizizi_resolve_artist_identity_candidates'
        in v_definition
      ) = 0
-     or position(
-       '''active'', ''draft'', ''needs_review'''
-       in v_definition
-     ) = 0
+     or v_definition !~*
+        '''active''[[:space:]]*,[[:space:]]*''draft''[[:space:]]*,[[:space:]]*''needs_review'''
   then
     raise exception
       'FAIL: public Artist Studio search does not delegate to bounded MIZIZI Registry identity resolution';
@@ -247,7 +245,7 @@ begin
      or v_definition !~*
         'insert[[:space:]]+into[[:space:]]+public\.registry_artists'
      or position(
-          '''draft'''
+          '''active'''
           in v_definition
         ) = 0
   then
@@ -280,10 +278,8 @@ begin
           'can_manage_team'
           in v_definition
         ) = 0
-     or position(
-          '''active'', ''draft'', ''needs_review'''
-          in v_definition
-        ) = 0
+     or v_definition !~*
+        '''active''[[:space:]]*,[[:space:]]*''draft''[[:space:]]*,[[:space:]]*''needs_review'''
   then
     raise exception
       'FAIL: Artist Studio management does not derive from scoped representation authority';
