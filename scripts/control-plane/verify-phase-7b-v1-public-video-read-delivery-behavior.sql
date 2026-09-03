@@ -223,8 +223,8 @@ begin
       'PHASE_7B_V1_BEHAVIOR_FAIL: bound active Show identity is not composed';
   end if;
 
-  if not exists (
-    select 1
+  if (
+    select count(*)
     from editorial.resources resource_row
     where resource_row.id in (
       '00000000-0000-4000-8000-000000007b11'::uuid,
@@ -232,9 +232,7 @@ begin
     )
       and resource_row.visibility = 'public'
       and resource_row.lifecycle_state = 'active'
-    group by true
-    having count(*) = 2
-  ) then
+  ) <> 2 then
     raise exception
       'PHASE_7B_V1_BEHAVIOR_FAIL: published Video Episode did not promote shared Show hierarchy visibility';
   end if;
