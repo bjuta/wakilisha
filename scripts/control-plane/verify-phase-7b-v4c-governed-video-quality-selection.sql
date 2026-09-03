@@ -15,8 +15,16 @@ begin
       'PHASE_7B_V4C_FAIL: public Video reader is missing';
   end if;
 
+  if to_regprocedure(
+       'platform_private.get_public_video_publication_phase_7b(text,text)'
+     ) is null
+  then
+    raise exception
+      'PHASE_7B_VIDEO_DELIVERY_FAIL: preserved internal Video delivery reader is missing';
+  end if;
+
   v_reader := pg_get_functiondef(
-    'public.get_public_video_publication(text,text)'::regprocedure
+    'platform_private.get_public_video_publication_phase_7b(text,text)'::regprocedure
   );
 
   if position('''renditions'', jsonb_build_array' in v_reader) = 0

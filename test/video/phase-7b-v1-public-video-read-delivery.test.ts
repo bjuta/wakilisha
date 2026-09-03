@@ -145,27 +145,30 @@ describe("Phase 7B V1 public Video read and delivery", () => {
     expect(databaseTypes).toContain("get_public_video_publication");
   });
 
-  it("mounts stable public Video index, standalone and Show Episode routes", () => {
+  it("mounts public Video as a standalone-only route family", () => {
     expect(lazyPublic).toContain("PublicVideoPage");
     expect(lazyPublic).toContain("PublicVideoDetailPage");
+    expect(lazyPublic).toContain("PublicShowsPage");
     expect(router).toContain('{ path: "/video"');
-    expect(router).toContain('{ path: "/video/:showSlug/:episodeSlug"');
     expect(router).toContain('{ path: "/video/:slug"');
+    expect(router).not.toContain('{ path: "/video/:showSlug/:episodeSlug"');
+    expect(router).toContain('{ path: "/shows"');
+    expect(router).toContain('{ path: "/shows/:showSlug"');
+    expect(router).toContain('{ path: "/shows/:showSlug/:episodeSlug"');
     expect(indexPage).toContain('url="https://wakilisha.africa/video"');
-    expect(detailPage).toContain(
-      "publication.canonicalPath !== location.pathname",
-    );
+    expect(detailPage).toContain('value.publicationKind !== "standalone"');
+    expect(detailPage).toContain('return <Navigate to="/404" replace />');
   });
 
-  it("does not mutate the shared Show Episode route contract", () => {
-    expect(router).toContain(
-      '{ path: "/shows/:showSlug/:episodeSlug"',
-    );
-    expect(router).toContain(
-      '{ path: "/shows/:showSlug"',
-    );
+  it("preserves the historical V1 mistake while current behavior rejects it", () => {
     expect(migration).toContain(
       "'/video/' || v_show.slug || '/' || v_episode.slug",
+    );
+    expect(behavior).toContain(
+      "'/shows/phase-7b-v1-show/phase-7b-v1-episode'",
+    );
+    expect(behavior).toContain(
+      "episodic Video leaked through standalone /video identity",
     );
   });
 });

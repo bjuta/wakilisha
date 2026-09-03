@@ -183,6 +183,7 @@ do $phase_7b_v1_behavior$
 declare
   v_publication jsonb;
   v_index jsonb;
+  v_show_index jsonb;
 begin
   v_publication := public.get_public_video_publication(
     'phase-7b-v1-fixture',
@@ -206,10 +207,10 @@ begin
       'phase-7b-v1-episode',
       'phase-7b-v1-show'
     ) #>> '{canonical_path}'
-  ) <> '/video/phase-7b-v1-show/phase-7b-v1-episode'
+  ) <> '/shows/phase-7b-v1-show/phase-7b-v1-episode'
   then
     raise exception
-      'PHASE_7B_V1_BEHAVIOR_FAIL: shared Show Episode Video route is not resolved';
+      'PHASE_7B_V1_BEHAVIOR_FAIL: shared Show Episode Video is not Show-scoped';
   end if;
 
   if (
@@ -221,6 +222,67 @@ begin
   then
     raise exception
       'PHASE_7B_V1_BEHAVIOR_FAIL: bound active Show identity is not composed';
+  end if;
+
+  if (
+    select count(*)
+    from editorial.resources resource_row
+    where resource_row.id in (
+      '00000000-0000-4000-8000-000000007b11'::uuid,
+      '00000000-0000-4000-8000-000000007b12'::uuid
+    )
+      and resource_row.visibility = 'public'
+      and resource_row.lifecycle_state = 'active'
+  ) <> 2 then
+    raise exception
+      'PHASE_7B_V1_BEHAVIOR_FAIL: published Video Episode did not promote shared Show hierarchy visibility';
+  end if;
+
+  if (
+    public.get_public_show_episode(
+      'phase-7b-v1-show',
+      'phase-7b-v1-episode'
+    ) #>> '{video,canonical_path}'
+  ) <> '/shows/phase-7b-v1-show/phase-7b-v1-episode'
+  then
+    raise exception
+      'PHASE_7B_V1_BEHAVIOR_FAIL: shared Show Episode reader did not compose published Video';
+  end if;
+
+  if (
+    public.get_public_show('phase-7b-v1-show')
+      #>> '{show,canonical_path}'
+  ) <> '/shows/phase-7b-v1-show'
+  then
+    raise exception
+      'PHASE_7B_V1_BEHAVIOR_FAIL: published Video Episode did not make its shared Show publicly resolvable';
+  end if;
+
+  if public.get_public_video_publication(
+    'phase-7b-v1-episode',
+    null
+  ) is not null then
+    raise exception
+      'PHASE_7B_V1_BEHAVIOR_FAIL: episodic Video leaked through standalone /video identity';
+  end if;
+
+  v_show_index := public.get_public_show_index(10);
+
+  if not exists (
+    select 1
+    from jsonb_array_elements(
+      coalesce(v_show_index->'items', '[]'::jsonb)
+    ) item
+    where item->>'resource_id' =
+      '00000000-0000-4000-8000-000000007b11'
+      and item->>'canonical_path' =
+        '/shows/phase-7b-v1-show'
+      and (item->>'episode_count')::integer = 1
+      and (item->>'video_episode_count')::integer = 1
+      and (item->>'audio_episode_count')::integer = 0
+  ) then
+    raise exception
+      'PHASE_7B_V1_BEHAVIOR_FAIL: public Show directory omitted Video-backed Show';
   end if;
 
   v_index := public.get_public_video_index(10);
@@ -235,6 +297,20 @@ begin
   ) then
     raise exception
       'PHASE_7B_V1_BEHAVIOR_FAIL: public Video index omitted published fixture';
+  end if;
+
+  if not exists (
+    select 1
+    from jsonb_array_elements(
+      coalesce(v_index->'items', '[]'::jsonb)
+    ) item
+    where item->>'version_id' =
+      '00000000-0000-4000-8000-000000007b16'
+      and item->>'canonical_path' =
+        '/shows/phase-7b-v1-show/phase-7b-v1-episode'
+  ) then
+    raise exception
+      'PHASE_7B_V1_BEHAVIOR_FAIL: Video index did not preserve Show-scoped Episode identity';
   end if;
 
   if public.get_public_video_publication(

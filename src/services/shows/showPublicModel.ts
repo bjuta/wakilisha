@@ -4,8 +4,11 @@ import {
   type PublicAudioSeason,
 } from "@/services/audio/audioPublicModel";
 import {
+  decodePublicVideoPublication,
+  type PublicVideoPublication,
+} from "@/services/video/videoPublicModel";
+import {
   showEpisodePath,
-  showFeedPath,
   showPath,
 } from "./showIdentity";
 
@@ -17,8 +20,10 @@ export interface PublicShowHeader {
   title: string;
   description: string | null;
   canonicalPath: string;
-  feedPath: string;
+  feedPath: string | null;
   episodeCount: number;
+  audioEpisodeCount: number;
+  videoEpisodeCount: number;
 }
 
 export interface PublicShowEpisodeIdentity {
@@ -33,13 +38,18 @@ export interface PublicShowEpisodeIdentity {
 
 export interface PublicShowEpisode {
   episode: PublicShowEpisodeIdentity;
-  audio: PublicAudioPublication;
+  audio: PublicAudioPublication | null;
+  video: PublicVideoPublication | null;
 }
 
 export interface PublicShowDetail {
   show: PublicShowHeader;
   seasons: PublicAudioSeason[];
   episodes: PublicShowEpisode[];
+}
+
+export interface PublicShowIndex {
+  items: PublicShowHeader[];
 }
 
 function record(value: unknown): UnknownRecord {
@@ -92,30 +102,85 @@ function decodeSeason(value: unknown): PublicAudioSeason | null {
   };
 }
 
+function decodeShowHeader(value: unknown): PublicShowHeader | null {
+  const input = record(value);
+  const resourceId = stringValue(input.resource_id);
+  const slug = stringValue(input.slug);
+  const title = stringValue(input.title);
+  const canonicalPath = stringValue(input.canonical_path);
+
+  if (
+    !resourceId
+    || !slug
+    || !title
+    || canonicalPath !== showPath(slug)
+  ) {
+    return null;
+  }
+
+  return {
+    resourceId,
+    slug,
+    title,
+    description: nullableString(input.description),
+    canonicalPath,
+    feedPath: nullableString(input.feed_path),
+    episodeCount: numberValue(input.episode_count),
+    audioEpisodeCount: numberValue(input.audio_episode_count),
+    videoEpisodeCount: numberValue(input.video_episode_count),
+  };
+}
+
 export function decodePublicShowEpisode(
   value: unknown,
+  expectedShowSlug?: string,
 ): PublicShowEpisode | null {
   const root = record(value);
   const episodeInput = record(root.episode);
-  const audio = decodePublicAudioPublication(root.audio);
+  const audio = root.audio
+    ? decodePublicAudioPublication(root.audio)
+    : null;
+  const video = root.video
+    ? decodePublicVideoPublication(root.video)
+    : null;
 
   const resourceId = stringValue(episodeInput.resource_id);
   const showResourceId = stringValue(episodeInput.show_resource_id);
   const slug = stringValue(episodeInput.slug);
   const canonicalPath = stringValue(episodeInput.canonical_path);
   const title = stringValue(episodeInput.title);
+  const showSlug = expectedShowSlug?.trim() || "";
 
   if (
-    !resourceId ||
-    !showResourceId ||
-    !slug ||
-    !canonicalPath ||
-    !title ||
-    !audio ||
-    audio.publicationKind !== "episode" ||
-    !audio.show?.slug ||
-    audio.canonicalPath !== canonicalPath ||
-    canonicalPath !== showEpisodePath(audio.show.slug, slug)
+    !resourceId
+    || !showResourceId
+    || !slug
+    || !canonicalPath
+    || !title
+    || (!audio && !video)
+    || (showSlug && canonicalPath !== showEpisodePath(showSlug, slug))
+  ) {
+    return null;
+  }
+
+  if (
+    audio
+    && (
+      audio.publicationKind !== "episode"
+      || audio.canonicalPath !== canonicalPath
+      || (showSlug && audio.show?.slug !== showSlug)
+    )
+  ) {
+    return null;
+  }
+
+  if (
+    video
+    && (
+      video.publicationKind !== "episode"
+      || video.canonicalPath !== canonicalPath
+      || (showSlug && video.show?.slug !== showSlug)
+    )
   ) {
     return null;
   }
@@ -131,6 +196,7 @@ export function decodePublicShowEpisode(
       episodeNumber: nullableNumber(episodeInput.episode_number),
     },
     audio,
+    video,
   };
 }
 
@@ -140,26 +206,21 @@ export function decodePublicShow(
   if (!value) return null;
 
   const root = record(value);
-  const showInput = record(root.show);
-  const resourceId = stringValue(showInput.resource_id);
-  const slug = stringValue(showInput.slug);
-  const title = stringValue(showInput.title);
-  const canonicalPath = stringValue(showInput.canonical_path);
-  const feedPath = stringValue(showInput.feed_path);
+  const show = decodeShowHeader(root.show);
+  if (!show) return null;
 
   const episodes = array(root.episodes)
-    .map(decodePublicShowEpisode)
+    .map((episode) => decodePublicShowEpisode(episode, show.slug))
     .filter((episode): episode is PublicShowEpisode => episode !== null)
-    .filter((episode) => episode.episode.showResourceId === resourceId);
+    .filter((episode) => episode.episode.showResourceId === show.resourceId);
 
   if (
-    !resourceId ||
-    !slug ||
-    !title ||
-    canonicalPath !== showPath(slug) ||
-    feedPath !== showFeedPath(slug) ||
-    episodes.length === 0 ||
-    numberValue(showInput.episode_count) !== episodes.length
+    episodes.length === 0
+    || show.episodeCount !== episodes.length
+    || show.audioEpisodeCount
+       !== episodes.filter((episode) => episode.audio !== null).length
+    || show.videoEpisodeCount
+       !== episodes.filter((episode) => episode.video !== null).length
   ) {
     return null;
   }
@@ -169,16 +230,19 @@ export function decodePublicShow(
     .filter((season): season is PublicAudioSeason => season !== null);
 
   return {
-    show: {
-      resourceId,
-      slug,
-      title,
-      description: nullableString(showInput.description),
-      canonicalPath,
-      feedPath,
-      episodeCount: episodes.length,
-    },
+    show,
     seasons,
     episodes,
   };
+}
+
+export function decodePublicShowIndex(
+  value: unknown,
+): PublicShowIndex {
+  const root = record(value);
+  const items = array(root.items)
+    .map(decodeShowHeader)
+    .filter((item): item is PublicShowHeader => item !== null);
+
+  return { items };
 }

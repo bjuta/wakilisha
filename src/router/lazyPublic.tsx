@@ -76,6 +76,10 @@ export const PublicVideoDetailPage = lazy(
   () => import("../pages/video/detail/page"),
 );
 
+export const PublicShowsPage = lazy(
+  () => import("../pages/shows/page"),
+);
+
 export const PublicShowPage = lazy(
   () => import("../pages/shows/detail/page"),
 );

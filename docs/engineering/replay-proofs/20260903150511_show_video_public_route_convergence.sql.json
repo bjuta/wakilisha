@@ -1,0 +1,44 @@
+{
+  "migration_file": "supabase/migrations/20260903150511_show_video_public_route_convergence.sql",
+  "migration_sha256": "ae66f2ac796c0b087e922dd5392ebaba91594a2a81b58012a01d64e6f1ef58a1",
+  "base_main_sha": "bfed077578cebc80e8afe446460c8eedc00669e5",
+  "preview_project_ref": "ckawmppbefnyfljwuqvn",
+  "preview_branch_id": "24fe30b5-31a5-45ca-8225-4aa919896c2b",
+  "preview_branch_name": "show-video-public-route-convergence",
+  "preview_migration_head": "20260903150511",
+  "baseline_migration_count": 83,
+  "baseline_migration_head": "20260903085155",
+  "preview_migration_count": 84,
+  "baseline_replay": "pass",
+  "candidate_apply": "pass",
+  "verifier": "pass",
+  "verifier_file": "scripts/control-plane/verify-phase-7b-v1-public-video-read-delivery.sql",
+  "verifier_marker": "PHASE_7B_V1_PUBLIC_VIDEO_READ_DELIVERY_PASS",
+  "behavior_marker": "PHASE_7B_V1_PUBLIC_VIDEO_READ_DELIVERY_BEHAVIOR_PASS",
+  "schema_types_sha256": "1af09ad4a464ff9278f3750427dece59a005da928adca6da68e8defe8a71bf34",
+  "schema_migration_count": 84,
+  "schema_migration_head": "20260903150511",
+  "preview_history_alignment": "pass",
+  "preview_history_alignment_detail": "20260903151115 reverted; repository migration 20260903150511 marked applied via Supabase CLI; db push --dry-run reported remote database up to date",
+  "public_route_contract": {
+    "standalone_video": "/video/:slug",
+    "show_episode": "/shows/:showSlug/:episodeSlug",
+    "rejected_episode_video_route": "/video/:showSlug/:episodeSlug"
+  },
+  "preview_behavior": {
+    "standalone_video": "pass",
+    "show_episode_video": "pass",
+    "show_directory_video_backed_show": "pass",
+    "standalone_episode_leakage_guard": "pass",
+    "shared_visibility_promotion": "pass",
+    "video_index_show_scoped_identity": "pass"
+  },
+  "preview_permanent_verifiers": {
+    "phase_7b_v1": "pass",
+    "phase_7b_v4b": "pass",
+    "phase_7b_v4c": "pass",
+    "transcript_authority": "pass"
+  },
+  "schema_type_generation_disposition": "Supabase generator omitted the repository-retained editorial top-level schema; accepted public delta adds only get_public_show_index(integer) to the existing public,editorial seal",
+  "verified_at": "2026-09-03T15:20:18Z"
+}

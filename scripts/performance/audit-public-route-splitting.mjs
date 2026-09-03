@@ -185,9 +185,12 @@ const directLazyImports = [
  * - ../pages/video/page
  * - ../pages/video/detail/page
  *
- * The current authority is therefore 67 direct lazy imports.
+ * Shared Show public-route convergence adds one Show directory import:
+ * - ../pages/shows/page
+ *
+ * The current authority is therefore 68 direct lazy imports.
  */
-const expectedDirectLazyImportCount = 67;
+const expectedDirectLazyImportCount = 68;
 
 if (
   directLazyImports.length !==
@@ -253,6 +256,7 @@ for (const requiredModule of [
   "../pages/playlists/detail/page",
   "../pages/audio/page",
   "../pages/audio/detail/page",
+  "../pages/shows/page",
   "../pages/shows/detail/page",
   "../pages/shows/episode/page",
   "../pages/video/page",
@@ -395,6 +399,9 @@ const routePaths = [
  * - /shows/:showSlug
  * - /shows/:showSlug/:episodeSlug
  *
+ * Shared Show public-route convergence adds the Show directory:
+ * - /shows
+ *
  * Public Audio directory convergence adds one public route:
  * - /audio
  *
@@ -405,25 +412,24 @@ const routePaths = [
  * These are Admin Studio routes only. They must not change the preserved
  * pre-M1 public route sequence.
  *
- * Phase 7B V1 adds three public Video routes:
+ * Phase 7B V1 originally added three public Video routes. Shared Show
+ * convergence removes the competing episodic Video path and keeps only:
  * - /video
- * - /video/:showSlug/:episodeSlug
  * - /video/:slug
  *
- * The current authority is therefore 174 paths. Removing the four declared
- * public Audio and Show paths, the two K5B Admin Video paths, and the three
- * Phase 7B public Video paths must still reproduce the exact 165-path
- * pre-M1 sequence.
+ * The current authority remains 174 paths. Removing the five declared public
+ * Audio and Show paths, the two K5B Admin Video paths, and the two public Video
+ * paths must still reproduce the exact 165-path pre-M1 sequence.
  */
 const expectedRoutePathCount = 174;
 const publicAudioIndexPath = "/audio";
 const publicAudioPath = "/audio/:slug";
+const publicShowIndexPath = "/shows";
 const publicShowPath = "/shows/:showSlug";
 const publicShowEpisodePath = "/shows/:showSlug/:episodeSlug";
 const adminVideoIndexPath = "video";
 const adminVideoDetailPath = "video/:publicationId";
 const publicVideoIndexPath = "/video";
-const publicVideoEpisodePath = "/video/:showSlug/:episodeSlug";
 const publicVideoStandalonePath = "/video/:slug";
 
 if (routePaths.length !== expectedRoutePathCount) {
@@ -435,12 +441,12 @@ if (routePaths.length !== expectedRoutePathCount) {
 for (const [routePath, label] of [
   [publicAudioIndexPath, "Audio Directory"],
   [publicAudioPath, "Standalone Audio"],
+  [publicShowIndexPath, "Show Directory"],
   [publicShowPath, "Show"],
   [publicShowEpisodePath, "Show Episode"],
   [adminVideoIndexPath, "Admin Video Directory"],
   [adminVideoDetailPath, "Admin Video Detail"],
   [publicVideoIndexPath, "Public Video Directory"],
-  [publicVideoEpisodePath, "Public Video Episode"],
   [publicVideoStandalonePath, "Public Standalone Video"],
 ]) {
   if (
@@ -454,10 +460,11 @@ for (const [routePath, label] of [
 
 if (
   routePaths.some((routePath) => routePath.startsWith("/audio/shows/")) ||
-  routePaths.some((routePath) => routePath.includes("/episodes/"))
+  routePaths.some((routePath) => routePath.includes("/episodes/")) ||
+  routePaths.includes("/video/:showSlug/:episodeSlug")
 ) {
   fail(
-    "rejected Audio-bucket or redundant Episode route grammar returned",
+    "rejected Audio-bucket, competing Video Episode, or redundant Episode route grammar returned",
   );
 }
 
@@ -465,12 +472,12 @@ const preM1RoutePaths = routePaths.filter(
   (routePath) =>
     routePath !== publicAudioIndexPath &&
     routePath !== publicAudioPath &&
+    routePath !== publicShowIndexPath &&
     routePath !== publicShowPath &&
     routePath !== publicShowEpisodePath &&
     routePath !== adminVideoIndexPath &&
     routePath !== adminVideoDetailPath &&
     routePath !== publicVideoIndexPath &&
-    routePath !== publicVideoEpisodePath &&
     routePath !== publicVideoStandalonePath,
 );
 
