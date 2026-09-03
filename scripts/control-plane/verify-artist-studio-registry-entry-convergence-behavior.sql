@@ -109,8 +109,8 @@ values
   'active',
   '{"fixture":"artist_studio_registry_entry"}'::jsonb,
   true,
-  'artist_studio_applicant_fixture',
-  'artist_studio_applicant_fixture'
+  'artiststudioapplicant',
+  'artiststudioapplicant'
 ),
 (
   '00000000-0000-4000-8000-00000000a512'::uuid,
@@ -119,8 +119,8 @@ values
   'active',
   '{"fixture":"artist_studio_registry_entry"}'::jsonb,
   true,
-  'artist_studio_reviewer_fixture',
-  'artist_studio_reviewer_fixture'
+  'artiststudioreviewer',
+  'artiststudioreviewer'
 )
 on conflict (user_id)
 do update
