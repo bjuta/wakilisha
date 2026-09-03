@@ -21473,6 +21473,7 @@ export type Database = {
         Args: { p_episode_slug: string; p_show_slug: string }
         Returns: Json
       }
+      get_public_show_index: { Args: { p_limit?: number }; Returns: Json }
       get_public_track_lyrics: { Args: { p_track_id: string }; Returns: Json }
       get_public_video_caption_delivery_target: {
         Args: { p_publication_version_id: string; p_track_number: number }
