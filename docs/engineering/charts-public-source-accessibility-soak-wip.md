@@ -2,7 +2,7 @@
 
 Status: **WIP / PENDING 7-DAY DURABILITY PROOF**
 
-Status date: 24 August 2026
+Status date: 3 September 2026
 
 This record preserves the current state of the Kenya-first public-source chart research so later work does not accidentally restart the investigation from first principles.
 
@@ -30,7 +30,9 @@ Two empirical access probes from a normal Kenyan connection established that mul
 
 The remaining gate before a final source-qualification decision is a seven-day unattended soak measuring source reliability, schema stability, depth stability, response changes, and access failures over time.
 
-Do not treat a one-off successful fetch as final source qualification.
+The first soak attempt was invalidated on 3 September 2026 after a controller time-unit defect was proved. That attempt captured only two observations across 6.77 hours before falsely finalizing. A clean, separately named second attempt is now running from a repaired and preflighted controller.
+
+Do not treat a one-off successful fetch, the invalid first soak attempt, or the first observation of attempt 2 as final source qualification.
 
 ## Empirical source-access evidence
 
@@ -191,33 +193,128 @@ Track/release genre authority can be extended where needed, but Spotify, Apple, 
 
 ### Status
 
-**RUNNING**
+**ATTEMPT 2 RUNNING / ATTEMPT 1 INVALIDATED**
 
-Started:
+### Attempt 1: invalid durability proof
+
+Attempt 1 started at:
 
 - UTC: `2026-08-24T13:52:43Z`
 - Africa/Nairobi: 24 August 2026 at 16:52:43 EAT
 
-Local LaunchAgent label:
+It used LaunchAgent label:
 
 `africa.wakilisha.chart-source-soak`
 
-Cadence:
+The intended cadence was every 6 hours for 7 days. The controller captured only two runs:
 
-- every 6 hours
-- target window: 7 days
-- expected ideal capture count: at least 28 observations per source
+- first capture: `2026-08-24T13:52:43Z`
+- second capture: `2026-08-24T20:38:56Z`
+- observed elapsed time at second capture: 6.77 hours
+- observed run count: 2
 
-Sources under soak:
+Both runs produced HTTP 200 and successful parses for Apple, YouTube, Mdundo, Audiomack, Boomplay, and Shazam, with depths of 100, 100, 100, 100, 100, and 200 respectively.
 
-- Apple
-- YouTube
-- Mdundo
-- Audiomack
-- Boomplay
-- Shazam
+The second wake then incorrectly emitted:
 
-First captured observation:
+```text
+SOAK_ELAPSED_HOURS=6.77
+SOAK_RUN_COUNT=2
+SOAK_WINDOW_COMPLETE=YES
+SOAK_REPORT_READY=YES
+RUN_COUNT=2
+SOAK_AUTO_FINALIZED=YES
+```
+
+The durability proof is therefore invalid. The two individual observations remain valid short-term accessibility evidence.
+
+#### Exact controller defect
+
+The runner calculated elapsed time in seconds:
+
+```python
+elapsed=(now-start).total_seconds()
+```
+
+It then compared that value with:
+
+```python
+elapsed >= 7*24
+```
+
+That threshold is 168 seconds, not seven days. Because the LaunchAgent woke every six hours, the second wake was the first opportunity to observe the false completion.
+
+The correct seven-day threshold is:
+
+```text
+604800 seconds
+```
+
+and the repaired comparison is:
+
+```python
+elapsed >= 7*24*60*60
+```
+
+The failed attempt was preserved before repair. Its original raw captures remain auditable with SHA-256 values:
+
+- `20260824T135243Z.json`: `1f024bb765afb22c19b140065502650a7ecee01a3b1180e246c81594e92ff883`
+- `20260824T203856Z.json`: `d394bd450ba1f71a3155dfb8668734aec199454ab52f1855038b77d65d34ae59`
+
+The failed controller also logged a two-run report bundle:
+
+- path at generation time: `~/Downloads/wakilisha-chart-source-soak-20260824T203907Z.zip`
+- logged SHA-256: `bac6af587d8270ffa5fffc5f6689d4172440c5bea0655fb913440cfdd4612aa4`
+
+The generated ZIP was no longer present when the failure was diagnosed. The preserved raw captures, state, logs, runner files, and LaunchAgent definition remain the authoritative failed-attempt evidence.
+
+### Repair preflight
+
+Before attempt 2 was allowed to contact any source, the repaired controller passed:
+
+- Bash syntax validation
+- Python static compilation
+- LaunchAgent plist validation
+- empty attempt-2 data and state proof
+- explicit proof that attempt 2 was not loaded
+- synthetic completion-boundary tests at 6 hours, 24 hours, 72 hours, 167 hours, 167:59:59, 168 hours, and 169 hours
+
+The boundary matrix proved:
+
+- 167:59:59 does not complete
+- exactly 168 hours completes
+- `WINDOW_SECONDS=604800`
+
+Attempt-2 preflight artifact SHA-256 values:
+
+- `runner.sh`: `dc69b56aa10323acbb69c7384b0c3703f0f2f93895912100c62ec879f43de791`
+- `run_once.py`: `444379cf326d58d1527ea0b94e9a5a18ddaa62dc94d5d874bb98631fbec8aad7`
+- `finalize.py`: `6aaf12c911b52814cc81c76ef8609f551ce67acc17577ba026f25d52ca5d313e`
+- LaunchAgent plist: `21f0d3405991c9fb2884921999cae332e10043fd99a6a7ddf139d7beb022dc1a`
+
+No source request was made during repair or preflight.
+
+### Attempt 2: authoritative running soak
+
+Attempt 2 uses a separate local authority:
+
+- root: `~/Library/Application Support/WAKILISHA/chart-source-soak-v2`
+- LaunchAgent label: `africa.wakilisha.chart-source-soak-v2`
+- cadence: every 6 hours
+- cadence seconds: `21600`
+- durability window seconds: `604800`
+
+Authoritative start:
+
+- UTC: `2026-09-03T12:29:31Z`
+- Africa/Nairobi: 3 September 2026 at 15:29:31 EAT
+
+Seven-day boundary:
+
+- UTC: `2026-09-10T12:29:31Z`
+- Africa/Nairobi: 10 September 2026 at 15:29:31 EAT
+
+The first attempt-2 capture was:
 
 | Source | HTTP | Parse | Depth |
 | --- | ---: | --- | ---: |
@@ -225,21 +322,38 @@ First captured observation:
 | YouTube | 200 | pass | 100 |
 | Mdundo | 200 | pass | 100 |
 | Audiomack | 200 | pass | 100 |
-| Boomplay | 200 | pass | 100 |
+| Boomplay | 403 | fail | n/a |
 | Shazam | 200 | pass | 200 |
 
-The first run wrote one local capture successfully, returned launchd exit code `0`, and produced no stderr output.
+Controller state immediately after the first attempt-2 capture proved:
 
-### Expected completion window
+```text
+SOAK_ELAPSED_HOURS=0.01
+SOAK_RUN_COUNT=1
+SOAK_WINDOW_COMPLETE=NO
+STDERR_EMPTY=PASS
+COMPLETE_MARKER_ABSENT=PASS
+SOAK_V2_STARTED=PASS
+```
 
-The seven-day window should complete after approximately:
+Boomplay's first-run HTTP 403 is evidence, not a reason to modify the experiment. The source must remain in the soak unchanged so the final audit can determine whether that access failure persists, recovers, or oscillates.
 
-- UTC: `2026-08-31T13:52:43Z`
-- Africa/Nairobi: 31 August 2026 after 16:52:43 EAT
+The first capture also proves the portfolio continues collecting usable evidence when one source fails. That is an observed degradation property, not yet a final source-qualification decision.
 
-The local runner is configured to package a final `wakilisha-chart-source-soak-<timestamp>.zip` report after the seven-day window and then stop making source requests.
+### Attempt-2 operating rule
 
-A Mac shutdown or prolonged unavailability may reduce the ideal 28-run count. Final qualification should judge calendar coverage and observed reliability, not treat 28 as an arbitrary magic threshold.
+Until the seven-day boundary is reached:
+
+- do not restart the LaunchAgent unless it is proved stopped unexpectedly
+- do not manually trigger additional captures
+- do not delete or rewrite state
+- do not edit the runner or parser set
+- do not remove Boomplay because it returned 403
+- do not redesign scoring during the soak
+- do not treat any source as permanently qualified or rejected
+- preserve all captures and logs exactly as observed
+
+The target remains approximately 28 observations per source. Final qualification must judge actual calendar coverage and observed reliability rather than use 28 as an arbitrary pass/fail number.
 
 ## Final soak audit questions
 
