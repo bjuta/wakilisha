@@ -78,6 +78,14 @@ begin
       'FAIL: proposed Artist identity claims do not have RLS enabled';
   end if;
 
+  if to_regclass(
+       'public.artist_claim_proposed_identities_accepted_artist_id_idx'
+     ) is null
+  then
+    raise exception
+      'FAIL: proposed Artist accepted identity foreign key is not indexed';
+  end if;
+
   if has_table_privilege(
        'anon',
        'public.artist_claim_proposed_identities',
@@ -248,6 +256,14 @@ begin
           '''active'''
           in v_definition
         ) = 0
+     or position(
+          'else 1.0 end'
+          in v_definition
+        ) = 0
+     or position(
+          'else 100 end'
+          in v_definition
+        ) > 0
   then
     raise exception
       'FAIL: reviewed new Artist acceptance is not the only canonical Registry creation boundary';
