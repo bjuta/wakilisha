@@ -374,7 +374,7 @@ begin
   v_resolve_replay :=
     public.community_submit_new_artist_claim(
       'Kivuli Meridian Fixture',
-      'duo',
+      'group',
       'KE',
       array['Kivuli Meridian'],
       'manager',
