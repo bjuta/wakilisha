@@ -108,6 +108,10 @@ export const Artists = lazy(
   () => import("../pages/artists/page"),
 );
 
+export const ArtistStudioPage = lazy(
+  () => import("../pages/artist-studio/page"),
+);
+
 export const ArtistDetail = lazy(
   () => import("../pages/artists/detail/page"),
 );
