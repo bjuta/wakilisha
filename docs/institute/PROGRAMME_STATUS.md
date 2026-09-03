@@ -1,5 +1,40 @@
 # WAKILISHA Programme Status
 
+## Phase 7B closure reconciliation - 3 September 2026
+
+**Phase 7B Public Video product is CLOSED and production accepted.**
+
+The real exit-gate Video remains `Monday Morning in September`.
+
+Final accepted production authority:
+
+- runtime main: `b0ffd4718094e9cca8d66de711cdc8e27a448548`
+- migrations: `83`
+- migration head: `20260903085155_phase_7b_public_video_transcript_authority.sql`
+- frontend entry: `assets/index-cocVN-2T.js`
+- frontend entry SHA-256: `535c06db6538bb25ff3e8f8dcf01f821f71a6022c74c541e6f09a37489a85d9b`
+- frontend index SHA-256: `f183a37a2a03ded8b3b70519c8560d065af8f59ad5c245dfae6c9bfa2b4a8984`
+- frontend dist-tree SHA-256: `7f1dc4a1a889d9c996231b14cd2f4cd776d436e37d0047aabd8225c8580090f2`
+- Edge Function `video-public-delivery`: ACTIVE v8
+- final published Video: v16, `4ab5a5bb-b0f4-4b8b-8ea2-94fe1be8786e`
+
+The accepted exit proof includes:
+
+- HLS master plus governed 360p and 720p renditions with MP4 fallback
+- desktop/mobile playback, settings, quality, captions, and fullscreen acceptance
+- governed public transcript authority and protected TXT delivery
+- real transcript presentation on the public Video
+- corrected Sheng caption through a fresh immutable working, submitted, approved, and published lifecycle
+- desktop/mobile proof that the corrected 00:12 through 00:14 cue appears and expires correctly
+- preserved historical v12 caption authority
+- final disposable transcript preview deletion
+
+Canonical closure record:
+
+- `docs/engineering/phase-7b-closure-record.md`
+
+**Current numbered work is now Phase 8: Field Capture.**
+
 ## Current production reconciliation - 2 September 2026
 
 The latest production-accepted runtime main is:
@@ -101,16 +136,15 @@ The compact navigation view is `docs/roadmap/wakilisha-master-programme-map.md`.
 
 ## Current numbered work
 
-**Phase 7B: Public Video product**
+**Phase 8: Field Capture**
 
-Phases 0 through 7A are closed.
+Phases 0 through 7B are closed.
 
 Phase 6B Public Audio closed by explicit programme decision on 25 August 2026. The former real-podcast exercise is retained as non-blocking Audio operational acceptance and is not falsely recorded as completed.
 
 Current references:
 
-- `docs/engineering/phase-6b-closure-record.md`
-- `docs/engineering/phase-7a-video-publication-authority-kickoff.md`
+- `docs/engineering/phase-7b-closure-record.md`
 - `docs/roadmap/wakilisha-master-programme-map.md`
 - `docs/engineering/charts-public-source-accessibility-soak-wip.md`
 - `docs/engineering/primitive-compounding-contract.md`
@@ -275,27 +309,23 @@ Canonical record:
 
 - `docs/engineering/phase-7b-v4a-adaptive-video-media-foundation.md`
 
-V4A closes the adaptive Media foundation only. It does **not** close Phase 7B.
+V4A closed the adaptive Media foundation only. The product-facing gates that remained after V4A are now also production accepted through V4B, V4C, governed transcript publication, caption cue-expiry repair, and the real immutable caption-correction lifecycle.
 
-Remaining Phase 7B exit work:
+Phase 7B is now closed. See:
 
-- expose the accepted HLS master through the public Video read model
-- cross-browser adaptive playback with MP4 fallback
-- desktop/mobile proof on the real Video
-- governed transcript authority and public presentation
-- public Video correction continuity and real correction-handling proof
+- `docs/engineering/phase-7b-closure-record.md`
 
 ## Immediate numbered programme work
 
-**Phase 7B: Public Video product remains CURRENT.**
+**Phase 8: Field Capture is CURRENT.**
 
-Phase 7A is closed. Do not reopen it.
+Phases 0 through 7B are closed. Do not reopen Phase 7A or Phase 7B unless production evidence invalidates a closed authority contract.
 
-Phase 7B V1 through V3, the subsequent public Video corrections, and V4A adaptive Media foundation are accepted baseline. V4A is production accepted, but no dedicated Phase 7B closure record exists yet, so this status overlay does not claim Phase 7B is closed.
+Phase 8 begins from the accepted Video, Media, Trust, Review, and publication primitives already in production. Its programme target remains safe mobile intake, newsroom triage, and promotion, exiting through a weak-network capture that reaches private review and becomes a safe draft without losing provenance.
 
-The September Registry/public-identity detour is also accepted baseline. It does not create a new numbered phase.
+The September Registry/public-identity detour remains accepted adjacent baseline. It does not create a new numbered phase.
 
-Immediate adjacent Registry state is:
+Immediate adjacent Registry state remains:
 
 1. MIZIZI v1.1.0 implements the accepted Release taxonomy invariant without changing public route grammar
 2. the historical Track identity apply is production accepted: 440 canonical repairs, 66 blocked review items, and 857 MIZIZI redirects
@@ -303,7 +333,7 @@ Immediate adjacent Registry state is:
 4. the historical Release taxonomy apply is production accepted: 32 canonical writes, 0 remaining taxonomy candidates, and exact transition split 11 EP to Single / 19 Album to EP / 2 EP to Album
 5. preserve the 18 bad active Release-membership relationships across 13 active Releases as evidence while preventing them from manufacturing public identity; the fresh Release post-apply audit is 1,430 observations with 0 taxonomy candidates
 
-Phase 7B product work can continue independently where public Video use exposes gaps.
+The remaining Registry review evidence can continue under its existing governance without blocking Phase 8.
 
 ## Primitive compounding rule
 

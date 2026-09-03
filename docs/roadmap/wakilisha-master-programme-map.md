@@ -1,5 +1,26 @@
 # WAKILISHA Master Programme Map
 
+## Phase 7B closure reconciliation - 3 September 2026
+
+**Phase 7B Public Video product is CLOSED and production accepted. Phase 7 is complete.**
+
+Accepted production state:
+
+- runtime main: `b0ffd4718094e9cca8d66de711cdc8e27a448548`
+- migrations: `83`
+- migration head: `20260903085155_phase_7b_public_video_transcript_authority.sql`
+- frontend entry: `assets/index-cocVN-2T.js`
+- Edge Function `video-public-delivery`: ACTIVE v8
+- real final published Video: v16, `4ab5a5bb-b0f4-4b8b-8ea2-94fe1be8786e`
+
+The Phase 7B exit proof includes governed HLS with MP4 fallback, desktop/mobile playback acceptance, governed transcript presentation, protected caption/transcript delivery, a real immutable post-publication caption correction, preserved historical v12 authority, and disposable preview cleanup.
+
+Canonical closure record:
+
+- `docs/engineering/phase-7b-closure-record.md`
+
+The numbered programme now advances to **Phase 8: Field Capture**.
+
 ## Current production reconciliation - 2 September 2026
 
 Latest production-accepted runtime main:
@@ -287,35 +308,34 @@ The machine-enforced contract is documented in `docs/engineering/primitive-compo
 
 ### Phase 7B: Public Video product
 
-**Current.** Compose the public Video experience over the accepted 7A authority.
+**Closed 3 September 2026.**
 
-Accepted Phase 7B baseline now includes V1 through V3, the subsequent public Video corrections, and **V4A adaptive Video Media foundation**.
+The real exit-gate Video `Monday Morning in September` now proves the complete public Video path over the accepted Phase 7A authority.
 
-V4A production acceptance established:
+Accepted closure includes:
 
-- one canonical cross-domain Media processing-profile authority
-- Audio publication processing migrated as a compatibility consumer
-- adaptive Video as the second-domain proof
-- no Video-specific processing RPC
-- two deterministic HLS renditions plus master playlist
-- exactly five governed adaptive derivatives for the real published Video
-- exact public HTTP bytes and byte-range delivery
-- production Media processor worker accepted at the exact merged-main SHA
-- public reader intentionally retained the existing MP4 fallback
+- current-published-version public read authority
+- protected governed captions
+- HLS master plus governed 360p and 720p renditions
+- MP4 fallback
+- desktop/mobile playback, settings, quality, captions, and fullscreen acceptance
+- governed public transcript authority and presentation
+- shared timed-text composition
+- a real post-publication caption correction carried through new immutable working, submitted, approved, and published versions
+- preserved historical v12 caption authority
+- caption cue-expiry repair proven on desktop and mobile
+- final disposable preview cleanup
 
-V4A canonical record:
+Final published Video:
 
-- `docs/engineering/phase-7b-v4a-adaptive-video-media-foundation.md`
+- v16
+- `4ab5a5bb-b0f4-4b8b-8ea2-94fe1be8786e`
 
-Remaining Phase 7B work is product-facing rather than Media-foundation work:
+Canonical closure record:
 
-- expose HLS in the public Video read model
-- cross-browser adaptive playback with MP4 fallback
-- real desktop/mobile acceptance
-- governed transcript presentation
-- public Video correction continuity and real correction-handling proof
+- `docs/engineering/phase-7b-closure-record.md`
 
-Exit Phase 7 through one real captioned Video publication across desktop and mobile with the required transcript/provenance/correction proof.
+Phase 7 is complete.
 
 ### Phase 8: Field Capture
 
@@ -350,11 +370,13 @@ Build Inquiry as a capability across canonical editors, then the public Inquiry 
 
 ## Immediate next step
 
-Continue **Phase 7B: Public Video product** from the production-accepted V1-through-V3 baseline, subsequent public Video corrections, and closed V4A adaptive Media foundation.
+Begin **Phase 8: Field Capture** from the production-accepted Phase 7 foundations.
 
-Do not reopen Phase 7A.
+Do not reopen Phase 7A or Phase 7B to add speculative abstractions.
 
-The September Registry/public-identity detour is accepted adjacent baseline:
+Phase 8 should reuse existing canonical Media, Resource, Trust, Review, correction-provenance, and lifecycle authority where the real field-capture workflow proves they fit. New primitives should be promoted only through the existing Primitive Compounding Contract.
+
+The September Registry/public-identity detour remains accepted adjacent baseline:
 
 - Release taxonomy and one-track public identity are accepted
 - Community Track Registry-ID-first identity is accepted
@@ -370,4 +392,4 @@ Canonical adjacent closure records:
 - `docs/engineering/mizizi-historical-track-production-closure-record.md`
 - `docs/engineering/mizizi-historical-release-taxonomy-production-closure-record.md`
 
-Phase 7B product work can continue independently while the remaining 66 Track review candidates and preserved Release-membership evidence stay governed without reopening either historical MIZIZI apply.
+The remaining Registry review evidence can continue under its existing governance without blocking Phase 8.
