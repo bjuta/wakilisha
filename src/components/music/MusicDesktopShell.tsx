@@ -265,7 +265,7 @@ export function MusicDesktopShell({
         location.pathname;
 
       if (pathname === "/") {
-        return "posts";
+        return "magazine";
       }
 
       if (
