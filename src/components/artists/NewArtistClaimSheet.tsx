@@ -104,6 +104,10 @@ export function NewArtistClaimSheet({
     null,
   );
   const [
+    draftStorageAvailable,
+    setDraftStorageAvailable,
+  ] = useState(true);
+  const [
     actionLoading,
     setActionLoading,
   ] = useState(false);
@@ -155,6 +159,7 @@ export function NewArtistClaimSheet({
       draft?.updatedAt ??
         null,
     );
+    setDraftStorageAvailable(true);
     setMessage(null);
   }, [
     flowId,
@@ -185,7 +190,7 @@ export function NewArtistClaimSheet({
 
     const timer =
       window.setTimeout(() => {
-        const draft =
+        const result =
           saveNewArtistClaimDraft({
             flowId,
             displayName,
@@ -197,8 +202,13 @@ export function NewArtistClaimSheet({
             proofLink,
           });
 
+        setDraftStorageAvailable(
+          result.saved,
+        );
         setSavedAt(
-          draft.updatedAt,
+          result.saved
+            ? result.draft.updatedAt
+            : null,
         );
       }, 180);
 
@@ -245,21 +255,39 @@ export function NewArtistClaimSheet({
       return;
     }
 
-    saveNewArtistClaimDraft({
-      flowId,
-      displayName:
-        cleanName,
-      artistType,
-      originIso2,
-      alternateNames,
-      claimantRole,
-      statement,
-      proofLink,
-    });
+    const draftResult =
+      saveNewArtistClaimDraft({
+        flowId,
+        displayName:
+          cleanName,
+        artistType,
+        originIso2,
+        alternateNames,
+        claimantRole,
+        statement,
+        proofLink,
+      });
+
+    setDraftStorageAvailable(
+      draftResult.saved,
+    );
+    setSavedAt(
+      draftResult.saved
+        ? draftResult.draft.updatedAt
+        : null,
+    );
 
     if (authLoading) return;
 
     if (!userId) {
+      if (!draftResult.saved) {
+        setMessage({
+          type: "error",
+          text: "This browser could not save your draft. Keep this page open or enable site storage before signing in.",
+        });
+        return;
+      }
+
       navigate(
         `/auth?returnTo=${encodeURIComponent(
           returnTo,
@@ -304,6 +332,7 @@ export function NewArtistClaimSheet({
         flowId,
       );
       setSavedAt(null);
+      setDraftStorageAvailable(true);
       setMessage({
         type: "success",
         text: "We received this Artist claim. WAKILISHA will review it.",
@@ -551,9 +580,11 @@ export function NewArtistClaimSheet({
 
           <div className="flex flex-wrap items-center justify-between gap-3 pt-1">
             <span className="text-[10px] font-semibold text-[var(--wk-text-faint)]">
-              {savedAt
-                ? "Saved on this device."
-                : "Your entries stay on this device until you submit."}
+              {!draftStorageAvailable
+                ? "Draft saving is unavailable in this browser."
+                : savedAt
+                  ? "Saved on this device."
+                  : "Your entries will be saved on this device as you type."}
             </span>
 
             <div className="flex gap-2">
