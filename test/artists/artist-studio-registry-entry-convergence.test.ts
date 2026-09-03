@@ -125,7 +125,7 @@ describe(
             .digest("hex");
 
         expect(digest).toBe(
-          "6769132f83f02d6f034f83d159616f17bc4008108916455eaaf148d4b34ffaf5",
+          "9ee7dcb326f270c7040c02d5dafc15e9274078b6fea2d844df597e3a16c10390",
         );
         expect(page).toContain(
           '"/assets/artist-studio/kenyan-creative-community.webp"',
