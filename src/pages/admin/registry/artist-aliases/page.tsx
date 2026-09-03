@@ -109,11 +109,10 @@ function sourceColor(table: string): string {
 
 function matchReasonLabel(reason: string): string {
   switch (reason) {
-    case "exact_slug": return "Exact slug";
-    case "exact_name": return "Exact name";
-    case "high_slug_similarity": return "High slug match";
-    case "high_name_similarity": return "High name match";
-    default: return "Partial match";
+    case "exact": return "Exact Registry match";
+    case "strong": return "Strong Registry match";
+    case "possible": return "Possible Registry match";
+    default: return "Registry match";
   }
 }
 
