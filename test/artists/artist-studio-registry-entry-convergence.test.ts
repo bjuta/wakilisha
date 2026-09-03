@@ -91,6 +91,15 @@ const adminClaimsPage = read(
 const routeAudit = read(
   "scripts/performance/audit-public-route-splitting.mjs",
 );
+const seoEdge = read(
+  "supabase/functions/seo-sitemap-admin/index.ts",
+);
+const prerender = read(
+  "scripts/seo/prerender-metadata.mjs",
+);
+const sitemapBuilder = read(
+  "scripts/seo/build-public-sitemap-html.mjs",
+);
 const verifier = read(
   "scripts/control-plane/verify-artist-studio-registry-entry-convergence.sql",
 );
@@ -545,6 +554,27 @@ describe(
         );
         expect(behavior).toContain(
           "artist_claim_proposed_identities",
+        );
+      },
+    );
+
+    it(
+      "treats Artist Studio as a real public acquisition landing page in SEO authority",
+      () => {
+        expect(seoEdge).toContain(
+          '{ loc: makeUrl("/artist-studio"), url_type: "static" }',
+        );
+        expect(prerender).toContain(
+          '"/artist-studio": {',
+        );
+        expect(prerender).toContain(
+          'title: "Artist Studio"',
+        );
+        expect(sitemapBuilder).toContain(
+          '<a href="/artist-studio">Artist Studio</a>',
+        );
+        expect(sitemapBuilder).toContain(
+          '"/artist-studio"',
         );
       },
     );
