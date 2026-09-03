@@ -9,33 +9,24 @@ import {
 import { MetaTags } from "@/components/seo/MetaTags";
 import { usePlayer } from "@/context/PlayerContext";
 import { publicAudioPlayerItem } from "@/services/audio/audioPlayerAdapter";
-import type { PublicShowDetail } from "@/services/shows/showPublicModel";
+import type {
+  PublicShowDetail,
+  PublicShowEpisode,
+} from "@/services/shows/showPublicModel";
 import { getPublicShow } from "@/services/shows/showPublicService";
 
 const SITE_URL = "https://wakilisha.africa";
 
-function formatDuration(seconds: number | null): string {
-  if (!seconds || seconds <= 0) return "";
-  const whole = Math.round(seconds);
-  const hours = Math.floor(whole / 3600);
-  const minutes = Math.floor((whole % 3600) / 60);
-  const remaining = whole % 60;
-
-  return hours > 0
-    ? `${hours}:${String(minutes).padStart(2, "0")}:${String(remaining).padStart(2, "0")}`
-    : `${minutes}:${String(remaining).padStart(2, "0")}`;
-}
-
-function formatDate(value: string | null): string {
-  if (!value) return "";
-  const parsed = new Date(value);
-  if (Number.isNaN(parsed.getTime())) return "";
-
-  return new Intl.DateTimeFormat("en", {
-    year: "numeric",
-    month: "short",
-    day: "numeric",
-  }).format(parsed);
+function episodeContext(item: PublicShowEpisode): string {
+  const labels: string[] = [];
+  if (item.episode.episodeNumber !== null) {
+    labels.push(`Episode ${item.episode.episodeNumber}`);
+  } else {
+    labels.push("Episode");
+  }
+  if (item.video) labels.push("Watch");
+  if (item.audio) labels.push("Listen");
+  return labels.join(" · ");
 }
 
 export default function PublicShowPage() {
@@ -77,7 +68,7 @@ export default function PublicShowPage() {
   }, [showSlug]);
 
   useEffect(() => {
-    if (!detail) return;
+    if (!detail?.show.feedPath) return;
 
     const href = `${SITE_URL}${detail.show.feedPath}`;
     const existing = document.querySelector<HTMLLinkElement>(
@@ -98,24 +89,24 @@ export default function PublicShowPage() {
     };
   }, [detail]);
 
-  const playerItems = useMemo(
-    () => detail?.episodes.map((item) => publicAudioPlayerItem(item.audio)) ?? [],
+  const audioQueue = useMemo(
+    () =>
+      detail?.episodes
+        .filter((item) => item.audio)
+        .map((item) => publicAudioPlayerItem(item.audio!)) ?? [],
     [detail],
   );
 
-  const playEpisode = (index: number) => {
-    if (!detail) return;
+  const listenToEpisode = (item: PublicShowEpisode) => {
+    if (!item.audio) return;
 
-    const item = detail.episodes[index];
-    const playerItem = playerItems[index];
-    if (!item || !playerItem) return;
-
+    const playerItem = publicAudioPlayerItem(item.audio);
     if (currentTrack?.id === playerItem.id && isPlaying) {
       pause();
       return;
     }
 
-    playTrack(playerItem, playerItems, {
+    playTrack(playerItem, audioQueue, {
       pageType: "show_detail",
       entityType: "audio_episode",
       entitySlug: item.episode.slug,
@@ -148,18 +139,15 @@ export default function PublicShowPage() {
   }
 
   const { show, episodes } = detail;
-  const feedUrl = `${SITE_URL}${show.feedPath}`;
   const canonicalUrl = `${SITE_URL}${show.canonicalPath}`;
-  const latest = episodes[0];
-  const latestActive = Boolean(
-    latest && currentTrack?.id === latest.audio.publicationId,
-  );
+  const firstVideo = episodes.find((item) => item.video);
+  const firstAudio = episodes.find((item) => item.audio);
 
   return (
     <>
       <MetaTags
         title={show.title}
-        description={show.description || `Listen to ${show.title} on WAKILISHA.`}
+        description={show.description || `Watch and listen to ${show.title} on WAKILISHA.`}
         url={canonicalUrl}
       />
 
@@ -189,103 +177,115 @@ export default function PublicShowPage() {
             ) : null}
 
             <div className="mt-6 flex flex-wrap items-center gap-3">
-              {latest ? (
+              {firstVideo ? (
+                <Link
+                  to={firstVideo.episode.canonicalPath}
+                  className="inline-flex items-center gap-2 rounded-full bg-wk-text px-5 py-3 text-sm font-semibold text-wk-bg transition hover:opacity-90"
+                >
+                  <Play className="h-4 w-4 fill-current" aria-hidden="true" />
+                  Watch latest
+                </Link>
+              ) : null}
+
+              {firstAudio ? (
                 <button
                   type="button"
-                  onClick={() => playEpisode(0)}
-                  className="inline-flex items-center gap-2 rounded-full bg-wk-text px-5 py-3 text-sm font-semibold text-wk-bg transition hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-wk-brand focus-visible:ring-offset-2"
+                  onClick={() => listenToEpisode(firstAudio)}
+                  className="inline-flex items-center gap-2 rounded-full border border-wk-border bg-wk-surface px-5 py-3 text-sm font-semibold text-wk-text transition hover:bg-wk-surface-raised"
                 >
-                  {latestActive && isPlaying ? (
+                  {currentTrack?.id === firstAudio.audio?.publicationId && isPlaying ? (
                     <Pause className="h-4 w-4" aria-hidden="true" />
                   ) : (
                     <Play className="h-4 w-4 fill-current" aria-hidden="true" />
                   )}
-                  {latestActive && isPlaying ? "Pause" : "Listen to latest"}
+                  Listen to latest
                 </button>
               ) : null}
 
-              <a
-                href={feedUrl}
-                className="inline-flex items-center gap-2 rounded-full border border-wk-border bg-wk-surface px-4 py-3 text-sm font-semibold text-wk-text transition hover:bg-wk-surface-raised"
-              >
-                <Rss className="h-4 w-4" aria-hidden="true" />
-                RSS Feed
-                <ExternalLink className="h-3.5 w-3.5" aria-hidden="true" />
-              </a>
+              {show.feedPath ? (
+                <a
+                  href={`${SITE_URL}${show.feedPath}`}
+                  className="inline-flex items-center gap-2 rounded-full border border-wk-border bg-wk-surface px-4 py-3 text-sm font-semibold text-wk-text transition hover:bg-wk-surface-raised"
+                >
+                  <Rss className="h-4 w-4" aria-hidden="true" />
+                  RSS Feed
+                  <ExternalLink className="h-3.5 w-3.5" aria-hidden="true" />
+                </a>
+              ) : null}
             </div>
 
             <p className="mt-5 text-sm text-wk-text-faint">
               {show.episodeCount} {show.episodeCount === 1 ? "Episode" : "Episodes"}
+              {show.videoEpisodeCount ? ` · ${show.videoEpisodeCount} Watch` : ""}
+              {show.audioEpisodeCount ? ` · ${show.audioEpisodeCount} Listen` : ""}
             </p>
           </div>
         </section>
 
         <section className="pt-9" aria-labelledby="episodes-heading">
-          <div>
-            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-wk-text-faint">
-              Published
-            </p>
-            <h2
-              id="episodes-heading"
-              className="mt-2 text-2xl font-semibold tracking-tight text-wk-text"
-            >
-              Episodes
-            </h2>
-          </div>
+          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-wk-text-faint">
+            Published
+          </p>
+          <h2
+            id="episodes-heading"
+            className="mt-2 text-2xl font-semibold tracking-tight text-wk-text"
+          >
+            Episodes
+          </h2>
 
           <ol className="mt-5 divide-y divide-wk-border border-y border-wk-border">
-            {episodes.map((item, index) => {
-              const { episode, audio } = item;
-              const active = currentTrack?.id === audio.publicationId;
-              const duration = formatDuration(audio.delivery.durationSeconds);
-              const publishedAt = formatDate(audio.provenance.publishedAt);
-              const context = [
-                audio.season
-                  ? `Season ${audio.season.seasonNumber}`
-                  : "",
-                audio.episodeNumber !== null
-                  ? `Episode ${audio.episodeNumber}`
-                  : "Episode",
-              ].filter(Boolean).join(" · ");
+            {episodes.map((item) => {
+              const audioActive =
+                item.audio
+                && currentTrack?.id === item.audio.publicationId
+                && isPlaying;
 
               return (
                 <li
-                  key={episode.resourceId}
-                  className="grid gap-4 py-5 sm:grid-cols-[auto_minmax(0,1fr)_auto] sm:items-center"
+                  key={item.episode.resourceId}
+                  className="grid gap-4 py-5 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center"
                 >
-                  <button
-                    type="button"
-                    onClick={() => playEpisode(index)}
-                    aria-label={`${active && isPlaying ? "Pause" : "Play"} ${episode.title}`}
-                    className="inline-flex h-11 w-11 items-center justify-center rounded-full border border-wk-border text-wk-text transition hover:bg-wk-surface-raised focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-wk-brand focus-visible:ring-offset-2"
-                  >
-                    {active && isPlaying ? (
-                      <Pause className="h-4 w-4" aria-hidden="true" />
-                    ) : (
-                      <Play className="h-4 w-4 fill-current" aria-hidden="true" />
-                    )}
-                  </button>
-
                   <div className="min-w-0">
                     <p className="text-xs font-medium uppercase tracking-[0.14em] text-wk-text-faint">
-                      {context}
+                      {episodeContext(item)}
                     </p>
                     <Link
-                      to={episode.canonicalPath}
+                      to={item.episode.canonicalPath}
                       className="mt-1 block text-lg font-semibold text-wk-text underline-offset-4 hover:text-wk-brand hover:underline"
                     >
-                      {episode.title}
+                      {item.episode.title}
                     </Link>
-                    {episode.summary ? (
+                    {item.episode.summary ? (
                       <p className="mt-1 line-clamp-2 max-w-2xl text-sm leading-6 text-wk-text-muted">
-                        {episode.summary}
+                        {item.episode.summary}
                       </p>
                     ) : null}
                   </div>
 
-                  <div className="flex items-center gap-3 text-xs text-wk-text-faint sm:justify-end">
-                    {publishedAt ? <span>{publishedAt}</span> : null}
-                    {duration ? <span>{duration}</span> : null}
+                  <div className="flex flex-wrap items-center gap-2">
+                    {item.video ? (
+                      <Link
+                        to={item.episode.canonicalPath}
+                        className="inline-flex items-center gap-2 rounded-full bg-wk-text px-4 py-2 text-xs font-semibold text-wk-bg"
+                      >
+                        <Play className="h-3.5 w-3.5 fill-current" aria-hidden="true" />
+                        Watch
+                      </Link>
+                    ) : null}
+                    {item.audio ? (
+                      <button
+                        type="button"
+                        onClick={() => listenToEpisode(item)}
+                        className="inline-flex items-center gap-2 rounded-full border border-wk-border px-4 py-2 text-xs font-semibold text-wk-text"
+                      >
+                        {audioActive ? (
+                          <Pause className="h-3.5 w-3.5" aria-hidden="true" />
+                        ) : (
+                          <Play className="h-3.5 w-3.5 fill-current" aria-hidden="true" />
+                        )}
+                        {audioActive ? "Pause" : "Listen"}
+                      </button>
+                    ) : null}
                   </div>
                 </li>
               );
