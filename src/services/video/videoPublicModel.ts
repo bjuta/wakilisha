@@ -36,6 +36,15 @@ export type PublicVideoDelivery =
   | PublicVideoNativeDelivery
   | PublicVideoProviderDelivery;
 
+export interface PublicVideoAdaptiveRendition {
+  height: number;
+  label: string;
+  url: string;
+  mimeType: "application/vnd.apple.mpegurl";
+  byteSize: number;
+  sha256: string;
+}
+
 export interface PublicVideoAdaptiveDelivery {
   kind: "hls";
   url: string;
@@ -44,6 +53,7 @@ export interface PublicVideoAdaptiveDelivery {
   sha256: string;
   profileVersion: "video-adaptive-v1";
   renditionCount: number;
+  renditions: PublicVideoAdaptiveRendition[];
 }
 
 export interface PublicVideoPoster {
@@ -238,6 +248,36 @@ function decodeDelivery(value: unknown): PublicVideoDelivery | null {
   return null;
 }
 
+function decodeAdaptiveRendition(
+  value: unknown,
+): PublicVideoAdaptiveRendition | null {
+  const input = record(value);
+  const height = numberValue(input.height);
+  const label = stringValue(input.label);
+  const url = stringValue(input.url);
+  const mimeType = stringValue(input.mime_type);
+  const sha256 = stringValue(input.sha256);
+
+  if (
+    height < 1
+    || label !== `${height}p`
+    || !url
+    || mimeType !== "application/vnd.apple.mpegurl"
+    || !sha256
+  ) {
+    return null;
+  }
+
+  return {
+    height,
+    label,
+    url,
+    mimeType,
+    byteSize: numberValue(input.byte_size),
+    sha256,
+  };
+}
+
 function decodeAdaptiveDelivery(
   value: unknown,
 ): PublicVideoAdaptiveDelivery | null {
@@ -249,6 +289,10 @@ function decodeAdaptiveDelivery(
   const sha256 = stringValue(input.sha256);
   const profileVersion = stringValue(input.profile_version);
   const renditionCount = numberValue(input.rendition_count);
+  const renditions = array(input.renditions)
+    .map(decodeAdaptiveRendition)
+    .filter((item): item is PublicVideoAdaptiveRendition => item !== null)
+    .sort((left, right) => left.height - right.height);
 
   if (
     kind !== "hls"
@@ -257,6 +301,9 @@ function decodeAdaptiveDelivery(
     || !sha256
     || profileVersion !== "video-adaptive-v1"
     || renditionCount < 1
+    || renditions.length !== renditionCount
+    || new Set(renditions.map((item) => item.height)).size
+       !== renditions.length
   ) {
     return null;
   }
@@ -269,6 +316,7 @@ function decodeAdaptiveDelivery(
     sha256,
     profileVersion,
     renditionCount,
+    renditions,
   };
 }
 
