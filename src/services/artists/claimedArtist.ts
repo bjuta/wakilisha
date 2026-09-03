@@ -57,6 +57,23 @@ export type ArtistRepresentationState = {
   representation: ArtistRepresentation | null;
 };
 
+export type ArtistManagementIdentity = {
+  id: string;
+  slug: string;
+  name: string;
+  status:
+    | "active"
+    | "draft"
+    | "needs_review";
+  imageUrl: string | null;
+};
+
+export type ArtistManagementWorkspace = {
+  artist: ArtistManagementIdentity;
+  presentation: ArtistPresentation | null;
+  representation: ArtistRepresentation;
+};
+
 export type ArtistTeamMember = {
   representationId: string;
   userId: string;
@@ -230,6 +247,124 @@ export async function getArtistRepresentationState(artistId: string): Promise<Ar
       acceptedAt: readString(representationRecord, "accepted_at"),
       verifiedAt: readString(representationRecord, "verified_at"),
     } : null,
+  };
+}
+
+export async function getArtistManagementWorkspace(
+  artistSlug: string,
+): Promise<ArtistManagementWorkspace> {
+  const data = await rpc<unknown>(
+    "community_get_artist_management_workspace",
+    {
+      p_artist_slug:
+        artistSlug,
+    },
+  );
+
+  const record =
+    asRecord(data);
+  const artist =
+    asRecord(
+      record?.artist,
+    );
+  const representation =
+    asRecord(
+      record?.representation,
+    );
+
+  const artistId =
+    readString(
+      artist,
+      "id",
+    );
+  const slug =
+    readString(
+      artist,
+      "slug",
+    );
+  const name =
+    readString(
+      artist,
+      "display_name",
+    );
+  const status =
+    readString(
+      artist,
+      "status",
+    );
+  const representationId =
+    readString(
+      representation,
+      "id",
+    );
+
+  if (
+    !artistId ||
+    !slug ||
+    !name ||
+    (
+      status !== "active" &&
+      status !== "draft" &&
+      status !== "needs_review"
+    ) ||
+    !representationId
+  ) {
+    throw new Error(
+      "Artist Studio access could not be loaded.",
+    );
+  }
+
+  return {
+    artist: {
+      id:
+        artistId,
+      slug,
+      name,
+      status,
+      imageUrl:
+        readString(
+          artist,
+          "image_url",
+        ),
+    },
+    presentation:
+      mapPresentation(
+        record?.presentation,
+      ),
+    representation: {
+      id:
+        representationId,
+      role:
+        readString(
+          representation,
+          "role",
+        ) ?? "other",
+      status:
+        readString(
+          representation,
+          "status",
+        ) ?? "active",
+      permissions:
+        mapPermissions(
+          representation
+            ?.permissions,
+        ),
+      invitedAt:
+        readString(
+          representation,
+          "invited_at",
+        ),
+      acceptedAt:
+        readString(
+          representation,
+          "accepted_at",
+        ),
+      verifiedAt:
+        readString(
+          representation,
+          "verified_at",
+        ),
+    },
   };
 }
 
