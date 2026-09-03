@@ -82,12 +82,17 @@ export function readArtistClaimDraft(
   }
 }
 
+export type ArtistClaimDraftSaveResult = {
+  draft: ArtistClaimDraft;
+  saved: boolean;
+};
+
 export function saveArtistClaimDraft(
   input: Omit<
     ArtistClaimDraft,
     "version" | "updatedAt"
   >,
-): ArtistClaimDraft {
+): ArtistClaimDraftSaveResult {
   const draft: ArtistClaimDraft = {
     version:
       ARTIST_CLAIM_DRAFT_VERSION,
@@ -97,19 +102,30 @@ export function saveArtistClaimDraft(
   };
 
   if (
-    typeof window !== "undefined"
+    typeof window === "undefined"
   ) {
-    try {
-      window.localStorage.setItem(
-        keyFor(input.artistId),
-        JSON.stringify(draft),
-      );
-    } catch {
-      // The form still works when local storage is unavailable.
-    }
+    return {
+      draft,
+      saved: false,
+    };
   }
 
-  return draft;
+  try {
+    window.localStorage.setItem(
+      keyFor(input.artistId),
+      JSON.stringify(draft),
+    );
+
+    return {
+      draft,
+      saved: true,
+    };
+  } catch {
+    return {
+      draft,
+      saved: false,
+    };
+  }
 }
 
 export function clearArtistClaimDraft(
