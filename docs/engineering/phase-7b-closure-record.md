@@ -4,6 +4,45 @@ Status: CLOSED
 
 Closed: 3 September 2026
 
+## Post-closure Show / Video route convergence — 3 September 2026
+
+Phase 7B remains CLOSED.
+
+A post-closure product-maintenance correction repaired public route authority for the real Video Episode `Monday Morning in September` without reopening Video publication authority or changing immutable Video content.
+
+Current accepted production runtime after the correction:
+
+- runtime main: `11eb22327d3286155375a197f77c57e5f57a435a`
+- migrations: `84`
+- migration head: `20260903150511_show_video_public_route_convergence.sql`
+- frontend entry: `assets/index-CZBM1l7e.js`
+- frontend entry SHA-256: `7092d872ad405d2a32616f2cca5bc63f1b118ca2ee0a1c21d85e724a7306b05d`
+- frontend index SHA-256: `8db2244ec6b98d41043bdf1e86d1d1f2d24e911ab8605925b9e34e2c7c9d44ca`
+- frontend file count: `3691`
+- rollback snapshot:
+  `/opt/wakilisha-react-backups/show-video-public-route-convergence-20260903T154716Z-11eb2232`
+- Edge Function `video-public-delivery`: unchanged at v8
+- published Video: unchanged at v16, `4ab5a5bb-b0f4-4b8b-8ea2-94fe1be8786e`
+
+Accepted public identity is now:
+
+- `/shows`
+- `/shows/the-sounds-of-nairobi`
+- `/shows/the-sounds-of-nairobi/monday-morning-in-september`
+
+The retired episodic Video identities render the 404 product surface:
+
+- `/video/the-sounds-of-nairobi/monday-morning-in-september`
+- `/video/monday-morning-in-september`
+
+The shared Show and Show Episode are now `public/active`. The Show reports one Episode, one Video Episode, and zero published Audio Episodes. Video v16, HLS, captions, transcript, and Media delivery authority were not republished or replaced.
+
+Canonical corrective closure record:
+
+`docs/engineering/show-video-public-route-convergence-production-closure-record.md`
+
+This correction is the production baseline inherited by Phase 8. It does not alter the Phase 7B exit decision below.
+
 ## Decision
 
 Phase 7B Public Video product is closed and production accepted.
