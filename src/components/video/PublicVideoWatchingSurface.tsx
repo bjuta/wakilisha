@@ -1,10 +1,12 @@
 import {
+  useEffect,
   useMemo,
   useRef,
   useState,
 } from "react";
 import { Link } from "react-router-dom";
 import { MediaPresentationSurface } from "@/components/design-system/media/MediaPresentationSurface";
+import { PlayerTimedTextPanel } from "@/components/design-system/player/PlayerTimedTextPanel";
 import { PublicVideoCard } from "./PublicVideoCard";
 import {
   VideoPlaybackCanvas,
@@ -12,7 +14,12 @@ import {
 } from "./VideoPlaybackCanvas";
 import {
   publicVideoCaptionUrl,
+  publicVideoTranscriptUrl,
 } from "@/services/video/videoPublicService";
+import {
+  fetchTimedTextDocument,
+  type TimedTextDocument,
+} from "@/services/player/timedText";
 import type {
   PublicVideoCitation,
   PublicVideoCredit,
@@ -198,6 +205,13 @@ export function PublicVideoWatchingSurface({
   const [playerDocked, setPlayerDocked] = useState(false);
   const [anchorHeight, setAnchorHeight] = useState<number | null>(null);
   const [descriptionExpanded, setDescriptionExpanded] = useState(false);
+  const [transcriptOpen, setTranscriptOpen] = useState(false);
+  const [transcriptDocument, setTranscriptDocument] =
+    useState<TimedTextDocument | null>(null);
+  const [transcriptLoading, setTranscriptLoading] = useState(false);
+  const [transcriptError, setTranscriptError] =
+    useState<string | null>(null);
+  const [playbackTime, setPlaybackTime] = useState(0);
 
   const publishedDate = formatDate(publication.provenance.publishedAt);
   const duration = publication.delivery.kind === "native_media"
@@ -241,6 +255,78 @@ export function PublicVideoWatchingSurface({
       canonicalUrl: publication.delivery.canonicalUrl,
     };
   }, [publication]);
+
+  useEffect(() => {
+    const element = videoRef.current;
+    if (!element) return;
+
+    const updatePlaybackTime = () => {
+      setPlaybackTime(element.currentTime);
+    };
+
+    updatePlaybackTime();
+    element.addEventListener("timeupdate", updatePlaybackTime);
+
+    return () => {
+      element.removeEventListener("timeupdate", updatePlaybackTime);
+    };
+  }, [source]);
+
+  useEffect(() => {
+    let active = true;
+
+    if (!publication.transcript) {
+      setTranscriptDocument(null);
+      setTranscriptLoading(false);
+      setTranscriptError(null);
+      return () => {
+        active = false;
+      };
+    }
+
+    if (!transcriptOpen) {
+      return () => {
+        active = false;
+      };
+    }
+
+    setTranscriptLoading(true);
+    setTranscriptError(null);
+
+    try {
+      const url = publicVideoTranscriptUrl(publication);
+
+      void fetchTimedTextDocument(url)
+        .then((document) => {
+          if (!active) return;
+          setTranscriptDocument(document);
+        })
+        .catch((error: unknown) => {
+          if (!active) return;
+          setTranscriptDocument(null);
+          setTranscriptError(
+            error instanceof Error
+              ? error.message
+              : "Transcript could not be opened.",
+          );
+        })
+        .finally(() => {
+          if (active) setTranscriptLoading(false);
+        });
+    } catch (error) {
+      setTranscriptDocument(null);
+      setTranscriptLoading(false);
+      setTranscriptError(
+        error instanceof Error
+          ? error.message
+          : "Transcript could not be opened.",
+      );
+    }
+
+    return () => {
+      active = false;
+    };
+  }, [publication, transcriptOpen]);
 
   const collapsePlayer = () => {
     const anchor = playerAnchorRef.current;
@@ -401,6 +487,48 @@ export function PublicVideoWatchingSurface({
               <PublicationRecord publication={publication} />
             </div>
           </div>
+
+          {publication.transcript ? (
+            <section className="mt-10 border-t border-[var(--wk-border)] pt-8">
+              <button
+                type="button"
+                onClick={() =>
+                  setTranscriptOpen((open) => !open)
+                }
+                aria-expanded={transcriptOpen}
+                className="flex w-full items-end justify-between gap-4 text-left"
+              >
+                <div>
+                  <p className="text-[10px] font-black uppercase tracking-[0.18em] text-[var(--wk-brand)]">
+                    Transcript
+                  </p>
+                  <h2 className="mt-1 text-[22px] font-black tracking-[-0.025em]">
+                    Read The Transcript
+                  </h2>
+                </div>
+                <span className="shrink-0 text-[11px] font-black text-[var(--wk-brand)]">
+                  {transcriptOpen
+                    ? "Hide Transcript"
+                    : "View Transcript"}
+                </span>
+              </button>
+
+              {transcriptOpen ? (
+                <div className="mt-5 rounded-2xl border border-[var(--wk-border)] bg-[var(--wk-surface)] p-4 sm:p-5">
+                  <PlayerTimedTextPanel
+                    variant="transcript"
+                    lines={transcriptDocument?.lines ?? []}
+                    currentTime={playbackTime}
+                    loading={transcriptLoading}
+                    error={transcriptError}
+                    emptyMessage="Transcript is not available for this Video yet."
+                    onSeek={jumpToChapter}
+                    sourceUrl={publicVideoTranscriptUrl(publication)}
+                  />
+                </div>
+              ) : null}
+            </section>
+          ) : null}
 
           {publication.chapters.length ? (
             <section className="mt-10 border-t border-[var(--wk-border)] pt-8">

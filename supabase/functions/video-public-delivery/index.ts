@@ -1,10 +1,9 @@
-// Phase 7B V1 public Video caption transport adapter.
+// Phase 7B public Video protected-text transport adapter.
 //
-// Authority stays in PostgreSQL. This function receives only an immutable
-// published-version identity + caption track number, asks the service-only
-// public RPC for the governed protected file target, signs that canonical
-// Lightsail path, and proxies the VTT bytes. No private storage path is sent
-// to the browser.
+// Authority stays in PostgreSQL. This function receives only immutable
+// published-version identity, asks service-only public RPCs for governed
+// caption or transcript file targets, signs canonical Lightsail paths, and
+// proxies public-safe text bytes. No private storage path is sent to the browser.
 
 import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.57.4";
@@ -90,6 +89,21 @@ function privateCaptionPath(value: unknown): string {
   return path;
 }
 
+function privateTranscriptPath(value: unknown): string {
+  const path = stringValue(value).replace(/^\/+/, "");
+
+  if (
+    !/^private-files\/transcripts\/[^/]+[.]txt$/i.test(path)
+    || path.includes("..")
+  ) {
+    throw new Error(
+      "Transcript storage path is not public-delivery eligible.",
+    );
+  }
+
+  return path;
+}
+
 function encodeStoragePath(path: string): string {
   return path
     .split("/")
@@ -118,7 +132,7 @@ async function hmacSha256Hex(
     .join("");
 }
 
-async function protectedCaptionUrl(storagePath: string): Promise<string> {
+async function protectedPrivateUrl(storagePath: string): Promise<string> {
   const expires = Math.floor(Date.now() / 1000) + 60;
   const token = await hmacSha256Hex(
     MEDIA_PRIVATE_DELIVERY_SECRET,
@@ -170,17 +184,13 @@ serve(async (request) => {
     .trim()
     .toLowerCase();
 
-  if (kind !== "caption") return badRequest(method);
+  if (kind !== "caption" && kind !== "transcript") {
+    return badRequest(method);
+  }
 
   const version = (url.searchParams.get("version") ?? "").trim();
-  const trackText = (url.searchParams.get("track") ?? "").trim();
-  const track = Number(trackText);
 
-  if (
-    !UUID_PATTERN.test(version)
-    || !Number.isInteger(track)
-    || track < 1
-  ) {
+  if (!UUID_PATTERN.test(version)) {
     return badRequest(method);
   }
 
@@ -195,6 +205,71 @@ serve(async (request) => {
       },
     },
   );
+
+  if (kind === "transcript") {
+    const { data, error } = await supabase.rpc(
+      "get_public_video_transcript_delivery_target",
+      {
+        p_publication_version_id: version,
+      },
+    );
+
+    if (error || !data || typeof data !== "object") {
+      return notFound(method);
+    }
+
+    const target = objectValue(data);
+    const mimeType = stringValue(target.mime_type);
+    const byteSize = Number(target.byte_size);
+
+    if (
+      mimeType !== "text/plain"
+      || !Number.isFinite(byteSize)
+      || byteSize <= 0
+    ) {
+      return notFound(method);
+    }
+
+    let storagePath: string;
+    try {
+      storagePath = privateTranscriptPath(target.storage_path);
+    } catch {
+      return notFound(method);
+    }
+
+    const signedUrl = await protectedPrivateUrl(storagePath);
+    const mediaResponse = await fetch(signedUrl, {
+      method,
+      headers: {
+        "Cache-Control": "no-cache",
+      },
+    });
+
+    if (!mediaResponse.ok) {
+      return notFound(method);
+    }
+
+    const etag = `"${stringValue(target.sha256)}"`;
+
+    return response(
+      method === "HEAD" ? null : mediaResponse.body,
+      200,
+      {
+        "Content-Type": "text/plain; charset=utf-8",
+        "Content-Length": String(Math.round(byteSize)),
+        "Cache-Control":
+          "public, max-age=300, stale-while-revalidate=1800",
+        "ETag": etag,
+      },
+    );
+  }
+
+  const trackText = (url.searchParams.get("track") ?? "").trim();
+  const track = Number(trackText);
+
+  if (!Number.isInteger(track) || track < 1) {
+    return badRequest(method);
+  }
 
   const { data, error } = await supabase.rpc(
     "get_public_video_caption_delivery_target",
@@ -227,7 +302,7 @@ serve(async (request) => {
     return notFound(method);
   }
 
-  const signedUrl = await protectedCaptionUrl(storagePath);
+  const signedUrl = await protectedPrivateUrl(storagePath);
   const mediaResponse = await fetch(signedUrl, {
     method,
     headers: {

@@ -21483,6 +21483,10 @@ export type Database = {
         Args: { p_show_slug?: string; p_slug: string }
         Returns: Json
       }
+      get_public_video_transcript_delivery_target: {
+        Args: { p_publication_version_id: string }
+        Returns: Json
+      }
       get_release_artists_for_anon: {
         Args: { p_artist_slug: string }
         Returns: {
