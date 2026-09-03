@@ -18,8 +18,16 @@ begin
       'PHASE_7B_VIDEO_TRANSCRIPT_FAIL: transcript delivery target is missing';
   end if;
 
+  if to_regprocedure(
+       'platform_private.get_public_video_publication_phase_7b(text,text)'
+     ) is null
+  then
+    raise exception
+      'PHASE_7B_VIDEO_TRANSCRIPT_FAIL: preserved internal Video delivery reader is missing';
+  end if;
+
   v_reader := pg_get_functiondef(
-    'public.get_public_video_publication(text,text)'::regprocedure
+    'platform_private.get_public_video_publication_phase_7b(text,text)'::regprocedure
   );
 
   v_target := pg_get_functiondef(
