@@ -4,6 +4,7 @@ import {
   useState,
 } from "react";
 import { Link } from "react-router-dom";
+import { MediaPresentationSurface } from "@/components/design-system/media/MediaPresentationSurface";
 import { PublicVideoCard } from "./PublicVideoCard";
 import {
   VideoPlaybackCanvas,
@@ -274,24 +275,42 @@ export function PublicVideoWatchingSurface({
           style={playerDocked && anchorHeight ? { minHeight: anchorHeight } : undefined}
         >
           {source ? (
-            <div
+            <MediaPresentationSurface
+              mode={playerDocked ? "floating" : "inline"}
+              draggable={playerDocked}
               className={
                 playerDocked
                   ? "fixed bottom-[calc(5.25rem+env(safe-area-inset-bottom))] left-3 right-3 z-[250] overflow-hidden rounded-2xl border border-white/10 bg-black shadow-2xl sm:bottom-6 sm:left-auto sm:right-6 sm:w-[360px]"
                   : "relative overflow-hidden bg-black sm:mt-6 sm:rounded-[24px] sm:border sm:border-[var(--wk-border)] sm:shadow-sm"
               }
             >
-              <VideoPlaybackCanvas
-                source={source}
-                title={publication.title}
-                videoRef={videoRef}
-                compact={playerDocked}
-                collapsed={playerDocked}
-                onCollapse={playerDocked ? undefined : collapsePlayer}
-                onExpand={playerDocked ? expandPlayer : undefined}
-                onClose={playerDocked ? closeDockedPlayer : undefined}
-              />
-            </div>
+              {({ dragHandleProps, dragging }) => (
+                <>
+                  {playerDocked ? (
+                    <button
+                      type="button"
+                      {...dragHandleProps}
+                      className="absolute left-1/2 top-1 z-40 flex h-5 w-12 -translate-x-1/2 items-center justify-center rounded-full bg-black/50 text-white/75 backdrop-blur-sm"
+                      style={dragHandleProps.style}
+                      aria-label="Move floating video"
+                      title={dragging ? "Moving video" : "Move floating video"}
+                    >
+                      <i className="ri-draggable text-[12px]" />
+                    </button>
+                  ) : null}
+                  <VideoPlaybackCanvas
+                    source={source}
+                    title={publication.title}
+                    videoRef={videoRef}
+                    compact={playerDocked}
+                    collapsed={playerDocked}
+                    onCollapse={playerDocked ? undefined : collapsePlayer}
+                    onExpand={playerDocked ? expandPlayer : undefined}
+                    onClose={playerDocked ? closeDockedPlayer : undefined}
+                  />
+                </>
+              )}
+            </MediaPresentationSurface>
           ) : (
             <div className="flex min-h-[320px] items-center justify-center bg-black p-8 text-center text-sm text-white/70 sm:mt-6 sm:rounded-[24px]">
               This Video provider does not have an embeddable public player.
