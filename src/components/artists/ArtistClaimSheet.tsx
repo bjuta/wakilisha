@@ -7,8 +7,14 @@ import {
   useNavigate,
 } from "react-router-dom";
 import {
+  Portal,
+} from "@/components/base/Portal";
+import {
   WkButton,
 } from "@/components/design-system/primitives/Button";
+import {
+  useScrollLock,
+} from "@/hooks/useScrollLock";
 import {
   submitArtistClaim,
 } from "@/services/artists/claimedArtist";
@@ -49,6 +55,8 @@ export function ArtistClaimSheet({
   onSubmitted?: () => void | Promise<void>;
 }) {
   const navigate = useNavigate();
+
+  useScrollLock(open);
   const [claimRole, setClaimRole] =
     useState("artist");
   const [statement, setStatement] =
@@ -249,12 +257,16 @@ export function ArtistClaimSheet({
   if (!open) return null;
 
   return (
-    <div
-      className="fixed inset-0 z-[120] flex items-end justify-center bg-black/55 p-0 sm:items-center sm:p-6"
-      onClick={onClose}
-    >
+    <Portal>
       <div
-        className="w-full max-w-xl rounded-t-3xl bg-[var(--wk-surface)] p-6 shadow-2xl sm:rounded-3xl"
+        className="fixed inset-0 z-[120] flex items-end justify-center bg-black/55 p-0 sm:items-center sm:p-6"
+        onClick={onClose}
+        role="dialog"
+        aria-modal="true"
+        aria-label={`Claim ${artistName}`}
+      >
+        <div
+          className="max-h-[92dvh] w-full max-w-xl overflow-y-auto overscroll-contain rounded-t-3xl bg-[var(--wk-surface)] p-6 shadow-2xl sm:rounded-3xl"
         onClick={(event) =>
           event.stopPropagation()
         }
@@ -400,7 +412,8 @@ export function ArtistClaimSheet({
             </div>
           </div>
         </form>
+        </div>
       </div>
-    </div>
+    </Portal>
   );
 }
