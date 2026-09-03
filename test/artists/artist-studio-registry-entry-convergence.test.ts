@@ -347,6 +347,38 @@ describe(
     );
 
     it(
+      "anchors Artist Studio sheets to the viewport instead of the scrolled page",
+      () => {
+        for (const sheet of [
+          claimSheet,
+          newArtistSheet,
+        ]) {
+          expect(sheet).toContain(
+            'from "@/components/base/Portal"',
+          );
+          expect(sheet).toContain(
+            "useScrollLock(open)",
+          );
+          expect(sheet).toContain(
+            'className="fixed inset-0',
+          );
+          expect(sheet).toContain(
+            'aria-modal="true"',
+          );
+          expect(sheet).toContain(
+            "overscroll-contain",
+          );
+        }
+
+        expect(
+          claimSheet,
+        ).toContain(
+          "max-h-[92dvh]",
+        );
+      },
+    );
+
+    it(
       "uses a bounded Registry identity projection instead of exposing draft Artist records",
       () => {
         expect(
