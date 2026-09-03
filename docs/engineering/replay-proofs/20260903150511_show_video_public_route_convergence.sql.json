@@ -15,7 +15,7 @@
   "verifier_file": "scripts/control-plane/verify-phase-7b-v1-public-video-read-delivery.sql",
   "verifier_marker": "PHASE_7B_V1_PUBLIC_VIDEO_READ_DELIVERY_PASS",
   "behavior_marker": "PHASE_7B_V1_PUBLIC_VIDEO_READ_DELIVERY_BEHAVIOR_PASS",
-  "schema_types_sha256": "2ff86abd79736827f7d1a3187dfff77f85cd46968f8128a90e2644538ce19d04",
+  "schema_types_sha256": "1af09ad4a464ff9278f3750427dece59a005da928adca6da68e8defe8a71bf34",
   "schema_migration_count": 84,
   "schema_migration_head": "20260903150511",
   "preview_history_alignment": "pass",
