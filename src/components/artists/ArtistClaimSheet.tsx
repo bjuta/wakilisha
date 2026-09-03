@@ -57,6 +57,10 @@ export function ArtistClaimSheet({
     useState("");
   const [savedAt, setSavedAt] =
     useState<string | null>(null);
+  const [
+    draftStorageAvailable,
+    setDraftStorageAvailable,
+  ] = useState(true);
   const [actionLoading, setActionLoading] =
     useState(false);
   const [message, setMessage] =
@@ -83,6 +87,7 @@ export function ArtistClaimSheet({
     setSavedAt(
       draft?.updatedAt ?? null,
     );
+    setDraftStorageAvailable(true);
     setMessage(null);
   }, [
     artistId,
@@ -104,7 +109,7 @@ export function ArtistClaimSheet({
 
     const timer =
       window.setTimeout(() => {
-        const draft =
+        const result =
           saveArtistClaimDraft({
             artistId,
             artistName,
@@ -115,8 +120,13 @@ export function ArtistClaimSheet({
             proofLink,
           });
 
+        setDraftStorageAvailable(
+          result.saved,
+        );
         setSavedAt(
-          draft.updatedAt,
+          result.saved
+            ? result.draft.updatedAt
+            : null,
         );
       }, 180);
 
@@ -148,19 +158,37 @@ export function ArtistClaimSheet({
       return;
     }
 
-    saveArtistClaimDraft({
-      artistId,
-      artistName,
-      artistSlug,
-      claimantRole:
-        claimRole,
-      statement,
-      proofLink,
-    });
+    const draftResult =
+      saveArtistClaimDraft({
+        artistId,
+        artistName,
+        artistSlug,
+        claimantRole:
+          claimRole,
+        statement,
+        proofLink,
+      });
+
+    setDraftStorageAvailable(
+      draftResult.saved,
+    );
+    setSavedAt(
+      draftResult.saved
+        ? draftResult.draft.updatedAt
+        : null,
+    );
 
     if (authLoading) return;
 
     if (!userId) {
+      if (!draftResult.saved) {
+        setMessage({
+          type: "error",
+          text: "This browser could not save your draft. Keep this page open or enable site storage before signing in.",
+        });
+        return;
+      }
+
       navigate(
         `/auth?returnTo=${encodeURIComponent(
           returnTo,
@@ -198,6 +226,7 @@ export function ArtistClaimSheet({
       setStatement("");
       setProofLink("");
       setSavedAt(null);
+      setDraftStorageAvailable(true);
       setMessage({
         type: "success",
         text: "We received your claim. WAKILISHA will review it.",
@@ -339,9 +368,11 @@ export function ArtistClaimSheet({
 
           <div className="flex flex-wrap items-center justify-between gap-3 pt-1">
             <span className="text-[10px] font-semibold text-[var(--wk-text-faint)]">
-              {savedAt
-                ? "Saved on this device."
-                : "Your entries stay on this device until you submit."}
+              {!draftStorageAvailable
+                ? "Draft saving is unavailable in this browser."
+                : savedAt
+                  ? "Saved on this device."
+                  : "Your entries will be saved on this device as you type."}
             </span>
 
             <div className="flex gap-2">
