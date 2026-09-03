@@ -8,8 +8,14 @@ import {
   useNavigate,
 } from "react-router-dom";
 import {
+  Portal,
+} from "@/components/base/Portal";
+import {
   WkButton,
 } from "@/components/design-system/primitives/Button";
+import {
+  useScrollLock,
+} from "@/hooks/useScrollLock";
 import {
   submitNewArtistClaim,
 } from "@/services/artists/claimedArtist";
@@ -63,6 +69,8 @@ export function NewArtistClaimSheet({
   ) => void | Promise<void>;
 }) {
   const navigate = useNavigate();
+
+  useScrollLock(open);
   const countryCodes =
     useMemo(
       () =>
@@ -357,12 +365,16 @@ export function NewArtistClaimSheet({
   if (!open) return null;
 
   return (
-    <div
-      className="fixed inset-0 z-[121] flex items-end justify-center bg-black/55 p-0 sm:items-center sm:p-6"
-      onClick={onClose}
-    >
+    <Portal>
       <div
-        className="max-h-[92dvh] w-full max-w-2xl overflow-y-auto rounded-t-3xl bg-[var(--wk-surface)] p-6 shadow-2xl sm:rounded-3xl"
+        className="fixed inset-0 z-[121] flex items-end justify-center bg-black/55 p-0 sm:items-center sm:p-6"
+        onClick={onClose}
+        role="dialog"
+        aria-modal="true"
+        aria-label="Propose an Artist"
+      >
+        <div
+          className="max-h-[92dvh] w-full max-w-2xl overflow-y-auto overscroll-contain rounded-t-3xl bg-[var(--wk-surface)] p-6 shadow-2xl sm:rounded-3xl"
         onClick={(event) =>
           event.stopPropagation()
         }
@@ -612,7 +624,8 @@ export function NewArtistClaimSheet({
             </div>
           </div>
         </form>
+        </div>
       </div>
-    </div>
+    </Portal>
   );
 }
