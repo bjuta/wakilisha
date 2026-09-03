@@ -172,6 +172,7 @@ Current machine-registry proof includes:
 - `EditorialMetadataWorkspace` / Discovery Workspace
 - `MediaTransport`
 - `MediaTimeline`
+- `MediaPresentationSurface`
 
 These are already proven by at least two governed domain consumers and should be reused directly where their meaning applies.
 
@@ -183,6 +184,8 @@ The machine registry currently identifies:
 - `EditorialCreditPicker`
 
 `AdminModeComposer`, `MediaTransport`, and `MediaTimeline` were promoted to canonical during the Phase 7A K5B Video Editor composition after Video became their second real domain consumer.
+
+`MediaPresentationSurface` was promoted to canonical when public Video and music/provider playback became two real consumers of the same inline, floating, modal, and free-drag presentation grammar.
 
 `EditorialCommentEditor` and `EditorialCreditPicker` remain candidates. K5B does not fabricate Video discussion or Credit attachment state merely to force reuse; those primitives may only be promoted after governed Video authority exists for the corresponding behavior.
 

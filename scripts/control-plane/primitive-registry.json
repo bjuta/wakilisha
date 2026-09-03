@@ -2,7 +2,8 @@
   "version": 1,
   "primitiveDirectories": [
     "src/components/design-system/admin",
-    "src/components/design-system/editorial"
+    "src/components/design-system/editorial",
+    "src/components/design-system/media"
   ],
   "surfaceDiscovery": [
     {
@@ -15,6 +16,16 @@
       "id": "public:audio",
       "path": "src/pages/audio",
       "required": false
+    },
+    {
+      "id": "public:video-playback",
+      "path": "src/components/video",
+      "required": true
+    },
+    {
+      "id": "public:music-playback",
+      "path": "src/components/design-system/music",
+      "required": true
     }
   ],
   "primitives": [
@@ -210,6 +221,18 @@
       ],
       "competingImplementationPatterns": [
         "(?:function|const)\\s+(?:AudioTimeline|VideoTimeline|WaveformTimeline|MediaTimeline)\\b"
+      ]
+    },
+    {
+      "id": "media.presentation-surface",
+      "path": "src/components/design-system/media/MediaPresentationSurface.tsx",
+      "kind": "presentation",
+      "maturity": "canonical",
+      "concept": "consumer-owned inline, floating, and modal Media presentation geometry with free-drag viewport clamping",
+      "authorityOwner": "consumer",
+      "consumers": [
+        "public:music-playback",
+        "public:video-playback"
       ]
     },
     {

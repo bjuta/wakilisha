@@ -116,3 +116,29 @@
       );
   }
 }
+
+.wk-provider-playback-drag-handle {
+  position: absolute;
+  z-index: 4;
+  top: 8px;
+  right: 8px;
+  display: flex;
+  width: 34px;
+  height: 24px;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid rgb(255 255 255 / 0.16);
+  border-radius: 999px;
+  background: rgb(0 0 0 / 0.62);
+  color: rgb(255 255 255 / 0.82);
+  font-size: 11px;
+  font-weight: 900;
+  line-height: 1;
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+}
+
+.wk-provider-playback-drag-handle:hover {
+  background: rgb(0 0 0 / 0.78);
+  color: #fff;
+}

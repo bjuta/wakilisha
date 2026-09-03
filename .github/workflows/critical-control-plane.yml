@@ -89,6 +89,10 @@ jobs:
             test/video/phase-7b-v4a-adaptive-video-media.test.ts \
             test/video/phase-7b-v4b-public-adaptive-video-playback.test.ts
 
+      - name: Enforce shared Media presentation convergence
+        run: |
+          npx vitest run             test/media/media-presentation-surface.test.ts             test/player/mobile-provider-playback-contract.test.ts
+
       - name: Require Supabase control-plane access
         run: |
           if [ -z "$SUPABASE_ACCESS_TOKEN" ]; then

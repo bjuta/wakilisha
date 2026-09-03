@@ -8,6 +8,7 @@ import {
 import type {
   CSSProperties,
 } from "react";
+import { MediaPresentationSurface } from "@/components/design-system/media/MediaPresentationSurface";
 import "./ProviderPlaybackCanvas.css";
 
 interface ProviderPlaybackCanvasProps {
@@ -357,7 +358,9 @@ export function ProviderPlaybackCanvas({
       : undefined;
 
   return createPortal(
-    <aside
+    <MediaPresentationSurface
+      mode={isFullPlayerOpen ? "inline" : "floating"}
+      draggable={active && !isFullPlayerOpen}
       className={[
         "wk-provider-playback-canvas",
         active
@@ -393,48 +396,65 @@ export function ProviderPlaybackCanvas({
           : undefined
       }
     >
-      <div
-        className="wk-provider-playback-frame"
-      >
-        <div
-          className="wk-provider-playback-badge"
-          hidden={
-            backend ===
-            "youtube"
-          }
-        >
-          SoundCloud
-        </div>
-
-        <div
-          className="wk-provider-engine"
-          hidden={
-            backend !==
-            "youtube"
-          }
-        >
+      {({ dragHandleProps, dragging }) => (
+        <>
           <div
-            id="wk-youtube-player-target"
-            className="wk-provider-engine-target"
-          />
-        </div>
+            className="wk-provider-playback-frame"
+          >
+            <div
+              className="wk-provider-playback-badge"
+              hidden={
+                backend ===
+                "youtube"
+              }
+            >
+              SoundCloud
+            </div>
 
-        <div
-          className="wk-provider-engine"
-          hidden={
-            backend !==
-            "soundcloud"
-          }
-        >
-          <iframe
-            id="wk-soundcloud-player"
-            title="SoundCloud playback"
-            allow="autoplay"
-            className="wk-provider-engine-target"
-          />
-        </div>
-      </div>
-    </aside>,
+            <div
+              className="wk-provider-engine"
+              hidden={
+                backend !==
+                "youtube"
+              }
+            >
+              <div
+                id="wk-youtube-player-target"
+                className="wk-provider-engine-target"
+              />
+            </div>
+
+            <div
+              className="wk-provider-engine"
+              hidden={
+                backend !==
+                "soundcloud"
+              }
+            >
+              <iframe
+                id="wk-soundcloud-player"
+                title="SoundCloud playback"
+                allow="autoplay"
+                className="wk-provider-engine-target"
+              />
+            </div>
+          </div>
+
+          {active && !isFullPlayerOpen ? (
+            <button
+              type="button"
+              {...dragHandleProps}
+              className="wk-provider-playback-drag-handle"
+              style={dragHandleProps.style}
+              aria-label="Move floating media"
+              title={dragging ? "Moving media" : "Move floating media"}
+            >
+              <span aria-hidden="true">⋮⋮</span>
+            </button>
+          ) : null}
+        </>
+      )}
+    </MediaPresentationSurface>,
     portalRoot,
   );
 }
