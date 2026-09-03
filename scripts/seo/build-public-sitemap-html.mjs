@@ -311,6 +311,7 @@ const publicLinksBlock = `<noscript data-wakilisha-public-links>
     <a href="/sitemap.html">Sitemap</a>
     <a href="/magazine">Magazine</a>
     <a href="/artists">Artists</a>
+    <a href="/artist-studio">Artist Studio</a>
     <a href="/releases">Releases</a>
     <a href="/playlists">Playlists</a>
     <a href="/charts">Charts</a>
@@ -344,7 +345,7 @@ fs.writeFileSync(sitemapXmlPath, updatedSitemapXml);
 
 const finalIndexHtml = readRequired(indexHtmlPath);
 const finalSitemapHtml = readRequired(sitemapHtmlPath);
-const homepageRequiredLinks = ["/sitemap.html", "/magazine", "/artists", "/releases", "/playlists", "/charts"];
+const homepageRequiredLinks = ["/sitemap.html", "/magazine", "/artists", "/artist-studio", "/releases", "/playlists", "/charts"];
 
 const missingHomepageLinks = homepageRequiredLinks.filter((href) => !finalIndexHtml.includes(`href="${href}"`));
 if (missingHomepageLinks.length) fail(`Homepage is missing raw links: ${missingHomepageLinks.join(", ")}`);
