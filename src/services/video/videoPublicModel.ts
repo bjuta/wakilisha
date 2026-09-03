@@ -71,6 +71,13 @@ export interface PublicVideoCaption {
   deliveryPath: string;
 }
 
+export interface PublicVideoTranscript {
+  assetId: string;
+  assetRevisionId: string;
+  mimeType: "text/plain";
+  deliveryPath: string;
+}
+
 export interface PublicVideoChapter {
   chapterNumber: number;
   startSeconds: number;
@@ -142,6 +149,7 @@ export interface PublicVideoPublication {
   delivery: PublicVideoDelivery;
   adaptiveDelivery: PublicVideoAdaptiveDelivery | null;
   poster: PublicVideoPoster | null;
+  transcript: PublicVideoTranscript | null;
   captions: PublicVideoCaption[];
   chapters: PublicVideoChapter[];
   provenance: PublicVideoProvenance;
@@ -320,6 +328,35 @@ function decodeAdaptiveDelivery(
   };
 }
 
+function decodeTranscript(
+  value: unknown,
+  versionId: string,
+): PublicVideoTranscript | null {
+  if (!value) return null;
+
+  const input = record(value);
+  const assetId = stringValue(input.asset_id);
+  const assetRevisionId = stringValue(input.asset_revision_id);
+  const mimeType = stringValue(input.mime_type);
+  const deliveryPath = stringValue(input.delivery_path);
+
+  if (
+    !assetId ||
+    !assetRevisionId ||
+    mimeType !== "text/plain" ||
+    deliveryPath !== `/video/transcripts/${versionId}.txt`
+  ) {
+    return null;
+  }
+
+  return {
+    assetId,
+    assetRevisionId,
+    mimeType: "text/plain",
+    deliveryPath,
+  };
+}
+
 function decodeCaption(value: unknown): PublicVideoCaption | null {
   const input = record(value);
   const trackNumber = numberValue(input.track_number);
@@ -484,6 +521,7 @@ export function decodePublicVideoPublication(
     delivery,
     adaptiveDelivery: decodeAdaptiveDelivery(input.adaptive_delivery),
     poster: decodePoster(input.poster),
+    transcript: decodeTranscript(input.transcript, versionId),
     captions: array(input.captions)
       .map(decodeCaption)
       .filter((value): value is PublicVideoCaption => value !== null),

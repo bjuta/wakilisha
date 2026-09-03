@@ -80,3 +80,22 @@ export function publicVideoCaptionUrl(
   url.searchParams.set("track", String(trackNumber));
   return url.toString();
 }
+
+export function publicVideoTranscriptUrl(
+  publication: PublicVideoPublication,
+): string {
+  const projectUrl = String(
+    import.meta.env.VITE_PUBLIC_SUPABASE_URL || "",
+  ).replace(/\/$/, "");
+
+  if (!projectUrl) {
+    throw new Error("Public Supabase URL is not configured.");
+  }
+
+  const url = new URL(
+    `${projectUrl}/functions/v1/video-public-delivery`,
+  );
+  url.searchParams.set("kind", "transcript");
+  url.searchParams.set("version", publication.versionId);
+  return url.toString();
+}
