@@ -1,5 +1,41 @@
 # WAKILISHA Programme Status
 
+## Show / Video public route convergence production reconciliation - 3 September 2026
+
+**Production accepted. Phase 7B remains CLOSED. Phase 8 remains current.**
+
+The published Video Episode `Monday Morning in September` now resolves only through the shared Show hierarchy.
+
+Current production authority:
+
+- runtime main: `11eb22327d3286155375a197f77c57e5f57a435a`
+- migrations: `84`
+- migration head: `20260903150511_show_video_public_route_convergence.sql`
+- frontend entry: `assets/index-CZBM1l7e.js`
+- frontend entry SHA-256: `7092d872ad405d2a32616f2cca5bc63f1b118ca2ee0a1c21d85e724a7306b05d`
+- frontend index SHA-256: `8db2244ec6b98d41043bdf1e86d1d1f2d24e911ab8605925b9e34e2c7c9d44ca`
+- frontend live relative-tree SHA-256: `f2519dcdd2ee085fa7d9378feae5c51ec207dde7b1a41edfadd536b0a15aeff8`
+- rollback snapshot:
+  `/opt/wakilisha-react-backups/show-video-public-route-convergence-20260903T154716Z-11eb2232`
+- published Video remains v16, `4ab5a5bb-b0f4-4b8b-8ea2-94fe1be8786e`
+- Edge Function `video-public-delivery` remains v8
+
+Public product acceptance:
+
+- `/shows`: renders `The Sounds of Nairobi`, one Episode, and one Watch
+- `/shows/the-sounds-of-nairobi`: renders the shared Show and `Watch latest`
+- `/shows/the-sounds-of-nairobi/monday-morning-in-september`: renders the real Video Episode, Show identity, and governed transcript action
+- `/video/the-sounds-of-nairobi/monday-morning-in-september`: Page not found
+- `/video/monday-morning-in-september`: Page not found
+- no legacy redirect retained
+- no Audio Episode was published as part of the repair
+
+The disposable preview `show-video-public-route-convergence` was deleted after production browser acceptance. No paid preview remains for this correction.
+
+Canonical record:
+
+- `docs/engineering/show-video-public-route-convergence-production-closure-record.md`
+
 ## Phase 7B closure reconciliation - 3 September 2026
 
 **Phase 7B Public Video product is CLOSED and production accepted.**
