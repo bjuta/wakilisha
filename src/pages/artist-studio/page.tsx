@@ -15,6 +15,9 @@ import {
   ArtistClaimSheet,
 } from "@/components/artists/ArtistClaimSheet";
 import {
+  NewArtistClaimSheet,
+} from "@/components/artists/NewArtistClaimSheet";
+import {
   useAuthUser,
 } from "@/hooks/useAuthUser";
 import {
@@ -26,6 +29,9 @@ import {
   searchArtistStudioRegistry,
   type ArtistStudioRegistryCandidate,
 } from "@/services/artists/artistStudioRegistry";
+import {
+  createNewArtistClaimFlowId,
+} from "@/services/artists/newArtistClaimDraft";
 
 const SITE_URL =
   "https://wakilisha.africa";
@@ -345,7 +351,19 @@ export default function ArtistStudioPage() {
   const [
     newArtistOpen,
     setNewArtistOpen,
-  ] = useState(false);
+  ] = useState(
+    () =>
+      searchParams.get("new") ===
+      "1",
+  );
+  const [
+    newArtistFlowId,
+    setNewArtistFlowId,
+  ] = useState(
+    () =>
+      searchParams.get("flow") ??
+      "",
+  );
   const [
     actionMessage,
     setActionMessage,
@@ -353,6 +371,24 @@ export default function ArtistStudioPage() {
 
   const claimId =
     searchParams.get("claim");
+
+  useEffect(() => {
+    const shouldOpen =
+      searchParams.get("new") ===
+      "1";
+    const flowId =
+      searchParams.get("flow");
+
+    if (
+      shouldOpen &&
+      flowId
+    ) {
+      setNewArtistFlowId(
+        flowId,
+      );
+      setNewArtistOpen(true);
+    }
+  }, [searchParams]);
 
   useEffect(() => {
     if (
@@ -576,6 +612,73 @@ export default function ArtistStudioPage() {
     );
   }
 
+  function openNewArtist() {
+    const flowId =
+      newArtistFlowId ||
+      createNewArtistClaimFlowId();
+
+    setNewArtistFlowId(
+      flowId,
+    );
+    setNewArtistOpen(true);
+    setClaimCandidate(null);
+
+    setSearchParams(
+      (current) => {
+        const next =
+          new URLSearchParams(
+            current,
+          );
+
+        next.set(
+          "q",
+          submittedQuery,
+        );
+        next.delete("claim");
+        next.set("new", "1");
+        next.set(
+          "flow",
+          flowId,
+        );
+
+        return next;
+      },
+      {
+        replace: true,
+      },
+    );
+  }
+
+  function closeNewArtist(
+    clearFlow = false,
+  ) {
+    setNewArtistOpen(false);
+
+    setSearchParams(
+      (current) => {
+        const next =
+          new URLSearchParams(
+            current,
+          );
+
+        next.delete("new");
+
+        if (clearFlow) {
+          next.delete("flow");
+        }
+
+        return next;
+      },
+      {
+        replace: true,
+      },
+    );
+
+    if (clearFlow) {
+      setNewArtistFlowId("");
+    }
+  }
+
   async function acceptInvitation(
     candidate:
       ArtistStudioRegistryCandidate,
@@ -721,11 +824,7 @@ export default function ArtistStudioPage() {
                 0 ? (
                 <button
                   type="button"
-                  onClick={() =>
-                    setNewArtistOpen(
-                      true,
-                    )
-                  }
+                  onClick={openNewArtist}
                   className="text-[11px] font-black text-[var(--wk-text-muted)] transition-colors hover:text-[var(--wk-brand)]"
                 >
                   None of These Are Me
@@ -819,11 +918,7 @@ export default function ArtistStudioPage() {
 
                 <button
                   type="button"
-                  onClick={() =>
-                    setNewArtistOpen(
-                      true,
-                    )
-                  }
+                  onClick={openNewArtist}
                   className="inline-flex min-h-11 items-center justify-center rounded-full bg-[var(--wk-brand)] px-5 text-[12px] font-black text-[var(--wk-brand-on)]"
                 >
                   Add New Artist
@@ -1004,64 +1099,42 @@ export default function ArtistStudioPage() {
         />
       ) : null}
 
-      {newArtistOpen ? (
-        <div
-          className="fixed inset-0 z-[121] flex items-end justify-center bg-black/55 p-0 sm:items-center sm:p-6"
-          onClick={() =>
-            setNewArtistOpen(false)
+      {newArtistOpen &&
+      newArtistFlowId ? (
+        <NewArtistClaimSheet
+          open
+          flowId={
+            newArtistFlowId
           }
-        >
-          <div
-            className="w-full max-w-xl rounded-t-3xl bg-[var(--wk-surface)] p-6 shadow-2xl sm:rounded-3xl"
-            onClick={(event) =>
-              event.stopPropagation()
-            }
-          >
-            <div className="flex items-start justify-between gap-4">
-              <div>
-                <div className="text-[10px] font-black uppercase tracking-[0.16em] text-[var(--wk-brand)]">
-                  New Artist
-                </div>
-                <h2 className="mt-1 text-[22px] font-black tracking-[-0.035em] text-[var(--wk-text)]">
-                  Add {submittedQuery || "an Artist"}
-                </h2>
-                <p className="mt-2 text-[13px] leading-6 text-[var(--wk-text-muted)]">
-                  We’ll check the Registry again before anything is submitted.
-                </p>
-              </div>
-              <button
-                type="button"
-                onClick={() =>
-                  setNewArtistOpen(
-                    false,
-                  )
-                }
-                aria-label="Close New Artist Form"
-                className="text-[var(--wk-text-muted)] hover:text-[var(--wk-text)]"
-              >
-                <i className="ri-close-line text-xl" />
-              </button>
-            </div>
-
-            <div className="mt-6 rounded-2xl border border-[var(--wk-border)] bg-[var(--wk-bg)] p-4 text-[12px] leading-6 text-[var(--wk-text-muted)]">
-              New Artist submission is being connected to the existing Artist Claims review authority. Your search and any form entries will stay on this device while you work.
-            </div>
-
-            <div className="mt-5 flex justify-end">
-              <button
-                type="button"
-                onClick={() =>
-                  setNewArtistOpen(
-                    false,
-                  )
-                }
-                className="min-h-10 rounded-full border border-[var(--wk-border)] px-4 text-[12px] font-black text-[var(--wk-text)]"
-              >
-                Close
-              </button>
-            </div>
-          </div>
-        </div>
+          initialName={
+            submittedQuery
+          }
+          userId={
+            authUser.id ||
+            undefined
+          }
+          authLoading={
+            authUser.loading
+          }
+          returnTo={`/artist-studio?q=${encodeURIComponent(
+            submittedQuery,
+          )}&new=1&flow=${encodeURIComponent(
+            newArtistFlowId,
+          )}`}
+          onClose={() =>
+            closeNewArtist(
+              false,
+            )
+          }
+          onSubmitted={() => {
+            setActionMessage(
+              "Your Artist claim is under review.",
+            );
+            closeNewArtist(
+              true,
+            );
+          }}
+        />
       ) : null}
     </>
   );
