@@ -52,7 +52,21 @@ describe("Phase 7B V2 public Video experience convergence", () => {
     expect(canvas).toContain('"disabled"');
     expect(canvas).toContain("activeCueLines");
     expect(canvas).toContain('data-wk-video-captions="active"');
-    expect(canvas).toContain('activeCues[index]');
+    expect(canvas).toContain(
+      "const cues = selectedTrack?.cues",
+    );
+    expect(canvas).toContain(
+      "time < vttCue.startTime",
+    );
+    expect(canvas).toContain(
+      "time >= vttCue.endTime",
+    );
+    expect(canvas).toContain(
+      "syncActiveCueLines(nextTime)",
+    );
+    expect(canvas).not.toContain(
+      "selectedTrack?.activeCues",
+    );
     expect(canvas).not.toContain('"showing"');
     expect(canvas).not.toContain("default={caption.isDefault}");
     expect(canvas).not.toContain('aria-label="Captions"');

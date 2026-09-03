@@ -330,6 +330,67 @@ export function VideoPlaybackCanvas({
     videoRef,
   ]);
 
+  const syncActiveCueLines = useCallback((
+    currentTime?: number,
+  ) => {
+    const element = videoRef.current;
+    if (
+      !element
+      || source.kind !== "native"
+      || activeCaptionTrack === null
+    ) {
+      setActiveCueLines([]);
+      return;
+    }
+
+    const selectedIndex = captions.findIndex(
+      (caption) => caption.trackNumber === activeCaptionTrack,
+    );
+    const selectedTrack =
+      selectedIndex >= 0
+        ? element.textTracks[selectedIndex]
+        : null;
+    const cues = selectedTrack?.cues;
+    const time = currentTime ?? element.currentTime;
+
+    if (
+      !selectedTrack
+      || !cues
+      || !Number.isFinite(time)
+    ) {
+      setActiveCueLines([]);
+      return;
+    }
+
+    const lines: string[] = [];
+    for (let index = 0; index < cues.length; index += 1) {
+      const cue = cues[index];
+      if (!cue || !("text" in cue)) continue;
+
+      const vttCue = cue as VTTCue;
+      if (
+        time < vttCue.startTime
+        || time >= vttCue.endTime
+      ) {
+        continue;
+      }
+
+      const htmlText =
+        typeof vttCue.getCueAsHTML === "function"
+          ? vttCue.getCueAsHTML().textContent
+          : null;
+      const text = (htmlText || vttCue.text || "").trim();
+      if (text) lines.push(text);
+    }
+
+    setActiveCueLines(lines);
+  }, [
+    activeCaptionTrack,
+    captions,
+    source.kind,
+    videoRef,
+  ]);
+
   useEffect(() => {
     const element = videoRef.current;
     if (!element || source.kind !== "native") {
@@ -338,39 +399,7 @@ export function VideoPlaybackCanvas({
     }
 
     const readActiveCues = () => {
-      if (activeCaptionTrack === null) {
-        setActiveCueLines([]);
-        return;
-      }
-
-      const selectedIndex = captions.findIndex(
-        (caption) => caption.trackNumber === activeCaptionTrack,
-      );
-      const selectedTrack =
-        selectedIndex >= 0
-          ? element.textTracks[selectedIndex]
-          : null;
-      const activeCues = selectedTrack?.activeCues;
-
-      if (!selectedTrack || !activeCues) {
-        setActiveCueLines([]);
-        return;
-      }
-
-      const lines: string[] = [];
-      for (let index = 0; index < activeCues.length; index += 1) {
-        const cue = activeCues[index];
-        if (cue && "text" in cue) {
-          const vttCue = cue as VTTCue;
-          const htmlText =
-            typeof vttCue.getCueAsHTML === "function"
-              ? vttCue.getCueAsHTML().textContent
-              : null;
-          const text = (htmlText || vttCue.text || "").trim();
-          if (text) lines.push(text);
-        }
-      }
-      setActiveCueLines(lines);
+      syncActiveCueLines();
     };
 
     const bindCueListeners = () => {
@@ -385,7 +414,7 @@ export function VideoPlaybackCanvas({
           readActiveCues,
         );
       }
-      readActiveCues();
+      syncActiveCueLines();
     };
 
     bindCueListeners();
@@ -401,9 +430,8 @@ export function VideoPlaybackCanvas({
       }
     };
   }, [
-    activeCaptionTrack,
-    captions,
     source.kind,
+    syncActiveCueLines,
     syncCaptionTracks,
     videoRef,
   ]);
@@ -770,7 +798,11 @@ export function VideoPlaybackCanvas({
           syncCaptionTracks();
         }}
         onDurationChange={(event) => setDuration(event.currentTarget.duration || 0)}
-        onTimeUpdate={(event) => setCurrentTime(event.currentTarget.currentTime)}
+        onTimeUpdate={(event) => {
+          const nextTime = event.currentTarget.currentTime;
+          setCurrentTime(nextTime);
+          syncActiveCueLines(nextTime);
+        }}
         onPlay={() => setPlaying(true)}
         onPause={() => setPlaying(false)}
         onVolumeChange={(event) => setMuted(event.currentTarget.muted)}
