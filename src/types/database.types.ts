@@ -1885,6 +1885,13 @@ export type Database = {
         }
         Relationships: [
           {
+            foreignKeyName: "field_submission_events_media_intake_fkey"
+            columns: ["media_intake_id"]
+            isOneToOne: false
+            referencedRelation: "field_submission_media_intakes"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "field_submission_events_submission_fkey"
             columns: ["submission_resource_id"]
             isOneToOne: false
@@ -1897,6 +1904,71 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "field_submission_event_types"
             referencedColumns: ["event_type"]
+          },
+        ]
+      }
+      field_submission_media_intakes: {
+        Row: {
+          adopted_at: string | null
+          attempt_number: number
+          cancelled_at: string | null
+          correlation_id: string
+          created_at: string
+          created_by: string
+          expired_at: string | null
+          id: string
+          intake_state: string
+          media_upload_session_id: string
+          slot_number: number
+          submission_resource_id: string
+          superseded_at: string | null
+          updated_at: string
+          usage_link_id: string | null
+          verified_at: string | null
+        }
+        Insert: {
+          adopted_at?: string | null
+          attempt_number: number
+          cancelled_at?: string | null
+          correlation_id: string
+          created_at?: string
+          created_by: string
+          expired_at?: string | null
+          id?: string
+          intake_state?: string
+          media_upload_session_id: string
+          slot_number: number
+          submission_resource_id: string
+          superseded_at?: string | null
+          updated_at?: string
+          usage_link_id?: string | null
+          verified_at?: string | null
+        }
+        Update: {
+          adopted_at?: string | null
+          attempt_number?: number
+          cancelled_at?: string | null
+          correlation_id?: string
+          created_at?: string
+          created_by?: string
+          expired_at?: string | null
+          id?: string
+          intake_state?: string
+          media_upload_session_id?: string
+          slot_number?: number
+          submission_resource_id?: string
+          superseded_at?: string | null
+          updated_at?: string
+          usage_link_id?: string | null
+          verified_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "field_submission_media_intakes_submission_fkey"
+            columns: ["submission_resource_id"]
+            isOneToOne: false
+            referencedRelation: "field_submissions"
+            referencedColumns: ["resource_id"]
           },
         ]
       }
@@ -4913,6 +4985,15 @@ export type Database = {
       }
       assert_citation_command_actor: { Args: never; Returns: string }
       assert_credit_command_actor: { Args: never; Returns: string }
+      assert_field_media_actor_v1: {
+        Args: {
+          p_actor_id: string
+          p_media_intake_id?: string
+          p_required_capability?: string
+          p_submission_resource_id: string
+        }
+        Returns: undefined
+      }
       assert_playlist_curator_credit: {
         Args: { p_credit_id: string }
         Returns: {
@@ -5460,6 +5541,10 @@ export type Database = {
       sync_artist_portal_roles: {
         Args: { p_user_id: string }
         Returns: undefined
+      }
+      user_has_field_capability_v1: {
+        Args: { p_actor_id: string; p_capability: string }
+        Returns: boolean
       }
       username_is_registry_artist_reserved: {
         Args: { p_username: string }
@@ -19234,6 +19319,29 @@ export type Database = {
         }
         Returns: Json
       }
+      adopt_verified_field_media_upload_session_v1: {
+        Args: {
+          p_correlation_id?: string
+          p_expected_current_revision: number
+          p_idempotency_key: string
+          p_media_intake_id: string
+          p_submission_resource_id: string
+        }
+        Returns: {
+          command_receipt_id: string
+          current_revision: number
+          idempotent_replay: boolean
+          media_asset_id: string
+          media_asset_revision_id: string
+          media_file_object_id: string
+          media_intake_id: string
+          media_upload_session_id: string
+          media_usage_link_id: string
+          receipt_status: string
+          submission_resource_id: string
+          submission_state: string
+        }[]
+      }
       adopt_verified_media_upload_session_v1: {
         Args: {
           p_asset_purpose?: string
@@ -20937,6 +21045,36 @@ export type Database = {
         }
         Returns: Json
       }
+      create_field_media_upload_session_v1: {
+        Args: {
+          p_correlation_id?: string
+          p_expected_byte_size: number
+          p_expected_current_revision: number
+          p_expected_sha256: string
+          p_idempotency_key: string
+          p_mime_type: string
+          p_original_filename: string
+          p_slot_number: number
+          p_submission_resource_id: string
+          p_ttl_seconds?: number
+        }
+        Returns: {
+          attempt_number: number
+          command_receipt_id: string
+          current_revision: number
+          expires_at: string
+          idempotent_replay: boolean
+          media_intake_id: string
+          media_upload_session_id: string
+          media_upload_state: string
+          part_size_bytes: number
+          receipt_status: string
+          slot_number: number
+          submission_resource_id: string
+          submission_state: string
+          total_parts: number
+        }[]
+      }
       create_field_submission_v1: {
         Args: {
           p_correlation_id?: string
@@ -21499,6 +21637,27 @@ export type Database = {
         Args: { p_error: string; p_session_id: string }
         Returns: Json
       }
+      finalize_field_submission_v1: {
+        Args: {
+          p_correlation_id?: string
+          p_expected_current_revision: number
+          p_idempotency_key: string
+          p_submission_resource_id: string
+        }
+        Returns: {
+          adopted_media_count: number
+          command_receipt_id: string
+          current_revision: number
+          idempotent_replay: boolean
+          receipt_issued_at: string
+          receipt_message: string
+          receipt_status: string
+          submission_reference: string
+          submission_resource_id: string
+          submission_state: string
+          submitted_at: string
+        }[]
+      }
       finalize_step_cf_chunk: {
         Args: { p_limit: number; p_min_id?: string; p_run_id: string }
         Returns: Json
@@ -21732,9 +21891,18 @@ export type Database = {
         Args: { p_case_resource_id: string }
         Returns: Json
       }
+      get_field_media_receiver_session_v1: {
+        Args: {
+          p_actor_id: string
+          p_media_intake_id: string
+          p_submission_resource_id: string
+        }
+        Returns: Json
+      }
       get_field_submission_intake_v1: {
         Args: { p_submission_resource_id: string }
         Returns: {
+          adopted_media_count: number
           cancelled_at: string
           consent_declaration: string
           consent_declaration_detail: string
@@ -21743,6 +21911,18 @@ export type Database = {
           contributor_identity_redacted: boolean
           contributor_user_id: string
           created_at: string
+          current_media_adopted_at: string
+          current_media_asset_id: string
+          current_media_asset_revision_id: string
+          current_media_attempt_number: number
+          current_media_file_object_id: string
+          current_media_intake_id: string
+          current_media_intake_state: string
+          current_media_slot_number: number
+          current_media_upload_session_id: string
+          current_media_upload_state: string
+          current_media_usage_link_id: string
+          current_media_verified_at: string
           current_revision: number
           declared_sensitivity: string
           embargo_request_mode: string
@@ -21750,6 +21930,7 @@ export type Database = {
           intake_notes: string
           location_description: string
           location_mode: string
+          media_intake_count: number
           newsroom_identity_mode: string
           public_attribution_preference: string
           received_at: string
@@ -21819,12 +22000,22 @@ export type Database = {
       get_my_field_submission_v1: {
         Args: { p_submission_resource_id: string }
         Returns: {
+          adopted_media_count: number
           cancelled_at: string
           consent_declaration: string
           consent_declaration_detail: string
           contact_preference: string
           content_captured_at: string
           created_at: string
+          current_media_adopted_at: string
+          current_media_attempt_number: number
+          current_media_file_label: string
+          current_media_intake_id: string
+          current_media_intake_state: string
+          current_media_slot_number: number
+          current_media_upload_session_id: string
+          current_media_upload_state: string
+          current_media_verified_at: string
           current_revision: number
           declared_sensitivity: string
           embargo_request_mode: string
@@ -21832,6 +22023,7 @@ export type Database = {
           intake_notes: string
           location_description: string
           location_mode: string
+          media_intake_count: number
           newsroom_identity_mode: string
           public_attribution_preference: string
           receipt_issued_at: string
@@ -23037,6 +23229,15 @@ export type Database = {
           receipt_status: string
           result_payload: Json
         }[]
+      }
+      record_field_media_upload_resume_v1: {
+        Args: {
+          p_actor_id: string
+          p_correlation_id?: string
+          p_media_intake_id: string
+          p_submission_resource_id: string
+        }
+        Returns: Json
       }
       record_password_reset_admin: {
         Args: {
@@ -24739,6 +24940,15 @@ export type Database = {
       suspend_user_access_admin: {
         Args: { reason?: string; target_user_id: string }
         Returns: boolean
+      }
+      sync_field_media_intake_v1: {
+        Args: {
+          p_actor_id: string
+          p_correlation_id?: string
+          p_media_intake_id: string
+          p_submission_resource_id: string
+        }
+        Returns: Json
       }
       sync_registry_track_intake_artist_credits: {
         Args: { p_registry_track_id: string; p_suggestion_id: string }

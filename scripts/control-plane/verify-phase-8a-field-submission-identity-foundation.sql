@@ -438,19 +438,6 @@ begin
       'Phase 8A.2A Field command vocabulary is incomplete';
   end if;
 
-  if exists (
-    select 1
-    from platform_private.command_types
-    where command_type in (
-      'field.submission.media.start',
-      'field.submission.media.adopt',
-      'field.submission.finalize'
-    )
-  ) then
-    raise exception
-      'Phase 8A.2B or finalization command vocabulary appeared inside 8A.2A';
-  end if;
-
   if to_regprocedure('public.create_field_submission_v1(jsonb,text,uuid)') is null
      or to_regprocedure(
        'public.update_field_submission_declarations_v1(uuid,bigint,jsonb,text,uuid)'
@@ -620,8 +607,7 @@ begin
       'Authenticated Field RPC execution grants are incomplete';
   end if;
 
-  if to_regclass('editorial.field_submission_media_intakes') is not null
-     or to_regclass('editorial.field_submission_versions') is not null
+  if to_regclass('editorial.field_submission_versions') is not null
      or exists (
        select 1
        from editorial.resource_version_types
@@ -629,7 +615,7 @@ begin
      )
   then
     raise exception
-      'Phase 8A.2A created deferred Media or Resource Version authority';
+      'Field Submission received deferred Resource Version authority';
   end if;
 
   if exists (
