@@ -205,6 +205,11 @@ export default function AdminArtistClaimsPage() {
                   {claim.claimant.username ? ` · @${claim.claimant.username}` : ""}
                   {claim.submittedAt ? ` · ${formatDate(claim.submittedAt)}` : ""}
                 </div>
+                {claim.claimant.phoneE164 ? (
+                  <div className="mt-1 text-[12px] font-semibold text-wk-text">
+                    Phone: {claim.claimant.phoneE164}
+                  </div>
+                ) : null}
               </div>
             </div>
 
