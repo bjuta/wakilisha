@@ -127,6 +127,10 @@ export type ArtistClaimQueueItem = {
     userId: string | null;
     username: string | null;
     displayName: string | null;
+    phoneCountryIso2: string | null;
+    phoneCallingCode: string | null;
+    phoneNationalNumber: string | null;
+    phoneE164: string | null;
   };
   evidence: ArtistClaimEvidence[];
 };
@@ -372,12 +376,22 @@ export async function submitArtistClaim(input: {
   artistId: string;
   claimantRole: string;
   statement: string;
+  phone: {
+    countryIso2: string;
+    callingCode: string;
+    nationalNumber: string;
+    e164: string;
+  };
   evidence: Array<{ type: string; reference?: string | null; note?: string | null }>;
 }): Promise<void> {
-  await rpc("community_submit_artist_claim", {
+  await rpc("community_submit_artist_claim_v2", {
     p_artist_id: input.artistId,
     p_claimant_role: input.claimantRole,
     p_statement: input.statement,
+    p_phone_country_iso2: input.phone.countryIso2,
+    p_phone_calling_code: input.phone.callingCode,
+    p_phone_national_number: input.phone.nationalNumber,
+    p_phone_e164: input.phone.e164,
     p_evidence: input.evidence,
   });
 }
@@ -389,6 +403,12 @@ export async function submitNewArtistClaim(input: {
   alternateNames: string[];
   claimantRole: string;
   statement: string;
+  phone: {
+    countryIso2: string;
+    callingCode: string;
+    nationalNumber: string;
+    e164: string;
+  };
   evidence: Array<{
     type: string;
     reference?: string | null;
@@ -396,7 +416,7 @@ export async function submitNewArtistClaim(input: {
   }>;
 }): Promise<{ claimId: string }> {
   const data = await rpc<unknown>(
-    "community_submit_new_artist_claim",
+    "community_submit_new_artist_claim_v2",
     {
       p_display_name:
         input.displayName,
@@ -412,6 +432,14 @@ export async function submitNewArtistClaim(input: {
         input.claimantRole,
       p_statement:
         input.statement,
+      p_phone_country_iso2:
+        input.phone.countryIso2,
+      p_phone_calling_code:
+        input.phone.callingCode,
+      p_phone_national_number:
+        input.phone.nationalNumber,
+      p_phone_e164:
+        input.phone.e164,
       p_evidence:
         input.evidence,
     },
@@ -554,7 +582,7 @@ export async function listArtistClaims(
   limit = 100,
 ): Promise<ArtistClaimQueueItem[]> {
   const data = await rpc<unknown>(
-    "community_admin_get_artist_claims",
+    "community_admin_get_artist_claims_v2",
     {
       p_status: status,
       p_limit: limit,
@@ -769,6 +797,26 @@ export async function listArtistClaims(
             readString(
               claimant,
               "display_name",
+            ),
+          phoneCountryIso2:
+            readString(
+              record,
+              "claimant_phone_country_iso2",
+            ),
+          phoneCallingCode:
+            readString(
+              record,
+              "claimant_phone_calling_code",
+            ),
+          phoneNationalNumber:
+            readString(
+              record,
+              "claimant_phone_national_number",
+            ),
+          phoneE164:
+            readString(
+              record,
+              "claimant_phone_e164",
             ),
         },
         evidence:

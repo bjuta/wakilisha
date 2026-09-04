@@ -11,6 +11,9 @@ import {
   Portal,
 } from "@/components/base/Portal";
 import {
+  ClaimantPhoneFields,
+} from "@/components/artists/ClaimantPhoneFields";
+import {
   WkButton,
 } from "@/components/design-system/primitives/Button";
 import {
@@ -28,6 +31,9 @@ import {
   getCountryNameForIso2,
   getSortedCountryCodes,
 } from "@/utils/countries";
+import {
+  normalizeClaimantPhone,
+} from "@/utils/claimantPhone";
 
 const CLAIM_ROLES = [
   ["artist", "Artist"],
@@ -98,6 +104,14 @@ export function NewArtistClaimSheet({
     setClaimantRole,
   ] = useState("artist");
   const [
+    phoneCountryIso2,
+    setPhoneCountryIso2,
+  ] = useState("");
+  const [
+    phoneNumber,
+    setPhoneNumber,
+  ] = useState("");
+  const [
     statement,
     setStatement,
   ] = useState("");
@@ -155,6 +169,14 @@ export function NewArtistClaimSheet({
       draft?.claimantRole ||
         "artist",
     );
+    setPhoneCountryIso2(
+      draft?.phoneCountryIso2 ||
+        "",
+    );
+    setPhoneNumber(
+      draft?.phoneNumber ||
+        "",
+    );
     setStatement(
       draft?.statement ||
         "",
@@ -184,6 +206,10 @@ export function NewArtistClaimSheet({
       originIso2.length > 0 ||
       alternateNames.trim()
         .length > 0 ||
+      phoneCountryIso2.length >
+        0 ||
+      phoneNumber.trim().length >
+        0 ||
       statement.trim().length >
         0 ||
       proofLink.trim().length >
@@ -206,6 +232,8 @@ export function NewArtistClaimSheet({
             originIso2,
             alternateNames,
             claimantRole,
+            phoneCountryIso2,
+            phoneNumber,
             statement,
             proofLink,
           });
@@ -229,6 +257,8 @@ export function NewArtistClaimSheet({
     originIso2,
     alternateNames,
     claimantRole,
+    phoneCountryIso2,
+    phoneNumber,
     statement,
     proofLink,
     open,
@@ -263,6 +293,25 @@ export function NewArtistClaimSheet({
       return;
     }
 
+    let phone;
+
+    try {
+      phone =
+        normalizeClaimantPhone(
+          phoneCountryIso2,
+          phoneNumber,
+        );
+    } catch (error) {
+      setMessage({
+        type: "error",
+        text:
+          error instanceof Error
+            ? error.message
+            : "Enter a valid phone number.",
+      });
+      return;
+    }
+
     const draftResult =
       saveNewArtistClaimDraft({
         flowId,
@@ -272,6 +321,8 @@ export function NewArtistClaimSheet({
         originIso2,
         alternateNames,
         claimantRole,
+        phoneCountryIso2,
+        phoneNumber,
         statement,
         proofLink,
       });
@@ -323,6 +374,7 @@ export function NewArtistClaimSheet({
           claimantRole,
           statement:
             statement.trim(),
+          phone,
           evidence:
             proofLink.trim()
               ? [
@@ -551,6 +603,23 @@ export function NewArtistClaimSheet({
                 )}
               </select>
             </label>
+
+            <div className="mt-4">
+              <ClaimantPhoneFields
+                countryIso2={
+                  phoneCountryIso2
+                }
+                phoneNumber={
+                  phoneNumber
+                }
+                onCountryChange={
+                  setPhoneCountryIso2
+                }
+                onPhoneNumberChange={
+                  setPhoneNumber
+                }
+              />
+            </div>
 
             <label className="mt-4 block">
               <span className="mb-1.5 block text-[12px] font-bold text-[var(--wk-text)]">

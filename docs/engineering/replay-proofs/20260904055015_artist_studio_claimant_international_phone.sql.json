@@ -1,0 +1,16 @@
+{
+  "migration_file": "supabase/migrations/20260904055015_artist_studio_claimant_international_phone.sql",
+  "migration_sha256": "34854d36883c7367106d74a747de834a790684c8d0d0fc1c9aa5397c4ccafb2a",
+  "base_main_sha": "7bae58576126d6f1fc9eb3859a531b8736dea30f",
+  "preview_project_ref": "gxvwfcrdkppacvnyvazu",
+  "preview_branch_id": "7c5b0b1b-ae04-4e19-9853-64fa2337226b",
+  "preview_migration_head": "20260904055015",
+  "baseline_replay": "pass",
+  "candidate_apply": "pass",
+  "verifier": "pass",
+  "verifier_file": "scripts/control-plane/verify-artist-studio-claimant-international-phone.sql",
+  "schema_types_sha256": "f5f94867186b1c3d001e489b1fb28d43b3d1dfdf44d261ea0f20c01aeba25d1c",
+  "schema_migration_count": 86,
+  "schema_migration_head": "20260904055015",
+  "verified_at": "2026-09-04T07:00:49.876Z"
+}

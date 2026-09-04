@@ -5975,6 +5975,10 @@ export type Database = {
         Row: {
           artist_id: string | null
           claim_kind: string
+          claimant_phone_calling_code: string | null
+          claimant_phone_country_iso2: string | null
+          claimant_phone_e164: string | null
+          claimant_phone_national_number: string | null
           claimant_role: string
           claimant_user_id: string | null
           created_at: string
@@ -5990,6 +5994,10 @@ export type Database = {
         Insert: {
           artist_id?: string | null
           claim_kind?: string
+          claimant_phone_calling_code?: string | null
+          claimant_phone_country_iso2?: string | null
+          claimant_phone_e164?: string | null
+          claimant_phone_national_number?: string | null
           claimant_role: string
           claimant_user_id?: string | null
           created_at?: string
@@ -6005,6 +6013,10 @@ export type Database = {
         Update: {
           artist_id?: string | null
           claim_kind?: string
+          claimant_phone_calling_code?: string | null
+          claimant_phone_country_iso2?: string | null
+          claimant_phone_e164?: string | null
+          claimant_phone_national_number?: string | null
           claimant_role?: string
           claimant_user_id?: string | null
           created_at?: string
@@ -19469,6 +19481,10 @@ export type Database = {
         Args: { p_limit?: number; p_status?: string }
         Returns: Json
       }
+      community_admin_get_artist_claims_v2: {
+        Args: { p_limit?: number; p_status?: string }
+        Returns: Json
+      }
       community_admin_get_registry_onboarding_artists: {
         Args: never
         Returns: Json
@@ -20247,6 +20263,19 @@ export type Database = {
         }
         Returns: Json
       }
+      community_submit_artist_claim_v2: {
+        Args: {
+          p_artist_id: string
+          p_claimant_role: string
+          p_evidence?: Json
+          p_phone_calling_code: string
+          p_phone_country_iso2: string
+          p_phone_e164: string
+          p_phone_national_number: string
+          p_statement: string
+        }
+        Returns: Json
+      }
       community_submit_artist_music: {
         Args: {
           p_artist_credits: Json
@@ -20273,6 +20302,22 @@ export type Database = {
           p_display_name: string
           p_evidence?: Json
           p_origin_iso2: string
+          p_statement: string
+        }
+        Returns: Json
+      }
+      community_submit_new_artist_claim_v2: {
+        Args: {
+          p_alternate_names: string[]
+          p_artist_type: string
+          p_claimant_role: string
+          p_display_name: string
+          p_evidence?: Json
+          p_origin_iso2: string
+          p_phone_calling_code: string
+          p_phone_country_iso2: string
+          p_phone_e164: string
+          p_phone_national_number: string
           p_statement: string
         }
         Returns: Json

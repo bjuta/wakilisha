@@ -10,6 +10,9 @@ import {
   Portal,
 } from "@/components/base/Portal";
 import {
+  ClaimantPhoneFields,
+} from "@/components/artists/ClaimantPhoneFields";
+import {
   WkButton,
 } from "@/components/design-system/primitives/Button";
 import {
@@ -23,6 +26,9 @@ import {
   readArtistClaimDraft,
   saveArtistClaimDraft,
 } from "@/services/artists/artistClaimDraft";
+import {
+  normalizeClaimantPhone,
+} from "@/utils/claimantPhone";
 
 const CLAIM_ROLES = [
   ["artist", "Artist"],
@@ -59,6 +65,14 @@ export function ArtistClaimSheet({
   useScrollLock(open);
   const [claimRole, setClaimRole] =
     useState("artist");
+  const [
+    phoneCountryIso2,
+    setPhoneCountryIso2,
+  ] = useState("");
+  const [
+    phoneNumber,
+    setPhoneNumber,
+  ] = useState("");
   const [statement, setStatement] =
     useState("");
   const [proofLink, setProofLink] =
@@ -86,6 +100,12 @@ export function ArtistClaimSheet({
     setClaimRole(
       draft?.claimantRole ?? "artist",
     );
+    setPhoneCountryIso2(
+      draft?.phoneCountryIso2 ?? "",
+    );
+    setPhoneNumber(
+      draft?.phoneNumber ?? "",
+    );
     setStatement(
       draft?.statement ?? "",
     );
@@ -107,6 +127,8 @@ export function ArtistClaimSheet({
 
     const hasDraft =
       claimRole !== "artist" ||
+      phoneCountryIso2.length > 0 ||
+      phoneNumber.trim().length > 0 ||
       statement.trim().length > 0 ||
       proofLink.trim().length > 0;
 
@@ -124,6 +146,8 @@ export function ArtistClaimSheet({
             artistSlug,
             claimantRole:
               claimRole,
+            phoneCountryIso2,
+            phoneNumber,
             statement,
             proofLink,
           });
@@ -145,6 +169,8 @@ export function ArtistClaimSheet({
     artistName,
     artistSlug,
     claimRole,
+    phoneCountryIso2,
+    phoneNumber,
     statement,
     proofLink,
     open,
@@ -166,6 +192,25 @@ export function ArtistClaimSheet({
       return;
     }
 
+    let phone;
+
+    try {
+      phone =
+        normalizeClaimantPhone(
+          phoneCountryIso2,
+          phoneNumber,
+        );
+    } catch (error) {
+      setMessage({
+        type: "error",
+        text:
+          error instanceof Error
+            ? error.message
+            : "Enter a valid phone number.",
+      });
+      return;
+    }
+
     const draftResult =
       saveArtistClaimDraft({
         artistId,
@@ -173,6 +218,8 @@ export function ArtistClaimSheet({
         artistSlug,
         claimantRole:
           claimRole,
+        phoneCountryIso2,
+        phoneNumber,
         statement,
         proofLink,
       });
@@ -214,6 +261,7 @@ export function ArtistClaimSheet({
           claimRole,
         statement:
           statement.trim(),
+        phone,
         evidence:
           proofLink.trim()
             ? [
@@ -231,6 +279,8 @@ export function ArtistClaimSheet({
         artistId,
       );
       setClaimRole("artist");
+      setPhoneCountryIso2("");
+      setPhoneNumber("");
       setStatement("");
       setProofLink("");
       setSavedAt(null);
@@ -339,6 +389,21 @@ export function ArtistClaimSheet({
               )}
             </select>
           </label>
+
+          <ClaimantPhoneFields
+            countryIso2={
+              phoneCountryIso2
+            }
+            phoneNumber={
+              phoneNumber
+            }
+            onCountryChange={
+              setPhoneCountryIso2
+            }
+            onPhoneNumberChange={
+              setPhoneNumber
+            }
+          />
 
           <label className="block">
             <span className="mb-1.5 block text-[12px] font-bold text-[var(--wk-text)]">
