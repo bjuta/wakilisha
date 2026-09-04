@@ -30,6 +30,9 @@ const studio = read(
 const phone = read(
   "src/components/artists/ClaimantPhoneFields.tsx",
 );
+const artistCountryPicker = read(
+  "src/components/artists/ArtistCountryPicker.tsx",
+);
 const claim = read(
   "src/components/artists/ArtistClaimSheet.tsx",
 );
@@ -71,7 +74,16 @@ describe(
           "setSubmittedQuery(clean)",
         );
         expect(studio).toContain(
-          ".slice(0, 6)",
+          ".slice(0, 4)",
+        );
+        expect(studio).toContain(
+          "CandidateSuggestionRow",
+        );
+        expect(studio).toContain(
+          "selectedSuggestionId",
+        );
+        expect(studio).toContain(
+          "Claim Artist",
         );
         expect(studio).toContain(
           "CandidateCard",
@@ -129,6 +141,38 @@ describe(
         );
         expect(phone).not.toContain(
           "<select",
+        );
+
+        expect(
+          artistCountryPicker,
+        ).toContain(
+          'aria-haspopup="listbox"',
+        );
+        expect(
+          artistCountryPicker,
+        ).toContain(
+          'placeholder="Country"',
+        );
+        expect(
+          artistCountryPicker,
+        ).toContain(
+          "Type a country name.",
+        );
+        expect(
+          artistCountryPicker,
+        ).toContain(
+          "getCountryFlagEmoji",
+        );
+        expect(
+          artistCountryPicker,
+        ).not.toContain(
+          "<select",
+        );
+        expect(proposed).toContain(
+          "ArtistCountryPicker",
+        );
+        expect(proposed).not.toContain(
+          "getSortedCountryCodes",
         );
       },
     );
