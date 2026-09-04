@@ -188,7 +188,10 @@ export default function AdminArtistClaimsPage() {
                   <span className="rounded-full bg-gray-100 px-2.5 py-1 text-[10px] font-black uppercase tracking-wider text-gray-600">
                     {claim.claimKind === "proposed_artist" ? "New Artist" : "Existing Artist"}
                   </span>
-                  <span className="rounded-full bg-gray-100 px-2.5 py-1 text-[10px] font-black uppercase tracking-wider text-gray-600">{claim.claimantRole.replace(/_/g, " ")}</span>
+                  <span className="rounded-full bg-gray-100 px-2.5 py-1 text-[10px] font-black uppercase tracking-wider text-gray-600">{claim.claimantRole === "other" &&
+                    claim.claimantRoleOther
+                      ? claim.claimantRoleOther
+                      : claim.claimantRole.replace(/_/g, " ")}</span>
                   <span className="rounded-full bg-amber-50 px-2.5 py-1 text-[10px] font-black uppercase tracking-wider text-amber-700">{claim.status}</span>
                 </div>
 

@@ -1,19 +1,22 @@
-export const ARTIST_CLAIM_DRAFT_VERSION = 2;
+export const ARTIST_CLAIM_DRAFT_VERSION = 3;
 
 export type ArtistClaimDraft = {
-  version: typeof ARTIST_CLAIM_DRAFT_VERSION;
+  version:
+    typeof ARTIST_CLAIM_DRAFT_VERSION;
   artistId: string;
   artistName: string;
   artistSlug: string | null;
   claimantRole: string;
+  claimantRoleOther: string;
   phoneCountryIso2: string;
   phoneNumber: string;
   statement: string;
-  proofLink: string;
   updatedAt: string;
 };
 
 const KEY_PREFIX =
+  "wk-artist-claim-draft:v3:";
+const PREVIOUS_KEY_PREFIX =
   "wk-artist-claim-draft:v2:";
 const LEGACY_KEY_PREFIX =
   "wk-artist-claim-draft:v1:";
@@ -41,13 +44,13 @@ function parseCurrentDraft(
       "string" ||
     typeof parsed.claimantRole !==
       "string" ||
+    typeof parsed.claimantRoleOther !==
+      "string" ||
     typeof parsed.phoneCountryIso2 !==
       "string" ||
     typeof parsed.phoneNumber !==
       "string" ||
     typeof parsed.statement !==
-      "string" ||
-    typeof parsed.proofLink !==
       "string" ||
     typeof parsed.updatedAt !==
       "string"
@@ -68,29 +71,31 @@ function parseCurrentDraft(
         : null,
     claimantRole:
       parsed.claimantRole,
+    claimantRoleOther:
+      parsed.claimantRoleOther,
     phoneCountryIso2:
       parsed.phoneCountryIso2,
     phoneNumber:
       parsed.phoneNumber,
     statement:
       parsed.statement,
-    proofLink:
-      parsed.proofLink,
     updatedAt:
       parsed.updatedAt,
   };
 }
 
-function parseLegacyDraft(
+function parseOlderDraft(
   raw: string,
   artistId: string,
+  expectedVersion: 1 | 2,
 ): ArtistClaimDraft | null {
   const parsed =
     JSON.parse(raw) as
       Record<string, unknown>;
 
   if (
-    parsed.version !== 1 ||
+    parsed.version !==
+      expectedVersion ||
     parsed.artistId !== artistId ||
     typeof parsed.artistName !==
       "string" ||
@@ -98,13 +103,24 @@ function parseLegacyDraft(
       "string" ||
     typeof parsed.statement !==
       "string" ||
-    typeof parsed.proofLink !==
-      "string" ||
     typeof parsed.updatedAt !==
       "string"
   ) {
     return null;
   }
+
+  const phoneCountryIso2 =
+    expectedVersion === 2 &&
+    typeof parsed.phoneCountryIso2 ===
+      "string"
+      ? parsed.phoneCountryIso2
+      : "";
+  const phoneNumber =
+    expectedVersion === 2 &&
+    typeof parsed.phoneNumber ===
+      "string"
+      ? parsed.phoneNumber
+      : "";
 
   return {
     version:
@@ -119,12 +135,11 @@ function parseLegacyDraft(
         : null,
     claimantRole:
       parsed.claimantRole,
-    phoneCountryIso2: "",
-    phoneNumber: "",
+    claimantRoleOther: "",
+    phoneCountryIso2,
+    phoneNumber,
     statement:
       parsed.statement,
-    proofLink:
-      parsed.proofLink,
     updatedAt:
       parsed.updatedAt,
   };
@@ -153,6 +168,22 @@ export function readArtistClaimDraft(
       );
     }
 
+    const previousRaw =
+      window.localStorage.getItem(
+        keyFor(
+          artistId,
+          PREVIOUS_KEY_PREFIX,
+        ),
+      );
+
+    if (previousRaw) {
+      return parseOlderDraft(
+        previousRaw,
+        artistId,
+        2,
+      );
+    }
+
     const legacyRaw =
       window.localStorage.getItem(
         keyFor(
@@ -162,9 +193,10 @@ export function readArtistClaimDraft(
       );
 
     return legacyRaw
-      ? parseLegacyDraft(
+      ? parseOlderDraft(
           legacyRaw,
           artistId,
+          1,
         )
       : null;
   } catch {
@@ -208,6 +240,12 @@ export function saveArtistClaimDraft(
     window.localStorage.removeItem(
       keyFor(
         input.artistId,
+        PREVIOUS_KEY_PREFIX,
+      ),
+    );
+    window.localStorage.removeItem(
+      keyFor(
+        input.artistId,
         LEGACY_KEY_PREFIX,
       ),
     );
@@ -235,15 +273,18 @@ export function clearArtistClaimDraft(
   }
 
   try {
-    window.localStorage.removeItem(
-      keyFor(artistId),
-    );
-    window.localStorage.removeItem(
-      keyFor(
-        artistId,
-        LEGACY_KEY_PREFIX,
-      ),
-    );
+    for (const prefix of [
+      KEY_PREFIX,
+      PREVIOUS_KEY_PREFIX,
+      LEGACY_KEY_PREFIX,
+    ]) {
+      window.localStorage.removeItem(
+        keyFor(
+          artistId,
+          prefix,
+        ),
+      );
+    }
   } catch {
     // No-op when local storage is unavailable.
   }

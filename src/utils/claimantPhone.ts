@@ -19,8 +19,28 @@ export type ClaimantPhoneCountryOption = {
   iso2: string;
   countryName: string;
   callingCode: string;
+  flag: string;
   label: string;
 };
+
+export function getCountryFlagEmoji(
+  iso2: string,
+) {
+  const clean =
+    iso2.trim().toUpperCase();
+
+  if (!/^[A-Z]{2}$/.test(clean)) {
+    return "🌐";
+  }
+
+  return String.fromCodePoint(
+    ...Array.from(clean).map(
+      (letter) =>
+        127397 +
+        letter.charCodeAt(0),
+    ),
+  );
+}
 
 export function getClaimantPhoneCountryOptions(): ClaimantPhoneCountryOption[] {
   return getSortedCountryCodes().flatMap(
@@ -40,6 +60,10 @@ export function getClaimantPhoneCountryOptions(): ClaimantPhoneCountryOption[] {
             iso2,
             countryName,
             callingCode,
+            flag:
+              getCountryFlagEmoji(
+                iso2,
+              ),
             label:
               `${countryName} (${callingCode})`,
           },
@@ -49,6 +73,36 @@ export function getClaimantPhoneCountryOptions(): ClaimantPhoneCountryOption[] {
       }
     },
   );
+}
+
+export function findClaimantPhoneCountryOptions(
+  query: string,
+  limit = 12,
+): ClaimantPhoneCountryOption[] {
+  const clean =
+    query.trim().toLocaleLowerCase();
+
+  if (!clean) {
+    return [];
+  }
+
+  return getClaimantPhoneCountryOptions()
+    .filter(
+      (country) =>
+        country.countryName
+          .toLocaleLowerCase()
+          .startsWith(clean) ||
+        country.iso2
+          .toLocaleLowerCase()
+          .startsWith(clean) ||
+        country.callingCode
+          .toLocaleLowerCase()
+          .startsWith(clean),
+    )
+    .slice(
+      0,
+      Math.max(1, limit),
+    );
 }
 
 export function normalizeClaimantPhone(

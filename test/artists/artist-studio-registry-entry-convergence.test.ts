@@ -491,7 +491,7 @@ describe(
         );
 
         expect(service).toContain(
-          '"community_submit_new_artist_claim_v2"',
+          '"community_submit_new_artist_claim_v3"',
         );
         expect(service).toContain(
           '"community_admin_resolve_artist_claim_existing"',
