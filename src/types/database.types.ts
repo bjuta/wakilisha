@@ -1816,6 +1816,203 @@ export type Database = {
         }
         Relationships: []
       }
+      field_submission_event_types: {
+        Row: {
+          created_at: string
+          description: string
+          enabled: boolean
+          event_type: string
+          label: string
+          sort_order: number
+        }
+        Insert: {
+          created_at?: string
+          description: string
+          enabled?: boolean
+          event_type: string
+          label: string
+          sort_order?: number
+        }
+        Update: {
+          created_at?: string
+          description?: string
+          enabled?: boolean
+          event_type?: string
+          label?: string
+          sort_order?: number
+        }
+        Relationships: []
+      }
+      field_submission_events: {
+        Row: {
+          actor_user_id: string | null
+          command_receipt_id: string | null
+          correlation_id: string
+          created_at: string
+          event_type: string
+          id: string
+          media_intake_id: string | null
+          prior_state: Json | null
+          reason: string | null
+          resulting_state: Json | null
+          submission_resource_id: string
+        }
+        Insert: {
+          actor_user_id?: string | null
+          command_receipt_id?: string | null
+          correlation_id: string
+          created_at?: string
+          event_type: string
+          id?: string
+          media_intake_id?: string | null
+          prior_state?: Json | null
+          reason?: string | null
+          resulting_state?: Json | null
+          submission_resource_id: string
+        }
+        Update: {
+          actor_user_id?: string | null
+          command_receipt_id?: string | null
+          correlation_id?: string
+          created_at?: string
+          event_type?: string
+          id?: string
+          media_intake_id?: string | null
+          prior_state?: Json | null
+          reason?: string | null
+          resulting_state?: Json | null
+          submission_resource_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "field_submission_events_submission_fkey"
+            columns: ["submission_resource_id"]
+            isOneToOne: false
+            referencedRelation: "field_submissions"
+            referencedColumns: ["resource_id"]
+          },
+          {
+            foreignKeyName: "field_submission_events_type_fkey"
+            columns: ["event_type"]
+            isOneToOne: false
+            referencedRelation: "field_submission_event_types"
+            referencedColumns: ["event_type"]
+          },
+        ]
+      }
+      field_submissions: {
+        Row: {
+          cancelled_at: string | null
+          consent_declaration: string
+          consent_declaration_detail: string | null
+          contact_preference: string
+          content_captured_at: string | null
+          correlation_id: string
+          created_at: string
+          created_by: string
+          current_revision: number
+          declared_sensitivity: string
+          embargo_request_mode: string
+          expired_at: string | null
+          intake_notes: string | null
+          location_description: string | null
+          location_mode: string
+          newsroom_identity_mode: string
+          owner_user_id: string
+          public_attribution_preference: string
+          receipt_issued_at: string | null
+          received_at: string | null
+          requested_embargo_until: string | null
+          resource_id: string
+          resource_kind: string
+          rights_declaration: string
+          rights_declaration_detail: string | null
+          source_protection_request: string
+          submission_reference: string
+          submission_state: string
+          submitted_at: string | null
+          submitter_mode: string
+          updated_at: string
+          updated_by: string
+        }
+        Insert: {
+          cancelled_at?: string | null
+          consent_declaration: string
+          consent_declaration_detail?: string | null
+          contact_preference?: string
+          content_captured_at?: string | null
+          correlation_id: string
+          created_at?: string
+          created_by: string
+          current_revision?: number
+          declared_sensitivity?: string
+          embargo_request_mode?: string
+          expired_at?: string | null
+          intake_notes?: string | null
+          location_description?: string | null
+          location_mode?: string
+          newsroom_identity_mode?: string
+          owner_user_id: string
+          public_attribution_preference?: string
+          receipt_issued_at?: string | null
+          received_at?: string | null
+          requested_embargo_until?: string | null
+          resource_id: string
+          resource_kind?: string
+          rights_declaration: string
+          rights_declaration_detail?: string | null
+          source_protection_request?: string
+          submission_reference: string
+          submission_state?: string
+          submitted_at?: string | null
+          submitter_mode?: string
+          updated_at?: string
+          updated_by: string
+        }
+        Update: {
+          cancelled_at?: string | null
+          consent_declaration?: string
+          consent_declaration_detail?: string | null
+          contact_preference?: string
+          content_captured_at?: string | null
+          correlation_id?: string
+          created_at?: string
+          created_by?: string
+          current_revision?: number
+          declared_sensitivity?: string
+          embargo_request_mode?: string
+          expired_at?: string | null
+          intake_notes?: string | null
+          location_description?: string | null
+          location_mode?: string
+          newsroom_identity_mode?: string
+          owner_user_id?: string
+          public_attribution_preference?: string
+          receipt_issued_at?: string | null
+          received_at?: string | null
+          requested_embargo_until?: string | null
+          resource_id?: string
+          resource_kind?: string
+          rights_declaration?: string
+          rights_declaration_detail?: string | null
+          source_protection_request?: string
+          submission_reference?: string
+          submission_state?: string
+          submitted_at?: string | null
+          submitter_mode?: string
+          updated_at?: string
+          updated_by?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "field_submissions_resource_fkey"
+            columns: ["resource_id", "resource_kind"]
+            isOneToOne: false
+            referencedRelation: "resources"
+            referencedColumns: ["id", "resource_kind"]
+          },
+        ]
+      }
       media_asset_resources: {
         Row: {
           asset_id: string
@@ -4991,6 +5188,10 @@ export type Database = {
         Args: { p_suggestion_id: string }
         Returns: string
       }
+      field_submission_state_snapshot_v1: {
+        Args: { p_submission_resource_id: string }
+        Returns: Json
+      }
       insert_article_lifecycle_version_from_article: {
         Args: {
           p_article: Database["public"]["Tables"]["wk_articles"]["Row"]
@@ -5275,6 +5476,10 @@ export type Database = {
       validate_correction_case_history: {
         Args: { p_case_resource_id: string }
         Returns: undefined
+      }
+      validate_field_declarations_v1: {
+        Args: { p_declarations: Json; p_require_core?: boolean }
+        Returns: Json
       }
     }
     Enums: {
@@ -19292,6 +19497,23 @@ export type Database = {
           deleted_count: number
         }[]
       }
+      cancel_field_submission_v1: {
+        Args: {
+          p_correlation_id?: string
+          p_expected_current_revision: number
+          p_idempotency_key: string
+          p_reason?: string
+          p_submission_resource_id: string
+        }
+        Returns: {
+          command_receipt_id: string
+          current_revision: number
+          idempotent_replay: boolean
+          receipt_status: string
+          submission_resource_id: string
+          submission_state: string
+        }[]
+      }
       cancel_media_upload_session_v1: {
         Args: { p_reason?: string; p_session_id: string }
         Returns: Json
@@ -20715,6 +20937,23 @@ export type Database = {
         }
         Returns: Json
       }
+      create_field_submission_v1: {
+        Args: {
+          p_correlation_id?: string
+          p_declarations: Json
+          p_idempotency_key: string
+        }
+        Returns: {
+          command_receipt_id: string
+          created_at: string
+          current_revision: number
+          idempotent_replay: boolean
+          receipt_status: string
+          submission_reference: string
+          submission_resource_id: string
+          submission_state: string
+        }[]
+      }
       create_import_run: {
         Args: {
           p_errors?: string[]
@@ -21493,6 +21732,38 @@ export type Database = {
         Args: { p_case_resource_id: string }
         Returns: Json
       }
+      get_field_submission_intake_v1: {
+        Args: { p_submission_resource_id: string }
+        Returns: {
+          cancelled_at: string
+          consent_declaration: string
+          consent_declaration_detail: string
+          contact_preference: string
+          content_captured_at: string
+          contributor_identity_redacted: boolean
+          contributor_user_id: string
+          created_at: string
+          current_revision: number
+          declared_sensitivity: string
+          embargo_request_mode: string
+          expired_at: string
+          intake_notes: string
+          location_description: string
+          location_mode: string
+          newsroom_identity_mode: string
+          public_attribution_preference: string
+          received_at: string
+          requested_embargo_until: string
+          rights_declaration: string
+          rights_declaration_detail: string
+          source_protection_request: string
+          submission_reference: string
+          submission_resource_id: string
+          submission_state: string
+          submitted_at: string
+          updated_at: string
+        }[]
+      }
       get_import_run_by_id: {
         Args: { p_id: string }
         Returns: {
@@ -21544,6 +21815,37 @@ export type Database = {
       get_media_upload_session_v1: {
         Args: { p_session_id: string }
         Returns: Json
+      }
+      get_my_field_submission_v1: {
+        Args: { p_submission_resource_id: string }
+        Returns: {
+          cancelled_at: string
+          consent_declaration: string
+          consent_declaration_detail: string
+          contact_preference: string
+          content_captured_at: string
+          created_at: string
+          current_revision: number
+          declared_sensitivity: string
+          embargo_request_mode: string
+          expired_at: string
+          intake_notes: string
+          location_description: string
+          location_mode: string
+          newsroom_identity_mode: string
+          public_attribution_preference: string
+          receipt_issued_at: string
+          received_at: string
+          requested_embargo_until: string
+          rights_declaration: string
+          rights_declaration_detail: string
+          source_protection_request: string
+          submission_reference: string
+          submission_resource_id: string
+          submission_state: string
+          submitted_at: string
+          updated_at: string
+        }[]
       }
       get_my_personal_playlist: {
         Args: { p_playlist_id: string }
@@ -24673,6 +24975,24 @@ export type Database = {
           p_public_url?: string
         }
         Returns: Json
+      }
+      update_field_submission_declarations_v1: {
+        Args: {
+          p_correlation_id?: string
+          p_declarations: Json
+          p_expected_current_revision: number
+          p_idempotency_key: string
+          p_submission_resource_id: string
+        }
+        Returns: {
+          command_receipt_id: string
+          current_revision: number
+          declaration_changed: boolean
+          idempotent_replay: boolean
+          receipt_status: string
+          submission_resource_id: string
+          submission_state: string
+        }[]
       }
       update_import_run: {
         Args: {
