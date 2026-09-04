@@ -86,12 +86,12 @@ describe("claimed Artist experience", () => {
 
   it("uses M2 claims, representation, team, and review authority instead of duplicating it", () => {
     expect(service).toContain('"community_get_artist_representation_state"');
-    expect(service).toContain('"community_submit_artist_claim_v2"');
+    expect(service).toContain('"community_submit_artist_claim_v3"');
     expect(service).toContain('"community_artist_invite_representative"');
     expect(service).toContain('"community_artist_accept_representation"');
     expect(service).toContain('"community_artist_update_representative"');
     expect(service).toContain('"community_artist_revoke_representation"');
-    expect(service).toContain('"community_admin_get_artist_claims_v2"');
+    expect(service).toContain('"community_admin_get_artist_claims_v3"');
     expect(service).toContain('"community_admin_decide_artist_claim"');
     expect(migration).toContain("profile_presentation_updated");
     expect(migration).toContain("or not v_actor_rep.can_manage_team");

@@ -1,4 +1,4 @@
-export const NEW_ARTIST_CLAIM_DRAFT_VERSION = 2;
+export const NEW_ARTIST_CLAIM_DRAFT_VERSION = 3;
 
 export type NewArtistClaimDraft = {
   version:
@@ -9,14 +9,16 @@ export type NewArtistClaimDraft = {
   originIso2: string;
   alternateNames: string;
   claimantRole: string;
+  claimantRoleOther: string;
   phoneCountryIso2: string;
   phoneNumber: string;
   statement: string;
-  proofLink: string;
   updatedAt: string;
 };
 
 const KEY_PREFIX =
+  "wk-new-artist-claim-draft:v3:";
+const PREVIOUS_KEY_PREFIX =
   "wk-new-artist-claim-draft:v2:";
 const LEGACY_KEY_PREFIX =
   "wk-new-artist-claim-draft:v1:";
@@ -63,13 +65,13 @@ function parseCurrentDraft(
       "string" ||
     typeof parsed.claimantRole !==
       "string" ||
+    typeof parsed.claimantRoleOther !==
+      "string" ||
     typeof parsed.phoneCountryIso2 !==
       "string" ||
     typeof parsed.phoneNumber !==
       "string" ||
     typeof parsed.statement !==
-      "string" ||
-    typeof parsed.proofLink !==
       "string" ||
     typeof parsed.updatedAt !==
       "string"
@@ -91,29 +93,31 @@ function parseCurrentDraft(
       parsed.alternateNames,
     claimantRole:
       parsed.claimantRole,
+    claimantRoleOther:
+      parsed.claimantRoleOther,
     phoneCountryIso2:
       parsed.phoneCountryIso2,
     phoneNumber:
       parsed.phoneNumber,
     statement:
       parsed.statement,
-    proofLink:
-      parsed.proofLink,
     updatedAt:
       parsed.updatedAt,
   };
 }
 
-function parseLegacyDraft(
+function parseOlderDraft(
   raw: string,
   flowId: string,
+  expectedVersion: 1 | 2,
 ): NewArtistClaimDraft | null {
   const parsed =
     JSON.parse(raw) as
       Record<string, unknown>;
 
   if (
-    parsed.version !== 1 ||
+    parsed.version !==
+      expectedVersion ||
     parsed.flowId !== flowId ||
     typeof parsed.displayName !==
       "string" ||
@@ -127,13 +131,24 @@ function parseLegacyDraft(
       "string" ||
     typeof parsed.statement !==
       "string" ||
-    typeof parsed.proofLink !==
-      "string" ||
     typeof parsed.updatedAt !==
       "string"
   ) {
     return null;
   }
+
+  const phoneCountryIso2 =
+    expectedVersion === 2 &&
+    typeof parsed.phoneCountryIso2 ===
+      "string"
+      ? parsed.phoneCountryIso2
+      : "";
+  const phoneNumber =
+    expectedVersion === 2 &&
+    typeof parsed.phoneNumber ===
+      "string"
+      ? parsed.phoneNumber
+      : "";
 
   return {
     version:
@@ -149,12 +164,11 @@ function parseLegacyDraft(
       parsed.alternateNames,
     claimantRole:
       parsed.claimantRole,
-    phoneCountryIso2: "",
-    phoneNumber: "",
+    claimantRoleOther: "",
+    phoneCountryIso2,
+    phoneNumber,
     statement:
       parsed.statement,
-    proofLink:
-      parsed.proofLink,
     updatedAt:
       parsed.updatedAt,
   };
@@ -183,6 +197,22 @@ export function readNewArtistClaimDraft(
       );
     }
 
+    const previousRaw =
+      window.localStorage.getItem(
+        keyFor(
+          flowId,
+          PREVIOUS_KEY_PREFIX,
+        ),
+      );
+
+    if (previousRaw) {
+      return parseOlderDraft(
+        previousRaw,
+        flowId,
+        2,
+      );
+    }
+
     const legacyRaw =
       window.localStorage.getItem(
         keyFor(
@@ -192,9 +222,10 @@ export function readNewArtistClaimDraft(
       );
 
     return legacyRaw
-      ? parseLegacyDraft(
+      ? parseOlderDraft(
           legacyRaw,
           flowId,
+          1,
         )
       : null;
   } catch {
@@ -238,6 +269,12 @@ export function saveNewArtistClaimDraft(
     window.localStorage.removeItem(
       keyFor(
         input.flowId,
+        PREVIOUS_KEY_PREFIX,
+      ),
+    );
+    window.localStorage.removeItem(
+      keyFor(
+        input.flowId,
         LEGACY_KEY_PREFIX,
       ),
     );
@@ -265,15 +302,18 @@ export function clearNewArtistClaimDraft(
   }
 
   try {
-    window.localStorage.removeItem(
-      keyFor(flowId),
-    );
-    window.localStorage.removeItem(
-      keyFor(
-        flowId,
-        LEGACY_KEY_PREFIX,
-      ),
-    );
+    for (const prefix of [
+      KEY_PREFIX,
+      PREVIOUS_KEY_PREFIX,
+      LEGACY_KEY_PREFIX,
+    ]) {
+      window.localStorage.removeItem(
+        keyFor(
+          flowId,
+          prefix,
+        ),
+      );
+    }
   } catch {
     // No-op when local storage is unavailable.
   }

@@ -112,6 +112,7 @@ export type ArtistClaimQueueItem = {
     | "proposed_artist";
   status: string;
   claimantRole: string;
+  claimantRoleOther: string | null;
   statement: string;
   submittedAt: string | null;
   decidedAt: string | null;
@@ -375,6 +376,7 @@ export async function getArtistManagementWorkspace(
 export async function submitArtistClaim(input: {
   artistId: string;
   claimantRole: string;
+  claimantRoleOther: string | null;
   statement: string;
   phone: {
     countryIso2: string;
@@ -384,9 +386,11 @@ export async function submitArtistClaim(input: {
   };
   evidence: Array<{ type: string; reference?: string | null; note?: string | null }>;
 }): Promise<void> {
-  await rpc("community_submit_artist_claim_v2", {
+  await rpc("community_submit_artist_claim_v3", {
     p_artist_id: input.artistId,
     p_claimant_role: input.claimantRole,
+    p_claimant_role_other:
+      input.claimantRoleOther,
     p_statement: input.statement,
     p_phone_country_iso2: input.phone.countryIso2,
     p_phone_calling_code: input.phone.callingCode,
@@ -402,6 +406,7 @@ export async function submitNewArtistClaim(input: {
   originIso2: string;
   alternateNames: string[];
   claimantRole: string;
+  claimantRoleOther: string | null;
   statement: string;
   phone: {
     countryIso2: string;
@@ -416,7 +421,7 @@ export async function submitNewArtistClaim(input: {
   }>;
 }): Promise<{ claimId: string }> {
   const data = await rpc<unknown>(
-    "community_submit_new_artist_claim_v2",
+    "community_submit_new_artist_claim_v3",
     {
       p_display_name:
         input.displayName,
@@ -430,6 +435,8 @@ export async function submitNewArtistClaim(input: {
         input.alternateNames,
       p_claimant_role:
         input.claimantRole,
+      p_claimant_role_other:
+        input.claimantRoleOther,
       p_statement:
         input.statement,
       p_phone_country_iso2:
@@ -582,7 +589,7 @@ export async function listArtistClaims(
   limit = 100,
 ): Promise<ArtistClaimQueueItem[]> {
   const data = await rpc<unknown>(
-    "community_admin_get_artist_claims_v2",
+    "community_admin_get_artist_claims_v3",
     {
       p_status: status,
       p_limit: limit,
@@ -699,6 +706,11 @@ export async function listArtistClaims(
             record,
             "claimant_role",
           ) ?? "other",
+        claimantRoleOther:
+          readString(
+            record,
+            "claimant_role_other",
+          ),
         statement:
           readString(
             record,

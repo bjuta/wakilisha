@@ -66,6 +66,10 @@ export function ArtistClaimSheet({
   const [claimRole, setClaimRole] =
     useState("artist");
   const [
+    claimantRoleOther,
+    setClaimantRoleOther,
+  ] = useState("");
+  const [
     phoneCountryIso2,
     setPhoneCountryIso2,
   ] = useState("");
@@ -74,8 +78,6 @@ export function ArtistClaimSheet({
     setPhoneNumber,
   ] = useState("");
   const [statement, setStatement] =
-    useState("");
-  const [proofLink, setProofLink] =
     useState("");
   const [savedAt, setSavedAt] =
     useState<string | null>(null);
@@ -100,6 +102,9 @@ export function ArtistClaimSheet({
     setClaimRole(
       draft?.claimantRole ?? "artist",
     );
+    setClaimantRoleOther(
+      draft?.claimantRoleOther ?? "",
+    );
     setPhoneCountryIso2(
       draft?.phoneCountryIso2 ?? "",
     );
@@ -108,9 +113,6 @@ export function ArtistClaimSheet({
     );
     setStatement(
       draft?.statement ?? "",
-    );
-    setProofLink(
-      draft?.proofLink ?? "",
     );
     setSavedAt(
       draft?.updatedAt ?? null,
@@ -127,10 +129,10 @@ export function ArtistClaimSheet({
 
     const hasDraft =
       claimRole !== "artist" ||
+      claimantRoleOther.trim().length > 0 ||
       phoneCountryIso2.length > 0 ||
       phoneNumber.trim().length > 0 ||
-      statement.trim().length > 0 ||
-      proofLink.trim().length > 0;
+      statement.trim().length > 0;
 
     if (!hasDraft) {
       setSavedAt(null);
@@ -146,10 +148,10 @@ export function ArtistClaimSheet({
             artistSlug,
             claimantRole:
               claimRole,
+            claimantRoleOther,
             phoneCountryIso2,
             phoneNumber,
             statement,
-            proofLink,
           });
 
         setDraftStorageAvailable(
@@ -169,10 +171,10 @@ export function ArtistClaimSheet({
     artistName,
     artistSlug,
     claimRole,
+    claimantRoleOther,
     phoneCountryIso2,
     phoneNumber,
     statement,
-    proofLink,
     open,
   ]);
 
@@ -181,6 +183,20 @@ export function ArtistClaimSheet({
   ) {
     event.preventDefault();
     setMessage(null);
+
+    if (
+      claimRole === "other" &&
+      (
+        claimantRoleOther.trim().length < 1 ||
+        claimantRoleOther.trim().length > 140
+      )
+    ) {
+      setMessage({
+        type: "error",
+        text: "Tell us your role in 140 characters or fewer.",
+      });
+      return;
+    }
 
     if (
       statement.trim().length < 10
@@ -218,10 +234,10 @@ export function ArtistClaimSheet({
         artistSlug,
         claimantRole:
           claimRole,
+        claimantRoleOther,
         phoneCountryIso2,
         phoneNumber,
         statement,
-        proofLink,
       });
 
     setDraftStorageAvailable(
@@ -259,30 +275,24 @@ export function ArtistClaimSheet({
         artistId,
         claimantRole:
           claimRole,
+        claimantRoleOther:
+          claimRole === "other"
+            ? claimantRoleOther.trim()
+            : null,
         statement:
           statement.trim(),
         phone,
-        evidence:
-          proofLink.trim()
-            ? [
-                {
-                  type:
-                    "official_social",
-                  reference:
-                    proofLink.trim(),
-                },
-              ]
-            : [],
+        evidence: [],
       });
 
       clearArtistClaimDraft(
         artistId,
       );
       setClaimRole("artist");
+      setClaimantRoleOther("");
       setPhoneCountryIso2("");
       setPhoneNumber("");
       setStatement("");
-      setProofLink("");
       setSavedAt(null);
       setDraftStorageAvailable(true);
       setMessage({
@@ -390,6 +400,27 @@ export function ArtistClaimSheet({
             </select>
           </label>
 
+          {claimRole === "other" ? (
+            <label className="block">
+              <span className="mb-1.5 block text-[12px] font-bold text-[var(--wk-text)]">
+                Other Role
+              </span>
+              <input
+                value={claimantRoleOther}
+                onChange={(event) =>
+                  setClaimantRoleOther(
+                    event.target.value,
+                  )
+                }
+                maxLength={140}
+                required
+                autoComplete="off"
+                placeholder="Describe your role"
+                className="w-full rounded-xl border border-[var(--wk-border)] bg-[var(--wk-bg)] px-4 py-3 text-[14px] text-[var(--wk-text)]"
+              />
+            </label>
+          ) : null}
+
           <ClaimantPhoneFields
             countryIso2={
               phoneCountryIso2
@@ -423,25 +454,6 @@ export function ArtistClaimSheet({
             />
           </label>
 
-          <label className="block">
-            <span className="mb-1.5 block text-[12px] font-bold text-[var(--wk-text)]">
-              Proof Link
-            </span>
-            <input
-              type="url"
-              value={proofLink}
-              onChange={(event) =>
-                setProofLink(
-                  event.target.value,
-                )
-              }
-              placeholder="https://"
-              className="w-full rounded-xl border border-[var(--wk-border)] bg-[var(--wk-bg)] px-4 py-3 text-[14px] text-[var(--wk-text)]"
-            />
-            <span className="mt-1.5 block text-[11px] leading-5 text-[var(--wk-text-muted)]">
-              An official website, social account, announcement, or other public proof can help us review your claim.
-            </span>
-          </label>
 
           <div className="flex flex-wrap items-center justify-between gap-3 pt-1">
             <span className="text-[10px] font-semibold text-[var(--wk-text-faint)]">

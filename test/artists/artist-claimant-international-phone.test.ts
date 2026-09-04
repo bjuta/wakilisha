@@ -6,7 +6,9 @@ import {
   it,
 } from "vitest";
 import {
+  findClaimantPhoneCountryOptions,
   getClaimantPhoneCountryOptions,
+  getCountryFlagEmoji,
   normalizeClaimantPhone,
 } from "../../src/utils/claimantPhone";
 import {
@@ -146,34 +148,37 @@ describe(
     );
 
     it(
-      "filters phone countries by typed prefix on both claimant forms",
+      "uses a compact searchable country-code picker on both claimant forms",
       () => {
+        expect(
+          getCountryFlagEmoji("KE"),
+        ).toBe("🇰🇪");
+        expect(
+          findClaimantPhoneCountryOptions(
+            "Ken",
+          ).map(
+            (country) =>
+              country.iso2,
+          ),
+        ).toEqual(["KE"]);
+
         expect(phoneFields).toContain(
+          'aria-haspopup="listbox"',
+        );
+        expect(phoneFields).toContain(
+          'placeholder="Country"',
+        );
+        expect(phoneFields).toContain(
+          "country.flag",
+        );
+        expect(phoneFields).not.toContain(
           "Search Country",
         );
-        expect(phoneFields).toContain(
-          "Start typing a country name",
-        );
-        expect(phoneFields).toContain(
+        expect(phoneFields).not.toContain(
           "Phone Country",
         );
-        expect(phoneFields).toContain(
-          "Choose Country",
-        );
-        expect(phoneFields).toContain(
-          "filteredCountries",
-        );
-        expect(phoneFields).toContain(
-          ".startsWith(query)",
-        );
-        expect(phoneFields).toContain(
-          '<select',
-        );
-        expect(phoneFields).toContain(
-          "country.label",
-        );
-        expect(phoneFields).toContain(
-          'autoComplete="country"',
+        expect(phoneFields).not.toContain(
+          "<select",
         );
 
         for (const sheet of [
@@ -200,13 +205,13 @@ describe(
       "preserves old drafts and carries phone state through authentication",
       () => {
         expect(claimDraft).toContain(
-          "ARTIST_CLAIM_DRAFT_VERSION = 2",
+          "ARTIST_CLAIM_DRAFT_VERSION = 3",
         );
         expect(claimDraft).toContain(
           "wk-artist-claim-draft:v1:",
         );
         expect(newArtistDraft).toContain(
-          "NEW_ARTIST_CLAIM_DRAFT_VERSION = 2",
+          "NEW_ARTIST_CLAIM_DRAFT_VERSION = 3",
         );
         expect(newArtistDraft).toContain(
           "wk-new-artist-claim-draft:v1:",
@@ -227,7 +232,7 @@ describe(
     );
 
     it(
-      "keeps v1 production RPCs while routing new clients through phone-aware v2 authority",
+      "keeps accepted v1 and v2 phone authority while corrected clients advance separately",
       () => {
         expect(migration).toContain(
           "community_submit_artist_claim_v2",
@@ -246,13 +251,13 @@ describe(
         );
 
         expect(service).toContain(
-          '"community_submit_artist_claim_v2"',
+          '"community_submit_artist_claim_v3"',
         );
         expect(service).toContain(
-          '"community_submit_new_artist_claim_v2"',
+          '"community_submit_new_artist_claim_v3"',
         );
         expect(service).toContain(
-          '"community_admin_get_artist_claims_v2"',
+          '"community_admin_get_artist_claims_v3"',
         );
       },
     );

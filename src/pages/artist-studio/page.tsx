@@ -333,6 +333,12 @@ export default function ArtistStudioPage() {
     setSubmittedQuery,
   ] = useState(initialQuery);
   const [
+    searchCommitted,
+    setSearchCommitted,
+  ] = useState(
+    initialQuery.trim().length >= 2,
+  );
+  const [
     candidates,
     setCandidates,
   ] = useState<
@@ -542,6 +548,26 @@ export default function ArtistStudioPage() {
       [candidates],
     );
 
+  function handleArtistSearchInput(
+    value: string,
+  ) {
+    setQuery(value);
+    setSearchError("");
+    setActionMessage("");
+    setSearchCommitted(false);
+
+    const clean =
+      value.trim();
+
+    if (clean.length < 2) {
+      setSubmittedQuery("");
+      setCandidates([]);
+      return;
+    }
+
+    setSubmittedQuery(clean);
+  }
+
   function commitSearch(
     event?: FormEvent,
   ) {
@@ -557,6 +583,7 @@ export default function ArtistStudioPage() {
       return;
     }
 
+    setSearchCommitted(true);
     setSubmittedQuery(clean);
     setSearchParams(
       (current) => {
@@ -790,7 +817,7 @@ export default function ArtistStudioPage() {
                   <input
                     value={query}
                     onChange={(event) =>
-                      setQuery(
+                      handleArtistSearchInput(
                         event.target.value,
                       )
                     }
@@ -806,6 +833,84 @@ export default function ArtistStudioPage() {
                   </button>
                 </div>
 
+                {query.trim().length >=
+                  2 &&
+                !searchCommitted ? (
+                  <div className="mt-2 max-h-[420px] overflow-y-auto overscroll-contain rounded-2xl border border-white/10 bg-[var(--wk-surface)] p-2 text-[var(--wk-text)] shadow-2xl">
+                    {searching ? (
+                      <div className="px-3 py-4 text-[12px] font-semibold text-[var(--wk-text-muted)]">
+                        Searching the Registry…
+                      </div>
+                    ) : searchError ? (
+                      <div className="px-3 py-4 text-[12px] text-red-700">
+                        {searchError}
+                      </div>
+                    ) : candidates.length >
+                      0 ? (
+                      <div className="grid gap-2">
+                        {candidates
+                          .slice(0, 6)
+                          .map(
+                            (candidate) => (
+                              <CandidateCard
+                                key={
+                                  candidate.artistId
+                                }
+                                candidate={
+                                  candidate
+                                }
+                                authority={
+                                  candidateAuthority[
+                                    candidate
+                                      .artistId
+                                  ] ??
+                                  null
+                                }
+                                authorityLoading={
+                                  authorityLoading
+                                }
+                                authLoading={
+                                  authUser.loading
+                                }
+                                signedIn={Boolean(
+                                  authUser.id,
+                                )}
+                                onClaim={() =>
+                                  openClaim(
+                                    candidate,
+                                  )
+                                }
+                                onAcceptInvitation={() =>
+                                  void acceptInvitation(
+                                    candidate,
+                                  )
+                                }
+                              />
+                            ),
+                          )}
+                      </div>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={openNewArtist}
+                        className="flex w-full items-center justify-between gap-4 rounded-xl px-3 py-4 text-left hover:bg-[var(--wk-surface-raised)]"
+                      >
+                        <span>
+                          <span className="block text-[13px] font-black text-[var(--wk-text)]">
+                            No close Registry match
+                          </span>
+                          <span className="mt-1 block text-[11px] text-[var(--wk-text-muted)]">
+                            Propose this Artist as a new Registry entry.
+                          </span>
+                        </span>
+                        <span className="shrink-0 text-[11px] font-black text-[var(--wk-brand)]">
+                          Add New Artist
+                        </span>
+                      </button>
+                    )}
+                  </div>
+                ) : null}
+
                 <button
                   type="submit"
                   className="mt-3 inline-flex min-h-11 w-full items-center justify-center rounded-full bg-[var(--wk-brand)] px-5 text-[12px] font-black text-[var(--wk-brand-on)] sm:hidden"
@@ -817,7 +922,8 @@ export default function ArtistStudioPage() {
           </div>
         </section>
 
-        {(submittedQuery ||
+        {searchCommitted &&
+        (submittedQuery ||
           searching ||
           searchError) ? (
           <section className="mx-auto w-full max-w-7xl px-4 py-8 sm:px-6 lg:px-10 lg:py-10">

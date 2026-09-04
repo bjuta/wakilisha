@@ -104,6 +104,10 @@ export function NewArtistClaimSheet({
     setClaimantRole,
   ] = useState("artist");
   const [
+    claimantRoleOther,
+    setClaimantRoleOther,
+  ] = useState("");
+  const [
     phoneCountryIso2,
     setPhoneCountryIso2,
   ] = useState("");
@@ -114,10 +118,6 @@ export function NewArtistClaimSheet({
   const [
     statement,
     setStatement,
-  ] = useState("");
-  const [
-    proofLink,
-    setProofLink,
   ] = useState("");
   const [
     savedAt,
@@ -169,6 +169,10 @@ export function NewArtistClaimSheet({
       draft?.claimantRole ||
         "artist",
     );
+    setClaimantRoleOther(
+      draft?.claimantRoleOther ||
+        "",
+    );
     setPhoneCountryIso2(
       draft?.phoneCountryIso2 ||
         "",
@@ -179,10 +183,6 @@ export function NewArtistClaimSheet({
     );
     setStatement(
       draft?.statement ||
-        "",
-    );
-    setProofLink(
-      draft?.proofLink ||
         "",
     );
     setSavedAt(
@@ -212,7 +212,7 @@ export function NewArtistClaimSheet({
         0 ||
       statement.trim().length >
         0 ||
-      proofLink.trim().length >
+      claimantRoleOther.trim().length >
         0 ||
       artistType !== "solo" ||
       claimantRole !== "artist";
@@ -232,10 +232,10 @@ export function NewArtistClaimSheet({
             originIso2,
             alternateNames,
             claimantRole,
+            claimantRoleOther,
             phoneCountryIso2,
             phoneNumber,
             statement,
-            proofLink,
           });
 
         setDraftStorageAvailable(
@@ -257,10 +257,10 @@ export function NewArtistClaimSheet({
     originIso2,
     alternateNames,
     claimantRole,
+    claimantRoleOther,
     phoneCountryIso2,
     phoneNumber,
     statement,
-    proofLink,
     open,
   ]);
 
@@ -279,6 +279,20 @@ export function NewArtistClaimSheet({
       setMessage({
         type: "error",
         text: "Enter the Artist name.",
+      });
+      return;
+    }
+
+    if (
+      claimantRole === "other" &&
+      (
+        claimantRoleOther.trim().length < 1 ||
+        claimantRoleOther.trim().length > 140
+      )
+    ) {
+      setMessage({
+        type: "error",
+        text: "Tell us your role in 140 characters or fewer.",
       });
       return;
     }
@@ -321,10 +335,10 @@ export function NewArtistClaimSheet({
         originIso2,
         alternateNames,
         claimantRole,
+        claimantRoleOther,
         phoneCountryIso2,
         phoneNumber,
         statement,
-        proofLink,
       });
 
     setDraftStorageAvailable(
@@ -372,20 +386,14 @@ export function NewArtistClaimSheet({
               )
               .filter(Boolean),
           claimantRole,
+          claimantRoleOther:
+            claimantRole === "other"
+              ? claimantRoleOther.trim()
+              : null,
           statement:
             statement.trim(),
           phone,
-          evidence:
-            proofLink.trim()
-              ? [
-                  {
-                    type:
-                      "official_social",
-                    reference:
-                      proofLink.trim(),
-                  },
-                ]
-              : [],
+          evidence: [],
         });
 
       clearNewArtistClaimDraft(
@@ -604,6 +612,27 @@ export function NewArtistClaimSheet({
               </select>
             </label>
 
+            {claimantRole === "other" ? (
+              <label className="mt-4 block">
+                <span className="mb-1.5 block text-[12px] font-bold text-[var(--wk-text)]">
+                  Other Role
+                </span>
+                <input
+                  value={claimantRoleOther}
+                  onChange={(event) =>
+                    setClaimantRoleOther(
+                      event.target.value,
+                    )
+                  }
+                  maxLength={140}
+                  required
+                  autoComplete="off"
+                  placeholder="Describe your role"
+                  className="w-full rounded-xl border border-[var(--wk-border)] bg-[var(--wk-bg)] px-4 py-3 text-[14px] text-[var(--wk-text)]"
+                />
+              </label>
+            ) : null}
+
             <div className="mt-4">
               <ClaimantPhoneFields
                 countryIso2={
@@ -639,24 +668,6 @@ export function NewArtistClaimSheet({
               />
             </label>
 
-            <label className="mt-4 block">
-              <span className="mb-1.5 block text-[12px] font-bold text-[var(--wk-text)]">
-                Proof Link
-              </span>
-              <input
-                type="url"
-                value={
-                  proofLink
-                }
-                onChange={(event) =>
-                  setProofLink(
-                    event.target.value,
-                  )
-                }
-                placeholder="https://"
-                className="w-full rounded-xl border border-[var(--wk-border)] bg-[var(--wk-bg)] px-4 py-3 text-[14px] text-[var(--wk-text)]"
-              />
-            </label>
           </div>
 
           <div className="flex flex-wrap items-center justify-between gap-3 pt-1">
