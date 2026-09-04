@@ -1,5 +1,25 @@
 # WAKILISHA Master Programme Map
 
+## Cultural Operating Layer reconciliation - 4 September 2026
+
+**Current numbered work: Phase 8A, Safe mobile intake.**
+
+The Cultural Operating Layer and Cultural Commerce architecture work is an adjacent documentation detour. It does not start Commerce implementation.
+
+The authoritative sequence from Phase 8A onward is:
+
+- `docs/roadmap/phase-8-to-16-programme-reconciliation.md`
+
+Supporting architecture:
+
+- `docs/engineering/wakilisha-cultural-operating-layer-doctrine.md`
+- `docs/engineering/cultural-commerce-existing-primitives-audit.md`
+- `docs/engineering/cultural-commerce-and-payments-authority.md`
+- `docs/engineering/events-venues-storefronts-and-public-route-authority.md`
+
+The former fixed maximum of two implementation PRs per phase and programme-wide PR ceiling are retired. Future work uses the smallest independently reviewable, deployable, reversible, and provable milestone.
+
+
 ## Phase 7B closure reconciliation - 3 September 2026
 
 **Phase 7B Public Video product is CLOSED and production accepted. Phase 7 is complete.**
@@ -156,12 +176,16 @@ Phase 7A opened from production runtime baseline `dae3de2dc9fb021496eb0fe0c4d4f0
 | 6A | Audio publication authority and internal editorial product | Complete | Governed Audio authority, Admin Studio workbench, submitted-version review, and production acceptance |
 | 6B | Public Audio product | Complete | Public Audio authority accepted; former real-podcast exercise retained as non-blocking operational acceptance |
 | 7A | Video publication authority | Complete | Real Video reached immutable published v8 with governed Sheng captions and preserved prior publication history |
-| 7B | Public Video product | Current | One real captioned Video publishes across desktop and mobile |
-| 8 | Field Capture | Planned | Weak-network capture survives intake, private review, and safe promotion |
-| 9 | Public delivery, search, and SEO at scale | Planned | Public delivery no longer depends on giant read or whole-corpus build paths |
-| 10 | Registry, Charts, and evidence consolidation | Planned | Shared Trust used without competing evidence authorities |
-| 11 | Operational proof and production freeze | Planned | Scale proof, restoration drill, operator independence, and foundation freeze |
-| 12 | Inquiry Mode | Planned | One real Inquiry connects Article, Playlist, and Registry work without weakening ordinary editors |
+| 7B | Public Video product | Complete | One real captioned Video publishes across desktop and mobile |
+| 8 | Field Capture | Current, 8A | Weak-network capture survives intake, private review, and safe promotion |
+| 9 | Public delivery, search, routes, and SEO at scale | Planned | Bounded public reads, maintained search, canonical routes, and incremental SEO |
+| 10 | Cultural Graph, Trust, and evidence convergence | Planned | Shared Trust and proven relationship semantics converge without duplicate authority |
+| 11 | Cultural Commerce foundation and WAKILISHA Store | Planned | One real WAKILISHA sale proves Order, Payment, Ledger, fulfillment, refund, and reconciliation |
+| 12 | Events, Venues, and native ticketing | Planned | One real canonical Event and one native ticketing flow become durable cultural record |
+| 13 | Artist Commerce | Planned | One claimed Artist Storefront completes a real governed sale and settlement |
+| 14 | User Cultural Collection and Commerce graph | Planned | Private cultural history and public cultural relationships converge safely |
+| 15 | Operational proof, recovery, and production freeze | Planned | Cultural and financial scale, restoration, reconciliation, and operator independence are proven |
+| 16 | Inquiry Mode | Planned | One real Inquiry connects canonical work without weakening ordinary editors |
 
 ## Closed mainline record
 
