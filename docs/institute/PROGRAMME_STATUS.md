@@ -1,5 +1,28 @@
 # WAKILISHA Programme Status
 
+## Cultural Operating Layer programme reconciliation - 4 September 2026
+
+**Current numbered work remains Phase 8A: Safe mobile intake.**
+
+The Cultural Operating Layer, Cultural Commerce, Events, Venues, Payments, and future financial architecture are an adjacent architecture detour. This detour does not start Commerce implementation and does not replace or renumber the current Phase 8 work.
+
+Opening protected main for this reconciliation:
+
+`b7af641b12528b9eb42967dd978a72d77be244aa`
+
+New architecture authorities:
+
+- `docs/engineering/wakilisha-cultural-operating-layer-doctrine.md`
+- `docs/engineering/cultural-commerce-existing-primitives-audit.md`
+- `docs/engineering/cultural-commerce-and-payments-authority.md`
+- `docs/engineering/events-venues-storefronts-and-public-route-authority.md`
+- `docs/roadmap/phase-8-to-16-programme-reconciliation.md`
+
+The reconciled numbered sequence preserves Phase 8, Phase 9, and Phase 10, inserts Cultural Commerce before the production freeze, moves operational proof and freeze to Phase 15, and moves Inquiry Mode to Phase 16.
+
+After this documentation detour merges, implementation returns immediately to Phase 8A.
+
+
 ## Show / Video public route convergence production reconciliation - 3 September 2026
 
 **Production accepted. Phase 7B remains CLOSED. Phase 8 remains current.**

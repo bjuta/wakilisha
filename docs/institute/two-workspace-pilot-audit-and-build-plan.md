@@ -15,7 +15,7 @@ All future work on Articles, Playlists, Audio, Video, Media, Registry, Charts, c
 
 ## Programme status
 
-Current phase: **Phase 7B: Public Video product**.
+Current phase: **Phase 8A: Safe mobile intake**.
 
 Phases 0 through 7A are closed.
 
@@ -1304,15 +1304,19 @@ Every participating page displays the same Inquiry identity and the connected wo
 
 ## Delivery shape
 
-The programme contains thirteen phases, numbered 0 through 12.
+The original programme was numbered 0 through 12.
 
-Each phase has a maximum of two implementation PRs.
+The 4 September 2026 programme reconciliation preserves Phase 8, Phase 9, and Phase 10, inserts Cultural Commerce before the production freeze, moves operational proof and freeze to Phase 15, and moves Inquiry Mode to Phase 16.
 
-The programme ceiling is 26 PRs.
+The current sequence from Phase 8A onward is authoritative in:
 
-The expected range is approximately 20 to 23 PRs because some later phases may fit safely into one PR once the platform kernel exists.
+`docs/roadmap/phase-8-to-16-programme-reconciliation.md`
 
-Do not force the programme into fewer PRs by creating unreviewable changes.
+There is no fixed maximum number of implementation PRs per phase and no programme-wide PR ceiling.
+
+The binding implementation unit is the smallest independently reviewable, deployable, reversible, and provable milestone that advances a named cultural or operational outcome.
+
+Do not force work into fewer PRs by creating unreviewable changes.
 
 Every PR must be:
 
@@ -1911,221 +1915,224 @@ Exit gate:
 
 ## Phase 8: Field Capture
 
-### PR 8A: Safe mobile intake
+### Phase 8A: Safe Mobile Intake
 
-Build:
+Build the missing Field Submission authority while reusing accepted Media ingest.
 
-- mobile capture
-- file selection
-- weak-network queue
-- resumable transfer
-- private originals
-- optional identity disclosure
-- anonymous-intake policy
-- consent and rights
-- sensitivity
-- embargo
-- metadata stripping
-- location protection
-- submission receipt
+Required outcomes:
 
-### PR 8B: Newsroom triage and promotion
+- mobile record or file selection;
+- durable local weak-network queue;
+- retry and resume after interruption;
+- canonical Media upload session reuse;
+- immutable private original;
+- contributor disclosure choice;
+- anonymous-intake policy where permitted;
+- rights and consent;
+- sensitivity;
+- embargo;
+- unsafe metadata handling;
+- protected location handling;
+- submission receipt;
+- durable provenance between Field Submission and Media.
 
-Build:
+Do not rebuild resumable Media upload.
 
-- urgent queue
-- verification
-- source protection
-- redaction requirements
-- holds
-- rejection
-- embargo
-- editorial notes
-- contributor communication
-- promotion to Media, Article, Audio, or Video
-- immutable intake history
+Do not create a second Media authority.
 
-Exit gate:
+#### Exit Proof
 
-- a simulated protest recording survives connection loss
-- it enters private review
-- a safe derivative becomes a draft publication without losing original provenance
+One real or controlled field recording begins on mobile, loses connectivity, survives interruption, resumes without duplicate file identity, reaches WAKILISHA as private governed Media, preserves Field Submission provenance and safety metadata, and produces a truthful receipt.
 
-## Phase 9: Public delivery, search, and SEO at scale
+### Phase 8B: Field Triage and Governed Promotion
 
-### PR 9A: Versioned public API and search
+Build urgent queue, verification, source protection, redaction requirements, holds, rejection, embargo, editorial notes, contributor communication, immutable intake history, and governed promotion into ordinary canonical workflows.
 
-Build:
+Promotion targets may include Article draft, Audio draft, Video draft, Source, or reviewed Registry evidence.
 
-- domain-based public query handlers
-- API versioning
-- cursor pagination
-- cached read models
-- validators such as ETags
-- outbox-driven cache invalidation
-- search documents
-- full-text and trigram indexes
-- incremental reindexing
-- removal of direct complex browser joins
+The original file is already governed Media before promotion.
 
-Exit gate:
+Do not create a second review system.
 
-- public pages no longer require the giant read function
-- list performance remains stable at representative large volumes
+#### Exit Proof
 
-### PR 9B: Incremental SEO and route infrastructure
+A Field Submission enters private review, receives a safety decision, and produces one safe canonical draft or reviewed evidence target without losing original Media identity or provenance.
 
-Build:
+## Phase 9: Public Delivery, Search, Routes, and SEO at Scale
 
-- sitemap index
-- sharded sitemaps
-- incremental URL updates
-- route aliases
-- redirect history
-- canonical URLs
-- publication-driven sitemap jobs
-- SEO metadata read models
-- load testing
+### Phase 9A: Public Query Convergence and Search
 
-Exit gate:
+Converge existing public-read infrastructure into bounded domain contracts.
 
-- adding one publication updates only the relevant sitemap shard
-- no build process fetches the entire public corpus
+Build or finish versioned domain query contracts, deterministic cursor pagination, cached read models, validators, outbox-driven invalidation, maintained search documents, full-text and trigram indexes, incremental reindexing, stable error contracts, removal of direct complex browser joins, and retirement of giant unrelated-domain ownership from the current public read function.
 
-## Phase 10: Registry, Charts, and evidence consolidation
+Reuse accepted domain readers and keyset pagination where correct.
 
-### PR 10A: Shared trust adapters
+#### Exit Proof
 
-Integrate:
+Representative public pages no longer depend on one giant read implementation for unrelated domains, and list/search performance remains stable at representative scale.
 
-- Registry evidence
-- relationship evidence
-- Chart methodology sources
-- citations
-- corrections
-- review events
-- provenance
-- meaningful review dates
+### Phase 9B: Incremental Public Identity and SEO
 
-Decouple evidence permissions from Institute-specific capabilities.
+Converge existing SEO and route infrastructure.
 
-Keep Registry and Charts authoritative for their own records.
+Build or finish sitemap index, sharded sitemaps, incremental publication-driven URL updates, canonical route authority, route aliases, redirect history, canonical URLs, route-backed public profile sections, SEO metadata read models, and load testing.
 
-### PR 10B: Consolidation and scale hygiene
+Important Artist and user public sections gain durable routes before Commerce depends on them.
 
-Complete:
+#### Exit Proof
 
-- migrate parallel evidence and Inquiry records into chosen authorities
-- remove duplicate ownership paths
-- archive compatibility tables and functions
-- add missing foreign-key indexes
-- simplify overlapping RLS policies
-- introduce retention and partitioning for high-volume tables
-- create analytics and operational rollups
-- retire the database-backed request-rate log
+Adding one publication or public entity updates only the relevant SEO shard or index path, no build fetches the whole public corpus, and a route-backed public profile section can be shared directly.
 
-Exit gate:
+## Phase 10: Cultural Graph, Trust, and Evidence Convergence
 
-- one reviewed Registry change and one Chart update use the shared trust layer
-- no active workflow depends on competing evidence authorities
+### Phase 10A: Shared Cultural Trust and Relationship Adapters
 
-## Phase 11: Operational proof and production freeze
+Integrate proven shared Trust authority across Registry evidence, relationship evidence, Chart methodology, Artist claims, Artist representation where relevant, People and Organisations, Field Capture, Corrections, Review, provenance, and meaningful review dates.
 
-### PR 11A: Scale and resilience proof
+Preserve domain authority.
 
-Test in isolated environments with representative volumes of at least:
+Do not create a generic universal graph table merely because multiple domains have relationships.
 
-- 100,000 editorial resources
-- hundreds of thousands of sources
-- millions of citations and resource links
-- millions of provenance and review events
-- millions of analytics and operational rows
-- large media catalogues
-- high concurrent public reads
-- competing editorial writes
+#### Exit Proof
 
-Verify:
+At least one reviewed Registry change and one non-Registry adopter use shared Trust and provenance without a competing evidence authority.
 
-- index usage
-- queue throughput
-- cursor pagination
-- command idempotency
-- stale-write handling
-- migration duration
-- public latency
-- cache behaviour
-- restoration from failed jobs
-- security boundaries
+### Phase 10B: Cultural Graph and Scale Hygiene
 
-### PR 11B: Disaster recovery and freeze
+Converge only relationship semantics proven by real use.
 
-Establish:
+Potential work includes temporal relationships where careers or Organisations change, reviewed relationship provenance, duplicate ownership retirement, compatibility-table retirement, missing foreign-key indexes, overlapping RLS simplification, retention and partition plans for high-volume operational data, analytics and operational rollups, and database-backed request-rate log retirement.
 
-- point-in-time recovery target
-- metadata exports
-- media inventory
-- checksum reconciliation
-- restore rehearsal
-- queue and worker dashboards
-- database-growth dashboards
-- slow-query alerts
-- incident runbooks
-- ownership of each system
-- production freeze policy
+#### Exit Proof
 
-Target outcomes include:
+The active cultural graph can explain selected important relationships with identity, time, and provenance while typed domain authority remains intact and no active workflow depends on duplicate evidence ownership.
 
-- no acknowledged editorial command is lost
-- core metadata recovery point is measured in minutes, not days
-- restoration is rehearsed rather than assumed
-- cached public reads remain available during editorial-processing failures
-- media originals remain recoverable even when derivatives fail
+## Phase 11: Cultural Commerce Foundation and WAKILISHA Store
 
-Exit gate:
+### Phase 11A: Commerce and Payments Authority
 
-- the production team can use every canonical editor without developer assistance
-- the restoration drill succeeds
-- editor and platform foundations enter freeze
+Implement the minimum real authority required for the first WAKILISHA transaction.
 
-## Phase 12: Inquiry Mode
+Expected foundations include Merchant, Storefront, Product, Product Variant, Offer, Money, inventory or availability, Cart, Checkout, Merchant Order, Order Line, Payment Intent, Payment Attempt, provider event inbox, Commission, Refund, double-entry Ledger, Settlement, Merchant payable or Payout boundaries, and Payment Connector contract.
 
-### PR 12A: Internal power-up
+Before production money moves, explicitly approve Merchant of Record model, first Payment Methods, first Connector, credential boundary, refund ownership, settlement model, and relevant regulatory and tax responsibilities.
 
-Build:
+#### Exit Proof
 
-- active Inquiry state
-- start, attach, switch, and exit controls
-- persistent context across admin routes
-- explicit resource attachment
-- many-to-many resource roles
-- question versions
-- Findings
-- Finding-to-source relationships
-- publication snapshots
-- shared Inquiry sidecar
-- contextual actions inside canonical editors
+A rehearsed transaction can move through Order, payment state, Commission, Ledger, Refund, and reconciliation without provider-specific business logic escaping the payment boundary.
 
-### PR 12B: Public Inquiry product and legacy retirement
+### Phase 11B: WAKILISHA Store
 
-Build:
+WAKILISHA becomes Merchant number one.
 
-- singular-output Inquiry treatments
-- plural Inquiry pages
-- connected-work navigation
-- Findings and uncertainty
-- affected Registry records
-- contributors
-- sources
-- provenance
-- corrections
-- legacy Inquiry migration
-- old Institute retirement
+Prove a real Product, Media, Variant where required, Offer, inventory, public Storefront, shareable Product route, real Checkout, real Payment, fulfillment, refund, Commission, reconciliation, and archival lifecycle.
 
-Exit gate:
+#### Exit Proof
 
-- one real Inquiry connects an Article, Playlist, and Registry change
-- all pages preserve the same Inquiry identity and history
-- Inquiry Mode can be turned off without weakening ordinary editors
+WAKILISHA completes one real end-to-end sale and one refund or equivalent failure-recovery exercise with financial authority reconciled.
+
+## Phase 12: Events, Venues, and Native Ticketing
+
+### Phase 12A: Events and Venues Cultural Authority
+
+Build Event, Event Occurrence, Venue, Event participants and roles, status and history, public Event route, public Venue route, discovery and search, external official ticket Offer support, Media and editorial context, and archive after completion.
+
+Borrow useful prior TWIC Event interaction patterns without its WordPress authority shortcuts.
+
+#### Exit Proof
+
+One real Event exists as a canonical cultural record, links to a canonical Venue and participants, has a shareable route, and remains valid whether ticketing is native, external, free, or closed.
+
+### Phase 12B: Native Ticketing
+
+Build Ticket Type, capacity, Offer, ticket Checkout, issued ticket, admission token, check-in, cancellation, refund, Event Occurrence capacity, entry permissions, and audit.
+
+#### Exit Proof
+
+One real WAKILISHA-ticketed Event sells tickets, admits attendees safely, reconciles money, handles one failure or refund path, and remains as cultural record after completion.
+
+## Phase 13: Artist Commerce
+
+### Phase 13A: Artist Storefronts and Commerce Permissions
+
+Allow an eligible claimed Artist to activate a Storefront without making Artist identity the Merchant account.
+
+Build Artist-to-Storefront association, Merchant/operator association, team capabilities, catalogue permissions, Order permissions, finance permissions, `/artists/:slug/shop`, and Artist Studio Commerce management surfaces.
+
+#### Exit Proof
+
+One claimed Artist team can operate a Storefront using governed permissions while a non-finance team member cannot access finance authority.
+
+### Phase 13B: Artist Settlement and First Artist Sale
+
+Prove first Artist Product, real Artist sale, WAKILISHA Commission, Merchant payable, fulfillment, refund handling, settlement or Payout, and reconciliation.
+
+#### Exit Proof
+
+One Artist receives the correct commercial outcome from a real sale, WAKILISHA Commission is auditable, and the Product remains linked to cultural identity after commercial availability ends.
+
+## Phase 14: User Cultural Collection and Commerce Graph
+
+### Phase 14A: User Cultural Collection
+
+Build private-by-default cultural state for saved, ticketed, attended, purchased, and owned or collected.
+
+Public projection requires explicit user choice.
+
+Do not expose purchase history by default.
+
+#### Exit Proof
+
+One user preserves a real Event or purchase in private cultural history and deliberately chooses whether an eligible cultural memory becomes public.
+
+### Phase 14B: Cultural Commerce Graph and Insights
+
+Connect commercial activity to public cultural history without exposing private financial facts.
+
+Potential relationships include Product to Artist, Product to Release, Product to Event, Event to Venue, Event to participant, and Storefront to cultural subject.
+
+Insights derive from governed events, Orders, audience state, and cultural relationships without becoming a second analytics authority.
+
+#### Exit Proof
+
+A real Artist or WAKILISHA Storefront can explain selected commercial performance in the context of canonical cultural identity while user-private purchase details remain protected.
+
+## Phase 15: Operational Proof, Recovery, and Production Freeze
+
+### Phase 15A: Scale and Resilience Proof
+
+Expand the original scale programme across editorial, cultural, and financial systems.
+
+Test representative volumes and concurrency for Resources, Sources, Citations, provenance, Media, public reads, Orders, payment provider events, inventory, tickets, admission, Ledger postings, settlement, and Payout state.
+
+Verify indexes, queues, cursor pagination, command idempotency, stale-write handling, migration duration, public latency, cache behaviour, failed-job recovery, security boundaries, duplicate payment callbacks, ambiguous payment outcomes, refund safety, oversell prevention, Ledger balance, duplicate ticket check-in prevention, and provider outage behaviour.
+
+### Phase 15B: Recovery, Reconciliation, and Freeze
+
+Establish and prove point-in-time recovery, metadata exports, Media inventory, checksum reconciliation, restoration rehearsal, queue and worker dashboards, database growth dashboards, slow-query alerts, incident runbooks, financial reconciliation, Merchant payable reconciliation, Payout recovery, ownership of each system, and production freeze policy.
+
+#### Exit Proof
+
+The production team can operate canonical cultural and commercial systems without developer assistance, restoration succeeds, financial reconciliation succeeds, and platform foundations enter freeze.
+
+## Phase 16: Inquiry Mode
+
+### Phase 16A: Internal Inquiry Power-Up
+
+Move the former Phase 12A here.
+
+Build active Inquiry state, start, attach, switch, and exit controls, persistent context, explicit Resource attachment, many-to-many Resource roles, question versions, Findings, Finding-to-Source relationships, publication snapshots, shared Inquiry sidecar, and contextual actions inside canonical editors.
+
+### Phase 16B: Public Inquiry and Legacy Retirement
+
+Move the former Phase 12B here.
+
+Build singular-output Inquiry treatments, plural Inquiry pages, connected-work navigation, Findings and uncertainty, affected Registry records, contributors, Sources, provenance, Corrections, legacy Inquiry migration, and old Institute retirement.
+
+#### Exit Proof
+
+One real Inquiry connects an Article, Playlist, and Registry change, participating pages preserve the same Inquiry identity and history, and Inquiry Mode can be disabled without weakening ordinary canonical tools.
 
 ## Definition of editor completion
 
@@ -2324,45 +2331,25 @@ After canonical editors and Inquiry Mode are proven:
 
 ## Current implementation boundary
 
-Phase 0 through Phase 4 are closed.
+Phases 0 through 7B are closed.
 
-Phase 5 Playlist is active.
+The next numbered implementation is:
 
-Phase 5A Canonical Playlist authority is closed through PR #587 and PR #588.
+**Phase 8A: Safe mobile intake.**
 
-The next implementation is:
+The Cultural Operating Layer and Cultural Commerce architecture reconciliation does not start Commerce implementation.
 
-**PR 5B: Public Playlist product**.
+Phase 8A begins with a read-only audit of accepted Media, Trust, command, job, Review, privacy, and provenance authorities.
 
-PR 5B must execute the public Playlist scope and exit gate defined in Phase 5 of this plan.
+Phase 8A must reuse existing resumable Media upload authority rather than create a second Field Capture file system.
 
-It must build on the accepted Phase 5A authority rather than reopening or duplicating:
+Current Phase 8 onward programme authority:
 
-- canonical Playlist identity
-- Playlist command and concurrency authority
-- immutable Playlist versions
-- review lifecycle
-- atomic ordering
-- Registry Track Intake
-- provider playback validation
-- Media cover authority
-- shared Sources, Citations, Credits, Corrections, and provenance
-- Registry canonical identity authority
-
-PR 5B must not begin Audio, Video, Field Capture, or Inquiry Mode implementation.
-
-The PR 5B exit gate remains:
-
-- one real editorial Playlist is reviewed and published end to end
-- the public Playlist is served through stable collection and detail routes
-- responsive playback works on desktop and mobile
-- matched Registry records link correctly
-- public credits, citations, provenance, corrections, scheduling, SEO, and sharing behaviour are verified
-
+`docs/roadmap/phase-8-to-16-programme-reconciliation.md`
 
 ## Production freeze principle
 
-The production freeze begins only after Phase 11 passes.
+The production freeze begins only after Phase 15 passes.
 
 During the freeze, foundational changes are limited to:
 
