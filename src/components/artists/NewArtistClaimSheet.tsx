@@ -1,6 +1,5 @@
 import {
   useEffect,
-  useMemo,
   useState,
   type FormEvent,
 } from "react";
@@ -10,6 +9,9 @@ import {
 import {
   Portal,
 } from "@/components/base/Portal";
+import {
+  ArtistCountryPicker,
+} from "@/components/artists/ArtistCountryPicker";
 import {
   ClaimantPhoneFields,
 } from "@/components/artists/ClaimantPhoneFields";
@@ -27,10 +29,6 @@ import {
   readNewArtistClaimDraft,
   saveNewArtistClaimDraft,
 } from "@/services/artists/newArtistClaimDraft";
-import {
-  getCountryNameForIso2,
-  getSortedCountryCodes,
-} from "@/utils/countries";
 import {
   normalizeClaimantPhone,
 } from "@/utils/claimantPhone";
@@ -77,12 +75,6 @@ export function NewArtistClaimSheet({
   const navigate = useNavigate();
 
   useScrollLock(open);
-  const countryCodes =
-    useMemo(
-      () =>
-        getSortedCountryCodes(),
-      [],
-    );
   const [
     displayName,
     setDisplayName,
@@ -530,38 +522,10 @@ export function NewArtistClaimSheet({
               </select>
             </label>
 
-            <label className="block">
-              <span className="mb-1.5 block text-[12px] font-bold text-[var(--wk-text)]">
-                Country
-              </span>
-              <select
-                value={
-                  originIso2
-                }
-                onChange={(event) =>
-                  setOriginIso2(
-                    event.target.value,
-                  )
-                }
-                className="w-full rounded-xl border border-[var(--wk-border)] bg-[var(--wk-bg)] px-4 py-3 text-[14px] text-[var(--wk-text)]"
-              >
-                <option value="">
-                  Not Set
-                </option>
-                {countryCodes.map(
-                  (code) => (
-                    <option
-                      key={code}
-                      value={code}
-                    >
-                      {getCountryNameForIso2(
-                        code,
-                      )}
-                    </option>
-                  ),
-                )}
-              </select>
-            </label>
+            <ArtistCountryPicker
+              value={originIso2}
+              onChange={setOriginIso2}
+            />
 
             <label className="block sm:col-span-2">
               <span className="mb-1.5 block text-[12px] font-bold text-[var(--wk-text)]">

@@ -211,6 +211,162 @@ function CandidateCard({
   );
 }
 
+
+function CandidateSuggestionRow({
+  candidate,
+  authority,
+  authorityLoading,
+  authLoading,
+  signedIn,
+  selected,
+  onSelect,
+  onClaim,
+  onAcceptInvitation,
+}: {
+  candidate:
+    ArtistStudioRegistryCandidate;
+  authority:
+    ArtistRepresentationState | null;
+  authorityLoading: boolean;
+  authLoading: boolean;
+  signedIn: boolean;
+  selected: boolean;
+  onSelect: () => void;
+  onClaim: () => void;
+  onAcceptInvitation:
+    () => void;
+}) {
+  const representation =
+    authority?.representation;
+  const pendingClaim =
+    authority?.latestClaim?.status ===
+    "pending";
+  const canManage =
+    hasStudioPermission(
+      authority,
+    );
+  const pendingInvitation =
+    representation?.status ===
+    "pending";
+  const canClaim =
+    !signedIn ||
+    authority?.canClaim ===
+      true;
+  const representedWithoutScope =
+    representation?.status ===
+      "active" &&
+    !canManage;
+
+  const secondary =
+    [
+      candidate.artistType,
+      candidate.country,
+      candidate.registryState ===
+      "active"
+        ? null
+        : "Already in the Registry",
+    ]
+      .filter(Boolean)
+      .join(" · ");
+
+  return (
+    <article
+      className={[
+        "rounded-xl transition-colors",
+        selected
+          ? "bg-[var(--wk-surface-raised)]"
+          : "hover:bg-[var(--wk-surface-raised)]/70",
+      ].join(" ")}
+    >
+      <button
+        type="button"
+        onClick={onSelect}
+        aria-expanded={selected}
+        className="flex w-full items-center gap-3 px-2.5 py-2 text-left"
+      >
+        <span className="flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-xl bg-[var(--wk-bg)]">
+          {candidate.imageUrl ? (
+            <img
+              src={candidate.imageUrl}
+              alt=""
+              className="h-full w-full object-cover"
+            />
+          ) : (
+            <span className="text-[14px] font-black text-[var(--wk-brand)]">
+              {candidate.displayName
+                .slice(0, 1)
+                .toUpperCase()}
+            </span>
+          )}
+        </span>
+
+        <span className="min-w-0 flex-1">
+          <span className="block truncate text-[14px] font-black tracking-[-0.015em] text-[var(--wk-text)]">
+            {candidate.displayName}
+          </span>
+          <span className="mt-0.5 block truncate text-[10px] font-semibold text-[var(--wk-text-muted)]">
+            {secondary ||
+              "WAKILISHA Registry"}
+          </span>
+        </span>
+
+        <i
+          className={[
+            "shrink-0 text-[17px] text-[var(--wk-text-faint)] transition-transform",
+            selected
+              ? "ri-arrow-up-s-line"
+              : "ri-arrow-down-s-line",
+          ].join(" ")}
+        />
+      </button>
+
+      {selected ? (
+        <div className="flex min-h-10 items-center justify-end gap-2 px-2.5 pb-2">
+          {authorityLoading ||
+          authLoading ? (
+            <span className="text-[10px] font-bold text-[var(--wk-text-faint)]">
+              Checking access…
+            </span>
+          ) : canManage ? (
+            <Link
+              to={`/artists/${candidate.slug}/manage`}
+              className="inline-flex min-h-8 items-center justify-center rounded-full bg-[var(--wk-brand)] px-3 text-[11px] font-black text-[var(--wk-brand-on)]"
+            >
+              Manage Artist
+            </Link>
+          ) : pendingInvitation ? (
+            <button
+              type="button"
+              onClick={
+                onAcceptInvitation
+              }
+              className="inline-flex min-h-8 items-center justify-center rounded-full bg-[var(--wk-brand)] px-3 text-[11px] font-black text-[var(--wk-brand-on)]"
+            >
+              Accept Invitation
+            </button>
+          ) : pendingClaim ? (
+            <span className="inline-flex min-h-8 items-center rounded-full bg-[var(--wk-brand-soft)] px-3 text-[10px] font-black text-[var(--wk-brand)]">
+              Claim under review
+            </span>
+          ) : representedWithoutScope ? (
+            <span className="inline-flex min-h-8 items-center rounded-full border border-[var(--wk-border)] px-3 text-[10px] font-black text-[var(--wk-text-muted)]">
+              No Studio access
+            </span>
+          ) : canClaim ? (
+            <button
+              type="button"
+              onClick={onClaim}
+              className="inline-flex min-h-8 items-center justify-center rounded-full bg-[var(--wk-brand)] px-3 text-[11px] font-black text-[var(--wk-brand-on)]"
+            >
+              Claim Artist
+            </button>
+          ) : null}
+        </div>
+      ) : null}
+    </article>
+  );
+}
+
 const VALUE_CARDS = [
   {
     icon: "ri-user-smile-line",
@@ -344,6 +500,12 @@ export default function ArtistStudioPage() {
   ] = useState<
     ArtistStudioRegistryCandidate[]
   >([]);
+  const [
+    selectedSuggestionId,
+    setSelectedSuggestionId,
+  ] = useState<string | null>(
+    null,
+  );
   const [
     searching,
     setSearching,
@@ -555,6 +717,7 @@ export default function ArtistStudioPage() {
     setSearchError("");
     setActionMessage("");
     setSearchCommitted(false);
+    setSelectedSuggestionId(null);
 
     const clean =
       value.trim();
@@ -583,6 +746,7 @@ export default function ArtistStudioPage() {
       return;
     }
 
+    setSelectedSuggestionId(null);
     setSearchCommitted(true);
     setSubmittedQuery(clean);
     setSearchParams(
@@ -836,7 +1000,7 @@ export default function ArtistStudioPage() {
                 {query.trim().length >=
                   2 &&
                 !searchCommitted ? (
-                  <div className="mt-2 max-h-[420px] overflow-y-auto overscroll-contain rounded-2xl border border-white/10 bg-[var(--wk-surface)] p-2 text-[var(--wk-text)] shadow-2xl">
+                  <div className="mt-2 max-h-[300px] overflow-y-auto overscroll-contain rounded-2xl border border-white/10 bg-[var(--wk-surface)] p-1.5 text-[var(--wk-text)] shadow-2xl">
                     {searching ? (
                       <div className="px-3 py-4 text-[12px] font-semibold text-[var(--wk-text-muted)]">
                         Searching the Registry…
@@ -847,12 +1011,12 @@ export default function ArtistStudioPage() {
                       </div>
                     ) : candidates.length >
                       0 ? (
-                      <div className="grid gap-2">
+                      <div className="grid gap-1">
                         {candidates
-                          .slice(0, 6)
+                          .slice(0, 4)
                           .map(
                             (candidate) => (
-                              <CandidateCard
+                              <CandidateSuggestionRow
                                 key={
                                   candidate.artistId
                                 }
@@ -875,6 +1039,19 @@ export default function ArtistStudioPage() {
                                 signedIn={Boolean(
                                   authUser.id,
                                 )}
+                                selected={
+                                  selectedSuggestionId ===
+                                  candidate.artistId
+                                }
+                                onSelect={() =>
+                                  setSelectedSuggestionId(
+                                    (current) =>
+                                      current ===
+                                      candidate.artistId
+                                        ? null
+                                        : candidate.artistId,
+                                  )
+                                }
                                 onClaim={() =>
                                   openClaim(
                                     candidate,
