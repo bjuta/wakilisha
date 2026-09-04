@@ -34,9 +34,11 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: "22"
+          cache: npm
+          cache-dependency-path: package-lock.json
 
       - name: Install dependencies
-        run: npm ci
+        run: npm ci --prefer-offline --no-audit --no-fund
 
       - name: Enforce migration replay contract
         run: node scripts/control-plane/verify-migration-replay-contract.mjs
@@ -107,9 +109,15 @@ jobs:
             exit 1
           fi
 
+      - name: Set up Supabase CLI
+        uses: supabase/setup-cli@v1
+        with:
+          version: 2.107.0
+          github-token: ${{ github.token }}
+
       - name: Resolve public RLS test credentials
         run: |
-          npx --yes supabase@2.107.0 projects api-keys \
+          supabase projects api-keys \
             --project-ref "$SUPABASE_PROJECT_REF" \
             -o json \
             > /tmp/supabase-api-keys.json
