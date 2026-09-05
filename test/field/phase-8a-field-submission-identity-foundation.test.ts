@@ -329,4 +329,21 @@ describe("Phase 8A.2A Field Submission identity foundation", () => {
       "A browser or service role has direct Field table authority",
     );
   });
+  it("keeps the lost playlist_item predecessor authority repaired", () => {
+    const convergence = readFileSync(
+      "supabase/migrations/20260905134500_resource_identity_control_plane_convergence.sql",
+      "utf8",
+    );
+
+    expect(convergence).toContain(
+      "when 'playlist_item' then",
+    );
+    expect(convergence).toContain(
+      "from editorial.playlist_item_resources",
+    );
+    expect(convergence).toContain(
+      "playlist_item_resources_binding_integrity",
+    );
+  });
+
 });
