@@ -240,6 +240,10 @@ export const AuthPage = lazy(
   () => import("../pages/auth/page"),
 );
 
+export const FieldIntakePage = lazy(
+  () => import("../pages/field/page"),
+);
+
 export const CategoriesIndex = lazy(
   () => import("../pages/categories/page"),
 );
