@@ -1,0 +1,99 @@
+name: Chart Source Soak V3 Cloud Preflight
+
+on:
+  push:
+    branches:
+      - chore/chart-source-soak-v3-cloud-preflight
+
+permissions:
+  contents: read
+
+concurrency:
+  group: chart-source-soak-v3-cloud-preflight
+  cancel-in-progress: true
+
+jobs:
+  cloud-preflight:
+    name: cloud-preflight
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    env:
+      WK_CHART_SOAK_BASE: ${{ github.workspace }}/.artifacts/chart-source-soak-v3
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Use Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Static parser check
+        run: |
+          python3 -m py_compile \
+            scripts/acceptance/chart-source-soak-v3/run_once.py
+
+      - name: Run one cloud observation
+        run: |
+          python3 \
+            scripts/acceptance/chart-source-soak-v3/run_once.py
+
+      - name: Verify observation structure
+        run: |
+          python3 - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+
+          base = Path(os.environ["WK_CHART_SOAK_BASE"])
+          files = sorted((base / "data").glob("*.json"))
+
+          if len(files) != 1:
+              raise SystemExit(
+                  f"Expected exactly one cloud observation, found {len(files)}"
+              )
+
+          observation = json.loads(files[0].read_text())
+          sources = observation.get("sources", [])
+
+          expected = [
+              "apple",
+              "youtube",
+              "mdundo",
+              "audiomack",
+              "boomplay",
+              "shazam",
+          ]
+
+          actual = [item.get("source") for item in sources]
+
+          if actual != expected:
+              raise SystemExit(
+                  f"Unexpected source set/order: {actual!r}"
+              )
+
+          print(f"CAPTURE={files[0].name}")
+          print(f"CAPTURED_AT_UTC={observation.get('captured_at_utc')}")
+
+          for item in sources:
+              obs = item.get("observation") or {}
+              print(
+                  "SOURCE="
+                  f"{item.get('source')} "
+                  f"HTTP={item.get('status')} "
+                  f"PARSE_OK={item.get('parse_ok')} "
+                  f"DEPTH={obs.get('depth')} "
+                  f"BODY_SHA256={item.get('body_sha256')}"
+              )
+          PY
+
+      - name: Upload raw preflight evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: chart-source-soak-v3-cloud-preflight
+          path: .artifacts/chart-source-soak-v3/
+          if-no-files-found: error
+          retention-days: 14
