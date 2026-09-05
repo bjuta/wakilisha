@@ -160,6 +160,7 @@ import {
   MobileLabels,
   MobileArticlePage,
   AuthPage,
+  FieldIntakePage,
   CategoriesIndex,
   CategoryDetail,
   TagsIndex,
@@ -241,6 +242,26 @@ function LegacyEntityRedirect({ base }: { base: "/artists" | "/releases" | "/tra
   }
 
   return <Navigate to="/tracks" replace />;
+}
+
+function AuthenticatedFieldRoute() {
+  const authUser = useAuthUser();
+
+  if (authUser.loading) {
+    return (
+      <div
+        className="min-h-[40vh]"
+        aria-busy="true"
+        aria-label="Loading Field intake"
+      />
+    );
+  }
+
+  if (!authUser.id) {
+    return <Navigate to="/auth" replace />;
+  }
+
+  return <FieldIntakePage />;
 }
 
 function AuthenticatedProfileRoute() {
@@ -327,6 +348,7 @@ const routes: RouteObject[] = [
       { path: "/search", element: <ResponsivePage mobile={<Search />} desktop={<Search />} /> },
       { path: "/player", element: <Navigate to="/" replace /> },
       { path: "/auth", element: <ResponsivePage mobile={<AuthPage />} desktop={<AuthPage />} /> },
+      { path: "/field", element: <AuthenticatedFieldRoute /> },
       { path: "/profile", element: <AuthenticatedProfileRoute /> },
       { path: "/music", element: <ResponsivePage mobile={<MusicPage />} desktop={<MusicPage />} /> },
       { path: "/following", element: <ResponsivePage mobile={<FollowingPage />} desktop={<FollowingPage />} /> },
