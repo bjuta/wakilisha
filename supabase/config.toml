@@ -6,6 +6,9 @@ verify_jwt = false
 [functions.media-upload-api]
 verify_jwt = false
 
+[functions.field-intake-api]
+verify_jwt = false
+
 [functions.link-preview-read]
 verify_jwt = false
 

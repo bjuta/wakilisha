@@ -537,3 +537,237 @@ describe("Phase 8A.2B Field Media binding and adoption", () => {
     );
   });
 });
+
+
+const fieldEdge = readFileSync(
+  "supabase/functions/field-intake-api/index.ts",
+  "utf8",
+);
+const functionConfig = readFileSync(
+  "supabase/config.toml",
+  "utf8",
+);
+
+describe("Phase 8A.3 Field Edge control", () => {
+  it("keeps one authenticated allowlisted control plane outside the large-byte path", () => {
+    expect(design).toContain("### 8A.3 Field Edge control");
+    expect(functionConfig).toMatch(
+      /\[functions\.field-intake-api\]\s*\nverify_jwt = false/,
+    );
+
+    expect(fieldEdge).toContain("FIELD_INTAKE_ALLOWED_ORIGINS");
+    expect(fieldEdge).toContain("https://wakilisha.africa");
+    expect(fieldEdge).toContain("https://www.wakilisha.africa");
+    expect(fieldEdge).toContain("http://localhost:5173");
+    expect(fieldEdge).not.toContain('"Access-Control-Allow-Origin": "*"');
+
+    expect(fieldEdge).toContain("requireFieldActor");
+    expect(fieldEdge).toContain("client.auth.getUser()");
+    expect(fieldEdge).toContain('"current_user_has_capability"');
+    expect(fieldEdge).toContain('required_capability: "submit_field_capture"');
+
+    for (const action of [
+      "create_upload_session",
+      "reissue_upload_capability",
+      "upload_status",
+      "finalize_upload",
+      "cancel_submission",
+    ]) {
+      expect(fieldEdge).toContain(`action === "${action}"`);
+    }
+
+    expect(fieldEdge).not.toContain('action === "upload_part"');
+    expect(fieldEdge).not.toContain("req.formData()");
+    expect(fieldEdge).not.toContain("req.arrayBuffer()");
+    expect(fieldEdge).not.toContain("file.arrayBuffer()");
+    expect(fieldEdge).toContain("part_upload_base_url");
+    expect(fieldEdge).not.toMatch(
+      /console\.(?:log|debug|info|warn|error)\s*\(/,
+    );
+  });
+
+  it("derives receiver authority from the actor-bound service hooks before receiver contact", () => {
+    expect(fieldEdge).toContain('"get_field_media_receiver_session_v1"');
+    expect(fieldEdge).toContain("p_actor_id: actorId");
+    expect(fieldEdge).toContain(
+      "p_submission_resource_id: submissionId",
+    );
+    expect(fieldEdge).toContain("p_media_intake_id: intakeId");
+    expect(fieldEdge).not.toContain("body.storage_path");
+    expect(fieldEdge).not.toContain("body.session_id");
+
+    expect(fieldEdge).toContain('if (code === "42501") return 403;');
+    expect(fieldEdge).toContain('if (code === "P0002") return 404;');
+    expect(fieldEdge).toContain('if (code === "23505") return 409;');
+    expect(fieldEdge).toContain("status: rpcErrorStatus(error)");
+
+    const createStart = fieldEdge.indexOf(
+      "async function createUploadSession(",
+    );
+    const reissueStart = fieldEdge.indexOf(
+      "async function reissueUploadCapability(",
+      createStart,
+    );
+    const createAction = fieldEdge.slice(
+      createStart,
+      reissueStart,
+    );
+
+    const receiptGuard = createAction.indexOf(
+      'receiptStatus !== "succeeded"',
+    );
+    const terminalGuard = createAction.indexOf(
+      'bound.session_state !== "created"',
+    );
+    const receiverProvision = createAction.indexOf(
+      "provisionReceiverCapability(bound)",
+    );
+
+    expect(receiptGuard).toBeGreaterThan(0);
+    expect(terminalGuard).toBeGreaterThan(receiptGuard);
+    expect(receiverProvision).toBeGreaterThan(terminalGuard);
+  });
+
+  it("reissues only fresh in-memory capability over exact immutable session metadata", () => {
+    expect(fieldEdge).toContain("freshCapability()");
+    expect(fieldEdge).toContain(
+      "capability_token: capabilityToken",
+    );
+    expect(fieldEdge).toContain(
+      "storage_path: bound.storage_path",
+    );
+    expect(fieldEdge).toContain(
+      "expected_byte_size: bound.expected_byte_size",
+    );
+    expect(fieldEdge).toContain(
+      "expected_sha256: bound.expected_sha256",
+    );
+    expect(fieldEdge).toContain(
+      "part_size_bytes: bound.part_size_bytes",
+    );
+    expect(fieldEdge).toContain(
+      "total_parts: bound.total_parts",
+    );
+    expect(fieldEdge).toContain('"record_field_media_upload_resume_v1"');
+  });
+
+  it("keeps receiver state authoritative for status and exact finalization", () => {
+    expect(fieldEdge).toContain('"expire_media_upload_session_v1"');
+    expect(fieldEdge).toContain('"sync_field_media_intake_v1"');
+    expect(fieldEdge).toContain(
+      "storagePath !== bound.storage_path",
+    );
+    expect(fieldEdge).toContain(
+      "byteSize !== bound.expected_byte_size",
+    );
+    expect(fieldEdge).toContain(
+      "sha256 !== bound.expected_sha256",
+    );
+    expect(fieldEdge).toContain('"verify_media_upload_session_v1"');
+    expect(fieldEdge).not.toContain("expire_field_submission");
+  });
+
+  it("never cleans receiver parts after a rejected Field cancellation command", () => {
+    const cancelStart = fieldEdge.indexOf(
+      "async function cancelSubmission(",
+    );
+    const cancelEnd = fieldEdge.indexOf(
+      "function errorStatus(",
+      cancelStart,
+    );
+    const cancelAction = fieldEdge.slice(
+      cancelStart,
+      cancelEnd,
+    );
+
+    const command = cancelAction.indexOf(
+      '"cancel_field_submission_v1"',
+    );
+    const accepted = cancelAction.indexOf(
+      'cancelled.receipt_status) !== "succeeded"',
+    );
+    const receiverDelete = cancelAction.indexOf(
+      'method: "DELETE"',
+    );
+
+    expect(command).toBeGreaterThan(0);
+    expect(accepted).toBeGreaterThan(command);
+    expect(receiverDelete).toBeGreaterThan(accepted);
+  });
+});
+
+
+describe("Phase 8A.3 receiver-state recovery", () => {
+  it("reconciles receiver terminal and verified state before returning a fresh capability", () => {
+    expect(fieldEdge).toContain(
+      "async function reconcileReceiverState(",
+    );
+    expect(fieldEdge).toContain(
+      'receiverState === "verified"',
+    );
+    expect(fieldEdge).toContain(
+      "receiver.verified_byte_size",
+    );
+    expect(fieldEdge).toContain(
+      "receiver.verified_sha256",
+    );
+    expect(fieldEdge).toContain(
+      '"verify_media_upload_session_v1"',
+    );
+    expect(fieldEdge).toContain(
+      '"expire_media_upload_session_v1"',
+    );
+    expect(fieldEdge).toContain(
+      'new Set(["failed", "cancelled"])',
+    );
+
+    const reissueStart = fieldEdge.indexOf(
+      "async function reissueUploadCapability(",
+    );
+    const statusStart = fieldEdge.indexOf(
+      "async function uploadStatus(",
+      reissueStart,
+    );
+    const reissue = fieldEdge.slice(
+      reissueStart,
+      statusStart,
+    );
+
+    expect(reissue).toContain(
+      'bound.session_state !== "created"',
+    );
+    expect(reissue).toContain(
+      "reconcileReceiverState(",
+    );
+    expect(reissue).not.toContain(
+      'new Set(["created", "verified"])',
+    );
+  });
+
+  it("recovers a lost post-verification response from authoritative receiver facts", () => {
+    const statusStart = fieldEdge.indexOf(
+      "async function uploadStatus(",
+    );
+    const finalizeStart = fieldEdge.indexOf(
+      "async function finalizeUpload(",
+      statusStart,
+    );
+    const status = fieldEdge.slice(
+      statusStart,
+      finalizeStart,
+    );
+
+    expect(status).toContain(
+      "reconcileReceiverState(",
+    );
+    expect(fieldEdge).toContain(
+      "storagePath !== bound.storage_path",
+    );
+    expect(fieldEdge).toContain(
+      "byteSize !== bound.expected_byte_size",
+    );
+    expect(fieldEdge).toContain(
+      "sha256 !== bound.expected_sha256",
+    );
+  });
+});
