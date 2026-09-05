@@ -449,7 +449,7 @@ begin
     );
 
   if position(
-       'resolve_person_follow_target'
+       'community_resolve_follow_target'
        in v_definition
      ) = 0
      or position(
@@ -469,7 +469,7 @@ begin
     );
 
   if position(
-       'resolve_person_follow_target'
+       'community_resolve_follow_target'
        in v_definition
      ) = 0
      or position(
@@ -569,6 +569,9 @@ declare
     '00000000-0000-4000-8000-00000000c201';
   v_external_contributor constant uuid :=
     '00000000-0000-4000-8000-00000000c202';
+
+  v_artist constant uuid :=
+    '00000000-0000-4000-8000-00000000c301';
 
   v_result jsonb;
   v_state jsonb;
@@ -876,10 +879,27 @@ begin
     true
   );
 
+  insert into public.registry_artists (
+    id,
+    slug,
+    display_name,
+    normalized_name,
+    status,
+    metadata
+  )
+  values (
+    v_artist,
+    'people-c-verifier-artist',
+    'People C Verifier Artist',
+    'people c verifier artist',
+    'active',
+    '{"fixture":"people_migration_c"}'::jsonb
+  );
+
   v_result :=
     public.community_set_follow_state(
       'artist',
-      'people-c-verifier-artist',
+      v_artist::text,
       'people-c-verifier-artist',
       true
     );
@@ -896,7 +916,7 @@ begin
          and follow.target_type =
              'artist'
          and follow.target_id =
-             'people-c-verifier-artist'
+             v_artist::text
      )
   then
     raise exception
@@ -906,7 +926,7 @@ begin
   v_result :=
     public.community_follow_target(
       'artist',
-      'people-c-verifier-artist',
+      v_artist::text,
       'people-c-verifier-artist'
     );
 
@@ -922,7 +942,7 @@ begin
          and follow.target_type =
              'artist'
          and follow.target_id =
-             'people-c-verifier-artist'
+             v_artist::text
      )
   then
     raise exception
@@ -1024,6 +1044,23 @@ begin
       'STOP: self-follow creation was accepted';
   end if;
 
+  select alias.path
+  into v_target_path
+  from editorial.resource_aliases alias
+  where alias.resource_id =
+        v_target_person
+    and alias.is_canonical
+    and alias.retired_at is null
+  order by
+    alias.created_at,
+    alias.path
+  limit 1;
+
+  if v_target_path is null then
+    raise exception
+      'STOP: target Person lost canonical path before Follow validation';
+  end if;
+
   v_result :=
     public.community_set_follow_state(
       'person',
@@ -1104,11 +1141,15 @@ begin
          ->> 'follower_count'
      )::integer <> 1
      or (
+       v_summary
+         ->> 'following_count'
+     )::integer <> 0
+     or (
        select count(*)
        from jsonb_object_keys(
          v_summary
        )
-     ) <> 2
+     ) <> 3
   then
     raise exception
       'STOP: public Person social summary is not aggregate-only/correct';
