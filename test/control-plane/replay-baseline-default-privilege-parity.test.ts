@@ -144,3 +144,83 @@ describe(
     );
   },
 );
+
+const forwardReplayParityPath =
+  "supabase/migrations/20260905090000_wakilisha_native_preview_acl_replay_parity.sql";
+
+const forwardReplayParity = readFileSync(
+  forwardReplayParityPath,
+  "utf8",
+);
+
+describe(
+  "native preview ACL replay parity",
+  () => {
+    it(
+      "converges the native branch path without rewriting historical migration rows",
+      () => {
+        expect(forwardReplayParity)
+          .toContain(
+            "native preview ACL replay parity repair",
+          );
+        expect(forwardReplayParity)
+          .toContain(
+            "requires exact 89 / 20260904190000 predecessor authority",
+          );
+        expect(forwardReplayParity)
+          .toContain(
+            "REVOKE EXECUTE ON FUNCTIONS FROM PUBLIC, anon, authenticated",
+          );
+        expect(forwardReplayParity)
+          .toContain(
+            "REVOKE ALL ON SEQUENCES FROM anon, authenticated",
+          );
+        expect(forwardReplayParity)
+          .toContain(
+            "REVOKE SELECT, INSERT, UPDATE, DELETE ON TABLES FROM anon, authenticated",
+          );
+        expect(forwardReplayParity)
+          .toContain(
+            "v_fragments <> 641 OR v_skipped <> 10",
+          );
+        expect(forwardReplayParity)
+          .toContain(
+            "7ed97824e39cde87cef32beb1f685f82",
+          );
+        expect(forwardReplayParity)
+          .toContain(
+            "64e520bb235dff2d8d72e8fd9440b018",
+          );
+        expect(forwardReplayParity)
+          .toContain(
+            "e8a372dbcc677549a11232bbae999507",
+          );
+      },
+    );
+
+    it(
+      "freezes the proven PUBLIC-execute and service_role exception sets",
+      () => {
+        const publicSection = forwardReplayParity
+          .split("-- WAKILISHA CANONICAL PUBLIC EXECUTE SET BEGIN")[1]
+          ?.split("-- WAKILISHA CANONICAL PUBLIC EXECUTE SET END")[0];
+        const serviceSection = forwardReplayParity
+          .split("-- WAKILISHA CANONICAL SERVICE_ROLE REVOKE SET BEGIN")[1]
+          ?.split("-- WAKILISHA CANONICAL SERVICE_ROLE REVOKE SET END")[0];
+
+        expect(publicSection)
+          .toBeTruthy();
+        expect(serviceSection)
+          .toBeTruthy();
+
+        expect(
+          publicSection?.match(/^\s*\('/gm) ?? [],
+        ).toHaveLength(91);
+
+        expect(
+          serviceSection?.match(/^\s*\('/gm) ?? [],
+        ).toHaveLength(34);
+      },
+    );
+  },
+);
