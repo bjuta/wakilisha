@@ -8,6 +8,177 @@
 
 begin;
 
+
+do $verify_auth_signup_resource_version_integrity_structure$
+declare
+  v_definition text;
+begin
+  select pg_catalog.pg_get_functiondef(
+    'editorial.provision_person_for_user_profile_insert()'::regprocedure
+  )
+  into v_definition;
+
+  if position(
+       'resources_article_version_pointer_integrity'
+       in v_definition
+     ) <> 0
+     or (
+       length(v_definition)
+       - length(
+           replace(
+             v_definition,
+             'resources_resource_version_pointer_integrity',
+             ''
+           )
+         )
+       ) / length('resources_resource_version_pointer_integrity') <> 2
+  then
+    raise exception
+      'STOP: Auth signup Person provisioning Resource pointer context drifted';
+  end if;
+
+  if not exists (
+    select 1
+    from pg_catalog.pg_trigger trigger_row
+    where trigger_row.tgrelid =
+          'editorial.resources'::regclass
+      and trigger_row.tgname =
+          'resources_resource_version_pointer_integrity'
+      and trigger_row.tgdeferrable
+      and trigger_row.tginitdeferred
+      and not trigger_row.tgisinternal
+  ) then
+    raise exception
+      'STOP: shared Resource Version pointer integrity trigger is missing';
+  end if;
+
+  if pg_catalog.pg_get_userbyid(
+       (
+         select p.proowner
+         from pg_catalog.pg_proc p
+         where p.oid =
+           'editorial.provision_person_for_user_profile_insert()'::regprocedure
+       )
+     ) <> 'postgres'
+     or not (
+       select p.prosecdef
+       from pg_catalog.pg_proc p
+       where p.oid =
+         'editorial.provision_person_for_user_profile_insert()'::regprocedure
+     )
+     or (
+       select p.proconfig
+       from pg_catalog.pg_proc p
+       where p.oid =
+         'editorial.provision_person_for_user_profile_insert()'::regprocedure
+     ) is distinct from
+       array[
+         'search_path=pg_catalog, public, editorial'
+       ]::text[]
+     or not pg_catalog.has_function_privilege(
+       'supabase_auth_admin',
+       'editorial.provision_person_for_user_profile_insert()',
+       'EXECUTE'
+     )
+     or pg_catalog.has_function_privilege(
+       'anon',
+       'editorial.provision_person_for_user_profile_insert()',
+       'EXECUTE'
+     )
+     or pg_catalog.has_function_privilege(
+       'authenticated',
+       'editorial.provision_person_for_user_profile_insert()',
+       'EXECUTE'
+     )
+  then
+    raise exception
+      'STOP: Auth signup Person provisioning security posture drifted';
+  end if;
+end;
+$verify_auth_signup_resource_version_integrity_structure$;
+
+insert into auth.users (
+  instance_id,
+  id,
+  aud,
+  role,
+  email,
+  encrypted_password,
+  email_confirmed_at,
+  raw_app_meta_data,
+  raw_user_meta_data,
+  created_at,
+  updated_at
+)
+values (
+  '00000000-0000-0000-0000-000000000000',
+  '00000000-0000-4000-8000-00000000ca01',
+  'authenticated',
+  'authenticated',
+  'people-auth-signup-integrity-verifier@local.invalid',
+  '',
+  now(),
+  '{"provider":"email","providers":["email"]}'::jsonb,
+  '{"name":"People Auth Signup Integrity Verifier"}'::jsonb,
+  now(),
+  now()
+);
+
+set constraints
+  public.user_profiles_person_provisioning
+immediate;
+
+set constraints
+  public.user_profiles_person_provisioning
+deferred;
+
+do $verify_auth_signup_resource_version_integrity_runtime$
+declare
+  v_user constant uuid :=
+    '00000000-0000-4000-8000-00000000ca01';
+  v_person uuid;
+begin
+  if not exists (
+    select 1
+    from public.user_profiles profile
+    where profile.user_id = v_user
+  ) then
+    raise exception
+      'STOP: Auth signup did not create the rollback-only user profile';
+  end if;
+
+  select link.person_resource_id
+  into v_person
+  from editorial.person_identity_links link
+  where link.user_id = v_user
+    and link.link_state = 'active';
+
+  if v_person is null
+     or (
+       select count(*)
+       from editorial.person_identity_links link
+       where link.user_id = v_user
+         and link.link_state = 'active'
+     ) <> 1
+     or not exists (
+       select 1
+       from editorial.people person
+       where person.resource_id = v_person
+     )
+     or not exists (
+       select 1
+       from editorial.resources resource_row
+       where resource_row.id = v_person
+         and resource_row.resource_kind = 'person'
+     )
+  then
+    raise exception
+      'STOP: Auth signup Person provisioning did not converge to one active Person';
+  end if;
+end;
+$verify_auth_signup_resource_version_integrity_runtime$;
+
+
 do $verify_people_migration_c_structure$
 declare
   v_definition text;
@@ -278,7 +449,7 @@ begin
     );
 
   if position(
-       'resolve_person_follow_target'
+       'community_resolve_follow_target'
        in v_definition
      ) = 0
      or position(
@@ -298,7 +469,7 @@ begin
     );
 
   if position(
-       'resolve_person_follow_target'
+       'community_resolve_follow_target'
        in v_definition
      ) = 0
      or position(
@@ -398,6 +569,9 @@ declare
     '00000000-0000-4000-8000-00000000c201';
   v_external_contributor constant uuid :=
     '00000000-0000-4000-8000-00000000c202';
+
+  v_artist constant uuid :=
+    '00000000-0000-4000-8000-00000000c301';
 
   v_result jsonb;
   v_state jsonb;
@@ -705,10 +879,27 @@ begin
     true
   );
 
+  insert into public.registry_artists (
+    id,
+    slug,
+    display_name,
+    normalized_name,
+    status,
+    metadata
+  )
+  values (
+    v_artist,
+    'people-c-verifier-artist',
+    'People C Verifier Artist',
+    'people c verifier artist',
+    'active',
+    '{"fixture":"people_migration_c"}'::jsonb
+  );
+
   v_result :=
     public.community_set_follow_state(
       'artist',
-      'people-c-verifier-artist',
+      v_artist::text,
       'people-c-verifier-artist',
       true
     );
@@ -725,7 +916,7 @@ begin
          and follow.target_type =
              'artist'
          and follow.target_id =
-             'people-c-verifier-artist'
+             v_artist::text
      )
   then
     raise exception
@@ -735,7 +926,7 @@ begin
   v_result :=
     public.community_follow_target(
       'artist',
-      'people-c-verifier-artist',
+      v_artist::text,
       'people-c-verifier-artist'
     );
 
@@ -751,7 +942,7 @@ begin
          and follow.target_type =
              'artist'
          and follow.target_id =
-             'people-c-verifier-artist'
+             v_artist::text
      )
   then
     raise exception
@@ -853,6 +1044,23 @@ begin
       'STOP: self-follow creation was accepted';
   end if;
 
+  select alias.path
+  into v_target_path
+  from editorial.resource_aliases alias
+  where alias.resource_id =
+        v_target_person
+    and alias.is_canonical
+    and alias.retired_at is null
+  order by
+    alias.created_at,
+    alias.path
+  limit 1;
+
+  if v_target_path is null then
+    raise exception
+      'STOP: target Person lost canonical path before Follow validation';
+  end if;
+
   v_result :=
     public.community_set_follow_state(
       'person',
@@ -933,11 +1141,15 @@ begin
          ->> 'follower_count'
      )::integer <> 1
      or (
+       v_summary
+         ->> 'following_count'
+     )::integer <> 0
+     or (
        select count(*)
        from jsonb_object_keys(
          v_summary
        )
-     ) <> 2
+     ) <> 3
   then
     raise exception
       'STOP: public Person social summary is not aggregate-only/correct';
