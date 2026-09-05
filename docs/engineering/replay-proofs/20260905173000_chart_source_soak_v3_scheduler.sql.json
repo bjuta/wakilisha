@@ -1,0 +1,16 @@
+{
+  "migration_file": "supabase/migrations/20260905173000_chart_source_soak_v3_scheduler.sql",
+  "migration_sha256": "dd6824ea4031ebf586a618ef21b7f9789ed06dc07cfed8a63ab69d4bc732f465",
+  "base_main_sha": "9be2d0ea15673081cceb7db1465c0dbdcbb222f8",
+  "preview_project_ref": "hmpwicptzwixmonzzedn",
+  "preview_branch_id": "5f586412-dbe0-417e-9b64-e6bdbd4b1068",
+  "preview_migration_head": "20260905173000",
+  "baseline_replay": "pass",
+  "candidate_apply": "pass",
+  "verifier": "pass",
+  "verifier_file": "scripts/control-plane/verify-chart-source-soak-v3-scheduler.sql",
+  "schema_types_sha256": "f1399a793269985f5d2c3a4dccdd5d6ccbe91b8c9c05b1a20ad023ca8b89773d",
+  "schema_migration_count": 94,
+  "schema_migration_head": "20260905173000",
+  "verified_at": "2026-09-05T17:26:10.999Z"
+}
