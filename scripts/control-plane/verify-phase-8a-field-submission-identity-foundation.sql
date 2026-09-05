@@ -388,6 +388,7 @@ begin
      or position('from editorial.field_submissions' in v_binding_definition) = 0
      or position('when ''article''' in v_binding_definition) = 0
      or position('when ''playlist''' in v_binding_definition) = 0
+     or position('when ''playlist_item''' in v_binding_definition) = 0
      or position('when ''registry_artist''' in v_binding_definition) = 0
      or position('when ''correction_case''' in v_binding_definition) = 0
      or position('when ''media_asset''' in v_binding_definition) = 0

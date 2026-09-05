@@ -224,3 +224,42 @@ describe(
     );
   },
 );
+
+
+const resourceControlPlaneConvergence =
+  readFileSync(
+    "supabase/migrations/20260905134500_resource_identity_control_plane_convergence.sql",
+    "utf8",
+  );
+
+describe("resource identity control-plane convergence", () => {
+  it("closes the non-CRUD relation privilege perimeter without broadening CRUD", () => {
+    expect(resourceControlPlaneConvergence).toContain(
+      "'d63c327fbab82ece6250d15d93cdb905'",
+    );
+    expect(resourceControlPlaneConvergence).toContain(
+      "'4917769c1828fafa2f3bacbc77a5c5b9'",
+    );
+    expect(resourceControlPlaneConvergence).toContain(
+      "revoke truncate, references, trigger on table public.%I from anon, authenticated",
+    );
+    expect(resourceControlPlaneConvergence).toContain(
+      "revoke maintain on table public.%I from anon, authenticated",
+    );
+  });
+
+  it("converges Registry Artist Resource identity and restores playlist_item enforcement", () => {
+    expect(resourceControlPlaneConvergence).toContain(
+      "ensure_registry_artist_resource_identity",
+    );
+    expect(resourceControlPlaneConvergence).toContain(
+      "registry_artists_resource_identity_sync",
+    );
+    expect(resourceControlPlaneConvergence).toContain(
+      "when 'playlist_item' then",
+    );
+    expect(resourceControlPlaneConvergence).toContain(
+      "playlist_item_resources_binding_integrity",
+    );
+  });
+});
