@@ -60,6 +60,7 @@ export interface FieldProgress {
   uploadedParts: number;
   totalParts: number;
   message: string;
+  submissionReference?: string;
 }
 
 export interface FieldReceipt {
@@ -602,6 +603,17 @@ export async function submitFieldVideo(
   };
   await putQueue(queue);
 
+  report(options.onProgress, {
+    stage: "creating_upload",
+    progress: 0,
+    processedBytes: 0,
+    totalBytes: file.size,
+    uploadedParts: 0,
+    totalParts: 0,
+    message: "Preparing your private upload…",
+    submissionReference: queue.submissionReference,
+  });
+
   const started = await startOrRestartUpload(queue, `field.media.start.${queue.id}.1`);
   queue = started.queue;
   const auth = capability(started.control);
@@ -645,7 +657,28 @@ async function exactLocalFile(queue: FieldQueueRecord, replacement?: File | null
   if (file.size !== queue.byteSize) {
     throw new Error("The selected file is not the same size as the queued original.");
   }
-  const sha256 = await hashBlobSha256(file);
+
+  let sha256: string;
+  try {
+    sha256 = await hashBlobSha256(file);
+  } catch (cause) {
+    if (!replacement && queue.fileBlob) {
+      await putQueue({
+        ...queue,
+        fileBlob: null,
+        localState: "paused",
+        updatedAt: new Date().toISOString(),
+      });
+
+      throw new FieldRecoverableError(
+        "paused",
+        "The browser can no longer read the saved video. Choose the exact original to continue.",
+      );
+    }
+
+    throw cause;
+  }
+
   if (sha256 !== queue.sha256) {
     throw new Error("The selected file does not match the queued original.");
   }
