@@ -159,7 +159,22 @@ describe("Phase 8A.4 mobile local durability", () => {
     expect(page).toContain("Saved on this device");
     expect(page).toContain("Resume upload");
     expect(page).toContain("savedStageLabel");
+    expect(page).toContain("SAVED_NETWORK_RESUME_STAGES");
+    expect(page).toContain("savedStageNeedsNetwork");
     expect(page).toContain("Ready to resume");
+    expect(page).toContain("Waiting for network");
+    expect(page).toContain(
+      "savedStageLabel(progress.stage, isOnline)",
+    );
+    expect(page).toContain(
+      'window.addEventListener("online", handleOnline)',
+    );
+    expect(page).toContain(
+      'window.addEventListener("offline", handleOffline)',
+    );
+    expect(page).toContain(
+      "Waiting for a network connection.",
+    );
     expect(page).toContain(
       'className="mt-5 grid grid-cols-2 gap-2 sm:flex sm:flex-wrap"',
     );
@@ -202,7 +217,7 @@ describe("Phase 8A.4 mobile local durability", () => {
       "Browser storage can be cleared by the device",
     );
     expect(page).toMatch(
-      /working\s*\?\s*stageLabel\(progress\.stage\)\s*:\s*savedStageLabel\(progress\.stage\)/,
+      /working\s*\?\s*stageLabel\(progress\.stage\)\s*:\s*savedStageLabel\(progress\.stage,\s*isOnline\)/,
     );
   });
 

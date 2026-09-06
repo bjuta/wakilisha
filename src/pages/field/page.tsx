@@ -91,14 +91,28 @@ function stageLabel(stage: FieldClientStage): string {
   return labels[stage];
 }
 
-function savedStageLabel(stage: FieldClientStage): string {
-  if (
-    stage === "creating_upload"
-    || stage === "uploading"
-    || stage === "verifying"
-    || stage === "received"
-    || stage === "submitting"
-  ) {
+const SAVED_NETWORK_RESUME_STAGES: readonly FieldClientStage[] = [
+  "creating_upload",
+  "uploading",
+  "waiting_for_network",
+  "verifying",
+  "received",
+  "submitting",
+];
+
+function savedStageNeedsNetwork(stage: FieldClientStage): boolean {
+  return SAVED_NETWORK_RESUME_STAGES.includes(stage);
+}
+
+function savedStageLabel(
+  stage: FieldClientStage,
+  isOnline: boolean,
+): string {
+  if (!isOnline && savedStageNeedsNetwork(stage)) {
+    return "Waiting for network";
+  }
+
+  if (savedStageNeedsNetwork(stage)) {
     return "Ready to resume";
   }
 
@@ -123,6 +137,22 @@ export default function FieldIntakePage() {
   const [completed, setCompleted] = useState(false);
   const [showUploadHelp, setShowUploadHelp] = useState(false);
   const [preparingActivityIndex, setPreparingActivityIndex] = useState(0);
+  const [isOnline, setIsOnline] = useState(() =>
+    typeof navigator === "undefined" ? true : navigator.onLine,
+  );
+
+  useEffect(() => {
+    const handleOnline = () => setIsOnline(true);
+    const handleOffline = () => setIsOnline(false);
+
+    window.addEventListener("online", handleOnline);
+    window.addEventListener("offline", handleOffline);
+
+    return () => {
+      window.removeEventListener("online", handleOnline);
+      window.removeEventListener("offline", handleOffline);
+    };
+  }, []);
 
   useEffect(() => {
     let alive = true;
@@ -474,7 +504,7 @@ export default function FieldIntakePage() {
                   <span className="rounded-full bg-[var(--wk-surface-raised)] px-2.5 py-1 text-[11px] font-bold text-[var(--wk-text-muted)]">
                     {working
                       ? stageLabel(progress.stage)
-                      : savedStageLabel(progress.stage)}
+                      : savedStageLabel(progress.stage, isOnline)}
                   </span>
                 </div>
 
@@ -517,7 +547,15 @@ export default function FieldIntakePage() {
               >
                 {working && progress.stage === "creating_upload"
                   ? preparingActivityMessage
-                  : progress.message}
+                  : !working
+                    && !isOnline
+                    && savedStageNeedsNetwork(progress.stage)
+                    ? "Waiting for a network connection."
+                    : !working
+                      && isOnline
+                      && progress.stage === "waiting_for_network"
+                      ? "Your upload can continue from where it stopped."
+                      : progress.message}
               </p>
             </div>
 
