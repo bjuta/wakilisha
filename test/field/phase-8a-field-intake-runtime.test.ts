@@ -37,8 +37,11 @@ describe("Phase 8A.4 mobile local durability", () => {
     expect(service).toContain('action: "reissue_upload_capability"');
     expect(service).toContain("authoritative.uploaded_parts");
     expect(service).toContain("exactLocalFile");
-    expect(service).toContain("sha256 = await hashBlobSha256(file);");
+    expect(service).toContain("const sha256 = await hashBlobSha256(file);");
     expect(service).toContain("sha256 !== queue.sha256");
+    expect(service).toMatch(
+      /try\s*\{\s*if \(file\.size !== queue\.byteSize\)[\s\S]*const sha256 = await hashBlobSha256\(file\);[\s\S]*if \(sha256 !== queue\.sha256\)/,
+    );
     expect(service).toContain("submissionResourceId: queue.submissionResourceId");
     expect(service).toContain("attemptNumber: Math.max(queue.attemptNumber + 1");
     expect(service).toContain("fileBlob: null");
