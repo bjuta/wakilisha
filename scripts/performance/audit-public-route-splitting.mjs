@@ -191,9 +191,12 @@ const directLazyImports = [
  * Artist Studio Registry Entry Convergence adds one public landing import:
  * - ../pages/artist-studio/page
  *
- * The current authority is therefore 69 direct lazy imports.
+ * Phase 8A.4 adds one authenticated Field intake import:
+ * - ../pages/field/page
+ *
+ * The current authority is therefore 70 direct lazy imports.
  */
-const expectedDirectLazyImportCount = 69;
+const expectedDirectLazyImportCount = 70;
 
 if (
   directLazyImports.length !==
@@ -268,6 +271,7 @@ for (const requiredModule of [
   "../pages/organizations/detail/page",
   "../pages/artists/detail/page",
   "../pages/artist-studio/page",
+  "../pages/field/page",
   "../pages/artists/manage/page",
   "../pages/artists/update/page",
   "../pages/posts/detail/page",
@@ -424,18 +428,22 @@ const routePaths = [
  * Artist Studio Registry Entry Convergence adds one public route:
  * - /artist-studio
  *
- * The current authority is 175 paths. Removing the Artist Studio path, the
- * five declared public Audio and Show paths, the two K5B Admin Video paths,
- * and the two public Video paths must still reproduce the exact 165-path
- * pre-M1 sequence.
+ * Phase 8A.4 adds one authenticated Field intake path:
+ * - /field
+ *
+ * The current authority is 176 paths. Removing the Artist Studio path, the
+ * Field intake path, the five declared public Audio and Show paths, the two
+ * K5B Admin Video paths, and the two public Video paths must still reproduce
+ * the exact 165-path pre-M1 sequence.
  */
-const expectedRoutePathCount = 175;
+const expectedRoutePathCount = 176;
 const publicAudioIndexPath = "/audio";
 const publicAudioPath = "/audio/:slug";
 const publicShowIndexPath = "/shows";
 const publicShowPath = "/shows/:showSlug";
 const publicShowEpisodePath = "/shows/:showSlug/:episodeSlug";
 const publicArtistStudioPath = "/artist-studio";
+const publicFieldPath = "/field";
 const adminVideoIndexPath = "video";
 const adminVideoDetailPath = "video/:publicationId";
 const publicVideoIndexPath = "/video";
@@ -454,6 +462,7 @@ for (const [routePath, label] of [
   [publicShowPath, "Show"],
   [publicShowEpisodePath, "Show Episode"],
   [publicArtistStudioPath, "Artist Studio"],
+  [publicFieldPath, "Field Intake"],
   [adminVideoIndexPath, "Admin Video Directory"],
   [adminVideoDetailPath, "Admin Video Detail"],
   [publicVideoIndexPath, "Public Video Directory"],
@@ -463,7 +472,7 @@ for (const [routePath, label] of [
     routePaths.filter((candidate) => candidate === routePath).length !== 1
   ) {
     fail(
-      `Declared Artist Studio, Audio, Show, Admin Video, and public Video authority must retain exactly one ${label} route at ${routePath}`,
+      `Declared Artist Studio, Field, Audio, Show, Admin Video, and public Video authority must retain exactly one ${label} route at ${routePath}`,
     );
   }
 }
@@ -486,6 +495,7 @@ const preM1RoutePaths = routePaths.filter(
     routePath !== publicShowPath &&
     routePath !== publicShowEpisodePath &&
     routePath !== publicArtistStudioPath &&
+    routePath !== publicFieldPath &&
     routePath !== adminVideoIndexPath &&
     routePath !== adminVideoDetailPath &&
     routePath !== publicVideoIndexPath &&
