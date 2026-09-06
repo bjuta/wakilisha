@@ -654,13 +654,18 @@ async function exactLocalFile(queue: FieldQueueRecord, replacement?: File | null
       "The browser no longer has the local video. Reselect the exact original to continue.",
     );
   }
-  if (file.size !== queue.byteSize) {
-    throw new Error("The selected file is not the same size as the queued original.");
-  }
 
-  let sha256: string;
   try {
-    sha256 = await hashBlobSha256(file);
+    if (file.size !== queue.byteSize) {
+      throw new Error("The selected file is not the same size as the queued original.");
+    }
+
+    const sha256 = await hashBlobSha256(file);
+    if (sha256 !== queue.sha256) {
+      throw new Error("The selected file does not match the queued original.");
+    }
+
+    return file;
   } catch (cause) {
     if (!replacement && queue.fileBlob) {
       await putQueue({
@@ -678,11 +683,6 @@ async function exactLocalFile(queue: FieldQueueRecord, replacement?: File | null
 
     throw cause;
   }
-
-  if (sha256 !== queue.sha256) {
-    throw new Error("The selected file does not match the queued original.");
-  }
-  return file;
 }
 
 export async function resumeFieldQueue(
