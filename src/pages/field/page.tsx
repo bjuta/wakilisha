@@ -17,6 +17,7 @@ import {
   type FieldDeclarations,
   type FieldProgress,
   type FieldQueueRecord,
+  type FieldReceipt,
 } from "@/services/fieldIntakeService";
 
 const INITIAL_PROGRESS: FieldProgress = {
@@ -29,23 +30,152 @@ const INITIAL_PROGRESS: FieldProgress = {
   message: "Choose or record a video when you are ready.",
 };
 
-const DURABILITY_PROOF_DECLARATIONS: FieldDeclarations = {
-  newsroom_identity_mode: "standard",
-  public_attribution_preference: "do_not_name",
-  contact_preference: "account_contact",
-  rights_declaration: "uncertain",
-  rights_declaration_detail: null,
-  consent_declaration: "uncertain",
-  consent_declaration_detail: null,
-  declared_sensitivity: "none",
-  source_protection_request: "internal",
-  embargo_request_mode: "none",
-  requested_embargo_until: null,
-  location_mode: "not_collected",
-  location_description: null,
-  content_captured_at: null,
-  intake_notes: null,
+type FieldDeclarationDraft = {
+  newsroomIdentityMode: FieldDeclarations["newsroom_identity_mode"];
+  publicAttributionPreference:
+    FieldDeclarations["public_attribution_preference"];
+  contactPreference: FieldDeclarations["contact_preference"];
+  rightsDeclaration: FieldDeclarations["rights_declaration"] | "";
+  consentDeclaration: FieldDeclarations["consent_declaration"] | "";
+  declaredSensitivity: FieldDeclarations["declared_sensitivity"];
+  sourceProtectionRequest:
+    FieldDeclarations["source_protection_request"];
+  embargoRequestMode: FieldDeclarations["embargo_request_mode"];
+  requestedEmbargoUntilLocal: string;
+  locationMode: FieldDeclarations["location_mode"];
+  locationDescription: string;
 };
+
+const INITIAL_DECLARATION_DRAFT: FieldDeclarationDraft = {
+  newsroomIdentityMode: "standard",
+  publicAttributionPreference: "do_not_name",
+  contactPreference: "account_contact",
+  rightsDeclaration: "",
+  consentDeclaration: "",
+  declaredSensitivity: "none",
+  sourceProtectionRequest: "internal",
+  embargoRequestMode: "none",
+  requestedEmbargoUntilLocal: "",
+  locationMode: "not_collected",
+  locationDescription: "",
+};
+
+function buildFieldDeclarations(
+  draft: FieldDeclarationDraft,
+): FieldDeclarations {
+  const rightsDeclaration = draft.rightsDeclaration;
+  const consentDeclaration = draft.consentDeclaration;
+
+  if (!rightsDeclaration) {
+    throw new Error(
+      "Tell us what you know about the rights to this video.",
+    );
+  }
+
+  if (!consentDeclaration) {
+    throw new Error(
+      "Tell us what you know about permission from people shown.",
+    );
+  }
+
+  let requestedEmbargoUntil: string | null = null;
+
+  if (draft.embargoRequestMode === "until_time") {
+    if (!draft.requestedEmbargoUntilLocal) {
+      throw new Error("Choose a date and time for the hold.");
+    }
+
+    const embargoDate = new Date(draft.requestedEmbargoUntilLocal);
+
+    if (
+      Number.isNaN(embargoDate.getTime())
+      || embargoDate.getTime() <= Date.now()
+    ) {
+      throw new Error("Choose a future date and time for the hold.");
+    }
+
+    requestedEmbargoUntil = embargoDate.toISOString();
+  }
+
+  const locationDescription = draft.locationDescription.trim();
+
+  if (
+    draft.locationMode === "coarse_text"
+    && !locationDescription
+  ) {
+    throw new Error(
+      "Add a broad location or choose not to add one.",
+    );
+  }
+
+  return {
+    newsroom_identity_mode: draft.newsroomIdentityMode,
+    public_attribution_preference:
+      draft.publicAttributionPreference,
+    contact_preference: draft.contactPreference,
+    rights_declaration: rightsDeclaration,
+    rights_declaration_detail: null,
+    consent_declaration: consentDeclaration,
+    consent_declaration_detail: null,
+    declared_sensitivity: draft.declaredSensitivity,
+    source_protection_request: draft.sourceProtectionRequest,
+    embargo_request_mode: draft.embargoRequestMode,
+    requested_embargo_until: requestedEmbargoUntil,
+    location_mode: draft.locationMode,
+    location_description:
+      draft.locationMode === "coarse_text"
+        ? locationDescription
+        : null,
+    content_captured_at: null,
+    intake_notes: null,
+  };
+}
+
+function formatReceiptTime(value: string | null): string {
+  if (!value) return "Received";
+
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "Received";
+
+  return date.toLocaleString(undefined, {
+    dateStyle: "medium",
+    timeStyle: "short",
+  });
+}
+
+function ChoiceButton({
+  selected,
+  onClick,
+  title,
+  description,
+}: {
+  selected: boolean;
+  onClick: () => void;
+  title: string;
+  description?: string;
+}) {
+  return (
+    <button
+      type="button"
+      aria-pressed={selected}
+      onClick={onClick}
+      className={`w-full rounded-2xl border px-3 py-3 text-left transition-colors ${
+        selected
+          ? "border-[var(--wk-brand)] bg-[var(--wk-brand-soft)]"
+          : "border-[var(--wk-border)] bg-[var(--wk-bg)] hover:bg-[var(--wk-surface-raised)]"
+      }`}
+    >
+      <span className="block text-[12px] font-black text-[var(--wk-text)]">
+        {title}
+      </span>
+      {description ? (
+        <span className="mt-1 block text-[11px] leading-5 text-[var(--wk-text-muted)]">
+          {description}
+        </span>
+      ) : null}
+    </button>
+  );
+}
 
 function prettyBytes(bytes: number): string {
   if (!Number.isFinite(bytes) || bytes <= 0) return "0 B";
@@ -129,6 +259,11 @@ export default function FieldIntakePage() {
   const [capabilityChecked, setCapabilityChecked] = useState(false);
   const [canSubmit, setCanSubmit] = useState<boolean | null>(null);
   const [file, setFile] = useState<File | null>(null);
+  const [declarationDraft, setDeclarationDraft] =
+    useState<FieldDeclarationDraft>(INITIAL_DECLARATION_DRAFT);
+  const [receipt, setReceipt] = useState<FieldReceipt | null>(null);
+  const [showProtectionOptions, setShowProtectionOptions] =
+    useState(false);
   const [pending, setPending] = useState<FieldQueueRecord | null>(null);
   const [replacementFile, setReplacementFile] = useState<File | null>(null);
   const [progress, setProgress] = useState<FieldProgress>(INITIAL_PROGRESS);
@@ -226,6 +361,7 @@ export default function FieldIntakePage() {
     const nextFile = event.target.files?.[0] ?? null;
     setFile(nextFile);
     setCompleted(false);
+    setReceipt(null);
     setError("");
     setShowUploadHelp(false);
   }
@@ -258,7 +394,22 @@ export default function FieldIntakePage() {
     if (!authUser.id || !file || working) return;
 
     setError("");
+
+    let declarations: FieldDeclarations;
+
+    try {
+      declarations = buildFieldDeclarations(declarationDraft);
+    } catch (cause) {
+      setError(
+        cause instanceof Error
+          ? cause.message
+          : "Check the submission details before sending.",
+      );
+      return;
+    }
+
     setCompleted(false);
+    setReceipt(null);
     setShowUploadHelp(false);
     setWorking(true);
 
@@ -266,10 +417,10 @@ export default function FieldIntakePage() {
     abortRef.current = controller;
 
     try {
-      await submitFieldVideo(
+      const nextReceipt = await submitFieldVideo(
         authUser.id,
         file,
-        DURABILITY_PROOF_DECLARATIONS,
+        declarations,
         {
           signal: controller.signal,
           onProgress: (next) =>
@@ -281,6 +432,7 @@ export default function FieldIntakePage() {
         },
       );
 
+      setReceipt(nextReceipt);
       setCompleted(true);
       setPending(null);
       setFile(null);
@@ -311,6 +463,7 @@ export default function FieldIntakePage() {
 
     setError("");
     setCompleted(false);
+    setReceipt(null);
     setWorking(true);
 
     setProgress((current) => ({
@@ -325,18 +478,23 @@ export default function FieldIntakePage() {
     abortRef.current = controller;
 
     try {
-      await resumeFieldQueue(pending.id, authUser.id, {
+      const nextReceipt = await resumeFieldQueue(
+        pending.id,
+        authUser.id,
+        {
         replacementFile,
         queueSnapshot: pending,
         signal: controller.signal,
-        onProgress: (next) =>
-          setProgress((current) => ({
-            ...next,
-            submissionReference:
-              next.submissionReference ?? current.submissionReference,
-          })),
-      });
+          onProgress: (next) =>
+            setProgress((current) => ({
+              ...next,
+              submissionReference:
+                next.submissionReference ?? current.submissionReference,
+            })),
+        },
+      );
 
+      setReceipt(nextReceipt);
       setCompleted(true);
       setPending(null);
       setReplacementFile(null);
@@ -378,6 +536,7 @@ export default function FieldIntakePage() {
       await cancelQueuedFieldSubmission(pending.id, authUser.id);
       setPending(null);
       setReplacementFile(null);
+      setReceipt(null);
       setProgress({
         ...INITIAL_PROGRESS,
         stage: "cancelled",
@@ -628,7 +787,7 @@ export default function FieldIntakePage() {
         </section>
       ) : null}
 
-      {completed ? (
+      {completed && receipt ? (
         <section
           className="mt-7 rounded-3xl border border-[var(--wk-border)] bg-[var(--wk-surface)] p-6 shadow-sm"
           aria-live="polite"
@@ -636,19 +795,49 @@ export default function FieldIntakePage() {
           <div className="flex h-12 w-12 items-center justify-center rounded-full bg-emerald-50 text-emerald-700">
             <i className="ri-check-line text-[24px]" />
           </div>
+
           <h2 className="mt-4 text-[22px] font-black tracking-tight text-[var(--wk-text)]">
-            Video received
+            Submission Received
           </h2>
+
           <p className="mt-2 text-[13px] leading-6 text-[var(--wk-text-muted)]">
-            The upload completed and the local recovery copy was cleared from
-            this browser.
+            {receipt.receiptMessage}
           </p>
+
+          <p className="mt-2 text-[12px] leading-5 text-[var(--wk-text-muted)]">
+            This confirms intake for review. It does not mean the video is
+            approved or will be published.
+          </p>
+
+          <div className="mt-5 rounded-2xl bg-[var(--wk-bg)] p-4">
+            <p className="text-[10px] font-black uppercase tracking-[0.14em] text-[var(--wk-text-faint)]">
+              Reference
+            </p>
+            <p className="mt-1 break-all text-[17px] font-black text-[var(--wk-text)]">
+              {receipt.submissionReference}
+            </p>
+            <p className="mt-2 text-[11px] leading-5 text-[var(--wk-text-muted)]">
+              Received{" "}
+              {formatReceiptTime(
+                receipt.receiptIssuedAt ?? receipt.submittedAt,
+              )}
+            </p>
+          </div>
+
+          <p className="mt-3 text-[11px] leading-5 text-[var(--wk-text-faint)]">
+            Keep this reference if you contact WAKILISHA about this
+            submission.
+          </p>
+
           <div className="mt-5">
             <WkButton
               type="button"
               variant="soft"
               onClick={() => {
                 setCompleted(false);
+                setReceipt(null);
+                setDeclarationDraft(INITIAL_DECLARATION_DRAFT);
+                setShowProtectionOptions(false);
                 setProgress(INITIAL_PROGRESS);
               }}
             >
@@ -780,6 +969,471 @@ export default function FieldIntakePage() {
                   <i className="ri-close-line text-[18px]" />
                 </button>
               </div>
+
+              {!working ? (
+                <div className="mt-6 border-t border-[var(--wk-divider)] pt-5">
+                  <p className="text-[10px] font-black uppercase tracking-[0.14em] text-[var(--wk-brand)]">
+                    Before You Send
+                  </p>
+                  <h3 className="mt-1 text-[18px] font-black tracking-tight text-[var(--wk-text)]">
+                    Tell Us What You Know
+                  </h3>
+                  <p className="mt-1 text-[12px] leading-5 text-[var(--wk-text-muted)]">
+                    These answers help the newsroom handle your video safely.
+                    They do not approve it for publication.
+                  </p>
+
+                  <div className="mt-5">
+                    <div className="flex items-center justify-between gap-3">
+                      <p className="text-[12px] font-black text-[var(--wk-text)]">
+                        Who Controls This Video?
+                      </p>
+                      <span className="text-[10px] font-bold text-[var(--wk-text-faint)]">
+                        Required
+                      </span>
+                    </div>
+
+                    <div className="mt-2 grid gap-2 sm:grid-cols-2">
+                      <ChoiceButton
+                        selected={
+                          declarationDraft.rightsDeclaration
+                          === "owns_or_controls"
+                        }
+                        onClick={() =>
+                          setDeclarationDraft((current) => ({
+                            ...current,
+                            rightsDeclaration: "owns_or_controls",
+                          }))
+                        }
+                        title="I own or control this video"
+                      />
+                      <ChoiceButton
+                        selected={
+                          declarationDraft.rightsDeclaration
+                          === "authorized_by_rights_holder"
+                        }
+                        onClick={() =>
+                          setDeclarationDraft((current) => ({
+                            ...current,
+                            rightsDeclaration:
+                              "authorized_by_rights_holder",
+                          }))
+                        }
+                        title="The rights holder allowed me to send it"
+                      />
+                      <ChoiceButton
+                        selected={
+                          declarationDraft.rightsDeclaration
+                          === "uncertain"
+                        }
+                        onClick={() =>
+                          setDeclarationDraft((current) => ({
+                            ...current,
+                            rightsDeclaration: "uncertain",
+                          }))
+                        }
+                        title="I’m not sure"
+                      />
+                      <ChoiceButton
+                        selected={
+                          declarationDraft.rightsDeclaration === "other"
+                        }
+                        onClick={() =>
+                          setDeclarationDraft((current) => ({
+                            ...current,
+                            rightsDeclaration: "other",
+                          }))
+                        }
+                        title="Something else"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="mt-5">
+                    <div className="flex items-center justify-between gap-3">
+                      <p className="text-[12px] font-black text-[var(--wk-text)]">
+                        What Do You Know About Permission?
+                      </p>
+                      <span className="text-[10px] font-bold text-[var(--wk-text-faint)]">
+                        Required
+                      </span>
+                    </div>
+
+                    <p className="mt-1 text-[11px] leading-5 text-[var(--wk-text-muted)]">
+                      Tell us what you know about permission from people shown
+                      or recorded.
+                    </p>
+
+                    <div className="mt-2 grid gap-2 sm:grid-cols-2">
+                      <ChoiceButton
+                        selected={
+                          declarationDraft.consentDeclaration === "granted"
+                        }
+                        onClick={() =>
+                          setDeclarationDraft((current) => ({
+                            ...current,
+                            consentDeclaration: "granted",
+                          }))
+                        }
+                        title="People shown gave permission"
+                      />
+                      <ChoiceButton
+                        selected={
+                          declarationDraft.consentDeclaration
+                          === "not_required"
+                        }
+                        onClick={() =>
+                          setDeclarationDraft((current) => ({
+                            ...current,
+                            consentDeclaration: "not_required",
+                          }))
+                        }
+                        title="Permission is not required"
+                      />
+                      <ChoiceButton
+                        selected={
+                          declarationDraft.consentDeclaration === "uncertain"
+                        }
+                        onClick={() =>
+                          setDeclarationDraft((current) => ({
+                            ...current,
+                            consentDeclaration: "uncertain",
+                          }))
+                        }
+                        title="I’m not sure"
+                      />
+                      <ChoiceButton
+                        selected={
+                          declarationDraft.consentDeclaration
+                          === "not_obtained"
+                        }
+                        onClick={() =>
+                          setDeclarationDraft((current) => ({
+                            ...current,
+                            consentDeclaration: "not_obtained",
+                          }))
+                        }
+                        title="Permission was not obtained"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="mt-5 rounded-2xl border border-[var(--wk-border)] bg-[var(--wk-bg)]">
+                    <button
+                      type="button"
+                      aria-expanded={showProtectionOptions}
+                      onClick={() =>
+                        setShowProtectionOptions((current) => !current)
+                      }
+                      className="flex w-full items-center justify-between gap-4 px-4 py-4 text-left"
+                    >
+                      <span>
+                        <span className="block text-[12px] font-black text-[var(--wk-text)]">
+                          Protection Options
+                        </span>
+                        <span className="mt-1 block text-[11px] leading-5 text-[var(--wk-text-muted)]">
+                          Name, contact, source handling, holds, and broad
+                          location.
+                        </span>
+                      </span>
+                      <i
+                        className={`ri-arrow-down-s-line shrink-0 text-[17px] text-[var(--wk-text-faint)] transition-transform ${
+                          showProtectionOptions ? "rotate-180" : ""
+                        }`}
+                      />
+                    </button>
+
+                    {showProtectionOptions ? (
+                      <div className="border-t border-[var(--wk-divider)] px-4 pb-4 pt-5">
+                        <div>
+                          <p className="text-[12px] font-black text-[var(--wk-text)]">
+                            How Should We Handle Your Name?
+                          </p>
+                          <p className="mt-1 text-[11px] leading-5 text-[var(--wk-text-muted)]">
+                            Your account stays attached to this submission.
+                            Restricted access limits who can connect it to you.
+                          </p>
+
+                          <div className="mt-2 grid gap-2 sm:grid-cols-2">
+                            <ChoiceButton
+                              selected={
+                                declarationDraft.newsroomIdentityMode
+                                === "standard"
+                              }
+                              onClick={() =>
+                                setDeclarationDraft((current) => ({
+                                  ...current,
+                                  newsroomIdentityMode: "standard",
+                                }))
+                              }
+                              title="Standard newsroom access"
+                              description="Authorized newsroom staff can connect this submission to your account."
+                            />
+                            <ChoiceButton
+                              selected={
+                                declarationDraft.newsroomIdentityMode
+                                === "restricted"
+                              }
+                              onClick={() =>
+                                setDeclarationDraft((current) => ({
+                                  ...current,
+                                  newsroomIdentityMode: "restricted",
+                                }))
+                              }
+                              title="Restricted newsroom access"
+                              description="Fewer newsroom staff can connect this submission to your account."
+                            />
+                          </div>
+                        </div>
+
+                        <div className="mt-5">
+                          <p className="text-[12px] font-black text-[var(--wk-text)]">
+                            Can WAKILISHA Name You Publicly?
+                          </p>
+                          <div className="mt-2 grid gap-2 sm:grid-cols-2">
+                            <ChoiceButton
+                              selected={
+                                declarationDraft.publicAttributionPreference
+                                === "do_not_name"
+                              }
+                              onClick={() =>
+                                setDeclarationDraft((current) => ({
+                                  ...current,
+                                  publicAttributionPreference:
+                                    "do_not_name",
+                                }))
+                              }
+                              title="Do not name me publicly"
+                            />
+                            <ChoiceButton
+                              selected={
+                                declarationDraft.publicAttributionPreference
+                                === "may_name"
+                              }
+                              onClick={() =>
+                                setDeclarationDraft((current) => ({
+                                  ...current,
+                                  publicAttributionPreference: "may_name",
+                                }))
+                              }
+                              title="You may name me publicly"
+                            />
+                          </div>
+                        </div>
+
+                        <div className="mt-5">
+                          <p className="text-[12px] font-black text-[var(--wk-text)]">
+                            Can We Contact You About This?
+                          </p>
+                          <div className="mt-2 grid gap-2 sm:grid-cols-2">
+                            <ChoiceButton
+                              selected={
+                                declarationDraft.contactPreference
+                                === "account_contact"
+                              }
+                              onClick={() =>
+                                setDeclarationDraft((current) => ({
+                                  ...current,
+                                  contactPreference: "account_contact",
+                                }))
+                              }
+                              title="You may contact me"
+                              description="Use the contact details already linked to my account."
+                            />
+                            <ChoiceButton
+                              selected={
+                                declarationDraft.contactPreference
+                                === "no_follow_up"
+                              }
+                              onClick={() =>
+                                setDeclarationDraft((current) => ({
+                                  ...current,
+                                  contactPreference: "no_follow_up",
+                                }))
+                              }
+                              title="No follow-up"
+                            />
+                          </div>
+                        </div>
+
+                        <div className="mt-5">
+                          <label
+                            htmlFor="field-sensitivity"
+                            className="text-[12px] font-black text-[var(--wk-text)]"
+                          >
+                            How Sensitive Is This?
+                          </label>
+                          <p className="mt-1 text-[11px] leading-5 text-[var(--wk-text-muted)]">
+                            Choose the level that best reflects the risk if
+                            this submission is exposed.
+                          </p>
+                          <select
+                            id="field-sensitivity"
+                            value={declarationDraft.declaredSensitivity}
+                            onChange={(event) =>
+                              setDeclarationDraft((current) => ({
+                                ...current,
+                                declaredSensitivity:
+                                  event.target.value as FieldDeclarations["declared_sensitivity"],
+                              }))
+                            }
+                            className="mt-2 w-full rounded-xl border border-[var(--wk-border)] bg-[var(--wk-surface)] px-3 py-3 text-[12px] font-semibold text-[var(--wk-text)] outline-none"
+                          >
+                            <option value="none">
+                              Not especially sensitive
+                            </option>
+                            <option value="low">Low sensitivity</option>
+                            <option value="moderate">
+                              Moderate sensitivity
+                            </option>
+                            <option value="high">High sensitivity</option>
+                            <option value="extreme">
+                              Extreme sensitivity
+                            </option>
+                          </select>
+                        </div>
+
+                        <div className="mt-5">
+                          <label
+                            htmlFor="field-source-protection"
+                            className="text-[12px] font-black text-[var(--wk-text)]"
+                          >
+                            Who Should See Source Details?
+                          </label>
+                          <select
+                            id="field-source-protection"
+                            value={
+                              declarationDraft.sourceProtectionRequest
+                            }
+                            onChange={(event) =>
+                              setDeclarationDraft((current) => ({
+                                ...current,
+                                sourceProtectionRequest:
+                                  event.target.value as FieldDeclarations["source_protection_request"],
+                              }))
+                            }
+                            className="mt-2 w-full rounded-xl border border-[var(--wk-border)] bg-[var(--wk-surface)] px-3 py-3 text-[12px] font-semibold text-[var(--wk-text)] outline-none"
+                          >
+                            <option value="internal">
+                              Newsroom staff handling the submission
+                            </option>
+                            <option value="restricted">
+                              A smaller newsroom group
+                            </option>
+                            <option value="confidential">
+                              Treat source details as confidential
+                            </option>
+                          </select>
+                        </div>
+
+                        <div className="mt-5">
+                          <label
+                            htmlFor="field-hold"
+                            className="text-[12px] font-black text-[var(--wk-text)]"
+                          >
+                            Should We Hold This Video?
+                          </label>
+                          <select
+                            id="field-hold"
+                            value={declarationDraft.embargoRequestMode}
+                            onChange={(event) =>
+                              setDeclarationDraft((current) => ({
+                                ...current,
+                                embargoRequestMode:
+                                  event.target.value as FieldDeclarations["embargo_request_mode"],
+                              }))
+                            }
+                            className="mt-2 w-full rounded-xl border border-[var(--wk-border)] bg-[var(--wk-surface)] px-3 py-3 text-[12px] font-semibold text-[var(--wk-text)] outline-none"
+                          >
+                            <option value="none">No hold request</option>
+                            <option value="until_review">
+                              Hold until the newsroom reviews it
+                            </option>
+                            <option value="until_time">
+                              Hold until a date and time
+                            </option>
+                          </select>
+
+                          {declarationDraft.embargoRequestMode
+                          === "until_time" ? (
+                            <input
+                              type="datetime-local"
+                              value={
+                                declarationDraft.requestedEmbargoUntilLocal
+                              }
+                              onChange={(event) =>
+                                setDeclarationDraft((current) => ({
+                                  ...current,
+                                  requestedEmbargoUntilLocal:
+                                    event.target.value,
+                                }))
+                              }
+                              aria-label="Hold until"
+                              className="mt-2 w-full rounded-xl border border-[var(--wk-border)] bg-[var(--wk-surface)] px-3 py-3 text-[12px] text-[var(--wk-text)] outline-none"
+                            />
+                          ) : null}
+                        </div>
+
+                        <div className="mt-5">
+                          <p className="text-[12px] font-black text-[var(--wk-text)]">
+                            Add a Broad Location?
+                          </p>
+                          <p className="mt-1 text-[11px] leading-5 text-[var(--wk-text-muted)]">
+                            Keep it broad. Avoid an exact address if that
+                            could put someone at risk.
+                          </p>
+
+                          <div className="mt-2 grid gap-2 sm:grid-cols-2">
+                            <ChoiceButton
+                              selected={
+                                declarationDraft.locationMode
+                                === "not_collected"
+                              }
+                              onClick={() =>
+                                setDeclarationDraft((current) => ({
+                                  ...current,
+                                  locationMode: "not_collected",
+                                  locationDescription: "",
+                                }))
+                              }
+                              title="Do not add a location"
+                            />
+                            <ChoiceButton
+                              selected={
+                                declarationDraft.locationMode
+                                === "coarse_text"
+                              }
+                              onClick={() =>
+                                setDeclarationDraft((current) => ({
+                                  ...current,
+                                  locationMode: "coarse_text",
+                                }))
+                              }
+                              title="Add a broad location"
+                            />
+                          </div>
+
+                          {declarationDraft.locationMode === "coarse_text" ? (
+                            <input
+                              type="text"
+                              value={declarationDraft.locationDescription}
+                              onChange={(event) =>
+                                setDeclarationDraft((current) => ({
+                                  ...current,
+                                  locationDescription: event.target.value,
+                                }))
+                              }
+                              placeholder="City, area, or landmark"
+                              aria-label="Broad location"
+                              className="mt-2 w-full rounded-xl border border-[var(--wk-border)] bg-[var(--wk-surface)] px-3 py-3 text-[12px] text-[var(--wk-text)] outline-none placeholder:text-[var(--wk-text-faint)]"
+                            />
+                          ) : null}
+                        </div>
+                      </div>
+                    ) : null}
+                  </div>
+                </div>
+              ) : null}
 
               {working ? (
                 <div className="mt-5">
