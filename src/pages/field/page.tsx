@@ -58,18 +58,24 @@ function prettyBytes(bytes: number): string {
   return `${value.toFixed(exponent === 0 ? 0 : 1)} ${units[exponent]}`;
 }
 
-function formatElapsed(seconds: number): string {
-  const minutes = Math.floor(seconds / 60);
-  const remainder = String(seconds % 60).padStart(2, "0");
-  return `${minutes}:${remainder} elapsed`;
-}
+const FRESH_UPLOAD_SETUP_MESSAGES = [
+  "Creating a private upload for this video.",
+  "Making the upload resumable if your connection drops.",
+  "Getting the first video section ready to send.",
+] as const;
+
+const RESUME_UPLOAD_SETUP_MESSAGES = [
+  "Restoring your saved upload.",
+  "Reopening secure upload access.",
+  "Getting the next video section ready to send.",
+] as const;
 
 function stageLabel(stage: FieldClientStage): string {
   const labels: Record<FieldClientStage, string> = {
     draft_local: "Ready",
     hashing: "Checking video",
     creating_submission: "Preparing",
-    creating_upload: "Preparing upload",
+    creating_upload: "Getting ready",
     uploading: "Uploading",
     waiting_for_network: "Waiting for network",
     paused: "Paused",
@@ -116,7 +122,7 @@ export default function FieldIntakePage() {
   const [error, setError] = useState("");
   const [completed, setCompleted] = useState(false);
   const [showUploadHelp, setShowUploadHelp] = useState(false);
-  const [preparingElapsedSeconds, setPreparingElapsedSeconds] = useState(0);
+  const [preparingActivityIndex, setPreparingActivityIndex] = useState(0);
 
   useEffect(() => {
     let alive = true;
@@ -164,23 +170,27 @@ export default function FieldIntakePage() {
 
   useEffect(() => {
     if (!working || progress.stage !== "creating_upload") {
-      setPreparingElapsedSeconds(0);
+      setPreparingActivityIndex(0);
       return;
     }
 
-    const startedAt = Date.now();
+    setPreparingActivityIndex(0);
 
-    const updateElapsed = () => {
-      setPreparingElapsedSeconds(
-        Math.max(0, Math.floor((Date.now() - startedAt) / 1000)),
-      );
-    };
-
-    updateElapsed();
-    const timer = window.setInterval(updateElapsed, 1000);
+    const timer = window.setInterval(() => {
+      setPreparingActivityIndex((current) => current + 1);
+    }, 1600);
 
     return () => window.clearInterval(timer);
   }, [working, progress.stage]);
+
+  const preparingMessages = pending
+    ? RESUME_UPLOAD_SETUP_MESSAGES
+    : FRESH_UPLOAD_SETUP_MESSAGES;
+
+  const preparingActivityMessage =
+    preparingMessages[
+      preparingActivityIndex % preparingMessages.length
+    ];
 
   function chooseFile(event: ChangeEvent<HTMLInputElement>) {
     const nextFile = event.target.files?.[0] ?? null;
@@ -494,9 +504,20 @@ export default function FieldIntakePage() {
             </div>
 
             <div className="mt-3 flex items-start gap-2">
-              <i className="ri-information-line mt-0.5 shrink-0 text-[14px] text-[var(--wk-text-faint)]" />
-              <p className="text-[12px] leading-5 text-[var(--wk-text-muted)]">
-                {progress.message}
+              <i
+                className={
+                  working && progress.stage === "creating_upload"
+                    ? "ri-loader-4-line mt-0.5 shrink-0 animate-spin text-[15px] text-[var(--wk-brand)]"
+                    : "ri-information-line mt-0.5 shrink-0 text-[14px] text-[var(--wk-text-faint)]"
+                }
+              />
+              <p
+                className="text-[12px] leading-5 text-[var(--wk-text-muted)]"
+                aria-live="polite"
+              >
+                {working && progress.stage === "creating_upload"
+                  ? preparingActivityMessage
+                  : progress.message}
               </p>
             </div>
 
@@ -730,33 +751,41 @@ export default function FieldIntakePage() {
                     </span>
                     <span className="font-semibold text-[var(--wk-text-muted)]">
                       {progress.stage === "creating_upload"
-                        ? formatElapsed(preparingElapsedSeconds)
+                        ? "Working"
                         : `${Math.round(progress.progress * 100)}%`}
                     </span>
                   </div>
 
-                  <div className="mt-2 h-2 overflow-hidden rounded-full bg-[var(--wk-surface-raised)]">
-                    {progress.stage === "creating_upload" ? (
-                      <div
-                        className="h-full w-1/3 animate-pulse rounded-full bg-[var(--wk-brand)]"
-                        aria-label="Upload setup is in progress"
-                      />
-                    ) : (
-                      <div
-                        className="h-full rounded-full bg-[var(--wk-brand)] transition-[width]"
-                        style={{
-                          width: `${Math.max(
-                            2,
-                            Math.min(100, progress.progress * 100),
-                          )}%`,
-                        }}
-                      />
-                    )}
-                  </div>
+                  {progress.stage === "creating_upload" ? (
+                    <div
+                      className="mt-3 flex items-start gap-2 rounded-2xl bg-[var(--wk-bg)] px-3 py-3"
+                      role="status"
+                      aria-live="polite"
+                    >
+                      <i className="ri-loader-4-line mt-0.5 shrink-0 animate-spin text-[16px] text-[var(--wk-brand)]" />
+                      <p className="text-[11px] leading-5 text-[var(--wk-text-muted)]">
+                        {preparingActivityMessage}
+                      </p>
+                    </div>
+                  ) : (
+                    <>
+                      <div className="mt-2 h-2 overflow-hidden rounded-full bg-[var(--wk-surface-raised)]">
+                        <div
+                          className="h-full rounded-full bg-[var(--wk-brand)] transition-[width]"
+                          style={{
+                            width: `${Math.max(
+                              2,
+                              Math.min(100, progress.progress * 100),
+                            )}%`,
+                          }}
+                        />
+                      </div>
 
-                  <p className="mt-3 text-[11px] leading-5 text-[var(--wk-text-muted)]">
-                    {progress.message}
-                  </p>
+                      <p className="mt-3 text-[11px] leading-5 text-[var(--wk-text-muted)]">
+                        {progress.message}
+                      </p>
+                    </>
+                  )}
 
                   <p className="mt-1 text-[10px] leading-4 text-[var(--wk-text-faint)]">
                     Keep this page open while the upload is active.

@@ -160,10 +160,25 @@ describe("Phase 8A.4 mobile local durability", () => {
       'className="col-span-2 w-full justify-center sm:w-auto"',
     );
     expect(page).toContain("Keep this page open while the upload is active.");
-    expect(page).toContain("formatElapsed");
-    expect(page).toContain("preparingElapsedSeconds");
+    expect(page).toContain("FRESH_UPLOAD_SETUP_MESSAGES");
+    expect(page).toContain("RESUME_UPLOAD_SETUP_MESSAGES");
+    expect(page).toContain("preparingActivityIndex");
+    expect(page).toContain("preparingActivityMessage");
     expect(page).toContain('progress.stage === "creating_upload"');
-    expect(page).toContain("Upload setup is in progress");
+    expect(page).toContain("ri-loader-4-line");
+    expect(page).toContain("animate-spin");
+    expect(page).toContain("Creating a private upload for this video.");
+    expect(page).toContain(
+      "Making the upload resumable if your connection drops.",
+    );
+    expect(page).toContain("Getting the first video section ready to send.");
+    expect(page).toContain("Restoring your saved upload.");
+    expect(page).toContain("Reopening secure upload access.");
+    expect(page).toContain("Getting the next video section ready to send.");
+    expect(page).not.toContain("formatElapsed");
+    expect(page).not.toContain("preparingElapsedSeconds");
+    expect(page).not.toContain(" elapsed");
+    expect(page).not.toContain("Upload setup is in progress");
     expect(page).toContain(
       "Checking the selected original before resuming…",
     );
