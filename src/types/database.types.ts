@@ -18936,6 +18936,14 @@ export type Database = {
           suggestion_id: string
         }[]
       }
+      accept_message_request: {
+        Args: {
+          p_conversation_id: string
+          p_correlation_id?: string
+          p_idempotency_key: string
+        }
+        Returns: Json
+      }
       accept_registry_missing_artist_intake: {
         Args: { p_review_reason: string; p_submission_id: string }
         Returns: Json
@@ -21578,6 +21586,14 @@ export type Database = {
       }
       current_user_is_administrator: { Args: never; Returns: boolean }
       daitch_mokotoff: { Args: { "": string }; Returns: string[] }
+      decline_message_request: {
+        Args: {
+          p_conversation_id: string
+          p_correlation_id?: string
+          p_idempotency_key: string
+        }
+        Returns: Json
+      }
       delete_batch_from_staging: {
         Args: { batch_size: number }
         Returns: number
@@ -22039,6 +22055,17 @@ export type Database = {
           updated_at: string
         }[]
       }
+      get_my_message_conversation: {
+        Args: {
+          p_before_accepted_at?: string
+          p_before_message_id?: string
+          p_conversation_id: string
+          p_limit?: number
+        }
+        Returns: Json
+      }
+      get_my_message_preferences: { Args: never; Returns: Json }
+      get_my_message_unread_counts: { Args: never; Returns: Json }
       get_my_personal_playlist: {
         Args: { p_playlist_id: string }
         Returns: Json
@@ -22619,6 +22646,15 @@ export type Database = {
           updated_at: string
         }[]
       }
+      list_my_message_conversations: {
+        Args: {
+          p_before_conversation_id?: string
+          p_before_last_activity_at?: string
+          p_folder?: string
+          p_limit?: number
+        }
+        Returns: Json
+      }
       list_my_personal_playlists: {
         Args: { p_include_archived?: boolean; p_limit?: number }
         Returns: {
@@ -22825,6 +22861,10 @@ export type Database = {
           suggestion_id: string
         }[]
       }
+      mark_my_message_conversation_read: {
+        Args: { p_conversation_id: string; p_through_message_id?: string }
+        Returns: Json
+      }
       merge_people: {
         Args: {
           p_correlation_id?: string
@@ -22892,6 +22932,15 @@ export type Database = {
           isOneToOne: true
           isSetofReturn: false
         }
+      }
+      move_message_conversation: {
+        Args: {
+          p_conversation_id: string
+          p_correlation_id?: string
+          p_folder: string
+          p_idempotency_key: string
+        }
+        Returns: Json
       }
       move_playlist_pending_registry_intake: {
         Args: {
@@ -24313,6 +24362,14 @@ export type Database = {
           version_number: number
         }[]
       }
+      revoke_message_sender_approval: {
+        Args: {
+          p_correlation_id?: string
+          p_idempotency_key: string
+          p_sender_person_resource_id: string
+        }
+        Returns: Json
+      }
       revoke_user_role_admin: {
         Args: { target_role_key: string; target_user_id: string }
         Returns: boolean
@@ -24471,6 +24528,23 @@ export type Database = {
           taxonomy: string
           term_name: string
           term_slug: string
+        }[]
+      }
+      send_message: {
+        Args: {
+          p_body: string
+          p_client_created_at?: string
+          p_conversation_id: string
+          p_correlation_id?: string
+          p_idempotency_key: string
+          p_resource_references: Json
+        }
+        Returns: {
+          command_receipt_id: string
+          conversation_id: string
+          idempotent_replay: boolean
+          message_id: string
+          receipt_status: string
         }[]
       }
       set_audio_publication_master: {
@@ -24747,6 +24821,25 @@ export type Database = {
         Args: never
         Returns: {
           result: Json
+        }[]
+      }
+      start_message_conversation: {
+        Args: {
+          p_body: string
+          p_client_created_at?: string
+          p_correlation_id?: string
+          p_idempotency_key: string
+          p_recipient_person_resource_id: string
+          p_resource_references: Json
+        }
+        Returns: {
+          command_receipt_id: string
+          conversation_id: string
+          first_contact_state: string
+          idempotent_replay: boolean
+          mailbox_folder: string
+          message_id: string
+          receipt_status: string
         }[]
       }
       submit_article_for_review: {
@@ -25249,6 +25342,20 @@ export type Database = {
           p_correlation_id?: string
           p_reason: string
           p_status: string
+        }
+        Returns: Json
+      }
+      update_my_message_sender_policy: {
+        Args: {
+          p_allow_links: boolean
+          p_allow_media: boolean
+          p_allow_resource_references: boolean
+          p_correlation_id?: string
+          p_expected_revision: number
+          p_first_contact_disposition: string
+          p_idempotency_key: string
+          p_sender_category: string
+          p_show_read_receipts: boolean
         }
         Returns: Json
       }
