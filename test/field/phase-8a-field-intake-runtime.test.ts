@@ -47,6 +47,11 @@ describe("Phase 8A.4 mobile local durability", () => {
     );
     expect(service).toContain("queue.fileBlob = file;");
     expect(service).toContain("queue.fileBlob = null;");
+    expect(service).toContain("queueSnapshot?: FieldQueueRecord | null");
+    expect(service).toContain(
+      "options.queueSnapshot ?? await getQueue(queueId)",
+    );
+    expect(page).toContain("queueSnapshot: pending");
     expect(service).toContain("submissionResourceId: queue.submissionResourceId");
     expect(service).toContain("attemptNumber: Math.max(queue.attemptNumber + 1");
     expect(service).toContain(
@@ -155,6 +160,22 @@ describe("Phase 8A.4 mobile local durability", () => {
       'className="col-span-2 w-full justify-center sm:w-auto"',
     );
     expect(page).toContain("Keep this page open while the upload is active.");
+    expect(page).toContain("formatElapsed");
+    expect(page).toContain("preparingElapsedSeconds");
+    expect(page).toContain('progress.stage === "creating_upload"');
+    expect(page).toContain("Upload setup is in progress");
+    expect(page).toContain(
+      "Checking the selected original before resuming…",
+    );
+    expect(page).toContain(
+      "Restoring your saved upload…",
+    );
+    expect(service).toContain(
+      "Setting up a resumable upload. Video transfer begins next.",
+    );
+    expect(service).toContain(
+      "Restoring your resumable upload. Video transfer begins next.",
+    );
     expect(page).toContain(
       "Browser storage can be cleared by the device",
     );

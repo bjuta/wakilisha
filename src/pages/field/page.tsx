@@ -58,6 +58,12 @@ function prettyBytes(bytes: number): string {
   return `${value.toFixed(exponent === 0 ? 0 : 1)} ${units[exponent]}`;
 }
 
+function formatElapsed(seconds: number): string {
+  const minutes = Math.floor(seconds / 60);
+  const remainder = String(seconds % 60).padStart(2, "0");
+  return `${minutes}:${remainder} elapsed`;
+}
+
 function stageLabel(stage: FieldClientStage): string {
   const labels: Record<FieldClientStage, string> = {
     draft_local: "Ready",
@@ -110,6 +116,7 @@ export default function FieldIntakePage() {
   const [error, setError] = useState("");
   const [completed, setCompleted] = useState(false);
   const [showUploadHelp, setShowUploadHelp] = useState(false);
+  const [preparingElapsedSeconds, setPreparingElapsedSeconds] = useState(0);
 
   useEffect(() => {
     let alive = true;
@@ -154,6 +161,26 @@ export default function FieldIntakePage() {
       abortRef.current?.abort();
     };
   }, [authUser.id]);
+
+  useEffect(() => {
+    if (!working || progress.stage !== "creating_upload") {
+      setPreparingElapsedSeconds(0);
+      return;
+    }
+
+    const startedAt = Date.now();
+
+    const updateElapsed = () => {
+      setPreparingElapsedSeconds(
+        Math.max(0, Math.floor((Date.now() - startedAt) / 1000)),
+      );
+    };
+
+    updateElapsed();
+    const timer = window.setInterval(updateElapsed, 1000);
+
+    return () => window.clearInterval(timer);
+  }, [working, progress.stage]);
 
   function chooseFile(event: ChangeEvent<HTMLInputElement>) {
     const nextFile = event.target.files?.[0] ?? null;
@@ -246,12 +273,21 @@ export default function FieldIntakePage() {
     setCompleted(false);
     setWorking(true);
 
+    setProgress((current) => ({
+      ...current,
+      stage: replacementFile ? "hashing" : "creating_upload",
+      message: replacementFile
+        ? "Checking the selected original before resuming…"
+        : "Restoring your saved upload…",
+    }));
+
     const controller = new AbortController();
     abortRef.current = controller;
 
     try {
       await resumeFieldQueue(pending.id, authUser.id, {
         replacementFile,
+        queueSnapshot: pending,
         signal: controller.signal,
         onProgress: (next) =>
           setProgress((current) => ({
@@ -693,20 +729,29 @@ export default function FieldIntakePage() {
                       {stageLabel(progress.stage)}
                     </span>
                     <span className="font-semibold text-[var(--wk-text-muted)]">
-                      {Math.round(progress.progress * 100)}%
+                      {progress.stage === "creating_upload"
+                        ? formatElapsed(preparingElapsedSeconds)
+                        : `${Math.round(progress.progress * 100)}%`}
                     </span>
                   </div>
 
                   <div className="mt-2 h-2 overflow-hidden rounded-full bg-[var(--wk-surface-raised)]">
-                    <div
-                      className="h-full rounded-full bg-[var(--wk-brand)] transition-[width]"
-                      style={{
-                        width: `${Math.max(
-                          2,
-                          Math.min(100, progress.progress * 100),
-                        )}%`,
-                      }}
-                    />
+                    {progress.stage === "creating_upload" ? (
+                      <div
+                        className="h-full w-1/3 animate-pulse rounded-full bg-[var(--wk-brand)]"
+                        aria-label="Upload setup is in progress"
+                      />
+                    ) : (
+                      <div
+                        className="h-full rounded-full bg-[var(--wk-brand)] transition-[width]"
+                        style={{
+                          width: `${Math.max(
+                            2,
+                            Math.min(100, progress.progress * 100),
+                          )}%`,
+                        }}
+                      />
+                    )}
                   </div>
 
                   <p className="mt-3 text-[11px] leading-5 text-[var(--wk-text-muted)]">

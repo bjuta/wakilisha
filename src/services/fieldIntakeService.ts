@@ -610,7 +610,7 @@ export async function submitFieldVideo(
     totalBytes: file.size,
     uploadedParts: 0,
     totalParts: 0,
-    message: "Preparing your private upload…",
+    message: "Setting up a resumable upload. Video transfer begins next.",
     submissionReference: queue.submissionReference,
   });
 
@@ -702,12 +702,16 @@ export async function resumeFieldQueue(
   ownerUserId: string,
   options: {
     replacementFile?: File | null;
+    queueSnapshot?: FieldQueueRecord | null;
     onProgress?: (progress: FieldProgress) => void;
     signal?: AbortSignal;
   } = {},
 ): Promise<FieldReceipt> {
-  let queue = await getQueue(queueId);
+  let queue = options.queueSnapshot ?? await getQueue(queueId);
   if (!queue) throw new Error("This local Field queue no longer exists.");
+  if (queue.id !== queueId) {
+    throw new Error("The restored Field queue does not match this upload.");
+  }
   if (queue.ownerUserId !== ownerUserId) {
     throw new Error("This queued submission belongs to another signed-in account.");
   }
@@ -756,6 +760,20 @@ export async function resumeFieldQueue(
   const file = await exactLocalFile(queue, options.replacementFile);
   queue.fileBlob = file;
   await putQueue(queue);
+
+  report(options.onProgress, {
+    stage: "creating_upload",
+    progress: queue.byteSize > 0
+      ? queue.uploadedBytes / queue.byteSize
+      : 0,
+    processedBytes: queue.uploadedBytes,
+    totalBytes: queue.byteSize,
+    uploadedParts: queue.uploadedParts,
+    totalParts: queue.totalParts,
+    message: "Restoring your resumable upload. Video transfer begins next.",
+    submissionReference: queue.submissionReference,
+  });
+
   requireOnline();
 
   if (!queue.mediaIntakeId) {
