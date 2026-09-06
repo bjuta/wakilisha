@@ -177,6 +177,16 @@ function throwIfAborted(signal?: AbortSignal) {
   throw new DOMException("Field upload was paused.", "AbortError");
 }
 
+function isUnreadableLocalObjectError(error: unknown): boolean {
+  return (
+    error instanceof DOMException
+    && (
+      error.name === "NotFoundError"
+      || /object can not be found here/i.test(error.message)
+    )
+  );
+}
+
 export class FieldRecoverableError extends Error {
   stage: FieldClientStage;
   constructor(stage: FieldClientStage, message: string) {
@@ -389,6 +399,21 @@ async function uploadRemainingParts(
       });
     }
   } catch (error) {
+    if (isUnreadableLocalObjectError(error)) {
+      current = {
+        ...current,
+        fileBlob: null,
+        localState: "paused",
+        updatedAt: new Date().toISOString(),
+      };
+      await putQueue(current);
+
+      throw new FieldRecoverableError(
+        "paused",
+        "The browser can no longer read the saved video. Choose the exact original to continue.",
+      );
+    }
+
     const recoverableState: FieldClientStage | null =
       error instanceof DOMException && error.name === "AbortError"
         ? "paused"

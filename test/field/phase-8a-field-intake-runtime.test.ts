@@ -64,6 +64,13 @@ describe("Phase 8A.4 mobile local durability", () => {
     expect(service).toContain(
       'error instanceof DOMException && error.name === "AbortError"',
     );
+    expect(service).toContain("isUnreadableLocalObjectError");
+    expect(service).toContain('error.name === "NotFoundError"');
+    expect(service).toContain("/object can not be found here/i");
+    expect(service).toContain("fileBlob: null");
+    expect(service).toContain(
+      "The browser can no longer read the saved video. Choose the exact original to continue.",
+    );
     expect(service).toContain('? "paused"');
     expect(service).toContain("error instanceof FieldRecoverableError");
     expect(service).toContain("? error.stage");
