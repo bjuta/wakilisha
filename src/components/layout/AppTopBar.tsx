@@ -5,6 +5,8 @@ import { getSiteIdentitySettings } from "@/services/adminSettings/settingsStore"
 import type { SiteIdentitySettings } from "@/services/adminSettings/settingsTypes";
 import { NotificationBell } from "@/components/feature/community/NotificationBell";
 import { useAuthUser } from "@/hooks/useAuthUser";
+import { useSessionSignOut } from "@/hooks/useSessionSignOut";
+import { useMessagesAccess } from "@/hooks/useMessagesAccess";
 
 function useSiteIdentity(): SiteIdentitySettings {
   const [identity, setIdentity] = useState<SiteIdentitySettings>(getSiteIdentitySettings);
@@ -41,6 +43,8 @@ export function AppTopBar() {
   const identity = useSiteIdentity();
   const { theme, toggle } = useTheme();
   const authUser = useAuthUser();
+  const { signOut, signingOut } = useSessionSignOut("/auth");
+  const messagesAccess = useMessagesAccess();
   const [logoError, setLogoError] = useState(false);
   const [scrolled, setScrolled] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
@@ -172,8 +176,31 @@ export function AppTopBar() {
           <Link to="/search" aria-label="Search" className={`flex h-9 w-9 items-center justify-center rounded-full transition-all duration-200 ${isActive("/search") ? "text-[var(--wk-brand)] bg-[var(--wk-brand-soft)]" : iconColor}`}>
             <i className="ri-search-line text-[17px]" />
           </Link>
+          {authUser.id && messagesAccess.visible && (
+            <Link
+              to="/messages"
+              aria-label="Messages"
+              className={`flex h-9 w-9 items-center justify-center rounded-full transition-all duration-200 ${isActive("/messages") ? "text-[var(--wk-brand)] bg-[var(--wk-brand-soft)]" : iconColor}`}
+            >
+              <i className="ri-message-3-line text-[17px]" />
+            </Link>
+          )}
           {authUser.id && (
             <NotificationBell userId={authUser.id} />
+          )}
+          {authUser.id && (
+            <button
+              type="button"
+              onClick={() => void signOut()}
+              disabled={signingOut}
+              aria-label={signingOut ? "Signing out" : "Sign out"}
+              className={`flex h-9 items-center justify-center gap-1.5 rounded-full px-2.5 transition-all duration-200 disabled:cursor-wait disabled:opacity-60 ${iconColor}`}
+            >
+              <i className="ri-logout-box-r-line text-[17px]" />
+              <span className="hidden text-[12px] font-bold xl:inline">
+                {signingOut ? "Signing out" : "Sign out"}
+              </span>
+            </button>
           )}
           <button onClick={toggle} aria-label={theme === "dark" ? "Switch to light mode" : "Switch to dark mode"} className={`flex h-9 w-9 items-center justify-center rounded-full transition-all duration-200 ${iconColor}`}>
             <i className={theme === "dark" ? "ri-sun-line text-[17px]" : "ri-moon-line text-[17px]"} />

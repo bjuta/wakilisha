@@ -30,6 +30,23 @@ describe("Mobile chrome scroll convergence", () => {
     );
   });
 
+  it("keeps top chrome available at rest and on short pages", () => {
+    const scrollDirection = readFileSync(
+      "src/hooks/useScrollDirection.ts",
+      "utf8",
+    );
+
+    expect(scrollDirection).toContain(
+      "useState(true);",
+    );
+    expect(scrollDirection).toContain(
+      "if (y <= 32)",
+    );
+    expect(scrollDirection).toContain(
+      "setTopVisible(true);",
+    );
+  });
+
   it("keeps top chrome transient while bottom navigation keeps the shared scroll signal", () => {
     expect(layout).toContain(
       "scrollChrome.topVisible",

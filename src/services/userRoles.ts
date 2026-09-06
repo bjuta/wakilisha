@@ -1,7 +1,7 @@
 import { supabase } from "@/lib/supabase";
 
 export type UserRole =
-  | "administrator" | "editor" | "chart_editor_global" | "chart_editor_regional" | "registry_editor" | "media_editor" | "reviewer" | "author" | "writer" | "viewer"
+  | "super_admin" | "administrator" | "editor" | "chart_editor_global" | "chart_editor_regional" | "registry_editor" | "media_editor" | "reviewer" | "author" | "writer" | "viewer"
   | "subscriber" | "customer" | "member" | "premium_member" | "artist_claimant" | "artist_manager" | "label_partner" | "chart_partner" | "brand_partner" | "research_partner"
   | "support_agent" | "moderator" | "analyst" | "developer";
 
@@ -9,11 +9,12 @@ export const PUBLIC_DEFAULT_ROLE: UserRole = "subscriber";
 export const CUSTOMER_ALIAS_ROLE: UserRole = "customer";
 
 export const ROLES: UserRole[] = [
-  "administrator", "developer", "editor", "chart_editor_global", "chart_editor_regional", "registry_editor", "media_editor", "reviewer", "moderator", "support_agent", "author", "analyst", "writer", "viewer",
+  "super_admin", "administrator", "developer", "editor", "chart_editor_global", "chart_editor_regional", "registry_editor", "media_editor", "reviewer", "moderator", "support_agent", "author", "analyst", "writer", "viewer",
   "subscriber", "member", "premium_member", "artist_claimant", "artist_manager", "label_partner", "chart_partner", "brand_partner", "research_partner",
 ];
 
 export const ROLE_LABELS: Record<UserRole, string> = {
+  super_admin: "Super Admin",
   administrator: "Administrator",
   editor: "Editor",
   chart_editor_global: "Chart Editor — Global",
@@ -41,6 +42,7 @@ export const ROLE_LABELS: Record<UserRole, string> = {
 };
 
 export const ROLE_DESCRIPTIONS: Record<UserRole, string> = {
+  super_admin: "Highest accountable platform operator. Includes explicit Messages Control Center authority.",
   administrator: "Full access to admin, settings, imports, users, charts, registry, review, and publishing.",
   editor: "Editorial lead with content, media, publishing, and review access.",
   chart_editor_global: "Manage chart editions and publishing across all markets and series.",
@@ -77,6 +79,7 @@ export type Capability =
   | "view_trust_records" | "manage_sources" | "review_sources" | "withdraw_sources" | "manage_citations" | "manage_credits"
   | "manage_users" | "view_media_migration" | "view_admin_readonly" | "view_public_account" | "manage_own_profile" | "manage_public_profile" | "manage_own_preferences" | "receive_notifications"
   | "save_content" | "follow_entities" | "follow_artists" | "follow_charts" | "contribute_lyrics" | "comment_public" | "moderate_community" | "view_gated_content" | "view_premium_content" | "manage_subscription"
+  | "manage_messages_control_center"
   | "view_customer_orders" | "manage_customer_orders" | "submit_artist_claim" | "manage_claimed_artist_profile" | "submit_artist_media" | "submit_label_updates" | "view_partner_reports" | "submit_chart_data"
   | "view_research_exports" | "export_research_data" | "view_analytics" | "view_support_console" | "manage_support_cases" | "view_developer_tools" | "manage_developer_tools";
 
@@ -107,8 +110,11 @@ export interface UserRoleRecord {
 
 const SUBSCRIBER_CAPABILITIES: Capability[] = ["view_public_account", "manage_own_profile", "manage_public_profile", "manage_own_preferences", "receive_notifications", "save_content", "follow_entities", "follow_artists", "follow_charts", "contribute_lyrics", "view_gated_content"];
 
+const ADMINISTRATOR_CAPABILITIES: Capability[] = ["view_dashboard", "view_audio", "edit_own_audio", "edit_others_audio", "publish_audio", "delete_audio", "view_video", "edit_own_video", "edit_others_video", "publish_video", "view_playlists", "edit_own_playlists", "edit_others_playlists", "publish_playlists", "delete_playlists", "edit_own_articles", "edit_others_articles", "publish_articles", "delete_articles", "edit_guides", "edit_pages", "view_publishing_dashboard", "manage_publishing", "view_archive", "manage_categories", "manage_tags", "upload_media", "manage_media_library", "view_missing_images", "view_broken_links", "view_charts_admin", "manage_charts", "manage_ingest", "publish_charts", "view_registry", "manage_registry", "view_relationships", "manage_relationships", "view_review_queue", "manage_review_queue", "view_imports", "manage_imports", "view_settings", "manage_settings", "manage_integrations", "manage_appearance", "view_trust_records", "manage_sources", "review_sources", "withdraw_sources", "manage_citations", "manage_credits", "manage_users", "view_media_migration", "view_admin_readonly", ...SUBSCRIBER_CAPABILITIES, "comment_public", "moderate_community", "view_premium_content", "manage_subscription", "view_customer_orders", "manage_customer_orders", "submit_artist_claim", "manage_claimed_artist_profile", "submit_artist_media", "submit_label_updates", "view_partner_reports", "submit_chart_data", "view_research_exports", "export_research_data", "view_analytics", "view_support_console", "manage_support_cases", "view_developer_tools", "manage_developer_tools"];
+
 const CAPABILITY_MATRIX: Record<UserRole, Capability[]> = {
-  administrator: ["view_dashboard", "view_audio", "edit_own_audio", "edit_others_audio", "publish_audio", "delete_audio", "view_video", "edit_own_video", "edit_others_video", "publish_video", "view_playlists", "edit_own_playlists", "edit_others_playlists", "publish_playlists", "delete_playlists", "edit_own_articles", "edit_others_articles", "publish_articles", "delete_articles", "edit_guides", "edit_pages", "view_publishing_dashboard", "manage_publishing", "view_archive", "manage_categories", "manage_tags", "upload_media", "manage_media_library", "view_missing_images", "view_broken_links", "view_charts_admin", "manage_charts", "manage_ingest", "publish_charts", "view_registry", "manage_registry", "view_relationships", "manage_relationships", "view_review_queue", "manage_review_queue", "view_imports", "manage_imports", "view_settings", "manage_settings", "manage_integrations", "manage_appearance", "view_trust_records", "manage_sources", "review_sources", "withdraw_sources", "manage_citations", "manage_credits", "manage_users", "view_media_migration", "view_admin_readonly", ...SUBSCRIBER_CAPABILITIES, "comment_public", "moderate_community", "view_premium_content", "manage_subscription", "view_customer_orders", "manage_customer_orders", "submit_artist_claim", "manage_claimed_artist_profile", "submit_artist_media", "submit_label_updates", "view_partner_reports", "submit_chart_data", "view_research_exports", "export_research_data", "view_analytics", "view_support_console", "manage_support_cases", "view_developer_tools", "manage_developer_tools"],
+  super_admin: [...ADMINISTRATOR_CAPABILITIES, "manage_messages_control_center"],
+  administrator: ADMINISTRATOR_CAPABILITIES,
   developer: ["view_dashboard", "view_developer_tools", "manage_developer_tools", "view_settings", "manage_integrations", "view_imports", "view_charts_admin", "view_admin_readonly"],
   editor: ["view_dashboard", "view_audio", "edit_own_audio", "edit_others_audio", "publish_audio", "delete_audio", "view_video", "edit_own_video", "edit_others_video", "publish_video", "view_playlists", "edit_own_playlists", "edit_others_playlists", "publish_playlists", "delete_playlists", "edit_own_articles", "edit_others_articles", "publish_articles", "delete_articles", "edit_guides", "edit_pages", "view_publishing_dashboard", "manage_publishing", "view_archive", "manage_categories", "manage_tags", "upload_media", "manage_media_library", "view_missing_images", "view_broken_links", "view_review_queue", "manage_review_queue", "view_trust_records", "manage_sources", "manage_citations", "manage_credits", "view_media_migration", "view_admin_readonly"],
   chart_editor_global: ["view_dashboard", "view_charts_admin", "manage_charts", "manage_ingest", "publish_charts", "view_review_queue", "view_admin_readonly"],
@@ -134,7 +140,7 @@ const CAPABILITY_MATRIX: Record<UserRole, Capability[]> = {
   research_partner: ["view_public_account", "view_research_exports", "export_research_data"],
 };
 
-const ROLE_PRIORITY: Record<UserRole, number> = { administrator: 10, developer: 25, editor: 30, chart_editor_global: 35, chart_editor_regional: 40, registry_editor: 45, media_editor: 50, reviewer: 55, moderator: 60, support_agent: 65, author: 70, analyst: 75, writer: 80, viewer: 90, chart_partner: 98, label_partner: 100, artist_manager: 105, artist_claimant: 110, brand_partner: 115, research_partner: 116, premium_member: 118, member: 125, subscriber: 130, customer: 135 };
+const ROLE_PRIORITY: Record<UserRole, number> = { super_admin: 1, administrator: 10, developer: 25, editor: 30, chart_editor_global: 35, chart_editor_regional: 40, registry_editor: 45, media_editor: 50, reviewer: 55, moderator: 60, support_agent: 65, author: 70, analyst: 75, writer: 80, viewer: 90, chart_partner: 98, label_partner: 100, artist_manager: 105, artist_claimant: 110, brand_partner: 115, research_partner: 116, premium_member: 118, member: 125, subscriber: 130, customer: 135 };
 
 export function normalizeRole(role: string | null | undefined): UserRole {
   const value = String(role ?? PUBLIC_DEFAULT_ROLE) as UserRole;

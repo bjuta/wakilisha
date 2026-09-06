@@ -12,6 +12,9 @@ import {
   WkIcon,
 } from "@/components/design-system/Icon";
 import {
+  NotificationBell,
+} from "@/components/feature/community/NotificationBell";
+import {
   useTheme,
 } from "@/components/design-system/theme/ThemeProvider";
 import {
@@ -21,6 +24,8 @@ import type {
   SiteIdentitySettings,
 } from "@/services/adminSettings/settingsTypes";
 import { GlobalSearchSurface } from "@/components/search/GlobalSearchSurface";
+import { useAuthUser } from "@/hooks/useAuthUser";
+import { useSessionSignOut } from "@/hooks/useSessionSignOut";
 
 const MUSIC_APP_PREFIXES = [
   "/music",
@@ -176,6 +181,9 @@ export function MusicDesktopShell({
     theme,
     toggle,
   } = useTheme();
+  const authUser = useAuthUser();
+  const isSignedIn = !authUser.loading && authUser.id.length > 0;
+  const { signOut, signingOut, signOutError } = useSessionSignOut("/auth");
   const [logoError, setLogoError] =
     useState(false);
   const [
@@ -274,6 +282,14 @@ export function MusicDesktopShell({
         )
       ) {
         return "search";
+      }
+
+      if (
+        pathname.startsWith(
+          "/notifications",
+        )
+      ) {
+        return "notifications";
       }
 
       if (
@@ -621,6 +637,18 @@ export function MusicDesktopShell({
               />
             </button>
 
+            {authUser.id ? (
+              <NotificationBell
+                userId={authUser.id}
+                className={[
+                  "h-9 w-9 border border-[var(--wk-border)]",
+                  activeSection === "notifications"
+                    ? "bg-[var(--wk-brand-soft)] ring-1 ring-[var(--wk-brand)]"
+                    : "",
+                ].join(" ")}
+              />
+            ) : null}
+
             <Link
               to="/settings"
               aria-label="Settings"
@@ -643,6 +671,34 @@ export function MusicDesktopShell({
               />
             </Link>
           </div>
+
+          {isSignedIn ? (
+            <div className={sidebarCollapsed ? "mt-2" : "mt-3"}>
+              <button
+                type="button"
+                onClick={() => void signOut()}
+                disabled={signingOut}
+                title={sidebarCollapsed ? "Sign out" : undefined}
+                aria-label={sidebarCollapsed ? "Sign out" : undefined}
+                className={[
+                  "flex h-9 items-center rounded-lg border border-[var(--wk-border)] text-[12px] font-bold text-[var(--wk-text-muted)] transition-colors hover:bg-[var(--wk-surface-raised)] hover:text-[var(--wk-text)] disabled:cursor-wait disabled:opacity-60",
+                  sidebarCollapsed
+                    ? "w-full justify-center px-0"
+                    : "w-full justify-start gap-2.5 px-3",
+                ].join(" ")}
+              >
+                <WkIcon name="LogOut" size={15} />
+                {!sidebarCollapsed ? (
+                  <span>{signingOut ? "Signing out" : "Sign out"}</span>
+                ) : null}
+              </button>
+              {!sidebarCollapsed && signOutError ? (
+                <p role="alert" className="mt-2 text-[11px] font-semibold text-[var(--wk-danger)]">
+                  {signOutError}
+                </p>
+              ) : null}
+            </div>
+          ) : null}
         </div>
       </aside>
 

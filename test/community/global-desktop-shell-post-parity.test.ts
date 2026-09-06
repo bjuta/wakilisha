@@ -71,15 +71,58 @@ describe(
     );
 
     it(
-      "maps the root Magazine route to Posts navigation",
+      "maps the root route to Magazine navigation",
       () => {
         expect(desktopShell).toContain(
           'if (pathname === "/")',
         );
 
         expect(desktopShell).toContain(
-          'return "posts";',
+          'return "magazine";',
         );
+      },
+    );
+
+    it(
+      "keeps Notifications in the desktop global utility cluster",
+      () => {
+        expect(desktopShell).toContain(
+          "NotificationBell",
+        );
+
+        expect(desktopShell).toContain(
+          "userId={authUser.id}",
+        );
+
+        expect(desktopShell).toContain(
+          '"/notifications"',
+        );
+
+        expect(desktopShell).toContain(
+          'activeSection === "notifications"',
+        );
+
+        const notificationSlot =
+          desktopShell.indexOf(
+            "<NotificationBell",
+          );
+
+        const settingsSlot =
+          desktopShell.indexOf(
+            'to="/settings"',
+          );
+
+        const profileSlot =
+          desktopShell.indexOf(
+            'to="/profile"',
+          );
+
+        expect(notificationSlot)
+          .toBeGreaterThan(-1);
+        expect(settingsSlot)
+          .toBeGreaterThan(notificationSlot);
+        expect(profileSlot)
+          .toBeGreaterThan(settingsSlot);
       },
     );
 

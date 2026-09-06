@@ -7,7 +7,7 @@ export interface ScrollChromeState {
 
 export function useScrollDirection(): ScrollChromeState {
   const [visible, setVisible] = useState(true);
-  const [topVisible, setTopVisible] = useState(false);
+  const [topVisible, setTopVisible] = useState(true);
   const lastY = useRef(0);
   const ticking = useRef(false);
   const topHideTimer = useRef<number | null>(null);
@@ -32,7 +32,7 @@ export function useScrollDirection(): ScrollChromeState {
 
         if (y <= 32) {
           setVisible(true);
-          setTopVisible(false);
+          setTopVisible(true);
           if (topHideTimer.current !== null) {
             window.clearTimeout(topHideTimer.current);
             topHideTimer.current = null;

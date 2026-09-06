@@ -1,6 +1,7 @@
 import type { RouteObject } from "react-router-dom";
 import { Navigate, useParams } from "react-router-dom";
 import {
+  AdminGuard,
   AdminAnalyticsPage,
   AdminApiDocsPage,
   AdminArticleDetailPage,
@@ -57,6 +58,7 @@ import {
   AdminLabelsPage,
   AdminLoginPage,
   AdminLyricsPage,
+  AdminMessagesPage,
   AdminMediaLayout,
   AdminMediaLibraryPage,
   AdminMissingImagesPage,
@@ -145,6 +147,7 @@ import {
   ProfilePage,
   FollowingPage,
   NotificationsPage,
+  MessagesPage,
   MusicPage,
   PostDetailPage,
   RegistryOnboardingPage,
@@ -264,6 +267,26 @@ function AuthenticatedFieldRoute() {
   return <FieldIntakePage />;
 }
 
+function AuthenticatedMessagesRoute() {
+  const authUser = useAuthUser();
+
+  if (authUser.loading) {
+    return (
+      <div
+        className="min-h-[40vh]"
+        aria-busy="true"
+        aria-label="Loading Messages"
+      />
+    );
+  }
+
+  if (!authUser.id) {
+    return <Navigate to="/auth" replace />;
+  }
+
+  return <MessagesPage />;
+}
+
 function AuthenticatedProfileRoute() {
   const authUser = useAuthUser();
 
@@ -353,6 +376,7 @@ const routes: RouteObject[] = [
       { path: "/music", element: <ResponsivePage mobile={<MusicPage />} desktop={<MusicPage />} /> },
       { path: "/following", element: <ResponsivePage mobile={<FollowingPage />} desktop={<FollowingPage />} /> },
       { path: "/notifications", element: <ResponsivePage mobile={<NotificationsPage />} desktop={<NotificationsPage />} /> },
+      { path: "/messages", element: <AuthenticatedMessagesRoute /> },
       { path: "/u/:username/playlists/:playlistSlug", element: <ResponsivePage mobile={<PersonPlaylistDetailPage />} desktop={<PersonPlaylistDetailPage />} /> },
       { path: "/u/:username/playlists", element: <ResponsivePage mobile={<PersonPlaylistsPage />} desktop={<PersonPlaylistsPage />} /> },
       { path: "/u/:username", element: <ResponsivePage mobile={<PublicProfilePage />} desktop={<PublicProfilePage />} /> },
@@ -381,6 +405,7 @@ const routes: RouteObject[] = [
       { index: true, element: <AdminDashboardPage /> },
       { path: "analytics", element: <AdminAnalyticsPage /> },
       { path: "community", element: <AdminCommunityPage /> },
+      { path: "messages", element: <AdminGuard capabilities={["manage_messages_control_center"]}><AdminMessagesPage /></AdminGuard> },
       { path: "community/artist-claims", element: <AdminArtistClaimsPage /> },
       { path: "institute/inquiry-interface", element: <AdminInquiryInterfacePage /> },
       {
