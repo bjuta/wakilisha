@@ -194,9 +194,9 @@ const directLazyImports = [
  * Phase 8A.4 adds one authenticated Field intake import:
  * - ../pages/field/page
  *
- * The current authority is therefore 70 direct lazy imports.
+ * Phase 8B.3 adds one signed-in Messages import:\n * - ../pages/messages/page\n *\n * The current authority is therefore 71 direct lazy imports.
  */
-const expectedDirectLazyImportCount = 70;
+const expectedDirectLazyImportCount = 71;
 
 if (
   directLazyImports.length !==
@@ -283,6 +283,7 @@ for (const requiredModule of [
   "../pages/mobile/releases/detail/page",
   "../pages/following/page",
   "../pages/notifications/page",
+  "../pages/messages/page",
   "../pages/start/page",
   "../pages/settings/page",
   "../pages/mobile/settings/page",
@@ -431,12 +432,9 @@ const routePaths = [
  * Phase 8A.4 adds one authenticated Field intake path:
  * - /field
  *
- * The current authority is 176 paths. Removing the Artist Studio path, the
- * Field intake path, the five declared public Audio and Show paths, the two
- * K5B Admin Video paths, and the two public Video paths must still reproduce
- * the exact 165-path pre-M1 sequence.
+ * Phase 8B.3 adds two route paths:\n * - /messages\n * - messages (Admin Messages Control Center)\n *\n * The current authority is 178 paths. Removing the Messages paths, the Artist\n * Studio path, the Field intake path, the five declared public Audio and Show\n * paths, the two K5B Admin Video paths, and the two public Video paths must\n * still reproduce the exact 165-path pre-M1 sequence.
  */
-const expectedRoutePathCount = 176;
+const expectedRoutePathCount = 178;
 const publicAudioIndexPath = "/audio";
 const publicAudioPath = "/audio/:slug";
 const publicShowIndexPath = "/shows";
@@ -444,6 +442,8 @@ const publicShowPath = "/shows/:showSlug";
 const publicShowEpisodePath = "/shows/:showSlug/:episodeSlug";
 const publicArtistStudioPath = "/artist-studio";
 const publicFieldPath = "/field";
+const publicMessagesPath = "/messages";
+const adminMessagesPath = "messages";
 const adminVideoIndexPath = "video";
 const adminVideoDetailPath = "video/:publicationId";
 const publicVideoIndexPath = "/video";
@@ -463,6 +463,8 @@ for (const [routePath, label] of [
   [publicShowEpisodePath, "Show Episode"],
   [publicArtistStudioPath, "Artist Studio"],
   [publicFieldPath, "Field Intake"],
+  [publicMessagesPath, "Messages"],
+  [adminMessagesPath, "Admin Messages Control Center"],
   [adminVideoIndexPath, "Admin Video Directory"],
   [adminVideoDetailPath, "Admin Video Detail"],
   [publicVideoIndexPath, "Public Video Directory"],
@@ -496,6 +498,8 @@ const preM1RoutePaths = routePaths.filter(
     routePath !== publicShowEpisodePath &&
     routePath !== publicArtistStudioPath &&
     routePath !== publicFieldPath &&
+    routePath !== publicMessagesPath &&
+    routePath !== adminMessagesPath &&
     routePath !== adminVideoIndexPath &&
     routePath !== adminVideoDetailPath &&
     routePath !== publicVideoIndexPath &&

@@ -4,6 +4,8 @@ import { usePlayer } from "@/context/PlayerContext";
 import { useScrollLock } from "@/hooks/useScrollLock";
 import { useScrollDirection } from "@/hooks/useScrollDirection";
 import { useAuthUser } from "@/hooks/useAuthUser";
+import { useSessionSignOut } from "@/hooks/useSessionSignOut";
+import { useMessagesAccess } from "@/hooks/useMessagesAccess";
 import { WkIcon } from "@/components/design-system/Icon";
 import { useTheme } from "@/components/design-system/theme/ThemeProvider";
 import { Portal } from "@/components/base/Portal";
@@ -22,6 +24,13 @@ const SIGNED_IN_NAV: MobileNavItem[] = [
   { label: "Charts", to: "/charts", icon: "BarChart3" },
   { label: "Home", to: "/", icon: "Home", prominent: true },
   { label: "Notifications", to: "/notifications", icon: "Bell" },
+];
+
+const SIGNED_IN_MESSAGES_NAV: MobileNavItem[] = [
+  { label: "Following", to: "/following", icon: "UserPlus" },
+  { label: "Charts", to: "/charts", icon: "BarChart3" },
+  { label: "Home", to: "/", icon: "Home", prominent: true },
+  { label: "Messages", to: "/messages", icon: "MessageSquare" },
 ];
 
 const SIGNED_OUT_NAV: MobileNavItem[] = [
@@ -49,14 +58,18 @@ const WAKILISHA_THUNDERBOLT_URL =
 function MobileBottomNav({ scrollVisible }: { scrollVisible: boolean }) {
   const location = useLocation();
   const authUser = useAuthUser();
+  const messagesAccess = useMessagesAccess();
   const { theme, toggle } = useTheme();
+  const { signOut, signingOut, signOutError } = useSessionSignOut("/auth");
   const [moreOpen, setMoreOpen] = useState(false);
   const isLoggedIn =
     !authUser.loading
     && authUser.id.length > 0;
   const navItems =
     isLoggedIn
-      ? SIGNED_IN_NAV
+      ? messagesAccess.visible
+        ? SIGNED_IN_MESSAGES_NAV
+        : SIGNED_IN_NAV
       : SIGNED_OUT_NAV;
 
   const isActive = (path: string) =>
@@ -342,6 +355,25 @@ function MobileBottomNav({ scrollVisible }: { scrollVisible: boolean }) {
                       : "Dark Mode"}
                   </span>
                 </button>
+
+                {isLoggedIn ? (
+                  <>
+                    <button
+                      type="button"
+                      onClick={() => void signOut()}
+                      disabled={signingOut}
+                      className="mt-2 flex min-h-13 w-full items-center gap-3 rounded-2xl border border-[var(--wk-border)] bg-[var(--wk-bg)] px-4 py-3 text-left text-[13px] font-bold text-[var(--wk-text)] disabled:cursor-wait disabled:opacity-60"
+                    >
+                      <WkIcon name="LogOut" size={18} />
+                      <span>{signingOut ? "Signing out" : "Sign out"}</span>
+                    </button>
+                    {signOutError ? (
+                      <p role="alert" className="mt-2 px-1 text-[12px] font-semibold text-[var(--wk-danger)]">
+                        {signOutError}
+                      </p>
+                    ) : null}
+                  </>
+                ) : null}
               </div>
             </div>
           </section>

@@ -1,16 +1,19 @@
 import { useEffect, useState, useCallback } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { useUserSettings } from "@/hooks/useUserSettings";
+import { useMessagesAccess } from "@/hooks/useMessagesAccess";
 import { useTheme, type ThemeMode } from "@/components/design-system/theme/ThemeProvider";
 import { WakilishaToggle } from "@/components/design-system/primitives/WakilishaToggle";
+import { MessagesSettingsPane } from "@/pages/settings/components/MessagesSettingsPane";
 import { supabase } from "@/lib/supabase";
 
-type SettingsTab = "Account" | "Appearance" | "Notifications" | "Playback" | "Privacy" | "Danger";
+type SettingsTab = "Account" | "Appearance" | "Notifications" | "Messages" | "Playback" | "Privacy" | "Danger";
 
 const TABS: { key: SettingsTab; icon: string }[] = [
   { key: "Account", icon: "ri-user-3-line" },
   { key: "Appearance", icon: "ri-palette-line" },
   { key: "Notifications", icon: "ri-notification-3-line" },
+  { key: "Messages", icon: "ri-message-3-line" },
   { key: "Playback", icon: "ri-headphone-line" },
   { key: "Privacy", icon: "ri-shield-check-line" },
   { key: "Danger", icon: "ri-error-warning-line" },
@@ -34,6 +37,7 @@ function isSettingsTab(
 }
 
 export default function MobileSettingsPage() {
+  const messagesAccess = useMessagesAccess();
   const [searchParams] = useSearchParams();
   const requestedSection =
     searchParams.get("section");
@@ -50,6 +54,20 @@ export default function MobileSettingsPage() {
       setActive(requestedSection);
     }
   }, [requestedSection]);
+
+  useEffect(() => {
+    if (
+      !messagesAccess.loading
+      && !messagesAccess.visible
+      && active === "Messages"
+    ) {
+      setActive("Account");
+    }
+  }, [
+    active,
+    messagesAccess.loading,
+    messagesAccess.visible,
+  ]);
 
   const {
     profile,
@@ -81,6 +99,11 @@ export default function MobileSettingsPage() {
   } = useUserSettings();
 
   const { theme, setTheme } = useTheme();
+  const visibleTabs = TABS.filter(
+    (tab) =>
+      tab.key !== "Messages"
+      || messagesAccess.visible,
+  );
 
   const [connectError, setConnectError] = useState<string | null>(null);
   const [connecting, setConnecting] = useState(false);
@@ -285,7 +308,7 @@ export default function MobileSettingsPage() {
       {/* Scrollable tab bar */}
       <div className="px-5 mb-5">
         <div className="flex gap-2 overflow-x-auto scrollbar-none">
-          {TABS.map((tab) => (
+          {visibleTabs.map((tab) => (
             <button
               key={tab.key}
               onClick={() => setActive(tab.key)}
@@ -581,6 +604,12 @@ export default function MobileSettingsPage() {
           </div>
         )}
 
+        {/* ─── Messages ─── */}
+        {active === "Messages"
+          && messagesAccess.visible && (
+            <MessagesSettingsPane />
+          )}
+
         {/* ─── Playback ─── */}
         {active === "Playback" && (
           <div className="space-y-5">
@@ -742,40 +771,41 @@ export default function MobileSettingsPage() {
         )}
       </div>
 
-      {/* Save bar */}
-      <div className="fixed bottom-[calc(52px+max(env(safe-area-inset-bottom),8px)+12px)] left-3 right-3 z-[75]">
-        <div className="flex items-center justify-between gap-3 px-4 py-3 rounded-2xl bg-[var(--wk-surface)] border border-[var(--wk-border)] backdrop-blur-xl">
-          <div className="text-[11px] font-bold">
-            {saveStatus === "saving" ? (
-              <span className="text-[var(--wk-text-muted)]"><i className="ri-loader-4-line animate-spin mr-1" /> Saving...</span>
-            ) : saveStatus === "saved" ? (
-              <span className="text-[var(--wk-success)]"><i className="ri-checkbox-circle-fill mr-1" /> Saved</span>
-            ) : saveStatus === "error" ? (
-              <span className="text-[var(--wk-danger)]">{error || "Save failed"}</span>
-            ) : dirty ? (
-              <span className="text-[var(--wk-warning)]">Unsaved changes</span>
-            ) : (
-              <span className="text-[var(--wk-text-faint)]">Up to date</span>
-            )}
-          </div>
-          <div className="flex items-center gap-2">
-            <button
-              onClick={discardChanges}
-              disabled={!dirty || saving}
-              className="h-[36px] px-3 rounded-lg text-[11px] font-bold text-[var(--wk-text-muted)] cursor-pointer disabled:opacity-40"
-            >
-              Discard
-            </button>
-            <button
-              onClick={handleSave}
-              disabled={!dirty || saving}
-              className="h-[36px] px-4 rounded-lg text-[11px] font-bold bg-[var(--wk-brand)] text-[var(--wk-brand-on)] cursor-pointer disabled:opacity-40"
-            >
-              {saving ? "Saving..." : "Save"}
-            </button>
+      {active !== "Messages" && (
+        <div className="fixed bottom-[calc(52px+max(env(safe-area-inset-bottom),8px)+12px)] left-3 right-3 z-[75]">
+          <div className="flex items-center justify-between gap-3 px-4 py-3 rounded-2xl bg-[var(--wk-surface)] border border-[var(--wk-border)] backdrop-blur-xl">
+            <div className="text-[11px] font-bold">
+              {saveStatus === "saving" ? (
+                <span className="text-[var(--wk-text-muted)]"><i className="ri-loader-4-line animate-spin mr-1" /> Saving...</span>
+              ) : saveStatus === "saved" ? (
+                <span className="text-[var(--wk-success)]"><i className="ri-checkbox-circle-fill mr-1" /> Saved</span>
+              ) : saveStatus === "error" ? (
+                <span className="text-[var(--wk-danger)]">{error || "Save failed"}</span>
+              ) : dirty ? (
+                <span className="text-[var(--wk-warning)]">Unsaved changes</span>
+              ) : (
+                <span className="text-[var(--wk-text-faint)]">Up to date</span>
+              )}
+            </div>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={discardChanges}
+                disabled={!dirty || saving}
+                className="h-[36px] px-3 rounded-lg text-[11px] font-bold text-[var(--wk-text-muted)] cursor-pointer disabled:opacity-40"
+              >
+                Discard
+              </button>
+              <button
+                onClick={handleSave}
+                disabled={!dirty || saving}
+                className="h-[36px] px-4 rounded-lg text-[11px] font-bold bg-[var(--wk-brand)] text-[var(--wk-brand-on)] cursor-pointer disabled:opacity-40"
+              >
+                {saving ? "Saving..." : "Save"}
+              </button>
+            </div>
           </div>
         </div>
-      </div>
+      )}
     </div>
   );
 }

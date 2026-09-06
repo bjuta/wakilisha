@@ -1,0 +1,16 @@
+{
+  "migration_file": "supabase/migrations/20260906224500_phase_8b_messages_recipient_email_search.sql",
+  "migration_sha256": "215fd5d80ff6b225f5684a6f95e298ac3288d59d097fcd0bdac5bf792c0bf192",
+  "base_main_sha": "22faadedc97efe25457d3249efdd95330c85d287",
+  "preview_project_ref": "gphnecflxuljewnotmlz",
+  "preview_branch_id": "df65dda7-cb12-4581-967b-f10bbffc9b32",
+  "preview_migration_head": "20260906224500",
+  "baseline_replay": "pass",
+  "candidate_apply": "pass",
+  "verifier": "pass",
+  "verifier_file": "scripts/control-plane/verify-phase-8b-messages-recipient-email-search.sql",
+  "schema_types_sha256": "b948eff09369040d8753f445e2046ce7a2eccff16e6bf12b63835cb5645c626c",
+  "schema_migration_count": 102,
+  "schema_migration_head": "20260907003000",
+  "verified_at": "2026-09-06T21:38:43.793Z"
+}

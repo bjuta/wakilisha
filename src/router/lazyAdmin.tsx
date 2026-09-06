@@ -2,6 +2,12 @@ import { lazy } from "react";
 
 /* Admin Studio modules stay outside the public application entry. */
 
+export const AdminGuard = lazy(() =>
+  import("../components/admin/AdminGuard").then((module) => ({
+    default: module.AdminGuard,
+  })),
+);
+
 export const AdminAnalyticsPage = lazy(() =>
   import("../pages/admin/analytics/page"),
 );
@@ -228,6 +234,10 @@ export const AdminLoginPage = lazy(() =>
 
 export const AdminLyricsPage = lazy(() =>
   import("../pages/admin/content/lyrics/page"),
+);
+
+export const AdminMessagesPage = lazy(() =>
+  import("../pages/admin/messages/page"),
 );
 
 export const AdminMediaLayout = lazy(() =>

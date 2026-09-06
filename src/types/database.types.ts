@@ -22013,6 +22013,7 @@ export type Database = {
         Args: { p_session_id: string }
         Returns: Json
       }
+      get_messages_control_center_status: { Args: never; Returns: Json }
       get_my_field_submission_v1: {
         Args: { p_submission_resource_id: string }
         Returns: {
@@ -22055,6 +22056,7 @@ export type Database = {
           updated_at: string
         }[]
       }
+      get_my_message_access: { Args: never; Returns: Json }
       get_my_message_conversation: {
         Args: {
           p_before_accepted_at?: string
@@ -24520,6 +24522,16 @@ export type Database = {
       search_admin_track_lyrics_tracks: {
         Args: { p_limit?: number; p_query?: string }
         Returns: Json
+      }
+      search_message_recipients: {
+        Args: { p_limit?: number; p_query: string }
+        Returns: {
+          avatar_url: string
+          display_name: string
+          handle: string
+          person_resource_id: string
+          sender_category: string
+        }[]
       }
       seed_taxonomy_terms_from_articles: {
         Args: never

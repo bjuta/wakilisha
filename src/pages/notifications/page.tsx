@@ -44,6 +44,7 @@ const NOTIFICATION_LABELS: Record<
   follow: "started following you",
   post_repost: "reposted your Post",
   post_quote: "quoted your Post",
+  direct_message: "sent you a message",
 };
 
 const NOTIFICATION_ICONS: Record<
@@ -61,6 +62,7 @@ const NOTIFICATION_ICONS: Record<
   follow: "ri-user-follow-line",
   post_repost: "ri-repeat-2-line",
   post_quote: "ri-double-quotes-l",
+  direct_message: "ri-mail-line",
 };
 
 function timeAgo(value: string): string {
@@ -95,6 +97,29 @@ function timeAgo(value: string): string {
 function notificationTarget(
   notification: NotificationWithActor,
 ): string | null {
+  if (
+    notification.notificationType
+      === "direct_message"
+  ) {
+    const canonicalPath =
+      (
+        notification.metadata as
+          | Record<string, unknown>
+          | null
+      )?.canonical_path;
+
+    if (
+      typeof canonicalPath === "string"
+      && canonicalPath.startsWith(
+        "/messages",
+      )
+    ) {
+      return canonicalPath;
+    }
+
+    return "/messages";
+  }
+
   if (notification.entityType === "post") {
     const canonicalPath =
       (
@@ -417,9 +442,19 @@ export default function NotificationsPage() {
                     notification.notificationType
                   ]
                   || "ri-notification-3-line";
+                const metadata =
+                  notification.metadata as
+                    | Record<string, unknown>
+                    | null;
+                const metadataSenderName =
+                  typeof metadata?.sender_display_name
+                    === "string"
+                    ? metadata.sender_display_name
+                    : null;
                 const actorName =
                   notification.actor?.displayName
                   || notification.actor?.username
+                  || metadataSenderName
                   || "Someone";
 
                 const row = (

@@ -180,6 +180,10 @@ export const NotificationsPage = lazy(
   () => import("../pages/notifications/page"),
 );
 
+export const MessagesPage = lazy(
+  () => import("../pages/messages/page"),
+);
+
 export const MusicPage = lazy(
   () => import("../pages/music/page"),
 );

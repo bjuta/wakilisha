@@ -5,7 +5,7 @@ import { WkIcon } from "@/components/design-system/Icon";
 import { AdminCommandPalette } from "@/components/admin/AdminCommandPalette";
 import { useAdminBadgeCounts } from "@/hooks/useAdminBadgeCounts";
 import { useAdminUser } from "@/hooks/useAdminUser";
-import { supabase } from "@/lib/supabase";
+import { useSessionSignOut } from "@/hooks/useSessionSignOut";
 import { ROLE_LABELS, roleCanAccessAdmin, type Capability } from "@/services/userRoles";
 import type { WkIconName } from "@/components/design-system/Icon";
 
@@ -16,6 +16,9 @@ const NAV_GROUPS: NavGroup[] = [
   { label: "Dashboard", icon: "LayoutDashboard", visible: (can) => can("view_dashboard"), items: [
     { path: "/admin", label: "Overview", icon: "LayoutDashboard", requiredCapability: "view_dashboard" },
     { path: "/admin/analytics", label: "Analytics", icon: "BarChart3", requiredCapability: "view_dashboard" },
+  ] },
+  { label: "Messages", icon: "MessageSquare", visible: (can) => can("manage_messages_control_center"), items: [
+    { path: "/admin/messages", label: "Control Center", icon: "MessageSquare", requiredCapability: "manage_messages_control_center" },
   ] },
   { label: "Community", icon: "MessageSquare", visible: (can) => can("moderate_community"), items: [
     { path: "/admin/community", label: "Moderation", icon: "MessageSquare", requiredCapability: "moderate_community", badgeKey: "pendingReports" },
@@ -305,16 +308,15 @@ function SidebarGroup({
   );
 }
 
-function UserProfileDropdown({ user, collapsed }: { user: ReturnType<typeof useAdminUser>; collapsed: boolean }) {
+function UserProfileDropdown({ user, collapsed, onSignOut, signingOut }: { user: ReturnType<typeof useAdminUser>; collapsed: boolean; onSignOut: () => Promise<boolean>; signingOut: boolean }) {
   const [open, setOpen] = useState(false);
   const navigate = useNavigate();
   const ref = useRef<HTMLDivElement>(null);
   useEffect(() => { function handleClick(e: MouseEvent) { if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false); } document.addEventListener("mousedown", handleClick); return () => document.removeEventListener("mousedown", handleClick); }, []);
-  const handleSignOut = async () => { await supabase.auth.signOut(); navigate("/admin/login"); };
   const roleLabel = user.role ? ROLE_LABELS[user.role] : null;
   const roleBadgeColors: Record<string, string> = { administrator: "bg-wk-danger/10 text-wk-danger border-wk-danger/20", editor: "bg-wk-brand/10 text-wk-brand border-wk-brand/20", chart_editor_global: "bg-wk-brand/10 text-wk-brand border-wk-brand/20", chart_editor_regional: "bg-wk-brand/10 text-wk-brand border-wk-brand/20", registry_editor: "bg-wk-success/10 text-wk-success border-wk-success/20", media_editor: "bg-wk-success/10 text-wk-success border-wk-success/20", reviewer: "bg-wk-warning/10 text-wk-warning border-wk-warning/20", author: "bg-wk-success/10 text-wk-success border-wk-success/20", writer: "bg-wk-warning/10 text-wk-warning border-wk-warning/20" };
   if (!user.id) return <button onClick={() => navigate("/admin/login")} className="flex w-full items-center gap-3 rounded-lg border border-wk-border bg-wk-surface-raised px-3 py-2 text-left hover:border-wk-brand/40"><div className="flex h-8 w-8 items-center justify-center rounded-full bg-wk-brand-soft"><WkIcon name="LogIn" size={16} className="text-wk-brand" /></div>{!collapsed && <div className="min-w-0"><div className="text-[12px] font-bold text-wk-text">Admin sign in</div><div className="text-[10px] text-wk-text-faint">Staff access</div></div>}</button>;
-  return <div ref={ref} className="relative"><button onClick={() => setOpen(!open)} className="flex w-full items-center gap-3 rounded-lg border border-wk-border bg-wk-surface-raised px-3 py-2 text-left hover:border-wk-brand/40"><div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-wk-brand text-[12px] font-black text-wk-brand-on">{user.name?.[0]?.toUpperCase() ?? "U"}</div>{!collapsed && <div className="min-w-0 flex-1"><div className="truncate text-[12px] font-bold text-wk-text">{user.name}</div><div className="truncate text-[10px] text-wk-text-faint">{roleLabel ?? "User"}</div></div>}{!collapsed && <WkIcon name="ChevronUp" size={14} className={`shrink-0 text-wk-text-faint transition-transform ${open ? "rotate-180" : ""}`} />}</button>{open && !collapsed && <div className="absolute bottom-full left-0 right-0 mb-2 overflow-hidden rounded-xl border border-wk-border bg-wk-surface shadow-xl"><div className="border-b border-wk-border p-3"><div className="font-bold text-wk-text text-sm">{user.name}</div><div className="text-xs text-wk-text-muted">{user.email}</div>{user.role && <div className={`mt-2 inline-flex rounded-full border px-2 py-0.5 text-[10px] font-bold uppercase ${roleBadgeColors[user.role] ?? "bg-wk-surface-raised text-wk-text-muted border-wk-border"}`}>{roleLabel}</div>}</div><button onClick={() => { setOpen(false); navigate("/admin/settings"); }} className="flex w-full items-center gap-2 px-3 py-2.5 text-sm text-wk-text-muted hover:bg-wk-surface-raised hover:text-wk-text"><WkIcon name="Settings" size={14} /> Settings</button><button onClick={handleSignOut} className="flex w-full items-center gap-2 px-3 py-2.5 text-sm text-wk-danger hover:bg-wk-danger/10"><WkIcon name="LogOut" size={14} /> Sign out</button></div>}</div>;
+  return <div ref={ref} className="relative"><button onClick={() => setOpen(!open)} className="flex w-full items-center gap-3 rounded-lg border border-wk-border bg-wk-surface-raised px-3 py-2 text-left hover:border-wk-brand/40"><div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-wk-brand text-[12px] font-black text-wk-brand-on">{user.name?.[0]?.toUpperCase() ?? "U"}</div>{!collapsed && <div className="min-w-0 flex-1"><div className="truncate text-[12px] font-bold text-wk-text">{user.name}</div><div className="truncate text-[10px] text-wk-text-faint">{roleLabel ?? "User"}</div></div>}{!collapsed && <WkIcon name="ChevronUp" size={14} className={`shrink-0 text-wk-text-faint transition-transform ${open ? "rotate-180" : ""}`} />}</button>{open && !collapsed && <div className="absolute bottom-full left-0 right-0 mb-2 overflow-hidden rounded-xl border border-wk-border bg-wk-surface shadow-xl"><div className="border-b border-wk-border p-3"><div className="font-bold text-wk-text text-sm">{user.name}</div><div className="text-xs text-wk-text-muted">{user.email}</div>{user.role && <div className={`mt-2 inline-flex rounded-full border px-2 py-0.5 text-[10px] font-bold uppercase ${roleBadgeColors[user.role] ?? "bg-wk-surface-raised text-wk-text-muted border-wk-border"}`}>{roleLabel}</div>}</div><button onClick={() => { setOpen(false); navigate("/admin/settings"); }} className="flex w-full items-center gap-2 px-3 py-2.5 text-sm text-wk-text-muted hover:bg-wk-surface-raised hover:text-wk-text"><WkIcon name="Settings" size={14} /> Settings</button><button onClick={() => void onSignOut()} disabled={signingOut} className="flex w-full items-center gap-2 px-3 py-2.5 text-sm text-wk-danger hover:bg-wk-danger/10 disabled:cursor-wait disabled:opacity-60"><WkIcon name="LogOut" size={14} /> {signingOut ? "Signing out" : "Sign out"}</button></div>}</div>;
 }
 
 export function AdminShell() {
@@ -323,6 +325,7 @@ export function AdminShell() {
   const { theme: resolvedTheme, setTheme: setMode } = useTheme();
   const counts = useAdminBadgeCounts();
   const user = useAdminUser();
+  const { signOut, signingOut, signOutError } = useSessionSignOut("/admin/login");
   const [collapsed, setCollapsed] = useState(() => { if (typeof window === "undefined") return false; return window.localStorage.getItem("wk-admin-sidebar-collapsed") === "true"; });
   const [mobileOpen, setMobileOpen] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
@@ -511,11 +514,27 @@ export function AdminShell() {
 
         {/* Footer */}
         <div className="border-t border-wk-border p-3">
-          <UserProfileDropdown user={user} collapsed={collapsed} />
+          <UserProfileDropdown user={user} collapsed={collapsed} onSignOut={signOut} signingOut={signingOut} />
           <button onClick={() => setMode(resolvedTheme === "dark" ? "light" : "dark")} className="mt-2 flex w-full items-center gap-3 rounded-lg px-3 py-2 text-[12px] font-semibold text-wk-text-muted hover:bg-wk-surface-raised hover:text-wk-text">
             <WkIcon name={resolvedTheme === "dark" ? "Sun" : "Moon"} size={15} />
             {!collapsed && <span>{resolvedTheme === "dark" ? "Light mode" : "Dark mode"}</span>}
           </button>
+          <button
+            type="button"
+            onClick={() => void signOut()}
+            disabled={signingOut}
+            className="mt-1 flex w-full items-center gap-3 rounded-lg px-3 py-2 text-[12px] font-semibold text-wk-text-muted hover:bg-wk-surface-raised hover:text-wk-text disabled:cursor-wait disabled:opacity-60"
+            title={collapsed ? "Sign out" : undefined}
+            aria-label={collapsed ? "Sign out" : undefined}
+          >
+            <WkIcon name="LogOut" size={15} />
+            {!collapsed && <span>{signingOut ? "Signing out" : "Sign out"}</span>}
+          </button>
+          {!collapsed && signOutError ? (
+            <p role="alert" className="mt-1 px-3 text-[11px] font-semibold text-wk-danger">
+              {signOutError}
+            </p>
+          ) : null}
         </div>
       </aside>
 

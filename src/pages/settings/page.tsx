@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { useUserSettings } from "@/hooks/useUserSettings";
+import { useMessagesAccess } from "@/hooks/useMessagesAccess";
 import { WkIcon } from "@/components/design-system/Icon";
 import { AccountSettingsPane } from "./components/AccountSettingsPane";
 import { AppearanceSettingsPane } from "./components/AppearanceSettingsPane";
@@ -8,8 +9,9 @@ import { NotificationsSettingsPane } from "./components/NotificationsSettingsPan
 import { PlaybackSettingsPane } from "./components/PlaybackSettingsPane";
 import { PrivacySettingsPane } from "./components/PrivacySettingsPane";
 import { DangerSettingsPane } from "./components/DangerSettingsPane";
+import { MessagesSettingsPane } from "./components/MessagesSettingsPane";
 
-type SettingsTab = "Account" | "Appearance" | "Notifications" | "Privacy" | "Playback" | "Danger";
+type SettingsTab = "Account" | "Appearance" | "Notifications" | "Messages" | "Privacy" | "Playback" | "Danger";
 
 const tabs: { key: SettingsTab; icon: string; desc: string }[] = [
   {
@@ -26,6 +28,11 @@ const tabs: { key: SettingsTab; icon: string; desc: string }[] = [
     key: "Notifications",
     icon: "ri-notification-3-line",
     desc: "Decide which cultural signals deserve to reach you.",
+  },
+  {
+    key: "Messages",
+    icon: "ri-message-3-line",
+    desc: "Control who may contact you and how first-contact Messages are routed.",
   },
   {
     key: "Privacy",
@@ -53,6 +60,7 @@ function isSettingsTab(
 }
 
 export default function SettingsPage() {
+  const messagesAccess = useMessagesAccess();
   const [searchParams] = useSearchParams();
   const requestedSection =
     searchParams.get("section");
@@ -68,6 +76,20 @@ export default function SettingsPage() {
       setActive(requestedSection);
     }
   }, [requestedSection]);
+
+  useEffect(() => {
+    if (
+      !messagesAccess.loading
+      && !messagesAccess.visible
+      && active === "Messages"
+    ) {
+      setActive("Account");
+    }
+  }, [
+    active,
+    messagesAccess.loading,
+    messagesAccess.visible,
+  ]);
 
   const {
     profile,
@@ -98,7 +120,16 @@ export default function SettingsPage() {
     checkUsernameAvailability,
   } = useUserSettings();
 
-  const activeTab = tabs.find((t) => t.key === active)!;
+  const visibleTabs = tabs.filter(
+    (tab) =>
+      tab.key !== "Messages"
+      || messagesAccess.visible,
+  );
+  const activeTab =
+    visibleTabs.find(
+      (tab) => tab.key === active,
+    )
+    ?? visibleTabs[0];
 
   const handleSave = async () => {
     await saveAll();
@@ -229,7 +260,7 @@ export default function SettingsPage() {
                 Your People
               </Link>
             )}
-            {tabs.map((tab) => (
+            {visibleTabs.map((tab) => (
               <button
                 key={tab.key}
                 className={`settings49-nav-item ${active === tab.key ? "active" : ""}`}
@@ -283,6 +314,10 @@ export default function SettingsPage() {
                   updateNotifications={updateNotifications}
                 />
               )}
+              {active === "Messages"
+                && messagesAccess.visible && (
+                  <MessagesSettingsPane />
+                )}
               {active === "Privacy" && (
                 <PrivacySettingsPane
                   privacy={privacy}
@@ -304,26 +339,27 @@ export default function SettingsPage() {
               )}
             </div>
 
-            {/* Save bar */}
-            <div className="settings49-savebar">
-              <div>{savePill()}</div>
-              <div className="flex items-center gap-2">
-                <button
-                  className="wk-button wk-button-sm wk-button-ghost"
-                  onClick={discardChanges}
-                  disabled={!dirty || saving}
-                >
-                  Discard
-                </button>
-                <button
-                  className="wk-button wk-button-sm wk-button-primary"
-                  onClick={handleSave}
-                  disabled={!dirty || saving}
-                >
-                  {saving ? "Saving..." : "Save changes"}
-                </button>
+            {active !== "Messages" && (
+              <div className="settings49-savebar">
+                <div>{savePill()}</div>
+                <div className="flex items-center gap-2">
+                  <button
+                    className="wk-button wk-button-sm wk-button-ghost"
+                    onClick={discardChanges}
+                    disabled={!dirty || saving}
+                  >
+                    Discard
+                  </button>
+                  <button
+                    className="wk-button wk-button-sm wk-button-primary"
+                    onClick={handleSave}
+                    disabled={!dirty || saving}
+                  >
+                    {saving ? "Saving..." : "Save changes"}
+                  </button>
+                </div>
               </div>
-            </div>
+            )}
           </section>
         </div>
       </div>
