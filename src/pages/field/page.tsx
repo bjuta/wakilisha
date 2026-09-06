@@ -3,6 +3,7 @@ import {
   useRef,
   useState,
   type ChangeEvent,
+  type ReactNode,
 } from "react";
 import { WkButton } from "@/components/design-system/primitives/Button";
 import { useAuthUser } from "@/hooks/useAuthUser";
@@ -68,13 +69,13 @@ function buildFieldDeclarations(
 
   if (!rightsDeclaration) {
     throw new Error(
-      "Tell us what you know about the rights to this video.",
+      "Choose an answer.",
     );
   }
 
   if (!consentDeclaration) {
     throw new Error(
-      "Tell us what you know about permission from people shown.",
+      "Choose an answer.",
     );
   }
 
@@ -82,7 +83,7 @@ function buildFieldDeclarations(
 
   if (draft.embargoRequestMode === "until_time") {
     if (!draft.requestedEmbargoUntilLocal) {
-      throw new Error("Choose a date and time for the hold.");
+      throw new Error("Choose a date and time.");
     }
 
     const embargoDate = new Date(draft.requestedEmbargoUntilLocal);
@@ -91,7 +92,7 @@ function buildFieldDeclarations(
       Number.isNaN(embargoDate.getTime())
       || embargoDate.getTime() <= Date.now()
     ) {
-      throw new Error("Choose a future date and time for the hold.");
+      throw new Error("Choose a future date and time.");
     }
 
     requestedEmbargoUntil = embargoDate.toISOString();
@@ -104,7 +105,7 @@ function buildFieldDeclarations(
     && !locationDescription
   ) {
     throw new Error(
-      "Add a broad location or choose not to add one.",
+      "Add a location or choose No Location.",
     );
   }
 
@@ -175,6 +176,113 @@ function ChoiceButton({
       ) : null}
     </button>
   );
+}
+
+
+function DisclosureCard({
+  title,
+  required = false,
+  summary,
+  open,
+  onToggle,
+  children,
+}: {
+  title: string;
+  required?: boolean;
+  summary: string;
+  open: boolean;
+  onToggle: () => void;
+  children: ReactNode;
+}) {
+  return (
+    <div className="overflow-hidden rounded-2xl border border-[var(--wk-border)] bg-[var(--wk-bg)]">
+      <button
+        type="button"
+        aria-expanded={open}
+        onClick={onToggle}
+        className="flex w-full items-center gap-3 px-4 py-4 text-left"
+      >
+        <span className="min-w-0 flex-1">
+          <span className="flex items-start justify-between gap-3">
+            <span className="text-[12px] font-black text-[var(--wk-text)]">
+              {title}
+            </span>
+            {required ? (
+              <span className="shrink-0 text-[10px] font-bold text-[var(--wk-text-faint)]">
+                Required
+              </span>
+            ) : null}
+          </span>
+
+          <span
+            className={`mt-1 block truncate text-[11px] leading-5 ${
+              summary === "Choose an answer"
+                ? "text-[var(--wk-text-faint)]"
+                : "font-semibold text-[var(--wk-text-muted)]"
+            }`}
+          >
+            {summary}
+          </span>
+        </span>
+
+        <i
+          className={`ri-arrow-down-s-line shrink-0 text-[17px] text-[var(--wk-text-faint)] transition-transform ${
+            open ? "rotate-180" : ""
+          }`}
+        />
+      </button>
+
+      {open ? (
+        <div className="border-t border-[var(--wk-divider)] px-3 pb-3 pt-3">
+          {children}
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+function rightsDeclarationLabel(
+  value: FieldDeclarationDraft["rightsDeclaration"],
+): string {
+  const labels: Record<
+    Exclude<FieldDeclarationDraft["rightsDeclaration"], "">,
+    string
+  > = {
+    owns_or_controls: "It’s Mine to Share",
+    authorized_by_rights_holder: "I Have Permission",
+    uncertain: "I’m Not Sure",
+    other: "Something Else",
+  };
+
+  return value ? labels[value] : "Choose an answer";
+}
+
+function consentDeclarationLabel(
+  value: FieldDeclarationDraft["consentDeclaration"],
+): string {
+  const labels: Record<
+    Exclude<FieldDeclarationDraft["consentDeclaration"], "">,
+    string
+  > = {
+    granted: "Yes",
+    not_required: "Permission Isn’t Needed",
+    uncertain: "I’m Not Sure",
+    not_obtained: "No",
+  };
+
+  return value ? labels[value] : "Choose an answer";
+}
+
+function formatHoldTime(value: string): string {
+  if (!value) return "Choose Date and Time";
+
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "Choose Date and Time";
+
+  return date.toLocaleString(undefined, {
+    dateStyle: "medium",
+    timeStyle: "short",
+  });
 }
 
 function prettyBytes(bytes: number): string {
@@ -262,6 +370,9 @@ export default function FieldIntakePage() {
   const [declarationDraft, setDeclarationDraft] =
     useState<FieldDeclarationDraft>(INITIAL_DECLARATION_DRAFT);
   const [receipt, setReceipt] = useState<FieldReceipt | null>(null);
+  const [showRightsQuestion, setShowRightsQuestion] = useState(false);
+  const [showPermissionQuestion, setShowPermissionQuestion] =
+    useState(false);
   const [showProtectionOptions, setShowProtectionOptions] =
     useState(false);
   const [pending, setPending] = useState<FieldQueueRecord | null>(null);
@@ -364,6 +475,9 @@ export default function FieldIntakePage() {
     setReceipt(null);
     setError("");
     setShowUploadHelp(false);
+    setShowRightsQuestion(false);
+    setShowPermissionQuestion(false);
+    setShowProtectionOptions(false);
   }
 
   function openCamera() {
@@ -395,15 +509,28 @@ export default function FieldIntakePage() {
 
     setError("");
 
+    if (!declarationDraft.rightsDeclaration) {
+      setShowRightsQuestion(true);
+      setError("Choose an answer.");
+      return;
+    }
+
+    if (!declarationDraft.consentDeclaration) {
+      setShowPermissionQuestion(true);
+      setError("Choose an answer.");
+      return;
+    }
+
     let declarations: FieldDeclarations;
 
     try {
       declarations = buildFieldDeclarations(declarationDraft);
     } catch (cause) {
+      setShowProtectionOptions(true);
       setError(
         cause instanceof Error
           ? cause.message
-          : "Check the submission details before sending.",
+          : "Check the options before sending.",
       );
       return;
     }
@@ -639,11 +766,10 @@ export default function FieldIntakePage() {
           Field
         </div>
         <h1 className="mt-1 text-[30px] font-black tracking-tight text-[var(--wk-text)] sm:text-[34px]">
-          Send a video to WAKILISHA
+          Send Us a Video
         </h1>
         <p className="mt-2 max-w-lg text-[14px] leading-6 text-[var(--wk-text-muted)]">
-          Share footage with the newsroom. Your original stays private while
-          we review it.
+          Your original stays private while we review it.
         </p>
       </header>
 
@@ -797,16 +923,11 @@ export default function FieldIntakePage() {
           </div>
 
           <h2 className="mt-4 text-[22px] font-black tracking-tight text-[var(--wk-text)]">
-            Submission Received
+            Video Received
           </h2>
 
           <p className="mt-2 text-[13px] leading-6 text-[var(--wk-text-muted)]">
-            {receipt.receiptMessage}
-          </p>
-
-          <p className="mt-2 text-[12px] leading-5 text-[var(--wk-text-muted)]">
-            This confirms intake for review. It does not mean the video is
-            approved or will be published.
+            We got it. We’ll review it before anything goes public.
           </p>
 
           <div className="mt-5 rounded-2xl bg-[var(--wk-bg)] p-4">
@@ -825,8 +946,7 @@ export default function FieldIntakePage() {
           </div>
 
           <p className="mt-3 text-[11px] leading-5 text-[var(--wk-text-faint)]">
-            Keep this reference if you contact WAKILISHA about this
-            submission.
+            Keep this if you need to follow up.
           </p>
 
           <div className="mt-5">
@@ -837,6 +957,8 @@ export default function FieldIntakePage() {
                 setCompleted(false);
                 setReceipt(null);
                 setDeclarationDraft(INITIAL_DECLARATION_DRAFT);
+                setShowRightsQuestion(false);
+                setShowPermissionQuestion(false);
                 setShowProtectionOptions(false);
                 setProgress(INITIAL_PROGRESS);
               }}
@@ -976,220 +1098,243 @@ export default function FieldIntakePage() {
                     Before You Send
                   </p>
                   <h3 className="mt-1 text-[18px] font-black tracking-tight text-[var(--wk-text)]">
-                    Tell Us What You Know
+                    Two Quick Questions
                   </h3>
-                  <p className="mt-1 text-[12px] leading-5 text-[var(--wk-text-muted)]">
-                    These answers help the newsroom handle your video safely.
-                    They do not approve it for publication.
-                  </p>
 
-                  <div className="mt-5">
-                    <div className="flex items-center justify-between gap-3">
-                      <p className="text-[12px] font-black text-[var(--wk-text)]">
-                        Who Controls This Video?
-                      </p>
-                      <span className="text-[10px] font-bold text-[var(--wk-text-faint)]">
-                        Required
-                      </span>
-                    </div>
-
-                    <div className="mt-2 grid gap-2 sm:grid-cols-2">
-                      <ChoiceButton
-                        selected={
-                          declarationDraft.rightsDeclaration
-                          === "owns_or_controls"
-                        }
-                        onClick={() =>
-                          setDeclarationDraft((current) => ({
-                            ...current,
-                            rightsDeclaration: "owns_or_controls",
-                          }))
-                        }
-                        title="I own or control this video"
-                      />
-                      <ChoiceButton
-                        selected={
-                          declarationDraft.rightsDeclaration
-                          === "authorized_by_rights_holder"
-                        }
-                        onClick={() =>
-                          setDeclarationDraft((current) => ({
-                            ...current,
-                            rightsDeclaration:
-                              "authorized_by_rights_holder",
-                          }))
-                        }
-                        title="The rights holder allowed me to send it"
-                      />
-                      <ChoiceButton
-                        selected={
-                          declarationDraft.rightsDeclaration
-                          === "uncertain"
-                        }
-                        onClick={() =>
-                          setDeclarationDraft((current) => ({
-                            ...current,
-                            rightsDeclaration: "uncertain",
-                          }))
-                        }
-                        title="I’m not sure"
-                      />
-                      <ChoiceButton
-                        selected={
-                          declarationDraft.rightsDeclaration === "other"
-                        }
-                        onClick={() =>
-                          setDeclarationDraft((current) => ({
-                            ...current,
-                            rightsDeclaration: "other",
-                          }))
-                        }
-                        title="Something else"
-                      />
-                    </div>
-                  </div>
-
-                  <div className="mt-5">
-                    <div className="flex items-center justify-between gap-3">
-                      <p className="text-[12px] font-black text-[var(--wk-text)]">
-                        What Do You Know About Permission?
-                      </p>
-                      <span className="text-[10px] font-bold text-[var(--wk-text-faint)]">
-                        Required
-                      </span>
-                    </div>
-
-                    <p className="mt-1 text-[11px] leading-5 text-[var(--wk-text-muted)]">
-                      Tell us what you know about permission from people shown
-                      or recorded.
-                    </p>
-
-                    <div className="mt-2 grid gap-2 sm:grid-cols-2">
-                      <ChoiceButton
-                        selected={
-                          declarationDraft.consentDeclaration === "granted"
-                        }
-                        onClick={() =>
-                          setDeclarationDraft((current) => ({
-                            ...current,
-                            consentDeclaration: "granted",
-                          }))
-                        }
-                        title="People shown gave permission"
-                      />
-                      <ChoiceButton
-                        selected={
-                          declarationDraft.consentDeclaration
-                          === "not_required"
-                        }
-                        onClick={() =>
-                          setDeclarationDraft((current) => ({
-                            ...current,
-                            consentDeclaration: "not_required",
-                          }))
-                        }
-                        title="Permission is not required"
-                      />
-                      <ChoiceButton
-                        selected={
-                          declarationDraft.consentDeclaration === "uncertain"
-                        }
-                        onClick={() =>
-                          setDeclarationDraft((current) => ({
-                            ...current,
-                            consentDeclaration: "uncertain",
-                          }))
-                        }
-                        title="I’m not sure"
-                      />
-                      <ChoiceButton
-                        selected={
-                          declarationDraft.consentDeclaration
-                          === "not_obtained"
-                        }
-                        onClick={() =>
-                          setDeclarationDraft((current) => ({
-                            ...current,
-                            consentDeclaration: "not_obtained",
-                          }))
-                        }
-                        title="Permission was not obtained"
-                      />
-                    </div>
-                  </div>
-
-                  <div className="mt-5 rounded-2xl border border-[var(--wk-border)] bg-[var(--wk-bg)]">
-                    <button
-                      type="button"
-                      aria-expanded={showProtectionOptions}
-                      onClick={() =>
-                        setShowProtectionOptions((current) => !current)
+                  <div className="mt-5 grid gap-3">
+                    <DisclosureCard
+                      title="Can You Share This Video With Us?"
+                      required
+                      summary={rightsDeclarationLabel(
+                        declarationDraft.rightsDeclaration,
+                      )}
+                      open={showRightsQuestion}
+                      onToggle={() =>
+                        setShowRightsQuestion((current) => !current)
                       }
-                      className="flex w-full items-center justify-between gap-4 px-4 py-4 text-left"
                     >
-                      <span>
-                        <span className="block text-[12px] font-black text-[var(--wk-text)]">
-                          Protection Options
-                        </span>
-                        <span className="mt-1 block text-[11px] leading-5 text-[var(--wk-text-muted)]">
-                          Name, contact, source handling, holds, and broad
-                          location.
-                        </span>
-                      </span>
-                      <i
-                        className={`ri-arrow-down-s-line shrink-0 text-[17px] text-[var(--wk-text-faint)] transition-transform ${
-                          showProtectionOptions ? "rotate-180" : ""
-                        }`}
-                      />
-                    </button>
+                      <div className="grid gap-2">
+                        <ChoiceButton
+                          selected={
+                            declarationDraft.rightsDeclaration
+                            === "owns_or_controls"
+                          }
+                          onClick={() => {
+                            setDeclarationDraft((current) => ({
+                              ...current,
+                              rightsDeclaration: "owns_or_controls",
+                            }));
+                            setShowRightsQuestion(false);
+                            setError("");
+                          }}
+                          title="It’s Mine to Share"
+                        />
 
-                    {showProtectionOptions ? (
-                      <div className="border-t border-[var(--wk-divider)] px-4 pb-4 pt-5">
-                        <div>
+                        <ChoiceButton
+                          selected={
+                            declarationDraft.rightsDeclaration
+                            === "authorized_by_rights_holder"
+                          }
+                          onClick={() => {
+                            setDeclarationDraft((current) => ({
+                              ...current,
+                              rightsDeclaration:
+                                "authorized_by_rights_holder",
+                            }));
+                            setShowRightsQuestion(false);
+                            setError("");
+                          }}
+                          title="I Have Permission"
+                        />
+
+                        <ChoiceButton
+                          selected={
+                            declarationDraft.rightsDeclaration
+                            === "uncertain"
+                          }
+                          onClick={() => {
+                            setDeclarationDraft((current) => ({
+                              ...current,
+                              rightsDeclaration: "uncertain",
+                            }));
+                            setShowRightsQuestion(false);
+                            setError("");
+                          }}
+                          title="I’m Not Sure"
+                        />
+
+                        <ChoiceButton
+                          selected={
+                            declarationDraft.rightsDeclaration === "other"
+                          }
+                          onClick={() => {
+                            setDeclarationDraft((current) => ({
+                              ...current,
+                              rightsDeclaration: "other",
+                            }));
+                            setShowRightsQuestion(false);
+                            setError("");
+                          }}
+                          title="Something Else"
+                        />
+                      </div>
+                    </DisclosureCard>
+
+                    <DisclosureCard
+                      title="Are People in It Okay With You Sending It?"
+                      required
+                      summary={consentDeclarationLabel(
+                        declarationDraft.consentDeclaration,
+                      )}
+                      open={showPermissionQuestion}
+                      onToggle={() =>
+                        setShowPermissionQuestion(
+                          (current) => !current,
+                        )
+                      }
+                    >
+                      <div className="grid gap-2">
+                        <ChoiceButton
+                          selected={
+                            declarationDraft.consentDeclaration
+                            === "granted"
+                          }
+                          onClick={() => {
+                            setDeclarationDraft((current) => ({
+                              ...current,
+                              consentDeclaration: "granted",
+                            }));
+                            setShowPermissionQuestion(false);
+                            setError("");
+                          }}
+                          title="Yes"
+                        />
+
+                        <ChoiceButton
+                          selected={
+                            declarationDraft.consentDeclaration
+                            === "not_required"
+                          }
+                          onClick={() => {
+                            setDeclarationDraft((current) => ({
+                              ...current,
+                              consentDeclaration: "not_required",
+                            }));
+                            setShowPermissionQuestion(false);
+                            setError("");
+                          }}
+                          title="Permission Isn’t Needed"
+                        />
+
+                        <ChoiceButton
+                          selected={
+                            declarationDraft.consentDeclaration
+                            === "uncertain"
+                          }
+                          onClick={() => {
+                            setDeclarationDraft((current) => ({
+                              ...current,
+                              consentDeclaration: "uncertain",
+                            }));
+                            setShowPermissionQuestion(false);
+                            setError("");
+                          }}
+                          title="I’m Not Sure"
+                        />
+
+                        <ChoiceButton
+                          selected={
+                            declarationDraft.consentDeclaration
+                            === "not_obtained"
+                          }
+                          onClick={() => {
+                            setDeclarationDraft((current) => ({
+                              ...current,
+                              consentDeclaration: "not_obtained",
+                            }));
+                            setShowPermissionQuestion(false);
+                            setError("");
+                          }}
+                          title="No"
+                        />
+                      </div>
+                    </DisclosureCard>
+
+                    <DisclosureCard
+                      title="More Options"
+                      summary="Name, contact, timing, and location."
+                      open={showProtectionOptions}
+                      onToggle={() =>
+                        setShowProtectionOptions(
+                          (current) => !current,
+                        )
+                      }
+                    >
+                      <div className="grid min-w-0 gap-5">
+                        <div className="min-w-0">
                           <p className="text-[12px] font-black text-[var(--wk-text)]">
-                            How Should We Handle Your Name?
-                          </p>
-                          <p className="mt-1 text-[11px] leading-5 text-[var(--wk-text-muted)]">
-                            Your account stays attached to this submission.
-                            Restricted access limits who can connect it to you.
+                            Your Details
                           </p>
 
-                          <div className="mt-2 grid gap-2 sm:grid-cols-2">
+                          <div className="mt-2 grid gap-2">
                             <ChoiceButton
                               selected={
                                 declarationDraft.newsroomIdentityMode
                                 === "standard"
+                                && declarationDraft.sourceProtectionRequest
+                                === "internal"
                               }
                               onClick={() =>
                                 setDeclarationDraft((current) => ({
                                   ...current,
                                   newsroomIdentityMode: "standard",
+                                  sourceProtectionRequest: "internal",
                                 }))
                               }
-                              title="Standard newsroom access"
-                              description="Authorized newsroom staff can connect this submission to your account."
+                              title="Newsroom Team"
                             />
+
                             <ChoiceButton
                               selected={
                                 declarationDraft.newsroomIdentityMode
+                                === "restricted"
+                                && declarationDraft.sourceProtectionRequest
                                 === "restricted"
                               }
                               onClick={() =>
                                 setDeclarationDraft((current) => ({
                                   ...current,
                                   newsroomIdentityMode: "restricted",
+                                  sourceProtectionRequest: "restricted",
                                 }))
                               }
-                              title="Restricted newsroom access"
-                              description="Fewer newsroom staff can connect this submission to your account."
+                              title="Smaller Team"
+                            />
+
+                            <ChoiceButton
+                              selected={
+                                declarationDraft.newsroomIdentityMode
+                                === "restricted"
+                                && declarationDraft.sourceProtectionRequest
+                                === "confidential"
+                              }
+                              onClick={() =>
+                                setDeclarationDraft((current) => ({
+                                  ...current,
+                                  newsroomIdentityMode: "restricted",
+                                  sourceProtectionRequest: "confidential",
+                                }))
+                              }
+                              title="Only People Who Need Them"
                             />
                           </div>
                         </div>
 
-                        <div className="mt-5">
+                        <div className="min-w-0">
                           <p className="text-[12px] font-black text-[var(--wk-text)]">
-                            Can WAKILISHA Name You Publicly?
+                            Public Credit
                           </p>
+
                           <div className="mt-2 grid gap-2 sm:grid-cols-2">
                             <ChoiceButton
                               selected={
@@ -1203,8 +1348,9 @@ export default function FieldIntakePage() {
                                     "do_not_name",
                                 }))
                               }
-                              title="Do not name me publicly"
+                              title="Don’t Name Me"
                             />
+
                             <ChoiceButton
                               selected={
                                 declarationDraft.publicAttributionPreference
@@ -1216,15 +1362,16 @@ export default function FieldIntakePage() {
                                   publicAttributionPreference: "may_name",
                                 }))
                               }
-                              title="You may name me publicly"
+                              title="You Can Name Me"
                             />
                           </div>
                         </div>
 
-                        <div className="mt-5">
+                        <div className="min-w-0">
                           <p className="text-[12px] font-black text-[var(--wk-text)]">
-                            Can We Contact You About This?
+                            Follow-Up
                           </p>
+
                           <div className="mt-2 grid gap-2 sm:grid-cols-2">
                             <ChoiceButton
                               selected={
@@ -1237,9 +1384,9 @@ export default function FieldIntakePage() {
                                   contactPreference: "account_contact",
                                 }))
                               }
-                              title="You may contact me"
-                              description="Use the contact details already linked to my account."
+                              title="You Can Contact Me"
                             />
+
                             <ChoiceButton
                               selected={
                                 declarationDraft.contactPreference
@@ -1251,136 +1398,149 @@ export default function FieldIntakePage() {
                                   contactPreference: "no_follow_up",
                                 }))
                               }
-                              title="No follow-up"
+                              title="No Follow-Up"
                             />
                           </div>
                         </div>
 
-                        <div className="mt-5">
-                          <label
-                            htmlFor="field-sensitivity"
-                            className="text-[12px] font-black text-[var(--wk-text)]"
-                          >
-                            How Sensitive Is This?
-                          </label>
-                          <p className="mt-1 text-[11px] leading-5 text-[var(--wk-text-muted)]">
-                            Choose the level that best reflects the risk if
-                            this submission is exposed.
+                        <div className="min-w-0">
+                          <p className="text-[12px] font-black text-[var(--wk-text)]">
+                            Extra Care
                           </p>
-                          <select
-                            id="field-sensitivity"
-                            value={declarationDraft.declaredSensitivity}
-                            onChange={(event) =>
-                              setDeclarationDraft((current) => ({
-                                ...current,
-                                declaredSensitivity:
-                                  event.target.value as FieldDeclarations["declared_sensitivity"],
-                              }))
-                            }
-                            className="mt-2 w-full rounded-xl border border-[var(--wk-border)] bg-[var(--wk-surface)] px-3 py-3 text-[12px] font-semibold text-[var(--wk-text)] outline-none"
-                          >
-                            <option value="none">
-                              Not especially sensitive
-                            </option>
-                            <option value="low">Low sensitivity</option>
-                            <option value="moderate">
-                              Moderate sensitivity
-                            </option>
-                            <option value="high">High sensitivity</option>
-                            <option value="extreme">
-                              Extreme sensitivity
-                            </option>
-                          </select>
+
+                          <div className="mt-2 grid gap-2">
+                            <ChoiceButton
+                              selected={
+                                declarationDraft.declaredSensitivity
+                                === "none"
+                              }
+                              onClick={() =>
+                                setDeclarationDraft((current) => ({
+                                  ...current,
+                                  declaredSensitivity: "none",
+                                }))
+                              }
+                              title="Standard"
+                            />
+
+                            <ChoiceButton
+                              selected={
+                                declarationDraft.declaredSensitivity
+                                === "moderate"
+                              }
+                              onClick={() =>
+                                setDeclarationDraft((current) => ({
+                                  ...current,
+                                  declaredSensitivity: "moderate",
+                                }))
+                              }
+                              title="Extra Care"
+                            />
+
+                            <ChoiceButton
+                              selected={
+                                declarationDraft.declaredSensitivity
+                                === "extreme"
+                              }
+                              onClick={() =>
+                                setDeclarationDraft((current) => ({
+                                  ...current,
+                                  declaredSensitivity: "extreme",
+                                }))
+                              }
+                              title="Highest Care"
+                            />
+                          </div>
                         </div>
 
-                        <div className="mt-5">
-                          <label
-                            htmlFor="field-source-protection"
-                            className="text-[12px] font-black text-[var(--wk-text)]"
-                          >
-                            Who Should See Source Details?
-                          </label>
-                          <select
-                            id="field-source-protection"
-                            value={
-                              declarationDraft.sourceProtectionRequest
-                            }
-                            onChange={(event) =>
-                              setDeclarationDraft((current) => ({
-                                ...current,
-                                sourceProtectionRequest:
-                                  event.target.value as FieldDeclarations["source_protection_request"],
-                              }))
-                            }
-                            className="mt-2 w-full rounded-xl border border-[var(--wk-border)] bg-[var(--wk-surface)] px-3 py-3 text-[12px] font-semibold text-[var(--wk-text)] outline-none"
-                          >
-                            <option value="internal">
-                              Newsroom staff handling the submission
-                            </option>
-                            <option value="restricted">
-                              A smaller newsroom group
-                            </option>
-                            <option value="confidential">
-                              Treat source details as confidential
-                            </option>
-                          </select>
-                        </div>
+                        <div className="min-w-0">
+                          <p className="text-[12px] font-black text-[var(--wk-text)]">
+                            Hold Until
+                          </p>
 
-                        <div className="mt-5">
-                          <label
-                            htmlFor="field-hold"
-                            className="text-[12px] font-black text-[var(--wk-text)]"
-                          >
-                            Should We Hold This Video?
-                          </label>
-                          <select
-                            id="field-hold"
-                            value={declarationDraft.embargoRequestMode}
-                            onChange={(event) =>
-                              setDeclarationDraft((current) => ({
-                                ...current,
-                                embargoRequestMode:
-                                  event.target.value as FieldDeclarations["embargo_request_mode"],
-                              }))
-                            }
-                            className="mt-2 w-full rounded-xl border border-[var(--wk-border)] bg-[var(--wk-surface)] px-3 py-3 text-[12px] font-semibold text-[var(--wk-text)] outline-none"
-                          >
-                            <option value="none">No hold request</option>
-                            <option value="until_review">
-                              Hold until the newsroom reviews it
-                            </option>
-                            <option value="until_time">
-                              Hold until a date and time
-                            </option>
-                          </select>
+                          <div className="mt-2 grid gap-2">
+                            <ChoiceButton
+                              selected={
+                                declarationDraft.embargoRequestMode
+                                === "none"
+                              }
+                              onClick={() =>
+                                setDeclarationDraft((current) => ({
+                                  ...current,
+                                  embargoRequestMode: "none",
+                                  requestedEmbargoUntilLocal: "",
+                                }))
+                              }
+                              title="No Hold"
+                            />
+
+                            <ChoiceButton
+                              selected={
+                                declarationDraft.embargoRequestMode
+                                === "until_review"
+                              }
+                              onClick={() =>
+                                setDeclarationDraft((current) => ({
+                                  ...current,
+                                  embargoRequestMode: "until_review",
+                                  requestedEmbargoUntilLocal: "",
+                                }))
+                              }
+                              title="Hold Until Review"
+                            />
+
+                            <ChoiceButton
+                              selected={
+                                declarationDraft.embargoRequestMode
+                                === "until_time"
+                              }
+                              onClick={() =>
+                                setDeclarationDraft((current) => ({
+                                  ...current,
+                                  embargoRequestMode: "until_time",
+                                }))
+                              }
+                              title="Pick a Date and Time"
+                            />
+                          </div>
 
                           {declarationDraft.embargoRequestMode
                           === "until_time" ? (
-                            <input
-                              type="datetime-local"
-                              value={
-                                declarationDraft.requestedEmbargoUntilLocal
-                              }
-                              onChange={(event) =>
-                                setDeclarationDraft((current) => ({
-                                  ...current,
-                                  requestedEmbargoUntilLocal:
-                                    event.target.value,
-                                }))
-                              }
-                              aria-label="Hold until"
-                              className="mt-2 w-full rounded-xl border border-[var(--wk-border)] bg-[var(--wk-surface)] px-3 py-3 text-[12px] text-[var(--wk-text)] outline-none"
-                            />
+                            <label className="relative mt-2 block box-border w-full min-w-0 max-w-full overflow-hidden rounded-2xl border border-[var(--wk-border)] bg-[var(--wk-surface)]">
+                              <span className="pointer-events-none flex min-w-0 items-center gap-3 px-3 py-3">
+                                <i className="ri-calendar-line shrink-0 text-[16px] text-[var(--wk-brand)]" />
+
+                                <span className="min-w-0 flex-1 truncate text-[12px] font-bold text-[var(--wk-text)]">
+                                  {formatHoldTime(
+                                    declarationDraft.requestedEmbargoUntilLocal,
+                                  )}
+                                </span>
+
+                                <i className="ri-arrow-right-s-line shrink-0 text-[16px] text-[var(--wk-text-faint)]" />
+                              </span>
+
+                              <input
+                                type="datetime-local"
+                                value={
+                                  declarationDraft.requestedEmbargoUntilLocal
+                                }
+                                onChange={(event) =>
+                                  setDeclarationDraft((current) => ({
+                                    ...current,
+                                    requestedEmbargoUntilLocal:
+                                      event.target.value,
+                                  }))
+                                }
+                                aria-label="Hold until"
+                                className="absolute inset-0 h-full w-full cursor-pointer opacity-0"
+                              />
+                            </label>
                           ) : null}
                         </div>
 
-                        <div className="mt-5">
+                        <div className="min-w-0">
                           <p className="text-[12px] font-black text-[var(--wk-text)]">
-                            Add a Broad Location?
-                          </p>
-                          <p className="mt-1 text-[11px] leading-5 text-[var(--wk-text-muted)]">
-                            Keep it broad. Avoid an exact address if that
-                            could put someone at risk.
+                            Location
                           </p>
 
                           <div className="mt-2 grid gap-2 sm:grid-cols-2">
@@ -1396,8 +1556,9 @@ export default function FieldIntakePage() {
                                   locationDescription: "",
                                 }))
                               }
-                              title="Do not add a location"
+                              title="No Location"
                             />
+
                             <ChoiceButton
                               selected={
                                 declarationDraft.locationMode
@@ -1409,7 +1570,7 @@ export default function FieldIntakePage() {
                                   locationMode: "coarse_text",
                                 }))
                               }
-                              title="Add a broad location"
+                              title="Add a Broad Location"
                             />
                           </div>
 
@@ -1425,12 +1586,12 @@ export default function FieldIntakePage() {
                               }
                               placeholder="City, area, or landmark"
                               aria-label="Broad location"
-                              className="mt-2 w-full rounded-xl border border-[var(--wk-border)] bg-[var(--wk-surface)] px-3 py-3 text-[12px] text-[var(--wk-text)] outline-none placeholder:text-[var(--wk-text-faint)]"
+                              className="mt-2 box-border w-full min-w-0 max-w-full rounded-2xl border border-[var(--wk-border)] bg-[var(--wk-surface)] px-3 py-3 text-[12px] text-[var(--wk-text)] outline-none placeholder:text-[var(--wk-text-faint)]"
                             />
                           ) : null}
                         </div>
                       </div>
-                    ) : null}
+                    </DisclosureCard>
                   </div>
                 </div>
               ) : null}
