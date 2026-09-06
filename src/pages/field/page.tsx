@@ -464,7 +464,7 @@ export default function FieldIntakePage() {
               </p>
             </div>
 
-            {!pending.fileBlob ? (
+            {!pending.fileBlob && !working ? (
               <div className="mt-5 rounded-2xl bg-[var(--wk-bg)] p-4">
                 <p className="text-[12px] font-bold text-[var(--wk-text)]">
                   The original is no longer available in browser storage.
