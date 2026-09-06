@@ -190,12 +190,12 @@ describe(
         expect(
           routeAudit,
         ).toContain(
-          "expectedDirectLazyImportCount = 70",
+          "expectedDirectLazyImportCount = 71",
         );
         expect(
           routeAudit,
         ).toContain(
-          "expectedRoutePathCount = 176",
+          "expectedRoutePathCount = 178",
         );
       },
     );
