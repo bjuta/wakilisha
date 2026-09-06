@@ -37,10 +37,14 @@ describe("Phase 8A.4 mobile local durability", () => {
     expect(service).toContain('action: "reissue_upload_capability"');
     expect(service).toContain("authoritative.uploaded_parts");
     expect(service).toContain("exactLocalFile");
-    expect(service).toContain("const sha256 = await hashBlobSha256(file)");
+    expect(service).toContain("sha256 = await hashBlobSha256(file);");
     expect(service).toContain("sha256 !== queue.sha256");
     expect(service).toContain("submissionResourceId: queue.submissionResourceId");
     expect(service).toContain("attemptNumber: Math.max(queue.attemptNumber + 1");
+    expect(service).toContain("fileBlob: null");
+    expect(service).toContain(
+      "The browser can no longer read the saved video. Choose the exact original to continue.",
+    );
   });
 
   it("persists recoverable pause and network state before rethrow", () => {
@@ -121,6 +125,10 @@ describe("Phase 8A.4 mobile local durability", () => {
     expect(page).toContain("replacementInputRef");
     expect(page).toContain("openReplacementFile");
     expect(page).toContain("Choose original video");
+    expect(service).toContain("submissionReference?: string");
+    expect(service).toContain("submissionReference: queue.submissionReference");
+    expect(page).toContain("progress.submissionReference");
+    expect(page).toContain("FieldRecoverableError");
     expect(page).not.toContain("file:mr-3");
   });
 
@@ -130,12 +138,20 @@ describe("Phase 8A.4 mobile local durability", () => {
     expect(page).toContain('aria-expanded={showUploadHelp}');
     expect(page).toContain("Saved on this device");
     expect(page).toContain("Resume upload");
+    expect(page).toContain("savedStageLabel");
+    expect(page).toContain("Ready to resume");
+    expect(page).toContain(
+      'className="mt-5 grid grid-cols-2 gap-2 sm:flex sm:flex-wrap"',
+    );
+    expect(page).toContain(
+      'className="col-span-2 w-full justify-center sm:w-auto"',
+    );
     expect(page).toContain("Keep this page open while the upload is active.");
     expect(page).toContain(
       "Browser storage can be cleared by the device",
     );
     expect(page).toMatch(
-      /stageLabel\(\s*working\s*\?\s*progress\.stage\s*:\s*pending\.localState,?\s*\)/,
+      /working\s*\?\s*stageLabel\(progress\.stage\)\s*:\s*savedStageLabel\(progress\.stage\)/,
     );
   });
 

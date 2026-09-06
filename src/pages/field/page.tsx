@@ -12,6 +12,7 @@ import {
   listFieldQueuesForOwner,
   resumeFieldQueue,
   submitFieldVideo,
+  FieldRecoverableError,
   type FieldClientStage,
   type FieldDeclarations,
   type FieldProgress,
@@ -76,6 +77,20 @@ function stageLabel(stage: FieldClientStage): string {
   };
 
   return labels[stage];
+}
+
+function savedStageLabel(stage: FieldClientStage): string {
+  if (
+    stage === "creating_upload"
+    || stage === "uploading"
+    || stage === "verifying"
+    || stage === "received"
+    || stage === "submitting"
+  ) {
+    return "Ready to resume";
+  }
+
+  return stageLabel(stage);
 }
 
 export default function FieldIntakePage() {
@@ -190,7 +205,12 @@ export default function FieldIntakePage() {
         DURABILITY_PROOF_DECLARATIONS,
         {
           signal: controller.signal,
-          onProgress: setProgress,
+          onProgress: (next) =>
+            setProgress((current) => ({
+              ...next,
+              submissionReference:
+                next.submissionReference ?? current.submissionReference,
+            })),
         },
       );
 
@@ -233,7 +253,12 @@ export default function FieldIntakePage() {
       await resumeFieldQueue(pending.id, authUser.id, {
         replacementFile,
         signal: controller.signal,
-        onProgress: setProgress,
+        onProgress: (next) =>
+          setProgress((current) => ({
+            ...next,
+            submissionReference:
+              next.submissionReference ?? current.submissionReference,
+          })),
       });
 
       setCompleted(true);
@@ -245,6 +270,12 @@ export default function FieldIntakePage() {
           ...current,
           stage: "paused",
           message: "Upload paused. You can continue when you are ready.",
+        }));
+      } else if (cause instanceof FieldRecoverableError) {
+        setProgress((current) => ({
+          ...current,
+          stage: cause.stage,
+          message: cause.message,
         }));
       } else {
         setError(
@@ -395,9 +426,9 @@ export default function FieldIntakePage() {
                     Saved on this device
                   </p>
                   <span className="rounded-full bg-[var(--wk-surface-raised)] px-2.5 py-1 text-[11px] font-bold text-[var(--wk-text-muted)]">
-                    {stageLabel(
-                      working ? progress.stage : pending.localState,
-                    )}
+                    {working
+                      ? stageLabel(progress.stage)
+                      : savedStageLabel(progress.stage)}
                   </span>
                 </div>
 
@@ -460,10 +491,11 @@ export default function FieldIntakePage() {
               </div>
             ) : null}
 
-            <div className="mt-5 flex flex-wrap gap-2">
+            <div className="mt-5 grid grid-cols-2 gap-2 sm:flex sm:flex-wrap">
               <WkButton
                 type="button"
                 variant="primary"
+                className="col-span-2 w-full justify-center sm:w-auto"
                 disabled={working || (!pending.fileBlob && !replacementFile)}
                 onClick={handleResume}
               >
@@ -473,6 +505,7 @@ export default function FieldIntakePage() {
               <WkButton
                 type="button"
                 variant="soft"
+                className="w-full justify-center sm:w-auto"
                 disabled={!working}
                 onClick={() => abortRef.current?.abort()}
               >
@@ -482,6 +515,7 @@ export default function FieldIntakePage() {
               <WkButton
                 type="button"
                 variant="ghost"
+                className="w-full justify-center sm:w-auto"
                 disabled={working}
                 onClick={handleCancel}
               >
@@ -635,6 +669,11 @@ export default function FieldIntakePage() {
                   <p className="mt-1 text-[12px] text-[var(--wk-text-muted)]">
                     {prettyBytes(file.size)}
                   </p>
+                  {progress.submissionReference ? (
+                    <p className="mt-1 text-[12px] text-[var(--wk-text-muted)]">
+                      Ref {progress.submissionReference}
+                    </p>
+                  ) : null}
                 </div>
 
                 <button
