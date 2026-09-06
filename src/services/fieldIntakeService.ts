@@ -647,15 +647,29 @@ export async function submitFieldVideo(
 }
 
 async function exactLocalFile(queue: FieldQueueRecord, replacement?: File | null): Promise<Blob> {
-  const file = replacement ?? queue.fileBlob;
-  if (!file) {
-    throw new FieldRecoverableError(
-      "paused",
-      "The browser no longer has the local video. Reselect the exact original to continue.",
-    );
+  if (replacement) {
+    if (replacement.size !== queue.byteSize) {
+      throw new Error("The selected file is not the same size as the queued original.");
+    }
+
+    const sha256 = await hashBlobSha256(replacement);
+    if (sha256 !== queue.sha256) {
+      throw new Error("The selected file does not match the queued original.");
+    }
+
+    return replacement;
   }
 
   try {
+    const file = queue.fileBlob;
+
+    if (!file) {
+      throw new FieldRecoverableError(
+        "paused",
+        "The browser no longer has the local video. Reselect the exact original to continue.",
+      );
+    }
+
     if (file.size !== queue.byteSize) {
       throw new Error("The selected file is not the same size as the queued original.");
     }
@@ -667,21 +681,19 @@ async function exactLocalFile(queue: FieldQueueRecord, replacement?: File | null
 
     return file;
   } catch (cause) {
-    if (!replacement && queue.fileBlob) {
-      await putQueue({
-        ...queue,
-        fileBlob: null,
-        localState: "paused",
-        updatedAt: new Date().toISOString(),
-      });
-
-      throw new FieldRecoverableError(
-        "paused",
-        "The browser can no longer read the saved video. Choose the exact original to continue.",
-      );
+    if (cause instanceof FieldRecoverableError) {
+      throw cause;
     }
 
-    throw cause;
+    queue.fileBlob = null;
+    queue.localState = "paused";
+    queue.updatedAt = new Date().toISOString();
+    await putQueue(queue);
+
+    throw new FieldRecoverableError(
+      "paused",
+      "The browser can no longer read the saved video. Choose the exact original to continue.",
+    );
   }
 }
 
@@ -721,11 +733,12 @@ export async function resumeFieldQueue(
   }
 
   if (state === "received") {
-    queue = {
-      ...queue,
-      submissionCurrentRevision: integer(own.current_revision, queue.submissionCurrentRevision),
-      updatedAt: new Date().toISOString(),
-    };
+    queue.submissionCurrentRevision = integer(
+      own.current_revision,
+      queue.submissionCurrentRevision,
+    );
+    queue.fileBlob = null;
+    queue.updatedAt = new Date().toISOString();
     await putQueue(queue);
     return finalizeReceivedSubmission(
       queue,
@@ -734,13 +747,14 @@ export async function resumeFieldQueue(
     );
   }
 
-  queue = {
-    ...queue,
-    submissionCurrentRevision: integer(own.current_revision, queue.submissionCurrentRevision),
-    fileBlob: options.replacementFile ?? queue.fileBlob,
-    updatedAt: new Date().toISOString(),
-  };
+  queue.submissionCurrentRevision = integer(
+    own.current_revision,
+    queue.submissionCurrentRevision,
+  );
+  queue.updatedAt = new Date().toISOString();
+
   const file = await exactLocalFile(queue, options.replacementFile);
+  queue.fileBlob = file;
   await putQueue(queue);
   requireOnline();
 

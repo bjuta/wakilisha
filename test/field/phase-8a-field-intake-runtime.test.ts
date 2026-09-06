@@ -40,11 +40,15 @@ describe("Phase 8A.4 mobile local durability", () => {
     expect(service).toContain("const sha256 = await hashBlobSha256(file);");
     expect(service).toContain("sha256 !== queue.sha256");
     expect(service).toMatch(
-      /try\s*\{\s*if \(file\.size !== queue\.byteSize\)[\s\S]*const sha256 = await hashBlobSha256\(file\);[\s\S]*if \(sha256 !== queue\.sha256\)/,
+      /try\s*\{\s*const file = queue\.fileBlob;[\s\S]*if \(!file\)[\s\S]*if \(file\.size !== queue\.byteSize\)[\s\S]*const sha256 = await hashBlobSha256\(file\);[\s\S]*if \(sha256 !== queue\.sha256\)/,
     );
+    expect(service).not.toContain(
+      "fileBlob: options.replacementFile ?? queue.fileBlob",
+    );
+    expect(service).toContain("queue.fileBlob = file;");
+    expect(service).toContain("queue.fileBlob = null;");
     expect(service).toContain("submissionResourceId: queue.submissionResourceId");
     expect(service).toContain("attemptNumber: Math.max(queue.attemptNumber + 1");
-    expect(service).toContain("fileBlob: null");
     expect(service).toContain(
       "The browser can no longer read the saved video. Choose the exact original to continue.",
     );
@@ -128,6 +132,7 @@ describe("Phase 8A.4 mobile local durability", () => {
     expect(page).toContain("replacementInputRef");
     expect(page).toContain("openReplacementFile");
     expect(page).toContain("Choose original video");
+    expect(page).toContain("!pending.fileBlob && !working");
     expect(service).toContain("submissionReference?: string");
     expect(service).toContain("submissionReference: queue.submissionReference");
     expect(page).toContain("progress.submissionReference");
