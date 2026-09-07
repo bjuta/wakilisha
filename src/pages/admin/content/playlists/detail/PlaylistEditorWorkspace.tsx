@@ -8,6 +8,7 @@ import { useNavigate } from "react-router-dom";
 import { WkIcon } from "@/components/design-system/Icon";
 import { WkSurface } from "@/components/design-system/primitives/Surface";
 import { EditorialMetadataWorkspace } from "@/components/design-system/editorial/EditorialMetadataWorkspace";
+import { RichTextEditor } from "@/components/design-system/editorial/RichTextEditor";
 import {
   PlaylistEditorHeader,
   type PlaylistEditorHeaderAction,
@@ -1620,6 +1621,28 @@ export function PlaylistEditorWorkspace({
       ) : null}
 
       <div className="space-y-5">
+        <WkSurface className="overflow-hidden">
+          <div className="px-5 py-4">
+            <h2 className="text-[16px] font-black text-wk-text">
+              Playlist Story
+            </h2>
+            <p className="mt-1 text-[12px] text-wk-text-muted">
+              Add context, links, and Registry references. Changes save automatically.
+            </p>
+          </div>
+          <div className="border-t border-wk-border">
+            <RichTextEditor
+              profile="playlist-description"
+              value={description}
+              onChange={setDescription}
+              minHeight={300}
+              readOnly={!canEdit}
+              readOnlyLabel="Viewing only"
+              placeholder="What should someone understand before they press play?"
+            />
+          </div>
+        </WkSurface>
+
         <WkSurface className="p-5">
           {!review?.currentWorkingVersionId ? (
             <div>
@@ -2404,12 +2427,10 @@ export function PlaylistEditorWorkspace({
         onClose={() => setDetailsOpen(false)}
         title={title}
         slug={slug}
-        description={description}
         onTitleChange={setTitle}
         onSlugChange={(value) =>
           setSlug(slugifyPlaylistTitle(value))
         }
-        onDescriptionChange={setDescription}
         canEdit={canEdit}
         curator={review?.curator ?? null}
         curatorLabel={playlist.curatorLabel}

@@ -44,10 +44,8 @@ export function PlaylistDetailsDrawer({
   onClose,
   title,
   slug,
-  description,
   onTitleChange,
   onSlugChange,
-  onDescriptionChange,
   canEdit,
   curator,
   curatorLabel,
@@ -73,10 +71,8 @@ export function PlaylistDetailsDrawer({
   onClose: () => void;
   title: string;
   slug: string;
-  description: string;
   onTitleChange: (value: string) => void;
   onSlugChange: (value: string) => void;
-  onDescriptionChange: (value: string) => void;
   canEdit: boolean;
   curator: PlaylistCuratorIdentity | null;
   curatorLabel: string | null;
@@ -372,20 +368,6 @@ export function PlaylistDetailsDrawer({
               />
             </label>
 
-            <label className="block">
-              <span className="mb-1 block text-[10px] font-bold text-wk-text-muted">
-                Description
-              </span>
-              <textarea
-                value={description}
-                onChange={(event) =>
-                  onDescriptionChange(event.target.value)
-                }
-                disabled={!canEdit}
-                rows={5}
-                className="w-full resize-y rounded-lg border border-wk-border bg-wk-bg px-3 py-2 text-[12px] leading-5 text-wk-text outline-none focus:border-wk-brand disabled:opacity-60"
-              />
-            </label>
           </section>
 
           <section className="space-y-3 border-t border-wk-border pt-5">

@@ -85,6 +85,10 @@ import {
 import {
   PlaylistPreviewModeBanner,
 } from "./components/PlaylistPreviewModeBanner";
+import {
+  playlistDescriptionToPlainText,
+  playlistDescriptionToSafeHtml,
+} from "@/utils/playlistRichText";
 
 function formatDuration(
   milliseconds: number | null,
@@ -118,7 +122,9 @@ function playlistSummary(
   description: string | null,
 ): string | null {
   const value =
-    description?.trim();
+    playlistDescriptionToPlainText(
+      description,
+    ).trim();
 
   if (!value) {
     return null;
@@ -1903,8 +1909,15 @@ export default function PublicPlaylistDetailPage() {
     canonicalUrl;
 
   const description =
-    playlist.description ??
+    playlistDescriptionToPlainText(
+      playlist.description,
+    ) ||
     `${playlist.title}, curated by ${playlist.curatorLabel ?? "WAKILISHA"}.`;
+
+  const descriptionHtml =
+    playlistDescriptionToSafeHtml(
+      playlist.description,
+    );
 
   const summary =
     playlistSummary(
@@ -1947,7 +1960,7 @@ export default function PublicPlaylistDetailPage() {
       playlist.curatorLabel ??
       "WAKILISHA",
     description:
-      playlist.description ??
+      description ||
       undefined,
     imageUrl:
       playlist.cover?.url ??
@@ -2232,7 +2245,7 @@ export default function PublicPlaylistDetailPage() {
           name:
             playlist.title,
           description:
-            playlist.description ??
+            description ||
             undefined,
           image:
             playlist.cover?.url ??
@@ -2524,11 +2537,12 @@ export default function PublicPlaylistDetailPage() {
                     </summary>
 
                     <div className="border-t border-[var(--wk-border)] px-5 py-5 md:px-6">
-                      <p className="max-w-[72ch] text-[15px] leading-7 text-[var(--wk-text-soft)]">
-                        {
-                          playlist.description
-                        }
-                      </p>
+                      <div
+                        className="max-w-[72ch] text-[15px] leading-7 text-[var(--wk-text-soft)] [&_p]:mb-4 [&_p:last-child]:mb-0 [&_h2]:mb-2 [&_h2]:mt-6 [&_h2]:text-[20px] [&_h2]:font-black [&_h3]:mb-2 [&_h3]:mt-5 [&_h3]:text-[17px] [&_h3]:font-bold [&_a]:font-semibold [&_a]:text-[var(--wk-brand)] [&_a]:underline [&_ul]:mb-4 [&_ul]:ml-5 [&_ul]:list-disc [&_ol]:mb-4 [&_ol]:ml-5 [&_ol]:list-decimal [&_li]:mb-1"
+                        dangerouslySetInnerHTML={{
+                          __html: descriptionHtml,
+                        }}
+                      />
                     </div>
                   </details>
                 </div>
