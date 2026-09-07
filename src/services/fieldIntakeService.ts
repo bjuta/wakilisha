@@ -4,6 +4,8 @@ import { hashBlobSha256, hashFileSha256 } from "@/services/mediaHash";
 export type FieldIdentityMode = "standard" | "restricted";
 export type FieldAttributionPreference = "may_name" | "do_not_name";
 export type FieldContactPreference = "account_contact" | "no_follow_up";
+export type FieldFollowUpPermission = "allowed" | "not_allowed";
+export type FieldPreferredContactChannel = "messages" | "email" | "phone";
 export type FieldRightsDeclaration =
   | "owns_or_controls"
   | "authorized_by_rights_holder"
@@ -22,6 +24,9 @@ export interface FieldDeclarations {
   newsroom_identity_mode: FieldIdentityMode;
   public_attribution_preference: FieldAttributionPreference;
   contact_preference: FieldContactPreference;
+  follow_up_permission: FieldFollowUpPermission;
+  preferred_contact_channel?: FieldPreferredContactChannel | null;
+  contact_point_id?: string | null;
   rights_declaration: FieldRightsDeclaration;
   rights_declaration_detail?: string | null;
   consent_declaration: FieldConsentDeclaration;
@@ -597,7 +602,7 @@ export async function submitFieldVideo(
     totalParts: 0,
     message: "Creating your private submission…",
   });
-  const created = await invokeRpc("create_field_submission_v1", {
+  const created = await invokeRpc("create_field_submission_v2", {
     p_declarations: declarations,
     p_idempotency_key: `field.create.${queueId}`,
     p_correlation_id: crypto.randomUUID(),

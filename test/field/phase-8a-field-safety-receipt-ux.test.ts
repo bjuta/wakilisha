@@ -162,3 +162,58 @@ describe("Phase 8A.5 Field safety and receipt UX", () => {
     expect(page).not.toContain("—");
   });
 });
+
+describe("Phase 8B.4 Candidate B Field Messages product convergence", () => {
+  it("uses the explicit Field contact contract and v2 create command", () => {
+    const fieldService = read("src/services/fieldIntakeService.ts");
+    const fieldPage = read("src/pages/field/page.tsx");
+
+    expect(fieldService).toContain("create_field_submission_v2");
+    expect(fieldService).toContain("follow_up_permission");
+    expect(fieldService).toContain("preferred_contact_channel");
+    expect(fieldPage).toContain('title="Messages"');
+    expect(fieldPage).toContain('title="Email"');
+    expect(fieldPage).toContain('title="Phone"');
+    expect(fieldPage).toContain('title="Do not contact me"');
+    expect(fieldPage).toContain(
+      'follow_up_permission: followUpAllowed ? "allowed" : "not_allowed"',
+    );
+    expect(fieldPage).toContain(
+      'preferred_contact_channel: followUpAllowed ? "messages" : null',
+    );
+  });
+
+  it("keeps scoped send separate from ordinary Conversation start", () => {
+    const messagesService = read("src/services/messages.ts");
+    const messagesAccess = read("src/hooks/useMessagesAccess.ts");
+    const messagesPage = read("src/pages/messages/page.tsx");
+
+    expect(messagesService).toContain("can_start: boolean");
+    expect(messagesService).toContain("can_send: boolean");
+    expect(messagesAccess).toContain("can_start: false");
+    expect(messagesPage).toContain("messagesAccess.can_start");
+    expect(messagesPage).toContain("messagesAccess.can_send");
+    expect(messagesPage).toContain('searchParams.get("conversation")');
+    expect(messagesPage).toContain(
+      "setFolder(next.conversation.mailbox_folder)",
+    );
+  });
+
+  it("hands authorized newsroom Field follow-up into canonical Messages", () => {
+    const roles = read("src/services/userRoles.ts");
+    const newsroom = read("src/services/fieldNewsroom.ts");
+    const adminFieldPage = read("src/pages/admin/field/page.tsx");
+    const lazyAdmin = read("src/router/lazyAdmin.tsx");
+    const routes = read("src/router/config.tsx");
+    const shell = read("src/pages/admin/AdminShell.tsx");
+
+    expect(roles).toContain('"view_field_intake"');
+    expect(roles).toContain('"view_restricted_field_sources"');
+    expect(newsroom).toContain('"start_field_submission_message_v1"');
+    expect(adminFieldPage).toContain("startFieldSubmissionMessage");
+    expect(adminFieldPage).toContain("/messages?conversation=");
+    expect(lazyAdmin).toContain("AdminFieldPage");
+    expect(routes).toContain('capabilities={["view_field_intake"]}');
+    expect(shell).toContain('path: "/admin/field"');
+  });
+});

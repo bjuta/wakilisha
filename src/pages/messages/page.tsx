@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
 import { useAuthUser } from "@/hooks/useAuthUser";
 import { useMessagesAccess } from "@/hooks/useMessagesAccess";
 import {
@@ -60,6 +60,8 @@ function Avatar({ summary, size = "h-10 w-10" }: { summary: MessageConversationS
 export default function MessagesPage() {
   const authUser = useAuthUser();
   const messagesAccess = useMessagesAccess();
+  const [searchParams] = useSearchParams();
+  const requestedConversationId = searchParams.get("conversation");
   const [folder, setFolder] = useState<MessageFolder>("inbox");
   const [conversations, setConversations] = useState<MessageConversationSummary[]>([]);
   const [unread, setUnread] = useState<Record<MessageFolder, number>>({ inbox: 0, requests: 0, spam: 0, archived: 0 });
@@ -124,6 +126,7 @@ export default function MessagesPage() {
     try {
       const next = await getMessageConversation(conversationId);
       setDetail(next);
+      setFolder(next.conversation.mailbox_folder);
       await markMessageConversationRead(conversationId);
       await refreshCounts();
       setConversations((current) => current.map((row) => row.conversation_id === conversationId ? { ...row, unread_count: 0 } : row));
@@ -133,6 +136,11 @@ export default function MessagesPage() {
       setLoadingDetail(false);
     }
   }, [refreshCounts]);
+
+  useEffect(() => {
+    if (!messagesAccess.visible || loadingList || !requestedConversationId || selectedId === requestedConversationId) return;
+    void openConversation(requestedConversationId);
+  }, [loadingList, messagesAccess.visible, openConversation, requestedConversationId, selectedId]);
 
   useEffect(() => {
     if (!newOpen || recipient || query.trim().length < 1) {
@@ -188,7 +196,7 @@ export default function MessagesPage() {
   };
 
   const handleStart = async () => {
-    if (!messagesAccess.can_send || !recipient || !newBody.trim() || starting) return;
+    if (!messagesAccess.can_start || !recipient || !newBody.trim() || starting) return;
     setStarting(true);
     setError(null);
     try {
@@ -237,7 +245,7 @@ export default function MessagesPage() {
             <Link to="/settings?section=Messages" className="flex h-10 w-10 items-center justify-center rounded-full border border-[var(--wk-border)] bg-[var(--wk-surface)] text-[var(--wk-text-muted)]" aria-label="Messages settings">
               <i className="ri-settings-3-line text-base" />
             </Link>
-            <button type="button" onClick={() => setNewOpen(true)} disabled={!messagesAccess.can_send} className="wk-button wk-button-sm wk-button-primary disabled:opacity-45">
+            <button type="button" onClick={() => setNewOpen(true)} disabled={!messagesAccess.can_start} className="wk-button wk-button-sm wk-button-primary disabled:opacity-45">
               <i className="ri-edit-2-line" /> New message
             </button>
           </div>
