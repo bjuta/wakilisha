@@ -398,12 +398,12 @@ describe(
 
         expect(page)
           .toContain(
-            "`/authors/${credit.authorSlug}`",
+            "`/people/${authorSlug}`",
           );
 
         expect(page)
           .toContain(
-            "`/u/${credit.username}`",
+            "`/u/${username}`",
           );
       },
     );

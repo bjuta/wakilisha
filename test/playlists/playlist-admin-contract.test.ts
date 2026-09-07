@@ -202,6 +202,38 @@ describe("Phase 5A Playlist admin product", () => {
     expect(service).toContain("set_playlist_curator");
   });
 
+  it("reuses the governed rich editor for Playlist Story without adding a second content authority", () => {
+    const workspace = source(
+      "src/pages/admin/content/playlists/detail/PlaylistEditorWorkspace.tsx",
+    );
+    const drawer = source(
+      "src/pages/admin/content/playlists/detail/components/PlaylistDetailsDrawer.tsx",
+    );
+    const newPage = source(
+      "src/pages/admin/content/playlists/new/page.tsx",
+    );
+    const richEditor = source(
+      "src/components/design-system/editorial/RichTextEditor.tsx",
+    );
+
+    expect(workspace).toContain("Playlist Story");
+    expect(workspace).toContain('profile="playlist-description"');
+    expect(workspace).toContain("updatePlaylistMetadata");
+    expect(newPage).toContain('profile="playlist-description"');
+
+    expect(drawer).not.toContain("onDescriptionChange");
+    expect(drawer).not.toContain("value={description}");
+
+    expect(richEditor).toContain(
+      'profile?: "article" | "playlist-description"',
+    );
+    expect(richEditor).toContain("playlistDescriptionMode");
+    expect(richEditor).toContain("handleInsertRegistryLink");
+    expect(richEditor).toContain("releaseUrl(");
+    expect(richEditor).toContain("trackUrl(");
+    expect(richEditor).toContain("`/artists/${artist.slug}`");
+  });
+
   it("surfaces the complete governed Playlist publication lifecycle in the editor shell", () => {
     const workspace = source(
       "src/pages/admin/content/playlists/detail/PlaylistEditorWorkspace.tsx",

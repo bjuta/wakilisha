@@ -4,6 +4,9 @@ import {
 } from "@/services/adminMediaReadService";
 import { mediaService } from "@/services/mediaService";
 import type { Json } from "@/types/database.types";
+import {
+  releaseTypeLabelFromActiveTrackCount,
+} from "@/utils/releaseUrl";
 import { parseProviderTrackUrl } from "./playlistAdminUtils";
 export { parseProviderTrackUrl, slugifyPlaylistTitle } from "./playlistAdminUtils";
 
@@ -190,10 +193,23 @@ export interface RegistryTrackSearchResult {
   slug: string;
   title: string;
   artistNames: string[];
+  artistSlug: string | null;
   releaseId: string | null;
   releaseTitle: string | null;
   artworkUrl: string | null;
   previewUrl: string | null;
+}
+
+export interface RegistryReleaseSearchResult {
+  id: string;
+  slug: string;
+  title: string;
+  artistName: string;
+  artistSlug: string;
+  artworkUrl: string | null;
+  releaseType: "Single" | "EP" | "Album";
+  releaseDate: string | null;
+  trackCount: number;
 }
 
 export interface PlaylistPlaybackValidation {
@@ -1917,6 +1933,186 @@ function escapeLike(value: string): string {
   return value.replace(/[%_]/g, (match) => `\\${match}`);
 }
 
+export async function searchRegistryReleases(
+  query: string,
+): Promise<RegistryReleaseSearchResult[]> {
+  const normalized = query.trim();
+  if (normalized.length < 2) return [];
+
+  const pattern = `%${escapeLike(normalized)}%`;
+
+  const [titleResponse, primaryArtistResponse] = await Promise.all([
+    supabase
+      .from("registry_releases")
+      .select("id")
+      .eq("status", "active")
+      .ilike("title", pattern)
+      .order("release_date", { ascending: false })
+      .limit(20),
+    supabase
+      .from("registry_release_artists")
+      .select("release_id")
+      .eq("status", "active")
+      .eq("is_primary", true)
+      .ilike("artist_name_text", pattern)
+      .limit(60),
+  ]);
+
+  if (titleResponse.error) throw titleResponse.error;
+  if (primaryArtistResponse.error) {
+    throw primaryArtistResponse.error;
+  }
+
+  const titleIds =
+    (titleResponse.data ?? [])
+      .map((row) => row.id)
+      .filter(Boolean);
+
+  const primaryArtistReleaseIds =
+    (primaryArtistResponse.data ?? [])
+      .map((row) => row.release_id)
+      .filter(Boolean);
+
+  const allIds = Array.from(
+    new Set([
+      ...primaryArtistReleaseIds,
+      ...titleIds,
+    ]),
+  );
+
+  if (allIds.length === 0) return [];
+
+  const [
+    releaseResponse,
+    creditResponse,
+    membershipResponse,
+  ] = await Promise.all([
+    supabase
+      .from("registry_releases")
+      .select(
+        "id,slug,title,artwork_url,release_date",
+      )
+      .in("id", allIds)
+      .eq("status", "active"),
+    supabase
+      .from("registry_release_artists")
+      .select(
+        "release_id,artist_name_text,artist_slug",
+      )
+      .in("release_id", allIds)
+      .eq("status", "active")
+      .eq("is_primary", true),
+    supabase
+      .from("registry_release_tracks")
+      .select("release_id,track_id")
+      .in("release_id", allIds)
+      .eq("status", "active"),
+  ]);
+
+  if (releaseResponse.error) throw releaseResponse.error;
+  if (creditResponse.error) throw creditResponse.error;
+  if (membershipResponse.error) throw membershipResponse.error;
+
+  const artistByRelease =
+    new Map<string, { name: string; slug: string }>();
+
+  (creditResponse.data ?? []).forEach((credit) => {
+    if (artistByRelease.has(credit.release_id)) return;
+
+    artistByRelease.set(credit.release_id, {
+      name: credit.artist_name_text?.trim() || "Unknown",
+      slug: credit.artist_slug?.trim() || "",
+    });
+  });
+
+  const trackIdsByRelease =
+    new Map<string, string[]>();
+
+  (membershipResponse.data ?? []).forEach((membership) => {
+    const releaseId = String(membership.release_id || "");
+    const trackId = String(membership.track_id || "");
+    if (!releaseId || !trackId) return;
+
+    const trackIds = trackIdsByRelease.get(releaseId) ?? [];
+
+    if (!trackIds.includes(trackId)) {
+      trackIds.push(trackId);
+    }
+
+    trackIdsByRelease.set(releaseId, trackIds);
+  });
+
+  const releaseById =
+    new Map(
+      (releaseResponse.data ?? []).map((release) => [
+        release.id,
+        release,
+      ]),
+    );
+
+  const primaryArtistReleaseIdSet =
+    new Set(primaryArtistReleaseIds);
+
+  const results =
+    allIds.flatMap((id) => {
+      const release = releaseById.get(id);
+      if (!release) return [];
+
+      const trackCount =
+        (trackIdsByRelease.get(id) ?? []).length;
+
+      const releaseType =
+        releaseTypeLabelFromActiveTrackCount(
+          trackCount,
+        );
+
+      if (
+        !releaseType ||
+        releaseType === "Single"
+      ) {
+        return [];
+      }
+
+      const artist = artistByRelease.get(id) ?? {
+        name: "Unknown",
+        slug: "",
+      };
+
+      return [{
+        id: release.id,
+        slug: release.slug,
+        title: release.title,
+        artistName: artist.name,
+        artistSlug: artist.slug,
+        artworkUrl: release.artwork_url,
+        releaseType,
+        releaseDate: release.release_date,
+        trackCount,
+      } satisfies RegistryReleaseSearchResult];
+    });
+
+  return results
+    .sort((a, b) => {
+      const primaryRank =
+        Number(
+          !primaryArtistReleaseIdSet.has(a.id),
+        ) -
+        Number(
+          !primaryArtistReleaseIdSet.has(b.id),
+        );
+
+      if (primaryRank !== 0) {
+        return primaryRank;
+      }
+
+      return String(b.releaseDate || "")
+        .localeCompare(
+          String(a.releaseDate || ""),
+        );
+    })
+    .slice(0, 30);
+}
+
 export async function searchRegistryTracks(
   query: string,
 ): Promise<RegistryTrackSearchResult[]> {
@@ -1936,23 +2132,45 @@ export async function searchRegistryTracks(
       .limit(20),
     supabase
       .from("registry_track_artists")
-      .select("track_id,artist_name_text")
+      .select(
+        "track_id,artist_name_text,is_primary",
+      )
       .eq("status", "active")
       .ilike("artist_name_text", pattern)
-      .limit(30),
+      .order("is_primary", {
+        ascending: false,
+      })
+      .limit(60),
   ]);
 
   if (titleResponse.error) throw titleResponse.error;
   if (artistResponse.error) throw artistResponse.error;
 
   const titleRows = titleResponse.data ?? [];
-  const artistTrackIds = (artistResponse.data ?? [])
-    .map((row) => row.track_id)
-    .filter(Boolean);
+  const artistRows = artistResponse.data ?? [];
 
-  const titleIds = titleRows.map((row) => row.id);
-  const allIds = Array.from(new Set([...titleIds, ...artistTrackIds]))
-    .slice(0, 30);
+  const titleIds =
+    titleRows.map((row) => row.id);
+
+  const primaryArtistTrackIds =
+    artistRows
+      .filter((row) => row.is_primary)
+      .map((row) => row.track_id)
+      .filter(Boolean);
+
+  const featuredArtistTrackIds =
+    artistRows
+      .filter((row) => !row.is_primary)
+      .map((row) => row.track_id)
+      .filter(Boolean);
+
+  const allIds = Array.from(
+    new Set([
+      ...primaryArtistTrackIds,
+      ...titleIds,
+      ...featuredArtistTrackIds,
+    ]),
+  );
 
   if (allIds.length === 0) return [];
 
@@ -1966,7 +2184,9 @@ export async function searchRegistryTracks(
       .eq("status", "active"),
     supabase
       .from("registry_track_artists")
-      .select("track_id,artist_name_text,is_primary")
+      .select(
+        "track_id,artist_name_text,artist_slug,is_primary",
+      )
       .in("track_id", allIds)
       .eq("status", "active"),
   ]);
@@ -1975,9 +2195,12 @@ export async function searchRegistryTracks(
   if (creditResponse.error) throw creditResponse.error;
 
   const tracks = trackResponse.data ?? [];
+
   const releaseIds = Array.from(
     new Set(
-      tracks.map((track) => track.release_id).filter(Boolean),
+      tracks
+        .map((track) => track.release_id)
+        .filter(Boolean),
     ),
   ) as string[];
 
@@ -1997,32 +2220,110 @@ export async function searchRegistryTracks(
     ]),
   );
 
-  const artistsByTrack = new Map<string, string[]>();
+  const artistsByTrack =
+    new Map<string, string[]>();
+
+  const primaryArtistSlugByTrack =
+    new Map<string, string>();
+
   (creditResponse.data ?? []).forEach((credit) => {
-    const names = artistsByTrack.get(credit.track_id) ?? [];
-    const name = credit.artist_name_text?.trim();
-    if (name && !names.includes(name)) names.push(name);
-    artistsByTrack.set(credit.track_id, names);
+    const names =
+      artistsByTrack.get(credit.track_id) ?? [];
+
+    const name =
+      credit.artist_name_text?.trim();
+
+    if (name && !names.includes(name)) {
+      names.push(name);
+    }
+
+    artistsByTrack.set(
+      credit.track_id,
+      names,
+    );
+
+    if (
+      credit.is_primary &&
+      !primaryArtistSlugByTrack.has(
+        credit.track_id,
+      )
+    ) {
+      const artistSlug =
+        credit.artist_slug?.trim();
+
+      if (artistSlug) {
+        primaryArtistSlugByTrack.set(
+          credit.track_id,
+          artistSlug,
+        );
+      }
+    }
   });
 
   const trackById = new Map(
-    tracks.map((track) => [track.id, track]),
+    tracks.map((track) => [
+      track.id,
+      track,
+    ]),
   );
 
-  return allIds.flatMap((id) => {
-    const track = trackById.get(id);
-    if (!track) return [];
-    return [{
-      id: track.id,
-      slug: track.slug,
-      title: track.title,
-      artistNames: artistsByTrack.get(track.id) ?? [],
-      releaseId: track.release_id,
-      releaseTitle: track.release_id
-        ? releaseTitleById.get(track.release_id) ?? null
-        : null,
-      artworkUrl: track.artwork_url,
-      previewUrl: track.preview_url,
-    } satisfies RegistryTrackSearchResult];
-  });
+  const primaryArtistTrackIdSet =
+    new Set(primaryArtistTrackIds);
+  const titleIdSet =
+    new Set(titleIds);
+
+  const results =
+    allIds.flatMap((id) => {
+      const track = trackById.get(id);
+      if (!track) return [];
+
+      return [{
+        id: track.id,
+        slug: track.slug,
+        title: track.title,
+        artistNames:
+          artistsByTrack.get(track.id) ?? [],
+        artistSlug:
+          primaryArtistSlugByTrack.get(
+            track.id,
+          ) ?? null,
+        releaseId: track.release_id,
+        releaseTitle: track.release_id
+          ? (
+              releaseTitleById.get(
+                track.release_id,
+              ) ?? null
+            )
+          : null,
+        artworkUrl: track.artwork_url,
+        previewUrl: track.preview_url,
+      } satisfies RegistryTrackSearchResult];
+    });
+
+  return results
+    .sort((a, b) => {
+      const rank = (id: string) => {
+        if (
+          primaryArtistTrackIdSet.has(id)
+        ) {
+          return 0;
+        }
+
+        if (titleIdSet.has(id)) {
+          return 1;
+        }
+
+        return 2;
+      };
+
+      const rankDifference =
+        rank(a.id) - rank(b.id);
+
+      if (rankDifference !== 0) {
+        return rankDifference;
+      }
+
+      return a.title.localeCompare(b.title);
+    })
+    .slice(0, 30);
 }

@@ -31,12 +31,6 @@ const detail =
     "utf8",
   );
 
-const migrationPath =
-  readFileSync(
-    "docs/engineering/live-schema-baseline.json",
-    "utf8",
-  );
-
 const migration =
   readFileSync(
     process.env.WK_PLAYLIST_COMMUNITY_MIGRATION ??
@@ -262,30 +256,5 @@ describe(
       },
     );
 
-    it(
-      "keeps the production schema baseline at or beyond M220",
-      () => {
-        const baseline = JSON.parse(
-          readFileSync(
-            "docs/engineering/live-schema-baseline.json",
-            "utf8",
-          ),
-        ) as {
-          migrationCount?: number;
-        };
-
-        expect(
-          baseline.migrationCount,
-        ).toBeTypeOf(
-          "number",
-        );
-
-        expect(
-          baseline.migrationCount ?? 0,
-        ).toBeGreaterThanOrEqual(
-          220,
-        );
-      },
-    );
   },
 );

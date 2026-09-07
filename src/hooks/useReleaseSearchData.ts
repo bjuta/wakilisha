@@ -1,24 +1,38 @@
 import { useState, useEffect } from "react";
 import { supabase } from "@/lib/supabase";
+import {
+  releaseTypeLabelFromActiveTrackCount,
+} from "@/utils/releaseUrl";
 
 export interface ReleaseSearchItem {
+  id: string;
   slug: string;
   title: string;
   artistName: string;
   artistSlug: string;
   artworkUrl: string;
-  releaseType: string;
+  releaseType: "Single" | "EP" | "Album";
   releaseDate: string;
   trackCount: number;
 }
 
-export function useReleaseSearchData() {
+export function useReleaseSearchData(enabled = true) {
   const [data, setData] = useState<ReleaseSearchItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     let alive = true;
+
+    if (!enabled) {
+      setData([]);
+      setLoading(false);
+      setError(null);
+      return () => {
+        alive = false;
+      };
+    }
+
     const fetchData = async () => {
       setLoading(true);
       try {
@@ -76,18 +90,30 @@ export function useReleaseSearchData() {
           trackCountByRelease[rt.release_id] = (trackCountByRelease[rt.release_id] || 0) + 1;
         });
 
-        const mapped: ReleaseSearchItem[] = releases.map((r) => {
+        const mapped: ReleaseSearchItem[] = releases.flatMap((r) => {
           const artist = artistByReleaseId[r.id] || { name: "Unknown", slug: "" };
-          return {
+          const trackCount =
+            trackCountByRelease[r.id] || 0;
+          const releaseType =
+            releaseTypeLabelFromActiveTrackCount(
+              trackCount,
+            );
+
+          if (!releaseType) {
+            return [];
+          }
+
+          return [{
+            id: r.id,
             slug: r.slug,
             title: r.title,
             artistName: artist.name,
             artistSlug: artist.slug,
             artworkUrl: r.artwork_url || "",
-            releaseType: r.release_type || "Release",
+            releaseType,
             releaseDate: r.release_date || "",
-            trackCount: trackCountByRelease[r.id] || 0,
-          };
+            trackCount,
+          }];
         });
 
         if (alive) setData(mapped);
@@ -101,7 +127,7 @@ export function useReleaseSearchData() {
 
     fetchData();
     return () => { alive = false; };
-  }, []);
+  }, [enabled]);
 
   return { data, loading, error };
 }

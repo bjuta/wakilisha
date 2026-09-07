@@ -31,6 +31,12 @@ const detail =
     "utf8",
   );
 
+const playlistRichText =
+  readFileSync(
+    "src/utils/playlistRichText.ts",
+    "utf8",
+  );
+
 describe(
   "Phase 5B public Playlist routes",
   () => {
@@ -215,6 +221,41 @@ describe(
         expect(detail)
           .toContain(
             "Playlist not found",
+          );
+      },
+    );
+
+    it(
+      "renders Playlist Story as constrained rich prose while keeping metadata plain",
+      () => {
+        expect(detail)
+          .toContain(
+            "playlistDescriptionToPlainText",
+          );
+
+        expect(detail)
+          .toContain(
+            "playlistDescriptionToSafeHtml",
+          );
+
+        expect(detail)
+          .toContain(
+            "dangerouslySetInnerHTML",
+          );
+
+        expect(playlistRichText)
+          .toContain(
+            "ALLOWED_PLAYLIST_TAGS",
+          );
+
+        expect(playlistRichText)
+          .toContain(
+            "SAFE_EXTERNAL_PROTOCOLS",
+          );
+
+        expect(playlistRichText)
+          .not.toContain(
+            '"script"',
           );
       },
     );

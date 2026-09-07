@@ -2,6 +2,7 @@ import { useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { WkIcon } from "@/components/design-system/Icon";
 import { WkSurface } from "@/components/design-system/primitives/Surface";
+import { RichTextEditor } from "@/components/design-system/editorial/RichTextEditor";
 import {
   createPlaylist,
   slugifyPlaylistTitle,
@@ -117,18 +118,20 @@ export default function AdminNewPlaylistPage() {
           </p>
         </div>
 
-        <label className="block">
+        <div>
           <span className="mb-1.5 block text-[11px] font-black uppercase tracking-wider text-wk-text-muted">
             Description
           </span>
-          <textarea
-            value={description}
-            onChange={(event) => setDescription(event.target.value)}
-            rows={5}
-            className="w-full resize-y rounded-xl border border-wk-border bg-wk-bg px-4 py-3 text-[13px] leading-6 text-wk-text outline-none focus:border-wk-brand"
-            placeholder="What should someone understand before they press play?"
-          />
-        </label>
+          <div className="overflow-hidden rounded-xl border border-wk-border bg-wk-bg">
+            <RichTextEditor
+              profile="playlist-description"
+              value={description}
+              onChange={setDescription}
+              minHeight={260}
+              placeholder="What should someone understand before they press play?"
+            />
+          </div>
+        </div>
 
         {error ? (
           <div className="rounded-lg bg-wk-danger-soft px-3 py-2 text-[12px] text-wk-danger">
