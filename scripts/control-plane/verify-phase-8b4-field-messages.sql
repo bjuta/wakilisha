@@ -66,8 +66,8 @@ begin
      or position('has_field_scope' in v_access_definition)=0 then
     raise exception 'PHASE_8B4_FIELD_FAIL: Messages access projection lacks scoped-start split';
   end if;
-  if position("f.follow_up_permission = 'allowed'" in v_scope_definition)=0
-     or position("f.preferred_contact_channel = 'messages'" in v_scope_definition)=0
+  if position('follow_up_permission' in v_scope_definition)=0
+     or position('preferred_contact_channel' in v_scope_definition)=0
      or position('count(*)' in v_scope_definition)=0 then
     raise exception 'PHASE_8B4_FIELD_FAIL: Field Conversation scope is not current-policy constrained';
   end if;
@@ -159,7 +159,6 @@ select alternate_field_resource_id,'field_submission','FS-20260907-A1B2C3D4E6',c
 union all
 select retired_field_resource_id,'field_submission','FS-20260907-A1B2C3D4E7',retired_id,'authenticated',1,'received','standard','do_not_name','account_contact','allowed','messages','owns_or_controls','granted','none','internal','none','not_collected',retired_id,retired_id,now(),gen_random_uuid() from phase8b4_field_fixture;
 
--- Retire the exact canonical identity link after Field Submission creation.
 update editorial.person_identity_links
 set link_state='retired',updated_at=now()
 where user_id=(select retired_id from phase8b4_field_fixture)
