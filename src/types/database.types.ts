@@ -22014,6 +22014,7 @@ export type Database = {
         Returns: Json
       }
       get_messages_control_center_status: { Args: never; Returns: Json }
+      get_messages_system_actors: { Args: never; Returns: Json }
       get_my_field_submission_v1: {
         Args: { p_submission_resource_id: string }
         Returns: {
@@ -24615,6 +24616,16 @@ export type Database = {
           p_expected_governance_revision: number
           p_public_safe: boolean
           p_reason?: string
+        }
+        Returns: Json
+      }
+      set_messages_system_actor_enabled: {
+        Args: {
+          p_actor_key: string
+          p_correlation_id?: string
+          p_enabled: boolean
+          p_expected_revision: number
+          p_idempotency_key: string
         }
         Returns: Json
       }
