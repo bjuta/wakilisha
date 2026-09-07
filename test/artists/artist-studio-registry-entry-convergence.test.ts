@@ -195,7 +195,7 @@ describe(
         expect(
           routeAudit,
         ).toContain(
-          "expectedRoutePathCount = 178",
+          "expectedRoutePathCount = 179",
         );
       },
     );
