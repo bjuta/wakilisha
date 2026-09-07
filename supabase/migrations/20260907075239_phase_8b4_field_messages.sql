@@ -40,6 +40,13 @@ alter table editorial.field_submissions
   add column preferred_contact_channel text,
   add column contact_point_id uuid;
 
+-- This is a one-time schema backfill, not a product mutation. Existing
+-- terminal Field submissions are intentionally immutable through the normal
+-- Phase 8A mutation path, so suspend only that guard for this deterministic
+-- compatibility backfill inside the migration transaction.
+alter table editorial.field_submissions
+  disable trigger field_submissions_protect_mutation;
+
 update editorial.field_submissions
 set follow_up_permission = case contact_preference
   when 'no_follow_up' then 'not_allowed'
@@ -47,6 +54,9 @@ set follow_up_permission = case contact_preference
 end,
 preferred_contact_channel = null,
 contact_point_id = null;
+
+alter table editorial.field_submissions
+  enable trigger field_submissions_protect_mutation;
 
 alter table editorial.field_submissions
   alter column follow_up_permission set not null,

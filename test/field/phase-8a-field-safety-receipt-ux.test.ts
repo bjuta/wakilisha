@@ -163,6 +163,38 @@ describe("Phase 8A.5 Field safety and receipt UX", () => {
   });
 });
 
+describe("Phase 8B.4 Candidate B migration safety", () => {
+  it("backfills terminal Field submissions without weakening the runtime mutation guard", () => {
+    const migration = read(
+      "supabase/migrations/20260907075239_phase_8b4_field_messages.sql",
+    );
+
+    const disable = migration.indexOf(
+      "disable trigger field_submissions_protect_mutation",
+    );
+    const backfill = migration.indexOf(
+      "update editorial.field_submissions\nset follow_up_permission",
+    );
+    const enable = migration.indexOf(
+      "enable trigger field_submissions_protect_mutation",
+    );
+
+    expect(disable).toBeGreaterThan(-1);
+    expect(backfill).toBeGreaterThan(disable);
+    expect(enable).toBeGreaterThan(backfill);
+    expect(
+      migration.match(
+        /disable trigger field_submissions_protect_mutation/g,
+      )?.length,
+    ).toBe(1);
+    expect(
+      migration.match(
+        /enable trigger field_submissions_protect_mutation/g,
+      )?.length,
+    ).toBe(1);
+  });
+});
+
 describe("Phase 8B.4 Candidate B Field Messages product convergence", () => {
   it("uses the explicit Field contact contract and v2 create command", () => {
     const fieldService = read("src/services/fieldIntakeService.ts");
