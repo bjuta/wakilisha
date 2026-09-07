@@ -199,6 +199,25 @@ describe("Phase 8B.4 Candidate B Field Messages product convergence", () => {
     );
   });
 
+  it("projects governed Field references back into their owning workflow", () => {
+    const messagesPage = read("src/pages/messages/page.tsx");
+    const adminFieldPage = read("src/pages/admin/field/page.tsx");
+
+    expect(messagesPage).toContain("GovernedResourceReferenceCard");
+    expect(messagesPage).toContain("getFieldSubmissionIntake(reference.resource_id)");
+    expect(messagesPage).toContain("Field Submission");
+    expect(messagesPage).toContain("Open in Field");
+    expect(messagesPage).toContain("/admin/field?submission=");
+    expect(messagesPage).toContain(
+      "Reference available through its owning workflow.",
+    );
+    expect(adminFieldPage).toContain('searchParams.get("submission")');
+    expect(adminFieldPage).toContain("requestedSubmissionId");
+    expect(adminFieldPage).toContain(
+      "setSearchParams({ submission: submissionResourceId }",
+    );
+  });
+
   it("hands authorized newsroom Field follow-up into canonical Messages", () => {
     const roles = read("src/services/userRoles.ts");
     const newsroom = read("src/services/fieldNewsroom.ts");

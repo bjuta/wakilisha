@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import {
   getFieldSubmissionIntake,
   listFieldSubmissionIntakes,
@@ -21,6 +21,8 @@ function label(value: string | null | undefined): string {
 
 export default function AdminFieldPage() {
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const requestedSubmissionId = searchParams.get("submission");
   const [rows, setRows] = useState<FieldIntakeSummary[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [detail, setDetail] = useState<FieldIntakeDetail | null>(null);
@@ -36,13 +38,20 @@ export default function AdminFieldPage() {
     try {
       const next = await listFieldSubmissionIntakes();
       setRows(next);
-      setSelectedId((current) => current && next.some((row) => row.submission_resource_id === current) ? current : next[0]?.submission_resource_id ?? null);
+      const requested = requestedSubmissionId
+        && next.some((row) => row.submission_resource_id === requestedSubmissionId)
+        ? requestedSubmissionId
+        : null;
+      setSelectedId((current) => requested
+        ?? (current && next.some((row) => row.submission_resource_id === current)
+          ? current
+          : next[0]?.submission_resource_id ?? null));
     } catch (err) {
       setError(err instanceof Error ? err.message : "Field intake could not be loaded.");
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [requestedSubmissionId]);
 
   useEffect(() => { void load(); }, [load]);
 
@@ -57,6 +66,11 @@ export default function AdminFieldPage() {
       .finally(() => { if (!cancelled) setLoadingDetail(false); });
     return () => { cancelled = true; };
   }, [selectedId]);
+
+  const selectSubmission = (submissionResourceId: string) => {
+    setSelectedId(submissionResourceId);
+    setSearchParams({ submission: submissionResourceId }, { replace: true });
+  };
 
   const handleMessage = async () => {
     if (!detail?.can_message_contributor || !messageBody.trim() || starting) return;
@@ -93,7 +107,7 @@ export default function AdminFieldPage() {
             <div className="flex min-h-[320px] items-center justify-center px-6 text-center text-[11px] font-bold text-[var(--wk-text-muted)]">No Field submissions are available.</div>
           ) : (
             <div className="divide-y divide-[var(--wk-divider)]">{rows.map((row) => (
-              <button key={row.submission_resource_id} type="button" onClick={() => setSelectedId(row.submission_resource_id)} className={`w-full px-4 py-4 text-left transition-colors ${selectedId === row.submission_resource_id ? "bg-[var(--wk-brand-soft)]" : "hover:bg-[var(--wk-surface-raised)]"}`}>
+              <button key={row.submission_resource_id} type="button" onClick={() => selectSubmission(row.submission_resource_id)} className={`w-full px-4 py-4 text-left transition-colors ${selectedId === row.submission_resource_id ? "bg-[var(--wk-brand-soft)]" : "hover:bg-[var(--wk-surface-raised)]"}`}>
                 <div className="flex items-center justify-between gap-3"><span className="truncate text-[12px] font-black text-[var(--wk-text)]">{row.submission_reference}</span><span className="shrink-0 text-[9px] font-black uppercase tracking-[0.1em] text-[var(--wk-text-faint)]">{label(row.submission_state)}</span></div>
                 <div className="mt-2 flex flex-wrap gap-2 text-[10px] font-bold text-[var(--wk-text-muted)]"><span>{label(row.newsroom_identity_mode)} identity</span><span>•</span><span>{row.follow_up_permission === "allowed" ? "follow-up allowed" : "no follow-up"}</span>{row.preferred_contact_channel ? <><span>•</span><span>{label(row.preferred_contact_channel)}</span></> : null}</div>
               </button>
