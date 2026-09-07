@@ -3,6 +3,10 @@ import { Link, useSearchParams } from "react-router-dom";
 import { useAuthUser } from "@/hooks/useAuthUser";
 import { useMessagesAccess } from "@/hooks/useMessagesAccess";
 import {
+  getFieldSubmissionIntake,
+  type FieldIntakeDetail,
+} from "@/services/fieldNewsroom";
+import {
   acceptMessageRequest,
   declineMessageRequest,
   getMessageConversation,
@@ -21,6 +25,7 @@ import {
   type MessageConversationSummary,
   type MessageFolder,
   type MessageRecipientSuggestion,
+  type MessageResourceReference,
 } from "@/services/messages";
 
 const FOLDERS: Array<{ key: MessageFolder; label: string; icon: string }> = [
@@ -53,6 +58,104 @@ function Avatar({ summary, size = "h-10 w-10" }: { summary: MessageConversationS
           {name.slice(0, 1).toUpperCase()}
         </span>
       )}
+    </div>
+  );
+}
+
+type ResolvedFieldReference = Pick<
+  FieldIntakeDetail,
+  "submission_reference" | "submission_state" | "current_revision"
+>;
+
+function GovernedResourceReferenceCard({
+  reference,
+  mine,
+}: {
+  reference: MessageResourceReference;
+  mine: boolean;
+}) {
+  const [field, setField] = useState<ResolvedFieldReference | null>(null);
+  const [resolved, setResolved] = useState(false);
+
+  useEffect(() => {
+    let alive = true;
+
+    if (
+      reference.presentation_kind !== "resource"
+      || reference.resource_version_id
+    ) {
+      setField(null);
+      setResolved(true);
+      return () => {
+        alive = false;
+      };
+    }
+
+    setResolved(false);
+
+    getFieldSubmissionIntake(reference.resource_id)
+      .then((next) => {
+        if (alive) setField(next);
+      })
+      .catch(() => {
+        if (alive) setField(null);
+      })
+      .finally(() => {
+        if (alive) setResolved(true);
+      });
+
+    return () => {
+      alive = false;
+    };
+  }, [
+    reference.presentation_kind,
+    reference.resource_id,
+    reference.resource_version_id,
+  ]);
+
+  const shellClass = mine
+    ? "border-white/20 bg-white/10 text-white"
+    : "border-[var(--wk-border)] bg-[var(--wk-surface)] text-[var(--wk-text)]";
+  const mutedClass = mine
+    ? "text-white/75"
+    : "text-[var(--wk-text-muted)]";
+
+  if (field) {
+    return (
+      <Link
+        to={`/admin/field?submission=${encodeURIComponent(reference.resource_id)}`}
+        className={`block rounded-xl border p-3 transition-colors hover:bg-black/5 ${shellClass}`}
+      >
+        <div className="flex items-start justify-between gap-3">
+          <div className="min-w-0">
+            <div className="text-[9px] font-black uppercase tracking-[0.12em]">
+              Field Submission
+            </div>
+            <div className="mt-1 truncate text-[11px] font-black">
+              {field.submission_reference}
+            </div>
+            <div className={`mt-1 text-[9px] font-bold capitalize ${mutedClass}`}>
+              {field.submission_state.replaceAll("_", " ")} · Revision {field.current_revision}
+            </div>
+          </div>
+          <span className="shrink-0 text-[9px] font-black">
+            Open in Field <i className="ri-arrow-right-up-line" />
+          </span>
+        </div>
+      </Link>
+    );
+  }
+
+  return (
+    <div className={`rounded-xl border p-3 ${shellClass}`}>
+      <div className="text-[9px] font-black uppercase tracking-[0.12em]">
+        Governed Resource
+      </div>
+      <div className={`mt-1 text-[9px] font-bold ${mutedClass}`}>
+        {resolved
+          ? "Reference available through its owning workflow."
+          : "Resolving owning workflow..."}
+      </div>
     </div>
   );
 }
@@ -364,8 +467,14 @@ export default function MessagesPage() {
                           <div className={`max-w-[82%] rounded-2xl px-4 py-3 sm:max-w-[70%] ${mine ? "rounded-br-md bg-[var(--wk-brand)] text-[var(--wk-brand-on)]" : "rounded-bl-md bg-[var(--wk-surface-raised)] text-[var(--wk-text)]"}`}>
                             <p className="whitespace-pre-wrap break-words text-[13px] leading-relaxed">{message.body}</p>
                             {message.resource_references?.length > 0 && (
-                              <div className={`mt-2 border-t pt-2 text-[9px] font-bold ${mine ? "border-white/20 text-white/75" : "border-[var(--wk-divider)] text-[var(--wk-text-faint)]"}`}>
-                                {message.resource_references.length} governed Resource reference{message.resource_references.length === 1 ? "" : "s"}
+                              <div className={`mt-2 space-y-2 border-t pt-2 ${mine ? "border-white/20" : "border-[var(--wk-divider)]"}`}>
+                                {message.resource_references.map((reference) => (
+                                  <GovernedResourceReferenceCard
+                                    key={`${reference.presentation_kind}:${reference.resource_id}:${reference.resource_version_id ?? "resource"}`}
+                                    reference={reference}
+                                    mine={mine}
+                                  />
+                                ))}
                               </div>
                             )}
                             <div className={`mt-1.5 flex items-center justify-end gap-1 text-[9px] font-bold ${mine ? "text-white/70" : "text-[var(--wk-text-faint)]"}`}>
