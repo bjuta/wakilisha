@@ -142,6 +142,7 @@ export interface MessagesSystemActor {
 export interface MyMessagesAccess {
   audience_mode: string;
   sender_category: string;
+  can_start: boolean;
   can_send: boolean;
   has_conversations: boolean;
   visible: boolean;
@@ -194,6 +195,7 @@ export async function getMyMessagesAccess(): Promise<MyMessagesAccess> {
   return {
     audience_mode: String(raw.audience_mode ?? "unknown"),
     sender_category: String(raw.sender_category ?? "unknown"),
+    can_start: raw.can_start === true,
     can_send: raw.can_send === true,
     has_conversations: raw.has_conversations === true,
     visible: raw.visible === true,

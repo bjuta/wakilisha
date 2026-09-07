@@ -236,6 +236,10 @@ export const AdminLyricsPage = lazy(() =>
   import("../pages/admin/content/lyrics/page"),
 );
 
+export const AdminFieldPage = lazy(() =>
+  import("../pages/admin/field/page"),
+);
+
 export const AdminMessagesPage = lazy(() =>
   import("../pages/admin/messages/page"),
 );

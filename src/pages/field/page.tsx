@@ -35,7 +35,7 @@ type FieldDeclarationDraft = {
   newsroomIdentityMode: FieldDeclarations["newsroom_identity_mode"];
   publicAttributionPreference:
     FieldDeclarations["public_attribution_preference"];
-  contactPreference: FieldDeclarations["contact_preference"];
+  followUpChoice: "" | "messages" | "none";
   rightsDeclaration: FieldDeclarations["rights_declaration"] | "";
   consentDeclaration: FieldDeclarations["consent_declaration"] | "";
   declaredSensitivity: FieldDeclarations["declared_sensitivity"];
@@ -50,7 +50,7 @@ type FieldDeclarationDraft = {
 const INITIAL_DECLARATION_DRAFT: FieldDeclarationDraft = {
   newsroomIdentityMode: "standard",
   publicAttributionPreference: "do_not_name",
-  contactPreference: "account_contact",
+  followUpChoice: "",
   rightsDeclaration: "",
   consentDeclaration: "",
   declaredSensitivity: "none",
@@ -98,6 +98,12 @@ function buildFieldDeclarations(
     requestedEmbargoUntil = embargoDate.toISOString();
   }
 
+  if (!draft.followUpChoice) {
+    throw new Error("Choose how the newsroom may follow up.");
+  }
+
+  const followUpAllowed = draft.followUpChoice === "messages";
+
   const locationDescription = draft.locationDescription.trim();
 
   if (
@@ -113,7 +119,10 @@ function buildFieldDeclarations(
     newsroom_identity_mode: draft.newsroomIdentityMode,
     public_attribution_preference:
       draft.publicAttributionPreference,
-    contact_preference: draft.contactPreference,
+    contact_preference: followUpAllowed ? "account_contact" : "no_follow_up",
+    follow_up_permission: followUpAllowed ? "allowed" : "not_allowed",
+    preferred_contact_channel: followUpAllowed ? "messages" : null,
+    contact_point_id: null,
     rights_declaration: rightsDeclaration,
     rights_declaration_detail: null,
     consent_declaration: consentDeclaration,
@@ -149,21 +158,26 @@ function ChoiceButton({
   onClick,
   title,
   description,
+  disabled = false,
 }: {
   selected: boolean;
   onClick: () => void;
   title: string;
   description?: string;
+  disabled?: boolean;
 }) {
   return (
     <button
       type="button"
       aria-pressed={selected}
       onClick={onClick}
+      disabled={disabled}
       className={`w-full rounded-2xl border px-3 py-3 text-left transition-colors ${
-        selected
-          ? "border-[var(--wk-brand)] bg-[var(--wk-brand-soft)]"
-          : "border-[var(--wk-border)] bg-[var(--wk-bg)] hover:bg-[var(--wk-surface-raised)]"
+        disabled
+          ? "cursor-not-allowed border-[var(--wk-border)] bg-[var(--wk-surface-raised)] opacity-55"
+          : selected
+            ? "border-[var(--wk-brand)] bg-[var(--wk-brand-soft)]"
+            : "border-[var(--wk-border)] bg-[var(--wk-bg)] hover:bg-[var(--wk-surface-raised)]"
       }`}
     >
       <span className="block text-[12px] font-black text-[var(--wk-text)]">
@@ -1371,34 +1385,23 @@ export default function FieldIntakePage() {
                           <p className="text-[12px] font-black text-[var(--wk-text)]">
                             Follow-Up
                           </p>
+                          <p className="mt-1 text-[11px] leading-5 text-[var(--wk-text-muted)]">
+                            Choose how the newsroom may contact you about this submission.
+                          </p>
 
                           <div className="mt-2 grid gap-2 sm:grid-cols-2">
                             <ChoiceButton
-                              selected={
-                                declarationDraft.contactPreference
-                                === "account_contact"
-                              }
-                              onClick={() =>
-                                setDeclarationDraft((current) => ({
-                                  ...current,
-                                  contactPreference: "account_contact",
-                                }))
-                              }
-                              title="You Can Contact Me"
+                              selected={declarationDraft.followUpChoice === "messages"}
+                              onClick={() => setDeclarationDraft((current) => ({ ...current, followUpChoice: "messages" }))}
+                              title="Messages"
+                              description="Continue privately in WAKILISHA Messages."
                             />
-
+                            <ChoiceButton selected={false} onClick={() => undefined} title="Email" description="Email follow-up is not enabled yet." disabled />
+                            <ChoiceButton selected={false} onClick={() => undefined} title="Phone" description="Phone follow-up is not enabled yet." disabled />
                             <ChoiceButton
-                              selected={
-                                declarationDraft.contactPreference
-                                === "no_follow_up"
-                              }
-                              onClick={() =>
-                                setDeclarationDraft((current) => ({
-                                  ...current,
-                                  contactPreference: "no_follow_up",
-                                }))
-                              }
-                              title="No Follow-Up"
+                              selected={declarationDraft.followUpChoice === "none"}
+                              onClick={() => setDeclarationDraft((current) => ({ ...current, followUpChoice: "none" }))}
+                              title="Do not contact me"
                             />
                           </div>
                         </div>

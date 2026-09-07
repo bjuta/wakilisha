@@ -8,6 +8,7 @@ import {
 const CLOSED: MyMessagesAccess = {
   audience_mode: "unknown",
   sender_category: "unknown",
+  can_start: false,
   can_send: false,
   has_conversations: false,
   visible: false,
