@@ -432,9 +432,12 @@ const routePaths = [
  * Phase 8A.4 adds one authenticated Field intake path:
  * - /field
  *
- * Phase 8B.3 adds two route paths:\n * - /messages\n * - messages (Admin Messages Control Center)\n *\n * The current authority is 178 paths. Removing the Messages paths, the Artist\n * Studio path, the Field intake path, the five declared public Audio and Show\n * paths, the two K5B Admin Video paths, and the two public Video paths must\n * still reproduce the exact 165-path pre-M1 sequence.
+ * Phase 8B.3 adds two route paths:\n * - /messages\n * - messages (Admin Messages Control Center)\n *\n * Phase 8B.4 Candidate B adds one Admin Field path:
+ * - field
+ *
+ * The current authority is 179 paths. Removing the Messages paths, the Artist\n * Studio path, the Field intake path, the five declared public Audio and Show\n * paths, the two K5B Admin Video paths, and the two public Video paths must\n * still reproduce the exact 165-path pre-M1 sequence.
  */
-const expectedRoutePathCount = 178;
+const expectedRoutePathCount = 179;
 const publicAudioIndexPath = "/audio";
 const publicAudioPath = "/audio/:slug";
 const publicShowIndexPath = "/shows";
@@ -444,6 +447,7 @@ const publicArtistStudioPath = "/artist-studio";
 const publicFieldPath = "/field";
 const publicMessagesPath = "/messages";
 const adminMessagesPath = "messages";
+const adminFieldPath = "field";
 const adminVideoIndexPath = "video";
 const adminVideoDetailPath = "video/:publicationId";
 const publicVideoIndexPath = "/video";
@@ -465,6 +469,7 @@ for (const [routePath, label] of [
   [publicFieldPath, "Field Intake"],
   [publicMessagesPath, "Messages"],
   [adminMessagesPath, "Admin Messages Control Center"],
+  [adminFieldPath, "Admin Field"],
   [adminVideoIndexPath, "Admin Video Directory"],
   [adminVideoDetailPath, "Admin Video Detail"],
   [publicVideoIndexPath, "Public Video Directory"],
@@ -500,6 +505,7 @@ const preM1RoutePaths = routePaths.filter(
     routePath !== publicFieldPath &&
     routePath !== publicMessagesPath &&
     routePath !== adminMessagesPath &&
+    routePath !== adminFieldPath &&
     routePath !== adminVideoIndexPath &&
     routePath !== adminVideoDetailPath &&
     routePath !== publicVideoIndexPath &&
