@@ -192,20 +192,23 @@ begin
       message = 'Playlist Review participation permission is required.';
   end if;
 
-  select
-    resource_row.*,
-    binding.playlist_id
-  into
-    v_resource,
-    v_playlist_id
+  select resource_row.*
+  into v_resource
   from editorial.resources resource_row
-  join editorial.playlist_resources binding
-    on binding.resource_id = resource_row.id
   where resource_row.id = p_resource_id
     and resource_row.resource_kind = 'playlist';
 
   if not found then
     raise exception 'Playlist Resource does not exist';
+  end if;
+
+  select binding.playlist_id
+  into v_playlist_id
+  from editorial.playlist_resources binding
+  where binding.resource_id = p_resource_id;
+
+  if not found then
+    raise exception 'Playlist Resource binding does not exist';
   end if;
 
   select playlist.*
