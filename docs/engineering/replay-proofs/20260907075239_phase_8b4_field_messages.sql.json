@@ -1,7 +1,7 @@
 {
   "migration_file": "supabase/migrations/20260907075239_phase_8b4_field_messages.sql",
-  "migration_sha256": "5555f4d288ee68c7375956749d9032823821e725e0b66d3487b1feacab89aa98",
-  "base_main_sha": "44f6ac5f513fe5220dbaaa34739ec55f8d3f7e56",
+  "migration_sha256": "fccea161f6f7c6da07d8b6d14ad8a5a510b0db2f6aa3ec2296138503dacb17d9",
+  "base_main_sha": "148ae2d4b616fbcc08892cc38442f4625b60c687",
   "preview_project_ref": "gmwnyorylzietjwxytoa",
   "preview_branch_id": "7c5b57e2-207a-47bb-a53c-fbb659f732b6",
   "preview_migration_head": "20260907075239",
@@ -12,5 +12,5 @@
   "schema_types_sha256": "2f0c520915d1f752700ca8a5e204d9f389c87e66542d6bf15734823fe06204c9",
   "schema_migration_count": 108,
   "schema_migration_head": "20260907075816",
-  "verified_at": "2026-09-07T09:12:50.565Z"
+  "verified_at": "2026-09-07T11:27:21.343Z"
 }
