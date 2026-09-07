@@ -111,9 +111,13 @@ update phase8b4_field_fixture f set contributor_person=l.person_resource_id from
 update phase8b4_field_fixture f set author_person=l.person_resource_id from editorial.person_identity_links l where l.user_id=f.author_id and l.link_state='active';
 update phase8b4_field_fixture f set retired_person=l.person_resource_id from editorial.person_identity_links l where l.user_id=f.retired_id and l.link_state='active';
 
-if exists(select 1 from phase8b4_field_fixture where editor_person is null or contributor_person is null or author_person is null or retired_person is null) then
-  raise exception 'PHASE_8B4_FIELD_FAIL: fixture canonical Person provisioning failed';
-end if;
+do $identity_assert$
+begin
+  if exists(select 1 from phase8b4_field_fixture where editor_person is null or contributor_person is null or author_person is null or retired_person is null) then
+    raise exception 'PHASE_8B4_FIELD_FAIL: fixture canonical Person provisioning failed';
+  end if;
+end
+$identity_assert$;
 
 insert into editorial.resources(id,resource_kind,owner_id,visibility,lifecycle_state,created_by)
 select field_resource_id,'field_submission',contributor_id,'private','active',contributor_id from phase8b4_field_fixture
