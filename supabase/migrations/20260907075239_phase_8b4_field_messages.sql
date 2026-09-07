@@ -55,8 +55,14 @@ end,
 preferred_contact_channel = null,
 contact_point_id = null;
 
+-- The backfill UPDATE queues the existing deferred Resource-binding
+-- constraint trigger. Flush those events before changing trigger state again.
+set constraints all immediate;
+
 alter table editorial.field_submissions
   enable trigger field_submissions_protect_mutation;
+
+set constraints all deferred;
 
 alter table editorial.field_submissions
   alter column follow_up_permission set not null,

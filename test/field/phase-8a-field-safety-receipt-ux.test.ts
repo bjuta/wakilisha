@@ -175,13 +175,18 @@ describe("Phase 8B.4 Candidate B migration safety", () => {
     const backfill = migration.indexOf(
       "update editorial.field_submissions\nset follow_up_permission",
     );
+    const flush = migration.indexOf(
+      "set constraints all immediate",
+      backfill,
+    );
     const enable = migration.indexOf(
       "enable trigger field_submissions_protect_mutation",
     );
 
     expect(disable).toBeGreaterThan(-1);
     expect(backfill).toBeGreaterThan(disable);
-    expect(enable).toBeGreaterThan(backfill);
+    expect(flush).toBeGreaterThan(backfill);
+    expect(enable).toBeGreaterThan(flush);
     expect(
       migration.match(
         /disable trigger field_submissions_protect_mutation/g,
