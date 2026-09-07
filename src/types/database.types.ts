@@ -5551,6 +5551,10 @@ export type Database = {
         Args: { p_user_id: string }
         Returns: undefined
       }
+      user_can_participate_playlist_review_v1: {
+        Args: { p_resource_id: string; p_user_id: string }
+        Returns: boolean
+      }
       user_has_capability_v1: {
         Args: { p_capability: string; p_user_id: string }
         Returns: boolean
@@ -22049,6 +22053,10 @@ export type Database = {
       }
       get_media_upload_session_v1: {
         Args: { p_session_id: string }
+        Returns: Json
+      }
+      get_message_playlist_review_projection_v1: {
+        Args: { p_resource_id: string; p_resource_version_id: string }
         Returns: Json
       }
       get_messages_control_center_status: { Args: never; Returns: Json }
