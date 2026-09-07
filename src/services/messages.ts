@@ -63,6 +63,25 @@ export interface MessageResourceReference {
   presentation_kind: "resource" | "version";
 }
 
+export interface MessagePlaylistReviewProjection {
+  resource_id: string;
+  resource_version_id: string;
+  playlist_id: string;
+  title: string;
+  slug: string;
+  version_number: number;
+  version_kind: string;
+  playlist_status: string;
+  authority_revision: number;
+  current_submitted_version_id: string | null;
+  is_current_submitted: boolean;
+  can_participate_review: boolean;
+  can_manage_review: boolean;
+  allowed_review_actions: Array<
+    "start_review" | "request_changes" | "approve"
+  >;
+}
+
 export interface MessageRow {
   id: string;
   message_kind: string;
@@ -234,6 +253,19 @@ export async function getMessageConversation(
   });
 }
 
+export async function getMessagePlaylistReviewProjection(
+  resourceId: string,
+  resourceVersionId: string,
+): Promise<MessagePlaylistReviewProjection> {
+  return rpc<MessagePlaylistReviewProjection>(
+    "get_message_playlist_review_projection_v1",
+    {
+      p_resource_id: resourceId,
+      p_resource_version_id: resourceVersionId,
+    },
+  );
+}
+
 export async function markMessageConversationRead(
   conversationId: string,
 ): Promise<void> {
@@ -257,6 +289,7 @@ export async function searchMessageRecipients(
 export async function startMessageConversation(
   recipientPersonResourceId: string,
   body: string,
+  resourceReferences: MessageResourceReference[] = [],
 ): Promise<{
   conversation_id: string;
   message_id: string;
@@ -271,7 +304,7 @@ export async function startMessageConversation(
   }>>("start_message_conversation", {
     p_recipient_person_resource_id: recipientPersonResourceId,
     p_body: body,
-    p_resource_references: [],
+    p_resource_references: resourceReferences,
     p_idempotency_key: actionKey("messages.start"),
     p_correlation_id: null,
     p_client_created_at: new Date().toISOString(),
@@ -283,11 +316,12 @@ export async function startMessageConversation(
 export async function sendMessage(
   conversationId: string,
   body: string,
+  resourceReferences: MessageResourceReference[] = [],
 ): Promise<void> {
   await rpc("send_message", {
     p_conversation_id: conversationId,
     p_body: body,
-    p_resource_references: [],
+    p_resource_references: resourceReferences,
     p_idempotency_key: actionKey("messages.send"),
     p_correlation_id: null,
     p_client_created_at: new Date().toISOString(),

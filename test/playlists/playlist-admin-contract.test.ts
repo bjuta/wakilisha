@@ -206,6 +206,9 @@ describe("Phase 5A Playlist admin product", () => {
     const workspace = source(
       "src/pages/admin/content/playlists/detail/PlaylistEditorWorkspace.tsx",
     );
+    const decisionWorkspace = source(
+      "src/pages/admin/content/playlists/detail/components/PlaylistReviewDecisionWorkspace.tsx",
+    );
     const service = source(
       "src/services/playlists/playlistAdminService.ts",
     );
@@ -223,11 +226,7 @@ describe("Phase 5A Playlist admin product", () => {
 
     for (const action of [
       "Submit for Review",
-      "Start Review",
-      "Request changes",
-      "Approve",
       "Schedule",
-      "Publish",
       "Unschedule",
       "Unpublish",
       "Archive",
@@ -235,6 +234,42 @@ describe("Phase 5A Playlist admin product", () => {
     ]) {
       expect(workspace).toContain(action);
     }
+
+    expect(workspace).toContain("PlaylistReviewDecisionWorkspace");
+
+    for (const action of [
+      "Start Review",
+      "Request Changes",
+      "Approve",
+      "Publish",
+    ]) {
+      expect(decisionWorkspace).toContain(action);
+    }
+  });
+
+  it("hands exact submitted Playlist versions into canonical Messages without moving Review authority", () => {
+    const workspace = source(
+      "src/pages/admin/content/playlists/detail/PlaylistEditorWorkspace.tsx",
+    );
+    const messagesService = source("src/services/messages.ts");
+    const messagesPage = source("src/pages/messages/page.tsx");
+
+    expect(workspace).toContain("Discuss in Messages");
+    expect(workspace).toContain("workflow=playlist-review");
+    expect(workspace).toContain("presentation=version");
+    expect(messagesService).toContain(
+      "get_message_playlist_review_projection_v1",
+    );
+    expect(messagesService).toContain(
+      "p_resource_references: resourceReferences",
+    );
+    expect(messagesPage).toContain("Playlist Review");
+    expect(messagesPage).toContain("Start Review");
+    expect(messagesPage).toContain("Request Changes");
+    expect(messagesPage).toContain("Approve");
+    expect(messagesPage).toContain("reviewPlaylist(");
+    expect(messagesPage).not.toContain("messages.review_playlist");
+    expect(messagesPage).not.toContain("Publish this Playlist");
   });
 
   it("keeps Editor's Notes collapsed and autosaved instead of snapshotting on a timer", () => {
