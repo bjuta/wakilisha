@@ -7,9 +7,13 @@ import {
   type FieldIntakeDetail,
 } from "@/services/fieldNewsroom";
 import {
+  reviewPlaylist,
+} from "@/services/playlists/playlistAdminService";
+import {
   acceptMessageRequest,
   declineMessageRequest,
   getMessageConversation,
+  getMessagePlaylistReviewProjection,
   getMessageUnreadCounts,
   listMessageConversations,
   markMessageConversationRead,
@@ -24,6 +28,7 @@ import {
   type MessageConversationDetail,
   type MessageConversationSummary,
   type MessageFolder,
+  type MessagePlaylistReviewProjection,
   type MessageRecipientSuggestion,
   type MessageResourceReference,
 } from "@/services/messages";
@@ -70,48 +75,71 @@ type ResolvedFieldReference = Pick<
 function GovernedResourceReferenceCard({
   reference,
   mine,
+  onChanged,
 }: {
   reference: MessageResourceReference;
   mine: boolean;
+  onChanged?: () => Promise<void> | void;
 }) {
   const [field, setField] = useState<ResolvedFieldReference | null>(null);
+  const [playlist, setPlaylist] =
+    useState<MessagePlaylistReviewProjection | null>(null);
   const [resolved, setResolved] = useState(false);
+  const [decisionBusy, setDecisionBusy] = useState(false);
+  const [decisionError, setDecisionError] = useState<string | null>(null);
+  const [changeNoteOpen, setChangeNoteOpen] = useState(false);
+  const [changeNote, setChangeNote] = useState("");
 
-  useEffect(() => {
-    let alive = true;
+  const resolveReference = useCallback(async () => {
+    setResolved(false);
+    setField(null);
+    setPlaylist(null);
 
     if (
-      reference.presentation_kind !== "resource"
-      || reference.resource_version_id
+      reference.presentation_kind === "resource"
+      && !reference.resource_version_id
     ) {
-      setField(null);
-      setResolved(true);
-      return () => {
-        alive = false;
-      };
+      try {
+        setField(
+          await getFieldSubmissionIntake(reference.resource_id),
+        );
+      } catch {
+        setField(null);
+      } finally {
+        setResolved(true);
+      }
+      return;
     }
 
-    setResolved(false);
+    if (
+      reference.presentation_kind === "version"
+      && reference.resource_version_id
+    ) {
+      try {
+        setPlaylist(
+          await getMessagePlaylistReviewProjection(
+            reference.resource_id,
+            reference.resource_version_id,
+          ),
+        );
+      } catch {
+        setPlaylist(null);
+      } finally {
+        setResolved(true);
+      }
+      return;
+    }
 
-    getFieldSubmissionIntake(reference.resource_id)
-      .then((next) => {
-        if (alive) setField(next);
-      })
-      .catch(() => {
-        if (alive) setField(null);
-      })
-      .finally(() => {
-        if (alive) setResolved(true);
-      });
-
-    return () => {
-      alive = false;
-    };
+    setResolved(true);
   }, [
     reference.presentation_kind,
     reference.resource_id,
     reference.resource_version_id,
   ]);
+
+  useEffect(() => {
+    void resolveReference();
+  }, [resolveReference]);
 
   const shellClass = mine
     ? "border-white/20 bg-white/10 text-white"
@@ -119,6 +147,45 @@ function GovernedResourceReferenceCard({
   const mutedClass = mine
     ? "text-white/75"
     : "text-[var(--wk-text-muted)]";
+
+  async function performPlaylistDecision(
+    decision: "start_review" | "request_changes" | "approve",
+    note?: string,
+  ) {
+    if (
+      !playlist
+      || !reference.resource_version_id
+      || decisionBusy
+    ) {
+      return;
+    }
+
+    setDecisionBusy(true);
+    setDecisionError(null);
+
+    try {
+      await reviewPlaylist(
+        playlist.playlist_id,
+        reference.resource_version_id,
+        playlist.authority_revision,
+        decision,
+        note,
+      );
+      setChangeNote("");
+      setChangeNoteOpen(false);
+      await resolveReference();
+      await onChanged?.();
+    } catch (reason) {
+      setDecisionError(
+        reason instanceof Error
+          ? reason.message
+          : "The Playlist Review action could not be completed.",
+      );
+      await resolveReference();
+    } finally {
+      setDecisionBusy(false);
+    }
+  }
 
   if (field) {
     return (
@@ -146,6 +213,125 @@ function GovernedResourceReferenceCard({
     );
   }
 
+  if (playlist) {
+    const canStart =
+      playlist.allowed_review_actions.includes("start_review");
+    const canRequestChanges =
+      playlist.allowed_review_actions.includes("request_changes");
+    const canApprove =
+      playlist.allowed_review_actions.includes("approve");
+
+    return (
+      <div className={`rounded-xl border p-3 ${shellClass}`}>
+        <div className="flex items-start justify-between gap-3">
+          <div className="min-w-0">
+            <div className="text-[9px] font-black uppercase tracking-[0.12em]">
+              Playlist Review
+            </div>
+            <div className="mt-1 truncate text-[11px] font-black">
+              {playlist.title}
+            </div>
+            <div className={`mt-1 text-[9px] font-bold capitalize ${mutedClass}`}>
+              Version {playlist.version_number} · {playlist.playlist_status.replaceAll("_", " ")}
+            </div>
+          </div>
+          <Link
+            to={`/admin/content/playlists/${encodeURIComponent(playlist.playlist_id)}`}
+            className="shrink-0 text-[9px] font-black"
+          >
+            Open Playlist <i className="ri-arrow-right-up-line" />
+          </Link>
+        </div>
+
+        {!playlist.is_current_submitted && (
+          <div className={`mt-2 text-[9px] font-bold ${mutedClass}`}>
+            This version is no longer the current submitted version.
+          </div>
+        )}
+
+        {(canStart || canRequestChanges || canApprove) && (
+          <div className="mt-3 flex flex-wrap gap-2">
+            {canStart && (
+              <button
+                type="button"
+                disabled={decisionBusy}
+                onClick={() => void performPlaylistDecision("start_review")}
+                className="wk-button wk-button-sm wk-button-primary disabled:opacity-45"
+              >
+                Start Review
+              </button>
+            )}
+            {canRequestChanges && (
+              <button
+                type="button"
+                disabled={decisionBusy}
+                onClick={() => setChangeNoteOpen(true)}
+                className="wk-button wk-button-sm wk-button-ghost disabled:opacity-45"
+              >
+                Request Changes
+              </button>
+            )}
+            {canApprove && (
+              <button
+                type="button"
+                disabled={decisionBusy}
+                onClick={() => void performPlaylistDecision("approve")}
+                className="wk-button wk-button-sm wk-button-primary disabled:opacity-45"
+              >
+                Approve
+              </button>
+            )}
+          </div>
+        )}
+
+        {changeNoteOpen && canRequestChanges && (
+          <div className="mt-3 rounded-xl border border-[var(--wk-border)] bg-[var(--wk-bg)] p-2">
+            <textarea
+              value={changeNote}
+              onChange={(event) => setChangeNote(event.target.value)}
+              rows={3}
+              maxLength={2000}
+              placeholder="What needs to change?"
+              className="w-full resize-none bg-transparent px-2 py-2 text-[11px] text-[var(--wk-text)] outline-none placeholder:text-[var(--wk-text-faint)]"
+            />
+            <div className="mt-2 flex justify-end gap-2">
+              <button
+                type="button"
+                disabled={decisionBusy}
+                onClick={() => {
+                  setChangeNoteOpen(false);
+                  setChangeNote("");
+                }}
+                className="wk-button wk-button-sm wk-button-ghost"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                disabled={!changeNote.trim() || decisionBusy}
+                onClick={() =>
+                  void performPlaylistDecision(
+                    "request_changes",
+                    changeNote.trim(),
+                  )
+                }
+                className="wk-button wk-button-sm wk-button-primary disabled:opacity-45"
+              >
+                Send Request
+              </button>
+            </div>
+          </div>
+        )}
+
+        {decisionError && (
+          <div className="mt-2 text-[9px] font-bold text-[var(--wk-danger)]">
+            {decisionError}
+          </div>
+        )}
+      </div>
+    );
+  }
+
   return (
     <div className={`rounded-xl border p-3 ${shellClass}`}>
       <div className="text-[9px] font-black uppercase tracking-[0.12em]">
@@ -163,8 +349,12 @@ function GovernedResourceReferenceCard({
 export default function MessagesPage() {
   const authUser = useAuthUser();
   const messagesAccess = useMessagesAccess();
-  const [searchParams] = useSearchParams();
+  const [searchParams, setSearchParams] = useSearchParams();
   const requestedConversationId = searchParams.get("conversation");
+  const requestedResourceId = searchParams.get("resource");
+  const requestedResourceVersionId = searchParams.get("version");
+  const requestedPresentation = searchParams.get("presentation");
+  const requestedWorkflow = searchParams.get("workflow");
   const [folder, setFolder] = useState<MessageFolder>("inbox");
   const [conversations, setConversations] = useState<MessageConversationSummary[]>([]);
   const [unread, setUnread] = useState<Record<MessageFolder, number>>({ inbox: 0, requests: 0, spam: 0, archived: 0 });
@@ -181,6 +371,10 @@ export default function MessagesPage() {
   const [recipient, setRecipient] = useState<MessageRecipientSuggestion | null>(null);
   const [newBody, setNewBody] = useState("");
   const [starting, setStarting] = useState(false);
+  const [workflowReference, setWorkflowReference] =
+    useState<MessageResourceReference | null>(null);
+  const [workflowProjection, setWorkflowProjection] =
+    useState<MessagePlaylistReviewProjection | null>(null);
 
   const selectedSummary = useMemo(
     () => conversations.find((item) => item.conversation_id === selectedId) ?? null,
@@ -245,6 +439,68 @@ export default function MessagesPage() {
     void openConversation(requestedConversationId);
   }, [loadingList, messagesAccess.visible, openConversation, requestedConversationId, selectedId]);
 
+  const clearWorkflowIntent = useCallback(() => {
+    const next = new URLSearchParams(searchParams);
+    next.delete("resource");
+    next.delete("version");
+    next.delete("presentation");
+    next.delete("workflow");
+    setSearchParams(next, { replace: true });
+    setWorkflowReference(null);
+    setWorkflowProjection(null);
+  }, [searchParams, setSearchParams]);
+
+  useEffect(() => {
+    if (
+      !messagesAccess.visible
+      || !messagesAccess.can_start
+      || requestedWorkflow !== "playlist-review"
+      || requestedPresentation !== "version"
+      || !requestedResourceId
+      || !requestedResourceVersionId
+    ) {
+      return;
+    }
+
+    let cancelled = false;
+
+    getMessagePlaylistReviewProjection(
+      requestedResourceId,
+      requestedResourceVersionId,
+    )
+      .then((projection) => {
+        if (cancelled) return;
+        setWorkflowReference({
+          resource_id: requestedResourceId,
+          resource_version_id: requestedResourceVersionId,
+          presentation_kind: "version",
+        });
+        setWorkflowProjection(projection);
+        setNewOpen(true);
+      })
+      .catch((reason) => {
+        if (cancelled) return;
+        setWorkflowReference(null);
+        setWorkflowProjection(null);
+        setError(
+          reason instanceof Error
+            ? reason.message
+            : "This Playlist version cannot be attached to Messages.",
+        );
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [
+    messagesAccess.can_start,
+    messagesAccess.visible,
+    requestedPresentation,
+    requestedResourceId,
+    requestedResourceVersionId,
+    requestedWorkflow,
+  ]);
+
   useEffect(() => {
     if (!newOpen || recipient || query.trim().length < 1) {
       setSuggestions([]);
@@ -303,11 +559,18 @@ export default function MessagesPage() {
     setStarting(true);
     setError(null);
     try {
-      const result = await startMessageConversation(recipient.person_resource_id, newBody.trim());
+      const result = await startMessageConversation(
+        recipient.person_resource_id,
+        newBody.trim(),
+        workflowReference ? [workflowReference] : [],
+      );
       setNewOpen(false);
       setRecipient(null);
       setQuery("");
       setNewBody("");
+      if (workflowReference) {
+        clearWorkflowIntent();
+      }
       const senderFolder: MessageFolder = "inbox";
       setFolder(senderFolder);
       await Promise.all([refreshFolder(senderFolder, false), refreshCounts()]);
@@ -473,6 +736,11 @@ export default function MessagesPage() {
                                     key={`${reference.presentation_kind}:${reference.resource_id}:${reference.resource_version_id ?? "resource"}`}
                                     reference={reference}
                                     mine={mine}
+                                    onChanged={() =>
+                                      selectedId
+                                        ? openConversation(selectedId)
+                                        : Promise.resolve()
+                                    }
                                   />
                                 ))}
                               </div>
@@ -529,14 +797,34 @@ export default function MessagesPage() {
 
       {newOpen && messagesAccess.can_send && (
         <div className="fixed inset-0 z-[180] flex items-end justify-center bg-black/55 p-0 backdrop-blur-[2px] sm:items-center sm:p-5">
-          <button type="button" className="absolute inset-0" onClick={() => { if (!starting) setNewOpen(false); }} aria-label="Close new Message" />
+          <button
+            type="button"
+            className="absolute inset-0"
+            onClick={() => {
+              if (!starting) {
+                setNewOpen(false);
+                if (workflowReference) clearWorkflowIntent();
+              }
+            }}
+            aria-label="Close new Message"
+          />
           <section role="dialog" aria-modal="true" aria-label="New Message" className="relative z-10 w-full max-w-[560px] rounded-t-[28px] border border-[var(--wk-border)] bg-[var(--wk-surface)] p-5 shadow-2xl sm:rounded-[28px]">
             <div className="flex items-center justify-between gap-4">
               <div>
                 <div className="text-[10px] font-black tracking-[0.16em] text-[var(--wk-brand)]">Messages</div>
                 <h2 className="mt-1 text-[20px] font-black tracking-[-0.025em] text-[var(--wk-text)]">New message</h2>
               </div>
-              <button type="button" onClick={() => setNewOpen(false)} className="flex h-9 w-9 items-center justify-center rounded-full bg-[var(--wk-surface-raised)] text-[var(--wk-text-muted)]" aria-label="Close"><i className="ri-close-line" /></button>
+              <button
+                type="button"
+                onClick={() => {
+                  setNewOpen(false);
+                  if (workflowReference) clearWorkflowIntent();
+                }}
+                className="flex h-9 w-9 items-center justify-center rounded-full bg-[var(--wk-surface-raised)] text-[var(--wk-text-muted)]"
+                aria-label="Close"
+              >
+                <i className="ri-close-line" />
+              </button>
             </div>
 
             <div className="mt-5">
@@ -575,6 +863,20 @@ export default function MessagesPage() {
                 </div>
               )}
             </div>
+
+            {workflowProjection && workflowReference && (
+              <div className="mt-4 rounded-2xl border border-[var(--wk-border)] bg-[var(--wk-bg)] p-4">
+                <div className="text-[9px] font-black uppercase tracking-[0.14em] text-[var(--wk-brand)]">
+                  Playlist Review
+                </div>
+                <div className="mt-1 text-[13px] font-black text-[var(--wk-text)]">
+                  {workflowProjection.title}
+                </div>
+                <div className="mt-1 text-[10px] font-bold capitalize text-[var(--wk-text-muted)]">
+                  Version {workflowProjection.version_number} · {workflowProjection.playlist_status.replaceAll("_", " ")}
+                </div>
+              </div>
+            )}
 
             <textarea
               value={newBody}

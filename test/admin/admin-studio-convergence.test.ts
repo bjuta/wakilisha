@@ -92,12 +92,18 @@ describe("Admin Studio convergence", () => {
   });
 
   it("keeps Article domain actions intact while moving only shell semantics", () => {
+    const articleDecisionWorkspace = source(
+      "src/pages/admin/content/articles/detail/components/ArticleReviewDecisionWorkspace.tsx",
+    );
+    const articleWorkspace = source(
+      "src/pages/admin/content/articles/detail/ArticleEditorWorkspace.tsx",
+    );
+
     for (const action of [
       "Preview",
       "Save",
       "Details",
-      "Approve Version",
-      "Request Changes",
+      "Open Review",
       "Submit for Review",
       "Publish",
       "Update",
@@ -108,20 +114,30 @@ describe("Admin Studio convergence", () => {
     ]) {
       expect(articleHeader).toContain(action);
     }
+
+    expect(articleWorkspace).toContain(
+      "ArticleReviewDecisionWorkspace",
+    );
+
+    for (const action of [
+      "Request Changes",
+      "Approve Version",
+    ]) {
+      expect(articleDecisionWorkspace).toContain(action);
+    }
   });
 
   it("keeps Playlist domain lifecycle actions owned by Playlist workspace while sharing chrome", () => {
     const playlistWorkspace = source(
       "src/pages/admin/content/playlists/detail/PlaylistEditorWorkspace.tsx",
     );
+    const playlistDecisionWorkspace = source(
+      "src/pages/admin/content/playlists/detail/components/PlaylistReviewDecisionWorkspace.tsx",
+    );
 
     for (const action of [
       "Submit for Review",
-      "Start Review",
-      "Request changes",
-      "Approve",
       "Schedule",
-      "Publish",
       "Unschedule",
       "Unpublish",
       "Archive",
@@ -130,13 +146,35 @@ describe("Admin Studio convergence", () => {
       expect(playlistWorkspace).toContain(action);
     }
 
+    expect(playlistWorkspace).toContain(
+      "PlaylistReviewDecisionWorkspace",
+    );
+
+    for (const action of [
+      "Start Review",
+      "Request Changes",
+      "Approve",
+      "Publish",
+    ]) {
+      expect(playlistDecisionWorkspace).toContain(action);
+    }
+
     expect(playlistHeader).toContain("Details");
     expect(playlistHeader).toContain("Save an immutable working version.");
   });
 
   it("recomposes Audio from the shared record and workspace primitives without flattening Audio workflow", () => {
-    expect(audioWorkspace).toContain("AdminRecordHeader");
+    const audioHeader = source(
+      "src/pages/admin/content/audio/detail/components/AudioEditorHeader.tsx",
+    );
+    const audioReviewWorkspace = source(
+      "src/pages/admin/content/audio/detail/components/AudioReviewWorkspace.tsx",
+    );
+
+    expect(audioWorkspace).toContain("AudioEditorHeader");
+    expect(audioHeader).toContain("AdminRecordHeader");
     expect(audioWorkspace).toContain("AdminWorkspaceSection");
+    expect(audioWorkspace).toContain("AudioReviewWorkspace");
     expect(audioWorkspace).not.toContain("function WorkflowPill");
     expect(audioWorkspace).not.toContain("function SectionHeader");
 
@@ -154,10 +192,19 @@ describe("Admin Studio convergence", () => {
       "replaceAudioChapters",
       "replaceAudioCredits",
       "replaceAudioCitations",
-      "reviewAudio",
-      "publishAudio",
     ]) {
       expect(audioWorkspace).toContain(domainConcept);
+    }
+
+    for (const reviewAuthority of [
+      "reviewAudio",
+      "publishAudio",
+      "Start Review",
+      "Request Changes",
+      "Approve",
+      "Publish",
+    ]) {
+      expect(audioReviewWorkspace).toContain(reviewAuthority);
     }
   });
 

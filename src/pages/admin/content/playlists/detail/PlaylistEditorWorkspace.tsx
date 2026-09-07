@@ -1381,6 +1381,20 @@ export function PlaylistEditorWorkspace({
         ? "Wait for moving changes to finish saving first."
         : "Open the exact public Playlist renderer from an immutable version.",
   });
+
+  if (review?.resourceId && submittedVersionId) {
+    headerSecondaryActions.push({
+      label: "Discuss in Messages",
+      icon: "MessageCircle",
+      href:
+        `/messages?resource=${encodeURIComponent(review.resourceId)}` +
+        `&version=${encodeURIComponent(submittedVersionId)}` +
+        "&presentation=version&workflow=playlist-review",
+      title:
+        "Discuss this exact submitted Playlist version in Messages.",
+    });
+  }
+
   let headerPrimaryAction: PlaylistEditorHeaderAction | null = null;
 
   if (
