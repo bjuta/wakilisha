@@ -1,16 +1,17 @@
 {
   "projectRef": "pgzizndxdyhqmtyywjmt",
   "schema": "public,editorial",
-  "generatedAt": "2026-09-06T21:39:25Z",
+  "generatedAt": "2026-09-07T06:30:10Z",
   "typesSha256": "b948eff09369040d8753f445e2046ce7a2eccff16e6bf12b63835cb5645c626c",
   "authoritativeMigrationDirectory": "supabase/migrations",
-  "migrationCount": 102,
-  "latestMigration": "20260907003000_phase_8b_messages_core_verifier_runtime_state_independence.sql",
+  "migrationCount": 104,
+  "latestMigration": "20260907061830_phase_8b4_system_actor_notification_fix.sql",
   "schemaSeal": {
     "mode": "preview",
-    "sourceProjectRef": "gphnecflxuljewnotmlz",
-    "migrationHead": "20260907003000",
-    "baseMainSha": "22faadedc97efe25457d3249efdd95330c85d287",
-    "previewBranchId": "df65dda7-cb12-4581-967b-f10bbffc9b32"
+    "sourceProjectRef": "bepufyydxueqjefgliux",
+    "migrationHead": "20260907061830",
+    "migrationFile": "20260907061830_phase_8b4_system_actor_notification_fix.sql",
+    "baseMainSha": "4b1d2668d84965dda7dd4823fce2a8ea2f453b23",
+    "previewBranchId": "ba3555ac-8b93-45f3-b587-58c1f18a6385"
   }
 }

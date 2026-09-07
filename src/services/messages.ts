@@ -23,7 +23,18 @@ export interface MessagePersonPresentation {
   username?: string | null;
   avatar_url?: string | null;
   canonical_path?: string | null;
+  label?: string | null;
+  actor_key?: string | null;
+  actor_kind?: string | null;
+  status?: string | null;
   [key: string]: unknown;
+}
+
+export interface MessageParticipantIdentity {
+  actor_kind?: "human" | "system" | "automation" | string;
+  person_resource_id: string;
+  actor_key?: string | null;
+  presentation: MessagePersonPresentation | null;
 }
 
 export interface MessageConversationSummary {
@@ -33,15 +44,15 @@ export interface MessageConversationSummary {
   mailbox_folder: MessageFolder;
   first_contact_state: string;
   last_activity_at: string;
-  other_participant: {
-    person_resource_id: string;
-    presentation: MessagePersonPresentation | null;
-  } | null;
+  other_participant: MessageParticipantIdentity | null;
   latest_message: {
     id: string;
     body: string | null;
     accepted_at: string;
+    sender?: MessageParticipantIdentity | null;
+    sender_actor_kind?: string | null;
     sender_person_resource_id: string;
+    sender_actor_key?: string | null;
   } | null;
   unread_count: number;
 }
@@ -58,7 +69,10 @@ export interface MessageRow {
   body: string | null;
   accepted_at: string;
   client_created_at: string | null;
+  sender?: MessageParticipantIdentity | null;
+  sender_actor_kind?: string | null;
   sender_person_resource_id: string;
+  sender_actor_key?: string | null;
   my_read_at: string | null;
   recipient_read_at: string | null;
   resource_references: MessageResourceReference[];
@@ -74,9 +88,7 @@ export interface MessageConversationDetail {
     created_at: string;
     last_activity_at: string;
   };
-  participants: Array<{
-    person_resource_id: string;
-    presentation: MessagePersonPresentation | null;
+  participants: Array<MessageParticipantIdentity & {
     membership_status: string;
   }>;
   messages: MessageRow[];
@@ -108,6 +120,23 @@ export interface MessagesControlCenterStatus {
   pending_requests: number;
   spam_conversations: number;
   active_human_participants: number;
+  registered_system_actors: number;
+  messages_enabled_system_actors: number;
+}
+
+export interface MessagesSystemActor {
+  actor_key: string;
+  label: string;
+  actor_kind: "system" | "automation" | string;
+  actor_status: "active" | "disabled" | string;
+  messaging_enabled: boolean;
+  permitted_purposes: string[];
+  recipient_scope: string;
+  allow_links: boolean;
+  allow_resource_references: boolean;
+  allow_human_reply: boolean;
+  revision: number;
+  latest_message_at: string | null;
 }
 
 export interface MyMessagesAccess {
@@ -136,6 +165,7 @@ export function messageDisplayName(
 ): string {
   return String(
     presentation?.display_name
+      || presentation?.label
       || presentation?.username
       || "WAKILISHA member",
   );
@@ -339,5 +369,41 @@ export async function getMessagesControlCenterStatus(): Promise<MessagesControlC
     pending_requests: Number(raw.pending_requests ?? 0),
     spam_conversations: Number(raw.spam_conversations ?? 0),
     active_human_participants: Number(raw.active_human_participants ?? 0),
+    registered_system_actors: Number(raw.registered_system_actors ?? 0),
+    messages_enabled_system_actors: Number(raw.messages_enabled_system_actors ?? 0),
+  };
+}
+
+export async function getMessagesSystemActors(): Promise<MessagesSystemActor[]> {
+  const rows = await rpc<MessagesSystemActor[]>("get_messages_system_actors");
+  return (rows ?? []).map((actor) => ({
+    ...actor,
+    messaging_enabled: actor.messaging_enabled === true,
+    permitted_purposes: Array.isArray(actor.permitted_purposes)
+      ? actor.permitted_purposes.map(String)
+      : [],
+    allow_links: actor.allow_links === true,
+    allow_resource_references: actor.allow_resource_references === true,
+    allow_human_reply: actor.allow_human_reply === true,
+    revision: Number(actor.revision ?? 0),
+    latest_message_at: actor.latest_message_at || null,
+  }));
+}
+
+export async function setMessagesSystemActorEnabled(
+  actor: Pick<MessagesSystemActor, "actor_key" | "revision">,
+  enabled: boolean,
+): Promise<{ actor_key: string; messaging_enabled: boolean; revision: number }> {
+  const result = await rpc<Record<string, unknown>>("set_messages_system_actor_enabled", {
+    p_actor_key: actor.actor_key,
+    p_expected_revision: actor.revision,
+    p_enabled: enabled,
+    p_idempotency_key: actionKey(`messages.system_actor.${actor.actor_key}`),
+    p_correlation_id: null,
+  });
+  return {
+    actor_key: String(result.actor_key ?? actor.actor_key),
+    messaging_enabled: result.messaging_enabled === true,
+    revision: Number(result.revision ?? actor.revision),
   };
 }
