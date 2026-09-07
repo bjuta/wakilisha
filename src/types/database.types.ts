@@ -1977,6 +1977,7 @@ export type Database = {
           cancelled_at: string | null
           consent_declaration: string
           consent_declaration_detail: string | null
+          contact_point_id: string | null
           contact_preference: string
           content_captured_at: string | null
           correlation_id: string
@@ -1986,11 +1987,13 @@ export type Database = {
           declared_sensitivity: string
           embargo_request_mode: string
           expired_at: string | null
+          follow_up_permission: string
           intake_notes: string | null
           location_description: string | null
           location_mode: string
           newsroom_identity_mode: string
           owner_user_id: string
+          preferred_contact_channel: string | null
           public_attribution_preference: string
           receipt_issued_at: string | null
           received_at: string | null
@@ -2011,6 +2014,7 @@ export type Database = {
           cancelled_at?: string | null
           consent_declaration: string
           consent_declaration_detail?: string | null
+          contact_point_id?: string | null
           contact_preference?: string
           content_captured_at?: string | null
           correlation_id: string
@@ -2020,11 +2024,13 @@ export type Database = {
           declared_sensitivity?: string
           embargo_request_mode?: string
           expired_at?: string | null
+          follow_up_permission: string
           intake_notes?: string | null
           location_description?: string | null
           location_mode?: string
           newsroom_identity_mode?: string
           owner_user_id: string
+          preferred_contact_channel?: string | null
           public_attribution_preference?: string
           receipt_issued_at?: string | null
           received_at?: string | null
@@ -2045,6 +2051,7 @@ export type Database = {
           cancelled_at?: string | null
           consent_declaration?: string
           consent_declaration_detail?: string | null
+          contact_point_id?: string | null
           contact_preference?: string
           content_captured_at?: string | null
           correlation_id?: string
@@ -2054,11 +2061,13 @@ export type Database = {
           declared_sensitivity?: string
           embargo_request_mode?: string
           expired_at?: string | null
+          follow_up_permission?: string
           intake_notes?: string | null
           location_description?: string | null
           location_mode?: string
           newsroom_identity_mode?: string
           owner_user_id?: string
+          preferred_contact_channel?: string | null
           public_attribution_preference?: string
           receipt_issued_at?: string | null
           received_at?: string | null
@@ -5542,6 +5551,10 @@ export type Database = {
         Args: { p_user_id: string }
         Returns: undefined
       }
+      user_has_capability_v1: {
+        Args: { p_capability: string; p_user_id: string }
+        Returns: boolean
+      }
       user_has_field_capability_v1: {
         Args: { p_actor_id: string; p_capability: string }
         Returns: boolean
@@ -5563,6 +5576,10 @@ export type Database = {
         Returns: undefined
       }
       validate_field_declarations_v1: {
+        Args: { p_declarations: Json; p_require_core?: boolean }
+        Returns: Json
+      }
+      validate_field_declarations_v2: {
         Args: { p_declarations: Json; p_require_core?: boolean }
         Returns: Json
       }
@@ -21100,6 +21117,23 @@ export type Database = {
           submission_state: string
         }[]
       }
+      create_field_submission_v2: {
+        Args: {
+          p_correlation_id?: string
+          p_declarations: Json
+          p_idempotency_key: string
+        }
+        Returns: {
+          command_receipt_id: string
+          created_at: string
+          current_revision: number
+          idempotent_replay: boolean
+          receipt_status: string
+          submission_reference: string
+          submission_resource_id: string
+          submission_state: string
+        }[]
+      }
       create_import_run: {
         Args: {
           p_errors?: string[]
@@ -21961,6 +21995,10 @@ export type Database = {
           updated_at: string
         }[]
       }
+      get_field_submission_intake_v2: {
+        Args: { p_submission_resource_id: string }
+        Returns: Json
+      }
       get_import_run_by_id: {
         Args: { p_id: string }
         Returns: {
@@ -22615,6 +22653,22 @@ export type Database = {
       list_editorial_credit_picker_options: {
         Args: { p_limit?: number; p_query?: string }
         Returns: Json
+      }
+      list_field_submission_intakes_v1: {
+        Args: { p_limit?: number }
+        Returns: {
+          can_message_contributor: boolean
+          contributor_identity_redacted: boolean
+          created_at: string
+          current_revision: number
+          follow_up_permission: string
+          newsroom_identity_mode: string
+          preferred_contact_channel: string
+          submission_reference: string
+          submission_resource_id: string
+          submission_state: string
+          updated_at: string
+        }[]
       }
       list_media_assets_v2: {
         Args: {
@@ -24846,6 +24900,25 @@ export type Database = {
           result: Json
         }[]
       }
+      start_field_submission_message_v1: {
+        Args: {
+          p_body: string
+          p_client_created_at?: string
+          p_correlation_id?: string
+          p_expected_submission_revision: number
+          p_idempotency_key: string
+          p_submission_resource_id: string
+        }
+        Returns: {
+          command_receipt_id: string
+          conversation_id: string
+          first_contact_state: string
+          idempotent_replay: boolean
+          mailbox_folder: string
+          message_id: string
+          receipt_status: string
+        }[]
+      }
       start_message_conversation: {
         Args: {
           p_body: string
@@ -25301,6 +25374,25 @@ export type Database = {
           p_public_url?: string
         }
         Returns: Json
+      }
+      update_field_submission_contact_policy_v1: {
+        Args: {
+          p_correlation_id?: string
+          p_expected_current_revision: number
+          p_follow_up_permission: string
+          p_idempotency_key: string
+          p_preferred_contact_channel: string
+          p_submission_resource_id: string
+        }
+        Returns: {
+          command_receipt_id: string
+          current_revision: number
+          follow_up_permission: string
+          idempotent_replay: boolean
+          preferred_contact_channel: string
+          receipt_status: string
+          submission_resource_id: string
+        }[]
       }
       update_field_submission_declarations_v1: {
         Args: {
