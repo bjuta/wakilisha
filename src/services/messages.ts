@@ -158,6 +158,109 @@ export interface MessagesSystemActor {
   latest_message_at: string | null;
 }
 
+export type MessagesSafetyCaseStatus =
+  | "open"
+  | "under_review"
+  | "resolved";
+
+export type MessagesSafetyDisposition =
+  | "pending"
+  | "no_action"
+  | "quarantine";
+
+export interface MessagesSafetyCaseSummary {
+  case_id: string;
+  status: MessagesSafetyCaseStatus;
+  policy_category: string;
+  severity: "low" | "medium" | "high" | "severe" | string;
+  current_disposition: MessagesSafetyDisposition;
+  source_kind: "user_report" | "staff" | "automated_signal" | string;
+  created_at: string;
+  updated_at: string;
+  message_target_count: number;
+  media_target_count: number;
+  active_quarantine_count: number;
+}
+
+export interface MessagesSafetyTarget {
+  target_id: string;
+  target_type: "message" | "media_file";
+  message_id?: string | null;
+  conversation_id?: string | null;
+  accepted_at?: string | null;
+  sender?: MessageParticipantIdentity | null;
+  media_file_object_id?: string | null;
+  linked_at: string;
+}
+
+export interface MessagesSafetyCaseEvent {
+  event_id: string;
+  event_kind:
+    | "opened"
+    | "signal_added"
+    | "review_started"
+    | "quarantined"
+    | "released"
+    | "resolved"
+    | "evidence_viewed"
+    | string;
+  actor_kind: "human" | "system" | "automation" | string;
+  actor_user_id: string | null;
+  actor_person_resource_id: string | null;
+  actor_key: string | null;
+  occurred_at: string;
+  metadata: Record<string, unknown>;
+}
+
+export interface MessagesQuarantineState {
+  quarantine_id: string;
+  message_id: string;
+  status: "active" | "released" | string;
+  policy_category: string;
+  placed_at: string;
+  released_at: string | null;
+  release_note: string | null;
+}
+
+export interface MessagesSafetyCaseDetail {
+  case: {
+    case_id: string;
+    status: MessagesSafetyCaseStatus;
+    policy_category: string;
+    severity: "low" | "medium" | "high" | "severe" | string;
+    confidence: number | null;
+    current_disposition: MessagesSafetyDisposition;
+    source_kind: "user_report" | "staff" | "automated_signal" | string;
+    created_by_user_id: string | null;
+    created_at: string;
+    updated_at: string;
+    reviewed_by_user_id: string | null;
+    review_started_at: string | null;
+    resolved_by_user_id: string | null;
+    resolved_at: string | null;
+    resolution_note: string | null;
+  };
+  targets: MessagesSafetyTarget[];
+  events: MessagesSafetyCaseEvent[];
+  quarantine: MessagesQuarantineState[];
+}
+
+export interface MessagesSafetyEvidence {
+  safety_case_id: string;
+  message_id: string;
+  conversation_id: string;
+  message_kind: string;
+  body: string | null;
+  accepted_at: string;
+  client_created_at: string | null;
+  sender: MessageParticipantIdentity | null;
+  sender_actor_kind: string | null;
+  sender_person_resource_id: string | null;
+  sender_actor_key: string | null;
+  evidence_event_id: string;
+  idempotent_replay: boolean;
+}
+
 export interface MyMessagesAccess {
   audience_mode: string;
   sender_category: string;
@@ -442,4 +545,96 @@ export async function setMessagesSystemActorEnabled(
     messaging_enabled: result.messaging_enabled === true,
     revision: Number(result.revision ?? actor.revision),
   };
+}
+
+export async function reportMessageSafety(
+  messageId: string,
+  policyCategory: string,
+  note: string | null,
+): Promise<{
+  safety_case_id: string;
+  message_id: string;
+  status: MessagesSafetyCaseStatus;
+  created: boolean;
+}> {
+  return rpc("report_message_safety_v1", {
+    p_message_id: messageId,
+    p_policy_category: policyCategory,
+    p_note: note,
+    p_idempotency_key: actionKey("messages.safety.report"),
+    p_correlation_id: null,
+  });
+}
+
+export async function listMessagesSafetyCases(
+  status: MessagesSafetyCaseStatus | null = null,
+): Promise<MessagesSafetyCaseSummary[]> {
+  return rpc<MessagesSafetyCaseSummary[]>("list_messages_safety_cases_v1", {
+    p_status: status,
+    p_before_updated_at: null,
+    p_before_case_id: null,
+    p_limit: 100,
+  });
+}
+
+export async function getMessagesSafetyCase(
+  caseId: string,
+): Promise<MessagesSafetyCaseDetail> {
+  return rpc<MessagesSafetyCaseDetail>("get_messages_safety_case_v1", {
+    p_case_id: caseId,
+  });
+}
+
+export async function startMessagesSafetyReview(
+  caseId: string,
+): Promise<void> {
+  await rpc("start_messages_safety_review_v1", {
+    p_case_id: caseId,
+    p_idempotency_key: actionKey("messages.safety.review"),
+    p_correlation_id: null,
+  });
+}
+
+export async function setMessageQuarantine(
+  caseId: string,
+  messageId: string,
+  quarantined: boolean,
+  reason: string,
+): Promise<void> {
+  await rpc("set_message_quarantine_v1", {
+    p_case_id: caseId,
+    p_message_id: messageId,
+    p_quarantined: quarantined,
+    p_reason: reason,
+    p_idempotency_key: actionKey("messages.safety.quarantine"),
+    p_correlation_id: null,
+  });
+}
+
+export async function resolveMessageSafetyCase(
+  caseId: string,
+  disposition: Exclude<MessagesSafetyDisposition, "pending">,
+  resolutionNote: string,
+): Promise<void> {
+  await rpc("resolve_message_safety_case_v1", {
+    p_case_id: caseId,
+    p_disposition: disposition,
+    p_resolution_note: resolutionNote,
+    p_idempotency_key: actionKey("messages.safety.resolve"),
+    p_correlation_id: null,
+  });
+}
+
+export async function inspectMessageSafetyEvidence(
+  caseId: string,
+  messageId: string,
+  reason: string,
+): Promise<MessagesSafetyEvidence> {
+  return rpc<MessagesSafetyEvidence>("inspect_message_safety_evidence_v1", {
+    p_case_id: caseId,
+    p_message_id: messageId,
+    p_reason: reason,
+    p_idempotency_key: actionKey("messages.safety.evidence"),
+    p_correlation_id: null,
+  });
 }
