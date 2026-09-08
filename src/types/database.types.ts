@@ -5395,6 +5395,10 @@ export type Database = {
         }
         Returns: string[]
       }
+      playlist_publication_payload_safety_v1: {
+        Args: { p_payload: Json; p_version_id: string }
+        Returns: Json
+      }
       playlist_version_content_fingerprint_with_discovery: {
         Args: { p_discovery: Json; p_version_id: string }
         Returns: string
@@ -19806,6 +19810,22 @@ export type Database = {
           resource_id: string
         }[]
       }
+      claim_messages_safety_media_scan_jobs_v1: {
+        Args: {
+          p_lease_seconds?: number
+          p_limit?: number
+          p_worker_id: string
+        }
+        Returns: {
+          attempt_count: number
+          command_receipt_id: string
+          job_id: string
+          lease_expires_at: string
+          max_attempts: number
+          media_file_object_id: string
+          safety_case_id: string
+        }[]
+      }
       close_correction_case: {
         Args: {
           p_case_resource_id: string
@@ -20804,6 +20824,10 @@ export type Database = {
         Args: { p_job_id: string; p_result?: Json; p_worker_id: string }
         Returns: Json
       }
+      complete_messages_safety_media_scan_job_v1: {
+        Args: { p_job_id: string; p_result: Json; p_worker_id: string }
+        Returns: Json
+      }
       complete_registry_relationship_review: {
         Args: {
           p_confidence: string
@@ -21691,6 +21715,16 @@ export type Database = {
         Args: { p_error: string; p_session_id: string }
         Returns: Json
       }
+      fail_messages_safety_media_scan_job_v1: {
+        Args: {
+          p_error: string
+          p_job_id: string
+          p_retry_delay_seconds?: number
+          p_retryable?: boolean
+          p_worker_id: string
+        }
+        Returns: Json
+      }
       finalize_field_submission_v1: {
         Args: {
           p_correlation_id?: string
@@ -22064,6 +22098,10 @@ export type Database = {
         Args: { p_case_id: string }
         Returns: Json
       }
+      get_messages_safety_media_scan_target_v1: {
+        Args: { p_job_id: string; p_worker_id: string }
+        Returns: Json
+      }
       get_messages_system_actors: { Args: never; Returns: Json }
       get_my_field_submission_v1: {
         Args: { p_submission_resource_id: string }
@@ -22118,6 +22156,7 @@ export type Database = {
         Returns: Json
       }
       get_my_message_preferences: { Args: never; Returns: Json }
+      get_my_message_safety_state_v1: { Args: never; Returns: Json }
       get_my_message_unread_counts: { Args: never; Returns: Json }
       get_my_personal_playlist: {
         Args: { p_playlist_id: string }
@@ -22724,6 +22763,15 @@ export type Database = {
           title: string
           updated_at: string
         }[]
+      }
+      list_messages_safety_appeals_v1: {
+        Args: {
+          p_before_appeal_id?: string
+          p_before_submitted_at?: string
+          p_limit?: number
+          p_status?: string
+        }
+        Returns: Json
       }
       list_messages_safety_cases_v1: {
         Args: {
@@ -23430,6 +23478,10 @@ export type Database = {
         Args: { p_limit?: number; p_retry_delay_seconds?: number }
         Returns: number
       }
+      recover_expired_messages_safety_media_scan_jobs_v1: {
+        Args: { p_limit?: number; p_retry_delay_seconds?: number }
+        Returns: number
+      }
       register_audio_delivery_processing_outputs_v1: {
         Args: { p_job_id: string; p_outputs: Json; p_worker_id: string }
         Returns: Json
@@ -24010,6 +24062,23 @@ export type Database = {
           p_disposition: string
           p_idempotency_key: string
           p_resolution_note: string
+        }
+        Returns: Json
+      }
+      resolve_messages_safety_appeal_v1: {
+        Args: {
+          p_appeal_id: string
+          p_correlation_id?: string
+          p_idempotency_key: string
+          p_modified_appeal_allowed: boolean
+          p_modified_cooldown_seconds: number
+          p_modified_effective_until: string
+          p_modified_enforcement_kind: string
+          p_modified_rate_limit_count: number
+          p_modified_rate_limit_window_seconds: number
+          p_resolution: string
+          p_resolution_internal_note: string
+          p_resolution_public_note: string
         }
         Returns: Json
       }
@@ -24735,6 +24804,35 @@ export type Database = {
         }
         Returns: Json
       }
+      set_messages_safety_enforcement_v1: {
+        Args: {
+          p_active: boolean
+          p_appeal_allowed: boolean
+          p_case_id: string
+          p_cooldown_seconds: number
+          p_correlation_id?: string
+          p_effective_until: string
+          p_enforcement_kind: string
+          p_idempotency_key: string
+          p_internal_reason: string
+          p_message_id: string
+          p_public_reason: string
+          p_rate_limit_count: number
+          p_rate_limit_window_seconds: number
+        }
+        Returns: Json
+      }
+      set_messages_safety_media_containment_v1: {
+        Args: {
+          p_case_id: string
+          p_contained: boolean
+          p_correlation_id?: string
+          p_idempotency_key: string
+          p_media_file_object_id: string
+          p_reason: string
+        }
+        Returns: Json
+      }
       set_messages_system_actor_enabled: {
         Args: {
           p_actor_key: string
@@ -25000,6 +25098,14 @@ export type Database = {
           receipt_status: string
         }[]
       }
+      start_messages_safety_appeal_review_v1: {
+        Args: {
+          p_appeal_id: string
+          p_correlation_id?: string
+          p_idempotency_key: string
+        }
+        Returns: Json
+      }
       start_messages_safety_review_v1: {
         Args: {
           p_case_id: string
@@ -25107,6 +25213,24 @@ export type Database = {
           job_id: string
           receipt_status: string
         }[]
+      }
+      submit_messages_safety_appeal_v1: {
+        Args: {
+          p_appeal_reason: string
+          p_correlation_id?: string
+          p_enforcement_id: string
+          p_idempotency_key: string
+        }
+        Returns: Json
+      }
+      submit_messages_safety_media_scan_v1: {
+        Args: {
+          p_case_id: string
+          p_correlation_id?: string
+          p_idempotency_key: string
+          p_media_file_object_id: string
+        }
+        Returns: Json
       }
       submit_playlist_for_review: {
         Args: {
@@ -25527,6 +25651,18 @@ export type Database = {
           p_correlation_id?: string
           p_reason: string
           p_status: string
+        }
+        Returns: Json
+      }
+      update_messages_safety_assessment_v1: {
+        Args: {
+          p_case_id: string
+          p_confidence: number
+          p_correlation_id?: string
+          p_idempotency_key: string
+          p_policy_category: string
+          p_reason: string
+          p_severity: string
         }
         Returns: Json
       }

@@ -33,6 +33,7 @@ import {
   type MessageResourceReference,
 } from "@/services/messages";
 import { MessageSafetyReportButton } from "./MessageSafetyReportButton";
+import { MessageSafetyState } from "./MessageSafetyState";
 
 const FOLDERS: Array<{ key: MessageFolder; label: string; icon: string }> = [
   { key: "inbox", label: "Inbox", icon: "ri-inbox-line" },
@@ -621,6 +622,8 @@ export default function MessagesPage() {
         {error && (
           <div className="mb-4 rounded-xl border border-[var(--wk-danger)]/30 bg-[var(--wk-danger)]/10 px-4 py-3 text-[12px] font-bold text-[var(--wk-danger)]">{error}</div>
         )}
+
+        <MessageSafetyState />
 
         <div className="mb-3 grid grid-cols-4 gap-1 rounded-2xl border border-[var(--wk-border)] bg-[var(--wk-surface)] p-1.5 lg:max-w-[520px]">
           {FOLDERS.map((item) => (

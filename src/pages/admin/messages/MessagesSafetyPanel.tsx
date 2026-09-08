@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Modal } from "@/components/design-system/primitives/Modal";
+import { MessagesSafetyCandidateBControls } from "./MessagesSafetyCandidateBControls";
 import {
   getMessagesSafetyCase,
   inspectMessageSafetyEvidence,
@@ -212,9 +213,13 @@ export function MessagesSafetyPanel() {
     setBusy(true);
     setError(null);
     try {
+      const hasEffectiveEnforcement = detail?.enforcements.some(
+        (item) => item.status === "active"
+          && (!item.effective_until || new Date(item.effective_until).getTime() > Date.now()),
+      ) ?? false;
       await resolveMessageSafetyCase(
         selectedId,
-        activeQuarantine ? "quarantine" : "no_action",
+        activeQuarantine ? "quarantine" : hasEffectiveEnforcement ? "enforced" : "no_action",
         resolutionNote.trim(),
       );
       setResolutionNote("");
@@ -327,6 +332,9 @@ export function MessagesSafetyPanel() {
                     <span>{item.message_target_count} Message</span>
                     <span>{item.media_target_count} Media file</span>
                     <span>{item.active_quarantine_count} quarantined</span>
+                    <span>{item.active_enforcement_count} enforced</span>
+                    <span>{item.open_appeal_count} appeals</span>
+                    <span>{item.active_media_containment_count} Media contained</span>
                   </div>
                 </button>
               ))}
@@ -406,6 +414,11 @@ export function MessagesSafetyPanel() {
                   </div>
                 </div>
               </div>
+
+              <MessagesSafetyCandidateBControls
+                detail={detail}
+                onChanged={refresh}
+              />
 
               <div className="rounded-xl border border-[var(--wk-border)] bg-[var(--wk-surface)] p-3">
                 <div className="flex items-center justify-between gap-3">

@@ -1,0 +1,21 @@
+{
+  "migration_file": "supabase/migrations/20260908184500_phase_8b5_candidate_b_enforcement_recovery_severe_media.sql",
+  "migration_sha256": "1ebab16c8d0d820519c82ee52ead5ae44794060ebe91bcc45717a6f260357efc",
+  "base_main_sha": "06671e5b79ce50d3c69502a73d246e15da786a92",
+  "preview_project_ref": "ughnlbuqffffoorucwyw",
+  "preview_branch_id": "f89e47f8-6a42-45b6-aea2-d683a97fc754",
+  "preview_migration_head": "20260908184500",
+  "preview_applied_migration_head": "20260908182345",
+  "repository_migration_head": "20260908184500",
+  "baseline_replay": "pass",
+  "candidate_apply": "pass",
+  "verifier": "pass",
+  "verifier_file": "scripts/control-plane/verify-phase-8b5-candidate-b-enforcement-recovery-severe-media.sql",
+  "verifier_sha256": "b7b6611af43ba6ac0520e397458dbc45926c4536bc78d9c0d16be9c2aa17aff8",
+  "schema_types_sha256": "76fa588cb5fb71668d19c5398199dfe546afbd8d8538088f20c842e00c9f4dc7",
+  "schema_migration_count": 111,
+  "schema_migration_head": "20260908184500",
+  "preview_schema_migration_head": "20260908182345",
+  "production_mutation": "none",
+  "verified_at": "2026-09-08T20:09:25Z"
+}
