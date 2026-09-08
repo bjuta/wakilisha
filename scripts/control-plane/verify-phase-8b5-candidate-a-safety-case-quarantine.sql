@@ -157,7 +157,7 @@ begin
 
   if position('safety_case_targets' in v_inspect_definition)=0
      or position('evidence_viewed' in v_inspect_definition)=0
-     or position('message.body' in lower(v_inspect_definition))=0 then
+     or position('message_row.body' in lower(v_inspect_definition))=0 then
     raise exception 'PHASE_8B5_A_FAIL: evidence inspection is missing exact-target/log/body authority';
   end if;
 
