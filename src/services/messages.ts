@@ -166,7 +166,8 @@ export type MessagesSafetyCaseStatus =
 export type MessagesSafetyDisposition =
   | "pending"
   | "no_action"
-  | "quarantine";
+  | "quarantine"
+  | "enforced";
 
 export interface MessagesSafetyCaseSummary {
   case_id: string;
@@ -180,6 +181,9 @@ export interface MessagesSafetyCaseSummary {
   message_target_count: number;
   media_target_count: number;
   active_quarantine_count: number;
+  active_enforcement_count: number;
+  open_appeal_count: number;
+  active_media_containment_count: number;
 }
 
 export interface MessagesSafetyTarget {
@@ -203,6 +207,17 @@ export interface MessagesSafetyCaseEvent {
     | "released"
     | "resolved"
     | "evidence_viewed"
+    | "assessment_updated"
+    | "enforcement_applied"
+    | "enforcement_released"
+    | "enforcement_superseded"
+    | "enforcement_expired"
+    | "enforcement_reversed"
+    | "appeal_submitted"
+    | "appeal_review_started"
+    | "appeal_resolved"
+    | "media_contained"
+    | "media_containment_released"
     | string;
   actor_kind: "human" | "system" | "automation" | string;
   actor_user_id: string | null;
@@ -243,6 +258,120 @@ export interface MessagesSafetyCaseDetail {
   targets: MessagesSafetyTarget[];
   events: MessagesSafetyCaseEvent[];
   quarantine: MessagesQuarantineState[];
+  enforcements: MessagesSafetyEnforcement[];
+  appeals: MessagesSafetyAppeal[];
+  media_containment: MessagesSafetyMediaContainment[];
+}
+
+export type MessagesSafetyEnforcementKind =
+  | "warning"
+  | "send_cooldown"
+  | "send_rate_limit"
+  | "links_restricted"
+  | "media_restricted"
+  | "conversation_start_restricted"
+  | "messaging_suspended"
+  | "messaging_removed";
+
+export type MessagesSafetyEnforcementStatus =
+  | "active"
+  | "released"
+  | "expired"
+  | "reversed"
+  | "superseded";
+
+export interface MessagesSafetyEnforcement {
+  enforcement_id: string;
+  source_message_id: string;
+  subject_user_id: string;
+  subject_person_resource_id: string;
+  enforcement_kind: MessagesSafetyEnforcementKind;
+  status: MessagesSafetyEnforcementStatus;
+  applied_at: string;
+  applied_by_user_id: string;
+  effective_until: string | null;
+  appeal_allowed: boolean;
+  public_reason: string;
+  internal_reason: string;
+  cooldown_seconds: number | null;
+  rate_limit_count: number | null;
+  rate_limit_window_seconds: number | null;
+  ended_at: string | null;
+  ended_by_user_id: string | null;
+  end_reason: string | null;
+  superseded_by_enforcement_id: string | null;
+  revision: number;
+}
+
+export interface MessagesSafetyAppeal {
+  appeal_id: string;
+  enforcement_id: string;
+  status: "open" | "under_review" | "resolved" | string;
+  appeal_reason: string;
+  submitted_at: string;
+  review_started_at: string | null;
+  reviewed_by_user_id: string | null;
+  resolution: "upheld" | "modified" | "reversed" | null;
+  resolution_public_note: string | null;
+  resolution_internal_note: string | null;
+  resolved_at: string | null;
+  resolved_by_user_id: string | null;
+  revision: number;
+}
+
+export interface MessagesSafetyAppealSummary {
+  appeal_id: string;
+  enforcement_id: string;
+  safety_case_id: string;
+  status: "open" | "under_review" | "resolved" | string;
+  enforcement_kind: MessagesSafetyEnforcementKind;
+  submitted_at: string;
+  review_started_at: string | null;
+  resolved_at: string | null;
+  resolution: "upheld" | "modified" | "reversed" | null;
+}
+
+export interface MessagesSafetyMediaContainment {
+  containment_id: string;
+  media_file_object_id: string;
+  status: "active" | "released" | string;
+  policy_category: string;
+  placed_at: string;
+  placed_by_user_id: string;
+  released_at: string | null;
+  released_by_user_id: string | null;
+  release_note: string | null;
+}
+
+export interface MyMessageSafetyStateAppeal {
+  appeal_id: string;
+  status: "open" | "under_review" | "resolved" | string;
+  submitted_at: string;
+  review_started_at: string | null;
+  resolution: "upheld" | "modified" | "reversed" | null;
+  resolution_public_note: string | null;
+  resolved_at: string | null;
+}
+
+export interface MyMessageSafetyStateEnforcement {
+  enforcement_id: string;
+  enforcement_kind: MessagesSafetyEnforcementKind;
+  applied_at: string;
+  effective_until: string | null;
+  is_effective: boolean;
+  appeal_allowed: boolean;
+  public_reason: string;
+  appeal: MyMessageSafetyStateAppeal | null;
+}
+
+export interface MyMessageSafetyState {
+  enforcements: MyMessageSafetyStateEnforcement[];
+  can_start: boolean;
+  can_send: boolean;
+  links_allowed: boolean;
+  media_allowed: boolean;
+  next_send_at: string | null;
+  has_safety_state: boolean;
 }
 
 export interface MessagesSafetyEvidence {
@@ -268,6 +397,10 @@ export interface MyMessagesAccess {
   can_send: boolean;
   has_conversations: boolean;
   visible: boolean;
+  links_allowed: boolean;
+  media_allowed: boolean;
+  send_limited_until: string | null;
+  has_safety_state: boolean;
 }
 
 function actionKey(prefix: string): string {
@@ -321,6 +454,10 @@ export async function getMyMessagesAccess(): Promise<MyMessagesAccess> {
     can_send: raw.can_send === true,
     has_conversations: raw.has_conversations === true,
     visible: raw.visible === true,
+    links_allowed: raw.links_allowed !== false,
+    media_allowed: raw.media_allowed !== false,
+    send_limited_until: typeof raw.send_limited_until === "string" ? raw.send_limited_until : null,
+    has_safety_state: raw.has_safety_state === true,
   };
 }
 
@@ -635,6 +772,156 @@ export async function inspectMessageSafetyEvidence(
     p_message_id: messageId,
     p_reason: reason,
     p_idempotency_key: actionKey("messages.safety.evidence"),
+    p_correlation_id: null,
+  });
+}
+
+
+export async function updateMessagesSafetyAssessment(
+  caseId: string,
+  policyCategory: string,
+  severity: string,
+  confidence: number | null,
+  reason: string,
+): Promise<void> {
+  await rpc("update_messages_safety_assessment_v1", {
+    p_case_id: caseId,
+    p_policy_category: policyCategory,
+    p_severity: severity,
+    p_confidence: confidence,
+    p_reason: reason,
+    p_idempotency_key: actionKey("messages.safety.assessment.update"),
+    p_correlation_id: null,
+  });
+}
+
+export interface SetMessagesSafetyEnforcementInput {
+  caseId: string;
+  messageId: string;
+  enforcementKind: MessagesSafetyEnforcementKind;
+  active: boolean;
+  effectiveUntil: string | null;
+  appealAllowed: boolean;
+  publicReason: string;
+  internalReason: string;
+  cooldownSeconds: number | null;
+  rateLimitCount: number | null;
+  rateLimitWindowSeconds: number | null;
+}
+
+export async function setMessagesSafetyEnforcement(
+  input: SetMessagesSafetyEnforcementInput,
+): Promise<void> {
+  await rpc("set_messages_safety_enforcement_v1", {
+    p_case_id: input.caseId,
+    p_message_id: input.messageId,
+    p_enforcement_kind: input.enforcementKind,
+    p_active: input.active,
+    p_effective_until: input.effectiveUntil,
+    p_appeal_allowed: input.appealAllowed,
+    p_public_reason: input.publicReason,
+    p_internal_reason: input.internalReason,
+    p_cooldown_seconds: input.cooldownSeconds,
+    p_rate_limit_count: input.rateLimitCount,
+    p_rate_limit_window_seconds: input.rateLimitWindowSeconds,
+    p_idempotency_key: actionKey("messages.safety.enforcement.update"),
+    p_correlation_id: null,
+  });
+}
+
+export async function getMyMessageSafetyState(): Promise<MyMessageSafetyState> {
+  return rpc<MyMessageSafetyState>("get_my_message_safety_state_v1");
+}
+
+export async function submitMessagesSafetyAppeal(
+  enforcementId: string,
+  appealReason: string,
+): Promise<void> {
+  await rpc("submit_messages_safety_appeal_v1", {
+    p_enforcement_id: enforcementId,
+    p_appeal_reason: appealReason,
+    p_idempotency_key: actionKey("messages.safety.appeal.submit"),
+    p_correlation_id: null,
+  });
+}
+
+export async function listMessagesSafetyAppeals(
+  status: "open" | "under_review" | "resolved" | null = null,
+): Promise<MessagesSafetyAppealSummary[]> {
+  return rpc<MessagesSafetyAppealSummary[]>("list_messages_safety_appeals_v1", {
+    p_status: status,
+    p_before_submitted_at: null,
+    p_before_appeal_id: null,
+    p_limit: 100,
+  });
+}
+
+export async function startMessagesSafetyAppealReview(
+  appealId: string,
+): Promise<void> {
+  await rpc("start_messages_safety_appeal_review_v1", {
+    p_appeal_id: appealId,
+    p_idempotency_key: actionKey("messages.safety.appeal.review.start"),
+    p_correlation_id: null,
+  });
+}
+
+export interface ResolveMessagesSafetyAppealInput {
+  appealId: string;
+  resolution: "upheld" | "modified" | "reversed";
+  resolutionPublicNote: string;
+  resolutionInternalNote: string;
+  modifiedEnforcementKind: MessagesSafetyEnforcementKind | null;
+  modifiedEffectiveUntil: string | null;
+  modifiedAppealAllowed: boolean | null;
+  modifiedCooldownSeconds: number | null;
+  modifiedRateLimitCount: number | null;
+  modifiedRateLimitWindowSeconds: number | null;
+}
+
+export async function resolveMessagesSafetyAppeal(
+  input: ResolveMessagesSafetyAppealInput,
+): Promise<void> {
+  await rpc("resolve_messages_safety_appeal_v1", {
+    p_appeal_id: input.appealId,
+    p_resolution: input.resolution,
+    p_resolution_public_note: input.resolutionPublicNote,
+    p_resolution_internal_note: input.resolutionInternalNote,
+    p_modified_enforcement_kind: input.modifiedEnforcementKind,
+    p_modified_effective_until: input.modifiedEffectiveUntil,
+    p_modified_appeal_allowed: input.modifiedAppealAllowed,
+    p_modified_cooldown_seconds: input.modifiedCooldownSeconds,
+    p_modified_rate_limit_count: input.modifiedRateLimitCount,
+    p_modified_rate_limit_window_seconds: input.modifiedRateLimitWindowSeconds,
+    p_idempotency_key: actionKey("messages.safety.appeal.resolve"),
+    p_correlation_id: null,
+  });
+}
+
+export async function setMessagesSafetyMediaContainment(
+  caseId: string,
+  mediaFileObjectId: string,
+  contained: boolean,
+  reason: string,
+): Promise<void> {
+  await rpc("set_messages_safety_media_containment_v1", {
+    p_case_id: caseId,
+    p_media_file_object_id: mediaFileObjectId,
+    p_contained: contained,
+    p_reason: reason,
+    p_idempotency_key: actionKey("messages.safety.media.containment.update"),
+    p_correlation_id: null,
+  });
+}
+
+export async function submitMessagesSafetyMediaScan(
+  caseId: string,
+  mediaFileObjectId: string,
+): Promise<void> {
+  await rpc("submit_messages_safety_media_scan_v1", {
+    p_case_id: caseId,
+    p_media_file_object_id: mediaFileObjectId,
+    p_idempotency_key: actionKey("messages.safety.media.scan"),
     p_correlation_id: null,
   });
 }
