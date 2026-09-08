@@ -22060,6 +22060,10 @@ export type Database = {
         Returns: Json
       }
       get_messages_control_center_status: { Args: never; Returns: Json }
+      get_messages_safety_case_v1: {
+        Args: { p_case_id: string }
+        Returns: Json
+      }
       get_messages_system_actors: { Args: never; Returns: Json }
       get_my_field_submission_v1: {
         Args: { p_submission_resource_id: string }
@@ -22369,6 +22373,16 @@ export type Database = {
             }
             Returns: number
           }
+      inspect_message_safety_evidence_v1: {
+        Args: {
+          p_case_id: string
+          p_correlation_id?: string
+          p_idempotency_key: string
+          p_message_id: string
+          p_reason: string
+        }
+        Returns: Json
+      }
       institute_accept_submission_as_evidence: {
         Args: {
           p_evidence_title?: string
@@ -22710,6 +22724,15 @@ export type Database = {
           title: string
           updated_at: string
         }[]
+      }
+      list_messages_safety_cases_v1: {
+        Args: {
+          p_before_case_id?: string
+          p_before_updated_at?: string
+          p_limit?: number
+          p_status?: string
+        }
+        Returns: Json
       }
       list_my_message_conversations: {
         Args: {
@@ -23888,6 +23911,16 @@ export type Database = {
           result_payload: Json
         }[]
       }
+      report_message_safety_v1: {
+        Args: {
+          p_correlation_id?: string
+          p_idempotency_key: string
+          p_message_id: string
+          p_note: string
+          p_policy_category: string
+        }
+        Returns: Json
+      }
       request_article_changes: {
         Args: { p_article_id: string; p_note?: string; p_version_id?: string }
         Returns: {
@@ -23969,6 +24002,16 @@ export type Database = {
           safe_delivery_url: string
           width: number
         }[]
+      }
+      resolve_message_safety_case_v1: {
+        Args: {
+          p_case_id: string
+          p_correlation_id?: string
+          p_disposition: string
+          p_idempotency_key: string
+          p_resolution_note: string
+        }
+        Returns: Json
       }
       resolve_playlist_item_match: {
         Args: {
@@ -24681,6 +24724,17 @@ export type Database = {
         }
         Returns: Json
       }
+      set_message_quarantine_v1: {
+        Args: {
+          p_case_id: string
+          p_correlation_id?: string
+          p_idempotency_key: string
+          p_message_id: string
+          p_quarantined: boolean
+          p_reason: string
+        }
+        Returns: Json
+      }
       set_messages_system_actor_enabled: {
         Args: {
           p_actor_key: string
@@ -24945,6 +24999,14 @@ export type Database = {
           message_id: string
           receipt_status: string
         }[]
+      }
+      start_messages_safety_review_v1: {
+        Args: {
+          p_case_id: string
+          p_correlation_id?: string
+          p_idempotency_key: string
+        }
+        Returns: Json
       }
       submit_article_for_review: {
         Args: {
