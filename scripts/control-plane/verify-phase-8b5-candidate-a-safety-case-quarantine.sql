@@ -427,7 +427,29 @@ select public.report_message_safety_v1(
   null
 ) as payload;
 
-do $participant_assert$
+do $participant_rpc_assert$
+declare
+  v_case uuid;
+begin
+  select safety_case_id
+  into v_case
+  from phase8b5_a_fixture;
+
+  if v_case is null
+     or (select (payload->>'safety_case_id')::uuid from phase8b5_a_report_replay)<>v_case then
+    raise exception 'PHASE_8B5_A_FAIL: participant report replay did not preserve the exact Safety Case';
+  end if;
+
+  begin
+    perform public.list_messages_safety_cases_v1(null,null,null,50);
+    raise exception 'PHASE_8B5_A_FAIL: ordinary participant read the Super Admin Safety queue';
+  exception when sqlstate '42501' then null; end;
+end
+$participant_rpc_assert$;
+
+reset role;
+
+do $participant_storage_assert$
 declare
   v_case uuid;
   v_message uuid;
@@ -443,24 +465,12 @@ begin
     raise exception 'PHASE_8B5_A_FAIL: participant report did not create one exact Safety Case target/event';
   end if;
 
-  if (select (payload->>'safety_case_id')::uuid from phase8b5_a_report_replay)<>v_case
-     or (select count(*) from messaging.safety_case_events where safety_case_id=v_case and event_kind='opened')<>1 then
-    raise exception 'PHASE_8B5_A_FAIL: participant report replay duplicated Safety authority';
-  end if;
-
   if (select count(*) from public.community_reports)<>(select community_report_count_before from phase8b5_a_fixture)
      or (select count(*) from public.community_blocks)<>(select community_block_count_before from phase8b5_a_fixture) then
     raise exception 'PHASE_8B5_A_FAIL: private Message report mutated Community moderation storage';
   end if;
-
-  begin
-    perform public.list_messages_safety_cases_v1(null,null,null,50);
-    raise exception 'PHASE_8B5_A_FAIL: ordinary participant read the Super Admin Safety queue';
-  exception when sqlstate '42501' then null; end;
 end
-$participant_assert$;
-
-reset role;
+$participant_storage_assert$;
 
 select set_config(
   'request.jwt.claims',
@@ -552,6 +562,8 @@ select public.inspect_message_safety_evidence_v1(
   null
 ) as payload;
 
+reset role;
+
 do $evidence_assert$
 declare
   v_case uuid;
@@ -578,6 +590,19 @@ begin
   end if;
 end
 $evidence_assert$;
+
+select set_config(
+  'request.jwt.claims',
+  (
+    select jsonb_build_object(
+      'sub',super_admin_user_id::text,
+      'role','authenticated'
+    )::text
+    from phase8b5_a_fixture
+  ),
+  true
+);
+set local role authenticated;
 
 select public.set_message_quarantine_v1(
   (select safety_case_id from phase8b5_a_fixture),
@@ -618,6 +643,8 @@ select public.mark_my_message_conversation_read(
   null
 ) as payload;
 
+reset role;
+
 do $quarantine_projection_assert$
 begin
   if position(
@@ -648,8 +675,6 @@ begin
   end if;
 end
 $quarantine_projection_assert$;
-
-reset role;
 
 select set_config(
   'request.jwt.claims',
@@ -711,6 +736,8 @@ select public.mark_my_message_conversation_read(
   null
 ) as payload;
 
+reset role;
+
 do $release_assert$
 begin
   if position(
@@ -749,8 +776,6 @@ begin
   end if;
 end
 $release_assert$;
-
-reset role;
 
 select jsonb_build_object(
   'verification','PASS',
