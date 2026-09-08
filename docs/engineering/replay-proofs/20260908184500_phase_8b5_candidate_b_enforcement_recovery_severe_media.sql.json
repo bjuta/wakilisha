@@ -11,11 +11,15 @@
   "candidate_apply": "pass",
   "verifier": "pass",
   "verifier_file": "scripts/control-plane/verify-phase-8b5-candidate-b-enforcement-recovery-severe-media.sql",
-  "verifier_sha256": "b7b6611af43ba6ac0520e397458dbc45926c4536bc78d9c0d16be9c2aa17aff8",
+  "verifier_sha256": "5f762f0c8db7ee68b0b418976bd1a0351960d6f16795c30ec8cfdbe63dc85e59",
   "schema_types_sha256": "76fa588cb5fb71668d19c5398199dfe546afbd8d8538088f20c842e00c9f4dc7",
   "schema_migration_count": 111,
   "schema_migration_head": "20260908184500",
   "preview_schema_migration_head": "20260908182345",
-  "production_mutation": "none",
-  "verified_at": "2026-09-08T20:09:25Z"
+  "production_mutation": "candidate_b_promoted",
+  "verified_at": "2026-09-08T20:09:25Z",
+  "production_migration_count": 111,
+  "production_migration_head": "20260908184500",
+  "production_verifier": "pass",
+  "production_verified_at": "2026-09-08T21:15:38Z"
 }
