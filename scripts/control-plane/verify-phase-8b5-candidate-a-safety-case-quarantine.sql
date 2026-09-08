@@ -312,13 +312,9 @@ select super_admin_user_id,'super_admin','active',null::uuid,now(),'Phase 8B.5 C
 from phase8b5_a_fixture
 union all
 select ordinary_admin_user_id,'administrator','active',null::uuid,now(),'Phase 8B.5 Candidate A rollback verifier',now(),now()
-from phase8b5_a_fixture
-union all
-select sender_user_id,'subscriber','active',null::uuid,now(),'Phase 8B.5 Candidate A rollback verifier',now(),now()
-from phase8b5_a_fixture
-union all
-select recipient_user_id,'subscriber','active',null::uuid,now(),'Phase 8B.5 Candidate A rollback verifier',now(),now()
 from phase8b5_a_fixture;
+
+-- auth.users provisioning already creates the canonical subscriber assignments.
 
 with conversation as (
   insert into messaging.conversations(

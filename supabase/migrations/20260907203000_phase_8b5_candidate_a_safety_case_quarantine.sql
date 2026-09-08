@@ -1198,7 +1198,7 @@ declare
   admin_identity record;
   safety_case messaging.safety_cases%rowtype;
   disposition text:=lower(btrim(coalesce(p_disposition,'')));
-  resolution_note text:=nullif(btrim(coalesce(p_resolution_note,'')),'');
+  resolution_note_value text:=nullif(btrim(coalesce(p_resolution_note,'')),'');
   correlation uuid;
   begin_row record;
   active_quarantine_count bigint;
@@ -1209,8 +1209,8 @@ begin
 
   if p_case_id is null
      or disposition not in ('no_action','quarantine')
-     or resolution_note is null
-     or octet_length(resolution_note)>4000 then
+     or resolution_note_value is null
+     or octet_length(resolution_note_value)>4000 then
     raise exception 'Safety Case resolution input is invalid.' using errcode='22023';
   end if;
 
@@ -1229,7 +1229,7 @@ begin
     jsonb_build_object(
       'safety_case_id',p_case_id,
       'disposition',disposition,
-      'resolution_note',resolution_note,
+      'resolution_note',resolution_note_value,
       'correlation_id',correlation
     )
   );
@@ -1292,7 +1292,7 @@ begin
     current_disposition=disposition,
     resolved_by_user_id=admin_identity.user_id,
     resolved_at=now(),
-    resolution_note=resolution_note,
+    resolution_note=resolution_note_value,
     updated_at=now(),
     reviewed_by_user_id=coalesce(
       reviewed_by_user_id,
@@ -1322,7 +1322,7 @@ begin
     now(),
     jsonb_build_object(
       'disposition',disposition,
-      'resolution_note',resolution_note,
+      'resolution_note',resolution_note_value,
       'active_quarantine_count',active_quarantine_count
     )
   )
@@ -1503,21 +1503,21 @@ set search_path=pg_catalog,auth,public,editorial,messaging
 as $$
 declare
   me record;
-  participant_id uuid;
+  my_participant_id uuid;
   cutoff timestamptz;
   read_at_value timestamptz:=now();
   marked bigint;
 begin
   select * into me from messaging.current_human_identity();
 
-  select participant.id into participant_id
+  select participant.id into my_participant_id
   from messaging.conversation_participants participant
   where participant.conversation_id=p_conversation_id
     and participant.person_resource_id=me.person_resource_id
     and participant.user_id=me.user_id
     and participant.membership_status='active';
 
-  if participant_id is null then
+  if my_participant_id is null then
     raise exception
       'Active conversation membership is required.'
       using errcode='42501';
@@ -1548,7 +1548,7 @@ begin
   set read_at=coalesce(receipt.read_at,read_at_value)
   from messaging.messages message
   where receipt.message_id=message.id
-    and receipt.participant_id=participant_id
+    and receipt.participant_id=my_participant_id
     and receipt.conversation_id=p_conversation_id
     and message.accepted_at<=cutoff
     and receipt.read_at is null
