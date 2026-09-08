@@ -1,0 +1,16 @@
+{
+  "migration_file": "supabase/migrations/20260907203000_phase_8b5_candidate_a_safety_case_quarantine.sql",
+  "migration_sha256": "8fd15fc5f1d33cb04cc06cbf3970bf1f77fc0cd3ac257ec1a6bd42a196152f3c",
+  "base_main_sha": "973879e1ec03eecaf1e54d45a7d6406afdcf01ee",
+  "preview_project_ref": "uxvlhnhwnsxewpinilod",
+  "preview_branch_id": "621e2efb-5141-48cc-885d-89c93ef4bb3e",
+  "preview_migration_head": "20260907203000",
+  "baseline_replay": "pass",
+  "candidate_apply": "pass",
+  "verifier": "pass",
+  "verifier_file": "scripts/control-plane/verify-phase-8b5-candidate-a-safety-case-quarantine.sql",
+  "schema_types_sha256": "bd22bcb40373f2a445447dc60f78a4013b3bf1d669964f93b858db2dca60dba8",
+  "schema_migration_count": 110,
+  "schema_migration_head": "20260907203000",
+  "verified_at": "2026-09-08T09:47:23.596Z"
+}

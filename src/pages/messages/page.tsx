@@ -32,6 +32,7 @@ import {
   type MessageRecipientSuggestion,
   type MessageResourceReference,
 } from "@/services/messages";
+import { MessageSafetyReportButton } from "./MessageSafetyReportButton";
 
 const FOLDERS: Array<{ key: MessageFolder; label: string; icon: string }> = [
   { key: "inbox", label: "Inbox", icon: "ri-inbox-line" },
@@ -745,9 +746,10 @@ export default function MessagesPage() {
                                 ))}
                               </div>
                             )}
-                            <div className={`mt-1.5 flex items-center justify-end gap-1 text-[9px] font-bold ${mine ? "text-white/70" : "text-[var(--wk-text-faint)]"}`}>
+                            <div className={`mt-1.5 flex items-center justify-end gap-2 text-[9px] font-bold ${mine ? "text-white/70" : "text-[var(--wk-text-faint)]"}`}>
                               <span>{when(message.accepted_at)}</span>
                               {mine && message.recipient_read_at && <span>· Read</span>}
+                              {!mine && <MessageSafetyReportButton messageId={message.id} />}
                             </div>
                           </div>
                         </div>
