@@ -158,16 +158,15 @@ export function MessagesSafetyPanel() {
     setBusy(true);
     setError(null);
     try {
-      setEvidence(
-        await inspectMessageSafetyEvidence(
-          selectedId,
-          target.message_id,
-          evidenceReason.trim(),
-        ),
+      const inspectedEvidence = await inspectMessageSafetyEvidence(
+        selectedId,
+        target.message_id,
+        evidenceReason.trim(),
       );
       setEvidenceReason("");
       setEvidenceOpen(false);
       await loadDetail(selectedId);
+      setEvidence(inspectedEvidence);
     } catch (reason) {
       setError(
         reason instanceof Error
