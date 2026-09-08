@@ -424,6 +424,8 @@ can_start = false
 can_send = false
 ```
 
+Historical Conversation reads and the safe enforcement/appeal surface remain available. Candidate B does not delete Message history or globally suspend the account.
+
 ### Conversation start denial
 
 If no hard denial exists but any effective row is:
@@ -511,6 +513,13 @@ pg_advisory_xact_lock(
 The common sender enforcement helper acquires this lock before cooldown/rate-limit evaluation.
 
 The lock remains held through canonical Message acceptance because it is transaction-scoped.
+
+Every mutation that changes effective enforcement for the subject must acquire the same subject lock before changing the enforcement row. This includes direct apply/release/supersede and appeal `modified` or `reversed` resolution.
+
+This gives a truthful order between one sender action and one enforcement mutation:
+
+- if Message acceptance holds the lock first, that Message may commit before the later enforcement;
+- if enforcement holds the lock first, the later first-time Message command observes the new restriction.
 
 All human send/start entry points must call the common helper before inserting a Message:
 
@@ -685,6 +694,8 @@ Submitting an appeal never changes enforcement state automatically.
 
 `modified` must narrow the effective restriction. It may not increase severity under the appeal resolution path.
 
+A `modified` resolution is allowed only while the original enforcement is still effective. If the original term elapsed during review, the appeal may be resolved `upheld` or `reversed`, but `modified` cannot reintroduce an already elapsed restriction.
+
 ### Same-kind modification
 
 Allowed for all kinds when the replacement term is no broader.
@@ -751,20 +762,21 @@ This conservative relation prevents an appeal resolution from swapping one restr
 A `modified` appeal resolution must atomically:
 
 1. lock the appeal and current enforcement;
-2. validate narrowing rules;
-3. create the replacement enforcement row;
-4. set the original enforcement to `superseded`;
-5. bind `superseded_by_enforcement_id` to the replacement;
-6. set original `ended_at`, `ended_by_user_id`, and `end_reason`;
-7. resolve the appeal;
-8. append `enforcement_superseded`, `enforcement_applied`, and `appeal_resolved` events;
-9. complete the command receipt.
+2. acquire the subject Safety advisory lock;
+3. validate narrowing rules;
+4. create the replacement enforcement row;
+5. set the original enforcement to `superseded`;
+6. bind `superseded_by_enforcement_id` to the replacement;
+7. set original `ended_at`, `ended_by_user_id`, and `end_reason`;
+8. resolve the appeal;
+9. append `enforcement_superseded`, `enforcement_applied`, and `appeal_resolved` events;
+10. complete the command receipt.
 
 No history is edited in place.
 
 ### Reversal
 
-A `reversed` appeal resolution must atomically set the enforcement to `reversed`, record accountable end fields, resolve the appeal, append `enforcement_reversed` and `appeal_resolved`, and complete the command receipt.
+A `reversed` appeal resolution must atomically acquire the subject Safety advisory lock, set the enforcement to `reversed`, record accountable end fields, resolve the appeal, append `enforcement_reversed` and `appeal_resolved`, and complete the command receipt.
 
 ### Upheld
 
@@ -852,6 +864,19 @@ Applying severe Media containment requires:
 4. the seed file is canonical and `verification_state = 'verified'`;
 5. the seed has a valid canonical SHA-256 and non-null byte size.
 
+The command acquires a transaction-scoped exact Media identity lock before containment convergence:
+
+```text
+pg_advisory_xact_lock(
+  hashtextextended(
+    'messages-safety-media:' || sha256 || ':' || byte_size::text,
+    0
+  )
+)
+```
+
+The hash and size are read from canonical Media only for the transaction lock. They are not persisted in Safety storage.
+
 The command then queries canonical `media.file_objects` for verified files with the same:
 
 ```text
@@ -870,7 +895,7 @@ For every current exact match:
 
 The command result may return counts and file-object IDs. It must not return SHA-256, storage paths, or provider credentials.
 
-Release with the same seed releases only active containment rows owned by the supplied case whose canonical file identity still belongs to the same exact match set.
+Release with the same seed acquires the same exact identity lock and releases only active containment rows owned by the supplied case whose immutable canonical file identity belongs to the same exact match set.
 
 A containment owned by another case remains active.
 
@@ -884,8 +909,10 @@ The common containment predicate therefore evaluates canonical Media at read tim
 
 `messaging.media_file_is_safety_contained(p_media_file_object_id uuid)` returns true when:
 
-1. the requested canonical file is verified and has canonical SHA-256 plus byte size; and
-2. any active `messaging.safety_media_containment` row references a verified canonical file with that same SHA-256 plus byte size.
+1. the requested canonical file has canonical SHA-256 plus byte size and is otherwise eligible for its caller's existing Media path; and
+2. any active `messaging.safety_media_containment` row references a canonical file with that same immutable SHA-256 plus byte size.
+
+Containment application itself requires the seed and expanded matches to be verified. Once a verified `media.file_objects` row exists, its canonical identity fields are immutable under existing Media authority.
 
 This prevents future duplicate file rows from escaping an active exact-match containment without copying the hash into Safety storage.
 
@@ -937,11 +964,18 @@ Release restores only the Safety half of eligibility.
 
 Candidate B must prevent normal Media processing from becoming an exact-file containment escape path.
 
-Use the common containment predicate. Do not create another processing queue.
+Use the common containment predicate and exact Media identity lock. Do not create another processing queue.
 
 ### New submissions
 
-`public.submit_media_processing_command_v1(...)` must reject when its canonical source file is actively contained by exact identity.
+`public.submit_media_processing_command_v1(...)` must:
+
+1. load the canonical verified source file;
+2. acquire the same transaction-scoped `sha256 + byte_size` Media Safety advisory lock;
+3. reject when the source file is actively contained by exact identity;
+4. create the existing command receipt/job only when allowed.
+
+This serializes a new normal processing submission against concurrent containment for the same exact canonical Media identity.
 
 ### Worker claims
 
@@ -949,7 +983,7 @@ Use the common containment predicate. Do not create another processing queue.
 
 ### Pending jobs when containment is applied
 
-The Media containment command must cancel queued/retrying normal `media.process_revision` jobs whose canonical `source_file_object_id` is one of the newly contained exact matches.
+The Media containment command must cancel queued/retrying normal `media.process_revision` jobs whose canonical `source_file_object_id` is one of the newly contained exact matches while the exact Media identity advisory lock is held.
 
 Use existing `platform_private.jobs` and `platform_private.command_receipts` state:
 
@@ -980,7 +1014,11 @@ public.register_audio_delivery_processing_outputs_v1(...)
 
 `public.complete_media_processing_job_v1(...)` must also reject successful completion while the job source is contained.
 
-The worker may then use the existing failure/retry boundary. Because the source remains contained, later claims remain blocked or the pending job is cancelled on the next governed containment convergence.
+`public.fail_media_processing_job_v1(...)` must convert a contained-source failure into terminal cancellation/failure state rather than scheduling another retry.
+
+`public.recover_expired_media_processing_jobs_v1(...)` must cancel an expired running job whose source became contained rather than returning it to `retry_wait`.
+
+This keeps contained-source jobs from becoming permanently stranded in retry state while preserving the existing job/receipt/outbox authority.
 
 No contained source may register a new deliverable output through these normal processing paths.
 
@@ -1103,6 +1141,16 @@ This service-role response is not Safety storage. SHA-256 remains read from cano
 
 Do not return public delivery authorization, browser credentials, access tokens, or unrelated Media.
 
+### Runtime isolation boundary
+
+The service-role process that leases Safety scan work is trusted WAKILISHA orchestration. An external or untrusted classifier/provider adapter must not receive Supabase service-role credentials or general database access.
+
+The trusted worker may retrieve the exact canonical file through the scoped worker target contract, then pass only the required file/content to an isolated provider process or provider API.
+
+The provider process receives no database credentials and no authority to call enforcement, containment, account, Community, or Media mutation commands.
+
+This preserves untrusted processing isolation without creating a second Media store.
+
 ### Completion API
 
 ```text
@@ -1199,21 +1247,62 @@ Use existing `retry_wait`, `dead_letter`, command receipt failure, and outbox ev
 
 No Candidate B scheduler is added.
 
-## Browser command types
+## Command types
 
-Add these command types using the existing `platform_private.command_types` table:
+Add these rows using the existing `platform_private.command_types` table:
 
 ```text
-messages.safety.assessment.update
-messages.safety.enforcement.update
-messages.safety.appeal.submit
-messages.safety.appeal.review.start
-messages.safety.appeal.resolve
-messages.safety.media.containment.update
-messages.safety.media.scan
+command_type: messages.safety.assessment.update
+job_type: messages.safety.assessment.update.sync
+accepted_event_type: messages.safety.assessment.update.accepted
+success_event_type: messages.safety.assessment.update.succeeded
+failure_event_type: messages.safety.assessment.update.failed
+retry_event_type: messages.safety.assessment.update.retry_scheduled
+
+command_type: messages.safety.enforcement.update
+job_type: messages.safety.enforcement.update.sync
+accepted_event_type: messages.safety.enforcement.update.accepted
+success_event_type: messages.safety.enforcement.update.succeeded
+failure_event_type: messages.safety.enforcement.update.failed
+retry_event_type: messages.safety.enforcement.update.retry_scheduled
+
+command_type: messages.safety.appeal.submit
+job_type: messages.safety.appeal.submit.sync
+accepted_event_type: messages.safety.appeal.submit.accepted
+success_event_type: messages.safety.appeal.submit.succeeded
+failure_event_type: messages.safety.appeal.submit.failed
+retry_event_type: messages.safety.appeal.submit.retry_scheduled
+
+command_type: messages.safety.appeal.review.start
+job_type: messages.safety.appeal.review.start.sync
+accepted_event_type: messages.safety.appeal.review.start.accepted
+success_event_type: messages.safety.appeal.review.start.succeeded
+failure_event_type: messages.safety.appeal.review.start.failed
+retry_event_type: messages.safety.appeal.review.start.retry_scheduled
+
+command_type: messages.safety.appeal.resolve
+job_type: messages.safety.appeal.resolve.sync
+accepted_event_type: messages.safety.appeal.resolve.accepted
+success_event_type: messages.safety.appeal.resolve.succeeded
+failure_event_type: messages.safety.appeal.resolve.failed
+retry_event_type: messages.safety.appeal.resolve.retry_scheduled
+
+command_type: messages.safety.media.containment.update
+job_type: messages.safety.media.containment.update.sync
+accepted_event_type: messages.safety.media.containment.update.accepted
+success_event_type: messages.safety.media.containment.update.succeeded
+failure_event_type: messages.safety.media.containment.update.failed
+retry_event_type: messages.safety.media.containment.update.retry_scheduled
+
+command_type: messages.safety.media.scan
+job_type: messages.safety.media.scan
+accepted_event_type: messages.safety.media.scan.accepted
+success_event_type: messages.safety.media.scan.succeeded
+failure_event_type: messages.safety.media.scan.failed
+retry_event_type: messages.safety.media.scan.retry_scheduled
 ```
 
-Each uses the existing accepted/succeeded/failed/retry naming contract.
+All seven are enabled.
 
 No new idempotency ledger is permitted.
 
@@ -1299,6 +1388,7 @@ No lower-step history is required for a severe case.
 For `p_active = false`:
 
 - exact case, Message, and derived subject must still agree;
+- acquire the same subject Safety advisory lock;
 - release only an active same-case/same-kind row;
 - release may occur after the Safety Case resolved;
 - set status `released` and accountable end fields;
@@ -1414,16 +1504,18 @@ public.resolve_messages_safety_appeal_v1(
   p_resolution text,
   p_resolution_public_note text,
   p_resolution_internal_note text,
-  p_modified_enforcement_kind text default null,
-  p_modified_effective_until timestamptz default null,
-  p_modified_appeal_allowed boolean default null,
-  p_modified_cooldown_seconds integer default null,
-  p_modified_rate_limit_count integer default null,
-  p_modified_rate_limit_window_seconds integer default null,
+  p_modified_enforcement_kind text,
+  p_modified_effective_until timestamptz,
+  p_modified_appeal_allowed boolean,
+  p_modified_cooldown_seconds integer,
+  p_modified_rate_limit_count integer,
+  p_modified_rate_limit_window_seconds integer,
   p_idempotency_key text,
   p_correlation_id uuid default null
 )
 ```
+
+All `p_modified_*` inputs are required RPC arguments and may be null. This keeps the PostgreSQL signature valid while making the modification shape explicit.
 
 Super Admin Messages authority only.
 
@@ -1701,6 +1793,8 @@ Every request fingerprint includes the exact Safety Case/Message/Media/enforceme
 
 Receipt results must not duplicate Message body, Media SHA-256, storage paths, unrestricted provider payloads, or secrets.
 
+For `messages.safety.media.scan`, the command receipt and job use the submitting Super Admin's canonical Person Resource as the existing generic `resource_id`; exact Safety Case and Media file identity remain in the bounded request/job payload.
+
 ## Replay semantics
 
 Every Candidate B mutation is principal/idempotency scoped through the existing command receipt authority.
@@ -1783,13 +1877,13 @@ Candidate B implementation should use one migration that contains only the locke
 4. new Candidate B command types;
 5. common sender Safety helper;
 6. sender chronology index;
-7. exact Media containment predicate;
+7. exact Media containment predicate and exact Media identity lock;
 8. governed Candidate B browser RPCs;
 9. service-role Safety scan worker RPCs;
 10. existing Messages start/send/access convergence;
 11. existing Candidate A case read/resolve convergence;
 12. exact current Media delivery convergence;
-13. normal Media processing containment convergence.
+13. normal Media processing containment convergence, including fail/recovery cleanup.
 
 No Edge Function is required by the database design itself.
 
@@ -1824,7 +1918,7 @@ The Candidate B verifier must prove at minimum:
 3. Candidate A four-table Safety authority remains intact;
 4. `current_disposition` accepts `enforced` without breaking existing values;
 5. new Safety event kinds exist without removing Candidate A kinds;
-6. all seven Candidate B command types exist and are enabled;
+6. all seven Candidate B command types exist and are enabled with the locked job/event names;
 7. ordinary Administrator is denied all Candidate B admin commands/reads;
 8. participant cannot apply enforcement to themselves or another user by arbitrary ID;
 9. exact Message target derives exact human sender;
@@ -1848,15 +1942,17 @@ The Candidate B verifier must prove at minimum:
 27. future equal-hash canonical files fail the common containment predicate while any exact-match containment remains active;
 28. every locked direct Media delivery function checks containment;
 29. normal Media processing submission/claim/output completion cannot bypass contained source;
-30. queued/retrying normal Media jobs are cancelled through existing job/receipt/outbox state when containment applies;
-31. Safety scan job uses existing job/outbox tables and scoped claim APIs;
-32. Safety scan worker cannot lease unrelated job types;
-33. scan target retrieval requires the exact active worker lease;
-34. sanitized scan result appends `signal_added` and cannot create enforcement automatically;
-35. provider raw payload/secrets are not persisted;
-36. Community Block/Report rows remain unchanged;
-37. canonical Message body and canonical Media file identity remain unchanged;
-38. migration replay is deterministic.
+30. normal Media processing submit and containment use the same exact Media identity lock;
+31. queued/retrying normal Media jobs are cancelled through existing job/receipt/outbox state when containment applies;
+32. normal Media fail/recovery does not return a contained source to retry;
+33. Safety scan job uses existing job/outbox tables and scoped claim APIs;
+34. Safety scan worker cannot lease unrelated job types;
+35. scan target retrieval requires the exact active worker lease;
+36. sanitized scan result appends `signal_added` and cannot create enforcement automatically;
+37. provider raw payload/secrets are not persisted;
+38. Community Block/Report rows remain unchanged;
+39. canonical Message body and canonical Media file identity remain unchanged;
+40. migration replay is deterministic.
 
 The permanent verifier is not required to create a redundant UI test family.
 
@@ -1872,6 +1968,15 @@ same subject under cooldown/rate limit
 -> first permitted acceptance commits
 -> second observes canonical chronology after lock acquisition
 -> second is denied when the effective restriction requires denial
+```
+
+Also prove one ordering race between send and enforcement apply:
+
+```text
+same subject
+-> sender command and enforcement command contend on the same advisory key
+-> one commits first
+-> the later transaction observes the committed order
 ```
 
 This one-time Preview acceptance supplements the rollback-only verifier. It does not justify a new permanent generic test family by itself.
@@ -1905,6 +2010,7 @@ participant Message Safety Case exists
 -> canonical Media bytes/identity/governance remain unchanged
 -> containment release restores Safety eligibility only
 -> normal Media processing cannot submit/claim/register/complete contained source
+-> contained running normal Media job fails/recovery converges to terminal cancellation/failure instead of retry
 -> Safety scan job claims only exact job type
 -> worker target retrieval requires active lease
 -> sanitized signal completion appends one signal_added event
@@ -1939,7 +2045,7 @@ Proceed as one contained vertical after this design merges:
 5. extend `/admin/messages` and `/messages`, with no new route;
 6. wire the common sender helper into generic start, Field start, send, and access projection;
 7. wire the common Media containment predicate into every current exact delivery boundary found at implementation freeze;
-8. wire normal Media processing containment convergence;
+8. wire normal Media processing containment convergence, including submit/containment locking and fail/recovery cleanup;
 9. add the scoped Safety scan job RPC family on existing jobs/outbox;
 10. run focused Messages/Media regressions and complete `npm run build`;
 11. replay on a fresh disposable Preview;
@@ -1984,18 +2090,21 @@ Enforcement subject: derived from exact targeted Message sender
 Graduation authority: reviewed severity matrix
 Severe bypass: direct permitted action with no lower history requirement
 Cooldown/rate counters: canonical Message chronology
-Concurrency control: sender-scoped transaction advisory lock
+Concurrency control: subject-scoped transaction advisory lock
 Appeal count: one per exact enforcement row
 Appeal modification: narrow-only atomic replacement
 User-safe reason: separate from internal reason
 Media exact matching: canonical verified SHA-256 + byte size at execution time
+Media containment/processing race: shared exact Media identity advisory lock
 SHA copied into Safety tables: NO
 Media containment: exact-file peer state plus dynamic exact-hash fail-closed predicate
 Asset-level public block authority: existing Media governance
 Direct Media delivery convergence: REQUIRED
 Normal Media processing containment escape: BLOCKED
+Contained normal Media retry loop: BLOCKED
 Safety scan storage: existing jobs/outbox
 Safety scan worker: exact-type scoped service-role lease APIs
+External provider receives database credentials: NO
 Provider result: bounded signal only
 Automatic provider punishment: NO
 Admin surface: existing /admin/messages
@@ -2009,6 +2118,6 @@ Candidate B needs three missing peer states and no parallel platform.
 
 Messages-scoped enforcement is bound to exact canonical human Message evidence. Appeals preserve exact recovery history without rewriting the original case outcome. Severe Media handling binds to canonical verified files, uses canonical SHA-256 only at execution time, blocks every current exact-file delivery path, and reuses existing Media governance and processing authority.
 
-All asynchronous scan work stays on the existing job, lease, retry, dead-letter, and outbox substrate. Provider output remains evidence until a governed WAKILISHA decision acts on it.
+All asynchronous scan work stays on the existing job, lease, retry, dead-letter, and outbox substrate. The trusted worker owns database access; external provider code does not. Provider output remains evidence until a governed WAKILISHA decision acts on it.
 
 That is the smallest complete Candidate B contract for #870.
