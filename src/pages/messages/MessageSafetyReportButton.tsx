@@ -63,26 +63,34 @@ export function MessageSafetyReportButton({
         maxWidth="md"
       >
         <p className="text-[11px] leading-relaxed text-[var(--wk-text-muted)]">
-          Reports create a Safety Case for review. A report does not automatically punish the sender.
+          Reports create a Safety Case for review. Reporting does not automatically punish the sender.
         </p>
 
-        <div className="mt-4">
-          <label className="text-[10px] font-black text-[var(--wk-text)]" htmlFor={`message-report-reason-${messageId}`}>
+        <fieldset className="mt-4">
+          <legend className="text-[10px] font-black text-[var(--wk-text)]">
             Reason
-          </label>
-          <select
-            id={`message-report-reason-${messageId}`}
-            value={reason}
-            onChange={(event) => setReason(event.target.value)}
-            className="mt-2 h-11 w-full rounded-xl border border-[var(--wk-border)] bg-[var(--wk-bg)] px-3 text-[16px] font-bold text-[var(--wk-text)] outline-none focus:border-[var(--wk-brand)] sm:text-[12px]"
-          >
-            {REPORT_REASONS.map(([value, label]) => (
-              <option key={value} value={value}>
-                {label}
-              </option>
-            ))}
-          </select>
-        </div>
+          </legend>
+          <div className="mt-2 grid grid-cols-2 gap-2 sm:grid-cols-4">
+            {REPORT_REASONS.map(([value, label]) => {
+              const selected = reason === value;
+              return (
+                <button
+                  key={value}
+                  type="button"
+                  aria-pressed={selected}
+                  onClick={() => setReason(value)}
+                  className={`min-h-10 rounded-xl border px-3 py-2 text-[10px] font-black transition-colors ${
+                    selected
+                      ? "border-[var(--wk-brand)] bg-[var(--wk-brand-soft)] text-[var(--wk-brand)]"
+                      : "border-[var(--wk-border)] bg-[var(--wk-bg)] text-[var(--wk-text-muted)] hover:bg-[var(--wk-surface-raised)]"
+                  }`}
+                >
+                  {label}
+                </button>
+              );
+            })}
+          </div>
+        </fieldset>
 
         <div className="mt-4">
           <label className="text-[10px] font-black text-[var(--wk-text)]" htmlFor={`message-report-note-${messageId}`}>
