@@ -543,7 +543,7 @@ insert into editorial.field_submissions(
   created_by,updated_by,received_at,correlation_id
 )
 select f.field_resource_id,'field_submission',
-       'FS-8B5B-'||upper(left(replace(f.field_resource_id::text,'-',''),10)),
+       'FS-'||to_char(now(),'YYYYMMDD')||'-'||upper(left(replace(f.field_resource_id::text,'-',''),10)),
        a.user_id,'authenticated',1,'received','standard','do_not_name','account_contact','allowed','messages',
        'owns_or_controls','granted','none','internal','none','not_collected',a.user_id,a.user_id,now(),gen_random_uuid()
 from phase8b5_b_field_fixture f
