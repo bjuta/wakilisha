@@ -63,7 +63,7 @@ export function MessagesSafetyPanel() {
   const [detailLoading, setDetailLoading] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [statusFilter, setStatusFilter] = useState<string>("open");
+  const [statusFilter, setStatusFilter] = useState<"open" | "under_review" | "resolved" | "all">("open");
   const [evidenceOpen, setEvidenceOpen] = useState(false);
   const [evidenceReason, setEvidenceReason] = useState("");
   const [quarantineOpen, setQuarantineOpen] = useState(false);
@@ -255,7 +255,7 @@ export function MessagesSafetyPanel() {
         </div>
 
         <div className="flex flex-wrap gap-1 rounded-xl border border-[var(--wk-border)] bg-[var(--wk-bg)] p-1">
-          {["open", "under_review", "resolved", "all"].map((status) => (
+          {(["open", "under_review", "resolved", "all"] as const).map((status) => (
             <button
               key={status}
               type="button"
