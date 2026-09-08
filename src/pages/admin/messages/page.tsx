@@ -8,6 +8,7 @@ import {
   type MessagesControlCenterStatus,
   type MessagesSystemActor,
 } from "@/services/messages";
+import { MessagesSafetyPanel } from "./MessagesSafetyPanel";
 
 function when(value: string | null): string {
   if (!value) return "No Messages yet";
@@ -129,7 +130,7 @@ export default function AdminMessagesPage() {
             <div className="rounded-2xl border border-[var(--wk-border)] bg-[var(--wk-surface)] p-5">
               <div className="text-[12px] font-black text-[var(--wk-text)]">Private-content boundary</div>
               <p className="mt-2 text-[11px] leading-relaxed text-[var(--wk-text-muted)]">
-                This surface intentionally exposes operational aggregates only. Conversation content remains participant-scoped unless a later governed Safety or Legal authority explicitly permits access.
+                This surface intentionally exposes operational aggregates only. Conversation content remains participant-scoped unless governed Safety or Legal authority permits access.
               </p>
             </div>
           </section>
@@ -187,6 +188,8 @@ export default function AdminMessagesPage() {
           </section>
         </>
       ) : null}
+
+      <MessagesSafetyPanel />
     </div>
   );
 }
