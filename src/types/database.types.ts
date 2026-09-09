@@ -19810,6 +19810,23 @@ export type Database = {
           resource_id: string
         }[]
       }
+      claim_messages_legal_disclosure_jobs_v1: {
+        Args: {
+          p_lease_seconds?: number
+          p_limit?: number
+          p_worker_id: string
+        }
+        Returns: {
+          attempt_count: number
+          command_receipt_id: string
+          job_id: string
+          lease_expires_at: string
+          legal_disclosure_package_id: string
+          legal_request_case_id: string
+          max_attempts: number
+          selection_fingerprint: string
+        }[]
+      }
       claim_messages_safety_media_scan_jobs_v1: {
         Args: {
           p_lease_seconds?: number
@@ -19825,6 +19842,18 @@ export type Database = {
           media_file_object_id: string
           safety_case_id: string
         }[]
+      }
+      classify_messages_legal_object_v1: {
+        Args: {
+          p_case_id: string
+          p_classification: string
+          p_correlation_id?: string
+          p_expected_revision: number
+          p_idempotency_key: string
+          p_preserved_object_id: string
+          p_reason: string
+        }
+        Returns: Json
       }
       close_correction_case: {
         Args: {
@@ -19846,6 +19875,16 @@ export type Database = {
           receipt_status: string
           result_payload: Json
         }[]
+      }
+      close_messages_legal_request_case_v1: {
+        Args: {
+          p_case_id: string
+          p_closure_note: string
+          p_correlation_id?: string
+          p_expected_revision: number
+          p_idempotency_key: string
+        }
+        Returns: Json
       }
       community_admin_decide_artist_claim: {
         Args: {
@@ -20824,6 +20863,10 @@ export type Database = {
         Args: { p_job_id: string; p_result?: Json; p_worker_id: string }
         Returns: Json
       }
+      complete_messages_legal_disclosure_job_v1: {
+        Args: { p_job_id: string; p_result: Json; p_worker_id: string }
+        Returns: Json
+      }
       complete_messages_safety_media_scan_job_v1: {
         Args: { p_job_id: string; p_result: Json; p_worker_id: string }
         Returns: Json
@@ -21715,6 +21758,16 @@ export type Database = {
         Args: { p_error: string; p_session_id: string }
         Returns: Json
       }
+      fail_messages_legal_disclosure_job_v1: {
+        Args: {
+          p_error: string
+          p_job_id: string
+          p_retry_delay_seconds?: number
+          p_retryable?: boolean
+          p_worker_id: string
+        }
+        Returns: Json
+      }
       fail_messages_safety_media_scan_job_v1: {
         Args: {
           p_error: string
@@ -22094,6 +22147,23 @@ export type Database = {
         Returns: Json
       }
       get_messages_control_center_status: { Args: never; Returns: Json }
+      get_messages_legal_case_v1: { Args: { p_case_id: string }; Returns: Json }
+      get_messages_legal_disclosure_package_v1: {
+        Args: { p_package_id: string }
+        Returns: Json
+      }
+      get_messages_legal_disclosure_plan_v1: {
+        Args: { p_job_id: string; p_worker_id: string }
+        Returns: Json
+      }
+      get_messages_legal_disclosure_source_v1: {
+        Args: {
+          p_job_id: string
+          p_legal_disclosure_object_id: string
+          p_worker_id: string
+        }
+        Returns: Json
+      }
       get_messages_safety_case_v1: {
         Args: { p_case_id: string }
         Returns: Json
@@ -22412,6 +22482,16 @@ export type Database = {
             }
             Returns: number
           }
+      inspect_message_legal_evidence_v1: {
+        Args: {
+          p_case_id: string
+          p_correlation_id?: string
+          p_idempotency_key: string
+          p_preserved_object_id: string
+          p_purpose: string
+        }
+        Returns: Json
+      }
       inspect_message_safety_evidence_v1: {
         Args: {
           p_case_id: string
@@ -22764,6 +22844,10 @@ export type Database = {
           updated_at: string
         }[]
       }
+      list_messages_legal_cases_v1: {
+        Args: { p_limit?: number; p_status?: string }
+        Returns: Json
+      }
       list_messages_safety_appeals_v1: {
         Args: {
           p_before_appeal_id?: string
@@ -23001,6 +23085,17 @@ export type Database = {
         Args: { p_conversation_id: string; p_through_message_id?: string }
         Returns: Json
       }
+      materialize_messages_legal_preservation_v1: {
+        Args: {
+          p_case_id: string
+          p_correlation_id?: string
+          p_expected_case_revision: number
+          p_idempotency_key: string
+          p_reason: string
+          p_scope_id: string
+        }
+        Returns: Json
+      }
       merge_people: {
         Args: {
           p_correlation_id?: string
@@ -23135,6 +23230,33 @@ export type Database = {
           isOneToOne: true
           isSetofReturn: false
         }
+      }
+      open_messages_legal_request_case_v1: {
+        Args: {
+          p_assigned_user_id: string
+          p_correlation_id?: string
+          p_idempotency_key: string
+          p_jurisdiction_or_process: string
+          p_notice_restriction_state: string
+          p_received_at: string
+          p_request_kind: string
+          p_request_reference: string
+          p_requesting_authority: string
+          p_scope_statement: string
+        }
+        Returns: Json
+      }
+      prepare_messages_legal_disclosure_v1: {
+        Args: {
+          p_case_id: string
+          p_correlation_id?: string
+          p_documented_omissions: string[]
+          p_idempotency_key: string
+          p_preserved_object_ids: string[]
+          p_production_reference: string
+          p_scope_statement: string
+        }
+        Returns: Json
       }
       promote_artist_split_relationship: {
         Args: { p_staging_record_id: string }
@@ -23478,6 +23600,10 @@ export type Database = {
         Args: { p_limit?: number; p_retry_delay_seconds?: number }
         Returns: number
       }
+      recover_expired_messages_legal_disclosure_jobs_v1: {
+        Args: { p_limit?: number; p_retry_delay_seconds?: number }
+        Returns: Json
+      }
       recover_expired_messages_safety_media_scan_jobs_v1: {
         Args: { p_limit?: number; p_retry_delay_seconds?: number }
         Returns: number
@@ -23645,6 +23771,27 @@ export type Database = {
         Args: { p_contribution_id: string; p_review_note?: string }
         Returns: Json
       }
+      release_messages_legal_disclosure_v1: {
+        Args: {
+          p_correlation_id?: string
+          p_expected_revision: number
+          p_idempotency_key: string
+          p_package_id: string
+          p_reason: string
+        }
+        Returns: Json
+      }
+      release_messages_legal_preservation_v1: {
+        Args: {
+          p_case_id: string
+          p_correlation_id?: string
+          p_expected_revision: number
+          p_idempotency_key: string
+          p_preserved_object_id: string
+          p_reason: string
+        }
+        Returns: Json
+      }
       remove_personal_playlist_item: {
         Args: {
           p_correlation_id?: string
@@ -23717,6 +23864,14 @@ export type Database = {
         }[]
       }
       renew_media_processing_lease_v1: {
+        Args: {
+          p_job_id: string
+          p_lease_seconds?: number
+          p_worker_id: string
+        }
+        Returns: string
+      }
+      renew_messages_legal_disclosure_lease_v1: {
         Args: {
           p_job_id: string
           p_lease_seconds?: number
@@ -25098,6 +25253,17 @@ export type Database = {
           receipt_status: string
         }[]
       }
+      start_messages_legal_review_v1: {
+        Args: {
+          p_assigned_user_id: string
+          p_case_id: string
+          p_correlation_id?: string
+          p_expected_revision: number
+          p_idempotency_key: string
+          p_reason: string
+        }
+        Returns: Json
+      }
       start_messages_safety_appeal_review_v1: {
         Args: {
           p_appeal_id: string
@@ -25213,6 +25379,15 @@ export type Database = {
           job_id: string
           receipt_status: string
         }[]
+      }
+      submit_messages_legal_disclosure_generation_v1: {
+        Args: {
+          p_correlation_id?: string
+          p_expected_package_revision: number
+          p_idempotency_key: string
+          p_package_id: string
+        }
+        Returns: Json
       }
       submit_messages_safety_appeal_v1: {
         Args: {
@@ -25654,6 +25829,39 @@ export type Database = {
         }
         Returns: Json
       }
+      update_messages_legal_disclosure_approval_v1: {
+        Args: {
+          p_action: string
+          p_correlation_id?: string
+          p_expected_package_revision: number
+          p_idempotency_key: string
+          p_package_id: string
+          p_preserved_object_id: string
+          p_reason: string
+          p_selection_fingerprint: string
+        }
+        Returns: Json
+      }
+      update_messages_legal_scope_v1: {
+        Args: {
+          p_accepted_from: string
+          p_accepted_until: string
+          p_action: string
+          p_case_id: string
+          p_conversation_id: string
+          p_correlation_id?: string
+          p_expected_revision: number
+          p_idempotency_key: string
+          p_media_file_object_id: string
+          p_message_id: string
+          p_reason: string
+          p_resource_version_id: string
+          p_scope_id: string
+          p_scope_kind: string
+          p_scope_note: string
+        }
+        Returns: Json
+      }
       update_messages_safety_assessment_v1: {
         Args: {
           p_case_id: string
@@ -25851,6 +26059,16 @@ export type Database = {
           p_session_id: string
           p_sha256: string
           p_storage_path: string
+        }
+        Returns: Json
+      }
+      void_messages_legal_disclosure_v1: {
+        Args: {
+          p_correlation_id?: string
+          p_expected_revision: number
+          p_idempotency_key: string
+          p_package_id: string
+          p_reason: string
         }
         Returns: Json
       }
