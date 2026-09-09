@@ -61,6 +61,21 @@ const cdn = fs.readFileSync(
   "utf8",
 );
 
+const candidateCLegalMigration = fs.readFileSync(
+  "supabase/migrations/20260909080000_phase_8b5_candidate_c_legal_preservation_scoped_disclosure.sql",
+  "utf8",
+);
+
+const candidateCLegalWorker = fs.readFileSync(
+  "ops/legal-disclosure-worker/worker.py",
+  "utf8",
+);
+
+const candidateCLegalService = fs.readFileSync(
+  "ops/systemd/wakilisha-legal-disclosure-worker.service",
+  "utf8",
+);
+
 describe("Phase 4B M4 operational hardening contract", () => {
   it("adds transcript and caption to compatibility file-kind authority", () => {
     expect(migration).toContain("'transcript'");
@@ -275,4 +290,59 @@ describe("Phase 4B M4 operational hardening contract", () => {
       "switch the Media DNS record back to DNS only",
     );
   });
+
+  it("keeps Candidate C Legal packages on the dedicated private Media tree", () => {
+    expect(candidateCLegalMigration).toContain(
+      "private-files/legal-disclosures/",
+    );
+    expect(candidateCLegalMigration).not.toContain(
+      "derived-objects/legal-disclosures/",
+    );
+    expect(candidateCLegalWorker).toContain(
+      'LEGAL_PACKAGE_PREFIX = "private-files/legal-disclosures/"',
+    );
+  });
+
+  it("keeps Candidate C Legal delivery separate from generic Media administrator delivery", () => {
+    expect(candidateCLegalMigration).toContain(
+      "create or replace function public.get_messages_legal_disclosure_delivery_target_v1",
+    );
+    expect(candidateCLegalMigration).not.toContain(
+      "create or replace function public.get_media_private_delivery_target_v1",
+    );
+    expect(candidateCLegalMigration).toContain(
+      "guard_legal_disclosure_media_asset_v1",
+    );
+    expect(candidateCLegalMigration).toContain(
+      "variants_legal_disclosure_guard",
+    );
+    expect(edge).toContain(
+      'action === "create_legal_disclosure_delivery"',
+    );
+    expect(edge).toContain(
+      '"get_messages_legal_disclosure_delivery_target_v1"',
+    );
+    expect(edge).toContain(
+      'path.startsWith("private-files/legal-disclosures/")',
+    );
+    expect(receiver).toContain(
+      '"private-files/legal-disclosures/",',
+    );
+    expect(receiver).not.toContain(
+      'normalized.startswith("private-files/legal-disclosures/")',
+    );
+  });
+
+  it("keeps Candidate C Legal worker writes least-privilege", () => {
+    expect(candidateCLegalService).toContain(
+      "ReadOnlyPaths=/opt",
+    );
+    expect(candidateCLegalService).toContain(
+      "ReadWritePaths=/opt/wakilisha-media/private-files/legal-disclosures /opt/wakilisha-legal-disclosure-processing",
+    );
+    expect(candidateCLegalService).not.toContain(
+      "ReadWritePaths=/opt/wakilisha-media /opt/wakilisha-legal-disclosure-processing",
+    );
+  });
+
 });

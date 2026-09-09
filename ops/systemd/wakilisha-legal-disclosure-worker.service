@@ -1,0 +1,28 @@
+[Unit]
+Description=WAKILISHA Legal Disclosure Worker
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+EnvironmentFile=/etc/wakilisha-legal-disclosure-worker.env
+ExecStart=/usr/bin/python3 /opt/wakilisha-legal-disclosure-worker/worker.py
+Restart=always
+RestartSec=5
+User=www-data
+Group=www-data
+WorkingDirectory=/opt/wakilisha-legal-disclosure-worker
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=full
+ReadOnlyPaths=/opt
+ReadWritePaths=/opt/wakilisha-media/private-files/legal-disclosures /opt/wakilisha-legal-disclosure-processing
+MemoryMax=512M
+CPUQuota=70%
+TasksMax=32
+Nice=10
+UMask=0027
+TimeoutStopSec=30
+
+[Install]
+WantedBy=multi-user.target

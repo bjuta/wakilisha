@@ -925,3 +925,535 @@ export async function submitMessagesSafetyMediaScan(
     p_correlation_id: null,
   });
 }
+// -----------------------------------------------------------------------------
+// Candidate C: Legal preservation and scoped disclosure.
+// Safe case reads remain metadata-only. Private evidence and released package
+// delivery are separate, purpose-recorded operations.
+// -----------------------------------------------------------------------------
+
+export type MessagesLegalCaseStatus = "open" | "under_review" | "closed";
+export type MessagesLegalRequestKind =
+  | "preservation"
+  | "disclosure"
+  | "emergency"
+  | "other";
+export type MessagesLegalNoticeRestriction = "none" | "restricted" | "unknown";
+export type MessagesLegalScopeKind =
+  | "exact_message"
+  | "conversation_window"
+  | "exact_media_file"
+  | "exact_resource_version";
+export type MessagesLegalClassification =
+  | "unclassified"
+  | "responsive"
+  | "elevated_review"
+  | "excluded";
+export type MessagesLegalPackageStatus =
+  | "draft"
+  | "approved"
+  | "queued"
+  | "generating"
+  | "generated"
+  | "released"
+  | "failed"
+  | "voided";
+
+export interface MessagesLegalCaseSummary {
+  id: string;
+  request_reference: string;
+  request_kind: MessagesLegalRequestKind;
+  status: MessagesLegalCaseStatus;
+  requesting_authority: string;
+  jurisdiction_or_process: string;
+  received_at: string;
+  scope_statement: string;
+  notice_restriction_state: MessagesLegalNoticeRestriction;
+  assigned_user_id: string | null;
+  opened_at: string;
+  closed_at: string | null;
+  revision: number;
+  held_object_count: number;
+  package_count: number;
+}
+
+export interface MessagesLegalCaseRecord {
+  id: string;
+  request_reference: string;
+  request_kind: MessagesLegalRequestKind;
+  status: MessagesLegalCaseStatus;
+  requesting_authority: string;
+  jurisdiction_or_process: string;
+  received_at: string;
+  scope_statement: string;
+  notice_restriction_state: MessagesLegalNoticeRestriction;
+  assigned_user_id: string | null;
+  opened_by_user_id: string | null;
+  opened_at: string;
+  closed_by_user_id: string | null;
+  closed_at: string | null;
+  closure_note: string | null;
+  revision: number;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface MessagesLegalScope {
+  id: string;
+  legal_request_case_id: string;
+  scope_kind: MessagesLegalScopeKind;
+  status: "active" | "released" | string;
+  message_id: string | null;
+  conversation_id: string | null;
+  accepted_from: string | null;
+  accepted_until: string | null;
+  media_file_object_id: string | null;
+  resource_version_id: string | null;
+  scope_note: string | null;
+  created_by_user_id: string | null;
+  created_at: string;
+  released_by_user_id: string | null;
+  released_at: string | null;
+  release_reason: string | null;
+  revision: number;
+}
+
+export interface MessagesLegalPreservedObject {
+  id: string;
+  object_kind: "message" | "media_file" | "resource_version" | string;
+  message_id: string | null;
+  media_file_object_id: string | null;
+  resource_version_id: string | null;
+  preservation_status: "held" | "released" | string;
+  response_classification: MessagesLegalClassification;
+  classification_reason: string | null;
+  preserved_at: string;
+  classified_at: string | null;
+  released_at: string | null;
+  revision: number;
+}
+
+export interface MessagesLegalPackageSummary {
+  id: string;
+  production_reference: string;
+  status: MessagesLegalPackageStatus;
+  scope_statement: string;
+  documented_omissions: string[];
+  selection_fingerprint: string;
+  requested_at: string;
+  generated_at: string | null;
+  manifest_sha256: string | null;
+  package_file_object_id: string | null;
+  package_sha256: string | null;
+  package_byte_size: number | null;
+  released_at: string | null;
+  failure_summary: string | null;
+  revision: number;
+}
+
+export interface MessagesLegalCaseEvent {
+  id: string;
+  legal_disclosure_package_id: string | null;
+  legal_preserved_object_id: string | null;
+  event_kind: string;
+  actor_kind: string;
+  actor_user_id: string | null;
+  actor_key: string | null;
+  occurred_at: string;
+  metadata: Record<string, unknown>;
+}
+
+export interface MessagesLegalCaseDetail {
+  case: MessagesLegalCaseRecord;
+  scopes: MessagesLegalScope[];
+  preserved_objects: MessagesLegalPreservedObject[];
+  packages: MessagesLegalPackageSummary[];
+  events: MessagesLegalCaseEvent[];
+}
+
+export interface MessagesLegalDisclosureObject {
+  id: string;
+  legal_disclosure_package_id: string;
+  legal_preserved_object_id: string;
+  manifest_order: number;
+  object_kind: "message" | "media_file" | "resource_version" | string;
+  response_classification: MessagesLegalClassification;
+  source_object_id: string;
+  source_fingerprint: string | null;
+  output_path: string | null;
+  output_mime_type: string | null;
+  object_sha256: string | null;
+  object_byte_size: number | null;
+  finalized_at: string | null;
+}
+
+export interface MessagesLegalDisclosureApproval {
+  id: string;
+  legal_disclosure_package_id: string;
+  legal_preserved_object_id: string | null;
+  approval_scope: "package" | "elevated_object" | string;
+  status: "active" | "revoked" | string;
+  selection_fingerprint: string;
+  approval_reason: string;
+  approved_by_user_id: string | null;
+  approved_at: string;
+  revoked_at: string | null;
+  revocation_reason: string | null;
+  revision: number;
+}
+
+export interface MessagesLegalDisclosurePackageDetail {
+  package: MessagesLegalPackageSummary & {
+    legal_request_case_id?: string;
+    manifest_text?: string | null;
+    archive_version?: string;
+    manifest_version?: string;
+  };
+  objects: MessagesLegalDisclosureObject[];
+  approvals: MessagesLegalDisclosureApproval[];
+}
+
+export interface MessagesLegalEvidenceResult {
+  legal_request_case_id: string;
+  legal_preserved_object_id: string;
+  evidence: Record<string, unknown>;
+  command_receipt_id: string;
+  correlation_id: string;
+}
+
+export interface MessagesLegalDeliveryTarget {
+  ok: boolean;
+  legal_disclosure_package_id: string;
+  file_object_id: string;
+  url: string;
+  expires_at: string;
+  ttl_seconds: number;
+}
+
+export interface OpenMessagesLegalCaseInput {
+  requestReference: string;
+  requestKind: MessagesLegalRequestKind;
+  requestingAuthority: string;
+  jurisdictionOrProcess: string;
+  receivedAt: string;
+  scopeStatement: string;
+  noticeRestrictionState: MessagesLegalNoticeRestriction;
+  assignedUserId?: string | null;
+}
+
+export interface UpdateMessagesLegalScopeInput {
+  caseId: string;
+  action: "add" | "release";
+  scopeId?: string | null;
+  scopeKind?: MessagesLegalScopeKind | null;
+  messageId?: string | null;
+  conversationId?: string | null;
+  acceptedFrom?: string | null;
+  acceptedUntil?: string | null;
+  mediaFileObjectId?: string | null;
+  resourceVersionId?: string | null;
+  scopeNote?: string | null;
+  expectedRevision: number;
+  reason: string;
+}
+
+export async function listMessagesLegalCases(
+  status: MessagesLegalCaseStatus | null = null,
+): Promise<MessagesLegalCaseSummary[]> {
+  return rpc<MessagesLegalCaseSummary[]>("list_messages_legal_cases_v1", {
+    p_status: status,
+    p_limit: 100,
+  });
+}
+
+export async function getMessagesLegalCase(
+  caseId: string,
+): Promise<MessagesLegalCaseDetail> {
+  return rpc<MessagesLegalCaseDetail>("get_messages_legal_case_v1", {
+    p_case_id: caseId,
+  });
+}
+
+export async function listMessagesLegalPreservedObjects(
+  caseId: string,
+  preservationStatus: "held" | "released" | null = null,
+  responseClassification: MessagesLegalClassification | null = null,
+  limit = 200,
+): Promise<MessagesLegalPreservedObject[]> {
+  return rpc<MessagesLegalPreservedObject[]>(
+    "list_messages_legal_preserved_objects_v1",
+    {
+      p_case_id: caseId,
+      p_preservation_status: preservationStatus,
+      p_response_classification: responseClassification,
+      p_limit: limit,
+    },
+  );
+}
+
+export async function getMessagesLegalDisclosurePackage(
+  packageId: string,
+): Promise<MessagesLegalDisclosurePackageDetail> {
+  return rpc<MessagesLegalDisclosurePackageDetail>(
+    "get_messages_legal_disclosure_package_v1",
+    { p_package_id: packageId },
+  );
+}
+
+export async function openMessagesLegalRequestCase(
+  input: OpenMessagesLegalCaseInput,
+): Promise<Record<string, unknown>> {
+  return rpc<Record<string, unknown>>("open_messages_legal_request_case_v1", {
+    p_request_reference: input.requestReference,
+    p_request_kind: input.requestKind,
+    p_requesting_authority: input.requestingAuthority,
+    p_jurisdiction_or_process: input.jurisdictionOrProcess,
+    p_received_at: input.receivedAt,
+    p_scope_statement: input.scopeStatement,
+    p_notice_restriction_state: input.noticeRestrictionState,
+    p_assigned_user_id: input.assignedUserId || null,
+    p_idempotency_key: actionKey("messages.legal.case.open"),
+    p_correlation_id: null,
+  });
+}
+
+export async function startMessagesLegalReview(
+  caseId: string,
+  expectedRevision: number,
+  reason: string,
+  assignedUserId: string | null = null,
+): Promise<Record<string, unknown>> {
+  return rpc<Record<string, unknown>>("start_messages_legal_review_v1", {
+    p_case_id: caseId,
+    p_expected_revision: expectedRevision,
+    p_assigned_user_id: assignedUserId,
+    p_reason: reason,
+    p_idempotency_key: actionKey("messages.legal.review.start"),
+    p_correlation_id: null,
+  });
+}
+
+export async function updateMessagesLegalScope(
+  input: UpdateMessagesLegalScopeInput,
+): Promise<Record<string, unknown>> {
+  return rpc<Record<string, unknown>>("update_messages_legal_scope_v1", {
+    p_case_id: input.caseId,
+    p_action: input.action,
+    p_scope_id: input.scopeId || null,
+    p_scope_kind: input.scopeKind || null,
+    p_message_id: input.messageId || null,
+    p_conversation_id: input.conversationId || null,
+    p_accepted_from: input.acceptedFrom || null,
+    p_accepted_until: input.acceptedUntil || null,
+    p_media_file_object_id: input.mediaFileObjectId || null,
+    p_resource_version_id: input.resourceVersionId || null,
+    p_scope_note: input.scopeNote || null,
+    p_expected_revision: input.expectedRevision,
+    p_reason: input.reason,
+    p_idempotency_key: actionKey("messages.legal.scope.update"),
+    p_correlation_id: null,
+  });
+}
+
+export async function materializeMessagesLegalPreservation(
+  caseId: string,
+  scopeId: string,
+  expectedCaseRevision: number,
+  reason: string,
+): Promise<Record<string, unknown>> {
+  return rpc<Record<string, unknown>>(
+    "materialize_messages_legal_preservation_v1",
+    {
+      p_case_id: caseId,
+      p_scope_id: scopeId,
+      p_expected_case_revision: expectedCaseRevision,
+      p_reason: reason,
+      p_idempotency_key: actionKey("messages.legal.preservation.materialize"),
+      p_correlation_id: null,
+    },
+  );
+}
+
+export async function releaseMessagesLegalPreservation(
+  caseId: string,
+  preservedObjectId: string,
+  expectedRevision: number,
+  reason: string,
+): Promise<Record<string, unknown>> {
+  return rpc<Record<string, unknown>>(
+    "release_messages_legal_preservation_v1",
+    {
+      p_case_id: caseId,
+      p_preserved_object_id: preservedObjectId,
+      p_expected_revision: expectedRevision,
+      p_reason: reason,
+      p_idempotency_key: actionKey("messages.legal.preservation.release"),
+      p_correlation_id: null,
+    },
+  );
+}
+
+export async function classifyMessagesLegalObject(
+  caseId: string,
+  preservedObjectId: string,
+  expectedRevision: number,
+  classification: Exclude<MessagesLegalClassification, "unclassified">,
+  reason: string,
+): Promise<Record<string, unknown>> {
+  return rpc<Record<string, unknown>>("classify_messages_legal_object_v1", {
+    p_case_id: caseId,
+    p_preserved_object_id: preservedObjectId,
+    p_expected_revision: expectedRevision,
+    p_classification: classification,
+    p_reason: reason,
+    p_idempotency_key: actionKey("messages.legal.classification.update"),
+    p_correlation_id: null,
+  });
+}
+
+export async function inspectMessagesLegalEvidence(
+  caseId: string,
+  preservedObjectId: string,
+  purpose: string,
+): Promise<MessagesLegalEvidenceResult> {
+  return rpc<MessagesLegalEvidenceResult>("inspect_message_legal_evidence_v1", {
+    p_case_id: caseId,
+    p_preserved_object_id: preservedObjectId,
+    p_purpose: purpose,
+    p_idempotency_key: actionKey("messages.legal.evidence.inspect"),
+    p_correlation_id: null,
+  });
+}
+
+export async function prepareMessagesLegalDisclosure(
+  caseId: string,
+  productionReference: string,
+  scopeStatement: string,
+  documentedOmissions: string[],
+  preservedObjectIds: string[],
+): Promise<Record<string, unknown>> {
+  return rpc<Record<string, unknown>>("prepare_messages_legal_disclosure_v1", {
+    p_case_id: caseId,
+    p_production_reference: productionReference,
+    p_scope_statement: scopeStatement,
+    p_documented_omissions: documentedOmissions,
+    p_preserved_object_ids: preservedObjectIds,
+    p_idempotency_key: actionKey("messages.legal.disclosure.prepare"),
+    p_correlation_id: null,
+  });
+}
+
+export async function updateMessagesLegalDisclosureApproval(
+  packageId: string,
+  action:
+    | "record_package"
+    | "record_elevated"
+    | "revoke_package"
+    | "revoke_elevated",
+  preservedObjectId: string | null,
+  expectedPackageRevision: number,
+  selectionFingerprint: string,
+  reason: string,
+): Promise<Record<string, unknown>> {
+  return rpc<Record<string, unknown>>(
+    "update_messages_legal_disclosure_approval_v1",
+    {
+      p_package_id: packageId,
+      p_action: action,
+      p_preserved_object_id: preservedObjectId,
+      p_expected_package_revision: expectedPackageRevision,
+      p_selection_fingerprint: selectionFingerprint,
+      p_reason: reason,
+      p_idempotency_key: actionKey("messages.legal.disclosure.approval.update"),
+      p_correlation_id: null,
+    },
+  );
+}
+
+export async function submitMessagesLegalDisclosureGeneration(
+  packageId: string,
+  expectedPackageRevision: number,
+): Promise<Record<string, unknown>> {
+  return rpc<Record<string, unknown>>(
+    "submit_messages_legal_disclosure_generation_v1",
+    {
+      p_package_id: packageId,
+      p_expected_package_revision: expectedPackageRevision,
+      p_idempotency_key: actionKey("messages.legal.disclosure.generate"),
+      p_correlation_id: null,
+    },
+  );
+}
+
+export async function releaseMessagesLegalDisclosure(
+  packageId: string,
+  expectedRevision: number,
+  reason: string,
+): Promise<Record<string, unknown>> {
+  return rpc<Record<string, unknown>>("release_messages_legal_disclosure_v1", {
+    p_package_id: packageId,
+    p_expected_revision: expectedRevision,
+    p_reason: reason,
+    p_idempotency_key: actionKey("messages.legal.disclosure.release"),
+    p_correlation_id: null,
+  });
+}
+
+export async function voidMessagesLegalDisclosure(
+  packageId: string,
+  expectedRevision: number,
+  reason: string,
+): Promise<Record<string, unknown>> {
+  return rpc<Record<string, unknown>>("void_messages_legal_disclosure_v1", {
+    p_package_id: packageId,
+    p_expected_revision: expectedRevision,
+    p_reason: reason,
+    p_idempotency_key: actionKey("messages.legal.disclosure.void"),
+    p_correlation_id: null,
+  });
+}
+
+export async function closeMessagesLegalRequestCase(
+  caseId: string,
+  expectedRevision: number,
+  closureNote: string,
+): Promise<Record<string, unknown>> {
+  return rpc<Record<string, unknown>>("close_messages_legal_request_case_v1", {
+    p_case_id: caseId,
+    p_expected_revision: expectedRevision,
+    p_closure_note: closureNote,
+    p_idempotency_key: actionKey("messages.legal.case.close"),
+    p_correlation_id: null,
+  });
+}
+
+export async function createMessagesLegalDisclosureDelivery(
+  packageId: string,
+  purpose: string,
+  ttlSeconds = 300,
+): Promise<MessagesLegalDeliveryTarget> {
+  const { data, error } = await supabase.functions.invoke("media-upload-api", {
+    body: {
+      action: "create_legal_disclosure_delivery",
+      package_id: packageId,
+      purpose,
+      ttl_seconds: ttlSeconds,
+      idempotency_key: actionKey("messages.legal.evidence.inspect.delivery"),
+      correlation_id: null,
+    },
+  });
+  if (error) {
+    throw new Error(
+      error.message || "Released Legal disclosure delivery could not be created.",
+    );
+  }
+  const target = data as Partial<MessagesLegalDeliveryTarget> | null;
+  if (
+    !target?.ok
+    || typeof target.url !== "string"
+    || typeof target.file_object_id !== "string"
+    || typeof target.expires_at !== "string"
+  ) {
+    throw new Error("Released Legal disclosure delivery response is invalid.");
+  }
+  return target as MessagesLegalDeliveryTarget;
+}

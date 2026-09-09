@@ -9,6 +9,7 @@ import {
   type MessagesSystemActor,
 } from "@/services/messages";
 import { MessagesSafetyPanel } from "./MessagesSafetyPanel";
+import { MessagesLegalPanel } from "./MessagesLegalPanel";
 
 function when(value: string | null): string {
   if (!value) return "No Messages yet";
@@ -190,6 +191,7 @@ export default function AdminMessagesPage() {
       ) : null}
 
       <MessagesSafetyPanel />
+      <MessagesLegalPanel />
     </div>
   );
 }
