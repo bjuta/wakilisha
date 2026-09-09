@@ -64,7 +64,7 @@ ALLOWED_MEDIA_SOURCE_PREFIXES = (
     "private-files/transcripts/",
     "private-files/captions/",
 )
-LEGAL_PACKAGE_PREFIX = "derived-objects/legal-disclosures/"
+LEGAL_PACKAGE_PREFIX = "private-files/legal-disclosures/"
 
 
 ACTIVE_JOB_ID = None
@@ -414,10 +414,51 @@ def canonical_representation(descriptor, object_kind):
                 representation.get("client_created_at"),
                 "Message client_created_at",
             )
-        if representation.get("resource_references") != []:
-            raise TerminalDisclosureError(
-                "Candidate C v1 refuses implicit Message Resource expansion."
+        resource_references = expect_list(
+            representation.get("resource_references"),
+            "Message resource_references",
+        )
+        normalized_references = []
+        seen_references = set()
+        for index, reference_value in enumerate(resource_references):
+            reference = expect_object(
+                reference_value,
+                f"Message resource_references[{index}]",
             )
+            if set(reference) != {
+                "resource_id",
+                "resource_version_id",
+                "presentation_kind",
+            }:
+                raise TerminalDisclosureError(
+                    "Legal Message Resource reference contains fields outside the exact identity envelope."
+                )
+            if reference.get("presentation_kind") != "version":
+                raise TerminalDisclosureError(
+                    "Legal Message Resource reference must bind an exact Resource Version."
+                )
+            resource_id = normalize_uuid(
+                reference.get("resource_id"),
+                f"Message resource_references[{index}].resource_id",
+            )
+            resource_version_id = normalize_uuid(
+                reference.get("resource_version_id"),
+                f"Message resource_references[{index}].resource_version_id",
+            )
+            identity = (resource_id, resource_version_id)
+            if identity in seen_references:
+                raise TerminalDisclosureError(
+                    "Legal Message Resource reference identity is duplicated."
+                )
+            seen_references.add(identity)
+            normalized_references.append(
+                {
+                    "resource_id": resource_id,
+                    "resource_version_id": resource_version_id,
+                    "presentation_kind": "version",
+                }
+            )
+        representation["resource_references"] = normalized_references
     elif object_kind == "resource_version":
         if representation.get("schema") != "wk-legal-resource-version-v1":
             raise TerminalDisclosureError(

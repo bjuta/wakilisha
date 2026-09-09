@@ -269,6 +269,7 @@ def private_delivery_authorized(raw_uri):
                     "derived-objects/",
                     "private-files/transcripts/",
                     "private-files/captions/",
+                    "private-files/legal-disclosures/",
                 )
             )
         ):

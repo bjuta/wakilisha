@@ -13,11 +13,14 @@ begin;
 do $wk$
 begin
   if to_regclass('messaging.messages') is null
+     or to_regclass('messaging.message_resource_references') is null
      or to_regclass('messaging.conversations') is null
      or to_regclass('media.file_objects') is null
      or to_regclass('media.assets') is null
      or to_regclass('media.asset_revisions') is null
      or to_regclass('media.asset_governance_versions') is null
+     or to_regclass('media.variants') is null
+     or to_regclass('media.usage_links') is null
      or to_regclass('editorial.resource_versions') is null
      or to_regclass('platform_private.command_receipts') is null
      or to_regclass('platform_private.jobs') is null
@@ -28,6 +31,9 @@ begin
      or to_regprocedure('platform_private.complete_resource_command(uuid,jsonb)') is null
      or to_regprocedure('platform_private.complete_job(uuid,text,jsonb)') is null
      or to_regprocedure('platform_private.fail_job(uuid,text,text,boolean,integer)') is null
+     or to_regprocedure('public.create_media_asset(text,text,text,uuid,uuid)') is null
+     or to_regprocedure('public.create_media_asset_revision(uuid,bigint,uuid,text,uuid)') is null
+     or to_regprocedure('public.create_media_governance_version(uuid,bigint,jsonb,text,uuid)') is null
      or to_regprocedure('public.current_user_has_capability(text)') is null
   then
     raise exception 'STOP: Candidate C requires accepted Messages, Media, Resource Version, command/job/outbox, and Super Admin authority.';
@@ -899,8 +905,310 @@ language sql
 immutable
 set search_path=pg_catalog
 as $fn$
-  select 'derived-objects/legal-disclosures/' || p_case_id::text || '/' || p_package_id::text || '/production.zip'
+  select 'private-files/legal-disclosures/' || p_case_id::text || '/' || p_package_id::text || '/production.zip'
 $fn$;
+
+-- ---------------------------------------------------------------------------
+-- Candidate C generated Media boundary.
+--
+-- Legal owns package production identity and disclosure authority. Media owns
+-- immutable bytes, but generic Media administration must not mint, mutate,
+-- rebind, derive, or attach a Legal disclosure artifact.
+-- ---------------------------------------------------------------------------
+
+create or replace function messaging.guard_legal_disclosure_media_file_v1()
+returns trigger
+language plpgsql
+security definer
+set search_path=pg_catalog,auth,messaging,media
+as $fn$
+begin
+  if new.storage_path is null
+     or new.storage_path !~ '^private-files/legal-disclosures/'
+  then
+    return new;
+  end if;
+
+  if coalesce(auth.role(),'')<>'service_role'
+     or new.storage_provider is distinct from 'lightsail_media'
+     or new.storage_namespace is distinct from 'lightsail-media'
+     or new.mime_type is distinct from 'application/zip'
+     or new.verification_state is distinct from 'verified'
+     or not exists(
+       select 1
+       from messaging.legal_disclosure_packages package
+       where package.status='generating'
+         and new.storage_path=messaging.legal_package_storage_path_v1(
+           package.legal_request_case_id,
+           package.id
+         )
+     )
+  then
+    raise exception using
+      errcode='42501',
+      message='Legal disclosure Media files may be registered only by active Candidate C generation authority.';
+  end if;
+
+  return new;
+end
+$fn$;
+
+create trigger file_objects_legal_disclosure_guard
+before insert on media.file_objects
+for each row execute function messaging.guard_legal_disclosure_media_file_v1();
+
+create or replace function messaging.guard_legal_disclosure_media_asset_v1()
+returns trigger
+language plpgsql
+security definer
+set search_path=pg_catalog,auth,messaging,media
+as $fn$
+declare
+  v_package_status text;
+begin
+  if tg_op='INSERT' then
+    if new.asset_purpose='legal_disclosure' then
+      select package.status
+      into v_package_status
+      from messaging.legal_disclosure_packages package
+      where package.id=new.id;
+
+      if coalesce(auth.role(),'')<>'service_role'
+         or v_package_status is distinct from 'generating'
+         or new.asset_kind is distinct from 'document'
+         or new.lifecycle_state is distinct from 'active'
+         or new.current_revision_id is not null
+         or new.current_governance_version_id is not null
+         or new.authority_revision is distinct from 1
+      then
+        raise exception using
+          errcode='42501',
+          message='Legal disclosure Media assets may be created only by active Candidate C generation authority.';
+      end if;
+    end if;
+    return new;
+  end if;
+
+  if tg_op='DELETE' then
+    if old.asset_purpose='legal_disclosure' then
+      raise exception using
+        errcode='42501',
+        message='Generated Legal disclosure Media assets are immutable.';
+    end if;
+    return old;
+  end if;
+
+  if old.asset_purpose='legal_disclosure'
+     or new.asset_purpose='legal_disclosure'
+  then
+    if old.id is distinct from new.id
+       or old.asset_purpose is distinct from 'legal_disclosure'
+       or new.asset_purpose is distinct from 'legal_disclosure'
+    then
+      raise exception using
+        errcode='42501',
+        message='Legal disclosure Media identity cannot be reassigned.';
+    end if;
+
+    select package.status
+    into v_package_status
+    from messaging.legal_disclosure_packages package
+    where package.id=old.id;
+
+    if coalesce(auth.role(),'')<>'service_role'
+       or v_package_status is distinct from 'generating'
+    then
+      raise exception using
+        errcode='42501',
+        message='Generated Legal disclosure Media assets are immutable outside active Candidate C generation.';
+    end if;
+  end if;
+
+  return new;
+end
+$fn$;
+
+create trigger assets_legal_disclosure_guard
+before insert or update or delete on media.assets
+for each row execute function messaging.guard_legal_disclosure_media_asset_v1();
+
+create or replace function messaging.guard_legal_disclosure_media_governance_v1()
+returns trigger
+language plpgsql
+security definer
+set search_path=pg_catalog,auth,messaging,media
+as $fn$
+begin
+  if not exists(
+    select 1
+    from media.assets asset
+    where asset.id=new.asset_id
+      and asset.asset_purpose='legal_disclosure'
+  ) then
+    return new;
+  end if;
+
+  if coalesce(auth.role(),'')<>'service_role'
+     or new.version_number<>1
+     or new.source_protection_class not in ('restricted','confidential')
+     or new.preservation_state<>'preserved'
+     or new.retention_state<>'retain'
+     or new.public_safety_state<>'internal'
+     or exists(
+       select 1
+       from media.asset_governance_versions governance
+       where governance.asset_id=new.asset_id
+     )
+     or not exists(
+       select 1
+       from messaging.legal_disclosure_packages package
+       where package.id=new.asset_id
+         and package.status='generating'
+     )
+  then
+    raise exception using
+      errcode='42501',
+      message='Legal disclosure Media governance is fixed by Candidate C generation authority.';
+  end if;
+
+  return new;
+end
+$fn$;
+
+create trigger governance_legal_disclosure_guard
+before insert on media.asset_governance_versions
+for each row execute function messaging.guard_legal_disclosure_media_governance_v1();
+
+create or replace function messaging.guard_legal_disclosure_media_revision_v1()
+returns trigger
+language plpgsql
+security definer
+set search_path=pg_catalog,auth,messaging,media
+as $fn$
+declare
+  v_asset_purpose text;
+  v_storage_path text;
+begin
+  select asset.asset_purpose
+  into v_asset_purpose
+  from media.assets asset
+  where asset.id=new.asset_id;
+
+  select file_object.storage_path
+  into v_storage_path
+  from media.file_objects file_object
+  where file_object.id=new.original_file_object_id;
+
+  if v_asset_purpose is distinct from 'legal_disclosure'
+     and coalesce(v_storage_path,'') !~ '^private-files/legal-disclosures/'
+  then
+    return new;
+  end if;
+
+  if coalesce(auth.role(),'')<>'service_role'
+     or new.revision_number<>1
+     or new.previous_revision_id is not null
+     or exists(
+       select 1
+       from media.asset_revisions revision
+       where revision.asset_id=new.asset_id
+     )
+     or not exists(
+       select 1
+       from messaging.legal_disclosure_packages package
+       where package.id=new.asset_id
+         and package.status='generating'
+         and v_storage_path=messaging.legal_package_storage_path_v1(
+           package.legal_request_case_id,
+           package.id
+         )
+     )
+  then
+    raise exception using
+      errcode='42501',
+      message='Legal disclosure Media revisions may be created only by active Candidate C generation authority.';
+  end if;
+
+  return new;
+end
+$fn$;
+
+create trigger asset_revisions_legal_disclosure_guard
+before insert on media.asset_revisions
+for each row execute function messaging.guard_legal_disclosure_media_revision_v1();
+
+create or replace function messaging.guard_legal_disclosure_media_variant_v1()
+returns trigger
+language plpgsql
+security definer
+set search_path=pg_catalog,messaging,media
+as $fn$
+begin
+  if exists(
+       select 1
+       from media.assets asset
+       where asset.id=new.asset_id
+         and asset.asset_purpose='legal_disclosure'
+     )
+     or exists(
+       select 1
+       from media.file_objects file_object
+       where file_object.id in (
+         new.source_file_object_id,
+         new.derived_file_object_id
+       )
+         and file_object.storage_path ~ '^private-files/legal-disclosures/'
+     )
+  then
+    raise exception using
+      errcode='42501',
+      message='Legal disclosure Media bytes cannot participate in generic Media variants.';
+  end if;
+
+  return new;
+end
+$fn$;
+
+create trigger variants_legal_disclosure_guard
+before insert on media.variants
+for each row execute function messaging.guard_legal_disclosure_media_variant_v1();
+
+create or replace function messaging.guard_legal_disclosure_media_usage_v1()
+returns trigger
+language plpgsql
+security definer
+set search_path=pg_catalog,messaging,media
+as $fn$
+begin
+  if exists(
+    select 1
+    from media.assets asset
+    where asset.id=new.asset_id
+      and asset.asset_purpose='legal_disclosure'
+  ) then
+    raise exception using
+      errcode='42501',
+      message='Legal disclosure Media assets cannot be attached through generic Media usage.';
+  end if;
+
+  if tg_op='UPDATE' and exists(
+    select 1
+    from media.assets asset
+    where asset.id=old.asset_id
+      and asset.asset_purpose='legal_disclosure'
+  ) then
+    raise exception using
+      errcode='42501',
+      message='Legal disclosure Media usage cannot be reassigned.';
+  end if;
+
+  return new;
+end
+$fn$;
+
+create trigger usage_links_legal_disclosure_guard
+before insert or update on media.usage_links
+for each row execute function messaging.guard_legal_disclosure_media_usage_v1();
 
 create or replace function messaging.legal_selection_fingerprint_v1(p_package_id uuid)
 returns text
@@ -1063,6 +1371,53 @@ begin
       'occurred_at',e.occurred_at,'metadata',e.metadata
     ) order by e.occurred_at,e.id) from messaging.legal_case_events e where e.legal_request_case_id=v_case.id),'[]'::jsonb)
   );
+end
+$fn$;
+
+create or replace function public.list_messages_legal_preserved_objects_v1(
+  p_case_id uuid,
+  p_preservation_status text default null,
+  p_response_classification text default null,
+  p_limit integer default 200
+)
+returns jsonb
+language plpgsql
+stable
+security definer
+set search_path=pg_catalog,public,messaging
+as $fn$
+declare
+  v_admin record;
+  v_result jsonb;
+begin
+  select * into v_admin from messaging.require_messages_legal_capability('view_messages_legal_cases');
+  if not exists(select 1 from messaging.legal_request_cases where id=p_case_id) then
+    raise exception using errcode='P0002',message='Legal Request Case does not exist.';
+  end if;
+  if p_preservation_status is not null and p_preservation_status not in ('held','released') then
+    raise exception using errcode='22023',message='Invalid Legal preservation status.';
+  end if;
+  if p_response_classification is not null and p_response_classification not in ('unclassified','responsive','elevated_review','excluded') then
+    raise exception using errcode='22023',message='Invalid Legal response classification.';
+  end if;
+  if p_limit not between 1 and 500 then
+    raise exception using errcode='22023',message='Legal preserved-object limit must be between 1 and 500.';
+  end if;
+  select coalesce(jsonb_agg(to_jsonb(x) order by x.preserved_at,x.id),'[]'::jsonb)
+  into v_result
+  from (
+    select
+      o.id,o.object_kind,o.message_id,o.media_file_object_id,o.resource_version_id,
+      o.preservation_status,o.response_classification,o.preserved_at,o.classified_at,
+      o.released_at,o.revision
+    from messaging.legal_preserved_objects o
+    where o.legal_request_case_id=p_case_id
+      and (p_preservation_status is null or o.preservation_status=p_preservation_status)
+      and (p_response_classification is null or o.response_classification=p_response_classification)
+    order by o.preserved_at,o.id
+    limit p_limit
+  ) x;
+  return v_result;
 end
 $fn$;
 
@@ -1553,6 +1908,23 @@ begin
     where o.legal_disclosure_package_id=p_package_id and o.legal_preserved_object_id=p_preserved_object_id
       and o.response_classification='elevated_review' and p.response_classification='elevated_review' and p.preservation_status='held'
   ) then raise exception using errcode='55000',message='Elevated approval requires one selected held elevated-review object.'; end if;
+  if p_action='record_package' and exists(
+    select 1
+    from messaging.legal_disclosure_objects o
+    where o.legal_disclosure_package_id=p_package_id
+      and o.response_classification='elevated_review'
+      and not exists(
+        select 1
+        from messaging.legal_disclosure_approvals a
+        where a.legal_disclosure_package_id=p_package_id
+          and a.legal_preserved_object_id=o.legal_preserved_object_id
+          and a.approval_scope='elevated_object'
+          and a.status='active'
+          and a.selection_fingerprint=p_selection_fingerprint
+      )
+  ) then
+    raise exception using errcode='55000',message='Elevated-review approvals must be recorded before package approval.';
+  end if;
   if p_action in ('record_package','record_elevated') then
     insert into messaging.legal_disclosure_approvals(
       legal_disclosure_package_id,legal_preserved_object_id,approval_scope,status,selection_fingerprint,
@@ -1774,7 +2146,31 @@ begin
       'client_created_at',case when m.client_created_at is null then null else to_char(m.client_created_at at time zone 'UTC','YYYY-MM-DD"T"HH24:MI:SS.US"Z"') end,
       'correlation_id',case when m.correlation_id is null then null else m.correlation_id::text end,
       'command_receipt_id',case when m.command_receipt_id is null then null else m.command_receipt_id::text end,
-      'resource_references','[]'::jsonb
+      'resource_references',coalesce((
+        select jsonb_agg(
+          jsonb_build_object(
+            'resource_id',reference.resource_id,
+            'resource_version_id',reference.resource_version_id,
+            'presentation_kind',reference.presentation_kind
+          )
+          order by reference.created_at,reference.id
+        )
+        from messaging.message_resource_references reference
+        join messaging.legal_preserved_objects held_reference
+          on held_reference.legal_request_case_id=v_package.legal_request_case_id
+         and held_reference.object_kind='resource_version'
+         and held_reference.resource_version_id=reference.resource_version_id
+         and held_reference.preservation_status='held'
+         and held_reference.response_classification in ('responsive','elevated_review')
+        join messaging.legal_disclosure_objects selected_reference
+          on selected_reference.legal_disclosure_package_id=v_package.id
+         and selected_reference.legal_preserved_object_id=held_reference.id
+         and selected_reference.object_kind='resource_version'
+         and selected_reference.response_classification=held_reference.response_classification
+        where reference.message_id=m.id
+          and reference.presentation_kind='version'
+          and reference.resource_version_id is not null
+      ),'[]'::jsonb)
     ) into v_rep from messaging.messages m where m.id=v_preserved.message_id;
     if v_rep is null then raise exception using errcode='P0002',message='Canonical Message source no longer exists.'; end if;
     return jsonb_build_object('legal_disclosure_object_id',v_entry.id,'object_kind','message','output_path',messaging.legal_disclosure_output_path_v1(v_entry.manifest_order,v_entry.object_kind,v_entry.legal_preserved_object_id),'output_mime_type','application/json','representation',v_rep);
@@ -2083,57 +2479,186 @@ end
 $fn$;
 
 -- ---------------------------------------------------------------------------
--- Legal packages reuse existing private Media delivery Edge Function path.
--- Keep non-Legal behavior unchanged while making Legal package authorization
--- case/capability-bound. Candidate C package bytes use protected derived-objects.
+-- Released Legal package delivery is case-bound and purpose-audited.
+-- Generic Media private delivery remains unchanged from accepted Media authority.
 -- ---------------------------------------------------------------------------
 
-create or replace function public.get_media_private_delivery_target_v1(p_file_object_id uuid)
+create or replace function public.get_messages_legal_disclosure_delivery_target_v1(
+  p_package_id uuid,
+  p_purpose text,
+  p_idempotency_key text,
+  p_correlation_id uuid default null
+)
 returns jsonb
 language plpgsql
 security definer
-set search_path=pg_catalog,public,auth,media,messaging
+set search_path=pg_catalog,auth,public,editorial,messaging,media,platform_private
 as $fn$
 declare
-  v_file media.file_objects%rowtype;
-  v_package messaging.legal_disclosure_packages%rowtype;
   v_admin record;
+  v_package messaging.legal_disclosure_packages%rowtype;
+  v_file media.file_objects%rowtype;
+  v_correlation uuid;
+  v_begin record;
+  v_expected_path text;
+  v_result jsonb;
 begin
-  if coalesce(auth.role(),'')<>'authenticated' or auth.uid() is null then
-    raise exception using errcode='42501',message='Authenticated Media actor is required.';
+  select * into v_admin
+  from messaging.require_messages_legal_capability('inspect_messages_legal_evidence');
+
+  if p_package_id is null
+     or nullif(btrim(p_purpose),'') is null
+     or octet_length(p_purpose)>4096
+  then
+    raise exception using errcode='22023',message='Legal disclosure delivery input is invalid.';
   end if;
-  if p_file_object_id is null then raise exception using errcode='22023',message='file_object_id is required.'; end if;
-  select * into v_file from media.file_objects where id=p_file_object_id;
-  if not found then raise exception using errcode='P0002',message='Media file object does not exist.'; end if;
-  select * into v_package from messaging.legal_disclosure_packages where package_file_object_id=v_file.id;
-  if found then
-    if v_package.status<>'released' then raise exception using errcode='42501',message='Legal disclosure package has not been released.'; end if;
-    select * into v_admin from messaging.current_messages_super_admin();
-    if not public.current_user_has_capability('inspect_messages_legal_evidence') then raise exception using errcode='42501',message='Messages Legal evidence capability is required.'; end if;
-    if v_file.storage_path is null or v_file.storage_path !~ '^derived-objects/legal-disclosures/' then raise exception using errcode='55000',message='Legal disclosure package is outside the protected Candidate C storage boundary.'; end if;
-    perform messaging.append_legal_case_event_v1(v_package.legal_request_case_id,v_package.id,null,'evidence_viewed',v_admin.user_id,v_admin.person_resource_id,'human',null,null,jsonb_build_object('purpose','released_legal_package_delivery','media_file_object_id',v_file.id));
-  else
-    if not (public.current_user_has_capability('manage_media_assets') or public.current_user_is_administrator()) then
-      raise exception using errcode='42501',message='manage_media_assets capability is required.';
-    end if;
+
+  v_correlation:=messaging.command_correlation(
+    v_admin.user_id,
+    'messages.legal.evidence.inspect',
+    p_idempotency_key,
+    p_correlation_id
+  );
+
+  select * into v_begin
+  from platform_private.begin_authenticated_resource_command(
+    'messages.legal.evidence.inspect',
+    v_admin.person_resource_id,
+    p_idempotency_key,
+    jsonb_build_object(
+      'operation','released_legal_package_delivery',
+      'package_id',p_package_id,
+      'purpose',btrim(p_purpose),
+      'correlation_id',v_correlation
+    )
+  );
+
+  if v_begin.idempotent_replay then
+    return v_begin.result_payload;
   end if;
+
+  select * into v_package
+  from messaging.legal_disclosure_packages
+  where id=p_package_id;
+
+  if not found then
+    raise exception using errcode='P0002',message='Legal disclosure package does not exist.';
+  end if;
+
+  if v_package.status<>'released'
+     or v_package.package_file_object_id is null
+     or v_package.package_asset_id is null
+     or v_package.package_asset_revision_id is null
+  then
+    raise exception using errcode='42501',message='Legal disclosure package is not released for delivery.';
+  end if;
+
+  select * into v_file
+  from media.file_objects
+  where id=v_package.package_file_object_id;
+
+  if not found then
+    raise exception using errcode='P0002',message='Canonical Legal disclosure Media file does not exist.';
+  end if;
+
+  v_expected_path:=messaging.legal_package_storage_path_v1(
+    v_package.legal_request_case_id,
+    v_package.id
+  );
+
   if v_file.verification_state<>'verified'
      or v_file.storage_provider<>'lightsail_media'
-     or v_file.storage_path is null
-     or v_file.storage_path !~ '^(masters/(audio|video)/|derived-objects/|private-files/(transcripts|captions)/)'
-  then raise exception using errcode='55000',message='Only verified protected Lightsail Media files may use private delivery.'; end if;
-  if not (
-    exists(select 1 from media.asset_revisions r where r.original_file_object_id=v_file.id)
-    or exists(select 1 from media.variants v where v.derived_file_object_id=v_file.id)
-  ) then raise exception using errcode='55000',message='Private delivery requires a canonical Media revision or variant binding.'; end if;
+     or v_file.storage_path is distinct from v_expected_path
+     or v_file.storage_path !~ '^private-files/legal-disclosures/[0-9a-f-]{36}/[0-9a-f-]{36}/production[.]zip$'
+     or v_file.sha256 is distinct from v_package.package_sha256
+     or v_file.byte_size is distinct from v_package.package_byte_size
+  then
+    raise exception using errcode='55000',message='Released Legal disclosure Media identity is invalid.';
+  end if;
+
+  if not exists(
+    select 1
+    from media.asset_revisions revision
+    where revision.id=v_package.package_asset_revision_id
+      and revision.asset_id=v_package.package_asset_id
+      and revision.original_file_object_id=v_file.id
+  ) then
+    raise exception using errcode='55000',message='Released Legal disclosure Media revision binding is invalid.';
+  end if;
+
+  if not exists(
+    select 1
+    from media.assets asset
+    join media.asset_governance_versions governance
+      on governance.id=asset.current_governance_version_id
+     and governance.asset_id=asset.id
+    where asset.id=v_package.package_asset_id
+      and asset.asset_kind='document'
+      and asset.asset_purpose='legal_disclosure'
+      and asset.lifecycle_state='active'
+      and asset.current_revision_id=v_package.package_asset_revision_id
+      and governance.source_protection_class in ('restricted','confidential')
+      and governance.preservation_state='preserved'
+      and governance.retention_state='retain'
+      and governance.public_safety_state='internal'
+  ) then
+    raise exception using errcode='55000',message='Released Legal disclosure Media governance is not restricted.';
+  end if;
+
   perform messaging.assert_media_file_not_safety_contained_v1(v_file.id);
-  return jsonb_build_object('file_object_id',v_file.id,'storage_path',v_file.storage_path,'original_filename',v_file.original_filename,'mime_type',v_file.mime_type,'byte_size',v_file.byte_size,'sha256',v_file.sha256,'verification_state',v_file.verification_state);
+
+  perform messaging.append_legal_case_event_v1(
+    v_package.legal_request_case_id,
+    v_package.id,
+    null,
+    'evidence_viewed',
+    v_admin.user_id,
+    v_admin.person_resource_id,
+    'human',
+    null,
+    v_begin.command_receipt_id,
+    jsonb_build_object(
+      'purpose',btrim(p_purpose),
+      'operation','released_legal_package_delivery',
+      'media_file_object_id',v_file.id,
+      'package_sha256',v_package.package_sha256,
+      'correlation_id',v_correlation
+    )
+  );
+
+  v_result:=jsonb_build_object(
+    'legal_request_case_id',v_package.legal_request_case_id,
+    'legal_disclosure_package_id',v_package.id,
+    'file_object_id',v_file.id,
+    'storage_path',v_file.storage_path,
+    'original_filename',v_file.original_filename,
+    'mime_type',v_file.mime_type,
+    'byte_size',v_file.byte_size,
+    'sha256',v_file.sha256,
+    'verification_state',v_file.verification_state,
+    'command_receipt_id',v_begin.command_receipt_id,
+    'correlation_id',v_correlation
+  );
+
+  perform platform_private.complete_resource_command(
+    v_begin.command_receipt_id,
+    v_result
+  );
+
+  return v_result;
 end
 $fn$;
 
 -- ---------------------------------------------------------------------------
 -- Function grants. Human RPCs are authenticated only. Worker RPCs service only.
 -- ---------------------------------------------------------------------------
+
+revoke all on function messaging.guard_legal_disclosure_media_file_v1() from public,anon,authenticated,service_role;
+revoke all on function messaging.guard_legal_disclosure_media_asset_v1() from public,anon,authenticated,service_role;
+revoke all on function messaging.guard_legal_disclosure_media_governance_v1() from public,anon,authenticated,service_role;
+revoke all on function messaging.guard_legal_disclosure_media_revision_v1() from public,anon,authenticated,service_role;
+revoke all on function messaging.guard_legal_disclosure_media_variant_v1() from public,anon,authenticated,service_role;
+revoke all on function messaging.guard_legal_disclosure_media_usage_v1() from public,anon,authenticated,service_role;
 
 revoke all on function messaging.require_messages_legal_capability(text) from public,anon,authenticated,service_role;
 revoke all on function messaging.append_legal_case_event_v1(uuid,uuid,uuid,text,uuid,uuid,text,text,uuid,jsonb) from public,anon,authenticated,service_role;
@@ -2144,6 +2669,8 @@ revoke all on function public.list_messages_legal_cases_v1(text,integer) from pu
 grant execute on function public.list_messages_legal_cases_v1(text,integer) to authenticated;
 revoke all on function public.get_messages_legal_case_v1(uuid) from public,anon,service_role;
 grant execute on function public.get_messages_legal_case_v1(uuid) to authenticated;
+revoke all on function public.list_messages_legal_preserved_objects_v1(uuid,text,text,integer) from public,anon,service_role;
+grant execute on function public.list_messages_legal_preserved_objects_v1(uuid,text,text,integer) to authenticated;
 revoke all on function public.get_messages_legal_disclosure_package_v1(uuid) from public,anon,service_role;
 grant execute on function public.get_messages_legal_disclosure_package_v1(uuid) to authenticated;
 revoke all on function public.open_messages_legal_request_case_v1(text,text,text,text,timestamptz,text,text,uuid,text,uuid) from public,anon,service_role;
@@ -2188,10 +2715,8 @@ grant execute on function public.fail_messages_legal_disclosure_job_v1(uuid,text
 revoke all on function public.recover_expired_messages_legal_disclosure_jobs_v1(integer,integer) from public,anon,authenticated;
 grant execute on function public.recover_expired_messages_legal_disclosure_jobs_v1(integer,integer) to service_role;
 
--- Keep existing private-delivery surface authenticated. Its implementation now
--- applies a stricter Legal-specific branch for released Candidate C packages.
-revoke all on function public.get_media_private_delivery_target_v1(uuid) from public,anon,service_role;
-grant execute on function public.get_media_private_delivery_target_v1(uuid) to authenticated;
+revoke all on function public.get_messages_legal_disclosure_delivery_target_v1(uuid,text,text,uuid) from public,anon,service_role;
+grant execute on function public.get_messages_legal_disclosure_delivery_target_v1(uuid,text,text,uuid) to authenticated;
 
 comment on table messaging.legal_request_cases is 'Candidate C Legal Request Case peer authority. Separate from Safety Case.';
 comment on table messaging.legal_preservation_scopes is 'Finite case-bound Legal preservation scopes. No arbitrary selectors.';

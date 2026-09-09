@@ -22148,6 +22148,15 @@ export type Database = {
       }
       get_messages_control_center_status: { Args: never; Returns: Json }
       get_messages_legal_case_v1: { Args: { p_case_id: string }; Returns: Json }
+      get_messages_legal_disclosure_delivery_target_v1: {
+        Args: {
+          p_correlation_id?: string
+          p_idempotency_key: string
+          p_package_id: string
+          p_purpose: string
+        }
+        Returns: Json
+      }
       get_messages_legal_disclosure_package_v1: {
         Args: { p_package_id: string }
         Returns: Json
@@ -22846,6 +22855,15 @@ export type Database = {
       }
       list_messages_legal_cases_v1: {
         Args: { p_limit?: number; p_status?: string }
+        Returns: Json
+      }
+      list_messages_legal_preserved_objects_v1: {
+        Args: {
+          p_case_id: string
+          p_limit?: number
+          p_preservation_status?: string
+          p_response_classification?: string
+        }
         Returns: Json
       }
       list_messages_safety_appeals_v1: {

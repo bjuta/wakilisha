@@ -132,6 +132,7 @@ function privateStoragePath(value: unknown) {
       || path.startsWith("derived-objects/")
       || path.startsWith("private-files/transcripts/")
       || path.startsWith("private-files/captions/")
+      || path.startsWith("private-files/legal-disclosures/")
     )
     || path.includes("..")
   ) {
@@ -197,6 +198,72 @@ async function createPrivateDelivery(
 
   return {
     ok: true,
+    file_object_id: fileObjectId,
+    url: url.toString(),
+    expires_at: new Date(expires * 1000).toISOString(),
+    ttl_seconds: ttlSeconds,
+  };
+}
+
+async function createLegalDisclosureDelivery(
+  authHeader: string,
+  body: JsonObject,
+) {
+  const packageId = stringValue(body.package_id);
+  const purpose = stringValue(body.purpose);
+  const idempotencyKey = stringValue(body.idempotency_key);
+  const correlationId = stringValue(body.correlation_id);
+  const ttlCandidate = numberValue(body.ttl_seconds);
+  const ttlSeconds = Number.isInteger(ttlCandidate)
+    ? Math.min(900, Math.max(30, ttlCandidate))
+    : 300;
+
+  if (!packageId || !purpose || !idempotencyKey) {
+    throw Object.assign(
+      new Error("package_id, purpose, and idempotency_key are required."),
+      { status: 400 },
+    );
+  }
+
+  const target = await userRpc(
+    authHeader,
+    "get_messages_legal_disclosure_delivery_target_v1",
+    {
+      p_package_id: packageId,
+      p_purpose: purpose,
+      p_idempotency_key: idempotencyKey,
+      p_correlation_id: correlationId || null,
+    },
+  );
+
+  const fileObjectId = stringValue(target.file_object_id);
+  const storagePath = privateStoragePath(target.storage_path);
+
+  if (
+    !fileObjectId
+    || !storagePath.startsWith("private-files/legal-disclosures/")
+  ) {
+    throw Object.assign(
+      new Error("Legal disclosure delivery target is invalid."),
+      { status: 500 },
+    );
+  }
+
+  const expires = Math.floor(Date.now() / 1000) + ttlSeconds;
+  const token = await hmacSha256Hex(
+    env("MEDIA_PRIVATE_DELIVERY_SECRET"),
+    `${expires}\n${storagePath}`,
+  );
+
+  const url = new URL(
+    `https://media.wakilisha.africa/__private/media-file/${encodeStoragePath(storagePath)}`,
+  );
+  url.searchParams.set("expires", String(expires));
+  url.searchParams.set("token", token);
+
+  return {
+    ok: true,
+    legal_disclosure_package_id: packageId,
     file_object_id: fileObjectId,
     url: url.toString(),
     expires_at: new Date(expires * 1000).toISOString(),
@@ -677,9 +744,17 @@ serve(async (req) => {
     const requestContentType = req.headers.get("Content-Type") ?? "";
 
     if (requestContentType.toLowerCase().includes("application/json")) {
-      requireAdmin(isAdmin);
       const body = objectValue(await req.json());
       const action = stringValue(body.action);
+
+      if (action === "create_private_delivery") {
+        return json(200, await createPrivateDelivery(authHeader, body));
+      }
+      if (action === "create_legal_disclosure_delivery") {
+        return json(200, await createLegalDisclosureDelivery(authHeader, body));
+      }
+
+      requireAdmin(isAdmin);
 
       if (action === "create_resumable_session") {
         return json(
@@ -702,10 +777,6 @@ serve(async (req) => {
       if (action === "cancel_resumable_session") {
         return json(200, await cancelResumableSession(authHeader, body));
       }
-      if (action === "create_private_delivery") {
-        return json(200, await createPrivateDelivery(authHeader, body));
-      }
-
       return json(400, { error: "Unsupported Media control action." });
     }
 
