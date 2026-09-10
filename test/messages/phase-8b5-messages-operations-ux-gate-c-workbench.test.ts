@@ -204,4 +204,161 @@ describe("Phase 8B.5 Messages Operations UX Gate C Legal workbench", () => {
     expect(panel).not.toContain("supabase.functions.invoke");
     expect(panel).not.toMatch(/\.from\([^\n]+\)\.(insert|update|delete)\(/);
   });
+  it("converges the Safety Case shell on the accepted Messages Operations primitives", () => {
+    const safetyPanel = fs.readFileSync(
+      "src/pages/admin/messages/MessagesSafetyPanel.tsx",
+      "utf8",
+    );
+
+    expect(safetyPanel).toContain("data-wk-messages-safety-workbench");
+    expect(safetyPanel).toContain("<WkWorkflowRail");
+    expect(safetyPanel).toContain('ariaLabel="Safety Case progress"');
+    expect(safetyPanel).toContain("<WkStateBadge");
+    expect(safetyPanel).toContain("<WkAuditTimeline");
+    expect(safetyPanel).toContain('ariaLabel="Safety Case activity"');
+    expect(safetyPanel).toContain("<WkCommandSheet");
+    expect(safetyPanel).toContain('eyebrow="Governed Safety action"');
+  });
+
+  it("keeps Safety evidence deliberate and non-ambient", () => {
+    const safetyPanel = fs.readFileSync(
+      "src/pages/admin/messages/MessagesSafetyPanel.tsx",
+      "utf8",
+    );
+
+    expect(safetyPanel).toContain("<WkInspector");
+    expect(safetyPanel).toContain(
+      'advancedLabel="Reveal inspected private evidence"',
+    );
+    expect(safetyPanel).toContain(
+      "The Message body is not rendered in the normal case.",
+    );
+    expect(safetyPanel).not.toContain('import { Modal }');
+    expect(safetyPanel).not.toContain("<Modal");
+  });
+
+  it("keeps the Safety queue aligned with case-status transitions", () => {
+    const safetyPanel = fs.readFileSync(
+      "src/pages/admin/messages/MessagesSafetyPanel.tsx",
+      "utf8",
+    );
+
+    expect(safetyPanel).toContain('setStatusFilter("under_review")');
+    expect(safetyPanel).toContain('setStatusFilter("resolved")');
+  });
+
+  it("does not introduce browser-native workflow selection chrome in Safety", () => {
+    const safetyPanel = fs.readFileSync(
+      "src/pages/admin/messages/MessagesSafetyPanel.tsx",
+      "utf8",
+    );
+
+    expect(safetyPanel).not.toMatch(/<select\b/);
+    expect(safetyPanel).not.toContain('type="datetime-local"');
+    expect(safetyPanel).not.toContain('type="date"');
+    expect(safetyPanel).not.toContain('type="time"');
+    expect(safetyPanel).not.toContain('type="checkbox"');
+  });
+
+  it("keeps Gate D Safety convergence on the existing service boundary", () => {
+    const safetyPanel = fs.readFileSync(
+      "src/pages/admin/messages/MessagesSafetyPanel.tsx",
+      "utf8",
+    );
+
+    for (const command of [
+      "getMessagesSafetyCase",
+      "inspectMessageSafetyEvidence",
+      "listMessagesSafetyCases",
+      "resolveMessageSafetyCase",
+      "setMessageQuarantine",
+      "startMessagesSafetyReview",
+    ]) {
+      expect(safetyPanel).toContain(command);
+    }
+
+    expect(safetyPanel).not.toContain("service_role");
+    expect(safetyPanel).not.toContain("platform_private.");
+    expect(safetyPanel).not.toContain("supabase.functions.invoke");
+    expect(safetyPanel).not.toMatch(/\.[ \t]*from\([^\n]+\)\.(insert|update|delete)\(/);
+  });
+
+  it("converges Candidate B controls into deliberate governed actions", () => {
+    const candidateB = fs.readFileSync(
+      "src/pages/admin/messages/MessagesSafetyCandidateBControls.tsx",
+      "utf8",
+    );
+
+    expect(candidateB).toContain(
+      "data-wk-messages-safety-candidate-b-workbench",
+    );
+    expect(candidateB).toContain("<WkCommandSheet");
+    expect(candidateB).toContain('title="Update Safety Assessment"');
+    expect(candidateB).toContain('title="Apply Safety Enforcement"');
+    expect(candidateB).toContain('title="Release Safety Enforcement"');
+    expect(candidateB).toContain('title="Resolve Safety Appeal"');
+    expect(candidateB).toContain('eyebrow="Exact Media action"');
+  });
+
+  it("uses WAKILISHA-owned selection and toggle controls for Candidate B", () => {
+    const candidateB = fs.readFileSync(
+      "src/pages/admin/messages/MessagesSafetyCandidateBControls.tsx",
+      "utf8",
+    );
+
+    expect(candidateB).toContain("<SearchableSelect");
+    expect(candidateB).toContain("policyOptions");
+    expect(candidateB).toContain("allowedKindOptions");
+    expect(candidateB).toContain("<WakilishaToggle");
+    expect(candidateB).toContain('ariaLabel="Allow appeal"');
+
+    expect(candidateB).not.toMatch(/<select\b/);
+    expect(candidateB).not.toContain('type="datetime-local"');
+    expect(candidateB).not.toContain('type="date"');
+    expect(candidateB).not.toContain('type="time"');
+    expect(candidateB).not.toContain('type="checkbox"');
+  });
+
+  it("keeps Media reasons exact-action scoped instead of ambient", () => {
+    const candidateB = fs.readFileSync(
+      "src/pages/admin/messages/MessagesSafetyCandidateBControls.tsx",
+      "utf8",
+    );
+
+    expect(candidateB).toContain("interface MediaAction");
+    expect(candidateB).toContain("nextContained: boolean");
+    expect(candidateB).toContain("setMediaAction({");
+    expect(candidateB).toContain(
+      'placeholder="Record the reason for this exact Media action."',
+    );
+    expect(candidateB).not.toContain(
+      'placeholder="Containment or release reason"',
+    );
+  });
+
+  it("preserves every accepted Candidate B browser command", () => {
+    const candidateB = fs.readFileSync(
+      "src/pages/admin/messages/MessagesSafetyCandidateBControls.tsx",
+      "utf8",
+    );
+
+    for (const command of [
+      "resolveMessagesSafetyAppeal",
+      "setMessagesSafetyEnforcement",
+      "setMessagesSafetyMediaContainment",
+      "startMessagesSafetyAppealReview",
+      "submitMessagesSafetyMediaScan",
+      "updateMessagesSafetyAssessment",
+    ]) {
+      expect(candidateB).toContain(command);
+    }
+
+    expect(candidateB).not.toContain("service_role");
+    expect(candidateB).not.toContain("platform_private.");
+    expect(candidateB).not.toContain("supabase.functions.invoke");
+    expect(candidateB).not.toMatch(
+      /\.[ \t]*from\([^\n]+\)\.(insert|update|delete)\(/,
+    );
+  });
+
 });
