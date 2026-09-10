@@ -24881,6 +24881,30 @@ export type Database = {
           sender_category: string
         }[]
       }
+      search_messages_legal_reviewers_v1: {
+        Args: { p_case_id: string; p_limit?: number; p_query: string }
+        Returns: {
+          display_name: string
+          secondary_label: string
+          user_id: string
+        }[]
+      }
+      search_messages_legal_scope_targets_v1: {
+        Args: {
+          p_case_id: string
+          p_limit?: number
+          p_query: string
+          p_target_kind: string
+        }
+        Returns: {
+          context: string
+          label: string
+          occurred_at: string
+          related_id: string
+          target_id: string
+          target_kind: string
+        }[]
+      }
       seed_taxonomy_terms_from_articles: {
         Args: never
         Returns: {

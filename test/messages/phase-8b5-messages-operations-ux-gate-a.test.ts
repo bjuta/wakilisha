@@ -25,6 +25,10 @@ const commandSheet = fs.readFileSync(
   "src/components/design-system/primitives/CommandSheet.tsx",
   "utf8",
 );
+const sheet = fs.readFileSync(
+  "src/components/design-system/primitives/Sheet.tsx",
+  "utf8",
+);
 const controlsWorkspace = fs.readFileSync(
   "src/pages/admin/messages/MessagesControlsWorkspace.tsx",
   "utf8",
@@ -118,15 +122,31 @@ describe("Phase 8B.5 Messages Operations UX Gate A", () => {
     expect(dateTime).not.toContain('type="datetime-local"');
   });
 
-  it("provides reusable governed workflow and command primitives", () => {
+  it("provides reusable governed workflow and visible command primitives", () => {
     expect(workflow).toContain("WkWorkflowRail");
     expect(workflow).toContain('aria-current={step.state === "current" ? "step" : undefined}');
     expect(commandSheet).toContain("WkCommandSheet");
     expect(commandSheet).toContain('<Sheet open={open} onClose={onClose} title={title} side="right">');
+
+    expect(sheet).toContain(
+      'import { Portal } from "@/components/base/Portal";',
+    );
+    expect(sheet).toContain("<Portal>");
+    expect(sheet).toContain('"items-end justify-center"');
+    expect(sheet).toContain('"items-stretch justify-end"');
+    expect(sheet).toContain(
+      '"h-full w-full max-w-sm overflow-y-auto',
+    );
+    expect(sheet).not.toContain(
+      '"absolute right-0 top-0 bottom-0',
+    );
+    expect(sheet).not.toContain(
+      '"absolute bottom-0 left-0 right-0',
+    );
   });
 
   it("does not introduce native selection/date chrome into Gate A surfaces", () => {
-    const gateASurface = `${page}\n${shell}\n${dateTime}\n${workflow}\n${commandSheet}`;
+    const gateASurface = `${page}\n${shell}\n${dateTime}\n${workflow}\n${commandSheet}\n${sheet}`;
     expect(gateASurface).not.toMatch(/<select\b/);
     expect(gateASurface).not.toContain('type="datetime-local"');
     expect(gateASurface).not.toContain('type="date"');

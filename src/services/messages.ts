@@ -1129,6 +1129,27 @@ export interface MessagesLegalDeliveryTarget {
   ttl_seconds: number;
 }
 
+export type MessagesLegalScopeTargetKind =
+  | "message"
+  | "conversation"
+  | "media_file"
+  | "resource_version";
+
+export interface MessagesLegalScopeTargetSearchResult {
+  target_kind: MessagesLegalScopeTargetKind;
+  target_id: string;
+  label: string;
+  context: string | null;
+  occurred_at: string | null;
+  related_id: string | null;
+}
+
+export interface MessagesLegalReviewerSearchResult {
+  user_id: string;
+  display_name: string;
+  secondary_label: string | null;
+}
+
 export interface OpenMessagesLegalCaseInput {
   requestReference: string;
   requestKind: MessagesLegalRequestKind;
@@ -1154,6 +1175,44 @@ export interface UpdateMessagesLegalScopeInput {
   scopeNote?: string | null;
   expectedRevision: number;
   reason: string;
+}
+
+export async function searchMessagesLegalScopeTargets(
+  caseId: string,
+  targetKind: MessagesLegalScopeTargetKind,
+  query: string,
+  limit = 20,
+): Promise<MessagesLegalScopeTargetSearchResult[]> {
+  const normalizedQuery = query.trim();
+  if (normalizedQuery.length < 3) return [];
+
+  return rpc<MessagesLegalScopeTargetSearchResult[]>(
+    "search_messages_legal_scope_targets_v1",
+    {
+      p_case_id: caseId,
+      p_target_kind: targetKind,
+      p_query: normalizedQuery,
+      p_limit: Math.min(Math.max(limit, 1), 20),
+    },
+  );
+}
+
+export async function searchMessagesLegalReviewers(
+  caseId: string,
+  query: string,
+  limit = 20,
+): Promise<MessagesLegalReviewerSearchResult[]> {
+  const normalizedQuery = query.trim();
+  if (normalizedQuery.length < 2) return [];
+
+  return rpc<MessagesLegalReviewerSearchResult[]>(
+    "search_messages_legal_reviewers_v1",
+    {
+      p_case_id: caseId,
+      p_query: normalizedQuery,
+      p_limit: Math.min(Math.max(limit, 1), 20),
+    },
+  );
 }
 
 export async function listMessagesLegalCases(
