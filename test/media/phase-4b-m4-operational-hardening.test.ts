@@ -76,6 +76,11 @@ const candidateCLegalService = fs.readFileSync(
   "utf8",
 );
 
+const candidateCLegalPanel = fs.readFileSync(
+  "src/pages/admin/messages/MessagesLegalPanel.tsx",
+  "utf8",
+);
+
 describe("Phase 4B M4 operational hardening contract", () => {
   it("adds transcript and caption to compatibility file-kind authority", () => {
     expect(migration).toContain("'transcript'");
@@ -342,6 +347,18 @@ describe("Phase 4B M4 operational hardening contract", () => {
     );
     expect(candidateCLegalService).not.toContain(
       "ReadWritePaths=/opt/wakilisha-media /opt/wakilisha-legal-disclosure-processing",
+    );
+  });
+
+  it("delivers Candidate C Legal packages without a popup-dependent browser handoff", () => {
+    expect(candidateCLegalPanel).toContain(
+      "window.location.assign(target.url);",
+    );
+    expect(candidateCLegalPanel).not.toContain(
+      'const anchor = document.createElement("a");',
+    );
+    expect(candidateCLegalPanel).not.toContain(
+      'anchor.target = "_blank";',
     );
   });
 

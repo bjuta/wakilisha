@@ -553,11 +553,9 @@ export function MessagesLegalPanel() {
         deliveryPackage.id,
         deliveryPurpose.trim(),
       );
-      const anchor = document.createElement("a");
-      anchor.href = target.url;
-      anchor.target = "_blank";
-      anchor.rel = "noopener noreferrer";
-      anchor.click();
+      // Navigate the signed file in the current browsing context so browser
+      // popup policy cannot block delivery after the async authorization step.
+      window.location.assign(target.url);
       setDeliveryPurpose("");
       setDeliveryPackage(null);
       setDeliveryOpen(false);
