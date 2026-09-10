@@ -31,6 +31,13 @@ export function Sheet({
 
     const handleKey = (event: KeyboardEvent) => {
       if (event.key === "Escape") {
+        const panel = panelRef.current;
+        const nestedPopupOpen = panel?.querySelector(
+          '[aria-haspopup][aria-expanded="true"]',
+        );
+
+        if (nestedPopupOpen) return;
+
         event.preventDefault();
         onClose();
         return;

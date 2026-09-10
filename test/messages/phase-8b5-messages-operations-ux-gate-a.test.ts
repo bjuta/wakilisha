@@ -154,6 +154,8 @@ describe("Phase 8B.5 Messages Operations UX Gate A", () => {
     expect(sheet).toContain("previousFocusRef");
     expect(sheet).toContain("previous?.isConnected");
     expect(sheet).toContain("panel.querySelectorAll<HTMLElement>");
+    expect(sheet).toContain("'[aria-haspopup][aria-expanded=\"true\"]'");
+    expect(sheet).toContain("if (nestedPopupOpen) return");
   });
 
   it("keeps Gate E keyboard focus bounded across the shared Messages controls", () => {
