@@ -5,6 +5,7 @@ interface WakilishaToggleProps {
   onChange: (v: boolean) => void;
   size?: "sm" | "md";
   disabled?: boolean;
+  ariaLabel?: string;
 }
 
 const SIZES = {
@@ -29,6 +30,7 @@ export const WakilishaToggle: React.FC<WakilishaToggleProps> = ({
   onChange,
   size = "md",
   disabled = false,
+  ariaLabel = "Toggle setting",
 }) => {
   const s = SIZES[size];
 
@@ -37,7 +39,9 @@ export const WakilishaToggle: React.FC<WakilishaToggleProps> = ({
       type="button"
       onClick={() => onChange(!value)}
       disabled={disabled}
-      aria-pressed={value}
+      role="switch"
+      aria-checked={value}
+      aria-label={ariaLabel}
       className={`
         ${s.track}
         relative rounded-full shrink-0 cursor-pointer

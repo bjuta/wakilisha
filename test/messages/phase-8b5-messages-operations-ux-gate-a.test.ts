@@ -25,6 +25,18 @@ const commandSheet = fs.readFileSync(
   "src/components/design-system/primitives/CommandSheet.tsx",
   "utf8",
 );
+const controlsWorkspace = fs.readFileSync(
+  "src/pages/admin/messages/MessagesControlsWorkspace.tsx",
+  "utf8",
+);
+const systemActorsWorkspace = fs.readFileSync(
+  "src/pages/admin/messages/MessagesSystemActorsWorkspace.tsx",
+  "utf8",
+);
+const agentsWorkspace = fs.readFileSync(
+  "src/pages/admin/messages/MessagesAgentsWorkspace.tsx",
+  "utf8",
+);
 
 describe("Phase 8B.5 Messages Operations UX Gate A", () => {
   it("establishes the accepted seven-workspace Messages Operations shell", () => {
@@ -59,26 +71,31 @@ describe("Phase 8B.5 Messages Operations UX Gate A", () => {
 
   it("moves Runtime Audience and Private Content Boundary into Controls", () => {
     expect(page).toContain('workspace === "controls"');
-    expect(page).toContain("Runtime audience");
-    expect(page).toContain("Private-content boundary");
+    expect(page).toContain("<MessagesControlsWorkspace status={status} />");
+    expect(controlsWorkspace).toContain("Runtime Audience");
+    expect(controlsWorkspace).toContain("Private Content Boundary");
 
     const overviewStart = page.indexOf('workspace === "overview"');
     const conversationsStart = page.indexOf('workspace === "conversations"');
     const overviewBlock = page.slice(overviewStart, conversationsStart);
 
-    expect(overviewBlock).not.toContain("Runtime audience");
-    expect(overviewBlock).not.toContain("Private-content boundary");
+    expect(overviewBlock).not.toContain("Runtime Audience");
+    expect(overviewBlock).not.toContain("Private Content Boundary");
   });
 
   it("moves System Actors into their own workspace", () => {
     expect(page).toContain('workspace === "system-actors"');
-    expect(page).toContain("System Actors in Messages");
+    expect(page).toContain("<MessagesSystemActorsWorkspace");
+    expect(systemActorsWorkspace).toContain("System Actors");
+    expect(systemActorsWorkspace).toContain("Messages participation");
   });
 
   it("keeps Agent Reviews & Updates as a bounded workspace without fake authority", () => {
     expect(page).toContain('workspace === "agents"');
-    expect(page).toContain("Agent Reviews &amp; Updates");
-    expect(page).toContain("Gate A adds no parallel agent authority or fake queue data.");
+    expect(page).toContain("<MessagesAgentsWorkspace />");
+    expect(agentsWorkspace).toContain("Agent Reviews &amp; Updates");
+    expect(agentsWorkspace).toContain("without fabricating queue counts");
+    expect(agentsWorkspace).toContain("Existing domain-specific review authorities remain canonical.");
   });
 
   it("makes the shared searchable picker generic and keyboard-addressable", () => {
