@@ -1,4 +1,4 @@
-import type { ReactNode } from "react";
+import { useRef, type KeyboardEvent, type ReactNode } from "react";
 
 export type MessagesOperationsWorkspace =
   | "overview"
@@ -65,6 +65,37 @@ export function MessagesOperationsShell({
   const current =
     messagesOperationsWorkspaces.find((workspace) => workspace.id === active) ??
     messagesOperationsWorkspaces[0];
+  const tabRefs = useRef<Array<HTMLButtonElement | null>>([]);
+
+  const focusWorkspace = (index: number) => {
+    const next = messagesOperationsWorkspaces[index];
+    if (!next) return;
+    onChange(next.id);
+    tabRefs.current[index]?.focus();
+  };
+
+  const handleTabKeyDown = (
+    event: KeyboardEvent<HTMLButtonElement>,
+    index: number,
+  ) => {
+    const lastIndex = messagesOperationsWorkspaces.length - 1;
+    let nextIndex: number | null = null;
+
+    if (event.key === "ArrowRight") {
+      nextIndex = index === lastIndex ? 0 : index + 1;
+    } else if (event.key === "ArrowLeft") {
+      nextIndex = index === 0 ? lastIndex : index - 1;
+    } else if (event.key === "Home") {
+      nextIndex = 0;
+    } else if (event.key === "End") {
+      nextIndex = lastIndex;
+    }
+
+    if (nextIndex === null) return;
+
+    event.preventDefault();
+    focusWorkspace(nextIndex);
+  };
 
   return (
     <div className="overflow-hidden rounded-2xl border border-wk-border bg-wk-surface">
@@ -78,16 +109,21 @@ export function MessagesOperationsShell({
             aria-label="Messages Operations"
             className="flex min-w-max gap-1"
           >
-            {messagesOperationsWorkspaces.map((workspace) => {
+            {messagesOperationsWorkspaces.map((workspace, index) => {
               const selected = workspace.id === active;
               return (
                 <button
                   key={workspace.id}
                   id={`messages-workspace-tab-${workspace.id}`}
                   type="button"
+                  ref={(node) => {
+                    tabRefs.current[index] = node;
+                  }}
                   role="tab"
+                  tabIndex={selected ? 0 : -1}
                   aria-selected={selected}
                   aria-controls={`messages-workspace-panel-${workspace.id}`}
+                  onKeyDown={(event) => handleTabKeyDown(event, index)}
                   onClick={() => onChange(workspace.id)}
                   className={`rounded-t-xl px-3.5 py-3 text-[11px] font-black transition-colors focus:outline-none focus:ring-2 focus:ring-inset focus:ring-wk-brand/20 ${
                     selected

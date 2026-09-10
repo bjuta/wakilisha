@@ -58,6 +58,11 @@ describe("Phase 8B.5 Messages Operations UX Gate A", () => {
 
     expect(shell).toContain('role="tablist"');
     expect(shell).toContain('role="tabpanel"');
+    expect(shell).toContain("tabIndex={selected ? 0 : -1}");
+    expect(shell).toContain('event.key === "ArrowRight"');
+    expect(shell).toContain('event.key === "ArrowLeft"');
+    expect(shell).toContain('event.key === "Home"');
+    expect(shell).toContain('event.key === "End"');
     expect(page).toContain("<MessagesOperationsShell");
   });
 
@@ -112,6 +117,8 @@ describe("Phase 8B.5 Messages Operations UX Gate A", () => {
     expect(searchable).toContain('event.key === "ArrowUp"');
     expect(searchable).toContain('event.key === "Enter"');
     expect(searchable).toContain('event.key === "Escape"');
+    expect(searchable).toContain("triggerRef");
+    expect(searchable).toContain("triggerRef.current?.focus()");
   });
 
   it("provides a WAKILISHA-owned date-time picker with no native date chrome", () => {
@@ -143,6 +150,20 @@ describe("Phase 8B.5 Messages Operations UX Gate A", () => {
     expect(sheet).not.toContain(
       '"absolute bottom-0 left-0 right-0',
     );
+    expect(sheet).toContain('event.key !== "Tab"');
+    expect(sheet).toContain("previousFocusRef");
+    expect(sheet).toContain("previous?.isConnected");
+    expect(sheet).toContain("panel.querySelectorAll<HTMLElement>");
+  });
+
+  it("keeps Gate E keyboard focus bounded across the shared Messages controls", () => {
+    expect(shell).toContain("tabRefs");
+    expect(shell).toContain("focusWorkspace(nextIndex)");
+    expect(searchable).toContain("triggerRef.current?.focus()");
+    expect(sheet).toContain("event.preventDefault()");
+    expect(sheet).toContain("last.focus()");
+    expect(sheet).toContain("first.focus()");
+    expect(sheet).toContain("previous.focus()");
   });
 
   it("does not introduce native selection/date chrome into Gate A surfaces", () => {

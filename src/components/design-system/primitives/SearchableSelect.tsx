@@ -44,6 +44,7 @@ export function SearchableSelect({
   const [activeIndex, setActiveIndex] = useState(-1);
   const containerRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+  const triggerRef = useRef<HTMLButtonElement>(null);
   const listRef = useRef<HTMLUListElement>(null);
   const rawId = useId();
   const listboxId = `wk-searchable-select-${rawId.replace(/:/g, "")}`;
@@ -79,9 +80,11 @@ export function SearchableSelect({
 
     function handleKeyDown(event: KeyboardEvent) {
       if (event.key === "Escape") {
+        event.preventDefault();
         setOpen(false);
         setSearch("");
         setActiveIndex(-1);
+        window.setTimeout(() => triggerRef.current?.focus(), 0);
       }
     }
 
@@ -130,6 +133,7 @@ export function SearchableSelect({
     setOpen(false);
     setSearch("");
     setActiveIndex(-1);
+    window.setTimeout(() => triggerRef.current?.focus(), 0);
   }
 
   function handleSearchKeyDown(event: ReactKeyboardEvent<HTMLInputElement>) {
@@ -164,6 +168,7 @@ export function SearchableSelect({
   return (
     <div ref={containerRef} className={`relative ${className}`}>
       <button
+        ref={triggerRef}
         type="button"
         role="combobox"
         aria-label={ariaLabel}
