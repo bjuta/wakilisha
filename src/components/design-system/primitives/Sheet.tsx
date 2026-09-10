@@ -1,4 +1,9 @@
-import { useEffect, type ReactNode } from "react";
+import {
+  useEffect,
+  useRef,
+  type ReactNode,
+} from "react";
+import { Portal } from "@/components/base/Portal";
 import { useScrollLock } from "@/hooks/useScrollLock";
 
 interface SheetProps {
@@ -9,48 +14,86 @@ interface SheetProps {
   side?: "bottom" | "right";
 }
 
-export function Sheet({ open, onClose, title, children, side = "bottom" }: SheetProps) {
+export function Sheet({
+  open,
+  onClose,
+  title,
+  children,
+  side = "bottom",
+}: SheetProps) {
+  const panelRef = useRef<HTMLDivElement>(null);
+
   useScrollLock(open);
 
   useEffect(() => {
     if (!open) return;
-    const handleKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") onClose();
+
+    const handleKey = (event: KeyboardEvent) => {
+      if (event.key === "Escape") onClose();
     };
+
     document.addEventListener("keydown", handleKey);
-    return () => document.removeEventListener("keydown", handleKey);
+
+    return () =>
+      document.removeEventListener("keydown", handleKey);
   }, [open, onClose]);
+
+  useEffect(() => {
+    if (open) {
+      panelRef.current?.focus();
+    }
+  }, [open]);
 
   if (!open) return null;
 
+  const alignmentClasses =
+    side === "bottom"
+      ? "items-end justify-center"
+      : "items-stretch justify-end";
+
   const panelClasses =
     side === "bottom"
-      ? "absolute bottom-0 left-0 right-0 rounded-t-2xl max-h-[80vh] overflow-y-auto"
-      : "absolute right-0 top-0 bottom-0 w-full max-w-sm overflow-y-auto";
+      ? "w-full max-h-[80dvh] overflow-y-auto rounded-t-2xl"
+      : "h-full w-full max-w-sm overflow-y-auto rounded-none sm:rounded-l-2xl";
 
   return (
-    <div
-      className="fixed inset-0 flex items-end justify-center"
-      style={{ zIndex: "var(--wk-z-modal)" }}
-      role="dialog"
-      aria-modal="true"
-    >
-      <div className="absolute inset-0 bg-[var(--wk-overlay)]" onClick={onClose} />
-      <div data-scroll-lock="container" className={`wk-panel relative ${panelClasses}`}>
-        {title && (
-          <div className="flex items-center justify-between border-b border-[var(--wk-border)] px-5 py-4">
-            <h2 className="text-[15px] font-bold text-[var(--wk-text)]">{title}</h2>
-            <button
-              onClick={onClose}
-              aria-label="Close"
-              className="flex h-8 w-8 items-center justify-center rounded-full text-[var(--wk-text-muted)] hover:bg-[var(--wk-surface-raised)]"
-            >
-              <i className="ri-close-line" />
-            </button>
-          </div>
-        )}
-        <div className="p-5">{children}</div>
+    <Portal>
+      <div
+        className={`fixed inset-0 flex ${alignmentClasses}`}
+        style={{ zIndex: "var(--wk-z-modal)" }}
+        role="dialog"
+        aria-modal="true"
+        aria-label={title}
+      >
+        <div
+          className="absolute inset-0 bg-[var(--wk-overlay)]"
+          onClick={onClose}
+        />
+        <div
+          ref={panelRef}
+          tabIndex={-1}
+          data-scroll-lock="container"
+          className={`wk-panel relative ${panelClasses} outline-none`}
+          style={{ zIndex: 1 }}
+        >
+          {title ? (
+            <div className="flex items-center justify-between border-b border-[var(--wk-border)] px-5 py-4">
+              <h2 className="text-[15px] font-bold text-[var(--wk-text)]">
+                {title}
+              </h2>
+              <button
+                type="button"
+                onClick={onClose}
+                aria-label="Close"
+                className="flex h-8 w-8 items-center justify-center rounded-full text-[var(--wk-text-muted)] hover:bg-[var(--wk-surface-raised)]"
+              >
+                <i className="ri-close-line" />
+              </button>
+            </div>
+          ) : null}
+          <div className="p-5">{children}</div>
+        </div>
       </div>
-    </div>
+    </Portal>
   );
 }
