@@ -64,6 +64,49 @@ test("WAKILISHA picker keyboard state is visible and selection keeps focus", asy
   await expect(page.getByRole("listbox")).toHaveCount(0);
 });
 
+test("canonical finite choice controls support keyboard operation", async ({
+  page,
+}) => {
+  await page.goto("/test/ui-browser/fixtures/interaction.html");
+  await page.getByRole("button", { name: "Open interaction sheet" }).click();
+
+  const dialog = page.getByRole("dialog", {
+    name: "Interaction acceptance",
+  });
+  const finiteSelect = dialog.getByRole("button", {
+    name: "Finite acceptance choice",
+  });
+
+  await finiteSelect.focus();
+  await page.keyboard.press("ArrowDown");
+  await expect(page.getByRole("listbox")).toBeVisible();
+  await page.keyboard.press("ArrowDown");
+  await page.keyboard.press("Enter");
+  await expect(finiteSelect).toContainText("Beta");
+
+  await finiteSelect.click();
+  await expect(page.getByRole("option", { name: "Gamma" })).toHaveAttribute(
+    "aria-disabled",
+    "true",
+  );
+  await page.keyboard.press("Escape");
+
+  const checkbox = dialog.getByRole("checkbox", {
+    name: "Acceptance checkbox",
+  });
+  await checkbox.focus();
+  await page.keyboard.press("Space");
+  await expect(checkbox).toBeChecked();
+
+  const person = dialog.getByRole("radio", { name: "Person" });
+  const organization = dialog.getByRole("radio", { name: "Organization" });
+  await expect(person).toBeChecked();
+  await person.focus();
+  await page.keyboard.press("ArrowRight");
+  await expect(organization).toBeChecked();
+  await expect(organization).toBeFocused();
+});
+
 test("nested Escape closes picker before sheet and restores invoker focus", async ({
   page,
 }) => {
