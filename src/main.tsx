@@ -4,6 +4,7 @@ import "./index.css";
 import App from "./App";
 import { initializeGa4Bootstrap } from "@/lib/analytics/ga4Bootstrap";
 import { getSiteIdentitySettings } from "@/services/adminSettings/settingsStore";
+import { initializeViewportIntegrityObserver } from "@/lib/viewport/viewportIntegrity";
 
 function syncSavedFavicon() {
   if (typeof document === "undefined") return;
@@ -23,6 +24,7 @@ function syncSavedFavicon() {
   });
 }
 
+initializeViewportIntegrityObserver();
 initializeGa4Bootstrap();
 syncSavedFavicon();
 window.addEventListener("wk_settings_changed", syncSavedFavicon);

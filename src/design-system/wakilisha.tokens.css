@@ -10,6 +10,7 @@
   --wk-font-ui:'Inter',system-ui,-apple-system,sans-serif;
   --wk-font-body:'DM Sans','Inter',system-ui,sans-serif;
   --wk-font-mono:'DM Mono',ui-monospace,Menlo,Consolas,monospace;
+  --wk-mobile-editable-font-size:16px;
 
   --wk-s-1:4px;--wk-s-2:8px;--wk-s-3:12px;--wk-s-4:16px;--wk-s-5:20px;
   --wk-s-6:24px;--wk-s-8:32px;--wk-s-10:40px;--wk-s-12:48px;--wk-s-16:64px;

@@ -5,8 +5,10 @@ import "@/design-system/wakilisha.tokens.css";
 import "@/design-system/wakilisha.elements.foundation.css";
 import "@/design-system/wakilisha.elements.product.css";
 import "@/design-system/wakilisha.elements.content.css";
+import "@/design-system/wakilisha.viewport-integrity.css";
 import { Sheet } from "@/components/design-system/primitives/Sheet";
 import { SearchableSelect } from "@/components/design-system/primitives/SearchableSelect";
+import { initializeViewportIntegrityObserver } from "@/lib/viewport/viewportIntegrity";
 
 function InteractionFixture() {
   const [open, setOpen] = useState(false);
@@ -47,6 +49,21 @@ function InteractionFixture() {
             className="wk-input w-full"
           />
 
+          <textarea
+            aria-label="Legacy compact field"
+            className="w-full rounded-lg border border-wk-border bg-wk-surface p-3 text-[12px] text-wk-text"
+          />
+
+          <div
+            aria-label="Editable note"
+            role="textbox"
+            contentEditable
+            suppressContentEditableWarning
+            className="min-h-12 w-full rounded-lg border border-wk-border bg-wk-surface p-3 text-[12px] text-wk-text"
+          >
+            Editable note
+          </div>
+
           <button type="button" className="wk-button wk-button-ghost">
             Final sheet action
           </button>
@@ -55,6 +72,8 @@ function InteractionFixture() {
     </main>
   );
 }
+
+initializeViewportIntegrityObserver();
 
 createRoot(document.getElementById("root")!).render(
   <InteractionFixture />,

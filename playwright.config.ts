@@ -26,5 +26,10 @@ export default defineConfig({
       name: "chromium",
       use: { ...devices["Desktop Chrome"] },
     },
+    {
+      name: "webkit-mobile",
+      testMatch: "**/viewport-integrity.spec.ts",
+      use: { ...devices["iPhone 13"] },
+    },
   ],
 });
