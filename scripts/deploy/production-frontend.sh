@@ -1,16 +1,16 @@
 #!/bin/bash
 set -euo pipefail
 
-RUNNER_VERSION="1"
+RUNNER_VERSION="2"
 BASE_EXPECTED_MAIN="57e4c9de7a205bbffde0ff97c9ec40f9a46b1b65"
 BASE_PREVIEW_REF="oeownzbanzbuvuyidwqh"
-TEMPLATE_SHA256="296f999f412d24240ac2dea51dc1126f02d7d8345edb0908fb89875178411f4e"
+TEMPLATE_SHA256="1770557be8998c5bc51d198bc6c22068ddd289adf40139ea562cd84da1f1e688"
 
 SCRIPT_DIR="$(
   CDPATH= cd -- "$(dirname -- "$0")" >/dev/null 2>&1
   pwd
 )"
-TEMPLATE="$SCRIPT_DIR/templates/lightsail-frontend-production-v1.sh"
+TEMPLATE="$SCRIPT_DIR/templates/lightsail-frontend-production-v2.sh"
 
 EXPECTED_MAIN=""
 DEPLOY_LABEL=""
@@ -30,9 +30,9 @@ Usage:
 Validation only:
   scripts/deploy/production-frontend.sh --self-test
 
-The wrapper renders the pinned, previously accepted Lightsail deployment
-template with the requested merged-main SHA and deployment label, validates
-the rendered Bash, and only then executes it.
+The wrapper renders the versioned canonical Lightsail deployment template
+with the requested merged-main SHA and deployment label, validates the
+rendered Bash, and only then executes it.
 
 If --forbid-ref is omitted, the template receives a non-matching sentinel.
 The template still requires the Production project ref in the built artifact.
@@ -190,6 +190,17 @@ if [ "$SELF_TEST" -eq 1 ]; then
     exit 1
   fi
 
+  if ! grep -Fxq 'npm run build' "$TMP_SELF"; then
+    echo 'PRODUCTION_FRONTEND_RUNNER=FAIL_SELF_TEST_FULL_BUILD_MISSING'
+    exit 1
+  fi
+
+  if grep -Fq 'npm run build:app' "$TMP_SELF"; then
+    echo 'PRODUCTION_FRONTEND_RUNNER=FAIL_SELF_TEST_BUILD_APP_REMAINS'
+    exit 1
+  fi
+
+  echo 'PRODUCTION_FRONTEND_FULL_BUILD_AUTHORITY=PASS'
   echo 'PRODUCTION_FRONTEND_RUNNER_SELF_TEST=PASS'
   exit 0
 fi
