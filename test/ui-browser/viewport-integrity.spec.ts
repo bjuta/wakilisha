@@ -94,6 +94,47 @@ test("mobile editable controls keep a 16px floor without changing page scale", a
   }
 });
 
+test("long canonical identities stay inside a bounded mobile grid", async ({
+  page,
+}, testInfo) => {
+  if (testInfo.project.name === "chromium") {
+    await page.setViewportSize({ width: 390, height: 844 });
+  }
+
+  await page.goto(FIXTURE);
+
+  const identity = page.locator(
+    "[data-viewport-long-identity]",
+  );
+  await expect(identity).toBeVisible();
+
+  const geometry = await identity.evaluate((element) => {
+    const rect = element.getBoundingClientRect();
+    const style = getComputedStyle(element);
+
+    return {
+      left: rect.left,
+      right: rect.right,
+      width: rect.width,
+      overflowWrap: style.overflowWrap,
+    };
+  });
+
+  const state = await viewportState(page);
+
+  expect(geometry.overflowWrap).toBe("anywhere");
+  expect(geometry.left).toBeGreaterThanOrEqual(-1);
+  expect(geometry.right).toBeLessThanOrEqual(
+    state.clientWidth + 1,
+  );
+  expect(geometry.width).toBeLessThanOrEqual(
+    state.clientWidth + 1,
+  );
+  expect(state.scrollWidth).toBeLessThanOrEqual(
+    state.clientWidth + 2,
+  );
+});
+
 test("viewport observer reports document overflow instead of hiding it", async ({
   page,
 }, testInfo) => {

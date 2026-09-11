@@ -18,6 +18,9 @@ const tokens = read("src/design-system/wakilisha.tokens.css");
 const integrityCss = read("src/design-system/wakilisha.viewport-integrity.css");
 const app = read("src/App.tsx");
 const main = read("src/main.tsx");
+const messagesLegalPanel = read(
+  "src/pages/admin/messages/MessagesLegalPanel.tsx",
+);
 const observer = read("src/lib/viewport/viewportIntegrity.ts");
 const config = read("playwright.config.ts");
 const workflow = read(".github/workflows/critical-control-plane.yml");
@@ -80,6 +83,9 @@ for (const required of [
   "select,",
   '[contenteditable="true"]',
   "font-size: var(--wk-mobile-editable-font-size) !important;",
+  ".wk-identity-wrap {",
+  "overflow-wrap: anywhere;",
+  "word-break: normal;",
 ]) {
   if (!integrityCss.includes(required)) {
     fail(`viewport CSS is missing ${required}`);
@@ -96,6 +102,20 @@ if (
   )
 ) {
   fail("viewport CSS suppresses user-controlled zoom");
+}
+
+for (const required of [
+  'grid-cols-[minmax(0,1fr)]',
+  'className="min-h-[520px] min-w-0 overflow-hidden',
+  'className="min-h-[520px] min-w-0 rounded-2xl',
+  'className="min-w-0 space-y-5"',
+  'className="wk-identity-wrap text-[16px] font-black text-wk-text"',
+]) {
+  if (!messagesLegalPanel.includes(required)) {
+    fail(
+      `Legal mobile intrinsic-size containment is missing ${required}`,
+    );
+  }
 }
 
 if (

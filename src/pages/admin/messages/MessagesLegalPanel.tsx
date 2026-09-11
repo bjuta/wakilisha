@@ -1415,8 +1415,8 @@ export function MessagesLegalPanel() {
           </p>
         </div>
       ) : (
-        <div className="mt-4 grid gap-4 xl:grid-cols-[minmax(280px,0.68fr)_minmax(0,1.32fr)]">
-          <aside className="min-h-[520px] overflow-hidden rounded-2xl border border-wk-border bg-wk-surface">
+        <div className="mt-4 grid grid-cols-[minmax(0,1fr)] gap-4 xl:grid-cols-[minmax(280px,0.68fr)_minmax(0,1.32fr)]">
+          <aside className="min-h-[520px] min-w-0 overflow-hidden rounded-2xl border border-wk-border bg-wk-surface">
             <div className="border-b border-wk-divider px-4 py-3">
               <div className="text-[10px] font-black uppercase tracking-[0.12em] text-wk-text-faint">
                 Case queue
@@ -1485,7 +1485,7 @@ export function MessagesLegalPanel() {
             )}
           </aside>
 
-          <div className="min-h-[520px] rounded-2xl border border-wk-border bg-wk-bg-subtle p-4">
+          <div className="min-h-[520px] min-w-0 rounded-2xl border border-wk-border bg-wk-bg-subtle p-4">
             {!selectedCaseId ? (
               <div className="flex min-h-[488px] items-center justify-center px-8 text-center text-[11px] font-bold text-wk-text-muted">
                 Choose a Legal Request Case to enter its governed workbench.
@@ -1496,11 +1496,11 @@ export function MessagesLegalPanel() {
                 aria-busy="true"
               />
             ) : (
-              <div className="space-y-5">
+              <div className="min-w-0 space-y-5">
                 <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                   <div className="min-w-0">
                     <div className="flex flex-wrap items-center gap-2">
-                      <h4 className="text-[16px] font-black text-wk-text">
+                      <h4 className="wk-identity-wrap text-[16px] font-black text-wk-text">
                         {detail.case.request_reference}
                       </h4>
                       <WkStateBadge
