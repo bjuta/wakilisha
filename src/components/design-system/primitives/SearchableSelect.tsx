@@ -1,6 +1,7 @@
 import {
   useEffect,
   useId,
+  useLayoutEffect,
   useMemo,
   useRef,
   useState,
@@ -97,11 +98,10 @@ export function SearchableSelect({
     };
   }, [open]);
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     if (!open) return;
     setActiveIndex(initialActiveIndex());
-    const timer = window.setTimeout(() => inputRef.current?.focus(), 0);
-    return () => window.clearTimeout(timer);
+    inputRef.current?.focus();
   }, [open]);
 
   function initialActiveIndex(): number {
@@ -144,20 +144,20 @@ export function SearchableSelect({
     window.setTimeout(() => triggerRef.current?.focus(), 0);
   }
 
-  function handleSearchKeyDown(event: ReactKeyboardEvent<HTMLInputElement>) {
-    if (event.key === "ArrowDown") {
+  function handlePickerKeyDown(event: ReactKeyboardEvent<HTMLElement>) {
+    if (event.key === "ArrowDown" || event.key === "ArrowUp") {
       event.preventDefault();
-      moveActive(1);
+
+      if (!open) {
+        setOpen(true);
+        return;
+      }
+
+      moveActive(event.key === "ArrowDown" ? 1 : -1);
       return;
     }
 
-    if (event.key === "ArrowUp") {
-      event.preventDefault();
-      moveActive(-1);
-      return;
-    }
-
-    if (event.key === "Enter") {
+    if (event.key === "Enter" && open) {
       event.preventDefault();
       const active = filtered[activeIndex];
       if (active && !active.disabled) {
@@ -174,7 +174,11 @@ export function SearchableSelect({
     "w-full rounded-xl border border-wk-border bg-wk-surface px-3.5 py-2.5 text-[13px] text-wk-text outline-none transition-colors focus:border-wk-border-strong focus:ring-2 focus:ring-wk-brand/15";
 
   return (
-    <div ref={containerRef} className={`relative ${className}`}>
+    <div
+      ref={containerRef}
+      onKeyDownCapture={handlePickerKeyDown}
+      className={`relative ${className}`}
+    >
       <button
         ref={triggerRef}
         type="button"
@@ -191,25 +195,6 @@ export function SearchableSelect({
         disabled={disabled}
         onClick={() => {
           if (!disabled) setOpen((current) => !current);
-        }}
-        onKeyDown={(event) => {
-          if (event.key === "ArrowDown" || event.key === "ArrowUp") {
-            event.preventDefault();
-
-            if (!open) {
-              setOpen(true);
-              return;
-            }
-
-            moveActive(event.key === "ArrowDown" ? 1 : -1);
-            return;
-          }
-
-          if (event.key === "Enter" && open) {
-            event.preventDefault();
-            const active = filtered[activeIndex];
-            if (active && !active.disabled) select(active);
-          }
         }}
         className={`${baseTriggerClass} ${inputClass} flex items-center justify-between gap-3 text-left ${
           disabled
@@ -240,7 +225,10 @@ export function SearchableSelect({
       </button>
 
       {open ? (
-        <div className="absolute left-0 right-0 top-full z-[var(--wk-z-dropdown)] mt-1.5 overflow-hidden rounded-xl border border-wk-border-2 bg-wk-surface shadow-[var(--wk-shadow)]">
+        <div
+          className="absolute left-0 right-0 top-full mt-1.5 overflow-hidden rounded-xl border border-wk-border-2 bg-wk-surface shadow-[var(--wk-shadow)]"
+          style={{ zIndex: 2 }}
+        >
           <div className="border-b border-wk-divider p-2">
             <div className="relative">
               <i
@@ -255,7 +243,6 @@ export function SearchableSelect({
                   setSearch(event.target.value);
                   setActiveIndex(-1);
                 }}
-                onKeyDown={handleSearchKeyDown}
                 placeholder={searchPlaceholder ?? placeholder}
                 aria-label={searchPlaceholder ?? `Search ${ariaLabel ?? "options"}`}
                 aria-controls={listboxId}
@@ -290,6 +277,7 @@ export function SearchableSelect({
                       id={`${listboxId}-option-${index}`}
                       type="button"
                       role="option"
+                      tabIndex={-1}
                       aria-selected={selectedOption}
                       disabled={option.disabled}
                       onMouseEnter={() => {

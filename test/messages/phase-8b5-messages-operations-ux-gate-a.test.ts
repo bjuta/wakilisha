@@ -120,14 +120,17 @@ describe("Phase 8B.5 Messages Operations UX Gate A", () => {
     expect(searchable).toContain("triggerRef");
     expect(searchable).toContain("triggerRef.current?.focus()");
     expect(searchable).toContain("initialActiveIndex()");
-    expect(searchable).toContain(
-      "window.setTimeout(() => inputRef.current?.focus(), 0)",
-    );
+    expect(searchable).toContain("useLayoutEffect");
+    expect(searchable).toContain("inputRef.current?.focus()");
+    expect(searchable).toContain("onKeyDownCapture={handlePickerKeyDown}");
     expect(searchable).toContain(
       'event.key === "ArrowDown" || event.key === "ArrowUp"',
     );
     expect(searchable).toContain('event.key === "Enter" && open');
     expect(searchable).toContain("open && activeIndex >= 0");
+    expect(searchable).toContain("tabIndex={-1}");
+    expect(searchable).toContain("style={{ zIndex: 2 }}");
+    expect(searchable).not.toContain("handleSearchKeyDown");
   });
 
   it("provides a WAKILISHA-owned date-time picker with no native date chrome", () => {
