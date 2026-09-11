@@ -1869,8 +1869,8 @@ export function MessagesLegalPanel() {
                     </span>
                   </div>
 
-                  <div className="mt-2 grid gap-2 lg:grid-cols-[0.82fr_1.18fr]">
-                    <div className="space-y-2">
+                  <div className="mt-2 grid grid-cols-[minmax(0,1fr)] gap-2 lg:grid-cols-[minmax(0,0.82fr)_minmax(0,1.18fr)]">
+                    <div className="min-w-0 space-y-2">
                       {detail.packages.length === 0 ? (
                         <div className="rounded-xl border border-dashed border-wk-border px-4 py-5 text-center text-[10px] font-bold text-wk-text-muted">
                           No disclosure package has been prepared.
@@ -1881,31 +1881,33 @@ export function MessagesLegalPanel() {
                             key={item.id}
                             type="button"
                             onClick={() => void loadPackage(item.id)}
-                            className={`w-full rounded-xl border p-3 text-left transition-colors ${
+                            className={`min-w-0 w-full rounded-xl border p-3 text-left transition-colors ${
                               selectedPackageId === item.id
                                 ? "border-wk-brand bg-wk-brand-soft"
                                 : "border-wk-border bg-wk-surface hover:bg-wk-surface-raised"
                             }`}
                           >
-                            <div className="flex items-start justify-between gap-2">
+                            <div className="flex min-w-0 flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
                               <div className="min-w-0">
-                                <div className="truncate text-[11px] font-black text-wk-text">
+                                <div className="wk-identity-wrap text-[11px] font-black text-wk-text">
                                   {item.production_reference}
                                 </div>
                                 <div className="mt-1 text-[9px] font-bold text-wk-text-faint">
                                   {when(item.requested_at)}
                                 </div>
                               </div>
-                              <WkStateBadge tone={packageTone(item.status)}>
-                                {humanize(item.status)}
-                              </WkStateBadge>
+                              <div className="shrink-0 self-start">
+                                <WkStateBadge tone={packageTone(item.status)}>
+                                  {humanize(item.status)}
+                                </WkStateBadge>
+                              </div>
                             </div>
                           </button>
                         ))
                       )}
                     </div>
 
-                    <div className="min-h-[220px] rounded-xl border border-wk-border bg-wk-surface p-3">
+                    <div className="min-h-[220px] min-w-0 rounded-xl border border-wk-border bg-wk-surface p-3">
                       {!selectedPackageId ? (
                         <div className="flex min-h-[194px] items-center justify-center px-5 text-center text-[10px] font-bold text-wk-text-muted">
                           Choose a package to review human-readable selection,
@@ -1918,9 +1920,9 @@ export function MessagesLegalPanel() {
                         />
                       ) : (
                         <div className="space-y-3">
-                          <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
-                            <div>
-                              <div className="text-[11px] font-black text-wk-text">
+                          <div className="flex min-w-0 flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+                            <div className="min-w-0">
+                              <div className="wk-identity-wrap text-[11px] font-black text-wk-text">
                                 {packageFromDetail.production_reference}
                               </div>
                               <div className="mt-1 text-[9px] font-bold text-wk-text-faint">

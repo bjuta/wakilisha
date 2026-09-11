@@ -27,6 +27,52 @@ function InteractionFixture() {
         </div>
       </div>
 
+      <div
+        data-viewport-disclosure-grid
+        className="mt-4 grid grid-cols-[minmax(0,1fr)] gap-2 lg:grid-cols-[minmax(0,0.82fr)_minmax(0,1.18fr)]"
+      >
+        <div className="min-w-0 space-y-2">
+          <button
+            data-viewport-disclosure-package
+            type="button"
+            className="min-w-0 w-full rounded-xl border border-wk-border bg-wk-surface p-3 text-left"
+          >
+            <div className="flex min-w-0 flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+              <div className="min-w-0">
+                <div
+                  data-viewport-disclosure-reference
+                  className="wk-identity-wrap text-[11px] font-black text-wk-text"
+                >
+                  WK-C-PROD-CANARY-20260909T195845Z-caf744e1-PKG-1-EXTREMELY-LONG-DISCLOSURE-PACKAGE-REFERENCE
+                </div>
+                <div className="mt-1 text-[9px] font-bold text-wk-text-faint">
+                  Sep 9, 2026 at 11:42 PM
+                </div>
+              </div>
+              <div
+                data-viewport-disclosure-status
+                className="shrink-0 self-start"
+              >
+                <span className="wk-badge">Released</span>
+              </div>
+            </div>
+          </button>
+        </div>
+
+        <div
+          data-viewport-disclosure-detail
+          className="min-h-[220px] min-w-0 rounded-xl border border-wk-border bg-wk-surface p-3"
+        >
+          <div className="flex min-w-0 flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+            <div className="min-w-0">
+              <div className="wk-identity-wrap text-[11px] font-black text-wk-text">
+                WK-C-PROD-CANARY-20260909T195845Z-caf744e1-PKG-1-EXTREMELY-LONG-DISCLOSURE-PACKAGE-REFERENCE
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
       <button
         type="button"
         onClick={() => setOpen(true)}

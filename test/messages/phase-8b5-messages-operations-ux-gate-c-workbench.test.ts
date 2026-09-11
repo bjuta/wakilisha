@@ -207,6 +207,30 @@ describe("Phase 8B.5 Messages Operations UX Gate C Legal workbench", () => {
     );
   });
 
+  it("contains the Disclosure package grid and exact references on mobile", () => {
+    expect(panel).toContain(
+      'grid-cols-[minmax(0,1fr)] gap-2 lg:grid-cols-[minmax(0,0.82fr)_minmax(0,1.18fr)]',
+    );
+    expect(panel).toContain(
+      'className="min-w-0 space-y-2"',
+    );
+    expect(panel).toContain(
+      'className={`min-w-0 w-full rounded-xl border p-3 text-left',
+    );
+    expect(panel).toContain(
+      'className="flex min-w-0 flex-col gap-2 sm:flex-row sm:items-start sm:justify-between"',
+    );
+    expect(panel).toContain(
+      'className="wk-identity-wrap text-[11px] font-black text-wk-text"',
+    );
+    expect(panel).toContain(
+      'className="shrink-0 self-start"',
+    );
+    expect(panel).toContain(
+      'className="min-h-[220px] min-w-0 rounded-xl',
+    );
+  });
+
   it("wraps deliberate machine detail inside the package Inspector", () => {
     expect(panel).toContain(
       'className="space-y-2 break-all text-[9px] font-bold text-wk-text-muted"',
