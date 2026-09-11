@@ -40,6 +40,9 @@ jobs:
       - name: Install dependencies
         run: npm ci --prefer-offline --no-audit --no-fund
 
+      - name: Validate canonical Production frontend runner
+        run: scripts/deploy/production-frontend.sh --self-test
+
       - name: Enforce WAKILISHA browser-chrome debt ledger
         run: |
           npm run audit:ui-chrome
