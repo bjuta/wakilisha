@@ -1,0 +1,35 @@
+/*
+ * WAKILISHA viewport integrity.
+ *
+ * Keep user-controlled pinch zoom available. Prevent browser-initiated
+ * focus zoom by guaranteeing legible editable controls on narrow and
+ * coarse-pointer devices. Do not hide layout bugs with global overflow
+ * clipping.
+ */
+
+html {
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+}
+
+html,
+body,
+#root {
+  min-width: 0;
+  max-width: 100%;
+}
+
+/*
+ * iOS/iPadOS Safari may enlarge the visual viewport when an editable
+ * control below 16 CSS px receives focus. This rule is intentionally
+ * stronger than legacy utility classes until every form surface has
+ * converged on canonical WAKILISHA primitives.
+ */
+@media (max-width: 1024px), (hover: none) and (pointer: coarse) {
+  input:not([type="button"]):not([type="checkbox"]):not([type="color"]):not([type="file"]):not([type="hidden"]):not([type="image"]):not([type="radio"]):not([type="range"]):not([type="reset"]):not([type="submit"]),
+  textarea,
+  select,
+  [contenteditable="true"] {
+    font-size: var(--wk-mobile-editable-font-size) !important;
+  }
+}

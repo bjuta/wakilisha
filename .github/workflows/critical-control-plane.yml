@@ -48,11 +48,14 @@ jobs:
           npm run audit:ui-chrome
           npx vitest run test/control-plane/wakilisha-ui-chrome.test.ts
 
+      - name: Enforce WAKILISHA viewport integrity
+        run: npm run audit:viewport-integrity
+
       - name: Run WAKILISHA DOM interaction contracts
         run: npm run test:ui-dom
 
-      - name: Install Chromium for critical interaction acceptance
-        run: npx playwright install --with-deps chromium
+      - name: Install Chromium and WebKit for critical interaction acceptance
+        run: npx playwright install --with-deps chromium webkit
 
       - name: Run WAKILISHA real-browser interaction acceptance
         run: npm run test:ui-browser

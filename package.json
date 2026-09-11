@@ -120,6 +120,7 @@
     "registry:mizizi:audit": "tsx scripts/registry/agents/mizizi/run.ts --mode=audit",
     "registry:mizizi:apply": "tsx scripts/registry/agents/mizizi/run.ts --mode=apply",
     "audit:ui-chrome": "node scripts/control-plane/verify-wakilisha-ui-chrome.mjs",
+    "audit:viewport-integrity": "node scripts/control-plane/verify-viewport-integrity.mjs",
     "audit:ui-chrome:zero": "node scripts/control-plane/verify-wakilisha-ui-chrome.mjs --require-zero",
     "test:ui-dom": "vitest run test/ui-interactions",
     "test:ui-browser": "node scripts/test/run-ui-browser.mjs"
