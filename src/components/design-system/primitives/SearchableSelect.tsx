@@ -99,10 +99,18 @@ export function SearchableSelect({
 
   useEffect(() => {
     if (!open) return;
-    setActiveIndex(-1);
-    const timer = window.setTimeout(() => inputRef.current?.focus(), 40);
+    setActiveIndex(initialActiveIndex());
+    const timer = window.setTimeout(() => inputRef.current?.focus(), 0);
     return () => window.clearTimeout(timer);
   }, [open]);
+
+  function initialActiveIndex(): number {
+    const selectedIndex = filtered.findIndex(
+      (option) => option.value === value && !option.disabled,
+    );
+    if (selectedIndex >= 0) return selectedIndex;
+    return filtered.findIndex((option) => !option.disabled);
+  }
 
   function scrollToActive(index: number) {
     if (index < 0) return;
@@ -175,14 +183,32 @@ export function SearchableSelect({
         aria-expanded={open}
         aria-controls={listboxId}
         aria-haspopup="listbox"
+        aria-activedescendant={
+          open && activeIndex >= 0
+            ? `${listboxId}-option-${activeIndex}`
+            : undefined
+        }
         disabled={disabled}
         onClick={() => {
           if (!disabled) setOpen((current) => !current);
         }}
         onKeyDown={(event) => {
-          if (event.key === "ArrowDown") {
+          if (event.key === "ArrowDown" || event.key === "ArrowUp") {
             event.preventDefault();
-            if (!open) setOpen(true);
+
+            if (!open) {
+              setOpen(true);
+              return;
+            }
+
+            moveActive(event.key === "ArrowDown" ? 1 : -1);
+            return;
+          }
+
+          if (event.key === "Enter" && open) {
+            event.preventDefault();
+            const active = filtered[activeIndex];
+            if (active && !active.disabled) select(active);
           }
         }}
         className={`${baseTriggerClass} ${inputClass} flex items-center justify-between gap-3 text-left ${

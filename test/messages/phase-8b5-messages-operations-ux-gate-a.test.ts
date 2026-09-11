@@ -119,6 +119,15 @@ describe("Phase 8B.5 Messages Operations UX Gate A", () => {
     expect(searchable).toContain('event.key === "Escape"');
     expect(searchable).toContain("triggerRef");
     expect(searchable).toContain("triggerRef.current?.focus()");
+    expect(searchable).toContain("initialActiveIndex()");
+    expect(searchable).toContain(
+      "window.setTimeout(() => inputRef.current?.focus(), 0)",
+    );
+    expect(searchable).toContain(
+      'event.key === "ArrowDown" || event.key === "ArrowUp"',
+    );
+    expect(searchable).toContain('event.key === "Enter" && open');
+    expect(searchable).toContain("open && activeIndex >= 0");
   });
 
   it("provides a WAKILISHA-owned date-time picker with no native date chrome", () => {
