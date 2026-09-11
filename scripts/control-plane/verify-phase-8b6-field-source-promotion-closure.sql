@@ -8,6 +8,7 @@ set local lock_timeout='5s';
 do $verify$
 declare
   v_def text;
+  v_asset_guard text;
 begin
   if (select count(*) from supabase_migrations.schema_migrations) <> 114
      or (select max(version) from supabase_migrations.schema_migrations) <> '20260911143000' then
@@ -49,6 +50,20 @@ begin
       and enabled
   ) then
     raise exception 'PHASE_8B6_FIELD_PROMOTION_FAIL: promotion command registration is missing';
+  end if;
+
+  v_asset_guard:=pg_get_functiondef('media.protect_field_original_asset_v1()'::regprocedure);
+  if position('new.current_revision_id is not distinct from old.current_revision_id' in v_asset_guard)=0
+     or position('new.authority_revision = old.authority_revision + 1' in v_asset_guard)=0
+     or position('next_governance.version_number = prior_governance.version_number + 1' in v_asset_guard)=0
+     or position('next_governance.asset_id = old.id' in v_asset_guard)=0
+     or position('new.current_revision_id is distinct from old.current_revision_id' in v_asset_guard)=0
+     or position('not v_initial_activation' in v_asset_guard)=0 then
+    raise exception 'PHASE_8B6_FIELD_PROMOTION_FAIL: Field-original guard lost exact-revision immutability or next-governance-only advance';
+  end if;
+
+  if md5(pg_get_functiondef('media.protect_field_original_governance_v1()'::regprocedure)) <> 'fa980a36c7f78dfb8deb7dd336c04ebf' then
+    raise exception 'PHASE_8B6_FIELD_PROMOTION_FAIL: protected Field-original governance-row guard drifted';
   end if;
 
   v_def:=pg_get_functiondef('public.promote_field_submission_to_source_v1(uuid,bigint,uuid,text,uuid)'::regprocedure);
