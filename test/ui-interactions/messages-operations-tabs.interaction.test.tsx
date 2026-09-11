@@ -108,7 +108,9 @@ describe("Messages Operations workspace tab interaction contract", () => {
       />,
     );
 
-    await user.click(screen.getByRole("button", { name: /MIZIZI mizizi/i }));
+    await user.click(
+      screen.getByRole("button", { name: /^MIZIZI.*mizizi/i }),
+    );
 
     const toggle = screen.getByRole("switch", {
       name: "Disable Messages for MIZIZI",
@@ -175,7 +177,9 @@ describe("Messages Operations workspace tab interaction contract", () => {
       />,
     );
 
-    await user.click(screen.getByRole("button", { name: /MIZIZI mizizi/i }));
+    await user.click(
+      screen.getByRole("button", { name: /^MIZIZI.*mizizi/i }),
+    );
     expect(
       screen.getByRole("switch", { name: "Disable Messages for MIZIZI" }),
     ).toBeEnabled();
