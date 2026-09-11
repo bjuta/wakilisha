@@ -16,6 +16,17 @@ function InteractionFixture() {
 
   return (
     <main className="min-h-screen bg-wk-bg p-6 text-wk-text">
+      <div className="grid grid-cols-[minmax(0,1fr)]">
+        <div className="min-w-0">
+          <div
+            data-viewport-long-identity
+            className="wk-identity-wrap w-full rounded-xl border border-wk-border bg-wk-surface p-3 text-[16px] font-black text-wk-text"
+          >
+            WK-C-PROD-CANARY-20260909T195845Z-caf744e1-EXTREMELY-LONG-IDENTITY-REGRESSION-PROBE
+          </div>
+        </div>
+      </div>
+
       <button
         type="button"
         onClick={() => setOpen(true)}

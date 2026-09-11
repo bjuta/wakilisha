@@ -20,6 +20,18 @@ body,
 }
 
 /*
+ * Canonical identifiers and externally supplied references can be long,
+ * unbroken tokens. They must remain inside the owning surface instead of
+ * widening the document and shifting the visual viewport horizontally.
+ */
+.wk-identity-wrap {
+  min-width: 0;
+  max-width: 100%;
+  overflow-wrap: anywhere;
+  word-break: normal;
+}
+
+/*
  * iOS/iPadOS Safari may enlarge the visual viewport when an editable
  * control below 16 CSS px receives focus. This rule is intentionally
  * stronger than legacy utility classes until every form surface has

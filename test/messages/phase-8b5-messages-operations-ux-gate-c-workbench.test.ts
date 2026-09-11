@@ -189,6 +189,24 @@ describe("Phase 8B.5 Messages Operations UX Gate C Legal workbench", () => {
     );
   });
 
+  it("contains long Legal identities and workbench intrinsic width on mobile", () => {
+    expect(panel).toContain(
+      'grid-cols-[minmax(0,1fr)]',
+    );
+    expect(panel).toContain(
+      'className="min-h-[520px] min-w-0 overflow-hidden',
+    );
+    expect(panel).toContain(
+      'className="min-h-[520px] min-w-0 rounded-2xl',
+    );
+    expect(panel).toContain(
+      'className="min-w-0 space-y-5"',
+    );
+    expect(panel).toContain(
+      'className="wk-identity-wrap text-[16px] font-black text-wk-text"',
+    );
+  });
+
   it("wraps deliberate machine detail inside the package Inspector", () => {
     expect(panel).toContain(
       'className="space-y-2 break-all text-[9px] font-bold text-wk-text-muted"',
