@@ -96,7 +96,8 @@
       "native-browser-dialog": 1
     },
     "src/pages/admin/content/articles/detail/components/ArticleMetaPanel.tsx": {
-      "native-input-datetime-local": 1
+      "native-input-datetime-local": 1,
+      "native-select": 1
     },
     "src/pages/admin/content/articles/detail/components/ArticleSourceForm.tsx": {
       "native-browser-dialog": 1,

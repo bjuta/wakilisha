@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { WkIcon } from "@/components/design-system/Icon";
 import { WkSurface } from "@/components/design-system/primitives/Surface";
 import { AdminTable } from "@/components/design-system/admin/AdminTable";
+import { AdminStatusBadge } from "@/components/design-system/admin/AdminStatusBadge";
 import { supabase } from "@/lib/supabase";
 import { decodeHtmlEntities } from "@/utils/decodeHtmlEntities";
 import { WkSelect } from "@/components/design-system/primitives/Select";
@@ -142,7 +143,7 @@ export default function AdminPagesPage() {
               key: "wp_status",
               label: "Status",
               width: "100px",
-              render: (row) => <StatusBadge status={row.wp_status} />,
+              render: (row) => <AdminStatusBadge status={row.wp_status} />,
             },
             {
               key: "created_at",
@@ -168,19 +169,5 @@ export default function AdminPagesPage() {
         />
       )}
     </div>
-  );
-}
-
-function StatusBadge({ status }: { status: string | null }) {
-  if (!status) return <span className="text-[11px] text-wk-text-faint">—</span>;
-  const color =
-    status === "publish" ? "bg-wk-success-soft text-wk-success" :
-    status === "draft" ? "bg-wk-warning-soft text-wk-warning" :
-    status === "pending" ? "bg-wk-info-soft text-wk-info" :
-    "bg-wk-surface-raised text-wk-text-muted";
-  return (
-    <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-bold uppercase ${color}`}>
-      {status}
-    </span>
   );
 }

@@ -70,25 +70,16 @@
         "admin:articles",
         "admin:playlists",
         "admin:audio",
-        "admin:video"
+        "admin:video",
+        "admin:guides",
+        "admin:pages"
       ],
       "competingImplementationPatterns": [
         "(?:function|const)\\s+[A-Za-z0-9_]*StatusBadge\\b",
         "function\\s+statusClass\\b",
         "const\\s+STATUS_COLORS\\b"
       ],
-      "competingImplementationExceptions": [
-        {
-          "path": "src/pages/admin/content/guides/page.tsx",
-          "classification": "legacy",
-          "reason": "Pre-contract WordPress publication lifecycle badge. The next change to Guides must migrate this surface to AdminStatusBadge."
-        },
-        {
-          "path": "src/pages/admin/content/pages/page.tsx",
-          "classification": "legacy",
-          "reason": "Pre-contract WordPress publication lifecycle badge. The next change to Pages must migrate this surface to AdminStatusBadge."
-        }
-      ]
+      "competingImplementationExceptions": []
     },
     {
       "id": "admin.save-state",

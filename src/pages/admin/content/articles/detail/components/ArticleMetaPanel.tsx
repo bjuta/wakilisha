@@ -13,8 +13,6 @@ import { ArticleRegistrySearch } from "./ArticleRegistrySearch";
 import type { ArticleWorkbenchMode } from "./ArticleWorkbenchNav";
 import { fetchAllAuthors, bustAuthorCache, type AuthorRow } from "@/services/authorProfiles";
 import { supabase } from "@/lib/supabase";
-import { WkSelect } from "@/components/design-system/primitives/Select";
-
 
 interface SeoMeta {
   title?: string;
@@ -737,15 +735,15 @@ export function ArticleMetaPanel({
               </div>
               {statusEditOpen && (
                 <div className="mt-2 flex items-start gap-2">
-                  <WkSelect
+                  <select
                     value={pendingStatus}
-                    onChange={(value) => setPendingStatus(value)}
-                    triggerClassName="flex-1 rounded-md border border-wk-border bg-wk-bg-subtle px-2 py-1.5 text-[12px] text-wk-text outline-none focus:border-wk-brand"
+                    onChange={(e) => setPendingStatus(e.target.value)}
+                    className="flex-1 rounded-md border border-wk-border bg-wk-bg-subtle px-2 py-1.5 text-[12px] text-wk-text outline-none focus:border-wk-brand"
                   >
                     <option value="publish">Published</option>
                     <option value="pending">Pending Review</option>
                     <option value="draft">Draft</option>
-                  </WkSelect>
+                  </select>
                   <button
                     onClick={() => {
                       const newStatus = pendingStatus;
