@@ -1,10 +1,10 @@
+import { useId, type ReactNode } from "react";
 import {
-  useEffect,
-  useRef,
-  type ReactNode,
-} from "react";
-import { Portal } from "@/components/base/Portal";
-import { useScrollLock } from "@/hooks/useScrollLock";
+  Button,
+  Dialog,
+  Modal,
+  ModalOverlay,
+} from "react-aria-components";
 
 interface SheetProps {
   open: boolean;
@@ -21,28 +21,8 @@ export function Sheet({
   children,
   side = "bottom",
 }: SheetProps) {
-  const panelRef = useRef<HTMLDivElement>(null);
-
-  useScrollLock(open);
-
-  useEffect(() => {
-    if (!open) return;
-
-    const handleKey = (event: KeyboardEvent) => {
-      if (event.key === "Escape") onClose();
-    };
-
-    document.addEventListener("keydown", handleKey);
-
-    return () =>
-      document.removeEventListener("keydown", handleKey);
-  }, [open, onClose]);
-
-  useEffect(() => {
-    if (open) {
-      panelRef.current?.focus();
-    }
-  }, [open]);
+  const rawId = useId();
+  const titleId = `wk-sheet-title-${rawId.replace(/:/g, "")}`;
 
   if (!open) return null;
 
@@ -57,43 +37,44 @@ export function Sheet({
       : "h-full w-full max-w-sm overflow-y-auto rounded-none sm:rounded-l-2xl";
 
   return (
-    <Portal>
-      <div
-        className={`fixed inset-0 flex ${alignmentClasses}`}
-        style={{ zIndex: "var(--wk-z-modal)" }}
-        role="dialog"
-        aria-modal="true"
-        aria-label={title}
+    <ModalOverlay
+      isOpen={open}
+      onOpenChange={(nextOpen) => {
+        if (!nextOpen) onClose();
+      }}
+      isDismissable
+      className={`fixed inset-0 flex bg-[var(--wk-overlay)] ${alignmentClasses}`}
+      style={{ zIndex: "var(--wk-z-modal)" }}
+    >
+      <Modal
+        data-scroll-lock="container"
+        className={`wk-panel relative ${panelClasses} outline-none`}
       >
-        <div
-          className="absolute inset-0 bg-[var(--wk-overlay)]"
-          onClick={onClose}
-        />
-        <div
-          ref={panelRef}
-          tabIndex={-1}
-          data-scroll-lock="container"
-          className={`wk-panel relative ${panelClasses} outline-none`}
-          style={{ zIndex: 1 }}
+        <Dialog
+          aria-labelledby={title ? titleId : undefined}
+          aria-label={title ? undefined : "Panel"}
+          className="outline-none"
         >
           {title ? (
             <div className="flex items-center justify-between border-b border-[var(--wk-border)] px-5 py-4">
-              <h2 className="text-[15px] font-bold text-[var(--wk-text)]">
+              <h2
+                id={titleId}
+                className="text-[15px] font-bold text-[var(--wk-text)]"
+              >
                 {title}
               </h2>
-              <button
-                type="button"
-                onClick={onClose}
+              <Button
+                slot="close"
                 aria-label="Close"
-                className="flex h-8 w-8 items-center justify-center rounded-full text-[var(--wk-text-muted)] hover:bg-[var(--wk-surface-raised)]"
+                className="flex h-8 w-8 items-center justify-center rounded-full text-[var(--wk-text-muted)] transition-colors hover:bg-[var(--wk-surface-raised)] focus:outline-none focus-visible:ring-2 focus-visible:ring-wk-brand/20"
               >
-                <i className="ri-close-line" />
-              </button>
+                <i aria-hidden="true" className="ri-close-line" />
+              </Button>
             </div>
           ) : null}
           <div className="p-5">{children}</div>
-        </div>
-      </div>
-    </Portal>
+        </Dialog>
+      </Modal>
+    </ModalOverlay>
   );
 }

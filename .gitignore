@@ -33,3 +33,8 @@ supabase/.temp/
 # Aider local state
 .aider*
 .env
+
+# Playwright local artifacts
+test-results/
+playwright-report/
+blob-report/

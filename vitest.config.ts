@@ -1,4 +1,5 @@
 import { defineConfig } from 'vitest/config';
+import react from '@vitejs/plugin-react';
 import path from 'node:path';
 
 /**
@@ -15,10 +16,15 @@ import path from 'node:path';
  *   src/services/chartsScoring/scoringPipeline.ts
  */
 export default defineConfig({
+  esbuild: {
+    jsx: 'automatic',
+    jsxImportSource: 'react',
+  },
+  plugins: [react()],
   test: {
     globals: true,
     environment: 'node',
-    include: ['test/**/*.test.ts'],
+    include: ['test/**/*.test.ts', 'test/**/*.test.tsx'],
     reporters: ['verbose'],
     coverage: {
       provider: 'v8',

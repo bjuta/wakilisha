@@ -30,3 +30,52 @@
 .btn,.wk-action{display:inline-flex;align-items:center;gap:8px;border-radius:var(--wk-r-2);font:700 13px/1 var(--wk-font-ui);letter-spacing:-.005em;border:1px solid transparent;transition:all var(--wk-d-fast) var(--wk-ease-standard);cursor:pointer}.btn-md{padding:11px 18px}.btn-sm{padding:7px 12px;font-size:12px}.btn-lg{padding:14px 24px;font-size:14px}.btn-primary{background:var(--wk-brand);color:var(--wk-brand-on)}.btn-primary:hover{transform:translateY(-1px);box-shadow:var(--wk-shadow-sm)}.btn-ghost{background:transparent;color:var(--wk-text);border-color:var(--wk-border-2)}.btn-ghost:hover{background:var(--wk-surface-raised);border-color:var(--wk-border-strong)}.btn-soft{background:var(--wk-surface);color:var(--wk-text);border-color:var(--wk-border)}.btn-soft:hover{background:var(--wk-surface-raised)}.btn-danger{background:transparent;color:var(--wk-danger);border-color:var(--wk-danger)}
 .tag{display:inline-flex;align-items:center;gap:6px;padding:3px 9px;border-radius:var(--wk-r-pill);font:600 11px/1.4 var(--wk-font-ui);letter-spacing:-.005em;background:var(--wk-surface);border:1px solid var(--wk-border-2);color:var(--wk-text-soft)}.tag-brand{background:var(--wk-brand-soft);color:var(--wk-brand);border-color:rgba(var(--wk-brand-rgb),.30)}.tag-success{background:var(--wk-success-soft);color:var(--wk-success);border-color:rgba(79,217,142,.30)}.tag-warn{background:var(--wk-warning-soft);color:var(--wk-warning);border-color:rgba(245,184,75,.30)}.tag-up{color:var(--wk-success)}.tag-dn{color:var(--wk-danger)}
 .stat{display:flex;flex-direction:column;gap:2px;padding:var(--wk-s-3) var(--wk-s-4);border:1px solid var(--wk-border);border-radius:var(--wk-r-3);background:var(--wk-surface)}.stat-val{font:800 22px/1 var(--wk-font-ui);letter-spacing:-.025em;color:var(--wk-text);font-variant-numeric:tabular-nums}.stat-lbl{font:500 11px/1.4 var(--wk-font-ui);letter-spacing:.04em;color:var(--wk-text-faint)}
+
+/* Canonical WAKILISHA text-entry visual primitive.
+   Semantic input/textarea elements remain underneath for accessibility,
+   while all visible chrome is WAKILISHA-owned. */
+.wk-input{
+  box-sizing:border-box;
+  min-height:42px;
+  border:1px solid var(--wk-border-2);
+  border-radius:var(--wk-r-3);
+  background:var(--wk-surface);
+  color:var(--wk-text);
+  caret-color:var(--wk-brand);
+  font:500 13px/1.4 var(--wk-font-ui);
+  padding:10px 12px;
+  transition:
+    border-color var(--wk-d-fast) var(--wk-ease-standard),
+    background-color var(--wk-d-fast) var(--wk-ease-standard),
+    box-shadow var(--wk-d-fast) var(--wk-ease-standard);
+}
+input.wk-input,
+textarea.wk-input{
+  -webkit-appearance:none;
+  appearance:none;
+}
+.wk-input::placeholder{
+  color:var(--wk-text-faint);
+  opacity:1;
+}
+.wk-input:hover:not(:disabled){
+  border-color:var(--wk-border-strong);
+}
+.wk-input:focus,
+.wk-input:focus-visible{
+  outline:none;
+  border-color:var(--wk-brand);
+  box-shadow:0 0 0 3px rgba(var(--wk-brand-rgb),.18);
+}
+.wk-input:disabled{
+  cursor:not-allowed;
+  opacity:.55;
+}
+input.wk-input:-webkit-autofill,
+input.wk-input:-webkit-autofill:hover,
+input.wk-input:-webkit-autofill:focus{
+  -webkit-text-fill-color:var(--wk-text);
+  caret-color:var(--wk-brand);
+  box-shadow:0 0 0 1000px var(--wk-surface) inset;
+  transition:background-color 9999s ease-out 0s;
+}
