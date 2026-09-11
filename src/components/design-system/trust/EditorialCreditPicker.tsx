@@ -4,6 +4,8 @@ import {
   useRef,
   useState,
 } from "react";
+import { WkSelect } from "@/components/design-system/primitives/Select";
+
 
 export interface EditorialCreditRoleOption {
   creditRole: string;
@@ -253,11 +255,11 @@ export function EditorialCreditPicker({
 
       <label className="block text-[11px] font-bold text-wk-text-muted">
         Credit role
-        <select
+        <WkSelect
           value={resolvedRole}
-          onChange={(event) => setCreditRole(event.target.value)}
+          onChange={(value) => setCreditRole(value)}
           disabled={disabled || !selectedParty || availableRoles.length === 0}
-          className="mt-1 w-full rounded-lg border border-wk-border bg-wk-surface px-3 py-2 text-xs text-wk-text disabled:opacity-60"
+          triggerClassName="mt-1 w-full rounded-lg border border-wk-border bg-wk-surface px-3 py-2 text-xs text-wk-text disabled:opacity-60"
         >
           {availableRoles.length === 0 ? (
             <option value="">
@@ -269,7 +271,7 @@ export function EditorialCreditPicker({
               {role.label}
             </option>
           ))}
-        </select>
+        </WkSelect>
       </label>
 
       {!canCreateCredit && selectedParty && availableRoles.length === 0 ? (

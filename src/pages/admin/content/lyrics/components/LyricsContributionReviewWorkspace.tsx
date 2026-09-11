@@ -19,6 +19,8 @@ import {
   rejectTrackLyricsContributionWithNote,
   type TrackLyricsInboxItem,
 } from "@/services/player/trackLyricsAdminService";
+import { WkSelect } from "@/components/design-system/primitives/Select";
+
 
 function editorTextForContribution(
   contribution: TrackLyricsInboxItem,
@@ -427,17 +429,17 @@ export function LyricsContributionReviewWorkspace({
 
           <label className="text-xs font-bold text-wk-text-muted">
             Timing
-            <select
+            <WkSelect
               value={timingMode}
-              onChange={(event) =>
-                setTimingMode(event.target.value === "line" ? "line" : "plain")
+              onChange={(value) =>
+                setTimingMode(value === "line" ? "line" : "plain")
               }
               disabled={busy || revisionLocked}
-              className="mt-1 w-full rounded-lg border border-wk-border bg-wk-bg px-3 py-2 text-sm text-wk-text"
+              triggerClassName="mt-1 w-full rounded-lg border border-wk-border bg-wk-bg px-3 py-2 text-sm text-wk-text"
             >
               <option value="plain">Plain Lyrics</option>
               <option value="line">Line-timed Lyrics</option>
-            </select>
+            </WkSelect>
           </label>
         </div>
 

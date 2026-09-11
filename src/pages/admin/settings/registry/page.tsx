@@ -10,6 +10,8 @@ import {
   DEFAULT_REGISTRY_SETTINGS,
   type RegistrySettings,
 } from "@/services/adminSettings/settingsTypes";
+import { WkSelect } from "@/components/design-system/primitives/Select";
+
 
 export default function AdminSettingsRegistry() {
   const navigate = useNavigate();
@@ -55,19 +57,19 @@ export default function AdminSettingsRegistry() {
           </div>
           <div>
             <label className="block text-[12px] font-semibold text-[var(--wk-text-muted)] mb-1.5">DB Status</label>
-            <select value={settings.dbStatus} onChange={(e) => update("dbStatus", e.target.value as "connected" | "disconnected" | "unknown")} className="w-full rounded-lg border border-[var(--wk-border)] bg-[var(--wk-bg)] px-3 py-2 text-[13px] text-[var(--wk-text)] focus:border-[var(--wk-brand)] focus:outline-none focus:ring-1 focus:ring-[var(--wk-brand)]">
+            <WkSelect value={settings.dbStatus} onChange={(value) => update("dbStatus", value as "connected" | "disconnected" | "unknown")} triggerClassName="w-full rounded-lg border border-[var(--wk-border)] bg-[var(--wk-bg)] px-3 py-2 text-[13px] text-[var(--wk-text)] focus:border-[var(--wk-brand)] focus:outline-none focus:ring-1 focus:ring-[var(--wk-brand)]">
               <option value="connected">Connected</option>
               <option value="disconnected">Disconnected</option>
               <option value="unknown">Unknown</option>
-            </select>
+            </WkSelect>
           </div>
           <div>
             <label className="block text-[12px] font-semibold text-[var(--wk-text-muted)] mb-1.5">Materialized Stats Status</label>
-            <select value={settings.materializedStatsStatus} onChange={(e) => update("materializedStatsStatus", e.target.value as "fresh" | "stale" | "unknown")} className="w-full rounded-lg border border-[var(--wk-border)] bg-[var(--wk-bg)] px-3 py-2 text-[13px] text-[var(--wk-text)] focus:border-[var(--wk-brand)] focus:outline-none focus:ring-1 focus:ring-[var(--wk-brand)]">
+            <WkSelect value={settings.materializedStatsStatus} onChange={(value) => update("materializedStatsStatus", value as "fresh" | "stale" | "unknown")} triggerClassName="w-full rounded-lg border border-[var(--wk-border)] bg-[var(--wk-bg)] px-3 py-2 text-[13px] text-[var(--wk-text)] focus:border-[var(--wk-brand)] focus:outline-none focus:ring-1 focus:ring-[var(--wk-brand)]">
               <option value="fresh">Fresh</option>
               <option value="stale">Stale</option>
               <option value="unknown">Unknown</option>
-            </select>
+            </WkSelect>
           </div>
         </div>
       </WkSurface>

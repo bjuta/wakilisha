@@ -12,6 +12,10 @@ import {
   withdrawSource,
   type ArticleTrustSourceSummary,
 } from "@/services/articles/articleTrustService";
+import { WkSelect } from "@/components/design-system/primitives/Select";
+import { WkCheckbox } from "@/components/design-system/primitives/Checkbox";
+
+
 
 export type ArticleSourceLifecycleMode =
   | "withdraw"
@@ -390,16 +394,15 @@ export function ArticleSourceLifecycleForm({
                   <span className="wk-label">
                     Review Decision
                   </span>
-                  <select
+                  <WkSelect
                     value={decision}
-                    onChange={(event) =>
+                    onChange={(value) =>
                       setDecision(
-                        event.target
-                          .value as ReviewDecision,
+                        value as ReviewDecision,
                       )
                     }
                     disabled={submitting}
-                    className="wk-input mt-1 w-full"
+                    triggerClassName="wk-input mt-1 w-full"
                   >
                     <option value="approve">
                       Approve
@@ -410,7 +413,7 @@ export function ArticleSourceLifecycleForm({
                     <option value="reject">
                       Reject
                     </option>
-                  </select>
+                  </WkSelect>
                 </label>
 
                 {decision === "approve" ? (
@@ -418,16 +421,15 @@ export function ArticleSourceLifecycleForm({
                     <span className="wk-label">
                       Approved Exposure
                     </span>
-                    <select
+                    <WkSelect
                       value={exposureClass}
-                      onChange={(event) =>
+                      onChange={(value) =>
                         setExposureClass(
-                          event.target
-                            .value as ExposureClass,
+                          value as ExposureClass,
                         )
                       }
                       disabled={submitting}
-                      className="wk-input mt-1 w-full"
+                      triggerClassName="wk-input mt-1 w-full"
                     >
                       <option value="internal">
                         Internal Use
@@ -438,7 +440,7 @@ export function ArticleSourceLifecycleForm({
                       <option value="public_redacted">
                         Public Reference with URL Redacted
                       </option>
-                    </select>
+                    </WkSelect>
                   </label>
                 ) : null}
               </>
@@ -472,18 +474,11 @@ export function ArticleSourceLifecycleForm({
 
             {mode === "withdraw" ||
             mode === "restore" ? (
-              <label className="flex items-start gap-3 rounded-xl border border-wk-border bg-wk-bg-subtle p-4">
-                <input
-                  type="checkbox"
-                  checked={confirmed}
-                  onChange={(event) =>
+              <WkCheckbox checked={confirmed} disabled={submitting} onChange={(checked) =>
                     setConfirmed(
-                      event.target.checked,
-                    )
-                  }
-                  disabled={submitting}
-                  className="mt-0.5"
-                />
+                      checked,
+                    )} className="flex items-start gap-3 rounded-xl border border-wk-border bg-wk-bg-subtle p-4">
+
                 <span>
                   <span className="block text-[11px] font-bold text-wk-text">
                     Confirm Source Lifecycle Change
@@ -495,24 +490,17 @@ export function ArticleSourceLifecycleForm({
                     attachment history.
                   </span>
                 </span>
-              </label>
+              </WkCheckbox>
             ) : null}
 
             {publicApproval ? (
-              <label className="flex items-start gap-3 rounded-xl border border-wk-success/30 bg-wk-success-soft p-4">
-                <input
-                  type="checkbox"
-                  checked={
+              <WkCheckbox checked={
                     publicReviewConfirmed
-                  }
-                  onChange={(event) =>
+                  } disabled={submitting} onChange={(checked) =>
                     setPublicReviewConfirmed(
-                      event.target.checked,
-                    )
-                  }
-                  disabled={submitting}
-                  className="mt-0.5"
-                />
+                      checked,
+                    )} className="flex items-start gap-3 rounded-xl border border-wk-success/30 bg-wk-success-soft p-4">
+
                 <span>
                   <span className="block text-[11px] font-bold text-wk-text">
                     Confirm Public Source Review
@@ -524,7 +512,7 @@ export function ArticleSourceLifecycleForm({
                     reference.
                   </span>
                 </span>
-              </label>
+              </WkCheckbox>
             ) : null}
           </div>
 

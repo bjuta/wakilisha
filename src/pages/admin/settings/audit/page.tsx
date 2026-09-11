@@ -4,6 +4,8 @@ import { WkIcon } from "@/components/design-system/Icon";
 import { WkSurface } from "@/components/design-system/primitives/Surface";
 import { loadAuditEvents, clearAuditEvents } from "@/services/adminSettings/settingsStore";
 import type { AuditEvent } from "@/services/adminSettings/settingsTypes";
+import { WkSelect } from "@/components/design-system/primitives/Select";
+
 
 export default function AdminSettingsAudit() {
   const navigate = useNavigate();
@@ -58,10 +60,10 @@ export default function AdminSettingsAudit() {
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
           <span className="text-[12px] font-semibold text-[var(--wk-text-muted)]">Filter:</span>
-          <select
+          <WkSelect
             value={filter}
-            onChange={(e) => setFilter(e.target.value)}
-            className="rounded-lg border border-[var(--wk-border)] bg-[var(--wk-bg)] px-3 py-1.5 text-[12px] text-[var(--wk-text)] focus:border-[var(--wk-brand)] focus:outline-none"
+            onChange={(value) => setFilter(value)}
+            triggerClassName="rounded-lg border border-[var(--wk-border)] bg-[var(--wk-bg)] px-3 py-1.5 text-[12px] text-[var(--wk-text)] focus:border-[var(--wk-brand)] focus:outline-none"
           >
             <option value="all">All Domains</option>
             <option value="charts">Charts</option>
@@ -75,7 +77,7 @@ export default function AdminSettingsAudit() {
             <option value="emailBriefings">Email</option>
             <option value="maintenance">Maintenance</option>
             <option value="navigation">Navigation</option>
-          </select>
+          </WkSelect>
         </div>
         <div className="flex items-center gap-2">
           <span className="text-[12px] text-[var(--wk-text-muted)]">{filtered.length} events</span>

@@ -8,6 +8,9 @@ import { AdminChartsKpiCard } from "../components/AdminChartsKpiCard";
 import { AdminChartsStatusBadge } from "../components/AdminChartsStatusBadge";
 import { AdminChartsEmptyState } from "../components/AdminChartsEmptyState";
 import { AdminChartsLoadingState } from "../components/AdminChartsLoadingState";
+import { WkSelect } from "@/components/design-system/primitives/Select";
+import { WkCheckbox } from "@/components/design-system/primitives/Checkbox";
+
 
 interface ReviewRowEx extends IngestResolvedRow {
   runId: string;
@@ -244,15 +247,15 @@ export default function AdminChartsReviewQueue() {
             </button>
           ))}
         </div>
-        <select
+        <WkSelect
           value={providerFilter}
-          onChange={(e) => setProviderFilter(e.target.value)}
-          className="rounded-lg border border-wk-border bg-wk-surface px-3 py-2 text-[13px] text-wk-text outline-none"
+          onChange={(value) => setProviderFilter(value)}
+          triggerClassName="rounded-lg border border-wk-border bg-wk-surface px-3 py-2 text-[13px] text-wk-text outline-none"
         >
           <option value="all">All Providers</option>
           <option value="spotify">Spotify</option>
           <option value="apple_music">Apple Music</option>
-        </select>
+        </WkSelect>
       </div>
 
       {/* Table */}
@@ -262,11 +265,10 @@ export default function AdminChartsReviewQueue() {
             <thead>
               <tr className="border-b border-wk-border">
                 <th className="px-4 py-3">
-                  <input
-                    type="checkbox"
+                  <WkCheckbox
                     checked={selected.size === filtered.length && filtered.length > 0}
                     onChange={toggleAll}
-                    className="h-4 w-4 rounded border-wk-border accent-wk-brand cursor-pointer"
+                    ariaLabel="Select all review rows"
                   />
                 </th>
                 {["#", "Title & Artist", "Status", "Confidence", "Provider", "Run", "Actions"].map((h) => (
@@ -285,11 +287,10 @@ export default function AdminChartsReviewQueue() {
                     className={`border-b border-wk-border/50 transition-colors hover:bg-wk-surface-raised/50 ${selected.has(row.id) ? "bg-wk-brand-soft/30" : ""}`}
                   >
                     <td className="px-4 py-3">
-                      <input
-                        type="checkbox"
+                      <WkCheckbox
                         checked={selected.has(row.id)}
                         onChange={() => toggleSelect(row.id)}
-                        className="h-4 w-4 rounded border-wk-border accent-wk-brand cursor-pointer"
+                        ariaLabel={`Select ${row.title}`}
                       />
                     </td>
                     <td className="px-4 py-3 font-bold text-wk-text-muted">{row.rank}</td>

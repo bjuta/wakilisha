@@ -30,6 +30,8 @@ import {
 } from "@/services/player/trackLyricsAdminService";
 import { LyricsContributionReviewWorkspace } from "./components/LyricsContributionReviewWorkspace";
 import { LyricsHistoryWorkspace } from "./components/LyricsHistoryWorkspace";
+import { WkSelect } from "@/components/design-system/primitives/Select";
+
 
 type LyricsWorkspaceView =
   | "inbox"
@@ -647,15 +649,15 @@ export default function AdminLyricsPage() {
 
                     <label className="text-xs font-bold text-wk-text-muted">
                       Timing
-                      <select
+                      <WkSelect
                         value={timingMode}
                         disabled={!workspace.canEdit}
-                        onChange={(event) => setTimingMode(event.target.value === "line" ? "line" : "plain")}
-                        className="mt-1 w-full rounded-lg border border-wk-border bg-wk-bg px-3 py-2 text-sm text-wk-text disabled:opacity-60"
+                        onChange={(value) => setTimingMode(value === "line" ? "line" : "plain")}
+                        triggerClassName="mt-1 w-full rounded-lg border border-wk-border bg-wk-bg px-3 py-2 text-sm text-wk-text disabled:opacity-60"
                       >
                         <option value="plain">Plain Lyrics</option>
                         <option value="line">Line-timed Lyrics</option>
-                      </select>
+                      </WkSelect>
                     </label>
 
                     <label className="text-xs font-bold text-wk-text-muted">

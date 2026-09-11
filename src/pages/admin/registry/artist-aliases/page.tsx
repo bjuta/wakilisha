@@ -1,6 +1,8 @@
 import { useEffect, useState, useCallback, useMemo } from "react";
 import { supabase } from "@/lib/supabase";
 import { WkIcon } from "@/components/design-system/Icon";
+import { WkCheckbox } from "@/components/design-system/primitives/Checkbox";
+
 
 /* ──────────────────────── Types ──────────────────────── */
 
@@ -762,14 +764,10 @@ export default function ArtistAliasesPage() {
                 className="min-h-[80px] w-full rounded-xl border border-[#dfe4d8] bg-white px-3 py-2 text-[13px] outline-none focus:border-[#85c441]"
               />
 
-              <label className="mt-3 flex items-center gap-2 text-[12px] font-bold text-[#5d6557]">
-                <input
-                  type="checkbox"
-                  checked={archiveSource}
-                  onChange={(event) => setArchiveSource(event.target.checked)}
-                />
+              <WkCheckbox checked={archiveSource} onChange={(checked) => setArchiveSource(checked)} className="mt-3 flex items-center gap-2 text-[12px] font-bold text-[#5d6557]">
+
                 Archive the source duplicate after merge
-              </label>
+              </WkCheckbox>
 
               <div className="mt-4 flex flex-wrap gap-2">
                 <button

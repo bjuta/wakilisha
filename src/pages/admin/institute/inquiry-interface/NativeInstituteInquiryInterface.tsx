@@ -53,6 +53,8 @@ import type {
   RegistryAnchor,
   ReviewState,
 } from "./types";
+import { WkSelect } from "@/components/design-system/primitives/Select";
+
 
 const defaultSetup: InquirySetup = {
   inquiryType: "Explain a cultural shift",
@@ -1758,15 +1760,15 @@ function MaterialSection({
               <span className="mb-2 block text-[10px] font-black uppercase tracking-[0.12em] text-wk-text-faint">
                 Type
               </span>
-              <select
+              <WkSelect
                 value={form.kind}
-                onChange={(event) =>
+                onChange={(value) =>
                   setForm((current) => ({
                     ...current,
-                    kind: event.target.value as EvidenceKind,
+                    kind: value as EvidenceKind,
                   }))
                 }
-                className="w-full rounded-lg border border-wk-border bg-wk-bg px-3 py-2.5 text-[13px] text-wk-text outline-none focus:border-wk-brand"
+                triggerClassName="w-full rounded-lg border border-wk-border bg-wk-bg px-3 py-2.5 text-[13px] text-wk-text outline-none focus:border-wk-brand"
               >
                 <option>Article</option>
                 <option>Link</option>
@@ -1782,7 +1784,7 @@ function MaterialSection({
                 <option>Archive document</option>
                 <option>WAKILISHA record</option>
                 <option>Personal note</option>
-              </select>
+              </WkSelect>
             </label>
           </div>
 
@@ -1871,27 +1873,27 @@ function MaterialSection({
           </div>
 
           <div className="flex flex-wrap gap-2">
-            <select
+            <WkSelect
               value={typeFilter}
-              onChange={(event) => setTypeFilter(event.target.value)}
-              className="rounded-lg border border-wk-border bg-wk-bg px-3 py-2 text-[12px] font-bold text-wk-text"
+              onChange={(value) => setTypeFilter(value)}
+              triggerClassName="rounded-lg border border-wk-border bg-wk-bg px-3 py-2 text-[12px] font-bold text-wk-text"
             >
               <option>All</option>
               {kinds.map((kind) => (
                 <option key={kind}>{kind}</option>
               ))}
-            </select>
+            </WkSelect>
 
-            <select
+            <WkSelect
               value={statusFilter}
-              onChange={(event) => setStatusFilter(event.target.value)}
-              className="rounded-lg border border-wk-border bg-wk-bg px-3 py-2 text-[12px] font-bold text-wk-text"
+              onChange={(value) => setStatusFilter(value)}
+              triggerClassName="rounded-lg border border-wk-border bg-wk-bg px-3 py-2 text-[12px] font-bold text-wk-text"
             >
               <option>All</option>
               {statuses.map((status) => (
                 <option key={status}>{status}</option>
               ))}
-            </select>
+            </WkSelect>
           </div>
         </div>
 
@@ -3037,17 +3039,17 @@ function EvidenceScreen({
                   <div className="grid gap-3 md:grid-cols-[1fr_180px]">
                     <label>
                       <span className="mb-2 block text-[10px] font-black uppercase tracking-[0.12em] text-wk-text-faint">Workspace status</span>
-                      <select
+                      <WkSelect
                         value={workspace.status}
-                        onChange={(event) => setWorkspace((current) => ({ ...current, status: event.target.value }))}
-                        className="w-full rounded-lg border border-wk-border bg-wk-bg px-3 py-2.5 text-[13px] font-bold text-wk-text outline-none focus:border-wk-brand"
+                        onChange={(value) => setWorkspace((current) => ({ ...current, status: value }))}
+                        triggerClassName="w-full rounded-lg border border-wk-border bg-wk-bg px-3 py-2.5 text-[13px] font-bold text-wk-text outline-none focus:border-wk-brand"
                       >
                         <option>Not started</option>
                         <option>In progress</option>
                         <option>Blocked</option>
                         <option>Needs source</option>
                         <option>Ready for review</option>
-                      </select>
+                      </WkSelect>
                     </label>
 
                     <label>

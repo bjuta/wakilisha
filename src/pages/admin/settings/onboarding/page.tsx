@@ -15,6 +15,8 @@ import {
   setAdminRegistryOnboardingConfig,
   type AdminRegistryOnboardingArtist,
 } from "@/services/community";
+import { WkCheckbox } from "@/components/design-system/primitives/Checkbox";
+
 
 const OPENING_LIMIT = 16;
 
@@ -431,22 +433,15 @@ export default function AdminSettingsOnboardingPage() {
             </p>
           </div>
 
-          <label className="flex cursor-pointer items-center gap-3 rounded-xl border border-[var(--wk-border)] bg-[var(--wk-bg)] px-3 py-2.5">
-            <input
-              type="checkbox"
-              checked={
+          <WkCheckbox checked={
                 fallbackEnabled
-              }
-              onChange={
-                (event) => {
+              } onChange={(checked) => {
                   setFallbackEnabled(
-                    event.target.checked,
+                    checked,
                   );
                   setMessage(null);
-                }
-              }
-              className="h-4 w-4 accent-[var(--wk-brand)]"
-            />
+                }} className="flex cursor-pointer items-center gap-3 rounded-xl border border-[var(--wk-border)] bg-[var(--wk-bg)] px-3 py-2.5">
+
             <span>
               <span className="block text-[12px] font-black text-[var(--wk-text)]">
                 Fill open spaces
@@ -455,7 +450,7 @@ export default function AdminSettingsOnboardingPage() {
                 WAKILISHA fills the rest when fewer than 16 are chosen.
               </span>
             </span>
-          </label>
+          </WkCheckbox>
         </div>
 
         {artists.length === 0 ? (

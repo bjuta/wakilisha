@@ -17,6 +17,8 @@ import {
 import { CsvMappingPreview } from "./CsvMappingPreview";
 import type { UserRole } from "@/services/chartsIngestion/client";
 import type { DiscoveredCsvSource } from "@/services/chartsIngestion/types";
+import { WkSelect } from "@/components/design-system/primitives/Select";
+
 
 interface SourcesStepProps {
   jobId: string;
@@ -158,10 +160,10 @@ export function SourcesStep({ jobId, sources, onUpdate, role = "admin" }: Source
           <div className="grid gap-3 sm:grid-cols-3">
             <div>
               <label className="text-[10px] font-bold uppercase text-[var(--wk-text-muted)]">Provider</label>
-              <select
+              <WkSelect
                 value={newProvider}
-                onChange={(e) => setNewProvider(e.target.value)}
-                className="mt-1 w-full rounded-md border border-[var(--wk-border)] bg-[var(--wk-bg)] px-3 py-2 text-[12px] text-[var(--wk-text)]"
+                onChange={(value) => setNewProvider(value)}
+                triggerClassName="mt-1 w-full rounded-md border border-[var(--wk-border)] bg-[var(--wk-bg)] px-3 py-2 text-[12px] text-[var(--wk-text)]"
               >
                 {[
                   { value: "spotify", label: "Spotify" }, { value: "apple", label: "Apple Music" },
@@ -171,7 +173,7 @@ export function SourcesStep({ jobId, sources, onUpdate, role = "admin" }: Source
                 ].map((p) => (
                   <option key={p.value} value={p.value}>{p.label}</option>
                 ))}
-              </select>
+              </WkSelect>
             </div>
             <div>
               <label className="text-[10px] font-bold uppercase text-[var(--wk-text-muted)]">Weight ({Math.round(newWeight * 100)}%)</label>

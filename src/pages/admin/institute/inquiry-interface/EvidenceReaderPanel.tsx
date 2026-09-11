@@ -11,6 +11,8 @@ import {
   type EvidenceReaderVerdict,
   recordEvidenceVerdict,
 } from "@/services/institute/evidenceReaderService";
+import { WkSelect } from "@/components/design-system/primitives/Select";
+
 
 // Evidence Reader. The assistant extracts what a piece of evidence contains;
 // a human judges the extraction and records where the evidence stands.
@@ -237,23 +239,23 @@ export default function EvidenceReaderPanel({
                       Where this evidence stands
                     </div>
                     <div className="mt-2 grid gap-2 md:grid-cols-[260px_1fr_auto]">
-                      <select
+                      <WkSelect
                         aria-label={`Verdict for ${item.title}`}
                         value={verdictById[item.id] ?? "accepted"}
-                        onChange={(event) =>
+                        onChange={(value) =>
                           setVerdictById((current) => ({
                             ...current,
-                            [item.id]: event.target.value as EvidenceReaderVerdict,
+                            [item.id]: value as EvidenceReaderVerdict,
                           }))
                         }
-                        className="rounded-lg border border-wk-border bg-wk-bg p-2.5 text-[13px] text-wk-text"
+                        triggerClassName="rounded-lg border border-wk-border bg-wk-bg p-2.5 text-[13px] text-wk-text"
                       >
                         {READER_VERDICT_OPTIONS.map((option) => (
                           <option key={option.value} value={option.value}>
                             {option.label}
                           </option>
                         ))}
-                      </select>
+                      </WkSelect>
                       <input
                         aria-label={`Verdict note for ${item.title}`}
                         value={noteById[item.id] ?? ""}

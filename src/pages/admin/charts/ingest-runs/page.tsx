@@ -9,6 +9,8 @@ import { AdminChartsStatusBadge } from "../components/AdminChartsStatusBadge";
 import { AdminChartsEmptyState } from "../components/AdminChartsEmptyState";
 import { AdminChartsLoadingState } from "../components/AdminChartsLoadingState";
 import { AdminChartsConfirmDialog } from "../components/AdminChartsConfirmDialog";
+import { WkSelect } from "@/components/design-system/primitives/Select";
+
 
 const ALL_STATUSES = ["all", "running", "dry_run_complete", "ready_to_commit", "committed", "failed", "needs_review", "cancelled"];
 
@@ -191,24 +193,24 @@ export default function AdminChartsIngestRuns() {
             />
           </div>
           {allSeries.length > 1 && (
-            <select
+            <WkSelect
               value={seriesFilter}
-              onChange={(e) => setSeriesFilter(e.target.value)}
-              className="rounded-lg border border-wk-border bg-wk-surface px-3 py-2 text-[13px] text-wk-text outline-none"
+              onChange={(value) => setSeriesFilter(value)}
+              triggerClassName="rounded-lg border border-wk-border bg-wk-surface px-3 py-2 text-[13px] text-wk-text outline-none"
             >
               <option value="all">All Series</option>
               {allSeries.map((s) => <option key={s} value={s}>{s}</option>)}
-            </select>
+            </WkSelect>
           )}
           {allProviders.length > 1 && (
-            <select
+            <WkSelect
               value={providerFilter}
-              onChange={(e) => setProviderFilter(e.target.value)}
-              className="rounded-lg border border-wk-border bg-wk-surface px-3 py-2 text-[13px] text-wk-text outline-none"
+              onChange={(value) => setProviderFilter(value)}
+              triggerClassName="rounded-lg border border-wk-border bg-wk-surface px-3 py-2 text-[13px] text-wk-text outline-none"
             >
               <option value="all">All Providers</option>
               {allProviders.map((p) => <option key={p} value={p}>{p === "spotify" ? "Spotify" : p === "apple_music" ? "Apple Music" : p}</option>)}
-            </select>
+            </WkSelect>
           )}
         </div>
       </div>

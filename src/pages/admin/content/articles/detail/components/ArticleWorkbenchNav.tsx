@@ -1,5 +1,7 @@
 import { useEffect, useRef } from "react";
 import { WkIcon, type WkIconName } from "@/components/design-system/Icon";
+import { WkSelect } from "@/components/design-system/primitives/Select";
+
 
 export type ArticleWorkbenchMode =
   | "write"
@@ -122,13 +124,13 @@ export function ArticleWorkbenchNav({
         </label>
 
         <div className="relative">
-          <select
+          <WkSelect
             id="article-work-mode"
             value={activeMode}
-            onChange={(event) =>
-              onModeChange(event.target.value as ArticleWorkbenchMode)
+            onChange={(value) =>
+              onModeChange(value as ArticleWorkbenchMode)
             }
-            className="w-full appearance-none rounded-lg border border-wk-border bg-wk-bg-subtle px-3 py-2.5 pr-10 text-[13px] font-bold text-wk-text outline-none focus:border-wk-brand"
+            triggerClassName="w-full appearance-none rounded-lg border border-wk-border bg-wk-bg-subtle px-3 py-2.5 pr-10 text-[13px] font-bold text-wk-text outline-none focus:border-wk-brand"
           >
             {WORKBENCH_GROUPS.map((group) => (
               <optgroup key={group.label} label={group.label}>
@@ -142,13 +144,8 @@ export function ArticleWorkbenchNav({
                 })}
               </optgroup>
             ))}
-          </select>
+          </WkSelect>
 
-          <WkIcon
-            name="ChevronDown"
-            size={15}
-            className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-wk-text-faint"
-          />
         </div>
 
         <p className="mt-2 text-[11px] leading-4 text-wk-text-muted">

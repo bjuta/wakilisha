@@ -14,6 +14,9 @@ import {
 import { normalizeSlug, validateField } from "@/services/registry/admin/fieldNormalization";
 import { calculateCompleteness, completenessLabel, completenessTone } from "@/services/registry/admin/completeness";
 import { supabase } from "@/lib/supabase";
+import { WkSelect } from "@/components/design-system/primitives/Select";
+import { WakilishaToggle } from "@/components/design-system/primitives/WakilishaToggle";
+
 
 interface RegistryEntityEditorDrawerProps {
   entityType: RegistryEntityType;
@@ -1154,11 +1157,11 @@ function FieldCard({
     if (field.type === "select") {
       return (
         <div className="relative">
-          <select
+          <WkSelect
             id={fieldId}
             value={strValue}
-            onChange={(e) => onChange(e.target.value)}
-            className={`h-11 w-full appearance-none rounded-xl border bg-[#f8f9f4] pl-3 pr-9 text-sm outline-none transition-all focus:bg-white ${
+            onChange={(value) => onChange(value)}
+            triggerClassName={`h-11 w-full appearance-none rounded-xl border bg-[#f8f9f4] pl-3 pr-9 text-sm outline-none transition-all focus:bg-white ${
               error
                 ? "border-red-400 focus:border-red-500"
                 : isDirty
@@ -1171,38 +1174,24 @@ function FieldCard({
                 {option}
               </option>
             ))}
-          </select>
-          <i className="ri-arrow-down-s-line absolute right-3 top-1/2 -translate-y-1/2 text-[#9aa292] pointer-events-none" />
+          </WkSelect>
         </div>
       );
     }
 
     if (field.type === "boolean") {
       return (
-        <label
-          htmlFor={fieldId}
-          className="flex items-center gap-3 cursor-pointer group"
-        >
-          <div className={`relative flex h-6 w-11 shrink-0 items-center rounded-full transition-colors ${
-            value ? "bg-[#85c441]" : "bg-[#d9ddcf]"
-          }`}>
-            <div
-              className={`absolute h-5 w-5 rounded-full bg-white shadow-sm transition-transform ${
-                value ? "translate-x-5" : "translate-x-0.5"
-              }`}
-            />
-          </div>
-          <input
-            id={fieldId}
-            type="checkbox"
-            checked={Boolean(value)}
-            onChange={(e) => onChange(e.target.checked)}
-            className="sr-only"
+        <div className="flex items-center gap-3">
+          <WakilishaToggle
+            value={Boolean(value)}
+            onChange={onChange}
+            size="sm"
+            ariaLabel={`Toggle ${field.label}`}
           />
-          <span className="text-sm font-semibold text-[#2d3329] group-hover:text-[#171712]">
+          <span className="text-sm font-semibold text-[#2d3329]">
             {value ? "Yes" : "No"}
           </span>
-        </label>
+        </div>
       );
     }
 

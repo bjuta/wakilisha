@@ -4,6 +4,8 @@ import { WkSurface } from "@/components/design-system/primitives/Surface";
 import type { IngestEnrichmentOptions, PreviewProvider } from "@/services/chartsEnrichment/enrichmentOptions";
 import { summarizeEnrichmentOptions } from "@/services/chartsEnrichment/enrichmentOptions";
 import { setCurrentIngestEnrichmentOptionsSelection } from "@/services/chartsEnrichment/enrichmentOptionsPersistence";
+import { WkCheckbox } from "@/components/design-system/primitives/Checkbox";
+
 
 const providers: PreviewProvider[] = ["apple_music", "spotify", "youtube", "acrcloud"];
 
@@ -18,13 +20,13 @@ type EnrichmentOptionsStepProps = {
 
 function Toggle({ checked, onChange, labelText, help }: { checked: boolean; onChange: (checked: boolean) => void; labelText: string; help?: string }) {
   return (
-    <label className="flex cursor-pointer items-start gap-3 rounded-lg border border-wk-border bg-wk-surface px-3 py-3 hover:bg-wk-surface-raised transition-colors">
-      <input type="checkbox" checked={checked} onChange={(event) => onChange(event.target.checked)} className="mt-0.5 h-4 w-4 rounded border-wk-border accent-wk-brand" />
+    <WkCheckbox checked={checked} onChange={(checked) => onChange(checked)} className="flex cursor-pointer items-start gap-3 rounded-lg border border-wk-border bg-wk-surface px-3 py-3 hover:bg-wk-surface-raised transition-colors">
+
       <span>
         <span className="block text-[12px] font-semibold text-wk-text-soft">{labelText}</span>
         {help && <span className="mt-0.5 block text-[11px] text-wk-text-muted">{help}</span>}
       </span>
-    </label>
+    </WkCheckbox>
   );
 }
 

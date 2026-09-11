@@ -7,6 +7,8 @@ import { calculateCompleteness, completenessTone } from "@/services/registry/adm
 import { getRegistryEntityList, saveRegistryEntityPatch, deleteRegistryEntity } from "@/services/registry/admin/client";
 import RegistryEntityEditorDrawer from "@/components/admin/registry/RegistryEntityEditorDrawer";
 import { WkIcon } from "@/components/design-system/Icon";
+import { WkSelect } from "@/components/design-system/primitives/Select";
+
 
 const schema = getEntitySchema("artist");
 const PAGE_SIZE = 20;
@@ -657,15 +659,15 @@ function ArtistEnrichPanel({ onDone }: { onDone: () => void }) {
             </button>
           </div>
           {/* Filter */}
-          <select
+          <WkSelect
             value={filterMode}
-            onChange={(e) => setFilterMode(e.target.value)}
-            className="h-8 rounded-lg border border-[#dfe4d8] bg-[#f8f9f4] px-2 text-[11px] font-bold text-[#697062] outline-none"
+            onChange={(value) => setFilterMode(value)}
+            triggerClassName="h-8 rounded-lg border border-[#dfe4d8] bg-[#f8f9f4] px-2 text-[11px] font-bold text-[#697062] outline-none"
           >
             <option value="missing_image">Missing image</option>
             <option value="missing_bio">Missing bio</option>
             <option value="all">All artists</option>
-          </select>
+          </WkSelect>
           {/* Force */}
           <button
             onClick={() => setForce((v) => !v)}
@@ -1995,10 +1997,10 @@ export default function ArtistsPage() {
                 className="h-11 w-full rounded-xl border border-[#dfe4d8] bg-[#f8f9f4] pl-10 pr-4 text-sm outline-none transition focus:border-[#85c441] focus:bg-white"
               />
             </div>
-            <select
+            <WkSelect
               value={countryFilter}
-              onChange={(e) => setCountryFilter(e.target.value)}
-              className="h-11 rounded-xl border border-[#dfe4d8] bg-[#f8f9f4] px-3 text-sm outline-none transition focus:border-[#85c441] focus:bg-white"
+              onChange={(value) => setCountryFilter(value)}
+              triggerClassName="h-11 rounded-xl border border-[#dfe4d8] bg-[#f8f9f4] px-3 text-sm outline-none transition focus:border-[#85c441] focus:bg-white"
             >
               <option value="all">All countries</option>
               {countryOptions.map((opt) => (
@@ -2006,11 +2008,11 @@ export default function ArtistsPage() {
                   {opt.label} ({opt.count})
                 </option>
               ))}
-            </select>
-            <select
+            </WkSelect>
+            <WkSelect
               value={qualityFilter}
-              onChange={(e) => setQualityFilter(e.target.value as QualityFilter)}
-              className="h-11 rounded-xl border border-[#dfe4d8] bg-[#f8f9f4] px-3 text-sm outline-none transition focus:border-[#85c441] focus:bg-white"
+              onChange={(value) => setQualityFilter(value as QualityFilter)}
+              triggerClassName="h-11 rounded-xl border border-[#dfe4d8] bg-[#f8f9f4] px-3 text-sm outline-none transition focus:border-[#85c441] focus:bg-white"
             >
               <option value="all">All quality states</option>
               <option value="complete">Near complete</option>
@@ -2022,26 +2024,26 @@ export default function ArtistsPage() {
               <option value="missing_genre">Missing genre</option>
               <option value="missing_type">Missing type</option>
               <option value="blocked">Blocked</option>
-            </select>
-            <select
+            </WkSelect>
+            <WkSelect
               value={statusFilter}
-              onChange={(e) => setStatusFilter(e.target.value as StatusFilter)}
-              className="h-11 rounded-xl border border-[#dfe4d8] bg-[#f8f9f4] px-3 text-sm outline-none transition focus:border-[#85c441] focus:bg-white"
+              onChange={(value) => setStatusFilter(value as StatusFilter)}
+              triggerClassName="h-11 rounded-xl border border-[#dfe4d8] bg-[#f8f9f4] px-3 text-sm outline-none transition focus:border-[#85c441] focus:bg-white"
             >
               <option value="all">All statuses</option>
               <option value="active">Active</option>
               <option value="draft">Draft</option>
-            </select>
-            <select
+            </WkSelect>
+            <WkSelect
               value={sortMode}
-              onChange={(e) => setSortMode(e.target.value as SortMode)}
-              className="h-11 rounded-xl border border-[#dfe4d8] bg-[#f8f9f4] px-3 text-sm outline-none transition focus:border-[#85c441] focus:bg-white"
+              onChange={(value) => setSortMode(value as SortMode)}
+              triggerClassName="h-11 rounded-xl border border-[#dfe4d8] bg-[#f8f9f4] px-3 text-sm outline-none transition focus:border-[#85c441] focus:bg-white"
             >
               <option value="recent">Recently updated</option>
               <option value="name">Name A-Z</option>
               <option value="completeness_low">Completeness low → high</option>
               <option value="completeness_high">Completeness high → low</option>
-            </select>
+            </WkSelect>
           </div>
         </section>
 

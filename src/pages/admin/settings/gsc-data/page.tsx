@@ -3,6 +3,8 @@ import { WkIcon } from "@/components/design-system/Icon";
 import { WkSurface } from "@/components/design-system/primitives/Surface";
 import DateRangePicker, { type DateRangeValue } from "@/components/base/DateRangePicker";
 import { supabase } from "@/lib/supabase";
+import { WkSelect } from "@/components/design-system/primitives/Select";
+
 
 interface GscConnection {
   id: string;
@@ -389,14 +391,14 @@ export default function AdminSettingsGscData() {
               <label className="block text-[11px] font-black uppercase tracking-wider text-[var(--wk-text-faint)] mb-1.5">
                 Property type
               </label>
-              <select
+              <WkSelect
                 value={propertyType}
-                onChange={(e) => setPropertyType(e.target.value as "URL_PREFIX" | "DOMAIN")}
-                className="w-full rounded-lg border border-[var(--wk-border)] bg-[var(--wk-bg)] px-3 py-2.5 text-[13px] text-[var(--wk-text)] outline-none focus:border-[var(--wk-brand)] cursor-pointer"
+                onChange={(value) => setPropertyType(value as "URL_PREFIX" | "DOMAIN")}
+                triggerClassName="w-full rounded-lg border border-[var(--wk-border)] bg-[var(--wk-bg)] px-3 py-2.5 text-[13px] text-[var(--wk-text)] outline-none focus:border-[var(--wk-brand)] cursor-pointer"
               >
                 <option value="URL_PREFIX">URL prefix (e.g. https://wakilisha.africa/)</option>
                 <option value="DOMAIN">Domain property (e.g. sc-domain:wakilisha.africa)</option>
-              </select>
+              </WkSelect>
             </div>
 
             {connectError && (

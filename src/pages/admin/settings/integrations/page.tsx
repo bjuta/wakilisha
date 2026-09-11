@@ -28,6 +28,8 @@ import {
   clearProviderCredentialsFromServer,
   type ServerSyncResult,
 } from "@/services/adminSettings/providerCredentialStore";
+import { WkSelect } from "@/components/design-system/primitives/Select";
+
 
 type ProviderFormState = Record<string, ProviderCredentialValues>;
 type ProviderFormErrors = Record<string, Record<string, string>>;
@@ -766,9 +768,9 @@ function ProviderField({ providerKey, field, value, error, showSecret, onToggleS
           </span>
         </button>
       ) : field.type === "select" ? (
-        <select id={id} value={String(value ?? "")} onChange={(event) => onChange(event.target.value)} className="w-full rounded-lg border border-[var(--wk-border)] bg-[var(--wk-bg)] px-3 py-2 text-[13px] text-[var(--wk-text)] focus:border-[var(--wk-brand)] focus:outline-none focus:ring-1 focus:ring-[var(--wk-brand)]">
+        <WkSelect id={id} value={String(value ?? "")} onChange={(value) => onChange(value)} triggerClassName="w-full rounded-lg border border-[var(--wk-border)] bg-[var(--wk-bg)] px-3 py-2 text-[13px] text-[var(--wk-text)] focus:border-[var(--wk-brand)] focus:outline-none focus:ring-1 focus:ring-[var(--wk-brand)]">
           {(field.options ?? []).map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
-        </select>
+        </WkSelect>
       ) : field.type === "secretTextarea" ? (
         <div className="relative">
           <textarea id={id} value={String(value ?? "")} onChange={(event) => onChange(event.target.value)} rows={5} placeholder={field.placeholder} className="w-full rounded-lg border border-[var(--wk-border)] bg-[var(--wk-bg)] px-3 py-2 pr-12 font-mono text-[12px] text-[var(--wk-text)] focus:border-[var(--wk-brand)] focus:outline-none focus:ring-1 focus:ring-[var(--wk-brand)]" style={{ WebkitTextSecurity: showSecret ? "none" : "disc" }} />

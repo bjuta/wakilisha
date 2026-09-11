@@ -2,18 +2,25 @@ import type { ReactNode } from "react";
 import { Checkbox } from "react-aria-components";
 
 interface WkCheckboxProps {
-  checked: boolean;
-  onChange: (checked: boolean) => void;
+  checked?: boolean;
+  defaultChecked?: boolean;
+  onChange?: (checked: boolean) => void;
   children?: ReactNode;
   description?: ReactNode;
   disabled?: boolean;
   indeterminate?: boolean;
   ariaLabel?: string;
   className?: string;
+  name?: string;
+  value?: string;
+  required?: boolean;
+  readOnly?: boolean;
+  id?: string;
 }
 
 export function WkCheckbox({
   checked,
+  defaultChecked,
   onChange,
   children,
   description,
@@ -21,14 +28,26 @@ export function WkCheckbox({
   indeterminate = false,
   ariaLabel,
   className = "",
+  name,
+  value,
+  required = false,
+  readOnly = false,
+  id,
 }: WkCheckboxProps) {
   return (
     <Checkbox
-      aria-label={ariaLabel}
+      id={id}
+      aria-label={ariaLabel ?? (children == null ? "Toggle option" : undefined)}
       isSelected={checked}
+      defaultSelected={defaultChecked}
       onChange={onChange}
       isDisabled={disabled}
       isIndeterminate={indeterminate}
+      isRequired={required}
+      isReadOnly={readOnly}
+      validationBehavior={required ? "native" : "aria"}
+      name={name}
+      value={value}
       className={({ isDisabled, isFocusVisible }) =>
         `inline-flex items-start gap-2.5 text-[13px] text-wk-text outline-none ${
           isDisabled ? "cursor-not-allowed opacity-45" : "cursor-pointer"
@@ -51,18 +70,18 @@ export function WkCheckbox({
               } text-[11px] font-black`}
             />
           </span>
-          {children != null || description != null ? (
-            <span className="min-w-0">
+          {description != null ? (
+            <span className="min-w-0 flex-1">
               {children != null ? (
                 <span className="block font-semibold leading-snug">{children}</span>
               ) : null}
-              {description != null ? (
-                <span className="mt-0.5 block text-[11px] leading-snug text-wk-text-muted">
-                  {description}
-                </span>
-              ) : null}
+              <span className="mt-0.5 block text-[11px] leading-snug text-wk-text-muted">
+                {description}
+              </span>
             </span>
-          ) : null}
+          ) : (
+            children
+          )}
         </>
       )}
     </Checkbox>

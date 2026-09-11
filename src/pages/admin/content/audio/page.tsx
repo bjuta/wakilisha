@@ -15,6 +15,8 @@ import {
   type AudioAdminIndex,
   type AudioPublicationSummary,
 } from "@/services/audio/audioAdminService";
+import { WkSelect } from "@/components/design-system/primitives/Select";
+
 
 type ComposerMode = "show" | "season" | "audio";
 type StatusFilter = "all" | "draft" | "in_review" | "changes_requested" | "approved" | "published";
@@ -185,7 +187,7 @@ export default function AdminAudioPage() {
 
           {composerMode === "season" ? (
             <form className="grid gap-4 lg:grid-cols-[1.2fr_120px_1fr_auto]" onSubmit={handleSeason}>
-              <label className="text-xs font-bold text-wk-text-muted">Show<select value={seasonShowId} onChange={(event) => setSeasonShowId(event.target.value)} required className="mt-1 w-full rounded-lg border border-wk-border bg-wk-bg px-3 py-3 text-sm text-wk-text"><option value="">Choose a Show</option>{index?.shows.map((show) => <option key={show.id} value={show.id}>{show.title}</option>)}</select></label>
+              <label className="text-xs font-bold text-wk-text-muted">Show<WkSelect value={seasonShowId} onChange={(value) => setSeasonShowId(value)} required triggerClassName="mt-1 w-full rounded-lg border border-wk-border bg-wk-bg px-3 py-3 text-sm text-wk-text"><option value="">Choose a Show</option>{index?.shows.map((show) => <option key={show.id} value={show.id}>{show.title}</option>)}</WkSelect></label>
               <label className="text-xs font-bold text-wk-text-muted">Number<input type="number" min={1} value={seasonNumber} onChange={(event) => setSeasonNumber(event.target.value)} required className="mt-1 w-full rounded-lg border border-wk-border bg-wk-bg px-3 py-3 text-sm text-wk-text" /></label>
               <label className="text-xs font-bold text-wk-text-muted">Season Title<input value={seasonTitle} onChange={(event) => setSeasonTitle(event.target.value)} required className="mt-1 w-full rounded-lg border border-wk-border bg-wk-bg px-3 py-3 text-sm text-wk-text" /></label>
               <button type="submit" disabled={busy !== null} className="wk-button wk-button-primary self-end disabled:opacity-50">Create Season</button>
@@ -198,8 +200,8 @@ export default function AdminAudioPage() {
               <label className="block text-xs font-bold text-wk-text-muted">Title<input value={publicationTitle} onChange={(event) => setPublicationTitle(event.target.value)} required className="mt-1 w-full rounded-lg border border-wk-border bg-wk-bg px-3 py-3 text-sm text-wk-text" /></label>
               {publicationKind === "episode" ? (
                 <div className="grid gap-4 lg:grid-cols-[1fr_1fr_120px]">
-                  <label className="text-xs font-bold text-wk-text-muted">Show<select value={publicationShowId} onChange={(event) => { setPublicationShowId(event.target.value); setPublicationSeasonId(""); }} required className="mt-1 w-full rounded-lg border border-wk-border bg-wk-bg px-3 py-3 text-sm text-wk-text"><option value="">Choose a Show</option>{index?.shows.map((show) => <option key={show.id} value={show.id}>{show.title}</option>)}</select></label>
-                  <label className="text-xs font-bold text-wk-text-muted">Season<select value={publicationSeasonId} onChange={(event) => setPublicationSeasonId(event.target.value)} className="mt-1 w-full rounded-lg border border-wk-border bg-wk-bg px-3 py-3 text-sm text-wk-text"><option value="">No Season</option>{selectedShowSeasons.map((season) => <option key={season.id} value={season.id}>{season.seasonNumber}. {season.title}</option>)}</select></label>
+                  <label className="text-xs font-bold text-wk-text-muted">Show<WkSelect value={publicationShowId} onChange={(value) => { setPublicationShowId(value); setPublicationSeasonId(""); }} required triggerClassName="mt-1 w-full rounded-lg border border-wk-border bg-wk-bg px-3 py-3 text-sm text-wk-text"><option value="">Choose a Show</option>{index?.shows.map((show) => <option key={show.id} value={show.id}>{show.title}</option>)}</WkSelect></label>
+                  <label className="text-xs font-bold text-wk-text-muted">Season<WkSelect value={publicationSeasonId} onChange={(value) => setPublicationSeasonId(value)} triggerClassName="mt-1 w-full rounded-lg border border-wk-border bg-wk-bg px-3 py-3 text-sm text-wk-text"><option value="">No Season</option>{selectedShowSeasons.map((season) => <option key={season.id} value={season.id}>{season.seasonNumber}. {season.title}</option>)}</WkSelect></label>
                   <label className="text-xs font-bold text-wk-text-muted">Episode Number<input type="number" min={1} value={episodeNumber} onChange={(event) => setEpisodeNumber(event.target.value)} required className="mt-1 w-full rounded-lg border border-wk-border bg-wk-bg px-3 py-3 text-sm text-wk-text" /></label>
                 </div>
               ) : null}

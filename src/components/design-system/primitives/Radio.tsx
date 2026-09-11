@@ -8,6 +8,8 @@ interface WkRadioGroupProps {
   label?: ReactNode;
   ariaLabel?: string;
   disabled?: boolean;
+  required?: boolean;
+  name?: string;
   className?: string;
 }
 
@@ -27,6 +29,8 @@ export function WkRadioGroup({
   label,
   ariaLabel,
   disabled = false,
+  required = false,
+  name,
   className = "",
 }: WkRadioGroupProps) {
   return (
@@ -35,7 +39,10 @@ export function WkRadioGroup({
       value={value}
       onChange={onChange}
       isDisabled={disabled}
-      className={`space-y-2 ${className}`}
+      isRequired={required}
+      validationBehavior={required ? "native" : "aria"}
+      name={name}
+      className={className || "space-y-2"}
     >
       {label != null ? (
         <div className="text-[12px] font-bold text-wk-text-muted">{label}</div>
@@ -81,7 +88,7 @@ export function WkRadio({
             />
           </span>
           {children != null || description != null ? (
-            <span className="min-w-0">
+            <span className="min-w-0 flex-1">
               {children != null ? (
                 <span className="block font-semibold leading-snug">{children}</span>
               ) : null}

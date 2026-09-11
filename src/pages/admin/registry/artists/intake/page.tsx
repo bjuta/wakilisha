@@ -2,6 +2,8 @@ import { useCallback, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/lib/supabase";
 import { WkIcon } from "@/components/design-system/Icon";
+import { WkCheckbox } from "@/components/design-system/primitives/Checkbox";
+
 
 const INTAKE_API = `${import.meta.env.VITE_PUBLIC_SUPABASE_URL}/functions/v1/artist-registry-intake`;
 
@@ -569,17 +571,12 @@ export default function ArtistIntakePage() {
             <div className="mb-4 flex items-center justify-between rounded-2xl border border-[#dfe4d8] bg-white p-4">
               <div className="flex items-center gap-4">
                 {records.length > 0 && (
-                  <label className="flex items-center gap-2 cursor-pointer select-none">
-                    <input
-                      type="checkbox"
-                      checked={allPendingSelected}
-                      onChange={toggleSelectAll}
-                      className="h-4 w-4 cursor-pointer rounded border-[#c8d0be] text-[#5f8f2f] focus:ring-[#85c441]"
-                    />
+                  <WkCheckbox checked={allPendingSelected} onChange={toggleSelectAll} className="flex items-center gap-2 cursor-pointer select-none">
+
                     <span className="text-[13px] font-semibold text-[#697062]">
                       {allPendingSelected ? "Deselect all" : "Select all pending"}
                     </span>
-                  </label>
+                  </WkCheckbox>
                 )}
                 <div className="flex items-center gap-3">
                   <span className="text-[13px] text-[#697062]">
@@ -655,12 +652,11 @@ export default function ArtistIntakePage() {
                         <div className="flex items-start gap-4">
                           {/* Selection checkbox */}
                           <div className="shrink-0 pt-1">
-                            <input
-                              type="checkbox"
+                            <WkCheckbox
                               checked={isSelected}
                               onChange={() => toggleSelect(record.id)}
                               disabled={!isPending}
-                              className={`h-4 w-4 cursor-pointer rounded border-[#c8d0be] text-[#5f8f2f] focus:ring-[#85c441] ${!isPending ? "opacity-30 cursor-not-allowed" : ""}`}
+                              ariaLabel={`Select ${record.source_artist_name}`}
                             />
                           </div>
 

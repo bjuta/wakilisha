@@ -53,6 +53,43 @@ describe("WAKILISHA choice-control interaction contract", () => {
     expect(screen.queryByRole("listbox")).not.toBeInTheDocument();
   });
 
+  it("preserves grouped option children and raw HTML form values", async () => {
+    const user = userEvent.setup();
+
+    render(
+      <form data-testid="choice-form">
+        <WkSelect
+          ariaLabel="Grouped policy"
+          name="policy"
+          required
+        >
+          <option value="">Choose policy</option>
+          <optgroup label="Governed">
+            <option value="alpha">Alpha</option>
+            <option value="beta">Beta</option>
+          </optgroup>
+        </WkSelect>
+        <WkCheckbox name="consent" value="1" required>
+          Consent
+        </WkCheckbox>
+      </form>,
+    );
+
+    const trigger = screen.getByRole("button", { name: "Grouped policy" });
+    expect(trigger).toHaveTextContent("Choose policy");
+
+    await user.click(trigger);
+    await user.click(screen.getByRole("option", { name: "Beta" }));
+    await waitFor(() => expect(trigger).toHaveTextContent("Beta"));
+
+    await user.click(screen.getByRole("checkbox", { name: "Consent" }));
+
+    const form = screen.getByTestId("choice-form") as HTMLFormElement;
+    const data = new FormData(form);
+    expect(data.get("policy")).toBe("beta");
+    expect(data.get("consent")).toBe("1");
+  });
+
   it("toggles a checkbox with Space and exposes indeterminate state", async () => {
     const user = userEvent.setup();
 

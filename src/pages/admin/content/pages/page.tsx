@@ -5,6 +5,8 @@ import { WkSurface } from "@/components/design-system/primitives/Surface";
 import { AdminTable } from "@/components/design-system/admin/AdminTable";
 import { supabase } from "@/lib/supabase";
 import { decodeHtmlEntities } from "@/utils/decodeHtmlEntities";
+import { WkSelect } from "@/components/design-system/primitives/Select";
+
 
 interface PageSurface {
   slug: string;
@@ -98,16 +100,16 @@ export default function AdminPagesPage() {
             )}
           </div>
           <div className="flex items-center gap-2">
-            <select
+            <WkSelect
               value={statusFilter}
-              onChange={(e) => setStatusFilter(e.target.value)}
-              className="rounded-lg border border-wk-border bg-wk-surface px-3 py-2 text-[13px] text-wk-text outline-none cursor-pointer"
+              onChange={(value) => setStatusFilter(value)}
+              triggerClassName="rounded-lg border border-wk-border bg-wk-surface px-3 py-2 text-[13px] text-wk-text outline-none cursor-pointer"
             >
               <option value="all">All Status</option>
               {statusOptions.filter((s) => s !== "all").map((s) => (
                 <option key={s} value={s}>{s.charAt(0).toUpperCase() + s.slice(1)}</option>
               ))}
-            </select>
+            </WkSelect>
             <span className="text-[12px] text-wk-text-muted whitespace-nowrap">{filtered.length} of {pages.length}</span>
           </div>
         </div>

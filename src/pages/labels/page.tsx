@@ -9,6 +9,8 @@ import {
   type PublicLabel,
   type LabelCatalogStats,
 } from "@/services/publicContent/client";
+import { WkSelect } from "@/components/design-system/primitives/Select";
+
 
 type SortKey = "prominence" | "name" | "artists" | "releases";
 
@@ -557,15 +559,15 @@ function FilterSelect({ label, value, options, onChange }: { label: string; valu
   return (
     <label className="block">
       <span className="mb-1 block text-[10px] font-extrabold uppercase tracking-[0.16em] text-[var(--wk-text-faint)]">{label}</span>
-      <select
+      <WkSelect
         value={value}
-        onChange={(event) => onChange(event.target.value)}
-        className="w-full rounded-xl border border-[var(--wk-border)] bg-[var(--wk-bg)] px-3 py-2.5 text-[13px] font-bold text-[var(--wk-text)] outline-none cursor-pointer"
+        onChange={(value) => onChange(value)}
+        triggerClassName="w-full rounded-xl border border-[var(--wk-border)] bg-[var(--wk-bg)] px-3 py-2.5 text-[13px] font-bold text-[var(--wk-text)] outline-none cursor-pointer"
       >
         {options.map((option) => (
           <option key={option} value={option}>{sortOptionLabel(option)}</option>
         ))}
-      </select>
+      </WkSelect>
     </label>
   );
 }

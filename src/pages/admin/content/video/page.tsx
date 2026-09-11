@@ -12,6 +12,8 @@ import {
   type VideoAdminIndex,
   type VideoPublicationSummary,
 } from "@/services/video/videoAdminService";
+import { WkSelect } from "@/components/design-system/primitives/Select";
+
 
 type ComposerMode = "standalone" | "episode";
 type StatusFilter =
@@ -222,17 +224,17 @@ export default function AdminVideoPage() {
                 </label>
                 <label className="text-xs font-bold text-wk-text-muted">
                   Classification
-                  <select
+                  <WkSelect
                     value={classification}
-                    onChange={(event) => setClassification(event.target.value)}
-                    className="mt-1 w-full rounded-lg border border-wk-border bg-wk-bg px-3 py-3 text-sm text-wk-text"
+                    onChange={(value) => setClassification(value)}
+                    triggerClassName="mt-1 w-full rounded-lg border border-wk-border bg-wk-bg px-3 py-3 text-sm text-wk-text"
                   >
                     {index?.classifications.map((item) => (
                       <option key={item.key} value={item.key}>
                         {item.label}
                       </option>
                     ))}
-                  </select>
+                  </WkSelect>
                 </label>
               </div>
               <label className="block text-xs font-bold text-wk-text-muted">
@@ -258,14 +260,14 @@ export default function AdminVideoPage() {
               <div className="grid gap-4 lg:grid-cols-[1fr_1.5fr_1fr]">
                 <label className="text-xs font-bold text-wk-text-muted">
                   Shared Show
-                  <select
+                  <WkSelect
                     value={showId}
-                    onChange={(event) => {
-                      setShowId(event.target.value);
+                    onChange={(value) => {
+                      setShowId(value);
                       setEpisodeId("");
                     }}
                     required
-                    className="mt-1 w-full rounded-lg border border-wk-border bg-wk-bg px-3 py-3 text-sm text-wk-text"
+                    triggerClassName="mt-1 w-full rounded-lg border border-wk-border bg-wk-bg px-3 py-3 text-sm text-wk-text"
                   >
                     <option value="">Choose a Show</option>
                     {index?.shows.map((show) => (
@@ -273,16 +275,16 @@ export default function AdminVideoPage() {
                         {show.title}
                       </option>
                     ))}
-                  </select>
+                  </WkSelect>
                 </label>
                 <label className="text-xs font-bold text-wk-text-muted">
                   Shared Show Episode
-                  <select
+                  <WkSelect
                     value={episodeId}
-                    onChange={(event) => setEpisodeId(event.target.value)}
+                    onChange={(value) => setEpisodeId(value)}
                     required
                     disabled={!showId}
-                    className="mt-1 w-full rounded-lg border border-wk-border bg-wk-bg px-3 py-3 text-sm text-wk-text disabled:opacity-50"
+                    triggerClassName="mt-1 w-full rounded-lg border border-wk-border bg-wk-bg px-3 py-3 text-sm text-wk-text disabled:opacity-50"
                   >
                     <option value="">Choose an Episode</option>
                     {episodesForShow.map((episode) => (
@@ -293,21 +295,21 @@ export default function AdminVideoPage() {
                         {episode.title}
                       </option>
                     ))}
-                  </select>
+                  </WkSelect>
                 </label>
                 <label className="text-xs font-bold text-wk-text-muted">
                   Classification
-                  <select
+                  <WkSelect
                     value={classification}
-                    onChange={(event) => setClassification(event.target.value)}
-                    className="mt-1 w-full rounded-lg border border-wk-border bg-wk-bg px-3 py-3 text-sm text-wk-text"
+                    onChange={(value) => setClassification(value)}
+                    triggerClassName="mt-1 w-full rounded-lg border border-wk-border bg-wk-bg px-3 py-3 text-sm text-wk-text"
                   >
                     {index?.classifications.map((item) => (
                       <option key={item.key} value={item.key}>
                         {item.label}
                       </option>
                     ))}
-                  </select>
+                  </WkSelect>
                 </label>
               </div>
               {showId && !episodesForShow.length ? (

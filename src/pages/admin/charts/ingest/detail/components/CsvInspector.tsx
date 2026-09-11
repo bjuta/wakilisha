@@ -7,6 +7,8 @@ import { useState } from "react";
 import { WkSurface } from "@/components/design-system/primitives/Surface";
 import type { DiscoveredCsvSource } from "@/services/chartsIngestion/types";
 import { validateCsvMapping } from "@/services/chartsIngestion/csv/parser";
+import { WkSelect } from "@/components/design-system/primitives/Select";
+
 
 interface CsvInspectorProps {
   csv: DiscoveredCsvSource | null;
@@ -76,18 +78,18 @@ export function CsvInspector({
           </p>
         </div>
         <div className="flex items-center gap-2">
-          <select
+          <WkSelect
             value={selected.id}
-            onChange={(e) => {
-              const c = discoveredCsvs.find((d) => d.id === e.target.value);
+            onChange={(value) => {
+              const c = discoveredCsvs.find((d) => d.id === value);
               if (c) onSelectCsv(c);
             }}
-            className="rounded-md border border-[var(--wk-border)] bg-[var(--wk-bg)] px-3 py-1.5 text-[12px] text-[var(--wk-text)]"
+            triggerClassName="rounded-md border border-[var(--wk-border)] bg-[var(--wk-bg)] px-3 py-1.5 text-[12px] text-[var(--wk-text)]"
           >
             {discoveredCsvs.map((c) => (
               <option key={c.id} value={c.id}>{c.filename}</option>
             ))}
-          </select>
+          </WkSelect>
           <button
             onClick={() => onGoToPhase(2)}
             className="wk-button wk-button-sm wk-button-primary whitespace-nowrap"

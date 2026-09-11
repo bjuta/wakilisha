@@ -28,6 +28,8 @@ import {
   type PublishingProductionStage,
   type PublishingWorkspaceItem,
 } from "@/services/publishing/publishingWorkspaceService";
+import { WkSelect } from "@/components/design-system/primitives/Select";
+
 
 type PublishingTableRow = PublishingWorkspaceItem &
   Record<string, unknown>;
@@ -960,17 +962,17 @@ export default function AdminPublishingDashboardPage() {
             </div>
           </label>
 
-          <select
+          <WkSelect
             aria-label="Planning state"
             value={planningFilter}
-            onChange={(event) =>
+            onChange={(value) =>
               changePlanningFilter(
-                event.target.value as
+                value as
                   | PublishingPlanningState
                   | "all",
               )
             }
-            className="rounded-xl border border-wk-border bg-wk-surface px-3 py-2 text-[12px] text-wk-text outline-none"
+            triggerClassName="rounded-xl border border-wk-border bg-wk-surface px-3 py-2 text-[12px] text-wk-text outline-none"
           >
             <option value="all">All Planning States</option>
             {PUBLISHING_PLANNING_STATES.map((state) => (
@@ -978,15 +980,15 @@ export default function AdminPublishingDashboardPage() {
                 {formatChoice(state)}
               </option>
             ))}
-          </select>
+          </WkSelect>
 
-          <select
+          <WkSelect
             aria-label="Content type"
             value={contentKindFilter}
-            onChange={(event) =>
-              setCustomContentKindFilter(event.target.value)
+            onChange={(value) =>
+              setCustomContentKindFilter(value)
             }
-            className="rounded-xl border border-wk-border bg-wk-surface px-3 py-2 text-[12px] text-wk-text outline-none"
+            triggerClassName="rounded-xl border border-wk-border bg-wk-surface px-3 py-2 text-[12px] text-wk-text outline-none"
           >
             <option value="all">All Content Types</option>
             {contentKinds.map((kind) => (
@@ -994,19 +996,19 @@ export default function AdminPublishingDashboardPage() {
                 {kind.label}
               </option>
             ))}
-          </select>
+          </WkSelect>
 
-          <select
+          <WkSelect
             aria-label="Priority"
             value={priorityFilter}
-            onChange={(event) =>
+            onChange={(value) =>
               setPriorityFilter(
-                event.target.value as
+                value as
                   | PublishingPriority
                   | "all",
               )
             }
-            className="rounded-xl border border-wk-border bg-wk-surface px-3 py-2 text-[12px] text-wk-text outline-none"
+            triggerClassName="rounded-xl border border-wk-border bg-wk-surface px-3 py-2 text-[12px] text-wk-text outline-none"
           >
             <option value="all">All Priorities</option>
             {PUBLISHING_PRIORITIES.map((priority) => (
@@ -1014,15 +1016,15 @@ export default function AdminPublishingDashboardPage() {
                 {formatChoice(priority)}
               </option>
             ))}
-          </select>
+          </WkSelect>
 
-          <select
+          <WkSelect
             aria-label="Channel"
             value={channelFilter}
-            onChange={(event) =>
-              setCustomChannelFilter(event.target.value)
+            onChange={(value) =>
+              setCustomChannelFilter(value)
             }
-            className="rounded-xl border border-wk-border bg-wk-surface px-3 py-2 text-[12px] text-wk-text outline-none"
+            triggerClassName="rounded-xl border border-wk-border bg-wk-surface px-3 py-2 text-[12px] text-wk-text outline-none"
           >
             <option value="all">All Channels</option>
             {channels.map((channel) => (
@@ -1030,15 +1032,15 @@ export default function AdminPublishingDashboardPage() {
                 {channel.label}
               </option>
             ))}
-          </select>
+          </WkSelect>
 
-          <select
+          <WkSelect
             aria-label="Owner"
             value={ownerFilter}
-            onChange={(event) =>
-              setCustomOwnerFilter(event.target.value)
+            onChange={(value) =>
+              setCustomOwnerFilter(value)
             }
-            className="rounded-xl border border-wk-border bg-wk-surface px-3 py-2 text-[12px] text-wk-text outline-none xl:col-start-5"
+            triggerClassName="rounded-xl border border-wk-border bg-wk-surface px-3 py-2 text-[12px] text-wk-text outline-none xl:col-start-5"
           >
             <option value="all">All Owners</option>
             {ownerOptions.map((owner) => (
@@ -1046,7 +1048,7 @@ export default function AdminPublishingDashboardPage() {
                 {owner.label}
               </option>
             ))}
-          </select>
+          </WkSelect>
 
           <button
             type="button"

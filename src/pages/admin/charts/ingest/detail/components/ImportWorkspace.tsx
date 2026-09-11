@@ -13,6 +13,8 @@ import {
   getDisabledReason,
 } from "@/services/chartsIngestion/client";
 import type { UserRole } from "@/services/chartsIngestion/client";
+import { WkSelect } from "@/components/design-system/primitives/Select";
+
 
 interface ImportWorkspaceProps {
   jobId: string;
@@ -72,16 +74,16 @@ export function ImportWorkspace({
           </p>
         </div>
         <div className="flex items-center gap-2">
-          <select
+          <WkSelect
             value={filter}
-            onChange={(e) => setFilter(e.target.value as typeof filter)}
-            className="rounded-md border border-[var(--wk-border)] bg-[var(--wk-bg)] px-3 py-1.5 text-[12px] text-[var(--wk-text)]"
+            onChange={(value) => setFilter(value as typeof filter)}
+            triggerClassName="rounded-md border border-[var(--wk-border)] bg-[var(--wk-bg)] px-3 py-1.5 text-[12px] text-[var(--wk-text)]"
           >
             <option value="all">All Files</option>
             <option value="ready">Ready to Import</option>
             <option value="warnings">Warnings</option>
             <option value="errors">Errors</option>
-          </select>
+          </WkSelect>
         </div>
       </div>
 

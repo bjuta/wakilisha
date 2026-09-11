@@ -9,6 +9,8 @@ import {
   fetchPlaylistsForAdmin,
   type AdminPlaylistListItem,
 } from "@/services/playlists/playlistAdminService";
+import { WkSelect } from "@/components/design-system/primitives/Select";
+
 
 export default function AdminPlaylistsPage() {
   const navigate = useNavigate();
@@ -98,10 +100,10 @@ export default function AdminPlaylistsPage() {
               </button>
             ) : null}
           </div>
-          <select
+          <WkSelect
             value={status}
-            onChange={(event) => setStatus(event.target.value)}
-            className="rounded-lg border border-wk-border bg-wk-surface px-3 py-2 text-[13px] text-wk-text outline-none"
+            onChange={(value) => setStatus(value)}
+            triggerClassName="rounded-lg border border-wk-border bg-wk-surface px-3 py-2 text-[13px] text-wk-text outline-none"
           >
             <option value="all">All statuses</option>
             {statusOptions.map((option) => (
@@ -109,7 +111,7 @@ export default function AdminPlaylistsPage() {
                 {humanizeAdminStatus(option)}
               </option>
             ))}
-          </select>
+          </WkSelect>
           <span className="text-[12px] text-wk-text-muted">
             {filtered.length} of {playlists.length}
           </span>

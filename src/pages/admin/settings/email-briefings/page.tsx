@@ -11,6 +11,8 @@ import type { ContentPickerOutput } from "./components/ContentPicker";
 import {
   AreaChart, Area, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
 } from "recharts";
+import { WkSelect } from "@/components/design-system/primitives/Select";
+
 
 const ContentPicker = lazy(() => import("./components/ContentPicker"));
 
@@ -452,12 +454,12 @@ export default function AdminSettingsEmailBriefings() {
       {tab === "subscribers" && (
         <div className="space-y-4">
           <div className="flex items-center gap-3">
-            <select value={subsFilter} onChange={(e) => setSubsFilter(e.target.value)} className="rounded-lg border border-[var(--wk-border)] bg-[var(--wk-surface)] px-3 py-2 text-[13px] text-[var(--wk-text)] focus:border-[var(--wk-brand)] focus:outline-none focus:ring-1 focus:ring-[var(--wk-brand)]">
+            <WkSelect value={subsFilter} onChange={(value) => setSubsFilter(value)} triggerClassName="rounded-lg border border-[var(--wk-border)] bg-[var(--wk-surface)] px-3 py-2 text-[13px] text-[var(--wk-text)] focus:border-[var(--wk-brand)] focus:outline-none focus:ring-1 focus:ring-[var(--wk-brand)]">
               <option value="">All Statuses</option>
               <option value="confirmed">Confirmed</option>
               <option value="pending">Pending</option>
               <option value="unsubscribed">Unsubscribed</option>
-            </select>
+            </WkSelect>
             <span className="text-[11px] text-[var(--wk-text-muted)]">{subscribers.length} subscriber{subscribers.length !== 1 ? "s" : ""}</span>
           </div>
           {subsLoading && <WkSurface className="p-8 flex items-center justify-center gap-3 text-[13px] text-[var(--wk-text-muted)]"><span className="flex h-4 w-4 items-center justify-center"><WkIcon name="Loader" size={16} className="animate-spin" /></span>Loading...</WkSurface>}
@@ -644,16 +646,16 @@ export default function AdminSettingsEmailBriefings() {
             {/* Briefing selector */}
             <div className="flex items-center gap-3 flex-wrap">
               <label className="text-[12px] font-semibold text-[var(--wk-text-muted)] whitespace-nowrap">For briefing:</label>
-              <select
+              <WkSelect
                 value={editorBriefingSlug}
-                onChange={(e) => setEditorBriefingSlug(e.target.value)}
-                className="rounded-lg border border-[var(--wk-border)] bg-[var(--wk-bg)] px-3 py-2 text-[13px] text-[var(--wk-text)] focus:border-[var(--wk-brand)] focus:outline-none"
+                onChange={(value) => setEditorBriefingSlug(value)}
+                triggerClassName="rounded-lg border border-[var(--wk-border)] bg-[var(--wk-bg)] px-3 py-2 text-[13px] text-[var(--wk-text)] focus:border-[var(--wk-brand)] focus:outline-none"
               >
                 <option value="">Select a briefing...</option>
                 {catalog.map((b) => (
                   <option key={b.id} value={b.slug}>{b.title}{!b.is_active ? " (inactive)" : ""}</option>
                 ))}
-              </select>
+              </WkSelect>
             </div>
 
             {editorError && (
@@ -694,7 +696,7 @@ export default function AdminSettingsEmailBriefings() {
           <div><h2 className="text-[14px] font-bold text-[var(--wk-text)] mb-1">Send a test email</h2><p className="text-[12px] text-[var(--wk-text-muted)]">Preview how your briefing will look with real content and your current identity settings.</p></div>
           <div className="grid gap-4 sm:grid-cols-2">
             <div><label className="block text-[12px] font-semibold text-[var(--wk-text-muted)] mb-1.5">Recipient Email</label><input type="email" value={testEmail} onChange={(e) => setTestEmail(e.target.value)} placeholder="you@example.com" className="w-full rounded-lg border border-[var(--wk-border)] bg-[var(--wk-bg)] px-3 py-2 text-[13px] text-[var(--wk-text)] focus:border-[var(--wk-brand)] focus:outline-none focus:ring-1 focus:ring-[var(--wk-brand)]" /></div>
-            <div><label className="block text-[12px] font-semibold text-[var(--wk-text-muted)] mb-1.5">Briefing (optional)</label><select value={testBriefingSlug} onChange={(e) => setTestBriefingSlug(e.target.value)} className="w-full rounded-lg border border-[var(--wk-border)] bg-[var(--wk-bg)] px-3 py-2 text-[13px] text-[var(--wk-text)] focus:border-[var(--wk-brand)] focus:outline-none focus:ring-1 focus:ring-[var(--wk-brand)]"><option value="">Generic test email</option>{catalog.filter((b) => b.is_active).map((b) => (<option key={b.id} value={b.slug}>{b.title}</option>))}</select></div>
+            <div><label className="block text-[12px] font-semibold text-[var(--wk-text-muted)] mb-1.5">Briefing (optional)</label><WkSelect value={testBriefingSlug} onChange={(value) => setTestBriefingSlug(value)} triggerClassName="w-full rounded-lg border border-[var(--wk-border)] bg-[var(--wk-bg)] px-3 py-2 text-[13px] text-[var(--wk-text)] focus:border-[var(--wk-brand)] focus:outline-none focus:ring-1 focus:ring-[var(--wk-brand)]"><option value="">Generic test email</option>{catalog.filter((b) => b.is_active).map((b) => (<option key={b.id} value={b.slug}>{b.title}</option>))}</WkSelect></div>
           </div>
           <button onClick={handleSendTest} disabled={testSending || !testEmail} className="wk-button wk-button-primary wk-button-sm flex items-center gap-2">
             {testSending ? <span className="flex h-3.5 w-3.5 items-center justify-center"><WkIcon name="Loader" size={14} className="animate-spin" /></span> : <span className="flex h-3.5 w-3.5 items-center justify-center"><WkIcon name="Send" size={14} /></span>}

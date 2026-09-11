@@ -10,6 +10,8 @@ import {
   fetchArticlesForAdminList,
   type AdminArticleListItem,
 } from "@/services/articles/articleAdminService";
+import { WkSelect } from "@/components/design-system/primitives/Select";
+
 
 export default function AdminArticlesPage() {
   const navigate = useNavigate();
@@ -122,10 +124,10 @@ export default function AdminArticlesPage() {
             ) : null}
           </div>
           <div className="flex items-center gap-2">
-            <select
+            <WkSelect
               value={statusFilter}
-              onChange={(event) => setStatusFilter(event.target.value)}
-              className="cursor-pointer rounded-lg border border-wk-border bg-wk-surface px-3 py-2 text-[13px] text-wk-text outline-none"
+              onChange={(value) => setStatusFilter(value)}
+              triggerClassName="cursor-pointer rounded-lg border border-wk-border bg-wk-surface px-3 py-2 text-[13px] text-wk-text outline-none"
             >
               <option value="all">All Status</option>
               {statusOptions
@@ -135,16 +137,16 @@ export default function AdminArticlesPage() {
                     {status.charAt(0).toUpperCase() + status.slice(1)}
                   </option>
                 ))}
-            </select>
-            <select
+            </WkSelect>
+            <WkSelect
               value={heroFilter}
-              onChange={(event) => setHeroFilter(event.target.value)}
-              className="cursor-pointer rounded-lg border border-wk-border bg-wk-surface px-3 py-2 text-[13px] text-wk-text outline-none"
+              onChange={(value) => setHeroFilter(value)}
+              triggerClassName="cursor-pointer rounded-lg border border-wk-border bg-wk-surface px-3 py-2 text-[13px] text-wk-text outline-none"
             >
               <option value="all">All Images</option>
               <option value="has">Has hero image</option>
               <option value="missing">No hero image</option>
-            </select>
+            </WkSelect>
             <span className="whitespace-nowrap text-[12px] text-wk-text-muted">
               {filtered.length} of {articles.length}
             </span>

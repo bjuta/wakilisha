@@ -10,6 +10,8 @@ import AdminReleaseTracklist from "./components/AdminReleaseTracklist";
 import type { TrackItem, TrackArtistRecord } from "./components/AdminReleaseTracklist";
 import AdminReleaseExcerpt from "./components/AdminReleaseExcerpt";
 import AdminReleaseSidebar from "./components/AdminReleaseSidebar";
+import { WkSelect } from "@/components/design-system/primitives/Select";
+
 
 /* ─── Types ─── */
 
@@ -422,7 +424,7 @@ export default function ReleaseDetailPage() {
                   <div className="grid gap-4 sm:grid-cols-3">
                     <div>
                       <label className="block text-[11px] font-bold uppercase tracking-wider text-[var(--wk-text-muted)] mb-2">Type</label>
-                      <select value={draft.release_type} onChange={(e) => patchDraft({ release_type: e.target.value })} className="w-full rounded-lg border border-[var(--wk-border)] bg-[var(--wk-bg)] px-3 py-2.5 text-[13px] text-[var(--wk-text)] outline-none focus:border-[var(--wk-brand)] cursor-pointer">
+                      <WkSelect value={draft.release_type} onChange={(value) => patchDraft({ release_type: value })} triggerClassName="w-full rounded-lg border border-[var(--wk-border)] bg-[var(--wk-bg)] px-3 py-2.5 text-[13px] text-[var(--wk-text)] outline-none focus:border-[var(--wk-brand)] cursor-pointer">
                         <option value="">Select type</option>
                         <option value="album">Album</option>
                         <option value="single">Single</option>
@@ -432,16 +434,16 @@ export default function ReleaseDetailPage() {
                         <option value="live">Live</option>
                         <option value="remix">Remix</option>
                         <option value="soundtrack">Soundtrack</option>
-                      </select>
+                      </WkSelect>
                     </div>
                     <div>
                       <label className="block text-[11px] font-bold uppercase tracking-wider text-[var(--wk-text-muted)] mb-2">Status</label>
-                      <select value={draft.status} onChange={(e) => patchDraft({ status: e.target.value })} className="w-full rounded-lg border border-[var(--wk-border)] bg-[var(--wk-bg)] px-3 py-2.5 text-[13px] text-[var(--wk-text)] outline-none focus:border-[var(--wk-brand)] cursor-pointer">
+                      <WkSelect value={draft.status} onChange={(value) => patchDraft({ status: value })} triggerClassName="w-full rounded-lg border border-[var(--wk-border)] bg-[var(--wk-bg)] px-3 py-2.5 text-[13px] text-[var(--wk-text)] outline-none focus:border-[var(--wk-brand)] cursor-pointer">
                         <option value="active">Active</option>
                         <option value="draft">Draft</option>
                         <option value="needs_review">Needs Review</option>
                         <option value="archived">Archived</option>
-                      </select>
+                      </WkSelect>
                     </div>
                     <div>
                       <label className="block text-[11px] font-bold uppercase tracking-wider text-[var(--wk-text-muted)] mb-2">Release Date</label>
@@ -449,12 +451,12 @@ export default function ReleaseDetailPage() {
                     </div>
                     <div>
                       <label className="block text-[11px] font-bold uppercase tracking-wider text-[var(--wk-text-muted)] mb-2">Date Precision</label>
-                      <select value={draft.release_date_precision} onChange={(e) => patchDraft({ release_date_precision: e.target.value })} className="w-full rounded-lg border border-[var(--wk-border)] bg-[var(--wk-bg)] px-3 py-2.5 text-[13px] text-[var(--wk-text)] outline-none focus:border-[var(--wk-brand)] cursor-pointer">
+                      <WkSelect value={draft.release_date_precision} onChange={(value) => patchDraft({ release_date_precision: value })} triggerClassName="w-full rounded-lg border border-[var(--wk-border)] bg-[var(--wk-bg)] px-3 py-2.5 text-[13px] text-[var(--wk-text)] outline-none focus:border-[var(--wk-brand)] cursor-pointer">
                         <option value="">Unknown</option>
                         <option value="day">Day</option>
                         <option value="month">Month</option>
                         <option value="year">Year</option>
-                      </select>
+                      </WkSelect>
                     </div>
                     <div>
                       <label className="block text-[11px] font-bold uppercase tracking-wider text-[var(--wk-text-muted)] mb-2">UPC</label>

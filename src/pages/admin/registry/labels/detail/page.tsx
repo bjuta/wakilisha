@@ -5,6 +5,8 @@ import { WkSurface } from "@/components/design-system/primitives/Surface";
 import { supabase } from "@/lib/supabase";
 import { useRelatedEntities } from "@/hooks/useRelatedEntities";
 import type { ResolvedRelation } from "@/hooks/useRelatedEntities";
+import { WkSelect } from "@/components/design-system/primitives/Select";
+
 
 interface LabelRecord {
   id: string;
@@ -239,12 +241,12 @@ export default function LabelDetailPage() {
               </div>
               <div>
                 <label className="block text-[11px] font-bold uppercase tracking-wider text-wk-text-muted mb-2">Status</label>
-                <select value={draft.status} onChange={(e) => patchDraft({ status: e.target.value })} className="w-full rounded-lg border border-wk-border bg-wk-bg-subtle px-3 py-2.5 text-[13px] text-wk-text outline-none focus:border-wk-brand cursor-pointer">
+                <WkSelect value={draft.status} onChange={(value) => patchDraft({ status: value })} triggerClassName="w-full rounded-lg border border-wk-border bg-wk-bg-subtle px-3 py-2.5 text-[13px] text-wk-text outline-none focus:border-wk-brand cursor-pointer">
                   <option value="active">Active</option>
                   <option value="draft">Draft</option>
                   <option value="needs_review">Needs Review</option>
                   <option value="archived">Archived</option>
-                </select>
+                </WkSelect>
               </div>
             </div>
           </WkSurface>

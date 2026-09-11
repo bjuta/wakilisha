@@ -6,6 +6,8 @@ import { useTheme, type ThemeMode } from "@/components/design-system/theme/Theme
 import { WakilishaToggle } from "@/components/design-system/primitives/WakilishaToggle";
 import { MessagesSettingsPane } from "@/pages/settings/components/MessagesSettingsPane";
 import { supabase } from "@/lib/supabase";
+import { WkSelect } from "@/components/design-system/primitives/Select";
+
 
 type SettingsTab = "Account" | "Appearance" | "Notifications" | "Messages" | "Playback" | "Privacy" | "Danger";
 
@@ -525,14 +527,14 @@ export default function MobileSettingsPage() {
 
             <div>
               <div className="text-[11px] font-bold text-[var(--wk-text-faint)] uppercase tracking-wider mb-2">Density</div>
-              <select
-                className="w-full h-[44px] px-4 rounded-xl bg-[var(--wk-surface)] border border-[var(--wk-border)] text-[var(--wk-text)] text-sm font-bold focus:outline-none focus:border-[var(--wk-brand)] cursor-pointer"
+              <WkSelect
+                triggerClassName="w-full h-[44px] px-4 rounded-xl bg-[var(--wk-surface)] border border-[var(--wk-border)] text-[var(--wk-text)] text-sm font-bold focus:outline-none focus:border-[var(--wk-brand)] cursor-pointer"
                 value={appearance.density}
-                onChange={(e) => updateAppearance({ density: e.target.value as any })}
+                onChange={(value) => updateAppearance({ density: value as any })}
               >
                 <option>Comfortable</option>
                 <option>Compact</option>
-              </select>
+              </WkSelect>
             </div>
           </div>
         )}
@@ -687,15 +689,15 @@ export default function MobileSettingsPage() {
                 <div className="text-[13px] font-bold text-[var(--wk-text)]">Playback quality</div>
                 <div className="text-[11px] text-[var(--wk-text-muted)] mt-0.5">Default stream quality</div>
               </div>
-              <select
-                className="h-[40px] px-3 rounded-xl bg-[var(--wk-surface)] border border-[var(--wk-border)] text-[var(--wk-text)] text-sm font-bold cursor-pointer"
+              <WkSelect
+                triggerClassName="h-[40px] px-3 rounded-xl bg-[var(--wk-surface)] border border-[var(--wk-border)] text-[var(--wk-text)] text-sm font-bold cursor-pointer"
                 value={playback.playbackQuality}
-                onChange={(e) => updatePlayback({ playbackQuality: e.target.value as any })}
+                onChange={(value) => updatePlayback({ playbackQuality: value as any })}
               >
                 <option>Auto</option>
                 <option>High</option>
                 <option>Data saver</option>
-              </select>
+              </WkSelect>
             </div>
           </div>
         )}

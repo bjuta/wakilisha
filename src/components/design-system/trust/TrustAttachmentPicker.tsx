@@ -1,4 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
+import { WkSelect } from "@/components/design-system/primitives/Select";
+
 
 export interface TrustAttachmentOption {
   id: string;
@@ -43,18 +45,18 @@ export function TrustAttachmentPicker({
     <div className="mt-3 flex flex-col gap-2 sm:flex-row">
       <label className="min-w-0 flex-1 text-xs font-bold text-wk-text-muted">
         Choose {noun}
-        <select
+        <WkSelect
           value={selectedId}
-          onChange={(event) => setSelectedId(event.target.value)}
+          onChange={(value) => setSelectedId(value)}
           disabled={disabled}
-          className="mt-1 w-full rounded-lg border border-wk-border bg-wk-bg px-3 py-2 text-xs text-wk-text disabled:opacity-60"
+          triggerClassName="mt-1 w-full rounded-lg border border-wk-border bg-wk-bg px-3 py-2 text-xs text-wk-text disabled:opacity-60"
         >
           {available.map((option) => (
             <option key={option.id} value={option.id}>
               {option.detail ? `${option.label} · ${option.detail}` : option.label}
             </option>
           ))}
-        </select>
+        </WkSelect>
       </label>
 
       <button

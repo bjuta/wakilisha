@@ -5,6 +5,8 @@ import { WkSurface } from "@/components/design-system/primitives/Surface";
 import { AdminTable } from "@/components/design-system/admin/AdminTable";
 import { supabase } from "@/lib/supabase";
 import { decodeHtmlEntities } from "@/utils/decodeHtmlEntities";
+import { WkSelect } from "@/components/design-system/primitives/Select";
+
 
 /* ─── Types ─── */
 
@@ -163,15 +165,15 @@ export default function AdminContentArchivePage() {
       {/* Filters */}
       <WkSurface className="p-4">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
-          <select
+          <WkSelect
             value={typeFilter}
-            onChange={(e) => setTypeFilter(e.target.value)}
-            className="rounded-lg border border-wk-border bg-wk-surface px-3 py-2 text-[13px] text-wk-text outline-none cursor-pointer"
+            onChange={(value) => setTypeFilter(value)}
+            triggerClassName="rounded-lg border border-wk-border bg-wk-surface px-3 py-2 text-[13px] text-wk-text outline-none cursor-pointer"
           >
             {typeOptions.map((opt) => (
               <option key={opt.value} value={opt.value}>{opt.label}</option>
             ))}
-          </select>
+          </WkSelect>
           <span className="text-[12px] text-wk-text-muted whitespace-nowrap">
             {filtered.length} of {items.length}
           </span>

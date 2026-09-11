@@ -18,6 +18,8 @@ import type {
 import type { ChartFamily } from "@/services/chartsIngestion/types";
 import { getEligibilityProfiles } from "@/services/chartsEligibility/eligibilityStore";
 import { getMarketScopes } from "@/services/chartsMarkets/marketScopeStore";
+import { WkSelect } from "@/components/design-system/primitives/Select";
+
 
 const INPUT_CLASS = "w-full rounded-md border border-wk-border bg-wk-surface px-3 py-2 text-[13px] text-wk-text outline-none focus:border-wk-brand";
 const LABEL_CLASS = "mb-1 block text-[11px] font-bold uppercase tracking-[0.12em] text-wk-text-muted";
@@ -263,13 +265,13 @@ export default function AdminChartsBackfillPlanner() {
         <div className="grid gap-4 lg:grid-cols-3">
           <div>
             <label className={LABEL_CLASS}>Chart family</label>
-            <select value={familyId} onChange={(event) => setFamilyId(event.target.value)} className={INPUT_CLASS}>
+            <WkSelect value={familyId} onChange={(value) => setFamilyId(value)} triggerClassName={INPUT_CLASS}>
               {families.map((family) => (
                 <option key={family.id} value={family.id}>
                   {family.label}
                 </option>
               ))}
-            </select>
+            </WkSelect>
           </div>
 
           <div>
@@ -294,32 +296,32 @@ export default function AdminChartsBackfillPlanner() {
 
           <div>
             <label className={LABEL_CLASS}>Chart kind</label>
-            <select value={config.chartKind} onChange={(event) => setConfig({ ...config, chartKind: event.target.value as "tracks" | "releases" })} className={INPUT_CLASS}>
+            <WkSelect value={config.chartKind} onChange={(value) => setConfig({ ...config, chartKind: value as "tracks" | "releases" })} triggerClassName={INPUT_CLASS}>
               <option value="tracks">Tracks</option>
               <option value="releases">Releases</option>
-            </select>
+            </WkSelect>
           </div>
 
           <div>
             <label className={LABEL_CLASS}>Eligibility profile</label>
-            <select value={config.eligibilityProfileId} onChange={(event) => setConfig({ ...config, eligibilityProfileId: event.target.value })} className={INPUT_CLASS}>
+            <WkSelect value={config.eligibilityProfileId} onChange={(value) => setConfig({ ...config, eligibilityProfileId: value })} triggerClassName={INPUT_CLASS}>
               {eligibilityProfiles.map((profile) => (
                 <option key={profile.id} value={profile.id}>
                   {profile.name}
                 </option>
               ))}
-            </select>
+            </WkSelect>
           </div>
 
           <div>
             <label className={LABEL_CLASS}>Market scope</label>
-            <select value={config.marketScopeId} onChange={(event) => setConfig({ ...config, marketScopeId: event.target.value })} className={INPUT_CLASS}>
+            <WkSelect value={config.marketScopeId} onChange={(value) => setConfig({ ...config, marketScopeId: value })} triggerClassName={INPUT_CLASS}>
               {marketScopes.map((scope) => (
                 <option key={scope.id} value={scope.id}>
                   {scope.name}
                 </option>
               ))}
-            </select>
+            </WkSelect>
           </div>
 
           <div>

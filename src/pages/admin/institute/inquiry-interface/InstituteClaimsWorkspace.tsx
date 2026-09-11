@@ -1,5 +1,7 @@
 import { useMemo, useState, type ReactNode } from "react";
 import type { EvidenceItem, InquiryDraft } from "./types";
+import { WkSelect } from "@/components/design-system/primitives/Select";
+
 
 type EvidenceRelation =
   | "supports"
@@ -506,15 +508,15 @@ export function InstituteClaimsWorkspace({
                 Note type
               </span>
 
-              <select
+              <WkSelect
                 value={noteType}
-                onChange={(event) => setNoteType(event.target.value)}
-                className="w-full rounded-lg border border-wk-border bg-wk-bg px-3 py-2.5 text-[13px] font-bold text-wk-text"
+                onChange={(value) => setNoteType(value)}
+                triggerClassName="w-full rounded-lg border border-wk-border bg-wk-bg px-3 py-2.5 text-[13px] font-bold text-wk-text"
               >
                 {noteTypes.map((option) => (
                   <option key={option}>{option}</option>
                 ))}
-              </select>
+              </WkSelect>
             </label>
 
             <label>
@@ -564,15 +566,15 @@ export function InstituteClaimsWorkspace({
                   Kind
                 </span>
 
-                <select
+                <WkSelect
                   value={findingKind}
-                  onChange={(event) => setFindingKind(event.target.value)}
-                  className="w-full rounded-lg border border-wk-border bg-wk-bg px-3 py-2.5 text-[13px] font-bold text-wk-text"
+                  onChange={(value) => setFindingKind(value)}
+                  triggerClassName="w-full rounded-lg border border-wk-border bg-wk-bg px-3 py-2.5 text-[13px] font-bold text-wk-text"
                 >
                   {findingKinds.map((option) => (
                     <option key={option}>{option}</option>
                   ))}
-                </select>
+                </WkSelect>
               </label>
 
               <label>
@@ -580,17 +582,17 @@ export function InstituteClaimsWorkspace({
                   Confidence
                 </span>
 
-                <select
+                <WkSelect
                   value={confidence}
-                  onChange={(event) =>
-                    setConfidence(event.target.value as Confidence)
+                  onChange={(value) =>
+                    setConfidence(value as Confidence)
                   }
-                  className="w-full rounded-lg border border-wk-border bg-wk-bg px-3 py-2.5 text-[13px] font-bold text-wk-text"
+                  triggerClassName="w-full rounded-lg border border-wk-border bg-wk-bg px-3 py-2.5 text-[13px] font-bold text-wk-text"
                 >
                   <option>Low</option>
                   <option>Medium</option>
                   <option>High</option>
-                </select>
+                </WkSelect>
               </label>
             </div>
 
@@ -682,21 +684,20 @@ export function InstituteClaimsWorkspace({
 
                   {selected ? (
                     <div className="mt-3">
-                      <select
+                      <WkSelect
                         value={relation}
-                        onChange={(event) =>
+                        onChange={(value) =>
                           setRelations((current) => ({
                             ...current,
-                            [item.id]: event.target
-                              .value as EvidenceRelation,
+                            [item.id]: value as EvidenceRelation,
                           }))
                         }
-                        className="w-full rounded-lg border border-wk-border bg-wk-surface px-3 py-2 text-[12px] font-bold text-wk-text"
+                        triggerClassName="w-full rounded-lg border border-wk-border bg-wk-surface px-3 py-2 text-[12px] font-bold text-wk-text"
                       >
                         {relationOptions.map((option) => (
                           <option key={option}>{option}</option>
                         ))}
-                      </select>
+                      </WkSelect>
 
                       <div className="mt-2">
                         <Pill tone={relationTone(relation)}>

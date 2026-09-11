@@ -21,6 +21,10 @@ import {
 } from "@/services/mediaService";
 import { MediaEditModal } from "@/components/admin/media/MediaEditModal";
 import { MediaLibraryPreviewPanel } from "@/components/admin/media/MediaLibraryPreviewPanel";
+import { WkSelect } from "@/components/design-system/primitives/Select";
+import { WkCheckbox } from "@/components/design-system/primitives/Checkbox";
+
+
 
 // ─── Types ───────────────────────────────────────────────────
 
@@ -698,16 +702,16 @@ export function MediaLibraryCore({
           </div>
 
           <div className="flex flex-wrap gap-1.5">
-            <select value={folderIdFilter} onChange={(e) => { setFolderIdFilter(e.target.value); setPage(0); }}
-              className="rounded-lg border border-wk-border bg-wk-surface px-2.5 py-2 text-[12px] text-wk-text outline-none cursor-pointer">
+            <WkSelect value={folderIdFilter} onChange={(value) => { setFolderIdFilter(value); setPage(0); }}
+              triggerClassName="rounded-lg border border-wk-border bg-wk-surface px-2.5 py-2 text-[12px] text-wk-text outline-none cursor-pointer">
               <option value="all">All folders</option>
               <option value="none">No folder</option>
               {folders.map((folder) => (
                 <option key={folder.id} value={folder.id}>{folder.name}</option>
               ))}
-            </select>
-            <select value={fileKindFilter} onChange={(e) => { setFileKindFilter(e.target.value); setPage(0); }}
-              className="rounded-lg border border-wk-border bg-wk-surface px-2.5 py-2 text-[12px] text-wk-text outline-none cursor-pointer">
+            </WkSelect>
+            <WkSelect value={fileKindFilter} onChange={(value) => { setFileKindFilter(value); setPage(0); }}
+              triggerClassName="rounded-lg border border-wk-border bg-wk-surface px-2.5 py-2 text-[12px] text-wk-text outline-none cursor-pointer">
               <option value="all">All file kinds</option>
               <option value="image">Images</option>
               <option value="document">Documents</option>
@@ -717,9 +721,9 @@ export function MediaLibraryCore({
               <option value="caption">Captions</option>
               <option value="archive">Archives</option>
               <option value="other">Other</option>
-            </select>
-            <select value={assetPurposeFilter} onChange={(e) => { setAssetPurposeFilter(e.target.value); setPage(0); }}
-              className="rounded-lg border border-wk-border bg-wk-surface px-2.5 py-2 text-[12px] text-wk-text outline-none cursor-pointer">
+            </WkSelect>
+            <WkSelect value={assetPurposeFilter} onChange={(value) => { setAssetPurposeFilter(value); setPage(0); }}
+              triggerClassName="rounded-lg border border-wk-border bg-wk-surface px-2.5 py-2 text-[12px] text-wk-text outline-none cursor-pointer">
               <option value="all">All purposes</option>
               <option value="general">General</option>
               <option value="article_hero">Article hero</option>
@@ -734,17 +738,17 @@ export function MediaLibraryCore({
               <option value="profile_media">Profile media</option>
               <option value="social_card">Social card</option>
               <option value="system">System</option>
-            </select>
-            <select value={mediaKindFilter} onChange={(e) => { setMediaKindFilter(e.target.value); setPage(0); }}
-              className="rounded-lg border border-wk-border bg-wk-surface px-2.5 py-2 text-[12px] text-wk-text outline-none cursor-pointer">
+            </WkSelect>
+            <WkSelect value={mediaKindFilter} onChange={(value) => { setMediaKindFilter(value); setPage(0); }}
+              triggerClassName="rounded-lg border border-wk-border bg-wk-surface px-2.5 py-2 text-[12px] text-wk-text outline-none cursor-pointer">
               <option value="all">All legacy types</option>
               <option value="image">Legacy image</option>
               <option value="document">Legacy document</option>
               <option value="external_artist_image_postmeta">Artist postmeta</option>
               <option value="external_chart_entry_artwork">Chart artwork</option>
-            </select>
-            <select value={rightsStatusFilter} onChange={(e) => { setRightsStatusFilter(e.target.value); setPage(0); }}
-              className="rounded-lg border border-wk-border bg-wk-surface px-2.5 py-2 text-[12px] text-wk-text outline-none cursor-pointer">
+            </WkSelect>
+            <WkSelect value={rightsStatusFilter} onChange={(value) => { setRightsStatusFilter(value); setPage(0); }}
+              triggerClassName="rounded-lg border border-wk-border bg-wk-surface px-2.5 py-2 text-[12px] text-wk-text outline-none cursor-pointer">
               <option value="all">All rights</option>
               <option value="unknown">Unknown rights</option>
               <option value="owned">Owned</option>
@@ -753,27 +757,27 @@ export function MediaLibraryCore({
               <option value="fair_use">Fair use</option>
               <option value="needs_clearance">Needs clearance</option>
               <option value="restricted">Restricted</option>
-            </select>
-            <select value={sourceKindFilter} onChange={(e) => { setSourceKindFilter(e.target.value); setPage(0); }}
-              className="rounded-lg border border-wk-border bg-wk-surface px-2.5 py-2 text-[12px] text-wk-text outline-none cursor-pointer">
+            </WkSelect>
+            <WkSelect value={sourceKindFilter} onChange={(value) => { setSourceKindFilter(value); setPage(0); }}
+              triggerClassName="rounded-lg border border-wk-border bg-wk-surface px-2.5 py-2 text-[12px] text-wk-text outline-none cursor-pointer">
               <option value="all">All sources</option>
               <option value="editor_upload">Uploaded</option>
               <option value="external_artist_image_postmeta">Artist postmeta</option>
               <option value="external_chart_entry_artwork">Chart artwork</option>
-            </select>
-            <select value={statusFilter} onChange={(e) => { setStatusFilter(e.target.value); setPage(0); }}
-              className="rounded-lg border border-wk-border bg-wk-surface px-2.5 py-2 text-[12px] text-wk-text outline-none cursor-pointer">
+            </WkSelect>
+            <WkSelect value={statusFilter} onChange={(value) => { setStatusFilter(value); setPage(0); }}
+              triggerClassName="rounded-lg border border-wk-border bg-wk-surface px-2.5 py-2 text-[12px] text-wk-text outline-none cursor-pointer">
               <option value="all">All statuses</option>
               <option value="active">Active</option>
               <option value="archived">Archived</option>
               <option value="needs_review">Needs review</option>
               <option value="rejected">Rejected</option>
-            </select>
+            </WkSelect>
             {!isPickerMode && (
-              <label className="flex items-center gap-1.5 rounded-lg border border-wk-border bg-wk-surface px-2.5 py-2 text-[12px] text-wk-text cursor-pointer whitespace-nowrap">
-                <input type="checkbox" checked={missingAltOnly} onChange={(e) => { setMissingAltOnly(e.target.checked); setPage(0); }} className="rounded w-3 h-3" />
+              <WkCheckbox checked={missingAltOnly} onChange={(checked) => { setMissingAltOnly(checked); setPage(0); }} className="flex items-center gap-1.5 rounded-lg border border-wk-border bg-wk-surface px-2.5 py-2 text-[12px] text-wk-text cursor-pointer whitespace-nowrap">
+
                 Missing alt
-              </label>
+              </WkCheckbox>
             )}
           </div>
 
@@ -808,12 +812,12 @@ export function MediaLibraryCore({
       {!isPickerMode && bulkSelected.size > 0 && (
         <div className="flex items-center gap-3 rounded-xl border border-wk-brand/20 bg-wk-brand-soft px-4 py-2.5">
           <span className="text-[12px] font-bold text-wk-brand">{bulkSelected.size} selected</span>
-          <select value={bulkAction} onChange={(e) => setBulkAction(e.target.value)}
-            className="rounded-lg border border-wk-border bg-wk-surface px-2.5 py-1.5 text-[12px] text-wk-text outline-none cursor-pointer">
+          <WkSelect value={bulkAction} onChange={(value) => setBulkAction(value)}
+            triggerClassName="rounded-lg border border-wk-border bg-wk-surface px-2.5 py-1.5 text-[12px] text-wk-text outline-none cursor-pointer">
             <option value="set_status_active">Set Active</option>
             <option value="set_status_archived">Set Archived</option>
             <option value="set_status_needs_review">Set Needs Review</option>
-          </select>
+          </WkSelect>
           <button onClick={handleBulkAction} disabled={bulkRunning}
             className="flex items-center gap-1 rounded-lg bg-wk-brand px-3 py-1.5 text-[11px] font-bold text-wk-brand-on hover:opacity-90 disabled:opacity-50 whitespace-nowrap cursor-pointer">
             {bulkRunning ? <><WkIcon name="Loader2" size={11} className="animate-spin" /> Running…</> : "Apply"}
@@ -945,9 +949,15 @@ export function MediaLibraryCore({
                     <thead className="border-b border-wk-border bg-wk-surface-raised text-[10px] uppercase tracking-wider text-wk-text-faint">
                       <tr>
                         <th className="px-3 py-3 w-8">
-                          <input type="checkbox" checked={bulkSelected.size === assets.length && assets.length > 0}
-                            onChange={(e) => e.target.checked ? setBulkSelected(new Set(assets.map((a) => a.id))) : setBulkSelected(new Set())}
-                            className="rounded w-3 h-3" />
+                          <WkCheckbox
+                            checked={bulkSelected.size === assets.length && assets.length > 0}
+                            onChange={(checked) =>
+                              checked
+                                ? setBulkSelected(new Set(assets.map((a) => a.id)))
+                                : setBulkSelected(new Set())
+                            }
+                            ariaLabel="Select all media assets"
+                          />
                         </th>
                         <th className="px-3 py-3 w-12">File</th>
                         <th className="px-3 py-3">Title / Slug</th>
@@ -963,7 +973,11 @@ export function MediaLibraryCore({
                       ) : assets.map((asset) => (
                         <tr key={asset.id} className="hover:bg-wk-surface-raised/60">
                           <td className="px-3 py-2.5">
-                            <input type="checkbox" checked={bulkSelected.has(asset.id)} onChange={() => toggleBulk(asset.id)} className="rounded w-3 h-3" />
+                            <WkCheckbox
+                              checked={bulkSelected.has(asset.id)}
+                              onChange={() => toggleBulk(asset.id)}
+                              ariaLabel={`Select ${asset.title || asset.slug || "media asset"}`}
+                            />
                           </td>
                           <td className="px-3 py-2.5">
                             <div className="h-9 w-9 overflow-hidden rounded-lg bg-wk-surface-raised cursor-pointer" onClick={() => selectItem(asset.id, getMediaAssetDeliveryUrl(asset))}>

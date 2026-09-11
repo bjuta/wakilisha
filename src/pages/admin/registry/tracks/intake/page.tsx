@@ -8,6 +8,10 @@ import {
 import { useSearchParams } from "react-router-dom";
 import { supabase } from "@/lib/supabase";
 import { WkIcon } from "@/components/design-system/Icon";
+import { WkSelect } from "@/components/design-system/primitives/Select";
+import { WkCheckbox } from "@/components/design-system/primitives/Checkbox";
+
+
 
 type ProviderKey = "apple_music" | "spotify";
 
@@ -1385,16 +1389,16 @@ export default function TrackIntakePage() {
                 className="h-11 w-full bg-transparent text-sm outline-none"
               />
             </div>
-            <select
+            <WkSelect
               value={status}
-              onChange={(event) => setStatus(event.target.value)}
-              className="h-11 rounded-xl border border-wk-border bg-wk-surface px-3 text-sm outline-none"
+              onChange={(value) => setStatus(value)}
+              triggerClassName="h-11 rounded-xl border border-wk-border bg-wk-surface px-3 text-sm outline-none"
             >
               <option value="needs_review">Needs review</option>
               <option value="rejected">Rejected</option>
               <option value="canonicalized">Canonicalized</option>
               <option value="all">All</option>
-            </select>
+            </WkSelect>
           </section>
         ) : (
           <div className="mb-5 flex items-center justify-between rounded-xl border border-wk-brand/20 bg-wk-brand-soft p-3 text-sm">
@@ -1761,16 +1765,16 @@ export default function TrackIntakePage() {
                         </div>
 
                         <div className="mt-4 grid gap-2 sm:grid-cols-[150px_1fr_auto]">
-                          <select
+                          <WkSelect
                             value={chosenProvider}
-                            onChange={(event) =>
+                            onChange={(value) =>
                               setProviderChoice((current) => ({
                                 ...current,
                                 [suggestionId]:
-                                  event.target.value as ProviderKey,
+                                  value as ProviderKey,
                               }))
                             }
-                            className="h-10 rounded-lg border border-wk-border bg-wk-bg px-3 text-xs outline-none"
+                            triggerClassName="h-10 rounded-lg border border-wk-border bg-wk-bg px-3 text-xs outline-none"
                           >
                             <option value="apple_music">
                               Apple Music
@@ -1778,7 +1782,7 @@ export default function TrackIntakePage() {
                             <option value="spotify">
                               Spotify
                             </option>
-                          </select>
+                          </WkSelect>
 
                           <input
                             value={
@@ -1943,14 +1947,7 @@ export default function TrackIntakePage() {
                                       String(value ?? "");
 
                                   return (
-                                    <label
-                                      key={field}
-                                      className="flex gap-3 rounded-lg border border-wk-border bg-wk-bg p-3"
-                                    >
-                                      <input
-                                        type="checkbox"
-                                        checked={checked}
-                                        onChange={(event) =>
+                                    <WkCheckbox checked={checked} onChange={(checked) =>
                                           setAcceptedFields(
                                             (current) => {
                                               const next = {
@@ -1960,7 +1957,7 @@ export default function TrackIntakePage() {
                                               };
 
                                               if (
-                                                event.target.checked
+                                                checked
                                               ) {
                                                 next[field] =
                                                   value;
@@ -1976,9 +1973,11 @@ export default function TrackIntakePage() {
                                                   next,
                                               };
                                             },
-                                          )
-                                        }
-                                      />
+                                          )}
+                                      key={field}
+                                      className="flex gap-3 rounded-lg border border-wk-border bg-wk-bg p-3"
+                                    >
+
 
                                       <div className="min-w-0">
                                         <div className="text-[9px] font-black uppercase tracking-wide text-wk-text-faint">
@@ -1991,7 +1990,7 @@ export default function TrackIntakePage() {
                                           )}
                                         </div>
                                       </div>
-                                    </label>
+                                    </WkCheckbox>
                                   );
                                 },
                               )}
@@ -2272,20 +2271,20 @@ export default function TrackIntakePage() {
                                       </div>
 
                                       <div className="mt-3 grid gap-2 sm:grid-cols-[130px_minmax(0,1fr)_auto]">
-                                        <select
+                                        <WkSelect
                                           value={role}
-                                          onChange={(event) =>
+                                          onChange={(value) =>
                                             setArtistRole(
                                               (current) => ({
                                                 ...current,
                                                 [key]:
-                                                  event.target.value as
+                                                  value as
                                                     | "primary"
                                                     | "featured",
                                               }),
                                             )
                                           }
-                                          className="h-10 rounded-lg border border-wk-border bg-wk-surface px-3 text-xs outline-none focus:border-wk-brand"
+                                          triggerClassName="h-10 rounded-lg border border-wk-border bg-wk-surface px-3 text-xs outline-none focus:border-wk-brand"
                                         >
                                           <option value="">
                                             Choose role
@@ -2296,7 +2295,7 @@ export default function TrackIntakePage() {
                                           <option value="featured">
                                             Featured
                                           </option>
-                                        </select>
+                                        </WkSelect>
 
                                         <input
                                           value={queryValue}
@@ -2754,30 +2753,25 @@ export default function TrackIntakePage() {
                             className="mt-3 min-h-[90px] w-full resize-y rounded-lg border border-wk-border bg-wk-surface p-3 text-sm outline-none focus:border-wk-brand"
                           />
 
-                          <label className="mt-3 flex items-start gap-2 rounded-lg border border-wk-warning/20 bg-wk-warning-soft p-3 text-[10px] leading-4 text-wk-warning">
-                            <input
-                              type="checkbox"
-                              checked={
+                          <WkCheckbox checked={
                                 allowOverwrite[
                                   suggestionId
                                 ] === true
-                              }
-                              onChange={(event) =>
+                              } onChange={(checked) =>
                                 setAllowOverwrite(
                                   (current) => ({
                                     ...current,
                                     [suggestionId]:
-                                      event.target.checked,
+                                      checked,
                                   }),
-                                )
-                              }
-                            />
+                                )} className="mt-3 flex items-start gap-2 rounded-lg border border-wk-warning/20 bg-wk-warning-soft p-3 text-[10px] leading-4 text-wk-warning">
+
                             <span>
                               Allow accepted enrichment to replace
                               conflicting canonical values. Leave this
                               off unless you have reviewed the conflict.
                             </span>
-                          </label>
+                          </WkCheckbox>
 
                           <div className="mt-3 flex flex-wrap gap-2">
                             <button

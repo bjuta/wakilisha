@@ -11,6 +11,11 @@ import {
   createCredit,
   createExternalContributor,
 } from "@/services/articles/articleTrustService";
+import { WkSelect } from "@/components/design-system/primitives/Select";
+import { WkCheckbox } from "@/components/design-system/primitives/Checkbox";
+import { WkRadio, WkRadioGroup } from "@/components/design-system/primitives/Radio";
+
+
 
 const CREDIT_ROLES = [
   ["author", "Author"],
@@ -462,20 +467,18 @@ export function ArticleCreditForm({
                 Choose the identity that should own this Credit.
               </p>
 
-              <div className="mt-3 grid gap-3 sm:grid-cols-2">
-                <label className="flex cursor-pointer items-start gap-3 rounded-xl border border-wk-border bg-wk-bg-subtle p-4">
-                  <input
-                    type="radio"
-                    name="credited-party"
-                    value="current_user"
-                    checked={
-                      partyKind === "current_user"
-                    }
-                    onChange={() =>
-                      setPartyKind("current_user")
-                    }
-                    className="mt-0.5"
-                  />
+              <WkRadioGroup
+                value={partyKind}
+                onChange={(value) => setPartyKind(value as CreditedPartyKind)}
+                disabled={partyLocked || submitting}
+                name="credited-party"
+                ariaLabel="Credited party"
+                className="mt-3 grid gap-3 sm:grid-cols-2"
+              >
+                <WkRadio
+                  value="current_user"
+                  className="rounded-xl border border-wk-border bg-wk-bg-subtle p-4"
+                >
                   <span>
                     <span className="block text-[11px] font-bold text-wk-text">
                       My WAKILISHA account
@@ -486,21 +489,12 @@ export function ArticleCreditForm({
                         "Signed-in user"}
                     </span>
                   </span>
-                </label>
+                </WkRadio>
 
-                <label className="flex cursor-pointer items-start gap-3 rounded-xl border border-wk-border bg-wk-bg-subtle p-4">
-                  <input
-                    type="radio"
-                    name="credited-party"
-                    value="external_contributor"
-                    checked={externalParty}
-                    onChange={() =>
-                      setPartyKind(
-                        "external_contributor",
-                      )
-                    }
-                    className="mt-0.5"
-                  />
+                <WkRadio
+                  value="external_contributor"
+                  className="rounded-xl border border-wk-border bg-wk-bg-subtle p-4"
+                >
                   <span>
                     <span className="block text-[11px] font-bold text-wk-text">
                       External contributor
@@ -510,8 +504,8 @@ export function ArticleCreditForm({
                       outside WAKILISHA accounts and the Registry.
                     </span>
                   </span>
-                </label>
-              </div>
+                </WkRadio>
+              </WkRadioGroup>
             </fieldset>
 
             {partyKind === "current_user" ? (
@@ -680,18 +674,18 @@ export function ArticleCreditForm({
                     <span className="wk-label">
                       Consent status
                     </span>
-                    <select
+                    <WkSelect
                       value={consentStatus}
-                      onChange={(event) =>
+                      onChange={(value) =>
                         setConsentStatus(
-                          event.target.value,
+                          value,
                         )
                       }
                       disabled={
                         contributorLocked ||
                         submitting
                       }
-                      className="wk-input mt-1 w-full"
+                      triggerClassName="wk-input mt-1 w-full"
                     >
                       {CONSENT_STATUSES.map(
                         ([value, label]) => (
@@ -703,7 +697,7 @@ export function ArticleCreditForm({
                           </option>
                         ),
                       )}
-                    </select>
+                    </WkSelect>
                   </label>
 
                   <label className="sm:col-span-2">
@@ -745,18 +739,18 @@ export function ArticleCreditForm({
                   <span className="wk-label">
                     Credit role
                   </span>
-                  <select
+                  <WkSelect
                     value={creditRole}
-                    onChange={(event) =>
+                    onChange={(value) =>
                       setCreditRole(
-                        event.target.value,
+                        value,
                       )
                     }
                     disabled={
                       creditLocked ||
                       submitting
                     }
-                    className="wk-input mt-1 w-full"
+                    triggerClassName="wk-input mt-1 w-full"
                   >
                     {CREDIT_ROLES.map(
                       ([value, label]) => (
@@ -768,7 +762,7 @@ export function ArticleCreditForm({
                         </option>
                       ),
                     )}
-                  </select>
+                  </WkSelect>
                 </label>
 
                 <label>
@@ -814,24 +808,17 @@ export function ArticleCreditForm({
               </div>
 
               <div className="mt-4 grid gap-3 sm:grid-cols-2">
-                <label className="flex items-start gap-3 rounded-xl border border-wk-border bg-wk-bg-subtle p-3">
-                  <input
-                    type="checkbox"
-                    checked={publicPresentation}
-                    onChange={(event) =>
-                      setPublicPresentation(
-                        event.target.checked,
-                      )
-                    }
-                    disabled={
+                <WkCheckbox checked={publicPresentation} disabled={
                       creditLocked ||
                       submitting ||
                       !publicConsentAllowed ||
                       (externalParty &&
                         contributorLocked)
-                    }
-                    className="mt-0.5"
-                  />
+                    } onChange={(checked) =>
+                      setPublicPresentation(
+                        checked,
+                      )} className="flex items-start gap-3 rounded-xl border border-wk-border bg-wk-bg-subtle p-3">
+
                   <span>
                     <span className="block text-[11px] font-bold text-wk-text">
                       Allow public presentation
@@ -844,24 +831,17 @@ export function ArticleCreditForm({
                       This does not create payment rights.
                     </span>
                   </span>
-                </label>
+                </WkCheckbox>
 
-                <label className="flex items-start gap-3 rounded-xl border border-wk-border bg-wk-bg-subtle p-3">
-                  <input
-                    type="checkbox"
-                    checked={isPrimary}
-                    onChange={(event) =>
-                      setIsPrimary(
-                        event.target.checked,
-                      )
-                    }
-                    disabled={
+                <WkCheckbox checked={isPrimary} disabled={
                       submitting ||
                       creditRole !== "author" ||
                       hasPrimaryAuthor
-                    }
-                    className="mt-0.5"
-                  />
+                    } onChange={(checked) =>
+                      setIsPrimary(
+                        checked,
+                      )} className="flex items-start gap-3 rounded-xl border border-wk-border bg-wk-bg-subtle p-3">
+
                   <span>
                     <span className="block text-[11px] font-bold text-wk-text">
                       Primary author
@@ -871,7 +851,7 @@ export function ArticleCreditForm({
                       no primary author is already attached.
                     </span>
                   </span>
-                </label>
+                </WkCheckbox>
               </div>
             </section>
 

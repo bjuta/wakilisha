@@ -5,6 +5,10 @@ import { submitForm } from "@/services/formService";
 import { BRIEFING_SLUGS, guideInterest, subscribeToBriefings } from "@/services/audienceSubscriptionService";
 import { dakarData } from "@/pages/guides/detail/dakarData";
 import { MobileShareButton } from "@/components/design-system/share/ShareSheet";
+import { WkSelect } from "@/components/design-system/primitives/Select";
+import { WkCheckbox } from "@/components/design-system/primitives/Checkbox";
+
+
 
 export default function MobileDakarGuide() {
   const { hero, share, argument, anatomy, disciplines, watchlist, timeline, follow } = dakarData;
@@ -326,16 +330,16 @@ export default function MobileDakarGuide() {
               </div>
               <div>
                 <label className="block text-[11px] font-bold text-[var(--wk-text)] mb-1">{follow.form.personaLabel}</label>
-                <select name="persona" className="w-full rounded-lg border border-[var(--wk-border)] bg-[var(--wk-bg)] px-4 py-3 text-[13px] text-[var(--wk-text)] outline-none focus:border-[var(--wk-brand)]/40">
+                <WkSelect name="persona" triggerClassName="w-full rounded-lg border border-[var(--wk-border)] bg-[var(--wk-bg)] px-4 py-3 text-[13px] text-[var(--wk-text)] outline-none focus:border-[var(--wk-brand)]/40">
                   {follow.form.personaOptions.map((opt) => (
                     <option key={opt.value} value={opt.value}>{opt.label}</option>
                   ))}
-                </select>
+                </WkSelect>
               </div>
-              <label className="flex items-start gap-2 text-[11px] text-[var(--wk-text-muted)] cursor-pointer">
-                <input type="checkbox" name="consent" className="mt-0.5" />
+              <WkCheckbox name="consent" className="flex items-start gap-2 text-[11px] text-[var(--wk-text-muted)] cursor-pointer">
+
                 <span>{follow.form.consentLabel}</span>
-              </label>
+              </WkCheckbox>
               <button type="submit" disabled={followStatus === "submitting" || followStatus === "success"} className="w-full rounded-lg bg-[var(--wk-brand)] px-4 py-3 text-[13px] font-bold text-[var(--wk-brand-on)] active:scale-[0.98] transition-transform whitespace-nowrap cursor-pointer disabled:opacity-60">
                 {followStatus === "submitting" ? "Submitting..." : followStatus === "success" ? "You’re on the list!" : follow.form.submitLabel}
               </button>

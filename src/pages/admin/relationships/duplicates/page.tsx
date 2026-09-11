@@ -1,6 +1,10 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { WkIcon } from "@/components/design-system/Icon";
 import { supabase } from "@/lib/supabase";
+import { WkSelect } from "@/components/design-system/primitives/Select";
+import { WkCheckbox } from "@/components/design-system/primitives/Checkbox";
+
+
 
 type AuditType = "all" | "provider_identity" | "apple_catalog_id" | "isrc" | "title_artist_numeric";
 
@@ -553,26 +557,22 @@ export default function AdminDuplicateMergePage() {
             )}
           </div>
 
-          <select
+          <WkSelect
             value={auditType}
-            onChange={(event) => setAuditType(event.target.value as AuditType)}
-            className="rounded-lg border border-wk-border bg-white px-3 py-2 text-[13px] font-semibold text-wk-text outline-none"
+            onChange={(value) => setAuditType(value as AuditType)}
+            triggerClassName="rounded-lg border border-wk-border bg-white px-3 py-2 text-[13px] font-semibold text-wk-text outline-none"
           >
             <option value="all">All audit types</option>
             <option value="provider_identity">Provider identity</option>
             <option value="apple_catalog_id">Apple Music ID</option>
             <option value="isrc">ISRC</option>
             <option value="title_artist_numeric">Title + artist + suffix</option>
-          </select>
+          </WkSelect>
 
-          <label className="flex items-center gap-2 rounded-lg border border-wk-border bg-white px-3 py-2 text-[12px] font-bold text-wk-text-muted">
-            <input
-              type="checkbox"
-              checked={includeLowConfidence}
-              onChange={(event) => setIncludeLowConfidence(event.target.checked)}
-            />
+          <WkCheckbox checked={includeLowConfidence} onChange={(checked) => setIncludeLowConfidence(checked)} className="flex items-center gap-2 rounded-lg border border-wk-border bg-white px-3 py-2 text-[12px] font-bold text-wk-text-muted">
+
             Include lower-confidence title checks
-          </label>
+          </WkCheckbox>
         </div>
       </div>
 

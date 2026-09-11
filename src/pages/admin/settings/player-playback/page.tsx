@@ -9,6 +9,8 @@ import {
   DEFAULT_PLAYER_PLAYBACK_SETTINGS,
   type PlayerPlaybackSettings,
 } from "@/services/adminSettings/settingsTypes";
+import { WkSelect } from "@/components/design-system/primitives/Select";
+
 
 export default function AdminSettingsPlayerPlayback() {
   const [settings, setSettings] = useState<PlayerPlaybackSettings>(getPlayerPlaybackSettings());
@@ -56,29 +58,29 @@ export default function AdminSettingsPlayerPlayback() {
         <div className="grid gap-4 sm:grid-cols-2">
           <div>
             <label className="block text-[12px] font-semibold text-[var(--wk-text-muted)] mb-1.5">Preview Source Mode</label>
-            <select
+            <WkSelect
               value={settings.previewSourceMode}
-              onChange={(e) => update("previewSourceMode", e.target.value as "auto" | "spotify" | "apple" | "youtube" | "acrcloud")}
-              className="w-full rounded-lg border border-[var(--wk-border)] bg-[var(--wk-bg)] px-3 py-2 text-[13px] text-[var(--wk-text)] focus:border-[var(--wk-brand)] focus:outline-none focus:ring-1 focus:ring-[var(--wk-brand)]"
+              onChange={(value) => update("previewSourceMode", value as "auto" | "spotify" | "apple" | "youtube" | "acrcloud")}
+              triggerClassName="w-full rounded-lg border border-[var(--wk-border)] bg-[var(--wk-bg)] px-3 py-2 text-[13px] text-[var(--wk-text)] focus:border-[var(--wk-brand)] focus:outline-none focus:ring-1 focus:ring-[var(--wk-brand)]"
             >
               <option value="auto">Auto (fallback chain)</option>
               <option value="spotify">Spotify</option>
               <option value="apple">Apple Music</option>
               <option value="youtube">YouTube</option>
               <option value="acrcloud">ACRCloud</option>
-            </select>
+            </WkSelect>
           </div>
           <div>
             <label className="block text-[12px] font-semibold text-[var(--wk-text-muted)] mb-1.5">Desktop Player Variant</label>
-            <select
+            <WkSelect
               value={settings.desktopPlayerVariant}
-              onChange={(e) => update("desktopPlayerVariant", e.target.value as "compact" | "full" | "minimal")}
-              className="w-full rounded-lg border border-[var(--wk-border)] bg-[var(--wk-bg)] px-3 py-2 text-[13px] text-[var(--wk-text)] focus:border-[var(--wk-brand)] focus:outline-none focus:ring-1 focus:ring-[var(--wk-brand)]"
+              onChange={(value) => update("desktopPlayerVariant", value as "compact" | "full" | "minimal")}
+              triggerClassName="w-full rounded-lg border border-[var(--wk-border)] bg-[var(--wk-bg)] px-3 py-2 text-[13px] text-[var(--wk-text)] focus:border-[var(--wk-brand)] focus:outline-none focus:ring-1 focus:ring-[var(--wk-brand)]"
             >
               <option value="compact">Compact</option>
               <option value="full">Full</option>
               <option value="minimal">Minimal</option>
-            </select>
+            </WkSelect>
           </div>
         </div>
       </WkSurface>

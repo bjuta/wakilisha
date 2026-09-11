@@ -32,6 +32,8 @@ import {
 import {
   normalizeClaimantPhone,
 } from "@/utils/claimantPhone";
+import { WkSelect } from "@/components/design-system/primitives/Select";
+
 
 const CLAIM_ROLES = [
   ["artist", "Artist"],
@@ -498,16 +500,16 @@ export function NewArtistClaimSheet({
               <span className="mb-1.5 block text-[12px] font-bold text-[var(--wk-text)]">
                 Artist Type
               </span>
-              <select
+              <WkSelect
                 value={
                   artistType
                 }
-                onChange={(event) =>
+                onChange={(value) =>
                   setArtistType(
-                    event.target.value,
+                    value,
                   )
                 }
-                className="w-full rounded-xl border border-[var(--wk-border)] bg-[var(--wk-bg)] px-4 py-3 text-[14px] text-[var(--wk-text)]"
+                triggerClassName="w-full rounded-xl border border-[var(--wk-border)] bg-[var(--wk-bg)] px-4 py-3 text-[14px] text-[var(--wk-text)]"
               >
                 {ARTIST_TYPES.map(
                   ([value, label]) => (
@@ -519,7 +521,7 @@ export function NewArtistClaimSheet({
                     </option>
                   ),
                 )}
-              </select>
+              </WkSelect>
             </label>
 
             <ArtistCountryPicker
@@ -552,16 +554,16 @@ export function NewArtistClaimSheet({
               <span className="mb-1.5 block text-[12px] font-bold text-[var(--wk-text)]">
                 Your Role
               </span>
-              <select
+              <WkSelect
                 value={
                   claimantRole
                 }
-                onChange={(event) =>
+                onChange={(value) =>
                   setClaimantRole(
-                    event.target.value,
+                    value,
                   )
                 }
-                className="w-full rounded-xl border border-[var(--wk-border)] bg-[var(--wk-bg)] px-4 py-3 text-[14px] text-[var(--wk-text)]"
+                triggerClassName="w-full rounded-xl border border-[var(--wk-border)] bg-[var(--wk-bg)] px-4 py-3 text-[14px] text-[var(--wk-text)]"
               >
                 {CLAIM_ROLES.map(
                   ([value, label]) => (
@@ -573,7 +575,7 @@ export function NewArtistClaimSheet({
                     </option>
                   ),
                 )}
-              </select>
+              </WkSelect>
             </label>
 
             {claimantRole === "other" ? (

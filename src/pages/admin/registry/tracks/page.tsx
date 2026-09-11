@@ -7,6 +7,8 @@ import { calculateCompleteness, completenessTone } from "@/services/registry/adm
 import { getRegistryEntityList } from "@/services/registry/admin/client";
 import RegistryEntityEditorDrawer from "@/components/admin/registry/RegistryEntityEditorDrawer";
 import { WkIcon } from "@/components/design-system/Icon";
+import { WkSelect } from "@/components/design-system/primitives/Select";
+
 
 const schema = getEntitySchema("track");
 const PAGE_SIZE = 20;
@@ -453,10 +455,10 @@ export default function TracksPage() {
                 className="h-11 w-full rounded-xl border border-[#dfe4d8] bg-[#f8f9f4] pl-10 pr-4 text-sm outline-none transition focus:border-[#85c441] focus:bg-white"
               />
             </div>
-            <select
+            <WkSelect
               value={qualityFilter}
-              onChange={(e) => setQualityFilter(e.target.value as QualityFilter)}
-              className="h-11 rounded-xl border border-[#dfe4d8] bg-[#f8f9f4] px-3 text-sm outline-none transition focus:border-[#85c441] focus:bg-white"
+              onChange={(value) => setQualityFilter(value as QualityFilter)}
+              triggerClassName="h-11 rounded-xl border border-[#dfe4d8] bg-[#f8f9f4] px-3 text-sm outline-none transition focus:border-[#85c441] focus:bg-white"
             >
               <option value="all">All quality states</option>
               <option value="complete">Near complete</option>
@@ -467,17 +469,17 @@ export default function TracksPage() {
               <option value="missing_artist">Missing artist</option>
               <option value="missing_release">Missing release</option>
               <option value="blocked">Blocked</option>
-            </select>
-            <select
+            </WkSelect>
+            <WkSelect
               value={sortMode}
-              onChange={(e) => setSortMode(e.target.value as SortMode)}
-              className="h-11 rounded-xl border border-[#dfe4d8] bg-[#f8f9f4] px-3 text-sm outline-none transition focus:border-[#85c441] focus:bg-white"
+              onChange={(value) => setSortMode(value as SortMode)}
+              triggerClassName="h-11 rounded-xl border border-[#dfe4d8] bg-[#f8f9f4] px-3 text-sm outline-none transition focus:border-[#85c441] focus:bg-white"
             >
               <option value="recent">Recently updated</option>
               <option value="title">Title A-Z</option>
               <option value="completeness_low">Completeness low → high</option>
               <option value="completeness_high">Completeness high → low</option>
-            </select>
+            </WkSelect>
           </div>
         </section>
 

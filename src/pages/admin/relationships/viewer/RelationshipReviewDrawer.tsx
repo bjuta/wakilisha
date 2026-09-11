@@ -6,6 +6,10 @@ import {
   type ConsolidationRow,
   type RelationshipReviewInput,
 } from "@/services/registryKnowledgeReviewService";
+import { WkSelect } from "@/components/design-system/primitives/Select";
+import { WkCheckbox } from "@/components/design-system/primitives/Checkbox";
+
+
 
 const EVIDENCE_TYPES = [
   ["article", "Article"],
@@ -164,9 +168,9 @@ export function RelationshipReviewDrawer({
               </label>
               <label className="block">
                 <span className="mb-1.5 block text-[11px] font-bold text-wk-text-muted">Evidence Type</span>
-                <select value={evidenceType} onChange={(event) => setEvidenceType(event.target.value)} className="w-full rounded-lg border border-wk-border bg-wk-surface-raised px-3 py-2.5 text-[13px] text-wk-text outline-none focus:border-wk-brand">
+                <WkSelect value={evidenceType} onChange={(value) => setEvidenceType(value)} triggerClassName="w-full rounded-lg border border-wk-border bg-wk-surface-raised px-3 py-2.5 text-[13px] text-wk-text outline-none focus:border-wk-brand">
                   {EVIDENCE_TYPES.map(([value, label]) => <option key={value} value={value}>{label}</option>)}
-                </select>
+                </WkSelect>
               </label>
               <label className="block">
                 <span className="mb-1.5 block text-[11px] font-bold text-wk-text-muted">Source URL <span className="font-normal">(optional)</span></span>
@@ -182,11 +186,11 @@ export function RelationshipReviewDrawer({
               </label>
               <label className="block">
                 <span className="mb-1.5 block text-[11px] font-bold text-wk-text-muted">Reliability</span>
-                <select value={reliability} onChange={(event) => setReliability(event.target.value)} className="w-full rounded-lg border border-wk-border bg-wk-surface-raised px-3 py-2.5 text-[13px] text-wk-text"><option value="high">High</option><option value="medium">Medium</option><option value="low">Low</option></select>
+                <WkSelect value={reliability} onChange={(value) => setReliability(value)} triggerClassName="w-full rounded-lg border border-wk-border bg-wk-surface-raised px-3 py-2.5 text-[13px] text-wk-text"><option value="high">High</option><option value="medium">Medium</option><option value="low">Low</option></WkSelect>
               </label>
               <label className="block">
                 <span className="mb-1.5 block text-[11px] font-bold text-wk-text-muted">Confidence</span>
-                <select value={confidence} onChange={(event) => setConfidence(event.target.value)} className="w-full rounded-lg border border-wk-border bg-wk-surface-raised px-3 py-2.5 text-[13px] text-wk-text"><option value="high">High</option><option value="medium">Medium</option><option value="low">Low</option></select>
+                <WkSelect value={confidence} onChange={(value) => setConfidence(value)} triggerClassName="w-full rounded-lg border border-wk-border bg-wk-surface-raised px-3 py-2.5 text-[13px] text-wk-text"><option value="high">High</option><option value="medium">Medium</option><option value="low">Low</option></WkSelect>
               </label>
             </div>
           </section>
@@ -205,17 +209,17 @@ export function RelationshipReviewDrawer({
             <div className="grid gap-4 sm:grid-cols-2">
               <label className="block">
                 <span className="mb-1.5 block text-[11px] font-bold text-wk-text-muted">Decision</span>
-                <select value={decision} onChange={(event) => { const value = event.target.value as RelationshipReviewInput["nextReviewStatus"]; setDecision(value); if (value !== "approved") setPublicSafe(false); }} className="w-full rounded-lg border border-wk-border bg-wk-surface-raised px-3 py-2.5 text-[13px] text-wk-text">
+                <WkSelect value={decision} onChange={(nextDecision) => { const value = nextDecision as RelationshipReviewInput["nextReviewStatus"]; setDecision(value); if (value !== "approved") setPublicSafe(false); }} triggerClassName="w-full rounded-lg border border-wk-border bg-wk-surface-raised px-3 py-2.5 text-[13px] text-wk-text">
                   <option value="pending_review">Save For Review</option>
                   <option value="approved">Approve</option>
                   <option value="rejected">Reject</option>
                   <option value="disputed">Mark Disputed</option>
-                </select>
+                </WkSelect>
               </label>
-              <label className="flex items-center gap-3 rounded-lg border border-wk-border bg-wk-surface-raised px-3 py-2.5">
-                <input type="checkbox" checked={publicSafe} disabled={decision !== "approved"} onChange={(event) => setPublicSafe(event.target.checked)} />
+              <WkCheckbox checked={publicSafe} disabled={decision !== "approved"} onChange={(checked) => setPublicSafe(checked)} className="flex items-center gap-3 rounded-lg border border-wk-border bg-wk-surface-raised px-3 py-2.5">
+
                 <span className="text-[12px] font-bold text-wk-text">Clear For Public Use</span>
-              </label>
+              </WkCheckbox>
               <label className="block sm:col-span-2">
                 <span className="mb-1.5 block text-[11px] font-bold text-wk-text-muted">Review Reason</span>
                 <textarea value={reviewReason} onChange={(event) => setReviewReason(event.target.value)} rows={3} className="w-full resize-none rounded-lg border border-wk-border bg-wk-surface-raised px-3 py-2.5 text-[13px] text-wk-text outline-none focus:border-wk-brand" />

@@ -6,26 +6,15 @@
       "native-input-number": 2
     },
     "src/components/admin/media/MediaEditModal.tsx": {
-      "native-input-checkbox": 1,
       "native-input-date": 1,
-      "native-input-number": 2,
-      "native-select": 8
+      "native-input-number": 2
     },
     "src/components/admin/media/MediaLibraryCore.tsx": {
-      "native-input-checkbox": 3,
       "native-input-date": 4,
-      "native-input-file": 1,
-      "native-select": 8
+      "native-input-file": 1
     },
     "src/components/admin/media/MediaLibraryPreviewPanel.tsx": {
       "native-media-controls": 2
-    },
-    "src/components/admin/registry/RegistryEntityEditorDrawer.tsx": {
-      "native-input-checkbox": 1,
-      "native-select": 1
-    },
-    "src/components/artists/ArtistClaimSheet.tsx": {
-      "native-select": 1
     },
     "src/components/artists/ArtistCountryPicker.tsx": {
       "native-input-search": 1
@@ -35,9 +24,6 @@
     },
     "src/components/artists/ClaimantPhoneFields.tsx": {
       "native-input-search": 1
-    },
-    "src/components/artists/NewArtistClaimSheet.tsx": {
-      "native-select": 2
     },
     "src/components/base/DateRangePicker.tsx": {
       "native-input-date": 2
@@ -60,14 +46,8 @@
     "src/components/design-system/player/PlayerQueuePanel.tsx": {
       "native-disclosure": 2
     },
-    "src/components/design-system/trust/EditorialCreditPicker.tsx": {
-      "native-select": 1
-    },
     "src/components/design-system/trust/PublicTrustSummary.tsx": {
       "native-disclosure": 2
-    },
-    "src/components/design-system/trust/TrustAttachmentPicker.tsx": {
-      "native-select": 1
     },
     "src/components/video/PublicVideoWatchingSurface.tsx": {
       "native-disclosure": 2
@@ -76,44 +56,15 @@
       "native-input-range": 1
     },
     "src/pages/admin/charts/artist-resolution/page.tsx": {
-      "native-browser-dialog": 6,
-      "native-select": 5
+      "native-browser-dialog": 6
     },
     "src/pages/admin/charts/backfill/page.tsx": {
       "native-input-date": 3,
-      "native-input-number": 1,
-      "native-select": 4
-    },
-    "src/pages/admin/charts/editions/page.tsx": {
-      "native-select": 1
-    },
-    "src/pages/admin/charts/ingest-run-detail/page.tsx": {
-      "native-select": 1
-    },
-    "src/pages/admin/charts/ingest-runs/page.tsx": {
-      "native-select": 2
-    },
-    "src/pages/admin/charts/ingest/components/EnrichmentOptionsStep.tsx": {
-      "native-input-checkbox": 1
-    },
-    "src/pages/admin/charts/ingest/components/MarketScopeStep.tsx": {
-      "native-select": 4
+      "native-input-number": 1
     },
     "src/pages/admin/charts/ingest/components/ProgramSetupStep.tsx": {
-      "native-input-checkbox": 1,
       "native-input-date": 1,
-      "native-input-range": 1,
-      "native-select": 2
-    },
-    "src/pages/admin/charts/ingest/components/RulesStep.tsx": {
-      "native-input-checkbox": 2,
-      "native-select": 5
-    },
-    "src/pages/admin/charts/ingest/detail/components/CandidatesStep.tsx": {
-      "native-select": 2
-    },
-    "src/pages/admin/charts/ingest/detail/components/CsvInspector.tsx": {
-      "native-select": 1
+      "native-input-range": 1
     },
     "src/pages/admin/charts/ingest/detail/components/DraftStep.tsx": {
       "native-input-date": 1,
@@ -123,15 +74,6 @@
       "native-input-date": 1,
       "native-input-number": 1
     },
-    "src/pages/admin/charts/ingest/detail/components/ImportWorkspace.tsx": {
-      "native-select": 1
-    },
-    "src/pages/admin/charts/ingest/detail/components/MappingStudio.tsx": {
-      "native-select": 2
-    },
-    "src/pages/admin/charts/ingest/detail/components/NormalizedCandidates.tsx": {
-      "native-select": 2
-    },
     "src/pages/admin/charts/ingest/detail/components/RankingIntegrity.tsx": {
       "native-input-number": 1
     },
@@ -139,276 +81,113 @@
       "native-input-number": 1
     },
     "src/pages/admin/charts/ingest/detail/components/SourcesStep.tsx": {
-      "native-input-range": 1,
-      "native-select": 1
-    },
-    "src/pages/admin/charts/review-queue/page.tsx": {
-      "native-input-checkbox": 2,
-      "native-select": 1
+      "native-input-range": 1
     },
     "src/pages/admin/charts/scoring-runs/page.tsx": {
-      "native-input-date": 1,
-      "native-select": 1
-    },
-    "src/pages/admin/charts/snapshots/page.tsx": {
-      "native-select": 1
-    },
-    "src/pages/admin/community/page.tsx": {
-      "native-select": 1
-    },
-    "src/pages/admin/content/archive/page.tsx": {
-      "native-select": 1
+      "native-input-date": 1
     },
     "src/pages/admin/content/articles/detail/ArticleEditorWorkspace.tsx": {
       "native-browser-dialog": 1
     },
     "src/pages/admin/content/articles/detail/components/ArticleCitationForm.tsx": {
-      "native-browser-dialog": 1,
-      "native-input-checkbox": 3,
-      "native-select": 4
+      "native-browser-dialog": 1
     },
     "src/pages/admin/content/articles/detail/components/ArticleCreditForm.tsx": {
-      "native-browser-dialog": 1,
-      "native-input-checkbox": 2,
-      "native-input-radio": 2,
-      "native-select": 2
-    },
-    "src/pages/admin/content/articles/detail/components/ArticleCreditGovernanceForm.tsx": {
-      "native-input-checkbox": 1,
-      "native-select": 1
+      "native-browser-dialog": 1
     },
     "src/pages/admin/content/articles/detail/components/ArticleMetaPanel.tsx": {
-      "native-input-datetime-local": 1,
-      "native-select": 1
+      "native-input-datetime-local": 1
     },
     "src/pages/admin/content/articles/detail/components/ArticleSourceForm.tsx": {
       "native-browser-dialog": 1,
-      "native-input-checkbox": 1,
-      "native-input-date": 3,
-      "native-select": 5
-    },
-    "src/pages/admin/content/articles/detail/components/ArticleSourceLifecycleForm.tsx": {
-      "native-input-checkbox": 2,
-      "native-select": 2
-    },
-    "src/pages/admin/content/articles/detail/components/ArticleWorkbenchNav.tsx": {
-      "native-select": 1
-    },
-    "src/pages/admin/content/articles/page.tsx": {
-      "native-select": 2
+      "native-input-date": 3
     },
     "src/pages/admin/content/audio/detail/AudioEditorWorkspace.tsx": {
       "native-media-controls": 1
     },
     "src/pages/admin/content/audio/page.tsx": {
-      "native-input-number": 2,
-      "native-select": 3
+      "native-input-number": 2
     },
     "src/pages/admin/content/components/TaxonomyTermsPage.tsx": {
       "native-browser-dialog": 4
-    },
-    "src/pages/admin/content/guides/detail/components/GuideEditorHeader.tsx": {
-      "native-select": 1
-    },
-    "src/pages/admin/content/guides/page.tsx": {
-      "native-select": 1
-    },
-    "src/pages/admin/content/lyrics/components/LyricsContributionReviewWorkspace.tsx": {
-      "native-select": 1
-    },
-    "src/pages/admin/content/lyrics/page.tsx": {
-      "native-select": 1
-    },
-    "src/pages/admin/content/pages/page.tsx": {
-      "native-select": 1
     },
     "src/pages/admin/content/playlists/detail/PlaylistEditorWorkspace.tsx": {
       "native-browser-dialog": 3
     },
     "src/pages/admin/content/playlists/detail/components/PlaylistDetailsDrawer.tsx": {
-      "native-input-datetime-local": 1,
-      "native-select": 2
-    },
-    "src/pages/admin/content/playlists/page.tsx": {
-      "native-select": 1
+      "native-input-datetime-local": 1
     },
     "src/pages/admin/content/publishing/components/CreatePublishingItemDrawer.tsx": {
-      "native-input-datetime-local": 2,
-      "native-select": 4
+      "native-input-datetime-local": 2
     },
     "src/pages/admin/content/publishing/components/EditPublishingItemDrawer.tsx": {
-      "native-input-datetime-local": 2,
-      "native-select": 5
-    },
-    "src/pages/admin/content/publishing/components/PublishingRelationshipsSection.tsx": {
-      "native-input-checkbox": 1,
-      "native-select": 3
-    },
-    "src/pages/admin/content/publishing/page.tsx": {
-      "native-select": 5
+      "native-input-datetime-local": 2
     },
     "src/pages/admin/content/video/detail/VideoEditorWorkspace.tsx": {
-      "native-input-number": 1,
-      "native-input-radio": 1,
-      "native-select": 4
-    },
-    "src/pages/admin/content/video/page.tsx": {
-      "native-select": 4
-    },
-    "src/pages/admin/institute/inquiry-interface/ClinicScreen.tsx": {
-      "native-select": 2
-    },
-    "src/pages/admin/institute/inquiry-interface/EvidenceReaderPanel.tsx": {
-      "native-select": 1
-    },
-    "src/pages/admin/institute/inquiry-interface/InstituteClaimsWorkspace.tsx": {
-      "native-select": 4
+      "native-input-number": 1
     },
     "src/pages/admin/institute/inquiry-interface/InstitutePlaylistWorkspace.tsx": {
       "native-browser-dialog": 1
     },
     "src/pages/admin/institute/inquiry-interface/NativeInstituteInquiryInterface.tsx": {
       "native-disclosure": 4,
-      "native-input-number": 1,
-      "native-select": 4
-    },
-    "src/pages/admin/institute/inquiry-interface/RelationshipsScreen.tsx": {
-      "native-input-checkbox": 1,
-      "native-select": 2
-    },
-    "src/pages/admin/institute/inquiry-interface/WakilishaRecordWorkspace.tsx": {
-      "native-select": 6
+      "native-input-number": 1
     },
     "src/pages/admin/login/page.tsx": {
       "native-input-password": 1
     },
-    "src/pages/admin/media/missing/page.tsx": {
-      "native-select": 1
-    },
     "src/pages/admin/registry/artist-aliases/decouple/page.tsx": {
-      "native-browser-dialog": 3,
-      "native-select": 4
+      "native-browser-dialog": 3
     },
     "src/pages/admin/registry/artist-aliases/page.tsx": {
-      "native-browser-dialog": 1,
-      "native-input-checkbox": 1
-    },
-    "src/pages/admin/registry/artists/detail/page.tsx": {
-      "native-select": 3
-    },
-    "src/pages/admin/registry/artists/intake/page.tsx": {
-      "native-input-checkbox": 2
-    },
-    "src/pages/admin/registry/artists/page.tsx": {
-      "native-select": 5
-    },
-    "src/pages/admin/registry/authors/page.tsx": {
-      "native-select": 1
-    },
-    "src/pages/admin/registry/genres/detail/page.tsx": {
-      "native-select": 1
-    },
-    "src/pages/admin/registry/genres/page.tsx": {
-      "native-select": 2
-    },
-    "src/pages/admin/registry/labels/detail/page.tsx": {
-      "native-select": 1
-    },
-    "src/pages/admin/registry/labels/page.tsx": {
-      "native-select": 2
+      "native-browser-dialog": 1
     },
     "src/pages/admin/registry/releases/detail/page.tsx": {
-      "native-input-date": 1,
-      "native-select": 3
-    },
-    "src/pages/admin/registry/releases/page.tsx": {
-      "native-select": 2
+      "native-input-date": 1
     },
     "src/pages/admin/registry/tracks/detail/page.tsx": {
-      "native-input-checkbox": 1,
       "native-input-number": 3,
-      "native-media-controls": 1,
-      "native-select": 1
-    },
-    "src/pages/admin/registry/tracks/intake/page.tsx": {
-      "native-input-checkbox": 2,
-      "native-select": 3
-    },
-    "src/pages/admin/registry/tracks/page.tsx": {
-      "native-select": 2
+      "native-media-controls": 1
     },
     "src/pages/admin/relationships/duplicates/page.tsx": {
-      "native-browser-dialog": 3,
-      "native-input-checkbox": 1,
-      "native-select": 1
-    },
-    "src/pages/admin/relationships/viewer/RelationshipReviewDrawer.tsx": {
-      "native-input-checkbox": 1,
-      "native-select": 4
-    },
-    "src/pages/admin/review/queue/page.tsx": {
-      "native-input-checkbox": 1,
-      "native-select": 2
+      "native-browser-dialog": 3
     },
     "src/pages/admin/settings/airplay/page.tsx": {
       "native-input-number": 1
     },
     "src/pages/admin/settings/audience/page.tsx": {
       "native-datalist": 1,
-      "native-input-number": 1,
-      "native-select": 5
-    },
-    "src/pages/admin/settings/audit/page.tsx": {
-      "native-select": 1
-    },
-    "src/pages/admin/settings/chart-defaults/market-scopes/page.tsx": {
-      "native-select": 1
+      "native-input-number": 1
     },
     "src/pages/admin/settings/chart-defaults/page.tsx": {
-      "native-input-number": 1,
-      "native-select": 1
+      "native-input-number": 1
     },
     "src/pages/admin/settings/email-briefings/page.tsx": {
       "native-input-number": 1,
-      "native-input-time": 1,
-      "native-select": 3
+      "native-input-time": 1
     },
     "src/pages/admin/settings/frontend-appearance/page.tsx": {
       "native-input-color": 2,
       "native-input-number": 1,
-      "native-input-range": 1,
-      "native-select": 2
+      "native-input-range": 1
     },
     "src/pages/admin/settings/gsc-data/page.tsx": {
-      "native-browser-dialog": 1,
-      "native-select": 1
+      "native-browser-dialog": 1
     },
     "src/pages/admin/settings/integrations/page.tsx": {
-      "native-input-file": 1,
-      "native-select": 1
-    },
-    "src/pages/admin/settings/onboarding/page.tsx": {
-      "native-input-checkbox": 1
-    },
-    "src/pages/admin/settings/player-playback/page.tsx": {
-      "native-select": 2
+      "native-input-file": 1
     },
     "src/pages/admin/settings/registry/page.tsx": {
-      "native-input-number": 3,
-      "native-select": 2
+      "native-input-number": 3
     },
     "src/pages/admin/settings/seo/page.tsx": {
       "native-disclosure": 2
     },
     "src/pages/admin/users/page.tsx": {
-      "native-browser-dialog": 2,
-      "native-input-checkbox": 3,
-      "native-select": 5
+      "native-browser-dialog": 2
     },
     "src/pages/artists/manage/page.tsx": {
-      "native-browser-dialog": 1,
-      "native-input-checkbox": 1,
-      "native-select": 7
+      "native-browser-dialog": 1
     },
     "src/pages/auth/page.tsx": {
       "native-input-password": 3
@@ -416,41 +195,9 @@
     "src/pages/auth/reset-password/page.tsx": {
       "native-input-password": 2
     },
-    "src/pages/briefings/page.tsx": {
-      "native-input-checkbox": 1
-    },
-    "src/pages/contact/page.tsx": {
-      "native-select": 1
-    },
     "src/pages/field/page.tsx": {
       "native-input-datetime-local": 1,
       "native-input-file": 3
-    },
-    "src/pages/genres/page.tsx": {
-      "native-select": 1
-    },
-    "src/pages/guides/detail/components/DakarFollowSection.tsx": {
-      "native-input-checkbox": 1,
-      "native-select": 1
-    },
-    "src/pages/guides/detail/components/GuideDownloadSection.tsx": {
-      "native-input-checkbox": 1,
-      "native-select": 2
-    },
-    "src/pages/guides/detail/sections/DownloadFormSection.tsx": {
-      "native-input-checkbox": 1,
-      "native-select": 2
-    },
-    "src/pages/guides/detail/sections/FollowFormSection.tsx": {
-      "native-input-checkbox": 1,
-      "native-select": 1
-    },
-    "src/pages/labels/page.tsx": {
-      "native-select": 1
-    },
-    "src/pages/mobile/guides/detail/components/MobileDakarGuide.tsx": {
-      "native-input-checkbox": 1,
-      "native-select": 1
     },
     "src/pages/mobile/guides/detail/components/MobileReadingGuide.tsx": {
       "native-input-range": 1
@@ -459,8 +206,7 @@
       "native-browser-dialog": 1
     },
     "src/pages/mobile/settings/page.tsx": {
-      "native-browser-dialog": 3,
-      "native-select": 2
+      "native-browser-dialog": 3
     },
     "src/pages/playlists/detail/page.tsx": {
       "native-disclosure": 2
@@ -468,17 +214,8 @@
     "src/pages/playlists/person/detail/page.tsx": {
       "native-browser-dialog": 1
     },
-    "src/pages/releases/page.tsx": {
-      "native-select": 1
-    },
     "src/pages/settings/components/AccountSettingsPane.tsx": {
       "native-input-file": 2
-    },
-    "src/pages/settings/components/AppearanceSettingsPane.tsx": {
-      "native-select": 1
-    },
-    "src/pages/settings/components/PlaybackSettingsPane.tsx": {
-      "native-select": 1
     },
     "src/pages/video/page.tsx": {
       "native-input-search": 1

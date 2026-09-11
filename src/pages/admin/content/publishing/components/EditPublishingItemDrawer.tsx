@@ -26,6 +26,8 @@ import {
   type PublishingProductionStage,
   type PublishingWorkspaceItem,
 } from "@/services/publishing/publishingWorkspaceService";
+import { WkSelect } from "@/components/design-system/primitives/Select";
+
 
 interface EditPublishingItemDrawerProps {
   item: PublishingWorkspaceItem;
@@ -727,14 +729,14 @@ export function EditPublishingItemDrawer({
                 <span className="text-[12px] font-bold text-wk-text">
                   Content Type
                 </span>
-                <select
+                <WkSelect
                   value={contentKind}
-                  onChange={(event) => {
-                    setContentKind(event.target.value);
+                  onChange={(value) => {
+                    setContentKind(value);
                     setError(null);
                   }}
                   disabled={formDisabled}
-                  className="mt-2 w-full rounded-xl border border-wk-border bg-wk-surface px-3 py-2.5 text-[13px] text-wk-text outline-none focus:border-wk-brand disabled:opacity-60"
+                  triggerClassName="mt-2 w-full rounded-xl border border-wk-border bg-wk-surface px-3 py-2.5 text-[13px] text-wk-text outline-none focus:border-wk-brand disabled:opacity-60"
                 >
                   {!currentKindAvailable ? (
                     <option value={item.contentKind}>
@@ -750,7 +752,7 @@ export function EditPublishingItemDrawer({
                       {kind.label}
                     </option>
                   ))}
-                </select>
+                </WkSelect>
 
                 {selectedContentKind?.description ? (
                   <p className="mt-1.5 text-[11px] leading-4 text-wk-text-muted">
@@ -780,16 +782,15 @@ export function EditPublishingItemDrawer({
                   <span className="text-[12px] font-bold text-wk-text">
                     Production Stage
                   </span>
-                  <select
+                  <WkSelect
                     value={productionStage}
-                    onChange={(event) =>
+                    onChange={(value) =>
                       setProductionStage(
-                        event.target
-                          .value as PublishingProductionStage,
+                        value as PublishingProductionStage,
                       )
                     }
                     disabled={formDisabled}
-                    className="mt-2 w-full rounded-xl border border-wk-border bg-wk-surface px-3 py-2.5 text-[13px] text-wk-text outline-none focus:border-wk-brand disabled:opacity-60"
+                    triggerClassName="mt-2 w-full rounded-xl border border-wk-border bg-wk-surface px-3 py-2.5 text-[13px] text-wk-text outline-none focus:border-wk-brand disabled:opacity-60"
                   >
                     {PUBLISHING_PRODUCTION_STAGES.map(
                       (stage) => (
@@ -801,23 +802,22 @@ export function EditPublishingItemDrawer({
                         </option>
                       ),
                     )}
-                  </select>
+                  </WkSelect>
                 </label>
 
                 <label className="block">
                   <span className="text-[12px] font-bold text-wk-text">
                     Planning State
                   </span>
-                  <select
+                  <WkSelect
                     value={planningState}
-                    onChange={(event) =>
+                    onChange={(value) =>
                       setPlanningState(
-                        event.target
-                          .value as PublishingPlanningState,
+                        value as PublishingPlanningState,
                       )
                     }
                     disabled={formDisabled}
-                    className="mt-2 w-full rounded-xl border border-wk-border bg-wk-surface px-3 py-2.5 text-[13px] text-wk-text outline-none focus:border-wk-brand disabled:opacity-60"
+                    triggerClassName="mt-2 w-full rounded-xl border border-wk-border bg-wk-surface px-3 py-2.5 text-[13px] text-wk-text outline-none focus:border-wk-brand disabled:opacity-60"
                   >
                     {PUBLISHING_PLANNING_STATES
                       .filter((state) =>
@@ -834,7 +834,7 @@ export function EditPublishingItemDrawer({
                           {formatChoice(state)}
                         </option>
                       ))}
-                  </select>
+                  </WkSelect>
                 </label>
               </div>
 
@@ -843,16 +843,15 @@ export function EditPublishingItemDrawer({
                   <span className="text-[12px] font-bold text-wk-text">
                     Priority
                   </span>
-                  <select
+                  <WkSelect
                     value={priority}
-                    onChange={(event) =>
+                    onChange={(value) =>
                       setPriority(
-                        event.target
-                          .value as PublishingPriority,
+                        value as PublishingPriority,
                       )
                     }
                     disabled={formDisabled}
-                    className="mt-2 w-full rounded-xl border border-wk-border bg-wk-surface px-3 py-2.5 text-[13px] text-wk-text outline-none focus:border-wk-brand disabled:opacity-60"
+                    triggerClassName="mt-2 w-full rounded-xl border border-wk-border bg-wk-surface px-3 py-2.5 text-[13px] text-wk-text outline-none focus:border-wk-brand disabled:opacity-60"
                   >
                     {PUBLISHING_PRIORITIES.map(
                       (priorityOption) => (
@@ -864,20 +863,20 @@ export function EditPublishingItemDrawer({
                         </option>
                       ),
                     )}
-                  </select>
+                  </WkSelect>
                 </label>
 
                 <label className="block">
                   <span className="text-[12px] font-bold text-wk-text">
                     Owner
                   </span>
-                  <select
+                  <WkSelect
                     value={ownerId}
-                    onChange={(event) =>
-                      setOwnerId(event.target.value)
+                    onChange={(value) =>
+                      setOwnerId(value)
                     }
                     disabled={formDisabled}
-                    className="mt-2 w-full rounded-xl border border-wk-border bg-wk-surface px-3 py-2.5 text-[13px] text-wk-text outline-none focus:border-wk-brand disabled:opacity-60"
+                    triggerClassName="mt-2 w-full rounded-xl border border-wk-border bg-wk-surface px-3 py-2.5 text-[13px] text-wk-text outline-none focus:border-wk-brand disabled:opacity-60"
                   >
                     {item.ownerId &&
                     item.ownerId !== currentUserId ? (
@@ -893,7 +892,7 @@ export function EditPublishingItemDrawer({
                     <option value="">
                       Leave Unassigned
                     </option>
-                  </select>
+                  </WkSelect>
                 </label>
               </div>
 
