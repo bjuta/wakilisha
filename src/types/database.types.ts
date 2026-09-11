@@ -1972,6 +1972,86 @@ export type Database = {
           },
         ]
       }
+      field_submission_source_promotions: {
+        Row: {
+          command_receipt_id: string
+          correlation_id: string
+          created_at: string
+          id: string
+          media_asset_id: string
+          media_asset_revision_id: string
+          media_governance_version_id: string
+          media_intake_id: string
+          media_usage_link_id: string
+          promoted_by_user_id: string
+          source_id: string
+          source_version_id: string
+          submission_resource_id: string
+          submission_revision: number
+        }
+        Insert: {
+          command_receipt_id: string
+          correlation_id: string
+          created_at?: string
+          id?: string
+          media_asset_id: string
+          media_asset_revision_id: string
+          media_governance_version_id: string
+          media_intake_id: string
+          media_usage_link_id: string
+          promoted_by_user_id: string
+          source_id: string
+          source_version_id: string
+          submission_resource_id: string
+          submission_revision: number
+        }
+        Update: {
+          command_receipt_id?: string
+          correlation_id?: string
+          created_at?: string
+          id?: string
+          media_asset_id?: string
+          media_asset_revision_id?: string
+          media_governance_version_id?: string
+          media_intake_id?: string
+          media_usage_link_id?: string
+          promoted_by_user_id?: string
+          source_id?: string
+          source_version_id?: string
+          submission_resource_id?: string
+          submission_revision?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "field_submission_source_promotions_media_intake_id_fkey"
+            columns: ["media_intake_id"]
+            isOneToOne: false
+            referencedRelation: "field_submission_media_intakes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "field_submission_source_promotions_source_id_fkey"
+            columns: ["source_id"]
+            isOneToOne: true
+            referencedRelation: "sources"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "field_submission_source_promotions_source_version_id_fkey"
+            columns: ["source_version_id"]
+            isOneToOne: true
+            referencedRelation: "source_versions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "field_submission_source_promotions_submission_resource_id_fkey"
+            columns: ["submission_resource_id"]
+            isOneToOne: false
+            referencedRelation: "field_submissions"
+            referencedColumns: ["resource_id"]
+          },
+        ]
+      }
       field_submissions: {
         Row: {
           cancelled_at: string | null
@@ -22090,6 +22170,10 @@ export type Database = {
         Args: { p_submission_resource_id: string }
         Returns: Json
       }
+      get_field_submission_promotion_state_v1: {
+        Args: { p_submission_resource_id: string }
+        Returns: Json
+      }
       get_import_run_by_id: {
         Args: { p_id: string }
         Returns: {
@@ -23279,6 +23363,27 @@ export type Database = {
       promote_artist_split_relationship: {
         Args: { p_staging_record_id: string }
         Returns: Json
+      }
+      promote_field_submission_to_source_v1: {
+        Args: {
+          p_correlation_id?: string
+          p_expected_submission_revision: number
+          p_idempotency_key: string
+          p_media_intake_id: string
+          p_submission_resource_id: string
+        }
+        Returns: {
+          command_receipt_id: string
+          idempotent_replay: boolean
+          media_asset_id: string
+          media_asset_revision_id: string
+          media_governance_version_id: string
+          receipt_status: string
+          source_id: string
+          source_review_status: string
+          source_version_id: string
+          submission_resource_id: string
+        }[]
       }
       promote_track_lyrics_contribution_to_draft: {
         Args: {
