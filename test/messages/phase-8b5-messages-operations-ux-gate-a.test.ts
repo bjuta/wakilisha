@@ -129,7 +129,11 @@ describe("Phase 8B.5 Messages Operations UX Gate A", () => {
     expect(searchable).toContain('event.key === "Enter" && open');
     expect(searchable).toContain("open && activeIndex >= 0");
     expect(searchable).toContain("tabIndex={-1}");
-    expect(searchable).toContain("style={{ zIndex: 2 }}");
+    expect(searchable).toContain("style={open ? { zIndex: 20 } : undefined}");
+    expect(searchable).toContain("style={{ zIndex: 21 }}");
+    expect(searchable).toContain(
+      "bg-wk-brand-soft text-wk-text ring-2 ring-inset ring-wk-brand",
+    );
     expect(searchable).not.toContain("handleSearchKeyDown");
   });
 

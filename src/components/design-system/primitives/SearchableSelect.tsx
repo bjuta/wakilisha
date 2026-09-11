@@ -178,6 +178,7 @@ export function SearchableSelect({
       ref={containerRef}
       onKeyDownCapture={handlePickerKeyDown}
       className={`relative ${className}`}
+      style={open ? { zIndex: 20 } : undefined}
     >
       <button
         ref={triggerRef}
@@ -227,7 +228,7 @@ export function SearchableSelect({
       {open ? (
         <div
           className="absolute left-0 right-0 top-full mt-1.5 overflow-hidden rounded-xl border border-wk-border-2 bg-wk-surface shadow-[var(--wk-shadow)]"
-          style={{ zIndex: 2 }}
+          style={{ zIndex: 21 }}
         >
           <div className="border-b border-wk-divider p-2">
             <div className="relative">
@@ -290,7 +291,7 @@ export function SearchableSelect({
                           : "cursor-pointer"
                       } ${
                         active
-                          ? "bg-wk-brand-soft text-wk-text"
+                          ? "bg-wk-brand-soft text-wk-text ring-2 ring-inset ring-wk-brand"
                           : selectedOption
                             ? "bg-wk-surface-raised text-wk-text"
                             : "text-wk-text-soft hover:bg-wk-surface-raised"
