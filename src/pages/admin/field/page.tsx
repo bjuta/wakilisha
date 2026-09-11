@@ -2,10 +2,13 @@ import { useCallback, useEffect, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import {
   getFieldSubmissionIntake,
+  getFieldSubmissionPromotionState,
   listFieldSubmissionIntakes,
+  promoteFieldSubmissionToSource,
   startFieldSubmissionMessage,
   type FieldIntakeDetail,
   type FieldIntakeSummary,
+  type FieldPromotionState,
 } from "@/services/fieldNewsroom";
 
 function when(value: string | null): string {
@@ -26,10 +29,12 @@ export default function AdminFieldPage() {
   const [rows, setRows] = useState<FieldIntakeSummary[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [detail, setDetail] = useState<FieldIntakeDetail | null>(null);
+  const [promotion, setPromotion] = useState<FieldPromotionState | null>(null);
   const [messageBody, setMessageBody] = useState("");
   const [loading, setLoading] = useState(true);
   const [loadingDetail, setLoadingDetail] = useState(false);
   const [starting, setStarting] = useState(false);
+  const [promotingIntakeId, setPromotingIntakeId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   const load = useCallback(async () => {
@@ -53,15 +58,34 @@ export default function AdminFieldPage() {
     }
   }, [requestedSubmissionId]);
 
+  const loadDetail = useCallback(async (submissionResourceId: string) => {
+    const [nextDetail, nextPromotion] = await Promise.all([
+      getFieldSubmissionIntake(submissionResourceId),
+      getFieldSubmissionPromotionState(submissionResourceId),
+    ]);
+    setDetail(nextDetail);
+    setPromotion(nextPromotion);
+    setMessageBody("");
+  }, []);
+
   useEffect(() => { void load(); }, [load]);
 
   useEffect(() => {
-    if (!selectedId) { setDetail(null); return; }
+    if (!selectedId) { setDetail(null); setPromotion(null); return; }
     let cancelled = false;
     setLoadingDetail(true);
     setError(null);
-    getFieldSubmissionIntake(selectedId)
-      .then((next) => { if (!cancelled) { setDetail(next); setMessageBody(""); } })
+    Promise.all([
+      getFieldSubmissionIntake(selectedId),
+      getFieldSubmissionPromotionState(selectedId),
+    ])
+      .then(([nextDetail, nextPromotion]) => {
+        if (!cancelled) {
+          setDetail(nextDetail);
+          setPromotion(nextPromotion);
+          setMessageBody("");
+        }
+      })
       .catch((err) => { if (!cancelled) setError(err instanceof Error ? err.message : "Field intake could not be opened."); })
       .finally(() => { if (!cancelled) setLoadingDetail(false); });
     return () => { cancelled = true; };
@@ -86,13 +110,30 @@ export default function AdminFieldPage() {
     }
   };
 
+  const handlePromote = async (mediaIntakeId: string) => {
+    if (!detail || promotingIntakeId) return;
+    setPromotingIntakeId(mediaIntakeId);
+    setError(null);
+    try {
+      const result = await promoteFieldSubmissionToSource(detail, mediaIntakeId);
+      if (result.receipt_status !== "succeeded") {
+        throw new Error("The Field original is not currently eligible for Source promotion.");
+      }
+      await loadDetail(detail.submission_resource_id);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "The Field original could not be prepared for Source review.");
+    } finally {
+      setPromotingIntakeId(null);
+    }
+  };
+
   return (
     <div className="space-y-6">
       <header className="flex flex-col gap-4 border-b border-[var(--wk-divider)] pb-5 sm:flex-row sm:items-end sm:justify-between">
         <div>
           <div className="text-[10px] font-black tracking-[0.18em] text-[var(--wk-brand)]">Newsroom</div>
           <h1 className="mt-1 text-[26px] font-black tracking-[-0.03em] text-[var(--wk-text)]">Field</h1>
-          <p className="mt-1 max-w-[720px] text-[12px] leading-relaxed text-[var(--wk-text-muted)]">Review Field intake authority and move approved contributor follow-up into canonical Messages.</p>
+          <p className="mt-1 max-w-[720px] text-[12px] leading-relaxed text-[var(--wk-text-muted)]">Review Field intake authority, contact contributors and move governed evidence into canonical Source review.</p>
         </div>
         <button type="button" onClick={() => void load()} disabled={loading} className="wk-button wk-button-sm wk-button-ghost disabled:opacity-50">{loading ? "Refreshing..." : "Refresh"}</button>
       </header>
@@ -126,6 +167,49 @@ export default function AdminFieldPage() {
               <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">{[
                 ["State", label(detail.submission_state)], ["Revision", String(detail.current_revision)], ["Identity", detail.contributor_identity_redacted ? "Restricted" : label(detail.newsroom_identity_mode)], ["Follow-up", detail.follow_up_permission === "allowed" ? "Allowed" : "Not allowed"], ["Channel", detail.preferred_contact_channel ? label(detail.preferred_contact_channel) : "Not selected"], ["Sensitivity", label(detail.declared_sensitivity)], ["Source protection", label(detail.source_protection_request)], ["Received", when(detail.received_at)], ["Submitted", when(detail.submitted_at)],
               ].map(([key, value]) => <div key={key} className="rounded-2xl border border-[var(--wk-border)] bg-[var(--wk-bg)] p-4"><div className="text-[9px] font-black uppercase tracking-[0.12em] text-[var(--wk-text-faint)]">{key}</div><div className="mt-1 text-[12px] font-black capitalize text-[var(--wk-text)]">{value}</div></div>)}</div>
+
+              <section className="rounded-2xl border border-[var(--wk-border)] bg-[var(--wk-bg)] p-5" aria-label="Field promotion">
+                <div className="flex flex-wrap items-start justify-between gap-3">
+                  <div>
+                    <div className="text-[12px] font-black text-[var(--wk-text)]">Governed evidence</div>
+                    <p className="mt-1 max-w-[680px] text-[11px] leading-relaxed text-[var(--wk-text-muted)]">A protected Field original must receive a separate Media governance review before it can enter canonical Source review. Promotion keeps the original Media identity and does not copy contributor contact details.</p>
+                  </div>
+                  <button type="button" onClick={() => navigate("/admin/media/library")} className="wk-button wk-button-sm wk-button-ghost">Media library</button>
+                </div>
+                {!promotion || promotion.items.length === 0 ? (
+                  <div className="mt-4 rounded-xl bg-[var(--wk-surface-raised)] px-4 py-3 text-[11px] font-bold text-[var(--wk-text-muted)]">No adopted Field original is available for promotion.</div>
+                ) : (
+                  <div className="mt-4 space-y-3">{promotion.items.map((item) => {
+                    const promoted = Boolean(item.source_id);
+                    const busy = promotingIntakeId === item.media_intake_id;
+                    return (
+                      <div key={item.media_intake_id} className="rounded-2xl border border-[var(--wk-border)] bg-[var(--wk-surface)] p-4">
+                        <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                          <div className="min-w-0">
+                            <div className="truncate text-[12px] font-black text-[var(--wk-text)]">{item.asset_title || `Field original ${item.slot_number}`}</div>
+                            <div className="mt-1 flex flex-wrap gap-2 text-[10px] font-bold text-[var(--wk-text-muted)]">
+                              <span>Slot {item.slot_number}</span><span>•</span><span>{item.media_governance_reviewed ? "governance reviewed" : "governance review required"}</span><span>•</span><span>{label(item.media_governance_public_safety_state)}</span>
+                            </div>
+                            <div className="mt-2 break-all font-mono text-[9px] text-[var(--wk-text-faint)]">Media {item.media_asset_id}</div>
+                            {promoted ? <div className="mt-2 text-[11px] font-bold text-[var(--wk-success)]">Source prepared for review. Original Media provenance remains attached to this promotion.</div> : null}
+                          </div>
+                          {!promoted ? (
+                            <button
+                              type="button"
+                              onClick={() => void handlePromote(item.media_intake_id)}
+                              disabled={!promotion.can_promote_sources || !item.promotion_eligible || Boolean(promotingIntakeId)}
+                              className="wk-button wk-button-sm wk-button-primary shrink-0 disabled:opacity-50"
+                            >
+                              {busy ? "Preparing..." : item.media_governance_reviewed ? "Prepare Source for review" : "Review Media first"}
+                            </button>
+                          ) : null}
+                        </div>
+                      </div>
+                    );
+                  })}</div>
+                )}
+              </section>
+
               <section className="rounded-2xl border border-[var(--wk-border)] bg-[var(--wk-bg)] p-5">
                 <div className="text-[12px] font-black text-[var(--wk-text)]">Message contributor</div>
                 <p className="mt-1 text-[11px] leading-relaxed text-[var(--wk-text-muted)]">The first Message references this Field Submission without copying protected intake content into the Conversation.</p>
