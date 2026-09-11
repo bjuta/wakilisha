@@ -110,6 +110,13 @@ for (const required of [
   'className="min-h-[520px] min-w-0 rounded-2xl',
   'className="min-w-0 space-y-5"',
   'className="wk-identity-wrap text-[16px] font-black text-wk-text"',
+  'grid-cols-[minmax(0,1fr)] gap-2 lg:grid-cols-[minmax(0,0.82fr)_minmax(0,1.18fr)]',
+  'className="min-w-0 space-y-2"',
+  'className={`min-w-0 w-full rounded-xl border p-3 text-left',
+  'className="flex min-w-0 flex-col gap-2 sm:flex-row sm:items-start sm:justify-between"',
+  'className="wk-identity-wrap text-[11px] font-black text-wk-text"',
+  'className="shrink-0 self-start"',
+  'className="min-h-[220px] min-w-0 rounded-xl',
 ]) {
   if (!messagesLegalPanel.includes(required)) {
     fail(

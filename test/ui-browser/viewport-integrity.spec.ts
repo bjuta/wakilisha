@@ -135,6 +135,99 @@ test("long canonical identities stay inside a bounded mobile grid", async ({
   );
 });
 
+test("nested Disclosure package rows keep long references and status inside the viewport", async ({
+  page,
+}, testInfo) => {
+  if (testInfo.project.name === "chromium") {
+    await page.setViewportSize({ width: 390, height: 844 });
+  }
+
+  await page.goto(FIXTURE);
+
+  const grid = page.locator("[data-viewport-disclosure-grid]");
+  const packageCard = page.locator(
+    "[data-viewport-disclosure-package]",
+  );
+  const reference = page.locator(
+    "[data-viewport-disclosure-reference]",
+  );
+  const status = page.locator(
+    "[data-viewport-disclosure-status]",
+  );
+  const detail = page.locator(
+    "[data-viewport-disclosure-detail]",
+  );
+
+  for (const element of [
+    grid,
+    packageCard,
+    reference,
+    status,
+    detail,
+  ]) {
+    await expect(element).toBeVisible();
+  }
+
+  const geometry = await page.evaluate(() => {
+    const names = [
+      "disclosureGrid",
+      "packageCard",
+      "reference",
+      "status",
+      "detail",
+    ] as const;
+
+    const selectors = {
+      disclosureGrid: "[data-viewport-disclosure-grid]",
+      packageCard: "[data-viewport-disclosure-package]",
+      reference: "[data-viewport-disclosure-reference]",
+      status: "[data-viewport-disclosure-status]",
+      detail: "[data-viewport-disclosure-detail]",
+    };
+
+    return Object.fromEntries(
+      names.map((name) => {
+        const element = document.querySelector(
+          selectors[name],
+        ) as HTMLElement;
+        const rect = element.getBoundingClientRect();
+
+        return [
+          name,
+          {
+            left: rect.left,
+            right: rect.right,
+            width: rect.width,
+          },
+        ];
+      }),
+    ) as Record<
+      string,
+      { left: number; right: number; width: number }
+    >;
+  });
+
+  const referenceWrap = await reference.evaluate(
+    (element) => getComputedStyle(element).overflowWrap,
+  );
+  const state = await viewportState(page);
+
+  expect(referenceWrap).toBe("anywhere");
+  expect(state.scrollWidth).toBeLessThanOrEqual(
+    state.clientWidth + 2,
+  );
+
+  for (const rect of Object.values(geometry)) {
+    expect(rect.left).toBeGreaterThanOrEqual(-1);
+    expect(rect.right).toBeLessThanOrEqual(
+      state.clientWidth + 1,
+    );
+    expect(rect.width).toBeLessThanOrEqual(
+      state.clientWidth + 1,
+    );
+  }
+});
+
 test("viewport observer reports document overflow instead of hiding it", async ({
   page,
 }, testInfo) => {
