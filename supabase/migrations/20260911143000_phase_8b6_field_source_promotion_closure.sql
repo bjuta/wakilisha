@@ -33,8 +33,14 @@ begin
      or to_regprocedure('platform_private.begin_authenticated_resource_command(text,uuid,text,jsonb)') is null
      or to_regprocedure('platform_private.read_authenticated_resource_command_result(uuid,boolean)') is null
      or to_regprocedure('platform_private.complete_resource_command(uuid,jsonb)') is null
-     or to_regprocedure('platform_private.reject_resource_command(uuid,text,text,jsonb)') is null then
+     or to_regprocedure('platform_private.reject_resource_command(uuid,text,text,jsonb)') is null
+     or to_regprocedure('media.protect_field_original_asset_v1()') is null
+     or to_regprocedure('media.protect_field_original_governance_v1()') is null then
     raise exception 'STOP: accepted Field, Media, Source, or command authority is incomplete';
+  end if;
+  if md5(pg_get_functiondef('media.protect_field_original_asset_v1()'::regprocedure)) <> '63a55a8dc2ec29929802c2dc40623e46'
+     or md5(pg_get_functiondef('media.protect_field_original_governance_v1()'::regprocedure)) <> 'fa980a36c7f78dfb8deb7dd336c04ebf' then
+    raise exception 'STOP: accepted Phase 8A Field-original protection guards drifted';
   end if;
   if to_regclass('editorial.field_submission_source_promotions') is not null
      or to_regprocedure('public.get_field_submission_promotion_state_v1(uuid)') is not null
@@ -44,6 +50,92 @@ begin
   end if;
 end
 $preflight$;
+
+-- Phase 8A correctly made the canonical Field original immutable after initial
+-- activation, but it also froze the governance pointer. That prevented the
+-- existing canonical Media governance command from ever recording the later
+-- accountable review required by the Phase 8B programme. Keep the exact Media
+-- revision and all private Field-original boundaries immutable, while allowing
+-- only a one-version-at-a-time governance-pointer advance for the same asset.
+create or replace function media.protect_field_original_asset_v1()
+returns trigger
+language plpgsql
+set search_path to 'pg_catalog','media'
+as $function$
+declare
+  v_initial_activation boolean := false;
+  v_governance_advance boolean := false;
+begin
+  if new.asset_purpose = 'field_original'
+     and new.asset_kind <> 'video'
+  then
+    raise exception
+      'Field original Media must remain video in the Phase 8A first proof.';
+  end if;
+
+  if tg_op = 'UPDATE'
+     and new.asset_purpose is distinct from old.asset_purpose
+     and (
+       old.asset_purpose = 'field_original'
+       or new.asset_purpose = 'field_original'
+     )
+  then
+    raise exception
+      'Field original Media purpose cannot be assigned or removed after asset creation.';
+  end if;
+
+  if tg_op = 'UPDATE'
+     and old.asset_purpose = 'field_original'
+  then
+    v_initial_activation :=
+      old.current_revision_id is null
+      and old.current_governance_version_id is null
+      and old.authority_revision = 1
+      and new.current_revision_id is not null
+      and new.current_governance_version_id is not null
+      and new.authority_revision = 2;
+
+    v_governance_advance :=
+      old.current_revision_id is not null
+      and new.current_revision_id is not distinct from old.current_revision_id
+      and old.current_governance_version_id is not null
+      and new.current_governance_version_id is distinct from old.current_governance_version_id
+      and new.current_governance_version_id is not null
+      and new.authority_revision = old.authority_revision + 1
+      and exists (
+        select 1
+        from media.asset_governance_versions next_governance
+        join media.asset_governance_versions prior_governance
+          on prior_governance.id = old.current_governance_version_id
+         and prior_governance.asset_id = old.id
+        where next_governance.id = new.current_governance_version_id
+          and next_governance.asset_id = old.id
+          and next_governance.version_number = prior_governance.version_number + 1
+          and next_governance.created_by is not null
+      );
+
+    if new.asset_kind is distinct from old.asset_kind
+       or new.lifecycle_state <> 'active'
+       or new.compatibility_folder_id is not null
+       or (
+         new.current_revision_id is distinct from old.current_revision_id
+         and not v_initial_activation
+       )
+       or (
+         new.current_governance_version_id is distinct from old.current_governance_version_id
+         and not (v_initial_activation or v_governance_advance)
+       )
+    then
+      raise exception
+        'Field original Media revision, kind, active lifecycle, and private compatibility boundary are immutable; governance may advance only through the next protected version.';
+    end if;
+  end if;
+
+  return new;
+end;
+$function$;
+
+revoke all on function media.protect_field_original_asset_v1() from public,anon,authenticated,service_role;
 
 create table editorial.field_submission_source_promotions (
   id uuid primary key default gen_random_uuid(),
