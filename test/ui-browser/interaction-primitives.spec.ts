@@ -1,7 +1,7 @@
 import AxeBuilder from "@axe-core/playwright";
 import { expect, test } from "@playwright/test";
 
-test("WAKILISHA picker keyboard state is visible and selection restores focus", async ({
+test("WAKILISHA picker keyboard state is visible and selection keeps focus", async ({
   page,
 }) => {
   await page.goto("/test/ui-browser/fixtures/interaction.html");
@@ -18,33 +18,50 @@ test("WAKILISHA picker keyboard state is visible and selection restores focus", 
   const dialog = page.getByRole("dialog", {
     name: "Interaction acceptance",
   });
-  const trigger = dialog.getByRole("combobox", {
+  const combobox = dialog.getByRole("combobox", {
     name: "Acceptance picker",
   });
 
-  await trigger.click();
+  await combobox.click();
+  await expect(combobox).toBeFocused();
+  await expect(page.getByRole("listbox")).toBeVisible();
 
-  const input = dialog.getByRole("textbox", { name: "Find option" });
-  await expect(input).toBeFocused();
+  await combobox.press("ArrowDown");
 
-  await input.press("ArrowDown");
+  const selectedActiveId =
+    await combobox.getAttribute("aria-activedescendant");
+  expect(selectedActiveId).toBeTruthy();
 
-  const activeId = await input.getAttribute("aria-activedescendant");
-  expect(activeId).toBeTruthy();
+  const selectedActiveOption = page.locator(`#${selectedActiveId}`);
+  await expect(selectedActiveOption).toContainText("Alpha");
+  await expect(selectedActiveOption).toHaveAttribute(
+    "aria-selected",
+    "true",
+  );
 
-  const activeOption = page.locator(`#${activeId}`);
-  await expect(activeOption).toContainText("Beta");
+  await combobox.press("ArrowDown");
 
-  const activeBoxShadow = await activeOption.evaluate(
+  const nextActiveId =
+    await combobox.getAttribute("aria-activedescendant");
+  expect(nextActiveId).toBeTruthy();
+
+  const nextActiveOption = page.locator(`#${nextActiveId}`);
+  await expect(nextActiveOption).toContainText("Beta");
+  await expect(nextActiveOption).toHaveAttribute(
+    "aria-selected",
+    "false",
+  );
+
+  const activeBoxShadow = await nextActiveOption.evaluate(
     (element) => getComputedStyle(element).boxShadow,
   );
   expect(activeBoxShadow).not.toBe("none");
 
-  await input.press("Enter");
+  await combobox.press("Enter");
 
-  await expect(trigger).toContainText("Beta");
-  await expect(trigger).toBeFocused();
-  await expect(dialog.getByRole("listbox")).toHaveCount(0);
+  await expect(combobox).toHaveValue("Beta");
+  await expect(combobox).toBeFocused();
+  await expect(page.getByRole("listbox")).toHaveCount(0);
 });
 
 test("nested Escape closes picker before sheet and restores invoker focus", async ({
@@ -60,15 +77,15 @@ test("nested Escape closes picker before sheet and restores invoker focus", asyn
   const dialog = page.getByRole("dialog", {
     name: "Interaction acceptance",
   });
-  const trigger = dialog.getByRole("combobox", {
+  const combobox = dialog.getByRole("combobox", {
     name: "Acceptance picker",
   });
 
-  await trigger.click();
-  await expect(dialog.getByRole("listbox")).toBeVisible();
+  await combobox.click();
+  await expect(page.getByRole("listbox")).toBeVisible();
 
   await page.keyboard.press("Escape");
-  await expect(dialog.getByRole("listbox")).toHaveCount(0);
+  await expect(page.getByRole("listbox")).toHaveCount(0);
   await expect(dialog).toBeVisible();
 
   await page.keyboard.press("Escape");
@@ -100,8 +117,10 @@ test("critical interaction fixture has no serious automated accessibility violat
     .withTags(["wcag2a", "wcag2aa"])
     .analyze();
 
-  const blocking = results.violations.filter((violation) =>
-    violation.impact === "serious" || violation.impact === "critical"
+  const blocking = results.violations.filter(
+    (violation) =>
+      violation.impact === "serious" ||
+      violation.impact === "critical",
   );
 
   expect(blocking).toEqual([]);

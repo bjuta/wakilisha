@@ -2,7 +2,7 @@
 
 import "@testing-library/jest-dom/vitest";
 import { useState } from "react";
-import { render, screen, waitFor, within } from "@testing-library/react";
+import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeAll, describe, expect, it, vi } from "vitest";
 import { Sheet } from "@/components/design-system/primitives/Sheet";
@@ -50,23 +50,25 @@ function Harness() {
 }
 
 describe("WAKILISHA Sheet interaction contract", () => {
-  it("closes a nested popup before the sheet and restores focus to the invoker", async () => {
+  it("closes the nested picker before the sheet and restores invoker focus", async () => {
     const user = userEvent.setup();
     render(<Harness />);
 
     const opener = screen.getByRole("button", { name: "Open sheet" });
     await user.click(opener);
 
-    const dialog = screen.getByRole("dialog", { name: "Interaction sheet" });
-    const picker = within(dialog).getByRole("combobox", {
+    const dialog = screen.getByRole("dialog", {
+      name: "Interaction sheet",
+    });
+    const picker = screen.getByRole("combobox", {
       name: "Nested picker",
     });
 
     await user.click(picker);
-    expect(within(dialog).getByRole("listbox")).toBeInTheDocument();
+    expect(screen.getByRole("listbox")).toBeInTheDocument();
 
     await user.keyboard("{Escape}");
-    expect(within(dialog).queryByRole("listbox")).not.toBeInTheDocument();
+    expect(screen.queryByRole("listbox")).not.toBeInTheDocument();
     expect(dialog).toBeInTheDocument();
 
     await user.keyboard("{Escape}");
@@ -75,7 +77,7 @@ describe("WAKILISHA Sheet interaction contract", () => {
         screen.queryByRole("dialog", { name: "Interaction sheet" }),
       ).not.toBeInTheDocument(),
     );
-    expect(opener).toHaveFocus();
+    await waitFor(() => expect(opener).toHaveFocus());
   });
 
   it("keeps repeated Tab and Shift+Tab focus inside the open sheet", async () => {
@@ -83,7 +85,9 @@ describe("WAKILISHA Sheet interaction contract", () => {
     render(<Harness />);
 
     await user.click(screen.getByRole("button", { name: "Open sheet" }));
-    const dialog = screen.getByRole("dialog", { name: "Interaction sheet" });
+    const dialog = screen.getByRole("dialog", {
+      name: "Interaction sheet",
+    });
 
     for (let index = 0; index < 12; index += 1) {
       await user.tab();

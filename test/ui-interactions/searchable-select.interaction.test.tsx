@@ -23,7 +23,7 @@ beforeAll(() => {
 });
 
 describe("WAKILISHA SearchableSelect interaction contract", () => {
-  it("moves active option with arrows, commits with Enter, and restores trigger focus", async () => {
+  it("moves active option with arrows, commits with Enter, and keeps focus", async () => {
     const user = userEvent.setup();
     let current = "alpha";
 
@@ -42,32 +42,45 @@ describe("WAKILISHA SearchableSelect interaction contract", () => {
     }
 
     const { rerender } = render(<Harness />);
-    const trigger = screen.getByRole("combobox", {
+    const combobox = screen.getByRole("combobox", {
       name: "Gate E test picker",
     });
 
-    await user.click(trigger);
-
-    const input = screen.getByRole("textbox", { name: "Find option" });
-    expect(input).toHaveFocus();
+    await user.click(combobox);
+    expect(combobox).toHaveFocus();
+    expect(screen.getByRole("listbox")).toBeInTheDocument();
 
     await user.keyboard("{ArrowDown}");
 
-    const activeId = input.getAttribute("aria-activedescendant");
-    expect(activeId).toBeTruthy();
-    expect(document.getElementById(activeId!)).toHaveTextContent("Beta");
+    await waitFor(() => {
+      const activeId = combobox.getAttribute("aria-activedescendant");
+      expect(activeId).toBeTruthy();
+      const activeOption = document.getElementById(activeId!);
+      expect(activeOption).toHaveTextContent("Alpha");
+      expect(activeOption).toHaveAttribute("aria-selected", "true");
+    });
+
+    await user.keyboard("{ArrowDown}");
+
+    await waitFor(() => {
+      const activeId = combobox.getAttribute("aria-activedescendant");
+      expect(activeId).toBeTruthy();
+      const activeOption = document.getElementById(activeId!);
+      expect(activeOption).toHaveTextContent("Beta");
+      expect(activeOption).toHaveAttribute("aria-selected", "false");
+    });
 
     await user.keyboard("{Enter}");
     expect(current).toBe("beta");
 
     rerender(<Harness />);
 
-    await waitFor(() => expect(trigger).toHaveFocus());
-    expect(trigger).toHaveTextContent("Beta");
+    await waitFor(() => expect(combobox).toHaveFocus());
+    expect(combobox).toHaveValue("Beta");
     expect(screen.queryByRole("listbox")).not.toBeInTheDocument();
   });
 
-  it("closes on Escape and restores focus to the WAKILISHA trigger", async () => {
+  it("closes on Escape and keeps focus on the WAKILISHA combobox", async () => {
     const user = userEvent.setup();
 
     render(
@@ -80,13 +93,14 @@ describe("WAKILISHA SearchableSelect interaction contract", () => {
       />,
     );
 
-    const trigger = screen.getByRole("combobox", { name: "Policy" });
-    await user.click(trigger);
-    expect(screen.getByRole("textbox", { name: "Find policy" })).toHaveFocus();
+    const combobox = screen.getByRole("combobox", { name: "Policy" });
+    await user.click(combobox);
+    expect(combobox).toHaveFocus();
+    expect(screen.getByRole("listbox")).toBeInTheDocument();
 
     await user.keyboard("{Escape}");
 
     expect(screen.queryByRole("listbox")).not.toBeInTheDocument();
-    await waitFor(() => expect(trigger).toHaveFocus());
+    await waitFor(() => expect(combobox).toHaveFocus());
   });
 });

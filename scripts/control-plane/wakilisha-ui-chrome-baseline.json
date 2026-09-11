@@ -75,9 +75,6 @@
     "src/components/video/VideoPlaybackCanvas.tsx": {
       "native-input-range": 1
     },
-    "src/pages/admin/analytics/page.tsx": {
-      "native-datalist": 11
-    },
     "src/pages/admin/charts/artist-resolution/page.tsx": {
       "native-browser-dialog": 6,
       "native-select": 5

@@ -103,8 +103,7 @@ function issueFor(sourceFile, file, node, kind, detail) {
   };
 }
 
-function scanFile(file) {
-  const sourceText = fs.readFileSync(file, "utf8");
+function scanSourceText(sourceText, file) {
   const scriptKind = file.endsWith(".tsx")
     ? ts.ScriptKind.TSX
     : file.endsWith(".jsx")
@@ -120,21 +119,21 @@ function scanFile(file) {
   const issues = [];
 
   function inspectJsx(node, tagName, attributes) {
-    const lower = tagName.toLowerCase();
+    const isIntrinsic = tagName === tagName.toLowerCase();
 
-    if (FORBIDDEN_ELEMENTS.has(lower)) {
+    if (isIntrinsic && FORBIDDEN_ELEMENTS.has(tagName)) {
       issues.push(
         issueFor(
           sourceFile,
           file,
           node,
-          FORBIDDEN_ELEMENTS.get(lower),
-          `<${lower}>`,
+          FORBIDDEN_ELEMENTS.get(tagName),
+          `<${tagName}>`,
         ),
       );
     }
 
-    if (lower === "input") {
+    if (tagName === "input") {
       const typeAttribute = getAttribute(attributes, "type");
       const typeValue = literalAttributeValue(typeAttribute);
       if (
@@ -153,7 +152,7 @@ function scanFile(file) {
       }
     }
 
-    if (lower === "audio" || lower === "video") {
+    if (tagName === "audio" || tagName === "video") {
       const controls = literalAttributeValue(
         getAttribute(attributes, "controls"),
       );
@@ -164,7 +163,7 @@ function scanFile(file) {
             file,
             node,
             "native-media-controls",
-            `<${lower} controls>`,
+            `<${tagName} controls>`,
           ),
         );
       }
@@ -216,6 +215,17 @@ function scanFile(file) {
 
   visit(sourceFile);
   return issues;
+}
+
+function scanFile(file) {
+  return scanSourceText(fs.readFileSync(file, "utf8"), file);
+}
+
+export function scanWakilishaUiChromeSource(sourceText) {
+  return scanSourceText(
+    sourceText,
+    path.join(SRC_ROOT, "__ui-chrome-contract__.tsx"),
+  );
 }
 
 export function scanWakilishaUiChrome() {

@@ -22,7 +22,7 @@ function Harness() {
 }
 
 describe("Messages Operations workspace tab interaction contract", () => {
-  it("supports Arrow, Home, and End roving focus with activation", async () => {
+  it("supports React Aria Arrow, Home, and End automatic activation", async () => {
     const user = userEvent.setup();
     render(<Harness />);
 
@@ -32,7 +32,7 @@ describe("Messages Operations workspace tab interaction contract", () => {
     });
     const controls = screen.getByRole("tab", { name: "Controls" });
 
-    overview.focus();
+    await user.click(overview);
     expect(overview).toHaveFocus();
 
     await user.keyboard("{ArrowRight}");
