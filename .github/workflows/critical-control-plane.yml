@@ -40,6 +40,20 @@ jobs:
       - name: Install dependencies
         run: npm ci --prefer-offline --no-audit --no-fund
 
+      - name: Enforce WAKILISHA browser-chrome debt ledger
+        run: |
+          npm run audit:ui-chrome
+          npx vitest run test/control-plane/wakilisha-ui-chrome.test.ts
+
+      - name: Run WAKILISHA DOM interaction contracts
+        run: npm run test:ui-dom
+
+      - name: Install Chromium for critical interaction acceptance
+        run: npx playwright install --with-deps chromium
+
+      - name: Run WAKILISHA real-browser interaction acceptance
+        run: npm run test:ui-browser
+
       - name: Enforce migration replay contract
         run: node scripts/control-plane/verify-migration-replay-contract.mjs
 
