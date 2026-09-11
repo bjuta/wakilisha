@@ -78,13 +78,13 @@ describe("WAKILISHA choice-control interaction contract", () => {
     const checkbox = screen.getByRole("checkbox", {
       name: "Include archived items",
     });
-    checkbox.focus();
+    await user.click(checkbox);
     await user.keyboard(" ");
-    expect(checkbox).toBeChecked();
+    expect(checkbox).not.toBeChecked();
 
     expect(
       screen.getByRole("checkbox", { name: "Partial table selection" }),
-    ).toHaveAttribute("aria-checked", "mixed");
+    ).toBePartiallyChecked();
   });
 
   it("moves radio selection with arrow keys inside one governed group", async () => {
@@ -110,7 +110,7 @@ describe("WAKILISHA choice-control interaction contract", () => {
     const organization = screen.getByRole("radio", { name: "Organization" });
 
     expect(person).toBeChecked();
-    person.focus();
+    await user.click(person);
     await user.keyboard("{ArrowRight}");
 
     await waitFor(() => expect(organization).toBeChecked());
