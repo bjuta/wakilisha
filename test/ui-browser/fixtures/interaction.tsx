@@ -6,13 +6,19 @@ import "@/design-system/wakilisha.elements.foundation.css";
 import "@/design-system/wakilisha.elements.product.css";
 import "@/design-system/wakilisha.elements.content.css";
 import "@/design-system/wakilisha.viewport-integrity.css";
-import { Sheet } from "@/components/design-system/primitives/Sheet";
+import { WkCheckbox } from "@/components/design-system/primitives/Checkbox";
+import { WkRadio, WkRadioGroup } from "@/components/design-system/primitives/Radio";
 import { SearchableSelect } from "@/components/design-system/primitives/SearchableSelect";
+import { WkSelect } from "@/components/design-system/primitives/Select";
+import { Sheet } from "@/components/design-system/primitives/Sheet";
 import { initializeViewportIntegrityObserver } from "@/lib/viewport/viewportIntegrity";
 
 function InteractionFixture() {
   const [open, setOpen] = useState(false);
   const [value, setValue] = useState("alpha");
+  const [finiteChoice, setFiniteChoice] = useState("alpha");
+  const [checked, setChecked] = useState(false);
+  const [radioChoice, setRadioChoice] = useState("person");
 
   return (
     <main className="min-h-screen bg-wk-bg p-6 text-wk-text">
@@ -88,6 +94,31 @@ function InteractionFixture() {
         side="right"
       >
         <div className="space-y-5">
+          <WkSelect
+            ariaLabel="Finite acceptance choice"
+            options={[
+              { value: "alpha", label: "Alpha" },
+              { value: "beta", label: "Beta" },
+              { value: "gamma", label: "Gamma", disabled: true },
+            ]}
+            value={finiteChoice}
+            onChange={setFiniteChoice}
+          />
+
+          <WkCheckbox checked={checked} onChange={setChecked}>
+            Acceptance checkbox
+          </WkCheckbox>
+
+          <WkRadioGroup
+            ariaLabel="Acceptance radio group"
+            value={radioChoice}
+            onChange={setRadioChoice}
+            className="flex flex-wrap gap-3 space-y-0"
+          >
+            <WkRadio value="person">Person</WkRadio>
+            <WkRadio value="organization">Organization</WkRadio>
+          </WkRadioGroup>
+
           <SearchableSelect
             ariaLabel="Acceptance picker"
             searchPlaceholder="Find option"
