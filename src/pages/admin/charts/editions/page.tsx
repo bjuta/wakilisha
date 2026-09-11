@@ -12,6 +12,8 @@ import { getSupabaseChartFamilies } from "@/services/chartsPublic/client";
 import type { ChartFamily } from "@/services/chartsPublic/client";
 import { reingestEdition } from "@/services/chartsIngestion/client";
 import type { ReingestEditionResult } from "@/services/chartsIngestion/client";
+import { WkSelect } from "@/components/design-system/primitives/Select";
+
 
 type AdminEditionStatus = "draft" | "published" | "archived" | "superseded" | "failed" | "cancelled" | "unknown";
 
@@ -359,16 +361,16 @@ export default function AdminChartsEditions() {
             className="w-full rounded-lg border border-wk-border bg-wk-surface py-2 pl-9 pr-3 text-[13px] text-wk-text placeholder:text-wk-text-faint outline-none focus:border-wk-border-strong"
           />
         </div>
-        <select
+        <WkSelect
           value={familyFilter}
-          onChange={(e) => setFamilyFilter(e.target.value)}
-          className="rounded-lg border border-wk-border bg-wk-surface px-3 py-2 text-[13px] text-wk-text outline-none"
+          onChange={(value) => setFamilyFilter(value)}
+          triggerClassName="rounded-lg border border-wk-border bg-wk-surface px-3 py-2 text-[13px] text-wk-text outline-none"
         >
           <option value="all">All Programs</option>
           {familyNames.map((id) => (
             <option key={id} value={id}>{familyLabel(id)}</option>
           ))}
-        </select>
+        </WkSelect>
         <div className="flex gap-1">
           {statusFilters.map((s) => (
             <button

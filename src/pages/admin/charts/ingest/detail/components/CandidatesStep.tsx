@@ -6,6 +6,8 @@ import { approveCandidate, excludeCandidate, restoreCandidate, getRawItems, hasC
 import type { RawSourceItem } from "@/services/chartsIngestion/types";
 import { useEffect } from "react";
 import type { UserRole } from "@/services/chartsIngestion/client";
+import { WkSelect } from "@/components/design-system/primitives/Select";
+
 
 interface CandidatesStepProps {
   jobId: string;
@@ -144,27 +146,27 @@ export function CandidatesStep({ jobId, candidates, matches, issues, onUpdate, r
             className="bg-transparent text-[12px] text-[var(--wk-text)] outline-none placeholder:text-[var(--wk-text-faint)]"
           />
         </div>
-        <select
+        <WkSelect
           value={statusFilter}
-          onChange={(e) => setStatusFilter(e.target.value)}
-          className="rounded-lg border border-[var(--wk-border)] bg-[var(--wk-bg)] px-3 py-2 text-[12px] text-[var(--wk-text)]"
+          onChange={(value) => setStatusFilter(value)}
+          triggerClassName="rounded-lg border border-[var(--wk-border)] bg-[var(--wk-bg)] px-3 py-2 text-[12px] text-[var(--wk-text)]"
         >
           <option value="all">All Status</option>
           <option value="approved">Approved</option>
           <option value="excluded">Excluded</option>
           <option value="needs_review">Needs Review</option>
           <option value="candidate">Candidate</option>
-        </select>
-        <select
+        </WkSelect>
+        <WkSelect
           value={sourceFilter}
-          onChange={(e) => setSourceFilter(e.target.value)}
-          className="rounded-lg border border-[var(--wk-border)] bg-[var(--wk-bg)] px-3 py-2 text-[12px] text-[var(--wk-text)]"
+          onChange={(value) => setSourceFilter(value)}
+          triggerClassName="rounded-lg border border-[var(--wk-border)] bg-[var(--wk-bg)] px-3 py-2 text-[12px] text-[var(--wk-text)]"
         >
           <option value="all">All Sources</option>
           {sources.map((s) => (
             <option key={s} value={s}>{s.charAt(0).toUpperCase() + s.slice(1)}</option>
           ))}
-        </select>
+        </WkSelect>
       </div>
 
       {/* Table */}

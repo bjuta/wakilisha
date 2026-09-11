@@ -8,6 +8,8 @@ import { AdminChartsPageHeader } from "../components/AdminChartsPageHeader";
 import { AdminChartsKpiCard } from "../components/AdminChartsKpiCard";
 import { AdminChartsLoadingState } from "../components/AdminChartsLoadingState";
 import { AdminChartsStatusBadge } from "../components/AdminChartsStatusBadge";
+import { WkSelect } from "@/components/design-system/primitives/Select";
+
 
 type DbRow = Record<string, unknown>;
 type DecisionType = "accepted_as_group" | "split_plan" | "alias_plan" | "needs_follow_up";
@@ -1047,15 +1049,15 @@ export default function AdminChartsArtistResolutionPage() {
             <input value={search} onChange={(event) => setSearch(event.target.value)} className={`${INPUT_CLASS} w-full pl-9`} placeholder="Search editions, families, dates…" />
           </div>
 
-          <select value={programFilter} onChange={(event) => setProgramFilter(event.target.value)} className={INPUT_CLASS}>
+          <WkSelect value={programFilter} onChange={(value) => setProgramFilter(value)} triggerClassName={INPUT_CLASS}>
             <option value="all">All chart families</option>
             {programs.map((program) => <option key={program.id} value={program.id}>{program.label}</option>)}
-          </select>
+          </WkSelect>
 
-          <select value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)} className={INPUT_CLASS}>
+          <WkSelect value={statusFilter} onChange={(value) => setStatusFilter(value)} triggerClassName={INPUT_CLASS}>
             <option value="all">All statuses</option>
             {Array.from(new Set(editions.map((edition) => edition.status))).map((status) => <option key={status} value={status}>{status.replace(/_/g, " ")}</option>)}
-          </select>
+          </WkSelect>
 
           <button
             onClick={() => {
@@ -1146,18 +1148,18 @@ export default function AdminChartsArtistResolutionPage() {
                 <input value={entrySearch} onChange={(event) => setEntrySearch(event.target.value)} className={`${INPUT_CLASS} w-full pl-9`} placeholder="Search rows by track, artist, slug, normalized key…" />
               </div>
 
-              <select value={issueFilter} onChange={(event) => setIssueFilter(event.target.value)} className={INPUT_CLASS}>
+              <WkSelect value={issueFilter} onChange={(value) => setIssueFilter(value)} triggerClassName={INPUT_CLASS}>
                 <option value="all">All issue types</option>
                 {issueOptions.map((issue) => <option key={issue} value={issue}>{issue.replace(/_/g, " ")}</option>)}
-              </select>
+              </WkSelect>
 
-              <select value={decisionStatusFilter} onChange={(event) => setDecisionStatusFilter(event.target.value)} className={INPUT_CLASS}>
+              <WkSelect value={decisionStatusFilter} onChange={(value) => setDecisionStatusFilter(value)} triggerClassName={INPUT_CLASS}>
                 <option value="all">All decision states</option>
                 <option value="undecided">Undecided only</option>
                 <option value="draft">Draft only</option>
                 <option value="ready">Ready only</option>
                 <option value="resolved">Resolved only</option>
-              </select>
+              </WkSelect>
 
               <button onClick={() => setUnresolvedOnly((value) => !value)} className={`wk-button wk-button-sm justify-center ${unresolvedOnly ? "wk-button-primary" : "wk-button-ghost"}`}>
                 <WkIcon name={unresolvedOnly ? "AlertTriangle" : "CheckCircle2"} size={13} />
@@ -1262,12 +1264,12 @@ export default function AdminChartsArtistResolutionPage() {
 
                   <div>
                     <label className="mb-2 block text-[10px] font-black uppercase tracking-wider text-wk-text-faint">Decision</label>
-                    <select value={decisionType} onChange={(event) => setDecisionType(event.target.value as DecisionType)} className={`${INPUT_CLASS} w-full`}>
+                    <WkSelect value={decisionType} onChange={(value) => setDecisionType(value as DecisionType)} triggerClassName={`${INPUT_CLASS} w-full`}>
                       <option value="split_plan">Split plan</option>
                       <option value="accepted_as_group">Accept as group/collab</option>
                       <option value="alias_plan">Alias plan</option>
                       <option value="needs_follow_up">Needs follow-up</option>
-                    </select>
+                    </WkSelect>
                   </div>
 
                   <div className="rounded-xl border border-wk-border bg-wk-bg-subtle p-3">

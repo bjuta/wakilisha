@@ -8,6 +8,10 @@ import {
   setCreditGovernance,
   type ArticleTrustCredit,
 } from "@/services/articles/articleTrustService";
+import { WkSelect } from "@/components/design-system/primitives/Select";
+import { WkCheckbox } from "@/components/design-system/primitives/Checkbox";
+
+
 
 const CREDIT_STATES = [
   ["active", "Active"],
@@ -183,16 +187,16 @@ export function ArticleCreditGovernanceForm({
               >
                 Credit state
               </label>
-              <select
+              <WkSelect
                 id="credit-governance-state"
                 value={creditState}
-                onChange={(event) =>
+                onChange={(value) =>
                   handleCreditStateChange(
-                    event.target.value as CreditState,
+                    value as CreditState,
                   )
                 }
                 disabled={submitting}
-                className="wk-input mt-2 w-full"
+                triggerClassName="wk-input mt-2 w-full"
               >
                 {CREDIT_STATES.map(
                   ([value, label]) => (
@@ -204,24 +208,17 @@ export function ArticleCreditGovernanceForm({
                     </option>
                   ),
                 )}
-              </select>
+              </WkSelect>
               <p className="mt-2 text-[10px] leading-4 text-wk-text-muted">
                 Withdrawn and archived Credits remain in editorial history but are not publicly eligible.
               </p>
             </section>
 
-            <label className="flex items-start gap-3 rounded-xl border border-wk-border bg-wk-bg-subtle p-4">
-              <input
-                type="checkbox"
-                checked={effectivePublicSafe}
-                onChange={(event) =>
-                  setPublicSafe(event.target.checked)
-                }
-                disabled={
+            <WkCheckbox checked={effectivePublicSafe} disabled={
                   submitting || !publicSafeAllowed
-                }
-                className="mt-0.5"
-              />
+                } onChange={(checked) =>
+                  setPublicSafe(checked)} className="flex items-start gap-3 rounded-xl border border-wk-border bg-wk-bg-subtle p-4">
+
               <span>
                 <span className="block text-[11px] font-bold text-wk-text">
                   Governed as public-safe
@@ -230,7 +227,7 @@ export function ArticleCreditGovernanceForm({
                   Only active Credits can be governed as public-safe. Withdrawal or archival clears this setting. The Credit attachment and contributor must also remain eligible.
                 </span>
               </span>
-            </label>
+            </WkCheckbox>
 
             <section>
               <label

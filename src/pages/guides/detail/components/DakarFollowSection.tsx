@@ -1,6 +1,10 @@
 import { useState, useCallback } from "react";
 import { trackEvent  } from "@/services/analytics";
 import { dakarData } from "../dakarData";
+import { WkSelect } from "@/components/design-system/primitives/Select";
+import { WkCheckbox } from "@/components/design-system/primitives/Checkbox";
+
+
 
 export default function DakarFollowSection() {
   const { follow } = dakarData;
@@ -105,30 +109,23 @@ export default function DakarFollowSection() {
                     <span className="block text-xs font-semibold uppercase tracking-wider text-[var(--wk-text-muted)] mb-1.5">
                       {follow.form.personaLabel}
                     </span>
-                    <select
+                    <WkSelect
                       name="persona"
                       value={persona}
-                      onChange={(e) => setPersona(e.target.value)}
-                      className="w-full px-3.5 py-2.5 text-sm rounded-lg border border-[var(--wk-divider)] bg-[var(--wk-bg)] text-[var(--wk-text)] focus:outline-none focus:ring-2 focus:ring-[var(--wk-v-fashion)]/30 focus:border-[var(--wk-v-fashion)] transition-all appearance-none cursor-pointer"
+                      onChange={(value) => setPersona(value)}
+                      triggerClassName="w-full px-3.5 py-2.5 text-sm rounded-lg border border-[var(--wk-divider)] bg-[var(--wk-bg)] text-[var(--wk-text)] focus:outline-none focus:ring-2 focus:ring-[var(--wk-v-fashion)]/30 focus:border-[var(--wk-v-fashion)] transition-all appearance-none cursor-pointer"
                       style={{ backgroundImage: "none" }}
                     >
                       {follow.form.personaOptions.map((opt) => (
                         <option key={opt.value} value={opt.value}>{opt.label}</option>
                       ))}
-                    </select>
+                    </WkSelect>
                   </label>
 
-                  <label className="flex items-start gap-2.5 cursor-pointer">
-                    <input
-                      type="checkbox"
-                      name="consent"
-                      checked={consent}
-                      onChange={(e) => setConsent(e.target.checked)}
-                      className="mt-0.5 w-4 h-4 rounded border-[var(--wk-divider)] text-[var(--wk-v-fashion)] focus:ring-[var(--wk-v-fashion)]/30 cursor-pointer"
-                      required
-                    />
+                  <WkCheckbox checked={consent} name="consent" required onChange={(checked) => setConsent(checked)} className="flex items-start gap-2.5 cursor-pointer">
+
                     <span className="text-sm text-[var(--wk-text-soft)] leading-relaxed">{follow.form.consentLabel}</span>
-                  </label>
+                  </WkCheckbox>
                 </div>
 
                 {error && (

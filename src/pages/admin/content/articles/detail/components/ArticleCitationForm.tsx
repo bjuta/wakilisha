@@ -14,6 +14,10 @@ import {
   type ArticleTrustCitationIntakeOptions,
   type ArticleTrustSourceSummary,
 } from "@/services/articles/articleTrustService";
+import { WkSelect } from "@/components/design-system/primitives/Select";
+import { WkCheckbox } from "@/components/design-system/primitives/Checkbox";
+
+
 
 interface Props {
   articleVersionId: string;
@@ -1076,14 +1080,14 @@ export function ArticleCitationForm({
                 <span className="wk-label">
                   Source
                 </span>
-                <select
+                <WkSelect
                   value={sourceId}
-                  onChange={(event) =>
+                  onChange={(value) =>
                     setSourceId(
-                      event.target.value,
+                      value,
                     )
                   }
-                  className="wk-input mt-1 w-full"
+                  triggerClassName="wk-input mt-1 w-full"
                 >
                   {eligibleSources.map(
                     (source) => (
@@ -1099,7 +1103,7 @@ export function ArticleCitationForm({
                       </option>
                     ),
                   )}
-                </select>
+                </WkSelect>
               </label>
 
               {selectedSource ? (
@@ -1161,14 +1165,14 @@ export function ArticleCitationForm({
                   <span className="wk-label">
                     Locator Type
                   </span>
-                  <select
+                  <WkSelect
                     value={locatorType}
-                    onChange={(event) =>
+                    onChange={(value) =>
                       setLocatorType(
-                        event.target.value,
+                        value,
                       )
                     }
-                    className="wk-input mt-1 w-full"
+                    triggerClassName="wk-input mt-1 w-full"
                   >
                     {options.locatorTypes.map(
                       (option) => (
@@ -1184,7 +1188,7 @@ export function ArticleCitationForm({
                         </option>
                       ),
                     )}
-                  </select>
+                  </WkSelect>
                 </label>
 
                 {renderLocatorFields()}
@@ -1240,21 +1244,14 @@ export function ArticleCitationForm({
                 </label>
               </div>
 
-              <label className="mt-4 flex items-start gap-3 rounded-xl border border-wk-border bg-wk-bg-subtle p-4">
-                <input
-                  type="checkbox"
-                  checked={citationPublicSafe}
-                  onChange={(event) =>
-                    setCitationPublicSafe(
-                      event.target.checked,
-                    )
-                  }
-                  disabled={
+              <WkCheckbox checked={citationPublicSafe} disabled={
                     !selectedSourcePublic ||
                     submitting
-                  }
-                  className="mt-0.5"
-                />
+                  } onChange={(checked) =>
+                    setCitationPublicSafe(
+                      checked,
+                    )} className="mt-4 flex items-start gap-3 rounded-xl border border-wk-border bg-wk-bg-subtle p-4">
+
                 <span>
                   <span className="block text-[11px] font-bold text-wk-text">
                     Citation is Public-Safe
@@ -1267,7 +1264,7 @@ export function ArticleCitationForm({
                     permission.
                   </span>
                 </span>
-              </label>
+              </WkCheckbox>
             </fieldset>
 
             <fieldset className="border-t border-wk-border pt-5">
@@ -1285,15 +1282,15 @@ export function ArticleCitationForm({
                   <span className="wk-label">
                     Citation Purpose
                   </span>
-                  <select
+                  <WkSelect
                     value={citationPurpose}
-                    onChange={(event) =>
+                    onChange={(value) =>
                       setCitationPurpose(
-                        event.target.value,
+                        value,
                       )
                     }
                     disabled={submitting}
-                    className="wk-input mt-1 w-full"
+                    triggerClassName="wk-input mt-1 w-full"
                   >
                     {options.citationPurposes.map(
                       (option) => (
@@ -1305,7 +1302,7 @@ export function ArticleCitationForm({
                         </option>
                       ),
                     )}
-                  </select>
+                  </WkSelect>
                 </label>
 
                 <label>
@@ -1323,15 +1320,15 @@ export function ArticleCitationForm({
                   <span className="wk-label">
                     Article Target
                   </span>
-                  <select
+                  <WkSelect
                     value={targetAnchorType}
-                    onChange={(event) =>
+                    onChange={(value) =>
                       setTargetAnchorType(
-                        event.target.value,
+                        value,
                       )
                     }
                     disabled={submitting}
-                    className="wk-input mt-1 w-full"
+                    triggerClassName="wk-input mt-1 w-full"
                   >
                     {options.targetAnchorTypes.map(
                       (option) => (
@@ -1343,29 +1340,22 @@ export function ArticleCitationForm({
                         </option>
                       ),
                     )}
-                  </select>
+                  </WkSelect>
                 </label>
 
                 {renderAnchorFields()}
               </div>
 
-              <label className="mt-4 flex items-start gap-3 rounded-xl border border-wk-border bg-wk-bg-subtle p-4">
-                <input
-                  type="checkbox"
-                  checked={
+              <WkCheckbox checked={
                     attachmentPublicSafe
-                  }
-                  onChange={(event) =>
-                    setAttachmentPublicSafe(
-                      event.target.checked,
-                    )
-                  }
-                  disabled={
+                  } disabled={
                     !citationPublicSafe ||
                     submitting
-                  }
-                  className="mt-0.5"
-                />
+                  } onChange={(checked) =>
+                    setAttachmentPublicSafe(
+                      checked,
+                    )} className="mt-4 flex items-start gap-3 rounded-xl border border-wk-border bg-wk-bg-subtle p-4">
+
                 <span>
                   <span className="block text-[11px] font-bold text-wk-text">
                     Article Attachment is Public-Safe
@@ -1378,24 +1368,17 @@ export function ArticleCitationForm({
                     satisfied.
                   </span>
                 </span>
-              </label>
+              </WkCheckbox>
             </fieldset>
 
             {publicPresentation ? (
-              <label className="flex items-start gap-3 rounded-xl border border-wk-success/30 bg-wk-success-soft p-4">
-                <input
-                  type="checkbox"
-                  checked={
+              <WkCheckbox checked={
                     publicReviewConfirmed
-                  }
-                  onChange={(event) =>
+                  } disabled={submitting} onChange={(checked) =>
                     setPublicReviewConfirmed(
-                      event.target.checked,
-                    )
-                  }
-                  disabled={submitting}
-                  className="mt-0.5"
-                />
+                      checked,
+                    )} className="flex items-start gap-3 rounded-xl border border-wk-success/30 bg-wk-success-soft p-4">
+
                 <span>
                   <span className="block text-[11px] font-bold text-wk-text">
                     Confirm Public Citation Review
@@ -1407,7 +1390,7 @@ export function ArticleCitationForm({
                     public presentation.
                   </span>
                 </span>
-              </label>
+              </WkCheckbox>
             ) : null}
 
             {createdCitationId ? (

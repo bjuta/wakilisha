@@ -8,6 +8,8 @@ import {
   type WakilishaRecordEntityType,
   type WakilishaRecordSearchResult,
 } from "./useWakilishaRecordSearch";
+import { WkSelect } from "@/components/design-system/primitives/Select";
+
 
 const registryWorkModes = [
   { key: "use_existing_record", label: "Use existing record" },
@@ -1002,18 +1004,18 @@ export function WakilishaRecordWorkspace({ draft, addEvidence, onSaved }: Props)
           </p>
 
           <div className="mt-4 grid gap-3 md:grid-cols-[220px_1fr]">
-            <select
+            <WkSelect
               value={entityType}
-              onChange={(event) => {
-                setEntityType(event.target.value as "all" | WakilishaRecordEntityType);
+              onChange={(value) => {
+                setEntityType(value as "all" | WakilishaRecordEntityType);
                 setSelectedRecord(null);
               }}
-              className="rounded-lg border border-wk-border bg-wk-bg px-3 py-3 text-[13px] font-bold text-wk-text outline-none focus:border-wk-brand"
+              triggerClassName="rounded-lg border border-wk-border bg-wk-bg px-3 py-3 text-[13px] font-bold text-wk-text outline-none focus:border-wk-brand"
             >
               {wakilishaRecordEntityOptions.map((option) => (
                 <option key={option.key} value={option.key}>{option.label}</option>
               ))}
-            </select>
+            </WkSelect>
 
             <input
               value={query}
@@ -1097,17 +1099,17 @@ export function WakilishaRecordWorkspace({ draft, addEvidence, onSaved }: Props)
             </p>
 
             <div className="mt-4 space-y-3">
-              <select
+              <WkSelect
                 value={suggestedType}
-                onChange={(event) => setSuggestedType(event.target.value as WakilishaRecordEntityType)}
-                className="w-full rounded-lg border border-wk-border bg-wk-bg px-3 py-3 text-[13px] font-bold text-wk-text outline-none focus:border-wk-brand"
+                onChange={(value) => setSuggestedType(value as WakilishaRecordEntityType)}
+                triggerClassName="w-full rounded-lg border border-wk-border bg-wk-bg px-3 py-3 text-[13px] font-bold text-wk-text outline-none focus:border-wk-brand"
               >
                 {wakilishaRecordEntityOptions
                   .filter((option) => option.key !== "all")
                   .map((option) => (
                     <option key={option.key} value={option.key}>{option.label}</option>
                   ))}
-              </select>
+              </WkSelect>
 
               <input
                 value={suggestedTitle}
@@ -1164,15 +1166,15 @@ export function WakilishaRecordWorkspace({ draft, addEvidence, onSaved }: Props)
           <div className="mt-4 space-y-4">
             <label className="block">
               <span className="mb-2 block text-[10px] font-black uppercase tracking-[0.12em] text-wk-text-faint">Evidence role</span>
-              <select
+              <WkSelect
                 value={evidenceRole}
-                onChange={(event) => setEvidenceRole(event.target.value)}
-                className="w-full rounded-lg border border-wk-border bg-wk-bg px-3 py-3 text-[13px] font-bold text-wk-text outline-none focus:border-wk-brand"
+                onChange={(value) => setEvidenceRole(value)}
+                triggerClassName="w-full rounded-lg border border-wk-border bg-wk-bg px-3 py-3 text-[13px] font-bold text-wk-text outline-none focus:border-wk-brand"
               >
                 {evidenceRoles.map((role) => (
                   <option key={role}>{role}</option>
                 ))}
-              </select>
+              </WkSelect>
             </label>
 
             <label className="block">
@@ -1199,15 +1201,15 @@ export function WakilishaRecordWorkspace({ draft, addEvidence, onSaved }: Props)
 
             <label className="block">
               <span className="mb-2 block text-[10px] font-black uppercase tracking-[0.12em] text-wk-text-faint">Confidence</span>
-              <select
+              <WkSelect
                 value={confidence}
-                onChange={(event) => setConfidence(event.target.value as Confidence)}
-                className="w-full rounded-lg border border-wk-border bg-wk-bg px-3 py-3 text-[13px] font-bold text-wk-text outline-none focus:border-wk-brand"
+                onChange={(value) => setConfidence(value as Confidence)}
+                triggerClassName="w-full rounded-lg border border-wk-border bg-wk-bg px-3 py-3 text-[13px] font-bold text-wk-text outline-none focus:border-wk-brand"
               >
                 <option>Low</option>
                 <option>Medium</option>
                 <option>High</option>
-              </select>
+              </WkSelect>
             </label>
           </div>
         </section>
@@ -1218,15 +1220,15 @@ export function WakilishaRecordWorkspace({ draft, addEvidence, onSaved }: Props)
           <div className="mt-4 space-y-4">
             <label className="block">
               <span className="mb-2 block text-[10px] font-black uppercase tracking-[0.12em] text-wk-text-faint">Registry work mode</span>
-              <select
+              <WkSelect
                 value={workMode}
-                onChange={(event) => setWorkMode(event.target.value as RegistryWorkMode)}
-                className="w-full rounded-lg border border-wk-border bg-wk-bg px-3 py-3 text-[13px] font-bold text-wk-text outline-none focus:border-wk-brand"
+                onChange={(value) => setWorkMode(value as RegistryWorkMode)}
+                triggerClassName="w-full rounded-lg border border-wk-border bg-wk-bg px-3 py-3 text-[13px] font-bold text-wk-text outline-none focus:border-wk-brand"
               >
                 {registryWorkModes.map((mode) => (
                   <option key={mode.key} value={mode.key}>{mode.label}</option>
                 ))}
-              </select>
+              </WkSelect>
             </label>
 
             {(workMode === "suggest_correction" || workMode === "suggest_provider_media_credit_update") && (
@@ -1381,15 +1383,15 @@ export function WakilishaRecordWorkspace({ draft, addEvidence, onSaved }: Props)
           <h3 className="mt-2 text-[20px] font-black tracking-[-0.045em] text-wk-text">Does the record need work?</h3>
 
           <div className="mt-4 space-y-4">
-            <select
+            <WkSelect
               value={enrichmentType}
-              onChange={(event) => setEnrichmentType(event.target.value)}
-              className="w-full rounded-lg border border-wk-border bg-wk-bg px-3 py-3 text-[13px] font-bold text-wk-text outline-none focus:border-wk-brand"
+              onChange={(value) => setEnrichmentType(value)}
+              triggerClassName="w-full rounded-lg border border-wk-border bg-wk-bg px-3 py-3 text-[13px] font-bold text-wk-text outline-none focus:border-wk-brand"
             >
               {enrichmentTypes.map((type) => (
                 <option key={type}>{type}</option>
               ))}
-            </select>
+            </WkSelect>
 
             <textarea
               value={enrichmentNote}

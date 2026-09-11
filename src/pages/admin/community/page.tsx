@@ -28,6 +28,8 @@ import {
   type ModerationStats,
 } from '@/services/community/admin';
 import type { CommunityComment, CommunityReport, CommunityContribution, CommunityModerationEvent } from '@/services/community/types';
+import { WkSelect } from "@/components/design-system/primitives/Select";
+
 
 // ── Status badge helpers ──────────────────────────────────────────
 
@@ -404,15 +406,15 @@ function CommentsTab({
           ))}
         </div>
         <div className="ml-auto flex items-center gap-2">
-          <select
+          <WkSelect
             value={filter.sort || 'newest'}
-            onChange={(e) => onFilterChange({ ...filter, sort: e.target.value as any, offset: 0 })}
-            className="rounded-lg border border-gray-200 px-2 py-1.5 text-[11px] font-semibold text-gray-600 bg-white cursor-pointer"
+            onChange={(value) => onFilterChange({ ...filter, sort: value as any, offset: 0 })}
+            triggerClassName="rounded-lg border border-gray-200 px-2 py-1.5 text-[11px] font-semibold text-gray-600 bg-white cursor-pointer"
           >
             {sortOptions.map((o) => (
               <option key={o.value} value={o.value}>{o.label}</option>
             ))}
-          </select>
+          </WkSelect>
           <button onClick={onRefresh} className="p-1.5 rounded-lg text-gray-400 hover:text-gray-600 hover:bg-gray-100 cursor-pointer" title="Refresh">
             <WkIcon name="RefreshCw" size={14} />
           </button>

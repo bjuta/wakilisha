@@ -18,6 +18,10 @@ import {
   supersedeRelationship,
   withdrawRelationship,
 } from "@/services/institute/relationshipService";
+import { WkSelect } from "@/components/design-system/primitives/Select";
+import { WkCheckbox } from "@/components/design-system/primitives/Checkbox";
+
+
 
 // Relationship Mapper. Candidates arrive from the assistant and wait in a
 // review queue; judgments are made by humans, stand on evidence, and stay
@@ -392,18 +396,18 @@ export default function RelationshipsScreen({
                   {side === "source" ? "From" : "To"}
                 </div>
                 <div className="mt-2 grid gap-2">
-                  <select
+                  <WkSelect
                     aria-label={`${side} type`}
                     value={side === "source" ? form.sourceType : form.targetType}
-                    onChange={(e) =>
-                      setForm((f) => f && { ...f, [side === "source" ? "sourceType" : "targetType"]: e.target.value as RelationshipEntityType })
+                    onChange={(value) =>
+                      setForm((f) => f && { ...f, [side === "source" ? "sourceType" : "targetType"]: value as RelationshipEntityType })
                     }
-                    className="rounded-lg border border-wk-border bg-wk-surface p-2.5 text-[13px] text-wk-text"
+                    triggerClassName="rounded-lg border border-wk-border bg-wk-surface p-2.5 text-[13px] text-wk-text"
                   >
                     {RELATIONSHIP_ENTITY_TYPES.map((t) => (
                       <option key={t} value={t}>{ENTITY_TYPE_LABELS[t]}</option>
                     ))}
-                  </select>
+                  </WkSelect>
                   <input
                     aria-label={`${side} name`}
                     value={side === "source" ? form.sourceLabel : form.targetLabel}
@@ -435,16 +439,16 @@ export default function RelationshipsScreen({
               placeholder='How they relate, in a short phrase: "mentored", "grew out of"'
               className="rounded-lg border border-wk-border bg-wk-bg p-3 text-[13px] text-wk-text"
             />
-            <select
+            <WkSelect
               aria-label="Confidence band"
               value={form.band}
-              onChange={(e) => setForm((f) => f && { ...f, band: e.target.value as RelationshipConfidenceBand })}
-              className="rounded-lg border border-wk-border bg-wk-bg p-3 text-[13px] text-wk-text"
+              onChange={(value) => setForm((f) => f && { ...f, band: value as RelationshipConfidenceBand })}
+              triggerClassName="rounded-lg border border-wk-border bg-wk-bg p-3 text-[13px] text-wk-text"
             >
               {Object.entries(CONFIDENCE_BAND_LABELS).map(([value, label]) => (
                 <option key={value} value={value}>{label}</option>
               ))}
-            </select>
+            </WkSelect>
           </div>
 
           <textarea
@@ -477,27 +481,21 @@ export default function RelationshipsScreen({
             ) : (
               <div className="mt-2 space-y-1.5">
                 {evidence.map((item) => (
-                  <label key={item.id} className="flex items-start gap-2 text-[13px] text-wk-text">
-                    <input
-                      type="checkbox"
-                      checked={form.evidenceIds.includes(item.id)}
-                      onChange={(e) =>
+                  <WkCheckbox checked={form.evidenceIds.includes(item.id)} onChange={(checked) =>
                         setForm((f) =>
                           f && {
                             ...f,
-                            evidenceIds: e.target.checked
+                            evidenceIds: checked
                               ? [...f.evidenceIds, item.id]
                               : f.evidenceIds.filter((id) => id !== item.id),
                           },
-                        )
-                      }
-                      className="mt-1"
-                    />
+                        )} key={item.id} className="flex items-start gap-2 text-[13px] text-wk-text">
+
                     <span>
                       {item.title}
                       <span className="text-wk-text-faint"> · {item.reviewState}</span>
                     </span>
-                  </label>
+                  </WkCheckbox>
                 ))}
               </div>
             )}

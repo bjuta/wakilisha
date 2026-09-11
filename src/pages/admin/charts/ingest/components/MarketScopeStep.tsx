@@ -12,6 +12,8 @@ import {
   getCountryNameForIso2,
   iso2ToCountrySlug,
 } from "@/utils/countries";
+import { WkSelect } from "@/components/design-system/primitives/Select";
+
 
 const INPUT_CLASS = "w-full rounded-md border border-wk-border bg-wk-surface px-3 py-2 text-[13px] text-wk-text outline-none focus:border-wk-border-strong focus:ring-1 focus:ring-wk-brand/20";
 const LABEL_CLASS = "mb-1 block text-[12px] font-semibold text-wk-text-soft";
@@ -150,11 +152,11 @@ export function MarketScopeStep({ scopes, selectedMarketScopeId, onSelectMarketS
 
       <div className="mb-4">
         <label className={LABEL_CLASS}>Scope</label>
-        <select value={selectedMarketScopeId} onChange={(event) => handleSelection(event.target.value)} className={INPUT_CLASS}>
+        <WkSelect value={selectedMarketScopeId} onChange={(value) => handleSelection(value)} triggerClassName={INPUT_CLASS}>
           {localScopes.map((scope) => (
             <option key={scope.id} value={scope.id}>{scope.name} ({scope.slug})</option>
           ))}
-        </select>
+        </WkSelect>
       </div>
 
       {showCreate && (
@@ -175,20 +177,20 @@ export function MarketScopeStep({ scopes, selectedMarketScopeId, onSelectMarketS
             </div>
             <div>
               <label className={LABEL_CLASS}>Aggregation</label>
-              <select value={draftAggregation} onChange={(event) => setDraftAggregation(event.target.value as StoredChartMarketScope["aggregationMode"])} className={INPUT_CLASS}>
+              <WkSelect value={draftAggregation} onChange={(value) => setDraftAggregation(value as StoredChartMarketScope["aggregationMode"])} triggerClassName={INPUT_CLASS}>
                 <option value="combined">Combined</option>
                 <option value="separate_then_combined">Separate then combined</option>
                 <option value="weighted">Weighted</option>
                 <option value="minimum_presence">Minimum presence</option>
                 <option value="editorial">Editorial</option>
-              </select>
+              </WkSelect>
             </div>
             <div>
               <label className={LABEL_CLASS}>Visibility</label>
-              <select value={draftVisibility} onChange={(event) => setDraftVisibility(event.target.value as StoredChartMarketScope["visibility"])} className={INPUT_CLASS}>
+              <WkSelect value={draftVisibility} onChange={(value) => setDraftVisibility(value as StoredChartMarketScope["visibility"])} triggerClassName={INPUT_CLASS}>
                 <option value="admin_only">Admin analytics only</option>
                 <option value="public">Public scope</option>
-              </select>
+              </WkSelect>
             </div>
           </div>
           <div className="mt-3">
@@ -234,11 +236,11 @@ export function MarketScopeStep({ scopes, selectedMarketScopeId, onSelectMarketS
             </div>
             <div>
               <label className={LABEL_CLASS}>When artist origin is unknown</label>
-              <select value={draftArtistOriginUnknownMode} onChange={(event) => setDraftArtistOriginUnknownMode(event.target.value as "exclude" | "warn" | "include")} className={INPUT_CLASS}>
+              <WkSelect value={draftArtistOriginUnknownMode} onChange={(value) => setDraftArtistOriginUnknownMode(value as "exclude" | "warn" | "include")} triggerClassName={INPUT_CLASS}>
                 <option value="exclude">Exclude — remove tracks by artists with unknown origin</option>
                 <option value="warn">Warn — keep but flag for manual review</option>
                 <option value="include">Include — let unknown-origin artists through</option>
-              </select>
+              </WkSelect>
             </div>
           </div>
           <div className="mt-4 flex flex-wrap gap-2">

@@ -1,5 +1,7 @@
 import { useTheme, type ThemeMode } from "@/components/design-system/theme/ThemeProvider";
 import type { UserAppearancePrefs } from "@/hooks/useUserSettings";
+import { WkSelect } from "@/components/design-system/primitives/Select";
+
 
 interface Props {
   appearance: UserAppearancePrefs;
@@ -98,14 +100,14 @@ export function AppearanceSettingsPane({ appearance, updateAppearance }: Props) 
         <p className="text-[12px] leading-relaxed text-[var(--wk-text-muted)] mb-4">
           Choose how tightly content rows and cards should render across the product.
         </p>
-        <select
-          className="h-[42px] px-4 rounded-lg border border-[var(--wk-border)] bg-[var(--wk-bg-subtle)] text-[var(--wk-text)] text-sm font-bold focus:outline-none focus:border-[var(--wk-brand)] cursor-pointer"
+        <WkSelect
+          triggerClassName="h-[42px] px-4 rounded-lg border border-[var(--wk-border)] bg-[var(--wk-bg-subtle)] text-[var(--wk-text)] text-sm font-bold focus:outline-none focus:border-[var(--wk-brand)] cursor-pointer"
           value={appearance.density}
-          onChange={(e) => updateAppearance({ density: e.target.value as UserAppearancePrefs["density"] })}
+          onChange={(value) => updateAppearance({ density: value as UserAppearancePrefs["density"] })}
         >
           <option>Comfortable</option>
           <option>Compact</option>
-        </select>
+        </WkSelect>
       </div>
     </div>
   );

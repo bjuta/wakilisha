@@ -11,6 +11,10 @@ import {
   submitSourceVersionForReview,
   type ArticleTrustSourceType,
 } from "@/services/articles/articleTrustService";
+import { WkSelect } from "@/components/design-system/primitives/Select";
+import { WkCheckbox } from "@/components/design-system/primitives/Checkbox";
+
+
 
 const RIGHTS_STATUSES = [
   ["unknown", "Unknown"],
@@ -595,14 +599,14 @@ export function ArticleSourceForm({
                   <span className="wk-label">
                     Source Type
                   </span>
-                  <select
+                  <WkSelect
                     value={sourceType}
-                    onChange={(event) =>
+                    onChange={(value) =>
                       setSourceType(
-                        event.target.value,
+                        value,
                       )
                     }
-                    className="wk-input mt-1 w-full"
+                    triggerClassName="wk-input mt-1 w-full"
                   >
                     {sourceTypes.map((item) => (
                       <option
@@ -612,7 +616,7 @@ export function ArticleSourceForm({
                         {item.label}
                       </option>
                     ))}
-                  </select>
+                  </WkSelect>
                 </label>
 
                 <label>
@@ -814,14 +818,14 @@ export function ArticleSourceForm({
                   <span className="wk-label">
                     Rights Status
                   </span>
-                  <select
+                  <WkSelect
                     value={rightsStatus}
-                    onChange={(event) =>
+                    onChange={(value) =>
                       setRightsStatus(
-                        event.target.value,
+                        value,
                       )
                     }
-                    className="wk-input mt-1 w-full"
+                    triggerClassName="wk-input mt-1 w-full"
                   >
                     {RIGHTS_STATUSES.map(
                       ([value, label]) => (
@@ -833,21 +837,21 @@ export function ArticleSourceForm({
                         </option>
                       ),
                     )}
-                  </select>
+                  </WkSelect>
                 </label>
 
                 <label>
                   <span className="wk-label">
                     Consent Status
                   </span>
-                  <select
+                  <WkSelect
                     value={consentStatus}
-                    onChange={(event) =>
+                    onChange={(value) =>
                       setConsentStatus(
-                        event.target.value,
+                        value,
                       )
                     }
-                    className="wk-input mt-1 w-full"
+                    triggerClassName="wk-input mt-1 w-full"
                   >
                     {CONSENT_STATUSES.map(
                       ([value, label]) => (
@@ -859,21 +863,21 @@ export function ArticleSourceForm({
                         </option>
                       ),
                     )}
-                  </select>
+                  </WkSelect>
                 </label>
 
                 <label>
                   <span className="wk-label">
                     Sensitivity
                   </span>
-                  <select
+                  <WkSelect
                     value={sensitivity}
-                    onChange={(event) =>
+                    onChange={(value) =>
                       setSensitivity(
-                        event.target.value,
+                        value,
                       )
                     }
-                    className="wk-input mt-1 w-full"
+                    triggerClassName="wk-input mt-1 w-full"
                   >
                     {SENSITIVITY_LEVELS.map(
                       ([value, label]) => (
@@ -885,7 +889,7 @@ export function ArticleSourceForm({
                         </option>
                       ),
                     )}
-                  </select>
+                  </WkSelect>
                 </label>
 
                 <label className="sm:col-span-3">
@@ -955,19 +959,18 @@ export function ArticleSourceForm({
                   <span className="wk-label">
                     Next Step
                   </span>
-                  <select
+                  <WkSelect
                     value={reviewMode}
-                    onChange={(event) =>
+                    onChange={(value) =>
                       setReviewMode(
-                        event.target
-                          .value as ReviewMode,
+                        value as ReviewMode,
                       )
                     }
                     disabled={
                       reviewLocked ||
                       submitting
                     }
-                    className="wk-input mt-1 w-full"
+                    triggerClassName="wk-input mt-1 w-full"
                   >
                     <option value="draft">
                       Save as Draft
@@ -988,7 +991,7 @@ export function ArticleSourceForm({
                         </option>
                       </>
                     ) : null}
-                  </select>
+                  </WkSelect>
                 </label>
 
                 <label>
@@ -1012,22 +1015,15 @@ export function ArticleSourceForm({
               </div>
 
               {publicApproval ? (
-                <label className="mt-4 flex items-start gap-3 rounded-xl border border-wk-border bg-wk-bg-subtle p-4">
-                  <input
-                    type="checkbox"
-                    checked={
+                <WkCheckbox checked={
                       publicApprovalConfirmed
-                    }
-                    onChange={(event) =>
-                      setPublicApprovalConfirmed(
-                        event.target.checked,
-                      )
-                    }
-                    disabled={
+                    } disabled={
                       approved || submitting
-                    }
-                    className="mt-0.5"
-                  />
+                    } onChange={(checked) =>
+                      setPublicApprovalConfirmed(
+                        checked,
+                      )} className="mt-4 flex items-start gap-3 rounded-xl border border-wk-border bg-wk-bg-subtle p-4">
+
                   <span>
                     <span className="block text-[11px] font-bold text-wk-text">
                       Confirm Public Review
@@ -1038,7 +1034,7 @@ export function ArticleSourceForm({
                       public presentation.
                     </span>
                   </span>
-                </label>
+                </WkCheckbox>
               ) : null}
             </section>
 

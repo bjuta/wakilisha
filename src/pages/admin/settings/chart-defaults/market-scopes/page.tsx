@@ -9,6 +9,8 @@ import {
   updateMarketScope,
   type StoredChartMarketScope,
 } from "@/services/chartsMarkets/marketScopeStore";
+import { WkSelect } from "@/components/design-system/primitives/Select";
+
 
 const INPUT_CLASS = "w-full rounded-lg border border-[var(--wk-border)] bg-[var(--wk-bg)] px-3 py-2 text-[13px] text-[var(--wk-text)] focus:border-[var(--wk-brand)] focus:outline-none focus:ring-1 focus:ring-[var(--wk-brand)]";
 const LABEL_CLASS = "mb-1.5 block text-[12px] font-semibold text-[var(--wk-text-muted)]";
@@ -300,9 +302,9 @@ function SelectField({ label, value, onChange, options }: { label: string; value
   return (
     <div>
       <label className={LABEL_CLASS}>{label}</label>
-      <select value={value} onChange={(event) => onChange(event.target.value)} className={INPUT_CLASS}>
+      <WkSelect value={value} onChange={(value) => onChange(value)} triggerClassName={INPUT_CLASS}>
         {options.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
-      </select>
+      </WkSelect>
     </div>
   );
 }

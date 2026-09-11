@@ -7,6 +7,8 @@ import { WkSurface } from "@/components/design-system/primitives/Surface";
 import type { IngestCandidate, IngestMatch, ReviewIssue, CsvImportSession } from "@/services/chartsIngestion/types";
 import { approveCandidate, excludeCandidate, restoreCandidate, hasCapability, getDisabledReason } from "@/services/chartsIngestion/client";
 import type { UserRole } from "@/services/chartsIngestion/client";
+import { WkSelect } from "@/components/design-system/primitives/Select";
+
 
 interface NormalizedCandidatesProps {
   jobId: string;
@@ -209,19 +211,19 @@ export function NormalizedCandidates({
             className="bg-transparent text-[12px] text-[var(--wk-text)] outline-none placeholder:text-[var(--wk-text-faint)] w-full"
           />
         </div>
-        <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)} className="rounded-lg border border-[var(--wk-border)] bg-[var(--wk-bg)] px-3 py-2 text-[12px] text-[var(--wk-text)]">
+        <WkSelect value={statusFilter} onChange={(value) => setStatusFilter(value)} triggerClassName="rounded-lg border border-[var(--wk-border)] bg-[var(--wk-bg)] px-3 py-2 text-[12px] text-[var(--wk-text)]">
           <option value="all">All Status</option>
           <option value="approved">Approved</option>
           <option value="excluded">Excluded</option>
           <option value="needs_review">Needs Review</option>
           <option value="candidate">Candidate</option>
-        </select>
-        <select value={sourceFilter} onChange={(e) => setSourceFilter(e.target.value)} className="rounded-lg border border-[var(--wk-border)] bg-[var(--wk-bg)] px-3 py-2 text-[12px] text-[var(--wk-text)]">
+        </WkSelect>
+        <WkSelect value={sourceFilter} onChange={(value) => setSourceFilter(value)} triggerClassName="rounded-lg border border-[var(--wk-border)] bg-[var(--wk-bg)] px-3 py-2 text-[12px] text-[var(--wk-text)]">
           <option value="all">All Sources</option>
           <option value="csv">CSV</option>
           <option value="manual">Manual</option>
           <option value="mock">Generated</option>
-        </select>
+        </WkSelect>
       </div>
 
       {/* Group by source or flat table */}

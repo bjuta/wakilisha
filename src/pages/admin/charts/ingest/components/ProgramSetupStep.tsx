@@ -8,6 +8,10 @@ import type { ChartFamilyDefaults, ChartFamilyDefaultsDiff } from "@/services/ch
 import { Music, Disc3, Save, RotateCcw, CheckCircle2, History } from "lucide-react";
 import { QuickTemplateButton, ProviderChip, KindToggle } from "./FormComponents";
 import { getSortedCountryCodes, getCountryNameForIso2 } from "@/utils/countries";
+import { WkSelect } from "@/components/design-system/primitives/Select";
+import { WkCheckbox } from "@/components/design-system/primitives/Checkbox";
+
+
 
 const INPUT_CLASS = "w-full rounded-md border border-wk-border bg-wk-surface px-3 py-2 text-[13px] text-wk-text outline-none focus:border-wk-border-strong focus:ring-1 focus:ring-wk-brand/20";
 const LABEL_CLASS = "mb-1 block text-[12px] font-semibold text-wk-text-soft";
@@ -151,7 +155,7 @@ export function ProgramSetupStep(props: ProgramSetupStepProps) {
 
       <div className="mb-4">
         <label className={LABEL_CLASS}>Chart Family *</label>
-        <select value={existingSeriesId} onChange={(event) => setExistingSeriesId(event.target.value)} className={INPUT_CLASS}>
+        <WkSelect value={existingSeriesId} onChange={(value) => setExistingSeriesId(value)} triggerClassName={INPUT_CLASS}>
           <option value="">— Select a family —</option>
           {families.map((family) => (
             <option key={family.id} value={family.id}>
@@ -159,7 +163,7 @@ export function ProgramSetupStep(props: ProgramSetupStepProps) {
             </option>
           ))}
           <option value="__new__">+ Create new family…</option>
-        </select>
+        </WkSelect>
 
         {selectedFamily && (
           <div className="mt-2 rounded-lg border border-wk-border bg-wk-surface-raised p-3">
@@ -346,20 +350,20 @@ export function ProgramSetupStep(props: ProgramSetupStepProps) {
         </div>
         <div>
           <label className={LABEL_CLASS}>Cover Style</label>
-          <select value={coverStyle} onChange={(event) => setCoverStyle(event.target.value)} className={INPUT_CLASS}>
+          <WkSelect value={coverStyle} onChange={(value) => setCoverStyle(value)} triggerClassName={INPUT_CLASS}>
             <option value="default">Default</option>
             <option value="genre">Genre</option>
             <option value="minimal">Minimal</option>
             <option value="editorial">Editorial</option>
-          </select>
+          </WkSelect>
         </div>
       </div>
 
       <div className="mb-5">
-        <label className="flex w-fit cursor-pointer items-center gap-2 rounded-lg border border-wk-border bg-wk-surface px-3 py-2 transition-colors hover:bg-wk-surface-raised">
-          <input type="checkbox" checked={saveAsRecurring} onChange={(event) => setSaveAsRecurring(event.target.checked)} className="h-4 w-4 rounded border-wk-border accent-wk-brand" />
+        <WkCheckbox checked={saveAsRecurring} onChange={(checked) => setSaveAsRecurring(checked)} className="flex w-fit cursor-pointer items-center gap-2 rounded-lg border border-wk-border bg-wk-surface px-3 py-2 transition-colors hover:bg-wk-surface-raised">
+
           <span className="text-[13px] text-wk-text-soft">Save as recurring family</span>
-        </label>
+        </WkCheckbox>
       </div>
 
       <div className="flex flex-wrap items-center gap-3 border-t border-wk-divider pt-2">

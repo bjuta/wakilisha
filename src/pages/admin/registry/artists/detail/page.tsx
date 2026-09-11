@@ -7,6 +7,8 @@ import { useRelatedEntities } from "@/hooks/useRelatedEntities";
 import type { ResolvedRelation } from "@/hooks/useRelatedEntities";
 import { DiscographyPanel } from "./components/DiscographyPanel";
 import { TopSongsPanel } from "./components/TopSongsPanel";
+import { WkSelect } from "@/components/design-system/primitives/Select";
+
 
 /* ─── Types ─── */
 interface ArtistRecord {
@@ -535,10 +537,10 @@ export default function ArtistDetailPage() {
                 <label className="block text-[11px] font-bold uppercase tracking-wider text-wk-text-muted mb-2">
                   Artist Type
                 </label>
-                <select
+                <WkSelect
                   value={draft.artist_type}
-                  onChange={(e) => patchDraft({ artist_type: e.target.value })}
-                  className="w-full rounded-lg border border-wk-border bg-wk-bg-subtle px-3 py-2.5 text-[13px] text-wk-text outline-none focus:border-wk-brand cursor-pointer"
+                  onChange={(value) => patchDraft({ artist_type: value })}
+                  triggerClassName="w-full rounded-lg border border-wk-border bg-wk-bg-subtle px-3 py-2.5 text-[13px] text-wk-text outline-none focus:border-wk-brand cursor-pointer"
                 >
                   <option value="">Select type</option>
                   <option value="solo">Solo</option>
@@ -547,16 +549,16 @@ export default function ArtistDetailPage() {
                   <option value="duo">Duo</option>
                   <option value="collaboration">Collaboration</option>
                   <option value="ensemble">Ensemble</option>
-                </select>
+                </WkSelect>
               </div>
               <div>
                 <label className="block text-[11px] font-bold uppercase tracking-wider text-wk-text-muted mb-2">
                   Gender
                 </label>
-                <select
+                <WkSelect
                   value={draft.gender}
-                  onChange={(e) => patchDraft({ gender: e.target.value })}
-                  className="w-full rounded-lg border border-wk-border bg-wk-bg-subtle px-3 py-2.5 text-[13px] text-wk-text outline-none focus:border-wk-brand cursor-pointer"
+                  onChange={(value) => patchDraft({ gender: value })}
+                  triggerClassName="w-full rounded-lg border border-wk-border bg-wk-bg-subtle px-3 py-2.5 text-[13px] text-wk-text outline-none focus:border-wk-brand cursor-pointer"
                 >
                   <option value="">Select</option>
                   <option value="male">Male</option>
@@ -564,7 +566,7 @@ export default function ArtistDetailPage() {
                   <option value="non_binary">Non-binary</option>
                   <option value="group">Group</option>
                   <option value="unknown">Unknown</option>
-                </select>
+                </WkSelect>
               </div>
               <div>
                 <label className="block text-[11px] font-bold uppercase tracking-wider text-wk-text-muted mb-2">
@@ -583,16 +585,16 @@ export default function ArtistDetailPage() {
                 <label className="block text-[11px] font-bold uppercase tracking-wider text-wk-text-muted mb-2">
                   Status
                 </label>
-                <select
+                <WkSelect
                   value={draft.status}
-                  onChange={(e) => patchDraft({ status: e.target.value })}
-                  className="w-full rounded-lg border border-wk-border bg-wk-bg-subtle px-3 py-2.5 text-[13px] text-wk-text outline-none focus:border-wk-brand cursor-pointer"
+                  onChange={(value) => patchDraft({ status: value })}
+                  triggerClassName="w-full rounded-lg border border-wk-border bg-wk-bg-subtle px-3 py-2.5 text-[13px] text-wk-text outline-none focus:border-wk-brand cursor-pointer"
                 >
                   <option value="active">Active</option>
                   <option value="draft">Draft</option>
                   <option value="needs_review">Needs Review</option>
                   <option value="archived">Archived</option>
-                </select>
+                </WkSelect>
               </div>
             </div>
           </WkSurface>

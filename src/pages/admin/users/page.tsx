@@ -12,6 +12,10 @@ import {
   type AccessScope,
   type UserRole,
 } from "@/services/userRoles";
+import { WkSelect } from "@/components/design-system/primitives/Select";
+import { WkCheckbox } from "@/components/design-system/primitives/Checkbox";
+
+
 
 type ProfileRow = {
   user_id: string;
@@ -761,27 +765,27 @@ export default function AdminUsersPage() {
             />
           </Field>
           <Field label="Role *" error={inviteValidationErrors.role}>
-            <select
-              className={`wk-input w-full ${inviteValidationErrors.role ? "border-wk-danger" : ""}`}
+            <WkSelect
+              triggerClassName={`wk-input w-full ${inviteValidationErrors.role ? "border-wk-danger" : ""}`}
               value={inviteRole}
-              onChange={(e) => setInviteRole(e.target.value as UserRole)}
+              onChange={(value) => setInviteRole(value as UserRole)}
             >
               {ADMIN_ROLES.map((role) => (
                 <option key={role} value={role}>
                   {ROLE_LABELS[role]}
                 </option>
               ))}
-            </select>
+            </WkSelect>
           </Field>
           <div className="grid gap-3 sm:grid-cols-2">
             <Field label="Scope type *" error={inviteValidationErrors.scopeType}>
-              <select
-                className={`wk-input w-full ${inviteValidationErrors.scopeType ? "border-wk-danger" : ""}`}
+              <WkSelect
+                triggerClassName={`wk-input w-full ${inviteValidationErrors.scopeType ? "border-wk-danger" : ""}`}
                 value={inviteScopeType}
-                onChange={(e) => {
-                  setInviteScopeType(e.target.value);
+                onChange={(value) => {
+                  setInviteScopeType(value);
                   // Auto-set default scope value
-                  if (e.target.value === "global") setInviteScopeValue("*");
+                  if (value === "global") setInviteScopeValue("*");
                   else setInviteScopeValue("");
                 }}
               >
@@ -790,7 +794,7 @@ export default function AdminUsersPage() {
                     {type}
                   </option>
                 ))}
-              </select>
+              </WkSelect>
             </Field>
             <Field label="Scope value *" error={inviteValidationErrors.scopeValue}>
               <ScopeValueInput
@@ -838,31 +842,31 @@ export default function AdminUsersPage() {
           onClose={() => setModal(null)}
         >
           <Field label="Role">
-            <select
-              className="wk-input w-full"
+            <WkSelect
+              triggerClassName="wk-input w-full"
               value={scopeRole}
-              onChange={(e) => setScopeRole(e.target.value as UserRole)}
+              onChange={(value) => setScopeRole(value as UserRole)}
             >
               {ADMIN_ROLES.map((role) => (
                 <option key={role} value={role}>
                   {ROLE_LABELS[role]}
                 </option>
               ))}
-            </select>
+            </WkSelect>
           </Field>
           <div className="grid gap-3 sm:grid-cols-2">
             <Field label="Scope type">
-              <select
-                className="wk-input w-full"
+              <WkSelect
+                triggerClassName="wk-input w-full"
                 value={scopeType}
-                onChange={(e) => { setScopeType(e.target.value); setScopeValue(""); }}
+                onChange={(value) => { setScopeType(value); setScopeValue(""); }}
               >
                 {SCOPE_TYPES.map((type) => (
                   <option key={type} value={type}>
                     {type}
                   </option>
                 ))}
-              </select>
+              </WkSelect>
             </Field>
             <Field label="Scope value">
               <ScopeValueInput
@@ -1043,10 +1047,10 @@ function ScopeValueInput({
 
   if (options) {
     return (
-      <select
-        className={`wk-input w-full ${error ? "border-wk-danger" : ""}`}
+      <WkSelect
+        triggerClassName={`wk-input w-full ${error ? "border-wk-danger" : ""}`}
         value={value}
-        onChange={(e) => onChange(e.target.value)}
+        onChange={(value) => onChange(value)}
       >
         <option value="">Select {scopeType}…</option>
         {options.map((opt) => (
@@ -1054,7 +1058,7 @@ function ScopeValueInput({
             {opt.label}
           </option>
         ))}
-      </select>
+      </WkSelect>
     );
   }
 
@@ -1081,25 +1085,17 @@ function Checks({
 }) {
   return (
     <div className="flex flex-wrap gap-3 text-[12px] text-wk-text-muted">
-      <label className="flex items-center gap-2 cursor-pointer">
-        <input type="checkbox" checked readOnly /> View
-      </label>
-      <label className="flex items-center gap-2 cursor-pointer">
-        <input
-          type="checkbox"
-          checked={canEdit}
-          onChange={(e) => setCanEdit(e.target.checked)}
-        />{" "}
+      <WkCheckbox checked readOnly className="flex items-center gap-2 cursor-pointer">
+         View
+      </WkCheckbox>
+      <WkCheckbox checked={canEdit} onChange={(checked) => setCanEdit(checked)} className="flex items-center gap-2 cursor-pointer">
+        {" "}
         Edit
-      </label>
-      <label className="flex items-center gap-2 cursor-pointer">
-        <input
-          type="checkbox"
-          checked={canPublish}
-          onChange={(e) => setCanPublish(e.target.checked)}
-        />{" "}
+      </WkCheckbox>
+      <WkCheckbox checked={canPublish} onChange={(checked) => setCanPublish(checked)} className="flex items-center gap-2 cursor-pointer">
+        {" "}
         Publish
-      </label>
+      </WkCheckbox>
     </div>
   );
 }

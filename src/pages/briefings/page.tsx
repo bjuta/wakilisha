@@ -2,6 +2,8 @@ import { useEffect, useMemo, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { briefingService, type BriefingCatalogItem } from "@/services/briefingService";
 import { trackEvent } from "@/services/analytics";
+import { WkCheckbox } from "@/components/design-system/primitives/Checkbox";
+
 
 type LoadState = "loading" | "ready" | "error";
 type SubmitState = "idle" | "submitting" | "success" | "error";
@@ -392,22 +394,15 @@ export default function PublicBriefingsPage() {
               />
             </label>
 
-            <label className="mt-4 flex cursor-pointer items-start gap-3">
-              <input
-                type="checkbox"
-                checked={consent}
-                onChange={(event) => {
-                  setConsent(event.target.checked);
+            <WkCheckbox checked={consent} disabled={submitState === "submitting" || submitState === "success"} required onChange={(checked) => {
+                  setConsent(checked);
                   if (submitState !== "submitting") setSubmitState("idle");
-                }}
-                disabled={submitState === "submitting" || submitState === "success"}
-                className="mt-1 h-4 w-4 rounded border-[var(--wk-border)] accent-[var(--wk-brand)]"
-                required
-              />
+                }} className="mt-4 flex cursor-pointer items-start gap-3">
+
               <span className="text-[12px] leading-relaxed text-[var(--wk-text-muted)]">
                 I want to receive the selected WAKILISHA briefings. I can unsubscribe or update preferences from any briefing email.
               </span>
-            </label>
+            </WkCheckbox>
 
             {message && (
               <div

@@ -10,6 +10,10 @@ import {
   type MediaGovernanceState,
   type ReferencedEntity,
 } from "@/services/mediaService";
+import { WkSelect } from "@/components/design-system/primitives/Select";
+import { WkCheckbox } from "@/components/design-system/primitives/Checkbox";
+
+
 
 function assetFileKind(asset: MediaAsset): string {
   return asset.file_kind || (asset.mime_type === "application/pdf" ? "document" : asset.media_kind || "other");
@@ -690,15 +694,10 @@ export function MediaEditModal({
 
                     {/* Animated */}
                     {canEditImage && (
-                    <label className="flex items-center gap-2 text-[12px] text-wk-text cursor-pointer">
-                      <input
-                        type="checkbox"
-                        checked={animated}
-                        onChange={(e) => setAnimated(e.target.checked)}
-                        className="rounded"
-                      />
+                    <WkCheckbox checked={animated} onChange={(checked) => setAnimated(checked)} className="flex items-center gap-2 text-[12px] text-wk-text cursor-pointer">
+
                       Animated
-                    </label>
+                    </WkCheckbox>
                     )}
 
                     {/* Library metadata */}
@@ -711,16 +710,16 @@ export function MediaEditModal({
                         <label className="block text-[11px] font-semibold text-wk-text-soft mb-1.5">
                           Folder
                         </label>
-                        <select
+                        <WkSelect
                           value={folderId}
-                          onChange={(e) => setFolderId(e.target.value)}
-                          className="w-full rounded-lg border border-wk-border bg-wk-surface px-3 py-1.5 text-[12px] text-wk-text outline-none focus:border-wk-brand/50 cursor-pointer"
+                          onChange={(value) => setFolderId(value)}
+                          triggerClassName="w-full rounded-lg border border-wk-border bg-wk-surface px-3 py-1.5 text-[12px] text-wk-text outline-none focus:border-wk-brand/50 cursor-pointer"
                         >
                           <option value="none">No folder</option>
                           {folders.map((folder) => (
                             <option key={folder.id} value={folder.id}>{folder.name}</option>
                           ))}
-                        </select>
+                        </WkSelect>
                       </div>
 
                       <div>
@@ -741,10 +740,10 @@ export function MediaEditModal({
                           <label className="block text-[11px] font-semibold text-wk-text-soft mb-1.5">
                             Purpose
                           </label>
-                          <select
+                          <WkSelect
                             value={assetPurpose}
-                            onChange={(e) => setAssetPurpose(e.target.value)}
-                            className="w-full rounded-lg border border-wk-border bg-wk-surface px-2.5 py-1.5 text-[12px] text-wk-text outline-none focus:border-wk-brand/50 cursor-pointer"
+                            onChange={(value) => setAssetPurpose(value)}
+                            triggerClassName="w-full rounded-lg border border-wk-border bg-wk-surface px-2.5 py-1.5 text-[12px] text-wk-text outline-none focus:border-wk-brand/50 cursor-pointer"
                           >
                             <option value="general">General</option>
                             <option value="article_hero">Article hero</option>
@@ -759,7 +758,7 @@ export function MediaEditModal({
                             <option value="profile_media">Profile media</option>
                             <option value="social_card">Social card</option>
                             <option value="system">System</option>
-                          </select>
+                          </WkSelect>
                         </div>
                         <div>
                           <label className="block text-[11px] font-semibold text-wk-text-soft mb-1.5">
@@ -778,10 +777,10 @@ export function MediaEditModal({
                         <label className="block text-[11px] font-semibold text-wk-text-soft mb-1.5">
                           Rights status
                         </label>
-                        <select
+                        <WkSelect
                           value={rightsStatus}
-                          onChange={(e) => setRightsStatus(e.target.value)}
-                          className="w-full rounded-lg border border-wk-border bg-wk-surface px-3 py-1.5 text-[12px] text-wk-text outline-none focus:border-wk-brand/50 cursor-pointer"
+                          onChange={(value) => setRightsStatus(value)}
+                          triggerClassName="w-full rounded-lg border border-wk-border bg-wk-surface px-3 py-1.5 text-[12px] text-wk-text outline-none focus:border-wk-brand/50 cursor-pointer"
                         >
                           <option value="unknown">Unknown</option>
                           <option value="owned">Owned</option>
@@ -790,7 +789,7 @@ export function MediaEditModal({
                           <option value="fair_use">Fair use</option>
                           <option value="needs_clearance">Needs clearance</option>
                           <option value="restricted">Restricted</option>
-                        </select>
+                        </WkSelect>
                       </div>
 
                       <div>
@@ -885,16 +884,16 @@ export function MediaEditModal({
                         Status
                       </label>
                       <div className="flex gap-2">
-                        <select
+                        <WkSelect
                           value={status}
-                          onChange={(e) => setStatus(e.target.value)}
-                          className="flex-1 rounded-lg border border-wk-border bg-wk-surface px-3 py-1.5 text-[12px] text-wk-text outline-none focus:border-wk-brand/50 cursor-pointer"
+                          onChange={(value) => setStatus(value)}
+                          triggerClassName="flex-1 rounded-lg border border-wk-border bg-wk-surface px-3 py-1.5 text-[12px] text-wk-text outline-none focus:border-wk-brand/50 cursor-pointer"
                         >
                           <option value="active">Active</option>
                           <option value="archived">Archived</option>
                           <option value="needs_review">Needs review</option>
                           <option value="rejected">Rejected</option>
-                        </select>
+                        </WkSelect>
                         <button
                           onClick={handleSaveStatus}
                           disabled={savingStatus}
@@ -945,10 +944,10 @@ export function MediaEditModal({
                       <div className="grid grid-cols-2 gap-2">
                         <label className="block text-[11px] font-semibold text-wk-text-soft">
                           Rights
-                          <select
+                          <WkSelect
                             value={governanceDraft.rightsStatus}
-                            onChange={(event) => {
-                              const nextRights = event.target.value as MediaGovernanceDraft["rightsStatus"];
+                            onChange={(value) => {
+                              const nextRights = value as MediaGovernanceDraft["rightsStatus"];
                               setGovernanceDraft((current) => current
                                 ? {
                                     ...current,
@@ -957,7 +956,7 @@ export function MediaEditModal({
                                 : current
                               );
                             }}
-                            className="mt-1.5 w-full rounded-lg border border-wk-border bg-wk-surface px-2.5 py-1.5 text-[12px] text-wk-text outline-none focus:border-wk-brand/50"
+                            triggerClassName="mt-1.5 w-full rounded-lg border border-wk-border bg-wk-surface px-2.5 py-1.5 text-[12px] text-wk-text outline-none focus:border-wk-brand/50"
                           >
                             <option value="unknown">Unknown</option>
                             <option value="owned">Owned</option>
@@ -966,21 +965,21 @@ export function MediaEditModal({
                             <option value="fair_use">Fair use</option>
                             <option value="needs_clearance">Needs clearance</option>
                             <option value="restricted">Restricted</option>
-                          </select>
+                          </WkSelect>
                         </label>
 
                         <label className="block text-[11px] font-semibold text-wk-text-soft">
                           Consent
-                          <select
+                          <WkSelect
                             value={governanceDraft.consentStatus}
                             disabled={governanceDraft.rightsStatus === "owned"}
-                            onChange={(event) =>
+                            onChange={(value) =>
                               setGovernanceDraft((current) => current
-                                ? { ...current, consentStatus: event.target.value as MediaGovernanceDraft["consentStatus"] }
+                                ? { ...current, consentStatus: value as MediaGovernanceDraft["consentStatus"] }
                                 : current
                               )
                             }
-                            className="mt-1.5 w-full rounded-lg border border-wk-border bg-wk-surface px-2.5 py-1.5 text-[12px] text-wk-text outline-none focus:border-wk-brand/50 disabled:cursor-not-allowed disabled:opacity-60"
+                            triggerClassName="mt-1.5 w-full rounded-lg border border-wk-border bg-wk-surface px-2.5 py-1.5 text-[12px] text-wk-text outline-none focus:border-wk-brand/50 disabled:cursor-not-allowed disabled:opacity-60"
                           >
                             <option value="unknown">Unknown</option>
                             <option value="not_required">Not required</option>
@@ -989,7 +988,7 @@ export function MediaEditModal({
                             <option value="limited">Limited</option>
                             <option value="declined">Declined</option>
                             <option value="withdrawn">Withdrawn</option>
-                          </select>
+                          </WkSelect>
                           {governanceDraft.rightsStatus === "owned" ? (
                             <span className="mt-1 block text-[10px] font-medium text-wk-text-faint">
                               Granted automatically because Rights is Owned.
@@ -1001,42 +1000,42 @@ export function MediaEditModal({
                       <div className="grid grid-cols-2 gap-2">
                         <label className="block text-[11px] font-semibold text-wk-text-soft">
                           Source protection
-                          <select
+                          <WkSelect
                             value={governanceDraft.sourceProtectionClass}
-                            onChange={(event) =>
+                            onChange={(value) =>
                               setGovernanceDraft((current) => current
-                                ? { ...current, sourceProtectionClass: event.target.value as MediaGovernanceDraft["sourceProtectionClass"] }
+                                ? { ...current, sourceProtectionClass: value as MediaGovernanceDraft["sourceProtectionClass"] }
                                 : current
                               )
                             }
-                            className="mt-1.5 w-full rounded-lg border border-wk-border bg-wk-surface px-2.5 py-1.5 text-[12px] text-wk-text outline-none focus:border-wk-brand/50"
+                            triggerClassName="mt-1.5 w-full rounded-lg border border-wk-border bg-wk-surface px-2.5 py-1.5 text-[12px] text-wk-text outline-none focus:border-wk-brand/50"
                           >
                             <option value="internal">Internal</option>
                             <option value="public">Public</option>
                             <option value="public_redacted">Public redacted</option>
                             <option value="restricted">Restricted</option>
                             <option value="confidential">Confidential</option>
-                          </select>
+                          </WkSelect>
                         </label>
 
                         <label className="block text-[11px] font-semibold text-wk-text-soft">
                           Public safety
-                          <select
+                          <WkSelect
                             value={governanceDraft.publicSafetyState}
-                            onChange={(event) =>
+                            onChange={(value) =>
                               setGovernanceDraft((current) => current
-                                ? { ...current, publicSafetyState: event.target.value as MediaGovernanceDraft["publicSafetyState"] }
+                                ? { ...current, publicSafetyState: value as MediaGovernanceDraft["publicSafetyState"] }
                                 : current
                               )
                             }
-                            className="mt-1.5 w-full rounded-lg border border-wk-border bg-wk-surface px-2.5 py-1.5 text-[12px] text-wk-text outline-none focus:border-wk-brand/50"
+                            triggerClassName="mt-1.5 w-full rounded-lg border border-wk-border bg-wk-surface px-2.5 py-1.5 text-[12px] text-wk-text outline-none focus:border-wk-brand/50"
                           >
                             <option value="internal">Internal</option>
                             <option value="review_required">Review required</option>
                             <option value="approved_public">Approved public</option>
                             <option value="approved_redacted">Approved redacted</option>
                             <option value="blocked">Blocked</option>
-                          </select>
+                          </WkSelect>
                         </label>
                       </div>
 

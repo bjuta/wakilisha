@@ -25,7 +25,7 @@ function importTokenFor(primitivePath) {
 }
 
 function importsToken(source, token) {
-  const quoted = [`'${token}'`, `\"${token}\"`, `'${token}.tsx'`, `\"${token}.tsx\"`];
+  const quoted = [`'${token}'`, `"${token}"`, `'${token}.tsx'`, `"${token}.tsx"`];
   return quoted.some((needle) => source.includes(needle));
 }
 
@@ -34,6 +34,11 @@ function sameSet(a, b) {
   const left = [...a].sort();
   const right = [...b].sort();
   return left.every((value, index) => value === right[index]);
+}
+
+function sameList(a, b) {
+  if (a.length !== b.length) return false;
+  return a.every((value, index) => value === b[index]);
 }
 
 function surfaceRoots(root, registry) {
@@ -82,6 +87,42 @@ function gitDiffNames(root, baseRef, { diffFilter = null, paths = [] } = {}) {
   } catch {
     return [];
   }
+}
+
+function gitShowFile(root, ref, relative) {
+  if (!ref) return null;
+  try {
+    return execFileSync('git', ['show', `${ref}:${relative}`], {
+      cwd: root,
+      encoding: 'utf8',
+      stdio: ['ignore', 'pipe', 'ignore'],
+    });
+  } catch {
+    return null;
+  }
+}
+
+function patternMatches(source, patternSource) {
+  try {
+    const pattern = new RegExp(patternSource, 'gm');
+    return [...source.matchAll(pattern)].map((match) => match[0]).sort();
+  } catch {
+    return [];
+  }
+}
+
+function legacyCompetingImplementationChanged({ root, baseRef, relative, source, patternSources }) {
+  if (!baseRef) return true;
+  const baseSource = gitShowFile(root, baseRef, relative);
+  if (baseSource === null) return true;
+
+  for (const patternSource of patternSources) {
+    const before = patternMatches(baseSource, patternSource);
+    const after = patternMatches(source, patternSource);
+    if (!sameList(before, after)) return true;
+  }
+
+  return false;
 }
 
 export function verifyPrimitiveCompounding({
@@ -191,8 +232,10 @@ export function verifyPrimitiveCompounding({
       exceptions.set(exceptionPath, exception);
     }
     const matchedExceptions = new Set();
+    const legacyReviewed = new Set();
+    const patternSources = primitive.competingImplementationPatterns ?? [];
 
-    for (const patternSource of primitive.competingImplementationPatterns ?? []) {
+    for (const patternSource of patternSources) {
       let pattern;
       try {
         pattern = new RegExp(patternSource, 'm');
@@ -214,8 +257,23 @@ export function verifyPrimitiveCompounding({
           }
 
           matchedExceptions.add(relative);
-          if (exception.classification === 'legacy' && effectiveChangedPaths.has(relative)) {
-            errors.push(`${primitive.id}: legacy competing implementation ${relative} was touched. Migrate it to the canonical primitive and remove the legacy exception instead of renewing the debt.`);
+          if (
+            exception.classification === 'legacy' &&
+            effectiveChangedPaths.has(relative) &&
+            !legacyReviewed.has(relative)
+          ) {
+            legacyReviewed.add(relative);
+            if (
+              legacyCompetingImplementationChanged({
+                root,
+                baseRef,
+                relative,
+                source,
+                patternSources,
+              })
+            ) {
+              errors.push(`${primitive.id}: legacy competing implementation ${relative} changed. Migrate it to the canonical primitive and remove the legacy exception instead of renewing the debt.`);
+            }
           }
         }
       }

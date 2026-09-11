@@ -7,6 +7,8 @@ import { AdminChartsEmptyState } from "../components/AdminChartsEmptyState";
 import { AdminChartsLoadingState } from "../components/AdminChartsLoadingState";
 import { getChartFamilies, getChartEditionsForFamily } from "@/services/chartsPublic/client";
 import type { ChartFamily, ChartEdition } from "@/services/chartsPublic/client";
+import { WkSelect } from "@/components/design-system/primitives/Select";
+
 
 
 interface SnapshotRecord {
@@ -168,14 +170,14 @@ export default function AdminChartsSnapshots() {
             className="w-full rounded-lg border border-wk-border bg-wk-surface py-2 pl-9 pr-3 text-[13px] text-wk-text placeholder:text-wk-text-faint outline-none focus:border-wk-border-strong"
           />
         </div>
-        <select
+        <WkSelect
           value={familyFilter}
-          onChange={(e) => setFamilyFilter(e.target.value)}
-          className="rounded-lg border border-wk-border bg-wk-surface px-3 py-2 text-[13px] text-wk-text outline-none"
+          onChange={(value) => setFamilyFilter(value)}
+          triggerClassName="rounded-lg border border-wk-border bg-wk-surface px-3 py-2 text-[13px] text-wk-text outline-none"
         >
           <option value="all">All Programs</option>
           {families.map((f) => <option key={f} value={f}>{f}</option>)}
-        </select>
+        </WkSelect>
         <div className="flex gap-1">
           {["all", "published", "draft"].map((s) => (
             <button

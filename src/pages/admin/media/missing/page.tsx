@@ -4,6 +4,8 @@ import { WkIcon } from "@/components/design-system/Icon";
 import { MediaPickerModal } from "@/components/admin/MediaPickerModal";
 import { supabase } from "@/lib/supabase";
 import { mediaService } from "@/services/mediaService";
+import { WkSelect } from "@/components/design-system/primitives/Select";
+
 
 interface MissingImageSlot {
   uid: string;
@@ -543,10 +545,10 @@ export default function AdminMissingImagesPage() {
           )}
         </div>
         <div className="flex items-center gap-2 flex-wrap">
-          <select
+          <WkSelect
             value={filterType}
-            onChange={(e) => { setFilterType(e.target.value); setPage(0); }}
-            className="rounded-lg border border-wk-border bg-wk-surface px-3 py-2 text-[12px] font-semibold text-wk-text outline-none cursor-pointer"
+            onChange={(value) => { setFilterType(value); setPage(0); }}
+            triggerClassName="rounded-lg border border-wk-border bg-wk-surface px-3 py-2 text-[12px] font-semibold text-wk-text outline-none cursor-pointer"
           >
             <option value="all">All Types</option>
             {ENTITY_DEFS.filter((d, i, arr) => arr.findIndex((x) => x.entityType === d.entityType) === i).map((d) => (
@@ -554,7 +556,7 @@ export default function AdminMissingImagesPage() {
                 {entityLabel(d.entityType)}
               </option>
             ))}
-          </select>
+          </WkSelect>
           <div className="flex items-center rounded-lg border border-wk-border bg-wk-surface overflow-hidden">
             {["all", "pending", "in_progress", "resolved", "skipped"].map((status) => (
               <button

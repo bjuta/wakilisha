@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import { WkIcon } from "@/components/design-system/Icon";
+import { WkSelect } from "@/components/design-system/primitives/Select";
+
 
 type SourceType = "charts" | "registry" | "provider_intake" | "artist_intake" | "manual";
 
@@ -625,9 +627,9 @@ function PreviewPanel({
 
                   {draft.selectedArtist && (
                     <div className="mt-3 grid gap-2 md:grid-cols-[0.8fr_1fr_auto]">
-                      <select value={draft.role} onChange={(event) => onUpdateTokenDraft(index, { role: event.target.value })} className={INPUT_CLASS}>
+                      <WkSelect value={draft.role} onChange={(value) => onUpdateTokenDraft(index, { role: value })} triggerClassName={INPUT_CLASS}>
                         {ROLE_OPTIONS.map((role) => <option key={role.value} value={role.value}>{role.label}</option>)}
-                      </select>
+                      </WkSelect>
                       <input value={draft.displayCredit} onChange={(event) => onUpdateTokenDraft(index, { displayCredit: event.target.value })} className={INPUT_CLASS} placeholder="Display credit override optional" />
                       <button onClick={() => onClearTokenArtist(index)} className="rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-[12px] font-black text-red-700">Clear</button>
                     </div>
@@ -646,13 +648,13 @@ function PreviewPanel({
             <div className="mt-3 grid gap-3 md:grid-cols-[0.8fr_1fr]">
               <div>
                 <label className={LABEL_CLASS}>Decision type</label>
-                <select value={decisionType} onChange={(event) => setDecisionType(event.target.value as DecoupleDecisionType)} className={INPUT_CLASS}>
+                <WkSelect value={decisionType} onChange={(value) => setDecisionType(value as DecoupleDecisionType)} triggerClassName={INPUT_CLASS}>
                   <option value="split_combined_artist">Split combined artist</option>
                   <option value="split_raw_credit">Split raw credit</option>
                   <option value="block_alias">Block alias</option>
                   <option value="needs_follow_up">Needs follow-up</option>
                   <option value="not_a_decouple">Not a decouple</option>
-                </select>
+                </WkSelect>
               </div>
               <div>
                 <label className={LABEL_CLASS}>Decision note</label>
@@ -823,7 +825,7 @@ function DecisionLedger({
         </div>
 
         <div className="flex flex-wrap gap-2">
-          <select value={statusFilter} onChange={(event) => setStatusFilter(event.target.value as "all" | DecoupleDecisionStatus)} className={INPUT_CLASS}>
+          <WkSelect value={statusFilter} onChange={(value) => setStatusFilter(value as "all" | DecoupleDecisionStatus)} triggerClassName={INPUT_CLASS}>
             <option value="all">All statuses</option>
             <option value="draft">Draft</option>
             <option value="ready">Ready</option>
@@ -831,13 +833,13 @@ function DecisionLedger({
             <option value="blocked">Blocked</option>
             <option value="failed">Failed</option>
             <option value="superseded">Superseded</option>
-          </select>
-          <select value={sourceFilter} onChange={(event) => setSourceFilter(event.target.value as "all" | SourceType)} className={INPUT_CLASS}>
+          </WkSelect>
+          <WkSelect value={sourceFilter} onChange={(value) => setSourceFilter(value as "all" | SourceType)} triggerClassName={INPUT_CLASS}>
             <option value="all">All sources</option>
             {SOURCE_OPTIONS.map((source) => (
               <option key={source.key} value={source.key}>{source.label}</option>
             ))}
-          </select>
+          </WkSelect>
         </div>
       </div>
 

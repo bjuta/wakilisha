@@ -18,6 +18,8 @@ import {
   type PublishingPriority,
   type PublishingProductionStage,
 } from "@/services/publishing/publishingWorkspaceService";
+import { WkSelect } from "@/components/design-system/primitives/Select";
+
 
 interface CreatePublishingItemDrawerProps {
   contentKinds: PublishingContentKind[];
@@ -360,16 +362,16 @@ export function CreatePublishingItemDrawer({
               <span className="text-[12px] font-bold text-wk-text">
                 Content Type
               </span>
-              <select
+              <WkSelect
                 value={contentKind}
-                onChange={(event) => {
-                  setContentKind(event.target.value);
+                onChange={(value) => {
+                  setContentKind(value);
                   setSelectedArticleResourceId(null);
                   setArticleSearchQuery("");
                   setError(null);
                 }}
                 disabled={saving}
-                className="mt-2 w-full rounded-xl border border-wk-border bg-wk-surface px-3 py-2.5 text-[13px] text-wk-text outline-none focus:border-wk-brand disabled:opacity-60"
+                triggerClassName="mt-2 w-full rounded-xl border border-wk-border bg-wk-surface px-3 py-2.5 text-[13px] text-wk-text outline-none focus:border-wk-brand disabled:opacity-60"
               >
                 {contentKinds.map((kind) => (
                   <option
@@ -379,7 +381,7 @@ export function CreatePublishingItemDrawer({
                     {kind.label}
                   </option>
                 ))}
-              </select>
+              </WkSelect>
               {selectedContentKind?.description ? (
                 <p className="mt-1.5 text-[11px] leading-4 text-wk-text-muted">
                   {selectedContentKind.description}
@@ -523,16 +525,15 @@ export function CreatePublishingItemDrawer({
                 <span className="text-[12px] font-bold text-wk-text">
                   Production Stage
                 </span>
-                <select
+                <WkSelect
                   value={productionStage}
-                  onChange={(event) =>
+                  onChange={(value) =>
                     setProductionStage(
-                      event.target
-                        .value as PublishingProductionStage,
+                      value as PublishingProductionStage,
                     )
                   }
                   disabled={saving}
-                  className="mt-2 w-full rounded-xl border border-wk-border bg-wk-surface px-3 py-2.5 text-[13px] text-wk-text outline-none focus:border-wk-brand disabled:opacity-60"
+                  triggerClassName="mt-2 w-full rounded-xl border border-wk-border bg-wk-surface px-3 py-2.5 text-[13px] text-wk-text outline-none focus:border-wk-brand disabled:opacity-60"
                 >
                   {PUBLISHING_PRODUCTION_STAGES.map(
                     (stage) => (
@@ -541,23 +542,22 @@ export function CreatePublishingItemDrawer({
                       </option>
                     ),
                   )}
-                </select>
+                </WkSelect>
               </label>
 
               <label className="block">
                 <span className="text-[12px] font-bold text-wk-text">
                   Priority
                 </span>
-                <select
+                <WkSelect
                   value={priority}
-                  onChange={(event) =>
+                  onChange={(value) =>
                     setPriority(
-                      event.target
-                        .value as PublishingPriority,
+                      value as PublishingPriority,
                     )
                   }
                   disabled={saving}
-                  className="mt-2 w-full rounded-xl border border-wk-border bg-wk-surface px-3 py-2.5 text-[13px] text-wk-text outline-none focus:border-wk-brand disabled:opacity-60"
+                  triggerClassName="mt-2 w-full rounded-xl border border-wk-border bg-wk-surface px-3 py-2.5 text-[13px] text-wk-text outline-none focus:border-wk-brand disabled:opacity-60"
                 >
                   {PUBLISHING_PRIORITIES.map(
                     (priorityOption) => (
@@ -569,7 +569,7 @@ export function CreatePublishingItemDrawer({
                       </option>
                     ),
                   )}
-                </select>
+                </WkSelect>
               </label>
             </div>
 
@@ -577,15 +577,15 @@ export function CreatePublishingItemDrawer({
               <span className="text-[12px] font-bold text-wk-text">
                 Owner
               </span>
-              <select
+              <WkSelect
                 value={ownerMode}
-                onChange={(event) =>
+                onChange={(value) =>
                   setOwnerMode(
-                    event.target.value as OwnerMode,
+                    value as OwnerMode,
                   )
                 }
                 disabled={saving}
-                className="mt-2 w-full rounded-xl border border-wk-border bg-wk-surface px-3 py-2.5 text-[13px] text-wk-text outline-none focus:border-wk-brand disabled:opacity-60"
+                triggerClassName="mt-2 w-full rounded-xl border border-wk-border bg-wk-surface px-3 py-2.5 text-[13px] text-wk-text outline-none focus:border-wk-brand disabled:opacity-60"
               >
                 <option value="me">
                   Assign To Me ({currentUserName})
@@ -593,7 +593,7 @@ export function CreatePublishingItemDrawer({
                 <option value="unassigned">
                   Leave Unassigned
                 </option>
-              </select>
+              </WkSelect>
             </label>
 
             <div className="grid gap-4 sm:grid-cols-2">

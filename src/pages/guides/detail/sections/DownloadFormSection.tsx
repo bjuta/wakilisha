@@ -4,6 +4,10 @@ import { trackEvent, getAnalyticsSessionId, getCanonicalPageUrl } from "@/servic
 import { submitForm } from "@/services/formService";
 import { BRIEFING_SLUGS, guideInterest, subscribeToBriefings } from "@/services/audienceSubscriptionService";
 import type { DownloadFormData } from "../sectionTypes";
+import { WkSelect } from "@/components/design-system/primitives/Select";
+import { WkCheckbox } from "@/components/design-system/primitives/Checkbox";
+
+
 
 export default function DownloadFormSection({ data }: { data: DownloadFormData }) {
   const { slug } = useParams<{ slug: string }>();
@@ -148,7 +152,7 @@ export default function DownloadFormSection({ data }: { data: DownloadFormData }
                       </div>
                       <div>
                         <label className="block text-[12px] font-semibold text-[var(--wk-text)] mb-1.5">Which best describes you?</label>
-                        <select name="wk_role" className="w-full rounded-lg border border-[var(--wk-border)] bg-[var(--wk-bg)] px-3 py-2.5 text-sm text-[var(--wk-text)] focus:border-[var(--wk-v-intel)] focus:outline-none transition-colors cursor-pointer">
+                        <WkSelect name="wk_role" triggerClassName="w-full rounded-lg border border-[var(--wk-border)] bg-[var(--wk-bg)] px-3 py-2.5 text-sm text-[var(--wk-text)] focus:border-[var(--wk-v-intel)] focus:outline-none transition-colors cursor-pointer">
                           <option value="">Choose one</option>
                           <option>Artist or creative</option>
                           <option>Curator, gallery or museum</option>
@@ -158,13 +162,13 @@ export default function DownloadFormSection({ data }: { data: DownloadFormData }
                           <option>Collector or patron</option>
                           <option>Traveller or culture lover</option>
                           <option>Brand, funder or partner</option>
-                        </select>
+                        </WkSelect>
                       </div>
                     </div>
 
                     <div>
                       <label className="block text-[12px] font-semibold text-[var(--wk-text)] mb-1.5">What brought you to this guide?</label>
-                      <select name="wk_use_case" className="w-full rounded-lg border border-[var(--wk-border)] bg-[var(--wk-bg)] px-3 py-2.5 text-sm text-[var(--wk-text)] focus:border-[var(--wk-v-intel)] focus:outline-none transition-colors cursor-pointer">
+                      <WkSelect name="wk_use_case" triggerClassName="w-full rounded-lg border border-[var(--wk-border)] bg-[var(--wk-bg)] px-3 py-2.5 text-sm text-[var(--wk-text)] focus:border-[var(--wk-v-intel)] focus:outline-none transition-colors cursor-pointer">
                         <option value="">Choose the closest reason</option>
                         <option>Planning a visit</option>
                         <option>Following the art scene</option>
@@ -172,13 +176,13 @@ export default function DownloadFormSection({ data }: { data: DownloadFormData }
                         <option>Writing, teaching or programming culture</option>
                         <option>Collecting or supporting art</option>
                         <option>Exploring WAKILISHA guides</option>
-                      </select>
+                      </WkSelect>
                     </div>
 
-                    <label className="flex items-start gap-3 cursor-pointer">
-                      <input type="checkbox" name="wk_consent" value="1" required className="mt-1 h-4 w-4 rounded border-[var(--wk-border)] accent-[var(--wk-v-intel)] cursor-pointer" />
+                    <WkCheckbox name="wk_consent" value="1" required className="flex items-start gap-3 cursor-pointer">
+
                       <span className="text-[12px] text-[var(--wk-text-muted)] leading-relaxed">Send me this guide and occasional WAKILISHA notes. I can unsubscribe anytime.</span>
-                    </label>
+                    </WkCheckbox>
 
                     {status === "error" && (
                       <div className="rounded-lg bg-[var(--wk-danger-soft)] p-3">

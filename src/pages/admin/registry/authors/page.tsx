@@ -2,6 +2,8 @@ import { useEffect, useState, useMemo, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { WkIcon } from "@/components/design-system/Icon";
 import { fetchAllAuthors, type AuthorRow } from "@/services/authorProfiles";
+import { WkSelect } from "@/components/design-system/primitives/Select";
+
 
 type SortMode = "recent" | "name" | "role";
 
@@ -94,15 +96,15 @@ export default function AuthorsPage() {
               placeholder="Search authors by name, slug, role, location, or email..."
               className="h-11 w-full rounded-xl border border-[var(--wk-border)] bg-[var(--wk-bg-subtle)] px-4 text-sm outline-none transition focus:border-[var(--wk-brand)] focus:bg-[var(--wk-surface)]"
             />
-            <select
+            <WkSelect
               value={sortMode}
-              onChange={(e) => setSortMode(e.target.value as SortMode)}
-              className="h-11 rounded-xl border border-[var(--wk-border)] bg-[var(--wk-bg-subtle)] px-3 text-sm outline-none transition focus:border-[var(--wk-brand)] focus:bg-[var(--wk-surface)] cursor-pointer"
+              onChange={(value) => setSortMode(value as SortMode)}
+              triggerClassName="h-11 rounded-xl border border-[var(--wk-border)] bg-[var(--wk-bg-subtle)] px-3 text-sm outline-none transition focus:border-[var(--wk-brand)] focus:bg-[var(--wk-surface)] cursor-pointer"
             >
               <option value="recent">Default order</option>
               <option value="name">Name A-Z</option>
               <option value="role">Role</option>
-            </select>
+            </WkSelect>
           </div>
         </section>
 

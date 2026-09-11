@@ -43,6 +43,10 @@ import {
   type ArtistLaunchTarget,
   type ArtistLaunchTargetType,
 } from "@/services/artists/artistLaunchTools";
+import { WkSelect } from "@/components/design-system/primitives/Select";
+import { WkCheckbox } from "@/components/design-system/primitives/Checkbox";
+
+
 
 const EMPTY_PRESENTATION: ArtistPresentation = {
   bio: null,
@@ -132,10 +136,10 @@ function Toggle({
   disabled?: boolean;
 }) {
   return (
-    <label className={`flex items-center gap-2 text-[12px] font-semibold ${disabled ? "opacity-50" : ""}`}>
-      <input type="checkbox" checked={checked} onChange={(event) => onChange(event.target.checked)} disabled={disabled} />
+    <WkCheckbox checked={checked} disabled={disabled} onChange={(checked) => onChange(checked)} className={`flex items-center gap-2 text-[12px] font-semibold ${disabled ? "opacity-50" : ""}`}>
+
       <span>{label}</span>
-    </label>
+    </WkCheckbox>
   );
 }
 
@@ -1322,32 +1326,32 @@ export default function ArtistManagePage() {
               <div className="mt-4 grid gap-3 lg:grid-cols-[minmax(0,1.4fr)_160px_minmax(0,1fr)]">
                 <label className="block">
                   <span className="mb-1.5 block text-[11px] font-bold text-[var(--wk-text)]">Public Page</span>
-                  <select
+                  <WkSelect
                     value={launchTargetKey}
-                    onChange={(event) => {
-                      setLaunchTargetKey(event.target.value);
+                    onChange={(value) => {
+                      setLaunchTargetKey(value);
                       setLaunchCopied(false);
                     }}
                     disabled={launchAnalyticsLoading || !launchAnalytics?.launchTargets.length}
-                    className="h-11 w-full rounded-xl border border-[var(--wk-border)] bg-[var(--wk-bg)] px-3 text-[12px] text-[var(--wk-text)] disabled:opacity-50"
+                    triggerClassName="h-11 w-full rounded-xl border border-[var(--wk-border)] bg-[var(--wk-bg)] px-3 text-[12px] text-[var(--wk-text)] disabled:opacity-50"
                   >
                     {(launchAnalytics?.launchTargets ?? []).map((target) => (
                       <option key={artistLaunchTargetKey(target)} value={artistLaunchTargetKey(target)}>
                         {artistLaunchTargetLabel(target.type)} · {target.title}
                       </option>
                     ))}
-                  </select>
+                  </WkSelect>
                 </label>
 
                 <label className="block">
                   <span className="mb-1.5 block text-[11px] font-bold text-[var(--wk-text)]">Source</span>
-                  <select
+                  <WkSelect
                     value={launchSource}
-                    onChange={(event) => {
-                      setLaunchSource(event.target.value);
+                    onChange={(value) => {
+                      setLaunchSource(value);
                       setLaunchCopied(false);
                     }}
-                    className="h-11 w-full rounded-xl border border-[var(--wk-border)] bg-[var(--wk-bg)] px-3 text-[12px] text-[var(--wk-text)]"
+                    triggerClassName="h-11 w-full rounded-xl border border-[var(--wk-border)] bg-[var(--wk-bg)] px-3 text-[12px] text-[var(--wk-text)]"
                   >
                     <option value="instagram">Instagram</option>
                     <option value="tiktok">TikTok</option>
@@ -1356,7 +1360,7 @@ export default function ArtistManagePage() {
                     <option value="newsletter">Newsletter</option>
                     <option value="press">Press</option>
                     <option value="other">Other</option>
-                  </select>
+                  </WkSelect>
                 </label>
 
                 <label className="block">
@@ -1591,18 +1595,18 @@ export default function ArtistManagePage() {
                 <div className="grid gap-3 md:grid-cols-[160px_minmax(0,1fr)_auto]">
                   <label className="block">
                     <span className="mb-1.5 block text-[12px] font-bold text-[var(--wk-text)]">Provider</span>
-                    <select
+                    <WkSelect
                       value={musicProvider}
-                      onChange={(event) => {
-                        setMusicProvider(event.target.value as ArtistMusicProviderKey);
+                      onChange={(value) => {
+                        setMusicProvider(value as ArtistMusicProviderKey);
                         setMusicHits([]);
                         setMusicInspection(null);
                       }}
-                      className="h-11 w-full rounded-xl border border-[var(--wk-border)] bg-[var(--wk-bg)] px-3 text-[13px] text-[var(--wk-text)]"
+                      triggerClassName="h-11 w-full rounded-xl border border-[var(--wk-border)] bg-[var(--wk-bg)] px-3 text-[13px] text-[var(--wk-text)]"
                     >
                       <option value="apple_music">Apple Music</option>
                       <option value="spotify">Spotify</option>
-                    </select>
+                    </WkSelect>
                   </label>
                   <label className="block">
                     <span className="mb-1.5 block text-[12px] font-bold text-[var(--wk-text)]">Track</span>
@@ -1677,14 +1681,14 @@ export default function ArtistManagePage() {
                     <div className="text-[12px] font-black text-[var(--wk-text)]">Other Artists</div>
                     <p className="mt-1 text-[11px] leading-5 text-[var(--wk-text-muted)]">Add other Primary or Featured Artists exactly as they should be reviewed.</p>
                     <div className="mt-3 grid gap-2 md:grid-cols-[150px_minmax(0,1fr)_auto]">
-                      <select
+                      <WkSelect
                         value={musicCreditRole}
-                        onChange={(event) => setMusicCreditRole(event.target.value as ArtistMusicCreditInput["role"])}
-                        className="h-10 rounded-xl border border-[var(--wk-border)] bg-[var(--wk-bg)] px-3 text-[12px] text-[var(--wk-text)]"
+                        onChange={(value) => setMusicCreditRole(value as ArtistMusicCreditInput["role"])}
+                        triggerClassName="h-10 rounded-xl border border-[var(--wk-border)] bg-[var(--wk-bg)] px-3 text-[12px] text-[var(--wk-text)]"
                       >
                         <option value="primary">Primary</option>
                         <option value="featured">Featured</option>
-                      </select>
+                      </WkSelect>
                       <input
                         value={musicCreditName}
                         onChange={(event) => setMusicCreditName(event.target.value)}
@@ -1782,9 +1786,9 @@ export default function ArtistManagePage() {
                 </label>
                 <label className="block">
                   <span className="mb-1 block text-[11px] font-bold text-[var(--wk-text-muted)]">Role</span>
-                  <select value={inviteRole} onChange={(event) => { const role = event.target.value; setInviteRole(role); setInvitePermissions(defaultPermissionsForRole(role)); }} className="w-full rounded-xl border border-[var(--wk-border)] bg-[var(--wk-surface)] px-4 py-3 text-[13px] text-[var(--wk-text)]">
+                  <WkSelect value={inviteRole} onChange={(value) => { const role = value; setInviteRole(role); setInvitePermissions(defaultPermissionsForRole(role)); }} triggerClassName="w-full rounded-xl border border-[var(--wk-border)] bg-[var(--wk-surface)] px-4 py-3 text-[13px] text-[var(--wk-text)]">
                     {ROLE_OPTIONS.map(([value, label]) => <option key={value} value={value}>{label}</option>)}
-                  </select>
+                  </WkSelect>
                 </label>
                 <WkButton type="submit" disabled={busy || !inviteUsername.trim()}>Invite</WkButton>
                 <div className="md:col-span-3 flex flex-wrap gap-4 pt-1">
@@ -1818,9 +1822,9 @@ export default function ArtistManagePage() {
                         <p className="mt-3 text-[12px] leading-5 text-[var(--wk-text-muted)]">The verified Artist role can only be revoked through WAKILISHA review.</p>
                       ) : draft ? (
                         <div className="mt-4 space-y-3">
-                          <select value={draft.role} onChange={(event) => patchTeamDraft(member.representationId, { role: event.target.value })} className="rounded-xl border border-[var(--wk-border)] bg-[var(--wk-bg)] px-3 py-2 text-[12px] text-[var(--wk-text)]">
+                          <WkSelect value={draft.role} onChange={(value) => patchTeamDraft(member.representationId, { role: value })} triggerClassName="rounded-xl border border-[var(--wk-border)] bg-[var(--wk-bg)] px-3 py-2 text-[12px] text-[var(--wk-text)]">
                             {ROLE_OPTIONS.map(([value, label]) => <option key={value} value={value}>{label}</option>)}
-                          </select>
+                          </WkSelect>
                           <div className="flex flex-wrap gap-4">
                             {(["profile", "releases", "updates", "team"] as const).map((key) => (
                               <Toggle
@@ -1850,9 +1854,9 @@ export default function ArtistManagePage() {
               <form onSubmit={handleCorrection} className="mt-5 space-y-4">
                 <label className="block">
                   <span className="mb-1.5 block text-[12px] font-bold text-[var(--wk-text)]">What Needs Changing?</span>
-                  <select value={correctionField} onChange={(event) => setCorrectionField(event.target.value)} className="w-full rounded-xl border border-[var(--wk-border)] bg-[var(--wk-bg)] px-4 py-3 text-[14px] text-[var(--wk-text)]">
+                  <WkSelect value={correctionField} onChange={(value) => setCorrectionField(value)} triggerClassName="w-full rounded-xl border border-[var(--wk-border)] bg-[var(--wk-bg)] px-4 py-3 text-[14px] text-[var(--wk-text)]">
                     {CORRECTION_FIELDS.map(([value, label]) => <option key={value} value={value}>{label}</option>)}
-                  </select>
+                  </WkSelect>
                 </label>
                 <label className="block">
                   <span className="mb-1.5 block text-[12px] font-bold text-[var(--wk-text)]">What Should It Say?</span>

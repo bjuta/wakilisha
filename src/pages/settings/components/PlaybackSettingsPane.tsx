@@ -2,6 +2,8 @@ import { useState } from "react";
 import { WakilishaToggle } from "@/components/design-system/primitives/WakilishaToggle";
 import type { UserPlaybackPrefs } from "@/hooks/useUserSettings";
 import { supabase } from "@/lib/supabase";
+import { WkSelect } from "@/components/design-system/primitives/Select";
+
 
 interface Props {
   playback: UserPlaybackPrefs;
@@ -187,15 +189,15 @@ export function PlaybackSettingsPane({ playback, isSignedIn, updatePlayback }: P
             Choose the default stream quality for embedded and source playback.
           </div>
         </div>
-        <select
-          className="h-[38px] px-4 rounded-lg border border-[var(--wk-border)] bg-[var(--wk-bg-subtle)] text-[var(--wk-text)] text-sm font-bold focus:outline-none focus:border-[var(--wk-brand)] cursor-pointer shrink-0"
+        <WkSelect
+          triggerClassName="h-[38px] px-4 rounded-lg border border-[var(--wk-border)] bg-[var(--wk-bg-subtle)] text-[var(--wk-text)] text-sm font-bold focus:outline-none focus:border-[var(--wk-brand)] cursor-pointer shrink-0"
           value={playback.playbackQuality}
-          onChange={(e) => updatePlayback({ playbackQuality: e.target.value as UserPlaybackPrefs["playbackQuality"] })}
+          onChange={(value) => updatePlayback({ playbackQuality: value as UserPlaybackPrefs["playbackQuality"] })}
         >
           <option>Auto</option>
           <option>High</option>
           <option>Data saver</option>
-        </select>
+        </WkSelect>
       </div>
     </div>
   );

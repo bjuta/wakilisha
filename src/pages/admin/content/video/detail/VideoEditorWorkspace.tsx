@@ -58,6 +58,9 @@ import {
   type VideoChapter,
   type VideoPublicationWorkspace,
 } from "@/services/video/videoAdminService";
+import { WkSelect } from "@/components/design-system/primitives/Select";
+import { WkRadio, WkRadioGroup } from "@/components/design-system/primitives/Radio";
+
 
 type WorkspaceView =
   | "details"
@@ -861,31 +864,31 @@ export function VideoEditorWorkspace({
             </label>
             <label className="text-xs font-bold text-wk-text-muted">
               Classification
-              <select
+              <WkSelect
                 value={classification}
-                onChange={(event) => setClassification(event.target.value)}
+                onChange={(value) => setClassification(value)}
                 disabled={!editable}
-                className="mt-1 w-full rounded-lg border border-wk-border bg-wk-bg px-3 py-2.5 text-sm text-wk-text disabled:opacity-60"
+                triggerClassName="mt-1 w-full rounded-lg border border-wk-border bg-wk-bg px-3 py-2.5 text-sm text-wk-text disabled:opacity-60"
               >
                 {workspace.classifications.map((item) => (
                   <option key={item.key} value={item.key}>
                     {item.label}
                   </option>
                 ))}
-              </select>
+              </WkSelect>
             </label>
             <label className="text-xs font-bold text-wk-text-muted">
               Visibility
-              <select
+              <WkSelect
                 value={visibility}
-                onChange={(event) => setVisibility(event.target.value)}
+                onChange={(value) => setVisibility(value)}
                 disabled={!editable}
-                className="mt-1 w-full rounded-lg border border-wk-border bg-wk-bg px-3 py-2.5 text-sm text-wk-text disabled:opacity-60"
+                triggerClassName="mt-1 w-full rounded-lg border border-wk-border bg-wk-bg px-3 py-2.5 text-sm text-wk-text disabled:opacity-60"
               >
                 <option value="private">Private</option>
                 <option value="internal">Internal</option>
                 <option value="public">Public</option>
-              </select>
+              </WkSelect>
             </label>
             <label className="text-xs font-bold text-wk-text-muted lg:col-span-2">
               Summary
@@ -1030,11 +1033,11 @@ export function VideoEditorWorkspace({
               <form className="space-y-3" onSubmit={registerProvider}>
                 <label className="block text-xs font-bold text-wk-text-muted">
                   Provider
-                  <select
+                  <WkSelect
                     value={providerKey}
-                    onChange={(event) => setProviderKey(event.target.value)}
+                    onChange={(value) => setProviderKey(value)}
                     disabled={!editable}
-                    className="mt-1 w-full rounded-lg border border-wk-border bg-wk-bg px-3 py-2.5 text-sm text-wk-text disabled:opacity-60"
+                    triggerClassName="mt-1 w-full rounded-lg border border-wk-border bg-wk-bg px-3 py-2.5 text-sm text-wk-text disabled:opacity-60"
                   >
                     <option value="">Choose a provider</option>
                     {workspace.sourceProviders.map((item) => (
@@ -1042,7 +1045,7 @@ export function VideoEditorWorkspace({
                         {item.label}
                       </option>
                     ))}
-                  </select>
+                  </WkSelect>
                 </label>
                 <label className="block text-xs font-bold text-wk-text-muted">
                   Provider Video ID
@@ -1155,7 +1158,20 @@ export function VideoEditorWorkspace({
             ) : null
           }
         >
-          <div className="space-y-3">
+          <WkRadioGroup
+            value={String(captionDrafts.findIndex((item) => item.isDefault))}
+            onChange={(value) =>
+              setCaptionDrafts((current) =>
+                current.map((item, itemIndex) => ({
+                  ...item,
+                  isDefault: itemIndex === Number(value),
+                })),
+              )
+            }
+            disabled={!editable}
+            ariaLabel="Default caption track"
+            className="space-y-3"
+          >
             {captionDrafts.map((track, index) => (
               <div
                 key={track.id || `${track.assetId}-${index}`}
@@ -1188,26 +1204,26 @@ export function VideoEditorWorkspace({
                 </label>
                 <label className="text-xs font-bold text-wk-text-muted">
                   Kind
-                  <select
+                  <WkSelect
                     value={track.trackKind}
-                    onChange={(event) =>
+                    onChange={(value) =>
                       setCaptionDrafts((current) =>
                         current.map((item, itemIndex) =>
                           itemIndex === index
-                            ? { ...item, trackKind: event.target.value }
+                            ? { ...item, trackKind: value }
                             : item,
                         ),
                       )
                     }
                     disabled={!editable}
-                    className="mt-1 w-full rounded-lg border border-wk-border bg-wk-surface px-2.5 py-2 text-xs text-wk-text"
+                    triggerClassName="mt-1 w-full rounded-lg border border-wk-border bg-wk-surface px-2.5 py-2 text-xs text-wk-text"
                   >
                     {workspace.captionTrackKinds.map((item) => (
                       <option key={item.key} value={item.key}>
                         {item.label}
                       </option>
                     ))}
-                  </select>
+                  </WkSelect>
                 </label>
                 <label className="text-xs font-bold text-wk-text-muted">
                   Label
@@ -1226,22 +1242,12 @@ export function VideoEditorWorkspace({
                     className="mt-1 w-full rounded-lg border border-wk-border bg-wk-surface px-2.5 py-2 text-xs text-wk-text"
                   />
                 </label>
-                <label className="flex items-center gap-2 self-center text-xs font-bold text-wk-text-muted">
-                  <input
-                    type="radio"
-                    checked={track.isDefault}
-                    disabled={!editable}
-                    onChange={() =>
-                      setCaptionDrafts((current) =>
-                        current.map((item, itemIndex) => ({
-                          ...item,
-                          isDefault: itemIndex === index,
-                        })),
-                      )
-                    }
-                  />
+                <WkRadio
+                  value={String(index)}
+                  className="self-center text-xs font-bold text-wk-text-muted"
+                >
                   Default
-                </label>
+                </WkRadio>
                 {editable ? (
                   <button
                     type="button"
@@ -1263,7 +1269,7 @@ export function VideoEditorWorkspace({
                 No caption or subtitle tracks yet.
               </p>
             ) : null}
-          </div>
+          </WkRadioGroup>
         </AdminWorkspaceSection>
       ) : null}
 

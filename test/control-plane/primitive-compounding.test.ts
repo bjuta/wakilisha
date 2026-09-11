@@ -206,7 +206,7 @@ describe("Primitive Compounding Contract", () => {
       changedPaths: [relative],
     });
     expect(touched.errors.join("\n")).toContain(
-      "was touched. Migrate it to the canonical primitive",
+      "changed. Migrate it to the canonical primitive",
     );
   });
 

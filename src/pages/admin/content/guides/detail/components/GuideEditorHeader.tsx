@@ -1,6 +1,8 @@
 import { useState } from "react";
 import { WkIcon } from "@/components/design-system/Icon";
 import type { GuidePageRecord } from "@/pages/guides/detail/sectionTypes";
+import { WkSelect } from "@/components/design-system/primitives/Select";
+
 
 interface GuideEditorHeaderProps {
   guide: GuidePageRecord;
@@ -114,15 +116,15 @@ export default function GuideEditorHeader({
             placeholder="Subtitle (optional)"
             className="flex-1 min-w-[200px] text-[14px] text-[var(--wk-text-muted)] bg-transparent border-b border-[var(--wk-divider)] outline-none pb-1 placeholder:text-[var(--wk-text-faint)] focus:border-[var(--wk-brand)] transition-colors"
           />
-          <select
+          <WkSelect
             value={guide.guide_format || "field_guide"}
-            onChange={(e) => onFormatChange(e.target.value)}
-            className="rounded-lg border border-[var(--wk-border)] bg-[var(--wk-surface)] px-3 py-1.5 text-[12px] font-semibold text-[var(--wk-text)] outline-none cursor-pointer"
+            onChange={(value) => onFormatChange(value)}
+            triggerClassName="rounded-lg border border-[var(--wk-border)] bg-[var(--wk-surface)] px-3 py-1.5 text-[12px] font-semibold text-[var(--wk-text)] outline-none cursor-pointer"
           >
             {FORMATS.map((f) => (
               <option key={f.value} value={f.value}>{f.label}</option>
             ))}
-          </select>
+          </WkSelect>
           <span className="text-[11px] text-[var(--wk-text-faint)]">
             {guide.sections.length} sections
           </span>

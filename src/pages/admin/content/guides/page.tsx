@@ -3,8 +3,11 @@ import { useNavigate } from "react-router-dom";
 import { WkIcon } from "@/components/design-system/Icon";
 import { WkSurface } from "@/components/design-system/primitives/Surface";
 import { AdminTable } from "@/components/design-system/admin/AdminTable";
+import { AdminStatusBadge } from "@/components/design-system/admin/AdminStatusBadge";
 import { supabase } from "@/lib/supabase";
 import { decodeHtmlEntities } from "@/utils/decodeHtmlEntities";
+import { WkSelect } from "@/components/design-system/primitives/Select";
+
 
 interface Guide {
   slug: string;
@@ -87,16 +90,16 @@ export default function AdminGuidesPage() {
             )}
           </div>
           <div className="flex items-center gap-2">
-            <select
+            <WkSelect
               value={statusFilter}
-              onChange={(e) => setStatusFilter(e.target.value)}
-              className="rounded-lg border border-wk-border bg-wk-surface px-3 py-2 text-[13px] text-wk-text outline-none cursor-pointer"
+              onChange={(value) => setStatusFilter(value)}
+              triggerClassName="rounded-lg border border-wk-border bg-wk-surface px-3 py-2 text-[13px] text-wk-text outline-none cursor-pointer"
             >
               <option value="all">All Status</option>
               {statusOptions.filter((s) => s !== "all").map((s) => (
                 <option key={s} value={s}>{s.charAt(0).toUpperCase() + s.slice(1)}</option>
               ))}
-            </select>
+            </WkSelect>
             <span className="text-[12px] text-wk-text-muted whitespace-nowrap">{filtered.length} of {guides.length}</span>
           </div>
         </div>
@@ -128,7 +131,7 @@ export default function AdminGuidesPage() {
               key: "wp_status",
               label: "Status",
               width: "100px",
-              render: (row) => <StatusBadge status={row.wp_status} />,
+              render: (row) => <AdminStatusBadge status={row.wp_status} />,
             },
             {
               key: "created_at",
@@ -154,19 +157,5 @@ export default function AdminGuidesPage() {
         />
       )}
     </div>
-  );
-}
-
-function StatusBadge({ status }: { status: string | null }) {
-  if (!status) return <span className="text-[11px] text-wk-text-faint">—</span>;
-  const color =
-    status === "publish" ? "bg-wk-success-soft text-wk-success" :
-    status === "draft" ? "bg-wk-warning-soft text-wk-warning" :
-    status === "pending" ? "bg-wk-info-soft text-wk-info" :
-    "bg-wk-surface-raised text-wk-text-muted";
-  return (
-    <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-bold uppercase ${color}`}>
-      {status}
-    </span>
   );
 }

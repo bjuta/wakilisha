@@ -9,6 +9,8 @@ import { AdminChartsLoadingState } from "../components/AdminChartsLoadingState";
 import { AuditSurfacePanel } from "../edition-detail/components/AuditSurfacePanel";
 import { ScoreBreakdownChips } from "../edition-detail/components/ScoreBreakdownChips";
 import type { WkChartEntryV2Row } from "@/services/chartsScoring/scoringTypes";
+import { WkSelect } from "@/components/design-system/primitives/Select";
+
 
 interface ChartProgram {
   id: string;
@@ -462,10 +464,10 @@ export default function AdminScoringRunsPage() {
                 <label className="block text-[11px] font-bold text-wk-text-muted uppercase tracking-wider mb-1.5">
                   Chart Program
                 </label>
-                <select
+                <WkSelect
                   value={selectedProgram}
-                  onChange={(e) => { setSelectedProgram(e.target.value); setTriggerStatus(null); }}
-                  className="wk-input w-full rounded-lg border border-wk-border bg-wk-bg px-3 py-2 text-[13px] text-wk-text focus:outline-none focus:border-wk-brand"
+                  onChange={(value) => { setSelectedProgram(value); setTriggerStatus(null); }}
+                  triggerClassName="wk-input w-full rounded-lg border border-wk-border bg-wk-bg px-3 py-2 text-[13px] text-wk-text focus:outline-none focus:border-wk-brand"
                 >
                   <option value="">Select a program...</option>
                   {programs.map((p) => (
@@ -473,7 +475,7 @@ export default function AdminScoringRunsPage() {
                       {p.public_label} {p.short_label && p.short_label !== p.public_label ? `(${p.short_label})` : ""} — {p.chart_size} positions
                     </option>
                   ))}
-                </select>
+                </WkSelect>
               </div>
 
               {/* Edition date */}

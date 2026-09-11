@@ -10,6 +10,8 @@ import {
   type FrontendAppearanceSettings,
 } from "@/services/adminSettings/settingsTypes";
 import { MediaPickerButton } from "@/components/admin/MediaPickerButton";
+import { WkSelect } from "@/components/design-system/primitives/Select";
+
 
 /* ──── Hero density helpers ──── */
 function getColumnCount(imageCount: number): number {
@@ -118,15 +120,15 @@ export default function AdminSettingsFrontendAppearance() {
           </div>
           <div>
             <label className="block text-[12px] font-semibold text-[var(--wk-text-muted)] mb-1.5">Theme Default</label>
-            <select
+            <WkSelect
               value={settings.themeDefault}
-              onChange={(e) => update("themeDefault", e.target.value as "system" | "light" | "dark")}
-              className="w-full rounded-lg border border-[var(--wk-border)] bg-[var(--wk-bg)] px-3 py-2 text-[13px] text-[var(--wk-text)] focus:border-[var(--wk-brand)] focus:outline-none focus:ring-1 focus:ring-[var(--wk-brand)]"
+              onChange={(value) => update("themeDefault", value as "system" | "light" | "dark")}
+              triggerClassName="w-full rounded-lg border border-[var(--wk-border)] bg-[var(--wk-bg)] px-3 py-2 text-[13px] text-[var(--wk-text)] focus:border-[var(--wk-brand)] focus:outline-none focus:ring-1 focus:ring-[var(--wk-brand)]"
             >
               <option value="system">System</option>
               <option value="light">Light</option>
               <option value="dark">Dark</option>
-            </select>
+            </WkSelect>
           </div>
         </div>
       </WkSurface>
@@ -166,14 +168,14 @@ export default function AdminSettingsFrontendAppearance() {
           ))}
           <div>
             <label className="block text-[12px] font-semibold text-[var(--wk-text-muted)] mb-1.5">Archive Filter Behavior</label>
-            <select
+            <WkSelect
               value={settings.archiveFilterBehavior}
-              onChange={(e) => update("archiveFilterBehavior", e.target.value as "show_all" | "collapse_by_year")}
-              className="w-full rounded-lg border border-[var(--wk-border)] bg-[var(--wk-bg)] px-3 py-2 text-[13px] text-[var(--wk-text)] focus:border-[var(--wk-brand)] focus:outline-none focus:ring-1 focus:ring-[var(--wk-brand)]"
+              onChange={(value) => update("archiveFilterBehavior", value as "show_all" | "collapse_by_year")}
+              triggerClassName="w-full rounded-lg border border-[var(--wk-border)] bg-[var(--wk-bg)] px-3 py-2 text-[13px] text-[var(--wk-text)] focus:border-[var(--wk-brand)] focus:outline-none focus:ring-1 focus:ring-[var(--wk-brand)]"
             >
               <option value="show_all">Show All</option>
               <option value="collapse_by_year">Collapse by Year</option>
-            </select>
+            </WkSelect>
           </div>
         </div>
       </WkSurface>

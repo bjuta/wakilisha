@@ -13,6 +13,10 @@ import {
   type PublishingMutationResult,
   type PublishingWorkspaceItem,
 } from "@/services/publishing/publishingWorkspaceService";
+import { WkSelect } from "@/components/design-system/primitives/Select";
+import { WkCheckbox } from "@/components/design-system/primitives/Checkbox";
+
+
 
 interface PublishingRelationshipsSectionProps {
   item: PublishingWorkspaceItem;
@@ -365,38 +369,38 @@ export function PublishingRelationshipsSection({
             <span className="text-[11px] font-bold text-wk-text">
               Production Role
             </span>
-            <select
+            <WkSelect
               value={assignmentRole}
-              onChange={(event) => {
+              onChange={(value) => {
                 setAssignmentRole(
-                  event.target.value as PublishingAssignmentRole,
+                  value as PublishingAssignmentRole,
                 );
                 setError(null);
               }}
               disabled={controlsDisabled}
-              className="mt-2 w-full rounded-xl border border-wk-border bg-wk-surface px-3 py-2.5 text-[12px] text-wk-text outline-none focus:border-wk-brand disabled:opacity-60"
+              triggerClassName="mt-2 w-full rounded-xl border border-wk-border bg-wk-surface px-3 py-2.5 text-[12px] text-wk-text outline-none focus:border-wk-brand disabled:opacity-60"
             >
               {ASSIGNMENT_ROLE_OPTIONS.map((role) => (
                 <option key={role} value={role}>
                   {formatChoice(role)}
                 </option>
               ))}
-            </select>
+            </WkSelect>
           </label>
         </div>
 
         <label className="block">
           <span className="text-[11px] font-bold text-wk-text">Person</span>
-          <select
+          <WkSelect
             value={assigneeUserId}
-            onChange={(event) => {
-              setAssigneeUserId(event.target.value);
+            onChange={(value) => {
+              setAssigneeUserId(value);
               setError(null);
             }}
             disabled={
               controlsDisabled || loadingUsers || availableUsers.length === 0
             }
-            className="mt-2 w-full rounded-xl border border-wk-border bg-wk-surface px-3 py-2.5 text-[12px] text-wk-text outline-none focus:border-wk-brand disabled:opacity-60"
+            triggerClassName="mt-2 w-full rounded-xl border border-wk-border bg-wk-surface px-3 py-2.5 text-[12px] text-wk-text outline-none focus:border-wk-brand disabled:opacity-60"
           >
             <option value="">
               {loadingUsers
@@ -414,7 +418,7 @@ export function PublishingRelationshipsSection({
                   : ""}
               </option>
             ))}
-          </select>
+          </WkSelect>
         </label>
 
         <button
@@ -499,14 +503,14 @@ export function PublishingRelationshipsSection({
           <span className="text-[11px] font-bold text-wk-text">
             Add Channel
           </span>
-          <select
+          <WkSelect
             value={channelKey}
-            onChange={(event) => {
-              setChannelKey(event.target.value);
+            onChange={(value) => {
+              setChannelKey(value);
               setError(null);
             }}
             disabled={controlsDisabled || availableChannels.length === 0}
-            className="mt-2 w-full rounded-xl border border-wk-border bg-wk-surface px-3 py-2.5 text-[12px] text-wk-text outline-none focus:border-wk-brand disabled:opacity-60"
+            triggerClassName="mt-2 w-full rounded-xl border border-wk-border bg-wk-surface px-3 py-2.5 text-[12px] text-wk-text outline-none focus:border-wk-brand disabled:opacity-60"
           >
             <option value="">
               {availableChannels.length === 0
@@ -519,17 +523,11 @@ export function PublishingRelationshipsSection({
                 {channel.label}
               </option>
             ))}
-          </select>
+          </WkSelect>
         </label>
 
-        <label className="flex items-start gap-2 rounded-lg border border-wk-border bg-wk-surface px-3 py-2.5">
-          <input
-            type="checkbox"
-            checked={channelPrimary}
-            onChange={(event) => setChannelPrimary(event.target.checked)}
-            disabled={controlsDisabled}
-            className="mt-0.5"
-          />
+        <WkCheckbox checked={channelPrimary} disabled={controlsDisabled} onChange={(checked) => setChannelPrimary(checked)} className="flex items-start gap-2 rounded-lg border border-wk-border bg-wk-surface px-3 py-2.5">
+
           <span>
             <span className="block text-[11px] font-bold text-wk-text">
               Make Primary
@@ -538,7 +536,7 @@ export function PublishingRelationshipsSection({
               A primary channel is the main planned destination for this work.
             </span>
           </span>
-        </label>
+        </WkCheckbox>
 
         <button
           type="button"

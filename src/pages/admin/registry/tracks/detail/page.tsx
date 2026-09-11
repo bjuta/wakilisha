@@ -5,6 +5,10 @@ import { WkSurface } from "@/components/design-system/primitives/Surface";
 import { supabase } from "@/lib/supabase";
 import { useRelatedEntities } from "@/hooks/useRelatedEntities";
 import type { ResolvedRelation } from "@/hooks/useRelatedEntities";
+import { WkSelect } from "@/components/design-system/primitives/Select";
+import { WkCheckbox } from "@/components/design-system/primitives/Checkbox";
+
+
 
 interface TrackRecord {
   id: string;
@@ -272,12 +276,12 @@ export default function TrackDetailPage() {
               </div>
               <div>
                 <label className="block text-[11px] font-bold uppercase tracking-wider text-wk-text-muted mb-2">Status</label>
-                <select value={draft.status} onChange={(e) => patchDraft({ status: e.target.value })} className="w-full rounded-lg border border-wk-border bg-wk-bg-subtle px-3 py-2.5 text-[13px] text-wk-text outline-none focus:border-wk-brand cursor-pointer">
+                <WkSelect value={draft.status} onChange={(value) => patchDraft({ status: value })} triggerClassName="w-full rounded-lg border border-wk-border bg-wk-bg-subtle px-3 py-2.5 text-[13px] text-wk-text outline-none focus:border-wk-brand cursor-pointer">
                   <option value="active">Active</option>
                   <option value="draft">Draft</option>
                   <option value="needs_review">Needs Review</option>
                   <option value="archived">Archived</option>
-                </select>
+                </WkSelect>
               </div>
               <div>
                 <label className="block text-[11px] font-bold uppercase tracking-wider text-wk-text-muted mb-2">Duration (ms)</label>
@@ -296,10 +300,10 @@ export default function TrackDetailPage() {
                 <input type="number" value={draft.disc_number} onChange={(e) => patchDraft({ disc_number: e.target.value })} className="w-full rounded-lg border border-wk-border bg-wk-bg-subtle px-3 py-2.5 text-[13px] text-wk-text outline-none focus:border-wk-brand" />
               </div>
               <div className="sm:col-span-2 flex items-center gap-3">
-                <label className="flex items-center gap-2 text-[13px] text-wk-text cursor-pointer">
-                  <input type="checkbox" checked={draft.explicit} onChange={(e) => patchDraft({ explicit: e.target.checked })} className="h-4 w-4 rounded border-wk-border accent-wk-brand" />
+                <WkCheckbox checked={draft.explicit} onChange={(checked) => patchDraft({ explicit: checked })} className="flex items-center gap-2 text-[13px] text-wk-text cursor-pointer">
+
                   Explicit content
-                </label>
+                </WkCheckbox>
               </div>
             </div>
           </WkSurface>

@@ -7,6 +7,8 @@ import {
   type AudienceSegmentSendFilters,
   type BriefingCatalogItem,
 } from "@/services/briefingService";
+import { WkSelect } from "@/components/design-system/primitives/Select";
+
 
 const ENTITY_TYPES = ["", "artist", "guide", "briefing", "track", "release", "chart", "genre", "label", "article"];
 const SUBSCRIBER_STATUSES = ["", "confirmed", "pending", "unsubscribed"];
@@ -314,31 +316,31 @@ export default function AdminSettingsAudience() {
         <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-4">
           <label className="space-y-1">
             <span className="text-[11px] font-bold text-[var(--wk-text-muted)]">Subscriber status</span>
-            <select value={subscriberStatus} onChange={(event) => setSubscriberStatus(event.target.value)} className="w-full rounded-lg border border-[var(--wk-border)] bg-[var(--wk-bg)] px-3 py-2 text-[13px] text-[var(--wk-text)]">
+            <WkSelect value={subscriberStatus} onChange={(value) => setSubscriberStatus(value)} triggerClassName="w-full rounded-lg border border-[var(--wk-border)] bg-[var(--wk-bg)] px-3 py-2 text-[13px] text-[var(--wk-text)]">
               {SUBSCRIBER_STATUSES.map((status) => <option key={status} value={status}>{status || "Any subscriber status"}</option>)}
-            </select>
+            </WkSelect>
           </label>
 
           <label className="space-y-1">
             <span className="text-[11px] font-bold text-[var(--wk-text-muted)]">Interest status</span>
-            <select value={interestStatus} onChange={(event) => setInterestStatus(event.target.value)} className="w-full rounded-lg border border-[var(--wk-border)] bg-[var(--wk-bg)] px-3 py-2 text-[13px] text-[var(--wk-text)]">
+            <WkSelect value={interestStatus} onChange={(value) => setInterestStatus(value)} triggerClassName="w-full rounded-lg border border-[var(--wk-border)] bg-[var(--wk-bg)] px-3 py-2 text-[13px] text-[var(--wk-text)]">
               {INTEREST_STATUSES.map((status) => <option key={status} value={status}>{status || "Any interest status"}</option>)}
-            </select>
+            </WkSelect>
           </label>
 
           <label className="space-y-1">
             <span className="text-[11px] font-bold text-[var(--wk-text-muted)]">Briefing</span>
-            <select value={briefingSlug} onChange={(event) => setBriefingSlug(event.target.value)} className="w-full rounded-lg border border-[var(--wk-border)] bg-[var(--wk-bg)] px-3 py-2 text-[13px] text-[var(--wk-text)]">
+            <WkSelect value={briefingSlug} onChange={(value) => setBriefingSlug(value)} triggerClassName="w-full rounded-lg border border-[var(--wk-border)] bg-[var(--wk-bg)] px-3 py-2 text-[13px] text-[var(--wk-text)]">
               <option value="">{catalogLoading ? "Loading briefings..." : "Any briefing"}</option>
               {catalog.map((item) => <option key={item.slug} value={item.slug}>{item.title}</option>)}
-            </select>
+            </WkSelect>
           </label>
 
           <label className="space-y-1">
             <span className="text-[11px] font-bold text-[var(--wk-text-muted)]">Entity type</span>
-            <select value={entityType} onChange={(event) => setEntityType(event.target.value)} className="w-full rounded-lg border border-[var(--wk-border)] bg-[var(--wk-bg)] px-3 py-2 text-[13px] text-[var(--wk-text)]">
+            <WkSelect value={entityType} onChange={(value) => setEntityType(value)} triggerClassName="w-full rounded-lg border border-[var(--wk-border)] bg-[var(--wk-bg)] px-3 py-2 text-[13px] text-[var(--wk-text)]">
               {ENTITY_TYPES.map((type) => <option key={type} value={type}>{type || "Any entity type"}</option>)}
-            </select>
+            </WkSelect>
           </label>
 
           <label className="space-y-1">
@@ -380,11 +382,11 @@ export default function AdminSettingsAudience() {
           <div className="flex w-full flex-col gap-2 lg:w-[420px]">
             <label className="space-y-1">
               <span className="text-[11px] font-bold text-[var(--wk-text-muted)]">Unsent issue</span>
-              <select
+              <WkSelect
                 value={selectedIssueId}
-                onChange={(event) => setSelectedIssueId(event.target.value)}
+                onChange={(value) => setSelectedIssueId(value)}
                 disabled={!briefingSlug || issuesLoading || issueOptions.length === 0 || sending}
-                className="w-full rounded-lg border border-[var(--wk-border)] bg-[var(--wk-bg)] px-3 py-2 text-[13px] text-[var(--wk-text)] disabled:opacity-60"
+                triggerClassName="w-full rounded-lg border border-[var(--wk-border)] bg-[var(--wk-bg)] px-3 py-2 text-[13px] text-[var(--wk-text)] disabled:opacity-60"
               >
                 <option value="">
                   {!briefingSlug ? "Choose a briefing first" : issuesLoading ? "Loading issues..." : "Select an unsent issue"}
@@ -394,7 +396,7 @@ export default function AdminSettingsAudience() {
                     {issue.title} · {issue.iso_week}
                   </option>
                 ))}
-              </select>
+              </WkSelect>
             </label>
 
             <button

@@ -28,6 +28,8 @@ import type { IngestRun, IngestStageStatus, ResourceGuardStatus } from "@/servic
 import type { ChartPlaybackReadiness } from "@/services/chartsIngestion/playbackReadiness";
 import { WkSurface } from "@/components/design-system/primitives/Surface";
 import { WkIcon } from "@/components/design-system/Icon";
+import { WkSelect } from "@/components/design-system/primitives/Select";
+
 
 const POLLING_INTERVAL_MS = 3000;
 const TERMINAL_STATUSES = new Set(["dry_run_complete", "committed", "failed", "cancelled", "needs_review"]);
@@ -330,10 +332,10 @@ function OriginCountryPicker({
         className="h-8 rounded-md border border-wk-border bg-wk-surface px-2 text-[11px] text-wk-text outline-none focus:border-wk-brand"
       />
       <div className="flex items-center gap-1.5">
-        <select
+        <WkSelect
           value={selectedIso2}
-          onChange={(event) => setSelectedIso2(event.target.value)}
-          className="h-8 min-w-0 flex-1 rounded-md border border-wk-border bg-wk-surface px-2 text-[11px] font-semibold text-wk-text outline-none focus:border-wk-brand"
+          onChange={(value) => setSelectedIso2(value)}
+          triggerClassName="h-8 min-w-0 flex-1 rounded-md border border-wk-border bg-wk-surface px-2 text-[11px] font-semibold text-wk-text outline-none focus:border-wk-brand"
         >
           {filtered.map((option) => (
             <option key={option.originIso2} value={option.originIso2}>
@@ -341,7 +343,7 @@ function OriginCountryPicker({
               {option.artistCount > 0 ? ` (${option.artistCount})` : ""}
             </option>
           ))}
-        </select>
+        </WkSelect>
         <button
           onClick={() => onApply(row, selectedIso2)}
           disabled={busy || !selectedIso2}

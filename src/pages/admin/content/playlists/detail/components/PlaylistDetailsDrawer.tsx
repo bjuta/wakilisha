@@ -24,6 +24,8 @@ import {
   type PlaylistReviewEvent,
   type PlaylistSchedule,
 } from "@/services/playlists/playlistAdminService";
+import { WkSelect } from "@/components/design-system/primitives/Select";
+
 
 function humanize(value: string): string {
   return value
@@ -618,16 +620,16 @@ export function PlaylistDetailsDrawer({
                         <span className="mb-1 block text-[9px] font-bold text-wk-text-muted">
                           Rights status
                         </span>
-                        <select
+                        <WkSelect
                           value={coverRightsStatus}
-                          onChange={(event) =>
+                          onChange={(value) =>
                             setCoverRightsStatus(
-                              event.target.value as
+                              value as
                                 PlaylistCoverRightsStatus | "",
                             )
                           }
                           disabled={coverGovernanceSaving}
-                          className="w-full rounded-lg border border-wk-border bg-wk-bg px-3 py-2 text-[10px] text-wk-text outline-none focus:border-wk-brand disabled:opacity-60"
+                          triggerClassName="w-full rounded-lg border border-wk-border bg-wk-bg px-3 py-2 text-[10px] text-wk-text outline-none focus:border-wk-brand disabled:opacity-60"
                         >
                           <option value="">
                             Select rights status
@@ -644,23 +646,23 @@ export function PlaylistDetailsDrawer({
                           <option value="fair_use">
                             Fair use
                           </option>
-                        </select>
+                        </WkSelect>
                       </label>
 
                       <label className="block">
                         <span className="mb-1 block text-[9px] font-bold text-wk-text-muted">
                           Consent
                         </span>
-                        <select
+                        <WkSelect
                           value={coverConsentStatus}
-                          onChange={(event) =>
+                          onChange={(value) =>
                             setCoverConsentStatus(
-                              event.target.value as
+                              value as
                                 PlaylistCoverConsentStatus | "",
                             )
                           }
                           disabled={coverGovernanceSaving}
-                          className="w-full rounded-lg border border-wk-border bg-wk-bg px-3 py-2 text-[10px] text-wk-text outline-none focus:border-wk-brand disabled:opacity-60"
+                          triggerClassName="w-full rounded-lg border border-wk-border bg-wk-bg px-3 py-2 text-[10px] text-wk-text outline-none focus:border-wk-brand disabled:opacity-60"
                         >
                           <option value="">
                             Select consent status
@@ -671,7 +673,7 @@ export function PlaylistDetailsDrawer({
                           <option value="granted">
                             Granted
                           </option>
-                        </select>
+                        </WkSelect>
                       </label>
                     </div>
 

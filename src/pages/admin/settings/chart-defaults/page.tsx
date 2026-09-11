@@ -10,6 +10,8 @@ import {
   DEFAULT_CHART_SETTINGS,
   type ChartSettings,
 } from "@/services/adminSettings/settingsTypes";
+import { WkSelect } from "@/components/design-system/primitives/Select";
+
 
 export default function AdminSettingsChartDefaults() {
   const navigate = useNavigate();
@@ -255,15 +257,15 @@ function SelectField({ label, value, onChange, options }: { label: string; value
   return (
     <div>
       <label className="block text-[12px] font-semibold text-[var(--wk-text-muted)] mb-1.5">{label}</label>
-      <select
+      <WkSelect
         value={value}
-        onChange={(e) => onChange(e.target.value)}
-        className="w-full rounded-lg border border-[var(--wk-border)] bg-[var(--wk-bg)] px-3 py-2 text-[13px] text-[var(--wk-text)] focus:border-[var(--wk-brand)] focus:outline-none focus:ring-1 focus:ring-[var(--wk-brand)]"
+        onChange={(value) => onChange(value)}
+        triggerClassName="w-full rounded-lg border border-[var(--wk-border)] bg-[var(--wk-bg)] px-3 py-2 text-[13px] text-[var(--wk-text)] focus:border-[var(--wk-brand)] focus:outline-none focus:ring-1 focus:ring-[var(--wk-brand)]"
       >
         {options.map((o) => (
           <option key={o.value} value={o.value}>{o.label}</option>
         ))}
-      </select>
+      </WkSelect>
     </div>
   );
 }

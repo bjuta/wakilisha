@@ -1,6 +1,8 @@
 import { useEffect, useRef, useState } from "react";
 import { trackEvent, getAnalyticsSessionId, getCanonicalPageUrl } from "@/services/analytics";
 import { submitForm } from "@/services/formService";
+import { WkSelect } from "@/components/design-system/primitives/Select";
+
 
 function useScrollReveal() {
   useEffect(() => {
@@ -173,11 +175,11 @@ export default function ContactPage() {
 
                 <div>
                   <label htmlFor="contact-subject" className="block text-[12px] font-bold text-[var(--wk-text-soft)] mb-2">Subject</label>
-                  <select
+                  <WkSelect
                     id="contact-subject"
                     name="subject"
                     required
-                    className="w-full h-12 rounded-xl border border-[var(--wk-border)] bg-[var(--wk-bg)] px-4 text-[14px] text-[var(--wk-text)] outline-none focus:border-[var(--wk-brand)] transition-colors appearance-none cursor-pointer"
+                    triggerClassName="w-full h-12 rounded-xl border border-[var(--wk-border)] bg-[var(--wk-bg)] px-4 text-[14px] text-[var(--wk-text)] outline-none focus:border-[var(--wk-brand)] transition-colors appearance-none cursor-pointer"
                     style={{ backgroundImage: "none" }}
                   >
                     <option value="" disabled selected>Select a topic</option>
@@ -189,7 +191,7 @@ export default function ContactPage() {
                     <option value="Press / media">Press / media</option>
                     <option value="Technical issue">Technical issue</option>
                     <option value="Other">Other</option>
-                  </select>
+                  </WkSelect>
                 </div>
 
                 <div>

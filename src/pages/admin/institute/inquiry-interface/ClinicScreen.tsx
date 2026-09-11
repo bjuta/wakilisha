@@ -14,6 +14,8 @@ import {
   listQuestionVersions,
   recordClinicAssessment,
 } from "@/services/institute/questionClinicService";
+import { WkSelect } from "@/components/design-system/primitives/Select";
+
 
 // Question Clinic. The raw question is preserved, refinements are versioned
 // with reasons, and the assistant only ever supplies candidates. The human
@@ -296,18 +298,18 @@ export default function ClinicScreen({
             <label className="text-[11px] font-black uppercase tracking-[0.14em] text-wk-text-faint" htmlFor="clinic-assessment">
               Where the question stands now
             </label>
-            <select
+            <WkSelect
               id="clinic-assessment"
               value={formAssessment}
-              onChange={(event) => setFormAssessment(event.target.value as ClinicAssessmentState)}
-              className="mt-1 w-full rounded-lg border border-wk-border bg-wk-bg p-3 text-[13px] text-wk-text"
+              onChange={(value) => setFormAssessment(value as ClinicAssessmentState)}
+              triggerClassName="mt-1 w-full rounded-lg border border-wk-border bg-wk-bg p-3 text-[13px] text-wk-text"
             >
               {CLINIC_ASSESSMENT_OPTIONS.map((option) => (
                 <option key={option.value} value={option.value}>
                   {option.label}
                 </option>
               ))}
-            </select>
+            </WkSelect>
             <p className="mt-1 text-[12px] text-wk-text-faint">
               {CLINIC_ASSESSMENT_OPTIONS.find((option) => option.value === formAssessment)?.hint}
             </p>
@@ -334,18 +336,18 @@ export default function ClinicScreen({
           Sometimes the question is fine, or the problem is not the wording. Record where it stands.
         </p>
         <div className="mt-4 grid gap-3 md:grid-cols-[240px_1fr_auto]">
-          <select
+          <WkSelect
             aria-label="Assessment"
             value={assessmentOnly}
-            onChange={(event) => setAssessmentOnly(event.target.value as ClinicAssessmentState)}
-            className="rounded-lg border border-wk-border bg-wk-bg p-3 text-[13px] text-wk-text"
+            onChange={(value) => setAssessmentOnly(value as ClinicAssessmentState)}
+            triggerClassName="rounded-lg border border-wk-border bg-wk-bg p-3 text-[13px] text-wk-text"
           >
             {CLINIC_ASSESSMENT_OPTIONS.map((option) => (
               <option key={option.value} value={option.value}>
                 {option.label}
               </option>
             ))}
-          </select>
+          </WkSelect>
           <input
             aria-label="Assessment note"
             value={assessmentNote}

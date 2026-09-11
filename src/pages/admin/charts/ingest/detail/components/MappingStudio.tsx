@@ -7,6 +7,8 @@ import { useState } from "react";
 import { WkSurface } from "@/components/design-system/primitives/Surface";
 import type { DiscoveredCsvSource } from "@/services/chartsIngestion/types";
 import type { UserRole } from "@/services/chartsIngestion/client";
+import { WkSelect } from "@/components/design-system/primitives/Select";
+
 
 interface MappingStudioProps {
   csv: DiscoveredCsvSource | null;
@@ -123,18 +125,18 @@ export function MappingStudio({
           </p>
         </div>
         <div className="flex items-center gap-2">
-          <select
+          <WkSelect
             value={selected.id}
-            onChange={(e) => {
-              const c = discoveredCsvs.find((d) => d.id === e.target.value);
+            onChange={(value) => {
+              const c = discoveredCsvs.find((d) => d.id === value);
               if (c) { onSelectCsv(c); setMappings(buildInitialMappings(c)); }
             }}
-            className="rounded-md border border-[var(--wk-border)] bg-[var(--wk-bg)] px-3 py-1.5 text-[12px] text-[var(--wk-text)]"
+            triggerClassName="rounded-md border border-[var(--wk-border)] bg-[var(--wk-bg)] px-3 py-1.5 text-[12px] text-[var(--wk-text)]"
           >
             {discoveredCsvs.map((c) => (
               <option key={c.id} value={c.id}>{c.filename}</option>
             ))}
-          </select>
+          </WkSelect>
         </div>
       </div>
 
@@ -191,11 +193,11 @@ export function MappingStudio({
                   <tr key={row.csvColumn} className={row.action === "ignored" ? "opacity-50" : ""}>
                     <td className="font-semibold text-[var(--wk-text)]">{row.csvColumn}</td>
                     <td>
-                      <select
+                      <WkSelect
                         value={row.mappedField ?? ""}
-                        onChange={(e) => handleFieldChange(row.csvColumn, e.target.value || null)}
+                        onChange={(value) => handleFieldChange(row.csvColumn, value || null)}
                         disabled={row.action === "ignored"}
-                        className="rounded-md border border-[var(--wk-border)] bg-[var(--wk-bg)] px-2 py-1.5 text-[11px] text-[var(--wk-text)] min-w-[160px]"
+                        triggerClassName="rounded-md border border-[var(--wk-border)] bg-[var(--wk-bg)] px-2 py-1.5 text-[11px] text-[var(--wk-text)] min-w-[160px]"
                       >
                         <option value="">— Not Mapped —</option>
                         {["Chart", "Identity", "Metadata", "External URLs", "Edition", "Source Metric"].map((group) => (
@@ -205,7 +207,7 @@ export function MappingStudio({
                             ))}
                           </optgroup>
                         ))}
-                      </select>
+                      </WkSelect>
                     </td>
                     <td className="text-[11px] text-[var(--wk-text-muted)] truncate max-w-[120px]" title={row.sampleValue}>
                       {row.sampleValue}
