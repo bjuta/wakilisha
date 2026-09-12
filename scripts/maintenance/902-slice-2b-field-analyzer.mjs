@@ -358,10 +358,9 @@ function buildTemporal(node, sf, rel, imports, type) {
     `onChange={${rewriteValueHandler(handler, "value", `${rel} ${label}`)}}`,
     `label=${JSON.stringify(label)}`,
     "showLabel={false}",
-    passProp("min", getAttr(node, "min"), sf),
-    passProp("max", getAttr(node, "max"), sf),
     passProp("disabled", getAttr(node, "disabled"), sf),
-    getAttr(node, "className") ? `triggerClassName=${attrInitializer(getAttr(node, "className"), sf)}` : null,
+    passProp("required", getAttr(node, "required"), sf),
+    getAttr(node, "className") ? `className=${attrInitializer(getAttr(node, "className"), sf)}` : null,
   ];
   return `<${component}\n  ${props.filter(Boolean).join("\n  ")}\n/>`;
 }
@@ -377,7 +376,6 @@ function buildRange(node, sf, rel, imports) {
     `value={${value}}`,
     `onChange={${rewriteValueHandler(handler, "range", `${rel} ${label}`)}}`,
     `ariaLabel=${JSON.stringify(label)}`,
-    "showValueLabel={false}",
     numberProp("min", getAttr(node, "min"), sf),
     numberProp("max", getAttr(node, "max"), sf),
     numberProp("step", getAttr(node, "step"), sf),
@@ -393,9 +391,7 @@ function buildPassword(node, sf, rel, imports) {
   const handler = attrExpression(getAttr(node, "onChange"), sf);
   if (!value || !handler) fail(`${rel}: password input missing value/onChange`);
   const label = controlLabel(node, sf, value);
-  const placeholder = attrLiteral(getAttr(node, "placeholder"));
-  const autoComplete = attrLiteral(getAttr(node, "autoComplete"))
-    ?? (/new|confirm/i.test(placeholder ?? label) ? "new-password" : "current-password");
+  const autoComplete = attrLiteral(getAttr(node, "autoComplete")) ?? "current-password";
   const props = [
     `value={${value}}`,
     `onChange={${rewriteValueHandler(handler, "value", `${rel} ${label}`)}}`,
@@ -572,6 +568,7 @@ for (const file of walk(SRC)) {
       text = `${text.slice(0, replacement.start)}${replacement.value}${text.slice(replacement.end)}`;
     }
     text = insertImports(file, text, imports);
+    text = text.replace(/[ \t]+$/gm, "");
     fs.writeFileSync(file, text);
     changedFiles.push(rel);
   }
