@@ -14,6 +14,7 @@ interface WkNumberFieldProps {
   ariaLabel?: string;
   placeholder?: string;
   className?: string;
+  groupClassName?: string;
   inputClassName?: string;
   disabled?: boolean;
   required?: boolean;
@@ -29,6 +30,7 @@ export function WkNumberField({
   ariaLabel = "Number",
   placeholder,
   className = "",
+  groupClassName = "",
   inputClassName = "",
   disabled = false,
   required = false,
@@ -47,7 +49,7 @@ export function WkNumberField({
       name={name}
       className={className}
     >
-      <Group className="flex min-w-0 items-stretch overflow-hidden rounded-xl border border-wk-border bg-wk-surface focus-within:border-wk-border-strong focus-within:ring-2 focus-within:ring-wk-brand/15">
+      <Group className={`flex min-w-0 items-stretch overflow-hidden rounded-xl border border-wk-border bg-wk-surface focus-within:border-wk-border-strong focus-within:ring-2 focus-within:ring-wk-brand/15 ${groupClassName}`.trim()}>
         <Button
           slot="decrement"
           aria-label={`Decrease ${ariaLabel}`}
