@@ -58,6 +58,38 @@ const mobileCss = read(
   "src/styles/wakilisha-mobile-ch53-75.css",
 );
 
+const appShell = read(
+  "src/App.tsx",
+);
+
+const adminShell = read(
+  "src/pages/admin/AdminShell.tsx",
+);
+
+const communityThreadHook = read(
+  "src/hooks/useCommunityThread.ts",
+);
+
+const trackMomentDrawer = read(
+  "src/components/feature/community/TrackMomentDrawer.tsx",
+);
+
+const contextAnchorDrawer = read(
+  "src/components/feature/community/ContextAnchorCommentDrawer.tsx",
+);
+
+const playbackMoments = read(
+  "src/components/feature/community/TrackMomentPlaybackOverlay.tsx",
+);
+
+const mobileTopBar = read(
+  "src/components/mobile/MobileTopBar.tsx",
+);
+
+const publicPageCss = read(
+  "src/styles/wakilisha-pages-35-46.css",
+);
+
 if (index.includes("font-awesome")) {
   fail("Font Awesome still loads globally");
 }
@@ -224,6 +256,68 @@ if (
 ) {
   fail(
     "inactive mobile navigation still uses faint text",
+  );
+}
+
+if (
+  appShell.includes(
+    "adminDesignSystemLayout.css",
+  )
+  || !adminShell.includes(
+    "adminDesignSystemLayout.css",
+  )
+) {
+  fail(
+    "Admin layout CSS is still owned by the anonymous public entry",
+  );
+}
+
+if (
+  !communityThreadHook.includes(
+    "getThreadByEntity(",
+  )
+  || !communityThreadHook.includes(
+    "const ensureThread = useCallback",
+  )
+  || trackMomentDrawer.includes(
+    "getOrCreateThread(entity)",
+  )
+  || contextAnchorDrawer.includes(
+    "getOrCreateThread(entity)",
+  )
+  || playbackMoments.includes(
+    "getOrCreateThread",
+  )
+) {
+  fail(
+    "ordinary Community reads can still create thread state",
+  );
+}
+
+for (const [name, sourceText] of [
+  ["mobile top bar", mobileTopBar],
+  ["mobile bottom navigation", mobileAppLayout],
+]) {
+  if (
+    sourceText.includes("translateZ(0)")
+    || sourceText.includes("visibility 0.28s")
+  ) {
+    fail(
+      `${name} still forces a layer or animates visibility`,
+    );
+  }
+}
+
+if (
+  !publicPageCss.includes(
+    ".reveal-up{opacity:1;transform:none}",
+  )
+  || publicPageCss.includes(
+    ".reveal-up{opacity:0}",
+  )
+) {
+  fail(
+    "public reveal motion still owns whether content is painted",
   );
 }
 

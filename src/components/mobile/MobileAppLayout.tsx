@@ -109,21 +109,23 @@ function MobileBottomNav({ scrollVisible }: { scrollVisible: boolean }) {
       <nav
         className="phn-nav phn-nav--compact"
         aria-label="Primary mobile navigation"
+        aria-hidden={!chromeVisible}
+        inert={!chromeVisible}
         style={{
-          visibility:
-            chromeVisible
-              ? "visible"
-              : "hidden",
           opacity:
             chromeVisible
               ? 1
               : 0,
+          pointerEvents:
+            chromeVisible
+              ? "auto"
+              : "none",
           transform:
             chromeVisible
-              ? "translateY(0) translateZ(0)"
-              : "translateY(16px) translateZ(0)",
+              ? "translateY(0)"
+              : "translateY(16px)",
           transition:
-            "opacity 0.28s cubic-bezier(.16,1,.3,1), transform 0.28s cubic-bezier(.16,1,.3,1), visibility 0.28s",
+            "opacity 0.28s cubic-bezier(.16,1,.3,1), transform 0.28s cubic-bezier(.16,1,.3,1)",
         }}
       >
         {navItems.map((item) => {

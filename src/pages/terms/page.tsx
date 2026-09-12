@@ -50,7 +50,7 @@ export default function TermsPage() {
           ref={heroImgRef}
           src="https://wakilisha.africa/api/search-image?query=Cinematic%20composition%20of%20human%20figures%20walking%20with%20purpose%20through%20warm%20amber%20and%20olive%20ambient%20light%2C%20grounded%20confident%20stride%20through%20architectural%20space%20with%20soft%20golden%20hour%20light%20creating%20elongated%20shadows%20and%20dramatic%20rim%20lighting%2C%20medium%20wide%20shot%20conveying%20foundation%20stability%20and%20forward%20movement%2C%20film%20grain%20texture%20with%20rich%20warm%20earth%20tones%20and%20deep%20charcoal%20shadows%2C%20editorial%20documentary%20photography%20style%20with%20grounded%20cinematic%20mood%2C%20modern%20contemporary%20African%20urban%20setting%20with%20clean%20architectural%20lines&width=1800&height=800&seq=terms-hero-2026-wk-v2&orientation=landscape"
           alt=""
-          className="absolute inset-0 w-full h-full object-cover will-change-transform"
+          className="absolute inset-0 w-full h-full object-cover"
         />
         <div className="absolute inset-0 bg-gradient-to-b from-black/20 via-black/40 to-black/90" />
 

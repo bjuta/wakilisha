@@ -219,7 +219,7 @@ export default function TagDetail() {
             ref={heroImgRef}
             src={heroStory.heroUrl}
             alt=""
-            className="absolute inset-0 w-full h-full object-cover opacity-85 will-change-transform"
+            className="absolute inset-0 w-full h-full object-cover opacity-85"
           />
         ) : (
           <div className="absolute inset-0">

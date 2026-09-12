@@ -8,7 +8,7 @@ import {
   createContextAnchorComment,
   getContextAnchorComments,
   getContextAnchorSummary,
-  getOrCreateThread,
+  getThreadByEntity,
   hydrateCommentsWithUserState,
   type CommentAnchorType,
   type CommunityComment,
@@ -54,6 +54,7 @@ export function ContextAnchorCommentDrawer({
   const isLoggedIn = Boolean(userId);
   const {
     thread,
+    ensureThread,
     postComment,
     loadReplies,
     refresh,
@@ -106,7 +107,7 @@ export function ContextAnchorCommentDrawer({
 
   const handlePost = useCallback(
     async (body: string) => {
-      if (!thread?.id || !target) return null;
+      if (!target) return null;
       if (!userId || user.loading) return null;
 
       if (!user.isEmailVerified) {
@@ -114,8 +115,9 @@ export function ContextAnchorCommentDrawer({
         return null;
       }
 
+      const activeThread = thread || await ensureThread();
       const result = await createContextAnchorComment({
-        threadId: thread.id,
+        threadId: activeThread.id,
         bodyMarkdown: body,
         bodyPlain: body,
         anchorType: target.anchorType,
@@ -131,7 +133,8 @@ export function ContextAnchorCommentDrawer({
       return result.comment;
     },
     [
-      thread?.id,
+      thread,
+      ensureThread,
       target,
       userId,
       user.loading,
@@ -331,8 +334,8 @@ export function ContextAnchorSummary({
     let alive = true;
 
     setLoading(true);
-    getOrCreateThread(entity)
-      .then(({ thread }) => getContextAnchorSummary(thread.id, anchorType, 8))
+    getThreadByEntity(entity.type, entity.id || undefined, entity.slug || undefined)
+      .then((thread) => thread ? getContextAnchorSummary(thread.id, anchorType, 8) : [])
       .then((next) => {
         if (alive) setItems(next);
       })

@@ -96,7 +96,7 @@ export default function ContactPage() {
           ref={heroImgRef}
           src="https://wakilisha.africa/api/search-image?query=Cinematic%20medium%20shot%20of%20human%20connection%20and%20conversation%20in%20warm%20amber%20and%20olive%20ambient%20lighting%2C%20two%20figures%20engaged%20in%20warm%20exchange%20with%20genuine%20expressions%20and%20natural%20body%20language%2C%20soft%20golden%20hour%20light%20wrapping%20around%20profiles%20with%20gentle%20lens%20flare%2C%20shallow%20depth%20of%20field%20with%20bokeh%20background%20of%20warm%20blurred%20tones%2C%20film%20grain%20texture%20with%20rich%20warm%20shadows%20and%20luminous%20highlights%2C%20intimate%20editorial%20documentary%20photography%20style%20with%20authentic%20candid%20mood%2C%20modern%20contemporary%20African%20creative%20setting&width=1800&height=900&seq=contact-hero-2026-wk-v2&orientation=landscape"
           alt=""
-          className="absolute inset-0 w-full h-full object-cover will-change-transform"
+          className="absolute inset-0 w-full h-full object-cover"
         />
         <div className="absolute inset-0 bg-gradient-to-b from-black/20 via-black/40 to-black/90" />
         <div className="absolute inset-0 bg-gradient-to-r from-black/50 via-transparent to-black/30" />

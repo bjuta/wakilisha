@@ -38,12 +38,13 @@ export function MobileTopBar({ scrollVisible }: { scrollVisible: boolean }) {
     <>
       <div
         className="pointer-events-none fixed inset-x-0 top-0 z-[78] w-full px-4"
+        aria-hidden={!visible}
+        inert={!visible}
         style={{
           paddingTop: "max(env(safe-area-inset-top), 12px)",
-          visibility: visible ? "visible" : "hidden",
           opacity: visible ? 1 : 0,
-          transform: visible ? "translateY(0) translateZ(0)" : "translateY(-16px) translateZ(0)",
-          transition: "opacity 0.28s cubic-bezier(.16,1,.3,1), transform 0.28s cubic-bezier(.16,1,.3,1), visibility 0.28s",
+          transform: visible ? "translateY(0)" : "translateY(-16px)",
+          transition: "opacity 0.28s cubic-bezier(.16,1,.3,1), transform 0.28s cubic-bezier(.16,1,.3,1)",
         }}
       >
         <div className="relative mx-auto h-12 w-full max-w-[980px]">

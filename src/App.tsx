@@ -10,7 +10,6 @@ import "./design-system/wakilisha.elements.product.css";
 import "./design-system/wakilisha.elements.content.css";
 import "./design-system/wakilisha.elements.mobile.css";
 import "./design-system/wakilisha.elements.motion.css";
-import "./pages/admin/design-system/adminDesignSystemLayout.css";
 import "./design-system/wakilisha.viewport-integrity.css";
 import { ThemeProvider } from "./components/design-system/theme/ThemeProvider";
 import { AccentProvider } from "./components/design-system/theme/AccentProvider";

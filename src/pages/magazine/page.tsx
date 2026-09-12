@@ -558,7 +558,7 @@ export default function Magazine() {
             fetchPriority="high"
             decoding="async"
             alt=""
-            className="absolute inset-0 w-full h-full object-cover opacity-85 will-change-transform"
+            className="absolute inset-0 w-full h-full object-cover opacity-85"
           />
         ) : (
           <Chapter19FallbackImage
