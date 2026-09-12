@@ -15,10 +15,11 @@ interface SharedFieldProps {
   disabled?: boolean;
   required?: boolean;
   name?: string;
+  autoFocus?: boolean;
+  autoComplete?: string;
 }
 
 interface WkPasswordFieldProps extends SharedFieldProps {
-  autoComplete?: string;
   revealLabel?: string;
   concealLabel?: string;
 }
@@ -33,6 +34,7 @@ export function WkPasswordField({
   disabled = false,
   required = false,
   name,
+  autoFocus = false,
   autoComplete = "current-password",
   revealLabel = "Show password",
   concealLabel = "Hide password",
@@ -51,6 +53,7 @@ export function WkPasswordField({
     >
       <Input
         type={revealed ? "text" : "password"}
+        autoFocus={autoFocus}
         autoComplete={autoComplete}
         placeholder={placeholder}
         className={`wk-input w-full rounded-xl border-wk-border bg-wk-surface pr-11 text-[13px] text-wk-text ${inputClassName}`.trim()}
@@ -84,6 +87,8 @@ export function WkSearchField({
   disabled = false,
   required = false,
   name,
+  autoFocus = false,
+  autoComplete = "off",
   clearLabel = "Clear search",
 }: WkSearchFieldProps) {
   return (
@@ -104,6 +109,8 @@ export function WkSearchField({
         type="text"
         role="searchbox"
         enterKeyHint="search"
+        autoFocus={autoFocus}
+        autoComplete={autoComplete}
         placeholder={placeholder}
         className={`wk-input w-full rounded-xl border-wk-border bg-wk-surface pl-9 pr-10 text-[13px] text-wk-text ${inputClassName}`.trim()}
       />
