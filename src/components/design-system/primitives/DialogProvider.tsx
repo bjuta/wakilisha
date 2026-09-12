@@ -2,6 +2,7 @@ import {
   createContext,
   useCallback,
   useContext,
+  useEffect,
   useMemo,
   useState,
   type ReactNode,
@@ -63,6 +64,20 @@ type DialogRequest =
 
 const DialogContext = createContext<DialogApi | null>(null);
 let nextDialogId = 1;
+let activeDialogApi: DialogApi | null = null;
+
+function requireDialogApi(): DialogApi {
+  if (!activeDialogApi) {
+    throw new Error("WAKILISHA dialog authority is not mounted.");
+  }
+  return activeDialogApi;
+}
+
+export const wakilishaDialog: DialogApi = {
+  confirm: (options) => requireDialogApi().confirm(options),
+  prompt: (options) => requireDialogApi().prompt(options),
+  alert: (options) => requireDialogApi().alert(options),
+};
 
 function PromptBody({
   request,
@@ -178,6 +193,13 @@ export function WakilishaDialogProvider({ children }: { children: ReactNode }) {
   }, [active, closeActive]);
 
   const api = useMemo<DialogApi>(() => ({ confirm, prompt, alert }), [alert, confirm, prompt]);
+
+  useEffect(() => {
+    activeDialogApi = api;
+    return () => {
+      if (activeDialogApi === api) activeDialogApi = null;
+    };
+  }, [api]);
 
   return (
     <DialogContext.Provider value={api}>
