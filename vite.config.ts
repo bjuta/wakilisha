@@ -16,24 +16,6 @@ export default defineConfig({
   define: {
     __BASE_PATH__: JSON.stringify(basePath),
   },
-  build: {
-    rolldownOptions: {
-      output: {
-        codeSplitting: {
-          groups: [
-            {
-              // Compact and full player surfaces are permanent shell dependencies.
-              // Keep their UI runtime cohesive without pulling route-local field
-              // primitives into the public application entry.
-              name: 'wk-player-runtime',
-              test: /src[\\/]components[\\/]design-system[\\/]player[\\/](?:PlayerCompactSurface|PlayerFullSurface|SeekRail)\.tsx$/,
-              priority: 100,
-            },
-          ],
-        },
-      },
-    },
-  },
   server: {
     host: true,
     port: 5173,

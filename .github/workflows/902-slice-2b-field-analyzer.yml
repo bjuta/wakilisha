@@ -35,8 +35,16 @@ jobs:
         run: npm run audit:viewport-integrity
       - name: Run DOM interaction contracts
         run: npm run test:ui-dom
-      - name: Build application
-        run: npm run build
+      - name: Build application and enforce frontend performance budgets
+        run: |
+          npm run performance:audit
+          npm run performance:audit:routes
+          npm run performance:audit:images
+          npm run performance:audit:public-routes
+          npm run analytics:audit
+          npm run build:app
+          npm run performance:audit:routes:dist
+          npm run performance:audit:public-routes:dist
       - name: Remove one-shot migration machinery
         run: |
           rm scripts/maintenance/902-slice-2b-field-analyzer.mjs

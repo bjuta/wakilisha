@@ -115,7 +115,14 @@ describe("Phase 6B media-first WAKILISHA Player", () => {
     expect(desktopShell).not.toContain("PlayerDock");
     expect(desktopShell).not.toContain("DesktopPlayerPage");
     expect(responsiveShell).toContain("PlayerCompactSurface");
-    expect(responsiveShell).toContain("PlayerFullSurface");
+    expect(responsiveShell).toContain("LazyPlayerFullSurface");
+    expect(responsiveShell).toContain(
+      'import(\n    "@/components/design-system/player/PlayerFullSurface"',
+    );
+    expect(responsiveShell).toContain("<Suspense fallback={baseLayout}>");
+    expect(responsiveShell).not.toContain(
+      'from "@/components/design-system/player/PlayerFullSurface"',
+    );
     expect(responsiveShell).toContain("isFullPlayerOpen");
     expect(full).toContain('data-wk-provider-media-host={mode}');
     expect(playerChrome).toContain(".phn-miniplayer");
