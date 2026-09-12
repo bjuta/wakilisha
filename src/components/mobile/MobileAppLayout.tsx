@@ -7,6 +7,7 @@ import { useAuthUser } from "@/hooks/useAuthUser";
 import { useSessionSignOut } from "@/hooks/useSessionSignOut";
 import { useMessagesAccess } from "@/hooks/useMessagesAccess";
 import { WkIcon } from "@/components/design-system/Icon";
+import { ResponsiveMediaImage } from "@/components/media/ResponsiveMediaImage";
 import { useTheme } from "@/components/design-system/theme/ThemeProvider";
 import { Portal } from "@/components/base/Portal";
 import { MobileTopBar } from "./MobileTopBar";
@@ -152,10 +153,15 @@ function MobileBottomNav({ scrollVisible }: { scrollVisible: boolean }) {
               {item.prominent ? (
                 <>
                   <span className="phn-nav-primary-core">
-                    <img
+                    <ResponsiveMediaImage
                       src={WAKILISHA_THUNDERBOLT_URL}
+                      preset="thumbnail"
                       alt=""
                       aria-hidden="true"
+                      loading="eager"
+                      fetchPriority="low"
+                      decoding="async"
+                      data-wakilisha-mobile-home-mark="true"
                       className="h-7 w-7 object-contain"
                     />
                   </span>

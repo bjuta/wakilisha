@@ -135,7 +135,38 @@ for (const marker of [
   }
 }
 
-let responsiveImageCount = 0;
+const mobileAppLayout = read(
+  "src/components/mobile/MobileAppLayout.tsx",
+);
+
+for (const marker of [
+  "WAKILISHA_THUNDERBOLT_URL",
+  "<ResponsiveMediaImage",
+  "src={WAKILISHA_THUNDERBOLT_URL}",
+  'preset="thumbnail"',
+  'loading="eager"',
+  'fetchPriority="low"',
+  'decoding="async"',
+  'data-wakilisha-mobile-home-mark="true"',
+]) {
+  if (!mobileAppLayout.includes(marker)) {
+    fail(
+      `Mobile Home mark media is missing ${marker}`,
+    );
+  }
+}
+
+if (
+  /<img[\s\S]{0,240}src=\{WAKILISHA_THUNDERBOLT_URL\}/.test(
+    mobileAppLayout,
+  )
+) {
+  fail(
+    "Mobile Home mark regressed to a raw original img",
+  );
+}
+
+let responsiveImageCount = 1;
 
 for (const target of targets) {
   const source = read(target.path);
@@ -188,5 +219,5 @@ if (
 }
 
 console.log(
-  `Responsive image audit passed: ${responsiveImageCount} Magazine + desktop/mobile Article images covered; Article LCP priority enforced.`,
+  `Responsive image audit passed: ${responsiveImageCount} Magazine + desktop/mobile Article/chrome images covered; Article LCP + mobile Home mark derivative authority enforced.`,
 );
