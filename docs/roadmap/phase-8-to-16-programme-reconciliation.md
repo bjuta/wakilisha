@@ -1,9 +1,24 @@
 # Phase 8A to Phase 16 Programme Reconciliation
 
 **Status:** Numbered programme authority from Phase 8A onward
-**Date:** 4 September 2026
+**Original reconciliation date:** 4 September 2026
+**Updated:** 12 September 2026
 **Opening main:** `b7af641b12528b9eb42967dd978a72d77be244aa`
-**Current numbered work:** Phase 8A, Safe mobile intake
+**Current numbered work:** Phase 9A, Public Query Convergence and Search
+
+## Phase 8 closure and Phase 9A opening - 12 September 2026
+
+Phase 8 is complete in Production.
+
+Phase 8A established the Safe Mobile Intake authority and proved resumable mobile Field capture over the existing governed Media path. Phase 8B then completed Field triage and governed promotion, including newsroom communication, System Actors, Safety, Legal, operator convergence, antifragile recovery, and the final Field-to-Source promotion closure.
+
+Final Phase 8 closure authority is recorded by `docs/engineering/phase-8b6-antifragile-production-closure.md` and issue #872. The closing database authority is 114 migrations through `20260911143000_phase_8b6_field_source_promotion_closure.sql`.
+
+The later #902 browser-native UI chrome programme is accepted adjacent interaction architecture. It is closed in Production and becomes part of the baseline, but it is not a numbered Phase 9 milestone.
+
+The numbered programme therefore advances directly to **Phase 9A: Public Query Convergence and Search**.
+
+The first Phase 9A engineering move is a read-only authority audit. Do not add SQL, public APIs, search indexes, cache infrastructure, or browser query rewrites until that audit establishes what is already authoritative, what is duplicated, and what is genuinely missing.
 
 ## Purpose
 
@@ -13,17 +28,17 @@ Artist Studio, Registry, MIZIZI, Community, public identity, routing, and produc
 
 WAKILISHA is building a governed cultural operating layer where identity, knowledge, community, Commerce, and history reinforce the same cultural record.
 
-This reconciliation preserves the current phase.
+This reconciliation preserves the numbered sequence while updating the current boundary as accepted work closes.
 
 It does not start Commerce implementation.
 
 ## Programme Rules
 
-### Current Work Remains Phase 8A
+### Current Work Is Phase 9A
 
-The Cultural Operating Layer architecture work is an adjacent documentation detour.
+Phase 8A and Phase 8B are closed. The Cultural Operating Layer, #902 interaction architecture, and other accepted detours remain part of the inherited baseline without renumbering the programme.
 
-After this reconciliation merges, implementation returns immediately to Phase 8A.
+Phase 9A starts with a read-only audit of existing public query and search authority before implementation.
 
 ### No Fixed PR Ceiling
 
@@ -43,7 +58,13 @@ Every phase ends with a real operational, cultural, or financial proof.
 
 ## Phase 8: Field Capture
 
+**CLOSED IN PRODUCTION.**
+
+Phase 8A and Phase 8B are accepted baseline. Final closure is recorded in `docs/engineering/phase-8b6-antifragile-production-closure.md`.
+
 ### Phase 8A: Safe Mobile Intake
+
+**Complete.**
 
 Build the missing Field Submission authority while reusing accepted Media ingest.
 
@@ -74,6 +95,8 @@ One real or controlled field recording begins on mobile, loses connectivity, sur
 
 ### Phase 8B: Field Triage and Governed Promotion
 
+**Complete.**
+
 Build urgent queue, verification, source protection, redaction requirements, holds, rejection, embargo, editorial notes, contributor communication, immutable intake history, and governed promotion into ordinary canonical workflows.
 
 Promotion targets may include Article draft, Audio draft, Video draft, Source, or reviewed Registry evidence.
@@ -89,6 +112,8 @@ A Field Submission enters private review, receives a safety decision, and produc
 ## Phase 9: Public Delivery, Search, Routes, and SEO at Scale
 
 ### Phase 9A: Public Query Convergence and Search
+
+**Current.**
 
 Converge existing public-read infrastructure into bounded domain contracts.
 
@@ -264,10 +289,19 @@ One real Inquiry connects an Article, Playlist, and Registry change, participati
 
 ## Immediate Next Implementation
 
-After this documentation reconciliation merges:
+**Begin Phase 9A with a read-only authority audit.**
 
-**Begin Phase 8A: Safe mobile intake.**
+Audit the current public-read and search estate before writing implementation code:
+
+- public domain readers and current `public-content-read` ownership;
+- direct browser joins and browser-side cross-domain composition;
+- cursor/keyset, offset, and unbounded list behavior;
+- current search documents, full-text/trigram indexes, and reindex paths;
+- cache and outbox-driven invalidation authority;
+- validators and public error contracts;
+- route/read dependencies that belong to Phase 9A versus sitemap/SEO build work that belongs to Phase 9B;
+- representative list/search performance budgets and existing load evidence.
+
+Preserve accepted bounded domain readers. Do not create a universal query layer simply because multiple domains expose public reads.
 
 Do not open a Commerce implementation branch.
-
-The next Phase 8A engineering move is a read-only authority audit against current Media, Trust, command, job, Review, and provenance implementations.
