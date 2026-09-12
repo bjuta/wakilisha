@@ -1,6 +1,7 @@
 import {
   Children,
   createContext,
+  isValidElement,
   useContext,
   useId,
   useMemo,
@@ -11,6 +12,7 @@ import {
 interface DisclosureState {
   expanded: boolean;
   contentId: string;
+  triggerId: string;
   toggle: () => void;
 }
 
@@ -37,20 +39,22 @@ function useDisclosureState({
   expanded?: boolean;
   onExpandedChange?: (expanded: boolean) => void;
 }) {
-  const rawId = useId();
-  const contentId = `wk-disclosure-${rawId.replace(/:/g, "")}`;
+  const rawId = useId().replace(/:/g, "");
+  const contentId = `wk-disclosure-content-${rawId}`;
+  const triggerId = `wk-disclosure-trigger-${rawId}`;
   const [uncontrolledExpanded, setUncontrolledExpanded] = useState(defaultExpanded);
   const isExpanded = expanded ?? uncontrolledExpanded;
 
   const state = useMemo<DisclosureState>(() => ({
     expanded: isExpanded,
     contentId,
+    triggerId,
     toggle: () => {
       const next = !isExpanded;
       if (expanded === undefined) setUncontrolledExpanded(next);
       onExpandedChange?.(next);
     },
-  }), [contentId, expanded, isExpanded, onExpandedChange]);
+  }), [contentId, expanded, isExpanded, onExpandedChange, triggerId]);
 
   return state;
 }
@@ -75,6 +79,7 @@ export function WkDisclosure({
   return (
     <div className={className} data-open={state.expanded ? "true" : "false"}>
       <button
+        id={state.triggerId}
         type="button"
         aria-expanded={state.expanded}
         aria-controls={state.contentId}
@@ -83,11 +88,15 @@ export function WkDisclosure({
       >
         {typeof summary === "function" ? summary(state.expanded) : summary}
       </button>
-      {state.expanded ? (
-        <div id={state.contentId} role={contentRole} className={contentClassName}>
-          {children}
-        </div>
-      ) : null}
+      <div
+        id={state.contentId}
+        role={contentRole}
+        aria-labelledby={state.triggerId}
+        hidden={!state.expanded}
+        className={contentClassName}
+      >
+        {children}
+      </div>
     </div>
   );
 }
@@ -116,6 +125,10 @@ export function WkDetails({
   const summary = items[0] ?? null;
   const content = items.slice(1);
 
+  if (!isValidElement(summary) || summary.type !== WkSummary) {
+    throw new Error("WkDetails requires WkSummary as its first child.");
+  }
+
   return (
     <DisclosureContext.Provider value={state}>
       <div
@@ -123,11 +136,14 @@ export function WkDetails({
         data-open={state.expanded ? "true" : "false"}
       >
         {summary}
-        {state.expanded ? (
-          <div id={state.contentId} role="region">
-            {content}
-          </div>
-        ) : null}
+        <div
+          id={state.contentId}
+          role="region"
+          aria-labelledby={state.triggerId}
+          hidden={!state.expanded}
+        >
+          {content}
+        </div>
       </div>
     </DisclosureContext.Provider>
   );
@@ -147,6 +163,7 @@ export function WkSummary({
 
   return (
     <button
+      id={state.triggerId}
       type="button"
       aria-expanded={state.expanded}
       aria-controls={state.contentId}
