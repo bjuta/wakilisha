@@ -14,14 +14,14 @@ interface WkUploadFieldProps {
   description?: string;
   className?: string;
   disabled?: boolean;
+  id?: string;
 }
 
 interface WkUploadTriggerProps
   extends Pick<
     WkUploadFieldProps,
-    "onSelect" | "accept" | "multiple" | "defaultCamera" | "ariaLabel" | "disabled"
+    "onSelect" | "accept" | "multiple" | "defaultCamera" | "ariaLabel" | "disabled" | "id"
   > {
-  id?: string;
   className?: string;
 }
 
@@ -80,6 +80,7 @@ export function WkUploadField({
   description,
   className = "",
   disabled = false,
+  id,
 }: WkUploadFieldProps) {
   return (
     <div className={className}>
@@ -90,6 +91,7 @@ export function WkUploadField({
         onSelect={onSelect}
       >
         <Button
+          id={id}
           type="button"
           aria-label={ariaLabel}
           isDisabled={disabled}
