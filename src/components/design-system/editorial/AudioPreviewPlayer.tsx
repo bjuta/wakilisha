@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type RefObject } from "react";
 import { MediaTransport } from "./MediaTransport";
 import { SeekRail } from "@/components/design-system/player/SeekRail";
 import { WkSlider } from "@/components/design-system/primitives/Slider";
@@ -7,12 +7,17 @@ export function AudioPreviewPlayer({
   src,
   title = "Audio preview",
   className = "",
+  mediaRef: externalMediaRef,
+  onTimeChange,
 }: {
   src: string;
   title?: string;
   className?: string;
+  mediaRef?: RefObject<HTMLAudioElement | null>;
+  onTimeChange?: (time: number) => void;
 }) {
-  const audioRef = useRef<HTMLAudioElement>(null);
+  const internalMediaRef = useRef<HTMLAudioElement>(null);
+  const audioRef = externalMediaRef ?? internalMediaRef;
   const [playing, setPlaying] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
@@ -25,14 +30,20 @@ export function AudioPreviewPlayer({
     setDuration(0);
   }, [src]);
 
+  const commitTime = (time: number) => {
+    setCurrentTime(time);
+    onTimeChange?.(time);
+  };
+
   const seek = (seconds: number) => {
     const audio = audioRef.current;
-    const safeDuration = Number.isFinite(audio?.duration) && (audio?.duration ?? 0) > 0
-      ? audio!.duration
+    const audioDuration = audio?.duration ?? 0;
+    const safeDuration = Number.isFinite(audioDuration) && audioDuration > 0
+      ? audioDuration
       : duration;
     const next = Math.min(Math.max(0, seconds), Math.max(0, safeDuration));
     if (audio) audio.currentTime = next;
-    setCurrentTime(next);
+    commitTime(next);
   };
 
   const togglePlayback = async () => {
@@ -69,7 +80,8 @@ export function AudioPreviewPlayer({
         }}
         onPlay={() => setPlaying(true)}
         onPause={() => setPlaying(false)}
-        onTimeUpdate={(event) => setCurrentTime(event.currentTarget.currentTime)}
+        onTimeUpdate={(event) => commitTime(event.currentTarget.currentTime)}
+        onSeeked={(event) => commitTime(event.currentTarget.currentTime)}
         onEnded={() => setPlaying(false)}
       />
       <MediaTransport
