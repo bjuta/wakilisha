@@ -1,3 +1,4 @@
+import { useState } from "react";
 import {
   Button,
   Input,
@@ -26,6 +27,7 @@ interface WkColorFieldProps {
   className?: string;
   disabled?: boolean;
   palette?: string[];
+  compact?: boolean;
 }
 
 function normalizedHex(value: string) {
@@ -42,10 +44,54 @@ export function WkColorField({
   className = "",
   disabled = false,
   palette = DEFAULT_PALETTE,
+  compact = false,
 }: WkColorFieldProps) {
+  const [open, setOpen] = useState(false);
   const preview = /^#[0-9a-f]{6}$/i.test(value.trim())
     ? value.trim()
     : "transparent";
+
+  if (compact) {
+    return (
+      <div className={`relative ${className}`.trim()}>
+        <Button
+          type="button"
+          aria-label={ariaLabel}
+          aria-expanded={open}
+          onPress={() => setOpen((current) => !current)}
+          isDisabled={disabled}
+          className="h-10 w-10 rounded-lg border border-wk-border-strong p-1 outline-none transition-transform hover:scale-105 focus-visible:ring-2 focus-visible:ring-wk-brand/30 disabled:cursor-not-allowed disabled:opacity-40"
+        >
+          <span
+            aria-hidden="true"
+            className="block h-full w-full rounded-md shadow-inner"
+            style={{ backgroundColor: preview }}
+          />
+        </Button>
+        {open ? (
+          <div
+            role="group"
+            aria-label={`${ariaLabel} palette`}
+            className="absolute left-0 top-full z-[var(--wk-z-dropdown)] mt-2 grid w-40 grid-cols-4 gap-2 rounded-xl border border-wk-border bg-wk-surface p-2 shadow-[var(--wk-shadow)]"
+          >
+            {palette.map((color) => (
+              <Button
+                key={color}
+                type="button"
+                aria-label={`Use ${color}`}
+                onPress={() => {
+                  onChange(color);
+                  setOpen(false);
+                }}
+                className="h-8 w-8 rounded-lg border border-wk-border-strong outline-none transition-transform hover:scale-105 focus-visible:ring-2 focus-visible:ring-wk-brand/30"
+                style={{ backgroundColor: color }}
+              />
+            ))}
+          </div>
+        ) : null}
+      </div>
+    );
+  }
 
   return (
     <div className={`space-y-2 ${className}`.trim()}>
