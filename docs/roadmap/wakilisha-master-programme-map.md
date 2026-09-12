@@ -1,5 +1,31 @@
 # WAKILISHA Master Programme Map
 
+## Phase 8 closure / Phase 9A opening reconciliation - 12 September 2026
+
+**Current numbered work: Phase 9A, Public Query Convergence and Search.**
+
+Phase 8 is complete in Production. Phase 8A Safe Mobile Intake and Phase 8B Field Triage and Governed Promotion are accepted baseline, with the final Phase 8B.6 closure recorded in `docs/engineering/phase-8b6-antifragile-production-closure.md`.
+
+Final numbered Phase 8 database authority:
+
+- Production migration count: `114`
+- Production migration head: `20260911143000_phase_8b6_field_source_promotion_closure.sql`
+- Phase 8B.6 closure issue: `#872`
+- Field-to-Source closure: PR `#910`
+- Phase 8B.6 Production closure documentation: PR `#911`
+
+The later #902 browser-native UI chrome programme is also closed in Production and is inherited interaction-architecture baseline. It was an adjacent programme and does not become numbered Phase 9 work.
+
+Current runtime/frontend authority after that adjacent closure:
+
+- Production runtime main: `54c7513bec99358eff96f5134fd5f3e24afd31a4`
+- current repository main before this reconciliation: `facd8729a2bd1d6f3e5ef142ae5d55de6a06f374`
+- repository-main delta from runtime: documentation only
+
+The immediate engineering move is a **read-only Phase 9A authority audit** of public domain readers, `public-content-read`, browser joins, pagination, search documents and indexes, cache/invalidation authority, validators/error contracts, and current performance evidence. Do not start Commerce implementation and do not write Phase 9A runtime authority before the audit proves what is reusable, duplicated, or missing.
+
+This section supersedes every older `current phase`, `current numbered work`, and `immediate next step` statement below. Older dated sections remain point-in-time programme history.
+
 ## Cultural Operating Layer reconciliation - 4 September 2026
 
 **Current numbered work: Phase 8A, Safe mobile intake.**
