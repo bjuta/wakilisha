@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, type CSSProperties } from "react";
 import {
   Button,
   Input,
@@ -12,6 +12,7 @@ interface SharedFieldProps {
   placeholder?: string;
   className?: string;
   inputClassName?: string;
+  inputStyle?: CSSProperties;
   disabled?: boolean;
   required?: boolean;
   name?: string;
@@ -22,6 +23,7 @@ interface SharedFieldProps {
 interface WkPasswordFieldProps extends SharedFieldProps {
   revealLabel?: string;
   concealLabel?: string;
+  minLength?: number;
 }
 
 export function WkPasswordField({
@@ -31,6 +33,7 @@ export function WkPasswordField({
   placeholder,
   className = "",
   inputClassName = "",
+  inputStyle,
   disabled = false,
   required = false,
   name,
@@ -38,6 +41,7 @@ export function WkPasswordField({
   autoComplete = "current-password",
   revealLabel = "Show password",
   concealLabel = "Hide password",
+  minLength,
 }: WkPasswordFieldProps) {
   const [revealed, setRevealed] = useState(false);
 
@@ -55,7 +59,9 @@ export function WkPasswordField({
         type={revealed ? "text" : "password"}
         autoFocus={autoFocus}
         autoComplete={autoComplete}
+        minLength={minLength}
         placeholder={placeholder}
+        style={inputStyle}
         className={`wk-input w-full rounded-xl border-wk-border bg-wk-surface pr-11 text-[13px] text-wk-text ${inputClassName}`.trim()}
       />
       <Button
@@ -84,6 +90,7 @@ export function WkSearchField({
   placeholder,
   className = "",
   inputClassName = "",
+  inputStyle,
   disabled = false,
   required = false,
   name,
@@ -112,6 +119,7 @@ export function WkSearchField({
         autoFocus={autoFocus}
         autoComplete={autoComplete}
         placeholder={placeholder}
+        style={inputStyle}
         className={`wk-input w-full rounded-xl border-wk-border bg-wk-surface pl-9 pr-10 text-[13px] text-wk-text ${inputClassName}`.trim()}
       />
       {value ? (
