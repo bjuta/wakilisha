@@ -1,3 +1,4 @@
+import "@/styles/wakilisha-magazine-38-44.css";
 import { useState, useEffect, useRef, useMemo } from "react";
 import { WkIcon } from "@/components/design-system/Icon";
 import { useScrollLock } from "@/hooks/useScrollLock";

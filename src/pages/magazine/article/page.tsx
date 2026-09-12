@@ -1,3 +1,4 @@
+import "@/styles/wakilisha-magazine-38-44.css";
 import { useEffect, useState, useRef, useMemo, useCallback } from "react";
 import { Link, useParams, useSearchParams, useNavigate } from "react-router-dom";
 import {
