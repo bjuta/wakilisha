@@ -43,9 +43,10 @@ describe("WAKILISHA field-control interaction contract", () => {
 
     render(<Harness />);
 
-    const field = screen.getByRole("spinbutton", {
+    const field = screen.getByRole("textbox", {
       name: "Confidence threshold",
     });
+    expect(field).toHaveAttribute("aria-roledescription", "Number field");
     await user.click(field);
     await user.keyboard("{ArrowUp}");
     await waitFor(() => expect(field).toHaveValue("2.5"));
@@ -77,7 +78,8 @@ describe("WAKILISHA field-control interaction contract", () => {
     const slider = screen.getByRole("slider", { name: "Playback volume" });
     await user.click(slider);
     await user.keyboard("{ArrowRight}");
-    await waitFor(() => expect(slider).toHaveAttribute("aria-valuenow", "30"));
+    await waitFor(() => expect(slider).toHaveValue("30"));
+    expect(screen.getByText("30")).toBeVisible();
   });
 
   it("keeps password semantics while WAKILISHA owns reveal interaction", async () => {
