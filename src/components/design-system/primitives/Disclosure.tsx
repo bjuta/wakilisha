@@ -1,7 +1,7 @@
 import { useId, useState, type ReactNode } from "react";
 
 interface WkDisclosureProps {
-  summary: ReactNode;
+  summary: ReactNode | ((expanded: boolean) => ReactNode);
   children: ReactNode;
   defaultExpanded?: boolean;
   expanded?: boolean;
@@ -42,7 +42,7 @@ export function WkDisclosure({
         onClick={() => setExpanded(!isExpanded)}
         className={triggerClassName}
       >
-        {summary}
+        {typeof summary === "function" ? summary(isExpanded) : summary}
       </button>
       {isExpanded ? (
         <div id={contentId} role={contentRole} className={contentClassName}>
