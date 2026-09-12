@@ -89,6 +89,7 @@ import {
   playlistDescriptionToPlainText,
   playlistDescriptionToSafeHtml,
 } from "@/utils/playlistRichText";
+import { WkDetails, WkSummary } from "@/components/design-system/primitives/Disclosure";
 
 function formatDuration(
   milliseconds: number | null,
@@ -2520,21 +2521,21 @@ export default function PublicPlaylistDetailPage() {
           playlist.description
             ? (
                 <div className="wk-container-wide px-5 pt-8 md:px-6 md:pt-10">
-                  <details className="mx-auto max-w-5xl rounded-2xl border border-[var(--wk-border)] bg-[var(--wk-surface)] group">
-                    <summary className="flex cursor-pointer list-none items-center justify-between gap-4 px-5 py-4 text-[13px] font-extrabold text-[var(--wk-text)] marker:hidden md:px-6">
+                  <WkDetails className="mx-auto max-w-5xl rounded-2xl border border-[var(--wk-border)] bg-[var(--wk-surface)] group">
+                    <WkSummary className="flex cursor-pointer list-none items-center justify-between gap-4 px-5 py-4 text-[13px] font-extrabold text-[var(--wk-text)] marker:hidden md:px-6">
                       <span>
                         About this Playlist
                       </span>
 
                       <span className="text-[11px] font-bold text-[var(--wk-text-muted)]">
-                        <span className="group-open:hidden">
+                        <span className="group-data-[open=true]:hidden">
                           Read more
                         </span>
-                        <span className="hidden group-open:inline">
+                        <span className="hidden group-data-[open=true]:inline">
                           Read less
                         </span>
                       </span>
-                    </summary>
+                    </WkSummary>
 
                     <div className="border-t border-[var(--wk-border)] px-5 py-5 md:px-6">
                       <div
@@ -2544,7 +2545,7 @@ export default function PublicPlaylistDetailPage() {
                         }}
                       />
                     </div>
-                  </details>
+                  </WkDetails>
                 </div>
               )
             : null

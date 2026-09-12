@@ -55,6 +55,7 @@ import type {
 } from "./types";
 import { WkSelect } from "@/components/design-system/primitives/Select";
 import { WkNumberField } from "@/components/design-system/primitives/NumberField";
+import { WkDetails, WkSummary } from "@/components/design-system/primitives/Disclosure";
 
 
 
@@ -1725,8 +1726,8 @@ function MaterialSection({
         </div>
       </section>
 
-      <details className="rounded-[22px] border border-wk-border bg-wk-surface p-5 shadow-sm">
-        <summary className="cursor-pointer list-none">
+      <WkDetails className="rounded-[22px] border border-wk-border bg-wk-surface p-5 shadow-sm">
+        <WkSummary className="cursor-pointer list-none">
           <div className="flex items-center justify-between gap-4">
             <div>
               <div className="text-[10px] font-black uppercase tracking-[0.2em] text-wk-brand">
@@ -1740,7 +1741,7 @@ function MaterialSection({
               Add Material
             </span>
           </div>
-        </summary>
+        </WkSummary>
 
         <div className="mt-5 grid gap-4">
           <div className="grid gap-4 md:grid-cols-2">
@@ -1861,7 +1862,7 @@ function MaterialSection({
             </button>
           </div>
         </div>
-      </details>
+      </WkDetails>
 
       <section className="rounded-[22px] border border-wk-border bg-wk-surface p-5 shadow-sm">
         <div className="flex flex-wrap items-end justify-between gap-4">
@@ -3747,12 +3748,12 @@ function InquiryShell({
             <p className="text-[14px] leading-6 text-wk-text">{draft.workingQuestion}</p>
 
             {draft.rawQuestion !== draft.workingQuestion ? (
-              <details className="mt-5 rounded-xl border border-wk-border bg-wk-bg px-4 py-3">
-                <summary className="cursor-pointer text-[11px] font-black uppercase tracking-[0.14em] text-wk-text-faint">
+              <WkDetails className="mt-5 rounded-xl border border-wk-border bg-wk-bg px-4 py-3">
+                <WkSummary className="cursor-pointer text-[11px] font-black uppercase tracking-[0.14em] text-wk-text-faint">
                   See the original question
-                </summary>
+                </WkSummary>
                 <p className="mt-3 text-[13px] leading-5 text-wk-text-muted">{draft.rawQuestion}</p>
-              </details>
+              </WkDetails>
             ) : null}
           </Panel>
 

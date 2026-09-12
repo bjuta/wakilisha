@@ -45,6 +45,7 @@ import {
 } from "@/services/artists/artistLaunchTools";
 import { WkSelect } from "@/components/design-system/primitives/Select";
 import { WkCheckbox } from "@/components/design-system/primitives/Checkbox";
+import { wakilishaDialog } from "@/components/design-system/primitives/DialogProvider";
 
 
 
@@ -601,7 +602,7 @@ export default function ArtistManagePage() {
 
   async function handleRemoveTeamMember(member: ArtistTeamMember) {
     if (!artist || !activeRepresentation?.permissions.team) return;
-    const reason = window.prompt("Why are you removing this team member?");
+    const reason = (await wakilishaDialog.prompt({ title: "Artist team", label: "Why are you removing this team member?", required: true, minLength: 3, confirmLabel: "Remove member", destructive: true }));
     if (!reason || reason.trim().length < 3) return;
     setBusy(true);
     setMessage(null);

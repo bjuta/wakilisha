@@ -5,6 +5,10 @@ import {
 import {
   WkIcon,
 } from "@/components/design-system/Icon";
+import {
+  WkDetails,
+  WkSummary,
+} from "@/components/design-system/primitives/Disclosure";
 
 export interface PublicTrustCreditItem {
   id: string;
@@ -424,8 +428,8 @@ export function PublicTrustSummary({
             sources.length >
               0
               ? (
-                  <details className="group border-t border-[var(--wk-border)]">
-                    <summary className="flex cursor-pointer list-none items-center justify-between gap-4 px-5 py-4 md:px-6 [&::-webkit-details-marker]:hidden">
+                  <WkDetails className="group border-t border-[var(--wk-border)]">
+                    <WkSummary className="flex w-full items-center justify-between gap-4 px-5 py-4 text-left md:px-6 focus:outline-none focus-visible:ring-2 focus-visible:ring-wk-brand/20">
                       <div className="flex items-center gap-2">
                         <WkIcon
                           name="Library"
@@ -451,9 +455,9 @@ export function PublicTrustSummary({
                         size={
                           14
                         }
-                        className="text-[var(--wk-text-faint)] transition-transform group-open:rotate-180"
+                        className="text-[var(--wk-text-faint)] transition-transform group-data-[open=true]:rotate-180"
                       />
-                    </summary>
+                    </WkSummary>
 
                     <div className="border-t border-[var(--wk-border)] px-5 py-2 md:px-6">
                       {
@@ -598,7 +602,7 @@ export function PublicTrustSummary({
                         )
                       }
                     </div>
-                  </details>
+                  </WkDetails>
                 )
               : null
           }

@@ -14,6 +14,7 @@ import {
 import { WkSelect } from "@/components/design-system/primitives/Select";
 import { WkCheckbox } from "@/components/design-system/primitives/Checkbox";
 import { WkRadio, WkRadioGroup } from "@/components/design-system/primitives/Radio";
+import { wakilishaDialog } from "@/components/design-system/primitives/DialogProvider";
 
 
 
@@ -176,12 +177,10 @@ export function ArticleCreditForm({
     }
   }, [creditRole]);
 
-  function requestClose() {
+  async function requestClose() {
     if (
       (createdContributorId || createdCreditId) &&
-      !window.confirm(
-        "A contributor or Credit has already been created. Closing now will leave it unattached. Continue?",
-      )
+      !(await wakilishaDialog.confirm({ title: "Close Credit", message: "A contributor or Credit has already been created. Closing now will leave it unattached. Continue?", confirmLabel: "Close anyway", destructive: true }))
     ) {
       return;
     }

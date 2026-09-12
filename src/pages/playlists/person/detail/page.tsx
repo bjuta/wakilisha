@@ -28,6 +28,7 @@ import {
   updatePersonalPlaylist,
   type PersonalPlaylistDetail,
 } from "@/services/playlists/personalPlaylistService";
+import { wakilishaDialog } from "@/components/design-system/primitives/DialogProvider";
 
 function artistLabel(
   names: string[],
@@ -508,9 +509,7 @@ export default function PersonPlaylistDetailPage() {
       if (
         !playlist ||
         !isOwner ||
-        !window.confirm(
-          `Archive "${playlist.title}"? It will stop being public, but its history will be preserved.`,
-        )
+        !(await wakilishaDialog.confirm({ title: "Archive Playlist", message: `Archive "${playlist.title}"? It will stop being public, but its history will be preserved.`, confirmLabel: "Archive", destructive: true }))
       ) {
         return;
       }

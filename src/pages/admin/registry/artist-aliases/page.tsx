@@ -2,6 +2,7 @@ import { useEffect, useState, useCallback, useMemo } from "react";
 import { supabase } from "@/lib/supabase";
 import { WkIcon } from "@/components/design-system/Icon";
 import { WkCheckbox } from "@/components/design-system/primitives/Checkbox";
+import { wakilishaDialog } from "@/components/design-system/primitives/DialogProvider";
 
 
 /* ──────────────────────── Types ──────────────────────── */
@@ -509,9 +510,7 @@ export default function ArtistAliasesPage() {
       return;
     }
 
-    const confirmed = window.confirm(
-      `Safely merge "${sourceArtist.display_name}" (${sourceArtist.artist_slug}) into "${canonicalArtist.display_name}" (${canonicalArtist.artist_slug})? Duplicate credit links will be archived, not deleted.`
-    );
+    const confirmed = (await wakilishaDialog.confirm({ title: "Merge Registry Artists", message: `Safely merge "${sourceArtist.display_name}" (${sourceArtist.artist_slug}) into "${canonicalArtist.display_name}" (${canonicalArtist.artist_slug})? Duplicate credit links will be archived, not deleted.`, confirmLabel: "Merge artists", destructive: true }));
 
     if (!confirmed) return;
 

@@ -30,6 +30,7 @@ import type {
   ReactionType,
   ReportReason,
 } from "@/services/community";
+import { wakilishaDialog } from "@/components/design-system/primitives/DialogProvider";
 
 const PUBLIC_ORIGIN = "https://wakilisha.africa";
 
@@ -138,12 +139,10 @@ export function PostActions({
     }
   }
 
-  function handleBlock() {
+  async function handleBlock() {
     if (!onToggleBlock) return;
     if (!blocked) {
-      const confirmed = window.confirm(
-        `Block ${post.actor.name}? You will unfollow them, and their Posts will stop appearing in your Following feed.`,
-      );
+      const confirmed = (await wakilishaDialog.confirm({ title: "Block account", message: `Block ${post.actor.name}? You will unfollow them, and their Posts will stop appearing in your Following feed.`, confirmLabel: "Block", destructive: true }));
       if (!confirmed) return;
     }
     setMenuOpen(false);

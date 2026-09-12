@@ -7,6 +7,7 @@ import { WakilishaToggle } from "@/components/design-system/primitives/Wakilisha
 import { MessagesSettingsPane } from "@/pages/settings/components/MessagesSettingsPane";
 import { supabase } from "@/lib/supabase";
 import { WkSelect } from "@/components/design-system/primitives/Select";
+import { wakilishaDialog } from "@/components/design-system/primitives/DialogProvider";
 
 
 type SettingsTab = "Account" | "Appearance" | "Notifications" | "Messages" | "Playback" | "Privacy" | "Danger";
@@ -221,7 +222,6 @@ export default function MobileSettingsPage() {
       } catch (err) {
         const message = err instanceof Error ? err.message : "Cover upload failed";
         setCoverUploadError(message);
-        alert(message);
       } finally {
         setCoverUploading(false);
       }
@@ -237,14 +237,14 @@ export default function MobileSettingsPage() {
       const file = (e.target as HTMLInputElement).files?.[0];
       if (!file) return;
       if (file.size > 5 * 1024 * 1024) {
-        alert("Image must be under 5MB");
+        (await wakilishaDialog.alert({ title: "Profile settings", message: "Image must be under 5MB" }));
         return;
       }
       try {
         const url = await uploadAvatar(file);
         if (url) updateProfile({ avatarUrl: url });
       } catch (err) {
-        alert("Upload failed. Please try again.");
+        (await wakilishaDialog.alert({ title: "Profile settings", message: "Upload failed. Please try again." }));
       }
     };
     input.click();

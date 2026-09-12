@@ -109,7 +109,7 @@ describe("Phase 7B V2 public Video experience convergence", () => {
     expect(playerIndex).toBeGreaterThan(-1);
     expect(titleIndex).toBeGreaterThan(playerIndex);
     expect(recordIndex).toBeGreaterThan(titleIndex);
-    expect(watching).toContain("<details");
+    expect(watching).toContain("WkDetails");
     expect(watching).toContain("Publication record");
     expect(watching).not.toContain('className="sticky top-0 z-40');
     expect(watching).not.toContain("Back to Video");

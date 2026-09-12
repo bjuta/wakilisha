@@ -1,6 +1,10 @@
-import { useEffect, useRef, type ReactNode } from "react";
-import { Portal } from "@/components/base/Portal";
-import { useScrollLock } from "@/hooks/useScrollLock";
+import type { ReactNode } from "react";
+import {
+  Button,
+  Dialog,
+  Modal as AriaModal,
+  ModalOverlay,
+} from "react-aria-components";
 
 interface ModalProps {
   open: boolean;
@@ -24,73 +28,43 @@ export function Modal({
   children,
   maxWidth = "md",
 }: ModalProps) {
-  const panelRef = useRef<HTMLDivElement>(null);
-
-  useScrollLock(open);
-
-  useEffect(() => {
-    if (!open) return;
-
-    const handleKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") onClose();
-    };
-
-    document.addEventListener("keydown", handleKey);
-
-    return () =>
-      document.removeEventListener(
-        "keydown",
-        handleKey,
-      );
-  }, [open, onClose]);
-
-  useEffect(() => {
-    if (open) {
-      panelRef.current?.focus();
-    }
-  }, [open]);
-
   if (!open) return null;
 
   return (
-    <Portal>
-      <div
-        className="fixed inset-0 z-[var(--wk-z-modal)] flex items-center justify-center p-4"
-        style={{
-          zIndex: "var(--wk-z-modal)",
-        }}
-        role="dialog"
-        aria-modal="true"
-        aria-label={title}
+    <ModalOverlay
+      isOpen={open}
+      onOpenChange={(nextOpen) => {
+        if (!nextOpen) onClose();
+      }}
+      isDismissable
+      className="fixed inset-0 flex items-center justify-center bg-[var(--wk-overlay)] p-4"
+      style={{ zIndex: "var(--wk-z-modal)" }}
+    >
+      <AriaModal
+        data-scroll-lock="container"
+        className={`wk-panel relative max-h-[calc(100dvh-2rem)] w-full ${maxWidths[maxWidth]} overflow-y-auto outline-none`}
       >
-        <div
-          className="absolute inset-0 bg-[var(--wk-overlay)]"
-          onClick={onClose}
-        />
-        <div
-          ref={panelRef}
-          tabIndex={-1}
-          className={`wk-panel relative max-h-[calc(100dvh-2rem)] w-full ${maxWidths[maxWidth]} overflow-y-auto outline-none`}
+        <Dialog
+          aria-label={title || "Dialog"}
+          className="outline-none"
         >
-          {title && (
+          {title ? (
             <div className="flex items-center justify-between border-b border-[var(--wk-border)] px-5 py-4">
               <h2 className="text-[15px] font-bold text-[var(--wk-text)]">
                 {title}
               </h2>
-              <button
-                onClick={onClose}
+              <Button
+                slot="close"
                 aria-label="Close"
-                className="flex h-8 w-8 items-center justify-center rounded-full text-[var(--wk-text-muted)] hover:bg-[var(--wk-surface-raised)]"
+                className="flex h-8 w-8 items-center justify-center rounded-full text-[var(--wk-text-muted)] transition-colors hover:bg-[var(--wk-surface-raised)] focus:outline-none focus-visible:ring-2 focus-visible:ring-wk-brand/20"
               >
-                <i className="ri-close-line" />
-              </button>
+                <i aria-hidden="true" className="ri-close-line" />
+              </Button>
             </div>
-          )}
-          <div className="p-5">
-            {children}
-          </div>
-        </div>
-      </div>
-    </Portal>
+          ) : null}
+          <div className="p-5">{children}</div>
+        </Dialog>
+      </AriaModal>
+    </ModalOverlay>
   );
 }

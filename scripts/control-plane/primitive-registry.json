@@ -200,6 +200,17 @@
       ]
     },
     {
+      "id": "editorial.audio-preview-player",
+      "path": "src/components/design-system/editorial/AudioPreviewPlayer.tsx",
+      "kind": "interaction",
+      "maturity": "candidate",
+      "concept": "governed audio preview playback composed from shared transport, seek, and volume controls",
+      "authorityOwner": "consumer",
+      "consumers": [
+        "admin:audio"
+      ]
+    },
+    {
       "id": "editorial.media-timeline",
       "path": "src/components/design-system/editorial/MediaTimeline.tsx",
       "kind": "interaction",

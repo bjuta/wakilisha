@@ -343,7 +343,7 @@ describe(
       () => {
         expect(component)
           .toContain(
-            "<details",
+            "WkDetails",
           );
 
         expect(component)

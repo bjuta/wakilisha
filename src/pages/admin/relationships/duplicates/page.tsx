@@ -3,6 +3,7 @@ import { WkIcon } from "@/components/design-system/Icon";
 import { supabase } from "@/lib/supabase";
 import { WkSelect } from "@/components/design-system/primitives/Select";
 import { WkCheckbox } from "@/components/design-system/primitives/Checkbox";
+import { wakilishaDialog } from "@/components/design-system/primitives/DialogProvider";
 
 
 
@@ -343,9 +344,7 @@ export default function AdminDuplicateMergePage() {
       return;
     }
 
-    const confirmed = window.confirm(
-      `Apply track duplicate repair?\n\nKeep: ${preview.canonicalTrack.title} (${preview.canonicalTrack.slug})\nArchive: ${preview.duplicateTracks.map((track) => track.slug).join(", ")}\n\nThis will move chart rows/provider links and archive duplicate track rows.`
-    );
+    const confirmed = (await wakilishaDialog.confirm({ title: "Repair Registry duplicate", message: `Apply track duplicate repair?\n\nKeep: ${preview.canonicalTrack.title} (${preview.canonicalTrack.slug})\nArchive: ${preview.duplicateTracks.map((track) => track.slug).join(", ")}\n\nThis will move chart rows/provider links and archive duplicate track rows.`, confirmLabel: "Apply repair", destructive: true }));
 
     if (!confirmed) return;
 
@@ -389,9 +388,7 @@ export default function AdminDuplicateMergePage() {
       return;
     }
 
-    const confirmed = window.confirm(
-      `Preview ${candidatesToPreview.length} high-confidence track duplicate repairs?\n\nThis does not change the database.`
-    );
+    const confirmed = (await wakilishaDialog.confirm({ title: "Repair Registry duplicate", message: `Preview ${candidatesToPreview.length} high-confidence track duplicate repairs?\n\nThis does not change the database.`, confirmLabel: "Preview repairs", destructive: false }));
 
     if (!confirmed) return;
 
@@ -433,9 +430,7 @@ export default function AdminDuplicateMergePage() {
       return;
     }
 
-    const confirmed = window.confirm(
-      `Apply ${readyBulkPreviews.length} ready high-confidence track duplicate repairs?\n\nThis will move chart rows/provider links/credits and archive duplicate track rows candidate by candidate.`
-    );
+    const confirmed = (await wakilishaDialog.confirm({ title: "Repair Registry duplicate", message: `Apply ${readyBulkPreviews.length} ready high-confidence track duplicate repairs?\n\nThis will move chart rows/provider links/credits and archive duplicate track rows candidate by candidate.`, confirmLabel: "Apply repairs", destructive: true }));
 
     if (!confirmed) return;
 

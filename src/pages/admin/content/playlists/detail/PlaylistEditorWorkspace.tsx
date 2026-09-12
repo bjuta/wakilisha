@@ -63,6 +63,7 @@ import type {
   EditorialDiscoveryDraft,
   EditorialDiscoveryValue,
 } from "@/types/editorialDiscovery";
+import { wakilishaDialog } from "@/components/design-system/primitives/DialogProvider";
 
 function humanize(value: string): string {
   return value
@@ -661,7 +662,7 @@ export function PlaylistEditorWorkspace({
       return;
     }
 
-    if (!window.confirm("Publish this approved Playlist now?")) {
+    if (!(await wakilishaDialog.confirm({ title: "Playlist workflow", message: "Publish this approved Playlist now?", confirmLabel: "Publish", destructive: false }))) {
       return;
     }
 
@@ -722,9 +723,7 @@ export function PlaylistEditorWorkspace({
 
   async function handleUnpublish() {
     if (
-      !window.confirm(
-        "Unpublish this Playlist and hide its public page?",
-      )
+      !(await wakilishaDialog.confirm({ title: "Playlist workflow", message: "Unpublish this Playlist and hide its public page?", confirmLabel: "Unpublish", destructive: true }))
     ) {
       return;
     }
@@ -743,9 +742,7 @@ export function PlaylistEditorWorkspace({
 
   async function handleArchive() {
     if (
-      !window.confirm(
-        "Archive this Playlist? Published content will be hidden.",
-      )
+      !(await wakilishaDialog.confirm({ title: "Playlist workflow", message: "Archive this Playlist? Published content will be hidden.", confirmLabel: "Archive", destructive: true }))
     ) {
       return;
     }

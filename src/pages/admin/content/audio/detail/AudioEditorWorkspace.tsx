@@ -57,6 +57,7 @@ import type {
   EditorialDiscoveryDraft,
   EditorialDiscoveryValue,
 } from "@/types/editorialDiscovery";
+import { AudioPreviewPlayer } from "@/components/design-system/editorial/AudioPreviewPlayer";
 
 type PickerKind = "master" | "transcript" | null;
 type WorkspaceView = "details" | "sound" | "discovery" | "trust" | "review" | "history";
@@ -647,22 +648,14 @@ export function AudioEditorWorkspace({
 
                 {mediaContext?.deliveryUrl ? (
                   <div className="mt-5 space-y-3 border-t border-wk-border pt-5">
-                    <audio
-                      ref={audioRef}
-                      controls
-                      preload="metadata"
+                    <AudioPreviewPlayer
+                      mediaRef={audioRef}
                       src={mediaContext.deliveryUrl}
-                      onTimeUpdate={(event) => {
-                        const next = event.currentTarget.currentTime;
+                      title="Audio master preview"
+                      onTimeChange={(next) => {
                         setPlayhead(next);
                         setChapterCursor(next);
                       }}
-                      onSeeked={(event) => {
-                        const next = event.currentTarget.currentTime;
-                        setPlayhead(next);
-                        setChapterCursor(next);
-                      }}
-                      className="w-full"
                     />
 
                     <MediaTimeline

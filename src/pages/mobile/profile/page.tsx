@@ -25,6 +25,7 @@ import {
   getListeningHistory,
   type ListeningHistoryItem,
 } from "@/services/listeningHistory";
+import { wakilishaDialog } from "@/components/design-system/primitives/DialogProvider";
 
 type Tab = "Listening" | "Following" | "Saves" | "Comments" | "Replies" | "Account";
 const tabs: Tab[] = ["Listening", "Following", "Saves", "Comments", "Replies", "Account"];
@@ -930,7 +931,7 @@ function MobileCommentActionDrawer({
   };
 
   const handleDelete = async () => {
-    const confirmed = window.confirm("Delete this comment? This cannot be undone.");
+    const confirmed = (await wakilishaDialog.confirm({ title: "Delete comment", message: "Delete this comment? This cannot be undone.", confirmLabel: "Delete", destructive: true }));
     if (!confirmed) return;
 
     setDeleting(true);

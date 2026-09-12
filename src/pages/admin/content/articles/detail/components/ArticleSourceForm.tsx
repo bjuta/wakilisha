@@ -14,6 +14,7 @@ import {
 import { WkSelect } from "@/components/design-system/primitives/Select";
 import { WkCheckbox } from "@/components/design-system/primitives/Checkbox";
 import { WkDatePicker } from "@/components/design-system/primitives/DateTimePicker";
+import { wakilishaDialog } from "@/components/design-system/primitives/DialogProvider";
 
 
 
@@ -252,7 +253,7 @@ export function ArticleSourceForm({
     }
   }, [publicApproval]);
 
-  function requestClose() {
+  async function requestClose() {
     if (
       (
         createdSourceId ||
@@ -260,9 +261,7 @@ export function ArticleSourceForm({
         submitted
       ) &&
       !approved &&
-      !window.confirm(
-        "This Source already has saved progress. Closing will keep that progress in the Source Library. Continue?",
-      )
+      !(await wakilishaDialog.confirm({ title: "Close Source", message: "This Source already has saved progress. Closing will keep that progress in the Source Library. Continue?", confirmLabel: "Close", destructive: false }))
     ) {
       return;
     }
