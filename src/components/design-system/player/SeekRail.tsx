@@ -14,6 +14,7 @@ export function SeekRail({
   progress,
   onSeek,
   variant = "inline",
+  step = 5,
 }: {
   label: string;
   currentTime: number;
@@ -21,6 +22,7 @@ export function SeekRail({
   progress?: number;
   onSeek: (time: number) => void;
   variant?: SeekRailVariant;
+  step?: number;
 }) {
   const draggingRef = useRef(false);
   const safeDuration =
@@ -74,13 +76,13 @@ export function SeekRail({
       tabIndex={safeDuration > 0 ? 0 : -1}
       aria-label={label}
       aria-valuemin={0}
-      aria-valuemax={Math.max(
-        0,
-        Math.round(safeDuration),
-      )}
+      aria-valuemax={safeDuration}
       aria-valuenow={Math.max(
         0,
-        Math.round(currentTime || 0),
+        Math.min(
+          safeDuration,
+          currentTime || 0,
+        ),
       )}
       className={[
         "group relative w-full cursor-pointer touch-none select-none",
@@ -134,7 +136,7 @@ export function SeekRail({
         if (event.key === "ArrowLeft") {
           event.preventDefault();
           onSeek(
-            Math.max(0, currentTime - 5),
+            Math.max(0, currentTime - step),
           );
         }
 
@@ -143,7 +145,7 @@ export function SeekRail({
           onSeek(
             Math.min(
               safeDuration,
-              currentTime + 5,
+              currentTime + step,
             ),
           );
         }
