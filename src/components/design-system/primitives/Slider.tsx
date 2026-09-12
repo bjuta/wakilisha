@@ -77,6 +77,16 @@ export function WkSlider({
     commit(min + pointerRatio * (safeMax - min));
   }
 
+  function releasePointerCapture(element: HTMLDivElement, pointerId: number) {
+    if (
+      typeof element.hasPointerCapture === "function"
+      && element.hasPointerCapture(pointerId)
+      && typeof element.releasePointerCapture === "function"
+    ) {
+      element.releasePointerCapture(pointerId);
+    }
+  }
+
   const pageStep = Math.max(step, (safeMax - min) / 10);
 
   return (
@@ -104,28 +114,27 @@ export function WkSlider({
         } ${trackClassName}`.trim()}
         onPointerDown={(event) => {
           if (disabled) return;
-          event.currentTarget.setPointerCapture(event.pointerId);
-          commitFromClientX(event.clientX, event.currentTarget);
-          event.currentTarget.focus();
+          const target = event.currentTarget;
+          if (typeof target.setPointerCapture === "function") {
+            target.setPointerCapture(event.pointerId);
+          }
+          commitFromClientX(event.clientX, target);
+          target.focus();
         }}
         onPointerMove={(event) => {
-          if (
-            disabled
-            || !event.currentTarget.hasPointerCapture(event.pointerId)
-          ) {
-            return;
-          }
-          commitFromClientX(event.clientX, event.currentTarget);
+          const target = event.currentTarget;
+          const captured =
+            typeof target.hasPointerCapture === "function"
+              ? target.hasPointerCapture(event.pointerId)
+              : false;
+          if (disabled || !captured) return;
+          commitFromClientX(event.clientX, target);
         }}
         onPointerUp={(event) => {
-          if (event.currentTarget.hasPointerCapture(event.pointerId)) {
-            event.currentTarget.releasePointerCapture(event.pointerId);
-          }
+          releasePointerCapture(event.currentTarget, event.pointerId);
         }}
         onPointerCancel={(event) => {
-          if (event.currentTarget.hasPointerCapture(event.pointerId)) {
-            event.currentTarget.releasePointerCapture(event.pointerId);
-          }
+          releasePointerCapture(event.currentTarget, event.pointerId);
         }}
         onKeyDown={(event) => {
           if (disabled) return;
