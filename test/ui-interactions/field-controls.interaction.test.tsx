@@ -76,9 +76,10 @@ describe("WAKILISHA field-control interaction contract", () => {
 
     render(<Harness />);
     const slider = screen.getByRole("slider", { name: "Playback volume" });
+    expect(slider).toHaveAttribute("aria-valuenow", "20");
     await user.click(slider);
     await user.keyboard("{ArrowRight}");
-    await waitFor(() => expect(slider).toHaveValue("30"));
+    await waitFor(() => expect(slider).toHaveAttribute("aria-valuenow", "30"));
     expect(screen.getByText("30")).toBeVisible();
   });
 
