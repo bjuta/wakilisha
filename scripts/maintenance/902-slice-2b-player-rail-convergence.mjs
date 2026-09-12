@@ -30,21 +30,9 @@ function removeSliderImport(text, context) {
   return next;
 }
 
-function addSeekRailImport(text) {
-  if (text.includes('from "@/components/design-system/player/SeekRail"')) {
-    return text;
-  }
-
-  const imports = [...text.matchAll(/^import[\s\S]*?;$/gm)];
-  if (!imports.length) fail("PlayerDock: no import boundary found");
-  const last = imports[imports.length - 1];
-  const end = (last.index ?? 0) + last[0].length;
-  return `${text.slice(0, end)}\nimport { SeekRail } from "@/components/design-system/player/SeekRail";${text.slice(end)}`;
-}
-
-function replaceVolumeSlider(text, wrapperClass, context) {
+function replaceFullPlayerVolumeSlider(text) {
   const pattern = /<WkSlider\s+value=\{volume\}\s+onChange=\{\(nextValue\) => setVolume\(nextValue\)\}\s+ariaLabel="Volume"\s+showValueLabel=\{false\}\s+min=\{0\}\s+max=\{1\}\s+step=\{0\.01\}\s+className="[^"]+"\s*\/>/;
-  const replacement = `<div className=${JSON.stringify(wrapperClass)}>
+  const replacement = `<div className="flex-1">
   <SeekRail
     label="Volume"
     currentTime={volume}
@@ -55,20 +43,25 @@ function replaceVolumeSlider(text, wrapperClass, context) {
     variant="inline"
   />
 </div>`;
-  return replaceOnce(text, pattern, replacement, `${context} volume slider`);
+  return replaceOnce(text, pattern, replacement, "PlayerFullSurface volume slider");
 }
 
 let dock = fs.readFileSync(PLAYER_DOCK, "utf8");
-dock = replaceVolumeSlider(dock, "w-24", "PlayerDock");
+dock = replaceOnce(
+  dock,
+  /\n\s*<div className="hidden items-center gap-2 sm:flex">\s*<i className="ri-volume-up-line text-\[var\(--wk-text-muted\)\]" \/>\s*<WkSlider\s+value=\{volume\}\s+onChange=\{\(nextValue\) => setVolume\(nextValue\)\}\s+ariaLabel="Volume"\s+showValueLabel=\{false\}\s+min=\{0\}\s+max=\{1\}\s+step=\{0\.01\}\s+className="w-24"\s*\/>\s*<\/div>\n/,
+  "\n",
+  "PlayerDock collapsed volume control",
+);
+dock = replaceOnce(dock, /\n\s{4}volume,\n\s{4}setVolume,/, "", "PlayerDock volume state");
 dock = removeSliderImport(dock, "PlayerDock");
-dock = addSeekRailImport(dock);
 fs.writeFileSync(PLAYER_DOCK, dock);
 
 let full = fs.readFileSync(PLAYER_FULL, "utf8");
 if (!full.includes('import { SeekRail } from "./SeekRail";')) {
   fail("PlayerFullSurface: canonical SeekRail import missing");
 }
-full = replaceVolumeSlider(full, "flex-1", "PlayerFullSurface");
+full = replaceFullPlayerVolumeSlider(full);
 full = removeSliderImport(full, "PlayerFullSurface");
 fs.writeFileSync(PLAYER_FULL, full);
 
@@ -112,4 +105,6 @@ rail = replaceOnce(
 fs.writeFileSync(SEEK_RAIL, rail);
 
 console.log("SLICE_2B_PLAYER_RAIL_CONVERGENCE_PASS");
+console.log("collapsed_player_volume_slider=retired");
+console.log("full_player_volume_slider=canonical_seek_rail");
 console.log("eager_generic_slider_imports=0");
