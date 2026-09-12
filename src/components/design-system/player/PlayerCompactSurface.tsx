@@ -113,14 +113,16 @@ export function PlayerCompactSurface({
           : undefined
       }
     >
-      <SeekRail
-        label={`Seek ${currentTrack.title}`}
-        currentTime={currentTime}
-        duration={duration}
-        progress={progress}
-        onSeek={seek}
-        variant="edge"
-      />
+      {isMobile ? (
+        <SeekRail
+          label={`Seek ${currentTrack.title}`}
+          currentTime={currentTime}
+          duration={duration}
+          progress={progress}
+          onSeek={seek}
+          variant="edge"
+        />
+      ) : null}
 
       <div
         className={[
