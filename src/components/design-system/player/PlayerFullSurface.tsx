@@ -41,6 +41,7 @@ import { PlayerQueuePanel } from "./PlayerQueuePanel";
 import { PlayerTimedTextPanel } from "./PlayerTimedTextPanel";
 import { SeekRail } from "./SeekRail";
 
+
 export type PlayerFullMode =
   | "desktop"
   | "mobile";
@@ -869,18 +870,16 @@ export function PlayerFullSurface({
                 size={16}
                 className="text-[var(--wk-text-faint)]"
               />
-              <input
-                aria-label="Volume"
-                type="range"
-                min={0}
-                max={1}
-                step={0.01}
-                value={volume}
-                onChange={(event) =>
-                  setVolume(Number(event.target.value))
-                }
-                className="h-1 flex-1 accent-[var(--wk-brand)]"
-              />
+              <div className="flex-1">
+  <SeekRail
+    label="Volume"
+    currentTime={volume}
+    duration={1}
+    progress={volume}
+    onSeek={setVolume}
+    step={0.01}
+  />
+</div>
             </div>
 
             {showContextualUnlock ? (

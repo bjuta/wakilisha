@@ -7,6 +7,8 @@ import { useRelatedEntities } from "@/hooks/useRelatedEntities";
 import type { ResolvedRelation } from "@/hooks/useRelatedEntities";
 import { WkSelect } from "@/components/design-system/primitives/Select";
 import { WkCheckbox } from "@/components/design-system/primitives/Checkbox";
+import { WkNumberField } from "@/components/design-system/primitives/NumberField";
+
 
 
 
@@ -285,7 +287,15 @@ export default function TrackDetailPage() {
               </div>
               <div>
                 <label className="block text-[11px] font-bold uppercase tracking-wider text-wk-text-muted mb-2">Duration (ms)</label>
-                <input type="number" value={draft.duration_ms} onChange={(e) => patchDraft({ duration_ms: e.target.value })} placeholder="e.g. 215000" className="w-full rounded-lg border border-wk-border bg-wk-bg-subtle px-3 py-2.5 text-[13px] text-wk-text placeholder:text-wk-text-faint outline-none focus:border-wk-brand" />
+                <WkNumberField
+  value={draft.duration_ms}
+  onChange={(nextValue) => patchDraft({ duration_ms: (Number.isNaN(nextValue) ? "" : String(nextValue)) })}
+  ariaLabel="e.g. 215000"
+  showSteppers={false}
+  placeholder="e.g. 215000"
+  groupClassName="w-full rounded-lg border border-wk-border bg-wk-bg-subtle px-3 py-2.5 text-[13px] text-wk-text placeholder:text-wk-text-faint outline-none focus:border-wk-brand"
+  inputClassName="text-left"
+/>
               </div>
               <div>
                 <label className="block text-[11px] font-bold uppercase tracking-wider text-wk-text-muted mb-2">Duration</label>
@@ -293,11 +303,25 @@ export default function TrackDetailPage() {
               </div>
               <div>
                 <label className="block text-[11px] font-bold uppercase tracking-wider text-wk-text-muted mb-2">Track #</label>
-                <input type="number" value={draft.track_number} onChange={(e) => patchDraft({ track_number: e.target.value })} className="w-full rounded-lg border border-wk-border bg-wk-bg-subtle px-3 py-2.5 text-[13px] text-wk-text outline-none focus:border-wk-brand" />
+                <WkNumberField
+  value={draft.track_number}
+  onChange={(nextValue) => patchDraft({ track_number: (Number.isNaN(nextValue) ? "" : String(nextValue)) })}
+  ariaLabel="Track number"
+  showSteppers={false}
+  groupClassName="w-full rounded-lg border border-wk-border bg-wk-bg-subtle px-3 py-2.5 text-[13px] text-wk-text outline-none focus:border-wk-brand"
+  inputClassName="text-left"
+/>
               </div>
               <div>
                 <label className="block text-[11px] font-bold uppercase tracking-wider text-wk-text-muted mb-2">Disc #</label>
-                <input type="number" value={draft.disc_number} onChange={(e) => patchDraft({ disc_number: e.target.value })} className="w-full rounded-lg border border-wk-border bg-wk-bg-subtle px-3 py-2.5 text-[13px] text-wk-text outline-none focus:border-wk-brand" />
+                <WkNumberField
+  value={draft.disc_number}
+  onChange={(nextValue) => patchDraft({ disc_number: (Number.isNaN(nextValue) ? "" : String(nextValue)) })}
+  ariaLabel="Disc number"
+  showSteppers={false}
+  groupClassName="w-full rounded-lg border border-wk-border bg-wk-bg-subtle px-3 py-2.5 text-[13px] text-wk-text outline-none focus:border-wk-brand"
+  inputClassName="text-left"
+/>
               </div>
               <div className="sm:col-span-2 flex items-center gap-3">
                 <WkCheckbox checked={draft.explicit} onChange={(checked) => patchDraft({ explicit: checked })} className="flex items-center gap-2 text-[13px] text-wk-text cursor-pointer">

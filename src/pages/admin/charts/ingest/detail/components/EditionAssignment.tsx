@@ -8,6 +8,9 @@ import DateRangePicker, { type DateRangeValue } from "@/components/base/DateRang
 import type { IngestJob, DiscoveredCsvSource } from "@/services/chartsIngestion/types";
 import type { UserRole } from "@/services/chartsIngestion/client";
 import { hasCapability } from "@/services/chartsIngestion/client";
+import { WkDatePicker } from "@/components/design-system/primitives/DateTimePicker";
+import { WkNumberField } from "@/components/design-system/primitives/NumberField";
+
 
 type RankPolicy =
   | "strict_ranked"
@@ -144,25 +147,28 @@ export function EditionAssignment({
           </div>
           <div>
             <label className="text-[10px] font-bold uppercase tracking-[0.12em] text-[var(--wk-text-muted)]">Edition Date *</label>
-            <input
-              type="date"
-              value={form.editionDate}
-              onChange={(e) => setForm((p) => ({ ...p, editionDate: e.target.value }))}
-              disabled={!canEdit}
-              className="mt-1 w-full rounded-md border border-[var(--wk-border)] bg-[var(--wk-bg)] px-3 py-2 text-[12px] text-[var(--wk-text)]"
-            />
+            <WkDatePicker
+  value={form.editionDate}
+  onChange={(nextValue) => setForm((p) => ({ ...p, editionDate: nextValue }))}
+  label="Edition date"
+  showLabel={false}
+  disabled={!canEdit}
+  triggerClassName="mt-1 w-full rounded-md border border-[var(--wk-border)] bg-[var(--wk-bg)] px-3 py-2 text-[12px] text-[var(--wk-text)]"
+/>
           </div>
           <div>
             <label className="text-[10px] font-bold uppercase tracking-[0.12em] text-[var(--wk-text-muted)]">Chart Size *</label>
-            <input
-              type="number"
-              value={form.chartSize}
-              onChange={(e) => setForm((p) => ({ ...p, chartSize: parseInt(e.target.value) || 40 }))}
-              min={1}
-              max={500}
-              disabled={!canEdit}
-              className="mt-1 w-full rounded-md border border-[var(--wk-border)] bg-[var(--wk-bg)] px-3 py-2 text-[12px] text-[var(--wk-text)]"
-            />
+            <WkNumberField
+  value={form.chartSize}
+  onChange={(nextValue) => setForm((p) => ({ ...p, chartSize: nextValue || 40 }))}
+  ariaLabel="Chart size"
+  showSteppers={false}
+  min={1}
+  max={500}
+  disabled={!canEdit}
+  groupClassName="mt-1 w-full rounded-md border border-[var(--wk-border)] bg-[var(--wk-bg)] px-3 py-2 text-[12px] text-[var(--wk-text)]"
+  inputClassName="text-left"
+/>
           </div>
           <div className="sm:col-span-2 lg:col-span-2">
             <label className="text-[10px] font-bold uppercase tracking-[0.12em] text-[var(--wk-text-muted)]">Period Range</label>

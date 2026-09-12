@@ -14,6 +14,8 @@ import type { ArticleWorkbenchMode } from "./ArticleWorkbenchNav";
 import { fetchAllAuthors, bustAuthorCache, type AuthorRow } from "@/services/authorProfiles";
 import { supabase } from "@/lib/supabase";
 import { WkSelect } from "@/components/design-system/primitives/Select";
+import { WkDateTimePicker } from "@/components/design-system/primitives/DateTimePicker";
+
 
 
 interface SeoMeta {
@@ -785,12 +787,13 @@ export function ArticleMetaPanel({
               </div>
               {dateEditOpen && (
                 <div className="mt-2 space-y-2">
-                  <input
-                    type="datetime-local"
-                    value={pendingDate}
-                    onChange={(e) => setPendingDate(e.target.value)}
-                    className="w-full rounded-md border border-wk-border bg-wk-bg-subtle px-2 py-1.5 text-[12px] text-wk-text outline-none focus:border-wk-brand"
-                  />
+                  <WkDateTimePicker
+  value={pendingDate}
+  onChange={(nextValue) => setPendingDate(nextValue)}
+  label="Pending date"
+  showLabel={false}
+  triggerClassName="w-full rounded-md border border-wk-border bg-wk-bg-subtle px-2 py-1.5 text-[12px] text-wk-text outline-none focus:border-wk-brand"
+/>
                   <div className="flex items-center gap-2">
                     <button
                       onClick={() => {

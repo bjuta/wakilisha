@@ -11,6 +11,8 @@ import type { TrackItem, TrackArtistRecord } from "./components/AdminReleaseTrac
 import AdminReleaseExcerpt from "./components/AdminReleaseExcerpt";
 import AdminReleaseSidebar from "./components/AdminReleaseSidebar";
 import { WkSelect } from "@/components/design-system/primitives/Select";
+import { WkDatePicker } from "@/components/design-system/primitives/DateTimePicker";
+
 
 
 /* ─── Types ─── */
@@ -447,7 +449,13 @@ export default function ReleaseDetailPage() {
                     </div>
                     <div>
                       <label className="block text-[11px] font-bold uppercase tracking-wider text-[var(--wk-text-muted)] mb-2">Release Date</label>
-                      <input type="date" value={draft.release_date} onChange={(e) => patchDraft({ release_date: e.target.value })} className="w-full rounded-lg border border-[var(--wk-border)] bg-[var(--wk-bg)] px-3 py-2.5 text-[13px] text-[var(--wk-text)] outline-none focus:border-[var(--wk-brand)] cursor-pointer" />
+                      <WkDatePicker
+  value={draft.release_date}
+  onChange={(nextValue) => patchDraft({ release_date: nextValue })}
+  label="Release date"
+  showLabel={false}
+  triggerClassName="w-full rounded-lg border border-[var(--wk-border)] bg-[var(--wk-bg)] px-3 py-2.5 text-[13px] text-[var(--wk-text)] outline-none focus:border-[var(--wk-brand)] cursor-pointer"
+/>
                     </div>
                     <div>
                       <label className="block text-[11px] font-bold uppercase tracking-wider text-[var(--wk-text-muted)] mb-2">Date Precision</label>

@@ -7,6 +7,8 @@ import {
 import { usePlayer } from "@/context/PlayerContext";
 import { Ch19GradientImage } from "@/components/media/Ch19GradientImage";
 import { AddToPlaylistButton } from "@/components/playlists/AddToPlaylistButton";
+import { WkSlider } from "@/components/design-system/primitives/Slider";
+
 
 export function PlayerDock() {
   const {
@@ -249,16 +251,16 @@ export function PlayerDock() {
 
             <div className="hidden items-center gap-2 sm:flex">
               <i className="ri-volume-up-line text-[var(--wk-text-muted)]" />
-              <input
-                aria-label="Volume"
-                type="range"
-                min="0"
-                max="1"
-                step="0.01"
-                value={volume}
-                onChange={(event) => setVolume(Number(event.target.value))}
-                className="h-1 w-24 accent-[var(--wk-brand)]"
-              />
+              <WkSlider
+  value={volume}
+  onChange={(nextValue) => setVolume(nextValue)}
+  ariaLabel="Volume"
+  showValueLabel={false}
+  min={0}
+  max={1}
+  step={0.01}
+  className="w-24"
+/>
             </div>
 
             <button

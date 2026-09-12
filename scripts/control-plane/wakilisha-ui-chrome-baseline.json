@@ -2,46 +2,14 @@
   "version": 1,
   "rule": "Visible product interactions must use WAKILISHA-owned primitives; native browser chrome is migration debt only.",
   "violations": {
-    "src/components/admin/media/ImageEditor.tsx": {
-      "native-input-number": 2
-    },
-    "src/components/admin/media/MediaEditModal.tsx": {
-      "native-input-date": 1,
-      "native-input-number": 2
-    },
-    "src/components/admin/media/MediaLibraryCore.tsx": {
-      "native-input-date": 4,
-      "native-input-file": 1
-    },
     "src/components/admin/media/MediaLibraryPreviewPanel.tsx": {
       "native-media-controls": 2
-    },
-    "src/components/artists/ArtistCountryPicker.tsx": {
-      "native-input-search": 1
-    },
-    "src/components/artists/ArtistImageField.tsx": {
-      "native-input-file": 1
-    },
-    "src/components/artists/ClaimantPhoneFields.tsx": {
-      "native-input-search": 1
-    },
-    "src/components/base/DateRangePicker.tsx": {
-      "native-input-date": 2
     },
     "src/components/community/PostActions.tsx": {
       "native-browser-dialog": 1
     },
-    "src/components/community/PostComposer.tsx": {
-      "native-input-file": 1
-    },
     "src/components/design-system/editorial/EditorialCommentEditor.tsx": {
       "native-browser-dialog": 1
-    },
-    "src/components/design-system/music/PlayerDock.tsx": {
-      "native-input-range": 1
-    },
-    "src/components/design-system/player/PlayerFullSurface.tsx": {
-      "native-input-range": 1
     },
     "src/components/design-system/player/PlayerQueuePanel.tsx": {
       "native-disclosure": 2
@@ -52,39 +20,8 @@
     "src/components/video/PublicVideoWatchingSurface.tsx": {
       "native-disclosure": 2
     },
-    "src/components/video/VideoPlaybackCanvas.tsx": {
-      "native-input-range": 1
-    },
     "src/pages/admin/charts/artist-resolution/page.tsx": {
       "native-browser-dialog": 6
-    },
-    "src/pages/admin/charts/backfill/page.tsx": {
-      "native-input-date": 3,
-      "native-input-number": 1
-    },
-    "src/pages/admin/charts/ingest/components/ProgramSetupStep.tsx": {
-      "native-input-date": 1,
-      "native-input-range": 1
-    },
-    "src/pages/admin/charts/ingest/detail/components/DraftStep.tsx": {
-      "native-input-date": 1,
-      "native-input-number": 1
-    },
-    "src/pages/admin/charts/ingest/detail/components/EditionAssignment.tsx": {
-      "native-input-date": 1,
-      "native-input-number": 1
-    },
-    "src/pages/admin/charts/ingest/detail/components/RankingIntegrity.tsx": {
-      "native-input-number": 1
-    },
-    "src/pages/admin/charts/ingest/detail/components/RankingStep.tsx": {
-      "native-input-number": 1
-    },
-    "src/pages/admin/charts/ingest/detail/components/SourcesStep.tsx": {
-      "native-input-range": 1
-    },
-    "src/pages/admin/charts/scoring-runs/page.tsx": {
-      "native-input-date": 1
     },
     "src/pages/admin/content/articles/detail/ArticleEditorWorkspace.tsx": {
       "native-browser-dialog": 1
@@ -95,18 +32,11 @@
     "src/pages/admin/content/articles/detail/components/ArticleCreditForm.tsx": {
       "native-browser-dialog": 1
     },
-    "src/pages/admin/content/articles/detail/components/ArticleMetaPanel.tsx": {
-      "native-input-datetime-local": 1
-    },
     "src/pages/admin/content/articles/detail/components/ArticleSourceForm.tsx": {
-      "native-browser-dialog": 1,
-      "native-input-date": 3
+      "native-browser-dialog": 1
     },
     "src/pages/admin/content/audio/detail/AudioEditorWorkspace.tsx": {
       "native-media-controls": 1
-    },
-    "src/pages/admin/content/audio/page.tsx": {
-      "native-input-number": 2
     },
     "src/pages/admin/content/components/TaxonomyTermsPage.tsx": {
       "native-browser-dialog": 4
@@ -114,27 +44,11 @@
     "src/pages/admin/content/playlists/detail/PlaylistEditorWorkspace.tsx": {
       "native-browser-dialog": 3
     },
-    "src/pages/admin/content/playlists/detail/components/PlaylistDetailsDrawer.tsx": {
-      "native-input-datetime-local": 1
-    },
-    "src/pages/admin/content/publishing/components/CreatePublishingItemDrawer.tsx": {
-      "native-input-datetime-local": 2
-    },
-    "src/pages/admin/content/publishing/components/EditPublishingItemDrawer.tsx": {
-      "native-input-datetime-local": 2
-    },
-    "src/pages/admin/content/video/detail/VideoEditorWorkspace.tsx": {
-      "native-input-number": 1
-    },
     "src/pages/admin/institute/inquiry-interface/InstitutePlaylistWorkspace.tsx": {
       "native-browser-dialog": 1
     },
     "src/pages/admin/institute/inquiry-interface/NativeInstituteInquiryInterface.tsx": {
-      "native-disclosure": 4,
-      "native-input-number": 1
-    },
-    "src/pages/admin/login/page.tsx": {
-      "native-input-password": 1
+      "native-disclosure": 4
     },
     "src/pages/admin/registry/artist-aliases/decouple/page.tsx": {
       "native-browser-dialog": 3
@@ -142,43 +56,14 @@
     "src/pages/admin/registry/artist-aliases/page.tsx": {
       "native-browser-dialog": 1
     },
-    "src/pages/admin/registry/releases/detail/page.tsx": {
-      "native-input-date": 1
-    },
     "src/pages/admin/registry/tracks/detail/page.tsx": {
-      "native-input-number": 3,
       "native-media-controls": 1
     },
     "src/pages/admin/relationships/duplicates/page.tsx": {
       "native-browser-dialog": 3
     },
-    "src/pages/admin/settings/airplay/page.tsx": {
-      "native-input-number": 1
-    },
-    "src/pages/admin/settings/audience/page.tsx": {
-      "native-datalist": 1,
-      "native-input-number": 1
-    },
-    "src/pages/admin/settings/chart-defaults/page.tsx": {
-      "native-input-number": 1
-    },
-    "src/pages/admin/settings/email-briefings/page.tsx": {
-      "native-input-number": 1,
-      "native-input-time": 1
-    },
-    "src/pages/admin/settings/frontend-appearance/page.tsx": {
-      "native-input-color": 2,
-      "native-input-number": 1,
-      "native-input-range": 1
-    },
     "src/pages/admin/settings/gsc-data/page.tsx": {
       "native-browser-dialog": 1
-    },
-    "src/pages/admin/settings/integrations/page.tsx": {
-      "native-input-file": 1
-    },
-    "src/pages/admin/settings/registry/page.tsx": {
-      "native-input-number": 3
     },
     "src/pages/admin/settings/seo/page.tsx": {
       "native-disclosure": 2
@@ -188,19 +73,6 @@
     },
     "src/pages/artists/manage/page.tsx": {
       "native-browser-dialog": 1
-    },
-    "src/pages/auth/page.tsx": {
-      "native-input-password": 3
-    },
-    "src/pages/auth/reset-password/page.tsx": {
-      "native-input-password": 2
-    },
-    "src/pages/field/page.tsx": {
-      "native-input-datetime-local": 1,
-      "native-input-file": 3
-    },
-    "src/pages/mobile/guides/detail/components/MobileReadingGuide.tsx": {
-      "native-input-range": 1
     },
     "src/pages/mobile/profile/page.tsx": {
       "native-browser-dialog": 1
@@ -213,12 +85,6 @@
     },
     "src/pages/playlists/person/detail/page.tsx": {
       "native-browser-dialog": 1
-    },
-    "src/pages/settings/components/AccountSettingsPane.tsx": {
-      "native-input-file": 2
-    },
-    "src/pages/video/page.tsx": {
-      "native-input-search": 1
     }
   }
 }

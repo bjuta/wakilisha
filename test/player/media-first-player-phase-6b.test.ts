@@ -68,6 +68,11 @@ describe("Phase 6B media-first WAKILISHA Player", () => {
     expect(compact).toContain("experience.creatorLabel");
     expect(compact).toContain("experience.spokenAudio");
     expect(compact).toContain("Back ${jump ?? 15} seconds");
+    expect(compact).toMatch(
+      /\{isMobile \? \(\s*<SeekRail[\s\S]*?variant="edge"[\s\S]*?\) : null\}/,
+    );
+    expect(compact.match(/variant="edge"/g)).toHaveLength(1);
+    expect(compact).toContain("{!isMobile ? (");
     expect(compact).not.toContain("playbackSourceLabel");
     expect(compact).not.toContain("AddToPlaylistButton");
     expect(compact).not.toContain("Connect Apple Music");
@@ -110,7 +115,14 @@ describe("Phase 6B media-first WAKILISHA Player", () => {
     expect(desktopShell).not.toContain("PlayerDock");
     expect(desktopShell).not.toContain("DesktopPlayerPage");
     expect(responsiveShell).toContain("PlayerCompactSurface");
-    expect(responsiveShell).toContain("PlayerFullSurface");
+    expect(responsiveShell).toContain("LazyPlayerFullSurface");
+    expect(responsiveShell).toContain(
+      'import(\n    "@/components/design-system/player/PlayerFullSurface"',
+    );
+    expect(responsiveShell).toContain("<Suspense fallback={baseLayout}>");
+    expect(responsiveShell).not.toContain(
+      'from "@/components/design-system/player/PlayerFullSurface"',
+    );
     expect(responsiveShell).toContain("isFullPlayerOpen");
     expect(full).toContain('data-wk-provider-media-host={mode}');
     expect(playerChrome).toContain(".phn-miniplayer");

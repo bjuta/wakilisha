@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { WkIcon } from "@/components/design-system/Icon";
+import { WkPasswordField } from "@/components/design-system/primitives/Field";
 import { WkSurface } from "@/components/design-system/primitives/Surface";
 import { supabase } from "@/lib/supabase";
 import { fetchUserRole, getDefaultRoute, roleCanAccessAdmin } from "@/services/userRoles";
@@ -217,10 +218,17 @@ export default function AdminLoginPage() {
                   <span className="mb-1 block text-[11px] font-black uppercase tracking-wider text-wk-text-faint">Admin email</span>
                   <input value={email} onChange={(e) => setEmail(e.target.value)} type="email" required autoComplete="email" className="wk-input w-full" placeholder="admin@wakilisha.africa" />
                 </label>
-                <label className="block">
+                <div className="block">
                   <span className="mb-1 block text-[11px] font-black uppercase tracking-wider text-wk-text-faint">Password</span>
-                  <input value={password} onChange={(e) => setPassword(e.target.value)} type="password" required autoComplete="current-password" className="wk-input w-full" placeholder="••••••••" />
-                </label>
+                  <WkPasswordField
+                    ariaLabel="Password"
+                    value={password}
+                    onChange={setPassword}
+                    required
+                    autoComplete="current-password"
+                    placeholder="••••••••"
+                  />
+                </div>
                 <div className="flex items-center justify-between gap-3">
                   <button type="button" onClick={() => { clearMessages(); setMode("forgot"); }} className="text-[12px] font-bold text-wk-text-muted hover:text-wk-brand">Forgot password?</button>
                   <button type="button" onClick={() => { clearMessages(); setMode("magic"); }} className="text-[12px] font-bold text-wk-text-muted hover:text-wk-brand">Use magic link</button>

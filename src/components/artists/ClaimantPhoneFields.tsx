@@ -4,6 +4,7 @@ import {
   useRef,
   useState,
 } from "react";
+import { WkSearchField } from "@/components/design-system/primitives/Field";
 import {
   findClaimantPhoneCountryOptions,
   getClaimantPhoneCountryOptions,
@@ -156,19 +157,14 @@ export function ClaimantPhoneFields({
             aria-label="Country"
             className="absolute left-0 top-[calc(100%+6px)] z-30 w-full max-w-sm rounded-2xl border border-[var(--wk-border)] bg-[var(--wk-surface)] p-2 shadow-2xl"
           >
-            <input
-              type="search"
+            <WkSearchField
               value={countryQuery}
-              onChange={(event) =>
-                setCountryQuery(
-                  event.target.value,
-                )
-              }
+              onChange={setCountryQuery}
               autoFocus
               autoComplete="off"
               placeholder="Country"
-              aria-label="Country"
-              className="w-full rounded-xl border border-[var(--wk-border)] bg-[var(--wk-bg)] px-3 py-2.5 text-[14px] text-[var(--wk-text)] outline-none focus:border-[var(--wk-brand)]"
+              ariaLabel="Country"
+              inputClassName="border-[var(--wk-border)] bg-[var(--wk-bg)] text-[14px] text-[var(--wk-text)] focus:border-[var(--wk-brand)]"
             />
 
             {!countryQuery.trim() ? (

@@ -25,6 +25,8 @@ import {
   type PlaylistSchedule,
 } from "@/services/playlists/playlistAdminService";
 import { WkSelect } from "@/components/design-system/primitives/Select";
+import { WkDateTimePicker } from "@/components/design-system/primitives/DateTimePicker";
+
 
 
 function humanize(value: string): string {
@@ -923,14 +925,13 @@ export function PlaylistDetailsDrawer({
                   <span className="mb-1 block text-[9px] font-bold text-wk-text-muted">
                     Publish date and time
                   </span>
-                  <input
-                    type="datetime-local"
-                    value={scheduleAt}
-                    onChange={(event) =>
-                      setScheduleAt(event.target.value)
-                    }
-                    className="w-full rounded-lg border border-wk-border bg-wk-bg px-3 py-2 text-[11px] text-wk-text outline-none focus:border-wk-brand"
-                  />
+                  <WkDateTimePicker
+  value={scheduleAt}
+  onChange={(nextValue) => setScheduleAt(nextValue)}
+  label="Schedule at"
+  showLabel={false}
+  triggerClassName="w-full rounded-lg border border-wk-border bg-wk-bg px-3 py-2 text-[11px] text-wk-text outline-none focus:border-wk-brand"
+/>
                 </label>
 
                 <textarea

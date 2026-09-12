@@ -4,6 +4,7 @@ import {
   useRef,
   useState,
 } from "react";
+import { WkSearchField } from "@/components/design-system/primitives/Field";
 import {
   getCountryNameForIso2,
   getSortedCountryCodes,
@@ -158,19 +159,14 @@ export function ArtistCountryPicker({
             aria-label="Country"
             className="absolute left-0 top-[calc(100%+6px)] z-40 w-full rounded-2xl border border-[var(--wk-border)] bg-[var(--wk-surface)] p-2 shadow-2xl"
           >
-            <input
-              type="search"
+            <WkSearchField
               value={query}
-              onChange={(event) =>
-                setQuery(
-                  event.target.value,
-                )
-              }
+              onChange={setQuery}
               autoFocus
               autoComplete="off"
               placeholder="Country"
-              aria-label="Country"
-              className="w-full rounded-xl border border-[var(--wk-border)] bg-[var(--wk-bg)] px-3 py-2.5 text-[14px] text-[var(--wk-text)] outline-none focus:border-[var(--wk-brand)]"
+              ariaLabel="Country"
+              inputClassName="border-[var(--wk-border)] bg-[var(--wk-bg)] text-[14px] text-[var(--wk-text)] focus:border-[var(--wk-brand)]"
             />
 
             {!query.trim() ? (

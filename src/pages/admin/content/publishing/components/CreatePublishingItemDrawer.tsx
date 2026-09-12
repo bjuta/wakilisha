@@ -19,6 +19,8 @@ import {
   type PublishingProductionStage,
 } from "@/services/publishing/publishingWorkspaceService";
 import { WkSelect } from "@/components/design-system/primitives/Select";
+import { WkDateTimePicker } from "@/components/design-system/primitives/DateTimePicker";
+
 
 
 interface CreatePublishingItemDrawerProps {
@@ -601,34 +603,32 @@ export function CreatePublishingItemDrawer({
                 <span className="text-[12px] font-bold text-wk-text">
                   Production Deadline
                 </span>
-                <input
-                  type="datetime-local"
-                  value={productionDeadline}
-                  onChange={(event) =>
-                    setProductionDeadline(
-                      event.target.value,
-                    )
-                  }
-                  disabled={saving}
-                  className="mt-2 w-full rounded-xl border border-wk-border bg-wk-surface px-3 py-2.5 text-[13px] text-wk-text outline-none focus:border-wk-brand disabled:opacity-60"
-                />
+                <WkDateTimePicker
+  value={productionDeadline}
+  onChange={(nextValue) => setProductionDeadline(
+                      nextValue,
+                    )}
+  label="Production deadline"
+  showLabel={false}
+  disabled={saving}
+  triggerClassName="mt-2 w-full rounded-xl border border-wk-border bg-wk-surface px-3 py-2.5 text-[13px] text-wk-text outline-none focus:border-wk-brand disabled:opacity-60"
+/>
               </label>
 
               <label className="block">
                 <span className="text-[12px] font-bold text-wk-text">
                   Planned Publish Time
                 </span>
-                <input
-                  type="datetime-local"
-                  value={plannedPublishAt}
-                  onChange={(event) =>
-                    setPlannedPublishAt(
-                      event.target.value,
-                    )
-                  }
-                  disabled={saving}
-                  className="mt-2 w-full rounded-xl border border-wk-border bg-wk-surface px-3 py-2.5 text-[13px] text-wk-text outline-none focus:border-wk-brand disabled:opacity-60"
-                />
+                <WkDateTimePicker
+  value={plannedPublishAt}
+  onChange={(nextValue) => setPlannedPublishAt(
+                      nextValue,
+                    )}
+  label="Planned publish at"
+  showLabel={false}
+  disabled={saving}
+  triggerClassName="mt-2 w-full rounded-xl border border-wk-border bg-wk-surface px-3 py-2.5 text-[13px] text-wk-text outline-none focus:border-wk-brand disabled:opacity-60"
+/>
               </label>
             </div>
 

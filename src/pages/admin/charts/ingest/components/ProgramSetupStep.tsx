@@ -10,6 +10,9 @@ import { QuickTemplateButton, ProviderChip, KindToggle } from "./FormComponents"
 import { getSortedCountryCodes, getCountryNameForIso2 } from "@/utils/countries";
 import { WkSelect } from "@/components/design-system/primitives/Select";
 import { WkCheckbox } from "@/components/design-system/primitives/Checkbox";
+import { WkDatePicker } from "@/components/design-system/primitives/DateTimePicker";
+import { WkSlider } from "@/components/design-system/primitives/Slider";
+
 
 
 
@@ -309,13 +312,28 @@ export function ProgramSetupStep(props: ProgramSetupStepProps) {
       <div className="mb-4 grid grid-cols-1 gap-4 sm:grid-cols-3">
         <div>
           <label className={LABEL_CLASS}>Edition Date *</label>
-          <input type="date" value={editionDate} onChange={(event) => setEditionDate(event.target.value)} className={INPUT_CLASS} />
+          <WkDatePicker
+  value={editionDate}
+  onChange={(nextValue) => setEditionDate(nextValue)}
+  label="Edition date"
+  showLabel={false}
+  triggerClassName={INPUT_CLASS}
+/>
           <p className="mt-1 text-[11px] text-wk-text-muted">Usually the chart week (Monday)</p>
         </div>
         <div>
           <label className={LABEL_CLASS}>Chart Size *</label>
           <div className="flex items-center gap-2">
-            <input type="range" min={10} max={100} step={10} value={chartSize} onChange={(event) => setChartSize(Number(event.target.value))} className="flex-1 accent-wk-brand" />
+            <WkSlider
+  value={chartSize}
+  onChange={(nextValue) => setChartSize(nextValue)}
+  ariaLabel="Chart size"
+  showValueLabel={false}
+  min={10}
+  max={100}
+  step={10}
+  className="flex-1"
+/>
             <span className="w-10 text-right text-[13px] font-bold text-wk-text">{chartSize}</span>
           </div>
         </div>

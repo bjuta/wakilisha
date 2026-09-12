@@ -11,6 +11,8 @@ import {
   type RegistrySettings,
 } from "@/services/adminSettings/settingsTypes";
 import { WkSelect } from "@/components/design-system/primitives/Select";
+import { WkNumberField } from "@/components/design-system/primitives/NumberField";
+
 
 
 export default function AdminSettingsRegistry() {
@@ -79,15 +81,45 @@ export default function AdminSettingsRegistry() {
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           <div>
             <label className="block text-[12px] font-semibold text-[var(--wk-text-muted)] mb-1.5">Quality Threshold</label>
-            <input type="number" value={settings.qualityThreshold} min={0} max={1} step={0.01} onChange={(e) => update("qualityThreshold", Number(e.target.value))} className="w-full rounded-lg border border-[var(--wk-border)] bg-[var(--wk-bg)] px-3 py-2 text-[13px] text-[var(--wk-text)] focus:border-[var(--wk-brand)] focus:outline-none focus:ring-1 focus:ring-[var(--wk-brand)]" />
+            <WkNumberField
+  value={settings.qualityThreshold}
+  onChange={(nextValue) => update("qualityThreshold", nextValue)}
+  ariaLabel="Quality threshold"
+  showSteppers={false}
+  min={0}
+  max={1}
+  step={0.01}
+  groupClassName="w-full rounded-lg border border-[var(--wk-border)] bg-[var(--wk-bg)] px-3 py-2 text-[13px] text-[var(--wk-text)] focus:border-[var(--wk-brand)] focus:outline-none focus:ring-1 focus:ring-[var(--wk-brand)]"
+  inputClassName="text-left"
+/>
           </div>
           <div>
             <label className="block text-[12px] font-semibold text-[var(--wk-text-muted)] mb-1.5">Duplicate Candidate Threshold</label>
-            <input type="number" value={settings.duplicateCandidateThreshold} min={0} max={1} step={0.01} onChange={(e) => update("duplicateCandidateThreshold", Number(e.target.value))} className="w-full rounded-lg border border-[var(--wk-border)] bg-[var(--wk-bg)] px-3 py-2 text-[13px] text-[var(--wk-text)] focus:border-[var(--wk-brand)] focus:outline-none focus:ring-1 focus:ring-[var(--wk-brand)]" />
+            <WkNumberField
+  value={settings.duplicateCandidateThreshold}
+  onChange={(nextValue) => update("duplicateCandidateThreshold", nextValue)}
+  ariaLabel="Duplicate candidate threshold"
+  showSteppers={false}
+  min={0}
+  max={1}
+  step={0.01}
+  groupClassName="w-full rounded-lg border border-[var(--wk-border)] bg-[var(--wk-bg)] px-3 py-2 text-[13px] text-[var(--wk-text)] focus:border-[var(--wk-brand)] focus:outline-none focus:ring-1 focus:ring-[var(--wk-brand)]"
+  inputClassName="text-left"
+/>
           </div>
           <div>
             <label className="block text-[12px] font-semibold text-[var(--wk-text-muted)] mb-1.5">Canonical Match Confidence Threshold</label>
-            <input type="number" value={settings.canonicalMatchConfidenceThreshold} min={0} max={1} step={0.01} onChange={(e) => update("canonicalMatchConfidenceThreshold", Number(e.target.value))} className="w-full rounded-lg border border-[var(--wk-border)] bg-[var(--wk-bg)] px-3 py-2 text-[13px] text-[var(--wk-text)] focus:border-[var(--wk-brand)] focus:outline-none focus:ring-1 focus:ring-[var(--wk-brand)]" />
+            <WkNumberField
+  value={settings.canonicalMatchConfidenceThreshold}
+  onChange={(nextValue) => update("canonicalMatchConfidenceThreshold", nextValue)}
+  ariaLabel="Canonical match confidence threshold"
+  showSteppers={false}
+  min={0}
+  max={1}
+  step={0.01}
+  groupClassName="w-full rounded-lg border border-[var(--wk-border)] bg-[var(--wk-bg)] px-3 py-2 text-[13px] text-[var(--wk-text)] focus:border-[var(--wk-brand)] focus:outline-none focus:ring-1 focus:ring-[var(--wk-brand)]"
+  inputClassName="text-left"
+/>
           </div>
         </div>
       </WkSurface>

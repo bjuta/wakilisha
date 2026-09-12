@@ -1,6 +1,8 @@
 import { useEffect, useRef, useState } from "react";
 import type { UserProfileFields, UsernameAvailability } from "@/hooks/useUserSettings";
 import { normalizeUsernameInput } from "@/hooks/useUserSettings";
+import { WkUploadTrigger } from "@/components/design-system/primitives/UploadField";
+
 
 interface Props {
   profile: UserProfileFields;
@@ -25,8 +27,8 @@ export function AccountSettingsPane({
   uploadCover,
   checkUsernameAvailability,
 }: Props) {
-  const fileRef = useRef<HTMLInputElement>(null);
-  const coverFileRef = useRef<HTMLInputElement>(null);
+  const fileRef = useRef<HTMLButtonElement>(null);
+  const coverFileRef = useRef<HTMLButtonElement>(null);
   const [uploading, setUploading] = useState(false);
   const [coverUploading, setCoverUploading] = useState(false);
   const [uploadError, setUploadError] = useState<string | null>(null);
@@ -60,9 +62,8 @@ export function AccountSettingsPane({
   const handleAvatarClick = () => fileRef.current?.click();
   const handleCoverClick = () => coverFileRef.current?.click();
 
-  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    e.target.value = "";
+  const handleFileChange = async (files: FileList | null) => {
+    const file = files?.[0];
     if (!file) return;
     if (file.size > 5 * 1024 * 1024) {
       setUploadError("Image must be under 5MB");
@@ -80,9 +81,8 @@ export function AccountSettingsPane({
     }
   };
 
-  const handleCoverFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    e.target.value = "";
+  const handleCoverFileChange = async (files: FileList | null) => {
+    const file = files?.[0];
     if (!file) return;
 
     setCoverUploading(true);
@@ -156,13 +156,13 @@ export function AccountSettingsPane({
             </div>
           </div>
         </div>
-        <input
-          ref={coverFileRef}
-          type="file"
-          accept="image/jpeg,image/png,image/webp"
-          onChange={handleCoverFileChange}
-          className="hidden"
-        />
+        <WkUploadTrigger
+  ref={coverFileRef}
+  accept="image/jpeg,image/png,image/webp"
+  onSelect={handleCoverFileChange}
+  ariaLabel="File"
+  className="hidden"
+/>
         {coverUploadError && <p className="mt-2 text-[11px] font-bold text-[var(--wk-danger)]">{coverUploadError}</p>}
       </div>
 
@@ -204,7 +204,13 @@ export function AccountSettingsPane({
             )}
             <p className="text-[10px] text-[var(--wk-text-faint)] mt-1">JPG, PNG, WebP. Max 5MB.</p>
           </div>
-          <input ref={fileRef} type="file" accept="image/jpeg,image/png,image/webp" onChange={handleFileChange} className="hidden" />
+          <WkUploadTrigger
+  ref={fileRef}
+  accept="image/jpeg,image/png,image/webp"
+  onSelect={handleFileChange}
+  ariaLabel="File"
+  className="hidden"
+/>
         </div>
         {uploadError && <p className="text-[11px] text-[var(--wk-danger)] mt-2">{uploadError}</p>}
       </div>

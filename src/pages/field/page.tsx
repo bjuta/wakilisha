@@ -20,6 +20,9 @@ import {
   type FieldQueueRecord,
   type FieldReceipt,
 } from "@/services/fieldIntakeService";
+import { WkDateTimePicker } from "@/components/design-system/primitives/DateTimePicker";
+import { WkUploadTrigger } from "@/components/design-system/primitives/UploadField";
+
 
 const INITIAL_PROGRESS: FieldProgress = {
   stage: "draft_local",
@@ -373,9 +376,9 @@ function savedStageLabel(
 
 export default function FieldIntakePage() {
   const authUser = useAuthUser();
-  const cameraInputRef = useRef<HTMLInputElement | null>(null);
-  const libraryInputRef = useRef<HTMLInputElement | null>(null);
-  const replacementInputRef = useRef<HTMLInputElement | null>(null);
+  const cameraInputRef = useRef<HTMLButtonElement | null>(null);
+  const libraryInputRef = useRef<HTMLButtonElement | null>(null);
+  const replacementInputRef = useRef<HTMLButtonElement | null>(null);
   const abortRef = useRef<AbortController | null>(null);
 
   const [capabilityChecked, setCapabilityChecked] = useState(false);
@@ -482,8 +485,8 @@ export default function FieldIntakePage() {
       preparingActivityIndex % preparingMessages.length
     ];
 
-  function chooseFile(event: ChangeEvent<HTMLInputElement>) {
-    const nextFile = event.target.files?.[0] ?? null;
+  function chooseFile(files: FileList | null) {
+    const nextFile = files?.[0] ?? null;
     setFile(nextFile);
     setCompleted(false);
     setReceipt(null);
@@ -743,37 +746,29 @@ export default function FieldIntakePage() {
 
   return (
     <main className="mx-auto w-full max-w-xl px-4 pb-24 pt-7 sm:pt-10">
-      <input
-        ref={cameraInputRef}
-        type="file"
-        accept="video/mp4,video/quicktime,video/webm,video/x-m4v,video/x-matroska"
-        capture="environment"
-        onChange={chooseFile}
-        className="sr-only"
-        tabIndex={-1}
-        aria-hidden="true"
-      />
-      <input
-        ref={libraryInputRef}
-        type="file"
-        accept="video/mp4,video/quicktime,video/webm,video/x-m4v,video/x-matroska"
-        onChange={chooseFile}
-        className="sr-only"
-        tabIndex={-1}
-        aria-hidden="true"
-      />
+      <WkUploadTrigger
+  ref={cameraInputRef}
+  accept="video/mp4,video/quicktime,video/webm,video/x-m4v,video/x-matroska"
+  defaultCamera="environment"
+  onSelect={chooseFile}
+  ariaLabel="File"
+  className="sr-only"
+/>
+      <WkUploadTrigger
+  ref={libraryInputRef}
+  accept="video/mp4,video/quicktime,video/webm,video/x-m4v,video/x-matroska"
+  onSelect={chooseFile}
+  ariaLabel="File"
+  className="sr-only"
+/>
 
-      <input
-        ref={replacementInputRef}
-        type="file"
-        accept="video/mp4,video/quicktime,video/webm,video/x-m4v,video/x-matroska"
-        onChange={(event) =>
-          setReplacementFile(event.target.files?.[0] ?? null)
-        }
-        className="sr-only"
-        tabIndex={-1}
-        aria-hidden="true"
-      />
+      <WkUploadTrigger
+  ref={replacementInputRef}
+  accept="video/mp4,video/quicktime,video/webm,video/x-m4v,video/x-matroska"
+  onSelect={(files) => setReplacementFile(files?.[0] ?? null)}
+  ariaLabel="File"
+  className="sr-only"
+/>
 
       <header>
         <div className="text-[10px] font-black uppercase tracking-[0.18em] text-[var(--wk-brand)]">
@@ -1509,35 +1504,18 @@ export default function FieldIntakePage() {
 
                           {declarationDraft.embargoRequestMode
                           === "until_time" ? (
-                            <label className="relative mt-2 block box-border w-full min-w-0 max-w-full overflow-hidden rounded-2xl border border-[var(--wk-border)] bg-[var(--wk-surface)]">
-                              <span className="pointer-events-none flex min-w-0 items-center gap-3 px-3 py-3">
-                                <i className="ri-calendar-line shrink-0 text-[16px] text-[var(--wk-brand)]" />
-
-                                <span className="min-w-0 flex-1 truncate text-[12px] font-bold text-[var(--wk-text)]">
-                                  {formatHoldTime(
-                                    declarationDraft.requestedEmbargoUntilLocal,
-                                  )}
-                                </span>
-
-                                <i className="ri-arrow-right-s-line shrink-0 text-[16px] text-[var(--wk-text-faint)]" />
-                              </span>
-
-                              <input
-                                type="datetime-local"
-                                value={
-                                  declarationDraft.requestedEmbargoUntilLocal
-                                }
-                                onChange={(event) =>
-                                  setDeclarationDraft((current) => ({
+                            <WkDateTimePicker
+  value={declarationDraft.requestedEmbargoUntilLocal}
+  onChange={(nextValue) => setDeclarationDraft((current) => ({
                                     ...current,
                                     requestedEmbargoUntilLocal:
-                                      event.target.value,
-                                  }))
-                                }
-                                aria-label="Hold until"
-                                className="absolute inset-0 h-full w-full cursor-pointer opacity-0"
-                              />
-                            </label>
+                                      nextValue,
+                                  }))}
+  label="Hold until"
+  showLabel={false}
+  className="mt-2 w-full"
+  triggerClassName="rounded-2xl border-[var(--wk-border)] bg-[var(--wk-surface)] px-3 py-3"
+/>
                           ) : null}
                         </div>
 

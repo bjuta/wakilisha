@@ -11,6 +11,8 @@ import {
   type AirplaySettings,
 } from "@/services/adminSettings/settingsTypes";
 import { readAcrCloudCredentials } from "@/services/adminSettings/providerCredentialReader";
+import { WkNumberField } from "@/components/design-system/primitives/NumberField";
+
 
 interface AirplaySourceRow {
   id: string;
@@ -183,7 +185,17 @@ export default function AdminSettingsAirplay() {
           </div>
           <div>
             <label className="block text-[12px] font-semibold text-[var(--wk-text-muted)] mb-1.5">Minimum Confidence Threshold</label>
-            <input type="number" value={settings.minimumConfidenceThreshold} min={0} max={1} step={0.05} onChange={(e) => update("minimumConfidenceThreshold", Number(e.target.value))} className="w-full rounded-lg border border-[var(--wk-border)] bg-[var(--wk-bg)] px-3 py-2 text-[13px] text-[var(--wk-text)] focus:border-[var(--wk-brand)] focus:outline-none focus:ring-1 focus:ring-[var(--wk-brand)]" />
+            <WkNumberField
+  value={settings.minimumConfidenceThreshold}
+  onChange={(nextValue) => update("minimumConfidenceThreshold", nextValue)}
+  ariaLabel="Minimum confidence threshold"
+  showSteppers={false}
+  min={0}
+  max={1}
+  step={0.05}
+  groupClassName="w-full rounded-lg border border-[var(--wk-border)] bg-[var(--wk-bg)] px-3 py-2 text-[13px] text-[var(--wk-text)] focus:border-[var(--wk-brand)] focus:outline-none focus:ring-1 focus:ring-[var(--wk-brand)]"
+  inputClassName="text-left"
+/>
           </div>
           <div className="flex items-center justify-between rounded-lg border border-[var(--wk-border)] bg-[var(--wk-bg)] px-3 py-2.5">
             <span className="text-[13px] font-semibold text-[var(--wk-text)]">Auto-Link Detections to Registry</span>

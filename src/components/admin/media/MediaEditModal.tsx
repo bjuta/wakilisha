@@ -12,6 +12,9 @@ import {
 } from "@/services/mediaService";
 import { WkSelect } from "@/components/design-system/primitives/Select";
 import { WkCheckbox } from "@/components/design-system/primitives/Checkbox";
+import { WkDatePicker } from "@/components/design-system/primitives/DateTimePicker";
+import { WkNumberField } from "@/components/design-system/primitives/NumberField";
+
 
 
 
@@ -641,31 +644,31 @@ export function MediaEditModal({
                         <label className="block text-[11px] font-semibold text-wk-text-soft mb-1.5">
                           Width
                         </label>
-                        <input
-                          type="number"
-                          value={
-                            editedBlob
+                        <WkNumberField
+  value={editedBlob
                               ? editedWidth
-                              : (asset.metadata?.width as number | undefined) || ""
-                          }
-                          readOnly
-                          className="w-full rounded-lg border border-wk-border bg-wk-bg px-3 py-1.5 text-[12px] text-wk-text-muted outline-none cursor-not-allowed"
-                        />
+                              : (asset.metadata?.width as number | undefined) || ""}
+  ariaLabel="Width"
+  showSteppers={false}
+  readOnly
+  groupClassName="w-full rounded-lg border border-wk-border bg-wk-bg px-3 py-1.5 text-[12px] text-wk-text-muted outline-none cursor-not-allowed"
+  inputClassName="text-left text-wk-text-muted"
+/>
                       </div>
                       <div className="flex-1">
                         <label className="block text-[11px] font-semibold text-wk-text-soft mb-1.5">
                           Height
                         </label>
-                        <input
-                          type="number"
-                          value={
-                            editedBlob
+                        <WkNumberField
+  value={editedBlob
                               ? editedHeight
-                              : (asset.metadata?.height as number | undefined) || ""
-                          }
-                          readOnly
-                          className="w-full rounded-lg border border-wk-border bg-wk-bg px-3 py-1.5 text-[12px] text-wk-text-muted outline-none cursor-not-allowed"
-                        />
+                              : (asset.metadata?.height as number | undefined) || ""}
+  ariaLabel="Height"
+  showSteppers={false}
+  readOnly
+  groupClassName="w-full rounded-lg border border-wk-border bg-wk-bg px-3 py-1.5 text-[12px] text-wk-text-muted outline-none cursor-not-allowed"
+  inputClassName="text-left text-wk-text-muted"
+/>
                       </div>
                     </div>
                     )}
@@ -764,12 +767,13 @@ export function MediaEditModal({
                           <label className="block text-[11px] font-semibold text-wk-text-soft mb-1.5">
                             Content date
                           </label>
-                          <input
-                            type="date"
-                            value={contentDate}
-                            onChange={(e) => setContentDate(e.target.value)}
-                            className="w-full rounded-lg border border-wk-border bg-wk-surface px-2.5 py-1.5 text-[12px] text-wk-text outline-none focus:border-wk-brand/50"
-                          />
+                          <WkDatePicker
+  value={contentDate}
+  onChange={(nextValue) => setContentDate(nextValue)}
+  label="Content date"
+  showLabel={false}
+  triggerClassName="w-full rounded-lg border border-wk-border bg-wk-surface px-2.5 py-1.5 text-[12px] text-wk-text outline-none focus:border-wk-brand/50"
+/>
                         </div>
                       </div>
 
