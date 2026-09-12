@@ -103,7 +103,7 @@ async function installObservers(page) {
 async function discoverPath(page, seedPath, patterns) {
   await page.goto(`${BASE_URL}${seedPath}`, { waitUntil: "domcontentloaded", timeout: NAV_TIMEOUT_MS });
   await page.locator("main").waitFor({ state: "attached", timeout: NAV_TIMEOUT_MS }).catch(() => {});
-  await page.waitForTimeout(1600);
+  await page.waitForTimeout(SETTLE_MS);
 
   const hrefs = await page.locator("a[href]").evaluateAll((anchors) =>
     anchors.map((anchor) => anchor.getAttribute("href")).filter(Boolean),
