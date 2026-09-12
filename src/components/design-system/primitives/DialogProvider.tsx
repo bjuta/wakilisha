@@ -32,6 +32,7 @@ export interface WkPromptOptions extends DialogCopy {
   placeholder?: string;
   required?: boolean;
   minLength?: number;
+  destructive?: boolean;
 }
 
 export interface WkAlertOptions extends Pick<DialogCopy, "title" | "message" | "confirmLabel"> {}
@@ -94,6 +95,7 @@ function PromptBody({
     placeholder,
     required = false,
     minLength,
+    destructive = false,
     confirmLabel = "Continue",
     cancelLabel = "Cancel",
     message,
@@ -132,7 +134,11 @@ function PromptBody({
         <WkButton type="button" variant="ghost" onClick={onCancel}>
           {cancelLabel}
         </WkButton>
-        <WkButton type="submit" disabled={!valid}>
+        <WkButton
+          type="submit"
+          disabled={!valid}
+          className={destructive ? "!bg-wk-danger !text-white" : ""}
+        >
           {confirmLabel}
         </WkButton>
       </div>
