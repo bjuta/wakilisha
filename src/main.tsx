@@ -1,6 +1,7 @@
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 import "./index.css";
+import "./styles/wakilisha-remixicon-compat.css";
 import App from "./App";
 import { WakilishaDialogProvider } from "@/components/design-system/primitives/DialogProvider";
 import { getSiteIdentitySettings } from "@/services/adminSettings/settingsStore";

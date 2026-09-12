@@ -12,6 +12,14 @@ const fail = (message) => {
 
 const index = read("index.html");
 
+const main = read(
+  "src/main.tsx",
+);
+
+const remixiconCompat = read(
+  "src/styles/wakilisha-remixicon-compat.css",
+);
+
 const publicDocs = read(
   "src/pages/api-docs/page.tsx",
 );
@@ -102,9 +110,32 @@ if (
   fail("Redoc still loads globally");
 }
 
-if (!index.includes("remixicon")) {
+if (
+  index.includes(
+    "cdnjs.cloudflare.com",
+  )
+  || index.includes(
+    "remixicon.min.css",
+  )
+) {
   fail(
-    "Remixicon was removed while the application still uses it",
+    "third-party Remixicon/CDN authority still loads globally",
+  );
+}
+
+if (
+  !main.includes(
+    'import "./styles/wakilisha-remixicon-compat.css";',
+  )
+  || !remixiconCompat.includes(
+    "Generated WAKILISHA compatibility layer for legacy ri-* callsites.",
+  )
+  || !remixiconCompat.includes(
+    '[class^="ri-"],[class*=" ri-"]',
+  )
+) {
+  fail(
+    "legacy ri-* callsites are not owned by the generated WAKILISHA compatibility layer",
   );
 }
 

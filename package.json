@@ -46,6 +46,7 @@
     "@types/node": "^22.10.0",
     "@vitejs/plugin-react": "latest",
     "jsdom": "30.0.1",
+    "remixicon": "4.5.0",
     "tsx": "^4.19.2",
     "typescript": "^5.7.2",
     "vite": "latest"
@@ -55,7 +56,7 @@
   "scripts": {
     "analytics:audit": "node scripts/analytics/audit-ga4-implementation.mjs",
     "analytics:audit:dist": "node scripts/analytics/audit-ga4-build-output.mjs",
-    "performance:audit": "node scripts/performance/audit-home-delivery.mjs && node scripts/performance/generate-wakilisha-icon-sprite.mjs --check && node scripts/performance/audit-css-important-debt.mjs && node scripts/performance/audit-font-delivery.mjs",
+    "performance:audit": "node scripts/performance/audit-home-delivery.mjs && node scripts/performance/generate-wakilisha-icon-sprite.mjs --check && node scripts/performance/generate-wakilisha-remixicon-compat.mjs --check && node scripts/performance/audit-css-important-debt.mjs && node scripts/performance/audit-font-delivery.mjs",
     "icons:generate": "node scripts/performance/generate-wakilisha-icon-sprite.mjs",
     "performance:audit:routes": "node scripts/performance/audit-admin-route-splitting.mjs",
     "performance:audit:images": "node scripts/performance/audit-responsive-images.mjs",
@@ -124,7 +125,8 @@
     "audit:viewport-integrity": "node scripts/control-plane/verify-viewport-integrity.mjs",
     "audit:ui-chrome:zero": "node scripts/control-plane/verify-wakilisha-ui-chrome.mjs --require-zero",
     "test:ui-dom": "vitest run test/ui-interactions",
-    "test:ui-browser": "node scripts/test/run-ui-browser.mjs"
+    "test:ui-browser": "node scripts/test/run-ui-browser.mjs",
+    "icons:generate:remixicon": "node scripts/performance/generate-wakilisha-remixicon-compat.mjs"
   },
   "type": "module",
   "version": "0.1.0"
