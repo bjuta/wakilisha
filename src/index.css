@@ -4,14 +4,10 @@
 @import "./styles/wakilisha-magazine-38-44.css";
 @import "./styles/wakilisha-article-prose.css";
 @import "./styles/wakilisha-embeds.css";
-@import "./styles/wakilisha-charts-39.css";
 @import "./styles/wakilisha-track-40.css";
-@import "./styles/wakilisha-album-41-42.css";
 @import "./styles/wakilisha-labels-43.css";
-@import "./styles/wakilisha-genres-v2.css";
 @import "./styles/wakilisha-share-45-46.css";
 @import "./styles/wakilisha-profile-48.css";
-@import "./styles/wakilisha-settings-49.css";
 
 /* Hero entrance animations */
 @keyframes slideIn {

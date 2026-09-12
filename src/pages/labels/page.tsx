@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback, useRef } from "react";
 import { Link } from "react-router-dom";
 import { ShareButton } from "@/components/design-system/share/ShareSheet";
 import { WkIcon } from "@/components/design-system/Icon";
+import { WkMetricCard, WkMetricStrip } from "@/components/design-system/primitives/Metric";
 import { Chapter19FallbackImage } from "@/components/media/Chapter19FallbackImage";
 import {
   listLabelsPaginated,
@@ -172,12 +173,12 @@ export default function Labels() {
       <FeaturedLabelCarousel labels={featuredLabels} catalogStats={stats} />
 
       <div className="wk-container-wide px-4 py-10 md:px-6">
-        <div className="chart-stats-strip mb-10">
-          <Stat value={stats.total} label="Labels" />
-          <Stat value={totalCount} label="Showing" />
-          <Stat value={stats.totalArtists.toLocaleString()} label="Artists" />
-          <Stat value={stats.totalReleases.toLocaleString()} label="Releases" />
-        </div>
+        <WkMetricStrip className="mb-10">
+          <WkMetricCard value={stats.total} label="Labels" />
+          <WkMetricCard value={totalCount} label="Showing" />
+          <WkMetricCard value={stats.totalArtists.toLocaleString()} label="Artists" />
+          <WkMetricCard value={stats.totalReleases.toLocaleString()} label="Releases" />
+        </WkMetricStrip>
 
         <section className="mb-10 rounded-2xl border border-[var(--wk-border)] bg-[var(--wk-surface)] p-4 md:p-5">
           <div className="flex flex-col gap-5 sm:flex-row sm:items-end sm:justify-between mb-5">
@@ -572,10 +573,6 @@ function FilterSelect({ label, value, options, onChange }: { label: string; valu
   );
 }
 
-/* ── Stat pill ── */
-function Stat({ value, label }: { value: string | number; label: string }) {
-  return <div className="chart-stat-card"><div className="chart-stat-value">{value}</div><div className="chart-stat-label">{label}</div></div>;
-}
 
 /* ── Helpers ── */
 function sortOptionLabel(value: string): string {

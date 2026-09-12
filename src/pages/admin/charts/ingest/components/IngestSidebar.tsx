@@ -3,7 +3,7 @@ import { WkSurface } from "@/components/design-system/primitives/Surface";
 import type { ChartEligibilityProfile } from "@/services/chartsEligibility/eligibilityTypes";
 import type { IngestRun, RecentIngestActivity, ResourceGuardStatus } from "@/services/chartsIngestion/ingestStudioTypes";
 import type { StoredChartMarketScope } from "@/services/chartsMarkets/marketScopeStore";
-import { AlertCircle, FolderPlus, GitPullRequest, Wrench, XCircle } from "lucide-react";
+import { WkIcon } from "@/components/design-system/Icon";
 import { fixChartArtistSlugs } from "@/services/chartsIngestion/client";
 import type { FixArtistSlugsResult } from "@/services/chartsIngestion/client";
 import { ActivityItem } from "./ActivityItem";
@@ -118,15 +118,15 @@ export function IngestSidebar({
       <WkSurface className="p-4">
         <h2 className="mb-3 text-[14px] font-bold text-wk-text">Operations</h2>
         <div className="space-y-1">
-          <NavButton icon={GitPullRequest} label="Review Queue" path={`${ADMIN_CHARTS_BASE}/review-queue`} />
-          <NavButton icon={XCircle} label="No-match Releases" path={`${ADMIN_CHARTS_BASE}/no-match`} />
-          <NavButton icon={FolderPlus} label="Release Shells" path="/admin/registry/release-shells" />
-          <NavButton icon={AlertCircle} label="Canon Gaps" path={`${ADMIN_CHARTS_BASE}/canon-gaps`} />
+          <NavButton icon="GitPullRequest" label="Review Queue" path={`${ADMIN_CHARTS_BASE}/review-queue`} />
+          <NavButton icon="XCircle" label="No-match Releases" path={`${ADMIN_CHARTS_BASE}/no-match`} />
+          <NavButton icon="FolderPlus" label="Release Shells" path="/admin/registry/release-shells" />
+          <NavButton icon="AlertCircle" label="Canon Gaps" path={`${ADMIN_CHARTS_BASE}/canon-gaps`} />
           <button
             onClick={() => { setFixSlugsOpen(true); setFixSlugsResult(null); setFixSlugsError(null); }}
             className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-[13px] font-semibold text-wk-text-soft transition-colors hover:bg-wk-bg-subtle whitespace-nowrap cursor-pointer"
           >
-            <Wrench size={14} />
+            <WkIcon name="Wrench" size={14} />
             Fix Artist Slugs
           </button>
         </div>
@@ -191,7 +191,7 @@ export function IngestSidebar({
         <div className="fixed inset-0 z-[300] flex items-center justify-center bg-black/50">
           <div ref={fixSlugsRef} className="w-full max-w-sm rounded-xl border border-wk-border bg-wk-surface p-6 shadow-lg">
             <div className="flex items-center gap-2">
-              <Wrench size={18} className="text-wk-brand" />
+              <WkIcon name="Wrench" size={18} className="text-wk-brand" />
               <h3 className="text-[15px] font-bold text-wk-text">Fix Artist Slugs</h3>
             </div>
             <p className="mt-2 text-[13px] text-wk-text-muted">

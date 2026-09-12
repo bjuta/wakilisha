@@ -1,4 +1,4 @@
-import { ArrowUp, ArrowDown } from "lucide-react";
+import { WkIcon } from "@/components/design-system/Icon";
 import { WkSurface } from "@/components/design-system/primitives/Surface";
 
 interface KpiCardProps {
@@ -14,7 +14,7 @@ export function KpiCard({ label, value, trend, positive }: KpiCardProps) {
       <p className="text-[11px] font-semibold uppercase tracking-wider text-wk-text-muted">{label}</p>
       <p className="mt-1 text-[26px] font-black text-wk-text">{value}</p>
       <span className={`mt-1 inline-block text-[11px] font-semibold ${positive ? "text-wk-success" : "text-wk-warning"}`}>
-        {positive ? <ArrowUp size={12} className="mr-0.5 inline" /> : <ArrowDown size={12} className="mr-0.5 inline" />}
+        {positive ? <WkIcon name="ArrowUp" size={12} className="mr-0.5 inline" /> : <WkIcon name="ArrowDown" size={12} className="mr-0.5 inline" />}
         {trend}
       </span>
       <div className={`absolute bottom-0 left-0 right-0 h-1 ${positive ? "bg-wk-success" : "bg-wk-warning"}`} />

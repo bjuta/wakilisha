@@ -1,20 +1,20 @@
 import { useNavigate } from "react-router-dom";
-import { type LucideIcon } from "lucide-react";
+import { WkIcon, type WkIconName } from "@/components/design-system/Icon";
 
 interface NavButtonProps {
-  icon: LucideIcon;
+  icon: WkIconName;
   label: string;
   path: string;
 }
 
-export function NavButton({ icon: Icon, label, path }: NavButtonProps) {
+export function NavButton({ icon, label, path }: NavButtonProps) {
   const navigate = useNavigate();
   return (
     <button
       onClick={() => navigate(path)}
       className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-[13px] font-semibold text-wk-text-soft transition-colors hover:bg-wk-bg-subtle"
     >
-      <Icon size={14} />
+      <WkIcon name={icon} size={14} />
       {label}
     </button>
   );

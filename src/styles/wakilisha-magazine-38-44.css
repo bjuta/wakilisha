@@ -496,16 +496,7 @@
 }
 
 /* ─── Scroll Reveal ─── */
-.mag-reveal {
-  opacity: 0;
-  transform: translateY(28px);
-  transition: opacity 0.7s var(--wk-ease-snap), transform 0.7s var(--wk-ease-snap);
-}
 
-.mag-reveal-visible {
-  opacity: 1;
-  transform: translateY(0);
-}
 
 /* ─── Magazine Hero V2 ─── */
 .mag-hero-v2 {

@@ -54,6 +54,23 @@ const javascriptFiles = fs
   .readdirSync(assetsPath)
   .filter((name) => name.endsWith(".js"));
 
+const lucideRuntimeChunks = javascriptFiles
+  .filter((name) => {
+    const buffer = fs.readFileSync(
+      path.join(assetsPath, name),
+    );
+
+    return buffer.includes(
+      Buffer.from("createLucideIcon"),
+    );
+  });
+
+if (lucideRuntimeChunks.length > 0) {
+  fail(
+    `lucide-react runtime factory still ships in: ${lucideRuntimeChunks.join(", ")}`,
+  );
+}
+
 const maximumRawBytes = 700000;
 const maximumGzipBytes = 200000;
 const minimumJavascriptChunks = 200;
@@ -97,4 +114,8 @@ console.log(
 
 console.log(
   `JavaScript chunks: ${javascriptFiles.length}`,
+);
+
+console.log(
+  "Lucide runtime factory chunks: 0",
 );

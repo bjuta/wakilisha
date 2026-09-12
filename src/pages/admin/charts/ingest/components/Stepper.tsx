@@ -1,4 +1,4 @@
-import { Settings, SlidersHorizontal, Eye, CheckCircle2 } from "lucide-react";
+import { WkIcon, type WkIconName } from "@/components/design-system/Icon";
 
 export type IngestStudioStep = "configure" | "rules" | "preview" | "commit";
 
@@ -9,10 +9,10 @@ interface StepperProps {
 
 export function Stepper({ step, onStepChange }: StepperProps) {
   const steps = [
-    { key: "configure" as const, label: "Program", icon: Settings },
-    { key: "rules" as const, label: "Rules", icon: SlidersHorizontal },
-    { key: "preview" as const, label: "Preview", icon: Eye },
-    { key: "commit" as const, label: "Commit", icon: CheckCircle2 },
+    { key: "configure" as const, label: "Program", icon: "Settings" as WkIconName },
+    { key: "rules" as const, label: "Rules", icon: "SlidersHorizontal" as WkIconName },
+    { key: "preview" as const, label: "Preview", icon: "Eye" as WkIconName },
+    { key: "commit" as const, label: "Commit", icon: "CheckCircle2" as WkIconName },
   ];
 
   const currentIndex = steps.findIndex((s) => s.key === step);
@@ -22,7 +22,7 @@ export function Stepper({ step, onStepChange }: StepperProps) {
       {steps.map((s, i) => {
         const isActive = s.key === step;
         const isDone = i < currentIndex;
-        const Icon = s.icon;
+        const icon = s.icon;
         const canJumpBack = isDone && (s.key === "configure" || s.key === "rules");
 
         return (
@@ -43,7 +43,7 @@ export function Stepper({ step, onStepChange }: StepperProps) {
               <span className={`flex h-5 w-5 items-center justify-center rounded-full text-[10px] font-bold ${
                 isActive ? "bg-wk-text-on-brand text-wk-brand" : isDone ? "bg-wk-brand text-wk-text-on-brand" : "bg-wk-border text-wk-text-faint"
               }`}>
-                {isDone ? <CheckCircle2 size={10} /> : <Icon size={11} />}
+                {isDone ? <WkIcon name="CheckCircle2" size={10} /> : <WkIcon name={icon} size={11} />}
               </span>
               {s.label}
             </button>

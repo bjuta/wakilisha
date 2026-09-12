@@ -1,27 +1,9 @@
+import { useScrollRevealElements } from "@/hooks/useScrollReveal";
 import { useEffect, useRef, useState } from "react";
 import { trackEvent, getAnalyticsSessionId, getCanonicalPageUrl } from "@/services/analytics";
 import { submitForm } from "@/services/formService";
 import { WkSelect } from "@/components/design-system/primitives/Select";
 
-
-function useScrollReveal() {
-  useEffect(() => {
-    const observer = new IntersectionObserver(
-      (entries) => {
-        entries.forEach((entry) => {
-          if (entry.isIntersecting) {
-            entry.target.classList.add("hp-reveal-visible");
-            observer.unobserve(entry.target);
-          }
-        });
-      },
-      { threshold: 0.06, rootMargin: "0px 0px -24px 0px" },
-    );
-    const els = document.querySelectorAll(".hp-reveal");
-    els.forEach((el) => observer.observe(el));
-    return () => observer.disconnect();
-  }, []);
-}
 
 export default function ContactPage() {
   const heroRef = useRef<HTMLDivElement>(null);
@@ -30,7 +12,15 @@ export default function ContactPage() {
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
 
-  useScrollReveal();
+  useScrollRevealElements(
+    [],
+    {
+      selector: ".hp-reveal",
+      visibleClass: "hp-reveal-visible",
+      threshold: 0.06,
+      rootMargin: "0px 0px -24px 0px",
+    },
+  );
 
   useEffect(() => {
     const hero = heroRef.current;
@@ -291,7 +281,7 @@ export default function ContactPage() {
       </div>
 
       <style>{`
-        .hp-reveal { opacity: 0; transform: translateY(24px); transition: opacity 0.7s var(--wk-ease-standard), transform 0.7s var(--wk-ease-standard); }
+        .hp-reveal { opacity: 1; transform: translateY(24px); transition: opacity 0.7s var(--wk-ease-standard), transform 0.7s var(--wk-ease-standard); }
         .hp-reveal-visible { opacity: 1; transform: translateY(0); }
       `}</style>
     </main>

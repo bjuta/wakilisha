@@ -1,4 +1,4 @@
-import { AlertTriangle } from "lucide-react";
+import { WkIcon } from "@/components/design-system/Icon";
 import { WkSurface } from "@/components/design-system/primitives/Surface";
 import type { IngestRun, ResourceGuardStatus } from "@/services/chartsIngestion/ingestStudioTypes";
 
@@ -26,12 +26,12 @@ export function ResourceGuardPanel({ guard, run }: ResourceGuardPanelProps) {
           ))}
           {guard.duplicateRunWarning && (
             <div className="rounded bg-wk-warning-soft p-2 text-[12px] text-wk-warning">
-              <AlertTriangle size={12} className="mr-1 inline" />{guard.duplicateRunWarning}
+              <WkIcon name="AlertTriangle" size={12} className="mr-1 inline" />{guard.duplicateRunWarning}
             </div>
           )}
           {guard.sameEditionDateWarning && (
             <div className="rounded bg-wk-warning-soft p-2 text-[12px] text-wk-warning">
-              <AlertTriangle size={12} className="mr-1 inline" />{guard.sameEditionDateWarning}
+              <WkIcon name="AlertTriangle" size={12} className="mr-1 inline" />{guard.sameEditionDateWarning}
             </div>
           )}
         </div>

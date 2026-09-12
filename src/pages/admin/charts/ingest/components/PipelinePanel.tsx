@@ -1,4 +1,4 @@
-import { Check, Loader } from "lucide-react";
+import { WkIcon } from "@/components/design-system/Icon";
 import { WkSurface } from "@/components/design-system/primitives/Surface";
 import type { IngestRun, IngestStageStatus } from "@/services/chartsIngestion/ingestStudioTypes";
 
@@ -184,9 +184,9 @@ export function PipelinePanel({ run, compact = false }: PipelinePanelProps) {
             <div key={stage.stage} className="flex items-start gap-2.5">
               <div className={`mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-[10px] font-bold text-white ${stageStatusColor(stage.status)}`}>
                 {stage.status === "done" ? (
-                  <Check size={9} />
+                  <WkIcon name="Check" size={9} />
                 ) : stage.status === "running" ? (
-                  <Loader size={9} className="animate-spin" />
+                  <WkIcon name="Loader" size={9} className="animate-spin" />
                 ) : (
                   <span>{i + 1}</span>
                 )}

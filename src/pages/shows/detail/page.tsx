@@ -1,11 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link, useParams } from "react-router-dom";
-import {
-  ExternalLink,
-  Pause,
-  Play,
-  Rss,
-} from "lucide-react";
+import { WkIcon } from "@/components/design-system/Icon";
 import { MetaTags } from "@/components/seo/MetaTags";
 import { usePlayer } from "@/context/PlayerContext";
 import { publicAudioPlayerItem } from "@/services/audio/audioPlayerAdapter";
@@ -182,7 +177,7 @@ export default function PublicShowPage() {
                   to={firstVideo.episode.canonicalPath}
                   className="inline-flex items-center gap-2 rounded-full bg-wk-text px-5 py-3 text-sm font-semibold text-wk-bg transition hover:opacity-90"
                 >
-                  <Play className="h-4 w-4 fill-current" aria-hidden="true" />
+                  <WkIcon name="Play" className="h-4 w-4 fill-current" aria-hidden="true" />
                   Watch latest
                 </Link>
               ) : null}
@@ -194,9 +189,9 @@ export default function PublicShowPage() {
                   className="inline-flex items-center gap-2 rounded-full border border-wk-border bg-wk-surface px-5 py-3 text-sm font-semibold text-wk-text transition hover:bg-wk-surface-raised"
                 >
                   {currentTrack?.id === firstAudio.audio?.publicationId && isPlaying ? (
-                    <Pause className="h-4 w-4" aria-hidden="true" />
+                    <WkIcon name="Pause" className="h-4 w-4" aria-hidden="true" />
                   ) : (
-                    <Play className="h-4 w-4 fill-current" aria-hidden="true" />
+                    <WkIcon name="Play" className="h-4 w-4 fill-current" aria-hidden="true" />
                   )}
                   Listen to latest
                 </button>
@@ -207,9 +202,9 @@ export default function PublicShowPage() {
                   href={`${SITE_URL}${show.feedPath}`}
                   className="inline-flex items-center gap-2 rounded-full border border-wk-border bg-wk-surface px-4 py-3 text-sm font-semibold text-wk-text transition hover:bg-wk-surface-raised"
                 >
-                  <Rss className="h-4 w-4" aria-hidden="true" />
+                  <WkIcon name="Rss" className="h-4 w-4" aria-hidden="true" />
                   RSS Feed
-                  <ExternalLink className="h-3.5 w-3.5" aria-hidden="true" />
+                  <WkIcon name="ExternalLink" className="h-3.5 w-3.5" aria-hidden="true" />
                 </a>
               ) : null}
             </div>
@@ -268,7 +263,7 @@ export default function PublicShowPage() {
                         to={item.episode.canonicalPath}
                         className="inline-flex items-center gap-2 rounded-full bg-wk-text px-4 py-2 text-xs font-semibold text-wk-bg"
                       >
-                        <Play className="h-3.5 w-3.5 fill-current" aria-hidden="true" />
+                        <WkIcon name="Play" className="h-3.5 w-3.5 fill-current" aria-hidden="true" />
                         Watch
                       </Link>
                     ) : null}
@@ -279,9 +274,9 @@ export default function PublicShowPage() {
                         className="inline-flex items-center gap-2 rounded-full border border-wk-border px-4 py-2 text-xs font-semibold text-wk-text"
                       >
                         {audioActive ? (
-                          <Pause className="h-3.5 w-3.5" aria-hidden="true" />
+                          <WkIcon name="Pause" className="h-3.5 w-3.5" aria-hidden="true" />
                         ) : (
-                          <Play className="h-3.5 w-3.5 fill-current" aria-hidden="true" />
+                          <WkIcon name="Play" className="h-3.5 w-3.5 fill-current" aria-hidden="true" />
                         )}
                         {audioActive ? "Pause" : "Listen"}
                       </button>

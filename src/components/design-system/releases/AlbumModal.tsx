@@ -1,3 +1,4 @@
+import "../../../styles/wakilisha-album-41-42.css";
 import { createPortal } from "react-dom";
 import { Link } from "react-router-dom";
 import { useScrollLock } from "@/hooks/useScrollLock";

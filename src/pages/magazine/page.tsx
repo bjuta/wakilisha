@@ -1,3 +1,4 @@
+import { useScrollRevealElements } from "@/hooks/useScrollReveal";
 import { useEffect, useMemo, useState, useRef, useCallback } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { useMagazineArticles, type MagazineArticle } from "@/services/magazineArticles";
@@ -27,26 +28,6 @@ import { CSS } from "@dnd-kit/utilities";
 import { NewsletterSubscribe } from "@/components/feature/NewsletterSubscribe";
 import { ArticleAuthorIdentity } from "@/components/design-system/editorial/ArticleAuthorIdentity";
 
-
-/* ── Scroll reveal ── */
-function useScrollReveal(deps: unknown[] = []) {
-  useEffect(() => {
-    const observer = new IntersectionObserver(
-      (entries) => {
-        entries.forEach((entry) => {
-          if (entry.isIntersecting) {
-            entry.target.classList.add("mag-reveal-visible");
-            observer.unobserve(entry.target);
-          }
-        });
-      },
-      { threshold: 0.08, rootMargin: "0px 0px -32px 0px" },
-    );
-    const els = document.querySelectorAll(".mag-reveal");
-    els.forEach((el) => observer.observe(el));
-    return () => observer.disconnect();
-  }, deps);
-}
 
 function computeIssueInfo(articles: MagazineArticle[]) {
   if (!articles.length) return { number: 1, date: "June 2026" };
@@ -172,7 +153,7 @@ export default function Magazine() {
     return () => window.removeEventListener("scroll", onScroll);
   }, [status]);
 
-  useScrollReveal([status]);
+  useScrollRevealElements([status]);
 
   const { number: issueNum, date: issueDate } = useMemo(
     () => computeIssueInfo(stories),
@@ -304,7 +285,7 @@ export default function Magazine() {
       defs.push({
         id: "picks",
         render: () => (
-          <section className="mag-reveal">
+          <section className="wk-reveal">
             <SectionLabel>Editor’s Picks</SectionLabel>
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-5 lg:items-stretch">
               <div className="lg:h-full">
@@ -328,7 +309,7 @@ export default function Magazine() {
       defs.push({
         id: "latest",
         render: () => (
-          <section className="mag-reveal">
+          <section className="wk-reveal">
             <SectionLabel count={latest.length} href="/magazine">Latest Stories</SectionLabel>
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
               {latest.map((story) => (
@@ -679,7 +660,7 @@ function SectionBlockContent({ section, stories }: { section: string; stories: M
 
   if (isMusic) {
     return (
-      <section className="mag-reveal">
+      <section className="wk-reveal">
         <SectionLabel count={stories.length} href="/magazine">{section}</SectionLabel>
         <SectionCarousel stories={stories} />
       </section>
@@ -691,7 +672,7 @@ function SectionBlockContent({ section, stories }: { section: string; stories: M
 
   if (isEven) {
     return (
-      <section className="mag-reveal">
+      <section className="wk-reveal">
         <SectionLabel count={stories.length} href="/magazine">{section}</SectionLabel>
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
           {stories.slice(0, 3).map((story, i) => (
@@ -703,7 +684,7 @@ function SectionBlockContent({ section, stories }: { section: string; stories: M
   }
 
   return (
-    <section className="mag-reveal">
+    <section className="wk-reveal">
       <SectionLabel count={stories.length} href="/magazine">{section}</SectionLabel>
       <div className="grid grid-cols-1 lg:grid-cols-5 gap-5 lg:items-stretch">
         {stories.slice(0, 1).map((story) => (
@@ -776,7 +757,7 @@ function CompactCardFill({ story, rank }: { story: MagazineArticle; rank: number
 /* ── Inline Newsletter component ── */
 function NewsletterCTA() {
   return (
-    <section className="mag-reveal">
+    <section className="wk-reveal">
       <NewsletterSubscribe
         formId="magazine-newsletter-form"
         headline="Read with us"

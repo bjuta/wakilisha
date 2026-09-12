@@ -23,7 +23,7 @@ export function ArtistSpotlightSpread({ artists, mood, sectionColor }: { artists
   if (!display.length) return null;
 
   return (
-    <section className="magazine-spread mag-reveal" style={{ background: "var(--mag-surface)" }}>
+    <section className="magazine-spread wk-reveal" style={{ background: "var(--mag-surface)" }}>
       <div className="mag-registry-spotlight">
         <div className="mag-registry-spotlight-rail">
           <div className="magazine-meta" style={{ color: accent }}>Artists in this issue</div>
@@ -66,7 +66,7 @@ export function ReleaseSpotlightSpread({ releases, mood, sectionColor }: { relea
   if (!display.length) return null;
 
   return (
-    <section className="magazine-spread mag-reveal" style={{ background: "var(--mag-surface)" }}>
+    <section className="magazine-spread wk-reveal" style={{ background: "var(--mag-surface)" }}>
       <div className="mag-registry-spotlight">
         <div className="mag-registry-spotlight-rail">
           <div className="magazine-meta" style={{ color: accent }}>Releases in this issue</div>
@@ -110,7 +110,7 @@ export function ChartHighlightSpread({ highlights, mood, sectionColor }: { highl
   if (!display.length) return null;
 
   return (
-    <section className="magazine-spread mag-reveal" style={{ background: "var(--mag-surface)" }}>
+    <section className="magazine-spread wk-reveal" style={{ background: "var(--mag-surface)" }}>
       <div className="mag-registry-spotlight" style={{ flexDirection: "column" }}>
         <div className="mag-registry-spotlight-rail" style={{ flexDirection: "row", alignItems: "flex-end", justifyContent: "space-between", marginBottom: 28 }}>
           <div>

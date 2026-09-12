@@ -1,24 +1,6 @@
+import { useScrollRevealElements } from "@/hooks/useScrollReveal";
 import { useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
-
-function useScrollReveal() {
-  useEffect(() => {
-    const observer = new IntersectionObserver(
-      (entries) => {
-        entries.forEach((entry) => {
-          if (entry.isIntersecting) {
-            entry.target.classList.add("hp-reveal-visible");
-            observer.unobserve(entry.target);
-          }
-        });
-      },
-      { threshold: 0.06, rootMargin: "0px 0px -24px 0px" },
-    );
-    const els = document.querySelectorAll(".hp-reveal");
-    els.forEach((el) => observer.observe(el));
-    return () => observer.disconnect();
-  }, []);
-}
 
 interface FaqItem {
   q: string;
@@ -185,7 +167,15 @@ export default function FaqsPage() {
   const heroRef = useRef<HTMLDivElement>(null);
   const heroImgRef = useRef<HTMLImageElement>(null);
 
-  useScrollReveal();
+  useScrollRevealElements(
+    [],
+    {
+      selector: ".hp-reveal",
+      visibleClass: "hp-reveal-visible",
+      threshold: 0.06,
+      rootMargin: "0px 0px -24px 0px",
+    },
+  );
 
   useEffect(() => {
     const hero = heroRef.current;
@@ -298,7 +288,7 @@ export default function FaqsPage() {
       </div>
 
       <style>{`
-        .hp-reveal { opacity: 0; transform: translateY(24px); transition: opacity 0.7s var(--wk-ease-standard), transform 0.7s var(--wk-ease-standard); }
+        .hp-reveal { opacity: 1; transform: translateY(24px); transition: opacity 0.7s var(--wk-ease-standard), transform 0.7s var(--wk-ease-standard); }
         .hp-reveal-visible { opacity: 1; transform: translateY(0); }
       `}</style>
     </main>

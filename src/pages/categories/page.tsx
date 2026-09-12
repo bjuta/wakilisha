@@ -1,26 +1,7 @@
+import { useScrollRevealElements } from "@/hooks/useScrollReveal";
 import { useState, useEffect, useCallback, useRef } from "react";
 import { Link } from "react-router-dom";
 import { fetchTaxonomyIndex, type PublicTaxonomyTerm } from "@/services/publicTaxonomy";
-
-/* ── Scroll reveal ── */
-function useScrollReveal(deps: unknown[] = []) {
-  useEffect(() => {
-    const observer = new IntersectionObserver(
-      (entries) => {
-        entries.forEach((entry) => {
-          if (entry.isIntersecting) {
-            entry.target.classList.add("mag-reveal-visible");
-            observer.unobserve(entry.target);
-          }
-        });
-      },
-      { threshold: 0.08, rootMargin: "0px 0px -32px 0px" },
-    );
-    const els = document.querySelectorAll(".mag-reveal");
-    els.forEach((el) => observer.observe(el));
-    return () => observer.disconnect();
-  }, deps);
-}
 
 /* ── Section header ── */
 function SectionLabel({ children, count }: { children: string; count?: number }) {
@@ -83,7 +64,7 @@ export default function CategoriesIndex() {
     return () => window.removeEventListener("scroll", onScroll);
   }, [loading]);
 
-  useScrollReveal([loading]);
+  useScrollRevealElements([loading]);
 
   const totalArticles = categories.reduce((s, c) => s + c.article_count, 0);
 
@@ -185,7 +166,7 @@ export default function CategoriesIndex() {
 
         {/* ── Featured Categories ── */}
         {featuredCategories.length > 0 && (
-          <section className="mag-reveal">
+          <section className="wk-reveal">
             <SectionLabel count={categories.length}>Featured Sections</SectionLabel>
 
             {/* Dynamic asymmetry: first category as hero card, next 2 stacked */}
@@ -205,7 +186,7 @@ export default function CategoriesIndex() {
         )}
 
         {/* ── Pullquote (visual rhythm break) ── */}
-        <div className="mag-reveal border-y border-[var(--wk-border)] py-14 lg:py-20">
+        <div className="wk-reveal border-y border-[var(--wk-border)] py-14 lg:py-20">
           <div className="max-w-[800px] mx-auto text-center">
             <div className="w-12 h-1 rounded-full bg-[var(--wk-brand)] mx-auto mb-7" />
             <p className="text-[clamp(28px,4vw,52px)] font-black tracking-[-0.045em] leading-[0.96] text-[var(--wk-text)]">
@@ -217,7 +198,7 @@ export default function CategoriesIndex() {
 
         {/* ── All Categories Grid ── */}
         {remainingCategories.length > 0 && (
-          <section className="mag-reveal">
+          <section className="wk-reveal">
             <SectionLabel>All Categories</SectionLabel>
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
               {remainingCategories.map((cat) => (

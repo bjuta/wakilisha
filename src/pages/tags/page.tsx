@@ -1,26 +1,7 @@
+import { useScrollRevealElements } from "@/hooks/useScrollReveal";
 import { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import { Link } from "react-router-dom";
 import { fetchTaxonomyIndex, type PublicTaxonomyTerm } from "@/services/publicTaxonomy";
-
-/* ── Scroll reveal ── */
-function useScrollReveal(deps: unknown[] = []) {
-  useEffect(() => {
-    const observer = new IntersectionObserver(
-      (entries) => {
-        entries.forEach((entry) => {
-          if (entry.isIntersecting) {
-            entry.target.classList.add("mag-reveal-visible");
-            observer.unobserve(entry.target);
-          }
-        });
-      },
-      { threshold: 0.08, rootMargin: "0px 0px -32px 0px" },
-    );
-    const els = document.querySelectorAll(".mag-reveal");
-    els.forEach((el) => observer.observe(el));
-    return () => observer.disconnect();
-  }, deps);
-}
 
 /* ── Section header ── */
 function SectionLabel({ children, count }: { children: string; count?: number }) {
@@ -79,7 +60,7 @@ export default function TagsIndex() {
     return () => window.removeEventListener("scroll", onScroll);
   }, [loading]);
 
-  useScrollReveal([loading]);
+  useScrollRevealElements([loading]);
 
   const filteredTags = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -201,7 +182,7 @@ export default function TagsIndex() {
       <div className="max-w-[1280px] mx-auto px-6 lg:px-8 flex flex-col gap-20 py-16">
 
         {/* ── Tag Cloud ── */}
-        <section className="mag-reveal">
+        <section className="wk-reveal">
           <SectionLabel count={query ? filteredTags.length : tags.length}>
             {query ? "Matching Tags" : "All Tags"}
           </SectionLabel>
@@ -230,7 +211,7 @@ export default function TagsIndex() {
         </section>
 
         {/* ── Pullquote (visual rhythm break) ── */}
-        <div className="mag-reveal border-y border-[var(--wk-border)] py-14 lg:py-20">
+        <div className="wk-reveal border-y border-[var(--wk-border)] py-14 lg:py-20">
           <div className="max-w-[800px] mx-auto text-center">
             <div className="w-12 h-1 rounded-full bg-[var(--wk-brand)] mx-auto mb-7" />
             <p className="text-[clamp(28px,4vw,52px)] font-black tracking-[-0.045em] leading-[0.96] text-[var(--wk-text)]">
@@ -242,7 +223,7 @@ export default function TagsIndex() {
 
         {/* ── Top Tags Feature ── */}
         {tags.length > 0 && (
-          <section className="mag-reveal">
+          <section className="wk-reveal">
             <div className="flex items-center gap-3 mb-8">
               <span className="text-[10px] font-black uppercase tracking-[0.22em] text-[var(--wk-brand)]">
                 Active topics

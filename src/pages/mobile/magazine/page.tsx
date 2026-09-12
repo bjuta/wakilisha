@@ -1,3 +1,4 @@
+import { useScrollRevealElements } from "@/hooks/useScrollReveal";
 import { useCallback, useEffect, useMemo, useState, useRef } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useMagazineArticles, type MagazineArticle } from "@/services/magazineArticles";
@@ -8,25 +9,6 @@ import { ResponsiveMediaImage } from "@/components/media/ResponsiveMediaImage";
 import { trackEvent, getAnalyticsSessionId, getCanonicalPageUrl } from "@/services/analytics";
 import { BRIEFING_SLUGS, briefingInterest, subscribeToBriefings } from "@/services/audienceSubscriptionService";
 import { ArticleAuthorIdentity } from "@/components/design-system/editorial/ArticleAuthorIdentity";
-
-function useScrollReveal(deps: unknown[] = []) {
-  useEffect(() => {
-    const observer = new IntersectionObserver(
-      (entries) => {
-        entries.forEach((entry) => {
-          if (entry.isIntersecting) {
-            entry.target.classList.add("mag-reveal-visible");
-            observer.unobserve(entry.target);
-          }
-        });
-      },
-      { threshold: 0.08, rootMargin: "0px 0px -24px 0px" },
-    );
-    const els = document.querySelectorAll(".mag-reveal");
-    els.forEach((el) => observer.observe(el));
-    return () => observer.disconnect();
-  }, deps);
-}
 
 function computeIssueInfo(articles: MagazineArticle[]) {
   if (!articles.length) return { number: 1, date: "June 2026" };
@@ -90,7 +72,7 @@ export default function MobileMagazine() {
     return () => window.removeEventListener("scroll", onScroll);
   }, [status]);
 
-  useScrollReveal([status, activeSection]);
+  useScrollRevealElements([status, activeSection], { rootMargin: "0px 0px -24px 0px" });
 
   const sectionNames = useMemo(() => {
     const sects = Array.from(new Set(stories.map((s) => s.section || "Article"))).sort();
@@ -292,7 +274,7 @@ export default function MobileMagazine() {
 
         {/* ── Editor’s Picks ── */}
         {filteredPicks.length > 0 && (
-          <section className="mag-reveal">
+          <section className="wk-reveal">
             <MobileSectionLabel>Editor’s Picks</MobileSectionLabel>
             <div className="flex flex-col gap-3">
               <MagazineCard variant="hero" story={filteredPicks[0]} rank={1} />
@@ -305,7 +287,7 @@ export default function MobileMagazine() {
 
         {/* ── Latest Stories ── */}
         {filteredLatest.length > 0 && (
-          <section className="mag-reveal">
+          <section className="wk-reveal">
             <MobileSectionLabel href="/magazine">Latest Stories</MobileSectionLabel>
             <div className="grid grid-cols-2 gap-3">
               {filteredLatest.map((story) => (
@@ -348,7 +330,7 @@ export default function MobileMagazine() {
         )}
 
         {/* ── Pullquote ── */}
-        <div className="mag-reveal border-y border-[var(--wk-border)] py-10">
+        <div className="wk-reveal border-y border-[var(--wk-border)] py-10">
           <div className="max-w-[600px] mx-auto text-center">
             <div className="w-10 h-0.5 rounded-full bg-[var(--wk-brand)] mx-auto mb-5" />
             <p className="text-[24px] sm:text-[30px] font-black tracking-[-0.04em] leading-[0.96] text-[var(--wk-text)]">
@@ -367,7 +349,7 @@ export default function MobileMagazine() {
             // Layout 0: Carousel: image-overlay portrait cards, horizontal scroll
             if (sectionIndex === 0) {
               return (
-                <section key={section} className="mag-reveal">
+                <section key={section} className="wk-reveal">
                   <MobileSectionLabel count={secStories.length} href="/magazine">{section}</MobileSectionLabel>
                   <div
                     className="flex gap-3 overflow-x-auto scrollbar-none snap-x snap-mandatory -mx-4 px-4"
@@ -441,7 +423,7 @@ export default function MobileMagazine() {
             // Layout 1: Wide Landscape Scroll: cinematic widescreen cards, horizontal scroll
             if (sectionIndex === 1) {
               return (
-                <section key={section} className="mag-reveal">
+                <section key={section} className="wk-reveal">
                   <MobileSectionLabel count={secStories.length} href="/magazine">{section}</MobileSectionLabel>
                   <div
                     className="flex gap-3 overflow-x-auto scrollbar-none snap-x snap-mandatory -mx-4 px-4"
@@ -496,7 +478,7 @@ export default function MobileMagazine() {
             // Layout 2: 2-Column Grid: image-forward vertical cards with taller images
             if (sectionIndex === 2) {
               return (
-                <section key={section} className="mag-reveal">
+                <section key={section} className="wk-reveal">
                   <MobileSectionLabel count={secStories.length} href="/magazine">{section}</MobileSectionLabel>
                   <div className="grid grid-cols-2 gap-3">
                     {secStories.slice(0, 6).map((story) => (
@@ -552,7 +534,7 @@ export default function MobileMagazine() {
             // Layout 3: Hero + Compact List: one big image-overlay hero, rest as thumb rows
             const [heroItem, ...restItems] = secStories;
             return (
-              <section key={section} className="mag-reveal">
+              <section key={section} className="wk-reveal">
                 <MobileSectionLabel count={secStories.length} href="/magazine">{section}</MobileSectionLabel>
                 <div className="flex flex-col gap-3">
                   {heroItem && (
@@ -645,7 +627,7 @@ export default function MobileMagazine() {
             );
           })
         ) : activeSection !== "All" ? (
-          <section className="mag-reveal py-16 text-center">
+          <section className="wk-reveal py-16 text-center">
             <div className="w-12 h-12 rounded-full bg-[var(--wk-surface)] flex items-center justify-center mx-auto mb-4">
               <i className="ri-article-line text-[20px] text-[var(--wk-text-faint)]" />
             </div>
@@ -712,7 +694,7 @@ function MobileNewsletterCTA() {
   };
 
   return (
-    <section className="mag-reveal rounded-xl border border-[var(--wk-border)] bg-[var(--wk-surface)] overflow-hidden">
+    <section className="wk-reveal rounded-xl border border-[var(--wk-border)] bg-[var(--wk-surface)] overflow-hidden">
       {done ? (
         <div className="py-12 px-5 text-center">
           <div className="w-12 h-12 rounded-full bg-[var(--wk-brand)] flex items-center justify-center mx-auto mb-4">

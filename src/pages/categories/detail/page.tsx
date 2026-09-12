@@ -1,3 +1,4 @@
+import { useScrollRevealElements } from "@/hooks/useScrollReveal";
 import { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import { useParams, Link, useSearchParams } from "react-router-dom";
 import {
@@ -9,26 +10,6 @@ import {
 import { MagazineCard } from "@/pages/magazine/components/MagazineCard";
 
 const PAGE_SIZE = 12;
-
-/* ── Scroll reveal ── */
-function useScrollReveal(deps: unknown[] = []) {
-  useEffect(() => {
-    const observer = new IntersectionObserver(
-      (entries) => {
-        entries.forEach((entry) => {
-          if (entry.isIntersecting) {
-            entry.target.classList.add("mag-reveal-visible");
-            observer.unobserve(entry.target);
-          }
-        });
-      },
-      { threshold: 0.08, rootMargin: "0px 0px -32px 0px" },
-    );
-    const els = document.querySelectorAll(".mag-reveal");
-    els.forEach((el) => observer.observe(el));
-    return () => observer.disconnect();
-  }, deps);
-}
 
 function stripHtml(html: string | null): string {
   if (!html) return "";
@@ -142,7 +123,7 @@ export default function CategoryDetail() {
     return () => window.removeEventListener("scroll", onScroll);
   }, [loading, articles]);
 
-  useScrollReveal([loading]);
+  useScrollRevealElements([loading]);
 
   const totalPages = Math.ceil(totalCount / PAGE_SIZE);
 
@@ -273,7 +254,7 @@ export default function CategoryDetail() {
 
         {/* ── Empty state ── */}
         {stories.length === 0 && (
-          <section className="mag-reveal text-center py-16">
+          <section className="wk-reveal text-center py-16">
             <i className="ri-file-text-line text-[36px] text-[var(--wk-text-faint)] mb-4 block" />
             <h2 className="text-[18px] font-black text-[var(--wk-text)] mb-2">No articles yet</h2>
             <p className="text-[13px] text-[var(--wk-text-muted)]">This category is waiting for its first story.</p>
@@ -282,7 +263,7 @@ export default function CategoryDetail() {
 
         {/* ── Editor's Picks (dynamic asymmetry: 1 hero + 3 compact stacked) ── */}
         {stories.length > 0 && heroStory && (
-          <section className="mag-reveal">
+          <section className="wk-reveal">
             <SectionLabel count={stories.length}>Stories in {term.name}</SectionLabel>
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-5 lg:items-stretch">
               <div className="lg:h-full">
@@ -303,7 +284,7 @@ export default function CategoryDetail() {
 
         {/* ── Pullquote (visual rhythm break) ── */}
         {gridStories.length > 0 && (
-          <div className="mag-reveal border-y border-[var(--wk-border)] py-14 lg:py-20">
+          <div className="wk-reveal border-y border-[var(--wk-border)] py-14 lg:py-20">
             <div className="max-w-[800px] mx-auto text-center">
               <div className="w-12 h-1 rounded-full bg-[var(--wk-brand)] mx-auto mb-7" />
               <p className="text-[clamp(28px,4vw,52px)] font-black tracking-[-0.045em] leading-[0.96] text-[var(--wk-text)]">
@@ -316,7 +297,7 @@ export default function CategoryDetail() {
 
         {/* ── Grid stories ── */}
         {gridStories.length > 0 && (
-          <section className="mag-reveal">
+          <section className="wk-reveal">
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
               {gridStories.map((story) => (
                 <MagazineCard key={story.slug} variant="standard" story={story} />
@@ -327,7 +308,7 @@ export default function CategoryDetail() {
 
         {/* ── Pagination ── */}
         {totalPages > 1 && (
-          <div className="mag-reveal flex items-center justify-center gap-2">
+          <div className="wk-reveal flex items-center justify-center gap-2">
             <button
               onClick={() => goToPage(currentPage - 1)}
               disabled={currentPage <= 1}
