@@ -163,6 +163,25 @@ describe("WAKILISHA governed dialog interaction contract", () => {
     await waitFor(() => expect(opener).toHaveFocus());
   });
 
+  it("cancels on Escape, resolves false, and restores the invoker", async () => {
+    const user = userEvent.setup();
+    render(<GovernedDialogHarness />);
+
+    const opener = screen.getByRole("button", { name: "Open confirm" });
+    await user.click(opener);
+    expect(screen.getByRole("dialog", { name: "Archive item" })).toBeInTheDocument();
+
+    await user.keyboard("{Escape}");
+
+    await waitFor(() =>
+      expect(screen.queryByRole("dialog", { name: "Archive item" })).not.toBeInTheDocument(),
+    );
+    await waitFor(() =>
+      expect(screen.getByLabelText("Dialog result")).toHaveTextContent("cancelled"),
+    );
+    await waitFor(() => expect(opener).toHaveFocus());
+  });
+
   it("preserves prompt initial value and resolves edited text", async () => {
     const user = userEvent.setup();
     render(<GovernedDialogHarness />);
