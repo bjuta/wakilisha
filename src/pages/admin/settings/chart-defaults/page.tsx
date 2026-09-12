@@ -1,6 +1,7 @@
 import { useState, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { WkIcon } from "@/components/design-system/Icon";
+import { WkNumberField } from "@/components/design-system/primitives/NumberField";
 import { WkSurface } from "@/components/design-system/primitives/Surface";
 import {
   getChartSettings,
@@ -241,13 +242,12 @@ function NumberField({ label, value, onChange, min, max }: { label: string; valu
   return (
     <div>
       <label className="block text-[12px] font-semibold text-[var(--wk-text-muted)] mb-1.5">{label}</label>
-      <input
-        type="number"
+      <WkNumberField
+        ariaLabel={label}
         value={value}
         min={min}
         max={max}
-        onChange={(e) => onChange(Number(e.target.value))}
-        className="w-full rounded-lg border border-[var(--wk-border)] bg-[var(--wk-bg)] px-3 py-2 text-[13px] text-[var(--wk-text)] focus:border-[var(--wk-brand)] focus:outline-none focus:ring-1 focus:ring-[var(--wk-brand)]"
+        onChange={onChange}
       />
     </div>
   );
