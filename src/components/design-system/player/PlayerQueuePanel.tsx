@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { WkIcon } from "@/components/design-system/Icon";
 import { Ch19GradientImage } from "@/components/media/Ch19GradientImage";
+import { WkDisclosure } from "@/components/design-system/primitives/Disclosure";
 import type {
   PlayerTrack,
   RepeatMode,
@@ -278,36 +279,36 @@ export function PlayerQueuePanel({
       </section>
 
       {historyIndices.length ? (
-        <details className="mt-6 border-t border-[var(--wk-divider)] pt-4">
-          <summary className="cursor-pointer text-[11px] font-black text-[var(--wk-text-muted)]">
-            Played Earlier ({historyIndices.length})
-          </summary>
-          <div className="mt-2 space-y-1">
-            {historyIndices.map((index) => {
-              const item = queue[index];
-              if (!item) return null;
+        <WkDisclosure
+          className="mt-6 border-t border-[var(--wk-divider)] pt-4"
+          triggerClassName="text-[11px] font-black text-[var(--wk-text-muted)] focus:outline-none focus-visible:ring-2 focus-visible:ring-wk-brand/20"
+          contentClassName="mt-2 space-y-1"
+          summary={`Played Earlier (${historyIndices.length})`}
+        >
+          {historyIndices.map((index) => {
+            const item = queue[index];
+            if (!item) return null;
 
-              return (
-                <button
-                  key={`${item.id}-history-${index}`}
-                  type="button"
-                  onClick={() => onPlay(index)}
-                  className="flex w-full items-center gap-3 rounded-xl px-2 py-2 text-left hover:bg-[var(--wk-bg)]"
-                >
-                  <QueueArtwork item={item} size="small" />
-                  <span className="min-w-0 flex-1">
-                    <span className="block truncate text-[12px] font-bold text-[var(--wk-text)]">
-                      {item.title}
-                    </span>
-                    <span className="block truncate text-[10px] text-[var(--wk-text-muted)]">
-                      {item.artist}
-                    </span>
+            return (
+              <button
+                key={`${item.id}-history-${index}`}
+                type="button"
+                onClick={() => onPlay(index)}
+                className="flex w-full items-center gap-3 rounded-xl px-2 py-2 text-left hover:bg-[var(--wk-bg)]"
+              >
+                <QueueArtwork item={item} size="small" />
+                <span className="min-w-0 flex-1">
+                  <span className="block truncate text-[12px] font-bold text-[var(--wk-text)]">
+                    {item.title}
                   </span>
-                </button>
-              );
-            })}
-          </div>
-        </details>
+                  <span className="block truncate text-[10px] text-[var(--wk-text-muted)]">
+                    {item.artist}
+                  </span>
+                </span>
+              </button>
+            );
+          })}
+        </WkDisclosure>
       ) : null}
     </div>
   );
