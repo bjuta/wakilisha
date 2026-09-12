@@ -1,0 +1,28 @@
+name: Slice 2B Field Analyzer
+
+on:
+  push:
+    branches:
+      - feat/902-slice-2b-native-field-controls
+
+permissions:
+  contents: read
+
+jobs:
+  analyze:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Check out branch
+        uses: actions/checkout@v4
+        with:
+          ref: feat/902-slice-2b-native-field-controls
+      - name: Use Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - name: Install dependencies
+        run: npm ci --prefer-offline --no-audit --no-fund
+      - name: Report remaining Slice 2B field nodes
+        run: node scripts/maintenance/902-slice-2b-field-analyzer.mjs
