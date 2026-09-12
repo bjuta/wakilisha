@@ -7,6 +7,11 @@ import userEvent from "@testing-library/user-event";
 import { beforeAll, describe, expect, it, vi } from "vitest";
 import { Sheet } from "@/components/design-system/primitives/Sheet";
 import { SearchableSelect } from "@/components/design-system/primitives/SearchableSelect";
+import {
+  WakilishaDialogProvider,
+  wakilishaDialog,
+} from "@/components/design-system/primitives/DialogProvider";
+import { WkDisclosure } from "@/components/design-system/primitives/Disclosure";
 
 beforeAll(() => {
   Object.defineProperty(Element.prototype, "scrollIntoView", {
@@ -46,6 +51,42 @@ function Harness() {
         <button type="button">Last sheet action</button>
       </Sheet>
     </>
+  );
+}
+
+function GovernedDialogHarness() {
+  const [result, setResult] = useState("idle");
+
+  return (
+    <WakilishaDialogProvider>
+      <button
+        type="button"
+        onClick={() => {
+          void wakilishaDialog.confirm({
+            title: "Archive item",
+            message: "Archive this item?",
+            confirmLabel: "Archive",
+            destructive: true,
+          }).then((confirmed) => setResult(confirmed ? "confirmed" : "cancelled"));
+        }}
+      >
+        Open confirm
+      </button>
+      <button
+        type="button"
+        onClick={() => {
+          void wakilishaDialog.prompt({
+            title: "Add reason",
+            label: "Reason",
+            initialValue: "Initial",
+            required: true,
+          }).then((value) => setResult(value ?? "cancelled"));
+        }}
+      >
+        Open prompt
+      </button>
+      <output aria-label="Dialog result">{result}</output>
+    </WakilishaDialogProvider>
   );
 }
 
@@ -98,5 +139,68 @@ describe("WAKILISHA Sheet interaction contract", () => {
       await user.tab({ shift: true });
       expect(dialog.contains(document.activeElement)).toBe(true);
     }
+  });
+});
+
+describe("WAKILISHA governed dialog interaction contract", () => {
+  it("resolves confirmation, traps focus, and restores the invoker", async () => {
+    const user = userEvent.setup();
+    render(<GovernedDialogHarness />);
+
+    const opener = screen.getByRole("button", { name: "Open confirm" });
+    await user.click(opener);
+
+    const dialog = screen.getByRole("dialog", { name: "Archive item" });
+    expect(dialog).toBeInTheDocument();
+
+    for (let index = 0; index < 8; index += 1) {
+      await user.tab();
+      expect(dialog.contains(document.activeElement)).toBe(true);
+    }
+
+    await user.click(screen.getByRole("button", { name: "Archive" }));
+    await waitFor(() => expect(screen.getByLabelText("Dialog result")).toHaveTextContent("confirmed"));
+    await waitFor(() => expect(opener).toHaveFocus());
+  });
+
+  it("preserves prompt initial value and resolves edited text", async () => {
+    const user = userEvent.setup();
+    render(<GovernedDialogHarness />);
+
+    await user.click(screen.getByRole("button", { name: "Open prompt" }));
+    const field = screen.getByRole("textbox", { name: "Reason" });
+    expect(field).toHaveValue("Initial");
+
+    await user.clear(field);
+    await user.type(field, "Editorial correction");
+    await user.click(screen.getByRole("button", { name: "Continue" }));
+
+    await waitFor(() =>
+      expect(screen.getByLabelText("Dialog result")).toHaveTextContent("Editorial correction"),
+    );
+  });
+});
+
+describe("WAKILISHA disclosure interaction contract", () => {
+  it("uses button keyboard semantics and exposes expanded state", async () => {
+    const user = userEvent.setup();
+    render(
+      <WkDisclosure summary="Publication record">
+        <p>Recorded source</p>
+      </WkDisclosure>,
+    );
+
+    const trigger = screen.getByRole("button", { name: "Publication record" });
+    expect(trigger).toHaveAttribute("aria-expanded", "false");
+    expect(screen.queryByText("Recorded source")).not.toBeInTheDocument();
+
+    trigger.focus();
+    await user.keyboard("{Enter}");
+    expect(trigger).toHaveAttribute("aria-expanded", "true");
+    expect(screen.getByText("Recorded source")).toBeInTheDocument();
+
+    await user.keyboard(" ");
+    expect(trigger).toHaveAttribute("aria-expanded", "false");
+    expect(screen.queryByText("Recorded source")).not.toBeInTheDocument();
   });
 });
