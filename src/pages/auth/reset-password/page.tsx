@@ -1,6 +1,7 @@
 import { useEffect, useState, type FormEvent } from "react";
 import { useNavigate } from "react-router-dom";
 import { WkIcon } from "@/components/design-system/Icon";
+import { WkPasswordField } from "@/components/design-system/primitives/Field";
 import { WkSurface } from "@/components/design-system/primitives/Surface";
 import { supabase } from "@/lib/supabase";
 
@@ -93,14 +94,26 @@ export default function ResetPasswordPage() {
 
         {status === "ready" || status === "error" ? (
           <form onSubmit={handleSubmit} className="space-y-4">
-            <label className="block">
+            <div className="block">
               <span className="mb-1 block text-[11px] font-black uppercase tracking-wider text-wk-text-faint">New password</span>
-              <input value={password} onChange={(e) => setPassword(e.target.value)} type="password" autoComplete="new-password" className="wk-input w-full" placeholder="At least 8 characters" />
-            </label>
-            <label className="block">
+              <WkPasswordField
+                ariaLabel="New password"
+                value={password}
+                onChange={setPassword}
+                autoComplete="new-password"
+                placeholder="At least 8 characters"
+              />
+            </div>
+            <div className="block">
               <span className="mb-1 block text-[11px] font-black uppercase tracking-wider text-wk-text-faint">Confirm password</span>
-              <input value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} type="password" autoComplete="new-password" className="wk-input w-full" placeholder="Repeat new password" />
-            </label>
+              <WkPasswordField
+                ariaLabel="Confirm password"
+                value={confirmPassword}
+                onChange={setConfirmPassword}
+                autoComplete="new-password"
+                placeholder="Repeat new password"
+              />
+            </div>
             <button type="submit" disabled={loading || status === "checking"} className="wk-button wk-button-primary w-full">
               {loading ? "Updating…" : "Update password"}
             </button>
