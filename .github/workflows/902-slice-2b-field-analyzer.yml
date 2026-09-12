@@ -1,4 +1,4 @@
-name: Slice 2B Field Analyzer
+name: Slice 2B Field Migration
 
 on:
   push:
@@ -6,17 +6,18 @@ on:
       - feat/902-slice-2b-native-field-controls
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
-  analyze:
+  migrate:
     if: github.actor != 'github-actions[bot]'
     runs-on: ubuntu-24.04
     steps:
-      - name: Check out branch
+      - name: Check out exact branch head
         uses: actions/checkout@v4
         with:
           ref: feat/902-slice-2b-native-field-controls
+          fetch-depth: 0
       - name: Use Node.js
         uses: actions/setup-node@v4
         with:
@@ -24,5 +25,27 @@ jobs:
           cache: npm
       - name: Install dependencies
         run: npm ci --prefer-offline --no-audit --no-fund
-      - name: Report remaining Slice 2B field nodes
+      - name: Migrate all remaining Slice 2B field debt
         run: node scripts/maintenance/902-slice-2b-field-analyzer.mjs
+      - name: Enforce updated browser-chrome ledger
+        run: npm run audit:ui-chrome
+      - name: Enforce viewport integrity
+        run: npm run audit:viewport-integrity
+      - name: Run DOM interaction contracts
+        run: npm run test:ui-dom
+      - name: Build application
+        run: npm run build
+      - name: Remove one-shot migration machinery
+        run: |
+          rm scripts/maintenance/902-slice-2b-field-analyzer.mjs
+          rm .github/workflows/902-slice-2b-field-analyzer.yml
+          git diff --check
+          test -n "$(git status --porcelain)"
+      - name: Commit and push proven migration
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git status --short
+          git commit -m "feat(#915): migrate remaining native field controls"
+          git push origin HEAD:feat/902-slice-2b-native-field-controls
