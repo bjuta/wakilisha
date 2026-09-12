@@ -1,3 +1,4 @@
+import "@/styles/wakilisha-profile-48.css";
 import {
   useEffect,
   useMemo,

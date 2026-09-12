@@ -24,6 +24,15 @@ export const LegacyArticleRedirect = lazy(
   () => import("../pages/LegacyArticleRedirect"),
 );
 
+export const Magazine = lazy(
+  () => import("../pages/magazine/page"),
+);
+
+export const MobileMagazine = lazy(
+  () => import("../pages/mobile/magazine/page"),
+);
+
+
 export const PublicApiDocsPage = lazy(
   () => import("../pages/api-docs/page"),
 );

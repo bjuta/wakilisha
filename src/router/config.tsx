@@ -109,6 +109,8 @@ import {
   PersonDetailPage,
   OrganizationDetailPage,
   LegacyArticleRedirect,
+  Magazine,
+  MobileMagazine,
   PublicApiDocsPage,
   PublicProfilePage,
   PublicBriefingsPage,
@@ -208,7 +210,6 @@ import { useAuthUser } from "@/hooks/useAuthUser";
 // Artists
 
 // Other entity pages
-import Magazine from "../pages/magazine/page";
 
 // Search
 
@@ -216,7 +217,6 @@ import Magazine from "../pages/magazine/page";
 
 
 // Mobile pages
-import MobileMagazine from "../pages/mobile/magazine/page";
 
 // Public taxonomy archive pages
 

@@ -468,7 +468,12 @@ describe(
         expect(
           authorityPanel,
         ).toContain(
-          "author-profile-hero-social-link",
+          "wk-identity-socials",
+        );
+        expect(
+          authorityPanel,
+        ).toContain(
+          "wk-identity-social-link",
         );
         expect(
           authorityPanel,

@@ -1,3 +1,4 @@
+import "@/styles/wakilisha-profile-48.css";
 import { useState, useEffect, useCallback } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useAuthUser } from "@/hooks/useAuthUser";
