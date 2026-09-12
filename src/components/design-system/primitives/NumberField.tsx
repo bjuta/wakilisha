@@ -6,7 +6,7 @@ import {
 } from "react-aria-components";
 
 interface WkNumberFieldProps {
-  value?: number;
+  value?: number | string;
   onChange: (value: number) => void;
   min?: number;
   max?: number;
@@ -36,10 +36,15 @@ export function WkNumberField({
   required = false,
   name,
 }: WkNumberFieldProps) {
+  const normalizedValue =
+    value === "" || value == null || Number.isNaN(Number(value))
+      ? undefined
+      : Number(value);
+
   return (
     <NumberField
       aria-label={ariaLabel}
-      value={value}
+      value={normalizedValue}
       onChange={onChange}
       minValue={min}
       maxValue={max}
