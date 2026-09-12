@@ -37,6 +37,26 @@ function pad(value: number) {
   return String(value).padStart(2, "0");
 }
 
+function localDate(
+  year: number,
+  monthIndex: number,
+  day: number,
+  hour = 0,
+  minute = 0,
+) {
+  const date = new Date(0);
+  date.setFullYear(year, monthIndex, day);
+  date.setHours(hour, minute, 0, 0);
+  return date;
+}
+
+function monthDayCount(year: number, month: number) {
+  const date = new Date(0);
+  date.setFullYear(year, month, 0);
+  date.setHours(0, 0, 0, 0);
+  return date.getDate();
+}
+
 function fallbackDraft(): DraftDateTime {
   const now = new Date();
   return {
@@ -122,10 +142,10 @@ function displayValue(value: string, mode: TemporalMode) {
     return new Intl.DateTimeFormat("en", {
       hour: "2-digit",
       minute: "2-digit",
-    }).format(new Date(2024, 0, 1, draft.hour, draft.minute));
+    }).format(localDate(2024, 0, 1, draft.hour, draft.minute));
   }
 
-  const date = new Date(
+  const date = localDate(
     draft.year,
     draft.month - 1,
     draft.day,
@@ -205,13 +225,13 @@ export function WkTemporalPicker({
       Array.from({ length: 12 }, (_, index) => ({
         value: String(index + 1),
         label: new Intl.DateTimeFormat("en", { month: "long" }).format(
-          new Date(2024, index, 1),
+          localDate(2024, index, 1),
         ),
       })),
     [],
   );
 
-  const daysInMonth = new Date(draft.year, draft.month, 0).getDate();
+  const daysInMonth = monthDayCount(draft.year, draft.month);
   const dayOptions = useMemo(
     () => Array.from({ length: daysInMonth }, (_, index) => option(index + 1)),
     [daysInMonth],
@@ -244,7 +264,7 @@ export function WkTemporalPicker({
   ) {
     setDraft((current) => {
       const next = { ...current, [key]: nextValue };
-      const maxDay = new Date(next.year, next.month, 0).getDate();
+      const maxDay = monthDayCount(next.year, next.month);
       if (next.day > maxDay) next.day = maxDay;
       return next;
     });
