@@ -21,6 +21,7 @@ interface WkNumberFieldProps {
   required?: boolean;
   name?: string;
   showSteppers?: boolean;
+  formatOptions?: Intl.NumberFormatOptions;
 }
 
 export function WkNumberField({
@@ -39,6 +40,7 @@ export function WkNumberField({
   required = false,
   name,
   showSteppers = true,
+  formatOptions,
 }: WkNumberFieldProps) {
   const normalizedValue =
     value === "" || value == null || Number.isNaN(Number(value))
@@ -59,6 +61,7 @@ export function WkNumberField({
       isReadOnly={readOnly}
       isRequired={required}
       name={name}
+      formatOptions={formatOptions}
       className={className}
     >
       <Group
