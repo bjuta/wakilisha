@@ -16,8 +16,7 @@ import { PlayerProvider } from "./context/PlayerContext";
 import { RecoveryRedirectGuard } from "./components/auth/RecoveryRedirectGuard";
 import { PageTitle } from "./components/seo/PageTitle";
 import ScrollRestoration from "./components/base/ScrollRestoration";
-import { PageViewTracker } from "./hooks/usePageViewTracking";
-import GtagInjector from "./components/analytics/GtagInjector";
+import DeferredAnalyticsBoundary from "./components/analytics/DeferredAnalyticsBoundary";
 
 function App() {
   return (
@@ -29,8 +28,7 @@ function App() {
               <RecoveryRedirectGuard />
               <PageTitle />
               <ScrollRestoration />
-              <PageViewTracker />
-              <GtagInjector />
+              <DeferredAnalyticsBoundary />
               <div className="page-transition">
                 <Suspense
                   fallback={
