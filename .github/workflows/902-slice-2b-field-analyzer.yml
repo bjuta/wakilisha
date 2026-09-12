@@ -29,6 +29,31 @@ jobs:
         run: node scripts/maintenance/902-slice-2b-field-analyzer.mjs
       - name: Keep generic field slider out of public player entry
         run: node scripts/maintenance/902-slice-2b-public-entry-player-adapter.mjs
+      - name: Normalize generated source whitespace
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          import subprocess
+
+          changed = subprocess.check_output(
+              ["git", "diff", "--name-only", "--diff-filter=ACM"],
+              text=True,
+          ).splitlines()
+
+          for name in changed:
+              path = Path(name)
+              if path.suffix not in {".ts", ".tsx", ".js", ".jsx", ".json"}:
+                  continue
+              text = path.read_text()
+              lines = text.splitlines(keepends=True)
+              normalized = "".join(
+                  line.rstrip(" \t\r\n") + ("\r\n" if line.endswith("\r\n") else "\n" if line.endswith("\n") else "")
+                  for line in lines
+              )
+              if normalized != text:
+                  path.write_text(normalized)
+          PY
+          git diff --check
       - name: Enforce updated browser-chrome ledger
         run: npm run audit:ui-chrome
       - name: Enforce viewport integrity
