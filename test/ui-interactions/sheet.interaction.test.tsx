@@ -182,25 +182,41 @@ describe("WAKILISHA governed dialog interaction contract", () => {
 });
 
 describe("WAKILISHA disclosure interaction contract", () => {
-  it("uses button keyboard semantics and exposes expanded state", async () => {
+  it("preserves keyboard semantics, screen-reader state, and nested state while collapsed", async () => {
     const user = userEvent.setup();
     render(
       <WkDisclosure summary="Publication record">
-        <p>Recorded source</p>
+        <div>
+          <p>Recorded source</p>
+          <input data-testid="disclosure-note" aria-label="Retained note" />
+        </div>
       </WkDisclosure>,
     );
 
     const trigger = screen.getByRole("button", { name: "Publication record" });
+    const content = screen.getByText("Recorded source").closest("[role='region']");
+    const note = screen.getByTestId("disclosure-note");
+
     expect(trigger).toHaveAttribute("aria-expanded", "false");
-    expect(screen.queryByText("Recorded source")).not.toBeInTheDocument();
+    expect(content).not.toBeVisible();
 
     trigger.focus();
     await user.keyboard("{Enter}");
     expect(trigger).toHaveAttribute("aria-expanded", "true");
-    expect(screen.getByText("Recorded source")).toBeInTheDocument();
+    expect(content).toBeVisible();
 
+    await user.type(note, "Retained state");
+    expect(note).toHaveValue("Retained state");
+
+    trigger.focus();
     await user.keyboard(" ");
     expect(trigger).toHaveAttribute("aria-expanded", "false");
-    expect(screen.queryByText("Recorded source")).not.toBeInTheDocument();
+    expect(content).not.toBeVisible();
+    expect(note).toHaveValue("Retained state");
+
+    await user.keyboard("{Enter}");
+    expect(trigger).toHaveAttribute("aria-expanded", "true");
+    expect(content).toBeVisible();
+    expect(note).toHaveValue("Retained state");
   });
 });
