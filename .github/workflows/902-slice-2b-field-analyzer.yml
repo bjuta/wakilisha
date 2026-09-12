@@ -27,6 +27,8 @@ jobs:
         run: npm ci --prefer-offline --no-audit --no-fund
       - name: Migrate all remaining Slice 2B field debt
         run: node scripts/maintenance/902-slice-2b-field-analyzer.mjs
+      - name: Keep generic field slider out of public player entry
+        run: node scripts/maintenance/902-slice-2b-public-entry-player-adapter.mjs
       - name: Enforce updated browser-chrome ledger
         run: npm run audit:ui-chrome
       - name: Enforce viewport integrity
@@ -38,6 +40,7 @@ jobs:
       - name: Remove one-shot migration machinery
         run: |
           rm scripts/maintenance/902-slice-2b-field-analyzer.mjs
+          rm scripts/maintenance/902-slice-2b-public-entry-player-adapter.mjs
           rm .github/workflows/902-slice-2b-field-analyzer.yml
           git diff --check
           test -n "$(git status --porcelain)"

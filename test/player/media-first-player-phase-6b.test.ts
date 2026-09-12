@@ -68,6 +68,11 @@ describe("Phase 6B media-first WAKILISHA Player", () => {
     expect(compact).toContain("experience.creatorLabel");
     expect(compact).toContain("experience.spokenAudio");
     expect(compact).toContain("Back ${jump ?? 15} seconds");
+    expect(compact).toMatch(
+      /\{isMobile \? \(\s*<SeekRail[\s\S]*?variant="edge"[\s\S]*?\) : null\}/,
+    );
+    expect(compact.match(/variant="edge"/g)).toHaveLength(1);
+    expect(compact).toContain("{!isMobile ? (");
     expect(compact).not.toContain("playbackSourceLabel");
     expect(compact).not.toContain("AddToPlaylistButton");
     expect(compact).not.toContain("Connect Apple Music");
