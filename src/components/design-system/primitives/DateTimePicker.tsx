@@ -26,6 +26,7 @@ interface WkTemporalPickerProps {
   disabled?: boolean;
   className?: string;
   triggerClassName?: string;
+  showLabel?: boolean;
 }
 
 interface WkDateTimePickerProps
@@ -154,6 +155,7 @@ export function WkTemporalPicker({
   disabled = false,
   className = "",
   triggerClassName = "",
+  showLabel = true,
 }: WkTemporalPickerProps) {
   const [open, setOpen] = useState(false);
   const [draft, setDraft] = useState<DraftDateTime>(() =>
@@ -251,6 +253,7 @@ export function WkTemporalPicker({
         disabled={disabled}
         aria-haspopup="dialog"
         aria-expanded={open}
+        aria-label={label}
         onClick={() => {
           if (!disabled) setOpen((current) => !current);
         }}
@@ -261,11 +264,13 @@ export function WkTemporalPicker({
         } ${triggerClassName}`.trim()}
       >
         <span>
-          <span className="block text-[10px] font-black uppercase tracking-[0.12em] text-wk-text-faint">
-            {label}
-          </span>
+          {showLabel ? (
+            <span className="block text-[10px] font-black uppercase tracking-[0.12em] text-wk-text-faint">
+              {label}
+            </span>
+          ) : null}
           <span
-            className={`mt-0.5 block text-[13px] font-semibold ${
+            className={`${showLabel ? "mt-0.5" : ""} block text-[13px] font-semibold ${
               value ? "text-wk-text" : "text-wk-text-muted"
             }`}
           >
