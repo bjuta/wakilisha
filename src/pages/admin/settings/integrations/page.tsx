@@ -29,6 +29,8 @@ import {
   type ServerSyncResult,
 } from "@/services/adminSettings/providerCredentialStore";
 import { WkSelect } from "@/components/design-system/primitives/Select";
+import { WkUploadField } from "@/components/design-system/primitives/UploadField";
+
 
 
 type ProviderFormState = Record<string, ProviderCredentialValues>;
@@ -647,8 +649,8 @@ function ProviderField({ providerKey, field, value, error, showSecret, onToggleS
     typeof value === "string" && value.startsWith("uploaded:") ? value.replace("uploaded:", "") : null
   );
 
-  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
+  const handleFileUpload = async (files: FileList | null) => {
+    const file = files?.[0];
     if (!file) return;
 
     // Validate file extension
@@ -721,30 +723,15 @@ function ProviderField({ providerKey, field, value, error, showSecret, onToggleS
           </div>
         ) : (
           <div>
-            <label
-              htmlFor={id}
-              className="flex cursor-pointer flex-col items-center gap-3 rounded-lg border-2 border-dashed border-[var(--wk-border)] bg-[var(--wk-bg)] px-6 py-6 hover:border-[var(--wk-brand)] hover:bg-[var(--wk-brand)]/5 transition-colors"
-            >
-              <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-[var(--wk-surface-raised)] text-[var(--wk-text-muted)]">
-                <WkIcon name={uploading ? "Loader2" : "Upload"} size={18} className={uploading ? "animate-spin" : ""} />
-              </div>
-              <div className="text-center">
-                <p className="text-[13px] font-semibold text-[var(--wk-text)]">
-                  {uploading ? "Uploading..." : "Click to upload .p8 file"}
-                </p>
-                <p className="mt-1 text-[11px] text-[var(--wk-text-faint)]">
-                  Select your Apple Music .p8 private key file. It is sent directly to a secure backend and never stored in the browser.
-                </p>
-              </div>
-              <input
-                id={id}
-                type="file"
-                accept=".p8,.key"
-                onChange={handleFileUpload}
-                disabled={uploading}
-                className="hidden"
-              />
-            </label>
+            <WkUploadField
+  id={id}
+  accept=".p8,.key"
+  onSelect={handleFileUpload}
+  disabled={uploading}
+  ariaLabel="Upload Apple Music private key"
+  label={uploading ? "Uploading..." : "Click to upload .p8 file"}
+  description="Select your Apple Music .p8 private key file. It is sent directly to a secure backend and never stored in the browser."
+/>
           </div>
         )}
 

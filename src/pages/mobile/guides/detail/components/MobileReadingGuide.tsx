@@ -5,6 +5,8 @@ import { submitForm } from "@/services/formService";
 import { BRIEFING_SLUGS, guideInterest, subscribeToBriefings } from "@/services/audienceSubscriptionService";
 import { readingGuide, prologueChapter } from "@/pages/guides/detail/readingData";
 import { MobileShareButton } from "@/components/design-system/share/ShareSheet";
+import { WkSlider } from "@/components/design-system/primitives/Slider";
+
 
 export default function MobileReadingGuide() {
   const [fontSize, setFontSize] = useState(17);
@@ -190,14 +192,15 @@ export default function MobileReadingGuide() {
       {/* Text size control */}
       <div className="px-5 py-3 flex items-center justify-center gap-3" style={{ background: "var(--wk-bg-subtle)" }}>
         <span className="text-[10px] text-[var(--wk-text-muted)]">A</span>
-        <input
-          type="range"
-          min={15}
-          max={22}
-          value={fontSize}
-          onChange={(e) => setFontSize(Number(e.target.value))}
-          className="w-[120px] accent-[#C4A35A]"
-        />
+        <WkSlider
+  value={fontSize}
+  onChange={(nextValue) => setFontSize(nextValue)}
+  ariaLabel="Font size"
+  showValueLabel={false}
+  min={15}
+  max={22}
+  className="w-[120px]"
+/>
         <span className="text-[14px] text-[var(--wk-text-muted)]">A</span>
       </div>
 

@@ -13,6 +13,8 @@ import {
 } from "@/services/articles/articleTrustService";
 import { WkSelect } from "@/components/design-system/primitives/Select";
 import { WkCheckbox } from "@/components/design-system/primitives/Checkbox";
+import { WkDatePicker } from "@/components/design-system/primitives/DateTimePicker";
+
 
 
 
@@ -721,48 +723,45 @@ export function ArticleSourceForm({
                   <span className="wk-label">
                     Publication Date
                   </span>
-                  <input
-                    type="date"
-                    value={publicationDate}
-                    onChange={(event) =>
-                      setPublicationDate(
-                        event.target.value,
-                      )
-                    }
-                    className="wk-input mt-1 w-full"
-                  />
+                  <WkDatePicker
+  value={publicationDate}
+  onChange={(nextValue) => setPublicationDate(
+                        nextValue,
+                      )}
+  label="Publication date"
+  showLabel={false}
+  triggerClassName="wk-input mt-1 w-full"
+/>
                 </label>
 
                 <label>
                   <span className="wk-label">
                     Capture Date
                   </span>
-                  <input
-                    type="date"
-                    value={captureDate}
-                    onChange={(event) =>
-                      setCaptureDate(
-                        event.target.value,
-                      )
-                    }
-                    className="wk-input mt-1 w-full"
-                  />
+                  <WkDatePicker
+  value={captureDate}
+  onChange={(nextValue) => setCaptureDate(
+                        nextValue,
+                      )}
+  label="Capture date"
+  showLabel={false}
+  triggerClassName="wk-input mt-1 w-full"
+/>
                 </label>
 
                 <label>
                   <span className="wk-label">
                     Retrieval Date
                   </span>
-                  <input
-                    type="date"
-                    value={retrievalDate}
-                    onChange={(event) =>
-                      setRetrievalDate(
-                        event.target.value,
-                      )
-                    }
-                    className="wk-input mt-1 w-full"
-                  />
+                  <WkDatePicker
+  value={retrievalDate}
+  onChange={(nextValue) => setRetrievalDate(
+                        nextValue,
+                      )}
+  label="Retrieval date"
+  showLabel={false}
+  triggerClassName="wk-input mt-1 w-full"
+/>
                 </label>
 
                 <label>

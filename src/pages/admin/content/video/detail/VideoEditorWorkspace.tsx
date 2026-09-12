@@ -60,6 +60,8 @@ import {
 } from "@/services/video/videoAdminService";
 import { WkSelect } from "@/components/design-system/primitives/Select";
 import { WkRadio, WkRadioGroup } from "@/components/design-system/primitives/Radio";
+import { WkNumberField } from "@/components/design-system/primitives/NumberField";
+
 
 
 type WorkspaceView =
@@ -1328,26 +1330,26 @@ export function VideoEditorWorkspace({
               >
                 <label className="text-xs font-bold text-wk-text-muted">
                   Start Seconds
-                  <input
-                    type="number"
-                    min={0}
-                    step="0.1"
-                    value={chapter.startSeconds}
-                    onChange={(event) =>
-                      setChapterDrafts((current) =>
+                  <WkNumberField
+  value={chapter.startSeconds}
+  onChange={(nextValue) => setChapterDrafts((current) =>
                         current.map((item, itemIndex) =>
                           itemIndex === index
                             ? {
                                 ...item,
-                                startSeconds: Number(event.target.value),
+                                startSeconds: nextValue,
                               }
                             : item,
                         ),
-                      )
-                    }
-                    disabled={!editable}
-                    className="mt-1 w-full rounded-lg border border-wk-border bg-wk-surface px-2.5 py-2 text-xs text-wk-text"
-                  />
+                      )}
+  ariaLabel="Start seconds"
+  showSteppers={false}
+  min={0}
+  step={0.1}
+  disabled={!editable}
+  groupClassName="mt-1 w-full rounded-lg border border-wk-border bg-wk-surface px-2.5 py-2 text-xs text-wk-text"
+  inputClassName="text-left"
+/>
                 </label>
                 <label className="text-xs font-bold text-wk-text-muted">
                   Title

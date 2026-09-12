@@ -13,6 +13,9 @@ import {
   getCandidates,
 } from "@/services/chartsIngestion/client";
 import type { UserRole, CsvIntegrityViolation } from "@/services/chartsIngestion/client";
+import { WkDatePicker } from "@/components/design-system/primitives/DateTimePicker";
+import { WkNumberField } from "@/components/design-system/primitives/NumberField";
+
 
 interface DraftStepProps {
   jobId: string;
@@ -245,23 +248,26 @@ export function DraftStep({ jobId, job, draftEntries, hasBlockingIssues, hasUnre
             </div>
             <div>
               <label className="text-[10px] font-bold uppercase text-[var(--wk-text-muted)]">Edition Date *</label>
-              <input
-                type="date"
-                value={editionSetup.editionDate}
-                onChange={(e) => setEditionSetup((p) => ({ ...p, editionDate: e.target.value }))}
-                className="mt-1 w-full rounded-md border border-[var(--wk-border)] bg-[var(--wk-bg)] px-3 py-2 text-[12px] text-[var(--wk-text)]"
-              />
+              <WkDatePicker
+  value={editionSetup.editionDate}
+  onChange={(nextValue) => setEditionSetup((p) => ({ ...p, editionDate: nextValue }))}
+  label="Edition date"
+  showLabel={false}
+  triggerClassName="mt-1 w-full rounded-md border border-[var(--wk-border)] bg-[var(--wk-bg)] px-3 py-2 text-[12px] text-[var(--wk-text)]"
+/>
             </div>
             <div>
               <label className="text-[10px] font-bold uppercase text-[var(--wk-text-muted)]">Chart Size</label>
-              <input
-                type="number"
-                value={editionSetup.chartSize}
-                onChange={(e) => setEditionSetup((p) => ({ ...p, chartSize: parseInt(e.target.value) || 40 }))}
-                min={1}
-                max={200}
-                className="mt-1 w-full rounded-md border border-[var(--wk-border)] bg-[var(--wk-bg)] px-3 py-2 text-[12px] text-[var(--wk-text)]"
-              />
+              <WkNumberField
+  value={editionSetup.chartSize}
+  onChange={(nextValue) => setEditionSetup((p) => ({ ...p, chartSize: nextValue || 40 }))}
+  ariaLabel="Chart size"
+  showSteppers={false}
+  min={1}
+  max={200}
+  groupClassName="mt-1 w-full rounded-md border border-[var(--wk-border)] bg-[var(--wk-bg)] px-3 py-2 text-[12px] text-[var(--wk-text)]"
+  inputClassName="text-left"
+/>
             </div>
             <div className="col-span-2 sm:col-span-2 lg:col-span-2">
               <label className="text-[10px] font-bold uppercase text-[var(--wk-text-muted)]">Period Range</label>

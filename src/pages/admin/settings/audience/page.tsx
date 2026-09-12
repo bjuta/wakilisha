@@ -8,6 +8,9 @@ import {
   type BriefingCatalogItem,
 } from "@/services/briefingService";
 import { WkSelect } from "@/components/design-system/primitives/Select";
+import { WkNumberField } from "@/components/design-system/primitives/NumberField";
+import { WkSuggestionField } from "@/components/design-system/primitives/SuggestionField";
+
 
 
 const ENTITY_TYPES = ["", "artist", "guide", "briefing", "track", "release", "chart", "genre", "label", "article"];
@@ -350,15 +353,29 @@ export default function AdminSettingsAudience() {
 
           <label className="space-y-1">
             <span className="text-[11px] font-bold text-[var(--wk-text-muted)]">Source form</span>
-            <input value={sourceForm} onChange={(event) => setSourceForm(event.target.value)} list="audience-source-forms" placeholder="artist_follow, guide_download..." className="w-full rounded-lg border border-[var(--wk-border)] bg-[var(--wk-bg)] px-3 py-2 text-[13px] text-[var(--wk-text)]" />
-            <datalist id="audience-source-forms">
-              {sourceFormOptions.map((option) => <option key={option} value={option} />)}
-            </datalist>
+            <WkSuggestionField
+  value={sourceForm}
+  onChange={(nextValue) => setSourceForm(nextValue)}
+  options={sourceFormOptions}
+  ariaLabel="artist_follow, guide_download..."
+  placeholder="artist_follow, guide_download..."
+  inputClassName="w-full rounded-lg border border-[var(--wk-border)] bg-[var(--wk-bg)] px-3 py-2 text-[13px] text-[var(--wk-text)]"
+/>
+
           </label>
 
           <label className="space-y-1">
             <span className="text-[11px] font-bold text-[var(--wk-text-muted)]">Limit</span>
-            <input type="number" min={1} max={1000} value={limit} onChange={(event) => setLimit(Math.max(1, Math.min(1000, Number(event.target.value) || 250)))} className="w-full rounded-lg border border-[var(--wk-border)] bg-[var(--wk-bg)] px-3 py-2 text-[13px] text-[var(--wk-text)]" />
+            <WkNumberField
+  value={limit}
+  onChange={(nextValue) => setLimit(Math.max(1, Math.min(1000, nextValue || 250)))}
+  ariaLabel="Limit"
+  showSteppers={false}
+  min={1}
+  max={1000}
+  groupClassName="w-full rounded-lg border border-[var(--wk-border)] bg-[var(--wk-bg)] px-3 py-2 text-[13px] text-[var(--wk-text)]"
+  inputClassName="text-left"
+/>
           </label>
 
           <div className="flex items-end">

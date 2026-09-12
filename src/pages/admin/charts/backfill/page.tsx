@@ -19,6 +19,9 @@ import type { ChartFamily } from "@/services/chartsIngestion/types";
 import { getEligibilityProfiles } from "@/services/chartsEligibility/eligibilityStore";
 import { getMarketScopes } from "@/services/chartsMarkets/marketScopeStore";
 import { WkSelect } from "@/components/design-system/primitives/Select";
+import { WkDatePicker } from "@/components/design-system/primitives/DateTimePicker";
+import { WkNumberField } from "@/components/design-system/primitives/NumberField";
+
 
 
 const INPUT_CLASS = "w-full rounded-md border border-wk-border bg-wk-surface px-3 py-2 text-[13px] text-wk-text outline-none focus:border-wk-brand";
@@ -286,7 +289,16 @@ export default function AdminChartsBackfillPlanner() {
 
           <div>
             <label className={LABEL_CLASS}>Chart size</label>
-            <input type="number" min={1} max={100} value={config.chartSize} onChange={(event) => setConfig({ ...config, chartSize: Number(event.target.value) || 100 })} className={INPUT_CLASS} />
+            <WkNumberField
+  value={config.chartSize}
+  onChange={(nextValue) => setConfig({ ...config, chartSize: nextValue || 100 })}
+  ariaLabel="Chart size"
+  showSteppers={false}
+  min={1}
+  max={100}
+  groupClassName={INPUT_CLASS}
+  inputClassName="text-left"
+/>
           </div>
 
           <div>
@@ -326,7 +338,13 @@ export default function AdminChartsBackfillPlanner() {
 
           <div>
             <label className={LABEL_CLASS}>Release window start</label>
-            <input type="date" value={config.releaseWindowStart} onChange={(event) => setConfig({ ...config, releaseWindowStart: event.target.value })} className={INPUT_CLASS} />
+            <WkDatePicker
+  value={config.releaseWindowStart}
+  onChange={(nextValue) => setConfig({ ...config, releaseWindowStart: nextValue })}
+  label="Release window start"
+  showLabel={false}
+  triggerClassName={INPUT_CLASS}
+/>
           </div>
 
           <div className="lg:col-span-3">
@@ -367,11 +385,23 @@ export default function AdminChartsBackfillPlanner() {
           <div className="grid grid-cols-2 gap-2">
             <div>
               <label className={LABEL_CLASS}>From Monday</label>
-              <input type="date" value={startDate} onChange={(event) => setStartDate(event.target.value)} className={INPUT_CLASS} />
+              <WkDatePicker
+  value={startDate}
+  onChange={(nextValue) => setStartDate(nextValue)}
+  label="Start date"
+  showLabel={false}
+  triggerClassName={INPUT_CLASS}
+/>
             </div>
             <div>
               <label className={LABEL_CLASS}>To Monday</label>
-              <input type="date" value={endDate} onChange={(event) => setEndDate(event.target.value)} className={INPUT_CLASS} />
+              <WkDatePicker
+  value={endDate}
+  onChange={(nextValue) => setEndDate(nextValue)}
+  label="End date"
+  showLabel={false}
+  triggerClassName={INPUT_CLASS}
+/>
             </div>
           </div>
         </div>

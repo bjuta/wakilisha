@@ -1,5 +1,7 @@
 import { useState, useRef, useEffect, useCallback } from "react";
 import { WkIcon } from "@/components/design-system/Icon";
+import { WkDatePicker } from "@/components/design-system/primitives/DateTimePicker";
+
 
 export type DateRangeValue =
   | { mode: "preset"; days: number }
@@ -169,13 +171,14 @@ export default function DateRangePicker({
                 Start date
               </label>
               <div className="relative">
-                <input
-                  type="date"
-                  value={draftStart}
-                  max={draftEnd || todayStr}
-                  onChange={(e) => setDraftStart(e.target.value)}
-                  className="w-full rounded-lg border border-[var(--wk-border)] bg-[var(--wk-bg)] px-3 py-2 pl-9 text-[13px] text-[var(--wk-text)] focus:border-[var(--wk-brand)] focus:outline-none focus:ring-1 focus:ring-[var(--wk-brand)] cursor-pointer"
-                />
+                <WkDatePicker
+  value={draftStart}
+  onChange={(nextValue) => setDraftStart(nextValue)}
+  label="Draft start"
+  showLabel={false}
+  max={draftEnd || todayStr}
+  triggerClassName="w-full rounded-lg border border-[var(--wk-border)] bg-[var(--wk-bg)] px-3 py-2 pl-9 text-[13px] text-[var(--wk-text)] focus:border-[var(--wk-brand)] focus:outline-none focus:ring-1 focus:ring-[var(--wk-brand)] cursor-pointer"
+/>
                 <WkIcon
                   name="Calendar"
                   size={14}
@@ -189,14 +192,15 @@ export default function DateRangePicker({
                 End date
               </label>
               <div className="relative">
-                <input
-                  type="date"
-                  value={draftEnd}
-                  min={draftStart}
-                  max={todayStr}
-                  onChange={(e) => setDraftEnd(e.target.value)}
-                  className="w-full rounded-lg border border-[var(--wk-border)] bg-[var(--wk-bg)] px-3 py-2 pl-9 text-[13px] text-[var(--wk-text)] focus:border-[var(--wk-brand)] focus:outline-none focus:ring-1 focus:ring-[var(--wk-brand)] cursor-pointer"
-                />
+                <WkDatePicker
+  value={draftEnd}
+  onChange={(nextValue) => setDraftEnd(nextValue)}
+  label="Draft end"
+  showLabel={false}
+  min={draftStart}
+  max={todayStr}
+  triggerClassName="w-full rounded-lg border border-[var(--wk-border)] bg-[var(--wk-bg)] px-3 py-2 pl-9 text-[13px] text-[var(--wk-text)] focus:border-[var(--wk-brand)] focus:outline-none focus:ring-1 focus:ring-[var(--wk-brand)] cursor-pointer"
+/>
                 <WkIcon
                   name="Calendar"
                   size={14}

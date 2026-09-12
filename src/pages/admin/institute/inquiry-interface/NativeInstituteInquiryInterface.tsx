@@ -54,6 +54,8 @@ import type {
   ReviewState,
 } from "./types";
 import { WkSelect } from "@/components/design-system/primitives/Select";
+import { WkNumberField } from "@/components/design-system/primitives/NumberField";
+
 
 
 const defaultSetup: InquirySetup = {
@@ -911,7 +913,7 @@ function WorkbenchScreen({
           Set up the inquiry
         </h1>
         <p className="mt-2 text-[14px] leading-6 text-wk-text-muted">
-          
+
         </p>
 
         <div className="mt-5 rounded-lg border border-wk-border bg-wk-bg-subtle p-3">
@@ -1005,7 +1007,7 @@ function WorkbenchScreen({
             <div className="text-[10px] font-black uppercase tracking-[0.14em] text-wk-brand">Setup</div>
             <h2 className="mt-1 text-[18px] font-black tracking-[-0.04em] text-wk-text">Suggest setup</h2>
             <p className="mt-1 text-[12px] leading-5 text-wk-text-muted">
-              
+
             </p>
           </div>
           <button
@@ -1052,7 +1054,7 @@ function WorkbenchScreen({
 
           <Panel eyebrow="3 · Evidence Formats" title="Materials">
             <p className="mb-3 text-[12px] leading-5 text-wk-text-muted">
-              
+
             </p>
             <div className="grid gap-3 md:grid-cols-2">
               {setupOptions.formats.map((option) => {
@@ -1209,7 +1211,7 @@ function WorkbenchScreen({
             <div className="text-[10px] font-black uppercase tracking-[0.14em] text-wk-brand">Ready</div>
             <h2 className="mt-1 text-[20px] font-black tracking-[-0.04em] text-wk-text">Next: Evidence</h2>
             <p className="mt-2 text-[12px] leading-5 text-wk-text-muted">
-              
+
             </p>
             <button
               type="button"
@@ -3054,14 +3056,16 @@ function EvidenceScreen({
 
                     <label>
                       <span className="mb-2 block text-[10px] font-black uppercase tracking-[0.12em] text-wk-text-faint">Capture state</span>
-                      <input
-                        type="number"
-                        min={0}
-                        max={100}
-                        value={workspace.completion}
-                        onChange={(event) => setWorkspace((current) => ({ ...current, completion: Math.max(0, Math.min(100, Number(event.target.value) || 0)) }))}
-                        className="w-full rounded-lg border border-wk-border bg-wk-bg px-3 py-2.5 text-[13px] font-bold text-wk-text outline-none focus:border-wk-brand"
-                      />
+                      <WkNumberField
+  value={workspace.completion}
+  onChange={(nextValue) => setWorkspace((current) => ({ ...current, completion: Math.max(0, Math.min(100, nextValue || 0)) }))}
+  ariaLabel="Completion"
+  showSteppers={false}
+  min={0}
+  max={100}
+  groupClassName="w-full rounded-lg border border-wk-border bg-wk-bg px-3 py-2.5 text-[13px] font-bold text-wk-text outline-none focus:border-wk-brand"
+  inputClassName="text-left"
+/>
                     </label>
                   </div>
 

@@ -10,6 +10,8 @@ import { AuditSurfacePanel } from "../edition-detail/components/AuditSurfacePane
 import { ScoreBreakdownChips } from "../edition-detail/components/ScoreBreakdownChips";
 import type { WkChartEntryV2Row } from "@/services/chartsScoring/scoringTypes";
 import { WkSelect } from "@/components/design-system/primitives/Select";
+import { WkDatePicker } from "@/components/design-system/primitives/DateTimePicker";
+
 
 
 interface ChartProgram {
@@ -483,12 +485,13 @@ export default function AdminScoringRunsPage() {
                 <label className="block text-[11px] font-bold text-wk-text-muted uppercase tracking-wider mb-1.5">
                   Edition Date (Monday)
                 </label>
-                <input
-                  type="date"
-                  value={editionDate}
-                  onChange={(e) => { setEditionDate(e.target.value); setTriggerStatus(null); }}
-                  className="wk-input w-full rounded-lg border border-wk-border bg-wk-bg px-3 py-2 text-[13px] text-wk-text focus:outline-none focus:border-wk-brand"
-                />
+                <WkDatePicker
+  value={editionDate}
+  onChange={(nextValue) => { setEditionDate(nextValue); setTriggerStatus(null); }}
+  label="Edition date"
+  showLabel={false}
+  triggerClassName="wk-input w-full rounded-lg border border-wk-border bg-wk-bg px-3 py-2 text-[13px] text-wk-text focus:outline-none focus:border-wk-brand"
+/>
                 <p className="mt-1 text-[10px] text-wk-text-faint">The edition date determines the chart week (Mon-Sun).</p>
               </div>
 

@@ -1,4 +1,6 @@
 import { useState, useRef, useEffect } from "react";
+import { WkNumberField } from "@/components/design-system/primitives/NumberField";
+
 
 interface ImageEditorProps {
   url: string;
@@ -541,29 +543,33 @@ export function ImageEditor({ url, onApply, onCancel, onSaveAsNew }: ImageEditor
             {/* Resize */}
             <div className="flex items-center gap-1.5">
               <span className="text-[11px] text-wk-text-faint">Resize:</span>
-              <input
-                type="number"
-                value={targetWidth}
-                onChange={(e) => handleWidthChange(Number(e.target.value))}
-                disabled={corsLimited}
-                className={`w-16 rounded-md border px-2 py-1 text-[11px] outline-none ${
+              <WkNumberField
+  value={targetWidth}
+  onChange={(nextValue) => handleWidthChange(nextValue)}
+  ariaLabel="Width"
+  showSteppers={false}
+  disabled={corsLimited}
+  groupClassName={`w-16 rounded-md border px-2 py-1 text-[11px] outline-none ${
                   corsLimited
                     ? "border-wk-border/50 bg-wk-surface-strong text-wk-text-faint"
                     : "border-wk-border bg-wk-bg text-wk-text"
                 }`}
-              />
+  inputClassName="text-left"
+/>
               <span className="text-[11px] text-wk-text-faint">x</span>
-              <input
-                type="number"
-                value={targetHeight}
-                onChange={(e) => handleHeightChange(Number(e.target.value))}
-                disabled={corsLimited}
-                className={`w-16 rounded-md border px-2 py-1 text-[11px] outline-none ${
+              <WkNumberField
+  value={targetHeight}
+  onChange={(nextValue) => handleHeightChange(nextValue)}
+  ariaLabel="Height"
+  showSteppers={false}
+  disabled={corsLimited}
+  groupClassName={`w-16 rounded-md border px-2 py-1 text-[11px] outline-none ${
                   corsLimited
                     ? "border-wk-border/50 bg-wk-surface-strong text-wk-text-faint"
                     : "border-wk-border bg-wk-bg text-wk-text"
                 }`}
-              />
+  inputClassName="text-left"
+/>
               <button
                 onClick={() => setLockAspect(!lockAspect)}
                 disabled={corsLimited}

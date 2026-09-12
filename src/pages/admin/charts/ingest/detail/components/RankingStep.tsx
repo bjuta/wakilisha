@@ -4,6 +4,8 @@ import { WkTag } from "@/components/design-system/primitives/Tag";
 import type { IngestCandidate } from "@/services/chartsIngestion/types";
 import { applyRankOverride, clearRankOverride, hasCapability, getDisabledReason } from "@/services/chartsIngestion/client";
 import type { UserRole } from "@/services/chartsIngestion/client";
+import { WkNumberField } from "@/components/design-system/primitives/NumberField";
+
 
 interface RankingStepProps {
   jobId: string;
@@ -121,13 +123,15 @@ export function RankingStep({ jobId, candidates, onUpdate, role = "admin" }: Ran
                           </>
                         ) : (
                           <>
-                            <input
-                              type="number"
-                              value={overrideRank[c.id] ?? ""}
-                              onChange={(e) => setOverrideRank((prev) => ({ ...prev, [c.id]: e.target.value }))}
-                              placeholder="Rank"
-                              className="w-12 rounded border border-[var(--wk-border)] bg-[var(--wk-bg)] px-1 py-0.5 text-[10px] text-[var(--wk-text)] text-center"
-                            />
+                            <WkNumberField
+  value={overrideRank[c.id] ?? ""}
+  onChange={(nextValue) => setOverrideRank((prev) => ({ ...prev, [c.id]: (Number.isNaN(nextValue) ? "" : String(nextValue)) }))}
+  ariaLabel="Rank"
+  showSteppers={false}
+  placeholder="Rank"
+  groupClassName="w-12 rounded border border-[var(--wk-border)] bg-[var(--wk-bg)] px-1 py-0.5 text-[10px] text-[var(--wk-text)] text-center"
+  inputClassName=""
+/>
                             <button
                               onClick={() => handleApplyOverride(c.id)}
                               className="flex h-6 w-6 items-center justify-center rounded text-[var(--wk-brand)] hover:bg-[var(--wk-brand-soft)]"

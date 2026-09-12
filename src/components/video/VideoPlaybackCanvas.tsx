@@ -8,6 +8,8 @@ import {
   useState,
 } from "react";
 import { providerEmbedUrl } from "./providerSource";
+import { WkSlider } from "@/components/design-system/primitives/Slider";
+
 
 export interface VideoPlaybackRendition {
   height: number;
@@ -1053,17 +1055,16 @@ export function VideoPlaybackCanvas({
       >
         {!compact ? (
           <div className="pointer-events-auto mb-3">
-            <input
-              type="range"
-              min={0}
-              max={Math.max(duration, 0.01)}
-              step={0.1}
-              value={Math.min(currentTime, duration || 0)}
-              onChange={(event) => seek(Number(event.target.value))}
-              className="h-1.5 w-full cursor-pointer"
-              style={{ accentColor: "var(--wk-brand)" }}
-              aria-label="Video progress"
-            />
+            <WkSlider
+  value={Math.min(currentTime, duration || 0)}
+  onChange={(nextValue) => seek(nextValue)}
+  ariaLabel="Video progress"
+  showValueLabel={false}
+  min={0}
+  max={Math.max(duration, 0.01)}
+  step={0.1}
+  className="w-full"
+/>
             <div className="mt-1 flex justify-between text-[10px] font-semibold text-white/75">
               <span>{formatTime(currentTime)}</span>
               <span>{formatTime(duration)}</span>

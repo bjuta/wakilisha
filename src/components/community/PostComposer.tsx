@@ -45,6 +45,8 @@ import {
   findPostMentionComposerQuery,
   type PostMentionComposerQuery,
 } from "@/services/community/postMentionComposer";
+import { WkUploadTrigger } from "@/components/design-system/primitives/UploadField";
+
 
 function quotedPostPresentation(post: CommunityPost): CommunityQuotedPost {
   return {
@@ -92,7 +94,7 @@ export function PostComposer({
   onCancelEdit?: () => void;
   onError?: (message: string) => void;
 }) {
-  const inputRef = useRef<HTMLInputElement>(null);
+  const inputRef = useRef<HTMLButtonElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const mentionRequestRef = useRef(0);
   const [open, setOpen] = useState(
@@ -395,9 +397,8 @@ export function PostComposer({
     }
   }
 
-  async function handlePhoto(event: ChangeEvent<HTMLInputElement>) {
-    const file = event.target.files?.[0];
-    event.target.value = "";
+  async function handlePhoto(files: FileList | null) {
+    const file = files?.[0];
     if (!file) return;
 
     setUploading(true);
@@ -977,13 +978,13 @@ export function PostComposer({
             />
           ) : null}
 
-          <input
-            ref={inputRef}
-            type="file"
-            accept="image/jpeg,image/png,image/webp"
-            onChange={handlePhoto}
-            className="hidden"
-          />
+          <WkUploadTrigger
+  ref={inputRef}
+  accept="image/jpeg,image/png,image/webp"
+  onSelect={handlePhoto}
+  ariaLabel="File"
+  className="hidden"
+/>
 
           {error ? (
             <div className="ml-[52px] mt-3 rounded-xl bg-red-50 px-3 py-2 text-[11px] font-semibold text-red-700 sm:ml-0 sm:mt-4">

@@ -8,6 +8,8 @@ import { WkSurface } from "@/components/design-system/primitives/Surface";
 import type { IngestJob, IngestCandidate } from "@/services/chartsIngestion/types";
 import { applyRankOverride, clearRankOverride, hasCapability } from "@/services/chartsIngestion/client";
 import type { UserRole } from "@/services/chartsIngestion/client";
+import { WkNumberField } from "@/components/design-system/primitives/NumberField";
+
 
 interface RankingIntegrityProps {
   jobId: string;
@@ -277,14 +279,16 @@ export function RankingIntegrity({
                           </>
                         ) : (
                           <>
-                            <input
-                              type="number"
-                              value={overrideInputs[c.id] ?? ""}
-                              onChange={(e) => setOverrideInputs((p) => ({ ...p, [c.id]: e.target.value }))}
-                              placeholder="Rank"
-                              disabled={isLocked || !canOverride}
-                              className="w-12 rounded border border-[var(--wk-border)] bg-[var(--wk-bg)] px-1 py-0.5 text-[10px] text-[var(--wk-text)] text-center"
-                            />
+                            <WkNumberField
+  value={overrideInputs[c.id] ?? ""}
+  onChange={(nextValue) => setOverrideInputs((p) => ({ ...p, [c.id]: (Number.isNaN(nextValue) ? "" : String(nextValue)) }))}
+  ariaLabel="Rank"
+  showSteppers={false}
+  disabled={isLocked || !canOverride}
+  placeholder="Rank"
+  groupClassName="w-12 rounded border border-[var(--wk-border)] bg-[var(--wk-bg)] px-1 py-0.5 text-[10px] text-[var(--wk-text)] text-center"
+  inputClassName=""
+/>
                             <button
                               onClick={() => handleApplyOverride(c.id)}
                               disabled={isLocked || !canOverride || !overrideInputs[c.id]}

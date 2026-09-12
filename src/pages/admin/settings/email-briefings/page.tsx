@@ -12,6 +12,9 @@ import {
   AreaChart, Area, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
 } from "recharts";
 import { WkSelect } from "@/components/design-system/primitives/Select";
+import { WkTimePicker } from "@/components/design-system/primitives/DateTimePicker";
+import { WkNumberField } from "@/components/design-system/primitives/NumberField";
+
 
 
 const ContentPicker = lazy(() => import("./components/ContentPicker"));
@@ -140,8 +143,24 @@ function CadenceEditor({ item, onSave, onClose }: { item: BriefingCatalogItem; o
       {isManual ? (<p className="text-[12px] text-[var(--wk-text-muted)] bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">No automatic delivery — admin must manually trigger each issue.</p>) : (
         <div className="space-y-3">
           <div><label className="block text-[11px] font-semibold text-[var(--wk-text-muted)] mb-2">Quick presets</label><div className="flex gap-2 flex-wrap">{presets.map((p) => (<button key={p.days} onClick={() => setEveryDays(p.days)} className={`rounded-full border px-3 py-1 text-[11px] font-bold transition-all cursor-pointer whitespace-nowrap ${everyDays === p.days ? "border-[var(--wk-brand)] bg-[var(--wk-brand-soft)] text-[var(--wk-brand)]" : "border-[var(--wk-border)] text-[var(--wk-text-muted)]"}`}>{p.label}</button>))}</div></div>
-          <div className="flex items-center gap-2"><label className="text-[12px] font-semibold text-[var(--wk-text-muted)] whitespace-nowrap">Every</label><input type="number" min={1} max={365} value={everyDays} onChange={(e) => setEveryDays(e.target.value === "" ? "" : Math.max(1, Math.min(365, Number(e.target.value))))} placeholder="7" className="w-20 rounded-lg border border-[var(--wk-border)] bg-[var(--wk-bg)] px-3 py-2 text-[13px] text-[var(--wk-text)] text-center focus:border-[var(--wk-brand)] focus:outline-none" /><span className="text-[12px] text-[var(--wk-text-muted)]">days</span></div>
-          <div className="flex items-center gap-2"><label className="text-[12px] font-semibold text-[var(--wk-text-muted)] whitespace-nowrap">At (UTC)</label><input type="time" value={sendTime} onChange={(e) => setSendTime(e.target.value)} className="rounded-lg border border-[var(--wk-border)] bg-[var(--wk-bg)] px-3 py-2 text-[13px] text-[var(--wk-text)] focus:border-[var(--wk-brand)] focus:outline-none" /></div>
+          <div className="flex items-center gap-2"><label className="text-[12px] font-semibold text-[var(--wk-text-muted)] whitespace-nowrap">Every</label><WkNumberField
+  value={everyDays}
+  onChange={(nextValue) => setEveryDays((Number.isNaN(nextValue) ? "" : String(nextValue)) === "" ? "" : Math.max(1, Math.min(365, nextValue)))}
+  ariaLabel="7"
+  showSteppers={false}
+  min={1}
+  max={365}
+  placeholder="7"
+  groupClassName="w-20 rounded-lg border border-[var(--wk-border)] bg-[var(--wk-bg)] px-3 py-2 text-[13px] text-[var(--wk-text)] text-center focus:border-[var(--wk-brand)] focus:outline-none"
+  inputClassName=""
+/><span className="text-[12px] text-[var(--wk-text-muted)]">days</span></div>
+          <div className="flex items-center gap-2"><label className="text-[12px] font-semibold text-[var(--wk-text-muted)] whitespace-nowrap">At (UTC)</label><WkTimePicker
+  value={sendTime}
+  onChange={(nextValue) => setSendTime(nextValue)}
+  label="Send time"
+  showLabel={false}
+  triggerClassName="rounded-lg border border-[var(--wk-border)] bg-[var(--wk-bg)] px-3 py-2 text-[13px] text-[var(--wk-text)] focus:border-[var(--wk-brand)] focus:outline-none"
+/></div>
         </div>
       )}
       <div className="flex items-center gap-2 pt-1">

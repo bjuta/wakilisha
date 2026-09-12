@@ -14,6 +14,8 @@ import {
   getRegistryOnboardingArtists,
   type RegistryOnboardingArtist,
 } from "@/services/community";
+import { WkPasswordField } from "@/components/design-system/primitives/Field";
+
 
 function AuthMobileTextClearing({
   children,
@@ -1020,8 +1022,30 @@ export default function AuthPage() {
                 </>
               ) : (
                 <form onSubmit={handleRecoveryPassword} className="flex flex-col gap-3 mb-6">
-                  <input type="password" placeholder="New password" value={password} onChange={(e) => setPassword(e.target.value)} required minLength={8} className="w-full h-[52px] rounded-[14px] px-5 text-[14px] outline-none transition-colors" style={{ background: "var(--wk-surface-raised)", border: "1px solid var(--wk-border)", color: "var(--wk-text)", fontFamily: "var(--wk-font-ui)" }} />
-                  <input type="password" placeholder="Confirm new password" value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} required minLength={8} className="w-full h-[52px] rounded-[14px] px-5 text-[14px] outline-none transition-colors" style={{ background: "var(--wk-surface-raised)", border: "1px solid var(--wk-border)", color: "var(--wk-text)", fontFamily: "var(--wk-font-ui)" }} />
+                  <WkPasswordField
+  value={password}
+  onChange={(nextValue) => setPassword(nextValue)}
+  ariaLabel="New password"
+  autoComplete="new-password"
+  className="w-full"
+  placeholder="New password"
+  required
+  minLength={8}
+  inputClassName="w-full h-[52px] rounded-[14px] px-5 text-[14px] outline-none transition-colors"
+  inputStyle={{ background: "var(--wk-surface-raised)", border: "1px solid var(--wk-border)", color: "var(--wk-text)", fontFamily: "var(--wk-font-ui)" }}
+/>
+                  <WkPasswordField
+  value={confirmPassword}
+  onChange={(nextValue) => setConfirmPassword(nextValue)}
+  ariaLabel="Confirm new password"
+  autoComplete="new-password"
+  className="w-full"
+  placeholder="Confirm new password"
+  required
+  minLength={8}
+  inputClassName="w-full h-[52px] rounded-[14px] px-5 text-[14px] outline-none transition-colors"
+  inputStyle={{ background: "var(--wk-surface-raised)", border: "1px solid var(--wk-border)", color: "var(--wk-text)", fontFamily: "var(--wk-font-ui)" }}
+/>
                   <button type="submit" disabled={loading} className="w-full h-[52px] rounded-[14px] flex items-center justify-center gap-3 font-bold text-[14px] whitespace-nowrap transition-all duration-200 cursor-pointer hover:opacity-90 active:scale-[0.98] disabled:opacity-50" style={{ background: "var(--wk-brand)", color: "var(--wk-brand-on)", fontFamily: "var(--wk-font-ui)" }}>{loading ? "Updating..." : "Update password"}</button>
                 </form>
               )}
@@ -1088,7 +1112,18 @@ export default function AuthPage() {
             <form onSubmit={handleEmailAuth} className="flex flex-col gap-3 mb-6">
               {mode === "signup" && <input type="text" placeholder="Display name" value={displayName} onChange={(e) => setDisplayName(e.target.value)} className="w-full h-[52px] rounded-[14px] px-5 text-[14px] outline-none transition-colors" style={{ background: "var(--wk-surface-raised)", border: "1px solid var(--wk-border)", color: "var(--wk-text)", fontFamily: "var(--wk-font-ui)" }} />}
               <input type="email" placeholder="Email address" value={email} onChange={(e) => setEmail(e.target.value)} required className="w-full h-[52px] rounded-[14px] px-5 text-[14px] outline-none transition-colors" style={{ background: "var(--wk-surface-raised)", border: "1px solid var(--wk-border)", color: "var(--wk-text)", fontFamily: "var(--wk-font-ui)" }} />
-              <input type="password" placeholder="Password" value={password} onChange={(e) => setPassword(e.target.value)} required minLength={6} className="w-full h-[52px] rounded-[14px] px-5 text-[14px] outline-none transition-colors" style={{ background: "var(--wk-surface-raised)", border: "1px solid var(--wk-border)", color: "var(--wk-text)", fontFamily: "var(--wk-font-ui)" }} />
+              <WkPasswordField
+  value={password}
+  onChange={(nextValue) => setPassword(nextValue)}
+  ariaLabel="Password"
+  autoComplete="current-password"
+  className="w-full"
+  placeholder="Password"
+  required
+  minLength={6}
+  inputClassName="w-full h-[52px] rounded-[14px] px-5 text-[14px] outline-none transition-colors"
+  inputStyle={{ background: "var(--wk-surface-raised)", border: "1px solid var(--wk-border)", color: "var(--wk-text)", fontFamily: "var(--wk-font-ui)" }}
+/>
               <AuthMobileTextClearing interactive>
                 <div className="flex items-center justify-between gap-3 px-1">
                   <button type="button" onClick={() => goToMode("forgot")} className="text-[12px] font-bold hover:opacity-80" style={{ color: "var(--wk-text-muted)", fontFamily: "var(--wk-font-ui)" }}>Forgot password?</button>

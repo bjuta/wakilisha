@@ -11,6 +11,10 @@ import {
 } from "@/services/adminSettings/settingsTypes";
 import { MediaPickerButton } from "@/components/admin/MediaPickerButton";
 import { WkSelect } from "@/components/design-system/primitives/Select";
+import { WkColorField } from "@/components/design-system/primitives/ColorField";
+import { WkNumberField } from "@/components/design-system/primitives/NumberField";
+import { WkSlider } from "@/components/design-system/primitives/Slider";
+
 
 
 /* ──── Hero density helpers ──── */
@@ -87,12 +91,13 @@ export default function AdminSettingsFrontendAppearance() {
           <div>
             <label className="block text-[12px] font-semibold text-[var(--wk-text-muted)] mb-1.5">Light Mode Accent</label>
             <div className="flex items-center gap-2">
-              <input
-                type="color"
-                value={settings.lightModeAccent}
-                onChange={(e) => update("lightModeAccent", e.target.value)}
-                className="h-10 w-10 rounded-lg border border-[var(--wk-border)] cursor-pointer"
-              />
+              <WkColorField
+  compact
+  value={settings.lightModeAccent}
+  onChange={(nextValue) => update("lightModeAccent", nextValue)}
+  ariaLabel="Light mode accent"
+  className="h-10 w-10 rounded-lg border border-[var(--wk-border)] cursor-pointer"
+/>
               <input
                 type="text"
                 value={settings.lightModeAccent}
@@ -104,12 +109,13 @@ export default function AdminSettingsFrontendAppearance() {
           <div>
             <label className="block text-[12px] font-semibold text-[var(--wk-text-muted)] mb-1.5">Dark Mode Accent</label>
             <div className="flex items-center gap-2">
-              <input
-                type="color"
-                value={settings.darkModeAccent}
-                onChange={(e) => update("darkModeAccent", e.target.value)}
-                className="h-10 w-10 rounded-lg border border-[var(--wk-border)] cursor-pointer"
-              />
+              <WkColorField
+  compact
+  value={settings.darkModeAccent}
+  onChange={(nextValue) => update("darkModeAccent", nextValue)}
+  ariaLabel="Dark mode accent"
+  className="h-10 w-10 rounded-lg border border-[var(--wk-border)] cursor-pointer"
+/>
               <input
                 type="text"
                 value={settings.darkModeAccent}
@@ -196,28 +202,31 @@ export default function AdminSettingsFrontendAppearance() {
           <div className="mb-3 flex items-center justify-between">
             <label className="text-[12px] font-semibold text-[var(--wk-text-muted)]">Image count</label>
             <div className="flex items-center gap-2">
-              <input
-                type="number"
-                min={1}
-                max={200}
-                value={settings.artistHeroImageCount}
-                onChange={(e) => {
-                  const v = Math.max(1, Math.min(200, Number(e.target.value)));
+              <WkNumberField
+  value={settings.artistHeroImageCount}
+  onChange={(nextValue) => {
+                  const v = Math.max(1, Math.min(200, nextValue));
                   update("artistHeroImageCount", v);
                 }}
-                className="w-16 rounded-lg border border-[var(--wk-border)] bg-[var(--wk-bg)] px-2 py-1 text-[13px] font-bold text-center text-[var(--wk-text)] focus:border-[var(--wk-brand)] focus:outline-none"
-              />
+  ariaLabel="Artist hero image count"
+  showSteppers={false}
+  min={1}
+  max={200}
+  groupClassName="w-16 rounded-lg border border-[var(--wk-border)] bg-[var(--wk-bg)] px-2 py-1 text-[13px] font-bold text-center text-[var(--wk-text)] focus:border-[var(--wk-brand)] focus:outline-none"
+  inputClassName=""
+/>
               <span className="text-[12px] text-[var(--wk-text-faint)]">/200</span>
             </div>
           </div>
-          <input
-            type="range"
-            min={1}
-            max={200}
-            value={settings.artistHeroImageCount}
-            onChange={(e) => update("artistHeroImageCount", Number(e.target.value))}
-            className="w-full h-2 rounded-full cursor-pointer accent-[var(--wk-brand)]"
-          />
+          <WkSlider
+  value={settings.artistHeroImageCount}
+  onChange={(nextValue) => update("artistHeroImageCount", nextValue)}
+  ariaLabel="Artist hero image count"
+  showValueLabel={false}
+  min={1}
+  max={200}
+  className="w-full"
+/>
           <div className="mt-1.5 flex justify-between text-[10px] text-[var(--wk-text-faint)]">
             <span>1 — Fullwidth portrait</span>
             <span>200 — 20-col mural</span>

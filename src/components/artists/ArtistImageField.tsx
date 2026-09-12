@@ -10,6 +10,8 @@ import {
 import {
   uploadArtistImage,
 } from "@/services/artists/artistMedia";
+import { WkUploadTrigger } from "@/components/design-system/primitives/UploadField";
+
 
 type ArtistImageFieldVariant =
   | "profile"
@@ -34,7 +36,7 @@ export function ArtistImageField({
   helper?: string;
 }) {
   const inputRef =
-    useRef<HTMLInputElement>(null);
+    useRef<HTMLButtonElement>(null);
   const [uploading, setUploading] =
     useState(false);
   const [error, setError] =
@@ -64,12 +66,8 @@ export function ArtistImageField({
         ? "h-32 w-32 rounded-2xl"
         : "aspect-video w-full max-w-xl rounded-2xl";
 
-  async function handleFile(
-    event: ChangeEvent<HTMLInputElement>,
-  ) {
-    const file =
-      event.target.files?.[0];
-    event.target.value = "";
+  async function handleFile(files: FileList | null) {
+    const file = files?.[0];
 
     if (!file) {
       return;
@@ -181,13 +179,13 @@ export function ArtistImageField({
           )}
         </div>
 
-        <input
-          ref={inputRef}
-          type="file"
-          accept="image/jpeg,image/png,image/webp"
-          onChange={handleFile}
-          className="hidden"
-        />
+        <WkUploadTrigger
+  ref={inputRef}
+  accept="image/jpeg,image/png,image/webp"
+  onSelect={handleFile}
+  ariaLabel="File"
+  className="hidden"
+/>
 
         <p className="text-[10px] leading-4 text-[var(--wk-text-faint)]">
           {helper ||

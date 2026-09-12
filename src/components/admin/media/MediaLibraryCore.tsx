@@ -23,6 +23,9 @@ import { MediaEditModal } from "@/components/admin/media/MediaEditModal";
 import { MediaLibraryPreviewPanel } from "@/components/admin/media/MediaLibraryPreviewPanel";
 import { WkSelect } from "@/components/design-system/primitives/Select";
 import { WkCheckbox } from "@/components/design-system/primitives/Checkbox";
+import { WkDatePicker } from "@/components/design-system/primitives/DateTimePicker";
+import { WkUploadTrigger } from "@/components/design-system/primitives/UploadField";
+
 
 
 
@@ -172,7 +175,7 @@ export function MediaLibraryCore({
   const [uploadProgress, setUploadProgress] = useState<Record<string, UploadQueueItem>>({});
   const [uploadedItems, setUploadedItems] = useState<{ name: string; url: string; assetId?: string }[]>([]);
   const [isDragging, setIsDragging] = useState(false);
-  const fileInputRef = useRef<HTMLInputElement>(null);
+  const fileInputRef = useRef<HTMLButtonElement>(null);
   const masterContextsRef = useRef<Record<string, ResumableMasterContext>>({});
   const masterControllersRef = useRef<Record<string, AbortController>>({});
 
@@ -785,23 +788,43 @@ export function MediaLibraryCore({
             <div className="flex flex-wrap gap-1.5 rounded-xl border border-wk-border bg-wk-surface/60 p-2">
               <label className="flex items-center gap-1.5 text-[11px] text-wk-text-muted">
                 Uploaded from
-                <input type="date" value={uploadedFrom} onChange={(e) => { setUploadedFrom(e.target.value); setPage(0); }}
-                  className="rounded-lg border border-wk-border bg-wk-bg px-2 py-1 text-[11px] text-wk-text outline-none" />
+                <WkDatePicker
+  value={uploadedFrom}
+  onChange={(nextValue) => { setUploadedFrom(nextValue); setPage(0); }}
+  label="Uploaded from"
+  showLabel={false}
+  triggerClassName="rounded-lg border border-wk-border bg-wk-bg px-2 py-1 text-[11px] text-wk-text outline-none"
+/>
               </label>
               <label className="flex items-center gap-1.5 text-[11px] text-wk-text-muted">
                 to
-                <input type="date" value={uploadedTo} onChange={(e) => { setUploadedTo(e.target.value); setPage(0); }}
-                  className="rounded-lg border border-wk-border bg-wk-bg px-2 py-1 text-[11px] text-wk-text outline-none" />
+                <WkDatePicker
+  value={uploadedTo}
+  onChange={(nextValue) => { setUploadedTo(nextValue); setPage(0); }}
+  label="Uploaded to"
+  showLabel={false}
+  triggerClassName="rounded-lg border border-wk-border bg-wk-bg px-2 py-1 text-[11px] text-wk-text outline-none"
+/>
               </label>
               <label className="flex items-center gap-1.5 text-[11px] text-wk-text-muted">
                 Content from
-                <input type="date" value={contentFrom} onChange={(e) => { setContentFrom(e.target.value); setPage(0); }}
-                  className="rounded-lg border border-wk-border bg-wk-bg px-2 py-1 text-[11px] text-wk-text outline-none" />
+                <WkDatePicker
+  value={contentFrom}
+  onChange={(nextValue) => { setContentFrom(nextValue); setPage(0); }}
+  label="Content from"
+  showLabel={false}
+  triggerClassName="rounded-lg border border-wk-border bg-wk-bg px-2 py-1 text-[11px] text-wk-text outline-none"
+/>
               </label>
               <label className="flex items-center gap-1.5 text-[11px] text-wk-text-muted">
                 to
-                <input type="date" value={contentTo} onChange={(e) => { setContentTo(e.target.value); setPage(0); }}
-                  className="rounded-lg border border-wk-border bg-wk-bg px-2 py-1 text-[11px] text-wk-text outline-none" />
+                <WkDatePicker
+  value={contentTo}
+  onChange={(nextValue) => { setContentTo(nextValue); setPage(0); }}
+  label="Content to"
+  showLabel={false}
+  triggerClassName="rounded-lg border border-wk-border bg-wk-bg px-2 py-1 text-[11px] text-wk-text outline-none"
+/>
               </label>
             </div>
           )}
@@ -1089,8 +1112,14 @@ export function MediaLibraryCore({
                 <p className="text-[15px] font-bold text-wk-text">{isDragging ? "Drop files here" : "Drag & drop or click to upload"}</p>
                 <p className="mt-1 text-[12px] text-wk-text-muted">Images and PDFs use the existing direct lane. Audio and video use resumable protected masters + durable processing.</p>
               </div>
-              <input ref={fileInputRef} type="file" accept={ACCEPTED_UPLOAD_TYPES} multiple className="hidden"
-                onChange={(e) => e.target.files && handleFilesAdded(e.target.files)} />
+              <WkUploadTrigger
+  ref={fileInputRef}
+  accept={ACCEPTED_UPLOAD_TYPES}
+  multiple
+  onSelect={(files) => files && handleFilesAdded(files)}
+  ariaLabel="File"
+  className="hidden"
+/>
             </div>
 
             {uploadFiles.length > 0 && (

@@ -18,6 +18,8 @@ import { CsvMappingPreview } from "./CsvMappingPreview";
 import type { UserRole } from "@/services/chartsIngestion/client";
 import type { DiscoveredCsvSource } from "@/services/chartsIngestion/types";
 import { WkSelect } from "@/components/design-system/primitives/Select";
+import { WkSlider } from "@/components/design-system/primitives/Slider";
+
 
 
 interface SourcesStepProps {
@@ -177,15 +179,16 @@ export function SourcesStep({ jobId, sources, onUpdate, role = "admin" }: Source
             </div>
             <div>
               <label className="text-[10px] font-bold uppercase text-[var(--wk-text-muted)]">Weight ({Math.round(newWeight * 100)}%)</label>
-              <input
-                type="range"
-                min="0.05"
-                max="0.8"
-                step="0.05"
-                value={newWeight}
-                onChange={(e) => setNewWeight(parseFloat(e.target.value))}
-                className="mt-2 w-full"
-              />
+              <WkSlider
+  value={newWeight}
+  onChange={(nextValue) => setNewWeight(nextValue)}
+  ariaLabel="New weight"
+  showValueLabel={false}
+  min={0.05}
+  max={0.8}
+  step={0.05}
+  className="mt-2 w-full"
+/>
             </div>
             <div>
               <label className="text-[10px] font-bold uppercase text-[var(--wk-text-muted)]">URL / Playlist</label>
