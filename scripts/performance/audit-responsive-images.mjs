@@ -34,6 +34,20 @@ const targets = [
     path: "src/pages/mobile/magazine/page.tsx",
     expected: 7,
   },
+  {
+    path: "src/pages/magazine/article/page.tsx",
+    expected: 1,
+  },
+  {
+    path:
+      "src/pages/magazine/article/components/ArticleRelated.tsx",
+    expected: 2,
+  },
+  {
+    path:
+      "src/pages/mobile/magazine/article/page.tsx",
+    expected: 2,
+  },
 ];
 
 for (const marker of [
@@ -62,6 +76,61 @@ for (const marker of [
   if (!component.includes(marker)) {
     fail(
       `responsive image component is missing ${marker}`,
+    );
+  }
+}
+
+const articlePage = read(
+  "src/pages/magazine/article/page.tsx",
+);
+
+for (const marker of [
+  'preset="hero"',
+  'loading="eager"',
+  'fetchPriority="high"',
+  'decoding="async"',
+  'data-wakilisha-article-hero="true"',
+]) {
+  if (!articlePage.includes(marker)) {
+    fail(
+      `Article LCP hero is missing ${marker}`,
+    );
+  }
+}
+
+const articleRelated = read(
+  "src/pages/magazine/article/components/ArticleRelated.tsx",
+);
+
+for (const marker of [
+  'preset="feature"',
+  'preset="thumbnail"',
+  'loading="lazy"',
+  'fetchPriority="low"',
+  'decoding="async"',
+]) {
+  if (!articleRelated.includes(marker)) {
+    fail(
+      `Article related imagery is missing ${marker}`,
+    );
+  }
+}
+
+const mobileArticlePage = read(
+  "src/pages/mobile/magazine/article/page.tsx",
+);
+
+for (const marker of [
+  'preset="hero"',
+  'preset="thumbnail"',
+  'loading="eager"',
+  'fetchPriority="high"',
+  'decoding="async"',
+  'data-wakilisha-article-hero="true"',
+]) {
+  if (!mobileArticlePage.includes(marker)) {
+    fail(
+      `Mobile Article media is missing ${marker}`,
     );
   }
 }
@@ -119,5 +188,5 @@ if (
 }
 
 console.log(
-  `Responsive image audit passed: ${responsiveImageCount} magazine images covered.`,
+  `Responsive image audit passed: ${responsiveImageCount} Magazine + desktop/mobile Article images covered; Article LCP priority enforced.`,
 );

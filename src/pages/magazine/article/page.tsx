@@ -19,6 +19,7 @@ import { resolveArtistMarkers } from "./components/ArticleArtistEmbeds";
 import { buildContentSegments } from "./components/ArticleEmbedUtils";
 import { SkeletonArticlePage } from "@/components/skeletons/Skeletons";
 import { Chapter19FallbackImage } from "@/components/media/Chapter19FallbackImage";
+import { ResponsiveMediaImage } from "@/components/media/ResponsiveMediaImage";
 import { MetaTags } from "@/components/seo/MetaTags";
 import { SchemaOrg } from "@/components/seo/SchemaOrg";
 import { checkArticleScheduling, lookupSlugRedirect } from "@/services/articles/articleAdminService";
@@ -344,7 +345,25 @@ export default function ArticlePage() {
       </div>
 
       <section className="relative overflow-hidden" style={{ height: "70vh", minHeight: "480px" }}>
-        {article.heroUrl ? <img src={article.heroUrl} alt={article.title} loading="lazy" className="absolute inset-0 w-full h-full object-cover" style={{ objectPosition: "50% 30%" }} /> : <Chapter19FallbackImage id={article.id} slug={article.slug} name={article.title} />}
+        {article.heroUrl ? (
+          <ResponsiveMediaImage
+            src={article.heroUrl}
+            preset="hero"
+            alt={article.title}
+            loading="eager"
+            fetchPriority="high"
+            decoding="async"
+            data-wakilisha-article-hero="true"
+            className="absolute inset-0 w-full h-full object-cover"
+            style={{ objectPosition: "50% 30%" }}
+          />
+        ) : (
+          <Chapter19FallbackImage
+            id={article.id}
+            slug={article.slug}
+            name={article.title}
+          />
+        )}
         <div className="absolute top-0 left-0 right-0 z-20 px-6 py-5 flex items-center justify-between">
           <Link to="/magazine" className="inline-flex items-center gap-2 rounded-full border border-white/20 bg-black/25 backdrop-blur-sm px-4 py-2 text-[11px] font-bold uppercase tracking-wider text-white/85 hover:bg-black/45 transition-all whitespace-nowrap"><WkIcon name="ArrowLeft" size={13} />Magazine</Link>
           <div className="flex items-center gap-2">

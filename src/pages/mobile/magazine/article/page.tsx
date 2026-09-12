@@ -12,6 +12,7 @@ import { transformArtistShortcodes } from "@/utils/transformArtistShortcodes";
 import { transformTrackShortcodes } from "@/utils/transformTrackShortcodes";
 import { SkeletonArticlePage } from "@/components/skeletons/Skeletons";
 import { Chapter19FallbackImage } from "@/components/media/Chapter19FallbackImage";
+import { ResponsiveMediaImage } from "@/components/media/ResponsiveMediaImage";
 import { ArticleContentRenderer, transformArticleHtmlForVideoEmbeds } from "@/pages/magazine/article/components/ArticleVideoEmbeds";
 import { transformArticleHtmlForReleaseEmbeds } from "@/pages/magazine/article/components/ArticleReleaseEmbeds";
 import { resolveArtistMarkers } from "@/pages/magazine/article/components/ArticleArtistEmbeds";
@@ -50,9 +51,13 @@ function RelatedCard({ story }: { story: MagazineArticle }) {
     >
       <div className="w-20 h-20 shrink-0 rounded-xl overflow-hidden bg-[var(--wk-surface-raised)]">
         {story.heroUrl ? (
-          <img
+          <ResponsiveMediaImage
             src={story.heroUrl}
+            preset="thumbnail"
             alt={story.title}
+            loading="lazy"
+            fetchPriority="low"
+            decoding="async"
             className="w-full h-full object-cover object-top transition-transform duration-300 group-hover:scale-110"
           />
         ) : (
@@ -258,9 +263,14 @@ export default function MobileArticle() {
       />
       <section className="relative overflow-hidden" style={{ height: "62dvh", minHeight: "380px" }}>
         {article.heroUrl ? (
-          <img
+          <ResponsiveMediaImage
             src={article.heroUrl}
+            preset="hero"
             alt={article.title}
+            loading="eager"
+            fetchPriority="high"
+            decoding="async"
+            data-wakilisha-article-hero="true"
             className="absolute inset-0 w-full h-full object-cover object-top"
           />
         ) : (
