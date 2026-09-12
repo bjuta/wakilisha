@@ -6,7 +6,7 @@ import {
 } from "react-aria-components";
 
 interface WkNumberFieldProps {
-  value: number;
+  value?: number;
   onChange: (value: number) => void;
   min?: number;
   max?: number;
