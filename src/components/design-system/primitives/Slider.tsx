@@ -12,6 +12,7 @@ interface WkSliderProps {
   step?: number;
   ariaLabel?: string;
   className?: string;
+  trackClassName?: string;
   disabled?: boolean;
   formatValue?: (value: number) => string;
 }
@@ -24,6 +25,7 @@ export function WkSlider({
   step = 1,
   ariaLabel = "Value",
   className = "",
+  trackClassName = "",
   disabled = false,
   formatValue = (current) => String(current),
 }: WkSliderProps) {
@@ -47,7 +49,7 @@ export function WkSlider({
           {formatValue(value)}
         </span>
       </div>
-      <SliderTrack className="relative flex h-8 w-full items-center">
+      <SliderTrack className={`relative flex h-8 w-full items-center ${trackClassName}`.trim()}>
         <div aria-hidden="true" className="absolute left-0 right-0 h-1.5 rounded-full bg-wk-surface-raised" />
         <div
           aria-hidden="true"
