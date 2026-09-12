@@ -19,7 +19,6 @@ import { WkSelect } from "@/components/design-system/primitives/Select";
 import { WkNumberField } from "@/components/design-system/primitives/NumberField";
 
 
-
 type ComposerMode = "show" | "season" | "audio";
 type StatusFilter = "all" | "draft" | "in_review" | "changes_requested" | "approved" | "published";
 
@@ -192,7 +191,7 @@ export default function AdminAudioPage() {
               <label className="text-xs font-bold text-wk-text-muted">Show<WkSelect value={seasonShowId} onChange={(value) => setSeasonShowId(value)} required triggerClassName="mt-1 w-full rounded-lg border border-wk-border bg-wk-bg px-3 py-3 text-sm text-wk-text"><option value="">Choose a Show</option>{index?.shows.map((show) => <option key={show.id} value={show.id}>{show.title}</option>)}</WkSelect></label>
               <label className="text-xs font-bold text-wk-text-muted">Number<WkNumberField
   value={seasonNumber}
-  onChange={(nextValue) => setSeasonnextValue}
+  onChange={(nextValue) => setSeasonNumber(Number.isNaN(nextValue) ? "" : String(nextValue))}
   ariaLabel="Season number"
   showSteppers={false}
   min={1}
@@ -215,7 +214,7 @@ export default function AdminAudioPage() {
                   <label className="text-xs font-bold text-wk-text-muted">Season<WkSelect value={publicationSeasonId} onChange={(value) => setPublicationSeasonId(value)} triggerClassName="mt-1 w-full rounded-lg border border-wk-border bg-wk-bg px-3 py-3 text-sm text-wk-text"><option value="">No Season</option>{selectedShowSeasons.map((season) => <option key={season.id} value={season.id}>{season.seasonNumber}. {season.title}</option>)}</WkSelect></label>
                   <label className="text-xs font-bold text-wk-text-muted">Episode Number<WkNumberField
   value={episodeNumber}
-  onChange={(nextValue) => setEpisodenextValue}
+  onChange={(nextValue) => setEpisodeNumber(Number.isNaN(nextValue) ? "" : String(nextValue))}
   ariaLabel="Episode number"
   showSteppers={false}
   min={1}
