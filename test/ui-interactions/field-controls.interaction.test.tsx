@@ -193,6 +193,28 @@ describe("WAKILISHA field-control interaction contract", () => {
     expect(onChange).toHaveBeenCalledWith("1974-03-01");
   });
 
+  it("does not remap years 0001 through 0099 into the 1900s", async () => {
+    const user = userEvent.setup();
+    const onChange = vi.fn();
+
+    render(
+      <WkDatePicker
+        label="Early archive date"
+        value="0099-03-01"
+        onChange={onChange}
+      />,
+    );
+
+    const trigger = screen.getByRole("button", { name: "Early archive date" });
+    expect(trigger).toHaveTextContent("Mar 1, 99");
+    expect(trigger).not.toHaveTextContent("1999");
+
+    await user.click(trigger);
+    expect(screen.getByRole("textbox", { name: "Year" })).toHaveValue("99");
+    await user.click(screen.getByRole("button", { name: "Use date" }));
+    expect(onChange).toHaveBeenCalledWith("0099-03-01");
+  });
+
   it("blocks temporal values outside the governed range and closes on Escape", async () => {
     const user = userEvent.setup();
     const onChange = vi.fn();
