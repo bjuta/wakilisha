@@ -24,6 +24,8 @@ interface WkTemporalPickerProps {
   minYear?: number;
   maxYear?: number;
   disabled?: boolean;
+  className?: string;
+  triggerClassName?: string;
 }
 
 interface WkDateTimePickerProps
@@ -150,6 +152,8 @@ export function WkTemporalPicker({
   minYear = 2000,
   maxYear = new Date().getFullYear() + 2,
   disabled = false,
+  className = "",
+  triggerClassName = "",
 }: WkTemporalPickerProps) {
   const [open, setOpen] = useState(false);
   const [draft, setDraft] = useState<DraftDateTime>(() =>
@@ -241,7 +245,7 @@ export function WkTemporalPicker({
   }
 
   return (
-    <div ref={rootRef} className="relative">
+    <div ref={rootRef} className={`relative ${className}`.trim()}>
       <button
         type="button"
         disabled={disabled}
@@ -254,7 +258,7 @@ export function WkTemporalPicker({
           disabled
             ? "cursor-not-allowed opacity-50"
             : "hover:bg-wk-surface-raised"
-        }`}
+        } ${triggerClassName}`.trim()}
       >
         <span>
           <span className="block text-[10px] font-black uppercase tracking-[0.12em] text-wk-text-faint">
