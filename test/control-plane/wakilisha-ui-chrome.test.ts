@@ -12,11 +12,21 @@ describe("WAKILISHA no-browser-chrome control plane", () => {
         "scripts/control-plane/wakilisha-ui-chrome-baseline.json",
         "utf8",
       ),
-    );
+    ) as {
+      version: number;
+      violations: Record<string, Record<string, number>>;
+    };
+    const summary: Record<string, Record<string, number>> = {};
+
+    for (const issue of scanWakilishaUiChrome()) {
+      summary[issue.path] ??= {};
+      summary[issue.path][issue.kind] =
+        (summary[issue.path][issue.kind] ?? 0) + 1;
+    }
 
     expect(baseline.version).toBe(1);
     expect(baseline.violations).toBeTypeOf("object");
-    expect(scanWakilishaUiChrome().length).toBeGreaterThan(0);
+    expect(summary).toEqual(baseline.violations);
   });
   it("pins the approved React Aria interaction runtime exactly", () => {
     const packageJson = JSON.parse(
