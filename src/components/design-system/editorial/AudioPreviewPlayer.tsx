@@ -49,8 +49,17 @@ export function AudioPreviewPlayer({
   const togglePlayback = async () => {
     const audio = audioRef.current;
     if (!audio) return;
-    if (audio.paused) await audio.play();
-    else audio.pause();
+
+    if (!audio.paused) {
+      audio.pause();
+      return;
+    }
+
+    try {
+      await audio.play();
+    } catch {
+      setPlaying(false);
+    }
   };
 
   const changeRate = (rate: number) => {
