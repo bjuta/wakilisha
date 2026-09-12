@@ -274,7 +274,7 @@ export function MediaLibraryPreviewPanel({
                     source={{
                       kind: "native",
                       url: videoTranscode.url,
-                      mimeType: "video/mp4",
+                      mimeType: videoTranscode.mime_type || "video/mp4",
                       poster: posterFrame?.url ?? thumbnail?.url ?? null,
                     }}
                     title={selectedAsset?.title || "Video preview"}

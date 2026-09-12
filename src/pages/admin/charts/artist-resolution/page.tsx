@@ -889,7 +889,7 @@ export default function AdminChartsArtistResolutionPage() {
   const applyResolutionDecision = useCallback(async () => {
     if (!selectedRow || !selectedDecision) return;
 
-    const confirmed = (await wakilishaDialog.confirm({ title: "Resolve Artist identity", message: "Apply this saved artist resolution decision to registry track credits?", confirmLabel: "Continue", destructive: false }));
+    const confirmed = (await wakilishaDialog.confirm({ title: "Resolve Artist identity", message: "Apply this saved artist resolution decision to registry track credits?", confirmLabel: "Apply decision", destructive: false }));
     if (!confirmed) return;
 
     setApplyingDecision(true);
@@ -918,7 +918,7 @@ export default function AdminChartsArtistResolutionPage() {
   const acceptSelectedAsGroup = useCallback(async () => {
     if (!selectedRow) return;
 
-    const confirmed = (await wakilishaDialog.confirm({ title: "Resolve Artist identity", message: `Accept "${selectedRow.artistName}" as an intentional group/collab credit?`, confirmLabel: "Continue", destructive: false }));
+    const confirmed = (await wakilishaDialog.confirm({ title: "Resolve Artist identity", message: `Accept "${selectedRow.artistName}" as an intentional group/collab credit?`, confirmLabel: "Accept group", destructive: false }));
     if (!confirmed) return;
 
     setSavingDecision(true);
@@ -969,7 +969,7 @@ export default function AdminChartsArtistResolutionPage() {
       return;
     }
 
-    const confirmed = (await wakilishaDialog.confirm({ title: "Resolve Artist identity", message: `Apply ${readyDecisions.length} ready decision${readyDecisions.length === 1 ? "" : "s"} to registry track credits?`, confirmLabel: "Continue", destructive: false }));
+    const confirmed = (await wakilishaDialog.confirm({ title: "Resolve Artist identity", message: `Apply ${readyDecisions.length} ready decision${readyDecisions.length === 1 ? "" : "s"} to registry track credits?`, confirmLabel: "Apply decisions", destructive: false }));
     if (!confirmed) return;
 
     setBulkApplying(true);

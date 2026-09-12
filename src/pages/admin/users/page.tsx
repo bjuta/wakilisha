@@ -431,7 +431,7 @@ export default function AdminUsersPage() {
   }
 
   async function handleSuspend(user: UserAccess) {
-    if (!(await wakilishaDialog.confirm({ title: "User access", message: `Suspend access for ${user.profile.email || user.profile.user_id}?`, confirmLabel: "Continue", destructive: false }))) return;
+    if (!(await wakilishaDialog.confirm({ title: "User access", message: `Suspend access for ${user.profile.email || user.profile.user_id}?`, confirmLabel: "Suspend", destructive: true }))) return;
     setBusy(true);
     setActionError(null);
     try {

@@ -602,7 +602,7 @@ export default function ArtistManagePage() {
 
   async function handleRemoveTeamMember(member: ArtistTeamMember) {
     if (!artist || !activeRepresentation?.permissions.team) return;
-    const reason = (await wakilishaDialog.prompt({ title: "Artist team", label: "Why are you removing this team member?" }));
+    const reason = (await wakilishaDialog.prompt({ title: "Artist team", label: "Why are you removing this team member?", required: true, minLength: 3, confirmLabel: "Remove member", destructive: true }));
     if (!reason || reason.trim().length < 3) return;
     setBusy(true);
     setMessage(null);

@@ -180,7 +180,7 @@ export function ArticleCreditForm({
   async function requestClose() {
     if (
       (createdContributorId || createdCreditId) &&
-      !(await wakilishaDialog.confirm({ title: "Close Credit", message: "A contributor or Credit has already been created. Closing now will leave it unattached. Continue?", confirmLabel: "Create", destructive: true }))
+      !(await wakilishaDialog.confirm({ title: "Close Credit", message: "A contributor or Credit has already been created. Closing now will leave it unattached. Continue?", confirmLabel: "Close anyway", destructive: true }))
     ) {
       return;
     }

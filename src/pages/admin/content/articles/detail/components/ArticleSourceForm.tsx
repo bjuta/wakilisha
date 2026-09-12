@@ -261,7 +261,7 @@ export function ArticleSourceForm({
         submitted
       ) &&
       !approved &&
-      !(await wakilishaDialog.confirm({ title: "Close Source", message: "This Source already has saved progress. Closing will keep that progress in the Source Library. Continue?", confirmLabel: "Continue", destructive: false }))
+      !(await wakilishaDialog.confirm({ title: "Close Source", message: "This Source already has saved progress. Closing will keep that progress in the Source Library. Continue?", confirmLabel: "Close", destructive: false }))
     ) {
       return;
     }

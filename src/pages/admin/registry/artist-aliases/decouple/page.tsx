@@ -1408,7 +1408,7 @@ export default function AdminArtistDecouplePage() {
       return;
     }
 
-    const confirmed = (await wakilishaDialog.confirm({ title: "Registry decouple", message: "Apply this decouple decision? This will insert replacement credits, archive coupled source credits, repair safe chart rows, and write registry history.", confirmLabel: "Archive", destructive: true }));
+    const confirmed = (await wakilishaDialog.confirm({ title: "Registry decouple", message: "Apply this decouple decision? This will insert replacement credits, archive coupled source credits, repair safe chart rows, and write registry history.", confirmLabel: "Apply decision", destructive: true }));
 
     if (!confirmed) return;
 

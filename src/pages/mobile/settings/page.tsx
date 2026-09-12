@@ -222,7 +222,6 @@ export default function MobileSettingsPage() {
       } catch (err) {
         const message = err instanceof Error ? err.message : "Cover upload failed";
         setCoverUploadError(message);
-        (await wakilishaDialog.alert({ title: "Profile settings", message: message }));
       } finally {
         setCoverUploading(false);
       }

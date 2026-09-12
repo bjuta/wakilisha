@@ -1637,7 +1637,7 @@ export function ArticleEditorWorkspace({
   async function handleCloseArticle() {
     if (
       isDirty &&
-      !(await wakilishaDialog.confirm({ title: "Leave Article", message: "Leave this Article with unsaved changes?", confirmLabel: "Continue", destructive: false }))
+      !(await wakilishaDialog.confirm({ title: "Leave Article", message: "Leave this Article with unsaved changes?", confirmLabel: "Leave without saving", destructive: true }))
     ) {
       return;
     }

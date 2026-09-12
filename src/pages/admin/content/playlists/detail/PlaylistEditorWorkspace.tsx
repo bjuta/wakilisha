@@ -723,7 +723,7 @@ export function PlaylistEditorWorkspace({
 
   async function handleUnpublish() {
     if (
-      !(await wakilishaDialog.confirm({ title: "Playlist workflow", message: "Unpublish this Playlist and hide its public page?", confirmLabel: "Publish", destructive: false }))
+      !(await wakilishaDialog.confirm({ title: "Playlist workflow", message: "Unpublish this Playlist and hide its public page?", confirmLabel: "Unpublish", destructive: true }))
     ) {
       return;
     }

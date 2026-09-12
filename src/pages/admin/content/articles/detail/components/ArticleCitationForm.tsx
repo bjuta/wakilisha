@@ -302,7 +302,7 @@ export function ArticleCitationForm({
   async function requestClose() {
     if (
       createdCitationId &&
-      !(await wakilishaDialog.confirm({ title: "Close Citation", message: "A Citation has already been created. Closing now will leave it unattached. Continue?", confirmLabel: "Create", destructive: true }))
+      !(await wakilishaDialog.confirm({ title: "Close Citation", message: "A Citation has already been created. Closing now will leave it unattached. Continue?", confirmLabel: "Close anyway", destructive: true }))
     ) {
       return;
     }
