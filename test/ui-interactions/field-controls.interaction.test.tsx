@@ -4,7 +4,7 @@ import "@testing-library/jest-dom/vitest";
 import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeAll, describe, expect, it, vi } from "vitest";
-import { useState } from "react";
+import { createRef, useState } from "react";
 import { WkColorField } from "@/components/design-system/primitives/ColorField";
 import {
   WkDatePicker,
@@ -17,7 +17,10 @@ import {
 import { WkNumberField } from "@/components/design-system/primitives/NumberField";
 import { WkSlider } from "@/components/design-system/primitives/Slider";
 import { WkSuggestionField } from "@/components/design-system/primitives/SuggestionField";
-import { WkUploadField } from "@/components/design-system/primitives/UploadField";
+import {
+  WkUploadField,
+  WkUploadTrigger,
+} from "@/components/design-system/primitives/UploadField";
 
 beforeAll(() => {
   Object.defineProperty(Element.prototype, "scrollIntoView", {
@@ -164,6 +167,32 @@ describe("WAKILISHA field-control interaction contract", () => {
     expect(timeChange).toHaveBeenCalledWith("08:30");
   });
 
+  it("preserves historical years without an arbitrary modern date floor", async () => {
+    const user = userEvent.setup();
+    const onChange = vi.fn();
+
+    render(
+      <WkDatePicker
+        label="Original release date"
+        value="1975-03-01"
+        onChange={onChange}
+      />,
+    );
+
+    await user.click(
+      screen.getByRole("button", { name: /Original release date/i }),
+    );
+    const year = screen.getByRole("textbox", { name: "Year" });
+    expect(year).toHaveValue("1975");
+
+    await user.click(year);
+    await user.keyboard("{ArrowDown}");
+    await waitFor(() => expect(year).toHaveValue("1974"));
+
+    await user.click(screen.getByRole("button", { name: "Use date" }));
+    expect(onChange).toHaveBeenCalledWith("1974-03-01");
+  });
+
   it("blocks temporal values outside the governed range and closes on Escape", async () => {
     const user = userEvent.setup();
     const onChange = vi.fn();
@@ -288,5 +317,34 @@ describe("WAKILISHA field-control interaction contract", () => {
       />,
     );
     expect(screen.getByRole("button", { name: "Upload evidence" })).toBeDisabled();
+  });
+
+  it("preserves programmatic upload triggers and outward-camera capture", () => {
+    const triggerRef = createRef<HTMLButtonElement>();
+    const onSelect = vi.fn();
+    const nativeClick = vi
+      .spyOn(HTMLInputElement.prototype, "click")
+      .mockImplementation(() => {});
+
+    const { container } = render(
+      <WkUploadTrigger
+        ref={triggerRef}
+        ariaLabel="Capture field video"
+        accept="video/mp4,video/quicktime"
+        defaultCamera="environment"
+        onSelect={onSelect}
+      />,
+    );
+
+    const nativeInput = container.querySelector(
+      'input[type="file"]',
+    ) as HTMLInputElement | null;
+    expect(nativeInput).not.toBeNull();
+    expect(nativeInput).toHaveAttribute("capture", "environment");
+    expect(nativeInput).toHaveAttribute("accept", "video/mp4,video/quicktime");
+
+    triggerRef.current?.click();
+    expect(nativeClick).toHaveBeenCalledTimes(1);
+    nativeClick.mockRestore();
   });
 });
