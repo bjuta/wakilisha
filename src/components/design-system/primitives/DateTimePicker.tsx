@@ -3,6 +3,7 @@ import {
   SearchableSelect,
   type SearchableSelectOption,
 } from "./SearchableSelect";
+import { WkNumberField } from "./NumberField";
 
 type TemporalMode = "date" | "datetime" | "time";
 
@@ -79,7 +80,7 @@ function serialize(draft: DraftDateTime, mode: TemporalMode) {
     return `${pad(draft.hour)}:${pad(draft.minute)}`;
   }
 
-  const date = `${draft.year}-${pad(draft.month)}-${pad(draft.day)}`;
+  const date = `${String(draft.year).padStart(4, "0")}-${pad(draft.month)}-${pad(draft.day)}`;
   if (mode === "date") return date;
 
   return `${date}T${pad(draft.hour)}:${pad(draft.minute)}`;
@@ -87,6 +88,12 @@ function serialize(draft: DraftDateTime, mode: TemporalMode) {
 
 function option(value: number, label = String(value)): SearchableSelectOption {
   return { value: String(value), label };
+}
+
+function boundaryYear(value?: string) {
+  if (!value) return undefined;
+  const match = /^(\d{4})-/.exec(value);
+  return match ? Number(match[1]) : undefined;
 }
 
 function defaultLabel(mode: TemporalMode) {
@@ -150,8 +157,8 @@ export function WkTemporalPicker({
   label = defaultLabel(mode),
   min,
   max,
-  minYear = 2000,
-  maxYear = new Date().getFullYear() + 2,
+  minYear,
+  maxYear,
   disabled = false,
   className = "",
   triggerClassName = "",
@@ -209,14 +216,6 @@ export function WkTemporalPicker({
     () => Array.from({ length: daysInMonth }, (_, index) => option(index + 1)),
     [daysInMonth],
   );
-  const yearOptions = useMemo(
-    () =>
-      Array.from(
-        { length: Math.max(1, maxYear - minYear + 1) },
-        (_, index) => option(maxYear - index),
-      ),
-    [maxYear, minYear],
-  );
   const hourOptions = useMemo(
     () =>
       Array.from({ length: 24 }, (_, hour) =>
@@ -229,6 +228,11 @@ export function WkTemporalPicker({
       Array.from({ length: 60 }, (_, minute) => option(minute, pad(minute))),
     [],
   );
+
+  const inferredMinYear = minYear ?? boundaryYear(min) ?? 1;
+  const inferredMaxYear = maxYear ?? boundaryYear(max) ?? 9999;
+  const yearMin = Math.max(1, Math.min(inferredMinYear, inferredMaxYear));
+  const yearMax = Math.min(9999, Math.max(inferredMinYear, inferredMaxYear));
 
   const display = useMemo(() => displayValue(value, mode), [mode, value]);
   const candidate = serialize(draft, mode);
@@ -302,9 +306,7 @@ export function WkTemporalPicker({
             className={`grid gap-2 ${
               mode === "time"
                 ? "grid-cols-2"
-                : mode === "date"
-                  ? "grid-cols-2 sm:grid-cols-3"
-                  : "grid-cols-2 sm:grid-cols-3"
+                : "grid-cols-2 sm:grid-cols-3"
             }`}
           >
             {mode !== "time" ? (
@@ -325,13 +327,19 @@ export function WkTemporalPicker({
                   placeholder="Day"
                   searchPlaceholder="Find day"
                 />
-                <SearchableSelect
+                <WkNumberField
                   ariaLabel="Year"
-                  value={String(draft.year)}
-                  onChange={(next) => update("year", Number(next))}
-                  options={yearOptions}
-                  placeholder="Year"
-                  searchPlaceholder="Find year"
+                  value={draft.year}
+                  onChange={(next) => {
+                    if (Number.isFinite(next)) update("year", Math.trunc(next));
+                  }}
+                  min={yearMin}
+                  max={yearMax}
+                  step={1}
+                  showSteppers={false}
+                  formatOptions={{ useGrouping: false, maximumFractionDigits: 0 }}
+                  groupClassName="h-10"
+                  inputClassName="text-left"
                 />
               </>
             ) : null}
