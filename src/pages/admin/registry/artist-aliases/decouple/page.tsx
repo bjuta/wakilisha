@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import { WkIcon } from "@/components/design-system/Icon";
 import { WkSelect } from "@/components/design-system/primitives/Select";
+import { wakilishaDialog } from "@/components/design-system/primitives/DialogProvider";
 
 
 type SourceType = "charts" | "registry" | "provider_intake" | "artist_intake" | "manual";
@@ -1296,10 +1297,10 @@ export default function AdminArtistDecouplePage() {
     const suggestedName = draft?.token.trim() || draft?.query.trim();
     if (!draft || !suggestedName) return;
 
-    const exactDisplayName = window.prompt("Exact artist display name. Preserve punctuation, dots, symbols, and casing.", suggestedName)?.trim();
+    const exactDisplayName = (await wakilishaDialog.prompt({ title: "Registry decouple", label: "Exact artist display name. Preserve punctuation, dots, symbols, and casing.", initialValue: suggestedName }))?.trim();
     if (!exactDisplayName) return;
 
-    const exactSlug = window.prompt("Artist slug. Keep display name exact; only normalize the URL slug.", slugify(exactDisplayName))?.trim();
+    const exactSlug = (await wakilishaDialog.prompt({ title: "Registry decouple", label: "Artist slug. Keep display name exact; only normalize the URL slug.", initialValue: slugify(exactDisplayName) }))?.trim();
     if (!exactSlug) return;
 
     updateTokenDraft(index, { creating: true });
@@ -1407,9 +1408,7 @@ export default function AdminArtistDecouplePage() {
       return;
     }
 
-    const confirmed = window.confirm(
-      "Apply this decouple decision? This will insert replacement credits, archive coupled source credits, repair safe chart rows, and write registry history."
-    );
+    const confirmed = (await wakilishaDialog.confirm({ title: "Registry decouple", message: "Apply this decouple decision? This will insert replacement credits, archive coupled source credits, repair safe chart rows, and write registry history.", confirmLabel: "Archive", destructive: true }));
 
     if (!confirmed) return;
 

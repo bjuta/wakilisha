@@ -17,6 +17,7 @@ import {
   type InstitutePlaylistReviewState,
 } from "@/services/institute/institutePlaylistBridgeService";
 import type { InquiryDraft } from "./types";
+import { wakilishaDialog } from "@/components/design-system/primitives/DialogProvider";
 
 type Props = {
   draft: InquiryDraft;
@@ -330,7 +331,7 @@ export function InstitutePlaylistWorkspace({ draft }: Props) {
   const deleteItem = async (item: InstitutePlaylistDraftItem) => {
     if (!item.id || !existingDraft) return;
 
-    const confirmed = window.confirm(`Delete "${itemTitle(item)}" from this playlist draft?`);
+    const confirmed = (await wakilishaDialog.confirm({ title: "Playlist draft", message: `Delete "${itemTitle(item)}" from this playlist draft?`, confirmLabel: "Delete", destructive: true }));
     if (!confirmed) return;
 
     setError("");

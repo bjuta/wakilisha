@@ -15,6 +15,8 @@ import {
 } from "@/services/mediaService";
 import { MediaEditModal } from "@/components/admin/media/MediaEditModal";
 import type { MediaPickerPurpose } from "@/types/mediaPicker";
+import { AudioPreviewPlayer } from "@/components/design-system/editorial/AudioPreviewPlayer";
+import { VideoPlaybackCanvas } from "@/components/video/VideoPlaybackCanvas";
 
 function assetFileKind(asset: MediaAsset): string {
   return asset.file_kind || (asset.mime_type === "application/pdf" ? "document" : asset.media_kind || "other");
@@ -246,7 +248,7 @@ export function MediaLibraryPreviewPanel({
               <div className="space-y-3">
                 <div className="rounded-xl border border-wk-border bg-wk-surface-raised p-3">
                   {audioPreview?.url ? (
-                    <audio controls preload="metadata" src={audioPreview.url} className="w-full" />
+                    <AudioPreviewPlayer src={audioPreview.url} title="Audio preview" />
                   ) : (
                     <div className="flex items-center gap-3 py-5">
                       <i className="ri-music-2-line text-[28px] text-wk-brand" />
@@ -268,7 +270,17 @@ export function MediaLibraryPreviewPanel({
             ) : selectedKind === "video" ? (
               <div className="space-y-3">
                 {videoTranscode?.url ? (
-                  <video controls preload="metadata" poster={posterFrame?.url ?? thumbnail?.url ?? undefined} src={videoTranscode.url} className="w-full rounded-xl border border-wk-border bg-black" />
+                  <VideoPlaybackCanvas
+                    source={{
+                      kind: "native",
+                      url: videoTranscode.url,
+                      mimeType: "video/mp4",
+                      poster: posterFrame?.url ?? thumbnail?.url ?? null,
+                    }}
+                    title={selectedAsset?.title || "Video preview"}
+                    compact
+                    className="w-full rounded-xl border border-wk-border bg-black"
+                  />
                 ) : (
                   <div className="flex flex-col items-center justify-center gap-3 rounded-xl border border-wk-border bg-wk-surface-raised px-4 py-10 text-center">
                     {posterFrame?.url || thumbnail?.url ? (

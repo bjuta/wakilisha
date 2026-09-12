@@ -8,6 +8,7 @@ import type { ResolvedRelation } from "@/hooks/useRelatedEntities";
 import { WkSelect } from "@/components/design-system/primitives/Select";
 import { WkCheckbox } from "@/components/design-system/primitives/Checkbox";
 import { WkNumberField } from "@/components/design-system/primitives/NumberField";
+import { AudioPreviewPlayer } from "@/components/design-system/editorial/AudioPreviewPlayer";
 
 
 
@@ -347,7 +348,7 @@ export default function TrackDetailPage() {
             <input type="text" value={draft.preview_url} onChange={(e) => patchDraft({ preview_url: e.target.value })} placeholder="https://..." className="w-full rounded-lg border border-wk-border bg-wk-bg-subtle px-3 py-2.5 text-[13px] text-wk-text placeholder:text-wk-text-faint outline-none focus:border-wk-brand transition-colors" />
             {draft.preview_url && (
               <div className="mt-3">
-                <audio controls src={draft.preview_url} className="w-full h-10" />
+                <AudioPreviewPlayer src={draft.preview_url} title="Track preview" />
               </div>
             )}
           </WkSurface>

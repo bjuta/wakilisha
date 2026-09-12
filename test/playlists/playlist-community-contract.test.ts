@@ -191,7 +191,7 @@ describe(
 
         expect(detail)
           .toContain(
-            "<details",
+            "WkDetails",
           );
       },
     );

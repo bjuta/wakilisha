@@ -51,6 +51,7 @@ import {
   rejectArticleSuggestion,
   withdrawArticleSuggestion,
 } from "@/services/articles/articleReviewService";
+import { wakilishaDialog } from "@/components/design-system/primitives/DialogProvider";
 
 const CANONICAL_PUBLIC_ORIGIN = String(
   import.meta.env.VITE_PUBLIC_SITE_ORIGIN ||
@@ -1633,12 +1634,10 @@ export function ArticleEditorWorkspace({
     };
   }, []);
 
-  function handleCloseArticle() {
+  async function handleCloseArticle() {
     if (
       isDirty &&
-      !window.confirm(
-        "Leave this Article with unsaved changes?",
-      )
+      !(await wakilishaDialog.confirm({ title: "Leave Article", message: "Leave this Article with unsaved changes?", confirmLabel: "Continue", destructive: false }))
     ) {
       return;
     }

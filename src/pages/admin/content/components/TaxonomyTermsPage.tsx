@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback, useRef } from "react";
 import { WkIcon } from "@/components/design-system/Icon";
 import { supabase } from "@/lib/supabase";
 import type { WkIconName } from "@/components/design-system/Icon";
+import { wakilishaDialog } from "@/components/design-system/primitives/DialogProvider";
 
 interface TaxonomyTerm {
   id: string;
@@ -285,12 +286,12 @@ export default function TaxonomyTermsPage({ title, subtitle, taxonomy, icon }: T
       const { error: rpcError } = await supabase.rpc("bulk_delete_taxonomy_terms", {
         p_term_ids: [showDelete.id],
       });
-      if (rpcError) { alert(`Failed to delete: ${rpcError.message}`); setDeleteSubmitting(false); return; }
+      if (rpcError) { (await wakilishaDialog.alert({ title: "Taxonomy change", message: `Failed to delete: ${rpcError.message}` })); setDeleteSubmitting(false); return; }
       setTerms((prev) => prev.filter((t) => t.id !== showDelete.id));
       setTotalCount((c) => c - 1);
       setShowDelete(null);
     } catch {
-      alert("An unexpected error occurred.");
+      (await wakilishaDialog.alert({ title: "Taxonomy change", message: "An unexpected error occurred." }));
     } finally {
       setDeleteSubmitting(false);
     }
@@ -304,12 +305,12 @@ export default function TaxonomyTermsPage({ title, subtitle, taxonomy, icon }: T
       const { error: rpcError } = await supabase.rpc("bulk_delete_taxonomy_terms", {
         p_term_ids: ids,
       });
-      if (rpcError) { alert(`Failed to delete: ${rpcError.message}`); setDeleteSubmitting(false); return; }
+      if (rpcError) { (await wakilishaDialog.alert({ title: "Taxonomy change", message: `Failed to delete: ${rpcError.message}` })); setDeleteSubmitting(false); return; }
       setSelected(new Set());
       setShowBulkDelete(false);
       loadTerms(page, search);
     } catch {
-      alert("An unexpected error occurred.");
+      (await wakilishaDialog.alert({ title: "Taxonomy change", message: "An unexpected error occurred." }));
     } finally {
       setDeleteSubmitting(false);
     }

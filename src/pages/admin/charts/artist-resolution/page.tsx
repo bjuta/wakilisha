@@ -9,6 +9,7 @@ import { AdminChartsKpiCard } from "../components/AdminChartsKpiCard";
 import { AdminChartsLoadingState } from "../components/AdminChartsLoadingState";
 import { AdminChartsStatusBadge } from "../components/AdminChartsStatusBadge";
 import { WkSelect } from "@/components/design-system/primitives/Select";
+import { wakilishaDialog } from "@/components/design-system/primitives/DialogProvider";
 
 
 type DbRow = Record<string, unknown>;
@@ -729,10 +730,7 @@ export default function AdminChartsArtistResolutionPage() {
 
     if (!draft || !suggestedName) return;
 
-    const exactDisplayName = window.prompt(
-      "Exact artist display name. Keep punctuation, dots, symbols, and casing exactly as the artist uses them.",
-      suggestedName
-    )?.trim();
+    const exactDisplayName = (await wakilishaDialog.prompt({ title: "Resolve Artist identity", label: "Exact artist display name. Keep punctuation, dots, symbols, and casing exactly as the artist uses them.", initialValue: suggestedName }))?.trim();
 
     if (!exactDisplayName) return;
 
@@ -744,14 +742,11 @@ export default function AdminChartsArtistResolutionPage() {
       .replace(/[^a-z0-9]+/g, "-")
       .replace(/(^-|-$)/g, "");
 
-    const exactSlug = window.prompt(
-      "Artist slug. Use a clean URL slug, but do not change the display name.",
-      suggestedSlug
-    )?.trim();
+    const exactSlug = (await wakilishaDialog.prompt({ title: "Resolve Artist identity", label: "Artist slug. Use a clean URL slug, but do not change the display name.", initialValue: suggestedSlug }))?.trim();
 
     if (!exactSlug) return;
 
-    const confirmed = window.confirm(`Create registry artist "${exactDisplayName}" with slug "${exactSlug}" and attach it to this token?`);
+    const confirmed = (await wakilishaDialog.confirm({ title: "Resolve Artist identity", message: `Create registry artist "${exactDisplayName}" with slug "${exactSlug}" and attach it to this token?`, confirmLabel: "Create", destructive: false }));
     if (!confirmed) return;
 
     setTokenDrafts((current) => current.map((item, itemIndex) => (
@@ -894,7 +889,7 @@ export default function AdminChartsArtistResolutionPage() {
   const applyResolutionDecision = useCallback(async () => {
     if (!selectedRow || !selectedDecision) return;
 
-    const confirmed = window.confirm("Apply this saved artist resolution decision to registry track credits?");
+    const confirmed = (await wakilishaDialog.confirm({ title: "Resolve Artist identity", message: "Apply this saved artist resolution decision to registry track credits?", confirmLabel: "Continue", destructive: false }));
     if (!confirmed) return;
 
     setApplyingDecision(true);
@@ -923,7 +918,7 @@ export default function AdminChartsArtistResolutionPage() {
   const acceptSelectedAsGroup = useCallback(async () => {
     if (!selectedRow) return;
 
-    const confirmed = window.confirm(`Accept "${selectedRow.artistName}" as an intentional group/collab credit?`);
+    const confirmed = (await wakilishaDialog.confirm({ title: "Resolve Artist identity", message: `Accept "${selectedRow.artistName}" as an intentional group/collab credit?`, confirmLabel: "Continue", destructive: false }));
     if (!confirmed) return;
 
     setSavingDecision(true);
@@ -974,7 +969,7 @@ export default function AdminChartsArtistResolutionPage() {
       return;
     }
 
-    const confirmed = window.confirm(`Apply ${readyDecisions.length} ready decision${readyDecisions.length === 1 ? "" : "s"} to registry track credits?`);
+    const confirmed = (await wakilishaDialog.confirm({ title: "Resolve Artist identity", message: `Apply ${readyDecisions.length} ready decision${readyDecisions.length === 1 ? "" : "s"} to registry track credits?`, confirmLabel: "Continue", destructive: false }));
     if (!confirmed) return;
 
     setBulkApplying(true);

@@ -5,6 +5,7 @@ import Underline from "@tiptap/extension-underline";
 import LinkExtension from "@tiptap/extension-link";
 import Placeholder from "@tiptap/extension-placeholder";
 import { WkIcon, type WkIconName } from "@/components/design-system/Icon";
+import { wakilishaDialog } from "@/components/design-system/primitives/DialogProvider";
 
 export function EditorialCommentEditor({
   value,
@@ -67,10 +68,10 @@ export function EditorialCommentEditor({
     }
   }, [editor, readOnly, value]);
 
-  const addLink = () => {
+  const addLink = async () => {
     if (!editor) return;
     const existing = editor.getAttributes("link").href as string | undefined;
-    const href = window.prompt("Link URL", existing ?? "https://");
+    const href = (await wakilishaDialog.prompt({ title: "Edit link", label: "Link URL", initialValue: existing ?? "https://" }));
     if (href === null) return;
     if (!href.trim()) {
       editor.chain().focus().unsetLink().run();

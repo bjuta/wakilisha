@@ -14,6 +14,7 @@ import {
 } from "@/services/userRoles";
 import { WkSelect } from "@/components/design-system/primitives/Select";
 import { WkCheckbox } from "@/components/design-system/primitives/Checkbox";
+import { wakilishaDialog } from "@/components/design-system/primitives/DialogProvider";
 
 
 
@@ -412,7 +413,7 @@ export default function AdminUsersPage() {
   }
 
   async function handleRevokeRole(userId: string, role: UserRole) {
-    if (!confirm(`Revoke ${ROLE_LABELS[role] ?? role}?`)) return;
+    if (!(await wakilishaDialog.confirm({ title: "User access", message: `Revoke ${ROLE_LABELS[role] ?? role}?`, confirmLabel: "Revoke", destructive: true }))) return;
     setBusy(true);
     setActionError(null);
     try {
@@ -430,7 +431,7 @@ export default function AdminUsersPage() {
   }
 
   async function handleSuspend(user: UserAccess) {
-    if (!confirm(`Suspend access for ${user.profile.email || user.profile.user_id}?`)) return;
+    if (!(await wakilishaDialog.confirm({ title: "User access", message: `Suspend access for ${user.profile.email || user.profile.user_id}?`, confirmLabel: "Continue", destructive: false }))) return;
     setBusy(true);
     setActionError(null);
     try {

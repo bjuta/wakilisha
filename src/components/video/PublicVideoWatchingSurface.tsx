@@ -25,6 +25,7 @@ import type {
   PublicVideoCredit,
   PublicVideoPublication,
 } from "@/services/video/videoPublicModel";
+import { WkDetails, WkSummary } from "@/components/design-system/primitives/Disclosure";
 
 function humanize(value: string): string {
   return value
@@ -94,8 +95,8 @@ function PublicationRecord({
   const current = formatDate(publication.provenance.publishedAt);
 
   return (
-    <details className="group rounded-2xl border border-[var(--wk-border)] bg-[var(--wk-surface)]">
-      <summary className="flex cursor-pointer list-none items-center justify-between gap-4 px-4 py-4 sm:px-5">
+    <WkDetails className="group rounded-2xl border border-[var(--wk-border)] bg-[var(--wk-surface)]">
+      <WkSummary className="flex cursor-pointer list-none items-center justify-between gap-4 px-4 py-4 sm:px-5">
         <span>
           <span className="block text-[10px] font-black uppercase tracking-[0.18em] text-[var(--wk-brand)]">
             Record
@@ -104,8 +105,8 @@ function PublicationRecord({
             Publication record
           </span>
         </span>
-        <i className="ri-arrow-down-s-line text-lg text-[var(--wk-text-muted)] transition-transform group-open:rotate-180" />
-      </summary>
+        <i className="ri-arrow-down-s-line text-lg text-[var(--wk-text-muted)] transition-transform group-data-[open=true]:rotate-180" />
+      </WkSummary>
 
       <div className="border-t border-[var(--wk-border)] px-4 pb-5 pt-4 sm:px-5">
         <div className="flex flex-wrap gap-x-5 gap-y-2 text-[12px] text-[var(--wk-text-muted)]">
@@ -189,7 +190,7 @@ function PublicationRecord({
           </div>
         ) : null}
       </div>
-    </details>
+    </WkDetails>
   );
 }
 

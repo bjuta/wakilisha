@@ -44,6 +44,7 @@ import {
   type SeoGrowthTask,
   type SeoGrowthTaskStatus,
 } from "@/services/seoGrowthActions";
+import { WkDetails, WkSummary } from "@/components/design-system/primitives/Disclosure";
 
 type SitemapSnapshot = {
   id: string;
@@ -1326,10 +1327,10 @@ function GrowthActionsPanel({
             const editedDescription = edited.description ?? derivedOverride.description;
 
             return (
-              <details key={draft.id} className="rounded-md border border-[var(--wk-border)] bg-[var(--wk-surface)] p-3">
-                <summary className="cursor-pointer text-[12px] font-black text-[var(--wk-text)]">
+              <WkDetails key={draft.id} className="rounded-md border border-[var(--wk-border)] bg-[var(--wk-surface)] p-3">
+                <WkSummary className="cursor-pointer text-[12px] font-black text-[var(--wk-text)]">
                   {draft.title}
-                </summary>
+                </WkSummary>
                 <p className="mt-2 text-[10px] uppercase tracking-[0.12em] text-[var(--wk-text-faint)]">
                   {draft.content_kind.replace(/_/g, " ")} · {draft.status}
                 </p>
@@ -1405,7 +1406,7 @@ function GrowthActionsPanel({
                 <pre className="mt-3 max-h-72 overflow-auto whitespace-pre-wrap rounded-md border border-[var(--wk-border)] bg-[var(--wk-bg)] p-3 text-[11px] leading-relaxed text-[var(--wk-text-muted)]">
                   {draft.body}
                 </pre>
-              </details>
+              </WkDetails>
             );
           })}
         </div>

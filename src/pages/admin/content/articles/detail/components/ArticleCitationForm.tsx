@@ -16,6 +16,7 @@ import {
 } from "@/services/articles/articleTrustService";
 import { WkSelect } from "@/components/design-system/primitives/Select";
 import { WkCheckbox } from "@/components/design-system/primitives/Checkbox";
+import { wakilishaDialog } from "@/components/design-system/primitives/DialogProvider";
 
 
 
@@ -298,12 +299,10 @@ export function ArticleCitationForm({
     }
   }, [publicPresentation]);
 
-  function requestClose() {
+  async function requestClose() {
     if (
       createdCitationId &&
-      !window.confirm(
-        "A Citation has already been created. Closing now will leave it unattached. Continue?",
-      )
+      !(await wakilishaDialog.confirm({ title: "Close Citation", message: "A Citation has already been created. Closing now will leave it unattached. Continue?", confirmLabel: "Create", destructive: true }))
     ) {
       return;
     }

@@ -4,6 +4,7 @@ import { WkSurface } from "@/components/design-system/primitives/Surface";
 import DateRangePicker, { type DateRangeValue } from "@/components/base/DateRangePicker";
 import { supabase } from "@/lib/supabase";
 import { WkSelect } from "@/components/design-system/primitives/Select";
+import { wakilishaDialog } from "@/components/design-system/primitives/DialogProvider";
 
 
 interface GscConnection {
@@ -231,7 +232,7 @@ export default function AdminSettingsGscData() {
 
   const handleDisconnect = async () => {
     if (!connection) return;
-    if (!confirm("Disconnect Google Search Console? Import history and metrics will be preserved.")) return;
+    if (!(await wakilishaDialog.confirm({ title: "Google Search Console", message: "Disconnect Google Search Console? Import history and metrics will be preserved.", confirmLabel: "Disconnect", destructive: true }))) return;
     try {
       const result = await callEdgeFunction("gsc-oauth-callback", {
         action: "disconnect",
