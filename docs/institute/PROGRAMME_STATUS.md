@@ -1,5 +1,35 @@
 # WAKILISHA Programme Status
 
+## Phase 8 closure / Phase 9A opening reconciliation - 12 September 2026
+
+**Current numbered work: Phase 9A, Public Query Convergence and Search.**
+
+Phase 8 is complete in Production. Phase 8A Safe Mobile Intake is accepted baseline. Phase 8B Field Triage and Governed Promotion is also complete, including Field contributor/newsroom communication, System Actors, Safety, Legal, operator convergence, antifragile recovery, and the final governed Field-to-Source promotion path.
+
+Canonical Phase 8 closure authority:
+
+- `docs/engineering/phase-8b6-antifragile-production-closure.md`
+- Phase 8B.6 issue `#872`
+- Field-to-Source closure PR `#910`
+- Phase 8B.6 documentation closure PR `#911`
+- Production migration count `114`
+- Production migration head `20260911143000_phase_8b6_field_source_promotion_closure.sql`
+
+The later #902 browser-native UI chrome programme is closed in Production and is inherited interaction-architecture baseline. It is adjacent work, not a numbered Phase 9 milestone.
+
+Current runtime/frontend authority after that adjacent programme:
+
+- Production runtime main: `54c7513bec99358eff96f5134fd5f3e24afd31a4`
+- current repository main before this reconciliation: `facd8729a2bd1d6f3e5ef142ae5d55de6a06f374`
+- repository-main delta from runtime: docs-only #902 closure record
+- Production migration authority remains 114 / `20260911143000`
+
+Phase 9A now begins with a **read-only authority audit**. Audit existing public domain readers, `public-content-read`, browser-side joins, pagination, search documents and indexes, reindexing, cache/invalidation authority, validators/error contracts, and existing list/search performance evidence before proposing implementation.
+
+Do not start Commerce implementation. Do not create a universal query layer merely because several domains expose public reads. Preserve bounded domain readers and existing keyset pagination wherever they are already correct.
+
+This section supersedes every older `current phase`, `current numbered work`, and `immediate numbered programme work` statement below. Older dated sections remain accurate point-in-time history.
+
 ## Cultural Operating Layer programme reconciliation - 4 September 2026
 
 **Current numbered work remains Phase 8A: Safe mobile intake.**
