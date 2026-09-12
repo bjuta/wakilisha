@@ -83,10 +83,76 @@ function RelatedCard({ story }: { story: MagazineArticle }) {
   );
 }
 
+function getPrerenderedMobileArticleHeroSource(
+  slug: string | undefined,
+): string | undefined {
+  if (
+    typeof document === "undefined"
+    || !slug
+  ) {
+    return undefined;
+  }
+
+  const expectedPath =
+    `/magazine/${encodeURIComponent(
+      slug,
+    )}`;
+
+  const preload =
+    Array.from(
+      document.querySelectorAll<HTMLLinkElement>(
+        'link[data-wakilisha-lcp-preload="article"]',
+      ),
+    ).find(
+      (link) =>
+        link.getAttribute(
+          "data-wakilisha-lcp-path",
+        ) === expectedPath,
+    );
+
+  const href =
+    preload?.href;
+
+  if (!href) {
+    return undefined;
+  }
+
+  try {
+    const url =
+      new URL(
+        href,
+      );
+
+    const derivative =
+      url.pathname.match(
+        /^\/__image\/w\d+(\/uploads\/.*)$/,
+      );
+
+    if (
+      url.hostname ===
+        "media.wakilisha.africa"
+      && derivative?.[1]
+    ) {
+      url.pathname =
+        derivative[1];
+
+      return url.href;
+    }
+  } catch {
+    return href;
+  }
+
+  return href;
+}
+
 export default function MobileArticle() {
   const { slug } = useParams<{ slug: string }>();
   const [searchParams] = useSearchParams();
   const previewNonce = searchParams.get("preview");
+  const prerenderedArticleHeroSource =
+    getPrerenderedMobileArticleHeroSource(
+      slug,
+    );
 
   useScrollDepthTracking({
     pageType: "article",
@@ -213,7 +279,55 @@ export default function MobileArticle() {
   }, [article?.slug, article?.id, article?.title, article?.author, article?.heroUrl]);
 
   if (loading) {
-    return <SkeletonArticlePage />;
+    return (
+      <div className="min-h-screen bg-[var(--wk-bg)]">
+        {previewNonce ? <ArticlePreviewModeBanner /> : null}
+
+        <section
+          key="mobile-article-hero-shell"
+          data-wakilisha-mobile-article-loading-hero="true"
+          className="relative overflow-hidden"
+          style={{
+            height: "62dvh",
+            minHeight: "380px",
+          }}
+        >
+          {prerenderedArticleHeroSource ? (
+            <ResponsiveMediaImage
+              key="mobile-article-hero-media"
+              src={prerenderedArticleHeroSource}
+              preset="hero"
+              alt=""
+              aria-hidden="true"
+              loading="eager"
+              fetchPriority="high"
+              decoding="async"
+              data-wakilisha-article-hero="true"
+              className="absolute inset-0 w-full h-full object-cover object-top"
+            />
+          ) : null}
+
+          <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/20 to-transparent" />
+
+          <div className="absolute inset-x-0 bottom-0 z-10 px-5 pb-7">
+            <p
+              role="status"
+              className="text-[13px] font-bold text-white/75"
+            >
+              Loading story…
+            </p>
+          </div>
+        </section>
+
+        <div
+          key="mobile-article-content-shell"
+          className="relative z-10 min-h-[360px] rounded-t-[24px] bg-[var(--wk-bg)]"
+          style={{
+            marginTop: "-60px",
+          }}
+        />
+      </div>
+    );
   }
 
   if (error || !article) {
@@ -237,33 +351,10 @@ export default function MobileArticle() {
     <div className="min-h-screen bg-[var(--wk-bg)]">
       {previewNonce ? <ArticlePreviewModeBanner /> : null}
 
-      {/* Reading progress */}
-      <div className="fixed top-0 left-0 right-0 z-50 h-[2px] bg-transparent">
-        <div
-          className="h-full bg-[var(--wk-brand)] origin-left transition-transform duration-100"
-          style={{ transform: `scaleX(${progress})` }}
-        />
-      </div>
-
-      {/* Full-bleed hero */}
-      <SchemaOrg
-        data={{
-          "@type": "Article",
-          headline: article.title,
-          description: article.dek || undefined,
-          image: article.heroUrl,
-          datePublished: article.date,
-          author: article.authorPersonPath ? { "@type": "Person", name: article.author, url: article.authorPersonPath }
-            : article.authorOrganizationPath
-              ? { "@type": "Organization", name: article.author, url: article.authorOrganizationPath }
-              : undefined,
-          publisher: { "@type": "Organization", name: "WAKILISHA" },
-          url: typeof window !== "undefined" ? window.location.href : undefined,
-        }}
-      />
-      <section className="relative overflow-hidden" style={{ height: "62dvh", minHeight: "380px" }}>
+      <section key="mobile-article-hero-shell" className="relative overflow-hidden" style={{ height: "62dvh", minHeight: "380px" }}>
         {article.heroUrl ? (
           <ResponsiveMediaImage
+            key="mobile-article-hero-media"
             src={article.heroUrl}
             preset="hero"
             alt={article.title}
@@ -310,9 +401,36 @@ export default function MobileArticle() {
         </div>
       </section>
 
+      {/* Reading progress */}
+      <div key="mobile-article-progress" className="fixed top-0 left-0 right-0 z-50 h-[2px] bg-transparent">
+        <div
+          className="h-full bg-[var(--wk-brand)] origin-left transition-transform duration-100"
+          style={{ transform: `scaleX(${progress})` }}
+        />
+      </div>
+
+      {/* Full-bleed hero */}
+      <SchemaOrg
+        data={{
+          "@type": "Article",
+          headline: article.title,
+          description: article.dek || undefined,
+          image: article.heroUrl,
+          datePublished: article.date,
+          author: article.authorPersonPath ? { "@type": "Person", name: article.author, url: article.authorPersonPath }
+            : article.authorOrganizationPath
+              ? { "@type": "Organization", name: article.author, url: article.authorOrganizationPath }
+              : undefined,
+          publisher: { "@type": "Organization", name: "WAKILISHA" },
+          url: typeof window !== "undefined" ? window.location.href : undefined,
+        }}
+      />
+
+
       {/* ── Floating content card ── */}
       <div
-        className="relative z-10 rounded-t-[24px] bg-[var(--wk-bg)]"
+        key="mobile-article-content-shell"
+        className="relative z-10 min-h-[360px] rounded-t-[24px] bg-[var(--wk-bg)]"
         style={{
           marginTop: "-60px",
           boxShadow: "0 -6px 32px -8px rgba(0,0,0,0.12)",

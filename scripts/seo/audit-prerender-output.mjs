@@ -8,6 +8,9 @@ const SITE_NAME = "WAKILISHA";
 const hardErrors = [];
 const warnings = [];
 
+let articleLcpPreloadCount = 0;
+let artistLcpPreloadCount = 0;
+
 function readText(filePath) {
   return fs.readFileSync(filePath, "utf8");
 }
@@ -244,6 +247,70 @@ function auditHtmlFile(filePath) {
     reportWarning(`${route}: missing canonical link.`);
   }
 
+  const lcpPreload =
+    html.match(
+      /<link\b(?=[^>]*\brel=["']preload["'])(?=[^>]*\bas=["']image["'])(?=[^>]*\bfetchpriority=["']high["'])(?=[^>]*\bdata-wakilisha-lcp-preload=["'](article|artist)["'])[^>]*>/i,
+    );
+
+  if (lcpPreload) {
+    const lcpPath =
+      lcpPreload[0].match(
+        /\bdata-wakilisha-lcp-path=["']([^"']+)["']/i,
+      )?.[1]
+      || "";
+
+    if (
+      lcpPath !==
+      route
+    ) {
+      reportError(
+        `${route}: LCP preload path authority is ${lcpPath || "missing"} instead of the exact route.`,
+      );
+    }
+  }
+
+  if (
+    lcpPreload?.[1] ===
+    "article"
+  ) {
+    articleLcpPreloadCount += 1;
+
+    if (
+      !/\bimagesrcset=["'][^"']*\/__image\/w640[^"']*640w[^"']*\/__image\/w1600[^"']*1600w[^"']*["']/i.test(
+        lcpPreload[0],
+      )
+      || !/\bimagesizes=["']100vw["']/i.test(
+        lcpPreload[0],
+      )
+    ) {
+      reportError(
+        `${route}: Article LCP preload must preserve responsive WAKILISHA hero derivative authority.`,
+      );
+    }
+  }
+
+  if (
+    lcpPreload?.[1] ===
+    "artist"
+  ) {
+    artistLcpPreloadCount += 1;
+  }
+
+  if (
+    route.startsWith(
+      "/magazine/",
+    )
+    && /<meta\s+property=["']og:image["']\s+content=["']https:\/\/media\.wakilisha\.africa\/(?:__image\/w\d+\/)?uploads\//i.test(
+      html,
+    )
+    && lcpPreload?.[1] !==
+      "article"
+  ) {
+    reportError(
+      `${route}: transformable Article hero is missing prerender LCP preload authority.`,
+    );
+  }
+
   for (const rawBlock of extractJsonLdBlocks(html)) {
     try {
       const parsed = JSON.parse(rawBlock);
@@ -268,6 +335,28 @@ function main() {
   } else {
     auditMetadataManifest();
     auditHtmlFiles();
+
+    if (
+      articleLcpPreloadCount ===
+      0
+    ) {
+      reportError(
+        "No prerendered Article LCP image preloads were found.",
+      );
+    }
+
+    if (
+      artistLcpPreloadCount ===
+      0
+    ) {
+      reportError(
+        "No prerendered Artist LCP image preloads were found.",
+      );
+    }
+
+    console.log(
+      `SEO audit: LCP preloads article=${articleLcpPreloadCount.toLocaleString()} artist=${artistLcpPreloadCount.toLocaleString()}.`,
+    );
   }
 
   if (warnings.length) {

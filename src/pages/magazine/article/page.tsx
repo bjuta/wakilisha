@@ -97,6 +97,68 @@ function ArticleBottomShare({ article, shareText, onComment }: { article: Magazi
   );
 }
 
+function getPrerenderedArticleHeroSource(
+  slug: string | undefined,
+): string | undefined {
+  if (
+    typeof document === "undefined"
+    || !slug
+  ) {
+    return undefined;
+  }
+
+  const expectedPath =
+    `/magazine/${encodeURIComponent(
+      slug,
+    )}`;
+
+  const preload =
+    Array.from(
+      document.querySelectorAll<HTMLLinkElement>(
+        'link[data-wakilisha-lcp-preload="article"]',
+      ),
+    ).find(
+      (link) =>
+        link.getAttribute(
+          "data-wakilisha-lcp-path",
+        ) === expectedPath,
+    );
+
+  const href =
+    preload?.href;
+
+  if (!href) {
+    return undefined;
+  }
+
+  try {
+    const url =
+      new URL(
+        href,
+      );
+
+    const derivative =
+      url.pathname.match(
+        /^\/__image\/w\d+(\/uploads\/.*)$/,
+      );
+
+    if (
+      url.hostname ===
+        "media.wakilisha.africa"
+      && derivative?.[1]
+    ) {
+      url.pathname =
+        derivative[1];
+
+      return url.href;
+    }
+  } catch {
+    return href;
+  }
+
+  return href;
+}
+
 export default function ArticlePage() {
   const { slug } = useParams<{ slug: string }>();
   const [searchParams] = useSearchParams();
@@ -105,6 +167,10 @@ export default function ArticlePage() {
   const { article, loading: articleLoading, error: articleError } = useMagazineArticle(slug, previewNonce);
   const authUser = useAuthUser();
   const isLoggedIn = !authUser.loading && authUser.id.length > 0;
+  const prerenderedArticleHeroSource =
+    getPrerenderedArticleHeroSource(
+      slug,
+    );
 
   useScrollDepthTracking({
     pageType: "article",
@@ -300,7 +366,58 @@ export default function ArticlePage() {
     };
   }, [article?.slug, article?.id, article?.title, article?.dek, article?.heroUrl]);
 
-  if (articleLoading) return <SkeletonArticlePage />;
+  if (articleLoading) {
+    return (
+      <main className="min-h-screen bg-[var(--wk-bg)]">
+        <section
+          key="article-hero-shell"
+          data-wakilisha-article-loading-hero="true"
+          className="relative overflow-hidden"
+          style={{
+            height: "70vh",
+            minHeight: "480px",
+          }}
+        >
+          {prerenderedArticleHeroSource ? (
+            <ResponsiveMediaImage
+              key="article-hero-media"
+              src={prerenderedArticleHeroSource}
+              preset="hero"
+              alt=""
+              aria-hidden="true"
+              loading="eager"
+              fetchPriority="high"
+              decoding="async"
+              data-wakilisha-article-hero="true"
+              className="absolute inset-0 w-full h-full object-cover"
+              style={{
+                objectPosition: "50% 30%",
+              }}
+            />
+          ) : null}
+
+          <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/20 to-transparent" />
+
+          <div className="absolute inset-x-0 bottom-0 z-10 px-6 pb-8">
+            <p
+              role="status"
+              className="text-[13px] font-bold text-white/75"
+            >
+              Loading story…
+            </p>
+          </div>
+        </section>
+
+        <div
+          key="article-loading-body"
+          className="relative z-10 min-h-[420px] rounded-t-[28px] bg-[var(--wk-bg)]"
+          style={{
+            marginTop: "-64px",
+          }}
+        />
+      </main>
+    );
+  }
   if (checkingRedirect) return <div className="min-h-screen flex items-center justify-center"><div className="flex items-center gap-3 text-[var(--wk-text-muted)]"><i className="ri-loader-4-line animate-spin text-[20px]" /><span className="text-[14px]">Checking for updated link…</span></div></div>;
   if (articleError) return <div className="min-h-screen flex items-center justify-center"><div className="text-center"><WkIcon name="AlertCircle" size={32} className="mx-auto mb-3 text-[var(--wk-danger)]" /><p className="text-sm text-[var(--wk-text-muted)]">We couldn't load this story. Try again in a moment.</p></div></div>;
   if (!article) return <div className="min-h-screen flex items-center justify-center"><div className="text-center"><WkIcon name="FileX" size={32} className="mx-auto mb-3 text-[var(--wk-text-faint)]" /><p className="text-sm text-[var(--wk-text-muted)]">This story isn't available.</p></div></div>;
@@ -321,32 +438,10 @@ export default function ArticlePage() {
 
   return (
     <main className="min-h-screen bg-[var(--wk-bg)]">
-      {previewNonce ? <ArticlePreviewModeBanner /> : null}
-
-      <MetaTags title={article.title} description={article.dek || `Read ${article.title} on WAKILISHA Magazine.`} imageUrl={article.heroUrl} url={typeof window !== "undefined" ? window.location.href : undefined} type="article" />
-      <SchemaOrg
-        data={{
-          "@type": "Article",
-          headline: article.title,
-          description: article.dek || undefined,
-          image: article.heroUrl,
-          datePublished: article.date,
-          author: article.authorPersonPath ? { "@type": "Person", name: article.author, url: article.authorPersonPath }
-            : article.authorOrganizationPath
-              ? { "@type": "Organization", name: article.author, url: article.authorOrganizationPath }
-              : undefined,
-          publisher: { "@type": "Organization", name: "WAKILISHA" },
-          url: typeof window !== "undefined" ? window.location.href : undefined,
-        }}
-      />
-      <div className="article-progress" ref={progressBarRef}><span style={{ transform: "scaleX(0)" }} /></div>
-      <div className={`fixed top-0 left-0 right-0 z-50 transition-all duration-300 ${scrolled ? "opacity-100 translate-y-0" : "opacity-0 -translate-y-full pointer-events-none"} bg-[var(--wk-bg)]/95 backdrop-blur-md border-b border-[var(--wk-border)]`}>
-        <div className="max-w-[1180px] mx-auto px-6 h-14 flex items-center gap-4"><Link to="/magazine" className="flex items-center gap-1.5 text-[12px] font-bold text-[var(--wk-text-muted)] hover:text-[var(--wk-brand)] transition-colors whitespace-nowrap shrink-0"><WkIcon name="ArrowLeft" size={14} />Magazine</Link><div className="h-4 w-px bg-[var(--wk-border)] shrink-0" /><h2 className="text-[13px] font-bold text-[var(--wk-text)] flex-1 min-w-0 truncate">{article.title}</h2><button onClick={handleNavCopy} className="ml-auto shrink-0 h-8 px-3 rounded-full border border-[var(--wk-border)] bg-[var(--wk-surface)] text-[11px] font-semibold text-[var(--wk-text-soft)] hover:border-[var(--wk-brand)] hover:text-[var(--wk-brand)] transition-all flex items-center gap-1.5 cursor-pointer whitespace-nowrap"><i className="ri-link-m" />{copyDone ? "Copied!" : "Share"}</button></div>
-      </div>
-
-      <section className="relative overflow-hidden" style={{ height: "70vh", minHeight: "480px" }}>
+      <section key="article-hero-shell" className="relative overflow-hidden" style={{ height: "70vh", minHeight: "480px" }}>
         {article.heroUrl ? (
           <ResponsiveMediaImage
+            key="article-hero-media"
             src={article.heroUrl}
             preset="hero"
             alt={article.title}
@@ -384,6 +479,31 @@ export default function ArticlePage() {
           </div>
         </div>
       </section>
+
+      {previewNonce ? <ArticlePreviewModeBanner /> : null}
+
+      <MetaTags title={article.title} description={article.dek || `Read ${article.title} on WAKILISHA Magazine.`} imageUrl={article.heroUrl} url={typeof window !== "undefined" ? window.location.href : undefined} type="article" />
+      <SchemaOrg
+        data={{
+          "@type": "Article",
+          headline: article.title,
+          description: article.dek || undefined,
+          image: article.heroUrl,
+          datePublished: article.date,
+          author: article.authorPersonPath ? { "@type": "Person", name: article.author, url: article.authorPersonPath }
+            : article.authorOrganizationPath
+              ? { "@type": "Organization", name: article.author, url: article.authorOrganizationPath }
+              : undefined,
+          publisher: { "@type": "Organization", name: "WAKILISHA" },
+          url: typeof window !== "undefined" ? window.location.href : undefined,
+        }}
+      />
+      <div className="article-progress" ref={progressBarRef}><span style={{ transform: "scaleX(0)" }} /></div>
+      <div className={`fixed top-0 left-0 right-0 z-50 transition-all duration-300 ${scrolled ? "opacity-100 translate-y-0" : "opacity-0 -translate-y-full pointer-events-none"} bg-[var(--wk-bg)]/95 backdrop-blur-md border-b border-[var(--wk-border)]`}>
+        <div className="max-w-[1180px] mx-auto px-6 h-14 flex items-center gap-4"><Link to="/magazine" className="flex items-center gap-1.5 text-[12px] font-bold text-[var(--wk-text-muted)] hover:text-[var(--wk-brand)] transition-colors whitespace-nowrap shrink-0"><WkIcon name="ArrowLeft" size={14} />Magazine</Link><div className="h-4 w-px bg-[var(--wk-border)] shrink-0" /><h2 className="text-[13px] font-bold text-[var(--wk-text)] flex-1 min-w-0 truncate">{article.title}</h2><button onClick={handleNavCopy} className="ml-auto shrink-0 h-8 px-3 rounded-full border border-[var(--wk-border)] bg-[var(--wk-surface)] text-[11px] font-semibold text-[var(--wk-text-soft)] hover:border-[var(--wk-brand)] hover:text-[var(--wk-brand)] transition-all flex items-center gap-1.5 cursor-pointer whitespace-nowrap"><i className="ri-link-m" />{copyDone ? "Copied!" : "Share"}</button></div>
+      </div>
+
+
 
       <div className="relative z-10 rounded-t-[28px] bg-[var(--wk-bg)]" style={{ marginTop: "-64px", boxShadow: "0 -4px 32px -8px rgba(0,0,0,0.10), 0 4px 16px -4px rgba(0,0,0,0.06)" }}>
         <ArticleFloatHeader article={article} />

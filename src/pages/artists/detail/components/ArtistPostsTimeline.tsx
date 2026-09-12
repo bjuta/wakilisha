@@ -112,17 +112,11 @@ export function ArtistPostsTimeline({
     ],
   );
 
-  if (
-    !loading &&
-    posts.length === 0
-  ) {
-    return null;
-  }
-
   return (
     <section
       aria-label={`${artistName} Posts`}
-      className="border-b border-[var(--wk-border)] bg-[var(--wk-surface)]"
+      data-wakilisha-artist-posts-geometry="true"
+      className="min-h-[280px] border-b border-[var(--wk-border)] bg-[var(--wk-surface)]"
     >
       <div className="wk-container px-6 py-6 md:py-8">
         <div className="max-w-[760px]">
@@ -147,6 +141,12 @@ export function ArtistPostsTimeline({
                   </div>
                 ),
               )}
+            </div>
+          ) : posts.length === 0 ? (
+            <div className="flex min-h-[184px] items-center justify-center text-center">
+              <p className="text-[13px] font-semibold text-[var(--wk-text-muted)]">
+                {artistName} has not posted yet.
+              </p>
             </div>
           ) : (
             <div>

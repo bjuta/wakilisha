@@ -668,6 +668,182 @@ function socialImageForModel(model) {
   ));
 }
 
+const LCP_MEDIA_ORIGIN =
+  "https://media.wakilisha.africa";
+
+const LCP_HERO_WIDTHS = [
+  640,
+  768,
+  960,
+  1280,
+  1600,
+];
+
+function lcpMediaUrl(raw) {
+  const value =
+    String(raw || "").trim();
+
+  if (!value) return null;
+
+  try {
+    if (
+      value.startsWith(
+        "/uploads/",
+      )
+    ) {
+      return new URL(
+        value,
+        LCP_MEDIA_ORIGIN,
+      );
+    }
+
+    return new URL(
+      value,
+    );
+  } catch {
+    return null;
+  }
+}
+
+function isTransformableLcpMedia(
+  url,
+) {
+  return Boolean(
+    url
+    && url.protocol === "https:"
+    && url.hostname === "media.wakilisha.africa"
+    && url.pathname.startsWith(
+      "/uploads/",
+    )
+    && /\.(?:jpe?g|png|webp)$/i.test(
+      url.pathname,
+    )
+  );
+}
+
+function lcpMediaVariant(
+  url,
+  width,
+) {
+  return (
+    `${LCP_MEDIA_ORIGIN}/__image/w${width}`
+    + `${url.pathname}${url.search}`
+  );
+}
+
+function imagePreloadForSource(
+  source,
+  kind,
+  pagePath,
+) {
+  const parsed =
+    lcpMediaUrl(
+      source,
+    );
+
+  if (!parsed) return "";
+
+  if (
+    isTransformableLcpMedia(
+      parsed,
+    )
+  ) {
+    const srcSet =
+      LCP_HERO_WIDTHS
+        .map(
+          (width) =>
+            `${lcpMediaVariant(parsed, width)} ${width}w`,
+        )
+        .join(", ");
+
+    return `    <link rel="preload" as="image" href="${escapeAttr(
+      lcpMediaVariant(
+        parsed,
+        1280,
+      ),
+    )}" imagesrcset="${escapeAttr(
+      srcSet,
+    )}" imagesizes="100vw" fetchpriority="high" data-wakilisha-lcp-preload="${kind}" data-wakilisha-lcp-path="${escapeAttr(
+      pagePath,
+    )}" />`;
+  }
+
+  if (
+    !/^https?:$/i.test(
+      parsed.protocol,
+    )
+  ) {
+    return "";
+  }
+
+  return `    <link rel="preload" as="image" href="${escapeAttr(
+    parsed.href,
+  )}" fetchpriority="high" data-wakilisha-lcp-preload="${kind}" data-wakilisha-lcp-path="${escapeAttr(
+    pagePath,
+  )}" />`;
+}
+
+function lcpPreloadForPath(
+  pagePath,
+  model,
+) {
+  const page =
+    cleanPath(
+      pagePath,
+    );
+
+  if (
+    page.startsWith(
+      "/magazine/",
+    )
+  ) {
+    const source =
+      firstNonEmpty(
+        ARTICLE_IMAGE_BY_PATH.get(
+          page,
+        ),
+        model.image,
+        model.imageUrl,
+        model.heroUrl,
+        model.heroImageUrl,
+      );
+
+    return imagePreloadForSource(
+      source,
+      "article",
+      page,
+    );
+  }
+
+  if (
+    page.startsWith(
+      "/artists/",
+    )
+  ) {
+    const artistMeta =
+      ARTIST_METADATA_BY_PATH.get(
+        page,
+      ) || {};
+
+    const source =
+      firstNonEmpty(
+        artistMeta.image,
+        model.image,
+        model.imageUrl,
+        model.heroUrl,
+        model.heroImageUrl,
+      );
+
+    return imagePreloadForSource(
+      source,
+      "artist",
+      page,
+    );
+  }
+
+  return "";
+}
+
 function breadcrumbItems(pagePath) {
   const clean = cleanPath(pagePath);
   const parts = clean.split("/").filter(Boolean);
@@ -1588,6 +1764,7 @@ function stripExistingSeo(html) {
     .replace(/\n?\s*<meta\s+name="(?:description|robots|twitter:card|twitter:title|twitter:description|twitter:image|twitter:image:alt|twitter:site)"[^>]*>/gi, "")
     .replace(/\n?\s*<meta\s+property="(?:og:site_name|og:title|og:description|og:type|og:url|og:image|og:image:secure_url|og:image:width|og:image:height|og:image:alt)"[^>]*>/gi, "")
     .replace(/\n?\s*<link\s+rel="canonical"[^>]*>/gi, "")
+    .replace(/\n?\s*<link\b[^>]*data-wakilisha-lcp-preload="(?:article|artist)"[^>]*>/gi, "")
     .replace(/\n?\s*<script\s+id="wk-jsonld-primary"[^>]*>[\s\S]*?<\/script>/gi, "");
 }
 
@@ -1597,6 +1774,10 @@ function seoBlockForPath(pagePath) {
   const title = formatPageTitle(model.title);
   const image = socialImageForModel(model);
   const jsonLd = JSON.stringify(buildJsonLd(model)).replace(/</g, "\\u003c");
+  const lcpPreload = lcpPreloadForPath(
+    pagePath,
+    model,
+  );
 
   return `    <title>${escapeHtml(title)}</title>
     <meta name="description" content="${escapeAttr(model.description)}" />
@@ -1618,7 +1799,7 @@ function seoBlockForPath(pagePath) {
     <meta name="twitter:description" content="${escapeAttr(model.description)}" />
     <meta name="twitter:image" content="${escapeAttr(image)}" />
     <meta name="twitter:image:alt" content="${escapeAttr(schemaEntityName(model))}" />
-    <script id="wk-jsonld-primary" type="application/ld+json">${jsonLd}</script>`;
+${lcpPreload ? `${lcpPreload}\n` : ""}    <script id="wk-jsonld-primary" type="application/ld+json">${jsonLd}</script>`;
 }
 
 function htmlForPath(baseHtml, pagePath) {
