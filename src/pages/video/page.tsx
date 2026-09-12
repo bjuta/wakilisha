@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { WkSearchField } from "@/components/design-system/primitives/Field";
 import { MetaTags } from "@/components/seo/MetaTags";
 import { PublicVideoCard } from "@/components/video/PublicVideoCard";
 import {
@@ -68,17 +69,15 @@ export default function VideoIndexPage() {
               </h1>
             </div>
 
-            <label className="relative block w-full max-w-[260px]">
-              <span className="sr-only">Search Video</span>
-              <i className="ri-search-line pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-[14px] text-[var(--wk-text-faint)]" />
-              <input
-                type="search"
+            <div className="w-full max-w-[260px]">
+              <WkSearchField
                 value={query}
-                onChange={(event) => setQuery(event.target.value)}
+                onChange={setQuery}
+                ariaLabel="Search Video"
                 placeholder="Search Video"
-                className="h-9 w-full rounded-full border border-[var(--wk-border)] bg-[var(--wk-surface)] pl-9 pr-3 text-[12px] font-semibold text-[var(--wk-text)] outline-none transition placeholder:text-[var(--wk-text-faint)] focus:border-[var(--wk-brand)]"
+                inputClassName="h-9 rounded-full border-[var(--wk-border)] bg-[var(--wk-surface)] text-[12px] font-semibold text-[var(--wk-text)] placeholder:text-[var(--wk-text-faint)] focus:border-[var(--wk-brand)]"
               />
-            </label>
+            </div>
           </div>
         </header>
 
