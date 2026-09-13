@@ -1,6 +1,5 @@
 import {
   useEffect,
-  useMemo,
   useRef,
   useState,
 } from "react";
@@ -10,8 +9,9 @@ import {
 } from "react-router-dom";
 import { WkIcon } from "@/components/design-system/Icon";
 import { usePlayer } from "@/context/PlayerContext";
-import { useArtistSearchData } from "@/hooks/useArtistSearchData";
-import { useTrackSearchData } from "@/hooks/useTrackSearchData";
+import {
+  usePublicRegistrySearch,
+} from "@/hooks/usePublicRegistrySearch";
 
 export function GlobalSearchSurface({
   open,
@@ -22,9 +22,25 @@ export function GlobalSearchSurface({
 }) {
   const navigate = useNavigate();
   const { playTrack } = usePlayer();
-  const { data: artists } = useArtistSearchData(open);
-  const { data: tracks } = useTrackSearchData(open);
   const [query, setQuery] = useState("");
+  const {
+    artists: artistResults,
+    tracks: trackResults,
+    loading: searchLoading,
+  } = usePublicRegistrySearch(
+    query,
+    {
+      enabled: open,
+      debounceMs: 120,
+      limits: {
+        artist: 5,
+        track: 6,
+        release: 0,
+        genre: 0,
+        label: 0,
+      },
+    },
+  );
   const inputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -45,35 +61,6 @@ export function GlobalSearchSurface({
   }, [open, onClose]);
 
   const normalized = query.trim().toLowerCase();
-
-  const artistResults = useMemo(
-    () =>
-      normalized
-        ? artists
-            .filter(
-              (artist) =>
-                artist.name.toLowerCase().includes(normalized) ||
-                artist.contextText.toLowerCase().includes(normalized),
-            )
-            .slice(0, 5)
-        : [],
-    [artists, normalized],
-  );
-
-  const trackResults = useMemo(
-    () =>
-      normalized
-        ? tracks
-            .filter(
-              (track) =>
-                track.title.toLowerCase().includes(normalized) ||
-                track.artist.toLowerCase().includes(normalized) ||
-                track.contextText.toLowerCase().includes(normalized),
-            )
-            .slice(0, 6)
-        : [],
-    [normalized, tracks],
-  );
 
   if (!open) return null;
 
@@ -233,7 +220,13 @@ export function GlobalSearchSurface({
                 </section>
               ) : null}
 
-              {!artistResults.length && !trackResults.length ? (
+              {searchLoading && !artistResults.length && !trackResults.length ? (
+                <div className="px-4 py-8 text-center text-sm text-[var(--wk-text-muted)]">
+                  Searching WAKILISHA…
+                </div>
+              ) : null}
+
+              {!searchLoading && !artistResults.length && !trackResults.length ? (
                 <div className="px-4 py-8 text-center text-sm text-[var(--wk-text-muted)]">
                   No quick matches.
                 </div>

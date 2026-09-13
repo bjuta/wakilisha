@@ -7,13 +7,12 @@ import { ArtistCard } from "@/components/design-system/registry/ArtistCard";
 import { ReleaseCard } from "@/components/design-system/registry/ReleaseCard";
 import { slugify } from "@/services/publicContent/client";
 import { useArtistSearchSuggestions } from "@/hooks/useArtistSearchSuggestions";
-import { useArtistSearchData, type ArtistSearchItem } from "@/hooks/useArtistSearchData";
-import { useTrackSearchData, type TrackSearchItem } from "@/hooks/useTrackSearchData";
-import { useGenreSearchData, type GenreSearchItem } from "@/hooks/useGenreSearchData";
-import { useLabelSearchData, type LabelSearchItem } from "@/hooks/useLabelSearchData";
+import {
+  usePublicRegistrySearch,
+  type PublicSearchTrackItem,
+} from "@/hooks/usePublicRegistrySearch";
 import { useChartSearchData, type ChartSearchItem } from "@/hooks/useChartSearchData";
 import { SkeletonBlock } from "@/components/skeletons/Skeletons";
-import { listReleases, type PublicRelease } from "@/services/publicContent/client";
 import { buildReleaseSearchSnippet } from "@/services/cultureContext/releaseAdapters";
 import { trackEvent } from "@/services/analytics";
 
@@ -56,15 +55,28 @@ export default function Search() {
   const urlQuery = searchParams.get("q") ?? "";
   const [query, setQuery] = useState(urlQuery);
   const [activeTab, setActiveTab] = useState<Tab>("All");
-  const [loading, setLoading] = useState(false);
-  const [releases, setReleases] = useState<PublicRelease[]>([]);
-  const [releasesLoading, setReleasesLoading] = useState(true);
   const { playTrack } = usePlayer();
   const { suggestions: trendingArtists, loading: trendingLoading } = useArtistSearchSuggestions(12);
-  const { data: artistData } = useArtistSearchData();
-  const { data: trackData } = useTrackSearchData();
-  const { data: genreData } = useGenreSearchData();
-  const { data: labelData } = useLabelSearchData();
+  const {
+    artists,
+    tracks,
+    releases,
+    genres,
+    labels,
+    totals: registryTotals,
+    loading: registryLoading,
+  } = usePublicRegistrySearch(
+    query,
+    {
+      limits: {
+        artist: 50,
+        track: 50,
+        release: 50,
+        genre: 50,
+        label: 50,
+      },
+    },
+  );
   const { data: chartData } = useChartSearchData();
   const prevTabRef = useRef<Tab>("All");
   const hasTrackedQueryRef = useRef(false);
@@ -107,31 +119,6 @@ export default function Search() {
   const q = query.trim().toLowerCase();
 
   useEffect(() => {
-    let alive = true;
-    const load = async () => {
-      setReleasesLoading(true);
-      try {
-        const data = await listReleases();
-        if (!alive) return;
-        setReleases(data);
-      } catch (err) {
-        console.error("Failed to load releases for search:", err);
-      } finally {
-        if (alive) setReleasesLoading(false);
-      }
-    };
-    load();
-    return () => { alive = false; };
-  }, []);
-
-  useEffect(() => {
-    if (!q) { setLoading(false); return; }
-    setLoading(true);
-    const t = setTimeout(() => setLoading(false), 300);
-    return () => clearTimeout(t);
-  }, [q]);
-
-  useEffect(() => {
     if (!q) {
       hasTrackedQueryRef.current = false;
       return;
@@ -162,22 +149,55 @@ export default function Search() {
 
 
 
-  const results = useMemo(() => {
-    if (!q) return { artists: [] as ArtistSearchItem[], tracks: [] as TrackSearchItem[], releases: [] as PublicRelease[], genres: [] as GenreSearchItem[], labels: [] as LabelSearchItem[], charts: [] as ChartSearchItem[] };
+  const results = useMemo(
+    () => ({
+      artists: q ? artists : [],
+      tracks: q ? tracks : [],
+      releases: q ? releases : [],
+      genres: q ? genres : [],
+      labels: q ? labels : [],
+      charts: q
+        ? chartData.filter(
+            (entry) =>
+              entry.title.toLowerCase().includes(q)
+              || entry.artist.toLowerCase().includes(q)
+              || entry.contextText.toLowerCase().includes(q),
+          )
+        : [] as ChartSearchItem[],
+    }),
+    [
+      artists,
+      chartData,
+      genres,
+      labels,
+      q,
+      releases,
+      tracks,
+    ],
+  );
 
-    const artists = artistData.filter((a) => a.name.toLowerCase().includes(q) || a.genres.some((g) => g.toLowerCase().includes(q)) || (a.country || "").toLowerCase().includes(q) || a.contextText.toLowerCase().includes(q));
-    const tracks = trackData.filter((t) => t.title.toLowerCase().includes(q) || t.artist.toLowerCase().includes(q) || t.genre.toLowerCase().includes(q) || t.label.toLowerCase().includes(q) || t.contextText.toLowerCase().includes(q));
-    const filteredReleases = releasesLoading ? [] : releases.filter((r) => r.title.toLowerCase().includes(q) || r.artist.toLowerCase().includes(q) || (r.labelName || "").toLowerCase().includes(q) || buildReleaseSearchSnippet(r).toLowerCase().includes(q));
-    const filteredGenres = genreData.filter((g) => g.name.toLowerCase().includes(q) || g.representativeArtists?.some((a) => a.toLowerCase().includes(q)) || g.contextText.toLowerCase().includes(q));
-    const filteredLabels = labelData.filter((l) => l.name.toLowerCase().includes(q) || (l.country || "").toLowerCase().includes(q) || l.contextText.toLowerCase().includes(q));
-    const filteredCharts = chartData.filter((c) => c.title.toLowerCase().includes(q) || c.artist.toLowerCase().includes(q) || c.contextText.toLowerCase().includes(q));
+  const counts = {
+    artists: q ? registryTotals.artist : 0,
+    tracks: q ? registryTotals.track : 0,
+    releases: q ? registryTotals.release : 0,
+    genres: q ? registryTotals.genre : 0,
+    labels: q ? registryTotals.label : 0,
+    charts: results.charts.length,
+  };
 
-    return { artists, tracks, releases: filteredReleases, genres: filteredGenres, labels: filteredLabels, charts: filteredCharts };
-  }, [q, artistData, trackData, releases, releasesLoading, genreData, labelData, chartData]);
+  const total =
+    counts.artists
+    + counts.tracks
+    + counts.releases
+    + counts.genres
+    + counts.labels
+    + counts.charts;
 
-  const total = results.artists.length + results.tracks.length + results.releases.length + results.genres.length + results.labels.length + results.charts.length;
+  const loading =
+    Boolean(q)
+    && registryLoading;
 
-  const handlePlayTrack = (track: TrackSearchItem) => {
+  const handlePlayTrack = (track: PublicSearchTrackItem) => {
     playTrack(
       { id: track.slug, registryTrackId: track.id, title: track.title, artist: track.artist, artworkUrl: track.artworkUrl, isPlayable: track.isPlayable, source: track.source, previewUrl: track.previewUrl ?? undefined, playbackEngine: "audio", artistSlug: track.artistSlug || undefined, trackSlug: track.slug },
       [{ id: track.slug, registryTrackId: track.id, title: track.title, artist: track.artist, artworkUrl: track.artworkUrl, isPlayable: track.isPlayable, source: track.source, previewUrl: track.previewUrl ?? undefined, playbackEngine: "audio", artistSlug: track.artistSlug || undefined, trackSlug: track.slug }],
@@ -250,7 +270,7 @@ export default function Search() {
         <div className="border-b border-[var(--wk-border)] sticky top-0 z-10" style={{ background: "var(--wk-bg)" }}>
           <div className="wk-container-wide flex gap-1 overflow-x-auto px-6 py-2 scrollbar-hide">
             {TABS.map((tab) => {
-              const count = tab === "All" ? total : tab === "Artists" ? results.artists.length : tab === "Tracks" ? results.tracks.length : tab === "Releases" ? results.releases.length : tab === "Genres" ? results.genres.length : tab === "Labels" ? results.labels.length : results.charts.length;
+              const count = tab === "All" ? total : tab === "Artists" ? counts.artists : tab === "Tracks" ? counts.tracks : tab === "Releases" ? counts.releases : tab === "Genres" ? counts.genres : tab === "Labels" ? counts.labels : counts.charts;
               return (
                 <button key={tab} onClick={() => handleTabSwitch(tab)} className={`flex-none rounded-full px-4 py-2 text-[13px] font-semibold transition-all whitespace-nowrap ${activeTab === tab ? "bg-[var(--wk-brand)] text-[var(--wk-brand-on)]" : "border border-[var(--wk-border)] text-[var(--wk-text-soft)] hover:bg-[var(--wk-surface-raised)]"}`}>
                   {tab}{count > 0 && <span className="ml-1.5 text-[11px] opacity-80">{count}</span>}
@@ -312,11 +332,11 @@ export default function Search() {
           <div className="space-y-10">
 
 
-            {showArtists && results.artists.length > 0 && <section><SectionHeader title="Artists" count={results.artists.length} onViewAll={activeTab === "All" && results.artists.length > 4 ? () => setActiveTab("Artists") : undefined} /><div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4">{results.artists.slice(0, activeTab === "All" ? 4 : undefined).map((artist, idx) => <div key={artist.slug} onClick={() => handleResultClick("artist", artist.slug, idx + 1)}><ArtistCard {...artist} contextText={artist.contextText} sourceSection="search" clickPosition={idx + 1} /></div>)}</div></section>}
+            {showArtists && results.artists.length > 0 && <section><SectionHeader title="Artists" count={counts.artists} onViewAll={activeTab === "All" && counts.artists > 4 ? () => setActiveTab("Artists") : undefined} /><div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4">{results.artists.slice(0, activeTab === "All" ? 4 : undefined).map((artist, idx) => <div key={artist.slug} onClick={() => handleResultClick("artist", artist.slug, idx + 1)}><ArtistCard {...artist} contextText={artist.contextText} sourceSection="search" clickPosition={idx + 1} /></div>)}</div></section>}
 
             {showTracks && results.tracks.length > 0 && (
               <section>
-                <SectionHeader title="Tracks" count={results.tracks.length} onViewAll={activeTab === "All" && results.tracks.length > 6 ? () => setActiveTab("Tracks") : undefined} />
+                <SectionHeader title="Tracks" count={counts.tracks} onViewAll={activeTab === "All" && counts.tracks > 6 ? () => setActiveTab("Tracks") : undefined} />
                 <div className="overflow-hidden rounded-2xl border border-[var(--wk-border)] bg-[var(--wk-surface)]">
                   <div className="divide-y divide-[var(--wk-divider)]">
                     {results.tracks.slice(0, activeTab === "All" ? 6 : undefined).map((track, idx) => {
@@ -355,15 +375,15 @@ export default function Search() {
               </section>
             )}
 
-            {showReleases && results.releases.length > 0 && <section><SectionHeader title="Releases" count={results.releases.length} onViewAll={activeTab === "All" && results.releases.length > 4 ? () => setActiveTab("Releases") : undefined} /><div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4">{results.releases.slice(0, activeTab === "All" ? 4 : undefined).map((release, idx) => <div key={release.slug} onClick={() => handleResultClick("release", release.slug, idx + 1)}><ReleaseCard {...release} contextText={buildReleaseSearchSnippet(release)} sourceSection="search" clickPosition={idx + 1} /></div>)}</div></section>}
+            {showReleases && results.releases.length > 0 && <section><SectionHeader title="Releases" count={counts.releases} onViewAll={activeTab === "All" && counts.releases > 4 ? () => setActiveTab("Releases") : undefined} /><div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4">{results.releases.slice(0, activeTab === "All" ? 4 : undefined).map((release, idx) => <div key={release.slug} onClick={() => handleResultClick("release", release.slug, idx + 1)}><ReleaseCard {...release} contextText={buildReleaseSearchSnippet(release)} sourceSection="search" clickPosition={idx + 1} /></div>)}</div></section>}
 
-            {showGenres && results.genres.length > 0 && <section><SectionHeader title="Genres" count={results.genres.length} /><div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">{results.genres.map((genre, idx) => <Link key={genre.slug} to={`/genres/${genre.slug}`} onClick={() => handleResultClick("genre", genre.slug, idx + 1)} className="group relative overflow-hidden rounded-xl border border-[var(--wk-border)] bg-[var(--wk-surface)] p-5 transition-all hover:border-[var(--wk-border-2)]"><div className="absolute right-0 top-0 h-32 w-32 rounded-bl-full opacity-[0.08] transition-opacity group-hover:opacity-[0.14]" style={{ background: genre.accentVar }} /><div className="mb-1 text-[11px] font-black uppercase tracking-[0.18em]" style={{ color: genre.accentVar }}>Genre</div><h3 className="text-[18px] font-black tracking-tight text-[var(--wk-text)]">{highlight(genre.name, query)}</h3>{genre.contextText && <p className="relative mt-2 line-clamp-2 text-[13px] leading-snug text-[var(--wk-text-soft)]">{highlight(genre.contextText, query)}</p>}</Link>)}</div></section>}
+            {showGenres && results.genres.length > 0 && <section><SectionHeader title="Genres" count={counts.genres} /><div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">{results.genres.map((genre, idx) => <Link key={genre.slug} to={`/genres/${genre.slug}`} onClick={() => handleResultClick("genre", genre.slug, idx + 1)} className="group relative overflow-hidden rounded-xl border border-[var(--wk-border)] bg-[var(--wk-surface)] p-5 transition-all hover:border-[var(--wk-border-2)]"><div className="absolute right-0 top-0 h-32 w-32 rounded-bl-full opacity-[0.08] transition-opacity group-hover:opacity-[0.14]" style={{ background: genre.accentVar }} /><div className="mb-1 text-[11px] font-black uppercase tracking-[0.18em]" style={{ color: genre.accentVar }}>Genre</div><h3 className="text-[18px] font-black tracking-tight text-[var(--wk-text)]">{highlight(genre.name, query)}</h3>{genre.contextText && <p className="relative mt-2 line-clamp-2 text-[13px] leading-snug text-[var(--wk-text-soft)]">{highlight(genre.contextText, query)}</p>}</Link>)}</div></section>}
 
-            {showLabels && results.labels.length > 0 && <section><SectionHeader title="Labels" count={results.labels.length} /><div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">{results.labels.map((label, idx) => <Link key={label.slug} to={`/labels/${label.slug}`} onClick={() => handleResultClick("label", label.slug, idx + 1)} className="block rounded-xl border border-[var(--wk-border)] bg-[var(--wk-surface)] p-5 transition-all hover:border-[var(--wk-border-2)] hover:bg-[var(--wk-surface-raised)]"><div className="flex items-center justify-between mb-2"><h3 className="text-[16px] font-bold text-[var(--wk-text)]">{highlight(label.name, query)}</h3>{label.country && <span className="text-[11px] text-[var(--wk-text-muted)]">{label.country}</span>}</div>{label.contextText && <p className="mb-3 line-clamp-2 text-[13px] leading-snug text-[var(--wk-text-soft)]">{highlight(label.contextText, query)}</p>}</Link>)}</div></section>}
+            {showLabels && results.labels.length > 0 && <section><SectionHeader title="Labels" count={counts.labels} /><div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">{results.labels.map((label, idx) => <Link key={label.slug} to={`/labels/${label.slug}`} onClick={() => handleResultClick("label", label.slug, idx + 1)} className="block rounded-xl border border-[var(--wk-border)] bg-[var(--wk-surface)] p-5 transition-all hover:border-[var(--wk-border-2)] hover:bg-[var(--wk-surface-raised)]"><div className="flex items-center justify-between mb-2"><h3 className="text-[16px] font-bold text-[var(--wk-text)]">{highlight(label.name, query)}</h3>{label.country && <span className="text-[11px] text-[var(--wk-text-muted)]">{label.country}</span>}</div>{label.contextText && <p className="mb-3 line-clamp-2 text-[13px] leading-snug text-[var(--wk-text-soft)]">{highlight(label.contextText, query)}</p>}</Link>)}</div></section>}
 
             {showCharts && results.charts.length > 0 && (
               <section>
-                <SectionHeader title="Chart entries" count={results.charts.length} />
+                <SectionHeader title="Chart entries" count={counts.charts} />
                 <div className="overflow-hidden rounded-2xl border border-[var(--wk-border)] bg-[var(--wk-surface)]">
                   <div className="divide-y divide-[var(--wk-divider)]">
                     {results.charts.map((entry, idx) => (

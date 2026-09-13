@@ -18680,6 +18680,21 @@ export type Database = {
         }
         Relationships: []
       }
+      public_search_documents_v1: {
+        Row: {
+          document_updated_at: string | null
+          entity_id: string | null
+          entity_type: string | null
+          image_url: string | null
+          parent_slug: string | null
+          payload: Json | null
+          search_text: string | null
+          slug: string | null
+          subtitle: string | null
+          title: string | null
+        }
+        Relationships: []
+      }
       registry_entity_index: {
         Row: {
           canonical_source_id: string | null
@@ -25008,6 +25023,35 @@ export type Database = {
           related_id: string
           target_id: string
           target_kind: string
+        }[]
+      }
+      search_public_registry_v1: {
+        Args: {
+          p_after_id?: string
+          p_after_score?: number
+          p_after_title?: string
+          p_after_type_rank?: number
+          p_limit?: number
+          p_query: string
+          p_types?: string[]
+        }
+        Returns: {
+          cursor_title: string
+          document_updated_at: string
+          entity_id: string
+          entity_type: string
+          has_more: boolean
+          image_url: string
+          overall_total: number
+          parent_slug: string
+          payload: Json
+          remaining_total: number
+          score: number
+          slug: string
+          subtitle: string
+          title: string
+          type_rank: number
+          type_total: number
         }[]
       }
       seed_taxonomy_terms_from_articles: {

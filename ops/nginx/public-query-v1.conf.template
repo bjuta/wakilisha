@@ -1,0 +1,37 @@
+# Phase 9A.2 same-origin public query transport.
+#
+# Render __SUPABASE_PROJECT_REF__ to the exact deployment target and include
+# this location inside the canonical wakilisha.africa HTTPS server block.
+#
+# Browser authority is the versioned same-origin GET below. Nginx deliberately
+# strips user credentials and Origin before proxying to the public transport
+# adapter so this cacheable endpoint cannot vary on authenticated user state.
+#
+# Keep proxy_pass itself static. The incoming query string is preserved by the
+# rewrite because the replacement contains no new arguments.
+
+location = /api/public/v1/search {
+    proxy_ssl_server_name on;
+    proxy_set_header Host __SUPABASE_PROJECT_REF__.supabase.co;
+    proxy_set_header X-Forwarded-Host $host;
+    proxy_set_header X-Forwarded-Proto https;
+    proxy_set_header Authorization "";
+    proxy_set_header Cookie "";
+    proxy_set_header Origin "";
+    proxy_set_header If-None-Match $http_if_none_match;
+    proxy_set_header Accept $http_accept;
+
+    # Supabase currently normalizes the upstream ETag on 200 responses and can
+    # omit it on 304 responses even when the Edge function emitted it. Preserve
+    # the canonical WAKILISHA validator in X-Wakilisha-ETag through the provider,
+    # then expose exactly one standards-compliant ETag at the same-origin
+    # browser boundary.
+    proxy_hide_header ETag;
+    proxy_hide_header X-Wakilisha-ETag;
+    add_header ETag $upstream_http_x_wakilisha_etag always;
+
+    proxy_pass_request_body off;
+    proxy_set_header Content-Length "";
+    rewrite ^ /functions/v1/public-query-v1 break;
+    proxy_pass https://__SUPABASE_PROJECT_REF__.supabase.co;
+}
