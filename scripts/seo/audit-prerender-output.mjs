@@ -10,6 +10,7 @@ const warnings = [];
 
 let articleLcpPreloadCount = 0;
 let artistLcpPreloadCount = 0;
+let releaseLcpPreloadCount = 0;
 
 function readText(filePath) {
   return fs.readFileSync(filePath, "utf8");
@@ -249,7 +250,7 @@ function auditHtmlFile(filePath) {
 
   const lcpPreload =
     html.match(
-      /<link\b(?=[^>]*\brel=["']preload["'])(?=[^>]*\bas=["']image["'])(?=[^>]*\bfetchpriority=["']high["'])(?=[^>]*\bdata-wakilisha-lcp-preload=["'](article|artist)["'])[^>]*>/i,
+      /<link\b(?=[^>]*\brel=["']preload["'])(?=[^>]*\bas=["']image["'])(?=[^>]*\bfetchpriority=["']high["'])(?=[^>]*\bdata-wakilisha-lcp-preload=["'](article|artist|release)["'])[^>]*>/i,
     );
 
   if (lcpPreload) {
@@ -297,6 +298,31 @@ function auditHtmlFile(filePath) {
   }
 
   if (
+    lcpPreload?.[1] ===
+    "release"
+  ) {
+    releaseLcpPreloadCount += 1;
+
+    if (
+      /\/__image\/w\d+\/uploads\//i.test(
+        lcpPreload[0],
+      )
+      && (
+        !/\bimagesrcset=["'][^"']*\/__image\/w640[^"']*640w[^"']*\/__image\/w1600[^"']*1600w[^"']*["']/i.test(
+          lcpPreload[0],
+        )
+        || !/\bimagesizes=["']100vw["']/i.test(
+          lcpPreload[0],
+        )
+      )
+    ) {
+      reportError(
+        `${route}: Release LCP preload must preserve responsive WAKILISHA hero derivative authority.`,
+      );
+    }
+  }
+
+  if (
     route.startsWith(
       "/magazine/",
     )
@@ -308,6 +334,22 @@ function auditHtmlFile(filePath) {
   ) {
     reportError(
       `${route}: transformable Article hero is missing prerender LCP preload authority.`,
+    );
+  }
+
+  if (
+    route.startsWith(
+      "/releases/",
+    )
+    && route.split("/").filter(Boolean).length === 3
+    && /<meta\s+property=["']og:image["']\s+content=["']https:\/\/media\.wakilisha\.africa\/(?:__image\/w\d+\/)?uploads\//i.test(
+      html,
+    )
+    && lcpPreload?.[1] !==
+      "release"
+  ) {
+    reportError(
+      `${route}: transformable Release artwork is missing prerender LCP preload authority.`,
     );
   }
 
@@ -354,8 +396,17 @@ function main() {
       );
     }
 
+    if (
+      releaseLcpPreloadCount ===
+      0
+    ) {
+      reportError(
+        "No prerendered Release LCP image preloads were found.",
+      );
+    }
+
     console.log(
-      `SEO audit: LCP preloads article=${articleLcpPreloadCount.toLocaleString()} artist=${artistLcpPreloadCount.toLocaleString()}.`,
+      `SEO audit: LCP preloads article=${articleLcpPreloadCount.toLocaleString()} artist=${artistLcpPreloadCount.toLocaleString()} release=${releaseLcpPreloadCount.toLocaleString()}.`,
     );
   }
 

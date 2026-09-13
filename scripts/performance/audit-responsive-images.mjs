@@ -252,6 +252,86 @@ if (
   );
 }
 
+const mobileReleasePage = read(
+  "src/pages/mobile/releases/detail/page.tsx",
+);
+
+for (const marker of [
+  "<ResponsiveMediaImage",
+  'preset="hero"',
+  'loading="eager"',
+  'fetchPriority="high"',
+  'decoding="async"',
+  'data-wakilisha-release-hero="true"',
+  "getPrerenderedMobileReleaseHeroSource",
+  'link[data-wakilisha-lcp-preload="release"]',
+  '"data-wakilisha-lcp-path"',
+  "prerenderedReleaseHeroSource",
+  'data-wakilisha-mobile-release-loading-hero="true"',
+  'key="mobile-release-hero-shell"',
+  'key="mobile-release-hero-media"',
+]) {
+  if (!mobileReleasePage.includes(marker)) {
+    fail(
+      `Mobile Release first-visual authority is missing ${marker}`,
+    );
+  }
+}
+
+if (
+  mobileReleasePage.includes(
+    'backgroundImage: `url(${release.artworkUrl})`',
+  )
+) {
+  fail(
+    "Mobile Release LCP hero regressed to CSS-background ownership",
+  );
+}
+
+if (
+  mobileReleasePage.includes(
+    'className="flex min-h-screen items-center justify-center bg-[var(--wk-bg)]"',
+  )
+) {
+  fail(
+    "Mobile Release first visual regressed to a replace-on-data full-screen loader",
+  );
+}
+
+const mobileReleaseHeroShellKeyCount =
+  (
+    mobileReleasePage.match(
+      /key="mobile-release-hero-shell"/g,
+    )
+    || []
+  ).length;
+
+const mobileReleaseHeroMediaKeyCount =
+  (
+    mobileReleasePage.match(
+      /key="mobile-release-hero-media"/g,
+    )
+    || []
+  ).length;
+
+const mobileReleaseResponsiveHeroCount =
+  (
+    mobileReleasePage.match(
+      /<ResponsiveMediaImage\b/g,
+    )
+    || []
+  ).length;
+
+if (
+  mobileReleaseHeroShellKeyCount < 2
+  || mobileReleaseHeroMediaKeyCount < 2
+  || mobileReleaseResponsiveHeroCount !== 2
+) {
+  fail(
+    `Mobile Release loading/ready hero identity is unstable: shell=${mobileReleaseHeroShellKeyCount} media=${mobileReleaseHeroMediaKeyCount} responsive=${mobileReleaseResponsiveHeroCount}`,
+  );
+}
+
 const mobileAppLayout = read(
   "src/components/mobile/MobileAppLayout.tsx",
 );
@@ -461,7 +541,7 @@ if (
   );
 }
 
-let responsiveImageCount = 2;
+let responsiveImageCount = 4;
 
 for (const target of targets) {
   const source = read(target.path);
@@ -514,5 +594,5 @@ if (
 }
 
 console.log(
-  `Responsive image audit passed: ${responsiveImageCount} Magazine + desktop/mobile Article/Artist/chrome images covered; Article + Artist LCP image ownership, Artist async geometry, and mobile Home mark derivative authority enforced.`,
+  `Responsive image audit passed: ${responsiveImageCount} Magazine + desktop/mobile Article/Artist/Release/chrome images covered; Article + Artist + Release LCP image ownership, Artist async geometry, and mobile Home mark derivative authority enforced.`,
 );

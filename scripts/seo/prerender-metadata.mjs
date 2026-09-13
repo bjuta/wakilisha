@@ -841,6 +841,33 @@ function lcpPreloadForPath(
     );
   }
 
+  if (
+    page.startsWith(
+      "/releases/",
+    )
+    && page.split("/").filter(Boolean).length === 3
+  ) {
+    const releaseMeta =
+      RELEASE_METADATA_BY_PATH.get(
+        page,
+      ) || {};
+
+    const source =
+      firstNonEmpty(
+        releaseMeta.image,
+        model.image,
+        model.imageUrl,
+        model.artworkUrl,
+        model.artwork_url,
+      );
+
+    return imagePreloadForSource(
+      source,
+      "release",
+      page,
+    );
+  }
+
   return "";
 }
 
@@ -1764,7 +1791,7 @@ function stripExistingSeo(html) {
     .replace(/\n?\s*<meta\s+name="(?:description|robots|twitter:card|twitter:title|twitter:description|twitter:image|twitter:image:alt|twitter:site)"[^>]*>/gi, "")
     .replace(/\n?\s*<meta\s+property="(?:og:site_name|og:title|og:description|og:type|og:url|og:image|og:image:secure_url|og:image:width|og:image:height|og:image:alt)"[^>]*>/gi, "")
     .replace(/\n?\s*<link\s+rel="canonical"[^>]*>/gi, "")
-    .replace(/\n?\s*<link\b[^>]*data-wakilisha-lcp-preload="(?:article|artist)"[^>]*>/gi, "")
+    .replace(/\n?\s*<link\b[^>]*data-wakilisha-lcp-preload="(?:article|artist|release)"[^>]*>/gi, "")
     .replace(/\n?\s*<script\s+id="wk-jsonld-primary"[^>]*>[\s\S]*?<\/script>/gi, "");
 }
 
