@@ -51,6 +51,24 @@ const trackHook = read(
 const globalSearch = read(
   "src/components/search/GlobalSearchSurface.tsx",
 );
+const searchPage = read(
+  "src/pages/search/page.tsx",
+);
+const publicSearchClient = read(
+  "src/services/publicSearch/client.ts",
+);
+const publicSearchHook = read(
+  "src/hooks/usePublicRegistrySearch.ts",
+);
+const publicQueryEdge = read(
+  "supabase/functions/public-query-v1/index.ts",
+);
+const publicQueryNginx = read(
+  "ops/nginx/public-query-v1.conf.template",
+);
+const supabaseConfig = read(
+  "supabase/config.toml",
+);
 
 describe(
   "Public Artist Search authority",
@@ -103,17 +121,27 @@ describe(
     );
 
     it(
-      "does not eagerly load quick Search datasets while the overlay is closed",
+      "does not hydrate legacy Search corpora while the global overlay is closed",
       () => {
         expect(
           globalSearch,
         ).toContain(
-          "useArtistSearchData(open)",
+          "usePublicRegistrySearch(",
         );
         expect(
           globalSearch,
         ).toContain(
-          "useTrackSearchData(open)",
+          "enabled: open",
+        );
+        expect(
+          globalSearch,
+        ).not.toContain(
+          "useArtistSearchData",
+        );
+        expect(
+          globalSearch,
+        ).not.toContain(
+          "useTrackSearchData",
         );
       },
     );
@@ -295,6 +323,319 @@ describe(
           searchVerifier,
         ).toContain(
           "duplicate entity documents",
+        );
+      },
+    );
+  },
+);
+
+describe(
+  "Phase 9A.2 same-origin public Search convergence",
+  () => {
+    it(
+      "keeps browser Search on one same-origin versioned GET boundary",
+      () => {
+        expect(
+          publicSearchClient,
+        ).toContain(
+          '"/api/public/v1/search"',
+        );
+        expect(
+          publicSearchClient,
+        ).toContain(
+          'method:\n          "GET"',
+        );
+        expect(
+          publicSearchClient,
+        ).toContain(
+          'credentials:\n          "omit"',
+        );
+        expect(
+          publicSearchClient,
+        ).not.toContain(
+          "@/lib/supabase",
+        );
+        expect(
+          publicSearchClient,
+        ).not.toContain(
+          "search_public_registry_v1",
+        );
+        expect(
+          publicSearchHook,
+        ).toContain(
+          "searchPublicRegistry",
+        );
+        expect(
+          publicSearchHook,
+        ).not.toContain(
+          "@/lib/supabase",
+        );
+      },
+    );
+
+    it(
+      "uses a thin anonymous Edge transport with opaque cursor and safe shared cache semantics",
+      () => {
+        expect(
+          publicQueryEdge,
+        ).toContain(
+          "SUPABASE_ANON_KEY",
+        );
+        expect(
+          publicQueryEdge,
+        ).not.toContain(
+          "SERVICE_ROLE",
+        );
+        expect(
+          publicQueryEdge,
+        ).toContain(
+          '"search_public_registry_v1"',
+        );
+        expect(
+          publicQueryEdge,
+        ).toContain(
+          "encodeCursor",
+        );
+        expect(
+          publicQueryEdge,
+        ).toContain(
+          "decodeCursor",
+        );
+        expect(
+          publicQueryEdge,
+        ).toContain(
+          '"ETag"',
+        );
+        expect(
+          publicQueryEdge,
+        ).toContain(
+          '"X-Wakilisha-ETag"',
+        );
+        expect(
+          publicQueryEdge.match(
+            /"X-Wakilisha-ETag"/g,
+          )?.length,
+        ).toBe(
+          2,
+        );
+        expect(
+          publicQueryEdge,
+        ).toContain(
+          "const parsed: Partial<SearchCursor>",
+        );
+        expect(
+          publicQueryEdge,
+        ).toContain(
+          "const rows: SearchRow[]",
+        );
+        expect(
+          publicQueryEdge,
+        ).not.toContain(
+          "return parsed\n      as SearchCursor",
+        );
+        expect(
+          publicQueryEdge,
+        ).not.toContain(
+          ") as SearchRow[]",
+        );
+        expect(
+          publicQueryEdge,
+        ).toContain(
+          "stale-while-revalidate=300",
+        );
+        expect(
+          publicQueryEdge,
+        ).toContain(
+          "s-maxage=60",
+        );
+        expect(
+          publicQueryEdge,
+        ).not.toContain(
+          "Access-Control-Allow-Origin",
+        );
+        expect(
+          supabaseConfig,
+        ).toContain(
+          "[functions.public-query-v1]",
+        );
+        expect(
+          supabaseConfig,
+        ).toContain(
+          "[functions.public-query-v1]\nverify_jwt = false",
+        );
+      },
+    );
+
+    it(
+      "strips user state at the same-origin Nginx cache boundary",
+      () => {
+        expect(
+          publicQueryNginx,
+        ).toContain(
+          "location = /api/public/v1/search",
+        );
+        expect(
+          publicQueryNginx,
+        ).toContain(
+          'proxy_set_header Authorization "";',
+        );
+        expect(
+          publicQueryNginx,
+        ).toContain(
+          'proxy_set_header Cookie "";',
+        );
+        expect(
+          publicQueryNginx,
+        ).toContain(
+          'proxy_set_header Origin "";',
+        );
+        expect(
+          publicQueryNginx,
+        ).toContain(
+          "proxy_hide_header ETag;",
+        );
+        expect(
+          publicQueryNginx,
+        ).toContain(
+          "proxy_hide_header X-Wakilisha-ETag;",
+        );
+        expect(
+          publicQueryNginx,
+        ).toContain(
+          "add_header ETag $upstream_http_x_wakilisha_etag always;",
+        );
+        expect(
+          publicQueryNginx,
+        ).toContain(
+          "rewrite ^ /functions/v1/public-query-v1 break;",
+        );
+        expect(
+          publicQueryNginx,
+        ).toContain(
+          "proxy_pass https://__SUPABASE_PROJECT_REF__.supabase.co;",
+        );
+      },
+    );
+
+    it(
+      "moves the representative public Search page off five-domain corpus hydration",
+      () => {
+        expect(
+          searchPage,
+        ).toContain(
+          "usePublicRegistrySearch(",
+        );
+        expect(
+          searchPage,
+        ).toContain(
+          "registryTotals.artist",
+        );
+        expect(
+          searchPage,
+        ).toContain(
+          "registryTotals.track",
+        );
+        expect(
+          searchPage,
+        ).not.toContain(
+          "useArtistSearchData",
+        );
+        expect(
+          searchPage,
+        ).not.toContain(
+          "useTrackSearchData",
+        );
+        expect(
+          searchPage,
+        ).not.toContain(
+          "useGenreSearchData",
+        );
+        expect(
+          searchPage,
+        ).not.toContain(
+          "useLabelSearchData",
+        );
+        expect(
+          searchPage,
+        ).not.toContain(
+          "listReleases(",
+        );
+        expect(
+          searchPage,
+        ).toContain(
+          "registryTrackId={track.id}",
+        );
+        expect(
+          searchPage,
+        ).toContain(
+          "previewUrl: track.previewUrl",
+        );
+      },
+    );
+
+    it(
+      "moves global Search to query-aware bounded Artist and Track calls",
+      () => {
+        expect(
+          globalSearch,
+        ).toContain(
+          "artist: 5",
+        );
+        expect(
+          globalSearch,
+        ).toContain(
+          "track: 6",
+        );
+        expect(
+          globalSearch,
+        ).toContain(
+          "release: 0",
+        );
+        expect(
+          globalSearch,
+        ).toContain(
+          "previewUrl: track.previewUrl",
+        );
+        expect(
+          globalSearch,
+        ).toContain(
+          "See All Results",
+        );
+      },
+    );
+
+    it(
+      "keeps the query contract bounded and cursor-capable without exposing rank internals to browser consumers",
+      () => {
+        expect(
+          publicSearchHook,
+        ).toContain(
+          "loadMore",
+        );
+        expect(
+          publicSearchHook,
+        ).toContain(
+          "nextCursor",
+        );
+        expect(
+          publicSearchClient,
+        ).toContain(
+          "Math.min(",
+        );
+        expect(
+          publicSearchClient,
+        ).toContain(
+          "50",
+        );
+        expect(
+          publicSearchClient,
+        ).not.toContain(
+          "typeRank",
+        );
+        expect(
+          publicSearchClient,
+        ).not.toContain(
+          "score:",
         );
       },
     );
