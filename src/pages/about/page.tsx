@@ -1,3 +1,4 @@
+import { useScrollRevealElements } from "@/hooks/useScrollReveal";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { trackEvent, getAnalyticsSessionId, getCanonicalPageUrl } from "@/services/analytics";
@@ -68,26 +69,6 @@ const SECTION_NAV_ITEMS = [
   { label: "Contact", href: "#diligence" },
 ];
 
-
-function useScrollReveal() {
-  useEffect(() => {
-    const observer = new IntersectionObserver(
-      (entries) => {
-        entries.forEach((entry) => {
-          if (entry.isIntersecting) {
-            entry.target.classList.add("about-reveal-visible");
-            observer.unobserve(entry.target);
-          }
-        });
-      },
-      { threshold: 0.08, rootMargin: "0px 0px -24px 0px" },
-    );
-
-    const els = document.querySelectorAll(".about-reveal");
-    els.forEach((el) => observer.observe(el));
-    return () => observer.disconnect();
-  }, []);
-}
 
 function excerpt(value: string, max = 175) {
   const clean = value.replace(/\s+/g, " ").trim();
@@ -338,7 +319,15 @@ export default function AboutPage() {
   const [appearance, setAppearance] = useState(() => getFrontendAppearanceSettings());
   const heroRef = useRef<HTMLDivElement>(null);
 
-  useScrollReveal();
+  useScrollRevealElements(
+    [],
+    {
+      selector: ".about-reveal",
+      visibleClass: "about-reveal-visible",
+      threshold: 0.08,
+      rootMargin: "0px 0px -24px 0px",
+    },
+  );
 
   useEffect(() => {
     const syncAppearance = () => setAppearance(getFrontendAppearanceSettings());
@@ -658,7 +647,7 @@ export default function AboutPage() {
         }
 
         .about-reveal {
-          opacity: 0;
+          opacity: 1;
           transform: translateY(24px);
           transition: opacity 0.7s var(--wk-ease-standard), transform 0.7s var(--wk-ease-standard);
         }

@@ -8,6 +8,11 @@ const SITE_NAME = "WAKILISHA";
 const hardErrors = [];
 const warnings = [];
 
+let articleLcpPreloadCount = 0;
+let artistLcpPreloadCount = 0;
+let releaseLcpPreloadCount = 0;
+let magazineLcpPreloadCount = 0;
+
 function readText(filePath) {
   return fs.readFileSync(filePath, "utf8");
 }
@@ -244,6 +249,171 @@ function auditHtmlFile(filePath) {
     reportWarning(`${route}: missing canonical link.`);
   }
 
+  const lcpPreload =
+    html.match(
+      /<link\b(?=[^>]*\brel=["']preload["'])(?=[^>]*\bas=["']image["'])(?=[^>]*\bfetchpriority=["']high["'])(?=[^>]*\bdata-wakilisha-lcp-preload=["'](article|artist|release|magazine)["'])[^>]*>/i,
+    );
+
+  if (lcpPreload) {
+    const lcpPath =
+      lcpPreload[0].match(
+        /\bdata-wakilisha-lcp-path=["']([^"']+)["']/i,
+      )?.[1]
+      || "";
+
+    if (
+      lcpPath !==
+      route
+    ) {
+      reportError(
+        `${route}: LCP preload path authority is ${lcpPath || "missing"} instead of the exact route.`,
+      );
+    }
+  }
+
+  if (
+    lcpPreload?.[1] ===
+    "article"
+  ) {
+    articleLcpPreloadCount += 1;
+
+    if (
+      !/\bimagesrcset=["'][^"']*\/__image\/w640[^"']*640w[^"']*\/__image\/w1600[^"']*1600w[^"']*["']/i.test(
+        lcpPreload[0],
+      )
+      || !/\bimagesizes=["']100vw["']/i.test(
+        lcpPreload[0],
+      )
+    ) {
+      reportError(
+        `${route}: Article LCP preload must preserve responsive WAKILISHA hero derivative authority.`,
+      );
+    }
+  }
+
+  if (
+    lcpPreload?.[1] ===
+    "artist"
+  ) {
+    artistLcpPreloadCount += 1;
+  }
+
+  if (
+    lcpPreload?.[1] ===
+    "release"
+  ) {
+    releaseLcpPreloadCount += 1;
+
+    if (
+      /\/__image\/w\d+\/uploads\//i.test(
+        lcpPreload[0],
+      )
+      && (
+        !/\bimagesrcset=["'][^"']*\/__image\/w640[^"']*640w[^"']*\/__image\/w1600[^"']*1600w[^"']*["']/i.test(
+          lcpPreload[0],
+        )
+        || !/\bimagesizes=["']100vw["']/i.test(
+          lcpPreload[0],
+        )
+      )
+    ) {
+      reportError(
+        `${route}: Release LCP preload must preserve responsive WAKILISHA hero derivative authority.`,
+      );
+    }
+  }
+
+  if (
+    lcpPreload?.[1] ===
+    "magazine"
+  ) {
+    magazineLcpPreloadCount += 1;
+
+    if (
+      route !==
+      "/magazine"
+    ) {
+      reportError(
+        `${route}: Magazine collection LCP preload must only belong to /magazine.`,
+      );
+    }
+
+    if (
+      !html.includes(
+        '<script id="wk-magazine-fallback" type="application/json">',
+      )
+    ) {
+      reportError(
+        "/magazine: prerender HTML is missing inline Magazine fallback authority.",
+      );
+    }
+
+    if (
+      /\/__image\/w\d+\/uploads\//i.test(
+        lcpPreload[0],
+      )
+      && (
+        !/\bimagesrcset=["'][^"']*\/__image\/w640[^"']*640w[^"']*\/__image\/w1600[^"']*1600w[^"']*["']/i.test(
+          lcpPreload[0],
+        )
+        || !/\bimagesizes=["']100vw["']/i.test(
+          lcpPreload[0],
+        )
+      )
+    ) {
+      reportError(
+        "/magazine: Magazine LCP preload must preserve responsive WAKILISHA hero derivative authority.",
+      );
+    }
+  }
+
+  if (
+    route ===
+      "/magazine"
+    && (
+      lcpPreload?.[1] !==
+        "magazine"
+      || !html.includes(
+        '<script id="wk-magazine-fallback" type="application/json">',
+      )
+    )
+  ) {
+    reportError(
+      "/magazine: prerender first visual requires inline fallback + Magazine LCP preload authority.",
+    );
+  }
+
+  if (
+    route.startsWith(
+      "/magazine/",
+    )
+    && /<meta\s+property=["']og:image["']\s+content=["']https:\/\/media\.wakilisha\.africa\/(?:__image\/w\d+\/)?uploads\//i.test(
+      html,
+    )
+    && lcpPreload?.[1] !==
+      "article"
+  ) {
+    reportError(
+      `${route}: transformable Article hero is missing prerender LCP preload authority.`,
+    );
+  }
+
+  if (
+    route.startsWith(
+      "/releases/",
+    )
+    && route.split("/").filter(Boolean).length === 3
+    && /<meta\s+property=["']og:image["']\s+content=["']https:\/\/media\.wakilisha\.africa\/(?:__image\/w\d+\/)?uploads\//i.test(
+      html,
+    )
+    && lcpPreload?.[1] !==
+      "release"
+  ) {
+    reportError(
+      `${route}: transformable Release artwork is missing prerender LCP preload authority.`,
+    );
+  }
+
   for (const rawBlock of extractJsonLdBlocks(html)) {
     try {
       const parsed = JSON.parse(rawBlock);
@@ -268,6 +438,46 @@ function main() {
   } else {
     auditMetadataManifest();
     auditHtmlFiles();
+
+    if (
+      articleLcpPreloadCount ===
+      0
+    ) {
+      reportError(
+        "No prerendered Article LCP image preloads were found.",
+      );
+    }
+
+    if (
+      artistLcpPreloadCount ===
+      0
+    ) {
+      reportError(
+        "No prerendered Artist LCP image preloads were found.",
+      );
+    }
+
+    if (
+      releaseLcpPreloadCount ===
+      0
+    ) {
+      reportError(
+        "No prerendered Release LCP image preloads were found.",
+      );
+    }
+
+    if (
+      magazineLcpPreloadCount !==
+      1
+    ) {
+      reportError(
+        `Expected exactly one Magazine collection LCP preload, found ${magazineLcpPreloadCount}.`,
+      );
+    }
+
+    console.log(
+      `SEO audit: LCP preloads article=${articleLcpPreloadCount.toLocaleString()} artist=${artistLcpPreloadCount.toLocaleString()} release=${releaseLcpPreloadCount.toLocaleString()} magazine=${magazineLcpPreloadCount.toLocaleString()}.`,
+    );
   }
 
   if (warnings.length) {

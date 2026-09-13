@@ -28,7 +28,7 @@ export function FeaturedArtistSpotlight() {
 
   if (loading) {
     return (
-      <section className="mag-reveal">
+      <section className="wk-reveal">
         <div className="flex items-center gap-3 mb-8">
           <span className="w-7 h-px bg-[var(--wk-brand)]" />
           <span className="text-[10px] font-black uppercase tracking-[0.22em] text-[var(--wk-brand)]">Featured Artists</span>
@@ -47,7 +47,7 @@ export function FeaturedArtistSpotlight() {
   if (artists.length === 0) return null;
 
   return (
-    <section className="mag-reveal">
+    <section className="wk-reveal">
       <div className="flex items-end justify-between mb-8 gap-4 flex-wrap">
         <div className="flex items-center gap-3">
           <span className="text-[10px] font-black uppercase tracking-[0.22em] text-[var(--wk-brand)]">

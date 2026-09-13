@@ -4,7 +4,7 @@
 
 /* ── Scroll reveal ── */
 .genre43-reveal {
-  opacity: 0;
+  opacity:1;
   transform: translateY(16px);
   transition: opacity .55s var(--wk-ease-out), transform .55s var(--wk-ease-out);
 }

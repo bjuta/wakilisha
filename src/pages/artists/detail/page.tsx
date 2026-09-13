@@ -77,6 +77,35 @@ function buildArtistConnections(
   });
 }
 
+function getPrerenderedArtistHeroSource(
+  slug: string | undefined,
+): string | undefined {
+  if (
+    typeof document === "undefined"
+    || !slug
+  ) {
+    return undefined;
+  }
+
+  const expectedPath =
+    `/artists/${slug}`;
+
+  const preload =
+    Array.from(
+      document.querySelectorAll<HTMLLinkElement>(
+        'link[data-wakilisha-lcp-preload="artist"]',
+      ),
+    ).find(
+      (link) =>
+        link.getAttribute(
+          "data-wakilisha-lcp-path",
+        ) === expectedPath,
+    );
+
+  return preload?.href
+    || undefined;
+}
+
 type ArtistProfileTab =
   | "posts"
   | "music"
@@ -164,6 +193,10 @@ function ArtistProfileTabs({
 export default function ArtistDetail() {
   const { slug } = useParams<{ slug: string }>();
   const user = useAuthUser();
+  const prerenderedArtistHeroSource =
+    getPrerenderedArtistHeroSource(
+      slug,
+    );
 
   useScrollDepthTracking({
     pageType: "artist_detail",
@@ -262,11 +295,17 @@ export default function ArtistDetail() {
 
   if (status === "loading") {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-[var(--wk-bg)]">
-        <div className="text-center">
-          <i className="ri-user-line mb-4 block text-5xl text-[var(--wk-text-faint)] animate-pulse" />
-          <p className="text-[15px] font-semibold text-[var(--wk-text-muted)]">Loading artist…</p>
-        </div>
+      <div className="wk-app-shell">
+        <ArtistDetailHero
+          key="artist-detail-hero"
+          loading
+          name=""
+          artistId=""
+          slug={slug || ""}
+          imageUrl={prerenderedArtistHeroSource}
+          profileImageUrl={prerenderedArtistHeroSource}
+          bio=""
+        />
       </div>
     );
   }
@@ -356,6 +395,7 @@ export default function ArtistDetail() {
       />
 
       <ArtistDetailHero
+        key="artist-detail-hero"
         name={artist.name}
         artistId={artist.id}
         slug={artist.slug}

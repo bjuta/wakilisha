@@ -1,6 +1,7 @@
 import { Link } from "react-router-dom";
 import type { MagazineArticle } from "@/services/magazineArticles";
 import { ArticleAuthorIdentity } from "@/components/design-system/editorial/ArticleAuthorIdentity";
+import { ResponsiveMediaImage } from "@/components/media/ResponsiveMediaImage";
 
 interface ArticleRelatedProps {
   stories: MagazineArticle[];
@@ -57,7 +58,17 @@ export function ArticleRelated({ stories, loading, issueContext }: ArticleRelate
             {primary && (
               <Link to={`/magazine/${primary.slug}`} className="group flex flex-col rounded-2xl overflow-hidden border border-[var(--wk-border)] bg-[var(--wk-surface)] hover:border-[var(--wk-border-2)] transition-all duration-300 hover:-translate-y-1">
                 <div className="relative aspect-[16/9] overflow-hidden bg-[var(--wk-surface-raised)]">
-                  {primary.heroUrl && <img src={primary.heroUrl} alt={primary.title} className="w-full h-full object-cover object-top transition-transform duration-500 group-hover:scale-105" />}
+                  {primary.heroUrl && (
+                    <ResponsiveMediaImage
+                      src={primary.heroUrl}
+                      preset="feature"
+                      alt={primary.title}
+                      loading="lazy"
+                      fetchPriority="low"
+                      decoding="async"
+                      className="w-full h-full object-cover object-top transition-transform duration-500 group-hover:scale-105"
+                    />
+                  )}
                   <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent" />
                   <span className="absolute top-4 left-4 rounded-full bg-[var(--wk-brand)] text-[var(--wk-brand-on)] text-[9px] font-black uppercase tracking-[0.18em] px-3 py-1">
                     {primary.section}
@@ -78,7 +89,17 @@ export function ArticleRelated({ stories, loading, issueContext }: ArticleRelate
               {rest.slice(0, 2).map((story) => (
                 <Link key={story.slug} to={`/magazine/${story.slug}`} className="group flex gap-4 rounded-2xl border border-[var(--wk-border)] bg-[var(--wk-surface)] p-4 hover:border-[var(--wk-border-2)] transition-all duration-300 hover:-translate-y-0.5">
                   <div className="relative w-24 h-24 shrink-0 rounded-xl overflow-hidden bg-[var(--wk-surface-raised)]">
-                    {story.heroUrl && <img src={story.heroUrl} alt={story.title} className="w-full h-full object-cover object-top transition-transform duration-400 group-hover:scale-110" />}
+                    {story.heroUrl && (
+                      <ResponsiveMediaImage
+                        src={story.heroUrl}
+                        preset="thumbnail"
+                        alt={story.title}
+                        loading="lazy"
+                        fetchPriority="low"
+                        decoding="async"
+                        className="w-full h-full object-cover object-top transition-transform duration-400 group-hover:scale-110"
+                      />
+                    )}
                   </div>
                   <div className="flex flex-col gap-1.5 min-w-0 flex-1">
                     <span className="text-[9px] font-black uppercase tracking-[0.18em] text-[var(--wk-brand)]">{story.section}</span>

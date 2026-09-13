@@ -11,6 +11,7 @@ import { WkRadio, WkRadioGroup } from "@/components/design-system/primitives/Rad
 import { SearchableSelect } from "@/components/design-system/primitives/SearchableSelect";
 import { WkSelect } from "@/components/design-system/primitives/Select";
 import { Sheet } from "@/components/design-system/primitives/Sheet";
+import { WkIcon } from "@/components/design-system/Icon";
 import { initializeViewportIntegrityObserver } from "@/lib/viewport/viewportIntegrity";
 
 function InteractionFixture() {
@@ -22,6 +23,13 @@ function InteractionFixture() {
 
   return (
     <main className="min-h-screen bg-wk-bg p-6 text-wk-text">
+      <div
+        data-wk-icon-sprite-probe
+        className="mb-4 inline-flex h-10 w-10 items-center justify-center text-wk-brand"
+      >
+        <WkIcon name="Home" size={24} />
+      </div>
+
       <div className="grid grid-cols-[minmax(0,1fr)]">
         <div className="min-w-0">
           <div

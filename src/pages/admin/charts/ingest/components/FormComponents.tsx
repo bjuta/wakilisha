@@ -1,4 +1,4 @@
-import { type LucideIcon } from "lucide-react";
+import { WkIcon, type WkIconName } from "@/components/design-system/Icon";
 import { getProviderLabel, getProviderColorClass } from "@/services/chartsIngestion/providerDetection";
 import type { ProviderName } from "@/services/chartsIngestion/ingestStudioTypes";
 
@@ -42,11 +42,11 @@ export function ProviderChip({ provider }: ProviderChipProps) {
 interface KindToggleProps {
   active: boolean;
   onClick: () => void;
-  icon: LucideIcon;
+  icon: WkIconName;
   label: string;
 }
 
-export function KindToggle({ active, onClick, icon: Icon, label }: KindToggleProps) {
+export function KindToggle({ active, onClick, icon, label }: KindToggleProps) {
   return (
     <button
       onClick={onClick}
@@ -56,7 +56,7 @@ export function KindToggle({ active, onClick, icon: Icon, label }: KindTogglePro
           : "border-wk-border bg-wk-bg text-wk-text-soft hover:bg-wk-bg-subtle"
       }`}
     >
-      <Icon size={14} />
+      <WkIcon name={icon} size={14} />
       {label}
     </button>
   );

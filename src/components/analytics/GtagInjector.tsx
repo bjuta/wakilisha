@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef } from "react";
 import { useLocation } from "react-router-dom";
 import {
   getGa4MeasurementId,
+  initializeGa4Bootstrap,
   isGa4RuntimeAllowed,
   isValidGa4MeasurementId,
 } from "@/lib/analytics/ga4Bootstrap";
@@ -105,6 +106,7 @@ export default function GtagInjector() {
       return;
     }
 
+    initializeGa4Bootstrap();
     window.__WAKILISHA_LOAD_GA4__?.();
 
     if (typeof window.gtag !== "function") {

@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Plus, ArrowUp, ArrowDown, Minus, AlertTriangle, Check, ChevronUp, ChevronDown } from "lucide-react";
+import { WkIcon, type WkIconName } from "@/components/design-system/Icon";
 import type { IngestResolvedRow } from "@/services/chartsIngestion/ingestStudioTypes";
 import { applyMatchDecision, searchRegistryByQuery } from "@/services/chartsIngestion/canonicalMatch";
 import type { MatchDecisionAction } from "@/services/chartsIngestion/canonicalMatch";
@@ -28,7 +28,7 @@ interface MiniChartRowProps {
 
 export function MiniChartRow({ row, index }: MiniChartRowProps) {
   const movement = row.movement;
-  const MovementIcon = movement === "up" ? ArrowUp : movement === "down" ? ArrowDown : movement === "new" ? Plus : Minus;
+  const movementIcon: WkIconName = movement === "up" ? "ArrowUp" : movement === "down" ? "ArrowDown" : movement === "new" ? "Plus" : "Minus";
   const movementColor = movement === "up" ? "text-wk-success" : movement === "down" ? "text-wk-danger" : movement === "new" ? "text-wk-brand" : "text-wk-text-faint";
 
   return (
@@ -40,7 +40,7 @@ export function MiniChartRow({ row, index }: MiniChartRowProps) {
         <img src={row.artworkUrl} alt="" className="h-9 w-9 shrink-0 rounded object-cover" />
       ) : (
         <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded bg-wk-border text-wk-text-faint">
-          <Plus size={14} />
+          <WkIcon name="Plus" size={14} />
         </div>
       )}
       <div className="min-w-0 flex-1">
@@ -49,7 +49,7 @@ export function MiniChartRow({ row, index }: MiniChartRowProps) {
       </div>
       <div className="flex items-center gap-2 shrink-0">
         <span className={`text-[12px] font-bold ${movementColor}`}>
-          <MovementIcon size={12} />
+          <WkIcon name={movementIcon} size={12} />
         </span>
         <MatchBadge status={row.matchStatus} />
       </div>
@@ -302,7 +302,7 @@ export function RowTableRow({ row: initialRow, expanded, onToggle, onDecisionApp
               <img src={row.artworkUrl} alt="" className="h-8 w-8 rounded object-cover shrink-0" />
             ) : (
               <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded bg-wk-border text-wk-text-faint">
-                <Plus size={12} />
+                <WkIcon name="Plus" size={12} />
               </div>
             )}
             <div>
@@ -328,12 +328,12 @@ export function RowTableRow({ row: initialRow, expanded, onToggle, onDecisionApp
         <td className="px-4 py-3">
           {row.warnings && row.warnings.length > 0 ? (
             <span className="text-[11px] text-wk-warning" title={row.warnings.join("; ")}>
-              <AlertTriangle size={11} className="mr-1 inline" />
+              <WkIcon name="AlertTriangle" size={11} className="mr-1 inline" />
               {row.warnings.length}
             </span>
           ) : (
             <span className="text-[11px] text-wk-success">
-              <Check size={11} className="mr-1 inline" />OK
+              <WkIcon name="Check" size={11} className="mr-1 inline" />OK
             </span>
           )}
         </td>
@@ -350,7 +350,7 @@ export function RowTableRow({ row: initialRow, expanded, onToggle, onDecisionApp
           </button>
         </td>
         <td className="px-4 py-3 text-right">
-          {expanded ? <ChevronUp size={14} className="text-wk-text-faint" /> : <ChevronDown size={14} className="text-wk-text-faint" />}
+          {expanded ? <WkIcon name="ChevronUp" size={14} className="text-wk-text-faint" /> : <WkIcon name="ChevronDown" size={14} className="text-wk-text-faint" />}
         </td>
       </tr>
 
@@ -388,7 +388,7 @@ export function RowTableRow({ row: initialRow, expanded, onToggle, onDecisionApp
                 <div className="sm:col-span-3 space-y-1">
                   {row.warnings.map((w, i) => (
                     <div key={i} className="flex items-start gap-1.5 rounded bg-wk-warning-soft px-2 py-1 text-[11px] text-wk-warning">
-                      <AlertTriangle size={10} className="shrink-0 mt-0.5" />
+                      <WkIcon name="AlertTriangle" size={10} className="shrink-0 mt-0.5" />
                       <span>{w}</span>
                     </div>
                   ))}

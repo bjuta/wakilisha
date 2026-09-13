@@ -98,34 +98,16 @@ const staticPageImports = [
   ),
 ].map((match) => match[1]);
 
-const expectedEagerModules = [
-  "../pages/magazine/page",
-  "../pages/mobile/magazine/page",
-];
-
-if (
-  staticPageImports.length !==
-  expectedEagerModules.length
-) {
+/*
+ * Phase 9A.1 public startup authority:
+ * no public page module may remain statically imported by router config.
+ * Homepage and Magazine are lazy route boundaries just like other
+ * substantial public surfaces.
+ */
+if (staticPageImports.length !== 0) {
   fail(
-    `expected 2 eager page imports, found ${staticPageImports.length}`,
+    `expected zero eager public page imports, found ${staticPageImports.length}: ${staticPageImports.join(", ")}`,
   );
-}
-
-for (const moduleName of expectedEagerModules) {
-  if (!staticPageImports.includes(moduleName)) {
-    fail(
-      `eager homepage module is missing: ${moduleName}`,
-    );
-  }
-}
-
-for (const moduleName of staticPageImports) {
-  if (!expectedEagerModules.includes(moduleName)) {
-    fail(
-      `non-home page remains statically imported: ${moduleName}`,
-    );
-  }
 }
 
 if (
@@ -194,9 +176,13 @@ const directLazyImports = [
  * Phase 8A.4 adds one authenticated Field intake import:
  * - ../pages/field/page
  *
- * Phase 8B.3 adds one signed-in Messages import:\n * - ../pages/messages/page\n *\n * The current authority is therefore 71 direct lazy imports.
+ * Phase 8B.3 adds one signed-in Messages import:\n * - ../pages/messages/page\n *\n * Phase 9A.1 removes the final two eager public page modules:
+ * - ../pages/magazine/page
+ * - ../pages/mobile/magazine/page
+ *
+ * The current authority is therefore 73 direct lazy imports.
  */
-const expectedDirectLazyImportCount = 71;
+const expectedDirectLazyImportCount = 73;
 
 if (
   directLazyImports.length !==
@@ -249,15 +235,9 @@ if (defaultExportFailures.length) {
   );
 }
 
-for (const homepageModule of expectedEagerModules) {
-  if (directLazyImports.includes(homepageModule)) {
-    fail(
-      `homepage module must remain eager: ${homepageModule}`,
-    );
-  }
-}
-
 for (const requiredModule of [
+  "../pages/magazine/page",
+  "../pages/mobile/magazine/page",
   "../pages/playlists/page",
   "../pages/playlists/detail/page",
   "../pages/audio/page",

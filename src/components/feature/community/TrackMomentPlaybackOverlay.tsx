@@ -1,6 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
-  getOrCreateThread,
   getThreadByEntity,
   getTrackMomentComments,
   type CommunityComment,
@@ -168,8 +167,12 @@ export function TrackMomentPlaybackOverlay({
           return;
         }
 
-        const existingThread = await getThreadByEntity(entity.type, entity.id || undefined, entity.slug || undefined);
-        const thread = existingThread || (await getOrCreateThread(entity)).thread;
+        const thread = await getThreadByEntity(entity.type, entity.id || undefined, entity.slug || undefined);
+        if (!thread) {
+          setMoments([]);
+          return;
+        }
+
         const comments = await getTrackMomentComments(thread.id, null, 0, 60);
         if (cancelled) return;
 

@@ -57,22 +57,19 @@
 
   .wk-container-max > div[class*="lg:grid-cols-[290px_minmax"] > aside:first-child:not(:hover):not(:focus-within) .wk-panel::before,
   .wk-container-max > div[class*="lg:grid-cols-[290px_minmax"] > aside:last-child:not(:hover):not(:focus-within) .wk-panel::before{
+    content: "";
     display: grid;
     width: 42px;
     height: 42px;
     place-items: center;
     border-radius: var(--wk-r-pill);
-    background: var(--wk-brand-soft);
-    color: var(--wk-brand);
-    font-family: remixicon;
-    font-size: 20px;
-    line-height: 1;
+    background:
+      radial-gradient(
+        circle,
+        var(--wk-brand) 0 5px,
+        var(--wk-brand-soft) 5.5px
+      );
   }
-
-  .wk-container-max > div[class*="lg:grid-cols-[290px_minmax"] > aside:first-child:not(:hover):not(:focus-within) .wk-panel:nth-child(1)::before{content: "\f0d1";}
-  .wk-container-max > div[class*="lg:grid-cols-[290px_minmax"] > aside:first-child:not(:hover):not(:focus-within) .wk-panel:nth-child(2)::before{content: "\ef3e";}
-  .wk-container-max > div[class*="lg:grid-cols-[290px_minmax"] > aside:last-child:not(:hover):not(:focus-within) .wk-panel:nth-child(1)::before{content: "\eb7b";}
-  .wk-container-max > div[class*="lg:grid-cols-[290px_minmax"] > aside:last-child:not(:hover):not(:focus-within) .wk-panel:nth-child(2)::before{content: "\edca";}
 
   .wk-container-max > div[class*="lg:grid-cols-[290px_minmax"] > aside:first-child:not(:hover):not(:focus-within)::after,
   .wk-container-max > div[class*="lg:grid-cols-[290px_minmax"] > aside:last-child:not(:hover):not(:focus-within)::after{

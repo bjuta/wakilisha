@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import "../../styles/wakilisha-settings-49.css";
 import { Link, useSearchParams } from "react-router-dom";
 import { useUserSettings } from "@/hooks/useUserSettings";
 import { useMessagesAccess } from "@/hooks/useMessagesAccess";

@@ -4,6 +4,7 @@ import { buildVerifyEmailUrl } from '@/services/auth/accountVerification';
 import type { CommunityEntity, CommunityThread, CommunityComment, SortMode } from '@/services/community';
 import {
   getOrCreateThread,
+  getThreadByEntity,
   getThreadComments,
   createComment,
   hydrateCommentsWithUserState,
@@ -24,18 +25,46 @@ export function useCommunityThread(entity: CommunityEntity, userId?: string) {
     setLoading(true);
     setError(null);
     try {
-      const { thread: t } = await getOrCreateThread(entity);
-      setThread(t);
+      const existing = await getThreadByEntity(
+        entity.type,
+        entity.id || undefined,
+        entity.slug || undefined,
+      );
 
-      const rootComments = await getThreadComments(t.id, { sortBy, limit: 50 });
-      const hydrated = await hydrateCommentsWithUserState(rootComments, userId);
+      if (!existing) {
+        setThread(null);
+        setComments([]);
+        return;
+      }
+
+      setThread(existing);
+
+      const rootComments = await getThreadComments(existing.id, { sortBy, limit: 50 });
+      const hydrated = await hydrateCommentsWithUserState(
+        rootComments,
+        effectiveUserId || undefined,
+      );
       setComments(hydrated);
     } catch (e) {
       setError(e instanceof Error ? e : new Error('Failed to load thread'));
     } finally {
       setLoading(false);
     }
-  }, [entity, sortBy, userId]);
+  }, [
+    entity.type,
+    entity.id,
+    entity.slug,
+    sortBy,
+    effectiveUserId,
+  ]);
+
+  const ensureThread = useCallback(async () => {
+    if (thread) return thread;
+
+    const { thread: created } = await getOrCreateThread(entity);
+    setThread(created);
+    return created;
+  }, [thread, entity]);
 
   useEffect(() => {
     loadThread();
@@ -43,7 +72,6 @@ export function useCommunityThread(entity: CommunityEntity, userId?: string) {
 
   const postComment = useCallback(
     async (body: string, parentId?: string) => {
-      if (!thread) return null;
       if (!effectiveUserId || authUser.loading) return null;
       if (!authUser.isEmailVerified) {
         if (typeof window !== "undefined") {
@@ -51,8 +79,10 @@ export function useCommunityThread(entity: CommunityEntity, userId?: string) {
         }
         return null;
       }
+
+      const activeThread = await ensureThread();
       const result = await createComment({
-        threadId: thread.id,
+        threadId: activeThread.id,
         parentId: parentId || null,
         bodyMarkdown: body,
         bodyPlain: body,
@@ -60,7 +90,14 @@ export function useCommunityThread(entity: CommunityEntity, userId?: string) {
       await loadThread();
       return result.comment;
     },
-    [thread, loadThread, effectiveUserId, authUser.loading, authUser.isEmailVerified, authUser.email]
+    [
+      ensureThread,
+      loadThread,
+      effectiveUserId,
+      authUser.loading,
+      authUser.isEmailVerified,
+      authUser.email,
+    ]
   );
 
   const loadReplies = useCallback(
@@ -84,6 +121,7 @@ export function useCommunityThread(entity: CommunityEntity, userId?: string) {
     sortBy,
     setSortBy,
     refresh: loadThread,
+    ensureThread,
     postComment,
     loadReplies,
     commentCount: thread?.commentCount || 0,

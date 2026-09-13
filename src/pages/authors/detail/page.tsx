@@ -496,12 +496,12 @@ export default function AuthorProfilePage() {
 
             {/* Social links */}
             {authorMeta.socialLinks.length > 0 && (
-              <div className="author-profile-hero-socials">
+              <div className="wk-identity-socials">
                 {authorMeta.socialLinks.map((link) => (
                   <a
                     key={link.label}
                     href={link.url}
-                    className="author-profile-hero-social-link"
+                    className="wk-identity-social-link"
                     target="_blank"
                     rel="noopener noreferrer"
                     aria-label={link.label}

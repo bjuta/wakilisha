@@ -210,14 +210,14 @@ export function ArtistAuthorityPanel({
         {showAuthorityToolbar ? (
           <div className="flex min-h-10 flex-wrap items-center justify-end gap-2 py-2.5">
             {publicLinks.length > 0 && (
-              <div className="author-profile-hero-socials mr-auto !mb-0">
+              <div className="wk-identity-socials mr-auto !mb-0">
                 {publicLinks.map((item) => (
                   <a
                     key={`${item.label}-${item.href}`}
                     href={item.href}
                     target={item.href.startsWith("mailto:") ? undefined : "_blank"}
                     rel={item.href.startsWith("mailto:") ? undefined : "noopener noreferrer"}
-                    className="author-profile-hero-social-link"
+                    className="wk-identity-social-link"
                     aria-label={item.label}
                     title={item.label}
                   >

@@ -8,6 +8,7 @@ import { useAdminUser } from "@/hooks/useAdminUser";
 import { useSessionSignOut } from "@/hooks/useSessionSignOut";
 import { ROLE_LABELS, roleCanAccessAdmin, type Capability } from "@/services/userRoles";
 import type { WkIconName } from "@/components/design-system/Icon";
+import "./design-system/adminDesignSystemLayout.css";
 
 interface NavItem { path: string; label: string; icon: WkIconName; badgeKey?: string; disabled?: boolean; requiredCapability?: Capability; separatorLabel?: string; }
 interface NavGroup { label: string; icon: WkIconName; items: NavItem[]; visible: (can: (capability: Capability) => boolean) => boolean; }

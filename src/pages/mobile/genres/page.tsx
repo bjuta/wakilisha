@@ -1,4 +1,6 @@
+import { useScrollRevealElements } from "@/hooks/useScrollReveal";
 import { useMemo, useState, useEffect, useCallback, useRef } from "react";
+import "../../../styles/wakilisha-genres-v2.css";
 import { Link } from "react-router-dom";
 import { ShareButton } from "@/components/design-system/share/ShareSheet";
 import { WkIcon } from "@/components/design-system/Icon";
@@ -6,25 +8,6 @@ import { Chapter19FallbackImage } from "@/components/media/Chapter19FallbackImag
 import { listGenres, type PublicGenre } from "@/services/publicContent/client";
 
 const filters = ["All", "High activity", "Artist-rich", "Track-rich"];
-
-function useScrollReveal(deps: unknown[] = []) {
-  useEffect(() => {
-    const observer = new IntersectionObserver(
-      (entries) => {
-        entries.forEach((entry) => {
-          if (entry.isIntersecting) {
-            entry.target.classList.add("genre43-reveal-visible");
-            observer.unobserve(entry.target);
-          }
-        });
-      },
-      { threshold: 0.06, rootMargin: "0px 0px -28px 0px" },
-    );
-    const els = document.querySelectorAll(".genre43-reveal");
-    els.forEach((el) => observer.observe(el));
-    return () => observer.disconnect();
-  }, deps);
-}
 
 export default function MobileGenres() {
   const [activeFilter, setActiveFilter] = useState("All");
@@ -47,7 +30,15 @@ export default function MobileGenres() {
   }, []);
 
   useEffect(() => { loadData(); }, [loadData]);
-  useScrollReveal([loading]);
+  useScrollRevealElements(
+    [loading],
+    {
+      selector: ".genre43-reveal",
+      visibleClass: "genre43-reveal-visible",
+      threshold: 0.06,
+      rootMargin: "0px 0px -28px 0px",
+    },
+  );
 
   const totalArtists = genres.reduce((s, g) => s + g.artistCount, 0);
   const totalTracks = genres.reduce((s, g) => s + g.trackCount, 0);

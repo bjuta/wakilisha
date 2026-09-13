@@ -8,7 +8,7 @@ import {
   createTrackMomentComment,
   getTrackMomentComments,
   getTrackMomentSummary,
-  getOrCreateThread,
+  getThreadByEntity,
   hydrateCommentsWithUserState,
   type CommunityComment,
   type CommunityEntity,
@@ -86,6 +86,7 @@ export function TrackMomentDrawer({
   );
   const {
     thread,
+    ensureThread,
     postComment,
     loadReplies,
     refresh,
@@ -167,7 +168,6 @@ export function TrackMomentDrawer({
 
   const handlePostMoment = useCallback(
     async (body: string) => {
-      if (!thread?.id) return null;
       if (!userId || user.loading) return null;
 
       if (!user.isEmailVerified) {
@@ -175,8 +175,9 @@ export function TrackMomentDrawer({
         return null;
       }
 
+      const activeThread = thread || await ensureThread();
       const result = await createTrackMomentComment({
-        threadId: thread.id,
+        threadId: activeThread.id,
         bodyMarkdown: body,
         bodyPlain: body,
         anchorTimeMs: selectedTimeMs,
@@ -188,7 +189,8 @@ export function TrackMomentDrawer({
       return result.comment;
     },
     [
-      thread?.id,
+      thread,
+      ensureThread,
       userId,
       user.loading,
       user.isEmailVerified,
@@ -369,8 +371,8 @@ export function TrackMomentSummary({
     let alive = true;
 
     setLoading(true);
-    getOrCreateThread(entity)
-      .then(({ thread }) => getTrackMomentSummary(thread.id, 6))
+    getThreadByEntity(entity.type, entity.id || undefined, entity.slug || undefined)
+      .then((thread) => thread ? getTrackMomentSummary(thread.id, 6) : [])
       .then((items) => {
         if (alive) setMoments(items);
       })

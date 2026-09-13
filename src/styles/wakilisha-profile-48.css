@@ -2129,31 +2129,8 @@
   border: 1px solid oklch(from var(--area-color) l c h / 0.25);
 }
 
-/* Social links */
-.author-profile-hero-socials {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  margin-bottom: 22px;
-}
-.author-profile-hero-social-link {
-  width: 34px;
-  height: 34px;
-  border-radius: 10px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: var(--wk-text-muted);
-  background: var(--wk-surface-raised);
-  border: 1px solid var(--wk-border);
-  transition: all 0.15s ease;
-  cursor: pointer;
-}
-.author-profile-hero-social-link:hover {
-  color: var(--wk-brand);
-  border-color: var(--wk-brand);
-  background: var(--wk-brand-soft);
-}
+
+
 
 /* Stats in hero */
 .author-profile-hero-stats {

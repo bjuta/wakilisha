@@ -1,4 +1,6 @@
+import { useScrollRevealElements } from "@/hooks/useScrollReveal";
 import { useEffect, useMemo, useState, useCallback, useRef } from "react";
+import "../../../styles/wakilisha-charts-39.css";
 import { Link, useParams, useNavigate } from "react-router-dom";
 import { usePlayer } from "@/context/PlayerContext";
 import { trackEvent } from "@/services/analytics";
@@ -48,25 +50,6 @@ import { PlaybackAccessNotice } from "@/components/playback/PlaybackAccessNotice
 
 const rankTone = (rank: number) =>
   rank === 1 ? "gold" : rank === 2 ? "silver" : rank === 3 ? "bronze" : "";
-
-function useScrollReveal(deps: unknown[] = []) {
-  useEffect(() => {
-    const observer = new IntersectionObserver(
-      (entries) => {
-        entries.forEach((entry) => {
-          if (entry.isIntersecting) {
-            entry.target.classList.add("chart-reveal-visible");
-            observer.unobserve(entry.target);
-          }
-        });
-      },
-      { threshold: 0.08, rootMargin: "0px 0px -36px 0px" },
-    );
-    const els = document.querySelectorAll(".chart-reveal");
-    els.forEach((el) => observer.observe(el));
-    return () => observer.disconnect();
-  }, deps);
-}
 
 export default function ChartEdition() {
   const {
@@ -425,7 +408,15 @@ export default function ChartEdition() {
     return () => window.removeEventListener("scroll", onScroll);
   }, [state.status]);
 
-  useScrollReveal([state.status]);
+  useScrollRevealElements(
+    [state.status],
+    {
+      selector: ".chart-reveal",
+      visibleClass: "chart-reveal-visible",
+      threshold: 0.08,
+      rootMargin: "0px 0px -36px 0px",
+    },
+  );
 
   // ─── Loading state ───
   if (state.status === "loading") {

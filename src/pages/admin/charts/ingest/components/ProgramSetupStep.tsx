@@ -5,7 +5,6 @@ import { SearchableSelect } from "@/components/design-system/primitives/Searchab
 import type { ProviderName } from "@/services/chartsIngestion/ingestStudioTypes";
 import type { ChartFamily } from "@/services/chartsIngestion/types";
 import type { ChartFamilyDefaults, ChartFamilyDefaultsDiff } from "@/services/chartsIngestion/chartFamilyDefaultsStore";
-import { Music, Disc3, Save, RotateCcw, CheckCircle2, History } from "lucide-react";
 import { QuickTemplateButton, ProviderChip, KindToggle } from "./FormComponents";
 import { getSortedCountryCodes, getCountryNameForIso2 } from "@/utils/countries";
 import { WkSelect } from "@/components/design-system/primitives/Select";
@@ -220,7 +219,7 @@ export function ProgramSetupStep(props: ProgramSetupStepProps) {
                 backgroundColor: hasDefaults ? "var(--wk-success)" : "var(--wk-text-faint)/15",
                 color: hasDefaults ? "#fff" : "var(--wk-text-muted)",
               }}>
-                {hasDefaults ? <CheckCircle2 size={14} /> : <Save size={14} />}
+                {hasDefaults ? <WkIcon name="CheckCircle2" size={14} /> : <WkIcon name="Save" size={14} />}
               </div>
               <div className="min-w-0">
                 <p className="text-[12px] font-bold text-wk-text">
@@ -241,7 +240,7 @@ export function ProgramSetupStep(props: ProgramSetupStepProps) {
                 {hasChanges && (
                   <div className="mt-1.5 flex items-center gap-1.5 flex-wrap">
                     <span className="inline-flex items-center gap-1 rounded-full bg-wk-warning-soft px-2 py-0.5 text-[10px] font-semibold text-wk-warning">
-                      <History size={10} />
+                      <WkIcon name="History" size={10} />
                       {defaultsDiff.changedCount} field{defaultsDiff.changedCount !== 1 ? "s" : ""} modified
                     </span>
                     <span className="text-[10px] text-wk-text-muted truncate max-w-[240px]">
@@ -258,7 +257,7 @@ export function ProgramSetupStep(props: ProgramSetupStepProps) {
                   className="inline-flex items-center gap-1 rounded-md border border-wk-border bg-wk-surface px-2.5 py-1.5 text-[11px] font-semibold text-wk-text-soft transition-colors hover:bg-wk-surface-raised whitespace-nowrap"
                   title="Reset all fields to saved defaults"
                 >
-                  <RotateCcw size={12} />
+                  <WkIcon name="RotateCcw" size={12} />
                   Reset
                 </button>
               )}
@@ -267,7 +266,7 @@ export function ProgramSetupStep(props: ProgramSetupStepProps) {
                 className="inline-flex items-center gap-1 rounded-md bg-wk-success px-2.5 py-1.5 text-[11px] font-semibold text-white transition-all hover:opacity-90 active:scale-[0.97] whitespace-nowrap"
                 title="Save current configuration as defaults for this chart family"
               >
-                <Save size={12} />
+                <WkIcon name="Save" size={12} />
                 {hasDefaults ? "Update defaults" : "Save as defaults"}
               </button>
             </div>
@@ -362,8 +361,8 @@ export function ProgramSetupStep(props: ProgramSetupStepProps) {
         <div>
           <label className={LABEL_CLASS}>Chart Kind</label>
           <div className="flex gap-2">
-            <KindToggle active={chartKind === "tracks"} onClick={() => setChartKind("tracks")} icon={Music} label="Tracks" />
-            <KindToggle active={chartKind === "releases"} onClick={() => setChartKind("releases")} icon={Disc3} label="Releases" />
+            <KindToggle active={chartKind === "tracks"} onClick={() => setChartKind("tracks")} icon="Music" label="Tracks" />
+            <KindToggle active={chartKind === "releases"} onClick={() => setChartKind("releases")} icon="Disc3" label="Releases" />
           </div>
         </div>
         <div>

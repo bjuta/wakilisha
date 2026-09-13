@@ -1,29 +1,19 @@
+import { useScrollRevealElements } from "@/hooks/useScrollReveal";
 import { useEffect, useRef } from "react";
-
-function useScrollReveal() {
-  useEffect(() => {
-    const observer = new IntersectionObserver(
-      (entries) => {
-        entries.forEach((entry) => {
-          if (entry.isIntersecting) {
-            entry.target.classList.add("hp-reveal-visible");
-            observer.unobserve(entry.target);
-          }
-        });
-      },
-      { threshold: 0.06, rootMargin: "0px 0px -24px 0px" },
-    );
-    const els = document.querySelectorAll(".hp-reveal");
-    els.forEach((el) => observer.observe(el));
-    return () => observer.disconnect();
-  }, []);
-}
 
 export default function PrivacyPage() {
   const heroRef = useRef<HTMLDivElement>(null);
   const heroImgRef = useRef<HTMLImageElement>(null);
 
-  useScrollReveal();
+  useScrollRevealElements(
+    [],
+    {
+      selector: ".hp-reveal",
+      visibleClass: "hp-reveal-visible",
+      threshold: 0.06,
+      rootMargin: "0px 0px -24px 0px",
+    },
+  );
 
   useEffect(() => {
     const hero = heroRef.current;
@@ -50,7 +40,7 @@ export default function PrivacyPage() {
           ref={heroImgRef}
           src="https://wakilisha.africa/api/search-image?query=Cinematic%20portrait%20of%20a%20solitary%20human%20figure%20in%20contemplative%20repose%20bathed%20in%20warm%20amber%20and%20olive%20ambient%20light%2C%20soft%20golden%20hour%20illumination%20wrapping%20gently%20around%20shoulders%20and%20profile%2C%20intimate%20close%20up%20composition%20conveying%20trust%20protection%20and%20quiet%20dignity%2C%20shallow%20depth%20of%20field%20with%20warm%20blurred%20background%20dissolving%20into%20rich%20charcoal%20shadow%2C%20film%20grain%20texture%20with%20luminous%20skin%20tones%20and%20gentle%20highlight%20falloff%2C%20editorial%20documentary%20photography%20style%20with%20understated%20intimacy%20and%20calm%20protective%20mood%2C%20modern%20warm%20minimal%20aesthetic&width=1800&height=800&seq=privacy-hero-2026-wk-v2&orientation=landscape"
           alt=""
-          className="absolute inset-0 w-full h-full object-cover will-change-transform"
+          className="absolute inset-0 w-full h-full object-cover"
         />
         <div className="absolute inset-0 bg-gradient-to-b from-black/20 via-black/40 to-black/90" />
 
@@ -176,7 +166,7 @@ export default function PrivacyPage() {
       </div>
 
       <style>{`
-        .hp-reveal { opacity: 0; transform: translateY(24px); transition: opacity 0.7s var(--wk-ease-standard), transform 0.7s var(--wk-ease-standard); }
+        .hp-reveal { opacity: 1; transform: translateY(24px); transition: opacity 0.7s var(--wk-ease-standard), transform 0.7s var(--wk-ease-standard); }
         .hp-reveal-visible { opacity: 1; transform: translateY(0); }
       `}</style>
     </main>

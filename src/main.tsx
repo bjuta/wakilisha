@@ -1,9 +1,9 @@
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 import "./index.css";
+import "./styles/wakilisha-remixicon-compat.css";
 import App from "./App";
 import { WakilishaDialogProvider } from "@/components/design-system/primitives/DialogProvider";
-import { initializeGa4Bootstrap } from "@/lib/analytics/ga4Bootstrap";
 import { getSiteIdentitySettings } from "@/services/adminSettings/settingsStore";
 import { initializeViewportIntegrityObserver } from "@/lib/viewport/viewportIntegrity";
 
@@ -26,7 +26,6 @@ function syncSavedFavicon() {
 }
 
 initializeViewportIntegrityObserver();
-initializeGa4Bootstrap();
 syncSavedFavicon();
 window.addEventListener("wk_settings_changed", syncSavedFavicon);
 

@@ -4,6 +4,7 @@ import { AlbumModal } from "@/components/design-system/releases/AlbumModal";
 import type { ModalRelease } from "@/components/design-system/releases/AlbumModal";
 import { ShareButton } from "@/components/design-system/share/ShareSheet";
 import { WkIcon } from "@/components/design-system/Icon";
+import { WkMetricCard, WkMetricStrip } from "@/components/design-system/primitives/Metric";
 import {
   listReleasesPaginated,
   getReleaseCatalogStats,
@@ -264,13 +265,13 @@ export default function Releases() {
       />
 
       <div className="wk-container-wide px-4 py-10 md:px-6">
-        <div className="chart-stats-strip mb-10">
-          <Stat value={stats.total} label="Releases" />
-          <Stat value={totalCount} label="Showing" />
-          <Stat value={stats.singles} label="Singles" />
-          <Stat value={stats.eps} label="EPs" />
-          <Stat value={stats.albums} label="Albums" />
-        </div>
+        <WkMetricStrip className="mb-10">
+          <WkMetricCard value={stats.total} label="Releases" />
+          <WkMetricCard value={totalCount} label="Showing" />
+          <WkMetricCard value={stats.singles} label="Singles" />
+          <WkMetricCard value={stats.eps} label="EPs" />
+          <WkMetricCard value={stats.albums} label="Albums" />
+        </WkMetricStrip>
 
         <section className="mb-10 rounded-2xl border border-[var(--wk-border)] bg-[var(--wk-surface)] p-4 md:p-5">
           <div className="flex flex-col gap-5 sm:flex-row sm:items-end sm:justify-between mb-5">
@@ -710,9 +711,6 @@ function FilterSelect({ label, value, options, onChange }: { label: string; valu
   );
 }
 
-function Stat({ value, label }: { value: string | number; label: string }) {
-  return <div className="chart-stat-card"><div className="chart-stat-value">{value}</div><div className="chart-stat-label">{label}</div></div>;
-}
 
 function yearValue(value: string): string {
   if (!value || value === "Unknown year") return "";

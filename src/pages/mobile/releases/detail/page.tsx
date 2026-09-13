@@ -1,6 +1,7 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useParams, Link, useNavigate } from "react-router-dom";
 import { WkIcon } from "@/components/design-system/Icon";
+import { ResponsiveMediaImage } from "@/components/media/ResponsiveMediaImage";
 import { PlayableArtwork } from "@/components/design-system/music/PlayableArtwork";
 import { TrackActionsMenu } from "@/components/tracks/TrackActionsMenu";
 import { AddToPlaylistButton } from "@/components/playlists/AddToPlaylistButton";
@@ -107,8 +108,79 @@ function buildDescription(opts: {
   return parts.join(" ");
 }
 
+function getPrerenderedMobileReleaseHeroSource(
+  artistSlug: string | undefined,
+  releaseSlug: string | undefined,
+): string | undefined {
+  if (
+    typeof document === "undefined"
+    || !artistSlug
+    || !releaseSlug
+  ) {
+    return undefined;
+  }
+
+  const expectedPath =
+    `/releases/${encodeURIComponent(
+      artistSlug,
+    )}/${encodeURIComponent(
+      releaseSlug,
+    )}`;
+
+  const preload =
+    Array.from(
+      document.querySelectorAll<HTMLLinkElement>(
+        'link[data-wakilisha-lcp-preload="release"]',
+      ),
+    ).find(
+      (link) =>
+        link.getAttribute(
+          "data-wakilisha-lcp-path",
+        ) === expectedPath,
+    );
+
+  const href =
+    preload?.href;
+
+  if (!href) {
+    return undefined;
+  }
+
+  try {
+    const url =
+      new URL(
+        href,
+      );
+
+    const derivative =
+      url.pathname.match(
+        /^\/__image\/w\d+(\/uploads\/.*)$/,
+      );
+
+    if (
+      url.hostname ===
+        "media.wakilisha.africa"
+      && derivative?.[1]
+    ) {
+      url.pathname =
+        derivative[1];
+
+      return url.href;
+    }
+  } catch {
+    return href;
+  }
+
+  return href;
+}
+
 export default function MobileReleaseDetail() {
   const { artistSlug, releaseSlug } = useParams<{ artistSlug: string; releaseSlug: string }>();
+  const prerenderedReleaseHeroSource =
+    getPrerenderedMobileReleaseHeroSource(
+      artistSlug,
+      releaseSlug,
+    );
   const navigate = useNavigate();
   const user = useAuthUser();
 
@@ -120,6 +192,8 @@ export default function MobileReleaseDetail() {
 
   const [release, setRelease] = useState<PublicReleaseDetail | null>(null);
   const [related, setRelated] = useState<PublicRelease[]>([]);
+  const relatedTriggerRef = useRef<HTMLDivElement | null>(null);
+  const relatedRequestedRef = useRef(false);
   const [status, setStatus] = useState<"loading" | "ready" | "error">("loading");
   const [error, setError] = useState<string | null>(null);
   const [artworkFailed, setArtworkFailed] = useState(false);
@@ -134,10 +208,15 @@ export default function MobileReleaseDetail() {
       setError("No release slug provided");
       return;
     }
+
+    setRelease(null);
+    setRelated([]);
+    relatedRequestedRef.current = false;
     setStatus("loading");
     setError(null);
-    Promise.all([getRelease(artistSlug, releaseSlug), listReleases()])
-      .then(([data, allReleases]) => {
+
+    getRelease(artistSlug, releaseSlug)
+      .then((data) => {
         if (!alive) return;
         if (!data) {
           setStatus("error");
@@ -154,11 +233,8 @@ export default function MobileReleaseDetail() {
           );
           return;
         }
+
         setRelease(data);
-        const rel = allReleases
-          .filter((r) => r.slug !== releaseSlug && (r.artist === data.artist || r.labelName === data.labelName))
-          .slice(0, 6);
-        setRelated(rel);
         setStatus("ready");
       })
       .catch((err) => {
@@ -166,8 +242,69 @@ export default function MobileReleaseDetail() {
         setError(err instanceof Error ? err.message : "Could not load release.");
         setStatus("error");
       });
+
     return () => { alive = false; };
   }, [artistSlug, releaseSlug, navigate]);
+
+  useEffect(() => {
+    if (!release || !releaseSlug) return;
+
+    const trigger = relatedTriggerRef.current;
+    if (!trigger) return;
+
+    let alive = true;
+
+    const loadRelated = () => {
+      if (relatedRequestedRef.current) return;
+      relatedRequestedRef.current = true;
+
+      void listReleases()
+        .then((allReleases) => {
+          if (!alive) return;
+
+          const rel = allReleases
+            .filter(
+              (candidate) =>
+                candidate.slug !== releaseSlug
+                && (
+                  candidate.artist === release.artist
+                  || candidate.labelName === release.labelName
+                ),
+            )
+            .slice(0, 6);
+
+          setRelated(rel);
+        })
+        .catch(() => {
+          // Related catalogue discovery is best-effort and never owns
+          // Release detail readiness.
+        });
+    };
+
+    if (typeof IntersectionObserver === "undefined") {
+      loadRelated();
+      return () => { alive = false; };
+    }
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (!entries.some((entry) => entry.isIntersecting)) return;
+        observer.disconnect();
+        loadRelated();
+      },
+      {
+        rootMargin: "0px",
+        threshold: 0.01,
+      },
+    );
+
+    observer.observe(trigger);
+
+    return () => {
+      alive = false;
+      observer.disconnect();
+    };
+  }, [release, releaseSlug]);
 
   useEffect(() => {
     setArtworkFailed(false);
@@ -252,13 +389,45 @@ export default function MobileReleaseDetail() {
 
   if (status === "loading") {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-[var(--wk-bg)]">
-        <div className="flex flex-col items-center gap-4">
-          <div className="h-1 w-32 overflow-hidden rounded-full bg-[var(--wk-surface-raised)]">
-            <div className="h-full w-1/2 animate-pulse rounded-full bg-[var(--wk-brand)]" />
+      <div className="min-h-screen bg-[var(--wk-bg)]">
+        <section
+          key="mobile-release-hero-shell"
+          data-wakilisha-mobile-release-loading-hero="true"
+          className="relative min-h-[420px] flex items-end overflow-hidden"
+        >
+          {prerenderedReleaseHeroSource ? (
+            <ResponsiveMediaImage
+              key="mobile-release-hero-media"
+              src={prerenderedReleaseHeroSource}
+              preset="hero"
+              alt=""
+              aria-hidden="true"
+              loading="eager"
+              fetchPriority="high"
+              decoding="async"
+              data-wakilisha-release-hero="true"
+              className="absolute inset-0 h-full w-full object-cover object-center"
+            />
+          ) : (
+            <div className="absolute inset-0 bg-[linear-gradient(135deg,#f7f9f1_0%,#dfe8d6_54%,#7fa64a_100%)]" />
+          )}
+
+          <div className="absolute inset-0 bg-gradient-to-t from-[var(--wk-bg)] via-[var(--wk-bg)]/80 to-[var(--wk-bg)]/35" />
+
+          <div className="relative w-full px-5 pb-8 pt-20">
+            <span
+              role="status"
+              className="text-[12px] font-semibold uppercase tracking-[0.2em] text-[var(--wk-text-muted)]"
+            >
+              Loading release...
+            </span>
           </div>
-          <span className="text-[12px] font-semibold uppercase tracking-[0.2em] text-[var(--wk-text-faint)]">Loading release...</span>
-        </div>
+        </section>
+
+        <div
+          key="mobile-release-content-shell"
+          className="min-h-[360px] px-5 py-6"
+        />
       </div>
     );
   }
@@ -341,9 +510,23 @@ export default function MobileReleaseDetail() {
       </div>
 
       {/* Hero */}
-      <section className="relative min-h-[420px] flex items-end overflow-hidden">
+      <section
+        key="mobile-release-hero-shell"
+        className="relative min-h-[420px] flex items-end overflow-hidden"
+      >
         {canUseArtwork ? (
-          <div className="absolute inset-0" style={{ backgroundImage: `url(${release.artworkUrl})`, backgroundSize: "cover", backgroundPosition: "center" }} />
+          <ResponsiveMediaImage
+            key="mobile-release-hero-media"
+            src={release.artworkUrl}
+            preset="hero"
+            alt={release.title}
+            loading="eager"
+            fetchPriority="high"
+            decoding="async"
+            data-wakilisha-release-hero="true"
+            className="absolute inset-0 h-full w-full object-cover object-center"
+            onError={() => setArtworkFailed(true)}
+          />
         ) : (
           <div className="absolute inset-0 bg-[linear-gradient(135deg,#f7f9f1_0%,#dfe8d6_54%,#7fa64a_100%)]" />
         )}
@@ -625,6 +808,13 @@ export default function MobileReleaseDetail() {
             <i className="ri-arrow-right-line text-[var(--wk-text-muted)] text-lg" />
           </Link>
         )}
+
+        <div
+          ref={relatedTriggerRef}
+          data-wakilisha-related-release-trigger="true"
+          aria-hidden="true"
+          className="h-px"
+        />
 
         {/* Related Releases */}
         {related.length > 0 && (

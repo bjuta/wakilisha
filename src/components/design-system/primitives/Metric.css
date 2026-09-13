@@ -1,0 +1,33 @@
+.wk-metric-strip {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 10px;
+  margin-top: var(--wk-s-5);
+}
+
+.wk-metric-card {
+  border: 1px solid var(--wk-border);
+  border-radius: var(--wk-r-3);
+  background: var(--wk-surface);
+  padding: 14px;
+}
+
+.wk-metric-value {
+  font: 900 26px/1 var(--wk-font-display);
+  letter-spacing: -.03em;
+  color: var(--wk-brand);
+}
+
+.wk-metric-label {
+  font: 800 10px/1 var(--wk-font-ui);
+  letter-spacing: .14em;
+  text-transform: uppercase;
+  color: var(--wk-text-faint);
+  margin-top: 6px;
+}
+
+@media (max-width: 640px) {
+  .wk-metric-strip {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}

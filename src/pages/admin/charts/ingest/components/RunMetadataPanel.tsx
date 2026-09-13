@@ -1,4 +1,4 @@
-import { AlertTriangle } from "lucide-react";
+import { WkIcon } from "@/components/design-system/Icon";
 import { WkSurface } from "@/components/design-system/primitives/Surface";
 import type { IngestRun } from "@/services/chartsIngestion/ingestStudioTypes";
 
@@ -138,7 +138,7 @@ export function RunMetadataPanel({ run }: RunMetadataPanelProps) {
         <div className="mt-3 space-y-2">
           {run.errorMessage && (
             <div className="rounded bg-wk-danger-soft p-2 text-[11px] text-wk-danger">
-              <AlertTriangle size={11} className="mr-1 inline shrink-0" />
+              <WkIcon name="AlertTriangle" size={11} className="mr-1 inline shrink-0" />
               <strong>Error:</strong> {run.errorMessage}
             </div>
           )}

@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
 import { ShareSheet } from "@/components/design-system/share/ShareSheet";
+import { ResponsiveMediaImage } from "@/components/media/ResponsiveMediaImage";
 import { useEntityActions } from "@/hooks/useCommunityActions";
 import { getCountryFlagUrl, getCountryLabel } from "@/utils/countries";
 
@@ -20,6 +21,7 @@ export interface ArtistDetailHeroProps {
   trackCount?: number;
   releaseCount?: number;
   chartEntryCount?: number;
+  loading?: boolean;
 }
 
 export function ArtistDetailHero({
@@ -38,6 +40,7 @@ export function ArtistDetailHero({
   trackCount = 0,
   releaseCount = 0,
   chartEntryCount = 0,
+  loading = false,
 }: ArtistDetailHeroProps) {
   const [shareOpen, setShareOpen] = useState(false);
   const [following, setFollowing] = useState(false);
@@ -56,19 +59,66 @@ export function ArtistDetailHero({
 
   const handleShare = () => setShareOpen(true);
 
+  if (loading) {
+    return (
+      <>
+        <section
+          data-wakilisha-artist-loading-hero="true"
+          className="relative -mt-16 flex min-h-[420px] items-end overflow-hidden bg-[var(--wk-surface-raised)] pt-16 md:min-h-[600px]"
+        >
+          {imageUrl && (
+            <ResponsiveMediaImage
+              src={imageUrl}
+              preset="hero"
+              alt=""
+              aria-hidden="true"
+              loading="eager"
+              fetchPriority="high"
+              decoding="async"
+              data-wakilisha-artist-hero="true"
+              className="absolute inset-0 h-full w-full object-cover"
+              style={{
+                objectPosition: "center 20%",
+              }}
+            />
+          )}
+
+          <div className="absolute inset-0 bg-gradient-to-t from-black/95 via-black/50 to-black/10" />
+          <div className="absolute inset-0 bg-gradient-to-r from-black/60 via-transparent to-black/40" />
+
+          <div className="relative w-full">
+            <div className="wk-container px-4 pb-7 md:px-6 md:pb-16">
+              <p
+                role="status"
+                className="text-[13px] font-bold text-white/70"
+              >
+                Loading artist…
+              </p>
+            </div>
+          </div>
+        </section>
+      </>
+    );
+  }
+
   return (
     <>
     <section className="relative -mt-16 pt-16 min-h-[420px] md:min-h-[600px] flex items-end overflow-hidden">
 
-      {/* Background image — full bleed, acts as artist photo on mobile */}
+      {/* Full-bleed Artist hero — explicit image ownership keeps LCP machine-discoverable. */}
       {imageUrl && (
-        <div
-          className="absolute inset-0 bg-[var(--wk-surface-raised)] hero-ken-burns"
+        <ResponsiveMediaImage
+          src={imageUrl}
+          preset="hero"
+          alt=""
+          aria-hidden="true"
+          loading="eager"
+          fetchPriority="high"
+          decoding="async"
+          data-wakilisha-artist-hero="true"
+          className="absolute inset-0 h-full w-full object-cover"
           style={{
-            backgroundImage: `url(${imageUrl})`,
-            backgroundSize: "cover",
-            backgroundPosition: "center 20%",
-            backgroundRepeat: "no-repeat",
+            objectPosition: "center 20%",
           }}
         />
       )}

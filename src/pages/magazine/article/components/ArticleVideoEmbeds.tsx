@@ -1,3 +1,4 @@
+import "@/styles/wakilisha-article-prose.css";
 import { type ContentSegment } from "./ArticleEmbedUtils";
 import { ReleaseEmbedCard } from "./ArticleReleaseEmbeds";
 import { ArtistEmbedCard } from "./ArticleArtistEmbeds";

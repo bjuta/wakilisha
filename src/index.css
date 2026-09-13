@@ -1,17 +1,11 @@
+@import "./styles/wakilisha-fonts.css";
 @import "./styles/wakilisha-mobile-v5.css";
 @import "./styles/wakilisha-mobile-ch53-75.css";
 @import "./styles/wakilisha-pages-35-46.css";
-@import "./styles/wakilisha-magazine-38-44.css";
-@import "./styles/wakilisha-article-prose.css";
 @import "./styles/wakilisha-embeds.css";
-@import "./styles/wakilisha-charts-39.css";
 @import "./styles/wakilisha-track-40.css";
-@import "./styles/wakilisha-album-41-42.css";
 @import "./styles/wakilisha-labels-43.css";
-@import "./styles/wakilisha-genres-v2.css";
 @import "./styles/wakilisha-share-45-46.css";
-@import "./styles/wakilisha-profile-48.css";
-@import "./styles/wakilisha-settings-49.css";
 
 /* Hero entrance animations */
 @keyframes slideIn {
@@ -19,16 +13,16 @@
   to { opacity: 1; transform: translateX(0); }
 }
 @keyframes heroFadeIn {
-  from { opacity: 0; transform: translateY(24px); }
-  to { opacity: 1; transform: translateY(0); }
+  from { transform: translateY(18px); }
+  to { transform: translateY(0); }
 }
 @keyframes heroImgReveal {
-  from { opacity: 0; transform: scale(1.05); }
-  to { opacity: 1; transform: scale(1); }
+  from { transform: scale(1.03); }
+  to { transform: scale(1); }
 }
 .animate-hero-fade {
-  opacity: 0;
-  animation: heroFadeIn 0.8s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  opacity: 1;
+  animation: heroFadeIn 0.65s cubic-bezier(0.16, 1, 0.3, 1);
 }
 .animate-hero-img {
   animation: heroImgReveal 1.2s cubic-bezier(0.16, 1, 0.3, 1) forwards;

@@ -301,3 +301,57 @@ test("viewport contract preserves user zoom capability", async ({
   expect(content).not.toContain("user-scalable=no");
   expect(content).not.toContain("maximum-scale");
 });
+
+test("WAKILISHA icon sprite paints a real external SVG symbol", async ({
+  page,
+}) => {
+  await page.goto(FIXTURE);
+
+  const probe = page.locator(
+    "[data-wk-icon-sprite-probe]",
+  );
+  const svg = probe.locator("svg");
+  const use = svg.locator("use");
+
+  await expect(probe).toBeVisible();
+  await expect(svg).toBeVisible();
+  await expect(use).toHaveCount(1);
+
+  const href = await use.getAttribute("href");
+  expect(href).toContain(
+    "#wk-lucide-home",
+  );
+
+  await expect
+    .poll(async () => {
+      return await use.evaluate((element) => {
+        const box = (
+          element as SVGUseElement
+        ).getBBox();
+
+        return {
+          width: box.width,
+          height: box.height,
+        };
+      });
+    })
+    .toMatchObject({
+      width: expect.any(Number),
+      height: expect.any(Number),
+    });
+
+  const painted = await use.evaluate(
+    (element) => {
+      const box = (
+        element as SVGUseElement
+      ).getBBox();
+
+      return (
+        box.width > 0
+        && box.height > 0
+      );
+    },
+  );
+
+  expect(painted).toBe(true);
+});
