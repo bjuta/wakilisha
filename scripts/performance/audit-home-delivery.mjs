@@ -42,8 +42,16 @@ const homeHero = read(
   "src/pages/home/components/HomeHero.tsx",
 );
 
+const magazine = read(
+  "src/pages/magazine/page.tsx",
+);
+
 const mobileMagazine = read(
   "src/pages/mobile/magazine/page.tsx",
+);
+
+const magazineFallbackBuilder = read(
+  "scripts/seo/build-public-magazine-fallback.mjs",
 );
 
 const magazineArticles = read(
@@ -201,6 +209,44 @@ if (
   fail(
     "the mobile magazine homepage still requests the full archive",
   );
+}
+
+for (const [name, source] of [
+  ["desktop Magazine", magazine],
+  ["mobile Magazine", mobileMagazine],
+]) {
+  if (
+    !source.includes(
+      'const status: "loading" | "ready" | "error" =',
+    )
+    || source.includes(
+      "setStatus(",
+    )
+    || !source.includes(
+      'data-wakilisha-magazine-hero="true"',
+    )
+  ) {
+    fail(
+      `${name} does not render inline fallback hero authority on the first client render`,
+    );
+  }
+}
+
+for (const marker of [
+  'const magazineIndexPath = path.join(',
+  'data-wakilisha-lcp-preload="magazine"',
+  'data-wakilisha-lcp-path="/magazine"',
+  "Magazine prerender first-visual authority: inline fallback + route-specific hero preload.",
+]) {
+  if (
+    !magazineFallbackBuilder.includes(
+      marker,
+    )
+  ) {
+    fail(
+      `Magazine fallback builder is missing ${marker}`,
+    );
+  }
 }
 
 if (

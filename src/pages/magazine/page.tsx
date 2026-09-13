@@ -124,19 +124,18 @@ export default function Magazine() {
   const searchQuery = (searchParams.get("search") || "").trim();
   const isSearchMode = searchQuery.length > 0;
 
-  const [status, setStatus] = useState<"loading" | "ready" | "error">("loading");
+  const status: "loading" | "ready" | "error" =
+    loading
+      ? "loading"
+      : error
+        ? "error"
+        : "ready";
   const [activeSection, setActiveSection] = useState("All");
   const heroRef = useRef<HTMLDivElement>(null);
   const heroImgRef = useRef<HTMLImageElement>(null);
   const contentRef = useRef<HTMLDivElement>(null);
   const { id: userId, loading: authLoading } = useAuthUser();
   const isAdmin = !authLoading && !!userId;
-
-  useEffect(() => {
-    if (loading) setStatus("loading");
-    else if (error) setStatus("error");
-    else setStatus("ready");
-  }, [loading, error]);
 
   /* Parallax scroll on hero image */
   useEffect(() => {
@@ -539,6 +538,7 @@ export default function Magazine() {
             loading="eager"
             fetchPriority="high"
             decoding="async"
+            data-wakilisha-magazine-hero="true"
             alt=""
             className="absolute inset-0 w-full h-full object-cover opacity-85"
           />

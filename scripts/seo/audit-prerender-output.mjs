@@ -11,6 +11,7 @@ const warnings = [];
 let articleLcpPreloadCount = 0;
 let artistLcpPreloadCount = 0;
 let releaseLcpPreloadCount = 0;
+let magazineLcpPreloadCount = 0;
 
 function readText(filePath) {
   return fs.readFileSync(filePath, "utf8");
@@ -250,7 +251,7 @@ function auditHtmlFile(filePath) {
 
   const lcpPreload =
     html.match(
-      /<link\b(?=[^>]*\brel=["']preload["'])(?=[^>]*\bas=["']image["'])(?=[^>]*\bfetchpriority=["']high["'])(?=[^>]*\bdata-wakilisha-lcp-preload=["'](article|artist|release)["'])[^>]*>/i,
+      /<link\b(?=[^>]*\brel=["']preload["'])(?=[^>]*\bas=["']image["'])(?=[^>]*\bfetchpriority=["']high["'])(?=[^>]*\bdata-wakilisha-lcp-preload=["'](article|artist|release|magazine)["'])[^>]*>/i,
     );
 
   if (lcpPreload) {
@@ -320,6 +321,66 @@ function auditHtmlFile(filePath) {
         `${route}: Release LCP preload must preserve responsive WAKILISHA hero derivative authority.`,
       );
     }
+  }
+
+  if (
+    lcpPreload?.[1] ===
+    "magazine"
+  ) {
+    magazineLcpPreloadCount += 1;
+
+    if (
+      route !==
+      "/magazine"
+    ) {
+      reportError(
+        `${route}: Magazine collection LCP preload must only belong to /magazine.`,
+      );
+    }
+
+    if (
+      !html.includes(
+        '<script id="wk-magazine-fallback" type="application/json">',
+      )
+    ) {
+      reportError(
+        "/magazine: prerender HTML is missing inline Magazine fallback authority.",
+      );
+    }
+
+    if (
+      /\/__image\/w\d+\/uploads\//i.test(
+        lcpPreload[0],
+      )
+      && (
+        !/\bimagesrcset=["'][^"']*\/__image\/w640[^"']*640w[^"']*\/__image\/w1600[^"']*1600w[^"']*["']/i.test(
+          lcpPreload[0],
+        )
+        || !/\bimagesizes=["']100vw["']/i.test(
+          lcpPreload[0],
+        )
+      )
+    ) {
+      reportError(
+        "/magazine: Magazine LCP preload must preserve responsive WAKILISHA hero derivative authority.",
+      );
+    }
+  }
+
+  if (
+    route ===
+      "/magazine"
+    && (
+      lcpPreload?.[1] !==
+        "magazine"
+      || !html.includes(
+        '<script id="wk-magazine-fallback" type="application/json">',
+      )
+    )
+  ) {
+    reportError(
+      "/magazine: prerender first visual requires inline fallback + Magazine LCP preload authority.",
+    );
   }
 
   if (
@@ -405,8 +466,17 @@ function main() {
       );
     }
 
+    if (
+      magazineLcpPreloadCount !==
+      1
+    ) {
+      reportError(
+        `Expected exactly one Magazine collection LCP preload, found ${magazineLcpPreloadCount}.`,
+      );
+    }
+
     console.log(
-      `SEO audit: LCP preloads article=${articleLcpPreloadCount.toLocaleString()} artist=${artistLcpPreloadCount.toLocaleString()} release=${releaseLcpPreloadCount.toLocaleString()}.`,
+      `SEO audit: LCP preloads article=${articleLcpPreloadCount.toLocaleString()} artist=${artistLcpPreloadCount.toLocaleString()} release=${releaseLcpPreloadCount.toLocaleString()} magazine=${magazineLcpPreloadCount.toLocaleString()}.`,
     );
   }
 

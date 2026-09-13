@@ -94,15 +94,178 @@ fs.writeFileSync(fallbackPath, JSON.stringify(fallback, null, 2) + "\n");
 const safeInlineJson = fallbackJson.replace(/</g, "\\u003c");
 const inlineScript = `<script id="wk-magazine-fallback" type="application/json">${safeInlineJson}</script>`;
 
-let indexHtml = fs.readFileSync(indexPath, "utf8");
-indexHtml = indexHtml.replace(/\s*<script id="wk-magazine-fallback" type="application\/json">[\s\S]*?<\/script>/g, "");
+const magazineIndexPath = path.join(
+  distDir,
+  "magazine",
+  "index.html",
+);
 
-if (!indexHtml.includes("</body>")) {
-  fail("dist/index.html is missing </body>.");
+if (!fs.existsSync(magazineIndexPath)) {
+  fail(
+    `Missing prerendered Magazine HTML: ${magazineIndexPath}`,
+  );
 }
 
-indexHtml = indexHtml.replace("</body>", `  ${inlineScript}\n</body>`);
-fs.writeFileSync(indexPath, indexHtml);
+const LCP_MEDIA_ORIGIN =
+  "https://media.wakilisha.africa";
+
+const LCP_HERO_WIDTHS = [
+  640,
+  768,
+  960,
+  1280,
+  1600,
+];
+
+function escapeAttr(value) {
+  return String(value || "")
+    .replace(/&/g, "&amp;")
+    .replace(/"/g, "&quot;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;");
+}
+
+function magazineHeroPreload(story) {
+  const raw =
+    String(
+      story?.heroUrl || "",
+    ).trim();
+
+  if (!raw) {
+    return "";
+  }
+
+  let parsed;
+
+  try {
+    parsed =
+      raw.startsWith("/uploads/")
+        ? new URL(
+            raw,
+            LCP_MEDIA_ORIGIN,
+          )
+        : new URL(raw);
+  } catch {
+    return "";
+  }
+
+  if (
+    parsed.protocol === "https:"
+    && parsed.hostname === "media.wakilisha.africa"
+    && parsed.pathname.startsWith("/uploads/")
+    && /\.(?:jpe?g|png|webp)$/i.test(
+      parsed.pathname,
+    )
+  ) {
+    const variant =
+      (width) =>
+        `${LCP_MEDIA_ORIGIN}/__image/w${width}${parsed.pathname}${parsed.search}`;
+
+    const srcSet =
+      LCP_HERO_WIDTHS
+        .map(
+          (width) =>
+            `${variant(width)} ${width}w`,
+        )
+        .join(", ");
+
+    return `<link rel="preload" as="image" href="${escapeAttr(
+      variant(1280),
+    )}" imagesrcset="${escapeAttr(
+      srcSet,
+    )}" imagesizes="100vw" fetchpriority="high" data-wakilisha-lcp-preload="magazine" data-wakilisha-lcp-path="/magazine" />`;
+  }
+
+  if (!/^https?:$/i.test(parsed.protocol)) {
+    return "";
+  }
+
+  return `<link rel="preload" as="image" href="${escapeAttr(
+    parsed.href,
+  )}" fetchpriority="high" data-wakilisha-lcp-preload="magazine" data-wakilisha-lcp-path="/magazine" />`;
+}
+
+const heroPreload =
+  magazineHeroPreload(
+    stories[0],
+  );
+
+if (!heroPreload) {
+  fail(
+    "Magazine fallback hero could not produce route-specific LCP preload authority.",
+  );
+}
+
+function stripMagazineInlineAuthority(html) {
+  return html
+    .replace(
+      /\s*<script id="wk-magazine-fallback" type="application\/json">[\s\S]*?<\/script>/g,
+      "",
+    )
+    .replace(
+      /\s*<link\b[^>]*data-wakilisha-lcp-preload=["']magazine["'][^>]*>/gi,
+      "",
+    );
+}
+
+function injectBeforeBody(
+  html,
+  additions,
+  label,
+) {
+  if (!html.includes("</body>")) {
+    fail(
+      `${label} is missing </body>.`,
+    );
+  }
+
+  return html.replace(
+    "</body>",
+    `${additions.map((item) => `  ${item}`).join("\n")}\n</body>`,
+  );
+}
+
+const rootHtml =
+  injectBeforeBody(
+    stripMagazineInlineAuthority(
+      fs.readFileSync(
+        indexPath,
+        "utf8",
+      ),
+    ),
+    [
+      inlineScript,
+    ],
+    "dist/index.html",
+  );
+
+fs.writeFileSync(
+  indexPath,
+  rootHtml,
+);
+
+const magazineHtml =
+  injectBeforeBody(
+    stripMagazineInlineAuthority(
+      fs.readFileSync(
+        magazineIndexPath,
+        "utf8",
+      ),
+    ),
+    [
+      heroPreload,
+      inlineScript,
+    ],
+    "dist/magazine/index.html",
+  );
+
+fs.writeFileSync(
+  magazineIndexPath,
+  magazineHtml,
+);
 
 console.log(`Magazine fallback generated: ${fallbackPath}`);
 console.log(`Magazine fallback stories: ${stories.length}`);
+console.log(
+  "Magazine prerender first-visual authority: inline fallback + route-specific hero preload.",
+);

@@ -47,16 +47,15 @@ function MobileSectionLabel({ children, count, href }: { children: string; count
 
 export default function MobileMagazine() {
   const { articles: stories, loading, error } = useMagazineArticles(24);
-  const [status, setStatus] = useState<"loading" | "ready" | "error">("loading");
+  const status: "loading" | "ready" | "error" =
+    loading
+      ? "loading"
+      : error
+        ? "error"
+        : "ready";
   const [activeSection, setActiveSection] = useState("All");
   const heroRef = useRef<HTMLDivElement>(null);
   const heroImgRef = useRef<HTMLImageElement>(null);
-
-  useEffect(() => {
-    if (loading) setStatus("loading");
-    else if (error) setStatus("error");
-    else setStatus("ready");
-  }, [loading, error]);
 
   useEffect(() => {
     const hero = heroRef.current;
@@ -202,6 +201,7 @@ export default function MobileMagazine() {
             loading="eager"
             fetchPriority="high"
             decoding="async"
+            data-wakilisha-magazine-hero="true"
             className="absolute inset-0 w-full h-full object-cover opacity-85"
           />
         ) : (
