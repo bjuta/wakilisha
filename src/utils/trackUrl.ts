@@ -14,38 +14,10 @@ export function trackUrl(slug: string, artistSlugs: string[]): string {
   return `/tracks/${primaryArtist}/${normalizedSlug}`;
 }
 
-export function releaseTrackUrl(
-  artistSlug: string,
-  releaseSlug: string,
-  trackSlug: string,
-): string {
-  const normalizedArtist = normalizeSlug(artistSlug);
-  const normalizedRelease = normalizeSlug(releaseSlug);
-  const normalizedTrack = normalizeSlug(trackSlug);
-
-  if (!normalizedArtist || !normalizedRelease) {
-    return trackUrl(normalizedTrack, normalizedArtist ? [normalizedArtist] : []);
-  }
-
-  return `/releases/${normalizedArtist}/${normalizedRelease}/${normalizedTrack}`;
-}
-
 export function canonicalTrackUrl(
   artistSlug: string,
   trackSlug: string,
-  releaseSlug?: string | null,
-  releaseTrackCount?: number | null,
 ): string {
-  const count = Number(releaseTrackCount || 0);
-
-  if (count > 1 && String(releaseSlug || "").trim()) {
-    return releaseTrackUrl(
-      artistSlug,
-      String(releaseSlug),
-      trackSlug,
-    );
-  }
-
   return trackUrl(
     trackSlug,
     artistSlug ? [artistSlug] : [],

@@ -99,8 +99,6 @@ export default function ReleaseTracklist({
             const trackHref = canonicalTrackUrl(
               artistSlug,
               track.slug,
-              release.slug,
-              release.trackCount,
             );
 
             return (

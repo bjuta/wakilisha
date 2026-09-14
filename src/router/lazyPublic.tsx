@@ -8,20 +8,12 @@ export const ResetPasswordPage = lazy(
   () => import("../pages/auth/reset-password/page"),
 );
 
-export const LegacyAuthorPersonRedirect = lazy(
-  () => import("../pages/authors/legacy-redirect/page"),
-);
-
 export const PersonDetailPage = lazy(
   () => import("../pages/people/detail/page"),
 );
 
 export const OrganizationDetailPage = lazy(
   () => import("../pages/organizations/detail/page"),
-);
-
-export const LegacyArticleRedirect = lazy(
-  () => import("../pages/LegacyArticleRedirect"),
 );
 
 export const Magazine = lazy(

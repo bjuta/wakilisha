@@ -1,6 +1,6 @@
 import "@/styles/wakilisha-magazine-38-44.css";
 import { useEffect, useState, useRef, useMemo, useCallback } from "react";
-import { Link, useParams, useSearchParams, useNavigate } from "react-router-dom";
+import { Link, useParams, useSearchParams } from "react-router-dom";
 import {
   useMagazineArticle,
   useMagazineArticles,
@@ -22,7 +22,7 @@ import { Chapter19FallbackImage } from "@/components/media/Chapter19FallbackImag
 import { ResponsiveMediaImage } from "@/components/media/ResponsiveMediaImage";
 import { MetaTags } from "@/components/seo/MetaTags";
 import { SchemaOrg } from "@/components/seo/SchemaOrg";
-import { checkArticleScheduling, lookupSlugRedirect } from "@/services/articles/articleAdminService";
+import { checkArticleScheduling } from "@/services/articles/articleAdminService";
 import { resolveTrackMarkers } from "./components/ArticleTrackEmbeds";
 import { transformTrackShortcodes } from "@/utils/transformTrackShortcodes";
 import { injectMediaCaptions, buildAssetCaptionMap } from "@/utils/injectMediaCaptions";
@@ -163,7 +163,6 @@ export default function ArticlePage() {
   const { slug } = useParams<{ slug: string }>();
   const [searchParams] = useSearchParams();
   const previewNonce = searchParams.get("preview");
-  const navigate = useNavigate();
   const { article, loading: articleLoading, error: articleError } = useMagazineArticle(slug, previewNonce);
   const authUser = useAuthUser();
   const isLoggedIn = !authUser.loading && authUser.id.length > 0;
@@ -259,7 +258,6 @@ export default function ArticlePage() {
   const displaySegments = captionedHtml ? captionedSegments : segments;
   const [isScheduled, setIsScheduled] = useState(false);
   const [scheduledDate, setScheduledDate] = useState<string | null>(null);
-  const [checkingRedirect, setCheckingRedirect] = useState(false);
 
 
 
@@ -287,16 +285,6 @@ export default function ArticlePage() {
       .catch(() => {});
     return () => { alive = false; };
   }, [slug]);
-
-  useEffect(() => {
-    if (articleLoading || article || !slug) return;
-    let alive = true;
-    setCheckingRedirect(true);
-    lookupSlugRedirect(slug)
-      .then((newSlug) => { if (!alive) return; if (newSlug) navigate(`/magazine/${newSlug}`, { replace: true }); setCheckingRedirect(false); })
-      .catch(() => { if (alive) setCheckingRedirect(false); });
-    return () => { alive = false; };
-  }, [slug, articleLoading, article, navigate]);
 
   useEffect(() => {
     let rafId: number | null = null;
@@ -418,7 +406,6 @@ export default function ArticlePage() {
       </main>
     );
   }
-  if (checkingRedirect) return <div className="min-h-screen flex items-center justify-center"><div className="flex items-center gap-3 text-[var(--wk-text-muted)]"><i className="ri-loader-4-line animate-spin text-[20px]" /><span className="text-[14px]">Checking for updated link…</span></div></div>;
   if (articleError) return <div className="min-h-screen flex items-center justify-center"><div className="text-center"><WkIcon name="AlertCircle" size={32} className="mx-auto mb-3 text-[var(--wk-danger)]" /><p className="text-sm text-[var(--wk-text-muted)]">We couldn't load this story. Try again in a moment.</p></div></div>;
   if (!article) return <div className="min-h-screen flex items-center justify-center"><div className="text-center"><WkIcon name="FileX" size={32} className="mx-auto mb-3 text-[var(--wk-text-faint)]" /><p className="text-sm text-[var(--wk-text-muted)]">This story isn't available.</p></div></div>;
 

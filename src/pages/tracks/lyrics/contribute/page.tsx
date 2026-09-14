@@ -6,7 +6,6 @@ import {
 import {
   Link,
   useLocation,
-  useNavigate,
   useParams,
 } from "react-router-dom";
 import { WkIcon } from "@/components/design-system/Icon";
@@ -15,10 +14,8 @@ import { useAuthUser } from "@/hooks/useAuthUser";
 import { usePlayer } from "@/context/PlayerContext";
 import { trackEvent } from "@/services/analytics";
 import {
-  getReleaseTrack,
   getTrack,
 } from "@/services/publicApi/client";
-import { resolveScopedSlugRedirect } from "@/services/slugRedirects";
 import {
   parseLyricsEditorText,
   submitTrackLyricsContribution,
@@ -37,21 +34,16 @@ interface TrackData {
   duration: number;
   isPlayable: boolean;
   previewUrl: string | null;
-  releaseSlug?: string;
-  releaseTrackCount?: number;
 }
 
 export default function LyricContribution() {
   const {
     artistSlug,
-    releaseSlug,
     trackSlug,
   } = useParams<{
     artistSlug: string;
-    releaseSlug?: string;
     trackSlug: string;
   }>();
-  const navigate = useNavigate();
   const location = useLocation();
   const authUser = useAuthUser();
   const {
@@ -220,39 +212,13 @@ export default function LyricContribution() {
     setLoading(true);
     setError(null);
 
-    const request = releaseSlug
-      ? getReleaseTrack(artistSlug, releaseSlug, trackSlug)
-      : getTrack(artistSlug, trackSlug);
+    const request = getTrack(artistSlug, trackSlug);
 
     request
-      .then(async (apiData) => {
+      .then((apiData) => {
         if (!alive) return;
 
         if (!apiData) {
-          const redirect = await resolveScopedSlugRedirect(
-            "track",
-            artistSlug,
-            trackSlug,
-            { releaseSlug },
-          );
-
-          if (!alive) return;
-
-          const redirectedLyricsPath = redirect
-            ? `${redirect.newPath}/lyrics/contribute`
-            : "";
-
-          if (
-            redirectedLyricsPath &&
-            redirectedLyricsPath !== location.pathname
-          ) {
-            navigate(
-              `${redirectedLyricsPath}${location.search || ""}${location.hash || ""}`,
-              { replace: true },
-            );
-            return;
-          }
-
           setLoading(false);
           setError("Track not found.");
           return;
@@ -286,50 +252,6 @@ export default function LyricContribution() {
           primaryArtist?.slug ||
           artistData?.slug ||
           artistSlug;
-        const releaseData =
-          raw.release &&
-          typeof raw.release === "object"
-            ? raw.release
-            : null;
-        const releaseTrackCount =
-          releaseData
-            ? Number(
-                releaseData.trackCount ??
-                releaseData.track_count ??
-                0,
-              )
-            : undefined;
-        const resolvedReleaseSlug =
-          String(
-            releaseData?.slug ||
-            releaseSlug ||
-            "",
-          ).trim();
-
-        if (
-          releaseSlug &&
-          releaseData &&
-          Number(releaseTrackCount || 0) <= 1
-        ) {
-          const standaloneLyricsPath =
-            `${canonicalTrackUrl(
-              resolvedArtistSlug,
-              trackData.slug,
-              resolvedReleaseSlug,
-              releaseTrackCount,
-            )}/lyrics/contribute`;
-
-          if (
-            standaloneLyricsPath !== location.pathname
-          ) {
-            navigate(
-              `${standaloneLyricsPath}${location.search || ""}${location.hash || ""}`,
-              { replace: true },
-            );
-            return;
-          }
-        }
-
         setTrack({
           registryTrackId,
           slug: trackData.slug,
@@ -340,8 +262,6 @@ export default function LyricContribution() {
           duration,
           isPlayable: Boolean(previewUrl),
           previewUrl,
-          releaseSlug: resolvedReleaseSlug || undefined,
-          releaseTrackCount,
         });
         setLoading(false);
       })
@@ -356,20 +276,14 @@ export default function LyricContribution() {
     };
   }, [
     artistSlug,
-    releaseSlug,
     trackSlug,
-    navigate,
-    location.pathname,
     location.search,
-    location.hash,
     currentTrack,
   ]);
 
   const canonicalTrackPath = canonicalTrackUrl(
     track?.artistSlug || artistSlug || "",
     track?.slug || trackSlug || "",
-    track?.releaseSlug || releaseSlug || null,
-    track?.releaseTrackCount ?? null,
   );
 
   const isThisTrackPlaying =

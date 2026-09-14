@@ -1,3 +1,5 @@
+import { createHash } from "node:crypto";
+
 import {
   analyzeChartIdentity,
   analyzeReleaseIdentity,
@@ -26,6 +28,7 @@ type Options = {
   since: string | null;
   shardCount: number;
   shardIndex: number;
+  sendStandup: boolean;
 };
 
 type TrackRow = {
@@ -42,6 +45,9 @@ type ReleaseRow = {
   slug: string;
   title: string;
   release_type: string | null;
+  release_date: string | null;
+  primary_artist_id: string | null;
+  primary_artist_slug: string | null;
   resolvable_active_track_count: number;
   updated_at: string;
 };
@@ -60,6 +66,15 @@ type ScopeCandidate = {
   id: string;
   slug: string;
   proposedSlug: string;
+};
+
+type ReleaseSlugPlan = {
+  releaseId: string;
+  artistId: string;
+  artistSlug: string;
+  baseSlug: string;
+  plannedSlug: string;
+  usesDateFallback: boolean;
 };
 
 type RunStats = {
@@ -167,6 +182,12 @@ function parseOptions(): Options {
   );
   const since =
     argValue("since", "").trim() || null;
+  const sendStandup =
+    argValue(
+      "send-standup",
+      "false",
+    ).trim().toLowerCase() ===
+      "true";
 
   if (!["audit", "apply"].includes(mode)) {
     throw new Error(
@@ -216,6 +237,7 @@ function parseOptions(): Options {
     since,
     shardCount,
     shardIndex,
+    sendStandup,
   };
 }
 
@@ -243,7 +265,6 @@ async function assertRequiredTables(
     "registry_release_artists",
     "registry_release_tracks",
     "wk_chart_entries_v2",
-    "wk_slug_redirects",
     "registry_review_items",
     "registry_canonical_write_events",
     "community_saves",
@@ -379,6 +400,7 @@ async function writeCanonicalEvent(
   pool: ReturnType<typeof createRegistryPool>,
   finding: MiziziFinding,
   downstreamImpact: Record<string, unknown> = {},
+  afterValue: string = finding.proposedValue,
 ): Promise<void> {
   const sourceTable =
     sourceTableFor(finding.entityType);
@@ -429,7 +451,7 @@ async function writeCanonicalEvent(
         ruleVersion: finding.ruleVersion,
       }),
       JSON.stringify({
-        value: finding.proposedValue,
+        value: afterValue,
         confidence: finding.confidence,
         downstreamImpact,
       }),
@@ -780,7 +802,7 @@ async function currentScopeCollision(
   return "";
 }
 
-async function loadTrackRedirectPaths(
+async function loadTrackPointerPaths(
   pool: ReturnType<typeof createRegistryPool>,
   row: TrackRow,
   oldSlug: string,
@@ -914,88 +936,6 @@ async function loadTrackRedirectPaths(
   }
 
   return paths;
-}
-
-async function ensureRedirect(
-  pool: ReturnType<typeof createRegistryPool>,
-  scopeSlug: string,
-  oldSlug: string,
-  newSlug: string,
-  oldPath: string,
-  newPath: string,
-): Promise<void> {
-  if (oldPath === newPath) {
-    return;
-  }
-
-  const existing =
-    await pool.query(
-      `
-      select new_path
-      from public.wk_slug_redirects
-      where old_path = $1
-      limit 1
-      `,
-      [oldPath],
-    );
-
-  if (existing.rowCount) {
-    const currentTarget = String(
-      existing.rows[0].new_path || "",
-    );
-
-    if (
-      currentTarget !== newPath
-    ) {
-      throw new Error(
-        "Redirect conflict for " +
-          oldPath +
-          ": existing target " +
-          currentTarget,
-      );
-    }
-
-    return;
-  }
-
-  await pool.query(
-    `
-    insert into public.wk_slug_redirects (
-      old_slug,
-      new_slug,
-      entity_type,
-      created_by,
-      scope_slug,
-      old_path,
-      new_path,
-      redirect_status,
-      created_at,
-      updated_at
-    )
-    values (
-      $1,
-      $2,
-      'track',
-      $3,
-      $4,
-      $5,
-      $6,
-      301,
-      now(),
-      now()
-    )
-    `,
-    [
-      oldSlug,
-      newSlug,
-      MIZIZI_AGENT_KEY +
-        ":" +
-        MIZIZI_RULESET_VERSION,
-      scopeSlug,
-      oldPath,
-      newPath,
-    ],
-  );
 }
 
 async function communityThreadOwnershipConflict(
@@ -1282,7 +1222,7 @@ async function applyTrackSlug(
     }
 
     const paths =
-      await loadTrackRedirectPaths(
+      await loadTrackPointerPaths(
         pool,
         row,
         finding.currentValue,
@@ -1304,17 +1244,6 @@ async function applyTrackSlug(
         reason:
           threadOwnershipConflict,
       };
-    }
-
-    for (const path of paths) {
-      await ensureRedirect(
-        pool,
-        path.scopeSlug,
-        finding.currentValue,
-        finding.proposedValue,
-        path.oldPath,
-        path.newPath,
-      );
     }
 
     const updated =
@@ -1372,8 +1301,8 @@ async function applyTrackSlug(
       pool,
       finding,
       {
-        permanentRedirects:
-          paths.length,
+        redirectWritesRetired: true,
+        redirectRowsCreated: 0,
         chartEntriesUpdated:
           chartUpdate.rowCount || 0,
         communitySavesUpdated:
@@ -1393,12 +1322,533 @@ async function applyTrackSlug(
       outcome: "applied",
       chartRows:
         chartUpdate.rowCount || 0,
-      redirects: paths.length,
+      redirects: 0,
     };
   } catch (error) {
     await pool
       .query("rollback")
       .catch(() => undefined);
+
+    throw error;
+  }
+}
+
+async function loadReleaseSlugPlan(
+  pool: ReturnType<typeof createRegistryPool>,
+): Promise<Map<string, ReleaseSlugPlan>> {
+  const result =
+    await pool.query(
+      `
+      with packaged as (
+        select
+          r.id::text as release_id,
+          r.slug as current_slug,
+          r.release_date,
+          regexp_replace(
+            r.slug,
+            '-(single|ep|album)$',
+            '',
+            'i'
+          ) as base_slug,
+          pa.artist_id::text as artist_id,
+          pa.artist_slug
+        from public.registry_releases r
+        left join lateral (
+          select
+            ra.artist_id,
+            ra.artist_slug
+          from public.registry_release_artists ra
+          where ra.release_id = r.id
+            and ra.status = 'active'
+            and ra.is_primary is true
+          order by
+            ra.credit_order nulls last,
+            ra.created_at,
+            ra.id
+          limit 1
+        ) pa on true
+        where r.status = 'active'
+          and (
+            (
+              r.slug ~* '-single$'
+              and r.title ~*
+                '[[:space:]]+-[[:space:]]+single$'
+            )
+            or (
+              r.slug ~* '-ep$'
+              and r.title ~*
+                '[[:space:]]+-[[:space:]]+ep$'
+            )
+            or (
+              r.slug ~* '-album$'
+              and r.title ~*
+                '[[:space:]]+-[[:space:]]+album$'
+            )
+          )
+      ),
+      grouped as (
+        select
+          artist_id,
+          base_slug,
+          count(*)::integer as candidate_count
+        from packaged
+        group by
+          artist_id,
+          base_slug
+      ),
+      planned as (
+        select
+          p.*,
+          g.candidate_count,
+          exists (
+            select 1
+            from public.registry_releases other
+            join public.registry_release_artists ora
+              on ora.release_id = other.id
+             and ora.status = 'active'
+             and ora.is_primary is true
+            where other.status = 'active'
+              and other.id::text <> p.release_id
+              and ora.artist_id::text = p.artist_id
+              and other.slug = p.base_slug
+          ) as existing_clean_conflict
+        from packaged p
+        join grouped g
+          on g.artist_id = p.artist_id
+         and g.base_slug = p.base_slug
+      )
+      select
+        release_id,
+        artist_id,
+        artist_slug,
+        base_slug,
+        case
+          when candidate_count = 1
+           and not existing_clean_conflict
+            then base_slug
+          when release_date is not null
+            then (
+              base_slug ||
+              '-' ||
+              to_char(
+                release_date,
+                'YYYY-MM-DD'
+              )
+            )
+          else null
+        end as planned_slug,
+        (
+          candidate_count > 1
+          or existing_clean_conflict
+        ) as uses_date_fallback
+      from planned
+      order by
+        artist_id,
+        base_slug,
+        release_id
+      `,
+    );
+
+  const plan =
+    new Map<string, ReleaseSlugPlan>();
+  const scopedTargets =
+    new Set<string>();
+
+  for (const row of result.rows) {
+    const releaseId =
+      String(row.release_id || "");
+    const artistId =
+      String(row.artist_id || "");
+    const artistSlug =
+      String(row.artist_slug || "");
+    const baseSlug =
+      String(row.base_slug || "");
+    const plannedSlug =
+      String(row.planned_slug || "");
+
+    if (
+      !releaseId ||
+      !artistId ||
+      !artistSlug ||
+      !baseSlug ||
+      !plannedSlug
+    ) {
+      throw new Error(
+        "Release slug plan is incomplete for " +
+          releaseId,
+      );
+    }
+
+    const targetKey =
+      artistId + ":" + plannedSlug;
+
+    if (scopedTargets.has(targetKey)) {
+      throw new Error(
+        "Release slug plan collision: " +
+          targetKey,
+      );
+    }
+
+    scopedTargets.add(targetKey);
+    plan.set(
+      releaseId,
+      {
+        releaseId,
+        artistId,
+        artistSlug,
+        baseSlug,
+        plannedSlug,
+        usesDateFallback:
+          Boolean(
+            row.uses_date_fallback,
+          ),
+      },
+    );
+  }
+
+  return plan;
+}
+
+async function applyReleaseSlugPackaging(
+  pool: ReturnType<typeof createRegistryPool>,
+  row: ReleaseRow,
+  finding: MiziziFinding,
+  plan: ReleaseSlugPlan,
+): Promise<"applied" | "stale"> {
+  await pool.query(
+    "begin isolation level serializable",
+  );
+
+  try {
+    await pool.query(
+      `
+      select pg_advisory_xact_lock(
+        hashtextextended(
+          'mizizi:release-slug:' || $1,
+          0
+        )
+      )
+      `,
+      [plan.artistId],
+    );
+
+    const locked =
+      await pool.query(
+        `
+        select
+          r.slug,
+          r.release_date::text,
+          pa.artist_id::text as artist_id,
+          pa.artist_slug
+        from public.registry_releases r
+        left join lateral (
+          select
+            ra.artist_id,
+            ra.artist_slug
+          from public.registry_release_artists ra
+          where ra.release_id = r.id
+            and ra.status = 'active'
+            and ra.is_primary is true
+          order by
+            ra.credit_order nulls last,
+            ra.created_at,
+            ra.id
+          limit 1
+        ) pa on true
+        where r.id = $1::uuid
+          and r.status = 'active'
+        for update of r
+        `,
+        [row.id],
+      );
+
+    if (
+      !locked.rowCount ||
+      String(
+        locked.rows[0].slug || "",
+      ) !== finding.currentValue ||
+      String(
+        locked.rows[0].artist_id || "",
+      ) !== plan.artistId ||
+      String(
+        locked.rows[0].artist_slug || "",
+      ) !== plan.artistSlug
+    ) {
+      await pool.query("rollback");
+      return "stale";
+    }
+
+    const collision =
+      await pool.query(
+        `
+        select other.id::text
+        from public.registry_releases other
+        join public.registry_release_artists ora
+          on ora.release_id = other.id
+         and ora.status = 'active'
+         and ora.is_primary is true
+        where other.status = 'active'
+          and other.id <> $1::uuid
+          and ora.artist_id = $2::uuid
+          and other.slug = $3
+        order by other.id
+        limit 1
+        `,
+        [
+          row.id,
+          plan.artistId,
+          plan.plannedSlug,
+        ],
+      );
+
+    if (collision.rowCount) {
+      await pool.query("rollback");
+      return "stale";
+    }
+
+    const updated =
+      await pool.query(
+        `
+        update public.registry_releases
+        set
+          slug = $1,
+          updated_at = now()
+        where id = $2::uuid
+          and status = 'active'
+          and slug = $3
+        returning id
+        `,
+        [
+          plan.plannedSlug,
+          row.id,
+          finding.currentValue,
+        ],
+      );
+
+    if (!updated.rowCount) {
+      await pool.query("rollback");
+      return "stale";
+    }
+
+    const oldPath =
+      "/releases/" +
+      plan.artistSlug +
+      "/" +
+      finding.currentValue;
+    const newPath =
+      "/releases/" +
+      plan.artistSlug +
+      "/" +
+      plan.plannedSlug;
+
+    const saves =
+      await pool.query(
+        `
+        update public.community_saves
+        set
+          entity_slug = $1,
+          entity_url = $2
+        where entity_type = 'release'
+          and entity_id = $3
+        `,
+        [
+          plan.plannedSlug,
+          "https://wakilisha.africa" +
+            newPath,
+          row.id,
+        ],
+      );
+
+    const threads =
+      await pool.query(
+        `
+        update public.community_threads
+        set
+          entity_id = $3,
+          entity_slug = $1,
+          entity_url = $2,
+          updated_at = now()
+        where entity_type = 'release'
+          and (
+            entity_id = $3
+            or (
+              entity_slug = $4
+              and entity_url is not null
+              and position(
+                $5 in entity_url
+              ) > 0
+            )
+            or (
+              entity_slug = $4
+              and entity_id = $4
+              and entity_url is not null
+              and position(
+                '/releases/' in entity_url
+              ) > 0
+              and not exists (
+                select 1
+                from public.registry_releases
+                  other
+                where other.status = 'active'
+                  and other.id <> $3::uuid
+                  and other.slug = $4
+              )
+            )
+          )
+        `,
+        [
+          plan.plannedSlug,
+          "https://wakilisha.africa" +
+            newPath,
+          row.id,
+          finding.currentValue,
+          oldPath,
+        ],
+      );
+
+    const interests =
+      await pool.query(
+        `
+        update public.audience_interests
+        set
+          entity_slug = $1,
+          updated_at = now()
+        where entity_type = 'release'
+          and entity_id = $2::uuid
+        `,
+        [
+          plan.plannedSlug,
+          row.id,
+        ],
+      );
+
+    const activity =
+      await pool.query(
+        `
+        update public.community_activity
+        set entity_slug = $1
+        where entity_type = 'release'
+          and entity_id = $2
+        `,
+        [
+          plan.plannedSlug,
+          row.id,
+        ],
+      );
+
+    const contributions =
+      await pool.query(
+        `
+        update public.community_contributions
+        set
+          entity_slug = $1,
+          updated_at = now()
+        where entity_type = 'release'
+          and entity_id = $2
+        `,
+        [
+          plan.plannedSlug,
+          row.id,
+        ],
+      );
+
+    const notifications =
+      await pool.query(
+        `
+        update public.community_notifications
+        set entity_slug = $1
+        where entity_type = 'release'
+          and entity_id = $2
+        `,
+        [
+          plan.plannedSlug,
+          row.id,
+        ],
+      );
+
+    const opportunities =
+      await pool.query(
+        `
+        update public.signal_os_content_opportunities
+        set
+          entity_slug = $1,
+          page_path = $2,
+          updated_at = now()
+        where entity_type = 'release'
+          and entity_slug = $3
+          and (
+            (
+              page_path is not null
+              and position(
+                $4 in page_path
+              ) > 0
+            )
+            or not exists (
+              select 1
+              from public.registry_releases
+                other
+              where other.status = 'active'
+                and other.id <> $5::uuid
+                and other.slug = $3
+            )
+          )
+        `,
+        [
+          plan.plannedSlug,
+          newPath,
+          finding.currentValue,
+          oldPath,
+          row.id,
+        ],
+      );
+
+    await writeCanonicalEvent(
+      pool,
+      finding,
+      {
+        baseCleanSlug:
+          plan.baseSlug,
+        collisionStrategy:
+          plan.usesDateFallback
+            ? "release_date_suffix"
+            : "clean_slug",
+        communitySavesUpdated:
+          saves.rowCount || 0,
+        communityThreadsUpdated:
+          threads.rowCount || 0,
+        audienceInterestsUpdated:
+          interests.rowCount || 0,
+        communityActivityUpdated:
+          activity.rowCount || 0,
+        communityContributionsUpdated:
+          contributions.rowCount || 0,
+        communityNotificationsUpdated:
+          notifications.rowCount || 0,
+        signalOpportunitiesUpdated:
+          opportunities.rowCount || 0,
+        redirectRowsCreated: 0,
+      },
+      plan.plannedSlug,
+    );
+
+    await pool.query("commit");
+    return "applied";
+  } catch (error) {
+    await pool
+      .query("rollback")
+      .catch(() => undefined);
+
+    if (
+      error &&
+      typeof error === "object" &&
+      "code" in error &&
+      String(
+        (error as { code?: string })
+          .code || "",
+      ) === "40001"
+    ) {
+      return "stale";
+    }
 
     throw error;
   }
@@ -1886,6 +2336,11 @@ async function scanReleases(
   options: Options,
   stats: RunStats,
 ): Promise<void> {
+  const releaseSlugPlan =
+    await loadReleaseSlugPlan(
+      pool,
+    );
+
   let seen = 0;
   let cursorUpdatedAt: string | null =
     null;
@@ -1912,6 +2367,11 @@ async function scanReleases(
           r.slug,
           r.title,
           r.release_type,
+          r.release_date::text,
+          pa.artist_id::text
+            as primary_artist_id,
+          pa.artist_slug
+            as primary_artist_slug,
           (
             select count(*)::integer
             from public.registry_release_tracks rt
@@ -1923,6 +2383,20 @@ async function scanReleases(
           ) as resolvable_active_track_count,
           r.updated_at::text
         from public.registry_releases r
+        left join lateral (
+          select
+            ra.artist_id,
+            ra.artist_slug
+          from public.registry_release_artists ra
+          where ra.release_id = r.id
+            and ra.status = 'active'
+            and ra.is_primary is true
+          order by
+            ra.credit_order nulls last,
+            ra.created_at,
+            ra.id
+          limit 1
+        ) pa on true
         where r.status = 'active'
           and (
             $1::timestamptz is null
@@ -1985,9 +2459,35 @@ async function scanReleases(
         const finding
         of rowFindings
       ) {
+        const plan =
+          finding.ruleId ===
+            "release_slug_provider_packaging"
+            ? releaseSlugPlan.get(
+                row.id,
+              )
+            : undefined;
+
+        const effectiveFinding =
+          plan
+            ? {
+                ...finding,
+                proposedValue:
+                  plan.plannedSlug,
+                evidence: {
+                  ...finding.evidence,
+                  baseCleanSlug:
+                    plan.baseSlug,
+                  collisionStrategy:
+                    plan.usesDateFallback
+                      ? "release_date_suffix"
+                      : "clean_slug",
+                },
+              }
+            : finding;
+
         recordFinding(
           stats,
-          finding,
+          effectiveFinding,
         );
 
         if (
@@ -1997,23 +2497,23 @@ async function scanReleases(
         }
 
         if (
-          finding.disposition ===
+          effectiveFinding.disposition ===
           "observe"
         ) {
           continue;
         }
 
         if (
-          finding.ruleId ===
+          effectiveFinding.ruleId ===
             "release_taxonomy_drift" &&
-          finding.disposition ===
+          effectiveFinding.disposition ===
             "auto_fix_candidate"
         ) {
           const outcome =
             await applyReleaseTaxonomy(
               pool,
               row,
-              finding,
+              effectiveFinding,
             );
 
           if (outcome === "applied") {
@@ -2026,12 +2526,50 @@ async function scanReleases(
         }
 
         if (
-          finding.disposition ===
+          effectiveFinding.ruleId ===
+            "release_slug_provider_packaging" &&
+          effectiveFinding.disposition ===
+            "auto_fix_candidate"
+        ) {
+          if (!plan) {
+            await queueReview(
+              pool,
+              {
+                ...effectiveFinding,
+                disposition: "review",
+                reason:
+                  effectiveFinding.reason +
+                  ",release_slug_plan_missing",
+              },
+            );
+            stats.queued += 1;
+            continue;
+          }
+
+          const outcome =
+            await applyReleaseSlugPackaging(
+              pool,
+              row,
+              effectiveFinding,
+              plan,
+            );
+
+          if (outcome === "applied") {
+            stats.applied += 1;
+          } else {
+            stats.stale += 1;
+          }
+
+          continue;
+        }
+
+        if (
+          effectiveFinding.disposition ===
             "review"
         ) {
           await queueReview(
             pool,
-            finding,
+            effectiveFinding,
           );
           stats.queued += 1;
         }
@@ -2339,6 +2877,137 @@ function printStats(
   );
 }
 
+async function sendOperationalStandup(
+  pool: ReturnType<typeof createRegistryPool>,
+  options: Options,
+  stats: RunStats,
+): Promise<void> {
+  if (
+    options.mode !== "apply" ||
+    !options.sendStandup
+  ) {
+    return;
+  }
+
+  const recipients =
+    await pool.query(
+      `
+      select distinct
+        link.person_resource_id::text
+          as person_resource_id
+      from public.user_role_assignments role
+      join editorial.person_identity_links link
+        on link.user_id = role.user_id
+       and link.link_state = 'active'
+      where role.role_key = 'super_admin'
+        and role.status = 'active'
+        and (
+          role.expires_at is null
+          or role.expires_at > now()
+        )
+      order by
+        link.person_resource_id::text
+      `,
+    );
+
+  if (recipients.rowCount !== 1) {
+    throw new Error(
+      "MIZIZI standup requires exactly one active Super Admin Person recipient.",
+    );
+  }
+
+  const blocked =
+    stats.queued + stats.stale;
+  const recommendation =
+    blocked > 0
+      ? (
+          "Recommendation: review blocked or stale findings before the next governed apply."
+        )
+      : (
+          "Recommendation: no blocked findings remain from this run."
+        );
+
+  const body = [
+    "MIZIZI operational standup",
+    "",
+    "Rule set: " +
+      MIZIZI_RULESET_VERSION,
+    "Entity scope: " +
+      options.entity,
+    "Findings: " +
+      stats.findings,
+    "Applied: " +
+      stats.applied,
+    "Queued for review: " +
+      stats.queued,
+    "Observed: " +
+      stats.observed,
+    "Stale: " +
+      stats.stale,
+    "",
+    "Successes: governed Registry repairs completed with canonical write provenance.",
+    "Blocked work: " +
+      blocked +
+      " finding(s) require review or a fresh run.",
+    "Learnings: redirect rows were not created; canonical identity and current pointers are repaired directly.",
+    recommendation,
+  ].join("\n");
+
+  const evidence = {
+    ruleSet:
+      MIZIZI_RULESET_VERSION,
+    entity:
+      options.entity,
+    findings:
+      stats.findings,
+    applied:
+      stats.applied,
+    queued:
+      stats.queued,
+    observed:
+      stats.observed,
+    stale:
+      stats.stale,
+    cursors:
+      stats.cursors,
+  };
+
+  const digest =
+    createHash("sha256")
+      .update(
+        JSON.stringify(
+          evidence,
+        ),
+      )
+      .digest("hex")
+      .slice(0, 32);
+
+  await pool.query(
+    `
+    select *
+    from platform_private.send_system_message(
+      $1,
+      $2::uuid,
+      'operational_update',
+      $3,
+      '[]'::jsonb,
+      $4,
+      null,
+      null
+    )
+    `,
+    [
+      MIZIZI_AGENT_KEY,
+      String(
+        recipients.rows[0]
+          .person_resource_id,
+      ),
+      body,
+      "mizizi-standup-" + digest,
+    ],
+  );
+}
+
 async function main(): Promise<void> {
   const options =
     parseOptions();
@@ -2434,6 +3103,12 @@ async function main(): Promise<void> {
     printStats(
       stats,
       options,
+    );
+
+    await sendOperationalStandup(
+      pool,
+      options,
+      stats,
     );
 
     if (

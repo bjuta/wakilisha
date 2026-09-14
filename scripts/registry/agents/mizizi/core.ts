@@ -21,7 +21,7 @@ export {
 
 export const MIZIZI_AGENT_KEY = "mizizi";
 export const MIZIZI_AGENT_LABEL = "MIZIZI Cultural Data Steward";
-export const MIZIZI_RULESET_VERSION = "1.1.0";
+export const MIZIZI_RULESET_VERSION = "1.2.0";
 
 export type MiziziEntityType = "track" | "release" | "chart_entry";
 export type MiziziDisposition = "auto_fix_candidate" | "review" | "observe";
@@ -297,20 +297,25 @@ export function analyzeReleaseIdentity(input: ReleaseIdentityInput): MiziziFindi
     }));
   }
 
+  const slugPackagingType =
+    input.slug.match(
+      /-(single|ep|album)$/i,
+    )?.[1]?.toLowerCase() || "";
+
   const cleanup =
-    stripReleasePackagingSuffix(
-      input.title,
-      input.releaseType,
-    );
+    slugPackagingType
+      ? stripReleasePackagingSuffix(
+          input.title,
+          slugPackagingType,
+        )
+      : {
+          coreTitle: input.title,
+          removedSuffix: "",
+        };
 
   if (!cleanup.removedSuffix) {
     return findings;
   }
-
-  const proposedSlug =
-    slugifyIdentity(
-      cleanup.coreTitle,
-    );
 
   findings.push(makeFinding({
     ruleId: "release_title_provider_packaging",
@@ -325,9 +330,27 @@ export function analyzeReleaseIdentity(input: ReleaseIdentityInput): MiziziFindi
     reason: "provider_package_type_is_structural_metadata_not_release_title",
     evidence: {
       releaseType: input.releaseType || "",
-      removedSuffix: cleanup.removedSuffix,
+      packagingType:
+        slugPackagingType,
+      removedSuffix:
+        cleanup.removedSuffix,
     },
   }));
+
+  const slugPackagingSuffix =
+    new RegExp(
+      "-" +
+        slugPackagingType +
+        "$",
+      "i",
+    );
+  const proposedSlug =
+    input.slug
+      .replace(
+        slugPackagingSuffix,
+        "",
+      )
+      .replace(/-+$/g, "");
 
   if (
     proposedSlug &&
@@ -340,14 +363,16 @@ export function analyzeReleaseIdentity(input: ReleaseIdentityInput): MiziziFindi
       fieldName: "slug",
       currentValue: input.slug,
       proposedValue: proposedSlug,
-      confidence: 0.99,
-      severity: "medium",
-      disposition: "observe",
+      confidence: 1,
+      severity: "high",
+      disposition: "auto_fix_candidate",
       reason: "provider_package_type_is_not_slug_identity",
       evidence: {
         releaseType: input.releaseType || "",
+        packagingType:
+          slugPackagingType,
         sourceTitle: input.title,
-        coreTitle: cleanup.coreTitle,
+        baseCleanSlug: proposedSlug,
       },
     }));
   }

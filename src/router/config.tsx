@@ -1,5 +1,5 @@
 import type { RouteObject } from "react-router-dom";
-import { Navigate, useParams } from "react-router-dom";
+import { Navigate } from "react-router-dom";
 import {
   AdminGuard,
   AdminAnalyticsPage,
@@ -105,10 +105,8 @@ import {
 import {
   NotFound,
   ResetPasswordPage,
-  LegacyAuthorPersonRedirect,
   PersonDetailPage,
   OrganizationDetailPage,
-  LegacyArticleRedirect,
   Magazine,
   MobileMagazine,
   PublicApiDocsPage,
@@ -222,32 +220,6 @@ import { useAuthUser } from "@/hooks/useAuthUser";
 
 // Housekeeping pages
 
-function LegacyTaxonomyRedirect({ base }: { base: "/categories" | "/tags" }) {
-  const { slug } = useParams<{ slug?: string }>();
-  return <Navigate to={slug ? `${base}/${slug}` : base} replace />;
-}
-
-function LegacyEntityRedirect({ base }: { base: "/artists" | "/releases" | "/tracks" }) {
-  const params = useParams<Record<string, string | undefined>>();
-
-  if (base === "/artists") {
-    return <Navigate to={params.slug ? `/artists/${params.slug}` : "/artists"} replace />;
-  }
-
-  if (base === "/releases") {
-    if (params.artistSlug && params.releaseSlug) {
-      return <Navigate to={`/releases/${params.artistSlug}/${params.releaseSlug}`} replace />;
-    }
-    return <Navigate to="/releases" replace />;
-  }
-
-  if (params.artistSlug && params.trackSlug) {
-    return <Navigate to={`/tracks/${params.artistSlug}/${params.trackSlug}`} replace />;
-  }
-
-  return <Navigate to="/tracks" replace />;
-}
-
 function AuthenticatedFieldRoute() {
   const authUser = useAuthUser();
 
@@ -336,12 +308,12 @@ const routes: RouteObject[] = [
       { path: "/charts/:series/:market/:edition", element: <ResponsivePage mobile={<MobileChartEdition />} desktop={<ChartEdition />} /> },
       { path: "/charts/:series/:edition", element: <ResponsivePage mobile={<MobileChartEdition />} desktop={<ChartEdition />} /> },
       { path: "/charts/:series", element: <ResponsivePage mobile={<MobileChartEdition />} desktop={<ChartEdition />} /> },
-      { path: "/artist", element: <LegacyEntityRedirect base="/artists" /> },
-      { path: "/artist/:slug", element: <LegacyEntityRedirect base="/artists" /> },
-      { path: "/release", element: <LegacyEntityRedirect base="/releases" /> },
-      { path: "/release/:artistSlug/:releaseSlug", element: <LegacyEntityRedirect base="/releases" /> },
-      { path: "/track", element: <LegacyEntityRedirect base="/tracks" /> },
-      { path: "/track/:artistSlug/:trackSlug", element: <LegacyEntityRedirect base="/tracks" /> },
+      { path: "/artist", element: <NotFound /> },
+      { path: "/artist/:slug", element: <NotFound /> },
+      { path: "/release", element: <NotFound /> },
+      { path: "/release/:artistSlug/:releaseSlug", element: <NotFound /> },
+      { path: "/track", element: <NotFound /> },
+      { path: "/track/:artistSlug/:trackSlug", element: <NotFound /> },
       { path: "/artist-studio", element: <ResponsivePage mobile={<ArtistStudioPage />} desktop={<ArtistStudioPage />} /> },
       { path: "/artists", element: <ResponsivePage mobile={<Artists />} desktop={<Artists />} /> },
       { path: "/artists/:slug", element: <ResponsivePage mobile={<ArtistDetail />} desktop={<ArtistDetail />} /> },
@@ -350,18 +322,16 @@ const routes: RouteObject[] = [
       { path: "/tracks/:artistSlug/:trackSlug", element: <ResponsivePage mobile={<TrackDetail />} desktop={<TrackDetail />} /> },
       { path: "/tracks/:artistSlug/:trackSlug/lyrics/contribute", element: <LyricContribution /> },
       { path: "/releases", element: <ResponsivePage mobile={<Releases />} desktop={<Releases />} /> },
-      { path: "/releases/:artistSlug/:releaseSlug/:trackSlug/lyrics/contribute", element: <LyricContribution /> },
-      { path: "/releases/:artistSlug/:releaseSlug/:trackSlug", element: <ResponsivePage mobile={<TrackDetail />} desktop={<TrackDetail />} /> },
       { path: "/releases/:artistSlug/:releaseSlug", element: <ResponsivePage mobile={<MobileReleaseDetail />} desktop={<ReleaseDetail />} /> },
       { path: "/genres/:slug", element: <ResponsivePage mobile={<GenreDetail />} desktop={<GenreDetail />} /> },
       { path: "/genres", element: <ResponsivePage mobile={<MobileGenres />} desktop={<Genres />} /> },
       { path: "/labels/:slug", element: <ResponsivePage mobile={<LabelDetail />} desktop={<LabelDetail />} /> },
       { path: "/labels", element: <ResponsivePage mobile={<MobileLabels />} desktop={<Labels />} /> },
       { path: "/preview/:nonce", element: <PreviewPage /> },
-      { path: "/category", element: <LegacyTaxonomyRedirect base="/categories" /> },
-      { path: "/category/:slug", element: <LegacyTaxonomyRedirect base="/categories" /> },
-      { path: "/tag", element: <LegacyTaxonomyRedirect base="/tags" /> },
-      { path: "/tag/:slug", element: <LegacyTaxonomyRedirect base="/tags" /> },
+      { path: "/category", element: <NotFound /> },
+      { path: "/category/:slug", element: <NotFound /> },
+      { path: "/tag", element: <NotFound /> },
+      { path: "/tag/:slug", element: <NotFound /> },
       { path: "/categories", element: <ResponsivePage mobile={<CategoriesIndex />} desktop={<CategoriesIndex />} /> },
       { path: "/categories/:slug", element: <ResponsivePage mobile={<CategoryDetail />} desktop={<CategoryDetail />} /> },
       { path: "/tags", element: <ResponsivePage mobile={<TagsIndex />} desktop={<TagsIndex />} /> },
@@ -370,7 +340,7 @@ const routes: RouteObject[] = [
       { path: "/guides/:slug/field-guide", element: <ResponsivePage mobile={<VeniceFieldGuidePage />} desktop={<VeniceFieldGuidePage />} /> },
       { path: "/guides", element: <ResponsivePage mobile={<GuidesPage />} desktop={<GuidesPage />} /> },
       { path: "/search", element: <ResponsivePage mobile={<Search />} desktop={<Search />} /> },
-      { path: "/player", element: <Navigate to="/" replace /> },
+      { path: "/player", element: <NotFound /> },
       { path: "/auth", element: <ResponsivePage mobile={<AuthPage />} desktop={<AuthPage />} /> },
       { path: "/field", element: <AuthenticatedFieldRoute /> },
       { path: "/profile", element: <AuthenticatedProfileRoute /> },
@@ -381,7 +351,7 @@ const routes: RouteObject[] = [
       { path: "/u/:username/playlists/:playlistSlug", element: <ResponsivePage mobile={<PersonPlaylistDetailPage />} desktop={<PersonPlaylistDetailPage />} /> },
       { path: "/u/:username/playlists", element: <ResponsivePage mobile={<PersonPlaylistsPage />} desktop={<PersonPlaylistsPage />} /> },
       { path: "/u/:username", element: <ResponsivePage mobile={<PublicProfilePage />} desktop={<PublicProfilePage />} /> },
-      { path: "/authors/:slug", element: <LegacyAuthorPersonRedirect /> },
+      { path: "/authors/:slug", element: <NotFound /> },
       { path: "/people/:slug/posts/:postId", element: <ResponsivePage mobile={<PostDetailPage />} desktop={<PostDetailPage />} /> },
       { path: "/people/:slug", element: <ResponsivePage mobile={<PersonDetailPage />} desktop={<PersonDetailPage />} /> },
       { path: "/organizations/:slug", element: <ResponsivePage mobile={<OrganizationDetailPage />} desktop={<OrganizationDetailPage />} /> },
@@ -396,7 +366,7 @@ const routes: RouteObject[] = [
       { path: "/briefing/unsubscribe", element: <ResponsivePage mobile={<BriefingUnsubscribePage />} desktop={<BriefingUnsubscribePage />} /> },
       { path: "/briefing/preferences", element: <ResponsivePage mobile={<BriefingPreferencesPage />} desktop={<BriefingPreferencesPage />} /> },
       { path: "/briefing/issue/:issueId", element: <BriefingIssuePage /> },
-      { path: "/:slug", element: <LegacyArticleRedirect /> },
+      { path: "/:slug", element: <NotFound /> },
     ],
   },
   {
