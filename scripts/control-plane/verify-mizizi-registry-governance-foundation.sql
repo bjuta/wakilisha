@@ -1,7 +1,8 @@
 \set ON_ERROR_STOP on
 
 -- Read-only post-apply verifier for the Slice 2 Registry governance foundation.
--- It proves structure and inertness; it does not create grants or operations.
+-- It proves structure, execution-integrity guards, and inertness; it does not
+-- create grants, operation types, or mutation operations.
 
 do $verify$
 declare
@@ -35,10 +36,82 @@ begin
 
   if to_regprocedure('platform_private.registry_plan_fingerprint(jsonb)') is null
      or to_regprocedure('platform_private.registry_subject_exists(text,uuid)') is null
+     or to_regprocedure('platform_private.registry_subject_state_fingerprint(text,uuid)') is null
+     or to_regprocedure('platform_private.registry_execution_target_set_fingerprint(uuid)') is null
      or to_regprocedure('platform_private.begin_registry_mutation_operation(text,uuid)') is null
   then
     raise exception
       'MIZIZI governance foundation functions are incomplete';
+  end if;
+
+  if not exists (
+    select 1
+    from pg_trigger trigger_row
+    join pg_class relation
+      on relation.oid = trigger_row.tgrelid
+    join pg_namespace namespace
+      on namespace.oid = relation.relnamespace
+    where namespace.nspname = 'platform_private'
+      and relation.relname = 'registry_operation_types'
+      and trigger_row.tgname =
+        'registry_operation_types_version_immutability_guard'
+      and not trigger_row.tgisinternal
+  )
+     or not exists (
+       select 1
+       from pg_trigger trigger_row
+       join pg_class relation
+         on relation.oid = trigger_row.tgrelid
+       join pg_namespace namespace
+         on namespace.oid = relation.relnamespace
+       where namespace.nspname = 'platform_private'
+         and relation.relname = 'system_actor_capability_grants'
+         and trigger_row.tgname =
+           'system_actor_capability_grants_immutability_guard'
+         and not trigger_row.tgisinternal
+     )
+     or not exists (
+       select 1
+       from pg_trigger trigger_row
+       join pg_class relation
+         on relation.oid = trigger_row.tgrelid
+       join pg_namespace namespace
+         on namespace.oid = relation.relnamespace
+       where namespace.nspname = 'platform_private'
+         and relation.relname = 'registry_execution_grants'
+         and trigger_row.tgname =
+           'registry_execution_grants_immutability_guard'
+         and not trigger_row.tgisinternal
+     )
+     or not exists (
+       select 1
+       from pg_trigger trigger_row
+       join pg_class relation
+         on relation.oid = trigger_row.tgrelid
+       join pg_namespace namespace
+         on namespace.oid = relation.relnamespace
+       where namespace.nspname = 'platform_private'
+         and relation.relname = 'registry_execution_grants'
+         and trigger_row.tgname =
+           'registry_execution_grants_target_fingerprint_guard'
+         and not trigger_row.tgisinternal
+     )
+     or not exists (
+       select 1
+       from pg_trigger trigger_row
+       join pg_class relation
+         on relation.oid = trigger_row.tgrelid
+       join pg_namespace namespace
+         on namespace.oid = relation.relnamespace
+       where namespace.nspname = 'platform_private'
+         and relation.relname = 'registry_execution_grant_targets'
+         and trigger_row.tgname =
+           'registry_execution_grant_targets_fingerprint_guard'
+         and not trigger_row.tgisinternal
+     )
+  then
+    raise exception
+      'MIZIZI governance execution-integrity triggers are incomplete';
   end if;
 
   if exists (
@@ -137,9 +210,24 @@ begin
        'platform_private.begin_registry_mutation_operation(text,uuid)',
        'EXECUTE'
      )
+     or has_function_privilege(
+       'anon',
+       'platform_private.registry_subject_state_fingerprint(text,uuid)',
+       'EXECUTE'
+     )
+     or has_function_privilege(
+       'authenticated',
+       'platform_private.registry_subject_state_fingerprint(text,uuid)',
+       'EXECUTE'
+     )
+     or has_function_privilege(
+       'service_role',
+       'platform_private.registry_subject_state_fingerprint(text,uuid)',
+       'EXECUTE'
+     )
   then
     raise exception
-      'Foundation begin-operation function leaked execution authority';
+      'Foundation execution authority or state-fingerprint helper leaked direct execution';
   end if;
 end
 $verify$;
