@@ -11,9 +11,9 @@ const ARTIFACT_DIR = process.env.MIZIZI_ARTIFACT_DIR || 'artifacts/mizizi-releas
 const EXPECTED_AUTHORITY_FINGERPRINT = 'cf71fc24d54bb71d64a469e159daaf06b137680f294efe4542b1b691aee68b16';
 const EXPECTED_CANDIDATE_FINGERPRINT = '238a817a5e342f8311ac04fc9a6bc978f67276cb664046cddc9e375bc323e9c4';
 const EXPECTED_BLOBS = {
-  'scripts/registry/agents/mizizi/run.ts': 'fa60ce8060ff12610354d3be94ec29f20b3a6f1f',
-  'scripts/registry/agents/mizizi/core.ts': '5d81530ed3e0550162e1d583dacf9eea7eefca07',
-  'supabase/functions/_shared/release-taxonomy.ts': 'e424dea443d7fb6ce85acca4f0c33375c56669ca',
+  'scripts/registry/agents/mizizi/run.ts': '32d745759c79aabfcbf1d1875431b3353d3af104',
+  'scripts/registry/agents/mizizi/core.ts': 'c8ab1436437175cd1d7d1c451299ae2b199bc327',
+  'supabase/functions/_shared/release-taxonomy.ts': '12eaff54ac13e9b36fe3319d955d84e0d98d73a6',
 };
 
 if (!['preflight','apply'].includes(MODE)) throw new Error('Unsupported control-plane mode');
@@ -196,6 +196,8 @@ const PRE_APPLY_BASELINE = {
 };
 const POST_APPLY_BASELINE = {
   ...PRE_APPLY_BASELINE,
+  ledger_count:116,
+  ledger_head:'20260914072142',
   taxonomy_candidates:0,
   ep_to_single:0,
   album_to_ep:0,
