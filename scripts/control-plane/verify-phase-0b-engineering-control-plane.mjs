@@ -273,9 +273,29 @@ const artistOriginBrokerSource = fs.readFileSync(
   "utf8",
 );
 
+for (const {
+  label,
+  pattern,
+} of [
+  {
+    label: "--artist-id parser",
+    pattern:
+      /argValue\(\s*"artist-id"\s*\)/,
+  },
+  {
+    label: "--idempotency-key parser",
+    pattern:
+      /argValue\(\s*"idempotency-key"\s*,/,
+  },
+]) {
+  if (!pattern.test(artistOriginBrokerSource)) {
+    throw new Error(
+      `MIZIZI Artist-origin broker contract is missing: ${label}`,
+    );
+  }
+}
+
 for (const fragment of [
-  'argValue("artist-id")',
-  'argValue("idempotency-key"',
   "public.registry_artists.metadata.country",
   "record_registry_artist_origin_evidence",
   "issue_registry_artist_origin_execution_grant",
