@@ -14,6 +14,7 @@ const requiredFiles = [
   "docs/operations/production-change-runbook.md",
   "scripts/control-plane/generate-live-schema.sh",
   "scripts/control-plane/promote-repository-migrations.sh",
+  "scripts/control-plane/registry-privileged-writer-manifest.json",
   "scripts/control-plane/resolve-supabase-anon-key.mjs",
   "scripts/control-plane/verify-frozen-institute.mjs",
   "scripts/control-plane/verify-live-schema.sh",
@@ -28,6 +29,216 @@ for (const file of requiredFiles) {
       `Required Phase 0B file is missing: ${file}`,
     );
   }
+}
+
+const registryWriterManifest = JSON.parse(
+  fs.readFileSync(
+    "scripts/control-plane/registry-privileged-writer-manifest.json",
+    "utf8",
+  ),
+);
+
+if (registryWriterManifest.schemaVersion !== 1) {
+  throw new Error(
+    "Registry privileged-writer manifest schemaVersion must be 1.",
+  );
+}
+
+if (
+  registryWriterManifest.scope !==
+  "canonical_music_registry"
+) {
+  throw new Error(
+    "Registry privileged-writer manifest has the wrong authority scope.",
+  );
+}
+
+for (const [rule, expected] of Object.entries({
+  newWriterRequiresClassification: true,
+  publicReadCanonicalMutationAllowed: false,
+  systemActorExecutionRequiresExactGrant: true,
+  directBrowserCanonicalDmlAllowed: false,
+  genericSqlIsExecutionCapability: false,
+})) {
+  if (
+    registryWriterManifest.rules?.[rule] !==
+    expected
+  ) {
+    throw new Error(
+      `Registry privileged-writer manifest rule drifted: ${rule}`,
+    );
+  }
+}
+
+const registryWriters =
+  registryWriterManifest.writers;
+
+if (
+  !Array.isArray(registryWriters) ||
+  registryWriters.length < 10
+) {
+  throw new Error(
+    "Registry privileged-writer manifest is unexpectedly small.",
+  );
+}
+
+const writerIds = new Set();
+const writerRiskClasses = new Set([
+  "medium",
+  "high",
+  "critical",
+]);
+const writerDispositions = new Set([
+  "keep_converge",
+  "converge",
+  "retire",
+  "partial_convergence",
+  "remove_canonical_write_side_effect",
+  "candidate_retire",
+  "retire_or_internalize",
+]);
+
+for (const writer of registryWriters) {
+  if (
+    !writer.id ||
+    writerIds.has(writer.id)
+  ) {
+    throw new Error(
+      `Registry privileged writer id is missing or duplicated: ${writer.id ?? "<missing>"}`,
+    );
+  }
+  writerIds.add(writer.id);
+
+  for (const field of [
+    "kind",
+    "entrypoint",
+    "authentication",
+    "authorization",
+    "executionAuthority",
+    "futureBoundary",
+  ]) {
+    if (
+      !writer[field] ||
+      !String(writer[field]).trim()
+    ) {
+      throw new Error(
+        `${writer.id}: privileged-writer field is missing: ${field}`,
+      );
+    }
+  }
+
+  if (!writerRiskClasses.has(writer.riskClass)) {
+    throw new Error(
+      `${writer.id}: unsupported Registry writer risk class ${writer.riskClass}`,
+    );
+  }
+
+  if (!writerDispositions.has(writer.disposition)) {
+    throw new Error(
+      `${writer.id}: unsupported Registry writer disposition ${writer.disposition}`,
+    );
+  }
+
+  if (
+    !Array.isArray(writer.targets) ||
+    writer.targets.length === 0
+  ) {
+    throw new Error(
+      `${writer.id}: Registry writer targets are required.`,
+    );
+  }
+
+  for (const flag of [
+    "miziziCallable",
+    "humanCallable",
+    "publicCallable",
+    "canonicalMutation",
+    "legacyDebt",
+  ]) {
+    if (typeof writer[flag] !== "boolean") {
+      throw new Error(
+        `${writer.id}: Registry writer flag must be boolean: ${flag}`,
+      );
+    }
+  }
+
+  if (
+    writer.kind === "edge_function" ||
+    writer.kind === "production_runner"
+  ) {
+    if (!fs.existsSync(writer.entrypoint)) {
+      throw new Error(
+        `${writer.id}: classified writer entrypoint is missing: ${writer.entrypoint}`,
+      );
+    }
+  }
+
+  if (
+    writer.publicCallable &&
+    writer.canonicalMutation &&
+    !writer.legacyDebt
+  ) {
+    throw new Error(
+      `${writer.id}: public canonical mutation may only exist as explicit legacy debt pending convergence/retirement.`,
+    );
+  }
+}
+
+for (const requiredWriter of [
+  "mizizi-agent-runner",
+  "scrape-artist-data",
+  "artist-registry-intake",
+  "ingest-artist-discography",
+  "registry-enrichment-review",
+  "chart-ingest-api",
+  "admin-router-registry",
+  "registry-enrich-artist",
+  "backfill-artist-spotify-images",
+  "backfill-artist-origin",
+  "backfill-artist-type",
+  "public-content-read",
+  "wakilisha-public-api",
+]) {
+  if (!writerIds.has(requiredWriter)) {
+    throw new Error(
+      `Required Registry privileged writer is unclassified: ${requiredWriter}`,
+    );
+  }
+}
+
+const publicReadWriter =
+  registryWriters.find(
+    (writer) =>
+      writer.id === "public-content-read",
+  );
+
+if (
+  publicReadWriter?.futureBoundary !==
+    "pure_public_read" ||
+  publicReadWriter?.disposition !==
+    "remove_canonical_write_side_effect"
+) {
+  throw new Error(
+    "Current public read authority must converge to a mechanically pure Registry read boundary.",
+  );
+}
+
+const miziziRunner =
+  registryWriters.find(
+    (writer) =>
+      writer.id === "mizizi-agent-runner",
+  );
+
+if (
+  miziziRunner?.executionAuthority !==
+    "direct postgres session" ||
+  miziziRunner?.futureBoundary !==
+    "exact_execution_grant_and_typed_registry_operation" ||
+  !miziziRunner?.legacyDebt
+) {
+  throw new Error(
+    "Current MIZIZI ambient database execution must remain classified as debt until brokered execution replaces it.",
+  );
 }
 
 for (const forbidden of [
@@ -290,6 +501,7 @@ console.log(
   [
     "PASS: Phase 0B engineering control plane is structurally complete.",
     `Authoritative migrations: ${migrations.length}`,
+    `Classified Registry privileged writers: ${registryWriters.length}`,
     `Committed type bytes: ${typesBuffer.length}`,
   ].join("\n"),
 );
