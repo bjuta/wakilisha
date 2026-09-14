@@ -2,7 +2,7 @@
   "schemaVersion": 1,
   "authority": "docs/engineering/mizizi-registry-authority-ledger.md",
   "scope": "canonical_music_registry",
-  "status": "slice_2_foundation",
+  "status": "slice_2_artist_origin_admission",
   "rules": {
     "newWriterRequiresClassification": true,
     "publicReadCanonicalMutationAllowed": false,
@@ -24,6 +24,23 @@
       "futureBoundary": "exact_execution_grant_and_typed_registry_operation",
       "miziziCallable": true,
       "humanCallable": true,
+      "publicCallable": false,
+      "canonicalMutation": true,
+      "legacyDebt": true
+    },
+    {
+      "id": "mizizi-artist-origin-broker",
+      "kind": "production_runner",
+      "entrypoint": "scripts/registry/agents/mizizi/artist-origin-broker.ts",
+      "authentication": "reviewed control-plane trigger plus JIT database session",
+      "authorization": "human standing admit_registry_artist_origin grant plus deterministic policy-issued exact execution grant",
+      "executionAuthority": "typed one-Artist origin broker over current JIT postgres transport",
+      "targets": ["registry_artists", "registry_canonical_write_events", "registry_operation_write_events", "registry_mutation_operations"],
+      "riskClass": "medium",
+      "disposition": "converge",
+      "futureBoundary": "dedicated_narrow_executor_identity_without_postgres_ambient_authority",
+      "miziziCallable": true,
+      "humanCallable": false,
       "publicCallable": false,
       "canonicalMutation": true,
       "legacyDebt": true
