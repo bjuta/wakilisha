@@ -18,6 +18,7 @@ const requiredFiles = [
   "scripts/control-plane/resolve-supabase-anon-key.mjs",
   "scripts/control-plane/verify-frozen-institute.mjs",
   "scripts/control-plane/verify-live-schema.sh",
+  "scripts/registry/agents/mizizi/artist-origin-broker.ts",
   "src/lib/requestContext.ts",
   "src/types/database.types.ts",
   "test/control-plane/request-context.test.ts",
@@ -186,6 +187,7 @@ for (const writer of registryWriters) {
 
 for (const requiredWriter of [
   "mizizi-agent-runner",
+  "mizizi-artist-origin-broker",
   "scrape-artist-data",
   "artist-registry-intake",
   "ingest-artist-discography",
@@ -239,6 +241,92 @@ if (
   throw new Error(
     "Current MIZIZI ambient database execution must remain classified as debt until brokered execution replaces it.",
   );
+}
+
+const artistOriginBroker =
+  registryWriters.find(
+    (writer) =>
+      writer.id === "mizizi-artist-origin-broker",
+  );
+
+if (
+  artistOriginBroker?.entrypoint !==
+    "scripts/registry/agents/mizizi/artist-origin-broker.ts" ||
+  artistOriginBroker?.executionAuthority !==
+    "typed one-Artist origin broker over current JIT postgres transport" ||
+  artistOriginBroker?.futureBoundary !==
+    "dedicated_narrow_executor_identity_without_postgres_ambient_authority" ||
+  artistOriginBroker?.disposition !== "converge" ||
+  artistOriginBroker?.miziziCallable !== true ||
+  artistOriginBroker?.humanCallable !== false ||
+  artistOriginBroker?.publicCallable !== false ||
+  artistOriginBroker?.canonicalMutation !== true ||
+  artistOriginBroker?.legacyDebt !== true
+) {
+  throw new Error(
+    "MIZIZI Artist-origin broker classification drifted from the typed exact-grant boundary.",
+  );
+}
+
+const artistOriginBrokerSource = fs.readFileSync(
+  "scripts/registry/agents/mizizi/artist-origin-broker.ts",
+  "utf8",
+);
+
+for (const {
+  label,
+  pattern,
+} of [
+  {
+    label: "--artist-id parser",
+    pattern:
+      /argValue\(\s*"artist-id"\s*\)/,
+  },
+  {
+    label: "--idempotency-key parser",
+    pattern:
+      /argValue\(\s*"idempotency-key"\s*,/,
+  },
+]) {
+  if (!pattern.test(artistOriginBrokerSource)) {
+    throw new Error(
+      `MIZIZI Artist-origin broker contract is missing: ${label}`,
+    );
+  }
+}
+
+for (const fragment of [
+  "public.registry_artists.metadata.country",
+  "record_registry_artist_origin_evidence",
+  "issue_registry_artist_origin_execution_grant",
+  "execute_registry_artist_origin_admission",
+  "verify_registry_artist_origin_admission",
+  "MIZIZI_ARTIST_ORIGIN_APPLY",
+]) {
+  if (!artistOriginBrokerSource.includes(fragment)) {
+    throw new Error(
+      `MIZIZI Artist-origin broker contract is missing: ${fragment}`,
+    );
+  }
+}
+
+for (const forbiddenFragment of [
+  'argValue("origin',
+  "--origin",
+  "update public.registry_artists",
+  "insert into public.registry_artists",
+  "delete from public.registry_artists",
+  "SUPABASE_SERVICE_ROLE_KEY",
+]) {
+  if (
+    artistOriginBrokerSource
+      .toLowerCase()
+      .includes(forbiddenFragment.toLowerCase())
+  ) {
+    throw new Error(
+      `MIZIZI Artist-origin broker contains a forbidden authority escape hatch: ${forbiddenFragment}`,
+    );
+  }
 }
 
 for (const forbidden of [
