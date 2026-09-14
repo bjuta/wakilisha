@@ -283,10 +283,33 @@ begin
         or execution_grant.capability_key <>
           'admit_registry_artist_origin'
         or execution_grant.max_rows <> 1
-        or execution_grant.issued_by_principal_key <>
-          'policy:registry-artist-origin-admission-v1'
         or execution_grant.policy_ruleset_version <>
           'registry-artist-origin-admission-v1'
+        or execution_grant.actor_key not in (
+          'mizizi',
+          'registry_artist_origin_admin'
+        )
+        or (
+          execution_grant.actor_key = 'mizizi'
+          and (
+            execution_grant.issued_by_user_id is not null
+            or execution_grant.issued_by_principal_key <>
+              'policy:registry-artist-origin-admission-v1'
+            or execution_grant.system_actor_capability_grant_id is null
+            or execution_grant.required_user_capability_key is not null
+          )
+        )
+        or (
+          execution_grant.actor_key = 'registry_artist_origin_admin'
+          and (
+            execution_grant.issued_by_user_id is null
+            or execution_grant.issued_by_principal_key <>
+              'user:' || execution_grant.issued_by_user_id::text
+            or execution_grant.system_actor_capability_grant_id is not null
+            or execution_grant.required_user_capability_key <>
+              'manage_registry'
+          )
+        )
       )
   ) then
     raise exception 'Artist-origin exact grant escaped V1 authority';

@@ -6,7 +6,7 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.1";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
-const SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+const ANON_KEY = Deno.env.get("SUPABASE_ANON_KEY")!;
 
 // ── ISO2 ↔ Country name mappings (subset focused on Africa + major music markets) ──
 
@@ -229,62 +229,136 @@ interface OriginResult {
   countryName: string | null;
   confidence: number;
   source: "metadata_normalization" | "musicbrainz" | "skipped";
+  admissionStatus?:
+    | "dry_run"
+    | "admitted"
+    | "rejected"
+    | "policy_rejected"
+    | "ineligible"
+    | "no_evidence";
+  operationId?: string;
+  verifierStatus?: string;
+  idempotentReplay?: boolean;
   debug?: string;
 }
 
 // ── Main handler ──
 
+async function sha256Hex(input: string): Promise<string> {
+  const bytes = new TextEncoder().encode(input);
+  const digest = await crypto.subtle.digest("SHA-256", bytes);
+  return Array.from(new Uint8Array(digest))
+    .map((byte) => byte.toString(16).padStart(2, "0"))
+    .join("");
+}
+
+function isUuid(value: string): boolean {
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value);
+}
+
+async function executeAdmission(
+  client: ReturnType<typeof createClient>,
+  input: {
+    artistId: string;
+    originIso2: string;
+    confidence: number;
+    sourceKind: "metadata_country_normalization" | "musicbrainz";
+    sourceRef: string;
+    sourcePayloadFingerprint: string;
+    observedAt: string;
+  },
+): Promise<{ operationId: string; verifierStatus: string; idempotentReplay: boolean }> {
+  const { data: executionRows, error: executionError } = await client.rpc(
+    "admin_execute_registry_artist_origin_admission",
+    {
+      p_artist_id: input.artistId,
+      p_origin_iso2: input.originIso2,
+      p_confidence: input.confidence,
+      p_source_kind: input.sourceKind,
+      p_source_ref: input.sourceRef,
+      p_source_payload_fingerprint: input.sourcePayloadFingerprint,
+      p_observed_at: input.observedAt,
+    },
+  );
+  if (executionError) throw new Error(executionError.message);
+  const execution = Array.isArray(executionRows) ? executionRows[0] : executionRows;
+  const operationId = String(execution?.operation_id ?? "");
+  if (!operationId) throw new Error("Artist-origin admission did not return an operation id.");
+
+  const { data: verifierRows, error: verifierError } = await client.rpc(
+    "admin_verify_registry_artist_origin_admission",
+    { p_operation_id: operationId },
+  );
+  if (verifierError) throw new Error(verifierError.message);
+  const verification = Array.isArray(verifierRows) ? verifierRows[0] : verifierRows;
+  const verifierStatus = String(verification?.verifier_status ?? "");
+  if (verifierStatus !== "passed") {
+    throw new Error(`Artist-origin verifier did not pass for operation ${operationId}.`);
+  }
+  return {
+    operationId,
+    verifierStatus,
+    idempotentReplay: Boolean(execution?.idempotent_replay),
+  };
+}
+
 Deno.serve(async (req) => {
   const cors = corsHeaders(req);
-  if (req.method === "OPTIONS") {
-    return new Response(null, { headers: cors });
-  }
-  if (req.method !== "POST") {
-    return json(req, { error: "method_not_allowed" }, 405);
-  }
+  if (req.method === "OPTIONS") return new Response(null, { headers: cors });
+  if (req.method !== "POST") return json(req, { error: "method_not_allowed" }, 405);
 
-  // Auth
   const authHeader = req.headers.get("Authorization");
-  if (!authHeader?.startsWith("Bearer ")) {
-    return json(req, { error: "unauthorized" }, 401);
-  }
+  if (!authHeader?.startsWith("Bearer ")) return json(req, { error: "unauthorized" }, 401);
   const token = authHeader.replace("Bearer ", "");
-  const userClient = createClient(SUPABASE_URL, SERVICE_KEY, {
-    global: { headers: { Authorization: `Bearer ${token}` } },
+  const userClient = createClient(SUPABASE_URL, ANON_KEY, {
+    global: { headers: { Authorization: authHeader } },
+    auth: { persistSession: false },
   });
   const { data: { user }, error: authErr } = await userClient.auth.getUser(token);
-  if (authErr || !user) {
-    return json(req, { error: "unauthorized" }, 401);
-  }
+  if (authErr || !user) return json(req, { error: "unauthorized" }, 401);
 
-  const db = createClient(SUPABASE_URL, SERVICE_KEY);
+  const { data: canManageRegistry, error: capabilityError } = await userClient.rpc(
+    "current_user_has_capability",
+    { required_capability: "manage_registry" },
+  );
+  if (capabilityError || canManageRegistry !== true) {
+    return json(req, { error: "forbidden_manage_registry_required" }, 403);
+  }
 
   let body: Record<string, unknown> = {};
-  try {
-    body = await req.json();
-  } catch { /* no body */ }
+  try { body = await req.json(); } catch { /* optional body */ }
 
   const dryRun = body.dry_run === true;
-  const useMusicBrainz = body.use_musicbrainz !== false; // default true
-  const batchSize = Math.min(Number(body.batch_size) || 80, 200);
-
-  // Fetch all active/published artists missing origin_iso2
-  const { data: artists, error: fetchErr } = await db
-    .from("registry_artists")
-    .select("id, slug, display_name, normalized_name, origin_iso2, metadata")
-    .in("status", ["active", "draft"])
-    .or("origin_iso2.is.null,origin_iso2.eq.")
-    .limit(batchSize);
-
-  if (fetchErr) {
-    return json(req, { error: "db_query_failed", detail: fetchErr.message }, 500);
+  const useMusicBrainz = body.use_musicbrainz !== false;
+  const batchSize = Math.min(Math.max(Number(body.batch_size) || 25, 1), 25);
+  const requestedArtistId = typeof body.artist_id === "string" ? body.artist_id.trim() : "";
+  if (requestedArtistId && !isUuid(requestedArtistId)) {
+    return json(req, { error: "invalid_artist_id" }, 400);
   }
 
+  let query = userClient.from("registry_artists").select(
+    "id, slug, display_name, normalized_name, origin_iso2, origin_confidence, metadata, status",
+  );
+  if (requestedArtistId) {
+    query = query.eq("id", requestedArtistId).limit(1);
+  } else {
+    query = query.in("status", ["active", "draft"])
+      .or("origin_iso2.is.null,origin_iso2.eq.")
+      .is("origin_confidence", null)
+      .limit(batchSize);
+  }
+
+  const { data: artists, error: fetchErr } = await query;
+  if (fetchErr) return json(req, { error: "db_query_failed", detail: fetchErr.message }, 500);
   if (!artists || artists.length === 0) {
     return json(req, {
       ok: true,
-      message: "All active artists already have origin ISO2 set.",
+      dry_run: dryRun,
+      exact_artist_id: requestedArtistId || null,
       total_found: 0,
+      normalized_from_metadata: 0,
+      from_musicbrainz: 0,
+      skipped: 0,
       results: [],
     });
   }
@@ -295,88 +369,164 @@ Deno.serve(async (req) => {
   let skipped = 0;
 
   for (const artist of artists) {
-    const meta = (artist.metadata || {}) as Record<string, unknown>;
-    const countryRaw = meta.country ? String(meta.country).trim() : null;
+    const artistId = String(artist.id);
     const displayName = String(artist.display_name || artist.slug);
     const normalizedName = String(artist.normalized_name || "");
+    const currentOrigin = String(artist.origin_iso2 ?? "").trim();
+    const currentConfidence = artist.origin_confidence;
 
-    // ── Phase 1: Try metadata.country normalization ──
+    if (!['active', 'draft'].includes(String(artist.status)) || currentOrigin || currentConfidence !== null) {
+      results.push({
+        slug: String(artist.slug), name: displayName,
+        previousIso2: currentOrigin || null, newIso2: null,
+        countryName: null, confidence: Number(currentConfidence ?? 0),
+        source: "skipped", admissionStatus: "ineligible",
+        debug: "Artist is not eligible for missing-origin admission.",
+      });
+      skipped++;
+      continue;
+    }
+
+    const meta = (artist.metadata || {}) as Record<string, unknown>;
+    const countryRaw = meta.country ? String(meta.country).trim() : null;
+    let proposal: null | {
+      iso2: string; countryName: string | null; confidence: number;
+      sourceKind: "metadata_country_normalization" | "musicbrainz";
+      sourceRef: string; sourcePayload: string;
+      source: "metadata_normalization" | "musicbrainz"; debug: string;
+    } = null;
+
     if (countryRaw) {
       const norm = normalizeCountryToIso2(countryRaw);
       if (norm) {
-        results.push({
-          slug: String(artist.slug),
-          name: displayName,
-          previousIso2: artist.origin_iso2 ? String(artist.origin_iso2) : null,
-          newIso2: norm.iso2,
+        proposal = {
+          iso2: norm.iso2,
           countryName: norm.name,
           confidence: 0.9,
+          sourceKind: "metadata_country_normalization",
+          sourceRef: `registry_artist:${artistId}:metadata.country`,
+          sourcePayload: JSON.stringify({
+            artistId,
+            path: "public.registry_artists.metadata.country",
+            rawCountry: countryRaw,
+          }),
           source: "metadata_normalization",
           debug: `Normalized "${countryRaw}" → ${norm.iso2} (${norm.name})`,
-        });
-
-        if (!dryRun) {
-          await db
-            .from("registry_artists")
-            .update({ origin_iso2: norm.iso2, origin_confidence: 0.9, updated_at: new Date().toISOString() })
-            .eq("id", String(artist.id));
-        }
-        normalized++;
-        continue;
+        };
       }
     }
 
-    // ── Phase 2: MusicBrainz lookup ──
-    if (useMusicBrainz) {
+    if (!proposal && useMusicBrainz) {
       const mb = await resolveMusicBrainzOrigin(displayName, normalizedName);
-      if (mb.iso2) {
-        results.push({
-          slug: String(artist.slug),
-          name: displayName,
-          previousIso2: null,
-          newIso2: mb.iso2,
+      if (mb.iso2 && mb.mbId) {
+        proposal = {
+          iso2: mb.iso2,
           countryName: mb.countryName,
           confidence: mb.confidence,
+          sourceKind: "musicbrainz",
+          sourceRef: `musicbrainz:artist:${mb.mbId}`,
+          sourcePayload: JSON.stringify({
+            artistId,
+            musicBrainzArtistId: mb.mbId,
+            originIso2: mb.iso2,
+            confidence: mb.confidence,
+          }),
           source: "musicbrainz",
           debug: `MusicBrainz match: "${mb.countryName}" (${mb.iso2}), score: ${mb.confidence}`,
-        });
-
-        if (!dryRun) {
-          await db
-            .from("registry_artists")
-            .update({
-              origin_iso2: mb.iso2,
-              origin_confidence: mb.confidence,
-              updated_at: new Date().toISOString(),
-            })
-            .eq("id", String(artist.id));
-        }
-        fromMusicBrainz++;
-        // Rate limit: MusicBrainz allows ~1 req/sec
-        await new Promise((resolve) => setTimeout(resolve, 1200));
-        continue;
+        };
       }
     }
 
-    // Not found
-    results.push({
-      slug: String(artist.slug),
-      name: displayName,
-      previousIso2: null,
-      newIso2: null,
-      countryName: null,
-      confidence: 0,
-      source: "skipped",
-      debug: countryRaw
-        ? `Could not normalize "${countryRaw}" to ISO2, MusicBrainz returned no match`
-        : "No metadata.country and MusicBrainz returned no match",
-    });
-    skipped++;
+    if (!proposal) {
+      results.push({
+        slug: String(artist.slug), name: displayName,
+        previousIso2: null, newIso2: null, countryName: null,
+        confidence: 0, source: "skipped", admissionStatus: "no_evidence",
+        debug: countryRaw
+          ? `Could not normalize "${countryRaw}" to ISO2; MusicBrainz returned no admissible match`
+          : "No metadata.country and MusicBrainz returned no admissible match",
+      });
+      skipped++;
+      continue;
+    }
+
+    if (proposal.confidence < 0.9) {
+      results.push({
+        slug: String(artist.slug), name: displayName,
+        previousIso2: null, newIso2: proposal.iso2,
+        countryName: proposal.countryName, confidence: proposal.confidence,
+        source: proposal.source, admissionStatus: "policy_rejected",
+        debug: `${proposal.debug}; below canonical admission confidence threshold 0.90`,
+      });
+      skipped++;
+      continue;
+    }
+
+    const sourcePayloadFingerprint = await sha256Hex(proposal.sourcePayload);
+    const observedAt = new Date().toISOString();
+
+    if (dryRun) {
+      results.push({
+        slug: String(artist.slug), name: displayName,
+        previousIso2: null, newIso2: proposal.iso2,
+        countryName: proposal.countryName, confidence: proposal.confidence,
+        source: proposal.source, admissionStatus: "dry_run", debug: proposal.debug,
+      });
+      if (proposal.source === "metadata_normalization") normalized++;
+      else fromMusicBrainz++;
+      continue;
+    }
+
+    try {
+      const admission = await executeAdmission(userClient, {
+        artistId,
+        originIso2: proposal.iso2,
+        confidence: proposal.confidence,
+        sourceKind: proposal.sourceKind,
+        sourceRef: proposal.sourceRef,
+        sourcePayloadFingerprint,
+        observedAt,
+      });
+      results.push({
+        slug: String(artist.slug), name: displayName,
+        previousIso2: null, newIso2: proposal.iso2,
+        countryName: proposal.countryName, confidence: proposal.confidence,
+        source: proposal.source, admissionStatus: "admitted",
+        operationId: admission.operationId,
+        verifierStatus: admission.verifierStatus,
+        idempotentReplay: admission.idempotentReplay,
+        debug: proposal.debug,
+      });
+      if (proposal.source === "metadata_normalization") normalized++;
+      else fromMusicBrainz++;
+    } catch (error) {
+      const detail = error instanceof Error ? error.message : String(error);
+      if (detail.toLowerCase().includes("admission is disabled")) {
+        return json(req, {
+          error: "artist_origin_admission_disabled",
+          detail,
+          dry_run_available: true,
+        }, 409);
+      }
+      results.push({
+        slug: String(artist.slug), name: displayName,
+        previousIso2: null, newIso2: proposal.iso2,
+        countryName: proposal.countryName, confidence: proposal.confidence,
+        source: proposal.source, admissionStatus: "rejected",
+        debug: `${proposal.debug}; admission rejected: ${detail}`,
+      });
+      skipped++;
+    }
+
+    if (proposal.source === "musicbrainz") {
+      await new Promise((resolve) => setTimeout(resolve, 1200));
+    }
   }
 
   return json(req, {
     ok: true,
     dry_run: dryRun,
+    exact_artist_id: requestedArtistId || null,
     total_found: artists.length,
     normalized_from_metadata: normalized,
     from_musicbrainz: fromMusicBrainz,

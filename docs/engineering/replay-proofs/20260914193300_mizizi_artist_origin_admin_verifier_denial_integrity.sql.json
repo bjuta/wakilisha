@@ -1,0 +1,16 @@
+{
+  "migration_file": "supabase/migrations/20260914193300_mizizi_artist_origin_admin_verifier_denial_integrity.sql",
+  "migration_sha256": "34f5068fb1f603bc4505c516ea3baf657aa0df182cfb5a8ae80814e0d8cd0892",
+  "base_main_sha": "123f936e5f8da5cef9987ec2747d9ecfe5dda53a",
+  "preview_project_ref": "kbqslgvkjyucubdqnyvw",
+  "preview_branch_id": "a8be9684-544f-4d42-a140-d768570d7174",
+  "preview_migration_head": "20260914193300",
+  "baseline_replay": "pass",
+  "candidate_apply": "pass",
+  "verifier": "pass",
+  "verifier_file": "scripts/control-plane/verify-mizizi-artist-origin-backfill-convergence.sql",
+  "schema_types_sha256": "9823ec55ccf9190f7fb313dd5a5f2b0df97f0e4fa795e0d0b364bb675e52619b",
+  "schema_migration_count": 123,
+  "schema_migration_head": "20260914193300",
+  "verified_at": "2026-09-14T19:26:09.554Z"
+}

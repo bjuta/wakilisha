@@ -210,7 +210,12 @@ export default function ArtistDetailPage() {
           Authorization: `Bearer ${token}`,
           apikey: (import.meta.env.VITE_PUBLIC_SUPABASE_ANON_KEY as string) || "",
         },
-        body: JSON.stringify({ dry_run: false, use_musicbrainz: true, batch_size: 150 }),
+        body: JSON.stringify({
+          dry_run: false,
+          use_musicbrainz: true,
+          batch_size: 1,
+          artist_id: artist.id,
+        }),
       });
 
       const originData = await originRes.json() as Record<string, unknown>;

@@ -19258,6 +19258,25 @@ export type Database = {
         }
         Returns: Json
       }
+      admin_execute_registry_artist_origin_admission: {
+        Args: {
+          p_artist_id: string
+          p_confidence: number
+          p_observed_at: string
+          p_origin_iso2: string
+          p_source_kind: string
+          p_source_payload_fingerprint: string
+          p_source_ref: string
+        }
+        Returns: {
+          evidence_assertion_id: string
+          execution_grant_id: string
+          idempotent_replay: boolean
+          operation_id: string
+          operation_status: string
+          verifier_status: string
+        }[]
+      }
       admin_get_artist_decouple_decisions: {
         Args: { p_source_type?: string }
         Returns: Json
@@ -19419,6 +19438,10 @@ export type Database = {
         Args: { p_enabled: boolean; p_reason: string }
         Returns: boolean
       }
+      admin_set_registry_artist_origin_operation_enabled: {
+        Args: { p_enabled: boolean; p_reason: string }
+        Returns: boolean
+      }
       admin_update_registry_track_intake_artist_credit: {
         Args: {
           p_credit_order: number
@@ -19458,6 +19481,13 @@ export type Database = {
           p_selected_artists?: Json
         }
         Returns: Json
+      }
+      admin_verify_registry_artist_origin_admission: {
+        Args: { p_operation_id: string }
+        Returns: {
+          operation_id: string
+          verifier_status: string
+        }[]
       }
       adopt_verified_field_media_upload_session_v1: {
         Args: {
