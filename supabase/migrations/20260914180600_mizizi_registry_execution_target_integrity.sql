@@ -78,44 +78,67 @@ security definer
 set search_path = pg_catalog, platform_private
 as $$
 declare
+  v_execution_grant_ids uuid[];
   v_execution_grant_id uuid;
+  v_checked uuid[] := array[]::uuid[];
   v_expected text;
   v_actual text;
 begin
-  v_execution_grant_id := coalesce(
-    new.execution_grant_id,
-    old.execution_grant_id,
-    new.id,
-    old.id
-  );
-
-  if v_execution_grant_id is null then
+  if tg_table_name = 'registry_execution_grants' then
+    v_execution_grant_ids := array[new.id];
+  elsif tg_table_name = 'registry_execution_grant_targets' then
+    v_execution_grant_ids := array[
+      case
+        when tg_op <> 'DELETE' then new.execution_grant_id
+        else null
+      end,
+      case
+        when tg_op <> 'INSERT' then old.execution_grant_id
+        else null
+      end
+    ];
+  else
     raise exception
-      'Registry execution target integrity could not resolve a grant ID.';
+      'Registry execution target integrity fired for unexpected table %.',
+      tg_table_name;
   end if;
 
-  select execution_grant.target_set_fingerprint
-  into v_expected
-  from platform_private.registry_execution_grants execution_grant
-  where execution_grant.id = v_execution_grant_id;
+  foreach v_execution_grant_id in array v_execution_grant_ids
+  loop
+    if v_execution_grant_id is null
+       or v_execution_grant_id = any(v_checked)
+    then
+      continue;
+    end if;
 
-  if not found then
-    -- Deleting a grant is already RESTRICTed by dependent authority rows. If a
-    -- row is absent during teardown there is nothing left to validate.
-    return null;
-  end if;
-
-  v_actual :=
-    platform_private.registry_execution_target_set_fingerprint(
+    v_checked := array_append(
+      v_checked,
       v_execution_grant_id
     );
 
-  if v_actual <> v_expected then
-    raise exception
-      using
-        errcode = '23514',
-        message = 'Registry execution target set does not match its exact grant fingerprint.';
-  end if;
+    select execution_grant.target_set_fingerprint
+    into v_expected
+    from platform_private.registry_execution_grants execution_grant
+    where execution_grant.id = v_execution_grant_id;
+
+    if not found then
+      -- Deleting a grant is RESTRICTed by dependent authority rows. If a grant
+      -- is absent during teardown there is no surviving exact grant to check.
+      continue;
+    end if;
+
+    v_actual :=
+      platform_private.registry_execution_target_set_fingerprint(
+        v_execution_grant_id
+      );
+
+    if v_actual <> v_expected then
+      raise exception
+        using
+          errcode = '23514',
+          message = 'Registry execution target set does not match its exact grant fingerprint.';
+    end if;
+  end loop;
 
   return null;
 end
