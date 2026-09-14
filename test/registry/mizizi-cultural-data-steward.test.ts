@@ -1,4 +1,4 @@
-import { readFileSync } from "node:fs";
+import { readFileSync, readdirSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 
 import {
@@ -228,13 +228,13 @@ describe("MIZIZI Cultural Data Steward", () => {
     ).toEqual([]);
   });
 
-  it("uses MIZIZI rule-set 1.1.0 for Release taxonomy authority", () => {
+  it("uses MIZIZI rule-set 1.2.0 for governed Release identity repair", () => {
     expect(MIZIZI_RULESET_VERSION).toBe(
-      "1.1.0",
+      "1.2.0",
     );
   });
 
-  it("observes exact provider Release packaging without creating review work", () => {
+  it("observes Release title packaging while making packaged slugs governed repair candidates", () => {
     expect(
       stripReleasePackagingSuffix(
         "Balance - Single",
@@ -265,7 +265,8 @@ describe("MIZIZI Cultural Data Steward", () => {
           ruleId:
             "release_slug_provider_packaging",
           proposedValue: "balance",
-          disposition: "observe",
+          disposition:
+            "auto_fix_candidate",
         }),
       ]),
     );
@@ -292,6 +293,40 @@ describe("MIZIZI Cultural Data Steward", () => {
         releaseType: "album",
       }),
     ).toEqual([]);
+  });
+
+  it("does not auto-fix a packaged-looking slug without independent title packaging proof", () => {
+    expect(
+      analyzeReleaseIdentity({
+        id: "release-ambiguous-packaging",
+        slug: "enlightened-ep",
+        title: "Enlightened EP",
+        releaseType: "ep",
+      }),
+    ).toEqual([]);
+  });
+
+  it("keeps provider packaging cleanup independent from Registry taxonomy", () => {
+    const findings =
+      analyzeReleaseIdentity({
+        id: "release-taxonomy-packaging-disagreement",
+        slug: "project-single",
+        title: "Project - Single",
+        releaseType: "ep",
+      });
+
+    expect(findings).toContainEqual(
+      expect.objectContaining({
+        ruleId:
+          "release_slug_provider_packaging",
+        currentValue:
+          "project-single",
+        proposedValue:
+          "project",
+        disposition:
+          "auto_fix_candidate",
+      }),
+    );
   });
 
   it("treats a canonical Track ID as authority for chart Track slug drift", () => {
@@ -612,6 +647,45 @@ describe("MIZIZI Cultural Data Steward", () => {
     );
   });
 
+  it("retires public-content redirect writers and seals the historical redirect table", () => {
+    const migrations =
+      readdirSync(
+        "supabase/migrations",
+      ).filter(
+        (name) =>
+          name.endsWith(
+            "_phase_9a3_public_redirect_writer_retirement.sql",
+          ),
+      );
+
+    expect(migrations).toHaveLength(
+      1,
+    );
+
+    const migration =
+      readFileSync(
+        "supabase/migrations/" +
+          migrations[0],
+        "utf8",
+      );
+
+    expect(migration).toContain(
+      "save_article_versioned",
+    );
+    expect(migration).toContain(
+      "apply_article_correction",
+    );
+    expect(migration).not.toContain(
+      "insert into public.wk_slug_redirects",
+    );
+    expect(migration).toContain(
+      "wk_slug_redirects_historical_read_only",
+    );
+    expect(migration).toContain(
+      "reject_slug_redirect_mutation",
+    );
+  });
+
   it("keeps the runtime bounded, review-aware, and provenance-preserving", () => {
     const runner =
       readFileSync(
@@ -652,8 +726,23 @@ describe("MIZIZI Cultural Data Steward", () => {
     expect(runner).toContain(
       "registry_canonical_write_events",
     );
+    expect(runner).not.toContain(
+      "insert into public.wk_slug_redirects",
+    );
+    expect(runner).not.toContain(
+      "ensureRedirect(",
+    );
     expect(runner).toContain(
-      "wk_slug_redirects",
+      "loadReleaseSlugPlan",
+    );
+    expect(runner).toContain(
+      "applyReleaseSlugPackaging",
+    );
+    expect(runner).toContain(
+      "platform_private.send_system_message",
+    );
+    expect(runner).toContain(
+      "'operational_update'",
     );
     expect(runner).toContain(
       "--confirm=MIZIZI_APPLY",
@@ -688,11 +777,32 @@ describe("MIZIZI Cultural Data Steward", () => {
     expect(runner).toContain(
       "coalesce(\n            btrim(release_type),",
     );
-    expect(runner).not.toContain(
+    expect(runner).toContain(
       "community_activity",
+    );
+    expect(runner).toContain(
+      "signal_os_content_opportunities",
+    );
+    expect(runner).toContain(
+      '"https://wakilisha.africa" +\n            newPath',
+    );
+    expect(runner).toContain(
+      "other.slug = $4",
+    );
+    expect(runner).toContain(
+      "other.slug = $3",
     );
     expect(runner).not.toContain(
       "analytics_events",
+    );
+    expect(runner).not.toContain(
+      "signal_os_entity_daily_metrics",
+    );
+    expect(runner).not.toContain(
+      "signal_os_entity_signal_scores",
+    );
+    expect(runner).not.toContain(
+      '"wk_slug_redirects",',
     );
   });
 });

@@ -18,53 +18,27 @@ describe("Release taxonomy and public identity", () => {
     expect(releaseTypeLabelFromActiveTrackCount(7)).toBe("Album");
   });
 
-  it("gives only multi-track Releases dedicated Release detail pages", () => {
-    expect(hasDedicatedPublicReleasePage(1)).toBe(false);
+  it("gives every resolvable Release a dedicated Release detail page", () => {
+    expect(hasDedicatedPublicReleasePage(0)).toBe(false);
+    expect(hasDedicatedPublicReleasePage(1)).toBe(true);
     expect(hasDedicatedPublicReleasePage(2)).toBe(true);
     expect(hasDedicatedPublicReleasePage(7)).toBe(true);
   });
 
-  it("routes a Single card directly to its canonical Track", () => {
-    expect(
-      releaseUrl({
-        slug: "nervous-single",
-        artist: "Ywaya Tajiri",
-        artistSlug: "ywaya-tajiri",
-        trackCount: 1,
-        singleTrackSlug: "nervous",
-        singleTrackArtistSlug: "ywaya-tajiri",
-      }),
-    ).toBe("/tracks/ywaya-tajiri/nervous");
-  });
-
-  it("fails closed instead of manufacturing a Single Release detail URL", () => {
-    expect(
-      releaseUrl({
-        slug: "nervous-single",
-        artist: "Ywaya Tajiri",
-        releaseType: "Single",
-        trackCount: 1,
-      }),
-    ).toBe("/releases");
-  });
-
-  it("keeps EP and Album cards on Release detail routes", () => {
-    expect(
-      releaseUrl({
-        slug: "two-track-project",
-        artist: "Artist",
-        artistSlug: "artist",
-        trackCount: 2,
-      }),
-    ).toBe("/releases/artist/two-track-project");
-
-    expect(
-      releaseUrl({
-        slug: "seven-track-project",
-        artist: "Artist",
-        artistSlug: "artist",
-        trackCount: 7,
-      }),
-    ).toBe("/releases/artist/seven-track-project");
+  it("keeps Singles, EPs, and Albums on Release detail routes", () => {
+    for (const fixture of [
+      { slug: "nervous", trackCount: 1 },
+      { slug: "two-track-project", trackCount: 2 },
+      { slug: "seven-track-project", trackCount: 7 },
+    ]) {
+      expect(
+        releaseUrl({
+          slug: fixture.slug,
+          artist: "Artist",
+          artistSlug: "artist",
+          trackCount: fixture.trackCount,
+        }),
+      ).toBe(`/releases/artist/${fixture.slug}`);
+    }
   });
 });

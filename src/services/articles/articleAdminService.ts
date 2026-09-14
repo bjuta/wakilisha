@@ -1029,42 +1029,6 @@ export async function saveHeroToMediaLibrary(
 }
 
 /**
- * Insert a slug redirect record.
- */
-export async function insertSlugRedirect(
-  oldSlug: string,
-  newSlug: string,
-  createdBy: string
-): Promise<void> {
-  try {
-    await supabase.from("wk_slug_redirects").insert({
-      old_slug: oldSlug,
-      new_slug: newSlug,
-      entity_type: "article",
-      created_by: createdBy,
-    });
-  } catch {
-    // Non-blocking — redirect is a nice-to-have
-  }
-}
-
-/**
- * Look up a slug redirect.
- */
-export async function lookupSlugRedirect(oldSlug: string): Promise<string | null> {
-  const { data } = await supabase
-    .from("wk_slug_redirects")
-    .select("new_slug")
-    .eq("old_slug", oldSlug)
-    .eq("entity_type", "article")
-    .order("created_at", { ascending: false })
-    .limit(1)
-    .maybeSingle();
-
-  return data?.new_slug ?? null;
-}
-
-/**
  * Trash an article (set wp_status = "trash").
  */
 export async function trashArticle(articleId: string): Promise<SaveResult> {
@@ -1188,7 +1152,7 @@ export async function restoreArticle(articleId: string): Promise<SaveResult> {
 
 /**
  * Permanently delete an article from the database.
- * This cascades to revisions and slug redirects.
+ * This permanently removes the Article and its stored revisions.
  */
 export async function permanentlyDeleteArticle(articleId: string): Promise<SaveResult> {
   try {
@@ -1197,13 +1161,6 @@ export async function permanentlyDeleteArticle(articleId: string): Promise<SaveR
       .from("wk_article_revisions")
       .delete()
       .eq("article_id", articleId);
-
-    // Delete slug redirects for this article
-    await supabase
-      .from("wk_slug_redirects")
-      .delete()
-      .eq("entity_type", "article")
-      .eq("new_slug", articleId);
 
     // Delete the article itself
     const { error } = await supabase

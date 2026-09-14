@@ -54,6 +54,15 @@ describe("MIZIZI Release production control plane", () => {
     expect(controlPlane).toContain(
       "238a817a5e342f8311ac04fc9a6bc978f67276cb664046cddc9e375bc323e9c4",
     );
+    expect(controlPlane).toContain(
+      "EXPECTED_PROVIDER_PACKAGING_CANDIDATES = 737",
+    );
+    expect(controlPlane).toContain("release_title_provider_packaging");
+    expect(controlPlane).toContain("release_slug_provider_packaging");
+    expect(controlPlane).toContain("1\\.2\\.0");
+    expect(controlPlane).not.toContain(
+      "taxonomy_candidates:findings-observedFindings",
+    );
     expect(controlPlane).toContain("--entity=release");
     expect(controlPlane).toContain("--confirm=MIZIZI_APPLY");
     expect(controlPlane).toContain(

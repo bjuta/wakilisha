@@ -186,7 +186,7 @@ export default function AdminTrashPage() {
               and all its revision history. This action <strong>cannot be undone</strong>.
             </p>
             <p className="text-[12px] text-wk-text-soft bg-wk-bg-subtle rounded-lg px-3 py-2 mb-5 border border-wk-border/50">
-              Slug redirects associated with this article will also be removed.
+              This permanently removes the article and its revisions.
             </p>
             <div className="flex gap-3">
               <button

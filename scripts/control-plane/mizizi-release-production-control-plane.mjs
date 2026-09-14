@@ -10,10 +10,11 @@ const TRIGGER_FILE = process.env.MIZIZI_TRIGGER_FILE || '';
 const ARTIFACT_DIR = process.env.MIZIZI_ARTIFACT_DIR || 'artifacts/mizizi-release-production-control-plane';
 const EXPECTED_AUTHORITY_FINGERPRINT = 'cf71fc24d54bb71d64a469e159daaf06b137680f294efe4542b1b691aee68b16';
 const EXPECTED_CANDIDATE_FINGERPRINT = '238a817a5e342f8311ac04fc9a6bc978f67276cb664046cddc9e375bc323e9c4';
+const EXPECTED_PROVIDER_PACKAGING_CANDIDATES = 737;
 const EXPECTED_BLOBS = {
-  'scripts/registry/agents/mizizi/run.ts': 'fa60ce8060ff12610354d3be94ec29f20b3a6f1f',
-  'scripts/registry/agents/mizizi/core.ts': '5d81530ed3e0550162e1d583dacf9eea7eefca07',
-  'supabase/functions/_shared/release-taxonomy.ts': 'e424dea443d7fb6ce85acca4f0c33375c56669ca',
+  'scripts/registry/agents/mizizi/run.ts': '32d745759c79aabfcbf1d1875431b3353d3af104',
+  'scripts/registry/agents/mizizi/core.ts': 'c8ab1436437175cd1d7d1c451299ae2b199bc327',
+  'supabase/functions/_shared/release-taxonomy.ts': '12eaff54ac13e9b36fe3319d955d84e0d98d73a6',
 };
 
 if (!['preflight','apply'].includes(MODE)) throw new Error('Unsupported control-plane mode');
@@ -196,6 +197,8 @@ const PRE_APPLY_BASELINE = {
 };
 const POST_APPLY_BASELINE = {
   ...PRE_APPLY_BASELINE,
+  ledger_count:116,
+  ledger_head:'20260914072142',
   taxonomy_candidates:0,
   ep_to_single:0,
   album_to_ep:0,
@@ -232,12 +235,27 @@ async function assertAcceptedPostApply(pool,state) {
   },'release acceptance');
 }
 
-function assertReleaseAudit(text,expectedCandidates) {
+function assertReleaseAudit(text) {
   const clean = text.replace(/\x1b\[[0-9;]*m/g,'');
+
   const summary = clean.match(
-    /│\s*0\s*│\s*(\d+)\s*│\s*(\d+)\s*│\s*(\d+)\s*│\s*(\d+)\s*│\s*(\d+)\s*│\s*(\d+)\s*│\s*(\d+)\s*│\s*(\d+)\s*│\s*'audit'\s*│\s*'1\.1\.0'\s*│/,
+    /│\s*0\s*│\s*(\d+)\s*│\s*(\d+)\s*│\s*(\d+)\s*│\s*(\d+)\s*│\s*(\d+)\s*│\s*(\d+)\s*│\s*(\d+)\s*│\s*(\d+)\s*│\s*'audit'\s*│\s*'1\.2\.0'\s*│/,
   );
-  if (!summary) throw new Error('Release audit summary was not parseable');
+  if (!summary) {
+    throw new Error('Release audit summary was not parseable as MIZIZI rule set 1.2.0');
+  }
+
+  const titlePackaging = clean.match(
+    /│\s*\d+\s*│\s*'release_title_provider_packaging'\s*│\s*(\d+)\s*│/,
+  );
+  const slugPackaging = clean.match(
+    /│\s*\d+\s*│\s*'release_slug_provider_packaging'\s*│\s*(\d+)\s*│/,
+  );
+
+  if (!titlePackaging || !slugPackaging) {
+    throw new Error('Release provider-packaging findings were not parseable');
+  }
+
   const [
     ,
     findings,
@@ -249,27 +267,42 @@ function assertReleaseAudit(text,expectedCandidates) {
     releasesScanned,
     chartEntriesScanned,
   ] = summary.map(Number);
+
+  const titlePackagingCount = Number(titlePackaging[1]);
+  const slugPackagingCount = Number(slugPackaging[1]);
+
   assertFields(
     {
+      findings,
       applied,
       queued_for_review:queuedForReview,
+      observed_findings:observedFindings,
       stale,
       tracks_scanned:tracksScanned,
       releases_scanned:releasesScanned,
       chart_entries_scanned:chartEntriesScanned,
-      taxonomy_candidates:findings-observedFindings,
+      title_packaging_observations:titlePackagingCount,
+      slug_packaging_candidates:slugPackagingCount,
     },
     {
+      findings:EXPECTED_PROVIDER_PACKAGING_CANDIDATES * 2,
       applied:0,
       queued_for_review:0,
+      observed_findings:EXPECTED_PROVIDER_PACKAGING_CANDIDATES,
       stale:0,
       tracks_scanned:0,
       releases_scanned:841,
       chart_entries_scanned:0,
-      taxonomy_candidates:expectedCandidates,
+      title_packaging_observations:EXPECTED_PROVIDER_PACKAGING_CANDIDATES,
+      slug_packaging_candidates:EXPECTED_PROVIDER_PACKAGING_CANDIDATES,
     },
     'Release audit summary',
   );
+
+  if (clean.includes("'release_taxonomy_drift'")) {
+    throw new Error('historical Release taxonomy drift resurfaced in current audit');
+  }
+
   if (!clean.includes('Audit mode completed. No Registry rows were changed.')) {
     throw new Error('Release audit did not prove read-only completion');
   }
@@ -388,7 +421,7 @@ async function main() {
 
         const auditCurrent = ARTIFACT_DIR+'/post-apply-audit.txt';
         await streamReadOnlyAuditWithRetry(['run','registry:mizizi:audit','--','--entity=release','--limit=0'],{DATABASE_URL:url},auditCurrent);
-        assertReleaseAudit(fs.readFileSync(auditCurrent,'utf8'),0);
+        assertReleaseAudit(fs.readFileSync(auditCurrent,'utf8'));
 
         if (MODE === 'apply') {
           throw new Error('historical Release taxonomy apply is already accepted; refusing repeat production mutation');
@@ -409,7 +442,7 @@ async function main() {
       console.log('\n=== 4. FRESH READ-ONLY PRODUCTION AUDIT ===');
       const auditBefore = ARTIFACT_DIR+'/pre-apply-audit.txt';
       await streamReadOnlyAuditWithRetry(['run','registry:mizizi:audit','--','--entity=release','--limit=0'],{DATABASE_URL:url},auditBefore);
-      assertReleaseAudit(fs.readFileSync(auditBefore,'utf8'),32);
+      assertReleaseAudit(fs.readFileSync(auditBefore,'utf8'));
 
       const {rows:[afterAudit]} = await pool.query(releaseStateSql);
       assertFields(afterAudit,PRE_APPLY_BASELINE,'post-audit Release baseline');
@@ -437,7 +470,7 @@ async function main() {
       console.log('\n=== 7. FRESH POST-APPLY AUDIT ===');
       const auditAfter = ARTIFACT_DIR+'/post-apply-audit.txt';
       await streamReadOnlyAuditWithRetry(['run','registry:mizizi:audit','--','--entity=release','--limit=0'],{DATABASE_URL:url},auditAfter);
-      assertReleaseAudit(fs.readFileSync(auditAfter,'utf8'),0);
+      assertReleaseAudit(fs.readFileSync(auditAfter,'utf8'));
       console.log('\n=== MIZIZI HISTORICAL RELEASE TAXONOMY PRODUCTION APPLY PASS ===');
     } finally {
       await pool.end().catch(()=>{});

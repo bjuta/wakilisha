@@ -180,9 +180,13 @@ const directLazyImports = [
  * - ../pages/magazine/page
  * - ../pages/mobile/magazine/page
  *
- * The current authority is therefore 73 direct lazy imports.
+ * Phase 9A.3 retires two compatibility-only lazy modules:
+ * - ../pages/LegacyArticleRedirect
+ * - ../pages/authors/legacy-redirect/page
+ *
+ * The current authority is therefore 71 direct lazy imports.
  */
-const expectedDirectLazyImportCount = 73;
+const expectedDirectLazyImportCount = 71;
 
 if (
   directLazyImports.length !==
@@ -200,6 +204,17 @@ if (
   fail(
     "duplicate direct lazy public imports were found",
   );
+}
+
+for (const retiredModule of [
+  "../pages/LegacyArticleRedirect",
+  "../pages/authors/legacy-redirect/page",
+]) {
+  if (directLazyImports.includes(retiredModule)) {
+    fail(
+      `retired compatibility lazy module returned: ${retiredModule}`,
+    );
+  }
 }
 
 const defaultExportFailures =
@@ -417,7 +432,13 @@ const routePaths = [
  *
  * The current authority is 179 paths. Removing the Messages paths, the Artist\n * Studio path, the Field intake path, the five declared public Audio and Show\n * paths, the two K5B Admin Video paths, and the two public Video paths must\n * still reproduce the exact 165-path pre-M1 sequence.
  */
-const expectedRoutePathCount = 179;
+/*
+ * Phase 9A.3 retires the two Release-scoped Track compatibility paths.
+ * Current route authority is 177 paths.
+ * The historical pre-M1 sequence, adjusted for that later retirement,
+ * is therefore 163 paths and receives a new exact checksum below.
+ */
+const expectedRoutePathCount = 177;
 const publicAudioIndexPath = "/audio";
 const publicAudioPath = "/audio/:slug";
 const publicShowIndexPath = "/shows";
@@ -437,6 +458,17 @@ if (routePaths.length !== expectedRoutePathCount) {
   fail(
     `expected ${expectedRoutePathCount} route paths, found ${routePaths.length}`,
   );
+}
+
+for (const retiredRoutePath of [
+  "/releases/:artistSlug/:releaseSlug/:trackSlug/lyrics/contribute",
+  "/releases/:artistSlug/:releaseSlug/:trackSlug",
+]) {
+  if (routePaths.includes(retiredRoutePath)) {
+    fail(
+      `retired Release-scoped Track route returned: ${retiredRoutePath}`,
+    );
+  }
 }
 
 for (const [routePath, label] of [
@@ -492,9 +524,9 @@ const preM1RoutePaths = routePaths.filter(
     routePath !== publicVideoStandalonePath,
 );
 
-if (preM1RoutePaths.length !== 165) {
+if (preM1RoutePaths.length !== 163) {
   fail(
-    `expected 165 pre-M1 route paths after removing declared Phase 6B paths, found ${preM1RoutePaths.length}`,
+    `expected 163 9A.3-adjusted pre-M1 route paths after removing declared Phase 6B paths, found ${preM1RoutePaths.length}`,
   );
 }
 
@@ -507,7 +539,7 @@ const routeChecksum = crypto
   .digest("hex");
 
 const expectedRouteChecksum =
-  "b88dad0db887b324d9d9db70019651a8dfff0a745106b0838c338f6ffcc455fc";
+  "25fde8d962f925ecf0ddc9b56d5118c08ad195ec0967dd9ee12292688ac4db9f";
 
 if (
   routeChecksum !==
@@ -549,5 +581,5 @@ if (
 
 console.log(
   "Public route splitting audit passed: " +
-  `${directLazyImports.length} lazy imports, ${expectedRoutePathCount} route paths, pre-M1 sequence preserved.`,
+  `${directLazyImports.length} lazy imports, ${expectedRoutePathCount} route paths, 9A.3-adjusted pre-M1 sequence preserved.`,
 );

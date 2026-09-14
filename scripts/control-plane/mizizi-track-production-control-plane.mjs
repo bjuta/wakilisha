@@ -11,8 +11,8 @@ const TRIGGER_FILE = process.env.MIZIZI_TRIGGER_FILE || '';
 const ARTIFACT_DIR = process.env.MIZIZI_ARTIFACT_DIR || 'artifacts/mizizi-track-production-control-plane';
 const EXPECTED_FINGERPRINT = '551b29431700536937c26ecb1e396c3cf9314edefd88c589284cf330c9d1bb9a';
 const EXPECTED_BLOBS = {
-  'scripts/registry/agents/mizizi/run.ts': 'fa60ce8060ff12610354d3be94ec29f20b3a6f1f',
-  'scripts/registry/agents/mizizi/core.ts': '5d81530ed3e0550162e1d583dacf9eea7eefca07',
+  'scripts/registry/agents/mizizi/run.ts': '32d745759c79aabfcbf1d1875431b3353d3af104',
+  'scripts/registry/agents/mizizi/core.ts': 'c8ab1436437175cd1d7d1c451299ae2b199bc327',
   'supabase/functions/_shared/registry-track-identity.ts': '7bcab485aecc3cc7b90e2a3154d90dcee81be92c',
 };
 
@@ -273,8 +273,8 @@ const POST_APPLY_BASELINE = {
   reviews:66,
   redirects:1148,
   mizizi_redirects:857,
-  ledger_count:79,
-  ledger_head:'20260901170500',
+  ledger_count:116,
+  ledger_head:'20260914072142',
 };
 
 function fieldsMatch(actual, expected) {
@@ -304,8 +304,8 @@ function assertAcceptedPostApply(state) {
       mizizi_redirects:857,
       chart_mismatches:0,
       save_mismatches:0,
-      ledger_count:79,
-      ledger_head:'20260901170500',
+      ledger_count:116,
+      ledger_head:'20260914072142',
     },
     'acceptance',
   );

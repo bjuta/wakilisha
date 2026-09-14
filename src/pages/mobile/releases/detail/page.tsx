@@ -468,7 +468,7 @@ export default function MobileReleaseDetail() {
 
   const communityEntity = {
     type: "release" as const,
-    id: releaseSlug || undefined,
+    id: release.id,
     slug: releaseSlug || undefined,
     url: typeof window !== "undefined" ? window.location.href : `/releases/${artistSlug}/${releaseSlug}`,
     title: release.title,
@@ -687,8 +687,6 @@ export default function MobileReleaseDetail() {
                 const trackHref = canonicalTrackUrl(
                   artistSlug,
                   track.slug,
-                  releaseSlug,
-                  release.trackCount,
                 );
                 return (
                   <div key={track.id} className="flex items-center gap-3 px-4 py-3 border-b border-[var(--wk-divider)] last:border-b-0 active:bg-[var(--wk-surface-raised)] transition-colors">

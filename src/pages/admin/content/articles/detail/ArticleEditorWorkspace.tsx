@@ -34,7 +34,6 @@ import {
   pruneRevisions,
   saveHeroToMediaLibrary,
   checkSlugCollision,
-  insertSlugRedirect,
   trashArticle,
   generatePreviewNonce,
   fetchArticleLifecycleEvents,
@@ -1434,8 +1433,6 @@ export function ArticleEditorWorkspace({
     }
 
     setPreviewNonce(null);
-    await insertSlugRedirect(slug, newSlug, adminUser.name || "system");
-
     addToast("success", "Slug updated. Reloading…");
     setTimeout(() => navigate(`/admin/content/articles/${newSlug}`), 800);
     return true;
