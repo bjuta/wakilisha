@@ -87,11 +87,15 @@ Current Production contains 16 jobs and 505 outbox events. These are real reusab
 
 **Decision**: do not create a second MIZIZI-only job/outbox stack unless a missing invariant is proved.
 
-### 2.5 System Actors and capabilities
+### 2.5 System Actor identity and executor binding
 
-MIZIZI already exists as a System Actor with capabilities and executor binding machinery.
+Current Production has an active `platform_private.system_actors` row for `mizizi` and an active `platform_private.system_actor_executor_bindings` row binding it to `database_role = postgres`.
 
-**Decision**: reuse the identity/capability concept, but replace ambient autonomous executor authority with short-lived typed execution grants before autonomous Production mutation.
+The System Actor row carries a bounded JSON `capability_profile` with `domain = registry`, `agent = mizizi`, and `ruleset_version = 1.1.0`.
+
+**Important live-schema correction:** current Production does **not** contain normalized relations named `capabilities`, `system_actor_capability_grants`, or `stewardship_rulesets`. The accepted Phase 8B.4 System Actor migration established identity, capability-profile metadata, executor binding, Messages policy, and System command receipts. It did not establish the typed capability-grant/ruleset authority that autonomous Registry mutation now requires.
+
+**Decision**: preserve System Actor identity and the separation between actor identity and executor identity. Replace ambient autonomous executor authority with normalized typed capabilities/delegations and short-lived exact execution grants before autonomous Production mutation. The current `postgres` executor binding is evidence of a boundary to supersede for autonomous mutation, not a permission model to extend.
 
 ## 3. Evidence that governance concepts are repeating
 
@@ -137,7 +141,7 @@ Current writers establish authority in several ways:
 - gateway JWT only;
 - user auth with no Registry capability;
 - no caller auth;
-- System Actor capability grants;
+- System Actor capability-profile metadata without a normalized mutation grant;
 - direct database role bindings.
 
 MIZIZI autonomy cannot safely inherit this inconsistency.
