@@ -44,6 +44,170 @@ begin
 end
 $preflight$;
 
+alter table platform_private.registry_operation_types
+  drop constraint registry_operation_types_subjects_check;
+
+alter table platform_private.registry_operation_types
+  add constraint registry_operation_types_subjects_check
+  check (
+    cardinality(allowed_subject_types) >= 1
+    and cardinality(allowed_subject_types) <= 8
+    and array_position(allowed_subject_types, null::text) is null
+    and allowed_subject_types <@ array[
+      'artist',
+      'track',
+      'release',
+      'registry_relationship',
+      'track_artist_credit',
+      'release_track_membership',
+      'release_artist_credit'
+    ]::text[]
+  );
+
+create or replace function
+platform_private.registry_subject_exists(
+  p_subject_type text,
+  p_subject_id uuid
+)
+returns boolean
+language plpgsql
+stable
+security definer
+set search_path = pg_catalog, public
+as $$
+begin
+  if p_subject_id is null then
+    return false;
+  end if;
+
+  return case p_subject_type
+    when 'artist' then
+      exists (
+        select 1
+        from public.registry_artists artist
+        where artist.id = p_subject_id
+      )
+    when 'track' then
+      exists (
+        select 1
+        from public.registry_tracks track
+        where track.id = p_subject_id
+      )
+    when 'release' then
+      exists (
+        select 1
+        from public.registry_releases release
+        where release.id = p_subject_id
+      )
+    when 'registry_relationship' then
+      exists (
+        select 1
+        from public.registry_entity_relationships relationship
+        where relationship.id = p_subject_id
+      )
+    when 'track_artist_credit' then
+      exists (
+        select 1
+        from public.registry_track_artists credit
+        where credit.id = p_subject_id
+      )
+    when 'release_track_membership' then
+      exists (
+        select 1
+        from public.registry_release_tracks membership
+        where membership.id = p_subject_id
+      )
+    when 'release_artist_credit' then
+      exists (
+        select 1
+        from public.registry_release_artists credit
+        where credit.id = p_subject_id
+      )
+    else false
+  end;
+end
+$$;
+
+create or replace function
+platform_private.registry_subject_state_fingerprint(
+  p_subject_type text,
+  p_subject_id uuid
+)
+returns text
+language plpgsql
+stable
+security definer
+set search_path = pg_catalog, public, extensions
+as $$
+declare
+  v_state jsonb;
+begin
+  if p_subject_id is null then
+    return null;
+  end if;
+
+  case p_subject_type
+    when 'artist' then
+      select to_jsonb(artist)
+      into v_state
+      from public.registry_artists artist
+      where artist.id = p_subject_id;
+    when 'track' then
+      select to_jsonb(track)
+      into v_state
+      from public.registry_tracks track
+      where track.id = p_subject_id;
+    when 'release' then
+      select to_jsonb(release)
+      into v_state
+      from public.registry_releases release
+      where release.id = p_subject_id;
+    when 'registry_relationship' then
+      select to_jsonb(relationship)
+      into v_state
+      from public.registry_entity_relationships relationship
+      where relationship.id = p_subject_id;
+    when 'track_artist_credit' then
+      select to_jsonb(credit)
+      into v_state
+      from public.registry_track_artists credit
+      where credit.id = p_subject_id;
+    when 'release_track_membership' then
+      select to_jsonb(membership)
+      into v_state
+      from public.registry_release_tracks membership
+      where membership.id = p_subject_id;
+    when 'release_artist_credit' then
+      select to_jsonb(credit)
+      into v_state
+      from public.registry_release_artists credit
+      where credit.id = p_subject_id;
+    else
+      return null;
+  end case;
+
+  if v_state is null then
+    return null;
+  end if;
+
+  return encode(
+    extensions.digest(
+      v_state::text,
+      'sha256'
+    ),
+    'hex'
+  );
+end
+$$;
+
+revoke all on function
+  platform_private.registry_subject_exists(text,uuid)
+from public, anon, authenticated, service_role;
+
+revoke all on function
+  platform_private.registry_subject_state_fingerprint(text,uuid)
+from public, anon, authenticated, service_role;
+
 insert into public.capability_definitions (
   capability_key,
   label,

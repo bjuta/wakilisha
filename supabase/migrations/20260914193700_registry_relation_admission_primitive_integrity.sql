@@ -172,6 +172,103 @@ begin
         )
       );
 
+  if exists (
+    select 1
+    from platform_private.registry_operation_types operation_type
+    where (
+      operation_type.operation_key = 'registry.track_artist_credit.admit'
+      and operation_type.allowed_subject_types
+          <> array['track_artist_credit']::text[]
+    )
+    or (
+      operation_type.operation_key = 'registry.release_track.admit'
+      and operation_type.allowed_subject_types
+          <> array['release_track_membership']::text[]
+    )
+    or (
+      operation_type.operation_key = 'registry.release_artist_credit.admit'
+      and operation_type.allowed_subject_types
+          <> array['release_artist_credit']::text[]
+    )
+  ) then
+    raise exception 'Registry relation subject-type contracts drifted';
+  end if;
+
+  if not (
+    pg_get_constraintdef(
+      (
+        select constraint_row.oid
+        from pg_constraint constraint_row
+        where constraint_row.conrelid =
+              'platform_private.registry_operation_types'::regclass
+          and constraint_row.conname =
+              'registry_operation_types_subjects_check'
+      )
+    ) like '%track_artist_credit%'
+    and pg_get_constraintdef(
+      (
+        select constraint_row.oid
+        from pg_constraint constraint_row
+        where constraint_row.conrelid =
+              'platform_private.registry_operation_types'::regclass
+          and constraint_row.conname =
+              'registry_operation_types_subjects_check'
+      )
+    ) like '%release_track_membership%'
+    and pg_get_constraintdef(
+      (
+        select constraint_row.oid
+        from pg_constraint constraint_row
+        where constraint_row.conrelid =
+              'platform_private.registry_operation_types'::regclass
+          and constraint_row.conname =
+              'registry_operation_types_subjects_check'
+      )
+    ) like '%release_artist_credit%'
+  ) then
+    raise exception 'Registry operation subject vocabulary did not converge for relation V1';
+  end if;
+
+  if position(
+       'registry_track_artists'
+       in pg_get_functiondef(
+            'platform_private.registry_subject_exists(text,uuid)'::regprocedure
+          )
+     ) = 0
+     or position(
+       'registry_release_tracks'
+       in pg_get_functiondef(
+            'platform_private.registry_subject_exists(text,uuid)'::regprocedure
+          )
+     ) = 0
+     or position(
+       'registry_release_artists'
+       in pg_get_functiondef(
+            'platform_private.registry_subject_exists(text,uuid)'::regprocedure
+          )
+     ) = 0
+     or position(
+       'registry_track_artists'
+       in pg_get_functiondef(
+            'platform_private.registry_subject_state_fingerprint(text,uuid)'::regprocedure
+          )
+     ) = 0
+     or position(
+       'registry_release_tracks'
+       in pg_get_functiondef(
+            'platform_private.registry_subject_state_fingerprint(text,uuid)'::regprocedure
+          )
+     ) = 0
+     or position(
+       'registry_release_artists'
+       in pg_get_functiondef(
+            'platform_private.registry_subject_state_fingerprint(text,uuid)'::regprocedure
+          )
+     ) = 0
+  then
+    raise exception 'Registry relation subject resolver mapping drifted';
+  end if;
+
   if v_count <> 3 then
     raise exception
       'STOP: Registry relation-admission operation contracts drifted';
