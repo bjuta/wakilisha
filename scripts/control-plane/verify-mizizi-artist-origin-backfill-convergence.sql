@@ -72,6 +72,29 @@ begin
         or grant_row.issued_by_principal_key<>'user:'||grant_row.issued_by_user_id::text
       )
   ) then raise exception 'Artist-origin admin exact grant escaped human one-row authority'; end if;
+  if position(
+       'Current user is not authorized to verify this Artist-origin operation.'
+       in pg_get_functiondef(
+         'public.admin_verify_registry_artist_origin_admission(uuid)'::regprocedure
+       )
+     ) = 0
+     or position(
+       '42501'
+       in pg_get_functiondef(
+         'public.admin_verify_registry_artist_origin_admission(uuid)'::regprocedure
+       )
+     ) = 0
+     or position(
+       'P0002'
+       in pg_get_functiondef(
+         'public.admin_verify_registry_artist_origin_admission(uuid)'::regprocedure
+       )
+     ) > 0
+  then
+    raise exception
+      'Artist-origin wrong-user verifier denial regressed from authorization semantics';
+  end if;
+
 end
 $verify$;
 
