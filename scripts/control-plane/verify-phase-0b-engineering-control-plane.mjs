@@ -19,6 +19,7 @@ const requiredFiles = [
   "scripts/control-plane/verify-frozen-institute.mjs",
   "scripts/control-plane/verify-live-schema.sh",
   "scripts/registry/agents/mizizi/artist-origin-broker.ts",
+  "supabase/functions/backfill-artist-origin/index.ts",
   "src/lib/requestContext.ts",
   "src/types/database.types.ts",
   "test/control-plane/request-context.test.ts",
@@ -85,11 +86,13 @@ if (
 
 const writerIds = new Set();
 const writerRiskClasses = new Set([
+  "low",
   "medium",
   "high",
   "critical",
 ]);
 const writerDispositions = new Set([
+  "keep",
   "keep_converge",
   "converge",
   "retire",
@@ -327,6 +330,73 @@ for (const forbiddenFragment of [
       `MIZIZI Artist-origin broker contains a forbidden authority escape hatch: ${forbiddenFragment}`,
     );
   }
+}
+
+
+const artistOriginBackfill =
+  registryWriters.find(
+    (writer) => writer.id === "backfill-artist-origin",
+  );
+
+if (
+  artistOriginBackfill?.authentication !== "request_user" ||
+  artistOriginBackfill?.authorization !== "manage_registry" ||
+  artistOriginBackfill?.executionAuthority !==
+    "typed_human_exact_grant_rpc_no_service_role" ||
+  artistOriginBackfill?.riskClass !== "low" ||
+  artistOriginBackfill?.disposition !== "keep" ||
+  artistOriginBackfill?.futureBoundary !==
+    "registry_artist_origin_admin_admission" ||
+  artistOriginBackfill?.miziziCallable !== false ||
+  artistOriginBackfill?.humanCallable !== true ||
+  artistOriginBackfill?.publicCallable !== false ||
+  artistOriginBackfill?.canonicalMutation !== true ||
+  artistOriginBackfill?.legacyDebt !== false
+) {
+  throw new Error(
+    "Artist-origin backfill classification drifted from the exact human-grant boundary.",
+  );
+}
+
+const artistOriginBackfillSource = fs.readFileSync(
+  "supabase/functions/backfill-artist-origin/index.ts",
+  "utf8",
+);
+
+for (const fragment of [
+  "SUPABASE_ANON_KEY",
+  'required_capability: "manage_registry"',
+  "admin_execute_registry_artist_origin_admission",
+  "admin_verify_registry_artist_origin_admission",
+  "artist_id",
+]) {
+  if (!artistOriginBackfillSource.includes(fragment)) {
+    throw new Error(`Artist-origin backfill contract is missing: ${fragment}`);
+  }
+}
+
+for (const forbiddenFragment of [
+  "SUPABASE_SERVICE_ROLE_KEY",
+  ".update(",
+  ".insert(",
+  ".delete(",
+]) {
+  if (artistOriginBackfillSource.toLowerCase().includes(forbiddenFragment.toLowerCase())) {
+    throw new Error(
+      `Artist-origin backfill retained forbidden ambient mutation authority: ${forbiddenFragment}`,
+    );
+  }
+}
+
+const artistDetailSource = fs.readFileSync(
+  "src/pages/admin/registry/artists/detail/page.tsx",
+  "utf8",
+);
+if (
+  !/artist_id\s*:\s*artist\.id/.test(artistDetailSource) ||
+  !/batch_size\s*:\s*1/.test(artistDetailSource)
+) {
+  throw new Error("Artist detail origin backfill is not bound to its exact Artist.");
 }
 
 for (const forbidden of [
