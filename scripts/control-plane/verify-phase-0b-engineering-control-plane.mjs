@@ -24,6 +24,7 @@ const requiredFiles = [
   "src/types/database.types.ts",
   "test/control-plane/request-context.test.ts",
   "scripts/control-plane/verify-registry-identity-creation-primitives.sql",
+  "scripts/control-plane/verify-registry-relation-admission-primitives.sql",
 ];
 
 for (const file of requiredFiles) {
