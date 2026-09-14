@@ -1,0 +1,16 @@
+{
+  "migration_file": "supabase/migrations/20260914193100_mizizi_artist_origin_admission_v1_integrity.sql",
+  "migration_sha256": "19fd77ad7d6a97057fd9b024306f7809d7540a09c4ac656b5d9a561c886a38cf",
+  "base_main_sha": "8797ebed112fb044e361a24b80382e724adbe055",
+  "preview_project_ref": "pvoltqrffqcctffkleed",
+  "preview_branch_id": "936b374d-c8e0-4c8c-9499-42eb38a61ff3",
+  "preview_migration_head": "20260914193100",
+  "baseline_replay": "pass",
+  "candidate_apply": "pass",
+  "verifier": "pass",
+  "verifier_file": "scripts/control-plane/verify-mizizi-artist-origin-admission.sql",
+  "schema_types_sha256": "771216b3bd2d1d58a609945e0946621cb99faedec9fe014dffb0c9b286db5e30",
+  "schema_migration_count": 121,
+  "schema_migration_head": "20260914193100",
+  "verified_at": "2026-09-14T17:44:25.617Z"
+}
