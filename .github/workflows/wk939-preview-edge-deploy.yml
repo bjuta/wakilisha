@@ -30,10 +30,13 @@ jobs:
       - name: Install pinned Supabase CLI
         run: npm install --global supabase@2.107.0
 
-      - name: Prove CLI
+      - name: Prove CLI deployment semantics
         run: |
           set -euo pipefail
           test "$(supabase --version)" = "2.107.0"
+          HELP="$(supabase functions deploy --help)"
+          printf '%s\n' "$HELP" | grep -q -- '--no-verify-jwt'
+          ! printf '%s\n' "$HELP" | grep -q -- '--verify-jwt'
 
       - name: Deploy provider fetch to Preview
         env:
@@ -42,8 +45,7 @@ jobs:
           set -euo pipefail
           supabase functions deploy chart-provider-fetch \
             --project-ref ulmemkqvcysqtjvjxepq \
-            --use-api \
-            --verify-jwt
+            --use-api
 
       - name: Deploy chart ingest API to Preview
         env:
@@ -52,8 +54,7 @@ jobs:
           set -euo pipefail
           supabase functions deploy chart-ingest-api \
             --project-ref ulmemkqvcysqtjvjxepq \
-            --use-api \
-            --verify-jwt
+            --use-api
 
       - name: Deployment marker
         run: echo WK939_PREVIEW_EDGE_DEPLOY_PASS
