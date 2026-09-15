@@ -40,6 +40,7 @@ Deno.serve(async (req) => {
   let body: {
     dry_run?: boolean;
     approved?: boolean;
+    evidence_ids?: string[];
     batch_size?: number;
     artist_id?: string;
     artist_ids?: string[];
@@ -61,6 +62,7 @@ Deno.serve(async (req) => {
     body: JSON.stringify({
       dry_run: body.dry_run !== false,
       approved: body.approved === true,
+      evidence_ids: body.evidence_ids,
       batch_size: Math.min(Math.max(Number(body.batch_size) || 20, 1), 50),
       artist_id: body.artist_id,
       artist_ids: body.artist_ids,
@@ -101,6 +103,7 @@ Deno.serve(async (req) => {
     no_image: Number(result.no_data ?? 0),
     errors: Number(result.errors ?? 0),
     reviewed_artist_ids: result.reviewed_artist_ids ?? [],
+    reviewed_evidence_ids: result.reviewed_evidence_ids ?? [],
     results,
   });
 });
