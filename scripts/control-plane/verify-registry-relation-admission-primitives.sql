@@ -47,7 +47,7 @@ begin
         (
           'registry.track_artist_credit.admit', 1,
           'admit_registry_track_artist_credit',
-          'medium', false, 1, 1, 300, true, true, false
+          'medium', false, 1, 1, 300, true, true, true
         ),
         (
           'registry.release_track.admit', 1,

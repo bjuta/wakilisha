@@ -1,7 +1,8 @@
 -- Permanent verifier for #939 Boundary A identity-creation foundation.
 --
 -- Expected state:
--- - Artist / Track / Release creation V1 operation types exist but are disabled;
+-- - Artist / Track creation V1 are enabled only behind exact chart grants;
+-- - Release creation V1 remains disabled;
 -- - registry_chart_admission is bound only to PostgREST authenticator transport;
 -- - no product role or standing System Actor grant carries the new capabilities;
 -- - no exact grants / mutation operations exist for these inert operations;
@@ -65,11 +66,11 @@ begin
       ) in (
         (
           'registry.artist.create', 1, 'create_registry_artist',
-          'medium', false, 1, 1, 300, true, true, false
+          'medium', false, 1, 1, 300, true, true, true
         ),
         (
           'registry.track.create', 1, 'create_registry_track',
-          'medium', false, 1, 1, 300, true, true, false
+          'medium', false, 1, 1, 300, true, true, true
         ),
         (
           'registry.release.create', 1, 'create_registry_release',
