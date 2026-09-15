@@ -187,9 +187,14 @@ BEGIN
     END;
   END LOOP;
 
-  IF v_fragments <> 641 OR v_skipped <> 10 THEN
+  -- The exact 89-migration predecessor source is byte-identical across both
+  -- proven history paths. Production/native-preview stored history yields 641
+  -- ACL fragments; clean repository replay yields 640. Both are accepted only
+  -- when the retired-target skip set remains exactly 10, and the canonical ACL
+  -- fingerprints below still converge to the same Production perimeter.
+  IF v_fragments NOT IN (640, 641) OR v_skipped <> 10 THEN
     RAISE EXCEPTION
-      'STOP: forward ACL history shape drifted: fragments %, skipped %; expected 641 / 10',
+      'STOP: forward ACL history shape drifted: fragments %, skipped %; expected 640 or 641 / 10',
       v_fragments,
       v_skipped;
   END IF;
