@@ -5,6 +5,10 @@ declare
   v_enabled_count integer;
   v_release_enabled integer;
   v_executor_definition text;
+  v_materialize_definition text;
+  v_origin_definition text;
+  v_shell_definition text;
+  v_target_subject_constraint text;
 begin
   select count(*)::integer
   into v_enabled_count
@@ -134,6 +138,45 @@ begin
   then
     raise exception
       'Chart identity executor crossed the draft identity nucleus boundary';
+  end if;
+
+  select pg_get_functiondef(
+    'public.chart_materialize_candidate_registry_v1(uuid,uuid)'::regprocedure
+  ) into v_materialize_definition;
+
+  select pg_get_functiondef(
+    'public.chart_admit_artist_origin_v1(uuid,text,uuid,uuid,text)'::regprocedure
+  ) into v_origin_definition;
+
+  select pg_get_functiondef(
+    'public.chart_create_artist_origin_shell_v1(text,text,uuid,uuid)'::regprocedure
+  ) into v_shell_definition;
+
+  if position('p_candidate_id::text' in v_materialize_definition)=0
+     or position('p_run_id::text' in v_materialize_definition)=0
+     or position('p_candidate_id::text' in v_origin_definition)=0
+     or position('p_run_id::text' in v_origin_definition)=0
+     or position('p_candidate_id::text' in v_shell_definition)=0
+     or position('p_run_id::text' in v_shell_definition)=0
+  then
+    raise exception
+      'Chart candidate UUID/text identity bridge drifted';
+  end if;
+
+  select pg_get_constraintdef(constraint_row.oid)
+  into v_target_subject_constraint
+  from pg_constraint constraint_row
+  where constraint_row.conrelid=
+        'platform_private.registry_execution_grant_targets'::regclass
+    and constraint_row.conname=
+        'registry_execution_grant_targets_subject_type_check';
+
+  if v_target_subject_constraint not like '%track_artist_credit%'
+     or v_target_subject_constraint not like '%release_track_membership%'
+     or v_target_subject_constraint not like '%release_artist_credit%'
+  then
+    raise exception
+      'Registry execution target relation subject vocabulary drifted';
   end if;
 
   if position(
