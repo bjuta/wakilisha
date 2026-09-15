@@ -1,0 +1,16 @@
+{
+  "migration_file": "supabase/migrations/20260915213000_historical_event_actor_retirement_compatibility.sql",
+  "migration_sha256": "d560aa7666fb7370f96436fe9a3bd4f63a1504ffa976da7709a13c28c00b1b9c",
+  "base_main_sha": "17f742442113438e7d668bbde05a57e67748d017",
+  "preview_project_ref": "ungwfhswlelzrjyezovy",
+  "preview_branch_id": "3345978d-7e01-4cdd-b941-41fca40e2eb4",
+  "preview_migration_head": "20260915213000",
+  "baseline_replay": "pass",
+  "candidate_apply": "pass",
+  "verifier": "pass",
+  "verifier_file": "scripts/control-plane/verify-historical-event-account-retirement-compatibility.sql",
+  "schema_types_sha256": "81240cf245c3a42d591e513b366b034ed7690ed889133148a568000f00dea553",
+  "schema_migration_count": 136,
+  "schema_migration_head": "20260915213000",
+  "verified_at": "2026-09-15T19:23:57.689Z"
+}
