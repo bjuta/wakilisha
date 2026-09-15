@@ -1,8 +1,8 @@
 {
   "projectRef": "pgzizndxdyhqmtyywjmt",
   "schema": "public,editorial",
-  "generatedAt": "2026-09-15T17:13:09Z",
-  "typesSha256": "ae40330f089dca9a0c8a092e9c7e99eb26a3834d39475e8e5465401540dc9ebc",
+  "generatedAt": "2026-09-15T17:40:33Z",
+  "typesSha256": "81240cf245c3a42d591e513b366b034ed7690ed889133148a568000f00dea553",
   "authoritativeMigrationDirectory": "supabase/migrations",
   "migrationCount": 135,
   "latestMigration": "20260915152300_registry_artist_enrichment_review_authority_v1.sql",
