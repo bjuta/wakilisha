@@ -1,5 +1,5 @@
 -- Read-only verifier for MIZIZI Slice 2 Artist Enrichment Authority V1.
--- Safe for Preview and Production after both candidate migrations exist.
+-- Safe for Preview and Production after all three candidate migrations exist.
 
 do $verify$
 declare
@@ -8,7 +8,9 @@ declare
 begin
   if to_regclass('platform_private.registry_evidence_assertions') is null
      or to_regclass('platform_private.registry_execution_grants') is null
+     or to_regclass('platform_private.registry_execution_grant_targets') is null
      or to_regclass('platform_private.registry_mutation_operations') is null
+     or to_regclass('platform_private.registry_operation_write_events') is null
   then
     raise exception 'Artist Enrichment V1 governance substrate is missing';
   end if;
@@ -41,6 +43,20 @@ begin
     raise exception 'Artist Enrichment V1 operation capability leaked into a product role';
   end if;
 
+  select count(*)::integer
+  into v_count
+  from platform_private.registry_operation_types
+  where operation_key in (
+    'registry.artist.provider_profile.admit',
+    'registry.artist.public_image.admit',
+    'registry.artist.bio.admit',
+    'registry.artist.type.admit'
+  );
+
+  if v_count <> 4 then
+    raise exception 'Artist Enrichment V1 operation family is incomplete';
+  end if;
+
   for v_operation in
     select *
     from platform_private.registry_operation_types
@@ -63,50 +79,25 @@ begin
     then
       raise exception 'Artist Enrichment V1 operation semantics drifted: %', v_operation.operation_key;
     end if;
-
-    if v_operation.operation_key = 'registry.artist.provider_profile.admit'
-       and (
-         v_operation.capability_key <> 'admit_registry_artist_provider_profile'
-         or v_operation.risk_class <> 'medium'
-       )
-    then
-      raise exception 'Artist provider-profile operation semantics drifted';
-    elsif v_operation.operation_key = 'registry.artist.public_image.admit'
-       and (
-         v_operation.capability_key <> 'admit_registry_artist_public_image'
-         or v_operation.risk_class <> 'medium'
-       )
-    then
-      raise exception 'Artist public-image operation semantics drifted';
-    elsif v_operation.operation_key = 'registry.artist.bio.admit'
-       and (
-         v_operation.capability_key <> 'admit_registry_artist_bio'
-         or v_operation.risk_class <> 'medium'
-       )
-    then
-      raise exception 'Artist bio operation semantics drifted';
-    elsif v_operation.operation_key = 'registry.artist.type.admit'
-       and (
-         v_operation.capability_key <> 'admit_registry_artist_type'
-         or v_operation.risk_class <> 'high'
-       )
-    then
-      raise exception 'Artist type operation semantics drifted';
-    end if;
   end loop;
 
-  select count(*)::integer
-  into v_count
-  from platform_private.registry_operation_types
-  where operation_key in (
-    'registry.artist.provider_profile.admit',
-    'registry.artist.public_image.admit',
-    'registry.artist.bio.admit',
-    'registry.artist.type.admit'
-  );
-
-  if v_count <> 4 then
-    raise exception 'Artist Enrichment V1 operation family is incomplete';
+  if exists (
+    select 1
+    from platform_private.registry_operation_types
+    where (operation_key, capability_key, risk_class) not in (
+      ('registry.artist.provider_profile.admit','admit_registry_artist_provider_profile','medium'),
+      ('registry.artist.public_image.admit','admit_registry_artist_public_image','medium'),
+      ('registry.artist.bio.admit','admit_registry_artist_bio','medium'),
+      ('registry.artist.type.admit','admit_registry_artist_type','high')
+    )
+      and operation_key in (
+        'registry.artist.provider_profile.admit',
+        'registry.artist.public_image.admit',
+        'registry.artist.bio.admit',
+        'registry.artist.type.admit'
+      )
+  ) then
+    raise exception 'Artist Enrichment V1 operation capability/risk mapping drifted';
   end if;
 
   if not exists (
@@ -130,44 +121,20 @@ begin
     raise exception 'Artist Enrichment V1 admin broker binding drifted';
   end if;
 
-  if to_regprocedure(
-       'platform_private.registry_artist_enrichment_claim_is_valid(text,jsonb,text)'
-     ) is null
-     or to_regprocedure(
-       'platform_private.registry_artist_enrichment_unowned_state_fingerprint(uuid,text)'
-     ) is null
-     or to_regprocedure(
-       'platform_private.record_registry_artist_enrichment_user_evidence(uuid,text,jsonb,text,text,text,timestamp with time zone)'
-     ) is null
-     or to_regprocedure(
-       'platform_private.issue_registry_artist_enrichment_user_execution_grant(uuid)'
-     ) is null
-     or to_regprocedure(
-       'platform_private.execute_registry_artist_enrichment_admission(uuid)'
-     ) is null
-     or to_regprocedure(
-       'platform_private.verify_registry_artist_enrichment_admission(uuid)'
-     ) is null
-     or to_regprocedure(
-       'platform_private.execute_registry_artist_enrichment_user_claim(uuid,text,jsonb,text,text,text,timestamp with time zone)'
-     ) is null
-     or to_regprocedure(
-       'public.admin_execute_registry_artist_provider_profile_admission(uuid,text,text,bigint,integer,text[],text,text,text,timestamp with time zone)'
-     ) is null
-     or to_regprocedure(
-       'public.admin_execute_registry_artist_public_image_admission(uuid,text,text,text,text,timestamp with time zone)'
-     ) is null
-     or to_regprocedure(
-       'public.admin_execute_registry_artist_bio_admission(uuid,text,text,text,text,text,timestamp with time zone)'
-     ) is null
-     or to_regprocedure(
-       'public.admin_execute_registry_artist_type_admission(uuid,text,text,text,text,text,timestamp with time zone)'
-     ) is null
-     or to_regprocedure(
-       'public.admin_verify_registry_artist_enrichment_admission(uuid)'
-     ) is null
+  if to_regprocedure('platform_private.registry_artist_enrichment_claim_is_valid(text,jsonb,text)') is null
+     or to_regprocedure('platform_private.registry_artist_enrichment_unowned_state_fingerprint(uuid,text)') is null
+     or to_regprocedure('platform_private.record_registry_artist_enrichment_user_evidence(uuid,text,jsonb,text,text,text,timestamp with time zone)') is null
+     or to_regprocedure('platform_private.issue_registry_artist_enrichment_user_execution_grant(uuid)') is null
+     or to_regprocedure('platform_private.execute_registry_artist_enrichment_admission(uuid)') is null
+     or to_regprocedure('platform_private.verify_registry_artist_enrichment_admission(uuid)') is null
+     or to_regprocedure('public.admin_prepare_registry_artist_provider_profile_evidence(uuid,text,text,bigint,integer,text[],text,text,text,timestamp with time zone)') is null
+     or to_regprocedure('public.admin_prepare_registry_artist_public_image_evidence(uuid,text,text,text,text,timestamp with time zone)') is null
+     or to_regprocedure('public.admin_prepare_registry_artist_bio_evidence(uuid,text,text,text,text,text,timestamp with time zone)') is null
+     or to_regprocedure('public.admin_prepare_registry_artist_type_evidence(uuid,text,text,text,text,text,timestamp with time zone)') is null
+     or to_regprocedure('public.admin_execute_registry_artist_enrichment_evidence_admission(uuid)') is null
+     or to_regprocedure('public.admin_verify_registry_artist_enrichment_admission(uuid)') is null
   then
-    raise exception 'Artist Enrichment V1 function authority is incomplete';
+    raise exception 'Artist Enrichment V1 reviewed-evidence function authority is incomplete';
   end if;
 
   if platform_private.registry_artist_enrichment_claim_is_valid(
@@ -194,87 +161,49 @@ begin
     raise exception 'Artist Enrichment V1 typed claim policy drifted';
   end if;
 
-  if has_function_privilege(
-       'anon',
-       'platform_private.execute_registry_artist_enrichment_admission(uuid)',
-       'EXECUTE'
-     )
-     or has_function_privilege(
-       'authenticated',
-       'platform_private.execute_registry_artist_enrichment_admission(uuid)',
-       'EXECUTE'
-     )
-     or has_function_privilege(
-       'service_role',
-       'platform_private.execute_registry_artist_enrichment_admission(uuid)',
-       'EXECUTE'
-     )
-     or has_function_privilege(
-       'anon',
-       'platform_private.verify_registry_artist_enrichment_admission(uuid)',
-       'EXECUTE'
-     )
-     or has_function_privilege(
-       'authenticated',
-       'platform_private.verify_registry_artist_enrichment_admission(uuid)',
-       'EXECUTE'
-     )
-     or has_function_privilege(
-       'service_role',
-       'platform_private.verify_registry_artist_enrichment_admission(uuid)',
-       'EXECUTE'
-     )
-     or has_function_privilege(
-       'anon',
-       'platform_private.execute_registry_artist_enrichment_user_claim(uuid,text,jsonb,text,text,text,timestamptz)',
-       'EXECUTE'
-     )
-     or has_function_privilege(
-       'authenticated',
-       'platform_private.execute_registry_artist_enrichment_user_claim(uuid,text,jsonb,text,text,text,timestamptz)',
-       'EXECUTE'
-     )
-     or has_function_privilege(
-       'service_role',
-       'platform_private.execute_registry_artist_enrichment_user_claim(uuid,text,jsonb,text,text,text,timestamptz)',
-       'EXECUTE'
-     )
+  if has_function_privilege('anon','platform_private.execute_registry_artist_enrichment_admission(uuid)','EXECUTE')
+     or has_function_privilege('authenticated','platform_private.execute_registry_artist_enrichment_admission(uuid)','EXECUTE')
+     or has_function_privilege('service_role','platform_private.execute_registry_artist_enrichment_admission(uuid)','EXECUTE')
+     or has_function_privilege('anon','platform_private.verify_registry_artist_enrichment_admission(uuid)','EXECUTE')
+     or has_function_privilege('authenticated','platform_private.verify_registry_artist_enrichment_admission(uuid)','EXECUTE')
+     or has_function_privilege('service_role','platform_private.verify_registry_artist_enrichment_admission(uuid)','EXECUTE')
+     or has_function_privilege('anon','platform_private.issue_registry_artist_enrichment_user_execution_grant(uuid)','EXECUTE')
+     or has_function_privilege('authenticated','platform_private.issue_registry_artist_enrichment_user_execution_grant(uuid)','EXECUTE')
+     or has_function_privilege('service_role','platform_private.issue_registry_artist_enrichment_user_execution_grant(uuid)','EXECUTE')
   then
     raise exception 'Artist Enrichment V1 private broker leaked direct execution authority';
   end if;
 
-  if has_function_privilege(
-       'anon',
-       'public.admin_execute_registry_artist_provider_profile_admission(uuid,text,text,bigint,integer,text[],text,text,text,timestamptz)',
-       'EXECUTE'
-     )
-     or has_function_privilege(
-       'service_role',
-       'public.admin_execute_registry_artist_provider_profile_admission(uuid,text,text,bigint,integer,text[],text,text,text,timestamptz)',
-       'EXECUTE'
-     )
-     or not has_function_privilege(
-       'authenticated',
-       'public.admin_execute_registry_artist_provider_profile_admission(uuid,text,text,bigint,integer,text[],text,text,text,timestamptz)',
-       'EXECUTE'
-     )
-     or has_function_privilege(
-       'anon',
-       'public.admin_execute_registry_artist_type_admission(uuid,text,text,text,text,text,timestamptz)',
-       'EXECUTE'
-     )
-     or has_function_privilege(
-       'service_role',
-       'public.admin_execute_registry_artist_type_admission(uuid,text,text,text,text,text,timestamptz)',
-       'EXECUTE'
-     )
-     or not has_function_privilege(
-       'authenticated',
-       'public.admin_execute_registry_artist_type_admission(uuid,text,text,text,text,text,timestamptz)',
-       'EXECUTE'
-     )
+  if has_function_privilege('authenticated','public.admin_execute_registry_artist_provider_profile_admission(uuid,text,text,bigint,integer,text[],text,text,text,timestamptz)','EXECUTE')
+     or has_function_privilege('authenticated','public.admin_execute_registry_artist_public_image_admission(uuid,text,text,text,text,timestamptz)','EXECUTE')
+     or has_function_privilege('authenticated','public.admin_execute_registry_artist_bio_admission(uuid,text,text,text,text,text,timestamptz)','EXECUTE')
+     or has_function_privilege('authenticated','public.admin_execute_registry_artist_type_admission(uuid,text,text,text,text,text,timestamptz)','EXECUTE')
+     or has_function_privilege('anon','public.admin_execute_registry_artist_provider_profile_admission(uuid,text,text,bigint,integer,text[],text,text,text,timestamptz)','EXECUTE')
+     or has_function_privilege('service_role','public.admin_execute_registry_artist_provider_profile_admission(uuid,text,text,bigint,integer,text[],text,text,text,timestamptz)','EXECUTE')
   then
-    raise exception 'Artist Enrichment V1 public broker grants drifted';
+    raise exception 'Artist Enrichment V1 raw-value execute bypass is callable';
+  end if;
+
+  if has_function_privilege('anon','public.admin_prepare_registry_artist_provider_profile_evidence(uuid,text,text,bigint,integer,text[],text,text,text,timestamptz)','EXECUTE')
+     or has_function_privilege('service_role','public.admin_prepare_registry_artist_provider_profile_evidence(uuid,text,text,bigint,integer,text[],text,text,text,timestamptz)','EXECUTE')
+     or not has_function_privilege('authenticated','public.admin_prepare_registry_artist_provider_profile_evidence(uuid,text,text,bigint,integer,text[],text,text,text,timestamptz)','EXECUTE')
+     or has_function_privilege('anon','public.admin_prepare_registry_artist_public_image_evidence(uuid,text,text,text,text,timestamptz)','EXECUTE')
+     or has_function_privilege('service_role','public.admin_prepare_registry_artist_public_image_evidence(uuid,text,text,text,text,timestamptz)','EXECUTE')
+     or not has_function_privilege('authenticated','public.admin_prepare_registry_artist_public_image_evidence(uuid,text,text,text,text,timestamptz)','EXECUTE')
+     or has_function_privilege('anon','public.admin_prepare_registry_artist_bio_evidence(uuid,text,text,text,text,text,timestamptz)','EXECUTE')
+     or has_function_privilege('service_role','public.admin_prepare_registry_artist_bio_evidence(uuid,text,text,text,text,text,timestamptz)','EXECUTE')
+     or not has_function_privilege('authenticated','public.admin_prepare_registry_artist_bio_evidence(uuid,text,text,text,text,text,timestamptz)','EXECUTE')
+     or has_function_privilege('anon','public.admin_prepare_registry_artist_type_evidence(uuid,text,text,text,text,text,timestamptz)','EXECUTE')
+     or has_function_privilege('service_role','public.admin_prepare_registry_artist_type_evidence(uuid,text,text,text,text,text,timestamptz)','EXECUTE')
+     or not has_function_privilege('authenticated','public.admin_prepare_registry_artist_type_evidence(uuid,text,text,text,text,text,timestamptz)','EXECUTE')
+     or has_function_privilege('anon','public.admin_execute_registry_artist_enrichment_evidence_admission(uuid)','EXECUTE')
+     or has_function_privilege('service_role','public.admin_execute_registry_artist_enrichment_evidence_admission(uuid)','EXECUTE')
+     or not has_function_privilege('authenticated','public.admin_execute_registry_artist_enrichment_evidence_admission(uuid)','EXECUTE')
+     or has_function_privilege('anon','public.admin_verify_registry_artist_enrichment_admission(uuid)','EXECUTE')
+     or has_function_privilege('service_role','public.admin_verify_registry_artist_enrichment_admission(uuid)','EXECUTE')
+     or not has_function_privilege('authenticated','public.admin_verify_registry_artist_enrichment_admission(uuid)','EXECUTE')
+  then
+    raise exception 'Artist Enrichment V1 reviewed-evidence public grants drifted';
   end if;
 
   if exists (
@@ -308,8 +237,7 @@ begin
         or execution_grant.operation_version <> 1
         or execution_grant.max_rows <> 1
         or execution_grant.issued_by_user_id is null
-        or execution_grant.issued_by_principal_key <>
-          'user:' || execution_grant.issued_by_user_id::text
+        or execution_grant.issued_by_principal_key <> 'user:' || execution_grant.issued_by_user_id::text
         or execution_grant.system_actor_capability_grant_id is not null
         or execution_grant.required_user_capability_key <> 'manage_registry'
         or execution_grant.policy_ruleset_version not in (
@@ -376,8 +304,7 @@ begin
     )
       and (
         event.registry_entity_type <> 'artist'
-        or event.source_table <>
-          'platform_private.registry_evidence_assertions'
+        or event.source_table <> 'platform_private.registry_evidence_assertions'
         or event.actor <> 'system:registry_artist_enrichment_admin'
         or (
           operation.operation_key = 'registry.artist.provider_profile.admit'
@@ -419,7 +346,6 @@ begin
     raise exception 'Artist Enrichment V1 canonical write evidence escaped typed field ownership';
   end if;
 
-  -- Preserve the already-accepted Artist-origin authority unchanged.
   select operation_type.*
   into v_operation
   from platform_private.registry_operation_types operation_type
@@ -432,12 +358,8 @@ begin
      or v_operation.max_targets <> 1
      or v_operation.max_rows_ceiling <> 1
      or not v_operation.requires_verifier
-     or to_regprocedure(
-       'public.admin_execute_registry_artist_origin_admission(uuid,text,numeric,text,text,text,timestamp with time zone)'
-     ) is null
-     or to_regprocedure(
-       'public.admin_verify_registry_artist_origin_admission(uuid)'
-     ) is null
+     or to_regprocedure('public.admin_execute_registry_artist_origin_admission(uuid,text,numeric,text,text,text,timestamp with time zone)') is null
+     or to_regprocedure('public.admin_verify_registry_artist_origin_admission(uuid)') is null
   then
     raise exception 'Accepted Artist-origin authority regressed during enrichment convergence';
   end if;
