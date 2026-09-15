@@ -2,7 +2,7 @@
   "schemaVersion": 1,
   "authority": "docs/engineering/mizizi-registry-authority-ledger.md",
   "scope": "canonical_music_registry",
-  "status": "slice_2_artist_origin_admission",
+  "status": "slice_2_chart_runtime_converged",
   "rules": {
     "newWriterRequiresClassification": true,
     "publicReadCanonicalMutationAllowed": false,
@@ -154,22 +154,22 @@
       "entrypoint": "supabase/functions/chart-ingest-api/index.ts",
       "authentication": "request_bearer_user",
       "authorization": "action_specific_capabilities",
-      "executionAuthority": "service_role_after_authorization",
+      "executionAuthority": "caller_jwt_rls_plus_typed_registry_operations",
       "targets": [
-        "registry_artists",
-        "registry_tracks",
-        "registry_track_artists",
         "wk_chart_programs_v2",
         "wk_chart_editions_v2",
-        "wk_chart_entries_v2"
+        "wk_chart_entries_v2",
+        "chart_materialize_candidate_registry_v1",
+        "chart_admit_artist_origin_v1",
+        "chart_create_artist_origin_shell_v1"
       ],
       "riskClass": "high",
-      "disposition": "keep_converge",
-      "futureBoundary": "typed_registry_identity_and_credit_operations",
+      "disposition": "keep",
+      "futureBoundary": "caller_jwt_rls_and_typed_registry_operations",
       "miziziCallable": false,
       "humanCallable": true,
       "publicCallable": false,
-      "canonicalMutation": true,
+      "canonicalMutation": false,
       "legacyDebt": false
     },
     {

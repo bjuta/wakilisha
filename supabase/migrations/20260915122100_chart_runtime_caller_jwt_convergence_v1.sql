@@ -306,6 +306,21 @@ from PUBLIC, anon, service_role;
 grant execute on function public.chart_get_entry_registry_identity_v1(text)
 to authenticated;
 
+revoke all on function public.chart_get_run_origin_review_queue(text)
+from PUBLIC, anon, authenticated, service_role;
+
+revoke all on function public.chart_get_family_ingest_presets()
+from PUBLIC, anon, authenticated, service_role;
+
+revoke all on function public.chart_get_weekly_backfill_plan(text,date,date)
+from PUBLIC, anon, authenticated, service_role;
+
+revoke all on function public.chart_reset_run_after_origin_resolution(text)
+from PUBLIC, anon, authenticated, service_role;
+
+revoke all on function public.chart_upsert_family_ingest_preset(text,jsonb,text)
+from PUBLIC, anon, authenticated, service_role;
+
 revoke all on function public.chart_set_artist_origin_for_charts(
   uuid,text,text,text,text,text
 )

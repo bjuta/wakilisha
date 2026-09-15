@@ -1,0 +1,158 @@
+name: WK939 Runtime Final Validation
+
+on:
+  push:
+    branches:
+      - validation/wk939-runtime-candidate-1
+    paths:
+      - .github/workflows/wk939-runtime-final-validation.yml
+
+permissions:
+  contents: write
+
+concurrency:
+  group: wk939-runtime-final-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    env:
+      CONTROL_PLANE_BASE_REF: origin/main
+
+    steps:
+      - name: Check out sealed candidate
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Use Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: package-lock.json
+
+      - name: Prove exact sealed parent
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD^)" = "830ef5f096bf62140aeefe09dd06346142551a8e"
+          test -z "$(git status --porcelain --untracked-files=all | grep -v '^?? .github/workflows/wk939-runtime-final-validation.yml$' || true)"
+
+      - name: Tighten superseded helper authority exactly once
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+
+          migration = Path("supabase/migrations/20260915122100_chart_runtime_caller_jwt_convergence_v1.sql")
+          verifier = Path("scripts/control-plane/verify-registry-chart-materialization-runtime.sql")
+
+          m = migration.read_text()
+          marker = """revoke all on function public.chart_set_artist_origin_for_charts(
+            uuid,text,text,text,text,text
+          )
+          from PUBLIC, anon, authenticated, service_role;
+          """
+          retirement = """revoke all on function public.chart_get_run_origin_review_queue(text)
+          from PUBLIC, anon, authenticated, service_role;
+
+          revoke all on function public.chart_get_family_ingest_presets()
+          from PUBLIC, anon, authenticated, service_role;
+
+          revoke all on function public.chart_get_weekly_backfill_plan(text,date,date)
+          from PUBLIC, anon, authenticated, service_role;
+
+          revoke all on function public.chart_reset_run_after_origin_resolution(text)
+          from PUBLIC, anon, authenticated, service_role;
+
+          revoke all on function public.chart_upsert_family_ingest_preset(text,jsonb,text)
+          from PUBLIC, anon, authenticated, service_role;
+
+          """
+          if m.count(marker) != 1:
+              raise SystemExit(f"migration retirement marker count={m.count(marker)}")
+          if "chart_get_run_origin_review_queue(text)\nfrom PUBLIC, anon, authenticated, service_role" in m:
+              raise SystemExit("migration helper retirement already present")
+          migration.write_text(m.replace(marker, retirement + marker, 1))
+
+          v = verifier.read_text()
+          wrapper_marker = """  select pg_get_functiondef('public.chart_get_entry_registry_identity_v1(text)'::regprocedure) into v_definition; if position('publish_charts' in v_definition)=0 or position('registry_tracks' in v_definition)=0 or position('registry_track_artists' in v_definition)=0 then raise exception 'Chart identity read wrapper drifted'; end if;
+          """
+          helper_check = """  foreach v_signature in array array['public.chart_get_run_origin_review_queue(text)','public.chart_get_family_ingest_presets()','public.chart_get_weekly_backfill_plan(text,date,date)','public.chart_reset_run_after_origin_resolution(text)','public.chart_upsert_family_ingest_preset(text,jsonb,text)'] loop if has_function_privilege('anon',v_signature,'execute') or has_function_privilege('authenticated',v_signature,'execute') or has_function_privilege('service_role',v_signature,'execute') then raise exception 'Superseded chart helper road remains executable: %',v_signature; end if; end loop;
+          """
+          if v.count(wrapper_marker) != 1:
+              raise SystemExit(f"verifier insertion marker count={v.count(wrapper_marker)}")
+          if "Superseded chart helper road remains executable" in v:
+              raise SystemExit("verifier helper retirement check already present")
+          verifier.write_text(v.replace(wrapper_marker, helper_check + wrapper_marker, 1))
+          PY
+
+          git diff --check
+          test "$(git diff --name-only | sort)" = "$(printf '%s\n' scripts/control-plane/verify-registry-chart-materialization-runtime.sql supabase/migrations/20260915122100_chart_runtime_caller_jwt_convergence_v1.sql | sort)"
+          grep -qF "Superseded chart helper road remains executable" scripts/control-plane/verify-registry-chart-materialization-runtime.sql
+          grep -qF "revoke all on function public.chart_upsert_family_ingest_preset(text,jsonb,text)" supabase/migrations/20260915122100_chart_runtime_caller_jwt_convergence_v1.sql
+
+      - name: Install locked dependencies
+        run: npm ci --prefer-offline --no-audit --no-fund
+
+      - name: TypeScript syntax check Edge functions
+        run: |
+          set -euo pipefail
+          node --input-type=module <<'NODE'
+          import fs from "node:fs";
+          import ts from "typescript";
+          for (const file of [
+            "supabase/functions/chart-ingest-api/index.ts",
+            "supabase/functions/chart-provider-fetch/index.ts",
+          ]) {
+            const source = fs.readFileSync(file, "utf8");
+            const result = ts.transpileModule(source, {
+              compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.ESNext },
+              fileName: file,
+              reportDiagnostics: true,
+            });
+            const errors = (result.diagnostics ?? []).filter((d) => d.category === ts.DiagnosticCategory.Error);
+            if (errors.length) {
+              for (const d of errors) console.error(`${file}: ${ts.flattenDiagnosticMessageText(d.messageText, "\n")}`);
+              process.exit(1);
+            }
+            console.log(`TYPESCRIPT_SYNTAX_PASS=${file}`);
+          }
+          NODE
+
+      - name: Run focused MIZIZI contract
+        run: npx vitest run test/registry/mizizi-cultural-data-steward.test.ts
+
+      - name: Run engineering control plane
+        run: npm run control-plane:verify
+
+      - name: Run primitive compounding contract
+        run: |
+          node scripts/control-plane/verify-primitive-compounding.mjs
+          npx vitest run test/control-plane/primitive-compounding.test.ts
+
+      - name: Run critical security and lifecycle tests
+        run: npm run test:critical
+
+      - name: Audit application performance contracts
+        run: npm run performance:audit
+
+      - name: Build application
+        run: npm run build:app
+
+      - name: Seal final exact disposable candidate
+        run: |
+          set -euo pipefail
+          rm -f .github/workflows/wk939-runtime-final-validation.yml
+          git diff --check
+          git add scripts/control-plane/verify-registry-chart-materialization-runtime.sql supabase/migrations/20260915122100_chart_runtime_caller_jwt_convergence_v1.sql
+          test "$(git diff --cached --name-only | sort)" = "$(printf '%s\n' scripts/control-plane/verify-registry-chart-materialization-runtime.sql supabase/migrations/20260915122100_chart_runtime_caller_jwt_convergence_v1.sql | sort)"
+          git diff --cached --check
+          git config user.name 'WAKILISHA Validation Bot'
+          git config user.email 'actions@users.noreply.github.com'
+          git commit -m 'fix: retire superseded chart helper execution roads'
+          git push origin HEAD:validation/wk939-runtime-candidate-1
+          echo "FINAL_VALIDATED_HEAD=$(git rev-parse HEAD)"
+          echo 'WK939_RUNTIME_FINAL_VALIDATION_PASS'
