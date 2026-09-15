@@ -8,6 +8,9 @@ import {
   validateReplayProof,
 } from "../../scripts/control-plane/verify-migration-replay-contract.mjs";
 import {
+  validateHistoricalCleanReplayProof,
+} from "../../scripts/control-plane/verify-historical-migration-clean-replay.mjs";
+import {
   validatePendingSchemaState,
   validateRepositorySchemaSnapshot,
 } from "../../scripts/control-plane/verify-repository-schema-snapshot.mjs";
@@ -217,12 +220,10 @@ describe(
         };
 
         expect(
-          validateReplayProof({
+          validateHistoricalCleanReplayProof({
             proof,
             migrationFile:
               proof.migration_file,
-            migrationSha256:
-              "f".repeat(64),
             baseMainSha:
               proof.base_main_sha,
           }),
@@ -275,22 +276,20 @@ describe(
         };
 
         expect(
-          validateReplayProof({
+          validateHistoricalCleanReplayProof({
             proof,
             migrationFile:
               proof.migration_file,
-            migrationSha256:
-              "f".repeat(64),
             baseMainSha:
               proof.base_main_sha,
           }),
         ).toEqual(
           expect.arrayContaining([
-            "historical clean replay requires replay_environment=supabase-local",
-            "historical clean replay requires a semantic supabase_cli_version",
-            "historical clean replay requires a canonical replay_marker",
-            "historical clean replay requires predecessor_migration_count",
-            "historical clean replay requires predecessor_blob_manifest_sha256",
+            "replay_environment must be supabase-local",
+            "supabase_cli_version must be semantic",
+            "replay_marker must be canonical",
+            "predecessor_migration_count must be a positive integer",
+            "predecessor_blob_manifest_sha256 must be a SHA-256 digest",
           ]),
         );
       },
