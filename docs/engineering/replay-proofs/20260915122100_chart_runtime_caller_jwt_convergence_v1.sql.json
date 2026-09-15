@@ -1,0 +1,16 @@
+{
+  "migration_file": "supabase/migrations/20260915122100_chart_runtime_caller_jwt_convergence_v1.sql",
+  "migration_sha256": "03c1444482379adf0b745b1fc43bb84c5c53d6f80ce4125b9233bad3ae7f7754",
+  "base_main_sha": "6022bccdc25b7733d5bfedd15250b17115fcd32f",
+  "preview_project_ref": "chuujtdijreulagarnfq",
+  "preview_branch_id": "b621f511-8796-432d-a230-118200cd2cbc",
+  "preview_migration_head": "20260915122100",
+  "baseline_replay": "pass",
+  "candidate_apply": "pass",
+  "verifier": "pass",
+  "verifier_file": "scripts/control-plane/verify-registry-chart-materialization-runtime.sql",
+  "schema_types_sha256": "ae40330f089dca9a0c8a092e9c7e99eb26a3834d39475e8e5465401540dc9ebc",
+  "schema_migration_count": 132,
+  "schema_migration_head": "20260915122100",
+  "verified_at": "2026-09-15T12:48:33.836Z"
+}
