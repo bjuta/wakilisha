@@ -1,5 +1,5 @@
 // Registry Artist Enrichment v3
-// Caller-JWT orchestration over governed one-Artist admission operations.
+// Proposal preparation + exact reviewed-evidence admission.
 // Provider credentials live only in registry-artist-provider-fetch.
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.1";
@@ -128,6 +128,7 @@ interface ProviderResponse {
 }
 
 type OperationOutcome = {
+  evidenceAssertionId: string;
   operationId: string;
   verifierStatus: string;
   idempotentReplay: boolean;
@@ -159,6 +160,21 @@ async function invokeProviderFetch(
   return body;
 }
 
+async function prepareEvidence(
+  db: ReturnType<typeof createClient>,
+  rpcName: string,
+  args: Record<string, unknown>,
+): Promise<string> {
+  const { data, error } = await db.rpc(rpcName, args);
+  if (error) throw new Error(error.message);
+  const value = Array.isArray(data) ? data[0] : data;
+  const evidenceId = typeof value === "string"
+    ? value
+    : String((value as Record<string, unknown> | null)?.admin_prepare_registry_artist_provider_profile_evidence ?? "");
+  if (!isUuid(evidenceId)) throw new Error(`${rpcName}:missing_evidence_assertion_id`);
+  return evidenceId;
+}
+
 async function verifyOperation(
   db: ReturnType<typeof createClient>,
   operationId: string,
@@ -174,18 +190,21 @@ async function verifyOperation(
   return status;
 }
 
-async function executeRpc(
+async function executeReviewedEvidence(
   db: ReturnType<typeof createClient>,
-  rpcName: string,
-  args: Record<string, unknown>,
+  evidenceId: string,
 ): Promise<OperationOutcome> {
-  const { data, error } = await db.rpc(rpcName, args);
+  const { data, error } = await db.rpc(
+    "admin_execute_registry_artist_enrichment_evidence_admission",
+    { p_evidence_assertion_id: evidenceId },
+  );
   if (error) throw new Error(error.message);
   const row = Array.isArray(data) ? data[0] : data;
   const operationId = String(row?.operation_id ?? "");
-  if (!operationId) throw new Error(`${rpcName}:missing_operation_id`);
+  if (!operationId) throw new Error("reviewed_evidence_admission:missing_operation_id");
   const verifierStatus = await verifyOperation(db, operationId);
   return {
+    evidenceAssertionId: evidenceId,
     operationId,
     verifierStatus,
     idempotentReplay: Boolean(row?.idempotent_replay),
@@ -222,6 +241,7 @@ Deno.serve(async (req) => {
   let body: {
     dry_run?: boolean;
     approved?: boolean;
+    evidence_ids?: string[];
     artist_id?: string;
     artist_slug?: string;
     artist_ids?: string[];
@@ -239,11 +259,57 @@ Deno.serve(async (req) => {
   }
 
   const dryRun = body.dry_run !== false;
-  if (!dryRun && body.approved !== true) {
+
+  if (!dryRun) {
+    if (body.approved !== true) {
+      return json(req, {
+        error: "approval_required",
+        message: "Applying Artist enrichment requires approved=true over reviewed evidence.",
+      }, 409);
+    }
+    const evidenceIds = Array.isArray(body.evidence_ids)
+      ? [...new Set(body.evidence_ids.map(String).filter(isUuid))].slice(0, 200)
+      : [];
+    if (!evidenceIds.length) {
+      return json(req, {
+        error: "reviewed_evidence_required",
+        message: "Apply requires immutable evidence IDs returned by preview.",
+      }, 409);
+    }
+
+    const outcomes: OperationOutcome[] = [];
+    const failures: Array<{ evidenceAssertionId: string; error: string }> = [];
+    for (const evidenceId of evidenceIds) {
+      try {
+        outcomes.push(await executeReviewedEvidence(callerDb, evidenceId));
+      } catch (error) {
+        failures.push({
+          evidenceAssertionId: evidenceId,
+          error: error instanceof Error ? error.message : String(error),
+        });
+      }
+    }
+
     return json(req, {
-      error: "approval_required",
-      message: "Applying Artist enrichment requires an explicit approved=true decision over reviewed targets.",
-    }, 409);
+      ok: failures.length === 0,
+      dry_run: false,
+      approved: true,
+      total_found: evidenceIds.length,
+      updated: outcomes.length,
+      skipped: 0,
+      no_data: 0,
+      errors: failures.length,
+      reviewed_evidence_ids: evidenceIds,
+      results: [{
+        status: failures.length === 0 ? "updated" : "error",
+        admissionStatus: failures.length === 0 ? "admitted" : "partial_failure",
+        operations: outcomes,
+        failures,
+        changes: {},
+        providersTried: [],
+        providersFound: [],
+      }],
+    }, failures.length === 0 ? 200 : 409);
   }
 
   const requestedProviders = Array.isArray(body.providers)
@@ -288,6 +354,7 @@ Deno.serve(async (req) => {
   const artists = (artistRows ?? []) as ArtistRow[];
 
   const results: Array<Record<string, unknown>> = [];
+  const allEvidenceIds: string[] = [];
   let updated = 0;
   let skipped = 0;
   let noData = 0;
@@ -386,6 +453,7 @@ Deno.serve(async (req) => {
           providersTried,
           providersFound,
           changes: {},
+          evidenceIds: [],
           message: "No matching provider evidence found.",
         });
         continue;
@@ -400,13 +468,14 @@ Deno.serve(async (req) => {
           providersTried,
           providersFound,
           changes: {},
+          evidenceIds: [],
           message: "No governed enrichment change is proposed.",
         });
         continue;
       }
 
       const proposedOperations: Array<Record<string, unknown>> = [];
-      const executedOperations: OperationOutcome[] = [];
+      const evidenceIds: string[] = [];
 
       if (metadataChanged && Object.keys(providerProfile).length > 0) {
         const combinedSource = providerData.spotify && providerData.appleMusic
@@ -429,77 +498,74 @@ Deno.serve(async (req) => {
             fingerprint: providerData.appleMusic.sourcePayloadFingerprint,
           },
         });
-        proposedOperations.push({ operation: "provider_profile", payload: providerProfile, source: combinedSource });
-        if (!dryRun) {
-          executedOperations.push(await executeRpc(callerDb, "admin_execute_registry_artist_provider_profile_admission", {
-            p_artist_id: artist.id,
-            p_spotify_id: providerData.spotify?.id ?? null,
-            p_apple_music_id: providerData.appleMusic?.id ?? null,
-            p_spotify_followers: providerData.spotify?.followers ?? null,
-            p_spotify_popularity: providerData.spotify?.popularity ?? null,
-            p_enriched_genres: genres.length ? genres : null,
-            p_source_kind: combinedSource,
-            p_source_ref: combinedRef,
-            p_source_payload_fingerprint: combinedFingerprint,
-            p_observed_at: providerData.observedAt,
-          }));
-        }
+        const evidenceId = await prepareEvidence(callerDb, "admin_prepare_registry_artist_provider_profile_evidence", {
+          p_artist_id: artist.id,
+          p_spotify_id: providerData.spotify?.id ?? null,
+          p_apple_music_id: providerData.appleMusic?.id ?? null,
+          p_spotify_followers: providerData.spotify?.followers ?? null,
+          p_spotify_popularity: providerData.spotify?.popularity ?? null,
+          p_enriched_genres: genres.length ? genres : null,
+          p_source_kind: combinedSource,
+          p_source_ref: combinedRef,
+          p_source_payload_fingerprint: combinedFingerprint,
+          p_observed_at: providerData.observedAt,
+        });
+        evidenceIds.push(evidenceId);
+        proposedOperations.push({ operation: "provider_profile", payload: providerProfile, source: combinedSource, evidenceId });
       }
 
       if (changes.image && image && imageSource && imageObservation) {
-        proposedOperations.push({ operation: "public_image", value: image.url, source: imageSource });
-        if (!dryRun) {
-          executedOperations.push(await executeRpc(callerDb, "admin_execute_registry_artist_public_image_admission", {
-            p_artist_id: artist.id,
-            p_public_image_url: image.url,
-            p_image_source_provider: imageSource,
-            p_source_ref: imageObservation.sourceRef,
-            p_source_payload_fingerprint: imageObservation.sourcePayloadFingerprint,
-            p_observed_at: providerData.observedAt,
-          }));
-        }
+        const evidenceId = await prepareEvidence(callerDb, "admin_prepare_registry_artist_public_image_evidence", {
+          p_artist_id: artist.id,
+          p_public_image_url: image.url,
+          p_image_source_provider: imageSource,
+          p_source_ref: imageObservation.sourceRef,
+          p_source_payload_fingerprint: imageObservation.sourcePayloadFingerprint,
+          p_observed_at: providerData.observedAt,
+        });
+        evidenceIds.push(evidenceId);
+        proposedOperations.push({ operation: "public_image", value: image.url, source: imageSource, evidenceId });
       }
 
       if (changes.bio && proposedBio && providerData.appleMusic) {
-        proposedOperations.push({ operation: "bio", value: proposedBio, source: "apple_music" });
-        if (!dryRun) {
-          executedOperations.push(await executeRpc(callerDb, "admin_execute_registry_artist_bio_admission", {
-            p_artist_id: artist.id,
-            p_bio: proposedBio,
-            p_source_kind: "apple_music",
-            p_source_ref: providerData.appleMusic.sourceRef,
-            p_source_payload_fingerprint: providerData.appleMusic.sourcePayloadFingerprint,
-            p_observed_at: providerData.observedAt,
-          }));
-        }
+        const evidenceId = await prepareEvidence(callerDb, "admin_prepare_registry_artist_bio_evidence", {
+          p_artist_id: artist.id,
+          p_bio: proposedBio,
+          p_source_kind: "apple_music",
+          p_source_ref: providerData.appleMusic.sourceRef,
+          p_source_payload_fingerprint: providerData.appleMusic.sourcePayloadFingerprint,
+          p_observed_at: providerData.observedAt,
+        });
+        evidenceIds.push(evidenceId);
+        proposedOperations.push({ operation: "bio", value: proposedBio, source: "apple_music", evidenceId });
       }
 
       if (changes.type && proposedType) {
-        proposedOperations.push({ operation: "artist_type", value: proposedType, source: typeSourceKind });
-        if (!dryRun) {
-          executedOperations.push(await executeRpc(callerDb, "admin_execute_registry_artist_type_admission", {
-            p_artist_id: artist.id,
-            p_artist_type: proposedType,
-            p_source_kind: typeSourceKind,
-            p_source_ref: typeSourceRef,
-            p_source_payload_fingerprint: typeSourceFingerprint,
-            p_observed_at: providerData.observedAt,
-          }));
-        }
+        const evidenceId = await prepareEvidence(callerDb, "admin_prepare_registry_artist_type_evidence", {
+          p_artist_id: artist.id,
+          p_artist_type: proposedType,
+          p_source_kind: typeSourceKind,
+          p_source_ref: typeSourceRef,
+          p_source_payload_fingerprint: typeSourceFingerprint,
+          p_observed_at: providerData.observedAt,
+        });
+        evidenceIds.push(evidenceId);
+        proposedOperations.push({ operation: "artist_type", value: proposedType, source: typeSourceKind, evidenceId });
       }
 
+      allEvidenceIds.push(...evidenceIds);
       updated++;
       results.push({
         id: artist.id,
         slug: artist.slug,
         name: artist.display_name,
         status: "updated",
-        admissionStatus: dryRun ? "proposed" : "admitted",
+        admissionStatus: "proposed",
         providersTried,
         providersFound,
         changes,
         proposedOperations,
-        operations: executedOperations,
+        evidenceIds,
       });
     } catch (error) {
       errors++;
@@ -511,6 +577,7 @@ Deno.serve(async (req) => {
         providersTried: requestedProviders,
         providersFound: [],
         changes: {},
+        evidenceIds: [],
         message: error instanceof Error ? error.message : String(error),
       });
     }
@@ -518,8 +585,8 @@ Deno.serve(async (req) => {
 
   return json(req, {
     ok: true,
-    dry_run: dryRun,
-    approved: !dryRun,
+    dry_run: true,
+    approved: false,
     force,
     total_found: artists.length,
     updated,
@@ -530,6 +597,7 @@ Deno.serve(async (req) => {
     reviewed_artist_ids: results
       .filter((result) => result.status === "updated")
       .map((result) => String(result.id)),
+    reviewed_evidence_ids: allEvidenceIds,
     results,
   });
 });
