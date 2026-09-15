@@ -4,6 +4,12 @@ import { WkIcon } from "@/components/design-system/Icon";
 import { WkSurface } from "@/components/design-system/primitives/Surface";
 import { supabase } from "@/lib/supabase";
 import { saveRegistryEntityPatch } from "@/services/registry/admin/client";
+import {
+  applyReviewedArtistEnrichment,
+  previewArtistEnrichment,
+  type ArtistEnrichmentMode,
+  type ArtistEnrichmentResponse,
+} from "@/services/registry/admin/artistEnrichment";
 import { useRelatedEntities } from "@/hooks/useRelatedEntities";
 import type { ResolvedRelation } from "@/hooks/useRelatedEntities";
 import { DiscographyPanel } from "./components/DiscographyPanel";
@@ -47,8 +53,6 @@ interface ToastMsg {
   message: string;
 }
 
-type EnrichmentMode = "profile" | "type";
-
 let toastCounter = 0;
 
 /* ─── Page ─── */
@@ -78,8 +82,8 @@ export default function ArtistDetailPage() {
   const [showDelete, setShowDelete] = useState(false);
   const [enriching, setEnriching] = useState(false);
   const [applyingEnrich, setApplyingEnrich] = useState(false);
-  const [enrichMode, setEnrichMode] = useState<EnrichmentMode | null>(null);
-  const [enrichResult, setEnrichResult] = useState<Record<string, unknown> | null>(null);
+  const [enrichMode, setEnrichMode] = useState<ArtistEnrichmentMode | null>(null);
+  const [enrichResult, setEnrichResult] = useState<ArtistEnrichmentResponse | null>(null);
   const [showEnrichResult, setShowEnrichResult] = useState(false);
   const [enrichingOrigin, setEnrichingOrigin] = useState(false);
   const [enrichingType, setEnrichingType] = useState(false);
@@ -148,50 +152,22 @@ export default function ArtistDetailPage() {
     setIsDirty(true);
   }, []);
 
-  async function callEnrichment(
-    mode: EnrichmentMode,
-    dryRun: boolean,
-  ): Promise<Record<string, unknown> | null> {
-    if (!artist) return null;
-    const { data: { session } } = await supabase.auth.getSession();
-    const token = session?.access_token;
-    if (!token) throw new Error("Not authenticated.");
-    const supabaseUrl = (import.meta.env.VITE_PUBLIC_SUPABASE_URL as string) || "";
-    const response = await fetch(`${supabaseUrl}/functions/v1/registry-enrich-artist`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${token}`,
-        apikey: (import.meta.env.VITE_PUBLIC_SUPABASE_ANON_KEY as string) || "",
-      },
-      body: JSON.stringify({
-        dry_run: dryRun,
-        approved: !dryRun,
-        artist_ids: [artist.id],
-        providers: mode === "profile" ? ["spotify", "apple_music"] : [],
-        include_type: mode === "type",
-        use_musicbrainz: true,
-        force: true,
-      }),
-    });
-    const data = await response.json() as Record<string, unknown>;
-    if (!response.ok || data.error) {
-      throw new Error(String(data.message || data.error || `HTTP ${response.status}`));
-    }
-    return data;
-  }
-
-  async function previewEnrichment(mode: EnrichmentMode) {
+  async function previewEnrichment(mode: ArtistEnrichmentMode) {
     if (!artist) return;
     if (mode === "profile") setEnriching(true);
     else setEnrichingType(true);
     try {
-      const data = await callEnrichment(mode, true);
-      if (!data) return;
+      const data = await previewArtistEnrichment({
+        mode,
+        artistIds: [artist.id],
+        providers: mode === "profile" ? ["spotify", "apple_music"] : [],
+        force: true,
+        useMusicBrainz: true,
+      });
       setEnrichMode(mode);
       setEnrichResult(data);
       setShowEnrichResult(true);
-      const result = (data.results as Array<Record<string, unknown>>)?.[0];
+      const result = data.results?.[0];
       if (result?.status === "no_data") {
         addToast("info", "No provider evidence found for this artist.");
       } else if (result?.status === "skipped") {
@@ -208,13 +184,12 @@ export default function ArtistDetailPage() {
   }
 
   async function handleApproveEnrichment() {
-    if (!artist || !enrichMode) return;
+    if (!artist || !enrichMode || !enrichResult) return;
     setApplyingEnrich(true);
     try {
-      const data = await callEnrichment(enrichMode, false);
-      if (!data) return;
+      const data = await applyReviewedArtistEnrichment(enrichResult);
       setEnrichResult(data);
-      const result = (data.results as Array<Record<string, unknown>>)?.[0];
+      const result = data.results?.[0];
       if (result?.status === "updated") {
         await reloadArtist();
         addToast("success", enrichMode === "type" ? "Artist type admitted and verified." : "Artist enrichment admitted and verified.");
@@ -661,11 +636,11 @@ export default function ArtistDetailPage() {
               </button>
             </div>
             {(() => {
-              const result = (enrichResult.results as Array<Record<string, unknown>>)?.[0];
+              const result = enrichResult.results?.[0];
               if (!result) return <p className="text-[13px] text-wk-text-muted">No results returned.</p>;
               const status = String(result.status);
-              const providersFound = (result.providersFound as string[]) ?? [];
-              const changes = (result.changes as Record<string, unknown>) ?? {};
+              const providersFound = result.providersFound ?? [];
+              const changes = result.changes ?? {};
               return (
                 <div className="space-y-4">
                   <div className="flex items-center gap-2">
