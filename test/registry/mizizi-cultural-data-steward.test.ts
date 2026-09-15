@@ -433,6 +433,17 @@ describe("MIZIZI Cultural Data Steward", () => {
     expect(migration).toContain("chart_get_entry_registry_identity_v1"); expect(migration).toContain("revoke all on function public.chart_set_artist_origin_for_charts"); expect(migration).not.toContain("wk_chart_editions_v2_publish_charts_insert_v1");
   });
 
+  it("keeps MIZIZI post-apply control planes valid across later migrations", () => {
+    const trackControlPlane=readFileSync("scripts/control-plane/mizizi-track-production-control-plane.mjs","utf8");
+    const releaseControlPlane=readFileSync("scripts/control-plane/mizizi-release-production-control-plane.mjs","utf8");
+    for(const controlPlane of [trackControlPlane,releaseControlPlane]){
+      expect(controlPlane).toContain("postApplyDomainFieldsMatch");
+      expect(controlPlane).toContain("postApplyLedgerAccepted");
+      expect(controlPlane).toMatch(/actualCount\s*>=\s*minimumCount/);
+      expect(controlPlane).toMatch(/actualHead\s*>=\s*minimumHead/);
+    }
+  });
+
   it("binds remaining live Registry Track writers to the shared identity rule", () => {
     const sharedRule =
       readFileSync(

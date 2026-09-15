@@ -283,9 +283,42 @@ function fieldsMatch(actual, expected) {
   );
 }
 
+function postApplyDomainFieldsMatch(actual, expected) {
+  return Object.entries(expected).every(
+    ([key, value]) =>
+      key === 'ledger_count' ||
+      key === 'ledger_head' ||
+      String(actual?.[key]) === String(value),
+  );
+}
+
+function postApplyLedgerAccepted(actual, expected = POST_APPLY_BASELINE) {
+  const actualCount = Number(actual?.ledger_count);
+  const minimumCount = Number(expected.ledger_count);
+  const actualHead = String(actual?.ledger_head || '');
+  const minimumHead = String(expected.ledger_head || '');
+  return (
+    Number.isFinite(actualCount) &&
+    Number.isFinite(minimumCount) &&
+    actualCount >= minimumCount &&
+    actualHead >= minimumHead
+  );
+}
+
+function assertPostApplyLedger(state, label) {
+  if (!postApplyLedgerAccepted(state, POST_APPLY_BASELINE)) {
+    throw new Error(
+      `${label} migration ledger regressed: count=${state?.ledger_count} head=${state?.ledger_head} minimum_count=${POST_APPLY_BASELINE.ledger_count} minimum_head=${POST_APPLY_BASELINE.ledger_head}`,
+    );
+  }
+}
+
 function classifyTrackProductionState(state) {
   if (fieldsMatch(state, PRE_APPLY_BASELINE)) return 'pre_apply';
-  if (fieldsMatch(state, POST_APPLY_BASELINE)) return 'post_apply';
+  if (
+    postApplyDomainFieldsMatch(state, POST_APPLY_BASELINE) &&
+    postApplyLedgerAccepted(state, POST_APPLY_BASELINE)
+  ) return 'post_apply';
   return 'unexpected';
 }
 
@@ -304,11 +337,10 @@ function assertAcceptedPostApply(state) {
       mizizi_redirects:857,
       chart_mismatches:0,
       save_mismatches:0,
-      ledger_count:116,
-      ledger_head:'20260914072142',
     },
     'acceptance',
   );
+  assertPostApplyLedger(state, 'acceptance');
   assertFields(
     state.impact,
     {

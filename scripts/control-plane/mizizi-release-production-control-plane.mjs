@@ -214,13 +214,39 @@ function assertFields(actual,expected,label) {
 function fieldsMatch(actual,expected) {
   return Object.entries(expected).every(([k,v])=>String(actual?.[k])===String(v));
 }
+function postApplyDomainFieldsMatch(actual,expected) {
+  return Object.entries(expected).every(([k,v])=>
+    k === 'ledger_count' || k === 'ledger_head' || String(actual?.[k])===String(v)
+  );
+}
+function postApplyLedgerAccepted(actual,expected=POST_APPLY_BASELINE) {
+  const actualCount=Number(actual?.ledger_count);
+  const minimumCount=Number(expected.ledger_count);
+  const actualHead=String(actual?.ledger_head||'');
+  const minimumHead=String(expected.ledger_head||'');
+  return Number.isFinite(actualCount) && Number.isFinite(minimumCount) &&
+    actualCount>=minimumCount && actualHead>=minimumHead;
+}
+function assertPostApplyLedger(state,label) {
+  if (!postApplyLedgerAccepted(state,POST_APPLY_BASELINE)) {
+    throw new Error(
+      label+' migration ledger regressed: count='+state?.ledger_count+
+      ' head='+state?.ledger_head+
+      ' minimum_count='+POST_APPLY_BASELINE.ledger_count+
+      ' minimum_head='+POST_APPLY_BASELINE.ledger_head,
+    );
+  }
+}
 function classifyReleaseProductionState(state) {
   if (fieldsMatch(state,PRE_APPLY_BASELINE)) return 'pre_apply';
-  if (fieldsMatch(state,POST_APPLY_BASELINE)) return 'post_apply';
+  if (postApplyDomainFieldsMatch(state,POST_APPLY_BASELINE) && postApplyLedgerAccepted(state,POST_APPLY_BASELINE)) return 'post_apply';
   return 'unexpected';
 }
 async function assertAcceptedPostApply(pool,state) {
-  assertFields(state,POST_APPLY_BASELINE,'release post-apply baseline');
+  if (!postApplyDomainFieldsMatch(state,POST_APPLY_BASELINE)) {
+    throw new Error('release post-apply domain state drifted');
+  }
+  assertPostApplyLedger(state,'release post-apply baseline');
   const {rows:[a]} = await pool.query(releaseAcceptanceSql);
   assertFields(a,{
     events:32,
