@@ -422,7 +422,29 @@ describe("MIZIZI Cultural Data Steward", () => {
     );
   });
 
-  it("binds live Registry Track writers to the shared identity rule", () => {
+  it("converges chart runtime onto caller-JWT and governed Registry authority", () => {
+    const chartIngest=readFileSync("supabase/functions/chart-ingest-api/index.ts","utf8");
+    const providerFetch=readFileSync("supabase/functions/chart-provider-fetch/index.ts","utf8");
+    const migration=readFileSync("supabase/migrations/20260915122100_chart_runtime_caller_jwt_convergence_v1.sql","utf8");
+    const manifest=JSON.parse(readFileSync("scripts/control-plane/registry-privileged-writer-manifest.json","utf8")) as {writers:Array<{id:string;executionAuthority:string;canonicalMutation:boolean}>};
+    expect(chartIngest).toContain("SUPABASE_ANON_KEY"); expect(chartIngest).not.toContain("SUPABASE_SERVICE_ROLE_KEY"); expect(chartIngest).not.toContain("admin_settings_secrets"); expect(chartIngest).toContain("/functions/v1/chart-provider-fetch"); expect(chartIngest).toContain("chart_materialize_candidate_registry_v1"); expect(chartIngest).toContain("chart_admit_artist_origin_v1"); expect(chartIngest).toContain("chart_create_artist_origin_shell_v1"); expect(chartIngest).not.toContain("chart_set_artist_origin_for_charts");
+    expect(providerFetch).toContain("SUPABASE_SERVICE_ROLE_KEY"); expect(providerFetch).toContain("admin_settings_secrets"); expect(providerFetch).toContain('required_capability: "manage_ingest"'); expect(providerFetch).not.toContain("registry_");
+    expect(manifest.writers.find(w=>w.id==="chart-ingest-api")).toMatchObject({executionAuthority:"caller_jwt_rls_plus_typed_registry_operations",canonicalMutation:false});
+    expect(migration).toContain("chart_get_entry_registry_identity_v1"); expect(migration).toContain("revoke all on function public.chart_set_artist_origin_for_charts"); expect(migration).not.toContain("wk_chart_editions_v2_publish_charts_insert_v1");
+  });
+
+  it("keeps MIZIZI post-apply control planes valid across later migrations", () => {
+    const trackControlPlane=readFileSync("scripts/control-plane/mizizi-track-production-control-plane.mjs","utf8");
+    const releaseControlPlane=readFileSync("scripts/control-plane/mizizi-release-production-control-plane.mjs","utf8");
+    for(const controlPlane of [trackControlPlane,releaseControlPlane]){
+      expect(controlPlane).toContain("postApplyDomainFieldsMatch");
+      expect(controlPlane).toContain("postApplyLedgerAccepted");
+      expect(controlPlane).toMatch(/actualCount\s*>=\s*minimumCount/);
+      expect(controlPlane).toMatch(/actualHead\s*>=\s*minimumHead/);
+    }
+  });
+
+  it("binds remaining live Registry Track writers to the shared identity rule", () => {
     const sharedRule =
       readFileSync(
         "supabase/functions/_shared/registry-track-identity.ts",
@@ -436,11 +458,6 @@ describe("MIZIZI Cultural Data Steward", () => {
     const enrichment =
       readFileSync(
         "supabase/functions/registry-enrichment-review/index.ts",
-        "utf8",
-      );
-    const chartIngest =
-      readFileSync(
-        "supabase/functions/chart-ingest-api/index.ts",
         "utf8",
       );
     const scraper =
@@ -466,15 +483,6 @@ describe("MIZIZI Cultural Data Steward", () => {
     );
     expect(enrichment).not.toContain(
       "scopedTrackSlug",
-    );
-    expect(chartIngest).toContain(
-      'from "../_shared/registry-track-identity.ts"',
-    );
-    expect(chartIngest).toContain(
-      "trackSlugCollisionInArtistScope",
-    );
-    expect(chartIngest).not.toContain(
-      "uniqueTrackSlug",
     );
     expect(scraper).toContain(
       'from "../_shared/registry-track-identity.ts"',

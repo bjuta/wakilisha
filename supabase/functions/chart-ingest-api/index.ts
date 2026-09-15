@@ -1,17 +1,33 @@
 // ── SHARED BLOCK (Phase A) ──
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.1";
-import { canonicalTrackSlugCandidate } from "../_shared/registry-track-identity.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
-const SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+const ANON_KEY = Deno.env.get("SUPABASE_ANON_KEY")!;
 
 const ALLOWED_ORIGINS = ["https://wakilisha.africa","https://www.wakilisha.africa","https://staging.wakilisha.africa","https://wakilisha.africa","https://wakilisha.africa","https://wakilisha.africa","http://localhost:5173","http://localhost:3000"];
 
 function corsRestricted(req: Request, methods="POST, OPTIONS"): Record<string,string> { const o=req.headers.get("Origin")??""; const isR=o.endsWith(".wakilisha.africa")||o==="https://wakilisha.africa"; const ao=ALLOWED_ORIGINS.includes(o)||isR?o:ALLOWED_ORIGINS[0]; return {"Access-Control-Allow-Origin":ao,"Access-Control-Allow-Headers":"authorization, x-client-info, apikey, content-type","Access-Control-Allow-Methods":methods,"Vary":"Origin"}; }
 
-async function verifyJwt(req: Request): Promise<{id:string;email?:string}|null> { const ah=req.headers.get("Authorization"); if(!ah||!ah.startsWith("Bearer ")) return null; const t=ah.replace("Bearer ",""); const uc=createClient(SUPABASE_URL,SERVICE_KEY,{global:{headers:{Authorization:`Bearer ${t}`}}}); const {data:{user},error}=await uc.auth.getUser(t); if(error||!user) return null; return {id:user.id,email:user.email}; }
+function callerClient(req: Request): ReturnType<typeof createClient> {
+  const authorization=req.headers.get("Authorization");
+  if(!authorization?.startsWith("Bearer ")) throw new Error("Bearer authorization is required.");
+  return createClient(SUPABASE_URL,ANON_KEY,{global:{headers:{Authorization:authorization}},auth:{persistSession:false}});
+}
 
-async function requireCap(userId: string, cap: string, db?: ReturnType<typeof createClient>): Promise<boolean> { const c=db??createClient(SUPABASE_URL,SERVICE_KEY); const {data:roles}=await c.from("user_role_assignments").select("role_key, role_definitions!inner(role_capabilities(capability_key))").eq("user_id",userId).eq("status","active").or("expires_at.is.null,expires_at.gt.now()"); if(!roles||roles.length===0) return false; if(roles.some((r:{role_key:string})=>r.role_key==="administrator")) return true; const all=new Set<string>(); for(const r of roles){const caps=(r.role_definitions as {role_capabilities?:Array<{capability_key:string}>}|null)?.role_capabilities??[];for(const c of caps)all.add(c.capability_key);} return all.has(cap); }
+async function verifyJwt(req: Request): Promise<{id:string;email?:string}|null> {
+  const authorization=req.headers.get("Authorization");
+  if(!authorization?.startsWith("Bearer ")) return null;
+  const token=authorization.replace("Bearer ","");
+  const db=callerClient(req);
+  const {data:{user},error}=await db.auth.getUser(token);
+  if(error||!user) return null;
+  return {id:user.id,email:user.email};
+}
+
+async function requireCap(db: ReturnType<typeof createClient>,cap:string): Promise<boolean> {
+  const {data,error}=await db.rpc("current_user_has_capability",{required_capability:cap});
+  return !error&&data===true;
+}
 
 const rid=()=>crypto.randomUUID().slice(0,12);
 const iso=()=>new Date().toISOString();
@@ -33,9 +49,9 @@ Deno.serve(async (req) => {
   if (!auth) return json(req, { error: "unauthorized" }, 401);
   let body: Record<string, unknown>; try { body = await req.json(); } catch { return json(req, { error: "invalid_json" }, 400); }
   const { action, ...params } = body as { action: string; [k: string]: unknown };
-  const requiredCapability = ACTION_CAPABILITIES[action];
-  if (requiredCapability) { const can = await requireCap(auth.id, requiredCapability); if (!can) return json(req, { error: "forbidden" }, 403); }
-  const db = createClient(SUPABASE_URL, SERVICE_KEY);
+  const db=callerClient(req);
+  const requiredCapability=ACTION_CAPABILITIES[action];
+  if(requiredCapability){const can=await requireCap(db,requiredCapability);if(!can)return json(req,{error:"forbidden"},403);}
   try {
     if (action === "create_dry_run") return handleCreateDryRun(req, db, params, auth);
     if (action === "list_runs") return handleListRuns(req, db, params);
@@ -180,17 +196,6 @@ function candidateSongIdentityKey(candidate: Record<string, unknown>): string {
   return `candidate:${candidate.id || crypto.randomUUID()}`;
 }
 
-function generateTrackSlug(title: string, artistDisplay: string): string {
-  const artistNames = parseArtists(artistDisplay);
-  return canonicalTrackSlugCandidate(
-    title,
-    {
-      featuredArtistNames:
-        artistNames.slice(1),
-    },
-  ).slice(0, 200);
-}
-function generateArtistSlug(name: string): string { return name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/-+$/, "").replace(/^-+/, "").slice(0, 200) || "unknown-artist"; }
 function normalizeSlug(raw: string): string { if (!raw || !raw.trim()) return ""; return raw.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/-+$/, "").replace(/^-+/, "").slice(0, 200); }
 function normalizeIso2(raw: string): string { const u = raw.toUpperCase(); const fixes: Record<string, string> = { "KENYA":"KE","HAITI":"HT","UK":"GB","CANADA":"CA","USA":"US","FRANCE":"FR","GERMANY":"DE","NIGERIA":"NG","TANZANIA":"TZ","UGANDA":"UG","GHANA":"GH" }; return fixes[u] || u; }
 function sanitizeDate(raw: string | null | undefined): string | null { if (!raw || !raw.trim()) return null; const r = raw.trim(); if (/^\d{4}-\d{2}-\d{2}$/.test(r)) return r; if (/^\d{4}-\d{2}$/.test(r)) return r + "-01"; if (/^\d{4}$/.test(r)) return r + "-01-01"; try { const d = new Date(r); if (!Number.isNaN(d.getTime())) return d.toISOString().split("T")[0]; } catch { } return null; }
@@ -221,299 +226,106 @@ function computeProvisionalScore(c: { normalized_key: string; lead_artist_key: s
 interface ProviderTrack { title: string; artist: string; release_date: string | null; isrc: string | null; source_position: number; provider_track_id: string | null; provider_release_id: string | null; provider_artist_ids: string[]; artwork_url: string | null; external_url: string | null; preview_url: string | null; raw_payload: unknown; }
 interface ProviderFetchResult { tracks: ProviderTrack[]; warnings: string[]; error: string | null; }
 
-async function readCredential(db: ReturnType<typeof createClient> | null, envVar: string, dbKey: string): Promise<string | null> { const ev = Deno.env.get(envVar); if (ev && ev.trim()) return ev.trim(); if (!db) return null; try { const { data: row } = await db.from("admin_settings_secrets").select("setting_value").eq("setting_key", dbKey).maybeSingle(); if (row && (row.setting_value as string)?.trim()) return (row.setting_value as string).trim(); } catch { } return null; }
-
-async function fetchSpotifySource(sourceUrl: string, market: string, maxRows: number, db: ReturnType<typeof createClient>): Promise<ProviderFetchResult> {
-  const clientId = await readCredential(db, "SPOTIFY_CLIENT_ID", "spotify_client_id");
-  const clientSecret = await readCredential(db, "SPOTIFY_CLIENT_SECRET", "spotify_client_secret");
-  const spotifyMarket = (await readCredential(db, "SPOTIFY_MARKET", "spotify_market")) || market;
-
-  if (!clientId || !clientSecret) {
-    return { tracks: [], warnings: [], error: "Spotify credentials not configured." };
-  }
-
-  const tokenRes = await fetch("https://accounts.spotify.com/api/token", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/x-www-form-urlencoded",
-      Authorization: "Basic " + btoa(clientId + ":" + clientSecret),
-    },
-    body: "grant_type=client_credentials",
-  });
-
-  if (!tokenRes.ok) {
-    const eb = await tokenRes.text();
-    return { tracks: [], warnings: [], error: "Spotify auth failed (" + tokenRes.status + "): " + eb.slice(0, 200) };
-  }
-
-  const tokenData = await tokenRes.json() as { access_token: string };
-  const pm = sourceUrl.match(/spotify\.com\/playlist\/([a-zA-Z0-9]+)/);
-
-  if (!pm) {
-    return { tracks: [], warnings: [], error: "Cannot extract Spotify playlist ID from: " + sourceUrl };
-  }
-
-  const pid = pm[1];
-  const warnings: string[] = [];
-  const playlistItems: Array<{
-    track: {
-      id: string;
-      name: string;
-      artists: Array<{ id: string; name: string }>;
-      album: { id: string; name: string; images: Array<{ url: string }>; release_date: string };
-      external_ids: { isrc?: string };
-      external_urls: { spotify: string };
-      preview_url: string | null;
-      duration_ms: number;
-      popularity: number;
-    } | null;
-  }> = [];
-
-  const pageLimit = 100;
-  let offset = 0;
-  let total = 0;
-
-  while (playlistItems.length < maxRows) {
-    const remaining = maxRows - playlistItems.length;
-    const limit = Math.min(pageLimit, remaining);
-
-    const apiUrl = new URL("https://api.spotify.com/v1/playlists/" + pid + "/tracks");
-    apiUrl.searchParams.set("market", spotifyMarket);
-    apiUrl.searchParams.set("limit", String(limit));
-    apiUrl.searchParams.set("offset", String(offset));
-    apiUrl.searchParams.set("fields", "items(track(id,name,artists(id,name),album(id,name,images,release_date),external_ids(isrc),external_urls(spotify),preview_url,duration_ms,popularity)),next,total");
-
-    const pres = await fetch(apiUrl.toString(), {
-      headers: { Authorization: "Bearer " + tokenData.access_token },
+async function fetchProviderSource(
+  req: Request,
+  provider: string,
+  sourceUrl: string,
+  market: string,
+  maxRows: number,
+): Promise<ProviderFetchResult> {
+  const authorization=req.headers.get("Authorization");
+  if(!authorization?.startsWith("Bearer ")) return {tracks:[],warnings:[],error:"Provider fetch requires caller bearer token."};
+  let response:Response;
+  try {
+    response=await fetch(`${SUPABASE_URL}/functions/v1/chart-provider-fetch`,{
+      method:"POST",
+      headers:{Authorization:authorization,apikey:ANON_KEY,"Content-Type":"application/json"},
+      body:JSON.stringify({provider,sourceUrl,market,maxRows}),
     });
-
-    if (!pres.ok) {
-      const eb = await pres.text();
-      return { tracks: [], warnings, error: "Spotify API " + pres.status + ": " + eb.slice(0, 300) };
-    }
-
-    const page = await pres.json() as {
-      items: Array<{
-        track: {
-          id: string;
-          name: string;
-          artists: Array<{ id: string; name: string }>;
-          album: { id: string; name: string; images: Array<{ url: string }>; release_date: string };
-          external_ids: { isrc?: string };
-          external_urls: { spotify: string };
-          preview_url: string | null;
-          duration_ms: number;
-          popularity: number;
-        } | null;
-      }>;
-      next: string | null;
-      total: number;
-    };
-
-    total = page.total ?? total;
-    const pageItems = page.items ?? [];
-
-    if (pageItems.length === 0) break;
-
-    playlistItems.push(...pageItems);
-    offset += pageItems.length;
-
-    if (!page.next) break;
+  } catch(error) {
+    return {tracks:[],warnings:[],error:"Chart provider fetch unavailable: "+(error instanceof Error?error.message:String(error))};
   }
-
-  if (total > playlistItems.length) {
-    warnings.push("Spotify playlist has " + total + " tracks; fetched " + playlistItems.length + " using maxRows cap " + maxRows + ".");
-  }
-
-  const tracks: ProviderTrack[] = [];
-
-  for (let i = 0; i < playlistItems.length; i++) {
-    const item = playlistItems[i];
-
-    if (!item || !item.track) {
-      warnings.push("Spotify item " + (i + 1) + ": null track");
-      continue;
-    }
-
-    const t = item.track;
-
-    tracks.push({
-      title: t.name,
-      artist: t.artists.map((a) => a.name).join(", "),
-      release_date: sanitizeDate(t.album?.release_date),
-      isrc: t.external_ids?.isrc || null,
-      source_position: i + 1,
-      provider_track_id: t.id,
-      provider_release_id: t.album?.id || null,
-      provider_artist_ids: t.artists.map((a) => a.id),
-      artwork_url: t.album?.images?.[0]?.url || null,
-      external_url: t.external_urls?.spotify || sourceUrl,
-      preview_url: t.preview_url || null,
-      raw_payload: {
-        provider: "spotify",
-        trackId: t.id,
-        albumId: t.album?.id,
-        artistIds: t.artists.map((a) => a.id),
-        durationMs: t.duration_ms,
-        popularity: t.popularity,
-      },
-    });
-  }
-
-  if (tracks.length === 0 && warnings.length === 0) {
-    warnings.push("Spotify playlist returned 0 tracks (total: " + total + ")");
-  }
-
-  return { tracks, warnings, error: null };
+  let payload:ProviderFetchResult;
+  try { payload=await response.json() as ProviderFetchResult; }
+  catch { return {tracks:[],warnings:[],error:`Chart provider fetch returned invalid JSON (${response.status}).`}; }
+  if(!response.ok) return {tracks:[],warnings:payload.warnings??[],error:payload.error||`Chart provider fetch failed (${response.status}).`};
+  return {tracks:Array.isArray(payload.tracks)?payload.tracks:[],warnings:Array.isArray(payload.warnings)?payload.warnings:[],error:payload.error??null};
 }
-
-async function createAppleMusicJWT(pk: string, tid: string, kid: string): Promise<string> { const pem = pk.replace("-----BEGIN PRIVATE KEY-----", "").replace("-----END PRIVATE KEY-----", "").replace(/\s/g, ""); const bin = Uint8Array.from(atob(pem), c => c.charCodeAt(0)); const key = await crypto.subtle.importKey("pkcs8", bin, { name: "ECDSA", namedCurve: "P-256" }, false, ["sign"]); const header = { alg: "ES256", kid }; const now = Math.floor(Date.now() / 1000); const payload = { iss: tid, iat: now, exp: now + 3600 }; const enc = new TextEncoder(); const b64u = (s: string) => s.replace(/=/g, "").replace(/\+/g, "-").replace(/\//g, "_"); const hb = b64u(btoa(JSON.stringify(header))), pb = b64u(btoa(JSON.stringify(payload))), si = hb+"."+pb; const sig = await crypto.subtle.sign({ name: "ECDSA", hash: "SHA-256" }, key, enc.encode(si)); const sb = b64u(btoa(String.fromCharCode(...new Uint8Array(sig)))); return si+"."+sb; }
-
-async function fetchAppleMusicSource(sourceUrl: string, market: string, maxRows: number, db: ReturnType<typeof createClient>): Promise<ProviderFetchResult> { const privateKey = await readCredential(db, "APPLE_MUSIC_PRIVATE_KEY", "apple_music_private_key"); const teamId = await readCredential(db, "APPLE_MUSIC_TEAM_ID", "apple_music_team_id"); const musicKeyId = await readCredential(db, "APPLE_MUSIC_KEY_ID", "apple_music_key_id"); const storefront = (await readCredential(db, "APPLE_MUSIC_STOREFRONT", "apple_music_storefront")) || market.slice(0, 2).toLowerCase(); if (!privateKey || !teamId || !musicKeyId) { const m: string[] = []; if (!privateKey) m.push("APPLE_MUSIC_PRIVATE_KEY"); if (!teamId) m.push("APPLE_MUSIC_TEAM_ID"); if (!musicKeyId) m.push("APPLE_MUSIC_KEY_ID"); return { tracks: [], warnings: [], error: "Apple Music credentials missing: "+m.join(", ") }; } let dt: string; try { dt = await createAppleMusicJWT(privateKey, teamId, musicKeyId); } catch (e) { return { tracks: [], warnings: [], error: "JWT failed: "+(e instanceof Error ? e.message : String(e)) }; } const parsed = sourceUrl.match(/music\.apple\.com\/([a-z]{2})\/(playlist|album)\/[^/]+\/(pl\.|[a-z]+\.)([a-zA-Z0-9]+)/i); let apiSf = storefront, rt = "playlists", rid = ""; if (parsed) { apiSf = parsed[1].toLowerCase(); rt = parsed[2] === "album" ? "albums" : "playlists"; rid = parsed[3] + parsed[4]; } else { const im = sourceUrl.match(/(pl\.|al\.)([a-zA-Z0-9]+)/i); if (im) rid = im[1] + im[2]; else return { tracks: [], warnings: [], error: "Cannot parse Apple Music URL: "+sourceUrl }; } const apiUrl = "https://api.music.apple.com/v1/catalog/"+apiSf+"/"+rt+"/"+rid+"/tracks"; const res = await fetch(apiUrl, { headers: { Authorization: "Bearer "+dt } }); if (!res.ok) { const eb = await res.text(); return { tracks: [], warnings: [], error: "Apple Music API "+res.status+": "+eb.slice(0, 300) }; } const data = await res.json() as { data: Array<{ id: string; attributes: { name: string; artistName: string; albumName: string; artwork: { url: string }; url: string; previews?: Array<{ url: string }>; releaseDate?: string; isrc?: string; genreNames: string[]; }; relationships?: { artists: { data: Array<{ id: string }>; }; albums: { data: Array<{ id: string }>; }; }; }>; }; const songs = (data.data || []).slice(0, maxRows); const warnings: string[] = []; const tracks: ProviderTrack[] = []; for (let i = 0; i < songs.length; i++) { const song = songs[i]; const attrs = song.attributes; if (!attrs) { warnings.push("Apple Music song "+(i+1)+": missing attributes"); continue; } const aw = attrs.artwork?.url ? attrs.artwork.url.replace("{w}", "300").replace("{h}", "300") : null; tracks.push({ title: attrs.name, artist: attrs.artistName, release_date: sanitizeDate(attrs.releaseDate), isrc: attrs.isrc || null, source_position: i + 1, provider_track_id: song.id, provider_release_id: song.relationships?.albums?.data?.[0]?.id || null, provider_artist_ids: song.relationships?.artists?.data?.map(a => a.id) || [], artwork_url: aw, external_url: attrs.url || sourceUrl, preview_url: attrs.previews?.[0]?.url || null, raw_payload: { provider: "apple_music", songId: song.id, albumId: song.relationships?.albums?.data?.[0]?.id, genres: attrs.genreNames, isrc: attrs.isrc } }); } if (tracks.length === 0 && warnings.length === 0) warnings.push("Apple Music "+rt+" returned 0 tracks"); return { tracks, warnings, error: null }; }
-
-async function fetchProviderSource(provider: string, sourceUrl: string, market: string, maxRows: number, db: ReturnType<typeof createClient>): Promise<ProviderFetchResult> { switch (provider) { case "spotify": return fetchSpotifySource(sourceUrl, market, maxRows, db); case "apple_music": return fetchAppleMusicSource(sourceUrl, market, maxRows, db); default: return { tracks: [], warnings: ["Unknown provider: "+provider], error: "Unknown provider '"+provider+"'." }; } }
 
 function anchorToMonday(dateStr: string): string { const d = new Date(dateStr); if (Number.isNaN(d.getTime())) return dateStr.slice(0, 10); const day = d.getUTCDay(); const diff = day === 0 ? 6 : day - 1; d.setUTCDate(d.getUTCDate() - diff); d.setUTCHours(0, 0, 0, 0); return d.toISOString().split("T")[0]; }
 
-// REGISTRY RESOLUTION HELPERS
-async function findOrCreateRegistryTrack(db: ReturnType<typeof createClient>, trackTitle: string, artistDisplay: string, isrc: string | null, artworkUrl: string | null, releaseDate: string | null, now: string, previewUrl: string | null = null): Promise<{ trackId: string; trackSlug: string; created: boolean }> {
-  if (isrc) { const { data: byIsrc } = await db.from("registry_tracks").select("id, slug, preview_url").eq("isrc", isrc).maybeSingle(); if (byIsrc) { if (previewUrl && !byIsrc.preview_url) { await db.from("registry_tracks").update({ preview_url: previewUrl, updated_at: now }).eq("id", byIsrc.id); } return { trackId: byIsrc.id as string, trackSlug: byIsrc.slug as string, created: false }; } }
-  const nk = build_normalized_key(trackTitle, artistDisplay);
-  if (nk) { const nt = normalize_title(trackTitle); const lk = lead_artist_key(artistDisplay); const { data: byTitle } = await db.from("registry_tracks").select("id, slug, normalized_title, preview_url").eq("normalized_title", nt).limit(5); if (byTitle && byTitle.length > 0) { for (const t of byTitle) { const { data: tas } = await db.from("registry_track_artists").select("artist_id").eq("track_id", t.id).limit(1); if (tas && tas.length > 0) { const { data: artist } = await db.from("registry_artists").select("slug, normalized_name").eq("id", tas[0].artist_id).maybeSingle(); if (artist) { const an = (artist.normalized_name as string) || ""; if (an === lk || an.includes(lk) || lk.includes(an)) { if (previewUrl && !t.preview_url) { await db.from("registry_tracks").update({ preview_url: previewUrl, updated_at: now }).eq("id", t.id); } return { trackId: t.id as string, trackSlug: t.slug as string, created: false }; } } } } } }
-  const { data: exactTitle } = await db.from("registry_tracks").select("id, slug, preview_url").eq("title", trackTitle).limit(5); if (exactTitle && exactTitle.length > 0) { for (const t of exactTitle) { const { data: tas } = await db.from("registry_track_artists").select("artist_id").eq("track_id", t.id).limit(1); if (tas && tas.length > 0) { const { data: artist } = await db.from("registry_artists").select("display_name").eq("id", tas[0].artist_id).maybeSingle(); if (artist) { const pa = artistDisplay.split(/\s+(?:feat\.?|ft\.?|featuring)\s+/i)[0].split(/\s*,\s*/)[0].trim(); const ra = (artist.display_name as string) || ""; if (pa.toLowerCase() === ra.toLowerCase()) { if (previewUrl && !t.preview_url) { await db.from("registry_tracks").update({ preview_url: previewUrl, updated_at: now }).eq("id", t.id); } return { trackId: t.id as string, trackSlug: t.slug as string, created: false }; } } } } }
-  const trackSlug = generateTrackSlug(
-    trackTitle,
-    artistDisplay,
-  );
-  const collision = await trackSlugCollisionInArtistScope(
-    db,
-    trackSlug,
-    artistDisplay,
-  );
-  if (collision) {
-    throw new Error(
-      "registry_track_slug_scope_collision:" +
-        collision,
-    );
-  }
-  const trackId = crypto.randomUUID();
-  const sanitizedRd = sanitizeDate(releaseDate);
-  void sanitizedRd;
-  const { error: insErr } = await db
-    .from("registry_tracks")
-    .insert({
-      id: trackId,
-      slug: trackSlug,
-      title: trackTitle,
-      normalized_title: normalize_title(trackTitle),
-      isrc: isrc || null,
-      artwork_url: artworkUrl || null,
-      preview_url: previewUrl || null,
-      status: "active",
-      metadata: {
-        source: "chart_ingest",
-        created_at: now,
-      },
-      created_at: now,
-      updated_at: now,
-    });
-  if (insErr) {
-    throw new Error(
-      "Failed to create registry track: " +
-        insErr.message,
-    );
-  }
-  return {
-    trackId,
-    trackSlug,
-    created: true,
-  };
-}
+// REGISTRY MATERIALIZATION
+// Canonical Registry writes are delegated to the governed Slice-2 RPC family.
 
-async function trackSlugCollisionInArtistScope(
-  db: ReturnType<typeof createClient>,
-  trackSlug: string,
-  artistDisplay: string,
-): Promise<string> {
-  const leadKey = lead_artist_key(
-    artistDisplay,
-  );
-  if (!leadKey) {
-    return "missing_lead_artist_scope";
-  }
-
-  const { data: candidates, error: candidateError } =
-    await db
-      .from("registry_tracks")
-      .select("id")
-      .eq("slug", trackSlug)
-      .eq("status", "active")
-      .limit(50);
-
-  if (candidateError) {
-    throw new Error(
-      "Track slug collision lookup failed: " +
-        candidateError.message,
-    );
-  }
-
-  for (const candidate of candidates ?? []) {
-    const { data: links, error: linksError } =
-      await db
-        .from("registry_track_artists")
-        .select("artist_id")
-        .eq("track_id", candidate.id)
-        .eq("status", "active")
-        .eq("is_primary", true)
-        .limit(2);
-
-    if (linksError) {
-      throw new Error(
-        "Track artist scope lookup failed: " +
-          linksError.message,
-      );
-    }
-
-    for (const link of links ?? []) {
-      const { data: artist, error: artistError } =
-        await db
-          .from("registry_artists")
-          .select("normalized_name")
-          .eq("id", link.artist_id)
-          .maybeSingle();
-
-      if (artistError) {
-        throw new Error(
-          "Track artist identity lookup failed: " +
-            artistError.message,
-        );
-      }
-
-      const normalizedArtist =
-        String(
-          artist?.normalized_name || "",
-        );
-
-      if (
-        normalizedArtist &&
-        normalizedArtist === leadKey
-      ) {
-        return String(candidate.id);
-      }
-    }
-  }
-
-  return "";
-}
-async function findOrCreateRegistryArtist(db: ReturnType<typeof createClient>, artistName: string, now: string): Promise<{ artistId: string; artistSlug: string; created: boolean }> { const normalized = artistName.split(/\s+(?:feat\.?|ft\.?|featuring)\s+/i)[0].split(/\s*,\s*/)[0].trim(); const nameSlug = generateArtistSlug(normalized); const { data: bySlug } = await db.from("registry_artists").select("id, slug").eq("slug", nameSlug).maybeSingle(); if (bySlug) return { artistId: bySlug.id as string, artistSlug: bySlug.slug as string, created: false }; const { data: byName } = await db.from("registry_artists").select("id, slug").eq("display_name", normalized).maybeSingle(); if (byName) return { artistId: byName.id as string, artistSlug: byName.slug as string, created: false }; const { data: byCi } = await db.from("registry_artists").select("id, slug, display_name").ilike("display_name", normalized).limit(3); if (byCi && byCi.length > 0) { const exact = byCi.find(a => ((a.display_name as string) || "").toLowerCase() === normalized.toLowerCase()); if (exact) return { artistId: exact.id as string, artistSlug: exact.slug as string, created: false }; return { artistId: byCi[0].id as string, artistSlug: byCi[0].slug as string, created: false }; } const artistSlug = await uniqueArtistSlug(db, nameSlug); const artistId = crypto.randomUUID(); const { error: insErr } = await db.from("registry_artists").insert({ id: artistId, slug: artistSlug, display_name: normalized, normalized_name: normalizeCore(normalized), sort_name: normalized, status: "draft", metadata: { source: "chart_ingest", created_at: now }, created_at: now, updated_at: now }); if (insErr) { const fallbackSlug = artistSlug + "-" + crypto.randomUUID().slice(0, 8); const { error: fbErr } = await db.from("registry_artists").insert({ id: artistId, slug: fallbackSlug, display_name: normalized, normalized_name: normalizeCore(normalized), sort_name: normalized, status: "draft", metadata: { source: "chart_ingest", created_at: now }, created_at: now, updated_at: now }); if (fbErr) throw new Error("Failed to create registry artist: "+fbErr.message); return { artistId, artistSlug: fallbackSlug, created: true }; } return { artistId, artistSlug, created: true }; }
-async function uniqueArtistSlug(db: ReturnType<typeof createClient>, base: string): Promise<string> { const { data } = await db.from("registry_artists").select("slug").eq("slug", base).maybeSingle(); if (!data) return base; return base + "-" + crypto.randomUUID().slice(0, 6); }
-async function ensureTrackArtistLink(db: ReturnType<typeof createClient>, trackId: string, artistId: string, artistSlug: string, artistName: string, now: string, creditOrder: number, isPrimary: boolean): Promise<void> { const { data: existing } = await db.from("registry_track_artists").select("id").eq("track_id", trackId).eq("artist_id", artistId).maybeSingle(); if (existing) return; const { error } = await db.from("registry_track_artists").insert({ id: crypto.randomUUID(), track_id: trackId, artist_id: artistId, artist_slug: artistSlug, artist_name_text: artistName, role: "primary", is_primary: isPrimary, is_featured: !isPrimary, credit_order: creditOrder, display_credit: artistName, source: "chart_ingest", confidence: creditOrder === 0 ? 100 : 80, status: "active", metadata: {}, created_at: now, updated_at: now }); if (error) console.error("[registry] track_artist link failed:", error.message); }
 function parseArtists(artistLine: string): string[] { if (!artistLine || !artistLine.trim()) return []; const parts = artistLine.split(/\s*,\s*/); const artists: string[] = []; for (const part of parts) { const subs = part.split(/\s+(?:feat\.?|ft\.?|featuring)\s+/i); for (const sub of subs) { const xs = sub.split(/\s+x\s+/i); for (const x of xs) { const amps = x.split(/\s+&\s+/); for (const a of amps) { const trimmed = a.trim(); if (trimmed) artists.push(trimmed); } } } } return artists; }
 
-// ── HANDLERS ──
-async function handleFixChartArtistSlugs(req: Request, db: ReturnType<typeof createClient>, params: Record<string, unknown>, user: { id: string; email?: string }) { const { editionId, dryRun } = params as { editionId?: string; dryRun?: boolean }; const isDryRun = dryRun !== false; const now = new Date().toISOString(); let query = db.from("wk_chart_entries_v2").select("id, track_title, artist_name, artist_slug, track_slug, canonical_track_id, edition_id"); if (editionId) query = query.eq("edition_id", editionId); const { data: allEntries } = await query; if (!allEntries || allEntries.length === 0) return json(req, { ok: true, fixed: 0, message: "No entries found." }); const { data: allArtists } = await db.from("registry_artists").select("slug, display_name"); const validSlugs = new Set((allArtists || []).map(a => a.slug as string)); const artistByName = new Map<string, string>(); for (const a of (allArtists || [])) { const dn = ((a.display_name as string) || "").toLowerCase(); artistByName.set(dn, a.slug as string); } const toFix: Array<{ id: string; track_title: string; artist_name: string; current_slug: string; correct_slug: string; method: string }> = []; const skipped: string[] = []; for (const entry of allEntries) { const currentSlug = (entry.artist_slug as string) || ""; if (validSlugs.has(currentSlug)) continue; let correctSlug = ""; let method = ""; if (entry.canonical_track_id) { const { data: rt } = await db.from("registry_tracks").select("id").eq("id", entry.canonical_track_id as string).maybeSingle(); if (rt) { const { data: rta } = await db.from("registry_track_artists").select("artist_slug").eq("track_id", rt.id).eq("is_primary", true).limit(1); if (rta && rta.length > 0 && rta[0].artist_slug) { correctSlug = rta[0].artist_slug as string; method = "track_artists"; } } } if (!correctSlug) { const primaryName = (entry.artist_name as string).split(/\s+(?:feat\.?|ft\.?|featuring)\s+/i)[0].split(/\s*,\s*/)[0].trim(); const lookup = artistByName.get(primaryName.toLowerCase()); if (lookup) { correctSlug = lookup; method = "name_match"; } } if (correctSlug) { toFix.push({ id: entry.id as string, track_title: (entry.track_title as string) || "", artist_name: (entry.artist_name as string) || "", current_slug: currentSlug, correct_slug: correctSlug, method }); } else { skipped.push(`${(entry.track_title as string)} by ${(entry.artist_name as string)} (slug: ${currentSlug})`); } } if (isDryRun) return json(req, { ok: true, dry_run: true, total_entries: allEntries.length, to_fix: toFix.length, skipped: skipped.length, fix_preview: toFix.slice(0, 50), skipped_samples: skipped.slice(0, 20) }); let fixed = 0; for (const fix of toFix) { const { error } = await db.from("wk_chart_entries_v2").update({ artist_slug: fix.correct_slug, updated_at: now }).eq("id", fix.id); if (!error) fixed++; } await db.from("chart_ingest_audit_events").insert({ run_id: editionId || "global", actor: user.id, actor_email: user.email || null, action: "fix_artist_slugs", new_status: "fixed", payload_json: { fixed, skipped: skipped.length, dryRun: false, totalEntries: allEntries.length }, created_at: now }); return json(req, { ok: true, fixed, skipped: skipped.length, total_entries: allEntries.length, skipped_samples: skipped.slice(0, 20) }); }
+interface ChartMaterializationResult {
+  run_id:string; candidate_id:string; track_id:string; track_slug:string;
+  track_created:boolean; track_operation_id?:string;
+  primary_artist_id:string; primary_artist_slug:string;
+  artists:Array<{artist_id:string;artist_slug:string;artist_name:string;created:boolean;operation_id?:string}>;
+  credits:Array<{credit_id:string;artist_id:string;created:boolean;operation_id?:string}>;
+}
 
-async function handleReingestEdition(req: Request, db: ReturnType<typeof createClient>, params: Record<string, unknown>, user: { id: string; email?: string }) { const { editionId, dryRun } = params as { editionId: string; dryRun?: boolean }; if (!editionId) return json(req, { error: "editionId_required" }, 400); const isDryRun = dryRun !== false; const now = new Date().toISOString(); const { data: edition } = await db.from("wk_chart_editions_v2").select("*").eq("id", editionId).maybeSingle(); if (!edition) return json(req, { error: "edition_not_found" }, 404); const { data: entries } = await db.from("wk_chart_entries_v2").select("*").eq("edition_id", editionId).order("rank", { ascending: true }); if (!entries || entries.length === 0) return json(req, { error: "no_entries" }, 400); const stats = { total: entries.length, tracks_found: 0, tracks_created: 0, artists_found: 0, artists_created: 0, links_created: 0, artist_slugs_fixed: 0, track_slugs_normalized: 0, canonical_ids_set: 0, errors: 0 }; const repairs: Array<{ id: string; track_title: string; artist_name: string; action: string }> = []; for (const entry of entries) { try { const entryId = entry.id as string; const trackTitle = (entry.track_title as string) || ""; const artistName = (entry.artist_name as string) || ""; const artworkUrl = (entry.artwork_url as string) || null; const releaseDate = (entry.release_date as string) || null; const existingCanonical = (entry.canonical_track_id as string) || null; if (existingCanonical) { const { data: existingRt } = await db.from("registry_tracks").select("id").eq("id", existingCanonical).maybeSingle(); if (existingRt) { stats.tracks_found++; const { data: rta } = await db.from("registry_track_artists").select("artist_slug").eq("track_id", existingRt.id).eq("is_primary", true).limit(1); if (rta && rta.length > 0 && rta[0].artist_slug) { const correctSlug = normalizeSlug(rta[0].artist_slug as string); const currentArtistSlug = (entry.artist_slug as string) || ""; const currentTrackSlug = (entry.track_slug as string) || ""; const updates: Record<string, unknown> = { updated_at: now }; if (correctSlug !== currentArtistSlug) { updates.artist_slug = correctSlug; stats.artist_slugs_fixed++; repairs.push({ id: entryId, track_title: trackTitle, artist_name: artistName, action: "fixed_artist_slug: " + currentArtistSlug + " -> " + correctSlug }); } const nTrackSlug = normalizeSlug(currentTrackSlug); if (nTrackSlug && nTrackSlug !== currentTrackSlug) { updates.track_slug = nTrackSlug; stats.track_slugs_normalized++; repairs.push({ id: entryId, track_title: trackTitle, artist_name: artistName, action: "normalized_track_slug: " + currentTrackSlug + " -> " + nTrackSlug }); } if (Object.keys(updates).length > 1) { if (!isDryRun) await db.from("wk_chart_entries_v2").update(updates).eq("id", entryId); } } continue; } } const trackResult = await findOrCreateRegistryTrack(db, trackTitle, artistName, null, artworkUrl, releaseDate, now); if (trackResult.created) stats.tracks_created++; else stats.tracks_found++; const artistNames = parseArtists(artistName); const artistResults: Array<{ artistId: string; artistSlug: string; created: boolean }> = []; for (const an of artistNames) { const ar = await findOrCreateRegistryArtist(db, an, now); artistResults.push(ar); if (ar.created) stats.artists_created++; else stats.artists_found++; } for (let i = 0; i < artistResults.length; i++) { if (!isDryRun) await ensureTrackArtistLink(db, trackResult.trackId, artistResults[i].artistId, normalizeSlug(artistResults[i].artistSlug), artistNames[i], now, i, i === 0); stats.links_created++; } const primaryArtistSlug = normalizeSlug(artistResults.length > 0 ? artistResults[0].artistSlug : ""); const finalTrackSlug = normalizeSlug(trackResult.trackSlug); if (!isDryRun) await db.from("wk_chart_entries_v2").update({ canonical_track_id: trackResult.trackId, track_slug: finalTrackSlug, artist_slug: primaryArtistSlug, updated_at: now }).eq("id", entryId); stats.canonical_ids_set++; repairs.push({ id: entryId, track_title: trackTitle, artist_name: artistName, action: trackResult.created ? "created_track: " + finalTrackSlug : "linked_track: " + finalTrackSlug }); } catch (err) { stats.errors++; repairs.push({ id: entry.id as string, track_title: (entry.track_title as string) || "", artist_name: (entry.artist_name as string) || "", action: "ERROR: " + (err instanceof Error ? err.message : String(err)) }); } } await db.from("chart_ingest_audit_events").insert({ run_id: editionId, actor: user.id, actor_email: user.email || null, action: "reingest_edition", new_status: isDryRun ? "dry_run" : "done", payload_json: { ...stats, edition_slug: edition.edition_slug, dryRun: isDryRun }, created_at: now }); return json(req, { ok: true, dry_run: isDryRun, edition_slug: edition.edition_slug as string, stats, repairs: repairs.slice(0, 100) }); }
+async function materializeChartCandidate(db:ReturnType<typeof createClient>,runId:string,candidateId:string):Promise<ChartMaterializationResult>{
+  const {data,error}=await db.rpc("chart_materialize_candidate_registry_v1",{p_run_id:runId,p_candidate_id:candidateId});
+  if(error) throw new Error(`Governed Registry materialization failed for candidate ${candidateId}: ${error.message}`);
+  const result=(data??{}) as unknown as ChartMaterializationResult;
+  if(!result.track_id||!result.track_slug||!result.primary_artist_id||!result.primary_artist_slug) throw new Error(`Governed Registry materialization returned incomplete identity for candidate ${candidateId}.`);
+  return {...result,artists:Array.isArray(result.artists)?result.artists:[],credits:Array.isArray(result.credits)?result.credits:[]};
+}
+
+// ── HANDLERS ──
+async function handleFixChartArtistSlugs(req:Request,db:ReturnType<typeof createClient>,params:Record<string,unknown>,user:{id:string;email?:string}) {
+  const {editionId,dryRun}=params as {editionId?:string;dryRun?:boolean};
+  const isDryRun=dryRun!==false; const now=new Date().toISOString();
+  const {data:rows,error}=await db.rpc("chart_get_entry_registry_identity_v1",{p_edition_id:editionId||null});
+  if(error) return json(req,{error:"canonical_identity_lookup_failed",detail:error.message},500);
+  const fixes:Array<{id:string;track_title:string;artist_name:string;current_slug:string;correct_slug:string;method:string}>=[]; const skipped:string[]=[];
+  for(const raw of rows||[]){
+    const row=raw as {entry_id?:string;track_title?:string;artist_name?:string;current_artist_slug?:string;canonical_track_id?:string;canonical_primary_artist_slug?:string};
+    const id=String(row.entry_id||""); const title=String(row.track_title||""); const artist=String(row.artist_name||"");
+    const current=normalizeSlug(String(row.current_artist_slug||"")); const correct=normalizeSlug(String(row.canonical_primary_artist_slug||""));
+    if(!id||!row.canonical_track_id||!correct){skipped.push(`${title} by ${artist} (no canonical primary credit)`);continue;}
+    if(current===correct)continue;
+    fixes.push({id,track_title:title,artist_name:artist,current_slug:current,correct_slug:correct,method:"canonical_track_primary_credit"});
+  }
+  if(isDryRun)return json(req,{ok:true,dry_run:true,total_entries:(rows||[]).length,to_fix:fixes.length,skipped:skipped.length,fix_preview:fixes.slice(0,50),skipped_samples:skipped.slice(0,20)});
+  let fixed=0;
+  for(const item of fixes){const {error:updateError}=await db.from("wk_chart_entries_v2").update({artist_slug:item.correct_slug,updated_at:now}).eq("id",item.id);if(!updateError)fixed++;}
+  await db.from("chart_ingest_audit_events").insert({run_id:editionId||"global",actor:user.id,actor_email:user.email||null,action:"fix_artist_slugs",new_status:"fixed",payload_json:{fixed,skipped:skipped.length,dryRun:false,totalEntries:(rows||[]).length},created_at:now});
+  return json(req,{ok:true,fixed,skipped:skipped.length,total_entries:(rows||[]).length,skipped_samples:skipped.slice(0,20)});
+}
+
+async function handleReingestEdition(req:Request,db:ReturnType<typeof createClient>,params:Record<string,unknown>,user:{id:string;email?:string}) {
+  const {editionId,dryRun}=params as {editionId:string;dryRun?:boolean}; if(!editionId)return json(req,{error:"editionId_required"},400);
+  const isDryRun=dryRun!==false; const now=new Date().toISOString();
+  const {data:edition,error:editionError}=await db.from("wk_chart_editions_v2").select("id, edition_slug, ingest_run_id").eq("id",editionId).maybeSingle();
+  if(editionError)return json(req,{error:"edition_lookup_failed",detail:editionError.message},500); if(!edition)return json(req,{error:"edition_not_found"},404);
+  const runId=String(edition.ingest_run_id||"");
+  const {data:entries,error:entryError}=await db.from("wk_chart_entries_v2").select("*").eq("edition_id",editionId).order("rank",{ascending:true});
+  if(entryError)return json(req,{error:"entry_lookup_failed",detail:entryError.message},500); if(!entries?.length)return json(req,{error:"no_entries"},400);
+  const stats={total:entries.length,tracks_found:0,tracks_created:0,artists_found:0,artists_created:0,links_created:0,artist_slugs_fixed:0,track_slugs_normalized:0,canonical_ids_set:0,errors:0};
+  const repairs:Array<{id:string;track_title:string;artist_name:string;action:string}>=[];
+  for(const entry of entries){
+    const id=String(entry.id||""); const title=String(entry.track_title||""); const artist=String(entry.artist_name||""); const key=String(entry.normalized_key||""); const existing=String(entry.canonical_track_id||"");
+    try{
+      if(!runId||!key){if(existing){stats.tracks_found++;repairs.push({id,track_title:title,artist_name:artist,action:"existing_canonical_binding_preserved"});continue;}throw new Error("missing_original_run_candidate_binding");}
+      const {data:candidates,error:candidateError}=await db.from("chart_ingest_candidates").select("id").eq("run_id",runId).eq("normalized_key",key).limit(2);
+      if(candidateError)throw new Error("candidate_binding_lookup_failed:"+candidateError.message);
+      if(!candidates||candidates.length!==1){if(existing){stats.tracks_found++;repairs.push({id,track_title:title,artist_name:artist,action:"existing_canonical_binding_preserved_without_unique_candidate"});continue;}throw new Error(candidates?.length?"ambiguous_original_candidate_binding":"missing_original_candidate_binding");}
+      const candidateId=String(candidates[0].id); if(isDryRun){repairs.push({id,track_title:title,artist_name:artist,action:`would_materialize_candidate:${candidateId}`});continue;}
+      const result=await materializeChartCandidate(db,runId,candidateId); if(result.track_created)stats.tracks_created++;else stats.tracks_found++;
+      for(const a of result.artists){if(a.created)stats.artists_created++;else stats.artists_found++;} stats.links_created+=result.credits.filter(c=>c.created).length;
+      const trackSlug=normalizeSlug(result.track_slug); const artistSlug=normalizeSlug(result.primary_artist_slug);
+      if(trackSlug!==String(entry.track_slug||""))stats.track_slugs_normalized++; if(artistSlug!==String(entry.artist_slug||""))stats.artist_slugs_fixed++;
+      const {error:updateError}=await db.from("wk_chart_entries_v2").update({canonical_track_id:result.track_id,track_slug:trackSlug,artist_slug:artistSlug,updated_at:now}).eq("id",id);
+      if(updateError)throw new Error("chart_entry_update_failed:"+updateError.message); stats.canonical_ids_set++; repairs.push({id,track_title:title,artist_name:artist,action:result.track_created?`created_track:${trackSlug}`:`linked_track:${trackSlug}`});
+    }catch(error){stats.errors++;repairs.push({id,track_title:title,artist_name:artist,action:"ERROR:"+(error instanceof Error?error.message:String(error))});}
+  }
+  await db.from("chart_ingest_audit_events").insert({run_id:editionId,actor:user.id,actor_email:user.email||null,action:"reingest_edition",new_status:isDryRun?"dry_run":"done",payload_json:{...stats,edition_slug:edition.edition_slug,dryRun:isDryRun},created_at:now});
+  return json(req,{ok:stats.errors===0,dry_run:isDryRun,edition_slug:String(edition.edition_slug||""),stats,repairs:repairs.slice(0,100)});
+}
 
 async function handleCreateDryRun(req: Request, db: ReturnType<typeof createClient>, params: Record<string, unknown>, user: { id: string; email?: string }) { const rq = params.request as Record<string, unknown>; if (!rq) return json(req, { error: "request_required" }, 400); const runId = crypto.randomUUID(); const ed = rq.editionDate as string; const sUrls = (rq.sourceUrls as string[]) || []; const { error: rErr } = await db.from("chart_ingest_runs").insert({ id: runId, program_id: (rq.existingSeriesId as string) || "unknown", series_slug: (rq.existingSeriesId as string) || null, market_slug: (rq.market as string) || "KE", chart_kind: (rq.chartKind as string) || "tracks", edition_date: ed, period_start: ed, period_end: ed, chart_size: (rq.chartSize as number) || 20, status: "queued", rule_snapshot_json: { chartTitle: rq.chartTitle, chartSlug: rq.chartSlug, coverStyle: rq.coverStyle || "default", saveAsRecurringSeries: rq.saveAsRecurringSeries || false, methodologyVersion: rq.methodologyVersion || "1.0.0" }, market_scope_snapshot_json: (rq.marketScopeSnapshot as object) || {}, eligibility_profile_id: (rq.eligibilityProfileId as string) || null, market_scope_id: (rq.marketScopeId as string) || null, scoring_policy_version: "1.0.1", source_policy_version: "1.0.0", eligibility_policy_version: "1.0.0", methodology_version: (rq.methodologyVersion as string) || "1.0.0", created_by: user.id, created_by_email: user.email || null }); if (rErr) return json(req, { error: "run_create_failed", detail: rErr.message }, 500); if (sUrls.length > 0) { const srs = sUrls.map((url, i) => ({ run_id: runId, provider: detectProvider(url), source_type: url.endsWith(".csv") ? "csv" : "playlist", source_url: url, storefront_or_market: (rq.market as string) || "KE", enabled: true, priority: i, fetch_status: "pending" })); await db.from("chart_ingest_run_sources").insert(srs); } const sgs = ALL_STAGES.map(s => ({ run_id: runId, stage: s, status: "idle", metrics_json: {} })); await db.from("chart_ingest_stage_events").insert(sgs); await db.from("chart_ingest_audit_events").insert({ run_id: runId, actor: user.id, actor_email: user.email || null, action: "run_created", new_status: "queued", payload_json: { sourceCount: sUrls.length } }); return json(req, { runId, status: "queued" }); }
 
@@ -665,7 +477,7 @@ async function handleNormalizeRun(req: Request, db: ReturnType<typeof createClie
   } if (groups.size === 0) { const d = Date.now() - ss; await db.from("chart_ingest_stage_events").update({ status: "done", finished_at: new Date().toISOString(), duration_ms: d, message: "No valid keys" }).eq("run_id", runId).eq("stage", "normalize"); return json(req, { ok: true, runId, rawCount: rawRows.length, uniqueCount: 0, durationMs: d }); } const now = new Date().toISOString(); const nrs: Array<Record<string, unknown>> = []; const cds: Array<Record<string, unknown>> = []; let wc = 0; for (const [nk, g] of groups) { const lk = nk.split("::")[1] || ""; const nt = nk.split("::")[0] || ""; const sc = g.sources.size; const oc = g.rows.length; const surls = [...g.sourceUrls]; const srd = sanitizeDate(g.bestReleaseDate); const providerIdsJson = providerIdsJsonFromBag(g.providerIds); const nid = crypto.randomUUID(); const cid = crypto.randomUUID(); const reasons: string[] = []; if (!nt) reasons.push("empty_title"); if (!lk) reasons.push("empty_artist"); if (sc < 1) reasons.push("no_sources"); nrs.push({ id:nid, run_id:runId, normalized_key:nk, lead_artist_key:lk, title:g.bestTitle, artist_display:g.bestArtist, normalized_title:nt, source_count:sc, occurrence_count:oc, source_urls_seen:surls, isrc:g.bestIsrc, release_date:srd, artwork_url:g.artwork_url, external_url:(g.rows[0].external_url as string)||null, preview_url:(g.rows[0].preview_url as string)||null, provider_track_id:(g.rows[0].provider_track_id as string)||null, provider_release_id:(g.rows[0].provider_release_id as string)||null, provider_artist_ids:(g.rows[0].provider_artist_ids as string[])||[], raw_source_count:g.rows.length, created_at:now }); cds.push({ id:cid, run_id:runId, normalized_key:nk, lead_artist_key:lk, title:g.bestTitle, artist_display:g.bestArtist, source_count:sc, occurrence_count:oc, source_urls_seen:surls, provider_ids_json:providerIdsJson, release_date:srd, candidate_type:"streaming", status:reasons.length===0?"eligible":"excluded", version:1, carry_forward_only:false, continuity_locked:false, airplay_candidate_only:false, streaming_qualified:sc>0, isrc:g.bestIsrc||null, upc:null, artwork_url:g.artwork_url, external_url:(g.rows[0].external_url as string)||null, preview_url:(g.rows[0].preview_url as string)||null, release_title:null, created_at:now, updated_at:now }); if (reasons.length > 0) wc++; } const CH = 200; for (let j=0; j<nrs.length; j+=CH) { await db.from("chart_ingest_normalized_rows").insert(nrs.slice(j,j+CH)); } for (let j=0; j<cds.length; j+=CH) { const chunk = cds.slice(j,j+CH); const { error: cErr } = await db.from("chart_ingest_candidates").insert(chunk); if (cErr) { const d = Date.now()-ss; await db.from("chart_ingest_stage_events").update({ status:"failed", finished_at:new Date().toISOString(), duration_ms:d, message:"Insert failed: "+cErr.message }).eq("run_id",runId).eq("stage","normalize"); return json(req, { error:"insert_failed", detail:cErr.message }, 500); } } const exclCands = cds.filter(c => c.status==="excluded"); if (exclCands.length>0) { const er = exclCands.map(c=>({ id:crypto.randomUUID(), run_id:runId, candidate_id:c.id, reason:"invalid_normalized_key", created_at:now })); for (let j=0; j<er.length; j+=CH) { await db.from("chart_ingest_exclusions").insert(er.slice(j,j+CH)); } } const ec = cds.filter(c=>c.status==="eligible").length; const d = Date.now()-ss; await db.from("chart_ingest_stage_events").update({ status:"done", finished_at:new Date().toISOString(), duration_ms:d, message:groups.size+" unique from "+rawRows.length }).eq("run_id",runId).eq("stage","normalize"); await db.from("chart_ingest_stage_events").update({ status:"done", finished_at:new Date().toISOString(), duration_ms:0, message:(rawRows.length-groups.size)+" duplicates removed." }).eq("run_id",runId).eq("stage","dedupe"); await db.from("chart_ingest_stage_events").update({ status:"done", finished_at:new Date().toISOString(), duration_ms:0, message:cds.length+" candidates built." }).eq("run_id",runId).eq("stage","release_candidate_build"); return json(req, { ok:true, runId, rawCount:rawRows.length, uniqueCount:groups.size, candidateCount:cds.length, warningCount:exclCands.length, durationMs:d }); }
 
 // SOURCE_FETCH — unchanged from v25
-async function handleSourceFetch(req: Request, db: ReturnType<typeof createClient>, params: Record<string, unknown>, user: { id: string; email?: string }) { const { runId } = params as { runId: string }; if (!runId) return json(req, { error: "runId_required" }, 400); const { data: run } = await db.from("chart_ingest_runs").select("id,status,edition_date,chart_size").eq("id", runId).maybeSingle(); if (!run) return json(req, { error: "run_not_found" }, 404); await db.from("chart_ingest_raw_rows").delete().eq("run_id", runId); await db.from("chart_ingest_stage_events").update({ status: "running", started_at: new Date().toISOString() }).eq("run_id", runId).eq("stage", "source_fetch"); const { data: sources } = await db.from("chart_ingest_run_sources").select("*").eq("run_id", runId).eq("enabled", true).order("priority"); if (!sources || sources.length === 0) { const d = Date.now(); await db.from("chart_ingest_stage_events").update({ status: "done", finished_at: new Date().toISOString(), duration_ms: d, message: "No enabled sources." }).eq("run_id", runId).eq("stage", "source_fetch"); return json(req, { ok: true, runId, sourceCount: 0, rawRowCount: 0 }); } const ed = (run.edition_date as string) || new Date().toISOString().split("T")[0]; const cs = (run.chart_size as number) || 20; let trr = 0, tfs = 0; const aw: string[] = []; const srs: Array<{ sourceId: string; fetchedCount: number; droppedCount: number; provider: string; warnings: string[]; error: string | null }> = []; for (const source of sources) { const market = (source.storefront_or_market as string) || "KE"; const mr = Math.min(500, Math.max(cs * 5, cs + 100)); if (source.provider === "csv") { srs.push({ sourceId: source.id, fetchedCount: source.fetched_count || 0, droppedCount: 0, provider: "csv", warnings: [], error: null }); trr += source.fetched_count || 0; continue; } const fr = await fetchProviderSource(source.provider as string, source.source_url as string, market, mr, db); if (fr.error) { srs.push({ sourceId: source.id, fetchedCount: 0, droppedCount: 0, provider: source.provider, warnings: fr.warnings, error: fr.error }); tfs++; aw.push(...fr.warnings); continue; } const tracks = fr.tracks; aw.push(...fr.warnings); if (tracks.length === 0) { srs.push({ sourceId: source.id, fetchedCount: 0, droppedCount: 0, provider: source.provider, warnings: fr.warnings, error: null }); continue; } const now = new Date().toISOString(); const rrs = tracks.map(t => ({ id: crypto.randomUUID(), run_id: runId, source_id: source.id, provider: source.provider, provider_row_id: t.provider_track_id ? source.provider+":"+t.provider_track_id+":"+t.source_position : source.provider+":pos:"+t.source_position, provider_track_id: t.provider_track_id, provider_release_id: t.provider_release_id, provider_artist_ids: t.provider_artist_ids, source_position: t.source_position, title_raw: t.title, artist_raw: t.artist, release_raw: null, isrc: t.isrc, upc: null, release_date_raw: t.release_date, artwork_url: t.artwork_url, external_url: t.external_url || source.source_url || null, preview_url: t.preview_url, raw_payload_json: t.raw_payload, raw_payload_hash: null })); const CH = 100; for (let j = 0; j < rrs.length; j += CH) { await db.from("chart_ingest_raw_rows").insert(rrs.slice(j, j + CH)); } trr += rrs.length; srs.push({ sourceId: source.id, fetchedCount: rrs.length, droppedCount: 0, provider: source.provider, warnings: fr.warnings, error: null }); } const d = Date.now(); const sm = trr > 0 ? trr+" raw rows from "+(sources.length - tfs)+"/"+sources.length+" source(s)" : "All sources failed."; await db.from("chart_ingest_stage_events").update({ status: trr > 0 ? "done" : "failed", finished_at: new Date().toISOString(), duration_ms: d, message: sm }).eq("run_id", runId).eq("stage", "source_fetch"); if (trr > 0) { await db.from("chart_ingest_stage_events").update({ status: "done", finished_at: new Date().toISOString(), duration_ms: 1, message: "Raw rows persisted." }).eq("run_id", runId).eq("stage", "raw_persist"); await db.from("chart_ingest_runs").update({ status: "running", updated_at: new Date().toISOString() }).eq("id", runId); } else { await db.from("chart_ingest_runs").update({ status: "source_fetch_failed", error_code: "all_sources_failed", error_message: "Configure credentials in Settings.", updated_at: new Date().toISOString() }).eq("id", runId); } return json(req, { ok: trr > 0, runId, sourceCount: sources.length, rawRowCount: trr, failedSourceCount: tfs, sourceResults: srs, durationMs: d }); }
+async function handleSourceFetch(req: Request, db: ReturnType<typeof createClient>, params: Record<string, unknown>, user: { id: string; email?: string }) { const { runId } = params as { runId: string }; if (!runId) return json(req, { error: "runId_required" }, 400); const { data: run } = await db.from("chart_ingest_runs").select("id,status,edition_date,chart_size").eq("id", runId).maybeSingle(); if (!run) return json(req, { error: "run_not_found" }, 404); await db.from("chart_ingest_raw_rows").delete().eq("run_id", runId); await db.from("chart_ingest_stage_events").update({ status: "running", started_at: new Date().toISOString() }).eq("run_id", runId).eq("stage", "source_fetch"); const { data: sources } = await db.from("chart_ingest_run_sources").select("*").eq("run_id", runId).eq("enabled", true).order("priority"); if (!sources || sources.length === 0) { const d = Date.now(); await db.from("chart_ingest_stage_events").update({ status: "done", finished_at: new Date().toISOString(), duration_ms: d, message: "No enabled sources." }).eq("run_id", runId).eq("stage", "source_fetch"); return json(req, { ok: true, runId, sourceCount: 0, rawRowCount: 0 }); } const ed = (run.edition_date as string) || new Date().toISOString().split("T")[0]; const cs = (run.chart_size as number) || 20; let trr = 0, tfs = 0; const aw: string[] = []; const srs: Array<{ sourceId: string; fetchedCount: number; droppedCount: number; provider: string; warnings: string[]; error: string | null }> = []; for (const source of sources) { const market = (source.storefront_or_market as string) || "KE"; const mr = Math.min(500, Math.max(cs * 5, cs + 100)); if (source.provider === "csv") { srs.push({ sourceId: source.id, fetchedCount: source.fetched_count || 0, droppedCount: 0, provider: "csv", warnings: [], error: null }); trr += source.fetched_count || 0; continue; } const fr = await fetchProviderSource(req, source.provider as string, source.source_url as string, market, mr); if (fr.error) { srs.push({ sourceId: source.id, fetchedCount: 0, droppedCount: 0, provider: source.provider, warnings: fr.warnings, error: fr.error }); tfs++; aw.push(...fr.warnings); continue; } const tracks = fr.tracks; aw.push(...fr.warnings); if (tracks.length === 0) { srs.push({ sourceId: source.id, fetchedCount: 0, droppedCount: 0, provider: source.provider, warnings: fr.warnings, error: null }); continue; } const now = new Date().toISOString(); const rrs = tracks.map(t => ({ id: crypto.randomUUID(), run_id: runId, source_id: source.id, provider: source.provider, provider_row_id: t.provider_track_id ? source.provider+":"+t.provider_track_id+":"+t.source_position : source.provider+":pos:"+t.source_position, provider_track_id: t.provider_track_id, provider_release_id: t.provider_release_id, provider_artist_ids: t.provider_artist_ids, source_position: t.source_position, title_raw: t.title, artist_raw: t.artist, release_raw: null, isrc: t.isrc, upc: null, release_date_raw: t.release_date, artwork_url: t.artwork_url, external_url: t.external_url || source.source_url || null, preview_url: t.preview_url, raw_payload_json: t.raw_payload, raw_payload_hash: null })); const CH = 100; for (let j = 0; j < rrs.length; j += CH) { await db.from("chart_ingest_raw_rows").insert(rrs.slice(j, j + CH)); } trr += rrs.length; srs.push({ sourceId: source.id, fetchedCount: rrs.length, droppedCount: 0, provider: source.provider, warnings: fr.warnings, error: null }); } const d = Date.now(); const sm = trr > 0 ? trr+" raw rows from "+(sources.length - tfs)+"/"+sources.length+" source(s)" : "All sources failed."; await db.from("chart_ingest_stage_events").update({ status: trr > 0 ? "done" : "failed", finished_at: new Date().toISOString(), duration_ms: d, message: sm }).eq("run_id", runId).eq("stage", "source_fetch"); if (trr > 0) { await db.from("chart_ingest_stage_events").update({ status: "done", finished_at: new Date().toISOString(), duration_ms: 1, message: "Raw rows persisted." }).eq("run_id", runId).eq("stage", "raw_persist"); await db.from("chart_ingest_runs").update({ status: "running", updated_at: new Date().toISOString() }).eq("id", runId); } else { await db.from("chart_ingest_runs").update({ status: "source_fetch_failed", error_code: "all_sources_failed", error_message: "Configure credentials in Settings.", updated_at: new Date().toISOString() }).eq("id", runId); } return json(req, { ok: trr > 0, runId, sourceCount: sources.length, rawRowCount: trr, failedSourceCount: tfs, sourceResults: srs, durationMs: d }); }
 
 // CARRY_FORWARD
 async function handleRunCarryForward(req: Request, db: ReturnType<typeof createClient>, params: Record<string, unknown>, user: { id: string; email?: string }) { const { runId } = params as { runId: string }; if (!runId) return json(req, { error: "runId_required" }, 400); const ss = Date.now(); const { data: run } = await db.from("chart_ingest_runs").select("id,status,edition_date,chart_size,program_id,series_slug").eq("id", runId).maybeSingle(); if (!run) return json(req, { error: "run_not_found" }, 404); await db.from("chart_ingest_stage_events").update({ status: "running", started_at: new Date().toISOString() }).eq("run_id", runId).eq("stage", "carry_forward"); const ed2 = (run.edition_date as string) || new Date().toISOString().split("T")[0]; const pid = (run.program_id as string) || "unknown"; const { data: ccs } = await db.from("chart_ingest_candidates").select("normalized_key").eq("run_id", runId); const fks = new Set<string>(); if (ccs) { for (const c of ccs) { if (c.normalized_key) fks.add(c.normalized_key); } } let cfc = 0, skc = 0, pec = 0; const ccds: Array<Record<string, unknown>> = []; try { const { data: pe } = await db.from("wk_chart_editions_v2").select("id").eq("program_id", pid).in("status",["committed","published"]).lt("edition_date",ed2).order("edition_date",{ascending:false}).limit(1).maybeSingle(); if (pe) { const { data: pes } = await db.from("wk_chart_entries_v2").select("normalized_key, rank, track_title, artist_name, release_date, track_slug, artist_slug, artwork_url").eq("edition_id", pe.id).order("rank",{ascending:true}); if (pes) { pec = pes.length; for (const p of pes) { const nk = (p.normalized_key as string)||""; if (!nk||nk==="::"||!nk.includes("::")) continue; if (fks.has(nk)){skc++;continue;} const cid = crypto.randomUUID(); ccds.push({ id:cid, run_id:runId, normalized_key:nk, lead_artist_key:nk.split("::")[1]??"", title:(p.track_title as string)||"", artist_display:(p.artist_name as string)||"", source_count:0, source_urls_seen:[], occurrence_count:0, release_date:sanitizeDate(p.release_date as string), candidate_type:"carry_forward", status:"eligible", version:1, carry_forward_only:true, continuity_locked:false, airplay_candidate_only:false, streaming_qualified:false, isrc:null, upc:null, artwork_url:(p.artwork_url as string)||null, external_url:null, preview_url:null, release_title:null, created_at:new Date().toISOString(), updated_at:new Date().toISOString() }); cfc++; } } } } catch (err) { console.error("[carry_forward]", err); } if (ccds.length>0) { const CH=200; for (let j=0; j<ccds.length; j+=CH) { const { error: ie } = await db.from("chart_ingest_candidates").insert(ccds.slice(j,j+CH)); if (ie) { const d=Date.now()-ss; await db.from("chart_ingest_stage_events").update({ status:"failed", finished_at:new Date().toISOString(), duration_ms:d, message:ie.message }).eq("run_id",runId).eq("stage","carry_forward"); return json(req,{error:"insert_failed",detail:ie.message},500); } } } const d=Date.now()-ss; await db.from("chart_ingest_stage_events").update({ status:"done", finished_at:new Date().toISOString(), duration_ms:d, message:cfc>0?cfc+" carry-forward from "+pec+" entries":"No carry-forward needed." }).eq("run_id",runId).eq("stage","carry_forward"); return json(req,{ok:true,runId,carryForwardCount:cfc,freshEvidenceCount:fks.size,previousEntryCount:pec,skippedExistingCount:skc,durationMs:d}); }
@@ -1174,19 +986,28 @@ async function handleRunShortlist(req: Request, db: ReturnType<typeof createClie
 async function handleRunFullPipeline(req: Request, db: ReturnType<typeof createClient>, params: Record<string, unknown>, user: { id: string; email?: string }) { const { runId } = params as { runId: string }; if (!runId) return json(req, { error: "runId_required" }, 400); const start = Date.now(); const pss: Array<{ stage: string; result: string }> = []; const sfR = await handleSourceFetch(req, db, params, user); const sfB = await sfR.json() as { ok: boolean; rawRowCount: number; error?: string }; pss.push({ stage: "source_fetch", result: sfB.ok ? sfB.rawRowCount+" rows" : "FAILED: "+(sfB.error||"unknown") }); if (!sfB.ok || sfB.rawRowCount === 0) { await db.from("chart_ingest_runs").update({ status: "failed", error_message: "Pipeline stopped at source_fetch", updated_at: new Date().toISOString() }).eq("id", runId); return json(req, { ok: false, runId, status: "failed", pipelineStages: pss, durationMs: Date.now() - start }); } const nrR = await handleNormalizeRun(req, db, params, user); const nrB = await nrR.json() as { ok: boolean; uniqueCount: number; candidateCount: number }; pss.push({ stage: "normalize", result: nrB.ok ? nrB.candidateCount+" from "+nrB.uniqueCount : "FAILED" }); if (!nrB.ok || nrB.candidateCount === 0) { await db.from("chart_ingest_runs").update({ status: "failed", error_message: "Pipeline stopped at normalize", updated_at: new Date().toISOString() }).eq("id", runId); return json(req, { ok: false, runId, status: "failed", pipelineStages: pss, durationMs: Date.now() - start }); } const cfR = await handleRunCarryForward(req, db, params, user); const cfB = await cfR.json() as { carryForwardCount: number }; pss.push({ stage: "carry_forward", result: cfB.carryForwardCount+" carry-forward" }); const elR = await handleRunEligibilityWithReleaseWindow(req, db, params, user); const elB = await elR.json() as { candidateCount: number; excludedCount: number; originExcludedCount?: number }; pss.push({ stage: "eligibility", result: elB.candidateCount+" total, "+elB.excludedCount+" excluded"+(elB.originExcludedCount?" ("+elB.originExcludedCount+" origin-filtered)":"") }); const scR = await handleRunScoring(req, db, params, user); const scB = await scR.json() as { ok: boolean; scoredCount: number }; pss.push({ stage: "scoring", result: scB.ok ? scB.scoredCount+" scored" : "FAILED" }); if (!scB.ok || scB.scoredCount === 0) { await db.from("chart_ingest_runs").update({ status: "failed", error_message: "Pipeline stopped at scoring", updated_at: new Date().toISOString() }).eq("id", runId); return json(req, { ok: false, runId, status: "failed", pipelineStages: pss, durationMs: Date.now() - start }); } const slR = await handleRunShortlist(req, db, params, user); const slB = await slR.json() as { shortlistedCount: number }; pss.push({ stage: "shortlist", result: slB.shortlistedCount+" shortlisted" }); if (slB.shortlistedCount === 0) { await db.from("chart_ingest_runs").update({ status: "failed", error_message: "Pipeline stopped at shortlist", updated_at: new Date().toISOString() }).eq("id", runId); return json(req, { ok: false, runId, status: "failed", pipelineStages: pss, durationMs: Date.now() - start }); } const td = Date.now() - start; await db.from("chart_ingest_runs").update({ status: "dry_run_complete", dry_run_completed_at: new Date().toISOString(), updated_at: new Date().toISOString() }).eq("id", runId); await db.from("chart_ingest_audit_events").insert({ run_id: runId, actor: user.id, actor_email: user.email || null, action: "dry_run_complete", new_status: "dry_run_complete", payload_json: { pipelineStages: pss, totalDurationMs: td } }); return json(req, { ok: true, runId, status: "dry_run_complete", pipelineStages: pss, totalDurationMs: td }); }
 
 // COMMIT (v26 — normalizeSlug safety-net ensures every entry gets hyphenated slugs)
-async function handleCommitRun(req: Request, db: ReturnType<typeof createClient>, params: Record<string, unknown>, user: { id: string; email?: string }) { const { runId, publishImmediately, notes } = params as { runId: string; publishImmediately?: boolean; notes?: string }; if (!runId) return json(req, { error: "runId_required" }, 400);
-
-  const { error: commitGateErr } = await db.rpc("chart_assert_committable_run", {
-    p_run_id: runId,
-  });
-
-  if (commitGateErr) {
-    return json(req, {
-      error: "commit_blocked_chart_run_integrity",
-      detail: commitGateErr.message,
-    }, 400);
-  }
- const { data: run } = await db.from("chart_ingest_runs").select("*").eq("id", runId).maybeSingle(); if (!run) return json(req, { error: "run_not_found" }, 404); const now = new Date().toISOString(); const ed = (run.edition_date as string) || now.split("T")[0]; const csz = (run.chart_size as number) || 20; const pid = (run.program_id as string) || "unknown"; const be = user.email || user.id; const { data: ecs } = await db.from("chart_ingest_candidates").select("*").eq("run_id", runId).eq("status", "eligible").order("created_at"); if (!ecs || ecs.length === 0) return json(req, { error: "no_eligible_candidates" }, 400); const ecids = ecs.map(c => c.id as string); const { data: scs } = await db.from("chart_ingest_candidate_scores").select("*").in("candidate_id", ecids); const sbc = new Map<string, Record<string, unknown>>(); if (scs) { for (const s of scs) sbc.set(s.candidate_id as string, s); } const sorted = [...ecs].sort((a, b) => { const sa = Number(sbc.get(a.id as string)?.final_score ?? 0); const sb = Number(sbc.get(b.id as string)?.final_score ?? 0); if (sb !== sa) return sb - sa; return ((a.normalized_key as string) || "").localeCompare((b.normalized_key as string) || ""); }); const topN = sorted.slice(0, csz); let pm = new Map<string, number>(); let pk = new Set<string>(); try { const { data: pe } = await db.from("wk_chart_editions_v2").select("id").eq("program_id", pid).in("status", ["committed","published"]).lt("edition_date", ed).order("edition_date", { ascending: false }).limit(1).maybeSingle(); if (pe) { const { data: pes } = await db.from("wk_chart_entries_v2").select("normalized_key, rank").eq("edition_id", pe.id); if (pes) { for (const p of pes) { if (p.normalized_key) { pm.set(p.normalized_key, p.rank as number); pk.add(p.normalized_key); } } } } } catch { } const eid = crypto.randomUUID(); const esl = ed; const { data: v2p } = await db.from("wk_chart_programs_v2").select("public_slug, public_label").eq("id", pid).maybeSingle(); const pps = (v2p?.public_slug as string) || pid; const ppl = (v2p?.public_label as string) || "Chart Edition"; const { error: eErr } = await db.from("wk_chart_editions_v2").insert({ id: eid, program_id: pid, edition_slug: esl, edition_label: ppl, edition_date: ed, period_start: run.period_start || ed, period_end: run.period_end || ed, entry_count: topN.length, status: publishImmediately ? "published" : "committed", methodology_version: (run.methodology_version as string) || "1.0.0", rule_set_snapshot: (run.rule_snapshot_json as Record<string, unknown>) || {}, chart_size: csz, ingest_run_id: runId, published_at: publishImmediately ? now : null, published_by: publishImmediately ? be : null, created_at: now, updated_at: now }); if (eErr) return json(req, { error: "edition_create_failed", detail: eErr.message }, 500); const rs = { tracks_found: 0, tracks_created: 0, artists_found: 0, artists_created: 0, links_created: 0, previews_set: 0, errors: 0 }; const ers: Array<Record<string, unknown>> = []; for (let i = 0; i < topN.length; i++) { const c = topN[i]; const rk = i + 1; const nk = (c.normalized_key as string) || ""; const sc = sbc.get(c.id as string); const pr = pm.get(nk) ?? null; let mv: string | null = null; if (pr === null) mv = pk.has(nk) ? "reentry" : "new"; else if (rk === pr) mv = "same"; else if (rk < pr) mv = "up"; else mv = "down"; const tt = (c.title as string) || ""; const ad = (c.artist_display as string) || ""; const awu = (c.artwork_url as string) || null; const rd2 = (c.release_date as string) || null; const isrc = (c.isrc as string) || null; const cpv = (c.preview_url as string) || null; let cti: string | null = null; let tsl = ""; let asl = ""; try { const tr = await findOrCreateRegistryTrack(db, tt, ad, isrc, awu, rd2, now, cpv); cti = tr.trackId; tsl = tr.trackSlug; if (cpv) rs.previews_set++; if (tr.created) rs.tracks_created++; else rs.tracks_found++; const ans = parseArtists(ad); for (let ai = 0; ai < ans.length; ai++) { const ar = await findOrCreateRegistryArtist(db, ans[ai], now); if (ar.created) rs.artists_created++; else rs.artists_found++; const nasl = normalizeSlug(ar.artistSlug); await ensureTrackArtistLink(db, tr.trackId, ar.artistId, nasl, ans[ai], now, ai, ai === 0); rs.links_created++; if (ai === 0) asl = nasl; } } catch (err) { rs.errors++; console.error("[commit]", tt, err); tsl = generateTrackSlug(tt); } tsl = normalizeSlug(tsl); asl = normalizeSlug(asl); ers.push({ id: crypto.randomUUID(), edition_id: eid, rank: rk, previous_rank: pr, movement: mv, track_title: tt, artist_name: ad, artwork_url: awu || null, normalized_key: nk, lead_artist_key: (c.lead_artist_key as string) || "", track_slug: tsl, artist_slug: asl, canonical_track_id: cti, total_score: Number(sc?.final_score ?? 0), carry_forward_only: !!(c.carry_forward_only), release_date: sanitizeDate(rd2), source_count: (c.source_count as number) || 0, occurrence_count: (c.occurrence_count as number) || 0, created_at: now, updated_at: now }); } const ECH = 100; for (let j = 0; j < ers.length; j += ECH) { await db.from("wk_chart_entries_v2").insert(ers.slice(j, j + ECH)); } const st = publishImmediately ? "published" : "committed"; await db.from("chart_ingest_runs").update({ status: st, committed_at: now, commit_edition_id: eid, notes: notes ?? null, updated_at: now }).eq("id", runId); await db.from("chart_ingest_stage_events").update({ status: "done", finished_at: now, message: topN.length+" entries committed." }).eq("run_id", runId).eq("stage", "commit_write"); await db.from("chart_ingest_audit_events").insert({ run_id: runId, actor: user.id, actor_email: be, action: "run_committed", new_status: st, payload_json: { editionId: eid, editionSlug: esl, entryCount: topN.length } }); return json(req, { runId, status: st, editionId: eid, editionSlug: esl, entryCount: topN.length, publicUrl: "/charts/"+pps+"/"+esl, registryStats: rs, integrity: { ok: true, warnings: [], errors: [] } }); }
+async function handleCommitRun(req:Request,db:ReturnType<typeof createClient>,params:Record<string,unknown>,user:{id:string;email?:string}) {
+  const {runId,publishImmediately,notes}=params as {runId:string;publishImmediately?:boolean;notes?:string}; if(!runId)return json(req,{error:"runId_required"},400);
+  const {error:gateError}=await db.rpc("chart_assert_committable_run",{p_run_id:runId}); if(gateError)return json(req,{error:"commit_blocked_chart_run_integrity",detail:gateError.message},400);
+  const {data:run,error:runError}=await db.from("chart_ingest_runs").select("*").eq("id",runId).maybeSingle(); if(runError)return json(req,{error:"run_lookup_failed",detail:runError.message},500); if(!run)return json(req,{error:"run_not_found"},404);
+  const now=new Date().toISOString(); const editionDate=String(run.edition_date||now.split("T")[0]); const chartSize=Number(run.chart_size||20); const programId=String(run.program_id||"unknown"); const actor=user.email||user.id;
+  const {data:candidates,error:candidateError}=await db.from("chart_ingest_candidates").select("*").eq("run_id",runId).eq("status","eligible").order("created_at"); if(candidateError)return json(req,{error:"candidate_lookup_failed",detail:candidateError.message},500); if(!candidates?.length)return json(req,{error:"no_eligible_candidates"},400);
+  const ids=candidates.map(c=>String(c.id)); const {data:scores,error:scoreError}=await db.from("chart_ingest_candidate_scores").select("*").in("candidate_id",ids); if(scoreError)return json(req,{error:"score_lookup_failed",detail:scoreError.message},500);
+  const scoreMap=new Map<string,Record<string,unknown>>(); for(const s of scores||[])scoreMap.set(String(s.candidate_id),s);
+  const top=[...candidates].sort((a,b)=>{const sa=Number(scoreMap.get(String(a.id))?.final_score??0);const sb=Number(scoreMap.get(String(b.id))?.final_score??0);return sb!==sa?sb-sa:String(a.normalized_key||"").localeCompare(String(b.normalized_key||""));}).slice(0,chartSize);
+  const prevRanks=new Map<string,number>(); const prevKeys=new Set<string>();
+  try{const {data:prev}=await db.from("wk_chart_editions_v2").select("id").eq("program_id",programId).in("status",["committed","published"]).lt("edition_date",editionDate).order("edition_date",{ascending:false}).limit(1).maybeSingle();if(prev){const {data:rows}=await db.from("wk_chart_entries_v2").select("normalized_key, rank").eq("edition_id",prev.id);for(const row of rows||[]){const key=String(row.normalized_key||"");if(key){prevRanks.set(key,Number(row.rank));prevKeys.add(key);}}}}catch{}
+  const registryStats={tracks_found:0,tracks_created:0,artists_found:0,artists_created:0,links_created:0,previews_set:0,errors:0}; const materialized=new Map<string,ChartMaterializationResult>();
+  for(const c of top){const candidateId=String(c.id);try{const result=await materializeChartCandidate(db,runId,candidateId);materialized.set(candidateId,result);if(result.track_created)registryStats.tracks_created++;else registryStats.tracks_found++;for(const a of result.artists){if(a.created)registryStats.artists_created++;else registryStats.artists_found++;}registryStats.links_created+=result.credits.filter(x=>x.created).length;}catch(error){registryStats.errors++;return json(req,{error:"registry_materialization_failed",candidateId,detail:error instanceof Error?error.message:String(error),registryStats},409);}}
+  const editionId=crypto.randomUUID(); const {data:program}=await db.from("wk_chart_programs_v2").select("public_slug, public_label").eq("id",programId).maybeSingle(); const editionSlug=editionDate;
+  const {error:editionError}=await db.from("wk_chart_editions_v2").insert({id:editionId,program_id:programId,edition_slug:editionSlug,edition_label:String(program?.public_label||"Chart Edition"),edition_date:editionDate,period_start:run.period_start||editionDate,period_end:run.period_end||editionDate,entry_count:top.length,status:publishImmediately?"published":"committed",methodology_version:String(run.methodology_version||"1.0.0"),rule_set_snapshot:(run.rule_snapshot_json as Record<string,unknown>)||{},chart_size:chartSize,ingest_run_id:runId,published_at:publishImmediately?now:null,published_by:publishImmediately?actor:null,created_at:now,updated_at:now}); if(editionError)return json(req,{error:"edition_create_failed",detail:editionError.message},500);
+  const rows:Array<Record<string,unknown>>=[];
+  for(let i=0;i<top.length;i++){const c=top[i];const candidateId=String(c.id);const result=materialized.get(candidateId);if(!result){await db.from("wk_chart_editions_v2").delete().eq("id",editionId);return json(req,{error:"materialization_result_missing",candidateId},500);}const rank=i+1;const key=String(c.normalized_key||"");const previous=prevRanks.get(key)??null;let movement:string|null=null;if(previous===null)movement=prevKeys.has(key)?"reentry":"new";else if(rank===previous)movement="same";else movement=rank<previous?"up":"down";rows.push({id:crypto.randomUUID(),edition_id:editionId,rank,previous_rank:previous,movement,track_title:String(c.title||""),artist_name:String(c.artist_display||""),artwork_url:c.artwork_url||null,normalized_key:key,lead_artist_key:String(c.lead_artist_key||""),track_slug:normalizeSlug(result.track_slug),artist_slug:normalizeSlug(result.primary_artist_slug),canonical_track_id:result.track_id,total_score:Number(scoreMap.get(candidateId)?.final_score??0),carry_forward_only:Boolean(c.carry_forward_only),release_date:sanitizeDate(c.release_date as string),source_count:Number(c.source_count||0),occurrence_count:Number(c.occurrence_count||0),created_at:now,updated_at:now});}
+  const {error:entryError}=await db.from("wk_chart_entries_v2").insert(rows);if(entryError){await db.from("wk_chart_editions_v2").delete().eq("id",editionId);return json(req,{error:"entry_create_failed",detail:entryError.message},500);}
+  const status=publishImmediately?"published":"committed"; const {error:updateError}=await db.from("chart_ingest_runs").update({status,committed_at:now,commit_edition_id:editionId,notes:notes??null,updated_at:now}).eq("id",runId);if(updateError)return json(req,{error:"run_commit_state_update_failed",detail:updateError.message},500);
+  await db.from("chart_ingest_stage_events").update({status:"done",finished_at:now,message:`${top.length} entries committed.`}).eq("run_id",runId).eq("stage","commit_write"); await db.from("chart_ingest_audit_events").insert({run_id:runId,actor:user.id,actor_email:actor,action:"run_committed",new_status:status,payload_json:{editionId,editionSlug,entryCount:top.length}});
+  return json(req,{runId,status,editionId,editionSlug,entryCount:top.length,publicUrl:`/charts/${String(program?.public_slug||programId)}/${editionSlug}`,registryStats,integrity:{ok:true,warnings:[],errors:[]}});
+}
 
 async function handleRunAirplayDetection(req: Request, db: ReturnType<typeof createClient>, params: Record<string, unknown>, user: { id: string; email?: string }) { return json(req, { ok: false, error: "ACRCloud credentials not configured." }); }
 async function handleResetPipeline(req: Request, db: ReturnType<typeof createClient>, params: Record<string, unknown>, user: { id: string; email?: string }) { const { runId } = params as { runId: string }; if (!runId) return json(req, { error: "runId_required" }, 400); const now = new Date().toISOString(); await db.from("chart_ingest_stage_events").update({ status: "idle", started_at: null, finished_at: null, duration_ms: null, message: null }).eq("run_id", runId); await Promise.all([db.from("chart_ingest_raw_rows").delete().eq("run_id", runId), db.from("chart_ingest_normalized_rows").delete().eq("run_id", runId), db.from("chart_ingest_candidates").delete().eq("run_id", runId), db.from("chart_ingest_exclusions").delete().eq("run_id", runId), db.from("chart_ingest_candidate_scores").delete().eq("run_id", runId), db.from("chart_ingest_matches").delete().eq("run_id", runId), db.from("chart_ingest_review_issues").delete().eq("run_id", runId)]); await db.from("chart_ingest_runs").update({ status: "draft", dry_run_completed_at: null, updated_at: now }).eq("id", runId); return json(req, { ok: true, runId, status: "draft" }); }
@@ -1198,7 +1019,7 @@ async function handleGetOriginReviewQueue(req: Request, db: ReturnType<typeof cr
   const { runId } = params as { runId: string };
   if (!runId) return json(req, { error: "runId_required" }, 400);
 
-  const { data, error } = await db.rpc("chart_get_run_origin_review_queue", {
+  const { data, error } = await db.rpc("chart_get_run_origin_review_queue_v1", {
     p_run_id: runId,
   });
 
@@ -1261,63 +1082,26 @@ async function handleGetOriginCountryOptions(req: Request, db: ReturnType<typeof
 }
 
 
-async function handleSetArtistOriginForRun(req: Request, db: ReturnType<typeof createClient>, params: Record<string, unknown>, user: { id: string; email?: string }) {
-  const { artistId, originIso2, runId, candidateId, note } = params as {
-    artistId: string;
-    originIso2: string;
-    runId?: string;
-    candidateId?: string;
-    note?: string;
-  };
-
-  if (!artistId) return json(req, { error: "artistId_required" }, 400);
-  if (!originIso2) return json(req, { error: "originIso2_required" }, 400);
-
-  const { data, error } = await db.rpc("chart_set_artist_origin_for_charts", {
-    p_artist_id: artistId,
-    p_origin_iso2: originIso2,
-    p_run_id: runId || null,
-    p_candidate_id: candidateId || null,
-    p_note: note || "Resolved from chart origin queue.",
-    p_actor_user_id: user.id,
-  });
-
-  if (error) return json(req, { error: error.message }, 500);
-
-  return json(req, { ok: true, result: data });
+async function handleSetArtistOriginForRun(req:Request,db:ReturnType<typeof createClient>,params:Record<string,unknown>,_user:{id:string;email?:string}) {
+  const {artistId,originIso2,runId,candidateId,note}=params as {artistId:string;originIso2:string;runId:string;candidateId:string;note?:string};
+  if(!artistId)return json(req,{error:"artistId_required"},400);if(!originIso2)return json(req,{error:"originIso2_required"},400);if(!runId)return json(req,{error:"runId_required"},400);if(!candidateId)return json(req,{error:"candidateId_required"},400);
+  const {data,error}=await db.rpc("chart_admit_artist_origin_v1",{p_artist_id:artistId,p_origin_iso2:originIso2,p_run_id:runId,p_candidate_id:candidateId,p_note:note||"Resolved from chart origin queue."});
+  if(error)return json(req,{error:error.message},500);return json(req,{ok:true,result:data});
 }
 
-async function handleCreateOriginArtistShell(req: Request, db: ReturnType<typeof createClient>, params: Record<string, unknown>, user: { id: string; email?: string }) {
-  const { artistName, originIso2, runId, candidateId } = params as {
-    artistName: string;
-    originIso2: string;
-    runId?: string;
-    candidateId?: string;
-  };
-
-  if (!artistName) return json(req, { error: "artistName_required" }, 400);
-  if (!originIso2) return json(req, { error: "originIso2_required" }, 400);
-
-  const { data, error } = await db.rpc("chart_create_artist_origin_shell", {
-    p_artist_name: artistName,
-    p_origin_iso2: originIso2,
-    p_run_id: runId || null,
-    p_candidate_id: candidateId || null,
-    p_actor_user_id: user.id,
-  });
-
-  if (error) return json(req, { error: error.message }, 500);
-
-  return json(req, { ok: true, result: data });
+async function handleCreateOriginArtistShell(req:Request,db:ReturnType<typeof createClient>,params:Record<string,unknown>,_user:{id:string;email?:string}) {
+  const {artistName,originIso2,runId,candidateId}=params as {artistName:string;originIso2:string;runId:string;candidateId:string};
+  if(!artistName)return json(req,{error:"artistName_required"},400);if(!originIso2)return json(req,{error:"originIso2_required"},400);if(!runId)return json(req,{error:"runId_required"},400);if(!candidateId)return json(req,{error:"candidateId_required"},400);
+  const {data,error}=await db.rpc("chart_create_artist_origin_shell_v1",{p_artist_name:artistName,p_origin_iso2:originIso2,p_run_id:runId,p_candidate_id:candidateId});
+  if(error)return json(req,{error:error.message},500);return json(req,{ok:true,result:data});
 }
-
 
 async function handleResetAfterOriginResolution(req: Request, db: ReturnType<typeof createClient>, params: Record<string, unknown>) {
   const { runId } = params as { runId: string };
 
   if (!runId) return json(req, { error: "runId_required" }, 400);
 
-  const { data, error } = await db.rpc("chart_reset_run_after_origin_resolution", {
+  const { data, error } = await db.rpc("chart_reset_run_after_origin_resolution_v1", {
     p_run_id: runId,
   });
 
@@ -1328,7 +1112,7 @@ async function handleResetAfterOriginResolution(req: Request, db: ReturnType<typ
 
 
 async function handleGetFamilyIngestPresets(req: Request, db: ReturnType<typeof createClient>) {
-  const { data, error } = await db.rpc("chart_get_family_ingest_presets");
+  const { data, error } = await db.rpc("chart_get_family_ingest_presets_v1");
 
   if (error) return json(req, { error: error.message }, 500);
 
@@ -1343,10 +1127,9 @@ async function handleSaveFamilyIngestPreset(req: Request, db: ReturnType<typeof 
 
   if (!familyId) return json(req, { error: "familyId_required" }, 400);
 
-  const { data, error } = await db.rpc("chart_upsert_family_ingest_preset", {
+  const { data, error } = await db.rpc("chart_upsert_family_ingest_preset_v1", {
     p_family_id: familyId,
     p_config_json: config || {},
-    p_actor_user_id: user.id,
   });
 
   if (error) return json(req, { error: error.message }, 500);
@@ -1365,7 +1148,7 @@ async function handleGetWeeklyBackfillPlan(req: Request, db: ReturnType<typeof c
   if (!startDate) return json(req, { error: "startDate_required" }, 400);
   if (!endDate) return json(req, { error: "endDate_required" }, 400);
 
-  const { data, error } = await db.rpc("chart_get_weekly_backfill_plan", {
+  const { data, error } = await db.rpc("chart_get_weekly_backfill_plan_v1", {
     p_family_id: familyId,
     p_start_date: startDate,
     p_end_date: endDate,

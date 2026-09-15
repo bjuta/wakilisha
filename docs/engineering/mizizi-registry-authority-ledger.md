@@ -203,19 +203,26 @@ Exact current-main slug search established the function and historical reference
 **Live posture**
 
 - ACTIVE deployment
-- request authentication
-- action-specific capability checks, including Registry/ingest/chart capabilities
-- service-role mutation after authorization
+- request-bearer authentication
+- action-specific capability checks
+- caller-JWT + RLS for Chart-domain reads and writes
+- no `SUPABASE_SERVICE_ROLE_KEY` load
+- no direct canonical Registry DML
+- provider fetch delegated to `chart-provider-fetch`, which returns provider data rather than credentials
 
 **Canonical authority**
 
-Can create Registry Artists and Tracks and write Track credits while ingesting Charts.
+Artist creation, Track creation, and Track↔Artist credit admission route through `chart_materialize_candidate_registry_v1(...)`. Existing-Artist origin admission routes through `chart_admit_artist_origin_v1(...)`, and unresolved Artist origin creation routes through `chart_create_artist_origin_shell_v1(...)`.
+
+`chart-ingest-api` is therefore an orchestration boundary, not a canonical Registry writer.
+
+`chart-provider-fetch` is a narrow provider boundary: it verifies the request user and `manage_ingest`, reads the existing Admin-managed provider secret store server-side, performs the provider request, and returns normalized provider data. It has no Registry authority.
 
 **Current consumer**
 
 Current Charts admin client is wired directly to `chart-ingest-api`.
 
-**Decision**: `KEEP / HARDEN / CONVERGE`. Do not replace a working governed vertical merely to centralize code. Converge its canonical mutation calls underneath it.
+**Decision**: `KEEP / SLICE-2 CONVERGED`. Preserve caller identity, Chart RLS, and governed typed Registry operations. Keep the superseded service-role origin roads revoked.
 
 ### 6.6 `admin-router`
 

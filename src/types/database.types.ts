@@ -19851,7 +19851,28 @@ export type Database = {
         Args: { p_edition_id: string }
         Returns: Json
       }
+      chart_get_entry_registry_identity_v1: {
+        Args: { p_edition_id?: string }
+        Returns: {
+          artist_name: string
+          canonical_primary_artist_slug: string
+          canonical_track_id: string
+          canonical_track_slug: string
+          current_artist_slug: string
+          entry_id: string
+          track_title: string
+        }[]
+      }
       chart_get_family_ingest_presets: {
+        Args: never
+        Returns: {
+          config_json: Json
+          family_id: string
+          updated_at: string
+          updated_by: string
+        }[]
+      }
+      chart_get_family_ingest_presets_v1: {
         Args: never
         Returns: {
           config_json: Json
@@ -19898,6 +19919,23 @@ export type Database = {
           top_score: number
         }[]
       }
+      chart_get_run_origin_review_queue_v1: {
+        Args: { p_run_id: string }
+        Returns: {
+          canonical_artist_id: string
+          canonical_name: string
+          canonical_slug: string
+          current_origin_iso2: string
+          examples: Json
+          impacted_candidate_count: number
+          issue_type: string
+          review_key: string
+          source_name: string
+          source_slug: string
+          target_iso2: string
+          top_score: number
+        }[]
+      }
       chart_get_run_playback_readiness: {
         Args: { p_provider_key?: string; p_run_id: string }
         Returns: Json
@@ -19917,11 +19955,30 @@ export type Database = {
           release_window_start: string
         }[]
       }
+      chart_get_weekly_backfill_plan_v1: {
+        Args: { p_end_date: string; p_family_id: string; p_start_date: string }
+        Returns: {
+          edition_date: string
+          existing_edition_id: string
+          existing_edition_status: string
+          existing_entry_count: number
+          latest_run_id: string
+          latest_run_status: string
+          latest_run_updated_at: string
+          recommended_action: string
+          release_window_end: string
+          release_window_start: string
+        }[]
+      }
       chart_materialize_candidate_registry_v1: {
         Args: { p_candidate_id: string; p_run_id: string }
         Returns: Json
       }
       chart_reset_run_after_origin_resolution: {
+        Args: { p_run_id: string }
+        Returns: Json
+      }
+      chart_reset_run_after_origin_resolution_v1: {
         Args: { p_run_id: string }
         Returns: Json
       }
@@ -19950,6 +20007,10 @@ export type Database = {
           p_config_json: Json
           p_family_id: string
         }
+        Returns: Json
+      }
+      chart_upsert_family_ingest_preset_v1: {
+        Args: { p_config_json: Json; p_family_id: string }
         Returns: Json
       }
       claim_media_processing_jobs_v1: {
