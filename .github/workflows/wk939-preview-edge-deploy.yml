@@ -1,0 +1,59 @@
+name: WK939 Preview Edge Deploy
+
+on:
+  push:
+    branches:
+      - validation/wk939-runtime-candidate-1
+    paths:
+      - .github/workflows/wk939-preview-edge-deploy.yml
+
+permissions:
+  contents: read
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Check out exact validated runtime
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Prove product tree matches feature head
+        run: |
+          set -euo pipefail
+          git diff --exit-code edd6edccfb2509f88ac26b73b82c6609b5931152 -- \
+            supabase/functions/chart-ingest-api/index.ts \
+            supabase/functions/chart-provider-fetch/index.ts
+
+      - name: Install pinned Supabase CLI
+        run: npm install --global supabase@2.107.0
+
+      - name: Prove CLI
+        run: |
+          set -euo pipefail
+          test "$(supabase --version)" = "2.107.0"
+
+      - name: Deploy provider fetch to Preview
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+        run: |
+          set -euo pipefail
+          supabase functions deploy chart-provider-fetch \
+            --project-ref ulmemkqvcysqtjvjxepq \
+            --use-api \
+            --verify-jwt
+
+      - name: Deploy chart ingest API to Preview
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+        run: |
+          set -euo pipefail
+          supabase functions deploy chart-ingest-api \
+            --project-ref ulmemkqvcysqtjvjxepq \
+            --use-api \
+            --verify-jwt
+
+      - name: Deployment marker
+        run: echo WK939_PREVIEW_EDGE_DEPLOY_PASS
