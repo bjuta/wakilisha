@@ -407,7 +407,7 @@ Deno.serve(async (req) => {
 
       const heuristic = classifyArtistType(artist.display_name);
       const proposedType = providerData.musicBrainz?.artistType ?? heuristic.type;
-      const typeSourceKind = providerData.musicBrainz?.artistType ? "musicbrainz" : "manual_review";
+      const typeSourceKind = providerData.musicBrainz?.artistType ? "musicbrainz" : "name_heuristic";
       const typeSourceRef = providerData.musicBrainz?.artistType
         ? providerData.musicBrainz.sourceRef
         : `heuristic:name-v1:${heuristic.heuristic}`;

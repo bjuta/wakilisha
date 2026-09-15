@@ -426,7 +426,7 @@ begin
   end if;
 
   if p_claim_key = 'registry.artist.type' then
-    if p_source_kind not in ('musicbrainz', 'manual_review')
+    if p_source_kind not in ('musicbrainz', 'name_heuristic')
        or (
          p_claim_payload - array['artist_type']::text[]
        ) <> '{}'::jsonb
@@ -607,7 +607,7 @@ begin
 
   v_trust_class :=
     case
-      when p_source_kind = 'manual_review' then 'INTERNAL_FACT'
+      when p_source_kind = 'name_heuristic' then 'INTERNAL_FACT'
       else 'EXTERNAL_EVIDENCE'
     end;
   v_recorded_by := 'user:' || v_user_id::text;

@@ -183,7 +183,7 @@ begin
   end if;
 
   if p_claim_key = 'registry.artist.type' then
-    if p_source_kind not in ('musicbrainz', 'manual_review')
+    if p_source_kind not in ('musicbrainz', 'name_heuristic')
        or (
          p_claim_payload - array['artist_type']::text[]
        ) <> '{}'::jsonb
@@ -595,12 +595,12 @@ begin
   if not platform_private.registry_artist_enrichment_claim_is_valid(
        'registry.artist.type',
        jsonb_build_object('artist_type', 'collective'),
-       'manual_review'
+       'name_heuristic'
      )
      or platform_private.registry_artist_enrichment_claim_is_valid(
        'registry.artist.type',
        jsonb_build_object('artist_type', 'corporation'),
-       'manual_review'
+       'name_heuristic'
      )
   then
     raise exception

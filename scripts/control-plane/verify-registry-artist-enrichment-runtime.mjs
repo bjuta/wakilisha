@@ -88,6 +88,8 @@ requireText(orchestrator, 'admin_verify_registry_artist_enrichment_admission', o
 requireText(orchestrator, 'reviewed_evidence_ids', orchestratorPath);
 requireText(orchestrator, 'evidence_ids', orchestratorPath);
 requireText(orchestrator, 'approved !== true', orchestratorPath);
+requireText(orchestrator, '\"name_heuristic\"', orchestratorPath);
+forbidText(orchestrator, '\"manual_review\"', orchestratorPath);
 for (const rawWrapper of [
   'admin_execute_registry_artist_provider_profile_admission',
   'admin_execute_registry_artist_public_image_admission',

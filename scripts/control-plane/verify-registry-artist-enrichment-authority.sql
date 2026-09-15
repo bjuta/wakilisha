@@ -145,6 +145,11 @@ begin
      or platform_private.registry_artist_enrichment_claim_is_valid(
        'registry.artist.type',
        jsonb_build_object('artist_type', 'corporation'),
+       'name_heuristic'
+     )
+     or platform_private.registry_artist_enrichment_claim_is_valid(
+       'registry.artist.type',
+       jsonb_build_object('artist_type', 'solo'),
        'manual_review'
      )
      or platform_private.registry_artist_enrichment_claim_is_valid(
@@ -155,7 +160,7 @@ begin
      or not platform_private.registry_artist_enrichment_claim_is_valid(
        'registry.artist.type',
        jsonb_build_object('artist_type', 'collective'),
-       'manual_review'
+       'name_heuristic'
      )
   then
     raise exception 'Artist Enrichment V1 typed claim policy drifted';
