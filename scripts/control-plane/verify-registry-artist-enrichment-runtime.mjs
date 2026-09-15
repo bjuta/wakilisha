@@ -22,6 +22,7 @@ const spotifyAdapterPath = "supabase/functions/backfill-artist-spotify-images/in
 const typeAdapterPath = "supabase/functions/backfill-artist-type/index.ts";
 const originPath = "supabase/functions/backfill-artist-origin/index.ts";
 const adminClientPath = "src/services/registry/admin/artistEnrichment.ts";
+const governancePanelsPath = "src/components/admin/registry/ArtistEnrichmentGovernancePanels.tsx";
 const detailPath = "src/pages/admin/registry/artists/detail/page.tsx";
 const listPath = "src/pages/admin/registry/artists/page.tsx";
 
@@ -31,6 +32,7 @@ const spotifyAdapter = read(spotifyAdapterPath);
 const typeAdapter = read(typeAdapterPath);
 const origin = read(originPath);
 const adminClient = read(adminClientPath);
+const governancePanels = read(governancePanelsPath);
 const detail = read(detailPath);
 const list = read(listPath);
 
@@ -96,6 +98,19 @@ requireText(adminClient, 'reviewed_evidence_ids', adminClientPath);
 requireText(adminClient, 'evidence_ids: evidenceIds', adminClientPath);
 requireText(adminClient, 'approved: true', adminClientPath);
 
+// Extracted list governance panels own the review/apply interaction and must use
+// the shared reviewed-evidence client rather than direct Edge-function calls.
+requireText(governancePanels, 'previewArtistEnrichment', governancePanelsPath);
+requireText(governancePanels, 'applyReviewedArtistEnrichment', governancePanelsPath);
+requireText(governancePanels, 'reviewed_evidence_ids', governancePanelsPath);
+for (const fragment of [
+  '/functions/v1/registry-enrich-artist',
+  '/functions/v1/backfill-artist-type',
+  '/functions/v1/backfill-artist-spotify-images',
+]) {
+  forbidText(governancePanels, fragment, governancePanelsPath);
+}
+
 // Detail surface must use shared reviewed-evidence client and governed manual edits.
 requireText(detail, 'previewArtistEnrichment', detailPath);
 requireText(detail, 'applyReviewedArtistEnrichment', detailPath);
@@ -113,10 +128,11 @@ for (const canonicalType of ['value="solo"','value="group"','value="band"','valu
   requireText(detail, canonicalType, detailPath);
 }
 
-// Bulk/list surface must use the same reviewed-evidence contract. Direct calls
-// to the enrichment runtime are intentionally forbidden once convergence lands.
+// Bulk/list surface must render the governed panels, while card-level enrichment
+// is preview-only and hands review off to the exact Artist detail surface.
+requireText(list, 'ArtistEnrichPanel', listPath);
+requireText(list, 'ArtistTypePanel', listPath);
 requireText(list, 'previewArtistEnrichment', listPath);
-requireText(list, 'applyReviewedArtistEnrichment', listPath);
 for (const fragment of [
   '/functions/v1/registry-enrich-artist',
   '/functions/v1/backfill-artist-type',
