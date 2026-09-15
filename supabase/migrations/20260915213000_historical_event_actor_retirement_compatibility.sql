@@ -180,8 +180,8 @@ begin
   if position('pg_trigger_depth() > 1' in v_definition) = 0
      or position('old.actor_id is not null' in v_definition) = 0
      or position('new.actor_id is null' in v_definition) = 0
-     or position("to_jsonb(old) - 'actor_id'" in v_definition) = 0
-     or position("to_jsonb(new) - 'actor_id'" in v_definition) = 0
+     or position('to_jsonb(old) - ''actor_id''' in v_definition) = 0
+     or position('to_jsonb(new) - ''actor_id''' in v_definition) = 0
   then
     raise exception
       'STOP: historical event retirement-maintenance guard is incomplete';
