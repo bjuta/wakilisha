@@ -4,6 +4,7 @@ do $verify$
 declare
   v_enabled_count integer;
   v_release_enabled integer;
+  v_executor_definition text;
 begin
   select count(*)::integer
   into v_enabled_count
@@ -108,6 +109,31 @@ begin
   then
     raise exception
       'Chart materialization privilege boundary drifted';
+  end if;
+
+  select regexp_replace(
+    pg_get_functiondef(
+      'platform_private.execute_registry_materialization_v1(text,uuid)'::regprocedure
+    ),
+    '[[:space:]]+',
+    ' ',
+    'g'
+  )
+  into v_executor_definition;
+
+  if not (
+       v_executor_definition ~
+         'insert into public\.registry_artists[[:space:]]*\([^)]*status[^)]*\)[[:space:]]*values[[:space:]]*\([^;]*''draft'''
+     )
+     or not (
+       v_executor_definition ~
+         'insert into public\.registry_tracks[[:space:]]*\([^)]*status[^)]*\)[[:space:]]*values[[:space:]]*\([^;]*''draft'''
+     )
+     or position('preview_url' in v_executor_definition) > 0
+     or position('artwork_url' in v_executor_definition) > 0
+  then
+    raise exception
+      'Chart identity executor crossed the draft identity nucleus boundary';
   end if;
 
   if position(
