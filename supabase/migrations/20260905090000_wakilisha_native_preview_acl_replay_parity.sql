@@ -101,6 +101,7 @@ $wk_native_preview_acl_clear_stale_defaults$;
 DO $wk_native_preview_acl_restore_baseline$
 DECLARE
   r record;
+  v_statement text;
   v_skipped integer := 0;
 BEGIN
   FOR r IN
@@ -111,9 +112,20 @@ BEGIN
       AND ordinality >= 4853
     ORDER BY ordinality
   LOOP
+    v_statement := regexp_replace(
+      r.statement,
+      '^([[:space:]]|--[^\n]*(\n|$))*',
+      '',
+      'n'
+    );
+
     BEGIN
       EXECUTE r.statement;
     EXCEPTION
+      WHEN duplicate_object THEN
+        IF upper(btrim(v_statement)) NOT LIKE 'CREATE POLICY %' THEN
+          RAISE;
+        END IF;
       WHEN undefined_function OR undefined_table OR undefined_object OR invalid_schema_name THEN
         v_skipped := v_skipped + 1;
     END;
