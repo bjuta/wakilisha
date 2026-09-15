@@ -1,0 +1,16 @@
+{
+  "migration_file": "supabase/migrations/20260915233000_account_retirement_data_api_private_executor.sql",
+  "migration_sha256": "438d92fdc7aadaa8b5ff671dd8b101c0bfccc0dba67a59fee48ead0acfcc759f",
+  "base_main_sha": "c90af1f9160156f67eef173f3430b2185b09cfb8",
+  "preview_project_ref": "bkerabqqgsvgeidnqqco",
+  "preview_branch_id": "13d841b2-63ac-4a0a-9e4b-586a6251d356",
+  "preview_migration_head": "20260915233000",
+  "baseline_replay": "pass",
+  "candidate_apply": "pass",
+  "verifier": "pass",
+  "verifier_file": "scripts/control-plane/verify-account-retirement-data-api-boundary.sql",
+  "schema_types_sha256": "81240cf245c3a42d591e513b366b034ed7690ed889133148a568000f00dea553",
+  "schema_migration_count": 137,
+  "schema_migration_head": "20260915233000",
+  "verified_at": "2026-09-15T20:50:46.102Z"
+}
