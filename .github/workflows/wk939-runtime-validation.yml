@@ -1,0 +1,143 @@
+name: WK939 Runtime Candidate Validation
+
+on:
+  push:
+    branches:
+      - validation/wk939-runtime-candidate-1
+    paths:
+      - .github/workflows/wk939-runtime-validation.yml
+
+permissions:
+  contents: write
+
+concurrency:
+  group: wk939-runtime-validation-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    env:
+      CONTROL_PLANE_BASE_REF: origin/main
+
+    steps:
+      - name: Check out disposable validation branch
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Use Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: package-lock.json
+
+      - name: Prove validation ancestry
+        run: |
+          set -euo pipefail
+          git merge-base --is-ancestor 6022bccdc25b7733d5bfedd15250b17115fcd32f HEAD
+          test -f scripts/tmp/wk939_runtime_apply.py
+          test -f supabase/functions/chart-provider-fetch/index.ts
+          test -f supabase/migrations/20260915122100_chart_runtime_caller_jwt_convergence_v1.sql
+
+      - name: Materialize candidate once
+        run: |
+          set -euo pipefail
+          python3 scripts/tmp/wk939_runtime_apply.py
+          git diff --check
+          git status --short
+
+      - name: Install locked dependencies
+        run: npm ci --prefer-offline --no-audit --no-fund
+
+      - name: TypeScript syntax check Edge functions
+        run: |
+          set -euo pipefail
+          node --input-type=module <<'NODE'
+          import fs from "node:fs";
+          import ts from "typescript";
+          for (const file of [
+            "supabase/functions/chart-ingest-api/index.ts",
+            "supabase/functions/chart-provider-fetch/index.ts",
+          ]) {
+            const source = fs.readFileSync(file, "utf8");
+            const result = ts.transpileModule(source, {
+              compilerOptions: {
+                target: ts.ScriptTarget.ES2022,
+                module: ts.ModuleKind.ESNext,
+              },
+              fileName: file,
+              reportDiagnostics: true,
+            });
+            const errors = (result.diagnostics ?? []).filter(
+              (d) => d.category === ts.DiagnosticCategory.Error,
+            );
+            if (errors.length) {
+              for (const d of errors) {
+                console.error(`${file}: ${ts.flattenDiagnosticMessageText(d.messageText, "\n")}`);
+              }
+              process.exit(1);
+            }
+            console.log(`TYPESCRIPT_SYNTAX_PASS=${file}`);
+          }
+          NODE
+
+      - name: Prove caller-JWT and provider boundaries statically
+        run: |
+          set -euo pipefail
+          EDGE=supabase/functions/chart-ingest-api/index.ts
+          FETCH=supabase/functions/chart-provider-fetch/index.ts
+          grep -qF 'SUPABASE_ANON_KEY' "$EDGE"
+          ! grep -qF 'SUPABASE_SERVICE_ROLE_KEY' "$EDGE"
+          ! grep -qF 'admin_settings_secrets' "$EDGE"
+          ! grep -qF 'SPOTIFY_CLIENT_SECRET' "$EDGE"
+          ! grep -qF 'APPLE_MUSIC_PRIVATE_KEY' "$EDGE"
+          grep -qF '/functions/v1/chart-provider-fetch' "$EDGE"
+          grep -qF 'chart_materialize_candidate_registry_v1' "$EDGE"
+          grep -qF 'chart_admit_artist_origin_v1' "$EDGE"
+          grep -qF 'chart_create_artist_origin_shell_v1' "$EDGE"
+          ! grep -qF 'chart_set_artist_origin_for_charts' "$EDGE"
+          ! grep -qF 'chart_create_artist_origin_shell"' "$EDGE"
+          grep -qF 'SUPABASE_SERVICE_ROLE_KEY' "$FETCH"
+          grep -qF 'admin_settings_secrets' "$FETCH"
+          grep -qF 'manage_ingest' "$FETCH"
+          ! grep -qF 'registry_' "$FETCH"
+
+      - name: Run focused MIZIZI contract
+        run: npx vitest run test/registry/mizizi-cultural-data-steward.test.ts
+
+      - name: Run engineering control plane
+        run: npm run control-plane:verify
+
+      - name: Run primitive compounding contract
+        run: |
+          node scripts/control-plane/verify-primitive-compounding.mjs
+          npx vitest run test/control-plane/primitive-compounding.test.ts
+
+      - name: Run critical security and lifecycle tests
+        run: npm run test:critical
+
+      - name: Audit application performance contracts
+        run: npm run performance:audit
+
+      - name: Build application
+        run: npm run build:app
+
+      - name: Seal disposable validated candidate
+        run: |
+          set -euo pipefail
+          git diff --check
+          rm -f scripts/tmp/wk939_runtime_apply.py
+          rm -f .github/workflows/wk939-runtime-validation.yml
+          git add -A
+          git diff --cached --check
+          printf '\n=== VALIDATED CANDIDATE FILES ===\n'
+          git diff --cached --name-status
+          git config user.name 'WAKILISHA Validation Bot'
+          git config user.email 'actions@users.noreply.github.com'
+          git commit -m 'test: seal validated Slice 2 runtime candidate'
+          git push origin HEAD:validation/wk939-runtime-candidate-1
+          echo "VALIDATED_HEAD=$(git rev-parse HEAD)"
+          echo 'WK939_RUNTIME_DISPOSABLE_VALIDATION_PASS'
