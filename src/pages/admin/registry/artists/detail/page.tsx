@@ -3,12 +3,18 @@ import { useParams, useNavigate } from "react-router-dom";
 import { WkIcon } from "@/components/design-system/Icon";
 import { WkSurface } from "@/components/design-system/primitives/Surface";
 import { supabase } from "@/lib/supabase";
+import { saveRegistryEntityPatch } from "@/services/registry/admin/client";
+import {
+  applyReviewedArtistEnrichment,
+  previewArtistEnrichment,
+  type ArtistEnrichmentMode,
+  type ArtistEnrichmentResponse,
+} from "@/services/registry/admin/artistEnrichment";
 import { useRelatedEntities } from "@/hooks/useRelatedEntities";
 import type { ResolvedRelation } from "@/hooks/useRelatedEntities";
 import { DiscographyPanel } from "./components/DiscographyPanel";
 import { TopSongsPanel } from "./components/TopSongsPanel";
 import { WkSelect } from "@/components/design-system/primitives/Select";
-
 
 /* ─── Types ─── */
 interface ArtistRecord {
@@ -75,10 +81,40 @@ export default function ArtistDetailPage() {
   const [toasts, setToasts] = useState<ToastMsg[]>([]);
   const [showDelete, setShowDelete] = useState(false);
   const [enriching, setEnriching] = useState(false);
-  const [enrichResult, setEnrichResult] = useState<Record<string, unknown> | null>(null);
+  const [applyingEnrich, setApplyingEnrich] = useState(false);
+  const [enrichMode, setEnrichMode] = useState<ArtistEnrichmentMode | null>(null);
+  const [enrichResult, setEnrichResult] = useState<ArtistEnrichmentResponse | null>(null);
   const [showEnrichResult, setShowEnrichResult] = useState(false);
   const [enrichingOrigin, setEnrichingOrigin] = useState(false);
   const [enrichingType, setEnrichingType] = useState(false);
+
+  const applyArtistRecord = useCallback((data: ArtistRecord) => {
+    setArtist(data);
+    setDraft({
+      display_name: data.display_name,
+      sort_name: data.sort_name ?? "",
+      bio: data.bio ?? "",
+      artist_type: data.artist_type ?? "",
+      gender: data.gender ?? "",
+      origin_iso2: data.origin_iso2 ?? "",
+      public_image_url: data.public_image_url ?? "",
+      image_source_provider: data.image_source_provider ?? "",
+      status: data.status,
+    });
+    setIsDirty(false);
+  }, []);
+
+  const reloadArtist = useCallback(async (): Promise<ArtistRecord | null> => {
+    if (!slug) return null;
+    const { data, error } = await supabase
+      .from("registry_artists")
+      .select("id, slug, display_name, normalized_name, sort_name, bio, artist_type, gender, origin_iso2, public_image_url, image_source_provider, status, metadata, created_at, updated_at")
+      .eq("slug", slug)
+      .maybeSingle();
+    if (error || !data) return null;
+    applyArtistRecord(data as ArtistRecord);
+    return data as ArtistRecord;
+  }, [slug, applyArtistRecord]);
 
   useEffect(() => {
     if (!slug) return;
@@ -99,23 +135,11 @@ export default function ArtistDetailPage() {
         setLoading(false);
         return;
       }
-      setArtist(data);
-      setDraft({
-        display_name: data.display_name,
-        sort_name: data.sort_name ?? "",
-        bio: data.bio ?? "",
-        artist_type: data.artist_type ?? "",
-        gender: data.gender ?? "",
-        origin_iso2: data.origin_iso2 ?? "",
-        public_image_url: data.public_image_url ?? "",
-        image_source_provider: data.image_source_provider ?? "",
-        status: data.status,
-      });
-      setIsDirty(false);
+      applyArtistRecord(data as ArtistRecord);
       setLoading(false);
     }
     load();
-  }, [slug]);
+  }, [slug, applyArtistRecord]);
 
   function addToast(type: ToastMsg["type"], message: string) {
     const id = ++toastCounter;
@@ -128,57 +152,55 @@ export default function ArtistDetailPage() {
     setIsDirty(true);
   }, []);
 
-  async function handleEnrich() {
+  async function previewEnrichment(mode: ArtistEnrichmentMode) {
     if (!artist) return;
-    setEnriching(true);
+    if (mode === "profile") setEnriching(true);
+    else setEnrichingType(true);
     try {
-      const { data: { session } } = await supabase.auth.getSession();
-      const token = session?.access_token;
-      if (!token) { addToast("error", "Not authenticated."); return; }
-      const supabaseUrl = (import.meta.env.VITE_PUBLIC_SUPABASE_URL as string) || "";
-      const res = await fetch(`${supabaseUrl}/functions/v1/registry-enrich-artist`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-          apikey: (import.meta.env.VITE_PUBLIC_SUPABASE_ANON_KEY as string) || "",
-        },
-        body: JSON.stringify({ artist_slug: artist.slug, providers: ["spotify", "apple_music"], force: true }),
+      const data = await previewArtistEnrichment({
+        mode,
+        artistIds: [artist.id],
+        providers: mode === "profile" ? ["spotify", "apple_music"] : [],
+        force: true,
+        useMusicBrainz: true,
       });
-      const data = await res.json() as Record<string, unknown>;
-      if (!res.ok || data.error) {
-        addToast("error", String(data.message || data.error || "Enrich failed"));
-        return;
-      }
+      setEnrichMode(mode);
       setEnrichResult(data);
       setShowEnrichResult(true);
-      const result = (data.results as Array<Record<string, unknown>>)?.[0];
-      if (result?.status === "updated") {
-        addToast("success", `Enriched — ${(result.providersFound as string[]).join(", ")}`);
-        // Reload artist data
-        const { data: fresh } = await supabase
-          .from("registry_artists")
-          .select("id, slug, display_name, normalized_name, sort_name, bio, artist_type, gender, origin_iso2, public_image_url, image_source_provider, status, metadata, created_at, updated_at")
-          .eq("slug", slug)
-          .maybeSingle();
-        if (fresh) {
-          setArtist(fresh);
-          setDraft((prev) => ({
-            ...prev,
-            public_image_url: fresh.public_image_url ?? "",
-            image_source_provider: fresh.image_source_provider ?? "",
-            bio: fresh.bio ?? "",
-          }));
-        }
-      } else if (result?.status === "no_data") {
-        addToast("info", "No provider data found for this artist.");
+      const result = data.results?.[0];
+      if (result?.status === "no_data") {
+        addToast("info", "No provider evidence found for this artist.");
+      } else if (result?.status === "skipped") {
+        addToast("info", String(result.message || "No governed change is proposed."));
       } else {
-        addToast("info", String(result?.message || "Skipped — already enriched"));
+        addToast("info", "Proposal ready for review.");
       }
     } catch (err) {
-      addToast("error", err instanceof Error ? err.message : "Enrich failed");
+      addToast("error", err instanceof Error ? err.message : "Enrichment preview failed");
     } finally {
-      setEnriching(false);
+      if (mode === "profile") setEnriching(false);
+      else setEnrichingType(false);
+    }
+  }
+
+  async function handleApproveEnrichment() {
+    if (!artist || !enrichMode || !enrichResult) return;
+    setApplyingEnrich(true);
+    try {
+      const data = await applyReviewedArtistEnrichment(enrichResult);
+      setEnrichResult(data);
+      const result = data.results?.[0];
+      if (result?.status === "updated") {
+        await reloadArtist();
+        addToast("success", enrichMode === "type" ? "Artist type admitted and verified." : "Artist enrichment admitted and verified.");
+        setShowEnrichResult(false);
+      } else {
+        addToast("info", String(result?.message || "No change was admitted."));
+      }
+    } catch (err) {
+      addToast("error", err instanceof Error ? err.message : "Enrichment admission failed");
+    } finally {
+      setApplyingEnrich(false);
     }
   }
 
@@ -190,19 +212,6 @@ export default function ArtistDetailPage() {
       const token = session?.access_token;
       if (!token) { addToast("error", "Not authenticated."); return; }
       const supabaseUrl = (import.meta.env.VITE_PUBLIC_SUPABASE_URL as string) || "";
-      // First try: enrich via the existing enrich function to get provider IDs
-      const enrichRes = await fetch(`${supabaseUrl}/functions/v1/registry-enrich-artist`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-          apikey: (import.meta.env.VITE_PUBLIC_SUPABASE_ANON_KEY as string) || "",
-        },
-        body: JSON.stringify({ artist_slug: artist.slug, providers: ["spotify", "apple_music"], force: true }),
-      });
-      const enrichData = await enrichRes.json() as Record<string, unknown>;
-
-      // Second: run origin backfill for this artist
       const originRes = await fetch(`${supabaseUrl}/functions/v1/backfill-artist-origin`, {
         method: "POST",
         headers: {
@@ -219,76 +228,25 @@ export default function ArtistDetailPage() {
       });
 
       const originData = await originRes.json() as Record<string, unknown>;
+      if (!originRes.ok || originData.error) {
+        addToast("error", String(originData.message || originData.error || "Origin enrichment failed"));
+        return;
+      }
       const originResults = (originData.results as Array<Record<string, unknown>>) ?? [];
       const thisArtistResult = originResults.find((r) => String(r.slug) === artist.slug);
 
       if (thisArtistResult && thisArtistResult.newIso2) {
-        setDraft((prev) => ({ ...prev, origin_iso2: String(thisArtistResult.newIso2 ?? "") }));
+        await reloadArtist();
         addToast("success", `Origin set to ${thisArtistResult.newIso2} (${thisArtistResult.countryName || "unknown"})`);
-        // Reload artist
-        const { data: fresh } = await supabase
-          .from("registry_artists")
-          .select("id, slug, display_name, normalized_name, sort_name, bio, artist_type, gender, origin_iso2, public_image_url, image_source_provider, status, metadata, created_at, updated_at")
-          .eq("slug", slug)
-          .maybeSingle();
-        if (fresh) setArtist(fresh);
       } else if (thisArtistResult && thisArtistResult.source === "skipped") {
         addToast("info", `No origin found: ${String(thisArtistResult.debug || "unknown")}`);
       } else {
-        const enriched = (enrichData.results as Array<Record<string, unknown>>)?.[0];
-        if (enriched?.status === "no_data") {
-          addToast("info", "No provider matches found. Try adding provider IDs manually.");
-        } else {
-          addToast("info", "Origin enrichment attempted — check results.");
-        }
+        addToast("info", "Origin enrichment attempted — check results.");
       }
     } catch (err) {
       addToast("error", err instanceof Error ? err.message : "Origin enrich failed");
     } finally {
       setEnrichingOrigin(false);
-    }
-  }
-
-  async function handleEnrichType() {
-    if (!artist) return;
-    setEnrichingType(true);
-    try {
-      const { data: { session } } = await supabase.auth.getSession();
-      const token = session?.access_token;
-      if (!token) { addToast("error", "Not authenticated."); return; }
-      const supabaseUrl = (import.meta.env.VITE_PUBLIC_SUPABASE_URL as string) || "";
-      const res = await fetch(`${supabaseUrl}/functions/v1/backfill-artist-type`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-          apikey: (import.meta.env.VITE_PUBLIC_SUPABASE_ANON_KEY as string) || "",
-        },
-        body: JSON.stringify({ dry_run: false, use_musicbrainz: true, batch_size: 1 }),
-      });
-      const data = await res.json() as Record<string, unknown>;
-      if (!res.ok || data.error) {
-        addToast("error", String(data.message || data.error || "Type backfill failed"));
-        return;
-      }
-      const results = (data.results as Array<Record<string, unknown>>) ?? [];
-      const thisResult = results.find((r) => String(r.slug) === artist.slug);
-      if (thisResult && thisResult.newType) {
-        setDraft((prev) => ({ ...prev, artist_type: String(thisResult.newType) }));
-        addToast("success", `Type set to "${thisResult.newType}" (${thisResult.heuristic || thisResult.source})`);
-        const { data: fresh } = await supabase
-          .from("registry_artists")
-          .select("id, slug, display_name, normalized_name, sort_name, bio, artist_type, gender, origin_iso2, public_image_url, image_source_provider, status, metadata, created_at, updated_at")
-          .eq("slug", slug)
-          .maybeSingle();
-        if (fresh) setArtist(fresh);
-      } else {
-        addToast("info", String(thisResult?.heuristic || "Could not classify artist type"));
-      }
-    } catch (err) {
-      addToast("error", err instanceof Error ? err.message : "Type backfill failed");
-    } finally {
-      setEnrichingType(false);
     }
   }
 
@@ -305,27 +263,32 @@ export default function ArtistDetailPage() {
       public_image_url: draft.public_image_url || null,
       image_source_provider: draft.image_source_provider || null,
       status: draft.status,
-      updated_at: new Date().toISOString(),
     };
-    const { error } = await supabase.from("registry_artists").update(payload).eq("id", artist.id);
+    const result = await saveRegistryEntityPatch(
+      "artist",
+      artist.id,
+      payload,
+      artist.updated_at,
+    );
     setIsSaving(false);
-    if (error) {
-      addToast("error", `Save failed: ${error.message}`);
+    if (!result.ok) {
+      addToast("error", `Save failed: ${result.message || result.errorCode || "unknown error"}`);
       return;
     }
-    setArtist((prev) => (prev ? { ...prev, ...payload } : prev));
-    setIsDirty(false);
+    await reloadArtist();
     addToast("success", "Artist saved.");
   }
 
   async function handleDelete() {
     if (!artist) return;
-    const { error } = await supabase
-      .from("registry_artists")
-      .update({ status: "archived", updated_at: new Date().toISOString() })
-      .eq("id", artist.id);
-    if (error) {
-      addToast("error", "Failed to archive artist.");
+    const result = await saveRegistryEntityPatch(
+      "artist",
+      artist.id,
+      { status: "archived" },
+      artist.updated_at,
+    );
+    if (!result.ok) {
+      addToast("error", `Failed to archive artist: ${result.message || result.errorCode || "unknown error"}`);
       return;
     }
     addToast("info", "Artist archived.");
@@ -434,7 +397,7 @@ export default function ArtistDetailPage() {
             <WkIcon name="Trash2" size={14} />
           </button>
           <button
-            onClick={handleEnrich}
+            onClick={() => previewEnrichment("profile")}
             disabled={enriching}
             className="wk-button wk-button-ghost wk-button-sm whitespace-nowrap text-[#5f8f2f] hover:bg-[#e8f5dc] hover:border-[#5f8f2f]/20 flex items-center gap-1.5"
           >
@@ -458,7 +421,7 @@ export default function ArtistDetailPage() {
             Origin
           </button>
           <button
-            onClick={handleEnrichType}
+            onClick={() => previewEnrichment("type")}
             disabled={enrichingType}
             className="wk-button wk-button-ghost wk-button-sm whitespace-nowrap text-sky-600 hover:bg-sky-50 hover:border-sky-600/20 flex items-center gap-1.5"
           >
@@ -552,8 +515,8 @@ export default function ArtistDetailPage() {
                   <option value="group">Group</option>
                   <option value="band">Band</option>
                   <option value="duo">Duo</option>
-                  <option value="collaboration">Collaboration</option>
-                  <option value="ensemble">Ensemble</option>
+                  <option value="collective">Collective</option>
+                  <option value="unknown">Unknown</option>
                 </WkSelect>
               </div>
               <div>
@@ -657,7 +620,14 @@ export default function ArtistDetailPage() {
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
           <div className="w-full max-w-lg mx-4 rounded-2xl border border-wk-border bg-wk-surface p-6 shadow-lg max-h-[80vh] overflow-y-auto">
             <div className="flex items-center justify-between mb-4">
-              <h3 className="text-[16px] font-bold text-wk-text">Enrich Results</h3>
+              <div>
+                <h3 className="text-[16px] font-bold text-wk-text">
+                  {enrichMode === "type" ? "Artist Type Proposal" : "Enrichment Proposal"}
+                </h3>
+                {enrichResult.dry_run === true && (
+                  <p className="mt-1 text-[11px] text-wk-text-faint">Review these exact changes before admission.</p>
+                )}
+              </div>
               <button
                 onClick={() => setShowEnrichResult(false)}
                 className="flex h-8 w-8 items-center justify-center rounded-lg text-wk-text-faint hover:bg-wk-surface-raised"
@@ -666,12 +636,11 @@ export default function ArtistDetailPage() {
               </button>
             </div>
             {(() => {
-              const result = (enrichResult.results as Array<Record<string, unknown>>)?.[0];
+              const result = enrichResult.results?.[0];
               if (!result) return <p className="text-[13px] text-wk-text-muted">No results returned.</p>;
               const status = String(result.status);
-              const providersFound = (result.providersFound as string[]) ?? [];
-              const providersTried = (result.providersTried as string[]) ?? [];
-              const changes = (result.changes as Record<string, unknown>) ?? {};
+              const providersFound = result.providersFound ?? [];
+              const changes = result.changes ?? {};
               return (
                 <div className="space-y-4">
                   <div className="flex items-center gap-2">
@@ -681,10 +650,10 @@ export default function ArtistDetailPage() {
                       status === "no_data" ? "bg-wk-warning-soft text-wk-warning" :
                       "bg-wk-surface-raised text-wk-text-muted"
                     }`}>
-                      {status}
+                      {enrichResult.dry_run === true && status === "updated" ? "proposed" : status}
                     </span>
                     <span className="text-[12px] text-wk-text-muted">
-                      {providersFound.length > 0 ? `Found on ${providersFound.join(" + ")}` : "No providers found data"}
+                      {providersFound.length > 0 ? `Evidence: ${providersFound.join(" + ")}` : "Local reviewed proposal"}
                     </span>
                   </div>
 
@@ -717,7 +686,7 @@ export default function ArtistDetailPage() {
                   {(changes.bio as Record<string, unknown>) && (
                     <div className="rounded-xl border border-wk-border bg-wk-bg-subtle p-3">
                       <p className="text-[11px] font-bold uppercase tracking-wider text-wk-text-muted mb-1">Bio</p>
-                      <p className="text-[12px] text-wk-text-muted line-clamp-4">
+                      <p className="text-[12px] text-wk-text-muted line-clamp-6">
                         {(changes.bio as Record<string, unknown>)?.new as string}
                       </p>
                       <span className="text-[10px] font-bold text-wk-text-muted mt-1 block">
@@ -737,8 +706,51 @@ export default function ArtistDetailPage() {
                     </div>
                   )}
 
+                  {(changes.type as Record<string, unknown>) && (
+                    <div className="rounded-xl border border-wk-border bg-wk-bg-subtle p-3">
+                      <p className="text-[11px] font-bold uppercase tracking-wider text-wk-text-muted mb-2">Artist Type</p>
+                      <div className="flex items-center gap-2 text-[13px] text-wk-text">
+                        <span>{String((changes.type as Record<string, unknown>).old || "unset")}</span>
+                        <WkIcon name="ArrowRight" size={14} className="text-wk-text-faint" />
+                        <strong>{String((changes.type as Record<string, unknown>).new || "unset")}</strong>
+                      </div>
+                      <p className="mt-1 text-[10px] text-wk-text-faint">
+                        Source: {String((changes.type as Record<string, unknown>).source || "review")} · {String((changes.type as Record<string, unknown>).heuristic || "")}
+                      </p>
+                    </div>
+                  )}
+
                   {result.message && (
                     <p className="text-[12px] text-wk-text-muted">{String(result.message)}</p>
+                  )}
+
+                  {enrichResult.dry_run === true && status === "updated" && (
+                    <div className="flex justify-end gap-2 border-t border-wk-border pt-4">
+                      <button
+                        onClick={() => setShowEnrichResult(false)}
+                        disabled={applyingEnrich}
+                        className="wk-button wk-button-secondary wk-button-sm"
+                      >
+                        Cancel
+                      </button>
+                      <button
+                        onClick={handleApproveEnrichment}
+                        disabled={applyingEnrich}
+                        className="wk-button wk-button-primary wk-button-sm"
+                      >
+                        {applyingEnrich ? (
+                          <>
+                            <WkIcon name="Loader2" size={14} className="animate-spin" />
+                            Admitting&hellip;
+                          </>
+                        ) : (
+                          <>
+                            <WkIcon name="Check" size={14} />
+                            Approve exact changes
+                          </>
+                        )}
+                      </button>
+                    </div>
                   )}
                 </div>
               );
