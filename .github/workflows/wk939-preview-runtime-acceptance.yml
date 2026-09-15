@@ -1,0 +1,164 @@
+name: WK939 Preview Runtime Acceptance
+
+on:
+  push:
+    branches:
+      - validation/wk939-runtime-candidate-1
+    paths:
+      - .github/workflows/wk939-preview-runtime-acceptance.yml
+
+permissions:
+  contents: read
+
+jobs:
+  accept:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      PREVIEW_REF: ulmemkqvcysqtjvjxepq
+    steps:
+      - name: Check out authority
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Prove exact feature runtime
+        run: |
+          set -euo pipefail
+          git diff --exit-code edd6edccfb2509f88ac26b73b82c6609b5931152 -- \
+            supabase/functions/chart-ingest-api/index.ts \
+            supabase/functions/chart-provider-fetch/index.ts \
+            supabase/migrations/20260915122100_chart_runtime_caller_jwt_convergence_v1.sql
+
+      - name: Real HTTP caller-JWT acceptance
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+        run: |
+          set -euo pipefail
+          URL="https://${PREVIEW_REF}.supabase.co"
+          EMAIL="wk939-preview-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}@example.invalid"
+          PASSWORD="$(openssl rand -hex 18)Aa1!"
+          USER_ID=""
+          RUN_ID=""
+          FAMILY_ID="wk939-preview-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
+
+          KEYS_FILE="$(mktemp)"
+          curl -fsS "https://api.supabase.com/v1/projects/${PREVIEW_REF}/api-keys?reveal=true" \
+            -H "Authorization: Bearer ${SUPABASE_ACCESS_TOKEN}" \
+            > "$KEYS_FILE"
+
+          ANON_KEY="$(jq -r '.[] | select(.name == "anon") | (.api_key // .key // .value) // empty' "$KEYS_FILE" | head -n1)"
+          SERVICE_KEY="$(jq -r '.[] | select(.name == "service_role") | (.api_key // .key // .value) // empty' "$KEYS_FILE" | head -n1)"
+          rm -f "$KEYS_FILE"
+          test -n "$ANON_KEY"
+          test -n "$SERVICE_KEY"
+          echo "PREVIEW_API_KEY_AUTHORITY=PASS"
+
+          cleanup() {
+            set +e
+            if [ -n "$RUN_ID" ]; then
+              for TABLE in chart_ingest_audit_events chart_ingest_stage_events chart_ingest_run_sources chart_ingest_raw_rows chart_ingest_normalized_rows chart_ingest_candidate_scores chart_ingest_matches chart_ingest_review_issues chart_ingest_exclusions chart_ingest_candidates; do
+                curl -fsS -X DELETE "$URL/rest/v1/${TABLE}?run_id=eq.${RUN_ID}" \
+                  -H "apikey: ${SERVICE_KEY}" \
+                  -H "Authorization: Bearer ${SERVICE_KEY}" >/dev/null 2>&1 || true
+              done
+              curl -fsS -X DELETE "$URL/rest/v1/chart_ingest_runs?id=eq.${RUN_ID}" \
+                -H "apikey: ${SERVICE_KEY}" \
+                -H "Authorization: Bearer ${SERVICE_KEY}" >/dev/null 2>&1 || true
+            fi
+            curl -fsS -X DELETE "$URL/rest/v1/chart_ingest_family_presets?family_id=eq.${FAMILY_ID}" \
+              -H "apikey: ${SERVICE_KEY}" \
+              -H "Authorization: Bearer ${SERVICE_KEY}" >/dev/null 2>&1 || true
+            if [ -n "$USER_ID" ]; then
+              curl -fsS -X DELETE "$URL/auth/v1/admin/users/${USER_ID}" \
+                -H "apikey: ${SERVICE_KEY}" \
+                -H "Authorization: Bearer ${SERVICE_KEY}" >/dev/null 2>&1 || true
+            fi
+          }
+          trap cleanup EXIT
+
+          CREATE_USER="$(curl -fsS -X POST "$URL/auth/v1/admin/users" \
+            -H "apikey: ${SERVICE_KEY}" \
+            -H "Authorization: Bearer ${SERVICE_KEY}" \
+            -H 'Content-Type: application/json' \
+            -d "$(jq -nc --arg email "$EMAIL" --arg password "$PASSWORD" '{email:$email,password:$password,email_confirm:true}')")"
+          USER_ID="$(printf '%s' "$CREATE_USER" | jq -r '.id // empty')"
+          test -n "$USER_ID"
+          echo "EPHEMERAL_AUTH_USER=PASS"
+
+          ROLE_BODY="$(jq -nc --arg uid "$USER_ID" '[
+            {user_id:$uid,role_key:"chart_editor_global",status:"active",notes:"WK939 Preview runtime acceptance"},
+            {user_id:$uid,role_key:"registry_editor",status:"active",notes:"WK939 Preview runtime acceptance"}
+          ]')"
+          curl -fsS -X POST "$URL/rest/v1/user_role_assignments" \
+            -H "apikey: ${SERVICE_KEY}" \
+            -H "Authorization: Bearer ${SERVICE_KEY}" \
+            -H 'Content-Type: application/json' \
+            -H 'Prefer: return=minimal' \
+            -d "$ROLE_BODY" >/dev/null
+          echo "EPHEMERAL_ROLE_BUNDLE=PASS"
+
+          TOKEN_JSON="$(curl -fsS -X POST "$URL/auth/v1/token?grant_type=password" \
+            -H "apikey: ${ANON_KEY}" \
+            -H 'Content-Type: application/json' \
+            -d "$(jq -nc --arg email "$EMAIL" --arg password "$PASSWORD" '{email:$email,password:$password}')")"
+          ACCESS_TOKEN="$(printf '%s' "$TOKEN_JSON" | jq -r '.access_token // empty')"
+          test -n "$ACCESS_TOKEN"
+          echo "CALLER_JWT_ISSUED=PASS"
+
+          for FN in chart-provider-fetch chart-ingest-api; do
+            CODE="$(curl -sS -o /tmp/${FN}.anon.json -w '%{http_code}' -X POST "$URL/functions/v1/${FN}" \
+              -H "apikey: ${ANON_KEY}" \
+              -H 'Content-Type: application/json' \
+              -d '{}')"
+            test "$CODE" = "401"
+            echo "${FN}_MISSING_JWT_DENIED=PASS"
+          done
+
+          PROVIDER_CODE="$(curl -sS -o /tmp/provider.json -w '%{http_code}' -X POST "$URL/functions/v1/chart-provider-fetch" \
+            -H "apikey: ${ANON_KEY}" \
+            -H "Authorization: Bearer ${ACCESS_TOKEN}" \
+            -H 'Content-Type: application/json' \
+            -d '{"provider":"spotify","sourceUrl":"https://open.spotify.com/playlist/wk939preview","market":"KE","maxRows":1}')"
+          test "$PROVIDER_CODE" = "200"
+          test "$(jq -r '.error // empty' /tmp/provider.json)" = "Spotify credentials not configured."
+          test "$(jq '.tracks | length' /tmp/provider.json)" = "0"
+          echo "PROVIDER_FETCH_CALLER_JWT_DB_CREDENTIAL_BOUNDARY=PASS"
+
+          CREATE_BODY="$(jq -nc '{action:"create_dry_run",request:{editionDate:"2026-09-15",sourceUrls:[],chartSize:1,existingSeriesId:"wk939-preview-runtime",market:"KE",chartKind:"tracks"}}')"
+          CREATE_CODE="$(curl -sS -o /tmp/create-run.json -w '%{http_code}' -X POST "$URL/functions/v1/chart-ingest-api" \
+            -H "apikey: ${ANON_KEY}" \
+            -H "Authorization: Bearer ${ACCESS_TOKEN}" \
+            -H 'Content-Type: application/json' \
+            -d "$CREATE_BODY")"
+          test "$CREATE_CODE" = "200"
+          RUN_ID="$(jq -r '.runId // empty' /tmp/create-run.json)"
+          test -n "$RUN_ID"
+          test "$(jq -r '.status // empty' /tmp/create-run.json)" = "queued"
+          echo "CHART_INGEST_CALLER_RLS_CREATE=PASS"
+
+          PRESET_BODY="$(jq -nc --arg family "$FAMILY_ID" '{action:"save_family_ingest_preset",familyId:$family,config:{wk939Preview:true}}')"
+          PRESET_CODE="$(curl -sS -o /tmp/preset-write.json -w '%{http_code}' -X POST "$URL/functions/v1/chart-ingest-api" \
+            -H "apikey: ${ANON_KEY}" \
+            -H "Authorization: Bearer ${ACCESS_TOKEN}" \
+            -H 'Content-Type: application/json' \
+            -d "$PRESET_BODY")"
+          test "$PRESET_CODE" = "200"
+          test "$(jq -r '.ok // false' /tmp/preset-write.json)" = "true"
+          echo "GUARDED_PRESET_WRITE_CALLER_JWT=PASS"
+
+          LIST_CODE="$(curl -sS -o /tmp/preset-list.json -w '%{http_code}' -X POST "$URL/functions/v1/chart-ingest-api" \
+            -H "apikey: ${ANON_KEY}" \
+            -H "Authorization: Bearer ${ACCESS_TOKEN}" \
+            -H 'Content-Type: application/json' \
+            -d '{"action":"get_family_ingest_presets"}')"
+          test "$LIST_CODE" = "200"
+          jq -e --arg family "$FAMILY_ID" '.presets | any(.family_id == $family)' /tmp/preset-list.json >/dev/null
+          echo "GUARDED_PRESET_READ_CALLER_JWT=PASS"
+
+          cleanup
+          trap - EXIT
+          USER_ID=""
+          RUN_ID=""
+
+          echo WK939_PREVIEW_CALLER_JWT_RUNTIME_ACCEPTANCE_PASS
