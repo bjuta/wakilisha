@@ -8,19 +8,18 @@ set local lock_timeout = '5s';
 -- Resource-event contract: auth.users(id) ON DELETE SET NULL.
 --
 -- The Phase 7A freeze was installed as a statement-level BEFORE UPDATE trigger.
--- PostgreSQL fires that trigger for the FK-maintenance UPDATE issued by
+-- PostgreSQL fires that trigger for FK-maintenance UPDATE statements issued by
 -- ON DELETE SET NULL even when no historical rows match the retiring user.
--- This made every governed Auth-account deletion fail closed.
+-- This made governed Auth-account deletion fail closed.
 --
 -- Repair:
 --   * retain all five historical tables;
 --   * retain all five actor_id -> auth.users ON DELETE SET NULL FKs;
---   * retain the same closed application ACLs;
+--   * retain closed application ACLs;
 --   * move the freeze to FOR EACH ROW so zero-row FK maintenance is harmless;
 --   * allow only a nested actor_id UUID -> NULL transition with every other
---     column byte-for-byte unchanged. This is the FK-maintenance transition
---     required by governed account retirement. All inserts, deletes, direct
---     updates, and other row changes remain rejected.
+--     historical field unchanged. All inserts, deletes, direct updates, and
+--     every other row mutation remain rejected.
 
 do $historical_event_actor_retirement_preflight$
 declare
