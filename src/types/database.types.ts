@@ -19258,12 +19258,99 @@ export type Database = {
         }
         Returns: Json
       }
+      admin_execute_registry_artist_bio_admission: {
+        Args: {
+          p_artist_id: string
+          p_bio: string
+          p_observed_at?: string
+          p_source_kind: string
+          p_source_payload_fingerprint: string
+          p_source_ref: string
+        }
+        Returns: {
+          evidence_assertion_id: string
+          execution_grant_id: string
+          idempotent_replay: boolean
+          operation_id: string
+          operation_status: string
+          verifier_status: string
+        }[]
+      }
+      admin_execute_registry_artist_enrichment_evidence_admission: {
+        Args: { p_evidence_assertion_id: string }
+        Returns: {
+          evidence_assertion_id: string
+          execution_grant_id: string
+          idempotent_replay: boolean
+          operation_id: string
+          operation_status: string
+          verifier_status: string
+        }[]
+      }
       admin_execute_registry_artist_origin_admission: {
         Args: {
           p_artist_id: string
           p_confidence: number
           p_observed_at: string
           p_origin_iso2: string
+          p_source_kind: string
+          p_source_payload_fingerprint: string
+          p_source_ref: string
+        }
+        Returns: {
+          evidence_assertion_id: string
+          execution_grant_id: string
+          idempotent_replay: boolean
+          operation_id: string
+          operation_status: string
+          verifier_status: string
+        }[]
+      }
+      admin_execute_registry_artist_provider_profile_admission: {
+        Args: {
+          p_apple_music_id?: string
+          p_artist_id: string
+          p_enriched_genres?: string[]
+          p_observed_at?: string
+          p_source_kind?: string
+          p_source_payload_fingerprint?: string
+          p_source_ref?: string
+          p_spotify_followers?: number
+          p_spotify_id?: string
+          p_spotify_popularity?: number
+        }
+        Returns: {
+          evidence_assertion_id: string
+          execution_grant_id: string
+          idempotent_replay: boolean
+          operation_id: string
+          operation_status: string
+          verifier_status: string
+        }[]
+      }
+      admin_execute_registry_artist_public_image_admission: {
+        Args: {
+          p_artist_id: string
+          p_image_source_provider: string
+          p_observed_at?: string
+          p_public_image_url: string
+          p_source_payload_fingerprint: string
+          p_source_ref: string
+        }
+        Returns: {
+          evidence_assertion_id: string
+          execution_grant_id: string
+          idempotent_replay: boolean
+          operation_id: string
+          operation_status: string
+          verifier_status: string
+        }[]
+      }
+      admin_execute_registry_artist_type_admission: {
+        Args: {
+          p_artist_id: string
+          p_artist_type: string
+          p_observed_at?: string
           p_source_kind: string
           p_source_payload_fingerprint: string
           p_source_ref: string
@@ -19343,6 +19430,54 @@ export type Database = {
           p_source_artist_id: string
         }
         Returns: Json
+      }
+      admin_prepare_registry_artist_bio_evidence: {
+        Args: {
+          p_artist_id: string
+          p_bio: string
+          p_observed_at?: string
+          p_source_kind: string
+          p_source_payload_fingerprint: string
+          p_source_ref: string
+        }
+        Returns: string
+      }
+      admin_prepare_registry_artist_provider_profile_evidence: {
+        Args: {
+          p_apple_music_id?: string
+          p_artist_id: string
+          p_enriched_genres?: string[]
+          p_observed_at?: string
+          p_source_kind?: string
+          p_source_payload_fingerprint?: string
+          p_source_ref?: string
+          p_spotify_followers?: number
+          p_spotify_id?: string
+          p_spotify_popularity?: number
+        }
+        Returns: string
+      }
+      admin_prepare_registry_artist_public_image_evidence: {
+        Args: {
+          p_artist_id: string
+          p_image_source_provider: string
+          p_observed_at?: string
+          p_public_image_url: string
+          p_source_payload_fingerprint: string
+          p_source_ref: string
+        }
+        Returns: string
+      }
+      admin_prepare_registry_artist_type_evidence: {
+        Args: {
+          p_artist_id: string
+          p_artist_type: string
+          p_observed_at?: string
+          p_source_kind: string
+          p_source_payload_fingerprint: string
+          p_source_ref: string
+        }
+        Returns: string
       }
       admin_preview_registry_track_duplicate_repair: {
         Args: { p_canonical_track_id: string; p_duplicate_track_ids: string[] }
@@ -19481,6 +19616,13 @@ export type Database = {
           p_selected_artists?: Json
         }
         Returns: Json
+      }
+      admin_verify_registry_artist_enrichment_admission: {
+        Args: { p_operation_id: string }
+        Returns: {
+          operation_id: string
+          verifier_status: string
+        }[]
       }
       admin_verify_registry_artist_origin_admission: {
         Args: { p_operation_id: string }
