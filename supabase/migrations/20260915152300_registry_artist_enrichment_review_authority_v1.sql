@@ -301,6 +301,16 @@ begin
 end
 $$;
 
+-- Raw-value execute wrappers were useful while composing V1, but once reviewed
+-- evidence exists they are no longer a product authority surface. Keep the
+-- definitions for migration compatibility while denying ordinary roles.
+revoke execute on function
+  public.admin_execute_registry_artist_provider_profile_admission(uuid,text,text,bigint,integer,text[],text,text,text,timestamptz),
+  public.admin_execute_registry_artist_public_image_admission(uuid,text,text,text,text,timestamptz),
+  public.admin_execute_registry_artist_bio_admission(uuid,text,text,text,text,text,timestamptz),
+  public.admin_execute_registry_artist_type_admission(uuid,text,text,text,text,text,timestamptz)
+from authenticated;
+
 revoke all on function
   public.admin_prepare_registry_artist_provider_profile_evidence(uuid,text,text,bigint,integer,text[],text,text,text,timestamptz),
   public.admin_prepare_registry_artist_public_image_evidence(uuid,text,text,text,text,timestamptz),
