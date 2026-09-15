@@ -157,7 +157,7 @@ describe(
   "native preview ACL replay parity",
   () => {
     it(
-      "converges the native branch path without rewriting historical migration rows",
+      "converges native-preview and clean-repository history representations without rewriting historical migration rows",
       () => {
         expect(forwardReplayParity)
           .toContain(
@@ -181,7 +181,15 @@ describe(
           );
         expect(forwardReplayParity)
           .toContain(
-            "v_fragments <> 641 OR v_skipped <> 10",
+            "v_fragments NOT IN (640, 641) OR v_skipped <> 10",
+          );
+        expect(forwardReplayParity)
+          .toContain(
+            "Production/native-preview stored history yields 641",
+          );
+        expect(forwardReplayParity)
+          .toContain(
+            "clean repository replay yields 640",
           );
         expect(forwardReplayParity)
           .toContain(

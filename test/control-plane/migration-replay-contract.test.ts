@@ -8,6 +8,9 @@ import {
   validateReplayProof,
 } from "../../scripts/control-plane/verify-migration-replay-contract.mjs";
 import {
+  validateHistoricalCleanReplayProof,
+} from "../../scripts/control-plane/verify-historical-migration-clean-replay.mjs";
+import {
   validatePendingSchemaState,
   validateRepositorySchemaSnapshot,
 } from "../../scripts/control-plane/verify-repository-schema-snapshot.mjs";
@@ -72,7 +75,7 @@ describe(
     );
 
     it(
-      "rejects a replay proof whose candidate bytes or base changed",
+      "rejects a preview replay proof whose candidate bytes or base changed",
       () => {
         const proof = {
           migration_file:
@@ -125,7 +128,7 @@ describe(
     );
 
     it(
-      "rejects replay proofs that omit the candidate schema snapshot",
+      "rejects preview replay proofs that omit the candidate schema snapshot",
       () => {
         const proof = {
           migration_file:
@@ -167,6 +170,126 @@ describe(
             "schema_types_sha256 must be a SHA-256 digest",
             "schema_migration_count must be a positive integer",
             "schema_migration_head must be a 14-digit migration version",
+          ]),
+        );
+      },
+    );
+
+    it(
+      "accepts a schema-neutral historical clean-replay receipt without pretending it was a Preview apply",
+      () => {
+        const proof = {
+          proof_mode:
+            "historical_clean_replay",
+          migration_file:
+            "supabase/migrations/20260905090000_acl.sql",
+          migration_git_blob_sha:
+            "a".repeat(40),
+          base_main_sha:
+            "b".repeat(40),
+          candidate_migration_version:
+            "20260905090000",
+          baseline_replay:
+            "pass",
+          candidate_apply:
+            "pass",
+          verifier:
+            "pass",
+          verifier_file:
+            "package.json",
+          schema_types_sha256:
+            "c".repeat(64),
+          schema_migration_count:
+            123,
+          schema_migration_head:
+            "20260914193300",
+          replay_candidate_head_sha:
+            "d".repeat(40),
+          replay_environment:
+            "supabase-local",
+          supabase_cli_version:
+            "2.107.0",
+          replay_marker:
+            "WK_NATIVE_PREVIEW_ACL_CLEAN_REPLAY_PASS",
+          predecessor_migration_count:
+            89,
+          predecessor_blob_manifest_sha256:
+            "e".repeat(64),
+          verified_at:
+            "2026-09-15T07:49:32.000Z",
+        };
+
+        expect(
+          validateHistoricalCleanReplayProof({
+            proof,
+            migrationFile:
+              proof.migration_file,
+            baseMainSha:
+              proof.base_main_sha,
+          }),
+        ).toEqual([]);
+      },
+    );
+
+    it(
+      "keeps historical clean replay receipts tightly bound to local replay evidence",
+      () => {
+        const proof = {
+          proof_mode:
+            "historical_clean_replay",
+          migration_file:
+            "supabase/migrations/20260905090000_acl.sql",
+          migration_git_blob_sha:
+            "a".repeat(40),
+          base_main_sha:
+            "b".repeat(40),
+          candidate_migration_version:
+            "20260905090000",
+          baseline_replay:
+            "pass",
+          candidate_apply:
+            "pass",
+          verifier:
+            "pass",
+          verifier_file:
+            "package.json",
+          schema_types_sha256:
+            "c".repeat(64),
+          schema_migration_count:
+            123,
+          schema_migration_head:
+            "20260914193300",
+          replay_candidate_head_sha:
+            "d".repeat(40),
+          replay_environment:
+            "preview",
+          supabase_cli_version:
+            "not-a-version",
+          replay_marker:
+            "pass",
+          predecessor_migration_count:
+            0,
+          predecessor_blob_manifest_sha256:
+            "bad",
+          verified_at:
+            "2026-09-15T07:49:32.000Z",
+        };
+
+        expect(
+          validateHistoricalCleanReplayProof({
+            proof,
+            migrationFile:
+              proof.migration_file,
+            baseMainSha:
+              proof.base_main_sha,
+          }),
+        ).toEqual(
+          expect.arrayContaining([
+            "replay_environment must be supabase-local",
+            "supabase_cli_version must be semantic",
+            "replay_marker must be canonical",
+            "predecessor_migration_count must be a positive integer",
+            "predecessor_blob_manifest_sha256 must be a SHA-256 digest",
           ]),
         );
       },

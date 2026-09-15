@@ -6,6 +6,11 @@ import { pathToFileURL } from "node:url";
 import {
   validateRepositorySchemaSnapshot,
 } from "./verify-repository-schema-snapshot.mjs";
+import {
+  isHistoricalCleanReplayProof,
+  validateHistoricalCleanReplayProof,
+  validateHistoricalCleanReplayRepositoryState,
+} from "./verify-historical-migration-clean-replay.mjs";
 
 const BASE_REF =
   process.env.CONTROL_PLANE_BASE_REF ??
@@ -603,17 +608,27 @@ function main() {
     );
 
     const proofErrors =
-      validateReplayProof({
+      isHistoricalCleanReplayProof(
         proof,
-        migrationFile:
-          entry.path,
-        migrationSha256:
-          sha256File(
-            entry.path,
-          ),
-        baseMainSha:
-          mergeBase,
-      });
+      )
+        ? validateHistoricalCleanReplayProof({
+            proof,
+            migrationFile:
+              entry.path,
+            baseMainSha:
+              mergeBase,
+          })
+        : validateReplayProof({
+            proof,
+            migrationFile:
+              entry.path,
+            migrationSha256:
+              sha256File(
+                entry.path,
+              ),
+            baseMainSha:
+              mergeBase,
+          });
 
     for (
       const error of
@@ -697,7 +712,35 @@ function main() {
           );
         }
 
+        const historicalMode =
+          changedActive.some(
+            (entry) =>
+              isHistoricalCleanReplayProof(
+                proofs.get(entry.path),
+              ),
+          );
+
+        if (historicalMode) {
+          for (
+            const error of
+            validateHistoricalCleanReplayRepositoryState({
+              changedActive,
+              proofs,
+              mergeBase,
+              baseline,
+              migrations,
+              latestMigration,
+              actualTypesSha256,
+            })
+          ) {
+            failures.push(
+              `historical clean replay: ${error}`,
+            );
+          }
+        }
+
         if (
+          !historicalMode &&
           baseline
             .schemaSeal?.mode !==
           "preview"
@@ -708,6 +751,7 @@ function main() {
         }
 
         if (
+          !historicalMode &&
           baseline
             .schemaSeal
             ?.baseMainSha !==
@@ -718,6 +762,7 @@ function main() {
           );
         }
 
+        if (!historicalMode) {
         const latestChanged =
           changedActive.at(-1);
         const latestProof =
@@ -787,6 +832,7 @@ function main() {
               `${BASELINE_FILE}: schemaSeal.migrationHead must equal the latest migration proof schema_migration_head`,
             );
           }
+        }
         }
       }
     }

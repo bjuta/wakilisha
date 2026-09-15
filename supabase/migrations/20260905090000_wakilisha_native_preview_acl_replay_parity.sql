@@ -101,6 +101,7 @@ $wk_native_preview_acl_clear_stale_defaults$;
 DO $wk_native_preview_acl_restore_baseline$
 DECLARE
   r record;
+  v_statement text;
   v_skipped integer := 0;
 BEGIN
   FOR r IN
@@ -111,9 +112,20 @@ BEGIN
       AND ordinality >= 4853
     ORDER BY ordinality
   LOOP
+    v_statement := regexp_replace(
+      r.statement,
+      '^([[:space:]]|--[^\n]*(\n|$))*',
+      '',
+      'n'
+    );
+
     BEGIN
       EXECUTE r.statement;
     EXCEPTION
+      WHEN duplicate_object THEN
+        IF upper(btrim(v_statement)) NOT LIKE 'CREATE POLICY %' THEN
+          RAISE;
+        END IF;
       WHEN undefined_function OR undefined_table OR undefined_object OR invalid_schema_name THEN
         v_skipped := v_skipped + 1;
     END;
@@ -175,9 +187,14 @@ BEGIN
     END;
   END LOOP;
 
-  IF v_fragments <> 641 OR v_skipped <> 10 THEN
+  -- The exact 89-migration predecessor source is byte-identical across both
+  -- proven history paths. Production/native-preview stored history yields 641
+  -- ACL fragments; clean repository replay yields 640. Both are accepted only
+  -- when the retired-target skip set remains exactly 10, and the canonical ACL
+  -- fingerprints below still converge to the same Production perimeter.
+  IF v_fragments NOT IN (640, 641) OR v_skipped <> 10 THEN
     RAISE EXCEPTION
-      'STOP: forward ACL history shape drifted: fragments %, skipped %; expected 641 / 10',
+      'STOP: forward ACL history shape drifted: fragments %, skipped %; expected 640 or 641 / 10',
       v_fragments,
       v_skipped;
   END IF;
