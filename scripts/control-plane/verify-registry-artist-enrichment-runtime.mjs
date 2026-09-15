@@ -26,6 +26,9 @@ const governancePanelsPath = "src/components/admin/registry/ArtistEnrichmentGove
 const detailPath = "src/pages/admin/registry/artists/detail/page.tsx";
 const listPath = "src/pages/admin/registry/artists/page.tsx";
 const manifestPath = "scripts/control-plane/registry-privileged-writer-manifest.json";
+const foundationMigrationPath = "supabase/migrations/20260915152100_registry_artist_enrichment_authority_v1.sql";
+const reviewMigrationPath = "supabase/migrations/20260915152300_registry_artist_enrichment_review_authority_v1.sql";
+const sqlVerifierPath = "scripts/control-plane/verify-registry-artist-enrichment-authority.sql";
 
 const provider = read(providerPath);
 const orchestrator = read(orchestratorPath);
@@ -37,6 +40,9 @@ const governancePanels = read(governancePanelsPath);
 const detail = read(detailPath);
 const list = read(listPath);
 const manifest = JSON.parse(read(manifestPath));
+const foundationMigration = read(foundationMigrationPath);
+const reviewMigration = read(reviewMigrationPath);
+const sqlVerifier = read(sqlVerifierPath);
 const writers = Array.isArray(manifest.writers) ? manifest.writers : [];
 const writer = (id) => writers.find((row) => row.id === id);
 
@@ -51,6 +57,46 @@ const assertWriter = (id, expected) => {
     }
   }
 };
+
+// SQL function identities must match their actual typed definitions exactly.
+// A surplus text parameter here makes PostgreSQL ACL statements fail at replay.
+for (const [path, source] of [
+  [foundationMigrationPath, foundationMigration],
+  [reviewMigrationPath, reviewMigration],
+  [sqlVerifierPath, sqlVerifier],
+]) {
+  for (const forbiddenSignature of [
+    "public.admin_execute_registry_artist_public_image_admission(uuid,text,text,text,text,text,",
+    "public.admin_execute_registry_artist_bio_admission(uuid,text,text,text,text,text,",
+    "public.admin_execute_registry_artist_type_admission(uuid,text,text,text,text,text,",
+    "public.admin_prepare_registry_artist_bio_evidence(uuid,text,text,text,text,text,",
+    "public.admin_prepare_registry_artist_type_evidence(uuid,text,text,text,text,text,",
+  ]) {
+    forbidText(source, forbiddenSignature, path);
+  }
+}
+
+for (const [path, source, requiredSignatures] of [
+  [foundationMigrationPath, foundationMigration, [
+    "public.admin_execute_registry_artist_public_image_admission(uuid,text,text,text,text,timestamptz)",
+    "public.admin_execute_registry_artist_bio_admission(uuid,text,text,text,text,timestamptz)",
+    "public.admin_execute_registry_artist_type_admission(uuid,text,text,text,text,timestamptz)",
+  ]],
+  [reviewMigrationPath, reviewMigration, [
+    "public.admin_execute_registry_artist_bio_admission(uuid,text,text,text,text,timestamptz)",
+    "public.admin_execute_registry_artist_type_admission(uuid,text,text,text,text,timestamptz)",
+    "public.admin_prepare_registry_artist_bio_evidence(uuid,text,text,text,text,timestamptz)",
+    "public.admin_prepare_registry_artist_type_evidence(uuid,text,text,text,text,timestamptz)",
+  ]],
+  [sqlVerifierPath, sqlVerifier, [
+    "public.admin_execute_registry_artist_bio_admission(uuid,text,text,text,text,timestamptz)",
+    "public.admin_execute_registry_artist_type_admission(uuid,text,text,text,text,timestamptz)",
+    "public.admin_prepare_registry_artist_bio_evidence(uuid,text,text,text,text,timestamptz)",
+    "public.admin_prepare_registry_artist_type_evidence(uuid,text,text,text,text,timestamptz)",
+  ]],
+]) {
+  for (const signature of requiredSignatures) requireText(source, signature, path);
+}
 
 // Provider credentials are isolated in one boundary that has no Registry DML.
 requireText(provider, 'SUPABASE_SERVICE_ROLE_KEY', providerPath);

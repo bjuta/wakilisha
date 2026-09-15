@@ -41,10 +41,10 @@ begin
        'public.admin_prepare_registry_artist_public_image_evidence(uuid,text,text,text,text,timestamp with time zone)'
      ) is not null
      or to_regprocedure(
-       'public.admin_prepare_registry_artist_bio_evidence(uuid,text,text,text,text,text,timestamp with time zone)'
+       'public.admin_prepare_registry_artist_bio_evidence(uuid,text,text,text,text,timestamp with time zone)'
      ) is not null
      or to_regprocedure(
-       'public.admin_prepare_registry_artist_type_evidence(uuid,text,text,text,text,text,timestamp with time zone)'
+       'public.admin_prepare_registry_artist_type_evidence(uuid,text,text,text,text,timestamp with time zone)'
      ) is not null
      or to_regprocedure(
        'public.admin_execute_registry_artist_enrichment_evidence_admission(uuid)'
@@ -307,23 +307,23 @@ $$;
 revoke execute on function
   public.admin_execute_registry_artist_provider_profile_admission(uuid,text,text,bigint,integer,text[],text,text,text,timestamptz),
   public.admin_execute_registry_artist_public_image_admission(uuid,text,text,text,text,timestamptz),
-  public.admin_execute_registry_artist_bio_admission(uuid,text,text,text,text,text,timestamptz),
-  public.admin_execute_registry_artist_type_admission(uuid,text,text,text,text,text,timestamptz)
+  public.admin_execute_registry_artist_bio_admission(uuid,text,text,text,text,timestamptz),
+  public.admin_execute_registry_artist_type_admission(uuid,text,text,text,text,timestamptz)
 from authenticated;
 
 revoke all on function
   public.admin_prepare_registry_artist_provider_profile_evidence(uuid,text,text,bigint,integer,text[],text,text,text,timestamptz),
   public.admin_prepare_registry_artist_public_image_evidence(uuid,text,text,text,text,timestamptz),
-  public.admin_prepare_registry_artist_bio_evidence(uuid,text,text,text,text,text,timestamptz),
-  public.admin_prepare_registry_artist_type_evidence(uuid,text,text,text,text,text,timestamptz),
+  public.admin_prepare_registry_artist_bio_evidence(uuid,text,text,text,text,timestamptz),
+  public.admin_prepare_registry_artist_type_evidence(uuid,text,text,text,text,timestamptz),
   public.admin_execute_registry_artist_enrichment_evidence_admission(uuid)
 from public, anon, service_role;
 
 grant execute on function
   public.admin_prepare_registry_artist_provider_profile_evidence(uuid,text,text,bigint,integer,text[],text,text,text,timestamptz),
   public.admin_prepare_registry_artist_public_image_evidence(uuid,text,text,text,text,timestamptz),
-  public.admin_prepare_registry_artist_bio_evidence(uuid,text,text,text,text,text,timestamptz),
-  public.admin_prepare_registry_artist_type_evidence(uuid,text,text,text,text,text,timestamptz),
+  public.admin_prepare_registry_artist_bio_evidence(uuid,text,text,text,text,timestamptz),
+  public.admin_prepare_registry_artist_type_evidence(uuid,text,text,text,text,timestamptz),
   public.admin_execute_registry_artist_enrichment_evidence_admission(uuid)
 to authenticated;
 
