@@ -200,3 +200,18 @@ begin
     'REGISTRY_CHART_MATERIALIZATION_RUNTIME_PASS enabled=3 release_enabled=0 standing_grants=0';
 end
 $verify$;
+
+
+-- Permanent verifier for #939 final chart caller-JWT convergence.
+do $verify_chart_caller_jwt$
+declare v_signature text; v_definition text;
+begin
+  if not has_table_privilege('authenticated','public.wk_chart_editions_v2','insert') or not has_table_privilege('authenticated','public.wk_chart_editions_v2','update') or not has_table_privilege('authenticated','public.wk_chart_editions_v2','delete') or not has_table_privilege('authenticated','public.wk_chart_entries_v2','insert') or not has_table_privilege('authenticated','public.wk_chart_entries_v2','update') or not has_table_privilege('authenticated','public.wk_chart_entries_v2','delete') then raise exception 'Chart caller-JWT output grants incomplete'; end if;
+  foreach v_signature in array array['public.chart_get_run_origin_review_queue_v1(text)','public.chart_get_family_ingest_presets_v1()','public.chart_get_weekly_backfill_plan_v1(text,date,date)','public.chart_reset_run_after_origin_resolution_v1(text)','public.chart_upsert_family_ingest_preset_v1(text,jsonb)','public.chart_get_entry_registry_identity_v1(text)'] loop if to_regprocedure(v_signature) is null or not has_function_privilege('authenticated',v_signature,'execute') or has_function_privilege('anon',v_signature,'execute') or has_function_privilege('service_role',v_signature,'execute') then raise exception 'Chart caller-JWT wrapper privilege drifted: %',v_signature; end if; end loop;
+  select pg_get_functiondef('public.chart_get_entry_registry_identity_v1(text)'::regprocedure) into v_definition; if position('publish_charts' in v_definition)=0 or position('registry_tracks' in v_definition)=0 or position('registry_track_artists' in v_definition)=0 then raise exception 'Chart identity read wrapper drifted'; end if;
+  if has_function_privilege('authenticated','public.chart_set_artist_origin_for_charts(uuid,text,text,text,text,text)','execute') or has_function_privilege('service_role','public.chart_set_artist_origin_for_charts(uuid,text,text,text,text,text)','execute') or has_function_privilege('authenticated','public.chart_create_artist_origin_shell(text,text,text,text,text)','execute') or has_function_privilege('service_role','public.chart_create_artist_origin_shell(text,text,text,text,text)','execute') then raise exception 'Legacy chart origin road remains executable'; end if;
+  if exists(select 1 from public.role_capabilities p where p.capability_key='publish_charts' and (not exists(select 1 from public.role_capabilities m where m.role_key=p.role_key and m.capability_key='manage_charts') or not exists(select 1 from public.role_capabilities v where v.role_key=p.role_key and v.capability_key='view_charts_admin'))) then raise exception 'publish_charts role bundle lost chart RLS prerequisites'; end if;
+  if exists(select 1 from public.role_capabilities i where i.capability_key='manage_ingest' and not exists(select 1 from public.role_capabilities m where m.role_key=i.role_key and m.capability_key='manage_charts')) then raise exception 'manage_ingest role bundle lost manage_charts'; end if;
+  raise notice 'REGISTRY_CHART_CALLER_JWT_CONVERGENCE_PASS';
+end
+$verify_chart_caller_jwt$;
