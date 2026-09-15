@@ -25,6 +25,7 @@ const adminClientPath = "src/services/registry/admin/artistEnrichment.ts";
 const governancePanelsPath = "src/components/admin/registry/ArtistEnrichmentGovernancePanels.tsx";
 const detailPath = "src/pages/admin/registry/artists/detail/page.tsx";
 const listPath = "src/pages/admin/registry/artists/page.tsx";
+const manifestPath = "scripts/control-plane/registry-privileged-writer-manifest.json";
 
 const provider = read(providerPath);
 const orchestrator = read(orchestratorPath);
@@ -35,6 +36,21 @@ const adminClient = read(adminClientPath);
 const governancePanels = read(governancePanelsPath);
 const detail = read(detailPath);
 const list = read(listPath);
+const manifest = JSON.parse(read(manifestPath));
+const writers = Array.isArray(manifest.writers) ? manifest.writers : [];
+const writer = (id) => writers.find((row) => row.id === id);
+
+const assertWriter = (id, expected) => {
+  const actual = writer(id);
+  if (!actual) throw new Error(`${manifestPath}: missing writer classification ${id}`);
+  for (const [key, value] of Object.entries(expected)) {
+    if (actual[key] !== value) {
+      throw new Error(
+        `${manifestPath}: ${id}.${key} expected ${JSON.stringify(value)} but found ${JSON.stringify(actual[key])}`,
+      );
+    }
+  }
+};
 
 // Provider credentials are isolated in one boundary that has no Registry DML.
 requireText(provider, 'SUPABASE_SERVICE_ROLE_KEY', providerPath);
@@ -81,9 +97,53 @@ for (const rawWrapper of [
   forbidText(orchestrator, rawWrapper, orchestratorPath);
 }
 
-// Compatibility names may remain but they must be adapters, never authorities.
-requireText(spotifyAdapter, '/functions/v1/registry-enrich-artist', spotifyAdapterPath);
-requireText(typeAdapter, '/functions/v1/registry-enrich-artist', typeAdapterPath);
+// Compatibility names may remain but they must be caller-JWT adapters over the
+// same reviewed-evidence contract, never alternate mutation authorities.
+for (const [path, source] of [
+  [spotifyAdapterPath, spotifyAdapter],
+  [typeAdapterPath, typeAdapter],
+]) {
+  requireText(source, '/functions/v1/registry-enrich-artist', path);
+  requireText(source, 'evidence_ids?: string[]', path);
+  requireText(source, 'evidence_ids: body.evidence_ids', path);
+  requireText(source, 'reviewed_evidence_ids', path);
+}
+
+// Privileged-writer classification must describe the converged authority, not
+// the superseded service-role implementation.
+if (manifest.status !== "slice_2_artist_enrichment_authority_converged") {
+  throw new Error(`${manifestPath}: Artist-enrichment authority status is stale`);
+}
+
+assertWriter("registry-enrich-artist", {
+  authentication: "request_bearer_user",
+  authorization: "manage_registry",
+  executionAuthority: "caller_jwt_reviewed_evidence_typed_exact_grant",
+  riskClass: "high",
+  disposition: "keep",
+  futureBoundary: "reviewed_evidence_exact_artist_enrichment_admission",
+  miziziCallable: false,
+  humanCallable: true,
+  publicCallable: false,
+  canonicalMutation: true,
+  legacyDebt: false,
+});
+
+for (const id of ["backfill-artist-spotify-images", "backfill-artist-type"]) {
+  assertWriter(id, {
+    authentication: "request_bearer_user",
+    authorization: "manage_registry_via_registry_enrich_artist",
+    executionAuthority: "caller_jwt_compatibility_adapter_to_reviewed_evidence_broker",
+    riskClass: "high",
+    disposition: "candidate_retire",
+    futureBoundary: "none_after_compatibility_traffic_proof",
+    miziziCallable: false,
+    humanCallable: true,
+    publicCallable: false,
+    canonicalMutation: true,
+    legacyDebt: false,
+  });
+}
 
 // Preserve the already accepted Artist-origin exact admission road.
 requireText(origin, 'required_capability: "manage_registry"', originPath);
