@@ -19796,6 +19796,16 @@ export type Database = {
         Args: { p_reason?: string; p_session_id: string }
         Returns: Json
       }
+      chart_admit_artist_origin_v1: {
+        Args: {
+          p_artist_id: string
+          p_candidate_id: string
+          p_note: string
+          p_origin_iso2: string
+          p_run_id: string
+        }
+        Returns: Json
+      }
       chart_assert_committable_run: {
         Args: { p_run_id: string }
         Returns: Json
@@ -19819,6 +19829,15 @@ export type Database = {
           p_candidate_id?: string
           p_origin_iso2: string
           p_run_id?: string
+        }
+        Returns: Json
+      }
+      chart_create_artist_origin_shell_v1: {
+        Args: {
+          p_artist_name: string
+          p_candidate_id: string
+          p_origin_iso2: string
+          p_run_id: string
         }
         Returns: Json
       }
@@ -19897,6 +19916,10 @@ export type Database = {
           release_window_end: string
           release_window_start: string
         }[]
+      }
+      chart_materialize_candidate_registry_v1: {
+        Args: { p_candidate_id: string; p_run_id: string }
+        Returns: Json
       }
       chart_reset_run_after_origin_resolution: {
         Args: { p_run_id: string }

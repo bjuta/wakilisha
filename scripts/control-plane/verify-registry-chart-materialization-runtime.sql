@@ -1,0 +1,202 @@
+-- Permanent verifier for #939 Boundary B1 chart materialization runtime.
+
+do $verify$
+declare
+  v_enabled_count integer;
+  v_release_enabled integer;
+  v_executor_definition text;
+  v_materialize_definition text;
+  v_origin_definition text;
+  v_shell_definition text;
+  v_target_subject_constraint text;
+begin
+  select count(*)::integer
+  into v_enabled_count
+  from platform_private.registry_operation_types
+  where operation_version=1
+    and enabled
+    and operation_key in (
+      'registry.artist.create',
+      'registry.track.create',
+      'registry.track_artist_credit.admit'
+    );
+
+  select count(*)::integer
+  into v_release_enabled
+  from platform_private.registry_operation_types
+  where operation_version=1
+    and enabled
+    and operation_key in (
+      'registry.release.create',
+      'registry.release_track.admit',
+      'registry.release_artist_credit.admit'
+    );
+
+  if v_enabled_count <> 3 or v_release_enabled <> 0 then
+    raise exception
+      'Chart materialization operation enablement drifted';
+  end if;
+
+  if to_regprocedure(
+       'public.chart_materialize_candidate_registry_v1(uuid,uuid)'
+     ) is null
+     or to_regprocedure(
+       'public.chart_admit_artist_origin_v1(uuid,text,uuid,uuid,text)'
+     ) is null
+     or to_regprocedure(
+       'public.chart_create_artist_origin_shell_v1(text,text,uuid,uuid)'
+     ) is null
+     or to_regprocedure(
+       'platform_private.execute_registry_materialization_v1(text,uuid)'
+     ) is null
+     or to_regprocedure(
+       'platform_private.verify_registry_materialization_v1(uuid)'
+     ) is null
+  then
+    raise exception
+      'Chart materialization runtime function family is incomplete';
+  end if;
+
+  if exists (
+    select 1
+    from public.role_capabilities
+    where capability_key in (
+      'create_registry_artist',
+      'create_registry_track',
+      'create_registry_release',
+      'admit_registry_track_artist_credit',
+      'admit_registry_release_track',
+      'admit_registry_release_artist_credit'
+    )
+  ) then
+    raise exception
+      'Typed Registry materialization capability leaked to product roles';
+  end if;
+
+  if exists (
+    select 1
+    from platform_private.system_actor_capability_grants
+    where actor_key='registry_chart_admission'
+      and status='active'
+      and valid_from<=now()
+      and expires_at>now()
+  ) then
+    raise exception
+      'Chart materialization unexpectedly has standing authority';
+  end if;
+
+  if has_function_privilege(
+       'anon',
+       'public.chart_materialize_candidate_registry_v1(uuid,uuid)',
+       'EXECUTE'
+     )
+     or has_function_privilege(
+       'service_role',
+       'public.chart_materialize_candidate_registry_v1(uuid,uuid)',
+       'EXECUTE'
+     )
+     or not has_function_privilege(
+       'authenticated',
+       'public.chart_materialize_candidate_registry_v1(uuid,uuid)',
+       'EXECUTE'
+     )
+     or has_function_privilege(
+       'authenticated',
+       'platform_private.execute_registry_materialization_v1(text,uuid)',
+       'EXECUTE'
+     )
+     or has_function_privilege(
+       'service_role',
+       'platform_private.execute_registry_materialization_v1(text,uuid)',
+       'EXECUTE'
+     )
+  then
+    raise exception
+      'Chart materialization privilege boundary drifted';
+  end if;
+
+  select regexp_replace(
+    pg_get_functiondef(
+      'platform_private.execute_registry_materialization_v1(text,uuid)'::regprocedure
+    ),
+    '[[:space:]]+',
+    ' ',
+    'g'
+  )
+  into v_executor_definition;
+
+  if not (
+       v_executor_definition ~
+         'insert into public\.registry_artists[[:space:]]*\([^)]*status[^)]*\)[[:space:]]*values[[:space:]]*\([^;]*''draft'''
+     )
+     or not (
+       v_executor_definition ~
+         'insert into public\.registry_tracks[[:space:]]*\([^)]*status[^)]*\)[[:space:]]*values[[:space:]]*\([^;]*''draft'''
+     )
+     or position('preview_url' in v_executor_definition) > 0
+     or position('artwork_url' in v_executor_definition) > 0
+  then
+    raise exception
+      'Chart identity executor crossed the draft identity nucleus boundary';
+  end if;
+
+  select pg_get_functiondef(
+    'public.chart_materialize_candidate_registry_v1(uuid,uuid)'::regprocedure
+  ) into v_materialize_definition;
+
+  select pg_get_functiondef(
+    'public.chart_admit_artist_origin_v1(uuid,text,uuid,uuid,text)'::regprocedure
+  ) into v_origin_definition;
+
+  select pg_get_functiondef(
+    'public.chart_create_artist_origin_shell_v1(text,text,uuid,uuid)'::regprocedure
+  ) into v_shell_definition;
+
+  if position('p_candidate_id::text' in v_materialize_definition)=0
+     or position('p_run_id::text' in v_materialize_definition)=0
+     or position('p_candidate_id::text' in v_origin_definition)=0
+     or position('p_run_id::text' in v_origin_definition)=0
+     or position('p_candidate_id::text' in v_shell_definition)=0
+     or position('p_run_id::text' in v_shell_definition)=0
+  then
+    raise exception
+      'Chart candidate UUID/text identity bridge drifted';
+  end if;
+
+  select pg_get_constraintdef(constraint_row.oid)
+  into v_target_subject_constraint
+  from pg_constraint constraint_row
+  where constraint_row.conrelid=
+        'platform_private.registry_execution_grant_targets'::regclass
+    and constraint_row.conname=
+        'registry_execution_grant_targets_subject_type_check';
+
+  if v_target_subject_constraint not like '%track_artist_credit%'
+     or v_target_subject_constraint not like '%release_track_membership%'
+     or v_target_subject_constraint not like '%release_artist_credit%'
+  then
+    raise exception
+      'Registry execution target relation subject vocabulary drifted';
+  end if;
+
+  if position(
+       'registry_track_artists'
+       in pg_get_functiondef(
+            'platform_private.registry_track_artist_credit_collision_state_v1(uuid,uuid,uuid)'::regprocedure
+          )
+     ) = 0
+     or position(
+       'status <> ''archived'''
+       in pg_get_functiondef(
+            'platform_private.registry_track_artist_credit_collision_state_v1(uuid,uuid,uuid)'::regprocedure
+          )
+     ) > 0
+  then
+    raise exception
+      'Track Artist credit collision authority regressed to status-filtered uniqueness';
+  end if;
+
+  raise notice
+    'REGISTRY_CHART_MATERIALIZATION_RUNTIME_PASS enabled=3 release_enabled=0 standing_grants=0';
+end
+$verify$;
