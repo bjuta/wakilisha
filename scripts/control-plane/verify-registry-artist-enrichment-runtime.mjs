@@ -56,6 +56,18 @@ const assertWriter = (id, expected) => {
 requireText(provider, 'SUPABASE_SERVICE_ROLE_KEY', providerPath);
 requireText(provider, 'required_capability: "manage_registry"', providerPath);
 requireText(provider, '.from("admin_settings_secrets")', providerPath);
+requireText(provider, 'const { data: artistData, error: artistError } = await callerDb', providerPath);
+requireText(provider, 'createAppleMusicJwt(', providerPath);
+for (const key of [
+  "spotify_client_id",
+  "spotify_client_secret",
+  "apple_music_private_key",
+  "apple_music_team_id",
+  "apple_music_key_id",
+  "apple_music_storefront",
+]) {
+  requireText(provider, `\"${key}\"`, providerPath);
+}
 for (const fragment of [
   '.from("registry_artists").update',
   '.from("registry_artists").insert',
@@ -88,6 +100,12 @@ requireText(orchestrator, 'admin_verify_registry_artist_enrichment_admission', o
 requireText(orchestrator, 'reviewed_evidence_ids', orchestratorPath);
 requireText(orchestrator, 'evidence_ids', orchestratorPath);
 requireText(orchestrator, 'approved !== true', orchestratorPath);
+requireText(orchestrator, 'Object.values(value as Record<string, unknown>)', orchestratorPath);
+forbidText(
+  orchestrator,
+  '?.admin_prepare_registry_artist_provider_profile_evidence',
+  orchestratorPath,
+);
 requireText(orchestrator, '\"name_heuristic\"', orchestratorPath);
 forbidText(orchestrator, '\"manual_review\"', orchestratorPath);
 for (const rawWrapper of [

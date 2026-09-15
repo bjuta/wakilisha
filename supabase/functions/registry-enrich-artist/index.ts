@@ -168,9 +168,15 @@ async function prepareEvidence(
   const { data, error } = await db.rpc(rpcName, args);
   if (error) throw new Error(error.message);
   const value = Array.isArray(data) ? data[0] : data;
-  const evidenceId = typeof value === "string"
-    ? value
-    : String((value as Record<string, unknown> | null)?.admin_prepare_registry_artist_provider_profile_evidence ?? "");
+  let evidenceId = "";
+  if (typeof value === "string") {
+    evidenceId = value;
+  } else if (value && typeof value === "object") {
+    const values = Object.values(value as Record<string, unknown>);
+    if (values.length === 1 && typeof values[0] === "string") {
+      evidenceId = values[0];
+    }
+  }
   if (!isUuid(evidenceId)) throw new Error(`${rpcName}:missing_evidence_assertion_id`);
   return evidenceId;
 }
