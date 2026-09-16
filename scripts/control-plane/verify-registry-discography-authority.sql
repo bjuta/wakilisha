@@ -1,20 +1,101 @@
 -- Read-only verifier for #945 Gate A Discography Exact-Set Authority V1.
--- Safe for clean Preview and Production after the candidate migration exists.
+-- Safe for clean Preview and Production after the candidate migrations exist.
 
 do $verify$
 declare
   v_count integer;
   v_operation platform_private.registry_operation_types%rowtype;
   v_definition text;
+  v_role text;
+  v_signature text;
 begin
   if to_regclass('platform_private.registry_evidence_assertions') is null
      or to_regclass('platform_private.registry_execution_grants') is null
      or to_regclass('platform_private.registry_execution_grant_targets') is null
      or to_regclass('platform_private.registry_mutation_operations') is null
      or to_regclass('platform_private.registry_operation_write_events') is null
+     or to_regclass('platform_private.registry_discography_provider_snapshots') is null
+     or to_regclass('platform_private.registry_discography_review_plans') is null
   then
     raise exception 'Discography V1 governance substrate is missing';
   end if;
+
+  -- Discography must fit around the accepted shared governance envelopes rather
+  -- than widening them for large provider observations or exact-set plans.
+  if not exists (
+       select 1
+       from pg_constraint constraint_row
+       where constraint_row.conrelid='platform_private.registry_evidence_assertions'::regclass
+         and pg_get_constraintdef(constraint_row.oid) like '%octet_length%16384%'
+     )
+     or not exists (
+       select 1
+       from pg_constraint constraint_row
+       where constraint_row.conrelid='platform_private.registry_execution_grants'::regclass
+         and pg_get_constraintdef(constraint_row.oid) like '%octet_length%32768%'
+     )
+  then
+    raise exception 'Shared Registry evidence/grant payload ceilings drifted';
+  end if;
+
+  if not exists (
+       select 1
+       from pg_constraint constraint_row
+       where constraint_row.conrelid='platform_private.registry_discography_provider_snapshots'::regclass
+         and pg_get_constraintdef(constraint_row.oid) like '%2097152%'
+     )
+     or not exists (
+       select 1
+       from pg_constraint constraint_row
+       where constraint_row.conrelid='platform_private.registry_discography_review_plans'::regclass
+         and pg_get_constraintdef(constraint_row.oid) like '%131072%'
+     )
+     or not exists (
+       select 1
+       from pg_constraint constraint_row
+       where constraint_row.conrelid='platform_private.registry_discography_review_plans'::regclass
+         and pg_get_constraintdef(constraint_row.oid) like '%4194304%'
+     )
+  then
+    raise exception 'Discography immutable storage payload ceilings drifted';
+  end if;
+
+  if not exists (
+       select 1
+       from pg_trigger trigger_row
+       where trigger_row.tgrelid='platform_private.registry_discography_provider_snapshots'::regclass
+         and trigger_row.tgname='registry_discography_provider_snapshots_immutable'
+         and not trigger_row.tgisinternal
+         and trigger_row.tgenabled<>'D'
+     )
+     or not exists (
+       select 1
+       from pg_trigger trigger_row
+       where trigger_row.tgrelid='platform_private.registry_discography_review_plans'::regclass
+         and trigger_row.tgname='registry_discography_review_plans_immutable'
+         and not trigger_row.tgisinternal
+         and trigger_row.tgenabled<>'D'
+     )
+  then
+    raise exception 'Discography immutable storage mutation guards are missing';
+  end if;
+
+  foreach v_role in array array['public','anon','authenticated','service_role']
+  loop
+    if has_table_privilege(v_role,'platform_private.registry_discography_provider_snapshots','SELECT')
+       or has_table_privilege(v_role,'platform_private.registry_discography_provider_snapshots','INSERT')
+       or has_table_privilege(v_role,'platform_private.registry_discography_provider_snapshots','UPDATE')
+       or has_table_privilege(v_role,'platform_private.registry_discography_provider_snapshots','DELETE')
+       or has_table_privilege(v_role,'platform_private.registry_discography_provider_snapshots','TRUNCATE')
+       or has_table_privilege(v_role,'platform_private.registry_discography_review_plans','SELECT')
+       or has_table_privilege(v_role,'platform_private.registry_discography_review_plans','INSERT')
+       or has_table_privilege(v_role,'platform_private.registry_discography_review_plans','UPDATE')
+       or has_table_privilege(v_role,'platform_private.registry_discography_review_plans','DELETE')
+       or has_table_privilege(v_role,'platform_private.registry_discography_review_plans','TRUNCATE')
+    then
+      raise exception 'Discography immutable storage leaked table authority to role %',v_role;
+    end if;
+  end loop;
 
   select count(*)::integer
   into v_count
@@ -184,21 +265,30 @@ begin
     raise exception 'Discography V1 admin broker binding drifted';
   end if;
 
-  if to_regprocedure('platform_private.registry_release_artist_set_v1(uuid)') is null
-     or to_regprocedure('platform_private.registry_release_track_set_v1(uuid)') is null
-     or to_regprocedure('platform_private.registry_track_artist_credit_set_v1(uuid)') is null
-     or to_regprocedure('platform_private.registry_discography_set_fingerprint_v1(jsonb)') is null
-     or to_regprocedure('platform_private.issue_registry_discography_user_execution_grant_v1(uuid,text,text,uuid,jsonb,text,integer)') is null
-     or to_regprocedure('platform_private.execute_registry_discography_operation_v1(uuid)') is null
-     or to_regprocedure('platform_private.verify_registry_discography_operation_v1(uuid)') is null
-     or to_regprocedure('public.admin_prepare_registry_discography_evidence_v1(uuid,jsonb,text)') is null
-     or to_regprocedure('public.admin_preview_registry_discography_evidence_v1(uuid)') is null
-     or to_regprocedure('public.admin_create_registry_discography_artist_shell_v1(uuid,text)') is null
-     or to_regprocedure('public.admin_execute_registry_discography_evidence_v1(uuid,uuid,jsonb)') is null
-     or to_regprocedure('public.admin_verify_registry_discography_operation_v1(uuid)') is null
-  then
-    raise exception 'Discography V1 function authority is incomplete';
-  end if;
+  foreach v_signature in array array[
+    'platform_private.registry_release_artist_set_v1(uuid)',
+    'platform_private.registry_release_track_set_v1(uuid)',
+    'platform_private.registry_track_artist_credit_set_v1(uuid)',
+    'platform_private.registry_discography_set_fingerprint_v1(jsonb)',
+    'platform_private.issue_registry_discography_user_execution_grant_v1(uuid,text,text,uuid,jsonb,text,integer)',
+    'platform_private.registry_discography_observation_fingerprint_v1(jsonb)',
+    'platform_private.registry_discography_validate_observation_v1(uuid,jsonb,text)',
+    'platform_private.record_registry_discography_provider_evidence_v1(uuid,jsonb,text)',
+    'platform_private.freeze_registry_discography_review_plan_v1(uuid,uuid,jsonb)',
+    'platform_private.registry_discography_build_frozen_plan_v1(uuid,uuid,uuid,jsonb)',
+    'platform_private.execute_registry_discography_operation_v1(uuid)',
+    'platform_private.verify_registry_discography_operation_v1(uuid)',
+    'public.admin_prepare_registry_discography_evidence_v1(uuid,jsonb,text)',
+    'public.admin_preview_registry_discography_evidence_v1(uuid)',
+    'public.admin_create_registry_discography_artist_shell_v1(uuid,text)',
+    'public.admin_execute_registry_discography_evidence_v1(uuid,uuid,jsonb)',
+    'public.admin_verify_registry_discography_operation_v1(uuid)'
+  ]
+  loop
+    if to_regprocedure(v_signature) is null then
+      raise exception 'Discography V1 function authority is incomplete: %',v_signature;
+    end if;
+  end loop;
 
   select pg_get_functiondef(to_regprocedure('platform_private.execute_registry_materialization_v1(text,uuid)'))
   into v_definition;
@@ -214,37 +304,88 @@ begin
     raise exception 'Shared materialization verifier does not implement Release Create V1';
   end if;
 
-  if has_function_privilege('anon','platform_private.execute_registry_discography_operation_v1(uuid)','EXECUTE')
-     or has_function_privilege('authenticated','platform_private.execute_registry_discography_operation_v1(uuid)','EXECUTE')
-     or has_function_privilege('service_role','platform_private.execute_registry_discography_operation_v1(uuid)','EXECUTE')
-     or has_function_privilege('anon','platform_private.verify_registry_discography_operation_v1(uuid)','EXECUTE')
-     or has_function_privilege('authenticated','platform_private.verify_registry_discography_operation_v1(uuid)','EXECUTE')
-     or has_function_privilege('service_role','platform_private.verify_registry_discography_operation_v1(uuid)','EXECUTE')
-     or has_function_privilege('anon','platform_private.issue_registry_discography_user_execution_grant_v1(uuid,text,text,uuid,jsonb,text,integer)','EXECUTE')
-     or has_function_privilege('authenticated','platform_private.issue_registry_discography_user_execution_grant_v1(uuid,text,text,uuid,jsonb,text,integer)','EXECUTE')
-     or has_function_privilege('service_role','platform_private.issue_registry_discography_user_execution_grant_v1(uuid,text,text,uuid,jsonb,text,integer)','EXECUTE')
+  select regexp_replace(
+    pg_get_functiondef(
+      to_regprocedure('platform_private.registry_discography_validate_observation_v1(uuid,jsonb,text)')
+    ),
+    '[[:space:]]+',
+    ' ',
+    'g'
+  ) into v_definition;
+  if position('p_source_payload_fingerprint' in v_definition)=0
+     or position('acquired_at' in v_definition)=0
   then
-    raise exception 'Discography V1 private exact-grant/executor authority leaked';
+    raise exception 'Discography provider evidence does not bind source payload fingerprint and acquisition time';
   end if;
 
-  if has_function_privilege('anon','public.admin_prepare_registry_discography_evidence_v1(uuid,jsonb,text)','EXECUTE')
-     or has_function_privilege('service_role','public.admin_prepare_registry_discography_evidence_v1(uuid,jsonb,text)','EXECUTE')
-     or not has_function_privilege('authenticated','public.admin_prepare_registry_discography_evidence_v1(uuid,jsonb,text)','EXECUTE')
-     or has_function_privilege('anon','public.admin_preview_registry_discography_evidence_v1(uuid)','EXECUTE')
-     or has_function_privilege('service_role','public.admin_preview_registry_discography_evidence_v1(uuid)','EXECUTE')
-     or not has_function_privilege('authenticated','public.admin_preview_registry_discography_evidence_v1(uuid)','EXECUTE')
-     or has_function_privilege('anon','public.admin_create_registry_discography_artist_shell_v1(uuid,text)','EXECUTE')
-     or has_function_privilege('service_role','public.admin_create_registry_discography_artist_shell_v1(uuid,text)','EXECUTE')
-     or not has_function_privilege('authenticated','public.admin_create_registry_discography_artist_shell_v1(uuid,text)','EXECUTE')
-     or has_function_privilege('anon','public.admin_execute_registry_discography_evidence_v1(uuid,uuid,jsonb)','EXECUTE')
-     or has_function_privilege('service_role','public.admin_execute_registry_discography_evidence_v1(uuid,uuid,jsonb)','EXECUTE')
-     or not has_function_privilege('authenticated','public.admin_execute_registry_discography_evidence_v1(uuid,uuid,jsonb)','EXECUTE')
-     or has_function_privilege('anon','public.admin_verify_registry_discography_operation_v1(uuid)','EXECUTE')
-     or has_function_privilege('service_role','public.admin_verify_registry_discography_operation_v1(uuid)','EXECUTE')
-     or not has_function_privilege('authenticated','public.admin_verify_registry_discography_operation_v1(uuid)','EXECUTE')
+  -- Exact grants must use semantic idempotency keys, never a state fingerprint
+  -- or null in the idempotency-key argument slot.
+  select regexp_replace(
+    pg_get_functiondef(
+      to_regprocedure('public.admin_execute_registry_discography_evidence_v1(uuid,uuid,jsonb)')
+    ),
+    '[[:space:]]+',
+    ' ',
+    'g'
+  ) into v_definition;
+  if position('v_grant_plan, v_expected_state, v_max_rows' in v_definition)>0
+     or position('v_grant_plan, null, 1' in v_definition)>0
+     or position('v_parent_plan, v_expected_state, 1' in v_definition)>0
+     or position('v_grant_plan, v_idempotency_key, v_max_rows' in v_definition)=0
+     or position('v_parent_plan, v_parent_idempotency, 1' in v_definition)=0
   then
-    raise exception 'Discography V1 public wrapper grants drifted';
+    raise exception 'Discography reviewed execution is not bound to semantic idempotency-key authority';
   end if;
+
+  select regexp_replace(
+    pg_get_functiondef(
+      to_regprocedure('public.admin_create_registry_discography_artist_shell_v1(uuid,text)')
+    ),
+    '[[:space:]]+',
+    ' ',
+    'g'
+  ) into v_definition;
+  if position('v_plan, null, 1' in v_definition)>0
+     or position('v_plan, v_idempotency_key, 1' in v_definition)=0
+  then
+    raise exception 'Discography Artist-shell grant is not bound to its semantic idempotency key';
+  end if;
+
+  foreach v_signature in array array[
+    'platform_private.issue_registry_discography_user_execution_grant_v1(uuid,text,text,uuid,jsonb,text,integer)',
+    'platform_private.registry_discography_observation_fingerprint_v1(jsonb)',
+    'platform_private.registry_discography_validate_observation_v1(uuid,jsonb,text)',
+    'platform_private.record_registry_discography_provider_evidence_v1(uuid,jsonb,text)',
+    'platform_private.freeze_registry_discography_review_plan_v1(uuid,uuid,jsonb)',
+    'platform_private.registry_discography_build_frozen_plan_v1(uuid,uuid,uuid,jsonb)',
+    'platform_private.execute_registry_discography_operation_v1(uuid)',
+    'platform_private.verify_registry_discography_operation_v1(uuid)'
+  ]
+  loop
+    foreach v_role in array array['public','anon','authenticated','service_role']
+    loop
+      if has_function_privilege(v_role,v_signature,'EXECUTE') then
+        raise exception 'Discography V1 private function leaked EXECUTE to role %: %',v_role,v_signature;
+      end if;
+    end loop;
+  end loop;
+
+  foreach v_signature in array array[
+    'public.admin_prepare_registry_discography_evidence_v1(uuid,jsonb,text)',
+    'public.admin_preview_registry_discography_evidence_v1(uuid)',
+    'public.admin_create_registry_discography_artist_shell_v1(uuid,text)',
+    'public.admin_execute_registry_discography_evidence_v1(uuid,uuid,jsonb)',
+    'public.admin_verify_registry_discography_operation_v1(uuid)'
+  ]
+  loop
+    if has_function_privilege('public',v_signature,'EXECUTE')
+       or has_function_privilege('anon',v_signature,'EXECUTE')
+       or has_function_privilege('service_role',v_signature,'EXECUTE')
+       or not has_function_privilege('authenticated',v_signature,'EXECUTE')
+    then
+      raise exception 'Discography V1 public wrapper grant drifted: %',v_signature;
+    end if;
+  end loop;
 
   if exists (
     select 1
@@ -315,12 +456,24 @@ begin
     raise exception 'Discography V1 has active exact grants at verifier rest state';
   end if;
 
-  if has_table_privilege('authenticated','public.registry_artists','INSERT,UPDATE,DELETE')
-     or has_table_privilege('authenticated','public.registry_tracks','INSERT,UPDATE,DELETE')
-     or has_table_privilege('authenticated','public.registry_releases','INSERT,UPDATE,DELETE')
-     or has_table_privilege('authenticated','public.registry_release_artists','INSERT,UPDATE,DELETE')
-     or has_table_privilege('authenticated','public.registry_release_tracks','INSERT,UPDATE,DELETE')
-     or has_table_privilege('authenticated','public.registry_track_artists','INSERT,UPDATE,DELETE')
+  if has_table_privilege('authenticated','public.registry_artists','INSERT')
+     or has_table_privilege('authenticated','public.registry_artists','UPDATE')
+     or has_table_privilege('authenticated','public.registry_artists','DELETE')
+     or has_table_privilege('authenticated','public.registry_tracks','INSERT')
+     or has_table_privilege('authenticated','public.registry_tracks','UPDATE')
+     or has_table_privilege('authenticated','public.registry_tracks','DELETE')
+     or has_table_privilege('authenticated','public.registry_releases','INSERT')
+     or has_table_privilege('authenticated','public.registry_releases','UPDATE')
+     or has_table_privilege('authenticated','public.registry_releases','DELETE')
+     or has_table_privilege('authenticated','public.registry_release_artists','INSERT')
+     or has_table_privilege('authenticated','public.registry_release_artists','UPDATE')
+     or has_table_privilege('authenticated','public.registry_release_artists','DELETE')
+     or has_table_privilege('authenticated','public.registry_release_tracks','INSERT')
+     or has_table_privilege('authenticated','public.registry_release_tracks','UPDATE')
+     or has_table_privilege('authenticated','public.registry_release_tracks','DELETE')
+     or has_table_privilege('authenticated','public.registry_track_artists','INSERT')
+     or has_table_privilege('authenticated','public.registry_track_artists','UPDATE')
+     or has_table_privilege('authenticated','public.registry_track_artists','DELETE')
   then
     raise exception 'Ordinary authenticated role gained direct canonical Registry DML';
   end if;
