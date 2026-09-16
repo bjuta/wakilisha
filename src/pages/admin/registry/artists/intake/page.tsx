@@ -53,15 +53,35 @@ interface MatchSummary {
   total: number;
 }
 
-function invokeIntakeApi(action: string, payload: Record<string, unknown>) {
-  return fetch(INTAKE_API, {
+async function invokeIntakeApi(action: string, payload: Record<string, unknown>) {
+  const {
+    data: { session },
+  } = await supabase.auth.getSession();
+  const token = session?.access_token;
+  if (!token) return { ok: false, error: "Not authenticated" };
+
+  const response = await fetch(INTAKE_API, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
-      Authorization: `Bearer ${import.meta.env.VITE_PUBLIC_SUPABASE_ANON_KEY}`,
+      Authorization: `Bearer ${token}`,
     },
     body: JSON.stringify({ action, ...payload }),
-  }).then((r) => r.json());
+  });
+
+  const result = await response.json().catch(() => ({
+    ok: false,
+    error: `Artist intake request failed with HTTP ${response.status}`,
+  }));
+
+  if (!response.ok && result.ok !== false) {
+    return {
+      ok: false,
+      error: result.error || `Artist intake request failed with HTTP ${response.status}`,
+    };
+  }
+
+  return result;
 }
 
 function StatusBadge({ status }: { status: string }) {
@@ -164,7 +184,7 @@ function ArtistLinkSearch({
               )}
               <div className="min-w-0 flex-1">
                 <p className="text-[12px] font-bold text-[#171712] truncate">{artist.display_name}</p>
-                <p className="text-[10px] text-[#858c7e]">{artist.origin_iso2 || "—"} · {artist.status}</p>
+                <p className="text-[10px] text-[#858c7e]">{artist.origin_iso2 || "Not set"} · {artist.status}</p>
               </div>
             </button>
           ))}
@@ -257,7 +277,7 @@ export default function ArtistIntakePage() {
       if (!result.ok) throw new Error(result.error || "Upload failed");
       setRunId(result.runId);
       setSummary(result.matchSummary);
-      showToast(`CSV uploaded — ${result.matchSummary?.total || 0} artists staged`);
+      showToast(`CSV uploaded: ${result.matchSummary?.total || 0} artists staged`);
       await loadResults(result.runId, "exact_match");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Upload failed");
@@ -317,7 +337,7 @@ export default function ArtistIntakePage() {
         next.delete(stagingId);
         return next;
       });
-      showToast(`${decision === "accepted" ? "Accepted" : "Rejected"} — ${records.find((r) => r.id === stagingId)?.source_artist_name}`);
+      showToast(`${decision === "accepted" ? "Accepted" : "Rejected"}: ${records.find((r) => r.id === stagingId)?.source_artist_name}`);
       await loadSummary(runId);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Decision failed");
@@ -340,7 +360,7 @@ export default function ArtistIntakePage() {
         return next;
       });
       setLinkingId(null);
-      showToast(`Linked → ${targetArtist.display_name}`);
+      showToast(`Linked to ${targetArtist.display_name}`);
       await loadSummary(runId);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Link failed");
@@ -381,7 +401,7 @@ export default function ArtistIntakePage() {
     try {
       const result = await invokeIntakeApi("apply_approved", { runId });
       if (!result.ok) throw new Error(result.error || "Apply failed");
-      showToast(`Applied — ${result.created} created, ${result.updated} updated, ${result.skipped} skipped`);
+      showToast(`Applied: ${result.created} created, ${result.updated} updated, ${result.skipped} skipped`);
       setRunId(null);
       setSummary(null);
       setRecords([]);
@@ -428,7 +448,7 @@ export default function ArtistIntakePage() {
             </p>
             <h1 className="text-3xl font-black tracking-tight">Artist Intake</h1>
             <p className="mt-2 max-w-2xl text-sm text-[#697062]">
-              Import artists from CSV or TSV. The registry owns the truth — no duplicates allowed.
+              Import artists from CSV or TSV. The Registry owns canonical truth and prevents duplicate identities.
             </p>
           </div>
           <div className="flex flex-wrap gap-2">
@@ -456,20 +476,20 @@ export default function ArtistIntakePage() {
             <div className="mb-4 rounded-xl border border-[#dfe4d8] bg-[#f8f9f4] p-4 text-[12px] text-[#697062] leading-relaxed">
               <p className="font-bold text-[#171712] mb-2">Supported column names (tab or comma delimited):</p>
               <div className="grid grid-cols-2 gap-x-6 gap-y-1 sm:grid-cols-3">
-                <span><strong>artist_id</strong> — Spotify ID</span>
-                <span><strong>artist_name</strong> — Display name</span>
-                <span><strong>origin_country</strong> — ISO2 code (e.g. KE)</span>
-                <span><strong>followers</strong> — Follower count</span>
-                <span><strong>popularity</strong> — 0–100 score</span>
-                <span><strong>genres</strong> — Comma-separated</span>
-                <span><strong>image_url</strong> — Profile photo</span>
-                <span><strong>biography</strong> — Bio text</span>
-                <span><strong>profile_url</strong> — Spotify URL</span>
-                <span><strong>latest_release</strong> — Latest album/track</span>
-                <span><strong>top_tracks</strong> — Spotify track IDs</span>
+                <span><strong>artist_id</strong>: Spotify ID</span>
+                <span><strong>artist_name</strong>: Display name</span>
+                <span><strong>origin_country</strong>: ISO2 code (e.g. KE)</span>
+                <span><strong>followers</strong>: Follower count</span>
+                <span><strong>popularity</strong>: 0–100 score</span>
+                <span><strong>genres</strong>: Comma-separated</span>
+                <span><strong>image_url</strong>: Profile photo</span>
+                <span><strong>biography</strong>: Bio text</span>
+                <span><strong>profile_url</strong>: Spotify URL</span>
+                <span><strong>latest_release</strong>: Latest album/track</span>
+                <span><strong>top_tracks</strong>: Spotify track IDs</span>
               </div>
               <p className="mt-2 text-[#858c7e]">
-                Images, bios, and genres from this file will be merged into existing artist records. New artists will be created with all available data.
+                Reviewed CSV evidence can enrich existing artists. New artist identities are created as drafts before any approved evidence is admitted.
               </p>
             </div>
             <textarea
