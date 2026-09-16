@@ -3433,7 +3433,7 @@ begin
 
   if v_grant_id is null then
     v_grant_id:=platform_private.issue_registry_discography_user_execution_grant_v1(
-      v_evidence.id,'registry.artist.create','artist',v_future_id,v_plan,null,1
+      v_evidence.id,'registry.artist.create','artist',v_future_id,v_plan,v_idempotency_key,1
     );
   end if;
 
@@ -3585,7 +3585,7 @@ begin
           end if;
 
           v_grant_id:=platform_private.issue_registry_discography_user_execution_grant_v1(
-            v_evidence.id,v_operation_key,v_subject_type,v_subject_id,v_grant_plan,null,1
+            v_evidence.id,v_operation_key,v_subject_type,v_subject_id,v_grant_plan,v_idempotency_key,1
           );
         else
           v_expected_state:=platform_private.registry_subject_state_fingerprint(v_subject_type,v_subject_id);
@@ -3621,7 +3621,7 @@ begin
 
           v_grant_id:=platform_private.issue_registry_discography_user_execution_grant_v1(
             v_master.id,v_operation_key,v_subject_type,v_subject_id,
-            v_grant_plan,v_expected_state,v_max_rows
+            v_grant_plan,v_idempotency_key,v_max_rows
           );
         end if;
       end if;
@@ -3682,7 +3682,7 @@ begin
         );
         v_grant_id:=platform_private.issue_registry_discography_user_execution_grant_v1(
           v_master.id,'registry.discography.apply','artist',p_artist_id,
-          v_parent_plan,v_expected_state,1
+          v_parent_plan,v_parent_idempotency,1
         );
       end if;
 
