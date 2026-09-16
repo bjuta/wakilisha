@@ -1,16 +1,16 @@
 {
   "projectRef": "pgzizndxdyhqmtyywjmt",
   "schema": "public,editorial",
-  "generatedAt": "2026-09-16T09:09:09Z",
-  "typesSha256": "00e3220d08e9315e180117a85f4909d4f5221741ad7d24da7072dcbaf92618b3",
+  "generatedAt": "2026-09-16T14:07:25Z",
+  "typesSha256": "0e133739c50ab0227e6b6c2310f2766e3df0c5897e9a32d7d87800526614177c",
   "authoritativeMigrationDirectory": "supabase/migrations",
-  "migrationCount": 139,
-  "latestMigration": "20260916055145_registry_discography_review_authority_v1.sql",
+  "migrationCount": 144,
+  "latestMigration": "20260916120400_registry_artist_intake_target_status_integrity_v1.sql",
   "schemaSeal": {
     "mode": "preview",
-    "sourceProjectRef": "kjstrghzqrvlgrnfqlsu",
-    "migrationHead": "20260916055145",
-    "baseMainSha": "0c97dc0eb8a99846e3e93aabcafd80120dd88c77",
-    "previewBranchId": "e465ce0c-f6d3-4630-a924-96256e1655f7"
+    "sourceProjectRef": "cxasrxyajuoxwsaevvfy",
+    "migrationHead": "20260916120400",
+    "baseMainSha": "e69f78667c8b8451239f085a87309e54a53fd008",
+    "previewBranchId": "9b532573-a392-4ced-8f48-559a03e00737"
   }
 }

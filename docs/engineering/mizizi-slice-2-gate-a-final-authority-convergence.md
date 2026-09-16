@@ -8,7 +8,9 @@ Accepted base: `main@e69f78667c8b8451239f085a87309e54a53fd008`
 
 Working branch: `fix/slice2-gate-a-final-artist-intake-authority`
 
-Preview branch: `gate-a-final-preview` / `ltrjkigkdryfdqkdwygk`
+Runtime-acceptance Preview: `gate-a-final-preview` / `ltrjkigkdryfdqkdwygk` — deleted after acceptance; used for runtime authority validation, not canonical migration-ledger replay proof.
+
+Canonical replay-proof Preview: `gate-a-final-preview-clean` / `cxasrxyajuoxwsaevvfy` / branch `9b532573-a392-4ced-8f48-559a03e00737`.
 
 This record supersedes the pre-convergence runtime descriptions for `artist-registry-intake` and the Track/Release detail browser mutation paths in `docs/engineering/mizizi-registry-authority-ledger.md`. The older ledger remains retained as historical Slice-1 audit evidence.
 
@@ -76,7 +78,7 @@ This is intentionally narrower than expanding `admin-router`: it does not add an
 
 ## Permanent source contract
 
-`test/registry/gate-a-final-artist-intake-authority.test.ts` seals the source-level invariants:
+`test/registry/mizizi-cultural-data-steward.test.ts` seals the source-level invariants:
 
 - signed-in JWT Artist intake transport;
 - JWT gateway enforcement configuration;
@@ -94,7 +96,11 @@ These tests are source contracts, not substitutes for runtime acceptance.
 
 ## Disposable Preview acceptance
 
-Supabase Preview `gate-a-final-preview` was created from Production and all Gate A-final migrations replayed successfully in order:
+The first disposable Preview, `gate-a-final-preview` / `ltrjkigkdryfdqkdwygk`, was used for runtime database-authority and Edge-artifact acceptance. It exposed the two integrity defects documented above and proved the corrected authority behavior. Its candidate migrations had been recorded by the management path under generated remote migration versions, so that Preview was not accepted as canonical migration-ledger replay authority and was deleted after the mismatch was discovered.
+
+A fresh disposable Preview, `gate-a-final-preview-clean` / `cxasrxyajuoxwsaevvfy` / branch `9b532573-a392-4ced-8f48-559a03e00737`, was then created from Production. No candidate migration was applied through the management API. Supabase CLI `2.107.0` replayed the five repository migration files directly, producing exact local/remote migration-version parity through `20260916120400`. The five committed replay-proof receipts, generated database types, and live-schema baseline are sealed to that clean Preview and accepted base `e69f78667c8b8451239f085a87309e54a53fd008`.
+
+The Gate A-final migrations are:
 
 1. `registry_artist_intake_authority_v1`;
 2. `registry_release_detail_admin_authority_v1`;

@@ -12248,6 +12248,7 @@ export type Database = {
       provider_intake_artist_staging: {
         Row: {
           action_taken: string | null
+          applied_registry_artist_id: string | null
           created_at: string
           id: string
           intake_run_id: string | null
@@ -12256,6 +12257,7 @@ export type Database = {
           match_status: string
           matched_registry_artist_id: string | null
           matched_registry_artist_name: string | null
+          review_fingerprint: string | null
           review_notes: string | null
           review_status: string
           reviewed_at: string | null
@@ -12275,6 +12277,7 @@ export type Database = {
         }
         Insert: {
           action_taken?: string | null
+          applied_registry_artist_id?: string | null
           created_at?: string
           id?: string
           intake_run_id?: string | null
@@ -12283,6 +12286,7 @@ export type Database = {
           match_status?: string
           matched_registry_artist_id?: string | null
           matched_registry_artist_name?: string | null
+          review_fingerprint?: string | null
           review_notes?: string | null
           review_status?: string
           reviewed_at?: string | null
@@ -12302,6 +12306,7 @@ export type Database = {
         }
         Update: {
           action_taken?: string | null
+          applied_registry_artist_id?: string | null
           created_at?: string
           id?: string
           intake_run_id?: string | null
@@ -12310,6 +12315,7 @@ export type Database = {
           match_status?: string
           matched_registry_artist_id?: string | null
           matched_registry_artist_name?: string | null
+          review_fingerprint?: string | null
           review_notes?: string | null
           review_status?: string
           reviewed_at?: string | null
@@ -12328,6 +12334,13 @@ export type Database = {
           updated_at?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "provider_intake_artist_staging_applied_registry_artist_id_fkey"
+            columns: ["applied_registry_artist_id"]
+            isOneToOne: false
+            referencedRelation: "registry_artists"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "provider_intake_artist_staging_intake_run_id_fkey"
             columns: ["intake_run_id"]
@@ -19231,6 +19244,14 @@ export type Database = {
         }
         Returns: Json
       }
+      admin_archive_registry_music_entity_v1: {
+        Args: {
+          p_entity_id: string
+          p_entity_type: string
+          p_expected_updated_at: string
+        }
+        Returns: Json
+      }
       admin_create_registry_artist_for_decouple: {
         Args: {
           p_display_name: string
@@ -19238,6 +19259,10 @@ export type Database = {
           p_slug?: string
           p_status?: string
         }
+        Returns: Json
+      }
+      admin_create_registry_artist_intake_shell_v1: {
+        Args: { p_staging_id: string }
         Returns: Json
       }
       admin_create_registry_discography_artist_shell_v1: {
@@ -19392,6 +19417,10 @@ export type Database = {
         Args: { p_edition_id: string }
         Returns: Json
       }
+      admin_get_registry_artist_intake_review_v1: {
+        Args: { p_staging_id: string }
+        Returns: Json
+      }
       admin_get_registry_artist_merge_preview: {
         Args: { p_canonical_artist_id: string; p_source_artist_id: string }
         Returns: Json
@@ -19434,12 +19463,32 @@ export type Database = {
         }
         Returns: Json
       }
+      admin_mark_registry_artist_intake_applied_v1: {
+        Args: { p_artist_id: string; p_staging_id: string }
+        Returns: Json
+      }
       admin_merge_registry_artists: {
         Args: {
           p_archive_source?: boolean
           p_canonical_artist_id: string
           p_note?: string
           p_source_artist_id: string
+        }
+        Returns: Json
+      }
+      admin_patch_registry_release_detail_v1: {
+        Args: {
+          p_artwork_url: string
+          p_description: string
+          p_expected_updated_at: string
+          p_label_id: string
+          p_release_date: string
+          p_release_date_precision: string
+          p_release_id: string
+          p_release_type: string
+          p_status: string
+          p_title: string
+          p_upc: string
         }
         Returns: Json
       }
@@ -19550,6 +19599,16 @@ export type Database = {
           p_registry_track_id: string
           p_review_note?: string
           p_suggestion_id: string
+        }
+        Returns: Json
+      }
+      admin_review_registry_artist_intake_v1: {
+        Args: {
+          p_decision: string
+          p_intake_run_id: string
+          p_notes?: string
+          p_staging_id: string
+          p_target_registry_artist_id?: string
         }
         Returns: Json
       }

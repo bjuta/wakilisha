@@ -1,0 +1,16 @@
+{
+  "migration_file": "supabase/migrations/20260916120200_registry_track_release_archive_authority_v1.sql",
+  "migration_sha256": "c1d1870407f82115a601deebb110450593fefb78f602b4ab488a7d4d46ddd3f6",
+  "base_main_sha": "e69f78667c8b8451239f085a87309e54a53fd008",
+  "preview_project_ref": "cxasrxyajuoxwsaevvfy",
+  "preview_branch_id": "9b532573-a392-4ced-8f48-559a03e00737",
+  "preview_migration_head": "20260916120200",
+  "baseline_replay": "pass",
+  "candidate_apply": "pass",
+  "verifier": "pass",
+  "verifier_file": "test/registry/mizizi-cultural-data-steward.test.ts",
+  "schema_types_sha256": "0e133739c50ab0227e6b6c2310f2766e3df0c5897e9a32d7d87800526614177c",
+  "schema_migration_count": 144,
+  "schema_migration_head": "20260916120400",
+  "verified_at": "2026-09-16T14:06:51.496Z"
+}
