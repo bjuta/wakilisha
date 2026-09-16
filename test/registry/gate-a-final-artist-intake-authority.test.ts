@@ -44,15 +44,26 @@ describe("MIZIZI Slice 2 Gate A-final Registry authority convergence", () => {
     expect(migration).toContain("admin_create_registry_artist_intake_shell_v1");
   });
 
-  it("removes direct browser canonical Track mutation", () => {
+  it("removes direct browser canonical Track mutation and preserves soft archive", () => {
     const track = read("src/pages/admin/registry/tracks/detail/page.tsx");
+    const archiveClient = read("src/services/registry/admin/archiveClient.ts");
+    const archiveAuthority = read(
+      "supabase/migrations/20260916120200_registry_track_release_archive_authority_v1.sql",
+    );
 
     expect(track).toContain("saveRegistryEntityPatch");
-    expect(track).toContain('deleteRegistryEntity("track"');
+    expect(track).toContain("archiveRegistryTrack");
+    expect(track).not.toContain("deleteRegistryEntity");
     expect(track).not.toMatch(/from\(["']registry_tracks["']\)\s*\.\s*update/s);
+    expect(archiveClient).toContain("admin_archive_registry_music_entity_v1");
+    expect(archiveAuthority).toContain("p_expected_updated_at");
+    expect(archiveAuthority).toContain("status = 'archived'");
+    expect(archiveAuthority).toContain("registry_audit_log");
+    expect(archiveAuthority).toContain("registry_canonical_write_events");
+    expect(archiveAuthority).not.toMatch(/delete\s+from\s+public\.registry_(tracks|releases)/i);
   });
 
-  it("removes direct browser canonical Release mutation while preserving precision and label", () => {
+  it("removes direct browser canonical Release mutation while preserving precision, label, and soft archive", () => {
     const release = read("src/pages/admin/registry/releases/detail/page.tsx");
     const client = read("src/services/registry/admin/releaseDetailClient.ts");
     const migration = read(
@@ -60,7 +71,8 @@ describe("MIZIZI Slice 2 Gate A-final Registry authority convergence", () => {
     );
 
     expect(release).toContain("saveRegistryReleaseDetail");
-    expect(release).toContain('deleteRegistryEntity("release"');
+    expect(release).toContain("archiveRegistryRelease");
+    expect(release).not.toContain("deleteRegistryEntity");
     expect(release).not.toMatch(/from\(["']registry_releases["']\)\s*\.\s*update/s);
     expect(client).toContain("admin_patch_registry_release_detail_v1");
     expect(client).toContain("p_release_date_precision");
