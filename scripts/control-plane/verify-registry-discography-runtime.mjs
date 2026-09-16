@@ -43,6 +43,16 @@ requireText(provider, 'provider: "apple_music"', providerPath);
 requireText(provider, 'acquired_at: acquiredAt', providerPath);
 requireText(provider, 'album_ids?: string[]', providerPath);
 
+// The source-payload hash is a stable hash of normalized provider facts. The
+// acquisition timestamp belongs to the immutable observation, not the payload
+// hash, and concurrent Album fetch completion order must not perturb identity.
+requireText(provider, 'const providerPayload = {', providerPath);
+requireText(provider, 'const observation = {', providerPath);
+requireText(provider, '...providerPayload,', providerPath);
+requireText(provider, 'sha256Hex(providerPayload)', providerPath);
+requireText(provider, '.sort((left, right) =>', providerPath);
+forbidText(provider, 'sha256Hex(observation)', providerPath);
+
 for (const fragment of [
   '.from("registry_artists").insert',
   '.from("registry_artists").update',
