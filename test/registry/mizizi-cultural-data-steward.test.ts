@@ -940,3 +940,39 @@ describe("MIZIZI Slice 2 Gate A-final Registry authority convergence", () => {
     expect(migration).toContain("registry_canonical_write_events");
   });
 });
+
+describe("MIZIZI Slice 2 Gate B Pure Public Read", () => {
+  const publicReadGateways = [
+    "supabase/functions/public-content-read/index.ts",
+    "supabase/functions/wakilisha-public-api/index.ts",
+  ];
+
+  it("keeps public Registry reads free of direct canonical Registry DML", () => {
+    const directRegistryMutation =
+      /\.from\(\s*["']registry_[^"']+["']\s*\)\s*\.\s*(insert|update|upsert|delete)\s*\(/s;
+
+    for (const path of publicReadGateways) {
+      const source = read(path);
+
+      expect(source).not.toMatch(
+        directRegistryMutation,
+      );
+    }
+  });
+
+  it("keeps generated Release descriptions response-only", () => {
+    for (const path of publicReadGateways) {
+      const source = read(path);
+
+      expect(source).toContain(
+        'let description = release.description || ""',
+      );
+      expect(source).toContain(
+        "description = desc;",
+      );
+      expect(source).not.toContain(
+        '.update({ description })',
+      );
+    }
+  });
+});
