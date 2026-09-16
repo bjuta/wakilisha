@@ -38,6 +38,27 @@ The observation is recorded as immutable Registry evidence before reviewed apply
 
 Apply consumes the immutable evidence assertion. Apply never refetches Apple Music.
 
+### 2.1 Bounded immutable storage
+
+The accepted shared Registry envelopes are intentionally small and are not widened for Discography convenience.
+
+Read-only Production inspection established these existing limits:
+
+- `platform_private.registry_evidence_assertions.claim_payload`: at most 16 KiB;
+- `platform_private.registry_execution_grants.plan_payload`: at most 32 KiB.
+
+A normalized multi-Album provider observation or complete exact-set review plan can legitimately exceed either envelope. Discography therefore stores the large typed artifacts in dedicated private immutable authority rather than weakening the shared governance constraints.
+
+`platform_private.registry_discography_provider_snapshots` owns the complete normalized provider observation. V1 bounds one snapshot observation at 2 MiB, binds exact Artist UUID, provider/storefront, acquisition time, source payload fingerprint, observation fingerprint, recording user, and immutable principal identity, and rejects update/delete mutation.
+
+`platform_private.registry_discography_review_plans` owns the complete reviewed selection and frozen execution plan. V1 bounds reviewed selections at 128 KiB and the frozen plan at 4 MiB, binds the exact evidence assertion and provider snapshot, recording user, selection fingerprint, and frozen-plan fingerprint, and rejects update/delete mutation.
+
+The generic evidence assertion stores only the bounded snapshot reference, provider/storefront summary, counts, and fingerprints. The generic execution grant stores only the bounded exact subject, review-plan reference, child reference, evidence fingerprints, state/set fingerprints, row budgets, policy version, and idempotency key.
+
+The full observation and full exact-set payload never need to be browser-round-tripped after evidence preparation and never need to be copied into the generic grant envelope.
+
+The provider source payload fingerprint is the stable fingerprint of normalized provider facts. Acquisition time belongs to the immutable observation fingerprint and evidence timestamp, not to the provider-fact hash. This distinction permits a repeated fetch of unchanged provider facts to retain the same source payload fingerprint while remaining a distinct time-bound observation.
+
 ## 3. Reviewed plan boundary
 
 The server freezes one reviewed plan from:
@@ -57,7 +78,9 @@ The plan rejects:
 - an all-ignore plan;
 - provider fingerprint drift.
 
-Provider album and Track fields in canonical operations are read from the immutable server-side evidence assertion, not from browser-authored payload fields.
+Provider album and Track fields in canonical operations are read from the immutable server-side provider snapshot referenced by the evidence assertion, not from browser-authored payload fields.
+
+The browser sends only reviewed selection intent plus the exact evidence assertion UUID. The server normalizes that selection against the immutable snapshot, freezes the complete plan, fingerprints it, and stores it in private immutable review-plan authority before issuing any execution grant.
 
 ## 4. Identity creation stays narrow
 
@@ -79,9 +102,11 @@ The accepted Track Create V1 contract intentionally excludes duration, artwork, 
 
 New Releases use the already-defined `registry.release.create/v1` identity primitive.
 
-It is currently installed but intentionally disabled/inert. The discography candidate implements and enables the exact Release Create V1 road for the human Registry broker without giving the chart broker new Release authority by implication.
+It is currently installed but intentionally disabled/inert on the accepted base. The discography candidate implements and enables the exact Release Create V1 road for the human Registry broker without giving the Chart broker new Release authority by implication.
 
 Release Create V1 remains limited to the accepted identity nucleus: future UUID, deterministic slug, title, normalized title, optional bound UPC, draft state, and audit timestamps.
+
+The permanent Chart verifier must therefore protect the Chart issuer's exact allow-list rather than asserting that the shared Release Create operation is globally disabled.
 
 ## 5. Provider fact admission is separate from identity creation
 
@@ -145,7 +170,7 @@ Discography owns three complete-set semantics:
 - `registry.release_track_set.replace/v1`;
 - `registry.track_artist_credit_set.replace/v1`.
 
-Suggested capability keys:
+Capability keys:
 
 - `replace_registry_release_artist_set`;
 - `replace_registry_release_track_set`;
@@ -160,6 +185,7 @@ Each issued grant binds:
 - exact current semantic set and fingerprint;
 - exact proposed final semantic set and fingerprint;
 - immutable evidence assertion and fingerprint;
+- immutable review-plan UUID and child reference;
 - policy/ruleset version;
 - maximum removed rows;
 - maximum inserted rows;
@@ -168,7 +194,7 @@ Each issued grant binds:
 - short TTL;
 - semantic idempotency key.
 
-The generic execution-grant `max_rows` remains the total affected-row ceiling. Removed and inserted sub-budgets are also explicit inside the typed plan and checked independently.
+The generic execution-grant `max_rows` remains the total affected-row ceiling. Removed and inserted sub-budgets are also explicit inside the compact typed grant plan and checked independently against the immutable frozen review plan.
 
 ## 8. Semantic set shapes
 
@@ -275,6 +301,8 @@ Execution order:
 11. mark execution succeeded with verifier pending;
 12. independently re-read and verify the final set.
 
+The compact exact grant never embeds the complete final set merely to make execution convenient. It references the immutable review plan and binds the exact child payload/set fingerprints and budgets. The executor re-resolves the frozen child payload from that immutable plan before mutation.
+
 A failed set operation rolls back that set operation. It does not erase independently successful identity or fact operations that already produced their own durable receipts.
 
 ## 12. Verifier semantics
@@ -286,6 +314,7 @@ The independent verifier must prove:
 - exact subject target;
 - plan fingerprint still matches;
 - bound evidence still matches;
+- immutable review-plan fingerprint still matches;
 - final canonical set fingerprint equals the proposed final fingerprint;
 - removed/inserted/total counts stayed within bound budgets;
 - write-event count and causality are exact;
@@ -320,6 +349,8 @@ The frontend convergence threads exact `artist.id` into:
 
 Slug remains display/routing context, never mutation authority.
 
+The preview response returns the immutable evidence assertion UUID. Apply must use that exact UUID plus reviewed selection intent. It must not send the provider observation back from the browser.
+
 ## 15. Compatibility and retirement
 
 During candidate construction, the current `ingest-artist-discography` service-role implementation remains explicitly classified as convergence debt.
@@ -342,7 +373,7 @@ Extend the existing control plane rather than creating a chronological pile of t
 Permanent protection belongs in:
 
 - `scripts/control-plane/verify-registry-discography-runtime.mjs` for source/manifest boundaries;
-- one permanent SQL verifier for operation types, ACLs, zero standing MIZIZI authority, exact grants, and private executor exposure;
+- one permanent SQL verifier for operation types, private immutable snapshot/review-plan storage, shared envelope limits, ACLs, zero standing MIZIZI authority, exact grants, and private executor exposure;
 - existing `test/artist-discography-release-credit.test.ts` for pure plan/credit semantics;
 - existing critical suite integration.
 
@@ -356,8 +387,11 @@ Before merge/promotion, prove at minimum:
 - authenticated caller without `manage_registry` denial;
 - wrong Artist denial;
 - provider observation bound to another Artist denial;
+- provider payload fingerprint mismatch denial;
 - browser-selected album absent from immutable evidence denial;
 - changed provider/evidence fingerprint denial;
+- immutable provider snapshot update/delete denial;
+- immutable review-plan update/delete denial;
 - stale parent state denial;
 - stale current-set fingerprint denial;
 - unexpected delete denial;
@@ -379,7 +413,7 @@ Before merge/promotion, prove at minimum:
 
 ## 18. Deployment classification
 
-SQL migration needed: Yes.
+SQL migration needed: Yes, two canonical forward migrations in the current candidate.
 
 Supabase Edge Function deploy needed: Yes, changed functions only.
 
@@ -389,4 +423,4 @@ Production Finish update needed: No current evidence.
 
 Existing Production Registry bulk mutation authorized by convergence itself: No.
 
-PR: only after the implementation candidate is coherent and local/Preview evidence is ready, except a draft CI-only PR if required to exercise protected validation.
+PR: draft CI-only while the candidate is still awaiting clean Preview replay, adversarial acceptance, frontend acceptance, and protected CI evidence.
