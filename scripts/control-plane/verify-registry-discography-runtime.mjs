@@ -20,7 +20,7 @@ const providerPath = "supabase/functions/registry-discography-provider-fetch/ind
 const governedBrokerPath = "supabase/functions/ingest-artist-discography/governedBroker.ts";
 const governedHandlerPath = "supabase/functions/ingest-artist-discography/governedHandler.ts";
 const governedPlanPath = "supabase/functions/ingest-artist-discography/governedPlan.ts";
-const legacyBrokerPath = "supabase/functions/ingest-artist-discography/index.ts";
+const brokerEntrypointPath = "supabase/functions/ingest-artist-discography/index.ts";
 const adminClientPath = "src/services/registry/admin/discography.ts";
 const manifestPath = "scripts/control-plane/registry-privileged-writer-manifest.json";
 
@@ -28,7 +28,7 @@ const provider = read(providerPath);
 const governedBroker = read(governedBrokerPath);
 const governedHandler = read(governedHandlerPath);
 const governedPlan = read(governedPlanPath);
-const legacyBroker = read(legacyBrokerPath);
+const brokerEntrypoint = read(brokerEntrypointPath);
 const adminClient = read(adminClientPath);
 const manifest = JSON.parse(read(manifestPath));
 const writers = Array.isArray(manifest.writers) ? manifest.writers : [];
@@ -98,8 +98,11 @@ for (const [key, expected] of Object.entries({
   }
 }
 
-// The mutation-side candidate is caller-JWT only and consumes immutable evidence.
+// Canonical Discography mutation is caller-JWT only and consumes immutable
+// evidence through typed RPCs. The Edge broker itself owns no Registry DML and
+// no service-role credential.
 for (const [path, source] of [
+  [brokerEntrypointPath, brokerEntrypoint],
   [governedBrokerPath, governedBroker],
   [governedHandlerPath, governedHandler],
 ]) {
@@ -119,6 +122,8 @@ for (const [path, source] of [
   }
 }
 
+requireText(brokerEntrypoint, 'handleGovernedDiscographyRequest', brokerEntrypointPath);
+requireText(brokerEntrypoint, 'Deno.serve(handleGovernedDiscographyRequest)', brokerEntrypointPath);
 requireText(governedBroker, 'required_capability: "manage_registry"', governedBrokerPath);
 requireText(governedBroker, '/functions/v1/registry-discography-provider-fetch', governedBrokerPath);
 requireText(governedBroker, 'admin_prepare_registry_discography_evidence_v1', governedBrokerPath);
@@ -156,12 +161,26 @@ for (const fragment of [
   forbidText(adminClient, fragment, adminClientPath);
 }
 
-// Until the full candidate lands, keep proving the superseded broker is still
-// classified as debt rather than silently treating its service-role path as accepted.
-const legacyWriter = writers.find((row) => row.id === "ingest-artist-discography");
-if (!legacyWriter || legacyWriter.legacyDebt !== true || legacyWriter.disposition !== "converge") {
-  throw new Error(`${manifestPath}: legacy discography authority must remain explicit convergence debt`);
+const brokerWriter = writers.find((row) => row.id === "ingest-artist-discography");
+if (!brokerWriter) {
+  throw new Error(`${manifestPath}: missing ingest-artist-discography classification`);
 }
-requireText(legacyBroker, 'SUPABASE_SERVICE_ROLE_KEY', legacyBrokerPath);
+for (const [key, expected] of Object.entries({
+  authentication: "request_bearer_user",
+  authorization: "manage_registry",
+  executionAuthority: "caller_jwt_reviewed_evidence_typed_exact_grants",
+  riskClass: "high",
+  disposition: "keep",
+  futureBoundary: "reviewed_evidence_exact_set_discography_authority",
+  miziziCallable: false,
+  humanCallable: true,
+  publicCallable: false,
+  canonicalMutation: true,
+  legacyDebt: false,
+})) {
+  if (brokerWriter[key] !== expected) {
+    throw new Error(`${manifestPath}: ingest-artist-discography.${key} drifted`);
+  }
+}
 
-console.log("REGISTRY_DISCOGRAPHY_RUNTIME_CONVERGENCE_IN_PROGRESS_PASS");
+console.log("REGISTRY_DISCOGRAPHY_RUNTIME_CONVERGENCE_PASS");
