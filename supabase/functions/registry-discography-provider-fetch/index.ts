@@ -67,6 +67,10 @@ function parseReleaseType(attributes: Record<string, unknown>): "album" | "ep" |
   return "album";
 }
 
+function sortedStrings(values: unknown[]): string[] {
+  return [...new Set(values.map(String).map((value) => value.trim()).filter(Boolean))].sort();
+}
+
 async function sha256Hex(value: unknown): Promise<string> {
   const bytes = new TextEncoder().encode(JSON.stringify(value));
   const digest = await crypto.subtle.digest("SHA-256", bytes);
@@ -91,7 +95,7 @@ async function readSecret(
 }
 
 async function createAppleMusicToken(teamId: string, keyId: string, privateKeyRaw: string): Promise<string> {
-  let key = privateKeyRaw
+  const key = privateKeyRaw
     .replace("-----BEGIN PRIVATE KEY-----", "")
     .replace("-----END PRIVATE KEY-----", "")
     .replace(/[\s\n\r\t]/g, "");
@@ -297,14 +301,17 @@ Deno.serve(async (req: Request) => {
       release_date: parseDate(attributes.releaseDate),
       upc: String(attributes.upc ?? "").trim() || null,
       record_label: String(attributes.recordLabel ?? "").trim() || null,
-      genre_names: (attributes.genreNames ?? []).map(String).map((value) => value.trim()).filter(Boolean),
+      genre_names: sortedStrings(attributes.genreNames ?? []),
       artwork_url: attributes.artwork?.url ? artworkUrl(attributes.artwork.url, 800) : null,
       apple_music_url: String(attributes.url ?? "").trim() || null,
       related_artists: relatedArtists.map((row) => ({
         apple_music_artist_id: row.id,
         name: String(row.attributes?.name ?? "").trim(),
         url: String(row.attributes?.url ?? "").trim() || null,
-      })).filter((row) => row.name),
+      })).filter((row) => row.name).sort((left, right) =>
+        left.apple_music_artist_id.localeCompare(right.apple_music_artist_id) ||
+        left.name.localeCompare(right.name)
+      ),
       tracks: tracks.map((track) => {
         const trackAttributes = track.attributes ?? {};
         return {
@@ -318,16 +325,21 @@ Deno.serve(async (req: Request) => {
           artwork_url: trackAttributes.artwork?.url ? artworkUrl(trackAttributes.artwork.url, 800) : null,
           explicit: String(trackAttributes.contentRating ?? "") === "explicit",
           preview_url: String(trackAttributes.previews?.[0]?.url ?? "").trim() || null,
-          genre_names: (trackAttributes.genreNames ?? []).map(String).map((value) => value.trim()).filter(Boolean),
+          genre_names: sortedStrings(trackAttributes.genreNames ?? []),
         };
-      }).filter((track) => track.title),
+      }).filter((track) => track.title).sort((left, right) =>
+        (left.disc_number ?? 1) - (right.disc_number ?? 1) ||
+        (left.track_number ?? Number.MAX_SAFE_INTEGER) - (right.track_number ?? Number.MAX_SAFE_INTEGER) ||
+        left.apple_music_id.localeCompare(right.apple_music_id)
+      ),
     };
-  }).filter((album) => album.title);
+  }).filter((album) => album.title).sort((left, right) =>
+    left.apple_music_id.localeCompare(right.apple_music_id)
+  );
 
-  const observation = {
-    provider: "apple_music",
+  const providerPayload = {
+    provider: "apple_music" as const,
     storefront,
-    acquired_at: acquiredAt,
     artist: {
       id: String(artist.id),
       slug: String(artist.slug),
@@ -336,7 +348,11 @@ Deno.serve(async (req: Request) => {
     albums,
     failed_album_ids: fetched.failed.sort(),
   };
-  const sourcePayloadFingerprint = await sha256Hex(observation);
+  const observation = {
+    ...providerPayload,
+    acquired_at: acquiredAt,
+  };
+  const sourcePayloadFingerprint = await sha256Hex(providerPayload);
 
   return json(req, {
     ok: true,
