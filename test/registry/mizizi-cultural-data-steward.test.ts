@@ -976,3 +976,120 @@ describe("MIZIZI Slice 2 Gate B Pure Public Read", () => {
     }
   });
 });
+
+describe("MIZIZI Slice 2 Gate C Relationship authority convergence", () => {
+  const migration = read(
+    "supabase/migrations/20260916182000_registry_relationship_authority_convergence_v1.sql",
+  );
+  const verifier = read(
+    "scripts/control-plane/verify-mizizi-relationship-authority-convergence.sql",
+  );
+
+  it("maps the historical core-music shells onto exact typed Registry identity", () => {
+    expect(migration).toContain(
+      "efdf79dc-9280-406a-b6e3-f8672f6b783f",
+    );
+    expect(migration).toContain(
+      "33b93023-0479-4feb-ade7-a1185f86cb23",
+    );
+    expect(migration).toContain(
+      "208e0284-93b8-43fd-991e-b17ffa624c4b",
+    );
+    expect(migration).toContain(
+      "e9a367d3-7cc4-4126-94ec-1e651dbe6ecf",
+    );
+    expect(migration).toContain(
+      "canonical_source_table = 'registry_artists'",
+    );
+    expect(migration).toContain(
+      "canonical_source_table = 'registry_tracks'",
+    );
+    expect(migration).toContain(
+      "canonical_source_table = 'registry_releases'",
+    );
+  });
+
+  it("preserves the two historical relationship UUIDs and evidence links in typed authority", () => {
+    expect(migration).toContain(
+      "8c03e889-3c3a-47f2-a776-9f8534191180",
+    );
+    expect(migration).toContain(
+      "ea733423-2c3b-4d47-93ea-6af44b6577b3",
+    );
+    expect(verifier).toContain(
+      "9e39f45d-10f4-45fc-af3e-9af17aa5e6a7",
+    );
+    expect(verifier).toContain(
+      "164714b3-955d-4bfe-a456-c2a70a343685",
+    );
+    expect(migration).toContain(
+      "legacy_cultural_relationship_migration",
+    );
+    expect(migration).toContain(
+      "insert into public.registry_relationship_evidence",
+    );
+    expect(migration).not.toContain(
+      "delete from public.entity_relationships",
+    );
+    expect(migration).not.toContain(
+      "delete from public.relationship_evidence",
+    );
+  });
+
+  it("keeps typed public-safe promotion stricter than the legacy review projection", () => {
+    expect(migration).toContain(
+      "'legacy_public_safe', er.public_safe",
+    );
+    expect(migration).toContain(
+      "review_status = 'approved'",
+    );
+    expect(migration).toContain(
+      "public_safe = false",
+    );
+    expect(migration).not.toMatch(
+      /update\s+public\.evidence_items[\s\S]*review_status\s*=\s*'approved'/i,
+    );
+  });
+
+  it("mechanically freezes only core-music use of the legacy graph", () => {
+    expect(migration).toContain(
+      "reject_legacy_core_cultural_entity_mutation",
+    );
+    expect(migration).toContain(
+      "reject_legacy_core_relationship_mutation",
+    );
+    expect(migration).toContain(
+      "reject_legacy_core_relationship_evidence_mutation",
+    );
+    expect(migration).toContain(
+      "('artist','track','release','label','genre')",
+    );
+    expect(migration).not.toMatch(
+      /drop\s+table\s+(if\s+exists\s+)?public\.cultural_entities/i,
+    );
+    expect(migration).not.toMatch(
+      /drop\s+table\s+(if\s+exists\s+)?public\.entity_relationships/i,
+    );
+    expect(migration).not.toMatch(
+      /drop\s+table\s+(if\s+exists\s+)?public\.relationship_evidence/i,
+    );
+  });
+
+  it("ships an independent deterministic Gate C verifier", () => {
+    expect(verifier).toContain(
+      "MIZIZI_RELATIONSHIP_AUTHORITY_CONVERGENCE_PASS",
+    );
+    expect(verifier).toContain(
+      "trg_reject_legacy_core_cultural_entity_mutation",
+    );
+    expect(verifier).toContain(
+      "trg_reject_legacy_core_relationship_mutation",
+    );
+    expect(verifier).toContain(
+      "trg_reject_legacy_core_relationship_evidence_mutation",
+    );
+    expect(verifier).toContain(
+      "metadata ->> 'legacy_public_safe' = 'true'",
+    );
+  });
+});
