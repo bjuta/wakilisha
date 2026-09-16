@@ -9,10 +9,8 @@ import { WkSelect } from "@/components/design-system/primitives/Select";
 import { WkCheckbox } from "@/components/design-system/primitives/Checkbox";
 import { WkNumberField } from "@/components/design-system/primitives/NumberField";
 import { AudioPreviewPlayer } from "@/components/design-system/editorial/AudioPreviewPlayer";
-import {
-  deleteRegistryEntity,
-  saveRegistryEntityPatch,
-} from "@/services/registry/admin/client";
+import { saveRegistryEntityPatch } from "@/services/registry/admin/client";
+import { archiveRegistryTrack } from "@/services/registry/admin/archiveClient";
 
 interface TrackRecord {
   id: string;
@@ -178,7 +176,7 @@ export default function TrackDetailPage() {
 
   async function handleDelete() {
     if (!track) return;
-    const result = await deleteRegistryEntity("track", track.id);
+    const result = await archiveRegistryTrack(track.id, track.updated_at);
     if (!result.ok) {
       addToast("error", result.error || "Failed to archive track.");
       return;
