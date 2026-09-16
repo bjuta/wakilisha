@@ -724,7 +724,12 @@ as $$
   select exists (
     select 1
     from regexp_split_to_table(
-      coalesce(p_credit_text,''),
+      regexp_replace(
+        coalesce(p_credit_text,''),
+        '\s+(?:feat\.?|ft\.?|featuring)\s+.*$',
+        '',
+        'i'
+      ),
       '\s*(?:,|&|\sand\s|\sx\s|\+)\s*',
       'i'
     ) part
@@ -1686,7 +1691,23 @@ begin
       );
       v_track_key := v_track_id::text;
 
+      v_profile := jsonb_build_object(
+        'duration_ms',case when v_track->>'duration_ms' is null then null else (v_track->>'duration_ms')::integer end,
+        'explicit',coalesce((v_track->>'explicit')::boolean,false),
+        'track_number',case when v_track->>'track_number' is null then null else (v_track->>'track_number')::integer end,
+        'disc_number',coalesce((v_track->>'disc_number')::integer,1),
+        'artwork_url',coalesce(nullif(v_track->>'artwork_url',''),nullif(v_album->>'artwork_url','')),
+        'preview_url',nullif(v_track->>'preview_url',''),
+        'apple_music_track_id',v_track->>'apple_music_id',
+        'apple_music_album_id',v_album->>'apple_music_id',
+        'genre_names',coalesce(v_track->'genre_names','[]'::jsonb),
+        'source','apple_music_ingest'
+      );
       if v_track_buckets ? v_track_key then
+        if (v_track_buckets->v_track_key->'profile') is distinct from v_profile then
+          raise exception using errcode='22023',
+            message='Selected provider Albums resolve to one canonical Track with conflicting provider profile facts.';
+        end if;
         v_bucket := jsonb_set(
           v_track_buckets->v_track_key,
           '{desired_credit_rows}',
@@ -1695,18 +1716,6 @@ begin
         );
         v_track_buckets := jsonb_set(v_track_buckets,array[v_track_key],v_bucket,true);
       else
-        v_profile := jsonb_build_object(
-          'duration_ms',case when v_track->>'duration_ms' is null then null else (v_track->>'duration_ms')::integer end,
-          'explicit',coalesce((v_track->>'explicit')::boolean,false),
-          'track_number',case when v_track->>'track_number' is null then null else (v_track->>'track_number')::integer end,
-          'disc_number',coalesce((v_track->>'disc_number')::integer,1),
-          'artwork_url',coalesce(nullif(v_track->>'artwork_url',''),nullif(v_album->>'artwork_url','')),
-          'preview_url',nullif(v_track->>'preview_url',''),
-          'apple_music_track_id',v_track->>'apple_music_id',
-          'apple_music_album_id',v_album->>'apple_music_id',
-          'genre_names',coalesce(v_track->'genre_names','[]'::jsonb),
-          'source','apple_music_ingest'
-        );
         v_track_buckets := jsonb_set(
           v_track_buckets,
           array[v_track_key],

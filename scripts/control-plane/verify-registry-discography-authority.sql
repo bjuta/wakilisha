@@ -318,6 +318,39 @@ begin
     raise exception 'Discography provider evidence does not bind source payload fingerprint and acquisition time';
   end if;
 
+  -- Release Artist primary-credit parsing must preserve the primary side of a
+  -- featured credit without promoting the featured side to primary.
+  if not platform_private.registry_discography_credit_includes_artist_v1(
+       'Primary Artist feat. Guest Artist',
+       'Primary Artist'
+     )
+     or platform_private.registry_discography_credit_includes_artist_v1(
+       'Primary Artist feat. Guest Artist',
+       'Guest Artist'
+     )
+     or not platform_private.registry_discography_credit_includes_artist_v1(
+       'Primary Artist & Guest Artist',
+       'Guest Artist'
+     )
+  then
+    raise exception 'Discography Release Artist primary-credit parsing drifted';
+  end if;
+
+  -- Multiple selected provider Albums must not resolve to one canonical Track
+  -- with conflicting provider-profile facts.
+  select pg_get_functiondef(
+    to_regprocedure('platform_private.registry_discography_build_frozen_plan_v1(uuid,uuid,uuid,jsonb)')
+  ) into v_definition;
+  if position('v_track_buckets->v_track_key' in v_definition)=0
+     or position('is distinct from v_profile' in v_definition)=0
+     or position(
+       'Selected provider Albums resolve to one canonical Track with conflicting provider profile facts.'
+       in v_definition
+     )=0
+  then
+    raise exception 'Discography canonical Track provider-profile ambiguity guard drifted';
+  end if;
+
   -- Exact grants must use semantic idempotency keys, never a state fingerprint
   -- or null in the idempotency-key argument slot.
   select regexp_replace(
@@ -328,11 +361,12 @@ begin
     ' ',
     'g'
   ) into v_definition;
-  if position('v_grant_plan, v_expected_state, v_max_rows' in v_definition)>0
-     or position('v_grant_plan, null, 1' in v_definition)>0
-     or position('v_parent_plan, v_expected_state, 1' in v_definition)>0
-     or position('v_grant_plan, v_idempotency_key, v_max_rows' in v_definition)=0
-     or position('v_parent_plan, v_parent_idempotency, 1' in v_definition)=0
+  v_definition := regexp_replace(v_definition,'[[:space:]]+','','g');
+  if position('v_grant_plan,v_expected_state,v_max_rows' in v_definition)>0
+     or position('v_grant_plan,null,1' in v_definition)>0
+     or position('v_parent_plan,v_expected_state,1' in v_definition)>0
+     or position('v_grant_plan,v_idempotency_key,v_max_rows' in v_definition)=0
+     or position('v_parent_plan,v_parent_idempotency,1' in v_definition)=0
   then
     raise exception 'Discography reviewed execution is not bound to semantic idempotency-key authority';
   end if;
@@ -345,8 +379,9 @@ begin
     ' ',
     'g'
   ) into v_definition;
-  if position('v_plan, null, 1' in v_definition)>0
-     or position('v_plan, v_idempotency_key, 1' in v_definition)=0
+  v_definition := regexp_replace(v_definition,'[[:space:]]+','','g');
+  if position('v_plan,null,1' in v_definition)>0
+     or position('v_plan,v_idempotency_key,1' in v_definition)=0
   then
     raise exception 'Discography Artist-shell grant is not bound to its semantic idempotency key';
   end if;

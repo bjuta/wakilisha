@@ -80,6 +80,10 @@ The plan rejects:
 
 Provider album and Track fields in canonical operations are read from the immutable server-side provider snapshot referenced by the evidence assertion, not from browser-authored payload fields.
 
+When two selected provider Albums resolve to the same canonical Track, V1 must not let traversal order choose one Album's provider profile as canonical truth. If the normalized Track provider-profile facts differ, including Apple Music Album identity or Album-position hints retained by the current schema, plan freezing rejects the reviewed plan as ambiguous. The Admin must reduce or resolve the selection before canonical mutation.
+
+Release Artist primary-credit parsing also distinguishes collaboration from featuring. Co-primary delimiters such as `&`, `and`, `x`, and `+` may identify multiple primary Artists, while a `feat.`, `ft.`, or `featuring` suffix is excluded from the primary side and remains featured-credit evidence.
+
 The browser sends only reviewed selection intent plus the exact evidence assertion UUID. The server normalizes that selection against the immutable snapshot, freezes the complete plan, fingerprints it, and stores it in private immutable review-plan authority before issuing any execution grant.
 
 ## 4. Identity creation stays narrow
