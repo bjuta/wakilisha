@@ -1,6 +1,11 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import { WkIcon } from "@/components/design-system/Icon";
+import {
+  applyReviewedArtistDiscography,
+  createGovernedDiscographyArtistShell,
+  previewGovernedArtistDiscography,
+} from "@/services/registry/admin/discography";
 
 /* ── Types ────────────────────────────────────────────────────────────────── */
 
@@ -614,6 +619,7 @@ function AlbumCard({ album, action, onAction, applying, additionalPrimaryArtists
 /* ── Main Drawer ──────────────────────────────────────────────────────────── */
 
 interface ArtistDiscographyIntakeDrawerProps {
+  artistId: string;
   artistSlug: string;
   artistName: string;
   onClose: () => void;
@@ -621,6 +627,7 @@ interface ArtistDiscographyIntakeDrawerProps {
 }
 
 export function ArtistDiscographyIntakeDrawer({
+  artistId,
   artistSlug,
   artistName,
   onClose,
@@ -639,6 +646,7 @@ export function ArtistDiscographyIntakeDrawer({
   const [applyError, setApplyError] = useState<string | null>(null);
   const [showConfirm, setShowConfirm] = useState(false);
   const [pendingApply, setPendingApply] = useState(false);
+  const [evidenceAssertionId, setEvidenceAssertionId] = useState<string | null>(null);
 
   const hasFetched = useRef(false);
 
@@ -650,51 +658,26 @@ export function ArtistDiscographyIntakeDrawer({
     async function fetchPreview() {
       setLoading(true);
       setError(null);
+      setEvidenceAssertionId(null);
+
       try {
-        const { data, error: invokeError } = await supabase.functions.invoke(
-          "ingest-artist-discography",
-          { body: { artistSlug, mode: "preview" }, timeout: 15000 }
-        );
+        const response = await previewGovernedArtistDiscography(artistId);
 
-        if (invokeError) {
-          console.error("[Intake] preview invoke error:", invokeError);
-          const ctx = (invokeError as Record<string, unknown>).context;
-          let detail = invokeError.message;
-          if (ctx) {
-            const bodyText = (ctx as Record<string, unknown>).body;
-            if (bodyText && typeof bodyText === "string") {
-              try {
-                const parsed = JSON.parse(bodyText);
-                if (parsed?.detail) detail = parsed.detail;
-                else if (parsed?.error) detail = `[${parsed.stage ?? "?"}] ${parsed.error}`;
-              } catch { /* keep detail */ }
-            }
-          }
-          setError(detail);
-          return;
-        }
-
-        const response = data as PreviewResponse;
-        if (!response.ok) {
-          setError(response.detail ?? response.error ?? "Preview failed");
-          return;
-        }
-
-        // Enrich albums with album_artist_name from Apple Music data
-        const enrichedAlbums = response.albums.map((a: any) => ({
-          ...a,
-          album_artist_name: a.album_artist_name || "",
+        const enrichedAlbums = response.albums.map((album) => ({
+          ...album,
+          album_artist_name: album.album_artist_name || "",
         })) as PreviewAlbum[];
 
         setAlbums(enrichedAlbums);
         setStorefront(response.storefront);
         setDuration(response.duration_ms);
         setFailedCount(response.albums_failed.length);
+        setEvidenceAssertionId(response.evidence_assertion_id);
 
-        // Auto-select actions: existing -> merge, new -> canonicalize
         const autoActions: Record<string, AlbumAction> = {};
         for (const album of enrichedAlbums) {
-          autoActions[album.apple_music_id] = album.match_status === "existing" ? "merge" : "canonicalize";
+          autoActions[album.apple_music_id] =
+            album.match_status === "existing" ? "merge" : "canonicalize";
         }
         setActions(autoActions);
       } catch (err) {
@@ -705,7 +688,7 @@ export function ArtistDiscographyIntakeDrawer({
     }
 
     fetchPreview();
-  }, [artistSlug]);
+  }, [artistId]);
 
   const handleAction = useCallback((albumId: string, action: AlbumAction) => {
     setApplyError(null);
@@ -739,51 +722,13 @@ export function ArtistDiscographyIntakeDrawer({
       throw new Error("Enter a valid artist name.");
     }
 
-    const { data, error: invokeError } = await supabase.functions.invoke(
-      "ingest-artist-discography",
-      {
-        body: {
-          artistSlug,
-          mode: "create_artist_shell",
-          artistName: cleanName,
-        },
-        timeout: 15000,
-      }
-    );
-
-    if (invokeError) {
-      const ctx = (invokeError as Record<string, unknown>).context;
-      let detail = invokeError.message;
-
-      if (ctx) {
-        const bodyText = (ctx as Record<string, unknown>).body;
-        if (bodyText && typeof bodyText === "string") {
-          try {
-            const parsed = JSON.parse(bodyText);
-            if (parsed?.detail) detail = parsed.detail;
-            else if (parsed?.error) detail = `[${parsed.stage ?? "?"}] ${parsed.error}`;
-          } catch {
-            // Keep default detail.
-          }
-        }
-      }
-
-      throw new Error(detail);
-    }
-
-    const response = data as {
-      ok?: boolean;
-      error?: string;
-      detail?: string;
-      artist?: AdditionalPrimaryArtist;
-    };
-
-    if (!response.ok || !response.artist) {
-      throw new Error(response.detail ?? response.error ?? "Artist was not created.");
-    }
+    const response = await createGovernedDiscographyArtistShell({
+      currentArtistId: artistId,
+      artistName: cleanName,
+    });
 
     return response.artist;
-  }, [artistSlug]);
+  }, [artistId]);
 
   const handleApply = async () => {
     const selectedAlbums = Object.entries(actions).map(([apple_music_id, action]) => ({
@@ -797,43 +742,23 @@ export function ArtistDiscographyIntakeDrawer({
       return;
     }
 
+    if (!evidenceAssertionId) {
+      setApplyError("Immutable preview evidence is unavailable. Close and reopen the intake drawer before applying.");
+      return;
+    }
+
     setApplying(true);
     setApplyError(null);
     setApplyResult(null);
 
     try {
-      const { data, error: invokeError } = await supabase.functions.invoke(
-        "ingest-artist-discography",
-        { body: { artistSlug, mode: "apply", selected_albums: selectedAlbums }, timeout: 15000 }
-      );
-
-      if (invokeError) {
-        console.error("[Intake] apply invoke error:", invokeError);
-        const ctx = (invokeError as Record<string, unknown>).context;
-        let detail = invokeError.message;
-        if (ctx) {
-          const bodyText = (ctx as Record<string, unknown>).body;
-          if (bodyText && typeof bodyText === "string") {
-            try {
-              const parsed = JSON.parse(bodyText);
-              if (parsed?.detail) detail = parsed.detail;
-              else if (parsed?.error) detail = `[${parsed.stage ?? "?"}] ${parsed.error}`;
-            } catch { /* keep */ }
-          }
-        }
-        setApplyError(detail);
-        return;
-      }
-
-      const response = data as ApplyResponse;
-      console.log("[Intake] apply response:", response);
-      if (!response.ok) {
-        setApplyError(response.error ?? "Apply failed");
-        return;
-      }
+      const response = await applyReviewedArtistDiscography({
+        artistId,
+        evidenceAssertionId,
+        selections: selectedAlbums,
+      });
 
       setApplyResult(response.summary);
-      // Only auto-close the drawer on clean success — keep it open if errors occurred
       if (response.summary.errors.length === 0) {
         setTimeout(() => {
           onComplete();
@@ -855,7 +780,7 @@ export function ArtistDiscographyIntakeDrawer({
   const unsetCount = albums.length - mergeCount - canonCount - ignoreCount;
 
   const hasTrackArtistErrors = applyResult?.errors.some((e) => e.includes("track_artists")) ?? false;
-  const hasErrors = applyResult?.errors.length ?? 0 > 0;
+  const hasErrors = (applyResult?.errors.length ?? 0) > 0;
   const isPartialSuccess = applyResult && hasErrors;
 
   return (

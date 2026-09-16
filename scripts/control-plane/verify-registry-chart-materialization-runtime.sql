@@ -3,8 +3,10 @@
 do $verify$
 declare
   v_enabled_count integer;
-  v_release_enabled integer;
+  v_release_additive_enabled integer;
   v_executor_definition text;
+  v_shared_executor_definition text;
+  v_chart_issuer_definition text;
   v_materialize_definition text;
   v_origin_definition text;
   v_shell_definition text;
@@ -21,18 +23,20 @@ begin
       'registry.track_artist_credit.admit'
     );
 
+  -- Release Create V1 is a shared Registry identity primitive. Discography may
+  -- enable it without granting Charts any Release authority. The additive
+  -- Release relationship operations remain outside the Chart broker.
   select count(*)::integer
-  into v_release_enabled
+  into v_release_additive_enabled
   from platform_private.registry_operation_types
   where operation_version=1
     and enabled
     and operation_key in (
-      'registry.release.create',
       'registry.release_track.admit',
       'registry.release_artist_credit.admit'
     );
 
-  if v_enabled_count <> 3 or v_release_enabled <> 0 then
+  if v_enabled_count <> 3 or v_release_additive_enabled <> 0 then
     raise exception
       'Chart materialization operation enablement drifted';
   end if;
@@ -45,6 +49,12 @@ begin
      ) is null
      or to_regprocedure(
        'public.chart_create_artist_origin_shell_v1(text,text,uuid,uuid)'
+     ) is null
+     or to_regprocedure(
+       'platform_private.issue_registry_chart_user_execution_grant_v1(uuid,text,text,uuid,jsonb,text,text,text)'
+     ) is null
+     or to_regprocedure(
+       'platform_private.execute_registry_materialization_core_v1(text,uuid)'
      ) is null
      or to_regprocedure(
        'platform_private.execute_registry_materialization_v1(text,uuid)'
@@ -110,14 +120,47 @@ begin
        'platform_private.execute_registry_materialization_v1(text,uuid)',
        'EXECUTE'
      )
+     or has_function_privilege(
+       'authenticated',
+       'platform_private.execute_registry_materialization_core_v1(text,uuid)',
+       'EXECUTE'
+     )
+     or has_function_privilege(
+       'service_role',
+       'platform_private.execute_registry_materialization_core_v1(text,uuid)',
+       'EXECUTE'
+     )
   then
     raise exception
       'Chart materialization privilege boundary drifted';
   end if;
 
+  -- Shared executor support for Release Create must not silently expand the
+  -- Chart grant issuer. Prove the Chart broker's exact allow-list remains the
+  -- three materialization operations plus Artist Origin only.
+  select pg_get_functiondef(
+    'platform_private.issue_registry_chart_user_execution_grant_v1(uuid,text,text,uuid,jsonb,text,text,text)'::regprocedure
+  ) into v_chart_issuer_definition;
+
+  if position('registry.release.create' in v_chart_issuer_definition) > 0
+     or position('registry.release_track.admit' in v_chart_issuer_definition) > 0
+     or position('registry.release_artist_credit.admit' in v_chart_issuer_definition) > 0
+     or position('registry.artist.create' in v_chart_issuer_definition) = 0
+     or position('registry.track.create' in v_chart_issuer_definition) = 0
+     or position('registry.track_artist_credit.admit' in v_chart_issuer_definition) = 0
+     or position('registry.artist_origin.admit' in v_chart_issuer_definition) = 0
+     or position('Operation/capability pair is outside chart materialization V1.' in v_chart_issuer_definition) = 0
+  then
+    raise exception
+      'Chart exact-grant issuer escaped its accepted operation allow-list';
+  end if;
+
+  -- Discography wraps the accepted Chart materialization executor to add the
+  -- shared Release Create primitive. The Chart identity nucleus remains in the
+  -- renamed core and must retain its narrow Artist/Track semantics.
   select regexp_replace(
     pg_get_functiondef(
-      'platform_private.execute_registry_materialization_v1(text,uuid)'::regprocedure
+      'platform_private.execute_registry_materialization_core_v1(text,uuid)'::regprocedure
     ),
     '[[:space:]]+',
     ' ',
@@ -138,6 +181,17 @@ begin
   then
     raise exception
       'Chart identity executor crossed the draft identity nucleus boundary';
+  end if;
+
+  select pg_get_functiondef(
+    'platform_private.execute_registry_materialization_v1(text,uuid)'::regprocedure
+  ) into v_shared_executor_definition;
+
+  if position('execute_registry_materialization_core_v1' in v_shared_executor_definition)=0
+     or position('registry.release.create' in v_shared_executor_definition)=0
+  then
+    raise exception
+      'Shared materialization wrapper no longer delegates accepted Chart authority';
   end if;
 
   select pg_get_functiondef(
@@ -197,7 +251,7 @@ begin
   end if;
 
   raise notice
-    'REGISTRY_CHART_MATERIALIZATION_RUNTIME_PASS enabled=3 release_enabled=0 standing_grants=0';
+    'REGISTRY_CHART_MATERIALIZATION_RUNTIME_PASS enabled=3 release_additive_enabled=0 standing_grants=0';
 end
 $verify$;
 
