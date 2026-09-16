@@ -131,12 +131,20 @@ for (const fragment of [
 requireText(governedPlan, 'exact_artist_id', governedPlanPath);
 requireText(governedPlan, 'provider_source_payload_fingerprint', governedPlanPath);
 
-// Frontend contract is exact-Artist + evidence-id based. It does not submit provider facts.
+// Frontend contract is exact-Artist + evidence-id based. Apply sends only reviewed
+// selection authority, never the provider observation or a caller-authored source fingerprint.
 requireText(adminClient, 'artist_id: artistId', adminClientPath);
 requireText(adminClient, 'evidence_assertion_id: input.evidenceAssertionId', adminClientPath);
+requireText(adminClient, 'selected_albums: input.selections', adminClientPath);
 requireText(adminClient, 'approved: true', adminClientPath);
-forbidText(adminClient, 'provider_album', adminClientPath);
-forbidText(adminClient, 'source_payload_fingerprint:', adminClientPath);
+for (const fragment of [
+  'provider_album: input.',
+  'observation: input.',
+  'provider_source_payload_fingerprint: input.',
+  'source_payload_fingerprint: input.',
+]) {
+  forbidText(adminClient, fragment, adminClientPath);
+}
 
 // Until the full candidate lands, keep proving the superseded broker is still
 // classified as debt rather than silently treating its service-role path as accepted.
