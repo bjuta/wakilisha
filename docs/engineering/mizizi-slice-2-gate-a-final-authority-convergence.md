@@ -38,7 +38,7 @@ The Track detail page no longer performs browser-side `registry_tracks.update(..
 
 Save now uses `saveRegistryEntityPatch(...)` in the shared Admin Registry client. The caller's real JWT is forwarded to the Admin Registry boundary, the existing editable-field schema remains authoritative, and `updated_at` is supplied as the optimistic concurrency boundary.
 
-Archive now uses the existing `deleteRegistryEntity("track", ...)` Admin Registry path rather than browser table DML.
+Archive does **not** use the shared `deleteRegistryEntity(...)` helper. Production inspection established that the corresponding `admin-router` DELETE route is a draft-only hard-delete boundary, so using it here would change existing editor semantics. Gate A-final therefore installs `admin_archive_registry_music_entity_v1(...)` and the Track editor calls it through `archiveRegistryTrack(...)`. The operation sets only `status='archived'`, compare-and-sets against the editor's `updated_at`, writes the Registry audit log, and emits canonical write evidence.
 
 Direct Track reads remain unchanged because this gate concerns mutation authority, not read-path consolidation.
 
@@ -62,7 +62,9 @@ Instead, Gate A-final installs `admin_patch_registry_release_detail_v1(...)`, a 
 
 The RPC requires an authenticated `manage_registry` user, locks the exact Release row, compare-and-sets against the editor's `updated_at`, relies on canonical table constraints/FKs for typed validity, writes the Registry audit log, writes the canonical write ledger, and returns the updated Release row.
 
-The frontend calls this authority through `src/services/registry/admin/releaseDetailClient.ts`. Archive continues through the established Admin Registry delete/archive path.
+The frontend calls this authority through `src/services/registry/admin/releaseDetailClient.ts`. Release archive uses the same exact soft-archive authority as Track through `archiveRegistryRelease(...)`; it does not call the draft-only hard-delete router path.
+
+`admin_archive_registry_music_entity_v1(...)` is intentionally restricted to `track` and `release`, requires `manage_registry`, locks the exact target, compare-and-sets `updated_at`, changes only canonical status to `archived`, writes both audit surfaces, and contains no DELETE statement.
 
 This is intentionally narrower than expanding `admin-router`: it does not add another generic CRUD surface and it preserves the two fields that the current generic router cannot save.
 
@@ -77,13 +79,14 @@ This is intentionally narrower than expanding `admin-router`: it does not add an
 - governed Artist creation/evidence admission;
 - no browser Track canonical update;
 - no browser Release canonical update;
+- soft archive rather than hard delete for Track and Release editors;
 - preservation of Release date precision and label binding through the new exact authority.
 
 These tests are source contracts, not substitutes for runtime acceptance.
 
 ## Runtime acceptance still required
 
-Before PR/merge/Production promotion, one disposable Supabase Preview must prove the repository migration baseline plus both Gate A-final migrations and runtime surfaces.
+Before PR/merge/Production promotion, one disposable Supabase Preview must prove the repository migration baseline plus all Gate A-final migrations and runtime surfaces.
 
 Required Preview proof includes:
 
@@ -95,10 +98,11 @@ Required Preview proof includes:
 6. collision/idempotency behavior;
 7. reviewed CSV origin/enrichment evidence admission;
 8. no direct canonical Artist mutation from the Edge function;
-9. Track detail save/archive through Admin Registry authority with stale-update protection;
+9. Track detail save and soft archive through governed authority with stale-update protection;
 10. Release detail save preserving `release_date_precision` and `label_id` with stale-update protection;
-11. canonical/audit write evidence for Release detail mutation;
-12. focused tests, consolidated CI contract, relevant audits, and `npm run build:app`.
+11. Release soft archive with no hard delete;
+12. canonical/audit write evidence for Release detail and Track/Release archive mutation;
+13. focused tests, consolidated CI contract, relevant audits, and `npm run build:app`.
 
 No disposable Preview branch existed when this candidate was prepared. Creating one is billable and therefore requires explicit cost confirmation before the Preview gate can begin.
 
