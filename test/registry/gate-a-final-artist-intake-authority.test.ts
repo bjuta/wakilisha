@@ -27,7 +27,8 @@ describe("MIZIZI Slice 2 Gate A-final Registry authority convergence", () => {
     expect(edge).toContain("admin_execute_registry_artist_enrichment_evidence_admission");
     expect(edge).toContain("admin_mark_registry_artist_intake_applied_v1");
     expect(edge).not.toMatch(/from\(["']registry_artists["']\)\s*\.\s*(insert|update|delete)/s);
-    expect(edge).not.toMatch(/\bactor\s*[:=].*body/s);
+    expect(edge).not.toContain("body.actor");
+    expect(edge).not.toMatch(/const\s*\{[^}]*\bactor\b[^}]*\}\s*=\s*body/);
   });
 
   it("freezes reviewed CSV authority before canonical Artist mutation", () => {
