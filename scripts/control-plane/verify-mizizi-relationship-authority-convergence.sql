@@ -62,6 +62,18 @@ begin
       and target_slug = 'mtoto-wa-khadija'
       and relationship_type = 'appeared_on'
       and relationship_status = 'needs_review'
+      and source_kind = 'legacy_cultural_relationship_migration'
+      and source_entity = 'entity_relationships'
+      and source_record_id =
+        '8c03e889-3c3a-47f2-a776-9f8534191180'
+      and plain_reason =
+        'Smoke relationship: Siaka appears in the Mtoto wa Khadija release context.'
+      and reviewed_by =
+        '27937fb0-147f-4d0f-b735-3b9b9b82f38f'::uuid
+      and reviewed_at =
+        '2026-06-29 21:50:26.637697+00'::timestamptz
+      and review_note =
+        'Admin review action from Institute review queue: needs more evidence'
       and review_status = 'pending_review'
       and public_safe is false
       and metadata ->> 'legacy_authority' = 'entity_relationships'
@@ -85,6 +97,18 @@ begin
       and target_slug = 'fik-fameica'
       and relationship_type = 'collaborated_with'
       and relationship_status = 'active'
+      and source_kind = 'legacy_cultural_relationship_migration'
+      and source_entity = 'entity_relationships'
+      and source_record_id =
+        'ea733423-2c3b-4d47-93ea-6af44b6577b3'
+      and plain_reason =
+        'Smoke relationship: Mejja and Fik Fameica are both primary artists on Siaka.'
+      and reviewed_by =
+        '27937fb0-147f-4d0f-b735-3b9b9b82f38f'::uuid
+      and reviewed_at =
+        '2026-06-29 21:49:58.055082+00'::timestamptz
+      and review_note =
+        'Admin review action from Institute review queue: public safe enabled'
       and review_status = 'approved'
       and public_safe is false
       and metadata ->> 'legacy_public_safe' = 'true'
@@ -111,6 +135,38 @@ begin
     )
   ) <> 2 then
     raise exception 'Gate C verifier: migrated relationship evidence missing';
+  end if;
+
+  if not exists (
+    select 1
+    from public.registry_relationship_evidence rre
+    join public.evidence_items e on e.id = rre.evidence_id
+    where rre.relationship_id =
+          '8c03e889-3c3a-47f2-a776-9f8534191180'::uuid
+      and rre.evidence_id =
+          '9e39f45d-10f4-45fc-af3e-9af17aa5e6a7'::uuid
+      and rre.support_type = 'supports'
+      and e.review_status = 'unreviewed'
+      and e.retrieval_status = 'review_only'
+  ) then
+    raise exception
+      'Gate C verifier: Siaka/Mtoto evidence review projection invalid';
+  end if;
+
+  if not exists (
+    select 1
+    from public.registry_relationship_evidence rre
+    join public.evidence_items e on e.id = rre.evidence_id
+    where rre.relationship_id =
+          'ea733423-2c3b-4d47-93ea-6af44b6577b3'::uuid
+      and rre.evidence_id =
+          '164714b3-955d-4bfe-a456-c2a70a343685'::uuid
+      and rre.support_type = 'supports'
+      and e.review_status = 'reviewed'
+      and e.retrieval_status = 'default_retrieval'
+  ) then
+    raise exception
+      'Gate C verifier: Mejja/Fik evidence review projection invalid';
   end if;
 
   -- Historical legacy observations still exist.

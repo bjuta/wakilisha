@@ -1026,6 +1026,39 @@ describe("MIZIZI Slice 2 Gate C Relationship authority convergence", () => {
       "legacy_cultural_relationship_migration",
     );
     expect(migration).toContain(
+      "Gate C historical Siaka/Mtoto relationship drift",
+    );
+    expect(migration).toContain(
+      "Gate C historical Mejja/Fik relationship drift",
+    );
+    expect(migration).toContain(
+      "Gate C historical Siaka/Mtoto evidence drift",
+    );
+    expect(migration).toContain(
+      "Gate C historical Mejja/Fik evidence drift",
+    );
+    expect(migration).toContain(
+      "Gate C typed Siaka/Mtoto provenance drift",
+    );
+    expect(migration).toContain(
+      "Gate C typed Mejja/Fik provenance drift",
+    );
+    expect(migration).toContain(
+      "Gate C typed Siaka/Mtoto evidence provenance drift",
+    );
+    expect(migration).toContain(
+      "Gate C typed Mejja/Fik evidence provenance drift",
+    );
+    expect(verifier).toContain(
+      "source_kind = 'legacy_cultural_relationship_migration'",
+    );
+    expect(verifier).toContain(
+      "e.review_status = 'reviewed'",
+    );
+    expect(verifier).toContain(
+      "e.retrieval_status = 'default_retrieval'",
+    );
+    expect(migration).toContain(
       "insert into public.registry_relationship_evidence",
     );
     expect(migration).not.toContain(
