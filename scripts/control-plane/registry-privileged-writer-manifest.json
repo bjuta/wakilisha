@@ -125,6 +125,26 @@
       "legacyDebt": true
     },
     {
+      "id": "registry-discography-provider-fetch",
+      "kind": "edge_function",
+      "entrypoint": "supabase/functions/registry-discography-provider-fetch/index.ts",
+      "authentication": "request_bearer_user",
+      "authorization": "manage_registry",
+      "executionAuthority": "service_role_credential_read_only",
+      "targets": [
+        "admin_settings_secrets",
+        "external_apple_music_catalog"
+      ],
+      "riskClass": "medium",
+      "disposition": "keep",
+      "futureBoundary": "provider_evidence_only_no_registry_dml",
+      "miziziCallable": false,
+      "humanCallable": true,
+      "publicCallable": false,
+      "canonicalMutation": false,
+      "legacyDebt": false
+    },
+    {
       "id": "registry-enrichment-review",
       "kind": "edge_function",
       "entrypoint": "supabase/functions/registry-enrichment-review/index.ts",
