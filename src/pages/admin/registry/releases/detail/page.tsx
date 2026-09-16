@@ -12,7 +12,7 @@ import AdminReleaseExcerpt from "./components/AdminReleaseExcerpt";
 import AdminReleaseSidebar from "./components/AdminReleaseSidebar";
 import { WkSelect } from "@/components/design-system/primitives/Select";
 import { WkDatePicker } from "@/components/design-system/primitives/DateTimePicker";
-import { deleteRegistryEntity } from "@/services/registry/admin/client";
+import { archiveRegistryRelease } from "@/services/registry/admin/archiveClient";
 import { saveRegistryReleaseDetail } from "@/services/registry/admin/releaseDetailClient";
 
 /* ─── Types ─── */
@@ -285,7 +285,7 @@ export default function ReleaseDetailPage() {
 
   async function handleDelete() {
     if (!release) return;
-    const result = await deleteRegistryEntity("release", release.id);
+    const result = await archiveRegistryRelease(release.id, release.updated_at);
     if (!result.ok) {
       addToast("error", result.error || "Failed to archive release.");
       return;
