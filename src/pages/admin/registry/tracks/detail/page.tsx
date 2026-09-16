@@ -9,9 +9,10 @@ import { WkSelect } from "@/components/design-system/primitives/Select";
 import { WkCheckbox } from "@/components/design-system/primitives/Checkbox";
 import { WkNumberField } from "@/components/design-system/primitives/NumberField";
 import { AudioPreviewPlayer } from "@/components/design-system/editorial/AudioPreviewPlayer";
-
-
-
+import {
+  deleteRegistryEntity,
+  saveRegistryEntityPatch,
+} from "@/services/registry/admin/client";
 
 interface TrackRecord {
   id: string;
@@ -128,7 +129,7 @@ export default function TrackDetailPage() {
   async function handleSave() {
     if (!track) return;
     setIsSaving(true);
-    const payload = {
+    const patch = {
       title: draft.title,
       isrc: draft.isrc || null,
       duration_ms: draft.duration_ms ? parseInt(draft.duration_ms, 10) : null,
@@ -138,27 +139,48 @@ export default function TrackDetailPage() {
       artwork_url: draft.artwork_url || null,
       preview_url: draft.preview_url || null,
       status: draft.status,
-      updated_at: new Date().toISOString(),
     };
-    const { error } = await supabase.from("registry_tracks").update(payload).eq("id", track.id);
+
+    const result = await saveRegistryEntityPatch(
+      "track",
+      track.id,
+      patch,
+      track.updated_at,
+    );
     setIsSaving(false);
-    if (error) {
-      addToast("error", `Save failed: ${error.message}`);
+
+    if (!result.ok) {
+      addToast("error", `Save failed: ${result.message || "Registry admin save failed"}`);
+      if (result.errorCode === "stale_update" && result.currentEntity) {
+        setTrack(result.currentEntity as unknown as TrackRecord);
+      }
       return;
     }
-    setTrack((prev) => (prev ? { ...prev, ...payload } : prev));
+
+    const next = result.updatedEntity
+      ? (result.updatedEntity as unknown as TrackRecord)
+      : ({ ...track, ...patch } as TrackRecord);
+    setTrack(next);
+    setDraft({
+      title: next.title,
+      isrc: next.isrc ?? "",
+      duration_ms: next.duration_ms?.toString() ?? "",
+      explicit: next.explicit ?? false,
+      track_number: next.track_number?.toString() ?? "",
+      disc_number: next.disc_number?.toString() ?? "",
+      artwork_url: next.artwork_url ?? "",
+      preview_url: next.preview_url ?? "",
+      status: next.status,
+    });
     setIsDirty(false);
     addToast("success", "Track saved.");
   }
 
   async function handleDelete() {
     if (!track) return;
-    const { error } = await supabase
-      .from("registry_tracks")
-      .update({ status: "archived", updated_at: new Date().toISOString() })
-      .eq("id", track.id);
-    if (error) {
-      addToast("error", "Failed to archive track.");
+    const result = await deleteRegistryEntity("track", track.id);
+    if (!result.ok) {
+      addToast("error", result.error || "Failed to archive track.");
       return;
     }
     addToast("info", "Track archived.");
@@ -326,7 +348,6 @@ export default function TrackDetailPage() {
               </div>
               <div className="sm:col-span-2 flex items-center gap-3">
                 <WkCheckbox checked={draft.explicit} onChange={(checked) => patchDraft({ explicit: checked })} className="flex items-center gap-2 text-[13px] text-wk-text cursor-pointer">
-
                   Explicit content
                 </WkCheckbox>
               </div>
