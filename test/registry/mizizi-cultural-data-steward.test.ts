@@ -1126,3 +1126,130 @@ describe("MIZIZI Slice 2 Gate C Relationship authority convergence", () => {
     );
   });
 });
+
+describe("MIZIZI Slice 2 Gate D Identity + Projection Lineage", () => {
+  const migration = read(
+    "supabase/migrations/20260916210000_registry_identity_projection_lineage_v1.sql",
+  );
+  const verifier = read(
+    "scripts/control-plane/verify-mizizi-identity-projection-lineage.sql",
+  );
+
+  it("models accepted identity transitions without turning aliases or archive status into lineage", () => {
+    expect(migration).toContain("registry_identity_lineage");
+    expect(migration).toContain("'merge'");
+    expect(migration).toContain("'supersede'");
+    expect(migration).toContain("'split'");
+    expect(migration).toContain("'alias_replacement'");
+    expect(migration).toContain("'retired'");
+    expect(migration).toContain(
+      "registry_identity_lineage_successor_cardinality_check",
+    );
+    expect(migration).not.toContain(
+      "source_authority = 'registry_artist_aliases'",
+    );
+    expect(migration).not.toMatch(
+      /where\s+status\s*=\s*'archived'[\s\S]*record_registry_identity_lineage_v1/i,
+    );
+  });
+
+  it("backfills accepted merge, supersession, and split events while preserving repeated history", () => {
+    expect(migration).toContain(
+      "registry_artist_resolution_events",
+    );
+    expect(migration).toContain(
+      "registry_track_resolution_events",
+    );
+    expect(migration).toContain(
+      "registry_audit_log:artist_credit_decoupled",
+    );
+    expect(migration).toContain(
+      "trg_capture_registry_artist_resolution_lineage_v1",
+    );
+    expect(migration).toContain(
+      "trg_capture_registry_track_resolution_lineage_v1",
+    );
+    expect(migration).toContain(
+      "trg_capture_registry_artist_split_lineage_v1",
+    );
+    expect(verifier).toMatch(
+      /source_record_id\s*=\s*e\.id::text\s*\|\|\s*':'\s*\|\|\s*duplicate\.source_id::text/,
+    );
+  });
+
+  it("resolves current, successor, split, retired, and unresolved identity without rewriting history", () => {
+    expect(migration).toContain(
+      "resolve_registry_identity_lineage_v1",
+    );
+    expect(migration).toContain("'current'");
+    expect(migration).toContain("'successor'");
+    expect(migration).toContain("'split'");
+    expect(migration).toContain("'retired'");
+    expect(migration).toContain("'unresolved'");
+    expect(migration).toContain("'cycle'");
+    expect(migration).toContain("'max_depth'");
+    expect(migration).toContain(
+      "missing_terminal_entity_ids",
+    );
+  });
+
+  it("separates rebuildable chart identity projection from historical observation and provider evidence", () => {
+    expect(migration).toContain(
+      "registry_identity_projection_lineage",
+    );
+    expect(migration).toContain(
+      "historical_observation_ref",
+    );
+    expect(migration).toContain(
+      "provider_evidence_ref",
+    );
+    expect(migration).toContain(
+      "canonical_state_fingerprint",
+    );
+    expect(migration).toContain(
+      "projection_fingerprint",
+    );
+    expect(migration).toContain(
+      "gate_d_backfill:wk_chart_entries_v2",
+    );
+    expect(migration).toContain(
+      "trg_capture_wk_chart_identity_projection_update_v1",
+    );
+    expect(migration).not.toMatch(
+      /update\s+public\.chart_ingest_raw_rows/i,
+    );
+    expect(migration).not.toMatch(
+      /update\s+public\.provider_field_observations/i,
+    );
+    expect(migration).not.toMatch(
+      /update\s+editorial\./i,
+    );
+  });
+
+  it("keeps lineage append-only, denies client mutation, and ships an independent verifier", () => {
+    expect(migration).toContain(
+      "Registry lineage is append-only.",
+    );
+    expect(migration).toContain(
+      "trg_registry_identity_lineage_append_only",
+    );
+    expect(migration).toContain(
+      "trg_registry_identity_projection_lineage_append_only",
+    );
+    expect(migration).toContain(
+      "revoke all on table public.registry_identity_lineage",
+    );
+    expect(migration).toContain(
+      "revoke all on table public.registry_identity_projection_lineage",
+    );
+    expect(verifier).toContain(
+      "MIZIZI_IDENTITY_PROJECTION_LINEAGE_PASS",
+    );
+    expect(verifier).toContain(
+      "unresolved Mali Safi identity was fabricated",
+    );
+    expect(verifier).toContain(
+      "ordinary Artist aliases were promoted into lineage",
+    );
+  });
+});
