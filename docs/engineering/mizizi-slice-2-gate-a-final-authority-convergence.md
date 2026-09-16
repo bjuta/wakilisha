@@ -2,11 +2,13 @@
 
 Date: 16 September 2026
 
-Status: **candidate source convergence only; Production is unchanged and runtime acceptance remains gated on disposable Preview replay.**
+Status: **disposable Preview acceptance passed for the database authority surfaces; protected PR/CI remains pending. Production is unchanged.**
 
 Accepted base: `main@e69f78667c8b8451239f085a87309e54a53fd008`
 
 Working branch: `fix/slice2-gate-a-final-artist-intake-authority`
+
+Preview branch: `gate-a-final-preview` / `ltrjkigkdryfdqkdwygk`
 
 This record supersedes the pre-convergence runtime descriptions for `artist-registry-intake` and the Track/Release detail browser mutation paths in `docs/engineering/mizizi-registry-authority-ledger.md`. The older ledger remains retained as historical Slice-1 audit evidence.
 
@@ -26,7 +28,11 @@ Service-role use remains limited to intake run/staging operations and canonical 
 
 Review decisions are recorded through `admin_review_registry_artist_intake_v1(...)`. Accepted review state is frozen with a SHA-256 `review_fingerprint`. The reviewed target pointer remains review authority; a separate `applied_registry_artist_id` stores the eventual materialization result so apply cannot rewrite the reviewed facts after approval.
 
-New Artist identity creation reuses the accepted `registry.artist.create/v1` materializer through `registry_artist_intake_admin`. That path creates a draft Artist only, rechecks collision state at execution, records canonical write evidence, and requires independent verification.
+New Artist identity creation reuses the accepted `registry.artist.create/v1` materializer through `registry_artist_intake_admin`. That path creates a draft Artist only, records canonical write evidence, and requires independent verification.
+
+Preview replay exposed one important retry defect: the first implementation performed fresh collision discovery before asking the shared materializer whether the exact deterministic grant was already a succeeded operation. A retry therefore collided with the Artist created by its own first success. `20260916120300_registry_artist_intake_idempotent_replay_integrity_v1.sql` corrects the order: an existing exact grant bound to the same caller, staging row, deterministic Artist and reviewed identity re-enters the shared materializer first; fresh collision discovery remains mandatory for first materialization only.
+
+Preview replay also closed a target-status mismatch. The original review functions admitted `needs_review` Artists while downstream Artist Origin/Enrichment authorities operate only on active/draft Artists. `20260916120400_registry_artist_intake_target_status_integrity_v1.sql` aligns review snapshot, review admission and apply sealing to the same active/draft boundary.
 
 Existing/new Artist evidence admission reuses the established typed Artist Origin and Artist Enrichment operations. `csv_manual_upload` is admitted narrowly as a reviewed evidence source rather than being mislabeled as Spotify, Apple Music, MusicBrainz, or another provider.
 
@@ -46,7 +52,7 @@ Direct Track reads remain unchanged because this gate concerns mutation authorit
 
 The Release detail page no longer performs browser-side `registry_releases.update(...)` calls.
 
-The legacy minified `admin-router` Release allowlist does not include `release_date_precision` or `label_id`. Rewriting that one-line deployed bundle merely to preserve these two existing editor fields would enlarge risk and create unrelated router churn.
+The deployed `admin-router` Release allowlist does not include `release_date_precision` or `label_id`. Rewriting that bundled router merely to preserve these two existing editor fields would enlarge risk and create unrelated router churn.
 
 Instead, Gate A-final installs `admin_patch_registry_release_detail_v1(...)`, a narrow caller-bound Release-detail authority that preserves the existing field family atomically:
 
@@ -73,9 +79,11 @@ This is intentionally narrower than expanding `admin-router`: it does not add an
 `test/registry/gate-a-final-artist-intake-authority.test.ts` seals the source-level invariants:
 
 - signed-in JWT Artist intake transport;
-- JWT gateway enforcement;
+- JWT gateway enforcement configuration;
 - no canonical Artist DML in the intake Edge function;
 - frozen review fingerprint and separate apply-result pointer;
+- deterministic idempotent replay before fresh collision discovery;
+- active/draft-only reviewed/applied Artist target eligibility;
 - governed Artist creation/evidence admission;
 - no browser Track canonical update;
 - no browser Release canonical update;
@@ -84,30 +92,51 @@ This is intentionally narrower than expanding `admin-router`: it does not add an
 
 These tests are source contracts, not substitutes for runtime acceptance.
 
-## Runtime acceptance still required
+## Disposable Preview acceptance
 
-Before PR/merge/Production promotion, one disposable Supabase Preview must prove the repository migration baseline plus all Gate A-final migrations and runtime surfaces.
+Supabase Preview `gate-a-final-preview` was created from Production and all Gate A-final migrations replayed successfully in order:
 
-Required Preview proof includes:
+1. `registry_artist_intake_authority_v1`;
+2. `registry_release_detail_admin_authority_v1`;
+3. `registry_track_release_archive_authority_v1`;
+4. `registry_artist_intake_idempotent_replay_integrity_v1`;
+5. `registry_artist_intake_target_status_integrity_v1`.
 
-1. unauthenticated Artist intake rejection;
-2. authenticated non-`manage_registry` rejection;
-3. valid manager upload/match/review flow;
-4. review fingerprint freeze and tamper rejection;
-5. new Artist materialization as draft only;
-6. collision/idempotency behavior;
-7. reviewed CSV origin/enrichment evidence admission;
-8. no direct canonical Artist mutation from the Edge function;
-9. Track detail save and soft archive through governed authority with stale-update protection;
-10. Release detail save preserving `release_date_precision` and `label_id` with stale-update protection;
-11. Release soft archive with no hard delete;
-12. canonical/audit write evidence for Release detail and Track/Release archive mutation;
-13. focused tests, consolidated CI contract, relevant audits, and `npm run build:app`.
+The candidate `artist-registry-intake` Edge function was deployed to Preview with `verify_jwt=true`.
 
-No disposable Preview branch existed when this candidate was prepared. Creating one is billable and therefore requires explicit cost confirmation before the Preview gate can begin.
+Database acceptance used disposable Preview auth identities under `authenticated` role plus request JWT claim context. The `registry_editor` fixture resolved `manage_registry=true`; the `viewer` fixture resolved `false`.
+
+Accepted runtime proofs:
+
+- non-`manage_registry` Artist review rejected with SQLSTATE `42501`;
+- manager review recorded a frozen review fingerprint;
+- changing a reviewed source fact after approval caused snapshot rejection with SQLSTATE `40001`;
+- first no-match materialization created exactly one deterministic Artist as `draft`, with independent verifier `passed`;
+- exact retry returned the same operation ID with `created=false` and `idempotent_replay=true`;
+- a `needs_review` Artist was rejected as a review target with SQLSTATE `22023` after target-status integrity convergence;
+- reviewed CSV origin, provider profile, public image and bio evidence were admitted through the existing governed Artist authorities;
+- the intake row retained its reviewed target separately from `applied_registry_artist_id`, and the run completed only after apply sealing;
+- final Artist remained `draft` with the reviewed evidence applied and canonical write evidence emitted;
+- Release detail mutation preserved `release_date_precision` and label binding and emitted audit/canonical write events;
+- stale Release detail mutation rejected with SQLSTATE `40001`;
+- viewer soft archive rejected with SQLSTATE `42501`;
+- manager Track and Release soft archive changed status only to `archived` and emitted audit/canonical write evidence;
+- stale Track archive rejected with SQLSTATE `40001`.
+
+The management environment available for this gate does not expose an authenticated Edge-function invocation primitive and its shell environment cannot resolve external hosts. Therefore an end-to-end signed HTTP POST using manager/non-manager access tokens was not fabricated. The deployed Preview artifact and `verify_jwt=true` gateway setting are verified, while the caller/capability behavior was exercised at the database authority boundary with PostgREST-equivalent authenticated role/JWT claim context. Browser/HTTP smoke remains part of post-merge deployment acceptance.
+
+## PR/CI gate still required
+
+Before merge or Production promotion, the protected PR must prove:
+
+1. focused Gate A-final source contract tests;
+2. the consolidated MIZIZI Registry governance tests;
+3. relevant TypeScript/lint checks;
+4. `npm run build:app` or the repository's protected equivalent;
+5. no unrelated diff or authority-surface regression.
 
 ## Production posture
 
 Production remains unchanged at this stage.
 
-No Gate A-final SQL has been applied to Production. No Gate A-final Edge function has been deployed. No frontend deployment has been activated. The accepted deployment sequence remains Preview proof first, protected PR/CI/merge second, then Production SQL, Edge, frontend activation, and smoke/canary as separate controlled steps.
+No Gate A-final SQL has been applied to Production. No Gate A-final Edge function has been deployed to Production. No frontend deployment has been activated. The accepted sequence remains protected PR/CI/merge first, then Production SQL, Edge, frontend activation, and smoke/canary as separate controlled steps.
