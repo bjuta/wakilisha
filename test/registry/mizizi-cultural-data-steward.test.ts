@@ -444,15 +444,20 @@ describe("MIZIZI Cultural Data Steward", () => {
     }
   });
 
-  it("binds remaining live Registry Track writers to the shared identity rule", () => {
+  it("binds remaining live Registry Track writers and governed Discography to canonical identity authority", () => {
     const sharedRule =
       readFileSync(
         "supabase/functions/_shared/registry-track-identity.ts",
         "utf8",
       );
-    const discography =
+    const discographyEntrypoint =
       readFileSync(
         "supabase/functions/ingest-artist-discography/index.ts",
+        "utf8",
+      );
+    const discographyAuthority =
+      readFileSync(
+        "supabase/migrations/20260916055145_registry_discography_review_authority_v1.sql",
         "utf8",
       );
     const enrichment =
@@ -469,11 +474,17 @@ describe("MIZIZI Cultural Data Steward", () => {
     expect(sharedRule).toContain(
       "canonicalTrackSlugCandidate",
     );
-    expect(discography).toContain(
-      'from "../_shared/registry-track-identity.ts"',
+    expect(discographyEntrypoint).toContain(
+      'from "./governedHandler.ts"',
     );
-    expect(discography).toContain(
+    expect(discographyEntrypoint).not.toContain(
       "canonicalTrackSlugCandidate",
+    );
+    expect(discographyAuthority).toContain(
+      "platform_private.registry_discography_resolve_track_v1(",
+    );
+    expect(discographyAuthority).toContain(
+      "platform_private.registry_track_creation_slug_v1(",
     );
     expect(enrichment).toContain(
       'from "../_shared/registry-track-identity.ts"',
