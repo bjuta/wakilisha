@@ -13688,6 +13688,114 @@ export type Database = {
           },
         ]
       }
+      registry_identity_lineage: {
+        Row: {
+          created_at: string
+          entity_type: string
+          id: string
+          metadata: Json
+          occurred_at: string
+          source_authority: string
+          source_entity_id: string
+          source_record_id: string
+          source_snapshot: Json
+          successor_entity_ids: string[]
+          transition_fingerprint: string
+          transition_type: string
+        }
+        Insert: {
+          created_at?: string
+          entity_type: string
+          id?: string
+          metadata?: Json
+          occurred_at: string
+          source_authority: string
+          source_entity_id: string
+          source_record_id: string
+          source_snapshot?: Json
+          successor_entity_ids?: string[]
+          transition_fingerprint: string
+          transition_type: string
+        }
+        Update: {
+          created_at?: string
+          entity_type?: string
+          id?: string
+          metadata?: Json
+          occurred_at?: string
+          source_authority?: string
+          source_entity_id?: string
+          source_record_id?: string
+          source_snapshot?: Json
+          successor_entity_ids?: string[]
+          transition_fingerprint?: string
+          transition_type?: string
+        }
+        Relationships: []
+      }
+      registry_identity_projection_lineage: {
+        Row: {
+          canonical_artist_id: string | null
+          canonical_release_id: string | null
+          canonical_state: Json
+          canonical_state_fingerprint: string
+          canonical_track_id: string | null
+          created_at: string
+          event_state: string
+          historical_observation_ref: Json
+          id: string
+          metadata: Json
+          projection_fingerprint: string
+          projection_key: string
+          projection_kind: string
+          projection_version: number
+          provider_evidence_ref: Json | null
+          rebuildable: boolean
+          recorded_at: string
+          source_authority: string
+        }
+        Insert: {
+          canonical_artist_id?: string | null
+          canonical_release_id?: string | null
+          canonical_state?: Json
+          canonical_state_fingerprint: string
+          canonical_track_id?: string | null
+          created_at?: string
+          event_state: string
+          historical_observation_ref?: Json
+          id?: string
+          metadata?: Json
+          projection_fingerprint: string
+          projection_key: string
+          projection_kind: string
+          projection_version: number
+          provider_evidence_ref?: Json | null
+          rebuildable?: boolean
+          recorded_at: string
+          source_authority: string
+        }
+        Update: {
+          canonical_artist_id?: string | null
+          canonical_release_id?: string | null
+          canonical_state?: Json
+          canonical_state_fingerprint?: string
+          canonical_track_id?: string | null
+          created_at?: string
+          event_state?: string
+          historical_observation_ref?: Json
+          id?: string
+          metadata?: Json
+          projection_fingerprint?: string
+          projection_key?: string
+          projection_kind?: string
+          projection_version?: number
+          provider_evidence_ref?: Json | null
+          rebuildable?: boolean
+          recorded_at?: string
+          source_authority?: string
+        }
+        Relationships: []
+      }
       registry_labels: {
         Row: {
           country_code: string | null
@@ -18723,6 +18831,30 @@ export type Database = {
         }
         Relationships: []
       }
+      registry_identity_projection_lineage_status_v1: {
+        Row: {
+          canonical_artist_id: string | null
+          canonical_release_id: string | null
+          canonical_state: Json | null
+          canonical_state_fingerprint: string | null
+          canonical_track_id: string | null
+          created_at: string | null
+          event_state: string | null
+          historical_observation_ref: Json | null
+          id: string | null
+          metadata: Json | null
+          projection_fingerprint: string | null
+          projection_key: string | null
+          projection_kind: string | null
+          projection_state: string | null
+          projection_version: number | null
+          provider_evidence_ref: Json | null
+          rebuildable: boolean | null
+          recorded_at: string | null
+          source_authority: string | null
+        }
+        Relationships: []
+      }
       registry_missing_artist_intake_queue: {
         Row: {
           affected_relationship_count: number | null
@@ -19554,6 +19686,16 @@ export type Database = {
       }
       admin_preview_registry_track_duplicate_repair: {
         Args: { p_canonical_track_id: string; p_duplicate_track_ids: string[] }
+        Returns: Json
+      }
+      admin_record_registry_identity_transition_v1: {
+        Args: {
+          p_entity_type: string
+          p_note?: string
+          p_source_entity_id: string
+          p_successor_entity_id?: string
+          p_transition_type: string
+        }
         Returns: Json
       }
       admin_record_registry_track_intake_provider_evidence: {
@@ -24758,6 +24900,14 @@ export type Database = {
       }
       resolve_public_registry_author_person: {
         Args: { p_slug: string }
+        Returns: Json
+      }
+      resolve_registry_identity_lineage_v1: {
+        Args: {
+          p_entity_id: string
+          p_entity_type: string
+          p_max_depth?: number
+        }
         Returns: Json
       }
       resolve_registry_relationship_endpoint: {
