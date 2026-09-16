@@ -44,6 +44,38 @@ describe("MIZIZI Slice 2 Gate A-final Registry authority convergence", () => {
     expect(migration).toContain("admin_create_registry_artist_intake_shell_v1");
   });
 
+  it("replays deterministic Artist intake materialization before fresh collision discovery", () => {
+    const migration = read(
+      "supabase/migrations/20260916120300_registry_artist_intake_idempotent_replay_integrity_v1.sql",
+    );
+
+    const grantLookup = migration.indexOf("v_existing_grant");
+    const collisionLookup = migration.indexOf(
+      "registry_artist_creation_collision_state_v1",
+    );
+
+    expect(migration).toContain("artist-intake-create:");
+    expect(migration).toContain("idempotent_replay");
+    expect(migration).toContain("created',false");
+    expect(grantLookup).toBeGreaterThan(-1);
+    expect(collisionLookup).toBeGreaterThan(grantLookup);
+  });
+
+  it("keeps reviewed and applied Artist targets inside the active/draft boundary", () => {
+    const migration = read(
+      "supabase/migrations/20260916120400_registry_artist_intake_target_status_integrity_v1.sql",
+    );
+
+    expect(migration).toContain("artist.status in ('active','draft')");
+    expect(migration).not.toContain("'needs_review'");
+    expect(migration).toContain(
+      "Artist intake target must be an active or draft Registry Artist.",
+    );
+    expect(migration).toContain(
+      "Applied Artist intake result must resolve to an active or draft Registry Artist.",
+    );
+  });
+
   it("removes direct browser canonical Track mutation and preserves soft archive", () => {
     const track = read("src/pages/admin/registry/tracks/detail/page.tsx");
     const archiveClient = read("src/services/registry/admin/archiveClient.ts");
