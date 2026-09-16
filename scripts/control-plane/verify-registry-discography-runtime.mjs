@@ -22,6 +22,9 @@ const governedHandlerPath = "supabase/functions/ingest-artist-discography/govern
 const governedPlanPath = "supabase/functions/ingest-artist-discography/governedPlan.ts";
 const brokerEntrypointPath = "supabase/functions/ingest-artist-discography/index.ts";
 const adminClientPath = "src/services/registry/admin/discography.ts";
+const intakeDrawerPath = "src/components/admin/registry/artist-discography/ArtistDiscographyIntakeDrawer.tsx";
+const discographyPanelPath = "src/pages/admin/registry/artists/detail/components/DiscographyPanel.tsx";
+const artistDetailPath = "src/pages/admin/registry/artists/detail/page.tsx";
 const manifestPath = "scripts/control-plane/registry-privileged-writer-manifest.json";
 
 const provider = read(providerPath);
@@ -30,6 +33,9 @@ const governedHandler = read(governedHandlerPath);
 const governedPlan = read(governedPlanPath);
 const brokerEntrypoint = read(brokerEntrypointPath);
 const adminClient = read(adminClientPath);
+const intakeDrawer = read(intakeDrawerPath);
+const discographyPanel = read(discographyPanelPath);
+const artistDetail = read(artistDetailPath);
 const manifest = JSON.parse(read(manifestPath));
 const writers = Array.isArray(manifest.writers) ? manifest.writers : [];
 
@@ -160,6 +166,17 @@ for (const fragment of [
 ]) {
   forbidText(adminClient, fragment, adminClientPath);
 }
+
+// The Artist detail route owns canonical Artist UUID authority. Slug remains
+// routing/display context only and cannot be used as Discography mutation authority.
+requireText(intakeDrawer, 'previewGovernedArtistDiscography(artistId)', intakeDrawerPath);
+requireText(intakeDrawer, 'currentArtistId: artistId', intakeDrawerPath);
+requireText(intakeDrawer, 'evidenceAssertionId', intakeDrawerPath);
+requireText(intakeDrawer, 'applyReviewedArtistDiscography({', intakeDrawerPath);
+forbidText(intakeDrawer, 'supabase.functions.invoke(', intakeDrawerPath);
+requireText(discographyPanel, 'artistId: string', discographyPanelPath);
+requireText(discographyPanel, 'artistId={artistId}', discographyPanelPath);
+requireText(artistDetail, 'artistId={artist.id}', artistDetailPath);
 
 const brokerWriter = writers.find((row) => row.id === "ingest-artist-discography");
 if (!brokerWriter) {

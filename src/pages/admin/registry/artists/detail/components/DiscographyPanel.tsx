@@ -121,7 +121,15 @@ function typeBadgeColor(type: string): string {
 
 /* ─── Component ─── */
 
-export function DiscographyPanel({ artistSlug, artistName }: { artistSlug: string; artistName?: string }) {
+export function DiscographyPanel({
+  artistId,
+  artistSlug,
+  artistName,
+}: {
+  artistId: string;
+  artistSlug: string;
+  artistName?: string;
+}) {
   const navigate = useNavigate();
   const [releases, setReleases] = useState<DiscographyRelease[]>([]);
   const [loading, setLoading] = useState(true);
@@ -332,6 +340,7 @@ export function DiscographyPanel({ artistSlug, artistName }: { artistSlug: strin
       {/* Intake drawer */}
       {showIntakeDrawer && (
         <ArtistDiscographyIntakeDrawer
+          artistId={artistId}
           artistSlug={artistSlug}
           artistName={artistDisplayName}
           onClose={() => setShowIntakeDrawer(false)}
