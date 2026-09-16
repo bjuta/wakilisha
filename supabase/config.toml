@@ -27,6 +27,9 @@ verify_jwt = false
 [functions.public-query-v1]
 verify_jwt = false
 
+[functions.artist-registry-intake]
+verify_jwt = true
+
 # WAKILISHA replayable Storage bucket authority.
 [storage.buckets.article-media]
 public = true

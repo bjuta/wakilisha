@@ -12,8 +12,8 @@ import AdminReleaseExcerpt from "./components/AdminReleaseExcerpt";
 import AdminReleaseSidebar from "./components/AdminReleaseSidebar";
 import { WkSelect } from "@/components/design-system/primitives/Select";
 import { WkDatePicker } from "@/components/design-system/primitives/DateTimePicker";
-
-
+import { archiveRegistryRelease } from "@/services/registry/admin/archiveClient";
+import { saveRegistryReleaseDetail } from "@/services/registry/admin/releaseDetailClient";
 
 /* ─── Types ─── */
 
@@ -213,6 +213,7 @@ export default function ReleaseDetailPage() {
       if (trackArtistsRes.data) setTrackArtists(trackArtistsRes.data as TrackArtistRecord[]);
       if (releaseArtistsRes.data) setReleaseArtists(releaseArtistsRes.data as ReleaseArtistRecord[]);
       if (labelRes?.data) setLabel(labelRes.data as LabelRecord);
+      if (!labelId) setLabel(null);
     } catch (err) {
       console.error("[loadRichData] error:", err);
       addToast("error", "Failed to load tracklist or artist data.");
@@ -239,7 +240,7 @@ export default function ReleaseDetailPage() {
   async function handleSave() {
     if (!release) return;
     setIsSaving(true);
-    const payload = {
+    const patch = {
       title: draft.title,
       release_type: draft.release_type || null,
       upc: draft.upc || null,
@@ -249,24 +250,46 @@ export default function ReleaseDetailPage() {
       description: draft.description || null,
       artwork_url: draft.artwork_url || null,
       status: draft.status,
-      updated_at: new Date().toISOString(),
     };
-    const { error } = await supabase.from("registry_releases").update(payload).eq("id", release.id);
+
+    const result = await saveRegistryReleaseDetail(
+      release.id,
+      patch,
+      release.updated_at,
+    );
     setIsSaving(false);
-    if (error) { addToast("error", `Save failed: ${error.message}`); return; }
-    setRelease((prev) => (prev ? { ...prev, ...payload } : prev));
+
+    if (!result.ok || !result.data) {
+      addToast("error", `Save failed: ${result.error || "Registry Release admin save failed"}`);
+      return;
+    }
+
+    const next = result.data as unknown as ReleaseRecord;
+    setRelease(next);
+    setDraft({
+      title: next.title,
+      release_type: next.release_type ?? "",
+      upc: next.upc ?? "",
+      release_date: next.release_date ?? "",
+      release_date_precision: next.release_date_precision ?? "",
+      label_id: next.label_id ?? "",
+      description: next.description ?? "",
+      artwork_url: next.artwork_url ?? "",
+      status: next.status,
+    });
     setIsDirty(false);
     setEditOpen(false);
+    await loadRichData(next.id, next.label_id);
     addToast("success", "Release saved.");
   }
 
   async function handleDelete() {
     if (!release) return;
-    const { error } = await supabase
-      .from("registry_releases")
-      .update({ status: "archived", updated_at: new Date().toISOString() })
-      .eq("id", release.id);
-    if (error) { addToast("error", "Failed to archive release."); return; }
+    const result = await archiveRegistryRelease(release.id, release.updated_at);
+    if (!result.ok) {
+      addToast("error", result.error || "Failed to archive release.");
+      return;
+    }
     addToast("info", "Release archived.");
     setTimeout(() => navigate("/admin/registry/releases"), 1000);
   }
