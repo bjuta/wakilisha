@@ -19240,6 +19240,10 @@ export type Database = {
         }
         Returns: Json
       }
+      admin_create_registry_discography_artist_shell_v1: {
+        Args: { p_artist_name: string; p_current_artist_id: string }
+        Returns: Json
+      }
       admin_create_registry_track_from_intake_enriched: {
         Args: {
           p_review_note?: string
@@ -19364,6 +19368,14 @@ export type Database = {
           verifier_status: string
         }[]
       }
+      admin_execute_registry_discography_evidence_v1: {
+        Args: {
+          p_artist_id: string
+          p_evidence_assertion_id: string
+          p_reviewed_selections: Json
+        }
+        Returns: Json
+      }
       admin_get_artist_decouple_decisions: {
         Args: { p_source_type?: string }
         Returns: Json
@@ -19478,6 +19490,18 @@ export type Database = {
           p_source_ref: string
         }
         Returns: string
+      }
+      admin_prepare_registry_discography_evidence_v1: {
+        Args: {
+          p_artist_id: string
+          p_observation: Json
+          p_source_payload_fingerprint: string
+        }
+        Returns: string
+      }
+      admin_preview_registry_discography_evidence_v1: {
+        Args: { p_evidence_assertion_id: string }
+        Returns: Json
       }
       admin_preview_registry_track_duplicate_repair: {
         Args: { p_canonical_track_id: string; p_duplicate_track_ids: string[] }
@@ -19630,6 +19654,10 @@ export type Database = {
           operation_id: string
           verifier_status: string
         }[]
+      }
+      admin_verify_registry_discography_operation_v1: {
+        Args: { p_operation_id: string }
+        Returns: Json
       }
       adopt_verified_field_media_upload_session_v1: {
         Args: {
