@@ -2,7 +2,7 @@ openapi: "3.0.3"
 info:
   title: WAKILISHA Admin API
   description: |
-    Admin gateway for WAKILISHA operations — registry CRUD, chart ingestion, provider credentials, and user management.
+    Admin gateway for WAKILISHA operations: registry CRUD, provider credentials, and user management.
     
     **Base URL:** `https://<project>.supabase.co/functions/v1/admin-router`
     
@@ -11,22 +11,19 @@ info:
     
     **Response envelope (success):**
     ```json
-    { "ok": true, "data": <payload>, "meta": { "requestId": "abc123", "servedAt": "2026-...", "version": "4.0.0" } }
+    { "ok": true, "data": <payload>, "meta": { "requestId": "abc123", "servedAt": "2026-...", "version": "5.0.0" } }
     ```
     
     **Response envelope (error):**
     ```json
-    { "ok": false, "error": { "code": "not_found", "message": "Entity not found" }, "meta": { "requestId": "abc123", "servedAt": "2026-...", "version": "4.0.0" } }
+    { "ok": false, "error": { "code": "not_found", "message": "Entity not found" }, "meta": { "requestId": "abc123", "servedAt": "2026-...", "version": "5.0.0" } }
     ```
     
     **Capability gates per section:**
     - Registry: `manage_registry`
     - Credentials: `manage_settings`
     - Users: `manage_users`
-    - Charts read: `view_charts_admin`
-    - Charts ingest: `manage_ingest`
-    - Charts publish: `publish_charts`
-  version: "4.0.0"
+  version: "5.0.0"
   contact:
     name: WAKILISHA Engineering
     url: https://wakilisha.africa
@@ -41,7 +38,7 @@ security:
 paths:
   /health:
     get:
-      summary: Health check (public — no auth)
+      summary: Health check (public, no auth)
       operationId: healthCheck
       tags: [System]
       security: []
@@ -241,101 +238,6 @@ paths:
         "403":
           description: Missing manage_users capability
 
-  # ═══════════════════════════════════════
-  # SECTION 4: CHARTS (body-based actions)
-  # ═══════════════════════════════════════
-  /charts:
-    post:
-      summary: Chart ingestion operations (action-based dispatch)
-      description: |
-        All chart actions are dispatched via `POST /charts` with `{ "action": "<name>", ...params }` in the body.
-        Capability checks are action-specific: read actions require `view_charts_admin`, ingest mutations require `manage_ingest`, publish actions require `publish_charts`.
-      operationId: chartAction
-      tags: [Charts]
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              type: object
-              required: [action]
-              properties:
-                action:
-                  type: string
-                  enum:
-                    - create_dry_run
-                    - list_runs
-                    - get_run
-                    - source_fetch
-                    - normalize_run
-                    - run_eligibility
-                    - run_carry_forward
-                    - run_scoring
-                    - run_shortlist
-                    - run_full_pipeline
-                    - cancel_run
-                    - retry_run
-                    - reset_pipeline
-                    - csv_list
-                    - preflight
-                    - get_stages
-                    - get_sources
-                    - get_candidates
-                    - get_normalized
-                    - get_kpis
-                    - get_activity
-                    - get_resource_guard
-                    - get_review_issues
-                    - get_matches_for_run
-                    - validate_commit
-                    - commit_run
-                    - run_airplay_detection
-                    - send_gaps_to_review
-                    - fix_chart_artist_slugs
-                    - reingest_edition
-                runId:
-                  type: string
-                  description: Required for most actions
-                limit:
-                  type: integer
-                  description: For list_runs
-                request:
-                  type: object
-                  description: Required for create_dry_run
-                  properties:
-                    editionDate: { type: string }
-                    chartTitle: { type: string }
-                    chartSlug: { type: string }
-                    chartKind: { type: string }
-                    chartSize: { type: integer }
-                    market: { type: string }
-                    sourceUrls: { type: array, items: { type: string } }
-                    existingSeriesId: { type: string }
-                    methodologyVersion: { type: string }
-                    marketScopeSnapshot: { type: object }
-                    coverStyle: { type: string }
-      responses:
-        "200":
-          description: Action result (shape varies by action)
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  ok: { type: boolean }
-                  data: { type: object, additionalProperties: true }
-                  meta:
-                    type: object
-                    properties:
-                      requestId: { type: string }
-                      servedAt: { type: string }
-                      version: { type: string }
-        "400":
-          description: Missing required params (e.g., runId)
-        "403":
-          description: Missing required capability for the action
-        "500":
-          description: Internal error with detail
 
 components:
   securitySchemes:
@@ -384,5 +286,3 @@ tags:
     description: Provider credential management (Spotify, Apple Music, ACRCloud, YouTube, Airplay)
   - name: Users
     description: Admin user invites, password resets, email testing
-  - name: Charts
-    description: Chart ingestion pipeline — dry runs, scoring, normalization, carry-forward, shortlist, commit
