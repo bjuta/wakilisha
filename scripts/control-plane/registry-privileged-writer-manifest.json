@@ -263,7 +263,7 @@
       "canonicalMutation": true,
       "legacyDebt": false
     },
-        {
+    {
       "id": "backfill-artist-origin",
       "kind": "edge_function",
       "entrypoint": "supabase/functions/backfill-artist-origin/index.ts",
@@ -282,7 +282,7 @@
       "canonicalMutation": true,
       "legacyDebt": false
     },
-        {
+    {
       "id": "run-chart-playback-enrichment",
       "kind": "edge_function",
       "entrypoint": "supabase/functions/run-chart-playback-enrichment/index.ts",
