@@ -1,0 +1,16 @@
+{
+  "migration_file": "supabase/migrations/20260916210001_registry_shared_review_authority_v1.sql",
+  "migration_sha256": "dc76c8c5d111f0596a132f14d909fcf32997cfd43fa93b82288074207c56e242",
+  "base_main_sha": "4ee5d28268d61e7f98e25fd13ccf23169699192d",
+  "preview_project_ref": "xrnyhnaewzbpostyevwb",
+  "preview_branch_id": "12e5714a-a958-4b1c-98ae-ece8e638a636",
+  "preview_migration_head": "20260916210001",
+  "baseline_replay": "pass",
+  "candidate_apply": "pass",
+  "verifier": "pass",
+  "verifier_file": "scripts/control-plane/verify-mizizi-shared-review-authority.sql",
+  "schema_types_sha256": "3658c175c9eeff75ce25077cd82a05b537de3f27795e026bb1acec22aff3caec",
+  "schema_migration_count": 147,
+  "schema_migration_head": "20260916210001",
+  "verified_at": "2026-09-17T07:10:38.803Z"
+}
