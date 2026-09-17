@@ -589,7 +589,7 @@ export default function ArtistDetailPage() {
           <DiscographyPanel artistId={artist.id} artistSlug={artist.slug} artistName={artist.display_name} />
 
           {/* Top Songs — curated from discography */}
-          <TopSongsPanel artistSlug={artist.slug} artistName={artist.display_name} />
+          <TopSongsPanel artistId={artist.id} artistSlug={artist.slug} artistName={artist.display_name} />
         </div>
 
         {/* Sidebar */}
