@@ -1,5 +1,7 @@
 # MIZIZI Registry Retirement Manifest
 
+> **17 September 2026 Slice 3 status:** the Artist-enrichment compatibility wrappers `backfill-artist-spotify-images` and `backfill-artist-type` have satisfied replacement and traffic proof and are now authorized for retirement as one coherent family. Production deletion remains a separate post-merge gate. Historical sections below retain the earlier prerequisite state rather than being rewritten.
+
 Date: 14 September 2026
 
 Status: **Slice 1 retirement design authority. This document identifies future retirement targets and prerequisites. It does not authorize deletion.**

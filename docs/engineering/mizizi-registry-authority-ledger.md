@@ -1,5 +1,7 @@
 # MIZIZI Registry Authority Ledger
 
+> **17 September 2026 Slice 3 status:** `backfill-artist-spotify-images` and `backfill-artist-type` are retired repository/runtime candidates after post-convergence traffic proof. Current Admin enrichment uses `registry-enrich-artist`; the two compatibility wrappers have no current product, workflow, database, or cron caller. Historical Slice 1 / Slice 2 sections below remain evidence of the authority that existed when audited.
+
 Date: 14 September 2026
 
 Status: **Slice 1 read-only authority audit. This document does not authorize a Production mutation, grant change, function deletion, route deletion, migration, or MIZIZI execution change.**

@@ -212,15 +212,35 @@ for (const requiredWriter of [
   "chart-ingest-api",
   "admin-router-registry",
   "registry-enrich-artist",
-  "backfill-artist-spotify-images",
   "backfill-artist-origin",
-  "backfill-artist-type",
   "public-content-read",
   "wakilisha-public-api",
 ]) {
   if (!writerIds.has(requiredWriter)) {
     throw new Error(
       `Required Registry privileged writer is unclassified: ${requiredWriter}`,
+    );
+  }
+}
+
+for (const [retiredWriter, retiredEntrypoint] of [
+  [
+    "backfill-artist-spotify-images",
+    "supabase/functions/backfill-artist-spotify-images/index.ts",
+  ],
+  [
+    "backfill-artist-type",
+    "supabase/functions/backfill-artist-type/index.ts",
+  ],
+]) {
+  if (writerIds.has(retiredWriter)) {
+    throw new Error(
+      `Retired Registry privileged writer must remain unclassified: ${retiredWriter}`,
+    );
+  }
+  if (fs.existsSync(retiredEntrypoint)) {
+    throw new Error(
+      `Retired Registry writer source returned: ${retiredEntrypoint}`,
     );
   }
 }

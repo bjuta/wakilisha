@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
 
 const root = process.cwd();
@@ -18,8 +18,6 @@ const forbidText = (source, fragment, label) => {
 
 const providerPath = "supabase/functions/registry-artist-provider-fetch/index.ts";
 const orchestratorPath = "supabase/functions/registry-enrich-artist/index.ts";
-const spotifyAdapterPath = "supabase/functions/backfill-artist-spotify-images/index.ts";
-const typeAdapterPath = "supabase/functions/backfill-artist-type/index.ts";
 const originPath = "supabase/functions/backfill-artist-origin/index.ts";
 const adminClientPath = "src/services/registry/admin/artistEnrichment.ts";
 const governancePanelsPath = "src/components/admin/registry/ArtistEnrichmentGovernancePanels.tsx";
@@ -32,8 +30,6 @@ const sqlVerifierPath = "scripts/control-plane/verify-registry-artist-enrichment
 
 const provider = read(providerPath);
 const orchestrator = read(orchestratorPath);
-const spotifyAdapter = read(spotifyAdapterPath);
-const typeAdapter = read(typeAdapterPath);
 const origin = read(originPath);
 const adminClient = read(adminClientPath);
 const governancePanels = read(governancePanelsPath);
@@ -124,17 +120,11 @@ for (const fragment of [
   forbidText(provider, fragment, providerPath);
 }
 
-// Canonical mutation/orchestration roads are caller-JWT only.
-for (const [path, source] of [
-  [orchestratorPath, orchestrator],
-  [spotifyAdapterPath, spotifyAdapter],
-  [typeAdapterPath, typeAdapter],
-]) {
-  forbidText(source, 'SUPABASE_SERVICE_ROLE_KEY', path);
-  forbidText(source, '.from("registry_artists").update', path);
-  forbidText(source, '.from("registry_artists").insert', path);
-  forbidText(source, '.from("registry_artists").delete', path);
-}
+// Canonical mutation/orchestration road remains caller-JWT only.
+forbidText(orchestrator, 'SUPABASE_SERVICE_ROLE_KEY', orchestratorPath);
+forbidText(orchestrator, '.from("registry_artists").update', orchestratorPath);
+forbidText(orchestrator, '.from("registry_artists").insert', orchestratorPath);
+forbidText(orchestrator, '.from("registry_artists").delete', orchestratorPath);
 
 requireText(orchestrator, 'required_capability: "manage_registry"', orchestratorPath);
 requireText(orchestrator, 'admin_prepare_registry_artist_provider_profile_evidence', orchestratorPath);
@@ -163,18 +153,6 @@ for (const rawWrapper of [
   forbidText(orchestrator, rawWrapper, orchestratorPath);
 }
 
-// Compatibility names may remain but they must be caller-JWT adapters over the
-// same reviewed-evidence contract, never alternate mutation authorities.
-for (const [path, source] of [
-  [spotifyAdapterPath, spotifyAdapter],
-  [typeAdapterPath, typeAdapter],
-]) {
-  requireText(source, '/functions/v1/registry-enrich-artist', path);
-  requireText(source, 'evidence_ids?: string[]', path);
-  requireText(source, 'evidence_ids: body.evidence_ids', path);
-  requireText(source, 'reviewed_evidence_ids', path);
-}
-
 // Privileged-writer classification must describe the converged authority, not
 // the superseded service-role implementation.
 if (manifest.status !== "slice_2_artist_enrichment_authority_converged") {
@@ -195,20 +173,18 @@ assertWriter("registry-enrich-artist", {
   legacyDebt: false,
 });
 
-for (const id of ["backfill-artist-spotify-images", "backfill-artist-type"]) {
-  assertWriter(id, {
-    authentication: "request_bearer_user",
-    authorization: "manage_registry_via_registry_enrich_artist",
-    executionAuthority: "caller_jwt_compatibility_adapter_to_reviewed_evidence_broker",
-    riskClass: "high",
-    disposition: "candidate_retire",
-    futureBoundary: "none_after_compatibility_traffic_proof",
-    miziziCallable: false,
-    humanCallable: true,
-    publicCallable: false,
-    canonicalMutation: true,
-    legacyDebt: false,
-  });
+// Slice 3 Candidate B retirement contract: the compatibility wrappers are no
+// longer runtime authorities or privileged-writer classifications.
+for (const [id, retiredPath] of [
+  ["backfill-artist-spotify-images", "supabase/functions/backfill-artist-spotify-images/index.ts"],
+  ["backfill-artist-type", "supabase/functions/backfill-artist-type/index.ts"],
+]) {
+  if (existsSync(retiredPath)) {
+    throw new Error(`${retiredPath}: retired Artist-enrichment compatibility wrapper returned`);
+  }
+  if (writer(id)) {
+    throw new Error(`${manifestPath}: retired Artist-enrichment wrapper is still classified: ${id}`);
+  }
 }
 
 // Preserve the already accepted Artist-origin exact admission road.
