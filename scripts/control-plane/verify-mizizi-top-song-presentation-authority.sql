@@ -17,19 +17,29 @@ begin
   end if;
 
   if has_table_privilege('anon', 'public.artist_top_song_curations', 'SELECT,INSERT,UPDATE,DELETE')
-     or has_table_privilege('authenticated', 'public.artist_top_song_curations', 'INSERT,UPDATE,DELETE')
+     or has_table_privilege('authenticated', 'public.artist_top_song_curations', 'SELECT,INSERT,UPDATE,DELETE')
      or has_table_privilege('anon', 'public.artist_top_song_curation_migration_map', 'SELECT,INSERT,UPDATE,DELETE')
-     or has_table_privilege('authenticated', 'public.artist_top_song_curation_migration_map', 'INSERT,UPDATE,DELETE')
+     or has_table_privilege('authenticated', 'public.artist_top_song_curation_migration_map', 'SELECT,INSERT,UPDATE,DELETE')
      or has_table_privilege('anon', 'public.artist_top_song_curation_events', 'SELECT,INSERT,UPDATE,DELETE')
-     or has_table_privilege('authenticated', 'public.artist_top_song_curation_events', 'INSERT,UPDATE,DELETE')
+     or has_table_privilege('authenticated', 'public.artist_top_song_curation_events', 'SELECT,INSERT,UPDATE,DELETE')
   then
     raise exception 'Browser direct Top Songs presentation DML grant detected';
+  end if;
+
+  if has_table_privilege('service_role', 'public.artist_top_song_curations', 'SELECT,INSERT,UPDATE,DELETE')
+     or has_table_privilege('service_role', 'public.artist_top_song_curation_migration_map', 'SELECT,INSERT,UPDATE,DELETE')
+     or has_table_privilege('service_role', 'public.artist_top_song_curation_events', 'SELECT,INSERT,UPDATE,DELETE')
+  then
+    raise exception 'Service-role direct Top Songs presentation table authority detected';
   end if;
 
   if has_function_privilege('anon', 'public.get_artist_top_songs_v1(uuid,text)', 'EXECUTE')
      or has_function_privilege('anon', 'public.admin_replace_artist_top_songs_v1(uuid,uuid[],text)', 'EXECUTE')
      or not has_function_privilege('authenticated', 'public.get_artist_top_songs_v1(uuid,text)', 'EXECUTE')
      or not has_function_privilege('authenticated', 'public.admin_replace_artist_top_songs_v1(uuid,uuid[],text)', 'EXECUTE')
+     or not has_function_privilege('service_role', 'public.get_artist_top_songs_v1(uuid,text)', 'EXECUTE')
+     or has_function_privilege('service_role', 'public.admin_replace_artist_top_songs_v1(uuid,uuid[],text)', 'EXECUTE')
+     or has_function_privilege('service_role', 'platform_private.artist_top_song_fingerprint_v1(uuid)', 'EXECUTE')
   then
     raise exception 'Top Songs RPC execution grants drifted';
   end if;
