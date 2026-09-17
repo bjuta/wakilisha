@@ -371,13 +371,13 @@
         "registry_releases"
       ],
       "riskClass": "high",
-      "disposition": "remove_canonical_write_side_effect",
+      "disposition": "keep",
       "futureBoundary": "pure_public_read",
       "miziziCallable": false,
       "humanCallable": true,
       "publicCallable": true,
-      "canonicalMutation": true,
-      "legacyDebt": true
+      "canonicalMutation": false,
+      "legacyDebt": false
     },
     {
       "id": "wakilisha-public-api",

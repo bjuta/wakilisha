@@ -234,12 +234,57 @@ const publicReadWriter =
 if (
   publicReadWriter?.futureBoundary !==
     "pure_public_read" ||
-  publicReadWriter?.disposition !==
-    "remove_canonical_write_side_effect"
+  publicReadWriter?.disposition !== "keep" ||
+  publicReadWriter?.canonicalMutation !== false ||
+  publicReadWriter?.legacyDebt !== false ||
+  publicReadWriter?.publicCallable !== true
 ) {
   throw new Error(
-    "Current public read authority must converge to a mechanically pure Registry read boundary.",
+    "Public content read authority must remain a mechanically pure canonical Registry read boundary.",
   );
+}
+
+const publicContentReadSource = fs.readFileSync(
+  "supabase/functions/public-content-read/index.ts",
+  "utf8",
+);
+
+const directCanonicalRegistryDml =
+  /\.from\(\s*["']registry_[^"']+["']\s*\)\s*\.\s*(insert|update|upsert|delete)\s*\(/s;
+
+if (directCanonicalRegistryDml.test(publicContentReadSource)) {
+  throw new Error(
+    "public-content-read reintroduced direct canonical Registry DML.",
+  );
+}
+
+const canonicalDatabaseMutatorNames =
+  registryWriters
+    .filter(
+      (writer) =>
+        writer.kind === "database_function" &&
+        writer.canonicalMutation === true,
+    )
+    .map((writer) => {
+      const match = String(writer.entrypoint).match(
+        /^(?:[^.]+\.)?([^.(]+)(?:\(|$)/,
+      );
+      return match?.[1] ?? "";
+    })
+    .filter(Boolean);
+
+for (const functionName of canonicalDatabaseMutatorNames) {
+  const escapedFunctionName =
+    functionName.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const rpcCall = new RegExp(
+    String.raw`\.rpc\(\s*["']${escapedFunctionName}["']`,
+  );
+
+  if (rpcCall.test(publicContentReadSource)) {
+    throw new Error(
+      `public-content-read may not invoke canonical Registry mutator RPC: ${functionName}`,
+    );
+  }
 }
 
 const miziziRunner =

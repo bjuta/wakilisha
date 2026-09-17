@@ -948,6 +948,77 @@ describe("MIZIZI Slice 2 Gate B Pure Public Read", () => {
     }
   });
 
+  it("classifies public-content-read as pure Registry read authority with no canonical mutator RPC path", () => {
+    const manifest =
+      JSON.parse(
+        readFileSync(
+          "scripts/control-plane/registry-privileged-writer-manifest.json",
+          "utf8",
+        ),
+      ) as {
+        writers: Array<{
+          id: string;
+          kind: string;
+          entrypoint: string;
+          disposition: string;
+          futureBoundary: string;
+          canonicalMutation: boolean;
+          legacyDebt: boolean;
+        }>;
+      };
+
+    const publicRead =
+      manifest.writers.find(
+        (writer) =>
+          writer.id ===
+          "public-content-read",
+      );
+
+    expect(publicRead).toMatchObject({
+      disposition: "keep",
+      futureBoundary: "pure_public_read",
+      canonicalMutation: false,
+      legacyDebt: false,
+    });
+
+    const canonicalMutatorNames =
+      manifest.writers
+        .filter(
+          (writer) =>
+            writer.kind ===
+              "database_function" &&
+            writer.canonicalMutation ===
+              true,
+        )
+        .map((writer) => {
+          const match =
+            writer.entrypoint.match(
+              /^(?:[^.]+\.)?([^.(]+)(?:\(|$)/,
+            );
+          return match?.[1] ?? "";
+        })
+        .filter(Boolean);
+
+    const publicReadSource =
+      readFileSync(
+        "supabase/functions/public-content-read/index.ts",
+        "utf8",
+      );
+
+    for (const functionName of canonicalMutatorNames) {
+      expect(
+        publicReadSource,
+      ).not.toContain(
+        `.rpc("${functionName}"`,
+      );
+      expect(
+        publicReadSource,
+      ).not.toContain(
+        `.rpc('${functionName}'`,
+      );
+    }
+  });
+
   it("keeps generated Release descriptions response-only", () => {
     for (const path of publicReadGateways) {
       const source = read(path);
