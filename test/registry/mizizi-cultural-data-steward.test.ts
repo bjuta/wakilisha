@@ -1252,4 +1252,70 @@ describe("MIZIZI Slice 2 Gate D Identity + Projection Lineage", () => {
       "ordinary Artist aliases were promoted into lineage",
     );
   });
+
+  it("binds human-required Registry grants to shared review authority", () => {
+    const migration = readFileSync(
+      "supabase/migrations/20260916210001_registry_shared_review_authority_v1.sql",
+      "utf8",
+    );
+    const verifier = readFileSync(
+      "scripts/control-plane/verify-mizizi-shared-review-authority.sql",
+      "utf8",
+    );
+
+    expect(migration).toContain(
+      "platform_private.registry_review_cases",
+    );
+    expect(migration).toContain(
+      "platform_private.registry_review_events",
+    );
+    expect(migration).toContain(
+      "platform_private.registry_review_case_status_v1",
+    );
+    expect(migration).toContain(
+      "registry_execution_grant_target_review_seal",
+    );
+    expect(migration).toContain(
+      "registry_execution_grants_review_authority_guard",
+    );
+    expect(migration).toContain(
+      "requires_human_approval",
+    );
+    expect(migration).toContain(
+      "'decision', 'supersede', 'reopen'",
+    );
+    expect(migration).toContain(
+      "'approved', 'rejected', 'needs_more_evidence'",
+    );
+    expect(
+      (migration.match(/for update;/g) ?? []).length,
+    ).toBeGreaterThanOrEqual(2);
+    expect(verifier).toContain(
+      "review-case lifecycle is not serialized",
+    );
+    expect(migration).toContain(
+      "event_sequence bigint generated always as identity",
+    );
+    expect(migration).toContain(
+      "registry_review_events_sequence_key",
+    );
+    expect(migration).toContain(
+      "order by review_event.event_sequence desc",
+    );
+    expect(migration).toContain(
+      "order by decision_event.event_sequence desc",
+    );
+    expect(verifier).toContain(
+      "deterministic review event ordering is missing",
+    );
+    expect(migration).not.toContain(
+      "alter table public.review_decisions",
+    );
+    expect(migration).not.toContain(
+      "alter table public.registry_review_items",
+    );
+    expect(verifier).toContain(
+      "MIZIZI_SHARED_REVIEW_AUTHORITY_PASS",
+    );
+  });
 });
