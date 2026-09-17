@@ -1441,4 +1441,45 @@ describe("MIZIZI Slice 3 Candidate D1 Top Songs presentation authority", () => {
     expect(migration).toContain("40001");
     expect(migration).toContain("at most 20 Top Songs");
   });
+
+  it("keeps Top Songs service-role authority behind the read RPC", () => {
+    const repair = readFileSync(
+      "supabase/migrations/20260917121600_artist_top_song_service_role_boundary_v1.sql",
+      "utf8",
+    );
+    const verifier = readFileSync(
+      "scripts/control-plane/verify-mizizi-top-song-presentation-authority.sql",
+      "utf8",
+    );
+
+    for (const table of [
+      "artist_top_song_curations",
+      "artist_top_song_curation_migration_map",
+      "artist_top_song_curation_events",
+    ]) {
+      expect(repair).toContain(
+        `revoke all on table public.${table}`,
+      );
+      expect(verifier).toContain(
+        `has_table_privilege('service_role', 'public.${table}', 'SELECT,INSERT,UPDATE,DELETE')`,
+      );
+    }
+
+    expect(repair).toContain(
+      "grant execute on function public.get_artist_top_songs_v1(uuid,text)",
+    );
+    expect(repair).toContain(
+      "revoke all on function public.admin_replace_artist_top_songs_v1(uuid,uuid[],text)",
+    );
+    expect(verifier).toContain(
+      "not has_function_privilege('service_role', 'public.get_artist_top_songs_v1(uuid,text)', 'EXECUTE')",
+    );
+    expect(verifier).toContain(
+      "has_function_privilege('service_role', 'public.admin_replace_artist_top_songs_v1(uuid,uuid[],text)', 'EXECUTE')",
+    );
+    expect(verifier).toContain(
+      "has_function_privilege('service_role', 'platform_private.artist_top_song_fingerprint_v1(uuid)', 'EXECUTE')",
+    );
+  });
+
 });
