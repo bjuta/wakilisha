@@ -169,15 +169,26 @@ for (const writer of registryWriters) {
     }
   }
 
-  if (
+  const writerHasRuntimeSource =
     writer.kind === "edge_function" ||
-    writer.kind === "production_runner"
+    writer.kind === "production_runner";
+
+  if (
+    writerHasRuntimeSource &&
+    writer.disposition === "retire"
   ) {
-    if (!fs.existsSync(writer.entrypoint)) {
+    if (fs.existsSync(writer.entrypoint)) {
       throw new Error(
-        `${writer.id}: classified writer entrypoint is missing: ${writer.entrypoint}`,
+        `${writer.id}: retired Registry writer source must remain absent: ${writer.entrypoint}`,
       );
     }
+  } else if (
+    writerHasRuntimeSource &&
+    !fs.existsSync(writer.entrypoint)
+  ) {
+    throw new Error(
+      `${writer.id}: classified writer entrypoint is missing: ${writer.entrypoint}`,
+    );
   }
 
   if (
