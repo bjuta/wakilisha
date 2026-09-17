@@ -1036,9 +1036,9 @@ describe("MIZIZI Slice 2 Gate B Pure Public Read", () => {
   });
 });
 
-describe("MIZIZI Slice 2 Gate C Relationship authority convergence", () => {
+describe("MIZIZI Slice 2 Gate C historical relationship authority receipt", () => {
   const migration = read(
-    "supabase/migrations/20260916182000_registry_relationship_authority_convergence_v1.sql",
+    "docs/engineering/replay-baseline/retired-active-migrations/20260916182000_registry_relationship_authority_convergence_v1.sql",
   );
   const verifier = read(
     "scripts/control-plane/verify-mizizi-relationship-authority-convergence.sql",

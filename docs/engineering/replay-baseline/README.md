@@ -192,3 +192,32 @@ The final zero-state replay was proven at migration count `56`, head
 
 This repair was discovered while preparing Phase 7A K4C-P2. K4C-P2 remains a
 separate sealed candidate and is not part of this replay-baseline repair.
+
+### September 17 Gate C relationship replay retirement
+
+MIZIZI Slice 3 Preview rehearsal exposed one post-baseline migration that mixed
+Production-only historical relationship reconciliation with enduring fail-closed
+Registry authority:
+
+- `20260916182000_registry_relationship_authority_convergence_v1.sql`
+
+Its exact Production-applied SQL is preserved under
+`retired-active-migrations/` with SHA-256
+`01fea943170f3cd3486d2d65f3635dbe4d9c0d8d25632905a379ba52d7c9fdf1`.
+
+The replay-safe forward replacement is:
+
+- `20260917121000_registry_relationship_replay_authority_v1.sql`
+
+The replacement carries only the enduring cultural-entity, relationship, and
+relationship-evidence mutation guards. It contains no Production content
+identities and no historical data reconciliation.
+
+The cutover follows the established two-stage retirement model. The replacement
+was merged and accepted in Production first. Stage 2 preserves the original
+bytes, removes the old migration from active replay, then uses native Supabase
+migration-history repair to mark only version `20260916182000` reverted before
+protected CI is allowed to merge the retirement branch.
+
+Final closure requires a brand-new zero-data Preview to replay the active
+migration chain to the accepted Production head with no manual fixtures.
