@@ -1,6 +1,8 @@
 # API Naming & Architecture Audit Report
 ## WAKILISHA — June 2026
 
+> **September 2026 status note:** this document preserves the June 2026 inventory as historical architecture evidence. `admin-registry-api` is no longer the current Admin Registry client boundary: generic CRUD moved to `admin-router/registry`, Top Songs moved to typed presentation-authority RPCs, and Slice 3 D2 retires the standalone Edge runtime after replacement and traffic proof.
+
 ---
 
 ## Executive Summary

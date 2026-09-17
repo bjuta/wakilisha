@@ -247,17 +247,17 @@ The function also retains an embedded Charts implementation while current Charts
 
 ### 6.7 `admin-registry-api`
 
-**Live posture**
+**D2 retirement posture**
 
-- ACTIVE deployment
-- authenticated/capability-governed Admin boundary
-- predates portions of `admin-router`
+- Production v37 is retained only as the temporary rollback deployment until the final D2 deletion gate;
+- current generic Admin Registry CRUD is served by `admin-router/registry`;
+- Artist Top Songs reads use `get_artist_top_songs_v1`;
+- Artist Top Songs writes use `admin_replace_artist_top_songs_v1`;
+- D1 Production acceptance proved both public readers and the authenticated Admin read/write path against the presentation authority;
+- exact current-main search establishes no remaining product caller;
+- the initial post-D1-release Production traffic window recorded zero `admin-registry-api` invocations.
 
-**Current consumer**
-
-The Artist Top Songs admin component still calls this API, so the function is not globally dead.
-
-**Decision**: `PARTIAL CONVERGENCE`. Move remaining unique capability to a shared governed primitive before retiring duplicate CRUD/router responsibilities.
+**Decision**: `RETIRE`. D2 removes the repository runtime source and privileged-writer classification now. The Production v37 deployment is deleted only after the retirement change is merged and a fresh final traffic check remains zero.
 
 ### 6.8 `provider-intake-api`
 

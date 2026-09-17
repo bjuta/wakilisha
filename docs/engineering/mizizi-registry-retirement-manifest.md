@@ -279,16 +279,18 @@ Retire only the duplicate Charts portion if no unique governed capability remain
 
 ### Decision
 
-**PARTIAL CONVERGENCE, later candidate retirement.**
+**RETIRE in Slice 3 D2 after D1 replacement proof.**
 
-A current Top Songs Admin component still calls it. Therefore the whole function is not dead.
+The prerequisite convergence is complete:
 
-Before retirement:
+- generic Admin Registry CRUD is served by `admin-router/registry`;
+- Top Songs reads are served by `get_artist_top_songs_v1`;
+- Top Songs writes are served by `admin_replace_artist_top_songs_v1`;
+- D1 Production public-reader and authenticated Admin acceptance passed;
+- current-main has no remaining product caller;
+- the initial bounded post-release Production traffic audit recorded zero invocations.
 
-- isolate remaining unique routes;
-- move those routes under the accepted shared Admin/relationship primitive;
-- prove no other current consumer;
-- retire duplicate CRUD behavior first if safely separable.
+D2 removes the source and standing writer classification, then keeps Production v37 only until the merged retirement contract and a final zero-traffic check authorize deployment deletion. Historical Top Songs relationship rows, evidence, migration lineage, and presentation rows are preserved.
 
 ## 13. Legacy relationship authority
 

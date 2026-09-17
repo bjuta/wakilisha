@@ -1482,4 +1482,61 @@ describe("MIZIZI Slice 3 Candidate D1 Top Songs presentation authority", () => {
     );
   });
 
+
+  it("keeps retired admin-registry-api outside the active Registry control plane", () => {
+    const manifest = JSON.parse(
+      readFileSync(
+        "scripts/control-plane/registry-privileged-writer-manifest.json",
+        "utf8",
+      ),
+    ) as { writers: Array<{ id: string }> };
+    const registryClient = readFileSync(
+      "src/services/registry/admin/client.ts",
+      "utf8",
+    );
+    const topSongsClient = readFileSync(
+      "src/services/registry/admin/topSongsClient.ts",
+      "utf8",
+    );
+    const topSongsPanel = readFileSync(
+      "src/pages/admin/registry/artists/detail/components/TopSongsPanel.tsx",
+      "utf8",
+    );
+    const config = readFileSync(
+      "supabase/config.toml",
+      "utf8",
+    );
+
+    expect(
+      existsSync(
+        "supabase/functions/admin-registry-api/index.ts",
+      ),
+    ).toBe(false);
+    expect(
+      manifest.writers.some(
+        (writer) =>
+          writer.id ===
+          "admin-registry-api",
+      ),
+    ).toBe(false);
+    expect(registryClient).toContain(
+      "/functions/v1/admin-router/registry",
+    );
+    expect(registryClient).not.toContain(
+      "/functions/v1/admin-registry-api",
+    );
+    expect(topSongsClient).toContain(
+      "get_artist_top_songs_v1",
+    );
+    expect(topSongsClient).toContain(
+      "admin_replace_artist_top_songs_v1",
+    );
+    expect(topSongsPanel).not.toContain(
+      "admin-registry-api",
+    );
+    expect(config).not.toContain(
+      "[functions.admin-registry-api]",
+    );
+  });
+
 });

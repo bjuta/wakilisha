@@ -219,27 +219,7 @@
       "canonicalMutation": true,
       "legacyDebt": false
     },
-    {
-      "id": "admin-registry-api",
-      "kind": "edge_function",
-      "entrypoint": "supabase/functions/admin-registry-api/index.ts",
-      "authentication": "request_bearer_user",
-      "authorization": "admin_or_registry_capability",
-      "executionAuthority": "service_role_after_authorization",
-      "targets": [
-        "registry_entity_relationships",
-        "registry_tracks"
-      ],
-      "riskClass": "high",
-      "disposition": "partial_convergence",
-      "futureBoundary": "typed_registry_relationship_operations",
-      "miziziCallable": false,
-      "humanCallable": true,
-      "publicCallable": false,
-      "canonicalMutation": true,
-      "legacyDebt": true
-    },
-    {
+        {
       "id": "provider-intake-api",
       "kind": "edge_function",
       "entrypoint": "supabase/functions/provider-intake-api/index.ts",

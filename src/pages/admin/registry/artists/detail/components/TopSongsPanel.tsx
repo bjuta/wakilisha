@@ -240,7 +240,7 @@ export function TopSongsPanel({ artistId, artistSlug, artistName }: { artistId: 
     });
   };
 
-  // Save via admin-registry-api
+  // Save through the governed Top Songs presentation authority.
   const handleSave = async () => {
     if (!artistSlug) return;
     setSaving(true);
