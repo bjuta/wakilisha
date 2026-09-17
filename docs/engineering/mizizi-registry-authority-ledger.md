@@ -243,9 +243,9 @@ Shared Admin Registry CRUD is routed through this boundary.
 
 Current Registry client sends the real user's access token.
 
-The function also retains an embedded Charts implementation while current Charts code calls `chart-ingest-api`. Current-main search did not establish a live `admin-router/charts` caller.
+The function retained an embedded Charts implementation after current Charts code had already converged on `chart-ingest-api`. The Slice 3 Production traffic gate observed 29,375 global Edge invocations and 14 real `admin-router` invocations across the post-convergence window, with zero `admin-router/charts` calls.
 
-**Decision**: `KEEP SHARED BOUNDARY`; mark embedded Charts section `CANDIDATE CONVERGENCE/RETIREMENT` after caller proof. Do not turn `admin-router` into a larger god-router.
+**Decision**: `KEEP SHARED BOUNDARY / RETIRE EMBEDDED CHARTS`. The repository candidate removes only the duplicate Charts dispatcher and contract surface. Registry, credentials, users, content, rate limiting, and shared Admin authorization remain in `admin-router`. Production retirement is not complete until the merged candidate is deployed and independently accepted.
 
 ### 6.7 `admin-registry-api`
 

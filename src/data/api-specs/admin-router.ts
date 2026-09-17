@@ -2,8 +2,8 @@ export const adminRouterSpec = {
   openapi: "3.0.3",
   info: {
     title: "WAKILISHA Admin API",
-    description: "Admin gateway for WAKILISHA operations — registry CRUD, chart ingestion, provider credentials, and user management. All endpoints (except /health) require a Supabase JWT.",
-    version: "4.0.0",
+    description: "Admin gateway for WAKILISHA operations: registry CRUD, provider credentials, and user management. All endpoints except /health require a Supabase JWT.",
+    version: "5.0.0",
     contact: { name: "WAKILISHA Engineering", url: "https://wakilisha.africa" }
   },
   servers: [{ url: "https://pgzizndxdyhqmtyywjmt.supabase.co/functions/v1/admin-router", description: "Production" }],
@@ -12,13 +12,12 @@ export const adminRouterSpec = {
     { name: "System", description: "Health check" },
     { name: "Registry", description: "Entity CRUD (artists, tracks, releases, labels, genres)" },
     { name: "Credentials", description: "Provider credential management" },
-    { name: "Users", description: "Admin user invites, password resets, email testing" },
-    { name: "Charts", description: "Chart ingestion pipeline — dry runs, scoring, normalization, carry-forward, shortlist, commit" }
+    { name: "Users", description: "Admin user invites, password resets, email testing" }
   ],
   paths: {
     "/health": {
       get: {
-        summary: "Health check (public — no auth)",
+        summary: "Health check (public, no auth)",
         operationId: "healthCheck",
         tags: ["System"],
         security: [],
@@ -95,24 +94,6 @@ export const adminRouterSpec = {
         responses: { "200": { description: "Operation result" }, "400": { description: "Missing required fields" }, "403": { description: "Missing manage_users capability" } }
       }
     },
-    "/charts": {
-      post: {
-        summary: "Chart ingestion operations (action-based dispatch)",
-        description: "All chart actions via POST /charts with { action, runId, ...params }. Capability-gated per action.",
-        operationId: "chartAction",
-        tags: ["Charts"],
-        requestBody: {
-          required: true,
-          content: { "application/json": { schema: { type: "object", required: ["action"], properties: { action: { type: "string", enum: ["create_dry_run", "list_runs", "get_run", "source_fetch", "normalize_run", "run_eligibility", "run_carry_forward", "run_scoring", "run_shortlist", "run_full_pipeline", "cancel_run", "retry_run", "reset_pipeline", "csv_list", "preflight", "get_stages", "get_sources", "get_candidates", "get_normalized", "get_kpis", "get_activity", "get_resource_guard", "get_review_issues", "get_matches_for_run", "validate_commit", "commit_run", "run_airplay_detection", "send_gaps_to_review", "fix_chart_artist_slugs", "reingest_edition"] }, runId: { type: "string" }, limit: { type: "integer" }, request: { type: "object" } } } } }
-        },
-        responses: {
-          "200": { description: "Action result (shape varies by action)" },
-          "400": { description: "Missing required params" },
-          "403": { description: "Missing required capability" },
-          "500": { description: "Internal error with detail" }
-        }
-      }
-    }
   },
   components: {
     securitySchemes: {

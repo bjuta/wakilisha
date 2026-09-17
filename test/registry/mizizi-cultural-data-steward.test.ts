@@ -423,12 +423,21 @@ describe("MIZIZI Cultural Data Steward", () => {
   });
 
   it("converges chart runtime onto caller-JWT and governed Registry authority", () => {
+    const adminRouter=readFileSync("supabase/functions/admin-router/index.ts","utf8");
+    const adminRouterSpec=readFileSync("src/data/api-specs/admin-router.ts","utf8");
+    const adminRouterOpenApi=readFileSync("docs/openapi/admin-router.yaml","utf8");
+    const productionAdapter=readFileSync("src/services/chartsIngestion/productionAdapter.ts","utf8");
     const chartIngest=readFileSync("supabase/functions/chart-ingest-api/index.ts","utf8");
     const providerFetch=readFileSync("supabase/functions/chart-provider-fetch/index.ts","utf8");
     const migration=readFileSync("supabase/migrations/20260915122100_chart_runtime_caller_jwt_convergence_v1.sql","utf8");
     const manifest=JSON.parse(readFileSync("scripts/control-plane/registry-privileged-writer-manifest.json","utf8")) as {writers:Array<{id:string;executionAuthority:string;canonicalMutation:boolean}>};
     expect(chartIngest).toContain("SUPABASE_ANON_KEY"); expect(chartIngest).not.toContain("SUPABASE_SERVICE_ROLE_KEY"); expect(chartIngest).not.toContain("admin_settings_secrets"); expect(chartIngest).toContain("/functions/v1/chart-provider-fetch"); expect(chartIngest).toContain("chart_materialize_candidate_registry_v1"); expect(chartIngest).toContain("chart_admit_artist_origin_v1"); expect(chartIngest).toContain("chart_create_artist_origin_shell_v1"); expect(chartIngest).not.toContain("chart_set_artist_origin_for_charts");
     expect(providerFetch).toContain("SUPABASE_SERVICE_ROLE_KEY"); expect(providerFetch).toContain("admin_settings_secrets"); expect(providerFetch).toContain('required_capability: "manage_ingest"'); expect(providerFetch).not.toContain("registry_");
+    expect(productionAdapter).toContain('supabase.functions.invoke("chart-ingest-api"');
+    expect(adminRouter).toContain('sections:["registry","credentials","users","content"]');
+    expect(adminRouter).not.toContain("const ACS:any="); expect(adminRouter).not.toContain("async function hCh("); expect(adminRouter).not.toContain('section==="charts"'); expect(adminRouter).not.toContain("return hCh(");
+    expect(adminRouterSpec).not.toContain('"/charts"'); expect(adminRouterSpec).not.toContain('name: "Charts"');
+    expect(adminRouterOpenApi).not.toContain("\n  /charts:"); expect(adminRouterOpenApi).not.toContain("name: Charts");
     expect(manifest.writers.find(w=>w.id==="chart-ingest-api")).toMatchObject({executionAuthority:"caller_jwt_rls_plus_typed_registry_operations",canonicalMutation:false});
     expect(migration).toContain("chart_get_entry_registry_identity_v1"); expect(migration).toContain("revoke all on function public.chart_set_artist_origin_for_charts"); expect(migration).not.toContain("wk_chart_editions_v2_publish_charts_insert_v1");
   });

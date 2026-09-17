@@ -264,18 +264,26 @@ Use the canonical Admin Registry mutation client/boundary with the authenticated
 
 ### Decision
 
-**CANDIDATE PARTIAL RETIREMENT.**
+**RETIRE NOW. PARTIAL ROUTER RETIREMENT ONLY.**
 
-Current Charts client is wired to `chart-ingest-api`; current-main search did not establish a caller for `admin-router/charts`.
+Current Charts product code invokes `chart-ingest-api` directly. The replacement dispatcher covers the legacy action family and retains the newer governed operations. The rest of `admin-router` remains legitimate shared authority for Registry, provider credentials, users, and content.
 
-### Proof required
+### Production traffic proof
 
-- exact route reference search;
-- request/traffic proof;
-- tests/docs/SDK references;
-- compare unique behavior with `chart-ingest-api`.
+The read-only Edge log audit covered `2026-09-15T14:52:23Z` through `2026-09-17T18:47:02Z` in five windows. It observed 29,375 global Edge invocations, 14 `admin-router` invocations, six `chart-ingest-api` invocations, and zero `admin-router/charts` invocations. The positive control therefore proves the logging source was live while the retired route was unused.
 
-Retire only the duplicate Charts portion if no unique governed capability remains.
+### Repository retirement contract
+
+- remove the embedded Charts dispatcher from `admin-router`;
+- remove `/charts` and the legacy root action fallback;
+- remove Charts from the router health-advertised section list;
+- remove the retired path from both Admin Router OpenAPI authorities;
+- keep `chart-ingest-api` and `chart-provider-fetch` unchanged;
+- extend the existing MIZIZI chart convergence test with a permanent negative contract rather than adding a new test file.
+
+### Production promotion
+
+After protected CI and merge, deploy `admin-router` and run the normal frontend Production Finish update so the live Admin API docs receive the retired `/charts` contract. No SQL or canonical data mutation is required. Rollback authority for the Edge runtime is the exact accepted Production v50 bundle if an undiscovered dependency appears during Production acceptance.
 
 ## 12. `admin-registry-api`
 
