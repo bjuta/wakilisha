@@ -1378,3 +1378,67 @@ describe("MIZIZI Slice 2 Gate D Identity + Projection Lineage", () => {
     );
   });
 });
+
+describe("MIZIZI Slice 3 Candidate D1 Top Songs presentation authority", () => {
+  const migration = read(
+    "supabase/migrations/20260917121500_artist_top_song_presentation_authority_v1.sql",
+  );
+  const verifier = read(
+    "scripts/control-plane/verify-mizizi-top-song-presentation-authority.sql",
+  );
+  const client = read(
+    "src/services/registry/admin/topSongsClient.ts",
+  );
+  const panel = read(
+    "src/pages/admin/registry/artists/detail/components/TopSongsPanel.tsx",
+  );
+  const artistPage = read(
+    "src/pages/admin/registry/artists/detail/page.tsx",
+  );
+  const publicReaders = [
+    "supabase/functions/public-content-read/index.ts",
+    "supabase/functions/wakilisha-public-api/index.ts",
+  ];
+
+  it("separates editorial Top Songs presentation from evidence-backed relationship truth", () => {
+    expect(migration).toContain("artist_top_song_curations");
+    expect(migration).toContain("artist_top_song_curation_migration_map");
+    expect(migration).toContain("artist_top_song_curation_events");
+    expect(migration).toContain("get_artist_top_songs_v1");
+    expect(migration).toContain("admin_replace_artist_top_songs_v1");
+    expect(migration).toContain("resolution_status");
+    expect(migration).toContain("candidate_track_ids");
+    expect(migration).not.toMatch(
+      /(update|delete\s+from)\s+public\.registry_entity_relationships/i,
+    );
+  });
+
+  it("moves the Admin Top Songs caller onto exact-set RPC authority", () => {
+    expect(client).toContain("get_artist_top_songs_v1");
+    expect(client).toContain("admin_replace_artist_top_songs_v1");
+    expect(panel).toContain("loadAdminArtistTopSongs");
+    expect(panel).toContain("replaceAdminArtistTopSongs");
+    expect(panel).not.toContain("admin-registry-api/top-songs");
+    expect(artistPage).toContain(
+      "<TopSongsPanel artistId={artist.id}",
+    );
+  });
+
+  it("moves both public Top Songs readers onto presentation authority", () => {
+    for (const path of publicReaders) {
+      const source = read(path);
+      expect(source).toContain("getTopSongsFromPresentationAuthority");
+      expect(source).toContain('"get_artist_top_songs_v1"');
+      expect(source).not.toContain("getTopSongsFromRelationships");
+    }
+  });
+
+  it("keeps direct browser DML closed and unresolved legacy identity fail-closed", () => {
+    expect(verifier).toContain("Browser direct Top Songs presentation DML grant detected");
+    expect(verifier).toContain("needs_review");
+    expect(verifier).toContain("candidate_track_ids");
+    expect(migration).toContain("p_expected_fingerprint");
+    expect(migration).toContain("40001");
+    expect(migration).toContain("at most 20 Top Songs");
+  });
+});

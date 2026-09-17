@@ -6626,6 +6626,152 @@ export type Database = {
           },
         ]
       }
+      artist_top_song_curation_events: {
+        Row: {
+          actor_id: string | null
+          after_track_ids: string[]
+          artist_id: string
+          before_track_ids: string[]
+          created_at: string
+          event_kind: string
+          expected_fingerprint: string | null
+          id: string
+          resulting_fingerprint: string
+        }
+        Insert: {
+          actor_id?: string | null
+          after_track_ids?: string[]
+          artist_id: string
+          before_track_ids?: string[]
+          created_at?: string
+          event_kind: string
+          expected_fingerprint?: string | null
+          id?: string
+          resulting_fingerprint: string
+        }
+        Update: {
+          actor_id?: string | null
+          after_track_ids?: string[]
+          artist_id?: string
+          before_track_ids?: string[]
+          created_at?: string
+          event_kind?: string
+          expected_fingerprint?: string | null
+          id?: string
+          resulting_fingerprint?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "artist_top_song_curation_events_artist_id_fkey"
+            columns: ["artist_id"]
+            isOneToOne: false
+            referencedRelation: "registry_artists"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      artist_top_song_curation_migration_map: {
+        Row: {
+          artist_id: string
+          candidate_track_ids: string[]
+          captured_at: string
+          legacy_sort_order: number | null
+          legacy_source_slug: string
+          legacy_target_slug: string
+          resolution_reason: string
+          resolution_status: string
+          resolved_track_id: string | null
+          source_relationship_id: string
+        }
+        Insert: {
+          artist_id: string
+          candidate_track_ids?: string[]
+          captured_at?: string
+          legacy_sort_order?: number | null
+          legacy_source_slug: string
+          legacy_target_slug: string
+          resolution_reason: string
+          resolution_status: string
+          resolved_track_id?: string | null
+          source_relationship_id: string
+        }
+        Update: {
+          artist_id?: string
+          candidate_track_ids?: string[]
+          captured_at?: string
+          legacy_sort_order?: number | null
+          legacy_source_slug?: string
+          legacy_target_slug?: string
+          resolution_reason?: string
+          resolution_status?: string
+          resolved_track_id?: string | null
+          source_relationship_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "artist_top_song_curation_migration_map_artist_id_fkey"
+            columns: ["artist_id"]
+            isOneToOne: false
+            referencedRelation: "registry_artists"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "artist_top_song_curation_migration_map_resolved_track_id_fkey"
+            columns: ["resolved_track_id"]
+            isOneToOne: false
+            referencedRelation: "registry_tracks"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      artist_top_song_curations: {
+        Row: {
+          artist_id: string
+          created_at: string
+          created_by: string | null
+          id: string
+          sort_order: number
+          track_id: string
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          artist_id: string
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          sort_order: number
+          track_id: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          artist_id?: string
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          sort_order?: number
+          track_id?: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "artist_top_song_curations_artist_id_fkey"
+            columns: ["artist_id"]
+            isOneToOne: false
+            referencedRelation: "registry_artists"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "artist_top_song_curations_track_id_fkey"
+            columns: ["track_id"]
+            isOneToOne: false
+            referencedRelation: "registry_tracks"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       audience_interests: {
         Row: {
           created_at: string
@@ -19718,6 +19864,14 @@ export type Database = {
         Args: { p_review_note: string; p_suggestion_id: string }
         Returns: Json
       }
+      admin_replace_artist_top_songs_v1: {
+        Args: {
+          p_artist_id: string
+          p_expected_fingerprint: string
+          p_track_ids: string[]
+        }
+        Returns: Json
+      }
       admin_resolve_chart_artist_alias: {
         Args: {
           p_alias_display_name?: string
@@ -22589,6 +22743,10 @@ export type Database = {
           registry_state: string
           slug: string
         }[]
+      }
+      get_artist_top_songs_v1: {
+        Args: { p_artist_id?: string; p_artist_slug?: string }
+        Returns: Json
       }
       get_audio_editorial_media_context: {
         Args: { p_publication_id: string }

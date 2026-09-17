@@ -117,7 +117,7 @@ async function getArtistDiscography(supabase: ReturnType<typeof createClient>, a
   return releases;
 }
 
-async function getTopSongsFromRelationships(
+async function getTopSongsFromPresentationAuthority(
   supabase: ReturnType<typeof createClient>,
   artistSlug: string,
 ): Promise<Array<{
@@ -130,144 +130,38 @@ async function getTopSongsFromRelationships(
   duration: string;
   songUrl: string;
 }>> {
-  const { data: relRows } = await supabase
-    .from("registry_entity_relationships")
-    .select("target_slug, sort_order")
-    .eq("source_entity_type", "artist")
-    .eq("source_slug", artistSlug)
-    .eq("target_entity_type", "track")
-    .eq("relationship_type", "popular_track")
-    .eq("relationship_role", "top_song")
-    .eq("relationship_status", "active")
-    .order("sort_order", { ascending: true });
+  const { data, error } = await supabase.rpc(
+    "get_artist_top_songs_v1",
+    {
+      p_artist_id: null,
+      p_artist_slug: artistSlug,
+    },
+  );
 
-  if (!relRows || relRows.length === 0) return [];
+  if (error || !data || typeof data !== "object") return [];
 
-  const seen = new Set<string>();
-  const uniqueRels: Array<{ target_slug: string; sort_order: number }> = [];
+  const payload = data as Record<string, any>;
+  const rows = Array.isArray(payload.tracks) ? payload.tracks : [];
 
-  for (const row of relRows as any[]) {
-    const targetSlug = String(row.target_slug || "");
-    if (!targetSlug || seen.has(targetSlug)) continue;
-
-    seen.add(targetSlug);
-    uniqueRels.push({
-      target_slug: targetSlug,
-      sort_order: Number(row.sort_order || 0),
-    });
-  }
-
-  const trackSlugs = uniqueRels.map((relationship) => relationship.target_slug);
-
-  const { data: trackRows } = await supabase
-    .from("registry_tracks")
-    .select("id, slug, title, duration_ms, artwork_url, preview_url")
-    .in("slug", trackSlugs)
-    .eq("status", "active");
-
-  if (!trackRows || trackRows.length === 0) return [];
-
-  const trackBySlug = new Map<string, any>();
-
-  for (const track of trackRows as any[]) {
-    trackBySlug.set(String(track.slug), track);
-  }
-
-  const trackIds = trackRows.map((track: any) => String(track.id));
-  const artistsByTrackId = new Map<string, string>();
-  const primaryArtistSlugByTrackId = new Map<string, string>();
-
-  if (trackIds.length > 0) {
-    const { data: trackArtistRows } = await supabase
-      .from("registry_track_artists")
-      .select("track_id, artist_name_text, artist_slug, is_primary, is_featured, credit_order")
-      .in("track_id", trackIds)
-      .eq("status", "active")
-      .order("credit_order", { ascending: true });
-
-    if (trackArtistRows && trackArtistRows.length > 0) {
-      const groups = new Map<
-        string,
-        Array<{
-          name: string;
-          slug: string;
-          isPrimary: boolean;
-          isFeatured: boolean;
-          creditOrder: number;
-        }>
-      >();
-
-      for (const credit of trackArtistRows as any[]) {
-        const trackId = String(credit.track_id);
-
-        if (!groups.has(trackId)) groups.set(trackId, []);
-
-        groups.get(trackId)!.push({
-          name: String(credit.artist_name_text || credit.artist_slug || ""),
-          slug: String(credit.artist_slug || ""),
-          isPrimary: Boolean(credit.is_primary),
-          isFeatured: Boolean(credit.is_featured),
-          creditOrder: Number(credit.credit_order || 0),
-        });
-      }
-
-      for (const [trackId, artists] of groups) {
-        artists.sort((left, right) => left.creditOrder - right.creditOrder);
-
-        const primary = artists.find((artist) => artist.isPrimary) || artists[0];
-        const featured = artists
-          .filter((artist) => artist !== primary && artist.name)
-          .map((artist) => artist.name);
-
-        primaryArtistSlugByTrackId.set(trackId, primary?.slug || "");
-
-        artistsByTrackId.set(
-          trackId,
-          featured.length > 0
-            ? `${primary?.name || ""} (feat. ${featured.join(", ")})`
-            : primary?.name || "",
-        );
-      }
-    }
-  }
-
-  return uniqueRels
-    .map((relationship) => {
-      const track = trackBySlug.get(relationship.target_slug);
-      if (!track) return null;
-
-      const trackId = String(track.id);
-      const durationMs = Number(track.duration_ms || 0);
-      const duration =
-        durationMs > 0
-          ? `${Math.floor(durationMs / 60000)}:${String(
-              Math.floor((durationMs % 60000) / 1000),
-            ).padStart(2, "0")}`
-          : "";
+  return rows
+    .map((row: Record<string, any>) => {
+      const durationMs = Number(row.durationMs || 0);
+      const minutes = Math.floor(durationMs / 60000);
+      const seconds = Math.floor((durationMs % 60000) / 1000);
 
       return {
-        id: trackId,
-        slug: String(track.slug || ""),
-        artistSlug: primaryArtistSlugByTrackId.get(trackId) || artistSlug,
-        title: String(track.title || ""),
-        artists: artistsByTrackId.get(trackId) || "",
-        image: String(track.artwork_url || ""),
-        duration,
-        songUrl: String(track.preview_url || ""),
+        id: String(row.trackId || ""),
+        slug: String(row.trackSlug || ""),
+        artistSlug: String(row.primaryArtistSlug || artistSlug),
+        title: String(row.title || ""),
+        artists: String(row.artistNames || ""),
+        image: String(row.artworkUrl || ""),
+        duration: durationMs > 0 ? `${minutes}:${String(seconds).padStart(2, "0")}` : "",
+        songUrl: String(row.previewUrl || ""),
       };
     })
-    .filter(Boolean) as Array<{
-      id: string;
-      slug: string;
-      artistSlug: string;
-      title: string;
-      artists: string;
-      image: string;
-      duration: string;
-      songUrl: string;
-    }>;
+    .filter((row) => row.id && row.slug && row.title);
 }
-
 function buildProgramSummary(p: any) {
   return { id: String(p.id), publicSlug: String(p.public_slug), publicLabel: String(p.public_label), shortLabel: String(p.public_label), sourceFamilySlug: String(p.source_family_slug || p.public_slug), seriesSlug: String(p.series_slug || ""), seriesLabel: String(p.series_slug || ""), marketSlug: String(p.market_slug || ""), marketLabel: String(p.market_slug || ""), periodType: String(p.default_period_type || "weekly"), methodologyVersion: String(p.default_methodology_version || "legacy-import-v1"), eligibilityRulesVersion: "legacy-import-v1" };
 }
@@ -389,7 +283,7 @@ Deno.serve(async (req) => {
       if (Array.isArray(genresArr)) { for (const g of genresArr as string[]) genres.push(String(g)); }
       if (meta.country) genres.push(String(meta.country));
 
-      const topSongs = await getTopSongsFromRelationships(supabase, slug);
+      const topSongs = await getTopSongsFromPresentationAuthority(supabase, slug);
 
       const wpBio = String(artist.bio || "");
       const tagline = String(meta.tagline || "");

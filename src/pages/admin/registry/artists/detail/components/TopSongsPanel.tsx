@@ -3,6 +3,11 @@ import { supabase } from "@/lib/supabase";
 import { WkIcon } from "@/components/design-system/Icon";
 import { WkSurface } from "@/components/design-system/primitives/Surface";
 import { clearDiscographyCache } from "@/services/publicContent/client";
+import {
+  loadAdminArtistTopSongs,
+  replaceAdminArtistTopSongs,
+  type AdminTopSongLegacyException,
+} from "@/services/registry/admin/topSongsClient";
 
 interface TopSongEntry {
   trackId: string;
@@ -34,72 +39,7 @@ function formatDuration(ms: number | null): string {
   return `${minutes}:${seconds.toString().padStart(2, "0")}`;
 }
 
-const SUPABASE_URL = import.meta.env.VITE_PUBLIC_SUPABASE_URL as string;
-
-async function fetchAdminTopSongs(artistSlug: string): Promise<TopSongEntry[]> {
-  const session = await supabase.auth.getSession();
-  const token = session.data.session?.access_token;
-  if (!token) throw new Error("Not authenticated");
-
-  const resp = await fetch(
-    `${SUPABASE_URL}/functions/v1/admin-registry-api/top-songs/${encodeURIComponent(artistSlug)}`,
-    {
-      headers: {
-        Accept: "application/json",
-        apikey: import.meta.env.VITE_PUBLIC_SUPABASE_ANON_KEY as string,
-        Authorization: `Bearer ${token}`,
-      },
-    },
-  );
-
-  if (!resp.ok) {
-    const text = await resp.text().catch(() => resp.statusText);
-    throw new Error(`Admin API ${resp.status}: ${text}`);
-  }
-
-  const payload = await resp.json();
-  const tracks = payload?.data?.tracks || payload?.tracks || [];
-
-  return tracks.map((t: any) => ({
-    trackId: t.trackId || t.track_id || "",
-    trackSlug: t.trackSlug || t.track_slug || "",
-    title: t.title || "",
-    artistNames: t.artistNames || t.artist_names || "",
-    durationDisplay: t.durationDisplay || t.duration_display || "",
-    artworkUrl: t.artworkUrl || t.artwork_url || "",
-    sortOrder: t.sortOrder ?? t.sort_order ?? 0,
-  }));
-}
-
-async function saveAdminTopSongs(
-  artistSlug: string,
-  tracks: Array<{ trackSlug: string; title: string; trackId: string }>,
-): Promise<void> {
-  const session = await supabase.auth.getSession();
-  const token = session.data.session?.access_token;
-  if (!token) throw new Error("Not authenticated");
-
-  const resp = await fetch(
-    `${SUPABASE_URL}/functions/v1/admin-registry-api/top-songs/${encodeURIComponent(artistSlug)}`,
-    {
-      method: "POST",
-      headers: {
-        Accept: "application/json",
-        "Content-Type": "application/json",
-        apikey: import.meta.env.VITE_PUBLIC_SUPABASE_ANON_KEY as string,
-        Authorization: `Bearer ${token}`,
-      },
-      body: JSON.stringify({ tracks }),
-    },
-  );
-
-  if (!resp.ok) {
-    const text = await resp.text().catch(() => resp.statusText);
-    throw new Error(`Admin API ${resp.status}: ${text}`);
-  }
-}
-
-export function TopSongsPanel({ artistSlug, artistName }: { artistSlug: string; artistName?: string }) {
+export function TopSongsPanel({ artistId, artistSlug, artistName }: { artistId: string; artistSlug: string; artistName?: string }) {
   const [topSongs, setTopSongs] = useState<TopSongEntry[]>([]);
   const [discographyTracks, setDiscographyTracks] = useState<DiscographyTrack[]>([]);
   const [loading, setLoading] = useState(true);
@@ -109,22 +49,36 @@ export function TopSongsPanel({ artistSlug, artistName }: { artistSlug: string; 
   const [searchQuery, setSearchQuery] = useState("");
   const [showTrackPicker, setShowTrackPicker] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
+  const [fingerprint, setFingerprint] = useState<string | null>(null);
+  const [unresolvedLegacy, setUnresolvedLegacy] = useState<AdminTopSongLegacyException[]>([]);
 
-  // Load existing top songs via admin-registry-api
+  // Load the exact editorial Top Songs presentation set through caller-bound authority.
   const loadTopSongs = useCallback(async () => {
-    if (!artistSlug) return;
+    if (!artistId) return;
     setLoading(true);
     setError(null);
 
     try {
-      const songs = await fetchAdminTopSongs(artistSlug);
-      setTopSongs(songs);
+      const payload = await loadAdminArtistTopSongs(artistId);
+      setTopSongs(
+        payload.tracks.map((track) => ({
+          trackId: track.trackId,
+          trackSlug: track.trackSlug,
+          title: track.title,
+          artistNames: track.artistNames,
+          durationDisplay: formatDuration(track.durationMs),
+          artworkUrl: track.artworkUrl,
+          sortOrder: track.sortOrder,
+        })),
+      );
+      setFingerprint(payload.fingerprint);
+      setUnresolvedLegacy(payload.unresolvedLegacy);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to load top songs");
     } finally {
       setLoading(false);
     }
-  }, [artistSlug]);
+  }, [artistId]);
 
   // Load artist's discography tracks for the picker (read-only, Supabase RPC OK)
   const loadDiscographyTracks = useCallback(async () => {
@@ -293,13 +247,15 @@ export function TopSongsPanel({ artistSlug, artistName }: { artistSlug: string; 
     setError(null);
 
     try {
-      const tracks = topSongs.map((s) => ({
-        trackSlug: s.trackSlug,
-        title: s.title,
-        trackId: s.trackId,
-      }));
+      if (!fingerprint) {
+        throw new Error("Top Songs state is missing its concurrency fingerprint. Reload and try again.");
+      }
 
-      await saveAdminTopSongs(artistSlug, tracks);
+      await replaceAdminArtistTopSongs(
+        artistId,
+        topSongs.map((song) => song.trackId),
+        fingerprint,
+      );
 
       // Clear the discography cache so the public page refreshes
       clearDiscographyCache(artistSlug);
@@ -359,7 +315,7 @@ export function TopSongsPanel({ artistSlug, artistName }: { artistSlug: string; 
           </span>
         </div>
         <div className="flex items-center gap-2">
-          {topSongs.length > 0 && !showTrackPicker && (
+          {fingerprint !== null && !showTrackPicker && (
             <button
               onClick={handleSave}
               disabled={saving}
@@ -399,6 +355,22 @@ export function TopSongsPanel({ artistSlug, artistName }: { artistSlug: string; 
           >
             Dismiss
           </button>
+        </div>
+      )}
+
+      {unresolvedLegacy.length > 0 && (
+        <div className="mb-3 rounded-lg border border-[var(--wk-warning)]/30 bg-[var(--wk-warning-soft)] p-3">
+          <div className="flex items-start gap-2">
+            <WkIcon name="AlertTriangle" size={14} className="mt-0.5 shrink-0 text-[var(--wk-warning)]" />
+            <div>
+              <p className="text-[11px] font-bold text-[var(--wk-text)]">
+                {unresolvedLegacy.length} legacy Top Song{unresolvedLegacy.length === 1 ? "" : "s"} need identity review
+              </p>
+              <p className="mt-1 text-[10px] text-[var(--wk-text-muted)]">
+                These historical selections are preserved in migration lineage and are not guessed into the live presentation set. The evidence-backed relationship graph remains unchanged.
+              </p>
+            </div>
+          </div>
         </div>
       )}
 
