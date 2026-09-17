@@ -264,25 +264,6 @@
       "legacyDebt": false
     },
     {
-      "id": "backfill-artist-spotify-images",
-      "kind": "edge_function",
-      "entrypoint": "supabase/functions/backfill-artist-spotify-images/index.ts",
-      "authentication": "request_bearer_user",
-      "authorization": "manage_registry_via_registry_enrich_artist",
-      "executionAuthority": "caller_jwt_compatibility_adapter_to_reviewed_evidence_broker",
-      "targets": [
-        "registry_artists"
-      ],
-      "riskClass": "high",
-      "disposition": "candidate_retire",
-      "futureBoundary": "none_after_compatibility_traffic_proof",
-      "miziziCallable": false,
-      "humanCallable": true,
-      "publicCallable": false,
-      "canonicalMutation": true,
-      "legacyDebt": false
-    },
-    {
       "id": "backfill-artist-origin",
       "kind": "edge_function",
       "entrypoint": "supabase/functions/backfill-artist-origin/index.ts",
@@ -295,25 +276,6 @@
       "riskClass": "low",
       "disposition": "keep",
       "futureBoundary": "registry_artist_origin_admin_admission",
-      "miziziCallable": false,
-      "humanCallable": true,
-      "publicCallable": false,
-      "canonicalMutation": true,
-      "legacyDebt": false
-    },
-    {
-      "id": "backfill-artist-type",
-      "kind": "edge_function",
-      "entrypoint": "supabase/functions/backfill-artist-type/index.ts",
-      "authentication": "request_bearer_user",
-      "authorization": "manage_registry_via_registry_enrich_artist",
-      "executionAuthority": "caller_jwt_compatibility_adapter_to_reviewed_evidence_broker",
-      "targets": [
-        "registry_artists"
-      ],
-      "riskClass": "high",
-      "disposition": "candidate_retire",
-      "futureBoundary": "none_after_compatibility_traffic_proof",
       "miziziCallable": false,
       "humanCallable": true,
       "publicCallable": false,
