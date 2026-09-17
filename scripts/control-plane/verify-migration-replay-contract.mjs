@@ -79,6 +79,22 @@ function sha256File(filePath) {
     .digest("hex");
 }
 
+export function validateRetiredMigrationReceipt({
+  originalText,
+  retiredText,
+  retiredPath,
+}) {
+  const errors = [];
+
+  if (retiredText !== originalText) {
+    errors.push(
+      `${retiredPath}: retired receipt bytes do not match deleted active migration`,
+    );
+  }
+
+  return errors;
+}
+
 function activeMigrations() {
   return fs
     .readdirSync(MIGRATIONS_DIR)
@@ -541,6 +557,43 @@ function main() {
         failures.push(
           `${entry.path}: deleted active migration lacks byte-preserved retired receipt at ${retiredReceipt}`,
         );
+      } else {
+        const originalResult =
+          runGit(
+            [
+              "show",
+              `${mergeBase}:${entry.path}`,
+            ],
+            {
+              allowFailure: true,
+            },
+          );
+
+        if (
+          originalResult.status !==
+          0
+        ) {
+          failures.push(
+            `${entry.path}: could not read deleted migration bytes from merge base ${mergeBase}`,
+          );
+        } else {
+          for (
+            const error of
+            validateRetiredMigrationReceipt({
+              originalText:
+                originalResult.stdout,
+              retiredText:
+                fs.readFileSync(
+                  retiredReceipt,
+                  "utf8",
+                ),
+              retiredPath:
+                retiredReceipt,
+            })
+          ) {
+            failures.push(error);
+          }
+        }
       }
 
       continue;

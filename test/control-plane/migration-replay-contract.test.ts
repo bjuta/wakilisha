@@ -6,6 +6,7 @@ import {
 import {
   analyzeMigrationText,
   validateReplayProof,
+  validateRetiredMigrationReceipt,
 } from "../../scripts/control-plane/verify-migration-replay-contract.mjs";
 import {
   validateHistoricalCleanReplayProof,
@@ -369,5 +370,35 @@ describe(
         ).toEqual([]);
       },
     );
+
+    it(
+      "rejects a retired active-migration receipt whose bytes differ from the deleted migration",
+      () => {
+        expect(
+          validateRetiredMigrationReceipt({
+            originalText:
+              "begin;\nselect 1;\ncommit;\n",
+            retiredText:
+              "begin;\nselect 2;\ncommit;\n",
+            retiredPath:
+              "docs/engineering/replay-baseline/retired-active-migrations/example.sql",
+          }),
+        ).toEqual([
+          "docs/engineering/replay-baseline/retired-active-migrations/example.sql: retired receipt bytes do not match deleted active migration",
+        ]);
+
+        expect(
+          validateRetiredMigrationReceipt({
+            originalText:
+              "begin;\nselect 1;\ncommit;\n",
+            retiredText:
+              "begin;\nselect 1;\ncommit;\n",
+            retiredPath:
+              "docs/engineering/replay-baseline/retired-active-migrations/example.sql",
+          }),
+        ).toEqual([]);
+      },
+    );
+
   },
 );
