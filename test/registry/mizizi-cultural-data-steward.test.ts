@@ -1,4 +1,4 @@
-import { readFileSync, readdirSync } from "node:fs";
+import { existsSync, readFileSync, readdirSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 
 import {
@@ -465,11 +465,6 @@ describe("MIZIZI Cultural Data Steward", () => {
         "supabase/functions/registry-enrichment-review/index.ts",
         "utf8",
       );
-    const scraper =
-      readFileSync(
-        "supabase/functions/scrape-artist-data/index.ts",
-        "utf8",
-      );
 
     expect(sharedRule).toContain(
       "canonicalTrackSlugCandidate",
@@ -495,18 +490,11 @@ describe("MIZIZI Cultural Data Steward", () => {
     expect(enrichment).not.toContain(
       "scopedTrackSlug",
     );
-    expect(scraper).toContain(
-      'from "../_shared/registry-track-identity.ts"',
-    );
-    expect(scraper).toContain(
-      "resolveTrackInArtistScope",
-    );
-    expect(scraper).not.toContain(
-      "artistScopedSlugPrefix",
-    );
-    expect(scraper).not.toContain(
-      "seenTrackSlugs",
-    );
+    expect(
+      existsSync(
+        "supabase/functions/scrape-artist-data/index.ts",
+      ),
+    ).toBe(false);
   });
 
   it("seals reviewed Track Intake route identity in SQL", () => {
