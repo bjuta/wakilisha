@@ -425,6 +425,35 @@ Remove obsolete mutation roads only after their dependencies and replacements ar
 
 This is where `scrape-artist-data` is retired.
 
+### Stage A narrow executor foundation closure
+
+Stage A of the remaining Slice 3 MIZIZI execution-authority convergence is
+Production accepted.
+
+PR #981 merged at
+`main@5efa912f2a35e5c58817f8ee220a73c21e07b903` and Production applied
+`20260918120331_mizizi_executor_foundation_v1` exactly once.
+
+The accepted Production state installs `mizizi_executor` as a narrow LOGIN role
+with no SUPERUSER, CREATEDB, CREATEROLE, REPLICATION, BYPASSRLS, or INHERIT
+authority. It has no direct governed-table mutation authority. Its future
+`mizizi` executor binding is disabled, the existing `mizizi -> postgres`
+binding remains active, the Release-taxonomy and Chart Track-slug operation
+types remain disabled, and active standing/exact MIZIZI grants remain zero.
+
+The private broker surface is executable by `mizizi_executor` only; browser and
+service roles do not receive that authority. No canonical Registry or Chart data
+mutation, Edge deployment, or frontend deployment occurred.
+
+Full acceptance evidence is recorded in
+`docs/engineering/mizizi-slice3-executor-stage-a-production-closure.md`.
+
+**Status**:
+`SLICE3_MIZIZI_EXECUTOR_STAGE_A=PRODUCTION_ACCEPTED`.
+
+The next boundary is a separate protected runtime/transport convergence gate.
+Stage A does not activate autonomous MIZIZI authority.
+
 ### `scrape-artist-data` retirement contract
 
 Retirement must cover the whole runtime contract, not only its source directory.
