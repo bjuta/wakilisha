@@ -168,37 +168,54 @@ Artist DML is prohibited by the permanent control-plane contract.
 
 ### 6.3 `ingest-artist-discography`
 
-**Live posture**
+**Current accepted posture**
 
-- ACTIVE deployment
-- `verify_jwt = true`
-- service-role mutation client
-- gateway authentication present
-- no request-user/capability authorization inside the function
+- ACTIVE Production deployment v68;
+- `verify_jwt = true`;
+- request bearer JWT required;
+- `manage_registry` required before Registry orchestration;
+- Apple Music/provider credential access isolated in
+  `registry-discography-provider-fetch`;
+- provider observations are frozen as immutable server-side snapshots;
+- reviewed selections and complete execution plans are frozen before mutation;
+- canonical mutation executes through typed exact Registry operations and exact
+  grants rather than ambient service-role DML;
+- exact-set Release↔Artist, Release↔Track, and Track↔Artist replacement binds
+  current/final fingerprints and row budgets;
+- idempotent replay and independent postcondition verification are part of the
+  accepted authority;
+- unresolved credited-name evidence remains unresolved rather than manufacturing
+  canonical Artist identities.
 
-Gateway JWT verification is authentication, not Registry authorization.
+The Admin Artist Discography workflow remains a legitimate live product
+capability for preview, reviewed Artist-shell creation, and reviewed apply.
 
-**Canonical authority**
+PR #950 converged Discography authority and merged at
+`e69f78667c8b8451239f085a87309e54a53fd008`. Production promotion applied the
+canonical migrations through `20260916055145`, promoted the exact governed Edge
+bundles and frontend workflow, and left zero active
+`registry_discography_admin` execution grants at rest.
 
-Can:
+Current Production `ingest-artist-discography` is ACTIVE v68 with bundle
+SHA-256
+`57fdd98772bab0eea44565bc41f7d1571201e80684a9603ae76c13c7ac13fe39`.
+Its deployed `index.ts`, `governedHandler.ts`, `governedBroker.ts`, and
+`governedPlan.ts` are byte-identical to current repository source.
 
-- create an Artist shell;
-- upsert Tracks and Releases;
-- update Artist metadata;
-- delete and rebuild Release memberships;
-- delete and rebuild Release and Track credits.
+The privileged-writer manifest correctly classifies this boundary as:
 
-The destructive membership/credit rebuild makes this one of the highest-blast-radius legitimate Registry writers.
+- `authentication=request_bearer_user`;
+- `authorization=manage_registry`;
+- `executionAuthority=caller_jwt_reviewed_evidence_typed_exact_grants`;
+- `disposition=keep`;
+- `publicCallable=false`;
+- `canonicalMutation=true`;
+- `legacyDebt=false`.
 
-**Current consumer**
-
-The Artist Discography Intake drawer is wired to this function.
-
-**Provenance**
-
-Apple Music/discography provenance is materially represented in current Registry data. This workflow is not disposable in the way `scrape-artist-data` appears to be.
-
-**Decision**: `KEEP CAPABILITY / CONVERGE AUTHORITY`. Preserve the product capability but move execution behind the shared Registry authorization/mutation primitive.
+**Decision**: `KEEP`. Discography convergence is complete. Do not retire the
+product workflow or reopen it as privileged debt. The permanent runtime/control
+plane must continue to reject unauthenticated, unauthorized, stale, changed-plan,
+or over-budget mutation attempts.
 
 ### 6.4 `registry-enrichment-review`
 
