@@ -248,11 +248,25 @@ Unknown or organic legacy invocations in the frozen seven-day window: **0**.
 - update current operational proxy/cache documentation to `public-content-read`;
 - preserve historical audits and closure records unchanged.
 
-### Production deletion gate
+### Production retirement closure
 
-Production v106 remains active as rollback authority until the repository retirement PR passes protected CI and merges. Immediately before deletion, rerun a narrow post-freeze traffic check. If no unknown consumer appears, delete only `wakilisha-public-api`, prove the retired URL fails closed, confirm the Edge inventory no longer contains it, and independently verify `public-content-read`.
+Production retirement is complete.
 
-No SQL migration, canonical data mutation, or frontend deployment is required.
+Accepted Production state:
+
+- repository retirement merged at `main@29e7bb083791a4dab3104dc8f4da8c3daa209461`;
+- final immediate traffic recheck observed 4 global Edge Function invocations, 0 `wakilisha-public-api` invocations, and 4 `public-content-read` invocations;
+- deployed `wakilisha-public-api` v106 rollback source was proven byte-identical to immutable Git source at `e8ec4d843f99700b96514ce8a3b2fd7bebb3c64d` and sealed locally before deletion;
+- Production deletion of `wakilisha-public-api` returned HTTP 200;
+- the function is absent from the Production Edge inventory;
+- the retired URL returns HTTP 404 and fails closed;
+- `public-content-read` v90 remains ACTIVE at bundle SHA `70a389d05f24c775a047ec8020651a4fb56d3e69420d4ed0eb3a24c610cb4f6d` and its live URL returns HTTP 200;
+- SQL migration: no;
+- canonical data mutation: no;
+- frontend deployment: no;
+- separate Finish update: no.
+
+**Status**: `SLICE3_WAKILISHA_PUBLIC_API_RETIREMENT=PRODUCTION_ACCEPTED`.
 
 ## 9. `public-content-read` canonical write side effect
 
