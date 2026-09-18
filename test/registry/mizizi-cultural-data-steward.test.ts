@@ -941,8 +941,35 @@ describe("MIZIZI Slice 2 Gate A-final Registry authority convergence", () => {
 describe("MIZIZI Slice 2 Gate B Pure Public Read", () => {
   const publicReadGateways = [
     "supabase/functions/public-content-read/index.ts",
-    "supabase/functions/wakilisha-public-api/index.ts",
   ];
+
+  it("keeps wakilisha-public-api retired from repository authority", () => {
+    expect(
+      existsSync(
+        "supabase/functions/wakilisha-public-api/index.ts",
+      ),
+    ).toBe(false);
+
+    const manifest =
+      JSON.parse(
+        readFileSync(
+          "scripts/control-plane/registry-privileged-writer-manifest.json",
+          "utf8",
+        ),
+      ) as {
+        writers: Array<{
+          id: string;
+        }>;
+      };
+
+    expect(
+      manifest.writers.some(
+        (writer) =>
+          writer.id ===
+          "wakilisha-public-api",
+      ),
+    ).toBe(false);
+  });
 
   it("keeps public Registry reads free of direct canonical Registry DML", () => {
     const directRegistryMutation =
@@ -1406,7 +1433,6 @@ describe("MIZIZI Slice 3 Candidate D1 Top Songs presentation authority", () => {
   );
   const publicReaders = [
     "supabase/functions/public-content-read/index.ts",
-    "supabase/functions/wakilisha-public-api/index.ts",
   ];
 
   it("separates editorial Top Songs presentation from evidence-backed relationship truth", () => {
@@ -1433,7 +1459,7 @@ describe("MIZIZI Slice 3 Candidate D1 Top Songs presentation authority", () => {
     );
   });
 
-  it("moves both public Top Songs readers onto presentation authority", () => {
+  it("keeps the surviving public Top Songs reader on presentation authority", () => {
     for (const path of publicReaders) {
       const source = read(path);
       expect(source).toContain("getTopSongsFromPresentationAuthority");

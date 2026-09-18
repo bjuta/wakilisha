@@ -115,7 +115,7 @@ After 1 week of monitoring with no violations, switch to `Content-Security-Polic
 | Path pattern | Cache TTL | Notes |
 |---|---|---|
 | `*.css`, `*.js`, `*.woff2`, `*.png`, `*.jpg`, `*.svg` | 30 days | Static assets with hashed filenames |
-| `/functions/v1/wakilisha-public-api/*` | 5 min | API responses |
+| `/functions/v1/public-content-read/*` | 5 min | API responses |
 | `*.html` | Bypass | Dynamic SPA shell |
 
 ---
@@ -157,7 +157,7 @@ If under active attack:
 After applying Cloudflare settings, verify:
 
 - [ ] `curl -I https://wakilisha.africa` returns HSTS, X-Frame-Options, X-Content-Type-Options
-- [ ] `curl -X POST https://wakilisha.africa/functions/v1/wakilisha-public-api` (no auth) works for public endpoints
+- [ ] A request to `/functions/v1/public-content-read/*` using the normal public Supabase request headers reaches the current public-read gateway
 - [ ] Rapid requests to `/functions/v1/` trigger rate limiting (429 responses)
 - [ ] WordPress paths (`/wp-admin`, `/wp-login.php`) return blocks or redirects
 - [ ] `.env` and `.git` path probing returns 403 blocks

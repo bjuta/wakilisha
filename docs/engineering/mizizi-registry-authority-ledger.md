@@ -333,11 +333,18 @@ The function also performs operational side effects such as rate-limit logging a
 
 ### 6.12 `wakilisha-public-api`
 
-This older broad public gateway remains source/deployment residue and contains the same Release-description write-on-read behavior.
+**Slice 3 retirement posture**
 
-Current-main application authority points to `public-content-read`; exact code search did not establish a current application consumer for `wakilisha-public-api` beyond source, docs, historical/operational references.
+- `public-content-read` is the accepted broad public application/API authority;
+- exact-main application, workflow, deployment-script, and migration audits found no current caller for `wakilisha-public-api`;
+- the legacy gateway has zero route or RPC surface that is not already owned by `public-content-read`;
+- its old related-Artist table reads are superseded by the governed structural-proximity read authority;
+- corrected Production traffic analysis covered `2026-09-11T05:13:00Z` through `2026-09-18T05:13:00Z` using `function_edge_logs` and exact function UUIDs;
+- 123,351 total Edge Function invocations and 122,955 `public-content-read` invocations were observed;
+- all 9 `wakilisha-public-api` invocations were documented WAKILISHA acceptance probes: two Gate B Release probes on v105 and seven D2 Artist probes on v106;
+- unknown or organic legacy consumers observed: zero.
 
-**Decision**: `CANDIDATE RETIRE`. Require traffic, host/proxy, SEO, external-consumer, and compatibility proof before deletion.
+**Decision**: `RETIRE`. Remove repository runtime authority and standing writer classification now. Keep Production v106 only as temporary rollback authority until the retirement PR is merged and an immediate pre-delete traffic recheck confirms no new unknown consumer.
 
 ### 6.13 `public-query-v1`
 
