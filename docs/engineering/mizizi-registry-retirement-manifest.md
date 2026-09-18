@@ -88,26 +88,60 @@ Before deletion:
 
 ### Decision
 
-**CONVERGE THEN RETIRE the standalone privileged boundary.**
+**KEEP. CONVERGENCE COMPLETED IN SLICE 2 GATE A-FINAL.**
 
-Do not retire the Artist intake product workflow.
+Do not retire the Artist intake product workflow or its current governed Edge
+orchestration boundary.
 
-### Why
+### Accepted authority
 
-The current function is product-wired, but its network authorization model is unacceptable for canonical mutation: `verify_jwt=false`, service-role authority, and no request-bound caller authorization.
+Current repository and Production authority is:
 
-### Required replacement
+- request bearer JWT;
+- gateway `verify_jwt=true`;
+- authenticated caller validation;
+- `manage_registry` required before service-role orchestration;
+- service-role limited to provider-intake staging/orchestration and canonical
+  reads;
+- no direct canonical `registry_artists` DML in the Edge function;
+- reviewed caller-bound Artist creation/origin/enrichment admissions for
+  canonical mutation;
+- frozen review fingerprint and separate apply-result identity;
+- deterministic idempotent Artist creation;
+- active/draft-only reviewed and applied targets;
+- canonical write and operation receipts through the accepted typed Registry
+  authority.
 
-Artist intake must become a typed governed operation using the shared Registry mutation/admission primitive. The UI must use the signed-in actor identity, not a public/anon credential, and review decisions must derive actor identity from authenticated authority rather than caller-supplied actor text.
+The current privileged-writer classification is therefore:
 
-### Exit gate
+- `authentication=request_bearer_user`;
+- `authorization=manage_registry`;
+- `executionAuthority=service_role_staging_and_reads_plus_caller_jwt_reviewed_registry_admissions`;
+- `disposition=keep`;
+- `publicCallable=false`;
+- `canonicalMutation=true`;
+- `legacyDebt=false`.
 
-- upload/staging remains functional;
-- review decision is authenticated and capability-bound;
-- apply-approved uses typed canonical admission;
-- exact before/after acceptance for representative Artist rows;
-- old function unavailable after cutover;
-- Admin intake route remains functional without hidden fallback.
+### Production closure lineage
+
+Gate A-final PR #953 merged at
+`91667e67ed29a6cc38c49359c44c837752d1e59d`.
+
+Production acceptance proved:
+
+- Artist Intake ACTIVE v33;
+- `verify_jwt=true`;
+- deployed bundle SHA-256
+  `36d8b345ba6cd2951eaa5e686d7e7bbf4ceb4f3057bf554adc2ca13dfae87fc7`;
+- anonymous POST rejected with HTTP 401 at the gateway;
+- caller-bound Gate A-final RPCs deny `anon` EXECUTE and allow
+  `authenticated` subject to their internal capability checks;
+- current deployed source remains byte-identical to current Git.
+
+No Slice 3 Edge deletion, SQL migration, data mutation, or frontend change is
+required for this road.
+
+**Status**: `SLICE3_ARTIST_REGISTRY_INTAKE=GOVERNED_KEEP`.
 
 ## 5. `ingest-artist-discography`
 
