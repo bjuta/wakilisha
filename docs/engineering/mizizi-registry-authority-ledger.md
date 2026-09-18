@@ -404,14 +404,13 @@ Targets:
 - `rebuild_discography_from_metadata()`
 - `split_multi_release_tracks()`
 
-**Slice 3 retirement posture**
+**Slice 3 retirement closure**
 
-Production inspection confirmed all three are zero-argument `SECURITY INVOKER`
-functions owned by `postgres`, callable through PUBLIC EXECUTE, and able to
-mutate canonical Registry tables when the invoking role has sufficient table
-authority. None contains an internal authorization guard.
+Production inspection established all three were zero-argument `SECURITY INVOKER`
+functions owned by `postgres`, callable through PUBLIC EXECUTE, with no internal
+authorization guard.
 
-Current exact-main and live-database dependency proof found:
+Dependency proof found:
 
 - no current application or script caller;
 - no live database function/procedure caller;
@@ -423,15 +422,37 @@ Current exact-main and live-database dependency proof found:
 
 A seven-day `edge_logs` audit from `2026-09-11T06:32:40Z` through
 `2026-09-18T06:32:40Z` observed 2,272,478 `/rest/v1/` requests and zero
-requests to any of the three exact `/rest/v1/rpc/...` paths. Broad target-name
-URL matching also returned zero.
+requests to any of the three exact `/rest/v1/rpc/...` paths. A final immediate
+pre-apply audit from `2026-09-18T06:32:40Z` through
+`2026-09-18T07:37:47Z` observed 3,288 additional `/rest/v1/` requests and
+zero target RPC invocations.
+
+Repository retirement merged at
+`main@85efa4db45ad27691d1f6011b1c1a3f4a4c61dcb`. Production then applied
+`20260918064000_legacy_registry_maintenance_rpc_retirement`.
+
+Accepted Production state:
+
+- migration ledger: 150 migrations;
+- migration head: `20260918064000`;
+- all three zero-argument maintenance functions are absent;
+- remaining overloads across the three retired function names: 0;
+- pre/post canonical Registry fingerprints are identical across
+  `registry_artists`, `registry_tracks`, `registry_releases`,
+  `registry_track_artists`, `registry_release_artists`, and
+  `registry_release_tracks`;
+- canonical Registry data mutation: none;
+- post-apply Supabase advisor scans contain no finding naming any retired RPC;
+- no Edge deployment;
+- no frontend deployment.
 
 Historical migrations remain immutable. The September 5 replay-parity migration
-correctly records the PUBLIC-execute state that existed at that point in
-history; a new head migration retires the three functions without `CASCADE`.
+continues to record the historical PUBLIC-execute state that existed at that
+point in schema history; the September 18 head migration is the retirement
+authority.
 
-**Decision**: `RETIRE`. No replacement runtime is required. Production apply
-remains a separate post-merge gate with an immediate pre-apply traffic recheck.
+**Decision**: `RETIRED`. No replacement runtime is required. Reintroduction of
+these PUBLIC maintenance RPCs is prohibited by the head-state negative contract.
 
 ## 8. Frontend direct-DML drift
 
