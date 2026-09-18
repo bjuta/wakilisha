@@ -361,29 +361,6 @@
       "publicCallable": false,
       "canonicalMutation": true,
       "legacyDebt": false
-    },
-    {
-      "id": "legacy-registry-maintenance-functions",
-      "kind": "database_function_family",
-      "entrypoint": "link_orphan_release_artists|rebuild_discography_from_metadata|split_multi_release_tracks",
-      "authentication": "caller_database_role",
-      "authorization": "security_invoker_no_internal_guard",
-      "executionAuthority": "caller_table_grants",
-      "targets": [
-        "registry_artists",
-        "registry_tracks",
-        "registry_releases",
-        "registry_release_artists",
-        "registry_release_tracks"
-      ],
-      "riskClass": "medium",
-      "disposition": "retire_or_internalize",
-      "futureBoundary": "typed_internal_maintenance_operation_if_still_required",
-      "miziziCallable": false,
-      "humanCallable": false,
-      "publicCallable": true,
-      "canonicalMutation": true,
-      "legacyDebt": true
     }
   ]
 }

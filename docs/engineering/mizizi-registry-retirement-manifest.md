@@ -186,18 +186,67 @@ Targets:
 
 ### Decision
 
-**RETIRE OR INTERNALIZE after dependency proof.**
+**RETIRE. Repository migration first; Production apply remains a separate post-merge gate.**
 
-### Why
+### Dependency proof
 
-They are PUBLIC executable `SECURITY INVOKER` maintenance functions without their own authorization checks. Current ordinary anon/authenticated table grants prevent them from mutating core Registry state, so this is unnecessary surface rather than a demonstrated direct exploit.
+Current exact-main and Production inspection established:
 
-### Exit gate
+- no current product or script caller;
+- no live database function/procedure caller;
+- no view or materialized-view dependency;
+- no trigger dependency;
+- no `pg_cron` caller;
+- no dependent database object;
+- zero recorded function-statistics calls.
 
-- no live application/RPC consumer;
-- no migration/replay contract depends on runtime presence;
-- if still operationally useful, replace PUBLIC execute with an internal controlled maintenance path;
-- negative test prevents PUBLIC re-exposure.
+The functions remain `SECURITY INVOKER` and PUBLIC executable, with no internal
+authorization guard. Their ability to mutate canonical Registry tables depends
+on the invoking role's table grants, so they are unnecessary callable authority
+rather than a required product capability.
+
+### External traffic proof
+
+A read-only seven-day PostgREST audit covered
+`2026-09-11T06:32:40Z` through `2026-09-18T06:32:40Z`.
+
+Positive control:
+
+- `/rest/v1/` requests: 2,272,478;
+- trusted 24-hour windows: 7 / 7.
+
+Target results:
+
+- `link_orphan_release_artists()`: 0 requests;
+- `rebuild_discography_from_metadata()`: 0 requests;
+- `split_multi_release_tracks()`: 0 requests;
+- broad target-name URL matches: 0.
+
+### Repository retirement contract
+
+- add one new head migration that drops exactly the three zero-argument
+  functions;
+- use no `CASCADE`, so an undiscovered dependency blocks retirement;
+- preserve the already-applied September 5 replay-parity migration unchanged as
+  historical schema truth;
+- remove the retired family from the privileged-writer manifest;
+- extend the existing consolidated MIZIZI test with a permanent negative
+  head-state contract;
+- update current authority documentation.
+
+### Production apply gate
+
+After protected CI and merge:
+
+1. rerun an immediate exact-path PostgREST traffic check;
+2. capture exact pre-apply Registry fingerprints/counts;
+3. apply only the retirement migration;
+4. prove all three functions are absent;
+5. prove their RPC paths fail closed;
+6. prove canonical Registry fingerprints/counts are unchanged.
+
+No data migration, Edge deployment, frontend deployment, or canonical data
+mutation is required.
 
 ## 8. `wakilisha-public-api`
 
