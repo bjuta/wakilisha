@@ -398,21 +398,52 @@ Accepted Production state:
 
 ### Decision
 
-**RETIRE the write-on-read behavior, not the current broad public read authority.**
+**RETIRED. KEEP THE BROAD PUBLIC READ AUTHORITY.**
 
-### Target behavior
+The canonical write-on-read behavior was removed by Slice 2 Gate B and the
+remaining stale writer classification was closed by Slice 3 Candidate C.
 
-Generating a Release description during a read may remain a presentation concern, but a public read must not persist that derived description into canonical Registry state.
+### Accepted pure-read boundary
 
-Acceptable future choices include:
+Current source and permanent contracts establish:
 
-- compute the fallback description only in the response;
-- precompute it through a governed projection workflow;
-- persist it through a typed editorial/Registry mutation with explicit authority.
+- missing Release descriptions are synthesized response-time only;
+- `public-content-read` performs no direct canonical Registry
+  INSERT/UPDATE/UPSERT/DELETE;
+- the gateway may not invoke a database function classified as a canonical
+  Registry mutator;
+- operational rate-limit logging remains outside canonical music Registry truth;
+- Magazine publication scheduling remains an editorial/publication concern,
+  not a Registry mutation authority.
 
-### Exit gate
+The privileged-writer manifest now permanently classifies the gateway as:
 
-A public Release GET/read cannot mutate `registry_releases` even when description is missing. Deterministic database/audit acceptance must prove zero canonical write events from public read requests.
+- `disposition=keep`;
+- `futureBoundary=pure_public_read`;
+- `publicCallable=true`;
+- `canonicalMutation=false`;
+- `legacyDebt=false`.
+
+### Closure lineage
+
+Slice 2 Gate B PR #957 merged at
+`b9f425d53e901f87ce83b0be2cc4e3032bf97d54` and Production acceptance proved
+response-time Release description synthesis does not mutate the canonical
+Release row.
+
+Slice 3 Candidate C PR #964 merged at
+`8b45840e9aa142c16021f6dd694eddbb1c14bdae`, correcting the stale
+privileged-writer/control-plane classification. Candidate C required no SQL,
+Edge, frontend, or data deployment.
+
+Current Production `public-content-read` is ACTIVE v90,
+`verify_jwt=true`, bundle SHA-256
+`70a389d05f24c775a047ec8020651a4fb56d3e69420d4ed0eb3a24c610cb4f6d`,
+and the deployed source remains byte-identical to current Git.
+
+No additional Slice 3 runtime or Production mutation is required.
+
+**Status**: `SLICE3_PUBLIC_CONTENT_READ_WRITE_ON_READ=PRODUCTION_ACCEPTED`.
 
 ## 10. Admin detail browser DML
 
