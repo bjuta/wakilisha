@@ -354,19 +354,47 @@ Primarily manages chart playback-enrichment state and provider links. In write m
 
 ### 6.11 `public-content-read`
 
-**Role**
+**Current accepted posture**
 
-This is the current broad public application/API read authority. Frontend runtime base, public API client, API documentation, environment authority, and prerendering all point at it.
+This is the current broad public application/API read authority. Frontend runtime
+base, public API client, API documentation, environment authority, and
+prerendering point at it.
 
-**Critical finding**
+Slice 2 Gate B removed the former canonical write-on-read behavior. Missing
+Release descriptions are now synthesized in response memory only; the read path
+does not persist the derived text into `registry_releases`.
 
-The Release read path uses service role and, when a Release description is blank, synthesizes a description and writes it back to `registry_releases` during the read request.
+The consolidated MIZIZI contract mechanically rejects direct
+INSERT/UPDATE/UPSERT/DELETE against canonical `registry_*` tables from this
+gateway. The Phase 0B control plane also rejects invocation of any database
+function classified as a canonical Registry mutator.
 
-That is a canonical side effect hidden in a public read path.
+Operational rate-limit logging and Magazine publication scheduling remain
+separate non-Registry concerns and are not misclassified as canonical music
+Registry mutation.
 
-The function also performs operational side effects such as rate-limit logging and an editorial publication check. Those are separate concerns; they do not make canonical Registry mutation acceptable.
+Slice 3 Candidate C then corrected the stale privileged-writer classification
+without changing the live runtime. PR #964 merged at
+`8b45840e9aa142c16021f6dd694eddbb1c14bdae` and was Production-accepted with
+no deployment required.
 
-**Decision**: `KEEP READ AUTHORITY / REMOVE CANONICAL WRITE SIDE EFFECT`. The future invariant is stronger than “no unsafe write”: **canonical public Reads are mechanically read-only with respect to Registry truth.**
+Current Production `public-content-read` remains ACTIVE v90,
+`verify_jwt=true`, bundle SHA-256
+`70a389d05f24c775a047ec8020651a4fb56d3e69420d4ed0eb3a24c610cb4f6d`,
+with deployed source byte-identical to current Git.
+
+The accepted machine classification is:
+
+- `disposition=keep`;
+- `futureBoundary=pure_public_read`;
+- `publicCallable=true`;
+- `canonicalMutation=false`;
+- `legacyDebt=false`.
+
+**Decision**: `KEEP`. Canonical public Registry reads are mechanically
+read-only with respect to Registry truth. Reintroduction of canonical Registry
+DML or an indirect canonical-mutator RPC path is prohibited by the permanent
+control-plane contract.
 
 ### 6.12 `wakilisha-public-api`
 
