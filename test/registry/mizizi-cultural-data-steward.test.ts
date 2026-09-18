@@ -1133,6 +1133,104 @@ describe("MIZIZI Slice 2 Gate B Pure Public Read", () => {
   });
 });
 
+
+describe("MIZIZI Slice 3 narrow executor Stage A foundation", () => {
+  it("installs the future MIZIZI executor inertly without relabelling the live runner", () => {
+    const migrations = readdirSync("supabase/migrations").filter(
+      (name) => name.endsWith("_mizizi_executor_foundation_v1.sql"),
+    );
+
+    expect(migrations).toHaveLength(1);
+
+    const migration = read(
+      "supabase/migrations/" + migrations[0],
+    );
+
+    expect(migration).toContain("create role mizizi_executor");
+    expect(migration).toContain("nobypassrls");
+    expect(migration).toContain("create schema mizizi_private");
+    expect(migration).toContain("'mizizi_executor',");
+    expect(migration).toContain("'disabled'");
+    expect(migration).toContain("'registry.release_taxonomy.repair'");
+    expect(migration).toContain("'registry.chart_track_slug.synchronize'");
+    expect(migration).toContain("queue_registry_review_v1");
+    expect(migration).toContain("finding_fingerprint_v1");
+    expect(migration).toContain("track_slug_identity_noise");
+    expect(migration).toContain("release_slug_provider_packaging");
+    expect(migration).toContain("MIZIZI review target changed since analysis.");
+    expect(migration).toContain("MIZIZI review fingerprint does not match deterministic finding identity.");
+    expect(migration).toContain("review.source_payload->>'ruleId'=p_rule_id");
+    expect(migration).toContain("limit 1");
+    expect(migration).toContain("for update;");
+    expect(migration).toContain("Stage A requires zero active MIZIZI standing grants");
+    expect(migration).toContain("Stage A created active MIZIZI exact authority");
+
+    expect(migration).not.toMatch(
+      /grant\s+(?:insert|update|delete|all)\s+on\s+(?:table\s+)?public\.registry_/i,
+    );
+    expect(migration).not.toMatch(
+      /grant\s+(?:insert|update|delete|all)\s+on\s+(?:table\s+)?public\.wk_chart_entries_v2/i,
+    );
+    expect(migration).not.toContain("set role mizizi_executor");
+
+    const manifest = JSON.parse(
+      readFileSync(
+        "scripts/control-plane/registry-privileged-writer-manifest.json",
+        "utf8",
+      ),
+    ) as {
+      writers: Array<{
+        id: string;
+        disposition: string;
+        executionAuthority: string;
+        legacyDebt: boolean;
+      }>;
+    };
+
+    expect(
+      manifest.writers.find(
+        (writer) => writer.id === "mizizi-agent-runner",
+      ),
+    ).toMatchObject({
+      disposition: "converge",
+      executionAuthority: "direct postgres session",
+      legacyDebt: true,
+    });
+  });
+
+  it("removes generic PUBLIC inheritance from browser bounded writers while preserving exact app roles", () => {
+    const migrations = readdirSync("supabase/migrations").filter(
+      (name) => name.endsWith("_mizizi_executor_foundation_v1.sql"),
+    );
+    const migration = read(
+      "supabase/migrations/" + migrations[0],
+    );
+
+    expect(migration).toContain(
+      "public.increment_share_count(text,text,text,text)",
+    );
+    expect(migration).toContain(
+      "public.track_analytics_event(text,text,text,text,text,jsonb,text,uuid,text)",
+    );
+    expect(migration).toContain("from public;");
+    expect(migration).toContain("to anon, authenticated, service_role;");
+  });
+
+  it("does not grant autonomous Track or Release slug rewrite authority", () => {
+    const migrations = readdirSync("supabase/migrations").filter(
+      (name) => name.endsWith("_mizizi_executor_foundation_v1.sql"),
+    );
+    const migration = read(
+      "supabase/migrations/" + migrations[0],
+    );
+
+    expect(migration).not.toContain("registry.track_slug");
+    expect(migration).not.toContain("registry.release_slug");
+    expect(migration).toContain("queue_registry_review_v1");
+  });
+});
+
+
 describe("MIZIZI Slice 3 legacy Registry maintenance RPC retirement", () => {
   const retiredFunctions = [
     "link_orphan_release_artists",

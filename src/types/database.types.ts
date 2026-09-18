@@ -19725,6 +19725,14 @@ export type Database = {
         Args: { p_expires_at: string; p_reason: string }
         Returns: string
       }
+      admin_issue_mizizi_stewardship_capability_grant_v1: {
+        Args: {
+          p_capability_key: string
+          p_expires_at: string
+          p_reason: string
+        }
+        Returns: string
+      }
       admin_log_artist_resolution_event: {
         Args: {
           p_action: string
@@ -19912,6 +19920,10 @@ export type Database = {
         Args: { p_grant_id: string; p_reason: string }
         Returns: boolean
       }
+      admin_revoke_mizizi_stewardship_capability_grant_v1: {
+        Args: { p_grant_id: string; p_reason: string }
+        Returns: boolean
+      }
       admin_safe_merge_registry_artists: {
         Args: {
           p_archive_source?: boolean
@@ -19950,6 +19962,10 @@ export type Database = {
       }
       admin_set_mizizi_artist_origin_operation_enabled: {
         Args: { p_enabled: boolean; p_reason: string }
+        Returns: boolean
+      }
+      admin_set_mizizi_stewardship_operation_enabled_v1: {
+        Args: { p_enabled: boolean; p_operation_key: string; p_reason: string }
         Returns: boolean
       }
       admin_set_registry_artist_origin_operation_enabled: {
