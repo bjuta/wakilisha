@@ -124,27 +124,47 @@ Current-main code search found no application caller. Remaining references are f
 
 ### 6.2 `artist-registry-intake`
 
-**Live posture**
+**Current accepted posture**
 
-- ACTIVE deployment
-- `verify_jwt = false`
-- service-role client
-- no request-bound caller authentication
-- no Registry capability authorization
+- ACTIVE Production deployment v33;
+- `verify_jwt = true`;
+- request bearer JWT validated before privileged orchestration;
+- `manage_registry` required before any service-role client is created;
+- service-role use is restricted to intake staging/orchestration and canonical
+  reads;
+- the Edge function contains no direct canonical `registry_artists`
+  insert/update/delete road;
+- canonical Artist creation and enrichment execute through caller-bound reviewed
+  Registry admissions.
 
-Its apparent `auth.getUser()` use does not authenticate the request caller because the client is service-role and is not bound to the caller's bearer token.
+The Admin Registry Artist intake page sends the signed-in user's Supabase access
+token. Review decisions bind the authenticated caller rather than body-supplied
+actor text.
 
-**Canonical authority**
+Gate A-final introduced and accepted the governed authority chain:
 
-Stages CSV intake, records review decisions, and can create/update canonical Artists.
+- `admin_review_registry_artist_intake_v1(...)`;
+- `admin_get_registry_artist_intake_review_v1(...)`;
+- `admin_create_registry_artist_intake_shell_v1(...)`;
+- `admin_mark_registry_artist_intake_applied_v1(...)`;
+- existing typed Artist Origin and Artist Enrichment admissions.
 
-The review path accepts caller-supplied actor information.
+Review state is fingerprinted before apply, reviewed/applied Artist targets are
+restricted to active/draft Registry Artists, new identity creation reuses the
+typed `registry.artist.create/v1` materializer, and canonical writes emit the
+accepted operation/write-event authority.
 
-**Current consumer**
+Gate A-final merged in PR #953 at
+`91667e67ed29a6cc38c49359c44c837752d1e59d` and was Production-accepted with
+Artist Intake ACTIVE v33, `verify_jwt=true`, bundle SHA-256
+`36d8b345ba6cd2951eaa5e686d7e7bbf4ceb4f3057bf554adc2ca13dfae87fc7`.
+Current Production source remains byte-identical to current repository source.
 
-The Admin Registry Artist intake page calls the function. The current page sends a public/anon credential rather than a user access token as mutation authority.
-
-**Decision**: `CONVERGE`, then retire the standalone privileged boundary. It is a live product path and cannot be deleted until its workflow has a governed replacement.
+**Decision**: `KEEP`. The standalone Artist Intake product boundary is no
+longer legacy privileged debt. Its orchestration remains legitimate because
+canonical mutation is delegated to reviewed, caller-bound typed Registry
+admissions. Reintroduction of public/anon mutation authority or direct canonical
+Artist DML is prohibited by the permanent control-plane contract.
 
 ### 6.3 `ingest-artist-discography`
 

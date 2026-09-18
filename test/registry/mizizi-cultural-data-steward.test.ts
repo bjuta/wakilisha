@@ -853,6 +853,67 @@ describe("MIZIZI Slice 2 Gate A-final Registry authority convergence", () => {
     expect(edge).not.toMatch(/const\s*\{[^}]*\bactor\b[^}]*\}\s*=\s*body/);
   });
 
+  it("classifies Artist intake as an accepted governed Registry authority", () => {
+    const manifest =
+      JSON.parse(
+        readFileSync(
+          "scripts/control-plane/registry-privileged-writer-manifest.json",
+          "utf8",
+        ),
+      ) as {
+        writers: Array<{
+          id: string;
+          authentication: string;
+          authorization: string;
+          executionAuthority: string;
+          targets: string[];
+          riskClass: string;
+          disposition: string;
+          futureBoundary: string;
+          miziziCallable: boolean;
+          humanCallable: boolean;
+          publicCallable: boolean;
+          canonicalMutation: boolean;
+          legacyDebt: boolean;
+        }>;
+      };
+
+    const intake =
+      manifest.writers.find(
+        (writer) =>
+          writer.id ===
+          "artist-registry-intake",
+      );
+
+    expect(intake).toMatchObject({
+      authentication: "request_bearer_user",
+      authorization: "manage_registry",
+      executionAuthority:
+        "service_role_staging_and_reads_plus_caller_jwt_reviewed_registry_admissions",
+      riskClass: "high",
+      disposition: "keep",
+      futureBoundary:
+        "reviewed_artist_intake_typed_registry_admissions",
+      miziziCallable: false,
+      humanCallable: true,
+      publicCallable: false,
+      canonicalMutation: true,
+      legacyDebt: false,
+    });
+
+    expect(intake?.targets).toEqual(
+      expect.arrayContaining([
+        "provider_intake_runs",
+        "provider_intake_artist_staging",
+        "registry_evidence_assertions",
+        "registry_artists",
+        "registry_canonical_write_events",
+        "registry_operation_write_events",
+        "registry_mutation_operations",
+      ]),
+    );
+  });
+
   it("freezes reviewed CSV authority before canonical Artist mutation", () => {
     const migration = read(
       "supabase/migrations/20260916120000_registry_artist_intake_authority_v1.sql",

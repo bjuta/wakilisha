@@ -248,6 +248,33 @@ for (const [retiredWriter, retiredEntrypoint] of [
   }
 }
 
+const artistRegistryIntake =
+  registryWriters.find(
+    (writer) =>
+      writer.id === "artist-registry-intake",
+  );
+
+if (
+  artistRegistryIntake?.authentication !==
+    "request_bearer_user" ||
+  artistRegistryIntake?.authorization !==
+    "manage_registry" ||
+  artistRegistryIntake?.executionAuthority !==
+    "service_role_staging_and_reads_plus_caller_jwt_reviewed_registry_admissions" ||
+  artistRegistryIntake?.disposition !== "keep" ||
+  artistRegistryIntake?.futureBoundary !==
+    "reviewed_artist_intake_typed_registry_admissions" ||
+  artistRegistryIntake?.miziziCallable !== false ||
+  artistRegistryIntake?.humanCallable !== true ||
+  artistRegistryIntake?.publicCallable !== false ||
+  artistRegistryIntake?.canonicalMutation !== true ||
+  artistRegistryIntake?.legacyDebt !== false
+) {
+  throw new Error(
+    "Artist Registry intake must remain caller-bound, manage_registry-gated, and converged onto reviewed typed Registry admissions.",
+  );
+}
+
 const publicReadWriter =
   registryWriters.find(
     (writer) =>
