@@ -1072,6 +1072,81 @@ describe("MIZIZI Slice 2 Gate B Pure Public Read", () => {
   });
 });
 
+describe("MIZIZI Slice 3 legacy Registry maintenance RPC retirement", () => {
+  const retiredFunctions = [
+    "link_orphan_release_artists",
+    "rebuild_discography_from_metadata",
+    "split_multi_release_tracks",
+  ];
+
+  it("retires obsolete PUBLIC maintenance RPC authority at head without rewriting historical migrations", () => {
+    const migrations =
+      readdirSync(
+        "supabase/migrations",
+      ).filter(
+        (name) =>
+          name.endsWith(
+            "_legacy_registry_maintenance_rpc_retirement.sql",
+          ),
+      );
+
+    expect(migrations).toHaveLength(1);
+
+    const retirementMigration =
+      readFileSync(
+        "supabase/migrations/" +
+          migrations[0],
+        "utf8",
+      );
+
+    const historicalReplay =
+      readFileSync(
+        "supabase/migrations/20260905090000_wakilisha_native_preview_acl_replay_parity.sql",
+        "utf8",
+      );
+
+    const manifest =
+      JSON.parse(
+        readFileSync(
+          "scripts/control-plane/registry-privileged-writer-manifest.json",
+          "utf8",
+        ),
+      ) as {
+        writers: Array<{
+          id: string;
+        }>;
+      };
+
+    for (const functionName of retiredFunctions) {
+      expect(
+        retirementMigration,
+      ).toContain(
+        `drop function public.${functionName}();`,
+      );
+
+      expect(
+        historicalReplay,
+      ).toContain(
+        `('${functionName}()')`,
+      );
+    }
+
+    expect(
+      retirementMigration,
+    ).not.toMatch(
+      /drop\\s+function\\b[^;]*\\bcascade\\b/i,
+    );
+
+    expect(
+      manifest.writers.some(
+        (writer) =>
+          writer.id ===
+          "legacy-registry-maintenance-functions",
+      ),
+    ).toBe(false);
+  });
+});
+
 describe("MIZIZI Slice 2 Gate C historical relationship authority receipt", () => {
   const migration = read(
     "docs/engineering/replay-baseline/retired-active-migrations/20260916182000_registry_relationship_authority_convergence_v1.sql",

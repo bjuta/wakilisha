@@ -398,17 +398,40 @@ The problem is therefore duplicated relationship authority, not an absence of re
 
 ### 7.5 Old PUBLIC maintenance functions
 
-The following old maintenance functions are PUBLIC executable, `SECURITY INVOKER`, and do not contain their own authorization guard:
+Targets:
 
 - `link_orphan_release_artists()`
 - `rebuild_discography_from_metadata()`
 - `split_multi_release_tracks()`
 
-Because ordinary anon/authenticated roles do not have the required core table DML privileges, these are not currently a direct anonymous/authenticated Registry exploit.
+**Slice 3 retirement posture**
 
-They are still unnecessary callable surface.
+Production inspection confirmed all three are zero-argument `SECURITY INVOKER`
+functions owned by `postgres`, callable through PUBLIC EXECUTE, and able to
+mutate canonical Registry tables when the invoking role has sufficient table
+authority. None contains an internal authorization guard.
 
-**Decision**: `RETIRE OR INTERNALIZE` after dependency proof.
+Current exact-main and live-database dependency proof found:
+
+- no current application or script caller;
+- no live database function/procedure caller;
+- no view or materialized-view dependency;
+- no trigger dependency;
+- no `pg_cron` caller;
+- no dependent database object;
+- zero recorded function-statistics calls.
+
+A seven-day `edge_logs` audit from `2026-09-11T06:32:40Z` through
+`2026-09-18T06:32:40Z` observed 2,272,478 `/rest/v1/` requests and zero
+requests to any of the three exact `/rest/v1/rpc/...` paths. Broad target-name
+URL matching also returned zero.
+
+Historical migrations remain immutable. The September 5 replay-parity migration
+correctly records the PUBLIC-execute state that existed at that point in
+history; a new head migration retires the three functions without `CASCADE`.
+
+**Decision**: `RETIRE`. No replacement runtime is required. Production apply
+remains a separate post-merge gate with an immediate pre-apply traffic recheck.
 
 ## 8. Frontend direct-DML drift
 
