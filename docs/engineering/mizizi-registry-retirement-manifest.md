@@ -147,28 +147,68 @@ required for this road.
 
 ### Decision
 
-**KEEP capability; CONVERGE privileged mutation. Do not retire the product workflow.**
+**KEEP. PRIVILEGED MUTATION CONVERGENCE COMPLETED IN SLICE 2.**
 
-### Why
+Do not retire the Discography product workflow or the current governed
+`ingest-artist-discography` orchestration boundary.
 
-Discography ingestion is live, product-wired, and materially represented in current Registry provenance. It also has legitimate high-blast-radius behavior: Track/Release upsert plus credit/membership rebuild.
+### Accepted authority
 
-### Future shape
+The old service-role canonical mutation road has already been replaced.
 
-The function may remain an investigation/provider adapter, but the canonical mutations should be brokered through typed capabilities such as:
+Current authority requires:
 
-- `registry.artist.ensure_shell`
-- `registry.release.upsert_provider_observation`
-- `registry.track.upsert_provider_observation`
-- `registry.release.membership.replace`
-- `registry.track.credit.replace`
-- `registry.release.credit.replace`
+- request bearer JWT;
+- `manage_registry`;
+- isolated provider acquisition through
+  `registry-discography-provider-fetch`;
+- immutable provider snapshots and source fingerprints;
+- reviewed, frozen execution plans;
+- exact Artist UUID target binding;
+- typed Release/Track identity and provider-profile operations;
+- exact-set Release↔Artist, Release↔Track, and Track↔Artist replacement
+  operations;
+- current/final semantic fingerprints;
+- exact row budgets and short-lived execution grants;
+- operation/canonical-write receipts;
+- independent deterministic verification;
+- exact idempotent replay;
+- preservation of unresolved credited-name evidence without fabricated Artist
+  identity.
 
-The capability names are illustrative until Slice 2 finalizes the primitive contract.
+The current machine classification is already correct:
 
-### Exit gate
+- `authentication=request_bearer_user`;
+- `authorization=manage_registry`;
+- `executionAuthority=caller_jwt_reviewed_evidence_typed_exact_grants`;
+- `disposition=keep`;
+- `publicCallable=false`;
+- `canonicalMutation=true`;
+- `legacyDebt=false`.
 
-No application-visible regression in preview/apply/create-shell workflow, but no broad service-role mutation remains available merely because a gateway JWT exists.
+### Production closure lineage
+
+PR #950 merged at
+`e69f78667c8b8451239f085a87309e54a53fd008`.
+
+Production convergence completed:
+
+- canonical migration head for the Discography candidate:
+  `20260916055145`;
+- exact governed Discography Edge bundles promoted;
+- governed frontend preview/create-shell/apply workflow activated;
+- zero active `registry_discography_admin` execution grants at rest after
+  acceptance;
+- current `ingest-artist-discography`: ACTIVE v68;
+- `verify_jwt=true`;
+- current bundle SHA-256:
+  `57fdd98772bab0eea44565bc41f7d1571201e80684a9603ae76c13c7ac13fe39`;
+- deployed four-file Discography bundle remains byte-identical to current Git.
+
+No Slice 3 SQL migration, Edge deletion, frontend change, or canonical data
+mutation is required for this road.
+
+**Status**: `SLICE3_INGEST_ARTIST_DISCOGRAPHY=GOVERNED_KEEP`.
 
 ## 6. Artist enrichment/backfill function family
 
