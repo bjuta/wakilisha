@@ -429,31 +429,84 @@ D2 removes the source and standing writer classification, then keeps Production 
 
 ## 13. Legacy relationship authority
 
-Targets:
+Historical targets:
 
 - `cultural_entities` core-music shells;
-- `entity_relationships`;
-- `relationship_evidence`;
-- old Institute/contributor dependencies that still point at that graph.
+- `entity_relationships` core-music observations;
+- `relationship_evidence` links attached to those observations.
 
 ### Decision
 
-**CONVERGE, MIGRATE EVIDENCE, THEN RETIRE THE OLD CORE-MUSIC GRAPH PATH.**
+**CORE-MUSIC AUTHORITY ALREADY RETIRED. PRESERVE THE HISTORICAL ROWS AND THE BROADER NON-MUSIC INSTITUTE MODEL.**
 
-Do not delete rows merely because only two relationships remain.
+### Slice 2 convergence proof
 
-### Required migration proof
+Gate C already completed the required evidence-preserving convergence:
 
-- map four legacy cultural shells to typed Registry identities;
-- map old relationships to canonical typed endpoints;
-- preserve review state, public-safety state, confidence, evidence, provenance, timestamps, and contributor history;
-- audit all functions/views/UI that reference old relationship IDs;
-- prove no non-music cultural semantics are accidentally forced into a music-specific graph;
-- explicitly decide whether `cultural_entities` remains for non-core cultural domains.
+- all four legacy core-music shells map to exact typed Registry identities;
+- both legacy relationship UUIDs are reused in
+  `registry_entity_relationships`;
+- review state, public-safety state, reason, provenance, timestamps, actor fields,
+  and historical metadata are preserved;
+- both legacy evidence links are present in
+  `registry_relationship_evidence`;
+- the old relationship and evidence rows were deliberately retained rather than
+  deleted.
 
-### Exit gate
+The Production population is now fully bounded:
 
-Core Artist/Track/Release relationships have one authority: `registry_entity_relationships`.
+- `cultural_entities`: 4 total, all four historical core-music shells;
+- `entity_relationships`: 2 total, both historical core-music relationships;
+- `relationship_evidence`: 2 total, one for each historical relationship;
+- typed counterpart coverage: 2 / 2;
+- typed evidence coverage: 2 / 2;
+- canonical shell pointer coverage: 4 / 4.
+
+### Fail-closed retirement boundary
+
+Production has enabled triggers that reject mutation of legacy core-music
+identity, relationships, and relationship evidence:
+
+- `trg_reject_legacy_core_cultural_entity_mutation`;
+- `trg_reject_legacy_core_relationship_mutation`;
+- `trg_reject_legacy_core_relationship_evidence_mutation`.
+
+Their trigger functions expose no EXECUTE authority to `public`, `anon`, or
+`authenticated`.
+
+Current runtime code does not use the legacy tables as core-music relationship
+authority. Product and Institute record-detail relationship reads use
+`registry_entity_relationships`.
+
+### Historical replay authority
+
+The Production-data-bound Gate C migration is intentionally retired from active
+clean replay and retained byte-for-byte at:
+
+`docs/engineering/replay-baseline/retired-active-migrations/20260916182000_registry_relationship_authority_convergence_v1.sql`
+
+The active forward replacement
+`20260917121000_registry_relationship_replay_authority_v1.sql` contains only
+the enduring fail-closed triggers and no data-bound inserts, updates, or
+deletes. The permanent replay verifier emits
+`MIZIZI_RELATIONSHIP_REPLAY_AUTHORITY_PASS`.
+
+### Broader cultural semantics explicitly preserved
+
+Do **not** drop `cultural_entities`, `entity_relationships`, or
+`relationship_evidence` merely because the current Production population is
+only the historical core-music receipt.
+
+`create_registry_cultural_entity(...)` remains a governed Institute primitive
+for non-core cultural types and explicitly rejects
+Artist/Track/Release/Label/Genre. `review_registry_cultural_entity(...)` also
+refuses music-Registry identity.
+
+No additional Slice 3 SQL migration, data migration, Edge deployment, frontend
+deployment, or canonical data mutation is required for the core-music road.
+
+**Status**:
+`SLICE3_LEGACY_CORE_MUSIC_RELATIONSHIP_AUTHORITY=ALREADY_RETIRED`.
 
 ## 14. What is explicitly not being retired
 
