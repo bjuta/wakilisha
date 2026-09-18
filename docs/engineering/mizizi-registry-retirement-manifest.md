@@ -342,21 +342,48 @@ A public Release GET/read cannot mutate `registry_releases` even when descriptio
 
 ## 10. Admin detail browser DML
 
-Targets:
+Targets historically identified:
 
-- Artist detail direct `registry_artists.update()`
-- Track detail direct `registry_tracks.update()`
-- Release detail direct `registry_releases.update()`
+- Artist detail direct `registry_artists.update()`;
+- Track detail direct `registry_tracks.update()`;
+- Release detail direct `registry_releases.update()`.
 
 ### Decision
 
-**RETIRE stale direct browser mutation code after replacement wiring is accepted.**
+**RETIRED. Slice 2 Gate A-final already removed these browser mutation roads.**
 
-Do not grant direct authenticated table DML to make this code work.
+### Replacement proof
 
-### Replacement
+Current exact-main source proves:
 
-Use the canonical Admin Registry mutation client/boundary with the authenticated user's access token, capability check, expected-state protection, and audit receipt.
+- Artist detail save/archive routes through `saveRegistryEntityPatch(...)`;
+- Track detail save routes through `saveRegistryEntityPatch(...)`;
+- Track archive routes through `archiveRegistryTrack(...)`;
+- Release detail save routes through `saveRegistryReleaseDetail(...)`;
+- Release archive routes through `archiveRegistryRelease(...)`;
+- none of the three current detail pages contains a direct
+  `.from("registry_*").update(...)` road.
+
+The governed Production authorities remain present:
+
+- `admin_patch_registry_release_detail_v1(...)`;
+- `admin_archive_registry_music_entity_v1(...)`.
+
+Production grants also prove the old browser path cannot reappear accidentally:
+`anon` and `authenticated` have no direct `INSERT`, `UPDATE`, or
+`DELETE` grants on `registry_artists`, `registry_tracks`, or
+`registry_releases`.
+
+### Closure lineage
+
+Slice 2 Gate A-final merged in PR #953 at
+`91667e67ed29a6cc38c49359c44c837752d1e59d`. The final Slice 2 Production
+closure recorded ordinary browser canonical Registry DML grants at zero.
+
+No additional Slice 3 runtime patch, SQL migration, Edge deployment, frontend
+deployment, or canonical data mutation is required for this road.
+
+**Status**: `SLICE3_ADMIN_DETAIL_BROWSER_DML=ALREADY_RETIRED`.
 
 ## 11. `admin-router` embedded Charts path
 
