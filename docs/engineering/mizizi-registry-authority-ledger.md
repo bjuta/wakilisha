@@ -491,16 +491,62 @@ documentation.
 
 ## 9. Relationship authority duplication
 
-WAKILISHA currently has two relationship authorities:
+**Slice 3 closure: core-music legacy relationship authority was already converged and frozen by Slice 2 Gate C.**
 
-- `entity_relationships` + `relationship_evidence` over `cultural_entities`;
-- `registry_entity_relationships` + `registry_relationship_evidence` over typed canonical endpoints.
+The two table families have different surviving roles:
 
-The newer Registry graph is the active large graph: 163 relationships versus 2 in the old graph.
+- `registry_entity_relationships` + `registry_relationship_evidence` are the
+  current typed Registry relationship authority for core music;
+- `cultural_entities` + `entity_relationships` + `relationship_evidence`
+  retain historical Institute evidence and the broader non-music cultural model.
 
-The four active `cultural_entities` rows are legacy music shells (`bien`, `sauti-sol`, Release `still`, Track `still`). Newer creation RPCs forbid new core music identity in that table.
+Production currently contains exactly four legacy core-music
+`cultural_entities` rows:
 
-**Decision**: `CONVERGE ON registry_entity_relationships`, but only after dependency/evidence migration proof. Preserve historical evidence and Institute semantics.
+- Artist `mejja`;
+- Artist `fik-fameica`;
+- Track `siaka`;
+- Release `mtoto-wa-khadija`.
+
+All four carry canonical pointers to existing typed Registry identities. The
+legacy graph contains exactly two core-music relationships and two linked
+evidence rows. Both relationship UUIDs are preserved in
+`registry_entity_relationships` with
+`source_kind='legacy_cultural_relationship_migration'`, and each typed
+relationship carries the corresponding migrated evidence link.
+
+Slice 2 Gate C preserved the old rows as immutable historical observations
+rather than deleting them. Production has all three fail-closed triggers enabled:
+
+- `trg_reject_legacy_core_cultural_entity_mutation`;
+- `trg_reject_legacy_core_relationship_mutation`;
+- `trg_reject_legacy_core_relationship_evidence_mutation`.
+
+The trigger functions are not executable by `public`, `anon`, or
+`authenticated`.
+
+Current product relationship reads use typed Registry authority. No current
+runtime source directly reads or writes the three legacy tables as core-music
+authority. The Institute record-search surface reads
+`registry_entity_relationships`, not `entity_relationships`.
+
+The broader cultural model is deliberately preserved. Production
+`create_registry_cultural_entity(...)` accepts only non-core cultural types
+such as person, scene, place, event, institution, work, concept, language,
+movement, publication, organization, article, inquiry, memory, and source. It
+explicitly rejects Artist/Track/Release/Label/Genre identity, and
+`review_registry_cultural_entity(...)` refuses to review those music types in
+this table.
+
+The original data-bound convergence migration is preserved as historical replay
+evidence under
+`docs/engineering/replay-baseline/retired-active-migrations/20260916182000_registry_relationship_authority_convergence_v1.sql`.
+Its enduring fail-closed authority was moved to
+`20260917121000_registry_relationship_replay_authority_v1.sql`.
+
+**Decision**: `CORE-MUSIC AUTHORITY RETIRED; HISTORICAL EVIDENCE PRESERVED`.
+Do not drop the broader cultural tables. Their non-music Institute semantics are
+outside this retirement target.
 
 ## 10. Public/read authority duplication
 
