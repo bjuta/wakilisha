@@ -456,17 +456,38 @@ these PUBLIC maintenance RPCs is prohibited by the head-state negative contract.
 
 ## 8. Frontend direct-DML drift
 
-Current Admin detail code contains direct browser mutations against:
+**Slice 3 closure: already retired by Slice 2 Gate A-final.**
 
-- `registry_artists`
-- `registry_tracks`
-- `registry_releases`
+The historical Slice 1 audit identified direct browser mutations against:
 
-Production grants deny ordinary authenticated direct DML on those tables.
+- `registry_artists`;
+- `registry_tracks`;
+- `registry_releases`.
 
-Therefore these calls are not alternate privileged authority; they are stale/broken mutation paths beside the governed Admin server boundary.
+Current exact-main source no longer contains those mutation roads:
 
-**Decision**: `CONVERGE`. Route through the canonical Admin Registry mutation primitive. Do **not** solve by granting browser DML.
+- Artist detail manual save/archive uses `saveRegistryEntityPatch(...)` through
+  the shared Admin Registry client;
+- Track detail save uses `saveRegistryEntityPatch(...)`;
+- Track archive uses `archiveRegistryTrack(...)` and the governed
+  `admin_archive_registry_music_entity_v1(...)` authority;
+- Release detail save uses `saveRegistryReleaseDetail(...)` backed by
+  `admin_patch_registry_release_detail_v1(...)`;
+- Release archive uses `archiveRegistryRelease(...)` and the same governed
+  archive authority.
+
+Production confirms both replacement RPCs exist, while `anon` and
+`authenticated` have no `INSERT`, `UPDATE`, or `DELETE` grants on
+`registry_artists`, `registry_tracks`, or `registry_releases`.
+
+Slice 2 Gate A-final merged the source convergence in PR #953 at
+`91667e67ed29a6cc38c49359c44c837752d1e59d`. Slice 2 was subsequently
+closed in Production with ordinary browser canonical Registry DML grants at
+zero, as recorded in the final Slice 2 closure.
+
+**Decision**: `RETIRED`. No Slice 3 implementation or Production mutation is
+required. The stale direct browser DML path survives only in historical audit
+documentation.
 
 ## 9. Relationship authority duplication
 
