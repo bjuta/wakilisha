@@ -84,21 +84,26 @@
       "id": "artist-registry-intake",
       "kind": "edge_function",
       "entrypoint": "supabase/functions/artist-registry-intake/index.ts",
-      "authentication": "none_request_bound",
-      "authorization": "none_registry_capability",
-      "executionAuthority": "service_role",
+      "authentication": "request_bearer_user",
+      "authorization": "manage_registry",
+      "executionAuthority": "service_role_staging_and_reads_plus_caller_jwt_reviewed_registry_admissions",
       "targets": [
-        "artist_intake_staging",
-        "registry_artists"
+        "provider_intake_runs",
+        "provider_intake_artist_staging",
+        "registry_evidence_assertions",
+        "registry_artists",
+        "registry_canonical_write_events",
+        "registry_operation_write_events",
+        "registry_mutation_operations"
       ],
-      "riskClass": "critical",
-      "disposition": "converge",
-      "futureBoundary": "governed_registry_admission",
+      "riskClass": "high",
+      "disposition": "keep",
+      "futureBoundary": "reviewed_artist_intake_typed_registry_admissions",
       "miziziCallable": false,
       "humanCallable": true,
-      "publicCallable": true,
+      "publicCallable": false,
       "canonicalMutation": true,
-      "legacyDebt": true
+      "legacyDebt": false
     },
     {
       "id": "ingest-artist-discography",
