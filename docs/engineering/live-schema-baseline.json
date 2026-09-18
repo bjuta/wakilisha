@@ -1,16 +1,16 @@
 {
   "projectRef": "pgzizndxdyhqmtyywjmt",
   "schema": "public,editorial",
-  "generatedAt": "2026-09-18T07:28:48.257Z",
-  "typesSha256": "4b11abbaae50c5672688439b81b1ef702bdde0911cec830e8580cb3f52485fd1",
+  "generatedAt": "2026-09-18T17:12:55Z",
+  "typesSha256": "1d32bc68224237f91f1f89102ddafa2db1a4f3ed80d4a26260db06c8d0fef67f",
   "authoritativeMigrationDirectory": "supabase/migrations",
-  "migrationCount": 150,
-  "latestMigration": "20260918064000_legacy_registry_maintenance_rpc_retirement.sql",
+  "migrationCount": 151,
+  "latestMigration": "20260918120331_mizizi_executor_foundation_v1.sql",
   "schemaSeal": {
     "mode": "preview",
-    "sourceProjectRef": "qruetsoggluwiaqvehzr",
-    "migrationHead": "20260918064000",
-    "baseMainSha": "a2b74fa6573979b3f45932d85268cf3746676742",
-    "previewBranchId": "2f79d03e-862e-4d30-bca8-7d7d746bb3e2"
+    "sourceProjectRef": "tpiyixndoqvgnkpoqzes",
+    "migrationHead": "20260918120331",
+    "baseMainSha": "c72fff300381ef6fe4fdb8b9374731a1324ea402",
+    "previewBranchId": "5f91ccbc-eb6d-4abe-a169-87313537b3cb"
   }
 }

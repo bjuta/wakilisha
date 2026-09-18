@@ -1,0 +1,16 @@
+{
+  "migration_file": "supabase/migrations/20260918120331_mizizi_executor_foundation_v1.sql",
+  "migration_sha256": "663755a0561abf7afb4b9e0f0c28794b8eb2a957d172863476d90d2c3f7b6ea5",
+  "base_main_sha": "c72fff300381ef6fe4fdb8b9374731a1324ea402",
+  "preview_project_ref": "tpiyixndoqvgnkpoqzes",
+  "preview_branch_id": "5f91ccbc-eb6d-4abe-a169-87313537b3cb",
+  "preview_migration_head": "20260918120331",
+  "baseline_replay": "pass",
+  "candidate_apply": "pass",
+  "verifier": "pass",
+  "verifier_file": "scripts/control-plane/verify-mizizi-executor-stage-a-foundation.sql",
+  "schema_types_sha256": "1d32bc68224237f91f1f89102ddafa2db1a4f3ed80d4a26260db06c8d0fef67f",
+  "schema_migration_count": 151,
+  "schema_migration_head": "20260918120331",
+  "verified_at": "2026-09-18T17:12:55Z"
+}
