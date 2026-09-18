@@ -186,9 +186,9 @@ Targets:
 
 ### Decision
 
-**RETIRE. Repository migration first; Production apply remains a separate post-merge gate.**
+**RETIRED. Repository and Production authority are closed.**
 
-### Dependency proof
+### Dependency and traffic proof
 
 Current exact-main and Production inspection established:
 
@@ -200,53 +200,56 @@ Current exact-main and Production inspection established:
 - no dependent database object;
 - zero recorded function-statistics calls.
 
-The functions remain `SECURITY INVOKER` and PUBLIC executable, with no internal
-authorization guard. Their ability to mutate canonical Registry tables depends
-on the invoking role's table grants, so they are unnecessary callable authority
-rather than a required product capability.
+Seven-day PostgREST traffic proof covered
+`2026-09-11T06:32:40Z` through `2026-09-18T06:32:40Z` with 2,272,478
+`/rest/v1/` positive-control requests and zero invocations across all three
+target RPC paths. The final immediate pre-apply window from
+`2026-09-18T06:32:40Z` through `2026-09-18T07:37:47Z` observed 3,288
+additional `/rest/v1/` requests and zero target RPC traffic.
 
-### External traffic proof
+### Repository closure
 
-A read-only seven-day PostgREST audit covered
-`2026-09-11T06:32:40Z` through `2026-09-18T06:32:40Z`.
+PR #974 merged at
+`main@85efa4db45ad27691d1f6011b1c1a3f4a4c61dcb` with:
 
-Positive control:
+- `20260918064000_legacy_registry_maintenance_rpc_retirement.sql`;
+- no `CASCADE`;
+- the retired writer-family removed from the privileged-writer manifest;
+- permanent MIZIZI head-state negative contract;
+- Preview replay proof sealed at exact migration head `20260918064000`;
+- generated schema types with the three retired RPC signatures removed.
 
-- `/rest/v1/` requests: 2,272,478;
-- trusted 24-hour windows: 7 / 7.
+Protected CI on the sealed PR head passed:
 
-Target results:
+- Critical Control Plane #1331;
+- MIZIZI Track Production Control Plane #56;
+- MIZIZI Release Production Control Plane #34.
 
-- `link_orphan_release_artists()`: 0 requests;
-- `rebuild_discography_from_metadata()`: 0 requests;
-- `split_multi_release_tracks()`: 0 requests;
-- broad target-name URL matches: 0.
+### Production retirement closure
 
-### Repository retirement contract
+Accepted Production state after applying
+`20260918064000_legacy_registry_maintenance_rpc_retirement`:
 
-- add one new head migration that drops exactly the three zero-argument
-  functions;
-- use no `CASCADE`, so an undiscovered dependency blocks retirement;
-- preserve the already-applied September 5 replay-parity migration unchanged as
-  historical schema truth;
-- remove the retired family from the privileged-writer manifest;
-- extend the existing consolidated MIZIZI test with a permanent negative
-  head-state contract;
-- update current authority documentation.
+- migration count: 150;
+- migration head: `20260918064000`;
+- `link_orphan_release_artists()`: absent;
+- `rebuild_discography_from_metadata()`: absent;
+- `split_multi_release_tracks()`: absent;
+- remaining target-name overloads: 0;
+- canonical Registry table counts unchanged;
+- canonical Registry row fingerprints unchanged across the six audited Registry
+  tables;
+- post-apply security/performance advisor scans contain no finding naming a
+  retired RPC;
+- data migration: no;
+- canonical data mutation: no;
+- Edge deployment: no;
+- frontend deployment: no.
 
-### Production apply gate
+The disposable Preview used for replay proof was deleted after the replay
+contract passed, stopping its hourly cost.
 
-After protected CI and merge:
-
-1. rerun an immediate exact-path PostgREST traffic check;
-2. capture exact pre-apply Registry fingerprints/counts;
-3. apply only the retirement migration;
-4. prove all three functions are absent;
-5. prove their RPC paths fail closed;
-6. prove canonical Registry fingerprints/counts are unchanged.
-
-No data migration, Edge deployment, frontend deployment, or canonical data
-mutation is required.
+**Status**: `SLICE3_LEGACY_REGISTRY_MAINTENANCE_RPC_RETIREMENT=PRODUCTION_ACCEPTED`.
 
 ## 8. `wakilisha-public-api`
 
