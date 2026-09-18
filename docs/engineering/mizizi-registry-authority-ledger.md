@@ -333,18 +333,21 @@ The function also performs operational side effects such as rate-limit logging a
 
 ### 6.12 `wakilisha-public-api`
 
-**Slice 3 retirement posture**
+**Slice 3 retirement closure**
 
 - `public-content-read` is the accepted broad public application/API authority;
 - exact-main application, workflow, deployment-script, and migration audits found no current caller for `wakilisha-public-api`;
-- the legacy gateway has zero route or RPC surface that is not already owned by `public-content-read`;
-- its old related-Artist table reads are superseded by the governed structural-proximity read authority;
-- corrected Production traffic analysis covered `2026-09-11T05:13:00Z` through `2026-09-18T05:13:00Z` using `function_edge_logs` and exact function UUIDs;
-- 123,351 total Edge Function invocations and 122,955 `public-content-read` invocations were observed;
-- all 9 `wakilisha-public-api` invocations were documented WAKILISHA acceptance probes: two Gate B Release probes on v105 and seven D2 Artist probes on v106;
-- unknown or organic legacy consumers observed: zero.
+- the legacy gateway had zero route or RPC surface not already owned by `public-content-read`;
+- its old related-Artist table reads were superseded by the governed structural-proximity read authority;
+- corrected seven-day Production traffic analysis found 123,351 total Edge Function invocations, 122,955 `public-content-read` invocations, and 9 `wakilisha-public-api` invocations;
+- all 9 legacy invocations were documented WAKILISHA acceptance probes, with zero unknown or organic consumers;
+- the repository retirement merged at `main@29e7bb083791a4dab3104dc8f4da8c3daa209461`;
+- an immediate pre-delete traffic recheck observed 4 global invocations, 0 legacy invocations, and 4 replacement invocations;
+- `wakilisha-public-api` v106 was deleted from Production after rollback-source equivalence was proven and sealed;
+- the retired URL returns HTTP 404 and the Production Edge inventory no longer contains the function;
+- `public-content-read` v90 remains ACTIVE and live at bundle SHA `70a389d05f24c775a047ec8020651a4fb56d3e69420d4ed0eb3a24c610cb4f6d`.
 
-**Decision**: `RETIRE`. Remove repository runtime authority and standing writer classification now. Keep Production v106 only as temporary rollback authority until the retirement PR is merged and an immediate pre-delete traffic recheck confirms no new unknown consumer.
+**Decision**: `RETIRED`. The obsolete broad gateway no longer exists in repository or Production authority. Reintroduction is prohibited by the retired-source negative contract.
 
 ### 6.13 `public-query-v1`
 
