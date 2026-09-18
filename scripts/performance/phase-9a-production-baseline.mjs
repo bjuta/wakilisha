@@ -330,7 +330,7 @@ async function auditRoute(browser, browserName, route) {
 
   const preflights = requests.filter((request) => request.method === "OPTIONS");
   const publicContentRequests = requests.filter((request) =>
-    request.url.includes("/functions/v1/public-content-read") || request.url.includes("/functions/v1/wakilisha-public-api"),
+    request.url.includes("/functions/v1/public-content-read"),
   );
 
   const result = {

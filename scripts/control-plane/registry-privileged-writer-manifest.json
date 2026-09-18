@@ -219,7 +219,7 @@
       "canonicalMutation": true,
       "legacyDebt": false
     },
-        {
+    {
       "id": "provider-intake-api",
       "kind": "edge_function",
       "entrypoint": "supabase/functions/provider-intake-api/index.ts",
@@ -320,25 +320,6 @@
       "publicCallable": true,
       "canonicalMutation": false,
       "legacyDebt": false
-    },
-    {
-      "id": "wakilisha-public-api",
-      "kind": "edge_function",
-      "entrypoint": "supabase/functions/wakilisha-public-api/index.ts",
-      "authentication": "public_read_contract",
-      "authorization": "public_read_contract",
-      "executionAuthority": "service_role",
-      "targets": [
-        "registry_releases"
-      ],
-      "riskClass": "high",
-      "disposition": "candidate_retire",
-      "futureBoundary": "none_after_traffic_and_compatibility_proof",
-      "miziziCallable": false,
-      "humanCallable": true,
-      "publicCallable": true,
-      "canonicalMutation": true,
-      "legacyDebt": true
     },
     {
       "id": "admin-create-registry-track-from-intake-enriched",

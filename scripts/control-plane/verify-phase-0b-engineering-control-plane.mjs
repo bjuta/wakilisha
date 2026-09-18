@@ -214,7 +214,6 @@ for (const requiredWriter of [
   "registry-enrich-artist",
   "backfill-artist-origin",
   "public-content-read",
-  "wakilisha-public-api",
 ]) {
   if (!writerIds.has(requiredWriter)) {
     throw new Error(
@@ -231,6 +230,10 @@ for (const [retiredWriter, retiredEntrypoint] of [
   [
     "backfill-artist-type",
     "supabase/functions/backfill-artist-type/index.ts",
+  ],
+  [
+    "wakilisha-public-api",
+    "supabase/functions/wakilisha-public-api/index.ts",
   ],
 ]) {
   if (writerIds.has(retiredWriter)) {

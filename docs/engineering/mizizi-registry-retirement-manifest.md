@@ -203,24 +203,56 @@ They are PUBLIC executable `SECURITY INVOKER` maintenance functions without thei
 
 ### Decision
 
-**CANDIDATE RETIRE; FREEZE new consumers now.**
+**RETIRE NOW. Repository retirement first; Production deletion remains a separate post-merge gate.**
 
-### Why
+### Replacement proof
 
-Current application/env/API-doc authority points to `public-content-read`, while `wakilisha-public-api` remains an older broad gateway. It also contains canonical Release write-on-read behavior.
+`public-content-read` is the accepted broad public application/API read authority.
 
-### Required proof before retirement
+Current exact-main proof establishes:
 
-- Production request/traffic analysis;
-- Cloudflare/Nginx/host routing analysis;
-- API docs and external consumer analysis;
-- SEO/prerender compatibility audit;
-- direct URL references outside application code;
-- acceptance comparison against `public-content-read` for any endpoints still served uniquely.
+- zero current product caller;
+- zero current GitHub workflow caller;
+- zero current deployment-script caller;
+- zero current migration caller;
+- zero legacy-only route surface;
+- zero legacy-only RPC surface;
+- the two legacy-only relationship-table reads are obsolete implementation detail, superseded for related-Artist presentation by `get_public_artist_structural_proximity`;
+- both gateways are mechanically free of direct canonical Registry DML.
 
-### Exit gate
+### Production traffic proof
 
-No external/public contract is silently broken, and `public-content-read` does not inherit obsolete compatibility behavior solely to make deletion easy.
+The corrected traffic audit used `function_edge_logs` with exact deployed function UUIDs across seven 24-hour windows from `2026-09-11T05:13:00Z` through `2026-09-18T05:13:00Z`.
+
+Observed:
+
+- global Edge Function invocations: 123,351;
+- `public-content-read` invocations: 122,955;
+- `wakilisha-public-api` invocations: 9.
+
+All 9 legacy invocations are documented WAKILISHA engineering acceptance:
+
+- two v105 calls are the Gate B Production Release `OPTIONS` + `GET` probe for `nakam-sai-feat-sosatheprodigyy-single`;
+- seven v106 calls are the D2 Production Artist probes for Savara, Elsy Wameyo, Nyashinski, and Zaituni.
+
+Unknown or organic legacy invocations in the frozen seven-day window: **0**.
+
+### Repository retirement contract
+
+- delete `supabase/functions/wakilisha-public-api/index.ts`;
+- remove `wakilisha-public-api` from the privileged-writer manifest;
+- move the function into the Phase 0B retired-source negative contract;
+- keep the existing consolidated MIZIZI test file and narrow public-read/Top Songs assertions to the surviving `public-content-read` authority;
+- add a permanent negative assertion that the retired Edge source and manifest classification remain absent;
+- stop active performance tooling from classifying the retired gateway as a normal public-content request;
+- update current operational proxy/cache documentation to `public-content-read`;
+- preserve historical audits and closure records unchanged.
+
+### Production deletion gate
+
+Production v106 remains active as rollback authority until the repository retirement PR passes protected CI and merges. Immediately before deletion, rerun a narrow post-freeze traffic check. If no unknown consumer appears, delete only `wakilisha-public-api`, prove the retired URL fails closed, confirm the Edge inventory no longer contains it, and independently verify `public-content-read`.
+
+No SQL migration, canonical data mutation, or frontend deployment is required.
 
 ## 9. `public-content-read` canonical write side effect
 
