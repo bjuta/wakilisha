@@ -23,7 +23,6 @@ with authenticated_commands as (
       or p.proname like 'institute_accept_%'
       or p.proname like 'institute_review_%'
       or p.proname in (
-        'registry_upsert_track_provider_link',
         'community_create_profile',
         'community_create_context_anchor_comment',
         'community_create_track_moment_comment',
@@ -41,7 +40,7 @@ with authenticated_commands as (
   select function_signature, 'authenticated privileged command lacks actor or capability guard' as violation
   from authenticated_commands
   where not (
-    definition ~* '(auth\.uid\s*\(|current_user_has_capability\s*\(|has_capability\s*\(|current_user_is_administrator\s*\(|is_current_user_administrator\s*\(|institute_can_(manage|review|read)\s*\(|user_role_assignments|role_capabilities|current_user\s*<>\s*''service_role''|current_user\s*=\s*''service_role'')'
+    definition ~* '(auth\.uid\s*\(|current_user_has_capability\s*\(|has_capability\s*\(|current_user_is_administrator\s*\(|is_current_user_administrator\s*\(|institute_can_(manage|review|read)\s*\(|user_role_assignments|role_capabilities|registry_provider_link_admin_current_user_v1\s*\(|current_user\s*<>\s*''service_role''|current_user\s*=\s*''service_role'')'
   )
 
   union all
