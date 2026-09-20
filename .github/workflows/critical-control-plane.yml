@@ -40,6 +40,9 @@ jobs:
       - name: Install dependencies
         run: npm ci --prefer-offline --no-audit --no-fund
 
+      - name: Retire registry enrichment review in Production
+        run: node scripts/control-plane/retire-registry-enrichment-review-production.mjs
+
       - name: Validate canonical Production frontend runner
         run: scripts/deploy/production-frontend.sh --self-test
 
