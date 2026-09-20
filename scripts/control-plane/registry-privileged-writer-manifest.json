@@ -159,30 +159,6 @@
       "legacyDebt": false
     },
     {
-      "id": "registry-enrichment-review",
-      "kind": "edge_function",
-      "entrypoint": "supabase/functions/registry-enrichment-review/index.ts",
-      "authentication": "request_bearer_user",
-      "authorization": "manage_registry",
-      "executionAuthority": "service_role_after_authorization",
-      "targets": [
-        "registry_artists",
-        "registry_tracks",
-        "registry_releases",
-        "registry_labels",
-        "registry_release_artists",
-        "registry_entity_relationships"
-      ],
-      "riskClass": "high",
-      "disposition": "keep_converge",
-      "futureBoundary": "typed_registry_operations",
-      "miziziCallable": false,
-      "humanCallable": true,
-      "publicCallable": false,
-      "canonicalMutation": true,
-      "legacyDebt": false
-    },
-    {
       "id": "chart-ingest-api",
       "kind": "edge_function",
       "entrypoint": "supabase/functions/chart-ingest-api/index.ts",

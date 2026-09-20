@@ -208,7 +208,6 @@ for (const requiredWriter of [
   "scrape-artist-data",
   "artist-registry-intake",
   "ingest-artist-discography",
-  "registry-enrichment-review",
   "chart-ingest-api",
   "admin-router-registry",
   "registry-enrich-artist",
@@ -234,6 +233,10 @@ for (const [retiredWriter, retiredEntrypoint] of [
   [
     "wakilisha-public-api",
     "supabase/functions/wakilisha-public-api/index.ts",
+  ],
+  [
+    "registry-enrichment-review",
+    "supabase/functions/registry-enrichment-review/index.ts",
   ],
 ]) {
   if (writerIds.has(retiredWriter)) {
