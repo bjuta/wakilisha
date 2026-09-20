@@ -70,7 +70,7 @@ begin
     select *
     from public_api
     where definition ~
-      '(insert[[:space:]]+into|update|delete[[:space:]]+from)[[:space:]]+public[.](registry_(artists|tracks|releases|track_artists|release_artists|release_tracks|artist_aliases|entity_relationships|relationship_evidence|labels|genres))'
+      '(insert[[:space:]]+into|update|delete[[:space:]]+from)[[:space:]]+public[.](registry_(artists|tracks|releases|track_artists|release_artists|release_tracks|artist_aliases|entity_relationships|relationship_evidence|track_provider_links|labels|genres))'
   ),
   private_executor_bridges as (
     select *
@@ -83,7 +83,7 @@ begin
     from public_api
     where definition ~ '(^|[^a-z0-9_])execute[[:space:]]'
       and definition ~
-        'registry_(artists|tracks|releases|track_artists|release_artists|release_tracks|artist_aliases|entity_relationships|relationship_evidence|labels|genres)'
+        'registry_(artists|tracks|releases|track_artists|release_artists|release_tracks|artist_aliases|entity_relationships|relationship_evidence|track_provider_links|labels|genres)'
   ),
   mutation_graph(signature, proname, definition, anon_execute, authenticated_execute) as (
     select signature, proname, definition, anon_execute, authenticated_execute
@@ -156,7 +156,7 @@ ${values}
     select *
     from public_api
     where definition ~
-      '(insert[[:space:]]+into|update|delete[[:space:]]+from)[[:space:]]+public[.](registry_(artists|tracks|releases|track_artists|release_artists|release_tracks|artist_aliases|entity_relationships|relationship_evidence|labels|genres))'
+      '(insert[[:space:]]+into|update|delete[[:space:]]+from)[[:space:]]+public[.](registry_(artists|tracks|releases|track_artists|release_artists|release_tracks|artist_aliases|entity_relationships|relationship_evidence|track_provider_links|labels|genres))'
   ),
   private_executor_bridges as (
     select *
@@ -169,7 +169,7 @@ ${values}
     from public_api
     where definition ~ '(^|[^a-z0-9_])execute[[:space:]]'
       and definition ~
-        'registry_(artists|tracks|releases|track_artists|release_artists|release_tracks|artist_aliases|entity_relationships|relationship_evidence|labels|genres)'
+        'registry_(artists|tracks|releases|track_artists|release_artists|release_tracks|artist_aliases|entity_relationships|relationship_evidence|track_provider_links|labels|genres)'
   ),
   mutation_graph(signature, proname, definition, anon_execute, authenticated_execute) as (
     select signature, proname, definition, anon_execute, authenticated_execute
