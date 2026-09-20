@@ -1,0 +1,16 @@
+{
+  "migration_file": "supabase/migrations/20260920151500_registry_chart_playback_provider_authority_v1.sql",
+  "migration_sha256": "68a9d8304db4132823fe1518668502c3d52acf04b938f4dc283e5d96659ff33e",
+  "base_main_sha": "a7cf499e60e708bb99ef7aa403d97c01394fc6c9",
+  "preview_project_ref": "zxxmjagnansastivcoiy",
+  "preview_branch_id": "e83cba48-1350-4941-b448-0e9540fb559c",
+  "preview_migration_head": "20260920151500",
+  "baseline_replay": "pass",
+  "candidate_apply": "pass",
+  "verifier": "pass",
+  "verifier_file": "scripts/control-plane/verify-registry-chart-playback-provider-authority.sql",
+  "schema_types_sha256": "7ebfc87e07e56c3d92a8f2af792e9a07e3142893b3030b509c031c6c79f0d154",
+  "schema_migration_count": 155,
+  "schema_migration_head": "20260920160500",
+  "verified_at": "2026-09-20T16:06:46Z"
+}
