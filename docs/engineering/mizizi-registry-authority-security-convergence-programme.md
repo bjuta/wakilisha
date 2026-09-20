@@ -1,8 +1,10 @@
 # MIZIZI Registry Authority, Security, and Primitive Convergence Programme
 
+> **20 September 2026 programme status:** Slices 1 through 3 are Production accepted and closed. Slice 4 may open only as the separate MIZIZI Stewardship Runtime Foundation boundary. Slice 3 closure does not authorize autonomous Production mutation.
+
 Date: 14 September 2026
 
-Status: **Architectural authority for the next MIZIZI programme. No Production mutation is authorized by this document.**
+Status: **Architectural authority. Slices 1 through 3 are Production accepted; Slice 4 opening audit/design is authorized, but autonomous Production mutation is not.**
 
 Base repository authority: `main@dee74bf733f6888deb8eaf998d27de455bf70071`
 
@@ -571,6 +573,44 @@ A legitimate workflow cannot be removed until its replacement is accepted.
 - every retained Registry writer is explicitly classified and governed;
 - no unjustified unauthenticated or JWT-only-to-service-role canonical writer remains.
 
+### Slice 3 Production closure
+
+Slice 3 is Production accepted and closed.
+
+Closing repository retirement PR #987 merged as:
+
+`177e4aaee15d5bbb2a77ae8ee43f7e119791aee3`
+
+Final Production acceptance proved:
+
+- migration count 153 at head `20260920095334`;
+- active MIZIZI standing grants 0;
+- active MIZIZI exact grants 0;
+- `mizizi -> mizizi_executor` active;
+- `mizizi -> postgres` disabled;
+- all six retired Registry Edge runtimes absent;
+- all nine retained governed Registry/Admin runtimes ACTIVE;
+- obsolete public Registry maintenance RPC count 0;
+- all three legacy core relationship fail-closed triggers enabled;
+- ordinary browser canonical Artist/Track/Release DML grants 0;
+- retired `registry-enrichment-review` external route HTTP 404;
+- live `public-content-read` network positive control HTTP 401.
+
+Critical Control Plane #1369 returned:
+
+`SLICE3_FINAL_EDGE_EXIT_AUDIT=PASS`
+
+Whole-Slice closure authority:
+
+`docs/engineering/mizizi-slice3-production-closure.md`
+
+Status receipt:
+
+`MIZIZI_SLICE3_OBSOLETE_AUTHORITY_RETIREMENT=PRODUCTION_ACCEPTED`
+
+Slice 4 is not implicitly activated by this closure. It requires its own issue,
+read-only opening audit, exact design, and protected implementation sequence.
+
 ## 10. Slice 4 — MIZIZI Stewardship Runtime Foundation
 
 ### Objective
@@ -900,18 +940,38 @@ The programme is complete when WAKILISHA can prove all of the following:
 
 ## 17. Immediate next action
 
-The next implementation action is **Slice 1 only**.
+The next implementation boundary is **Slice 4 — MIZIZI Stewardship Runtime
+Foundation**.
 
-That action is read-only authority mapping and exact convergence design.
+Its first move is read-only authority/runtime mapping only.
 
-Until the Registry Authority Ledger and associated dependency map are complete:
+Before any new runtime mutation authority is implemented, freeze the exact
+current state of:
 
-- do not delete `scrape-artist-data`;
-- do not remove its pages or callers;
-- do not patch `artist-registry-intake` in isolation;
-- do not patch `ingest-artist-discography` in isolation;
-- do not add the new MIZIZI execution runtime;
-- do not add canonical admission barriers;
-- do not create new permanent milestone tests merely because this programme has started.
+- MIZIZI process entrypoints, schedules, leases, retries, and operational
+  memory;
+- current read surfaces and all credentials reachable by the reasoning/runtime
+  process;
+- deterministic policy and exact-grant primitives already accepted in
+  Production;
+- capability-broker execution boundaries;
+- operation journal and independent verifier semantics;
+- compensation/rollback authority;
+- kill-switch ownership and fail-closed behavior;
+- network egress, filesystem/process execution, and secret boundaries;
+- concurrency, rate, row, daily-budget, and cooldown controls.
 
-The next mutation must be justified by the completed authority map, not by the order in which individual problems were discovered.
+The Slice 4 design must prove that a fully compromised reasoning process still
+cannot exceed deterministic capability, target, state, expiry, and blast-radius
+authority.
+
+Until that opening audit and design are accepted:
+
+- do not grant MIZIZI standing Production mutation authority;
+- do not expose arbitrary SQL;
+- do not place long-lived Production credentials in the reasoning runtime;
+- do not let model output create or widen its own capability;
+- do not add autonomous retries or compensation outside deterministic policy;
+- do not bypass the accepted exact-grant, broker, journal, and verifier
+  boundaries.
+
