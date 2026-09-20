@@ -363,7 +363,7 @@ function ArtistCard({
                 onClick={() => onArchive(artist)}
                 className="rounded-xl bg-red-600/90 px-4 py-2 text-[12px] font-bold text-white hover:bg-red-700"
               >
-                Delete
+                Archive
               </button>
             )}
           </div>
@@ -749,7 +749,7 @@ export default function ArtistsPage() {
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [publishing, setPublishing] = useState(false);
   const [confirmPublishOpen, setConfirmPublishOpen] = useState(false);
-  const [archiving, setDeleting] = useState(false);
+  const [archiving, setArchiving] = useState(false);
   const [confirmArchiveOpen, setConfirmArchiveOpen] = useState(false);
   const [singleArchiveTarget, setSingleArchiveTarget] = useState<EnrichedArtist | null>(null);
 
@@ -1372,7 +1372,7 @@ export default function ArtistsPage() {
                   draftCount={selectedDraftIds.length}
                   activeCount={selectedActiveIds.length}
                   onArchive={openConfirmArchive}
-                  deleting={deleting}
+                  archiving={archiving}
                   archiveCount={selectedDraftIds.length}
                 />
 
