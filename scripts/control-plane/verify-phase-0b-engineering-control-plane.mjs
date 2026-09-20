@@ -344,14 +344,23 @@ const miziziRunner =
   );
 
 if (
+  miziziRunner?.entrypoint !==
+    "scripts/registry/agents/mizizi/run.ts" ||
+  miziziRunner?.authorization !==
+    "manual apply confirmation plus human standing stewardship capability grant and deterministic policy-issued exact execution grant" ||
   miziziRunner?.executionAuthority !==
-    "direct postgres session" ||
+    "typed exact-grant stewardship broker over current JIT postgres transport" ||
   miziziRunner?.futureBoundary !==
-    "exact_execution_grant_and_typed_registry_operation" ||
-  !miziziRunner?.legacyDebt
+    "dedicated_narrow_executor_identity_without_postgres_ambient_authority" ||
+  miziziRunner?.disposition !== "converge" ||
+  miziziRunner?.miziziCallable !== true ||
+  miziziRunner?.humanCallable !== true ||
+  miziziRunner?.publicCallable !== false ||
+  miziziRunner?.canonicalMutation !== true ||
+  miziziRunner?.legacyDebt !== true
 ) {
   throw new Error(
-    "Current MIZIZI ambient database execution must remain classified as debt until brokered execution replaces it.",
+    "MIZIZI runner classification drifted from the Stage B brokered-mutation / JIT-postgres transport-debt boundary.",
   );
 }
 

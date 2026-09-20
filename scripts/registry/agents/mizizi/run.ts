@@ -7,7 +7,6 @@ import {
   MIZIZI_AGENT_KEY,
   MIZIZI_AGENT_LABEL,
   MIZIZI_RULESET_VERSION,
-  releaseTaxonomyFromActiveTrackCount,
   slugifyIdentity,
   stripFeatureCreditNoise,
   type MiziziFinding,
@@ -241,19 +240,6 @@ function parseOptions(): Options {
   };
 }
 
-function sourceTableFor(
-  entityType: MiziziFinding["entityType"],
-): string {
-  if (entityType === "track") {
-    return "registry_tracks";
-  }
-
-  if (entityType === "release") {
-    return "registry_releases";
-  }
-
-  return "wk_chart_entries_v2";
-}
 
 async function assertRequiredTables(
   pool: ReturnType<typeof createRegistryPool>,
@@ -286,178 +272,72 @@ async function assertRequiredTables(
   }
 }
 
-function reviewKey(
-  finding: MiziziFinding,
-): string {
-  return (
-    MIZIZI_AGENT_KEY +
-    ":" +
-    finding.fingerprint
-  );
-}
 
-function findingTitle(
-  finding: MiziziFinding,
-): string {
-  const label =
-    finding.entityType === "track"
-      ? "Track"
-      : finding.entityType === "release"
-        ? "Release"
-        : "chart entry";
-
-  return (
-    "MIZIZI found " +
-    label +
-    " data that needs review"
-  );
-}
 
 async function queueReview(
   pool: ReturnType<typeof createRegistryPool>,
   finding: MiziziFinding,
   extraEvidence: Record<string, unknown> = {},
 ): Promise<void> {
-  await pool.query(
-    `
-    insert into public.registry_review_items (
-      review_key,
-      entity_type,
-      entity_id,
-      review_type,
-      priority,
-      status,
-      title,
-      summary,
-      source_table,
-      source_id,
-      source_payload,
-      candidate_payload,
-      created_at,
-      updated_at
-    )
-    values (
-      $1,
-      $2,
-      case
-        when $3 ~* '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'
-          then $3::uuid
-        else null
-      end,
-      'mizizi_data_hygiene',
-      $4,
-      'open',
-      $5,
-      $6,
-      $7,
-      $3,
-      $8::jsonb,
-      $9::jsonb,
-      now(),
-      now()
-    )
-    on conflict (review_key)
-    do update set
-      priority = excluded.priority,
-      title = excluded.title,
-      summary = excluded.summary,
-      source_payload = excluded.source_payload,
-      candidate_payload = excluded.candidate_payload,
-      updated_at = now()
-    where public.registry_review_items.status <> 'resolved'
-    `,
-    [
-      reviewKey(finding),
-      finding.entityType,
-      finding.entityId,
-      finding.severity === "high"
-        ? "high"
-        : "normal",
-      findingTitle(finding),
-      finding.reason,
-      sourceTableFor(finding.entityType),
-      JSON.stringify({
-        agent: MIZIZI_AGENT_KEY,
-        ruleId: finding.ruleId,
-        ruleVersion: finding.ruleVersion,
-        fieldName: finding.fieldName,
-        currentValue: finding.currentValue,
-        confidence: finding.confidence,
-        evidence: {
+  if (
+    finding.entityType !== "track" &&
+    finding.entityType !== "release"
+  ) {
+    throw new Error(
+      "Stage B review broker only accepts Track/Release slug review work.",
+    );
+  }
+
+  const result =
+    await pool.query(
+      `
+      select
+        mizizi_private.queue_registry_review_v1(
+          $1::text,
+          $2::text,
+          $3::text,
+          $4::text,
+          $5::text,
+          $6::text,
+          $7::text,
+          $8::text,
+          $9::numeric,
+          $10::text,
+          $11::text,
+          $12::jsonb
+        )::text as review_id
+      `,
+      [
+        finding.entityType,
+        finding.entityId,
+        finding.fingerprint,
+        finding.ruleId,
+        finding.ruleVersion,
+        finding.fieldName,
+        finding.currentValue,
+        finding.proposedValue,
+        finding.confidence,
+        finding.severity,
+        finding.reason,
+        JSON.stringify({
           ...finding.evidence,
           ...extraEvidence,
-        },
-      }),
-      JSON.stringify({
-        proposedValue: finding.proposedValue,
-        disposition: finding.disposition,
-      }),
-    ],
-  );
+        }),
+      ],
+    );
+
+  if (
+    result.rowCount !== 1 ||
+    !String(
+      result.rows[0]?.review_id || "",
+    )
+  ) {
+    throw new Error(
+      "Bounded MIZIZI review broker did not return one review row.",
+    );
+  }
 }
 
-async function writeCanonicalEvent(
-  pool: ReturnType<typeof createRegistryPool>,
-  finding: MiziziFinding,
-  downstreamImpact: Record<string, unknown> = {},
-  afterValue: string = finding.proposedValue,
-): Promise<void> {
-  const sourceTable =
-    sourceTableFor(finding.entityType);
-
-  await pool.query(
-    `
-    insert into public.registry_canonical_write_events (
-      registry_entity_type,
-      registry_entity_id,
-      source_suggestion_id,
-      source_table,
-      field_name,
-      target_path,
-      before_value,
-      after_value,
-      action,
-      status,
-      actor,
-      created_at
-    )
-    values (
-      $1,
-      $2,
-      $3,
-      'mizizi_cultural_data_steward',
-      $4,
-      $5,
-      $6::jsonb,
-      $7::jsonb,
-      'canonicalize_identity',
-      'succeeded',
-      'mizizi',
-      now()
-    )
-    `,
-    [
-      finding.entityType,
-      finding.entityId,
-      finding.fingerprint,
-      finding.fieldName,
-      "public." +
-        sourceTable +
-        "." +
-        finding.fieldName,
-      JSON.stringify({
-        value: finding.currentValue,
-        ruleId: finding.ruleId,
-        ruleVersion: finding.ruleVersion,
-      }),
-      JSON.stringify({
-        value: afterValue,
-        confidence: finding.confidence,
-        downstreamImpact,
-      }),
-    ],
-  );
-}
 
 async function loadTrackFeaturedArtists(
   pool: ReturnType<typeof createRegistryPool>,
@@ -688,462 +568,125 @@ function candidateCollision(
     : "";
 }
 
-async function currentScopeCollision(
-  pool: ReturnType<typeof createRegistryPool>,
-  row: TrackRow,
-  proposedSlug: string,
-): Promise<string> {
-  const artistSlug = String(
-    row.primary_artist_slug || "",
+
+
+
+
+function stewardshipIdempotencyKey(
+  finding: MiziziFinding,
+): string {
+  return (
+    "mizizi:" +
+    finding.ruleId +
+    ":" +
+    finding.fingerprint
   );
+}
 
-  if (!artistSlug) {
-    return "missing_explicit_primary_artist_scope";
-  }
-
-  const artistCollision =
+async function executeBrokeredStewardshipOperation(
+  pool: ReturnType<typeof createRegistryPool>,
+  operationKey: string,
+  targetRef: string,
+  finding: MiziziFinding,
+): Promise<Record<string, unknown>> {
+  const grantResult =
     await pool.query(
       `
-      select t.id::text
-      from public.registry_track_artists ta
-      join public.registry_tracks t
-        on t.id = ta.track_id
-      where ta.artist_slug = $1
-        and ta.status = 'active'
-        and ta.is_primary is true
-        and t.status = 'active'
-        and t.slug = $2
-        and t.id <> $3::uuid
-      order by t.id
-      limit 1
-      `,
-      [
-        artistSlug,
-        proposedSlug,
-        row.id,
-      ],
-    );
-
-  if (artistCollision.rowCount) {
-    return (
-      "candidate_slug_collides_with_track:" +
-      String(
-        artistCollision.rows[0].id,
-      )
-    );
-  }
-
-  const releaseCollision =
-    await pool.query(
-      `
-      select sibling_track.id::text
-      from public.registry_release_tracks target
-      join public.registry_release_tracks sibling
-        on sibling.release_id =
-           target.release_id
-       and sibling.status = 'active'
-      join public.registry_tracks sibling_track
-        on sibling_track.id =
-           sibling.track_id
-       and sibling_track.status =
-           'active'
-      where target.track_id = $1::uuid
-        and target.status = 'active'
-        and sibling_track.id <>
-            $1::uuid
-        and sibling_track.slug = $2
-      order by sibling_track.id
-      limit 1
-      `,
-      [
-        row.id,
-        proposedSlug,
-      ],
-    );
-
-  if (releaseCollision.rowCount) {
-    return (
-      "candidate_slug_collides_with_track:" +
-      String(
-        releaseCollision.rows[0].id,
-      )
-    );
-  }
-
-  const communityThreadCollision =
-    await pool.query(
-      `
-      select id::text
-      from public.community_threads
-      where entity_type = 'track'
-        and (
-          entity_slug = $1
-          or entity_id = $1
+      select *
+      from mizizi_private
+        .issue_stewardship_execution_grant_v1(
+          $1::text,
+          $2::text,
+          $3::text
         )
-        and coalesce(entity_slug, '') <> $2
-      order by id
-      limit 1
       `,
       [
-        proposedSlug,
-        row.slug,
+        operationKey,
+        targetRef,
+        stewardshipIdempotencyKey(
+          finding,
+        ),
       ],
     );
 
-  if (communityThreadCollision.rowCount) {
-    return (
-      "candidate_slug_collides_with_current_community_thread:" +
-      String(
-        communityThreadCollision.rows[0].id,
-      )
+  if (grantResult.rowCount !== 1) {
+    throw new Error(
+      "Stage B exact execution grant was not issued.",
     );
   }
 
-  return "";
-}
+  const executionGrantId =
+    String(
+      grantResult.rows[0]
+        ?.execution_grant_id || "",
+    );
 
-async function loadTrackPointerPaths(
-  pool: ReturnType<typeof createRegistryPool>,
-  row: TrackRow,
-  oldSlug: string,
-  newSlug: string,
-): Promise<
-  Array<{
-    scopeSlug: string;
-    oldPath: string;
-    newPath: string;
-  }>
-> {
-  const paths: Array<{
-    scopeSlug: string;
-    oldPath: string;
-    newPath: string;
-  }> = [];
-  const primary = String(
-    row.primary_artist_slug || "",
-  );
-
-  if (primary) {
-    paths.push({
-      scopeSlug: primary,
-      oldPath:
-        "/tracks/" +
-        primary +
-        "/" +
-        oldSlug,
-      newPath:
-        "/tracks/" +
-        primary +
-        "/" +
-        newSlug,
-    });
+  if (!executionGrantId) {
+    throw new Error(
+      "Stage B exact execution grant id is missing.",
+    );
   }
 
-  const releaseResult =
+  const executionResult =
     await pool.query(
       `
-      select
-        r.slug as release_slug,
-        coalesce(
-          (
-            select ra.artist_slug
-            from public.registry_release_artists ra
-            where ra.release_id = r.id
-              and ra.status = 'active'
-              and ra.is_primary is true
-              and nullif(
-                btrim(ra.artist_slug),
-                ''
-              ) is not null
-            order by
-              ra.credit_order nulls last,
-              ra.id
-            limit 1
-          ),
-          $2
-        ) as artist_slug,
-        (
-          select count(*)
-          from public.registry_release_tracks member
-          where member.release_id = r.id
-            and member.status = 'active'
-        )::integer as active_track_count
-      from public.registry_release_tracks rt
-      join public.registry_releases r
-        on r.id = rt.release_id
-      where rt.track_id = $1::uuid
-        and rt.status = 'active'
-        and r.status = 'active'
-      order by r.id
+      select *
+      from mizizi_private
+        .execute_stewardship_operation_v1(
+          $1::uuid
+        )
       `,
-      [
-        row.id,
-        primary,
-      ],
+      [executionGrantId],
     );
 
-  for (
-    const release
-    of releaseResult.rows
+  if (
+    executionResult.rowCount !== 1 ||
+    executionResult.rows[0]
+      ?.operation_status !== "succeeded"
   ) {
-    const artistSlug = String(
-      release.artist_slug || "",
+    throw new Error(
+      "Stage B typed stewardship execution did not succeed.",
     );
-    const releaseSlug = String(
-      release.release_slug || "",
-    );
-    const activeTrackCount = Number(
-      release.active_track_count || 0,
-    );
-
-    if (
-      !artistSlug ||
-      !releaseSlug
-    ) {
-      continue;
-    }
-
-    const oldPath =
-      "/releases/" +
-      artistSlug +
-      "/" +
-      releaseSlug +
-      "/" +
-      oldSlug;
-
-    const newPath =
-      activeTrackCount > 1
-        ? (
-            "/releases/" +
-            artistSlug +
-            "/" +
-            releaseSlug +
-            "/" +
-            newSlug
-          )
-        : (
-            "/tracks/" +
-            artistSlug +
-            "/" +
-            newSlug
-          );
-
-    paths.push({
-      scopeSlug: artistSlug,
-      oldPath,
-      newPath,
-    });
   }
 
-  return paths;
-}
-
-async function communityThreadOwnershipConflict(
-  pool: ReturnType<typeof createRegistryPool>,
-  oldSlug: string,
-  paths: Array<{
-    scopeSlug: string;
-    oldPath: string;
-    newPath: string;
-  }>,
-): Promise<string> {
-  const result =
-    await pool.query(
-      `
-      select
-        id::text,
-        entity_url
-      from public.community_threads
-      where entity_type = 'track'
-        and entity_slug = $1
-      order by id
-      limit 1
-      `,
-      [oldSlug],
-    );
-
-  if (!result.rowCount) {
-    return "";
-  }
-
-  const thread =
-    result.rows[0];
-  const entityUrl =
+  const operationId =
     String(
-      thread.entity_url || "",
-    );
-  const ownershipProven =
-    paths.some(
-      (path) =>
-        entityUrl.includes(
-          path.oldPath,
-        ),
+      executionResult.rows[0]
+        ?.operation_id || "",
     );
 
-  return ownershipProven
-    ? ""
-    : (
-        "current_community_thread_ownership_ambiguous:" +
-        String(thread.id)
-      );
-}
-
-async function repairCurrentTrackPointers(
-  pool: ReturnType<typeof createRegistryPool>,
-  row: TrackRow,
-  oldSlug: string,
-  newSlug: string,
-  paths: Array<{
-    scopeSlug: string;
-    oldPath: string;
-    newPath: string;
-  }>,
-): Promise<{
-  savesUpdated: number;
-  saveUrlsUpdated: number;
-  threadsUpdated: number;
-  ambiguousThreadsSkipped: number;
-}> {
-  const saveSlugUpdate =
-    await pool.query(
-      `
-      update public.community_saves
-      set entity_slug = $1
-      where entity_type = 'track'
-        and entity_id = $2
-        and entity_slug
-            is distinct from $1
-      `,
-      [
-        newSlug,
-        row.id,
-      ],
+  if (!operationId) {
+    throw new Error(
+      "Stage B mutation operation id is missing.",
     );
-
-  let saveUrlsUpdated = 0;
-
-  for (const path of paths) {
-    const updated =
-      await pool.query(
-        `
-        update public.community_saves
-        set entity_url =
-          replace(
-            entity_url,
-            $1,
-            $2
-          )
-        where entity_type = 'track'
-          and entity_id = $3
-          and entity_url is not null
-          and position(
-            $1 in entity_url
-          ) > 0
-        `,
-        [
-          path.oldPath,
-          path.newPath,
-          row.id,
-        ],
-      );
-
-    saveUrlsUpdated +=
-      updated.rowCount || 0;
   }
 
-  const threadResult =
+  const verificationResult =
     await pool.query(
       `
-      select
-        id::text,
-        entity_id,
-        entity_slug,
-        entity_url
-      from public.community_threads
-      where entity_type = 'track'
-        and entity_slug = $1
-      order by id
-      limit 1
+      select *
+      from mizizi_private
+        .verify_stewardship_operation_v1(
+          $1::uuid
+        )
       `,
-      [oldSlug],
+      [operationId],
     );
 
-  if (!threadResult.rowCount) {
-    return {
-      savesUpdated:
-        saveSlugUpdate.rowCount || 0,
-      saveUrlsUpdated,
-      threadsUpdated: 0,
-      ambiguousThreadsSkipped: 0,
-    };
+  if (
+    verificationResult.rowCount !== 1 ||
+    verificationResult.rows[0]
+      ?.verifier_status !== "passed"
+  ) {
+    throw new Error(
+      "Stage B independent stewardship verification did not pass.",
+    );
   }
 
-  const thread =
-    threadResult.rows[0];
-  const entityUrl =
-    String(
-      thread.entity_url || "",
-    );
-  const matchedPath =
-    paths.find(
-      (path) =>
-        entityUrl.includes(
-          path.oldPath,
-        ),
-    );
-
-  if (!matchedPath) {
-    return {
-      savesUpdated:
-        saveSlugUpdate.rowCount || 0,
-      saveUrlsUpdated,
-      threadsUpdated: 0,
-      ambiguousThreadsSkipped: 1,
-    };
-  }
-
-  const threadUpdate =
-    await pool.query(
-      `
-      update public.community_threads
-      set
-        entity_id = case
-          when entity_id = $1
-            then $2
-          else entity_id
-        end,
-        entity_slug = $2,
-        entity_url = case
-          when entity_url is null
-            then entity_url
-          else replace(
-            entity_url,
-            $3,
-            $4
-          )
-        end,
-        updated_at = now()
-      where id = $5::uuid
-        and entity_type = 'track'
-        and entity_slug = $1
-      `,
-      [
-        oldSlug,
-        newSlug,
-        matchedPath.oldPath,
-        matchedPath.newPath,
-        String(thread.id),
-      ],
-    );
-
-  return {
-    savesUpdated:
-      saveSlugUpdate.rowCount || 0,
-    saveUrlsUpdated,
-    threadsUpdated:
-      threadUpdate.rowCount || 0,
-    ambiguousThreadsSkipped: 0,
-  };
+  return (
+    executionResult.rows[0]
+      ?.result_payload || {}
+  ) as Record<string, unknown>;
 }
 
 async function applyTrackSlug(
@@ -1164,170 +707,66 @@ async function applyTrackSlug(
       reason: string;
     }
 > {
-  await pool.query("begin");
-
-  try {
+  const plan =
     await pool.query(
       `
-      select pg_advisory_xact_lock(
-        hashtextextended(
-          'mizizi:track-scope:' || $1,
-          0
+      select
+        current_slug,
+        proposed_slug
+      from mizizi_private
+        .track_slug_plan_v1(
+          $1::uuid
         )
-      )
       `,
-      [
-        row.primary_artist_slug || "",
-      ],
+      [row.id],
     );
 
-    const locked =
-      await pool.query(
-        `
-        select slug
-        from public.registry_tracks
-        where id = $1::uuid
-          and status = 'active'
-        for update
-        `,
-        [row.id],
-      );
+  if (
+    plan.rowCount !== 1 ||
+    String(
+      plan.rows[0]?.current_slug || "",
+    ) !== finding.currentValue ||
+    String(
+      plan.rows[0]?.proposed_slug || "",
+    ) !== finding.proposedValue
+  ) {
+    return {
+      outcome: "stale",
+    };
+  }
 
-    if (
-      !locked.rowCount ||
-      String(
-        locked.rows[0].slug,
-      ) !== finding.currentValue
-    ) {
-      await pool.query("rollback");
-      return {
-        outcome: "stale",
-      };
-    }
-
-    const collision =
-      await currentScopeCollision(
+  try {
+    const result =
+      await executeBrokeredStewardshipOperation(
         pool,
-        row,
-        finding.proposedValue,
+        "registry.track_slug.canonicalize",
+        row.id,
+        finding,
       );
-
-    if (collision) {
-      await pool.query("rollback");
-
-      return {
-        outcome: "collision",
-        reason: collision,
-      };
-    }
-
-    const paths =
-      await loadTrackPointerPaths(
-        pool,
-        row,
-        finding.currentValue,
-        finding.proposedValue,
-      );
-
-    const threadOwnershipConflict =
-      await communityThreadOwnershipConflict(
-        pool,
-        finding.currentValue,
-        paths,
-      );
-
-    if (threadOwnershipConflict) {
-      await pool.query("rollback");
-
-      return {
-        outcome: "collision",
-        reason:
-          threadOwnershipConflict,
-      };
-    }
-
-    const updated =
-      await pool.query(
-        `
-        update public.registry_tracks
-        set
-          slug = $1,
-          updated_at = now()
-        where id = $2::uuid
-          and slug = $3
-        returning id
-        `,
-        [
-          finding.proposedValue,
-          row.id,
-          finding.currentValue,
-        ],
-      );
-
-    if (!updated.rowCount) {
-      throw new Error(
-        "Track changed after lock: " +
-          row.id,
-      );
-    }
-
-    const chartUpdate =
-      await pool.query(
-        `
-        update public.wk_chart_entries_v2
-        set
-          track_slug = $1,
-          updated_at = now()
-        where canonical_track_id = $2
-          and track_slug
-              is distinct from $1
-        `,
-        [
-          finding.proposedValue,
-          row.id,
-        ],
-      );
-
-    const currentPointers =
-      await repairCurrentTrackPointers(
-        pool,
-        row,
-        finding.currentValue,
-        finding.proposedValue,
-        paths,
-      );
-
-    await writeCanonicalEvent(
-      pool,
-      finding,
-      {
-        redirectWritesRetired: true,
-        redirectRowsCreated: 0,
-        chartEntriesUpdated:
-          chartUpdate.rowCount || 0,
-        communitySavesUpdated:
-          currentPointers.savesUpdated,
-        communitySaveUrlsUpdated:
-          currentPointers.saveUrlsUpdated,
-        communityThreadsUpdated:
-          currentPointers.threadsUpdated,
-        ambiguousCommunityThreadsSkipped:
-          currentPointers.ambiguousThreadsSkipped,
-      },
-    );
-
-    await pool.query("commit");
 
     return {
       outcome: "applied",
       chartRows:
-        chartUpdate.rowCount || 0,
+        Number(
+          result.chart_entries_updated ||
+            0,
+        ),
       redirects: 0,
     };
   } catch (error) {
-    await pool
-      .query("rollback")
-      .catch(() => undefined);
+    if (
+      error &&
+      typeof error === "object" &&
+      "code" in error &&
+      String(
+        (error as { code?: string })
+          .code || "",
+      ) === "40001"
+    ) {
+      return {
+        outcome: "stale",
+      };
+    }
 
     throw error;
   }
@@ -1515,329 +954,63 @@ async function applyReleaseSlugPackaging(
   finding: MiziziFinding,
   plan: ReleaseSlugPlan,
 ): Promise<"applied" | "stale"> {
-  await pool.query(
-    "begin isolation level serializable",
-  );
-
-  try {
+  const serverPlan =
     await pool.query(
       `
-      select pg_advisory_xact_lock(
-        hashtextextended(
-          'mizizi:release-slug:' || $1,
-          0
+      select
+        artist_id::text,
+        artist_slug,
+        current_slug,
+        base_slug,
+        proposed_slug,
+        uses_date_fallback
+      from mizizi_private
+        .release_slug_plan_v1(
+          $1::uuid
         )
-      )
       `,
-      [plan.artistId],
+      [row.id],
     );
 
-    const locked =
-      await pool.query(
-        `
-        select
-          r.slug,
-          r.release_date::text,
-          pa.artist_id::text as artist_id,
-          pa.artist_slug
-        from public.registry_releases r
-        left join lateral (
-          select
-            ra.artist_id,
-            ra.artist_slug
-          from public.registry_release_artists ra
-          where ra.release_id = r.id
-            and ra.status = 'active'
-            and ra.is_primary is true
-          order by
-            ra.credit_order nulls last,
-            ra.created_at,
-            ra.id
-          limit 1
-        ) pa on true
-        where r.id = $1::uuid
-          and r.status = 'active'
-        for update of r
-        `,
-        [row.id],
-      );
+  if (
+    serverPlan.rowCount !== 1 ||
+    String(
+      serverPlan.rows[0]
+        ?.artist_id || "",
+    ) !== plan.artistId ||
+    String(
+      serverPlan.rows[0]
+        ?.artist_slug || "",
+    ) !== plan.artistSlug ||
+    String(
+      serverPlan.rows[0]
+        ?.current_slug || "",
+    ) !== finding.currentValue ||
+    String(
+      serverPlan.rows[0]
+        ?.base_slug || "",
+    ) !== plan.baseSlug ||
+    String(
+      serverPlan.rows[0]
+        ?.proposed_slug || "",
+    ) !== finding.proposedValue ||
+    Boolean(
+      serverPlan.rows[0]
+        ?.uses_date_fallback,
+    ) !== plan.usesDateFallback
+  ) {
+    return "stale";
+  }
 
-    if (
-      !locked.rowCount ||
-      String(
-        locked.rows[0].slug || "",
-      ) !== finding.currentValue ||
-      String(
-        locked.rows[0].artist_id || "",
-      ) !== plan.artistId ||
-      String(
-        locked.rows[0].artist_slug || "",
-      ) !== plan.artistSlug
-    ) {
-      await pool.query("rollback");
-      return "stale";
-    }
-
-    const collision =
-      await pool.query(
-        `
-        select other.id::text
-        from public.registry_releases other
-        join public.registry_release_artists ora
-          on ora.release_id = other.id
-         and ora.status = 'active'
-         and ora.is_primary is true
-        where other.status = 'active'
-          and other.id <> $1::uuid
-          and ora.artist_id = $2::uuid
-          and other.slug = $3
-        order by other.id
-        limit 1
-        `,
-        [
-          row.id,
-          plan.artistId,
-          plan.plannedSlug,
-        ],
-      );
-
-    if (collision.rowCount) {
-      await pool.query("rollback");
-      return "stale";
-    }
-
-    const updated =
-      await pool.query(
-        `
-        update public.registry_releases
-        set
-          slug = $1,
-          updated_at = now()
-        where id = $2::uuid
-          and status = 'active'
-          and slug = $3
-        returning id
-        `,
-        [
-          plan.plannedSlug,
-          row.id,
-          finding.currentValue,
-        ],
-      );
-
-    if (!updated.rowCount) {
-      await pool.query("rollback");
-      return "stale";
-    }
-
-    const oldPath =
-      "/releases/" +
-      plan.artistSlug +
-      "/" +
-      finding.currentValue;
-    const newPath =
-      "/releases/" +
-      plan.artistSlug +
-      "/" +
-      plan.plannedSlug;
-
-    const saves =
-      await pool.query(
-        `
-        update public.community_saves
-        set
-          entity_slug = $1,
-          entity_url = $2
-        where entity_type = 'release'
-          and entity_id = $3
-        `,
-        [
-          plan.plannedSlug,
-          "https://wakilisha.africa" +
-            newPath,
-          row.id,
-        ],
-      );
-
-    const threads =
-      await pool.query(
-        `
-        update public.community_threads
-        set
-          entity_id = $3,
-          entity_slug = $1,
-          entity_url = $2,
-          updated_at = now()
-        where entity_type = 'release'
-          and (
-            entity_id = $3
-            or (
-              entity_slug = $4
-              and entity_url is not null
-              and position(
-                $5 in entity_url
-              ) > 0
-            )
-            or (
-              entity_slug = $4
-              and entity_id = $4
-              and entity_url is not null
-              and position(
-                '/releases/' in entity_url
-              ) > 0
-              and not exists (
-                select 1
-                from public.registry_releases
-                  other
-                where other.status = 'active'
-                  and other.id <> $3::uuid
-                  and other.slug = $4
-              )
-            )
-          )
-        `,
-        [
-          plan.plannedSlug,
-          "https://wakilisha.africa" +
-            newPath,
-          row.id,
-          finding.currentValue,
-          oldPath,
-        ],
-      );
-
-    const interests =
-      await pool.query(
-        `
-        update public.audience_interests
-        set
-          entity_slug = $1,
-          updated_at = now()
-        where entity_type = 'release'
-          and entity_id = $2::uuid
-        `,
-        [
-          plan.plannedSlug,
-          row.id,
-        ],
-      );
-
-    const activity =
-      await pool.query(
-        `
-        update public.community_activity
-        set entity_slug = $1
-        where entity_type = 'release'
-          and entity_id = $2
-        `,
-        [
-          plan.plannedSlug,
-          row.id,
-        ],
-      );
-
-    const contributions =
-      await pool.query(
-        `
-        update public.community_contributions
-        set
-          entity_slug = $1,
-          updated_at = now()
-        where entity_type = 'release'
-          and entity_id = $2
-        `,
-        [
-          plan.plannedSlug,
-          row.id,
-        ],
-      );
-
-    const notifications =
-      await pool.query(
-        `
-        update public.community_notifications
-        set entity_slug = $1
-        where entity_type = 'release'
-          and entity_id = $2
-        `,
-        [
-          plan.plannedSlug,
-          row.id,
-        ],
-      );
-
-    const opportunities =
-      await pool.query(
-        `
-        update public.signal_os_content_opportunities
-        set
-          entity_slug = $1,
-          page_path = $2,
-          updated_at = now()
-        where entity_type = 'release'
-          and entity_slug = $3
-          and (
-            (
-              page_path is not null
-              and position(
-                $4 in page_path
-              ) > 0
-            )
-            or not exists (
-              select 1
-              from public.registry_releases
-                other
-              where other.status = 'active'
-                and other.id <> $5::uuid
-                and other.slug = $3
-            )
-          )
-        `,
-        [
-          plan.plannedSlug,
-          newPath,
-          finding.currentValue,
-          oldPath,
-          row.id,
-        ],
-      );
-
-    await writeCanonicalEvent(
+  try {
+    await executeBrokeredStewardshipOperation(
       pool,
+      "registry.release_slug.canonicalize",
+      row.id,
       finding,
-      {
-        baseCleanSlug:
-          plan.baseSlug,
-        collisionStrategy:
-          plan.usesDateFallback
-            ? "release_date_suffix"
-            : "clean_slug",
-        communitySavesUpdated:
-          saves.rowCount || 0,
-        communityThreadsUpdated:
-          threads.rowCount || 0,
-        audienceInterestsUpdated:
-          interests.rowCount || 0,
-        communityActivityUpdated:
-          activity.rowCount || 0,
-        communityContributionsUpdated:
-          contributions.rowCount || 0,
-        communityNotificationsUpdated:
-          notifications.rowCount || 0,
-        signalOpportunitiesUpdated:
-          opportunities.rowCount || 0,
-        redirectRowsCreated: 0,
-      },
-      plan.plannedSlug,
     );
-
-    await pool.query("commit");
     return "applied";
   } catch (error) {
-    await pool
-      .query("rollback")
-      .catch(() => undefined);
-
     if (
       error &&
       typeof error === "object" &&
@@ -1859,130 +1032,53 @@ async function applyReleaseTaxonomy(
   row: ReleaseRow,
   finding: MiziziFinding,
 ): Promise<"applied" | "stale"> {
-  await pool.query(
-    "begin isolation level serializable",
-  );
-
-  try {
+  const plan =
     await pool.query(
       `
-      select pg_advisory_xact_lock(
-        hashtextextended(
-          'mizizi:release-taxonomy:' || $1,
-          0
+      select
+        current_release_type,
+        active_track_count,
+        proposed_release_type
+      from mizizi_private
+        .release_taxonomy_plan_v1(
+          $1::uuid
         )
-      )
       `,
       [row.id],
     );
 
-    const locked =
-      await pool.query(
-        `
-        select release_type
-        from public.registry_releases
-        where id = $1::uuid
-          and status = 'active'
-        for update
-        `,
-        [row.id],
-      );
-
-    if (
-      !locked.rowCount ||
-      String(
-        locked.rows[0].release_type || "",
-      ).trim() !== finding.currentValue
-    ) {
-      await pool.query("rollback");
-      return "stale";
-    }
-
-    const trackCountResult =
-      await pool.query(
-        `
-        select count(*)::integer
-          as resolvable_active_track_count
-        from public.registry_release_tracks rt
-        join public.registry_tracks t
-          on t.id = rt.track_id
-         and t.status = 'active'
-        where rt.release_id = $1::uuid
-          and rt.status = 'active'
-        `,
-        [row.id],
-      );
-
-    const currentTrackCount =
-      Number(
-        trackCountResult.rows[0]
-          ?.resolvable_active_track_count ||
-        0,
-      );
-    const expectedTrackCount =
+  if (
+    plan.rowCount !== 1 ||
+    String(
+      plan.rows[0]
+        ?.current_release_type || "",
+    ).trim() !== finding.currentValue ||
+    String(
+      plan.rows[0]
+        ?.proposed_release_type || "",
+    ) !== finding.proposedValue ||
+    Number(
+      plan.rows[0]
+        ?.active_track_count || 0,
+    ) !==
       Number(
         finding.evidence
           .resolvableActiveTrackCount ||
-        0,
-      );
-    const currentTaxonomy =
-      releaseTaxonomyFromActiveTrackCount(
-        currentTrackCount,
-      );
+          0,
+      )
+  ) {
+    return "stale";
+  }
 
-    if (
-      currentTrackCount !== expectedTrackCount ||
-      !currentTaxonomy ||
-      currentTaxonomy !==
-        finding.proposedValue
-    ) {
-      await pool.query("rollback");
-      return "stale";
-    }
-
-    const updated =
-      await pool.query(
-        `
-        update public.registry_releases
-        set
-          release_type = $1,
-          updated_at = now()
-        where id = $2::uuid
-          and status = 'active'
-          and coalesce(
-            btrim(release_type),
-            ''
-          ) = $3
-        returning id
-        `,
-        [
-          finding.proposedValue,
-          row.id,
-          finding.currentValue,
-        ],
-      );
-
-    if (!updated.rowCount) {
-      await pool.query("rollback");
-      return "stale";
-    }
-
-    await writeCanonicalEvent(
+  try {
+    await executeBrokeredStewardshipOperation(
       pool,
+      "registry.release_taxonomy.repair",
+      row.id,
       finding,
-      {
-        resolvableActiveTrackCount:
-          currentTrackCount,
-      },
     );
-
-    await pool.query("commit");
     return "applied";
   } catch (error) {
-    await pool
-      .query("rollback")
-      .catch(() => undefined);
-
     if (
       error &&
       typeof error === "object" &&
@@ -2005,43 +1101,54 @@ async function applyChartSlug(
 ): Promise<
   "applied" | "stale"
 > {
-  await pool.query("begin");
+  const plan =
+    await pool.query(
+      `
+      select
+        current_track_slug,
+        canonical_track_slug
+      from mizizi_private
+        .chart_track_slug_plan_v1(
+          $1::text
+        )
+      `,
+      [finding.entityId],
+    );
+
+  if (
+    plan.rowCount !== 1 ||
+    String(
+      plan.rows[0]
+        ?.current_track_slug || "",
+    ) !== finding.currentValue ||
+    String(
+      plan.rows[0]
+        ?.canonical_track_slug || "",
+    ) !== finding.proposedValue
+  ) {
+    return "stale";
+  }
 
   try {
-    const updated =
-      await pool.query(
-        `
-        update public.wk_chart_entries_v2
-        set
-          track_slug = $1,
-          updated_at = now()
-        where id = $2
-          and track_slug = $3
-        returning id
-        `,
-        [
-          finding.proposedValue,
-          finding.entityId,
-          finding.currentValue,
-        ],
-      );
-
-    if (!updated.rowCount) {
-      await pool.query("rollback");
-      return "stale";
-    }
-
-    await writeCanonicalEvent(
+    await executeBrokeredStewardshipOperation(
       pool,
+      "registry.chart_track_slug.synchronize",
+      finding.entityId,
       finding,
     );
-    await pool.query("commit");
-
     return "applied";
   } catch (error) {
-    await pool
-      .query("rollback")
-      .catch(() => undefined);
+    if (
+      error &&
+      typeof error === "object" &&
+      "code" in error &&
+      String(
+        (error as { code?: string })
+          .code || "",
+      ) === "40001"
+    ) {
+      return "stale";
+    }
 
     throw error;
   }

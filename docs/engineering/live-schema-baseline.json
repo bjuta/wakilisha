@@ -1,16 +1,16 @@
 {
   "projectRef": "pgzizndxdyhqmtyywjmt",
   "schema": "public,editorial",
-  "generatedAt": "2026-09-18T17:12:55Z",
+  "generatedAt": "2026-09-20T09:19:40Z",
   "typesSha256": "1d32bc68224237f91f1f89102ddafa2db1a4f3ed80d4a26260db06c8d0fef67f",
   "authoritativeMigrationDirectory": "supabase/migrations",
-  "migrationCount": 151,
-  "latestMigration": "20260918120331_mizizi_executor_foundation_v1.sql",
+  "migrationCount": 152,
+  "latestMigration": "20260918173446_mizizi_stage_b_broker_convergence_v1.sql",
   "schemaSeal": {
     "mode": "preview",
-    "sourceProjectRef": "tpiyixndoqvgnkpoqzes",
-    "migrationHead": "20260918120331",
-    "baseMainSha": "c72fff300381ef6fe4fdb8b9374731a1324ea402",
-    "previewBranchId": "5f91ccbc-eb6d-4abe-a169-87313537b3cb"
+    "sourceProjectRef": "rsjcfpdzrsbbwibnmitq",
+    "migrationHead": "20260918173446",
+    "baseMainSha": "c27163b46ae1cd50761dd55c36aaa8e3cc5c35a2",
+    "previewBranchId": "b0fdcf16-4dcd-474e-b2e2-4c3877d0899d"
   }
 }

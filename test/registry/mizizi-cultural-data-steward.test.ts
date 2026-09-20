@@ -708,6 +708,24 @@ describe("MIZIZI Cultural Data Steward", () => {
         "scripts/registry/agents/mizizi/run.ts",
         "utf8",
       );
+    const stageBMigrations =
+      readdirSync(
+        "supabase/migrations",
+      ).filter(
+        (name) =>
+          name.endsWith(
+            "_mizizi_stage_b_broker_convergence_v1.sql",
+          ),
+      );
+
+    expect(stageBMigrations).toHaveLength(1);
+
+    const brokerMigration =
+      readFileSync(
+        "supabase/migrations/" +
+          stageBMigrations[0],
+        "utf8",
+      );
 
     expect(runner).toContain(
       "MAX_SAMPLE_FINDINGS = 30",
@@ -733,8 +751,8 @@ describe("MIZIZI Cultural Data Steward", () => {
     expect(runner).toContain(
       "registry_review_items",
     );
-    expect(runner).toContain(
-      'finding.disposition ===\n          "observe"',
+    expect(runner).toMatch(
+      /finding\.disposition\s*===\s*"observe"/,
     );
     expect(runner).toContain(
       "observed_findings",
@@ -764,19 +782,16 @@ describe("MIZIZI Cultural Data Steward", () => {
       "--confirm=MIZIZI_APPLY",
     );
     expect(runner).toContain(
-      "pg_advisory_xact_lock(",
+      "issue_stewardship_execution_grant_v1",
     );
     expect(runner).toContain(
-      "repairCurrentTrackPointers",
+      "execute_stewardship_operation_v1",
     );
     expect(runner).toContain(
-      "communityThreadOwnershipConflict",
+      "verify_stewardship_operation_v1",
     );
     expect(runner).toContain(
-      "community_saves",
-    );
-    expect(runner).toContain(
-      "community_threads",
+      "queue_registry_review_v1",
     );
     expect(runner).toContain(
       "resolvable_active_track_count",
@@ -784,30 +799,66 @@ describe("MIZIZI Cultural Data Steward", () => {
     expect(runner).toContain(
       "applyReleaseTaxonomy",
     );
-    expect(runner).toContain(
+
+    expect(runner).not.toContain(
+      "pg_advisory_xact_lock(",
+    );
+    expect(runner).not.toContain(
+      "repairCurrentTrackPointers",
+    );
+    expect(runner).not.toContain(
       "begin isolation level serializable",
     );
-    expect(runner).toContain(
-      "releaseTaxonomyFromActiveTrackCount",
+
+    expect(brokerMigration).toContain(
+      "pg_advisory_xact_lock(",
     );
-    expect(runner).toContain(
-      "coalesce(\n            btrim(release_type),",
+    expect(brokerMigration).toContain(
+      "update public.registry_tracks",
     );
-    expect(runner).toContain(
-      "community_activity",
+    expect(brokerMigration).toContain(
+      "update public.registry_releases",
     );
-    expect(runner).toContain(
-      "signal_os_content_opportunities",
+    expect(brokerMigration).toContain(
+      "update public.wk_chart_entries_v2",
     );
-    expect(runner).toContain(
-      '"https://wakilisha.africa" +\n            newPath',
+    expect(brokerMigration).toContain(
+      "update public.community_saves",
     );
-    expect(runner).toContain(
-      "other.slug = $4",
+    expect(brokerMigration).toContain(
+      "update public.community_threads",
     );
-    expect(runner).toContain(
-      "other.slug = $3",
+    expect(brokerMigration).toContain(
+      "update public.audience_interests",
     );
+    expect(brokerMigration).toContain(
+      "update public.community_activity",
+    );
+    expect(brokerMigration).toContain(
+      "update public.community_contributions",
+    );
+    expect(brokerMigration).toContain(
+      "update public.community_notifications",
+    );
+    expect(brokerMigration).toContain(
+      "update public.signal_os_content_opportunities",
+    );
+    expect(brokerMigration).toContain(
+      "insert into public.registry_canonical_write_events",
+    );
+    expect(brokerMigration).toContain(
+      "insert into platform_private.registry_operation_write_events",
+    );
+    expect(brokerMigration).toContain(
+      "registry_subject_state_fingerprint",
+    );
+    expect(brokerMigration).toContain(
+      "compare-and-set",
+    );
+    expect(brokerMigration).not.toContain(
+      "insert into public.wk_slug_redirects",
+    );
+
     expect(runner).not.toContain(
       "analytics_events",
     );
@@ -1193,7 +1244,8 @@ describe("MIZIZI Slice 3 narrow executor Stage A foundation", () => {
       ),
     ).toMatchObject({
       disposition: "converge",
-      executionAuthority: "direct postgres session",
+      executionAuthority:
+        "typed exact-grant stewardship broker over current JIT postgres transport",
       legacyDebt: true,
     });
   });
@@ -1808,4 +1860,149 @@ describe("MIZIZI Slice 3 Candidate D1 Top Songs presentation authority", () => {
     );
   });
 
+});
+
+describe("MIZIZI Slice 3 Stage B typed broker convergence", () => {
+  const migrations =
+    readdirSync(
+      "supabase/migrations",
+    ).filter(
+      (name) =>
+        name.endsWith(
+          "_mizizi_stage_b_broker_convergence_v1.sql",
+        ),
+    );
+
+  it("installs all four exact stewardship operations inertly", () => {
+    expect(migrations).toHaveLength(1);
+
+    const migration = read(
+      "supabase/migrations/" +
+        migrations[0],
+    );
+
+    for (const operationKey of [
+      "registry.track_slug.canonicalize",
+      "registry.release_taxonomy.repair",
+      "registry.release_slug.canonicalize",
+      "registry.chart_track_slug.synchronize",
+    ]) {
+      expect(migration).toContain(
+        `'${operationKey}'`,
+      );
+    }
+
+    expect(migration).toContain(
+      "issue_stewardship_execution_grant_v1",
+    );
+    expect(migration).toContain(
+      "execute_stewardship_operation_v1",
+    );
+    expect(migration).toContain(
+      "verify_stewardship_operation_v1",
+    );
+    expect(migration).toContain(
+      "begin_registry_mutation_operation",
+    );
+    expect(migration).toContain(
+      "registry_operation_write_events",
+    );
+    expect(migration).toContain(
+      "queue_registry_review_v1",
+    );
+    expect(migration).toContain(
+      "Stage B created active MIZIZI standing authority",
+    );
+    expect(migration).toContain(
+      "Stage B created active MIZIZI exact authority",
+    );
+    expect(migration).toContain(
+      "executor_key='postgres'",
+    );
+    expect(migration).toContain(
+      "executor_key='mizizi_executor'",
+    );
+
+    expect(migration).not.toMatch(
+      /grant\s+(?:insert|update|delete|all)\s+on\s+(?:table\s+)?public\.registry_/i,
+    );
+    expect(migration).not.toContain(
+      "set role mizizi_executor",
+    );
+  });
+
+  it("removes caller-side mutation DML from the MIZIZI runner", () => {
+    const runnerSource = read(
+      "scripts/registry/agents/mizizi/run.ts",
+    );
+
+    expect(runnerSource).toContain(
+      "issue_stewardship_execution_grant_v1",
+    );
+    expect(runnerSource).toContain(
+      "execute_stewardship_operation_v1",
+    );
+    expect(runnerSource).toContain(
+      "verify_stewardship_operation_v1",
+    );
+    expect(runnerSource).toContain(
+      "queue_registry_review_v1",
+    );
+
+    expect(runnerSource).not.toMatch(
+      /\b(?:insert\s+into|update|delete\s+from)\s+public\.(?:registry_|wk_chart_entries_v2|community_|audience_interests|signal_os_content_opportunities)/i,
+    );
+    expect(runnerSource).not.toMatch(
+      /\b(?:insert\s+into|update|delete\s+from)\s+platform_private\.(?:registry_execution_grants|registry_mutation_operations|registry_operation_write_events)/i,
+    );
+  });
+
+  it("keeps transport debt explicit until Stage C", () => {
+    const manifest =
+      JSON.parse(
+        readFileSync(
+          "scripts/control-plane/registry-privileged-writer-manifest.json",
+          "utf8",
+        ),
+      ) as {
+        writers: Array<{
+          id: string;
+          disposition: string;
+          authorization: string;
+          executionAuthority: string;
+          futureBoundary: string;
+          legacyDebt: boolean;
+        }>;
+      };
+
+    expect(
+      manifest.writers.find(
+        (writer) =>
+          writer.id ===
+          "mizizi-agent-runner",
+      ),
+    ).toMatchObject({
+      disposition: "converge",
+      executionAuthority:
+        "typed exact-grant stewardship broker over current JIT postgres transport",
+      futureBoundary:
+        "dedicated_narrow_executor_identity_without_postgres_ambient_authority",
+      legacyDebt: true,
+    });
+
+    expect(
+      manifest.writers.find(
+        (writer) =>
+          writer.id ===
+          "mizizi-artist-origin-broker",
+      ),
+    ).toMatchObject({
+      disposition: "converge",
+      executionAuthority:
+        "typed one-Artist origin broker over current JIT postgres transport",
+      futureBoundary:
+        "dedicated_narrow_executor_identity_without_postgres_ambient_authority",
+      legacyDebt: true,
+    });
+  });
 });
