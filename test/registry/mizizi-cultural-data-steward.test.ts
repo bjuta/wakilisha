@@ -1049,7 +1049,8 @@ describe("MIZIZI Slice 2 Gate A-final Registry authority convergence", () => {
     expect(adminRouter).toContain("admin_patch_registry_release_profile_v1");
     expect(adminRouter).toContain("admin_patch_registry_label_profile_v1");
     expect(adminRouter).toContain("admin_patch_registry_genre_profile_v1");
-    expect(adminRouter).toContain("admin_delete_registry_draft_artist_v1");
+    expect(adminRouter).toContain("retired_registry_hard_delete");
+    expect(adminRouter).not.toContain("admin_delete_registry_draft_artist_v1");
     expect(adminRouter).not.toMatch(
       /\.from\(\s*["']registry_(artists|tracks|releases|labels|genres)["']\s*\)\s*\.\s*(insert|update|upsert|delete)\s*\(/s,
     );
@@ -1060,7 +1061,9 @@ describe("MIZIZI Slice 2 Gate A-final Registry authority convergence", () => {
     expect(migration).toContain("auth.uid()");
     expect(migration).toContain("current_user_has_capability('manage_registry')");
     expect(migration).toContain("registry_canonical_write_events");
-    expect(migration).toContain("v_before.status <> 'draft'");
+    expect(artistsPage).toContain('{ status: "archived" }');
+    expect(artistsPage).toContain("Archive");
+    expect(artistsPage).not.toContain("deleteRegistryEntity");
     expect(verifier).toContain("ADMIN_REGISTRY_PROFILE_AUTHORITY_PASS");
   });
 
