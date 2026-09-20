@@ -39,6 +39,27 @@ begin
     end if;
   end loop;
 
+  foreach v_signature in array array[
+    'public.admin_patch_registry_artist_profile_v1(uuid,jsonb,timestamp with time zone)',
+    'public.admin_patch_registry_track_profile_v1(uuid,jsonb,timestamp with time zone)',
+    'public.admin_patch_registry_release_profile_v1(uuid,jsonb,timestamp with time zone)',
+    'public.admin_patch_registry_label_profile_v1(uuid,jsonb,timestamp with time zone)',
+    'public.admin_patch_registry_genre_profile_v1(uuid,jsonb,timestamp with time zone)',
+    'public.admin_delete_registry_draft_artist_v1(uuid,timestamp with time zone)',
+    'public.admin_patch_registry_release_detail_v1(uuid,text,text,text,date,text,uuid,text,text,text,timestamp with time zone)',
+    'public.admin_archive_registry_music_entity_v1(text,uuid,timestamp with time zone)'
+  ]
+  loop
+    select pg_get_functiondef(to_regprocedure(v_signature))
+    into v_definition;
+
+    if position('40001' in v_definition) <> 0
+       or position('WK_STALE_UPDATE' in v_definition) = 0
+    then
+      raise exception 'FAIL: Registry admin stale-conflict transport contract drifted for %', v_signature;
+    end if;
+  end loop;
+
   select pg_get_functiondef(
     'public.admin_patch_registry_artist_profile_v1(uuid,jsonb,timestamp with time zone)'::regprocedure
   ) into v_definition;
