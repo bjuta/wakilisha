@@ -1,10 +1,12 @@
 # MIZIZI Registry Authority Ledger
 
+> **20 September 2026 Slice 3 closure:** obsolete Registry authority retirement and bypass closure is Production accepted. The final orphaned Edge writer `registry-enrichment-review` is deleted from Production, its route returns HTTP 404, all six retired Registry Edge runtimes are absent, and all nine retained governed Registry/Admin runtimes are ACTIVE. Historical sections below preserve the authority that existed when originally audited.
+
 > **17 September 2026 Slice 3 status:** `backfill-artist-spotify-images` and `backfill-artist-type` are retired repository/runtime candidates after post-convergence traffic proof. Current Admin enrichment uses `registry-enrich-artist`; the two compatibility wrappers have no current product, workflow, database, or cron caller. Historical Slice 1 / Slice 2 sections below remain evidence of the authority that existed when audited.
 
 Date: 14 September 2026
 
-Status: **Slice 1 read-only authority audit. This document does not authorize a Production mutation, grant change, function deletion, route deletion, migration, or MIZIZI execution change.**
+Status: **Living Registry authority ledger. Slice 3 Production closure is accepted; historical audit sections remain evidence of the authority that existed when captured.**
 
 Programme authority: `docs/engineering/mizizi-registry-authority-security-convergence-programme.md`
 
@@ -219,24 +221,24 @@ or over-budget mutation attempts.
 
 ### 6.4 `registry-enrichment-review`
 
-**Production posture at retirement freeze**
+**Production posture before retirement**
 
-- ACTIVE v42 before Production retirement;
+- ACTIVE v42;
 - deployed function id `5421aa89-2b73-4fe8-9251-fa23f4dc84df`;
 - `verify_jwt = true`;
 - deployed bundle SHA-256
   `deda61f512909d58bc4fc826d5462373e2da9f62177609f81bc29cf00d6aa64d`;
-- explicitly resolves bearer user;
-- checks `manage_registry`;
-- uses service role only after authorization.
+- explicitly resolved bearer user;
+- checked `manage_registry`;
+- used service role only after authorization.
 
-**Canonical authority**
+**Canonical authority before retirement**
 
-The runtime can canonicalize Release shells and directly create or mutate
+The runtime could canonicalize Release shells and directly create or mutate
 Artists, Tracks, Releases, Labels, Release credits, and Registry
 relationships.
 
-**Current dependency proof**
+**Dependency and traffic proof**
 
 Fresh exact-main Slice 3 audit at
 `main@b553a50f67cc775c131d58873f5e666b1b68b317` established:
@@ -247,36 +249,54 @@ Fresh exact-main Slice 3 audit at
 - database function/procedure reference: 0;
 - view reference: 0;
 - cron reference: 0;
-- the historical
-  `src/services/registry/enrichment-review/client.ts` caller is absent.
+- historical `src/services/registry/enrichment-review/client.ts` caller:
+  absent.
 
 The current `scripts/charts/serve-v2-api.ts` compatibility surface does not
 invoke this Edge function. Its old enrichment-review write routes already fail
-closed with HTTP 410; its surviving enrichment context/audit routes are
-read-only and are not canonical mutation authority.
+closed with HTTP 410; surviving enrichment context/audit routes are read-only.
 
-**Production traffic proof**
-
-Critical Control Plane #1357 queried `function_edge_logs` using the exact
-deployed function id across seven bounded 24-hour windows from
-13 September 2026 12:39 UTC through 20 September 2026 12:39 UTC.
-
-Observed:
+Critical Control Plane #1357 queried seven bounded 24-hour
+`function_edge_logs` windows from 13 September 2026 12:39 UTC through
+20 September 2026 12:39 UTC:
 
 - total Edge-function log events: 46,013;
 - `registry-enrichment-review` invocations: 0;
-- `public-content-read` positive-control invocations: 45,670.
+- `public-content-read` positive-control invocations: 45,670;
+- every individual window: target 0 with positive control nonzero.
 
-Every individual 24-hour window recorded zero target invocations and nonzero
-positive-control traffic.
+**Rollback authority**
 
-**Decision**: `RETIRE`.
+Before deletion, the live entrypoint and shared Track identity helper were
+byte-identical to immutable Git at
+`main@b553a50f67cc775c131d58873f5e666b1b68b317`.
 
-No legitimate live consumer remains. Repository retirement removes the Edge
-source and active privileged-writer classification and extends the permanent
-retired-source negative contract. Production deletion remains a separate
-post-merge gate with one fresh immediate traffic recheck and retained rollback
-source proof.
+**Production retirement**
+
+Repository retirement PR #987 merged as
+`177e4aaee15d5bbb2a77ae8ee43f7e119791aee3`.
+
+Critical Control Plane #1368 then rechecked traffic from
+20 September 2026 12:39:00 UTC through 13:20:04 UTC:
+
+- total Edge-function log events: 36;
+- target invocations: 0;
+- `public-content-read` positive-control invocations: 36.
+
+The exact function deletion returned HTTP 200.
+
+Post-delete inventory proved the runtime absent while
+`public-content-read` remained ACTIVE v90.
+
+Critical Control Plane #1369 independently proved the retired external route
+returns HTTP 404 and the live `public-content-read` route returns HTTP 401 as
+the network positive control.
+
+**Decision**: `RETIRED IN PRODUCTION`.
+
+Permanent negative architecture coverage requires the retired source and active
+writer classification to remain absent.
+
 
 ### 6.5 `chart-ingest-api`
 
