@@ -1,5 +1,11 @@
 # MIZIZI Registry Retirement Manifest
 
+> **20 September 2026 programme correction:** runtime retirement itself is complete, but Slice 3 is reopened.
+> A fresh final live-writer audit found three service-role Edge canonical writers plus additional authenticated `SECURITY DEFINER` canonical writers outside the complete machine inventory. Accepted narrow commands are preserved; alternate/broad roads must converge before whole-Slice closure.
+> Retirement evidence below remains valid.
+>
+> Authoritative remaining-work audit: `docs/engineering/mizizi-slice3-final-live-writer-authority-audit.md`.
+
 > **20 September 2026 Slice 3 closure:** Production retirement is complete. All six retired Registry Edge runtimes are absent, all nine retained governed Registry/Admin runtimes are ACTIVE, and the final `registry-enrichment-review` route fails closed with HTTP 404. Historical prerequisite sections remain retained as evidence.
 
 > **20 September 2026 Slice 3 status:** `registry-enrichment-review` has zero observed Production invocations across seven bounded 24-hour windows with 45,670 `public-content-read` positive-control invocations. Exact-main dependency proof found no live caller. Repository retirement is authorized; Production deletion remains a separate post-merge gate.
@@ -8,7 +14,7 @@
 
 Date: 14 September 2026
 
-Status: **Living retirement authority. Slice 3 Production retirement is complete; historical prerequisite sections are retained as evidence.**
+Status: **Living retirement authority. Runtime retirement is complete; Slice 3 is reopened for final convergence of live retained writers.**
 
 Programme authority: `docs/engineering/mizizi-registry-authority-security-convergence-programme.md`
 

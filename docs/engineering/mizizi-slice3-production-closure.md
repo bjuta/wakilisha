@@ -1,8 +1,12 @@
 # MIZIZI Slice 3 Production Closure
 
+> **20 September 2026 correction:** the retirement and MIZIZI Stage A/B/C evidence in this record remains accepted, but the whole Slice 3 closure decision was premature.
+> A fresh exact-main + Production audit found three live service-role Edge canonical writers plus a broader authenticated `SECURITY DEFINER` canonical-writer surface that was not completely represented in the machine privileged-writer manifest.
+> #962 is reopened and Slice 4 #991 is blocked until the complete live-writer inventory is mechanically classified and the remaining alternate/broad writer roads converge or are explicitly proven non-bypass under the original Slice 3 exit gate.
+
 Date: 20 September 2026
 
-Status: **PRODUCTION ACCEPTED — SLICE 3 CLOSED**
+Status: **RETIREMENT ACCEPTED — SLICE 3 REOPENED FOR FINAL LIVE-WRITER CONVERGENCE**
 
 Programme authority: `docs/engineering/mizizi-registry-authority-security-convergence-programme.md`
 
@@ -261,11 +265,23 @@ mechanically proves:
   remain intact;
 - exact merged-main Production state is independently accepted.
 
-**Slice 3 is closed in Production.**
+**The obsolete-runtime retirement work is accepted, but Slice 3 is not closed.**
 
 Status receipt:
 
-`MIZIZI_SLICE3_OBSOLETE_AUTHORITY_RETIREMENT=PRODUCTION_ACCEPTED`
+`MIZIZI_SLICE3_OBSOLETE_RUNTIME_RETIREMENT=PRODUCTION_ACCEPTED`
+
+Whole-Slice closure remains blocked. The authoritative remaining-work inventory is:
+
+`docs/engineering/mizizi-slice3-final-live-writer-authority-audit.md`
+
+The first confirmed convergence set includes:
+
+- `admin-router` Registry direct service-role PATCH/DELETE;
+- `provider-intake-api` direct service-role `registry_releases` writes;
+- `run-chart-playback-enrichment` direct service-role `registry_tracks.metadata` writes;
+- `public.admin_create_registry_track_from_intake_enriched(...)` direct SECURITY DEFINER canonical Track creation;
+- `public.community_admin_decide_artist_claim(...)` direct SECURITY DEFINER canonical Artist creation.
 
 ## 8. What this does not authorize
 
@@ -289,15 +305,13 @@ changes without an exact schema-ACL/exposure audit.
 
 ## 9. Next programme
 
-The next bounded programme slice is **Slice 4 — MIZIZI Stewardship Runtime
-Foundation**.
+Slice 4 — MIZIZI Stewardship Runtime Foundation — is defined but **blocked**.
 
-Slice 4 must build and adversarially prove the execution boundary before any
-increase in autonomous intelligence.
+The active programme boundary remains reopened Slice 3 final live-writer convergence.
 
-Its opening work is read-only authority and runtime mapping only.
+Do not advance Slice 4 audit/design as the active programme until #962 re-closes.
 
-No Slice 4 Production mutation is authorized by this closure record.
+No Slice 4 Production mutation is authorized.
 
 ## 10. Deployment classification
 
