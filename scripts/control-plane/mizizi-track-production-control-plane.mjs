@@ -11,7 +11,7 @@ const TRIGGER_FILE = process.env.MIZIZI_TRIGGER_FILE || '';
 const ARTIFACT_DIR = process.env.MIZIZI_ARTIFACT_DIR || 'artifacts/mizizi-track-production-control-plane';
 const EXPECTED_FINGERPRINT = '551b29431700536937c26ecb1e396c3cf9314edefd88c589284cf330c9d1bb9a';
 const EXPECTED_BLOBS = {
-  'scripts/registry/agents/mizizi/run.ts': '045371254e510e57589c82e43267ad2e34d8257d',
+  'scripts/registry/agents/mizizi/run.ts': '3f6870d1605786786d78643efd0d97dc54d2d47e',
   'scripts/registry/agents/mizizi/core.ts': 'c8ab1436437175cd1d7d1c451299ae2b199bc327',
   'supabase/functions/_shared/registry-track-identity.ts': '7bcab485aecc3cc7b90e2a3154d90dcee81be92c',
 };
@@ -117,7 +117,7 @@ async function waitForDatabaseHealth() {
   throw new Error('database did not return healthy after SSL enforcement change');
 }
 
-function databaseUrl() {
+function databaseUrl(role) {
   const poolerPath = 'supabase/.temp/pooler-url';
   if (!fs.existsSync(poolerPath)) throw new Error(`linked Supabase CLI did not create ${poolerPath}`);
 
@@ -128,12 +128,12 @@ function databaseUrl() {
     throw new Error(`linked Supabase CLI returned unexpected pooler host ${u.hostname}`);
   }
 
-  u.username = `postgres.${PROJECT_REF}`;
+  u.username = `${role}.${PROJECT_REF}`;
   u.password = TOKEN;
   u.port = '5432';
   u.search = '';
   u.searchParams.set('options', '-c jit=true');
-  console.log(`Using linked Supabase pooler host: ${u.hostname}:5432`);
+  console.log(`Using linked Supabase pooler host: ${u.hostname}:5432 as ${role}`);
   return u.toString();
 }
 
@@ -151,7 +151,7 @@ function isTransientJitError(error) {
   );
 }
 
-async function createJitPoolWithRetry(url) {
+async function createJitPoolWithRetry(url, expectedRole) {
   const attempts = 12;
 
   for (let attempt = 1; attempt <= attempts; attempt += 1) {
@@ -169,13 +169,13 @@ async function createJitPoolWithRetry(url) {
         'select current_user as database_user, current_database() as database_name',
       );
 
-      if (session.database_user !== 'postgres' || session.database_name !== 'postgres') {
+      if (session.database_user !== expectedRole || session.database_name !== 'postgres') {
         throw new Error(
-          `unexpected JIT database session ${session.database_user}@${session.database_name}`,
+          `unexpected JIT database session ${session.database_user}@${session.database_name} expected ${expectedRole}@postgres`,
         );
       }
 
-      console.log(`PASS: JIT database session ready on attempt ${attempt}/${attempts}`);
+      console.log(`PASS: JIT ${expectedRole} database session ready on attempt ${attempt}/${attempts}`);
       return pool;
     } catch (error) {
       await pool.end().catch(()=>{});
@@ -192,6 +192,75 @@ async function createJitPoolWithRetry(url) {
   }
 
   throw new Error('JIT database session readiness exhausted');
+}
+
+const transportAuthoritySql = `select
+ exists(
+   select 1
+   from supabase_migrations.schema_migrations
+   where version='20260920095334'
+     and name='mizizi_stage_c_narrow_executor_transport_v1'
+ ) as stage_c_applied,
+ exists(
+   select 1
+   from platform_private.system_actor_executor_bindings
+   where actor_key='mizizi'
+     and executor_kind='database_role'
+     and executor_key='postgres'
+     and status='active'
+ ) as postgres_active,
+ exists(
+   select 1
+   from platform_private.system_actor_executor_bindings
+   where actor_key='mizizi'
+     and executor_kind='database_role'
+     and executor_key='postgres'
+     and status='disabled'
+ ) as postgres_disabled,
+ exists(
+   select 1
+   from platform_private.system_actor_executor_bindings
+   where actor_key='mizizi'
+     and executor_kind='database_role'
+     and executor_key='mizizi_executor'
+     and status='active'
+ ) as executor_active,
+ exists(
+   select 1
+   from platform_private.system_actor_executor_bindings
+   where actor_key='mizizi'
+     and executor_kind='database_role'
+     and executor_key='mizizi_executor'
+     and status='disabled'
+ ) as executor_disabled`;
+
+function resolveMiziziTransportRole() {
+  const authority = queryViaLinkedCli(transportAuthoritySql);
+
+  if (authority.stage_c_applied === true) {
+    if (
+      authority.executor_active !== true ||
+      authority.postgres_disabled !== true
+    ) {
+      throw new Error(
+        'Stage C ledger is present but dedicated executor binding is not exact',
+      );
+    }
+    console.log('PASS: Stage C ledger active; JIT transport = mizizi_executor');
+    return 'mizizi_executor';
+  }
+
+  if (
+    authority.postgres_active !== true ||
+    authority.executor_disabled !== true
+  ) {
+    throw new Error(
+      'Stage C ledger is absent but Stage B transport binding is not exact',
+    );
+  }
+
+  console.log('PASS: Stage C ledger absent; exact Stage B postgres compatibility transport retained');
+  return 'postgres';
 }
 
 const fingerprintSql = `with payload as (
@@ -468,6 +537,8 @@ async function main() {
   if (!['enabled','disabled'].includes(originalState)) throw new Error(`temporary access did not become available after SSL enforcement: ${originalState}`);
   console.log(`Temporary access at entry: ${originalState}`);
 
+  const transportRole = resolveMiziziTransportRole();
+
   let existing = null;
   let originalRoles = [];
   let mappingChanged = false;
@@ -480,17 +551,17 @@ async function main() {
       await api('PUT',`/v1/projects/${PROJECT_REF}/jit-access`,{state:'enabled'});
     }
 
-    const roles = originalRoles.filter(r => String(r.role || '') !== 'postgres');
-    roles.push({ role:'postgres', expires_at: Date.now() + 60*60*1000 });
+    const roles = originalRoles.filter(r => !['postgres','mizizi_executor'].includes(String(r.role || '')));
+    roles.push({ role:transportRole, expires_at: Date.now() + 60*60*1000 });
     await api('PUT',`/v1/projects/${PROJECT_REF}/database/jit`,{user_id:userId,roles});
     mappingChanged = true;
 
-    const url = databaseUrl();
+    const url = databaseUrl(transportRole);
     console.log(`::add-mask::${url}`);
-    const pool = await createJitPoolWithRetry(url);
+    const pool = await createJitPoolWithRetry(url,transportRole);
     try {
       console.log('\n=== 3. PRODUCTION TRACK STATE ===');
-      const { rows:[baseline] } = await pool.query(baselineSql);
+      const baseline = queryViaLinkedCli(baselineSql);
       const productionState = classifyTrackProductionState(baseline);
       if (productionState === 'unexpected') {
         throw new Error(
@@ -503,8 +574,7 @@ async function main() {
         console.log('PASS: accepted historical Track post-apply baseline detected');
 
         console.log('\n=== 4. EXACT POST-APPLY ACCEPTANCE ===');
-        const { rows:[row] } = await pool.query(acceptanceSql);
-        const acceptedState = row.state;
+        const acceptedState = queryViaLinkedCli(acceptanceSql).state;
         assertAcceptedPostApply(acceptedState);
         fs.writeFileSync(
           `${ARTIFACT_DIR}/state-after.json`,
@@ -533,7 +603,7 @@ async function main() {
       }
 
       console.log('PASS: accepted historical Track pre-apply baseline detected');
-      const { rows:[fp] } = await pool.query(fingerprintSql);
+      const fp = queryViaLinkedCli(fingerprintSql);
       if (fp.fingerprint !== EXPECTED_FINGERPRINT) throw new Error(`accepted-rehearsal input fingerprint drift: ${fp.fingerprint}`);
       console.log(`PASS: exact full-row input fingerprint ${fp.fingerprint}`);
 
@@ -553,8 +623,7 @@ async function main() {
       await streamCommand('npm',['run','registry:mizizi:apply','--','--entity=track','--limit=0','--confirm=MIZIZI_APPLY'],{DATABASE_URL:url},`${ARTIFACT_DIR}/apply.txt`,pool);
 
       console.log('\n=== 6. EXACT PRODUCTION ACCEPTANCE ===');
-      const { rows:[row] } = await pool.query(acceptanceSql);
-      const s = row.state;
+      const s = queryViaLinkedCli(acceptanceSql).state;
       assertAcceptedPostApply(s);
       fs.writeFileSync(`${ARTIFACT_DIR}/state-after.json`,JSON.stringify(s,null,2)+'\n');
       console.log('PASS: production acceptance exact 440 / 66 / 857 with exact downstream impact');

@@ -349,18 +349,18 @@ if (
   miziziRunner?.authorization !==
     "manual apply confirmation plus human standing stewardship capability grant and deterministic policy-issued exact execution grant" ||
   miziziRunner?.executionAuthority !==
-    "typed exact-grant stewardship broker over current JIT postgres transport" ||
+    "typed exact-grant stewardship broker over Stage-C-ledger-gated JIT transport with dedicated mizizi_executor after activation" ||
   miziziRunner?.futureBoundary !==
-    "dedicated_narrow_executor_identity_without_postgres_ambient_authority" ||
-  miziziRunner?.disposition !== "converge" ||
+    "stage_c_ledger_gated_dedicated_executor_cutover" ||
+  miziziRunner?.disposition !== "keep" ||
   miziziRunner?.miziziCallable !== true ||
   miziziRunner?.humanCallable !== true ||
   miziziRunner?.publicCallable !== false ||
   miziziRunner?.canonicalMutation !== true ||
-  miziziRunner?.legacyDebt !== true
+  miziziRunner?.legacyDebt !== false
 ) {
   throw new Error(
-    "MIZIZI runner classification drifted from the Stage B brokered-mutation / JIT-postgres transport-debt boundary.",
+    "MIZIZI runner classification drifted from the Stage C ledger-gated dedicated-executor boundary.",
   );
 }
 
@@ -374,18 +374,18 @@ if (
   artistOriginBroker?.entrypoint !==
     "scripts/registry/agents/mizizi/artist-origin-broker.ts" ||
   artistOriginBroker?.executionAuthority !==
-    "typed one-Artist origin broker over current JIT postgres transport" ||
+    "typed one-Artist origin broker over Stage-C-ledger-gated JIT transport with dedicated mizizi_executor after activation" ||
   artistOriginBroker?.futureBoundary !==
-    "dedicated_narrow_executor_identity_without_postgres_ambient_authority" ||
-  artistOriginBroker?.disposition !== "converge" ||
+    "stage_c_ledger_gated_dedicated_executor_cutover" ||
+  artistOriginBroker?.disposition !== "keep" ||
   artistOriginBroker?.miziziCallable !== true ||
   artistOriginBroker?.humanCallable !== false ||
   artistOriginBroker?.publicCallable !== false ||
   artistOriginBroker?.canonicalMutation !== true ||
-  artistOriginBroker?.legacyDebt !== true
+  artistOriginBroker?.legacyDebt !== false
 ) {
   throw new Error(
-    "MIZIZI Artist-origin broker classification drifted from the typed exact-grant boundary.",
+    "MIZIZI Artist-origin broker classification drifted from the Stage C ledger-gated dedicated-executor boundary.",
   );
 }
 
@@ -418,10 +418,10 @@ for (const {
 
 for (const fragment of [
   "public.registry_artists.metadata.country",
-  "record_registry_artist_origin_evidence",
-  "issue_registry_artist_origin_execution_grant",
-  "execute_registry_artist_origin_admission",
-  "verify_registry_artist_origin_admission",
+  "record_artist_origin_evidence_v1",
+  "issue_artist_origin_execution_grant_v1",
+  "execute_artist_origin_admission_v1",
+  "verify_artist_origin_admission_v1",
   "MIZIZI_ARTIST_ORIGIN_APPLY",
 ]) {
   if (!artistOriginBrokerSource.includes(fragment)) {
@@ -438,6 +438,10 @@ for (const forbiddenFragment of [
   "insert into public.registry_artists",
   "delete from public.registry_artists",
   "SUPABASE_SERVICE_ROLE_KEY",
+  "platform_private.record_registry_artist_origin_evidence",
+  "platform_private.issue_registry_artist_origin_execution_grant",
+  "platform_private.execute_registry_artist_origin_admission",
+  "platform_private.verify_registry_artist_origin_admission",
 ]) {
   if (
     artistOriginBrokerSource
@@ -448,6 +452,28 @@ for (const forbiddenFragment of [
       `MIZIZI Artist-origin broker contains a forbidden authority escape hatch: ${forbiddenFragment}`,
     );
   }
+}
+
+
+const stageCMiziziRunnerSource = fs.readFileSync(
+  "scripts/registry/agents/mizizi/run.ts",
+  "utf8",
+);
+for (const forbiddenFragment of [
+  "from public.user_role_assignments role",
+  "editorial.person_identity_links",
+  "platform_private.send_system_message",
+]) {
+  if (stageCMiziziRunnerSource.includes(forbiddenFragment)) {
+    throw new Error(
+      `MIZIZI runner retained direct Stage C standup authority: ${forbiddenFragment}`,
+    );
+  }
+}
+if (!stageCMiziziRunnerSource.includes("send_operational_standup_v1")) {
+  throw new Error(
+    "MIZIZI runner is missing the narrow Stage C operational standup wrapper.",
+  );
 }
 
 

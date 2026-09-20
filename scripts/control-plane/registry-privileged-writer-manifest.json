@@ -17,7 +17,7 @@
       "entrypoint": "scripts/registry/agents/mizizi/run.ts",
       "authentication": "reviewed production control-plane trigger plus JIT database session",
       "authorization": "manual apply confirmation plus human standing stewardship capability grant and deterministic policy-issued exact execution grant",
-      "executionAuthority": "typed exact-grant stewardship broker over current JIT postgres transport",
+      "executionAuthority": "typed exact-grant stewardship broker over Stage-C-ledger-gated JIT transport with dedicated mizizi_executor after activation",
       "targets": [
         "registry_tracks",
         "registry_releases",
@@ -28,13 +28,13 @@
         "registry_mutation_operations"
       ],
       "riskClass": "critical",
-      "disposition": "converge",
-      "futureBoundary": "dedicated_narrow_executor_identity_without_postgres_ambient_authority",
+      "disposition": "keep",
+      "futureBoundary": "stage_c_ledger_gated_dedicated_executor_cutover",
       "miziziCallable": true,
       "humanCallable": true,
       "publicCallable": false,
       "canonicalMutation": true,
-      "legacyDebt": true
+      "legacyDebt": false
     },
     {
       "id": "mizizi-artist-origin-broker",
@@ -42,7 +42,7 @@
       "entrypoint": "scripts/registry/agents/mizizi/artist-origin-broker.ts",
       "authentication": "reviewed control-plane trigger plus JIT database session",
       "authorization": "human standing admit_registry_artist_origin grant plus deterministic policy-issued exact execution grant",
-      "executionAuthority": "typed one-Artist origin broker over current JIT postgres transport",
+      "executionAuthority": "typed one-Artist origin broker over Stage-C-ledger-gated JIT transport with dedicated mizizi_executor after activation",
       "targets": [
         "registry_artists",
         "registry_canonical_write_events",
@@ -50,13 +50,13 @@
         "registry_mutation_operations"
       ],
       "riskClass": "medium",
-      "disposition": "converge",
-      "futureBoundary": "dedicated_narrow_executor_identity_without_postgres_ambient_authority",
+      "disposition": "keep",
+      "futureBoundary": "stage_c_ledger_gated_dedicated_executor_cutover",
       "miziziCallable": true,
       "humanCallable": false,
       "publicCallable": false,
       "canonicalMutation": true,
-      "legacyDebt": true
+      "legacyDebt": false
     },
     {
       "id": "scrape-artist-data",

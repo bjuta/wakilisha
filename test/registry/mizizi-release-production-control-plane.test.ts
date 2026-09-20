@@ -72,7 +72,11 @@ describe("MIZIZI Release production control plane", () => {
       "production temporary access disabled at rest",
     );
     expect(controlPlane).toContain("-c jit=true");
-    expect(controlPlane).toMatch(/role:\s*['"]postgres['"]/);
+    expect(controlPlane).toContain("mizizi_stage_c_narrow_executor_transport_v1");
+    expect(controlPlane).toContain("resolveMiziziTransportRole");
+    expect(controlPlane).toContain("return 'mizizi_executor'");
+    expect(controlPlane).toContain("return 'postgres'");
+    expect(controlPlane).toContain("role:transportRole");
     expect(controlPlane).toContain("createJitPoolWithRetry");
     expect(controlPlane).toContain("streamReadOnlyAuditWithRetry");
     expect(controlPlane).toContain("EJITREQUESTFAILED");

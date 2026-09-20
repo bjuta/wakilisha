@@ -1,0 +1,16 @@
+{
+  "migration_file": "supabase/migrations/20260920095334_mizizi_stage_c_narrow_executor_transport_v1.sql",
+  "migration_sha256": "51f1729637dc8b60542aa1191f510e44f73b1ba118aace505006412fbf7e2311",
+  "base_main_sha": "d96815f70d39851ca1b4fd74bd10be8bebba8032",
+  "preview_project_ref": "pdeqwideogswrcxthnqr",
+  "preview_branch_id": "7bcf2f3e-135d-4658-8bc3-51c54c9d3921",
+  "preview_migration_head": "20260920095334",
+  "baseline_replay": "pass",
+  "candidate_apply": "pass",
+  "verifier": "pass",
+  "verifier_file": "scripts/control-plane/verify-mizizi-stage-c-narrow-executor-transport.sql",
+  "schema_types_sha256": "1d32bc68224237f91f1f89102ddafa2db1a4f3ed80d4a26260db06c8d0fef67f",
+  "schema_migration_count": 153,
+  "schema_migration_head": "20260920095334",
+  "verified_at": "2026-09-20T12:13:48.509Z"
+}

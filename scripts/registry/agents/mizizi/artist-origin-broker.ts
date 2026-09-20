@@ -445,7 +445,7 @@ async function main(): Promise<void> {
       await pool.query(
         `
         select
-          platform_private.record_registry_artist_origin_evidence(
+          mizizi_private.record_artist_origin_evidence_v1(
             $1::text,
             $2::uuid,
             $3::text,
@@ -484,8 +484,8 @@ async function main(): Promise<void> {
       await pool.query(
         `
         select *
-        from platform_private
-          .issue_registry_artist_origin_execution_grant(
+        from mizizi_private
+          .issue_artist_origin_execution_grant_v1(
             $1::text,
             $2::uuid,
             $3::text
@@ -514,8 +514,8 @@ async function main(): Promise<void> {
       await pool.query(
         `
         select *
-        from platform_private
-          .execute_registry_artist_origin_admission(
+        from mizizi_private
+          .execute_artist_origin_admission_v1(
             $1::text,
             $2::uuid
           )
@@ -553,8 +553,8 @@ async function main(): Promise<void> {
       await pool.query(
         `
         select *
-        from platform_private
-          .verify_registry_artist_origin_admission(
+        from mizizi_private
+          .verify_artist_origin_admission_v1(
             $1::uuid
           )
         `,

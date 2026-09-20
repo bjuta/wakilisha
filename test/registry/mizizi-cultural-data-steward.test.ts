@@ -578,13 +578,25 @@ describe("MIZIZI Cultural Data Steward", () => {
       "supabase/.temp/pooler-url",
     );
     expect(controlPlane).toContain(
-      "postgres.${PROJECT_REF}",
+      "resolveMiziziTransportRole",
+    );
+    expect(controlPlane).toContain(
+      "databaseUrl(transportRole)",
+    );
+    expect(controlPlane).toContain(
+      "mizizi_stage_c_narrow_executor_transport_v1",
+    );
+    expect(controlPlane).toContain(
+      "return 'postgres'",
+    );
+    expect(controlPlane).toContain(
+      "return 'mizizi_executor'",
     );
     expect(controlPlane).not.toContain(
       "aws-0-",
     );
     expect(controlPlane).toContain(
-      "role:'postgres'",
+      "role:transportRole",
     );
     expect(controlPlane).toContain(
       "{user_id:userId,roles}",
@@ -617,7 +629,7 @@ describe("MIZIZI Cultural Data Steward", () => {
       "EJITREQUESTFAILED",
     );
     expect(controlPlane).toContain(
-      "JIT database session ready",
+      "database session ready on attempt",
     );
     expect(controlPlane).toContain(
       "PRE_APPLY_BASELINE",
@@ -772,11 +784,11 @@ describe("MIZIZI Cultural Data Steward", () => {
     expect(runner).toContain(
       "applyReleaseSlugPackaging",
     );
-    expect(runner).toContain(
+    expect(runner).not.toContain(
       "platform_private.send_system_message",
     );
     expect(runner).toContain(
-      "'operational_update'",
+      "send_operational_standup_v1",
     );
     expect(runner).toContain(
       "--confirm=MIZIZI_APPLY",
@@ -1186,7 +1198,7 @@ describe("MIZIZI Slice 2 Gate B Pure Public Read", () => {
 
 
 describe("MIZIZI Slice 3 narrow executor Stage A foundation", () => {
-  it("installs the future MIZIZI executor inertly without relabelling the live runner", () => {
+  it("installs the future MIZIZI executor inertly before the later Stage C cutover", () => {
     const migrations = readdirSync("supabase/migrations").filter(
       (name) => name.endsWith("_mizizi_executor_foundation_v1.sql"),
     );
@@ -1224,30 +1236,12 @@ describe("MIZIZI Slice 3 narrow executor Stage A foundation", () => {
     );
     expect(migration).not.toContain("set role mizizi_executor");
 
-    const manifest = JSON.parse(
-      readFileSync(
-        "scripts/control-plane/registry-privileged-writer-manifest.json",
-        "utf8",
-      ),
-    ) as {
-      writers: Array<{
-        id: string;
-        disposition: string;
-        executionAuthority: string;
-        legacyDebt: boolean;
-      }>;
-    };
-
-    expect(
-      manifest.writers.find(
-        (writer) => writer.id === "mizizi-agent-runner",
-      ),
-    ).toMatchObject({
-      disposition: "converge",
-      executionAuthority:
-        "typed exact-grant stewardship broker over current JIT postgres transport",
-      legacyDebt: true,
-    });
+    expect(migration).toContain(
+      "audited active MIZIZI postgres executor binding is missing",
+    );
+    expect(migration).toContain(
+      "'mizizi_executor',\n  'disabled'",
+    );
   });
 
   it("removes generic PUBLIC inheritance from browser bounded writers while preserving exact app roles", () => {
@@ -1957,52 +1951,136 @@ describe("MIZIZI Slice 3 Stage B typed broker convergence", () => {
     );
   });
 
-  it("keeps transport debt explicit until Stage C", () => {
-    const manifest =
-      JSON.parse(
-        readFileSync(
-          "scripts/control-plane/registry-privileged-writer-manifest.json",
-          "utf8",
+  it("records that Stage B intentionally left transport cutover for Stage C", () => {
+    const migration = read(
+      "supabase/migrations/" +
+        migrations[0],
+    );
+
+    expect(migration).toContain(
+      "Stage B deliberately preserves the current JIT postgres transport",
+    );
+    expect(migration).toContain(
+      "Transport cutover to mizizi_executor is Stage C",
+    );
+  });
+});
+
+describe("MIZIZI Slice 3 Stage C narrow executor transport", () => {
+  const migrations =
+    readdirSync(
+      "supabase/migrations",
+    ).filter(
+      (name) =>
+        name.endsWith(
+          "_mizizi_stage_c_narrow_executor_transport_v1.sql",
         ),
-      ) as {
-        writers: Array<{
-          id: string;
-          disposition: string;
-          authorization: string;
-          executionAuthority: string;
-          futureBoundary: string;
-          legacyDebt: boolean;
-        }>;
-      };
+    );
+
+  it("cuts database authority to the narrow executor when the Stage C ledger is activated", () => {
+    expect(migrations).toHaveLength(1);
+    const migration = read(
+      "supabase/migrations/" + migrations[0],
+    );
+
+    expect(migration).toContain("record_artist_origin_evidence_v1");
+    expect(migration).toContain("issue_artist_origin_execution_grant_v1");
+    expect(migration).toContain("execute_artist_origin_admission_v1");
+    expect(migration).toContain("verify_artist_origin_admission_v1");
+    expect(migration).toContain("send_operational_standup_v1");
+    expect(migration).toContain("executor_key='postgres'");
+    expect(migration).toContain("executor_key='mizizi_executor'");
+    expect(migration).not.toMatch(
+      /grant\s+usage\s+on\s+schema\s+platform_private\s+to\s+mizizi_executor/i,
+    );
+  });
+
+  it("keeps runtime off platform_private and admin identity tables", () => {
+    const runner = read(
+      "scripts/registry/agents/mizizi/run.ts",
+    );
+    const artist = read(
+      "scripts/registry/agents/mizizi/artist-origin-broker.ts",
+    );
+
+    expect(runner).toContain("send_operational_standup_v1");
+    expect(runner).not.toContain("from public.user_role_assignments role");
+    expect(runner).not.toContain("editorial.person_identity_links");
+    expect(runner).not.toContain("platform_private.send_system_message");
+
+    for (const wrapper of [
+      "record_artist_origin_evidence_v1",
+      "issue_artist_origin_execution_grant_v1",
+      "execute_artist_origin_admission_v1",
+      "verify_artist_origin_admission_v1",
+    ]) {
+      expect(artist).toContain(wrapper);
+    }
+
+    expect(artist).not.toContain("platform_private.record_registry_artist_origin_evidence");
+    expect(artist).not.toContain("platform_private.issue_registry_artist_origin_execution_grant");
+    expect(artist).not.toContain("platform_private.execute_registry_artist_origin_admission");
+    expect(artist).not.toContain("platform_private.verify_registry_artist_origin_admission");
+  });
+
+  it("gates both production control planes on the exact Stage C ledger", () => {
+    const track = read(
+      "scripts/control-plane/mizizi-track-production-control-plane.mjs",
+    );
+    const release = read(
+      "scripts/control-plane/mizizi-release-production-control-plane.mjs",
+    );
+
+    for (const source of [track,release]) {
+      expect(source).toContain("mizizi_stage_c_narrow_executor_transport_v1");
+      expect(source).toContain("resolveMiziziTransportRole");
+      expect(source).toContain("Stage C ledger is present but dedicated executor binding is not exact");
+      expect(source).toContain("Stage C ledger is absent but Stage B transport binding is not exact");
+      expect(source).toContain("return 'mizizi_executor'");
+      expect(source).toContain("return 'postgres'");
+      expect(source).toContain("databaseUrl(transportRole)");
+    }
+  });
+
+  it("closes live transport debt in the writer manifest", () => {
+    const manifest = JSON.parse(
+      read(
+        "scripts/control-plane/registry-privileged-writer-manifest.json",
+      ),
+    ) as {
+      writers: Array<{
+        id: string;
+        executionAuthority: string;
+        disposition: string;
+        futureBoundary: string;
+        legacyDebt: boolean;
+      }>;
+    };
 
     expect(
       manifest.writers.find(
-        (writer) =>
-          writer.id ===
-          "mizizi-agent-runner",
+        (writer) => writer.id === "mizizi-agent-runner",
       ),
     ).toMatchObject({
-      disposition: "converge",
       executionAuthority:
-        "typed exact-grant stewardship broker over current JIT postgres transport",
+        "typed exact-grant stewardship broker over Stage-C-ledger-gated JIT transport with dedicated mizizi_executor after activation",
+      disposition: "keep",
       futureBoundary:
-        "dedicated_narrow_executor_identity_without_postgres_ambient_authority",
-      legacyDebt: true,
+        "stage_c_ledger_gated_dedicated_executor_cutover",
+      legacyDebt: false,
     });
 
     expect(
       manifest.writers.find(
-        (writer) =>
-          writer.id ===
-          "mizizi-artist-origin-broker",
+        (writer) => writer.id === "mizizi-artist-origin-broker",
       ),
     ).toMatchObject({
-      disposition: "converge",
       executionAuthority:
-        "typed one-Artist origin broker over current JIT postgres transport",
+        "typed one-Artist origin broker over Stage-C-ledger-gated JIT transport with dedicated mizizi_executor after activation",
+      disposition: "keep",
       futureBoundary:
-        "dedicated_narrow_executor_identity_without_postgres_ambient_authority",
-      legacyDebt: true,
+        "stage_c_ledger_gated_dedicated_executor_cutover",
+      legacyDebt: false,
     });
   });
 });
