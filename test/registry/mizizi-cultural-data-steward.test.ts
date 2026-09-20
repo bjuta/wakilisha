@@ -1067,6 +1067,81 @@ describe("MIZIZI Slice 2 Gate A-final Registry authority convergence", () => {
     expect(verifier).toContain("ADMIN_REGISTRY_PROFILE_AUTHORITY_PASS");
   });
 
+  it("converges generic Track provider-link writes onto exact Registry authority", () => {
+    const client = read("src/services/registry/providerLinks.ts");
+    const migration = read(
+      "supabase/migrations/20260920201257_registry_track_provider_link_admin_authority_v1.sql",
+    );
+    const verifier = read(
+      "scripts/control-plane/verify-registry-provider-link-admin-authority.sql",
+    );
+    const manifest = JSON.parse(
+      read(
+        "scripts/control-plane/registry-privileged-writer-manifest.json",
+      ),
+    ) as {
+      writers: Array<{
+        id: string;
+        authentication: string;
+        authorization: string;
+        executionAuthority: string;
+        disposition: string;
+        futureBoundary: string;
+        humanCallable: boolean;
+        canonicalMutation: boolean;
+      }>;
+    };
+
+    expect(client).toContain("admin_admit_registry_track_provider_link_v1");
+    expect(client).not.toContain('"registry_upsert_track_provider_link"');
+
+    expect(migration).toContain("registry_provider_link_admin");
+    expect(migration).toContain("registry.track.provider_link.admit");
+    expect(migration).toContain("ADMIN_REVIEWED");
+    expect(migration).toContain("required_user_capability_key");
+    expect(migration).toContain("manage_registry");
+    expect(migration).toContain("WK_STALE_PROVIDER_LINK");
+    expect(migration).toContain("registry_operation_write_events");
+    expect(migration).toContain("registry_canonical_write_events");
+    expect(migration).toContain("verify_registry_provider_link_admin_v1");
+    expect(migration).toContain(
+      "revoke all on function\n  public.registry_upsert_track_provider_link",
+    );
+
+    expect(verifier).toContain(
+      "REGISTRY_PROVIDER_LINK_ADMIN_AUTHORITY_PASS",
+    );
+
+    expect(
+      manifest.writers.find(
+        (writer) => writer.id === "registry-upsert-track-provider-link",
+      ),
+    ).toMatchObject({
+      authentication: "owner_internal_only",
+      authorization: "no_external_execute",
+      disposition: "keep",
+      futureBoundary:
+        "owner_internal_provider_link_upsert_behind_typed_exact_operation",
+      humanCallable: false,
+      canonicalMutation: true,
+    });
+
+    expect(
+      manifest.writers.find(
+        (writer) =>
+          writer.id === "admin-admit-registry-track-provider-link-v1",
+      ),
+    ).toMatchObject({
+      authentication: "auth_uid",
+      authorization: "manage_registry",
+      disposition: "keep",
+      futureBoundary:
+        "typed_registry_provider_link_admission_for_registry_admin",
+      humanCallable: true,
+      canonicalMutation: true,
+    });
+  });
+
   it("removes direct browser canonical Release mutation while preserving precision, label, and soft archive", () => {
     const release = read("src/pages/admin/registry/releases/detail/page.tsx");
     const client = read("src/services/registry/admin/releaseDetailClient.ts");
