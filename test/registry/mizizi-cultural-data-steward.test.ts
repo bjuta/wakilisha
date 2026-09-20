@@ -469,11 +469,6 @@ describe("MIZIZI Cultural Data Steward", () => {
         "supabase/migrations/20260916055145_registry_discography_review_authority_v1.sql",
         "utf8",
       );
-    const enrichment =
-      readFileSync(
-        "supabase/functions/registry-enrichment-review/index.ts",
-        "utf8",
-      );
 
     expect(sharedRule).toContain(
       "canonicalTrackSlugCandidate",
@@ -490,15 +485,11 @@ describe("MIZIZI Cultural Data Steward", () => {
     expect(discographyAuthority).toContain(
       "platform_private.registry_track_creation_slug_v1(",
     );
-    expect(enrichment).toContain(
-      'from "../_shared/registry-track-identity.ts"',
-    );
-    expect(enrichment).toContain(
-      "findTrackByArtistAndSlug",
-    );
-    expect(enrichment).not.toContain(
-      "scopedTrackSlug",
-    );
+    expect(
+      existsSync(
+        "supabase/functions/registry-enrichment-review/index.ts",
+      ),
+    ).toBe(false);
     expect(
       existsSync(
         "supabase/functions/scrape-artist-data/index.ts",
