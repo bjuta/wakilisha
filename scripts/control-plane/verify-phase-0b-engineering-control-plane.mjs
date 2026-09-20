@@ -15,6 +15,8 @@ const requiredFiles = [
   "scripts/control-plane/generate-live-schema.sh",
   "scripts/control-plane/promote-repository-migrations.sh",
   "scripts/control-plane/registry-privileged-writer-manifest.json",
+  "scripts/control-plane/generate-registry-canonical-writer-verifier.mjs",
+  "scripts/control-plane/verify-registry-canonical-writer-inventory.sql",
   "scripts/control-plane/resolve-supabase-anon-key.mjs",
   "scripts/control-plane/verify-frozen-institute.mjs",
   "scripts/control-plane/verify-live-schema.sh",
@@ -88,6 +90,7 @@ if (
 }
 
 const writerIds = new Set();
+const databaseFunctionEntrypoints = new Set();
 const writerRiskClasses = new Set([
   "low",
   "medium",
@@ -200,6 +203,54 @@ for (const writer of registryWriters) {
       `${writer.id}: public canonical mutation may only exist as explicit legacy debt pending convergence/retirement.`,
     );
   }
+
+  if (writer.kind === "database_function") {
+    if (
+      !/^public\.[a-z0-9_]+\(.+\)$/.test(
+        String(writer.entrypoint),
+      )
+    ) {
+      throw new Error(
+        `${writer.id}: database-function writer must use an exact public regprocedure signature: ${writer.entrypoint}`,
+      );
+    }
+
+    if (
+      databaseFunctionEntrypoints.has(
+        writer.entrypoint,
+      )
+    ) {
+      throw new Error(
+        `${writer.id}: database-function writer signature is duplicated: ${writer.entrypoint}`,
+      );
+    }
+
+    databaseFunctionEntrypoints.add(
+      writer.entrypoint,
+    );
+  }
+}
+
+const registryWriterVerifierGeneration =
+  execFileSync(
+    process.execPath,
+    [
+      "scripts/control-plane/generate-registry-canonical-writer-verifier.mjs",
+      "--check",
+    ],
+    {
+      encoding: "utf8",
+    },
+  );
+
+if (
+  !registryWriterVerifierGeneration.includes(
+    "REGISTRY_CANONICAL_WRITER_VERIFIER_GENERATION=PASS",
+  )
+) {
+  throw new Error(
+    "Registry canonical-writer verifier generation did not return its PASS receipt.",
+  );
 }
 
 for (const requiredWriter of [
