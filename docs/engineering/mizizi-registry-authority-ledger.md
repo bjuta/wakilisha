@@ -219,23 +219,64 @@ or over-budget mutation attempts.
 
 ### 6.4 `registry-enrichment-review`
 
-**Live posture**
+**Production posture at retirement freeze**
 
-- ACTIVE deployment
-- `verify_jwt = true`
-- explicitly resolves bearer user
-- checks `manage_registry`
-- uses service role only after authorization
+- ACTIVE v42 before Production retirement;
+- deployed function id `5421aa89-2b73-4fe8-9251-fa23f4dc84df`;
+- `verify_jwt = true`;
+- deployed bundle SHA-256
+  `deda61f512909d58bc4fc826d5462373e2da9f62177609f81bc29cf00d6aa64d`;
+- explicitly resolves bearer user;
+- checks `manage_registry`;
+- uses service role only after authorization.
 
 **Canonical authority**
 
-Can canonicalize Release shells, create Artists/Tracks/Labels, create Release credits, and create Registry relationships.
+The runtime can canonicalize Release shells and directly create or mutate
+Artists, Tracks, Releases, Labels, Release credits, and Registry
+relationships.
 
-**Current consumer status**
+**Current dependency proof**
 
-Exact current-main slug search established the function and historical references but did not establish a current application caller. That is a caller-status question, not evidence that the function is dead.
+Fresh exact-main Slice 3 audit at
+`main@b553a50f67cc775c131d58873f5e666b1b68b317` established:
 
-**Decision**: `KEEP / HARDEN / CONVERGE`. This is much closer to the desired boundary than the legacy writers.
+- current `src/` Edge-function caller: 0;
+- GitHub workflow caller: 0;
+- other Supabase Edge-function caller: 0;
+- database function/procedure reference: 0;
+- view reference: 0;
+- cron reference: 0;
+- the historical
+  `src/services/registry/enrichment-review/client.ts` caller is absent.
+
+The current `scripts/charts/serve-v2-api.ts` compatibility surface does not
+invoke this Edge function. Its old enrichment-review write routes already fail
+closed with HTTP 410; its surviving enrichment context/audit routes are
+read-only and are not canonical mutation authority.
+
+**Production traffic proof**
+
+Critical Control Plane #1357 queried `function_edge_logs` using the exact
+deployed function id across seven bounded 24-hour windows from
+13 September 2026 12:39 UTC through 20 September 2026 12:39 UTC.
+
+Observed:
+
+- total Edge-function log events: 46,013;
+- `registry-enrichment-review` invocations: 0;
+- `public-content-read` positive-control invocations: 45,670.
+
+Every individual 24-hour window recorded zero target invocations and nonzero
+positive-control traffic.
+
+**Decision**: `RETIRE`.
+
+No legitimate live consumer remains. Repository retirement removes the Edge
+source and active privileged-writer classification and extends the permanent
+retired-source negative contract. Production deletion remains a separate
+post-merge gate with one fresh immediate traffic recheck and retained rollback
+source proof.
 
 ### 6.5 `chart-ingest-api`
 
