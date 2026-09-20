@@ -613,7 +613,69 @@ deployment, or canonical data mutation is required for the core-music road.
 **Status**:
 `SLICE3_LEGACY_CORE_MUSIC_RELATIONSHIP_AUTHORITY=ALREADY_RETIRED`.
 
-## 14. What is explicitly not being retired
+## 14. `registry-enrichment-review`
+
+### Decision
+
+**RETIRE. Repository retirement is authorized; Production deletion remains a
+separate post-merge gate.**
+
+### Why
+
+Fresh Slice 3 dependency proof found no current product, workflow, Edge,
+database function/procedure, view, or cron caller for the deployed runtime.
+
+The historical frontend client documented in older architecture evidence is
+absent from current main.
+
+The runtime is still a high-authority service-role writer after
+`manage_registry` authorization and can directly mutate canonical Registry
+identity, credits, memberships, and relationships. With no legitimate live
+consumer, preserving that dormant authority creates risk without preserving a
+product capability.
+
+### Production traffic proof
+
+Critical Control Plane #1357 queried the exact deployed function id
+`5421aa89-2b73-4fe8-9251-fa23f4dc84df` across seven 24-hour
+`function_edge_logs` windows from 13 September 2026 12:39 UTC through
+20 September 2026 12:39 UTC.
+
+Observed:
+
+- 46,013 total Edge-function log events;
+- 0 `registry-enrichment-review` invocations;
+- 45,670 `public-content-read` positive-control invocations.
+
+Traffic gate: **PASS**.
+
+### Repository retirement contract
+
+- delete `supabase/functions/registry-enrichment-review/index.ts`;
+- remove `registry-enrichment-review` from the active privileged-writer
+  manifest;
+- add it to the existing Phase 0B retired-source negative contract;
+- update the consolidated MIZIZI test so the retired source must remain absent;
+- preserve historical architecture and replay evidence unchanged;
+- retain the shared `registry-track-identity.ts` helper because MIZIZI and
+  active tests still use it.
+
+### Production retirement gate
+
+After protected merge:
+
+1. run one immediate bounded traffic recheck;
+2. prove the live v42 rollback source/hash;
+3. delete only `registry-enrichment-review`;
+4. prove the function is absent from Production Edge inventory;
+5. prove the retired URL fails closed;
+6. prove retained Registry/Admin authorities remain healthy;
+7. run the final whole-Slice 3 mechanical exit audit.
+
+No SQL migration, canonical data mutation, frontend deployment, or unrelated
+Edge deployment is required.
+
+## 15. What is explicitly not being retired
 
 The following should not be swept away merely for consolidation aesthetics:
 
@@ -629,7 +691,7 @@ The following should not be swept away merely for consolidation aesthetics:
 - governed domain RPCs that already enforce their business permission contract;
 - Chart/discography/provider capabilities that have legitimate active consumers.
 
-## 15. Retirement execution order
+## 16. Retirement execution order
 
 The intended Slice 3 order is:
 
@@ -648,7 +710,7 @@ The intended Slice 3 order is:
 
 This order prevents a security cleanup from becoming a product outage or a data migration by accident.
 
-## 16. Programme rule after retirement
+## 17. Programme rule after retirement
 
 Once a privileged path is retired, WAKILISHA must not reintroduce it as an emergency shortcut.
 
