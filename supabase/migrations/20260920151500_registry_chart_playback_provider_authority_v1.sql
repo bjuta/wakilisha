@@ -964,10 +964,12 @@ begin
        or v_link.preview_url is distinct from nullif(v_claim->>'preview_url','')
        or v_link.artwork_url is distinct from nullif(v_claim->>'artwork_url','')
        or v_link.duration_ms is distinct from
-          case
-            when v_claim->>'duration_ms' is null then null
-            else (v_claim->>'duration_ms')::integer
-          end
+          (
+            case
+              when v_claim->>'duration_ms' is null then null
+              else (v_claim->>'duration_ms')::integer
+            end
+          )
        or v_link.storefront is distinct from nullif(v_claim->>'storefront','')
        or v_link.match_method is distinct from
           coalesce(nullif(v_claim->>'match_method',''),'unknown')
