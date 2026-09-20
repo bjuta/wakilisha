@@ -1010,9 +1010,15 @@ export default function ArtistsPage() {
     for (let i = 0; i < ids.length; i += batchSize) {
       const batch = ids.slice(i, i + batchSize);
       const results = await Promise.allSettled(
-        batch.map((id) =>
-          saveRegistryEntityPatch("artist", id, { status: "draft" })
-        ),
+        batch.map((id) => {
+          const artist = enrichedArtists.find((row) => String(row.id) === id);
+          return saveRegistryEntityPatch(
+            "artist",
+            id,
+            { status: "draft" },
+            String(artist?.updated_at ?? ""),
+          );
+        }),
       );
       results.forEach((r) => {
         if (r.status === "fulfilled" && r.value.ok) {
@@ -1041,9 +1047,15 @@ export default function ArtistsPage() {
     for (let i = 0; i < ids.length; i += batchSize) {
       const batch = ids.slice(i, i + batchSize);
       const results = await Promise.allSettled(
-        batch.map((id) =>
-          saveRegistryEntityPatch("artist", id, { status: "active" })
-        ),
+        batch.map((id) => {
+          const artist = enrichedArtists.find((row) => String(row.id) === id);
+          return saveRegistryEntityPatch(
+            "artist",
+            id,
+            { status: "active" },
+            String(artist?.updated_at ?? ""),
+          );
+        }),
       );
       results.forEach((r) => {
         if (r.status === "fulfilled" && r.value.ok) {
@@ -1085,7 +1097,12 @@ export default function ArtistsPage() {
     let failed = 0;
 
     for (const id of ids) {
-      const result = await deleteRegistryEntity("artist", id);
+      const artist = enrichedArtists.find((row) => String(row.id) === id);
+      const result = await deleteRegistryEntity(
+        "artist",
+        id,
+        String(artist?.updated_at ?? ""),
+      );
       if (result.ok) {
         succeeded++;
       } else {
