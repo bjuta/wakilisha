@@ -377,13 +377,21 @@ for (const requiredRpc of [
   "admin_patch_registry_release_profile_v1",
   "admin_patch_registry_label_profile_v1",
   "admin_patch_registry_genre_profile_v1",
-  "admin_delete_registry_draft_artist_v1",
 ]) {
   if (!adminRouterSource.includes(requiredRpc)) {
     throw new Error(
       `admin-router is missing bounded Registry command: ${requiredRpc}`,
     );
   }
+}
+
+if (
+  !adminRouterSource.includes("retired_registry_hard_delete") ||
+  adminRouterSource.includes("admin_delete_registry_draft_artist_v1")
+) {
+  throw new Error(
+    "admin-router Registry hard-delete retirement contract drifted.",
+  );
 }
 
 if (
