@@ -1,8 +1,8 @@
 # MIZIZI Slice 3 Production Closure
 
 > **20 September 2026 correction:** the retirement and MIZIZI Stage A/B/C evidence in this record remains accepted, but the whole Slice 3 closure decision was premature.
-> A fresh exact-main + Production audit found five live `keep_converge` canonical Registry writers still outside the typed exact-grant / mutation-operation / independent-verifier boundary.
-> #962 is reopened and Slice 4 #991 is blocked until those live writer roads converge or are explicitly proven non-bypass under the original Slice 3 exit gate.
+> A fresh exact-main + Production audit found three live service-role Edge canonical writers plus a broader authenticated `SECURITY DEFINER` canonical-writer surface that was not completely represented in the machine privileged-writer manifest.
+> #962 is reopened and Slice 4 #991 is blocked until the complete live-writer inventory is mechanically classified and the remaining alternate/broad writer roads converge or are explicitly proven non-bypass under the original Slice 3 exit gate.
 
 Date: 20 September 2026
 
@@ -271,7 +271,11 @@ Status receipt:
 
 `MIZIZI_SLICE3_OBSOLETE_RUNTIME_RETIREMENT=PRODUCTION_ACCEPTED`
 
-Whole-Slice closure remains blocked on final convergence of:
+Whole-Slice closure remains blocked. The authoritative remaining-work inventory is:
+
+`docs/engineering/mizizi-slice3-final-live-writer-authority-audit.md`
+
+The first confirmed convergence set includes:
 
 - `admin-router` Registry direct service-role PATCH/DELETE;
 - `provider-intake-api` direct service-role `registry_releases` writes;
