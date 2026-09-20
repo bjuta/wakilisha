@@ -650,13 +650,13 @@ function matchingStatus(counters: MatchingCounters, totalItems: number): Matchin
 }
 
 async function persistAcceptedProviderLinks(
-  db: ReturnType<typeof createClient>,
+  stagingDb: ReturnType<typeof createClient>,
+  authorityDb: ReturnType<typeof createClient>,
   runId: string,
-  storefront: string,
 ): Promise<number> {
-  const { data: acceptedItems, error } = await db
+  const { data: acceptedItems, error } = await stagingDb
     .from("wk_chart_playback_enrichment_items")
-    .select("id, registry_track_id, provider_track_id, provider_url, preview_url, artwork_url, confidence, match_method, raw_match_payload, metadata")
+    .select("id")
     .eq("run_id", runId)
     .eq("status", "accepted")
     .not("registry_track_id", "is", null)
@@ -667,89 +667,28 @@ async function persistAcceptedProviderLinks(
   let persisted = 0;
 
   for (const item of acceptedItems ?? []) {
-    const trackId = uuidOrNull(item.registry_track_id);
-    const providerTrackId = cleanOptionalText(item.provider_track_id);
-    if (!trackId || !providerTrackId) continue;
+    const itemId = uuidOrNull(item.id);
+    if (!itemId) continue;
 
-    const song = item.raw_match_payload && typeof item.raw_match_payload === "object"
-      ? item.raw_match_payload as AppleSong
-      : null;
+    const { data, error: admissionError } = await authorityDb.rpc(
+      "chart_admit_track_provider_link_v1",
+      { p_enrichment_item_id: itemId },
+    );
 
-    const attrs = song?.attributes ?? {};
-    const payload = {
-      provider: "apple_music",
-      id: providerTrackId,
-      storefront,
-      name: attrs.name ?? null,
-      artistName: attrs.artistName ?? null,
-      albumName: attrs.albumName ?? null,
-      isrc: attrs.isrc ?? null,
-      matchMethod: cleanOptionalText(item.match_method),
-      matchConfidence: typeof item.confidence === "number" ? item.confidence : null,
-      matchStatus: "matched",
-      enrichedAt: new Date().toISOString(),
-      enrichmentRunId: runId,
-      enrichmentItemId: item.id,
-    };
-
-    const { error: linkError } = await db
-      .from("registry_track_provider_links")
-      .upsert({
-        track_id: trackId,
-        provider_key: "apple_music",
-        provider_track_id: providerTrackId,
-        provider_release_id: song ? appleReleaseId(song) : null,
-        provider_artist_ids: song ? appleArtistIds(song) : [],
-        isrc: normalizeIsrc(attrs.isrc ?? null),
-        preview_url: cleanOptionalText(item.preview_url),
-        artwork_url: cleanOptionalText(item.artwork_url),
-        duration_ms: attrs.durationInMillis ?? null,
-        storefront,
-        match_method: cleanOptionalText(item.match_method) ?? "exact_title_artist",
-        match_confidence: typeof item.confidence === "number" ? item.confidence : 0,
-        match_status: "matched",
-        raw_payload: { song, providerPayload: payload },
-        last_checked_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-      }, {
-        onConflict: "provider_key,provider_track_id",
-      });
-
-    if (linkError) throw new Error(`failed_to_persist_provider_link: ${linkError.message}`);
-
-    const { data: existingTrack, error: existingTrackError } = await db
-      .from("registry_tracks")
-      .select("metadata")
-      .eq("id", trackId)
-      .maybeSingle();
-
-    if (existingTrackError) {
-      throw new Error(`failed_to_load_registry_track_metadata: ${existingTrackError.message}`);
+    if (admissionError) {
+      throw new Error(
+        `failed_to_admit_provider_link: ${admissionError.message}`,
+      );
     }
 
-    const existingMetadata = existingTrack?.metadata && typeof existingTrack.metadata === "object"
-      ? existingTrack.metadata as Record<string, unknown>
-      : {};
-    const existingProviders = existingMetadata.providers && typeof existingMetadata.providers === "object"
-      ? existingMetadata.providers as Record<string, unknown>
-      : {};
-
-    const { error: trackError } = await db
-      .from("registry_tracks")
-      .update({
-        metadata: {
-          ...existingMetadata,
-          providers: {
-            ...existingProviders,
-            apple_music: payload,
-          },
-          apple_music_track_id: providerTrackId,
-          apple_music_catalog_id: providerTrackId,
-        },
-      })
-      .eq("id", trackId);
-
-    if (trackError) throw new Error(`failed_to_update_registry_track_metadata: ${trackError.message}`);
+    const receipt = Array.isArray(data) ? data[0] : data;
+    if (
+      !receipt ||
+      typeof receipt !== "object" ||
+      (receipt as Record<string, unknown>).verifier_status !== "passed"
+    ) {
+      throw new Error("failed_to_admit_provider_link: missing verified receipt");
+    }
 
     persisted += 1;
   }
@@ -759,6 +698,7 @@ async function persistAcceptedProviderLinks(
 
 async function processAppleMatching(
   db: ReturnType<typeof createClient>,
+  authorityDb: ReturnType<typeof createClient>,
   runId: string,
   value: ParsedRequest,
   token: string,
@@ -882,7 +822,7 @@ async function processAppleMatching(
   }
 
   const persistedProviderLinkCount = value.write
-    ? await persistAcceptedProviderLinks(db, runId, value.storefront)
+    ? await persistAcceptedProviderLinks(db, authorityDb, runId)
     : 0;
 
   return {
@@ -1050,7 +990,13 @@ Deno.serve(async (req) => {
       }, 500);
     }
 
-    const matched = await processAppleMatching(serviceClient, runId, value, token);
+    const matched = await processAppleMatching(
+      serviceClient,
+      authClient,
+      runId,
+      value,
+      token,
+    );
     const finishedAt = new Date().toISOString();
 
     await serviceClient
