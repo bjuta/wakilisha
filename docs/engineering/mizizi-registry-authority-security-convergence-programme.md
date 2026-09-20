@@ -485,9 +485,41 @@ Full acceptance evidence is recorded in
 **Status**:
 `SLICE3_MIZIZI_STAGE_B_TYPED_BROKER=PRODUCTION_ACCEPTED`.
 
-The next boundary is Stage C: a separate protected narrow-executor transport
-cutover for the general runner and Artist-origin broker, followed by retirement
-of the ambient MIZIZI `postgres` binding.
+### Stage C narrow-executor transport closure
+
+Stage C of the remaining Slice 3 MIZIZI execution-authority convergence is
+Production accepted.
+
+PR #985 merged at
+`main@c93369cfdf026f8841a2fd0d61fabbf5bda4b218` and Production applied
+`20260920095334_mizizi_stage_c_narrow_executor_transport_v1` exactly once.
+
+The accepted live transport now resolves MIZIZI JIT database execution to the
+dedicated `mizizi_executor` role. The legacy `mizizi -> postgres` binding is
+disabled. `mizizi_executor` retains only the approved Registry/Chart read
+surface and exact private wrapper EXECUTE surface required by the governed
+brokers. It has no ambient `platform_private` or editorial schema access, no
+direct admin identity reads, and no direct canonical Registry or Chart UPDATE
+authority.
+
+Both Production Track and Release control planes established real JIT
+`mizizi_executor` database sessions after cutover, completed read-only
+post-apply preflight successfully, and restored temporary JIT mappings with
+Production temporary access disabled at rest.
+
+The accepted Production state is migration count 153 at head
+`20260920095334`, with active standing MIZIZI grants 0 and active exact MIZIZI
+grants 0.
+
+Full acceptance evidence is recorded in
+`docs/engineering/mizizi-slice3-stage-c-production-closure.md`.
+
+**Status**:
+`SLICE3_MIZIZI_STAGE_C_NARROW_EXECUTOR_TRANSPORT=PRODUCTION_ACCEPTED`.
+
+Stage C closes the ambient MIZIZI transport debt only. Slice 3 remains open for
+the broader obsolete Registry authority retirement and bypass-closure exit gate.
+No Slice 4 autonomy or runtime expansion is authorized by Stage C closure.
 
 ### `scrape-artist-data` retirement contract
 
