@@ -1,6 +1,6 @@
 # MIZIZI Registry Authority, Security, and Primitive Convergence Programme
 
-> **20 September 2026 programme correction:** Slices 1 and 2 remain Production accepted. Slice 3 retirement and MIZIZI executor convergence are accepted, but Slice 3 is reopened because five live `keep_converge` canonical Registry writers still bypass the typed exact-grant / operation-journal / verifier boundary. Slice 4 #991 is blocked.
+> **20 September 2026 programme correction:** Slices 1 and 2 remain Production accepted. Slice 3 retirement and MIZIZI executor convergence are accepted, but Slice 3 is reopened after a complete live-writer audit found three service-role Edge canonical writers plus additional authenticated `SECURITY DEFINER` canonical writers not completely represented in the machine privileged-writer manifest. Slice 4 #991 is blocked.
 
 Date: 14 September 2026
 
@@ -608,7 +608,9 @@ Accepted retirement receipt:
 
 `MIZIZI_SLICE3_OBSOLETE_RUNTIME_RETIREMENT=PRODUCTION_ACCEPTED`
 
-Fresh exact-main + Production audit identified five live `keep_converge` canonical writers that remain pending convergence: `admin-router` Registry, `provider-intake-api`, `run-chart-playback-enrichment`, `admin_create_registry_track_from_intake_enriched(...)`, and `community_admin_decide_artist_claim(...)`.
+Fresh exact-main + Production audit established a broader final writer surface than the prior manifest captured. The authoritative classification is `docs/engineering/mizizi-slice3-final-live-writer-authority-audit.md`.
+
+Confirmed service-role Edge convergence debt includes `admin-router` Registry, `provider-intake-api`, and `run-chart-playback-enrichment`. The database-function audit separately classifies accepted narrow commands, typed relationship authority, live convergence debt, internalization candidates, and one retirement candidate.
 
 #962 is reopened. Slice 4 #991 is blocked until the original Slice 3 exit gate is satisfied.
 
@@ -943,7 +945,7 @@ The programme is complete when WAKILISHA can prove all of the following:
 
 The active implementation boundary remains **Slice 3 final live-writer convergence**.
 
-Converge the five live `keep_converge` canonical Registry writers onto accepted typed/caller-bound authority without retiring legitimate product capability.
+First make the canonical-writer inventory mechanically complete, then converge the existing-primitive callers and high-blast repair/merge roads described in `docs/engineering/mizizi-slice3-final-live-writer-authority-audit.md` without retiring legitimate product capability.
 
 Before any new runtime mutation authority is implemented, freeze the exact
 current state of:
