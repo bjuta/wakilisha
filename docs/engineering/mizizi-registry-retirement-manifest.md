@@ -1,12 +1,14 @@
 # MIZIZI Registry Retirement Manifest
 
+> **20 September 2026 Slice 3 closure:** Production retirement is complete. All six retired Registry Edge runtimes are absent, all nine retained governed Registry/Admin runtimes are ACTIVE, and the final `registry-enrichment-review` route fails closed with HTTP 404. Historical prerequisite sections remain retained as evidence.
+
 > **20 September 2026 Slice 3 status:** `registry-enrichment-review` has zero observed Production invocations across seven bounded 24-hour windows with 45,670 `public-content-read` positive-control invocations. Exact-main dependency proof found no live caller. Repository retirement is authorized; Production deletion remains a separate post-merge gate.
 
 > **17 September 2026 Slice 3 status:** the Artist-enrichment compatibility wrappers `backfill-artist-spotify-images` and `backfill-artist-type` have satisfied replacement and traffic proof and are now authorized for retirement as one coherent family. Production deletion remains a separate post-merge gate. Historical sections below retain the earlier prerequisite state rather than being rewritten.
 
 Date: 14 September 2026
 
-Status: **Slice 1 retirement design authority. This document identifies future retirement targets and prerequisites. It does not authorize deletion.**
+Status: **Living retirement authority. Slice 3 Production retirement is complete; historical prerequisite sections are retained as evidence.**
 
 Programme authority: `docs/engineering/mizizi-registry-authority-security-convergence-programme.md`
 
@@ -619,10 +621,9 @@ deployment, or canonical data mutation is required for the core-music road.
 
 ### Decision
 
-**RETIRE. Repository retirement is authorized; Production deletion remains a
-separate post-merge gate.**
+**RETIRED IN PRODUCTION.**
 
-### Why
+### Why retirement was accepted
 
 Fresh Slice 3 dependency proof found no current product, workflow, Edge,
 database function/procedure, view, or cron caller for the deployed runtime.
@@ -630,16 +631,15 @@ database function/procedure, view, or cron caller for the deployed runtime.
 The historical frontend client documented in older architecture evidence is
 absent from current main.
 
-The runtime is still a high-authority service-role writer after
-`manage_registry` authorization and can directly mutate canonical Registry
-identity, credits, memberships, and relationships. With no legitimate live
-consumer, preserving that dormant authority creates risk without preserving a
-product capability.
+The runtime retained high-authority service-role canonical Registry mutation
+after `manage_registry` authorization. With no legitimate live consumer,
+preserving that dormant authority created risk without preserving a product
+capability.
 
-### Production traffic proof
+### Seven-day Production traffic proof
 
 Critical Control Plane #1357 queried the exact deployed function id
-`5421aa89-2b73-4fe8-9251-fa23f4dc84df` across seven 24-hour
+`5421aa89-2b73-4fe8-9251-fa23f4dc84df` across seven bounded 24-hour
 `function_edge_logs` windows from 13 September 2026 12:39 UTC through
 20 September 2026 12:39 UTC.
 
@@ -649,33 +649,65 @@ Observed:
 - 0 `registry-enrichment-review` invocations;
 - 45,670 `public-content-read` positive-control invocations.
 
-Traffic gate: **PASS**.
+Every individual window recorded zero target invocations and nonzero positive
+control.
 
-### Repository retirement contract
+### Repository retirement
 
-- delete `supabase/functions/registry-enrichment-review/index.ts`;
-- remove `registry-enrichment-review` from the active privileged-writer
-  manifest;
-- add it to the existing Phase 0B retired-source negative contract;
-- update the consolidated MIZIZI test so the retired source must remain absent;
-- preserve historical architecture and replay evidence unchanged;
-- retain the shared `registry-track-identity.ts` helper because MIZIZI and
-  active tests still use it.
+PR #987 merged as:
 
-### Production retirement gate
+`177e4aaee15d5bbb2a77ae8ee43f7e119791aee3`
 
-After protected merge:
+The accepted repository contract:
 
-1. run one immediate bounded traffic recheck;
-2. prove the live v42 rollback source/hash;
-3. delete only `registry-enrichment-review`;
-4. prove the function is absent from Production Edge inventory;
-5. prove the retired URL fails closed;
-6. prove retained Registry/Admin authorities remain healthy;
-7. run the final whole-Slice 3 mechanical exit audit.
+- deletes `supabase/functions/registry-enrichment-review/index.ts`;
+- removes the runtime from the active privileged-writer manifest;
+- adds it to the Phase 0B retired-source negative contract;
+- makes the consolidated MIZIZI test require the source remain absent;
+- preserves historical architecture/replay evidence;
+- retains `registry-track-identity.ts` because active MIZIZI/tests still use
+  it.
+
+### Rollback proof
+
+Before Production deletion, the live v42 entrypoint and shared helper were
+byte-identical to immutable Git at pre-retirement
+`main@b553a50f67cc775c131d58873f5e666b1b68b317`.
+
+### Immediate Production retirement receipt
+
+Critical Control Plane #1368 rechecked traffic from
+20 September 2026 12:39:00 UTC through 13:20:04 UTC:
+
+- 36 total Edge-function log events;
+- 0 target invocations;
+- 36 `public-content-read` positive-control invocations.
+
+The Supabase Management API deletion returned HTTP 200.
+
+Post-delete inventory proved the target absent and
+`public-content-read` ACTIVE v90.
+
+Receipt:
+
+`SLICE3_REGISTRY_ENRICHMENT_REVIEW_PRODUCTION_RETIREMENT=PASS`
+
+### Final external exit proof
+
+Critical Control Plane #1369 proved:
+
+- all six retired Registry Edge runtimes absent;
+- all nine retained governed Registry/Admin runtimes ACTIVE;
+- retired `registry-enrichment-review` route HTTP 404;
+- `public-content-read` network positive control HTTP 401.
+
+Receipt:
+
+`SLICE3_FINAL_EDGE_EXIT_AUDIT=PASS`
 
 No SQL migration, canonical data mutation, frontend deployment, or unrelated
-Edge deployment is required.
+Edge deployment was required for this final retirement.
+
 
 ## 15. What is explicitly not being retired
 
