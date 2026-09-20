@@ -105,7 +105,7 @@ async function hReg(req:Request,c:any,auth:any){
       const{data,error}=await cc.rpc(rpcByType[et],{p_entity_id:ei,p_patch:sp,p_expected_updated_at:eu});
       if(error){
         const msg=[error.message,error.details,error.hint].filter(Boolean).join(" ");
-        if(error.code==="40001"){
+        if(error.code==="40001"||(error.code==="P0001"&&msg.includes("WK_STALE_UPDATE"))){
           const{data:currentEntity}=await ac.from(tb).select("*").eq("id",ei).maybeSingle();
           return jR({ok:false,entityType:et,entityId:ei,savedFields:[],skippedFields:sf,rejectedFields:[],warnings:[],error:{code:"stale_update",message:"Record modified by another user."},currentEntity,meta:{requestId:ri(),servedAt:is(),version:"7.5.0"}},c,409);
         }
