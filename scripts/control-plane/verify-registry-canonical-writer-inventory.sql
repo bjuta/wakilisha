@@ -101,6 +101,7 @@ begin
       ('public.admin_resolve_registry_track_intake_enriched(uuid,uuid,text,boolean)'),
       ('public.admin_safe_merge_registry_artists(uuid,uuid,text,boolean,text)'),
       ('public.chart_admit_artist_origin_v1(uuid,text,uuid,uuid,text)'),
+      ('public.chart_admit_track_provider_link_v1(uuid)'),
       ('public.chart_create_artist_origin_shell_v1(text,text,uuid,uuid)'),
       ('public.chart_materialize_candidate_registry_v1(uuid,uuid)'),
       ('public.community_admin_decide_artist_claim(uuid,text,text,boolean,boolean,boolean,boolean)'),
