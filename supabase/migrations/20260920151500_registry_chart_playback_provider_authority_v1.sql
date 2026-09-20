@@ -295,8 +295,8 @@ begin
   end if;
 
   return v_assertion_id;
-end
-$$;
+end;
+$;
 
 create function platform_private.issue_registry_chart_playback_provider_grant_v1(
   p_evidence_assertion_id uuid,
@@ -485,8 +485,8 @@ begin
   );
 
   return v_grant_id;
-end
-$$;
+end;
+$;
 
 create function platform_private.execute_registry_chart_playback_provider_v1(
   p_execution_grant_id uuid
@@ -852,8 +852,8 @@ begin
   verifier_status:='pending';
   idempotent_replay:=v_begin.idempotent_replay;
   return next;
-end
-$$;
+end;
+$;
 
 create function platform_private.verify_registry_chart_playback_provider_v1(
   p_operation_id uuid
@@ -1077,8 +1077,8 @@ begin
   operation_id:=v_operation.id;
   verifier_status:='failed';
   return next;
-end
-$$;
+end;
+$;
 
 create function public.chart_admit_track_provider_link_v1(
   p_enrichment_item_id uuid
@@ -1137,8 +1137,8 @@ begin
     'evidence_assertion_id',v_evidence_id,
     'execution_grant_id',v_grant_id
   );
-end
-$$;
+end;
+$;
 
 revoke all on function
   platform_private.record_registry_chart_playback_provider_evidence_v1(uuid),
