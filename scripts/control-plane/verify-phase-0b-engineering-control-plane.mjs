@@ -203,7 +203,6 @@ for (const writer of registryWriters) {
       `${writer.id}: public canonical mutation may only exist as explicit legacy debt pending convergence/retirement.`,
     );
   }
-}
 
   if (writer.kind === "database_function") {
     if (
@@ -230,6 +229,7 @@ for (const writer of registryWriters) {
       writer.entrypoint,
     );
   }
+}
 
 const registryWriterVerifierGeneration =
   execFileSync(
