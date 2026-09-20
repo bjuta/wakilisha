@@ -126,20 +126,12 @@ async function hReg(req:Request,c:any,auth:any){
       return jO({entityType:et,entityId:ei,savedFields:svd,skippedFields:sf,rejectedFields:[],warnings:sf.length>0?[sf.length+" unsupported fields not saved"]:[],updatedEntity},c);
     }
     if(req.method==="DELETE"&&seg[0]==="entities"&&seg.length===3){
-      const et=seg[1];const ei=seg[2];
-      if(et!=="artist")return jE("unsupported_delete","Only draft Artist hard-delete remains available through the shared Registry router.",c,400);
-      let body:any={};try{body=await req.json();}catch{}
-      const eu=String(body._expected_updated_at??"").trim();
-      if(!eu)return jE("expected_updated_at_required","Expected updated_at is required for Registry deletion.",c,409);
-      const cc=cU(req);
-      const{data,error}=await cc.rpc("admin_delete_registry_draft_artist_v1",{p_artist_id:ei,p_expected_updated_at:eu});
-      if(error){
-        if(error.code==="40001")return jE("stale_update","Record modified by another user.",c,409);
-        if(error.code==="P0002")return jE("not_found","Entity not found",c,404);
-        if(error.code==="22023")return jE("delete_rejected",error.message,c,400);
-        return jE("delete_failed",error.message,c,500);
-      }
-      return jO((Array.isArray(data)?data[0]:data)??{entity_type:"artist",entity_id:ei,deleted:true},c);
+      return jE(
+        "retired_registry_hard_delete",
+        "Canonical Registry hard-delete is retired. Archive through a bounded profile PATCH so Resource identity and provenance remain durable.",
+        c,
+        410
+      );
     }
     return jE("route_not_found","Registry route not found",c,404);
   }catch(err){return jE("internal_error",err instanceof Error?err.message:"Unknown error",c,500);}
