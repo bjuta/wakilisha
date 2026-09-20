@@ -917,38 +917,17 @@ if (route === "inspect") {
       const res=await fetch("https://api.music.apple.com/v1/catalog/"+((body.storefront as string)||"ke")+"/search?term=test&types=artists&limit=1",{headers:{Authorization:"Bearer "+creds.token}});
       return jRaw({provider:"apple_music",storefront:(body.storefront as string)||"ke",status:res.ok?"connected":"failed",latencyMs:Date.now()-start,testedAt:now},cors);
     }
-    if (route === "create-shell") {
-      const pid=(body.providerEntityId as string)||""; const sf=(body.storefrontOrMarket as string)||(body.storefront as string)||"ke"; const stids=(body.selectedTrackIds as string[])||[];
-      if(!pid) return jRaw({error:"Missing providerEntityId"},cors);
-      const creds=await getAC(db); if("error" in creds) return jRaw({error:creds.error},cors);
-      const{album,error:fe}=await fAlbum(creds.token,pid,sf); if(fe||!album) return jRaw({error:fe||"Album not found"},cors);
-      const attrs=album.attributes || {}; const title=attrs.name||"Untitled"; const artist=attrs.artistName||"Unknown Artist"; const aw=aUrl(attrs.artwork,600); const rd=attrs.releaseDate||null; const gn=attrs.genreNames||[]; const rl=attrs.recordLabel||null; const upc=attrs.playParams?.id||null;
-      const tracks=eTracks(album,artist,aw); const st=stids.length>0?tracks.filter(tr=>stids.includes(tr.id)):[...tracks]; if(st.length===0&&tracks.length>0) st.push(...tracks);
-      const asl=slugify(artist); let ps=asl,pn=artist; const{data:ra}=await db.from("registry_artists").select("slug,display_name").eq("slug",asl).in("status",["active","draft"]).maybeSingle(); if(ra){ps=ra.slug as string;pn=ra.display_name as string;}
-      const cs=ps+"--"+slugify(title);
-      const{data:el}=await db.from("provider_entity_links").select("registry_entity_id").eq("provider","apple_music").eq("provider_entity_id",pid).limit(1); if(el&&el.length>0) return jRaw({error:"A release shell already exists.",existingShellKey:el[0].registry_entity_id},cors);
-      const rid=crypto.randomUUID(); let mer=false; const{data:exRel}=await db.from("registry_releases").select("id,slug").eq("slug",cs).maybeSingle();
-      if(exRel){mer=true;} else {const{error:re}=await db.from("registry_releases").insert({id:rid,slug:cs,title,normalized_title:title.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g,""),status:"draft",metadata:{},release_date:rd,artwork_url:aw,upc,created_at:now,updated_at:now});if(re) return jRaw({error:"Failed to create release: "+re.message},cors);}
-      const sid=crypto.randomUUID(); const{error:se}=await db.from("registry_release_shells").insert({id:sid,release_id:rid,slug:cs,title,primary_artist_name:pn,primary_artist_slug:ps,release_date:rd,track_count:st.length,has_artwork:!!aw,tracks:st,status:"draft",readiness:"draft",generated_by:"provider_intake_api",source_provenance:{provider:"apple_music",provider_entity_id:pid,artist_name:artist,genre_names:gn,record_label:rl,upc,artwork_url:aw,track_count:st.length,ingested_at:now,matched_existing_release:mer},last_generated_at:now,created_at:now,updated_at:now});
-      if(se) return jRaw({error:"Failed to create shell: "+se.message},cors);
-      await db.from("provider_entity_links").insert({id:crypto.randomUUID(),provider:"apple_music",provider_entity_id:pid,registry_entity_type:"release",registry_entity_id:sid,confidence_score:1.0,match_status:"confirmed",created_at:now,updated_at:now});
-      return jRaw({shell:{shellKey:sid,registryEntityId:sid,status:"draft"},mode:"create",matchedExistingRelease:mer,slug:{scoped:cs,artistSlug:ps,artistName:pn},release:{id:rid,slug:cs,createdNew:!mer}},cors);
-    }
-    if (route === "refresh-shell") {
-      const pid=(body.providerEntityId as string)||""; const sf=(body.storefrontOrMarket as string)||(body.storefront as string)||"ke"; const stids=(body.selectedTrackIds as string[])||[];
-      if(!pid) return jRaw({error:"Missing providerEntityId"},cors);
-      const{data:el}=await db.from("provider_entity_links").select("registry_entity_id").eq("provider","apple_music").eq("provider_entity_id",pid).limit(1); if(!el||el.length===0) return jRaw({error:"No existing shell found. Use create instead."},cors);
-      const sid=el[0].registry_entity_id as string; const{data:es}=await db.from("registry_release_shells").select("id,slug,release_id,status,source_provenance").eq("id",sid).maybeSingle(); if(!es) return jRaw({error:"Shell not found."},cors);
-      if(TS.includes(es.status as string)) return jRaw({shell:{shellKey:sid,status:es.status},mode:"refresh-skipped"},cors);
-      const creds=await getAC(db); if("error" in creds) return jRaw({error:creds.error},cors);
-      const{album,error:fe}=await fAlbum(creds.token,pid,sf); if(fe||!album) return jRaw({error:fe||"Album not found"},cors);
-      const attrs=album.attributes || {}; const title=attrs.name||"Untitled"; const artist=attrs.artistName||"Unknown Artist"; const aw=aUrl(attrs.artwork,600); const rd=attrs.releaseDate||null;
-      const tracks=eTracks(album,artist,aw); const st=stids.length>0?tracks.filter(tr=>stids.includes(tr.id)):[...tracks]; if(st.length===0&&tracks.length>0) st.push(...tracks);
-      const asl=slugify(artist); let ps=asl,pn=artist; const{data:ra}=await db.from("registry_artists").select("slug,display_name").eq("slug",asl).in("status",["active","draft"]).maybeSingle(); if(ra){ps=ra.slug as string;pn=ra.display_name as string;}
-      const upd={title,primary_artist_name:pn,primary_artist_slug:ps,release_date:rd,track_count:st.length,has_artwork:!!aw,tracks:st,status:"draft",readiness:"draft",source_provenance:{provider:"apple_music",provider_entity_id:pid,artist_name:artist,track_count:st.length,refreshed_at:now,ingested_at:(es.source_provenance as Record<string,unknown>)?.ingested_at||now},last_generated_at:now,updated_at:now};
-      const{error:ue}=await db.from("registry_release_shells").update(upd).eq("id",sid); if(ue) return jRaw({error:"Failed to refresh: "+ue.message},cors);
-      const rid=es.release_id as string; await db.from("registry_releases").update({title,release_date:rd,artwork_url:aw,updated_at:now}).eq("id",rid).eq("status","draft");
-      return jRaw({shell:{shellKey:sid,status:"draft"},mode:"refresh",slug:{scoped:es.slug,artistSlug:ps,artistName:pn},release:{id:rid,slug:es.slug,createdNew:false},diag:{tracksFetched:tracks.length,tracksSelected:st.length}},cors);
+    if (route === "create-shell" || route === "refresh-shell") {
+      return jRaw(
+        {
+          error: "retired_provider_release_mutation_route",
+          detail:
+            "Legacy provider Release shell mutation is fail-closed. Use the governed Registry Discography workflow for canonical Release creation or provider-profile updates.",
+          route,
+        },
+        cors,
+        409,
+      );
     }
     return jRaw({ error: "Unknown route: " + (route || "none") }, cors);
   } catch (err) {
