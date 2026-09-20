@@ -33,7 +33,7 @@ begin
     select *
     from public_api
     where definition ~
-      '(insert[[:space:]]+into|update|delete[[:space:]]+from)[[:space:]]+public[.](registry_(artists|tracks|releases|track_artists|release_artists|release_tracks|artist_aliases|entity_relationships|relationship_evidence|labels|genres))'
+      '(insert[[:space:]]+into|update|delete[[:space:]]+from)[[:space:]]+public[.](registry_(artists|tracks|releases|track_artists|release_artists|release_tracks|artist_aliases|entity_relationships|relationship_evidence|track_provider_links|labels|genres))'
   ),
   private_executor_bridges as (
     select *
@@ -46,7 +46,7 @@ begin
     from public_api
     where definition ~ '(^|[^a-z0-9_])execute[[:space:]]'
       and definition ~
-        'registry_(artists|tracks|releases|track_artists|release_artists|release_tracks|artist_aliases|entity_relationships|relationship_evidence|labels|genres)'
+        'registry_(artists|tracks|releases|track_artists|release_artists|release_tracks|artist_aliases|entity_relationships|relationship_evidence|track_provider_links|labels|genres)'
   ),
   mutation_graph(signature, proname, definition, anon_execute, authenticated_execute) as (
     select signature, proname, definition, anon_execute, authenticated_execute
@@ -109,6 +109,7 @@ begin
       ('public.create_registry_entity_relationship(text,uuid,text,uuid,text,text,text,date,date,uuid,text,text,jsonb)'),
       ('public.merge_registry_relationship_duplicate(uuid,uuid,text)'),
       ('public.normalize_registry_relationship_vocabulary(uuid,text,text,text)'),
+      ('public.registry_upsert_track_provider_link(uuid,text,text,text,text[],text,text,text,text,integer,text,text,numeric,text,jsonb)'),
       ('public.resolve_registry_relationship_endpoint(uuid,text,text,uuid,text)'),
       ('public.resolve_registry_relationship_endpoint_from_alias(uuid,text,text)'),
       ('public.review_registry_relationship(uuid,text,boolean,text)')
@@ -148,7 +149,7 @@ begin
     select *
     from public_api
     where definition ~
-      '(insert[[:space:]]+into|update|delete[[:space:]]+from)[[:space:]]+public[.](registry_(artists|tracks|releases|track_artists|release_artists|release_tracks|artist_aliases|entity_relationships|relationship_evidence|labels|genres))'
+      '(insert[[:space:]]+into|update|delete[[:space:]]+from)[[:space:]]+public[.](registry_(artists|tracks|releases|track_artists|release_artists|release_tracks|artist_aliases|entity_relationships|relationship_evidence|track_provider_links|labels|genres))'
   ),
   private_executor_bridges as (
     select *
@@ -161,7 +162,7 @@ begin
     from public_api
     where definition ~ '(^|[^a-z0-9_])execute[[:space:]]'
       and definition ~
-        'registry_(artists|tracks|releases|track_artists|release_artists|release_tracks|artist_aliases|entity_relationships|relationship_evidence|labels|genres)'
+        'registry_(artists|tracks|releases|track_artists|release_artists|release_tracks|artist_aliases|entity_relationships|relationship_evidence|track_provider_links|labels|genres)'
   ),
   mutation_graph(signature, proname, definition, anon_execute, authenticated_execute) as (
     select signature, proname, definition, anon_execute, authenticated_execute
