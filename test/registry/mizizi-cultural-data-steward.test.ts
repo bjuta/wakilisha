@@ -1032,6 +1032,41 @@ describe("MIZIZI Slice 2 Gate A-final Registry authority convergence", () => {
     expect(archiveAuthority).not.toMatch(/delete\s+from\s+public\.registry_(tracks|releases)/i);
   });
 
+  it("converges shared Admin Registry mutation onto bounded caller commands", () => {
+    const adminRouter = read("supabase/functions/admin-router/index.ts");
+    const client = read("src/services/registry/admin/client.ts");
+    const artistsPage = read("src/pages/admin/registry/artists/page.tsx");
+    const migration = read(
+      "supabase/migrations/20260920173000_admin_registry_profile_authority_v1.sql",
+    );
+    const verifier = read(
+      "scripts/control-plane/verify-admin-registry-profile-authority.sql",
+    );
+
+    expect(adminRouter).toContain("SUPABASE_ANON_KEY");
+    expect(adminRouter).toContain("admin_patch_registry_artist_profile_v1");
+    expect(adminRouter).toContain("admin_patch_registry_track_profile_v1");
+    expect(adminRouter).toContain("admin_patch_registry_release_profile_v1");
+    expect(adminRouter).toContain("admin_patch_registry_label_profile_v1");
+    expect(adminRouter).toContain("admin_patch_registry_genre_profile_v1");
+    expect(adminRouter).toContain("retired_registry_hard_delete");
+    expect(adminRouter).not.toContain("admin_delete_registry_draft_artist_v1");
+    expect(adminRouter).not.toMatch(
+      /\.from\(\s*["']registry_(artists|tracks|releases|labels|genres)["']\s*\)\s*\.\s*(insert|update|upsert|delete)\s*\(/s,
+    );
+
+    expect(client).toContain("expectedUpdatedAt?: string");
+    expect(client).toContain("payload._expected_updated_at = expectedUpdatedAt");
+    expect(artistsPage).toContain("artist?.updated_at");
+    expect(migration).toContain("auth.uid()");
+    expect(migration).toContain("current_user_has_capability('manage_registry')");
+    expect(migration).toContain("registry_canonical_write_events");
+    expect(artistsPage).toContain('{ status: "archived" }');
+    expect(artistsPage).toContain("Archive");
+    expect(artistsPage).not.toContain("deleteRegistryEntity");
+    expect(verifier).toContain("ADMIN_REGISTRY_PROFILE_AUTHORITY_PASS");
+  });
+
   it("removes direct browser canonical Release mutation while preserving precision, label, and soft archive", () => {
     const release = read("src/pages/admin/registry/releases/detail/page.tsx");
     const client = read("src/services/registry/admin/releaseDetailClient.ts");

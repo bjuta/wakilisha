@@ -4,7 +4,7 @@ import { supabase } from "@/lib/supabase";
 import { type RegistryEntityProfile } from "@/services/registry/admin/types";
 import { getEntitySchema } from "@/services/registry/admin/entitySchemas";
 import { calculateCompleteness, completenessTone } from "@/services/registry/admin/completeness";
-import { getRegistryEntityList, saveRegistryEntityPatch, deleteRegistryEntity } from "@/services/registry/admin/client";
+import { getRegistryEntityList, saveRegistryEntityPatch } from "@/services/registry/admin/client";
 import { previewArtistEnrichment } from "@/services/registry/admin/artistEnrichment";
 import { ArtistEnrichPanel, ArtistTypePanel } from "@/components/admin/registry/ArtistEnrichmentGovernancePanels";
 import RegistryEntityEditorDrawer from "@/components/admin/registry/RegistryEntityEditorDrawer";
@@ -154,9 +154,9 @@ function BulkToolbar({
   publishing,
   draftCount,
   activeCount,
-  onDelete,
-  deleting,
-  deleteCount,
+  onArchive,
+  archiving,
+  archiveCount,
 }: {
   selectedCount: number;
   totalInView: number;
@@ -168,15 +168,15 @@ function BulkToolbar({
   publishing?: boolean;
   draftCount?: number;
   activeCount?: number;
-  onDelete?: () => void;
-  deleting?: boolean;
-  deleteCount?: number;
+  onArchive?: () => void;
+  archiving?: boolean;
+  archiveCount?: number;
 }) {
   if (selectedCount === 0) return null;
 
   const showPublish = onPublish && draftCount && draftCount > 0;
   const showUnpublish = activeCount && activeCount > 0;
-  const showDelete = onDelete && deleteCount && deleteCount > 0;
+  const showArchive = onArchive && archiveCount && archiveCount > 0;
 
   return (
     <div className="sticky top-0 z-30 mb-3 flex items-center justify-between rounded-2xl border border-[#dfe4d8] bg-white px-4 py-2.5 shadow-sm">
@@ -238,21 +238,21 @@ function BulkToolbar({
             )}
           </button>
         )}
-        {showDelete && (
+        {showArchive && (
           <button
-            onClick={onDelete}
-            disabled={deleting}
+            onClick={onArchive}
+            disabled={archiving}
             className="rounded-xl bg-red-600 px-4 py-2 text-[12px] font-black text-white transition hover:bg-red-700 disabled:opacity-50 flex items-center gap-2"
           >
-            {deleting ? (
+            {archiving ? (
               <>
                 <WkIcon name="Loader2" size={14} className="animate-spin" />
-                Deleting…
+                Archiving…
               </>
             ) : (
               <>
-                <i className="ri-delete-bin-6-line text-[14px]" />
-                Delete ({deleteCount})
+                <WkIcon name="Archive" size={14} />
+                Archive ({archiveCount})
               </>
             )}
           </button>
@@ -270,7 +270,7 @@ function ArtistCard({
   onNavigate,
   selected,
   onToggleSelect,
-  onDelete,
+  onArchive,
   onEnrich,
   enriching,
 }: {
@@ -279,7 +279,7 @@ function ArtistCard({
   onNavigate: (slug: string) => void;
   selected: boolean;
   onToggleSelect: (id: string) => void;
-  onDelete?: (artist: EnrichedArtist) => void;
+  onArchive?: (artist: EnrichedArtist) => void;
   onEnrich?: (artist: EnrichedArtist) => void;
   enriching?: boolean;
 }) {
@@ -358,12 +358,12 @@ function ArtistCard({
                 Enrich
               </button>
             )}
-            {String(artist.status) === "draft" && onDelete && (
+            {String(artist.status) === "draft" && onArchive && (
               <button
-                onClick={() => onDelete(artist)}
+                onClick={() => onArchive(artist)}
                 className="rounded-xl bg-red-600/90 px-4 py-2 text-[12px] font-bold text-white hover:bg-red-700"
               >
-                Delete
+                Archive
               </button>
             )}
           </div>
@@ -749,9 +749,9 @@ export default function ArtistsPage() {
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [publishing, setPublishing] = useState(false);
   const [confirmPublishOpen, setConfirmPublishOpen] = useState(false);
-  const [deleting, setDeleting] = useState(false);
-  const [confirmDeleteOpen, setConfirmDeleteOpen] = useState(false);
-  const [singleDeleteTarget, setSingleDeleteTarget] = useState<EnrichedArtist | null>(null);
+  const [archiving, setArchiving] = useState(false);
+  const [confirmArchiveOpen, setConfirmArchiveOpen] = useState(false);
+  const [singleArchiveTarget, setSingleArchiveTarget] = useState<EnrichedArtist | null>(null);
 
   // Single enrich state
   const [enrichingSlug, setEnrichingSlug] = useState<string | null>(null);
@@ -970,7 +970,7 @@ export default function ArtistsPage() {
       + (selectedDraftIds.length > 15 ? ` …and ${selectedDraftIds.length - 15} more` : "");
   }, [selectedDraftIds, enrichedArtists]);
 
-  const confirmDeleteDetail = useMemo(() => {
+  const confirmArchiveDetail = useMemo(() => {
     return selectedDraftIds
       .slice(0, 15)
       .map((id) => {
@@ -1010,9 +1010,15 @@ export default function ArtistsPage() {
     for (let i = 0; i < ids.length; i += batchSize) {
       const batch = ids.slice(i, i + batchSize);
       const results = await Promise.allSettled(
-        batch.map((id) =>
-          saveRegistryEntityPatch("artist", id, { status: "draft" })
-        ),
+        batch.map((id) => {
+          const artist = enrichedArtists.find((row) => String(row.id) === id);
+          return saveRegistryEntityPatch(
+            "artist",
+            id,
+            { status: "draft" },
+            String(artist?.updated_at ?? ""),
+          );
+        }),
       );
       results.forEach((r) => {
         if (r.status === "fulfilled" && r.value.ok) {
@@ -1041,9 +1047,15 @@ export default function ArtistsPage() {
     for (let i = 0; i < ids.length; i += batchSize) {
       const batch = ids.slice(i, i + batchSize);
       const results = await Promise.allSettled(
-        batch.map((id) =>
-          saveRegistryEntityPatch("artist", id, { status: "active" })
-        ),
+        batch.map((id) => {
+          const artist = enrichedArtists.find((row) => String(row.id) === id);
+          return saveRegistryEntityPatch(
+            "artist",
+            id,
+            { status: "active" },
+            String(artist?.updated_at ?? ""),
+          );
+        }),
       );
       results.forEach((r) => {
         if (r.status === "fulfilled" && r.value.ok) {
@@ -1060,32 +1072,38 @@ export default function ArtistsPage() {
     fetchArtists();
   }
 
-  function openConfirmDelete() {
+  function openConfirmArchive() {
     if (selectedDraftIds.length === 0) {
-      showToast("No draft artists selected to delete.");
+      showToast("No draft artists selected to archive.");
       return;
     }
-    setSingleDeleteTarget(null);
-    setConfirmDeleteOpen(true);
+    setSingleArchiveTarget(null);
+    setConfirmArchiveOpen(true);
   }
 
-  function openConfirmSingleDelete(artist: EnrichedArtist) {
-    setSingleDeleteTarget(artist);
-    setConfirmDeleteOpen(true);
+  function openConfirmSingleArchive(artist: EnrichedArtist) {
+    setSingleArchiveTarget(artist);
+    setConfirmArchiveOpen(true);
   }
 
-  async function executeDelete() {
-    setDeleting(true);
-    setConfirmDeleteOpen(false);
+  async function executeArchive() {
+    setArchiving(true);
+    setConfirmArchiveOpen(false);
 
-    const ids = singleDeleteTarget
-      ? [String(singleDeleteTarget.id)]
+    const ids = singleArchiveTarget
+      ? [String(singleArchiveTarget.id)]
       : selectedDraftIds;
     let succeeded = 0;
     let failed = 0;
 
     for (const id of ids) {
-      const result = await deleteRegistryEntity("artist", id);
+      const artist = enrichedArtists.find((row) => String(row.id) === id);
+      const result = await saveRegistryEntityPatch(
+        "artist",
+        id,
+        { status: "archived" },
+        String(artist?.updated_at ?? ""),
+      );
       if (result.ok) {
         succeeded++;
       } else {
@@ -1093,10 +1111,10 @@ export default function ArtistsPage() {
       }
     }
 
-    setDeleting(false);
-    setSingleDeleteTarget(null);
+    setArchiving(false);
+    setSingleArchiveTarget(null);
     setSelectedIds(new Set());
-    showToast(`Deleted ${succeeded} artist${succeeded !== 1 ? "s" : ""}${failed > 0 ? `, ${failed} failed` : ""}`);
+    showToast(`Archived ${succeeded} artist${succeeded !== 1 ? "s" : ""}${failed > 0 ? `, ${failed} failed` : ""}`);
     fetchArtists();
   }
 
@@ -1165,14 +1183,14 @@ export default function ArtistsPage() {
       />
 
       <ConfirmModal
-        open={confirmDeleteOpen}
-        title={`Delete ${singleDeleteTarget ? `"${singleDeleteTarget._displayName}"` : `${selectedDraftIds.length} artist${selectedDraftIds.length !== 1 ? "s" : ""}`}?`}
-        message="This action is permanent and cannot be undone. The artist record will be completely removed from the database."
-        detail={singleDeleteTarget ? singleDeleteTarget._displayName : confirmDeleteDetail}
-        confirmLabel={`Yes, delete ${singleDeleteTarget ? "this artist" : `${selectedDraftIds.length}`}`}
-        onConfirm={executeDelete}
-        onCancel={() => { setConfirmDeleteOpen(false); setSingleDeleteTarget(null); }}
-        loading={deleting}
+        open={confirmArchiveOpen}
+        title={`Archive ${singleArchiveTarget ? `"${singleArchiveTarget._displayName}"` : `${selectedDraftIds.length} artist${selectedDraftIds.length !== 1 ? "s" : ""}`}?`}
+        message="This keeps the Artist and Resource identities intact, removes the draft from active work, and preserves provenance for future audit."
+        detail={singleArchiveTarget ? singleArchiveTarget._displayName : confirmArchiveDetail}
+        confirmLabel={`Yes, archive ${singleArchiveTarget ? "this artist" : `${selectedDraftIds.length}`}`}
+        onConfirm={executeArchive}
+        onCancel={() => { setConfirmArchiveOpen(false); setSingleArchiveTarget(null); }}
+        loading={archiving}
       />
 
       <div className="mx-auto max-w-7xl">
@@ -1353,9 +1371,9 @@ export default function ArtistsPage() {
                   publishing={publishing}
                   draftCount={selectedDraftIds.length}
                   activeCount={selectedActiveIds.length}
-                  onDelete={openConfirmDelete}
-                  deleting={deleting}
-                  deleteCount={selectedDraftIds.length}
+                  onArchive={openConfirmArchive}
+                  archiving={archiving}
+                  archiveCount={selectedDraftIds.length}
                 />
 
                 {/* Card grid */}
@@ -1368,7 +1386,7 @@ export default function ArtistsPage() {
                       onNavigate={(slug) => navigate(`/admin/registry/artists/${slug}`)}
                       selected={selectedIds.has(String(artist.id))}
                       onToggleSelect={toggleSelect}
-                      onDelete={openConfirmSingleDelete}
+                      onArchive={openConfirmSingleArchive}
                       onEnrich={enrichSingle}
                       enriching={enrichingSlug === artist.slug}
                     />

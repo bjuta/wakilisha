@@ -40,7 +40,7 @@ export async function saveRegistryReleaseDetail(
   );
 
   if (error) {
-    const stale = error.code === "40001";
+    const stale = error.code === "40001" || (error.code === "P0001" && error.message.includes("WK_STALE_UPDATE"));
     return {
       ok: false,
       data: null,

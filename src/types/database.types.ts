@@ -19762,6 +19762,30 @@ export type Database = {
         }
         Returns: Json
       }
+      admin_patch_registry_artist_profile_v1: {
+        Args: {
+          p_entity_id: string
+          p_expected_updated_at: string
+          p_patch: Json
+        }
+        Returns: Json
+      }
+      admin_patch_registry_genre_profile_v1: {
+        Args: {
+          p_entity_id: string
+          p_expected_updated_at: string
+          p_patch: Json
+        }
+        Returns: Json
+      }
+      admin_patch_registry_label_profile_v1: {
+        Args: {
+          p_entity_id: string
+          p_expected_updated_at: string
+          p_patch: Json
+        }
+        Returns: Json
+      }
       admin_patch_registry_release_detail_v1: {
         Args: {
           p_artwork_url: string
@@ -19775,6 +19799,22 @@ export type Database = {
           p_status: string
           p_title: string
           p_upc: string
+        }
+        Returns: Json
+      }
+      admin_patch_registry_release_profile_v1: {
+        Args: {
+          p_entity_id: string
+          p_expected_updated_at: string
+          p_patch: Json
+        }
+        Returns: Json
+      }
+      admin_patch_registry_track_profile_v1: {
+        Args: {
+          p_entity_id: string
+          p_expected_updated_at: string
+          p_patch: Json
         }
         Returns: Json
       }
