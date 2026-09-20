@@ -20347,6 +20347,10 @@ export type Database = {
         }
         Returns: Json
       }
+      chart_admit_track_provider_link_v1: {
+        Args: { p_enrichment_item_id: string }
+        Returns: Json
+      }
       chart_assert_committable_run: {
         Args: { p_run_id: string }
         Returns: Json

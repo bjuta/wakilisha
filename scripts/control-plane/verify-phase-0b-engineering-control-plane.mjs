@@ -28,6 +28,7 @@ const requiredFiles = [
   "scripts/control-plane/verify-registry-identity-creation-primitives.sql",
   "scripts/control-plane/verify-registry-relation-admission-primitives.sql",
   "scripts/control-plane/verify-registry-chart-materialization-runtime.sql",
+  "scripts/control-plane/verify-registry-chart-playback-provider-authority.sql",
 ];
 
 for (const file of requiredFiles) {
@@ -387,6 +388,32 @@ for (const functionName of canonicalDatabaseMutatorNames) {
   if (rpcCall.test(publicContentReadSource)) {
     throw new Error(
       `public-content-read may not invoke canonical Registry mutator RPC: ${functionName}`,
+    );
+  }
+}
+
+const chartPlaybackEnrichmentSource = fs.readFileSync(
+  "supabase/functions/run-chart-playback-enrichment/index.ts",
+  "utf8",
+);
+
+if (
+  !chartPlaybackEnrichmentSource.includes(
+    '"chart_admit_track_provider_link_v1"',
+  )
+) {
+  throw new Error(
+    "Chart playback enrichment must route accepted provider persistence through the typed provider-link admission RPC.",
+  );
+}
+
+for (const forbiddenPattern of [
+  /\.from\(\s*["']registry_track_provider_links["']\s*\)\s*\.\s*(insert|update|upsert|delete)\s*\(/s,
+  /\.from\(\s*["']registry_tracks["']\s*\)\s*\.\s*(insert|update|upsert|delete)\s*\(/s,
+]) {
+  if (forbiddenPattern.test(chartPlaybackEnrichmentSource)) {
+    throw new Error(
+      "Chart playback enrichment reintroduced direct canonical Registry provider/Track DML.",
     );
   }
 }
