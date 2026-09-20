@@ -134,6 +134,43 @@ begin
   end if;
 
   select lower(pg_get_functiondef(
+    'platform_private.issue_registry_chart_playback_provider_grant_v1(uuid,uuid)'::regprocedure
+  ))
+  into v_definition;
+
+  if position(
+       'and execution_grant.idempotency_key=v_idempotency_key'
+       in v_definition
+     )=0
+     or position(
+          'v_state_fingerprint :='
+          in v_definition
+        )=0
+     or position(
+          'and execution_grant.idempotency_key=v_idempotency_key'
+          in v_definition
+        )>=position(
+          'v_state_fingerprint :='
+          in v_definition
+        )
+     or position(
+          'v_existing.plan_payload->>''evidence_assertion_id'''
+          in v_definition
+        )=0
+     or position(
+          'v_existing.plan_payload->''claim_payload'''
+          in v_definition
+        )=0
+     or position(
+          'registry_execution_target_set_fingerprint('
+          in v_definition
+        )=0
+  then
+    raise exception
+      'Chart Playback Provider V1 replay-integrity boundary drifted';
+  end if;
+
+  select lower(pg_get_functiondef(
     'platform_private.execute_registry_chart_playback_provider_v1(uuid)'::regprocedure
   ))
   into v_definition;
