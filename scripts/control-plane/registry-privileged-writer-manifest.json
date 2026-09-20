@@ -199,8 +199,7 @@
         "admin_patch_registry_track_profile_v1",
         "admin_patch_registry_release_profile_v1",
         "admin_patch_registry_label_profile_v1",
-        "admin_patch_registry_genre_profile_v1",
-        "admin_delete_registry_draft_artist_v1"
+        "admin_patch_registry_genre_profile_v1"
       ],
       "riskClass": "medium",
       "disposition": "keep",
@@ -1092,27 +1091,6 @@
       "riskClass": "medium",
       "disposition": "keep",
       "futureBoundary": "bounded_human_genre_profile_command",
-      "miziziCallable": false,
-      "humanCallable": true,
-      "publicCallable": false,
-      "canonicalMutation": true,
-      "legacyDebt": false
-    },
-    {
-      "id": "admin-delete-registry-draft-artist-v1",
-      "kind": "database_function",
-      "entrypoint": "public.admin_delete_registry_draft_artist_v1(uuid,timestamp with time zone)",
-      "authentication": "auth_uid",
-      "authorization": "manage_registry_plus_expected_updated_at_plus_draft_status",
-      "executionAuthority": "security_definer_bounded_human_command",
-      "targets": [
-        "registry_artists",
-        "registry_canonical_write_events",
-        "registry_audit_log"
-      ],
-      "riskClass": "high",
-      "disposition": "keep",
-      "futureBoundary": "bounded_human_draft_artist_delete_command",
       "miziziCallable": false,
       "humanCallable": true,
       "publicCallable": false,
