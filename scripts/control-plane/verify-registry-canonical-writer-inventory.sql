@@ -87,7 +87,6 @@ begin
       ('public.admin_apply_chart_artist_resolution_decision(uuid)'),
       ('public.admin_apply_registry_track_duplicate_repair(uuid,uuid[],text,boolean)'),
       ('public.admin_archive_registry_music_entity_v1(text,uuid,timestamp with time zone)'),
-      ('public.admin_delete_registry_draft_artist_v1(uuid,timestamp with time zone)'),
       ('public.admin_patch_registry_artist_profile_v1(uuid,jsonb,timestamp with time zone)'),
       ('public.admin_patch_registry_genre_profile_v1(uuid,jsonb,timestamp with time zone)'),
       ('public.admin_patch_registry_label_profile_v1(uuid,jsonb,timestamp with time zone)'),
