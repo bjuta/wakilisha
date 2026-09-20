@@ -1,10 +1,10 @@
 # MIZIZI Registry Authority, Security, and Primitive Convergence Programme
 
-> **20 September 2026 programme status:** Slices 1 through 3 are Production accepted and closed. Slice 4 may open only as the separate MIZIZI Stewardship Runtime Foundation boundary. Slice 3 closure does not authorize autonomous Production mutation.
+> **20 September 2026 programme correction:** Slices 1 and 2 remain Production accepted. Slice 3 retirement and MIZIZI executor convergence are accepted, but Slice 3 is reopened because five live `keep_converge` canonical Registry writers still bypass the typed exact-grant / operation-journal / verifier boundary. Slice 4 #991 is blocked.
 
 Date: 14 September 2026
 
-Status: **Architectural authority. Slices 1 through 3 are Production accepted; Slice 4 opening audit/design is authorized, but autonomous Production mutation is not.**
+Status: **Architectural authority. Slices 1 and 2 are Production accepted. Slice 3 is reopened for final live-writer convergence. Slice 4 is blocked.**
 
 Base repository authority: `main@dee74bf733f6888deb8eaf998d27de455bf70071`
 
@@ -573,9 +573,9 @@ A legitimate workflow cannot be removed until its replacement is accepted.
 - every retained Registry writer is explicitly classified and governed;
 - no unjustified unauthenticated or JWT-only-to-service-role canonical writer remains.
 
-### Slice 3 Production closure
+### Slice 3 retirement acceptance and reopening
 
-Slice 3 is Production accepted and closed.
+The retirement work and MIZIZI Stage A/B/C executor convergence are Production accepted, but the whole Slice is reopened.
 
 Closing repository retirement PR #987 merged as:
 
@@ -604,12 +604,13 @@ Whole-Slice closure authority:
 
 `docs/engineering/mizizi-slice3-production-closure.md`
 
-Status receipt:
+Accepted retirement receipt:
 
-`MIZIZI_SLICE3_OBSOLETE_AUTHORITY_RETIREMENT=PRODUCTION_ACCEPTED`
+`MIZIZI_SLICE3_OBSOLETE_RUNTIME_RETIREMENT=PRODUCTION_ACCEPTED`
 
-Slice 4 is not implicitly activated by this closure. It requires its own issue,
-read-only opening audit, exact design, and protected implementation sequence.
+Fresh exact-main + Production audit identified five live `keep_converge` canonical writers that remain pending convergence: `admin-router` Registry, `provider-intake-api`, `run-chart-playback-enrichment`, `admin_create_registry_track_from_intake_enriched(...)`, and `community_admin_decide_artist_claim(...)`.
+
+#962 is reopened. Slice 4 #991 is blocked until the original Slice 3 exit gate is satisfied.
 
 ## 10. Slice 4 — MIZIZI Stewardship Runtime Foundation
 
@@ -940,10 +941,9 @@ The programme is complete when WAKILISHA can prove all of the following:
 
 ## 17. Immediate next action
 
-The next implementation boundary is **Slice 4 — MIZIZI Stewardship Runtime
-Foundation**.
+The active implementation boundary remains **Slice 3 final live-writer convergence**.
 
-Its first move is read-only authority/runtime mapping only.
+Converge the five live `keep_converge` canonical Registry writers onto accepted typed/caller-bound authority without retiring legitimate product capability.
 
 Before any new runtime mutation authority is implemented, freeze the exact
 current state of:
