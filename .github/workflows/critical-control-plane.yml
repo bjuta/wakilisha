@@ -40,6 +40,9 @@ jobs:
       - name: Install dependencies
         run: npm ci --prefer-offline --no-audit --no-fund
 
+      - name: Audit Registry enrichment review Production traffic
+        run: node scripts/control-plane/audit-registry-enrichment-review-traffic.mjs
+
       - name: Validate canonical Production frontend runner
         run: scripts/deploy/production-frontend.sh --self-test
 
