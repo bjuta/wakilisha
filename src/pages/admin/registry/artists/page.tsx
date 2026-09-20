@@ -251,7 +251,7 @@ function BulkToolbar({
               </>
             ) : (
               <>
-                <i className="ri-archive-line text-[14px]" />
+                <WkIcon name="Archive" size={14} />
                 Archive ({archiveCount})
               </>
             )}
