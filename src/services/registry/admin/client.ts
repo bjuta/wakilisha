@@ -272,36 +272,6 @@ export async function saveRegistryEntityPatch(
   }
 }
 
-export async function deleteRegistryEntity(
-  entityType: RegistryEntityType,
-  entityId: string,
-  expectedUpdatedAt: string,
-): Promise<{ ok: boolean; error: string | null }> {
-  const headers = await getAuthHeaders();
-  if (!headers) return { ok: false, error: "Not authenticated" };
-
-  try {
-    if (!expectedUpdatedAt) {
-      return { ok: false, error: "Expected updated_at is required." };
-    }
-
-    const res = await fetch(`${API_BASE}/entities/${entityType}/${entityId}`, {
-      method: "DELETE",
-      headers,
-      body: JSON.stringify({ _expected_updated_at: expectedUpdatedAt }),
-    });
-    const json = await res.json();
-
-    if (!json.ok) {
-      const errMsg = json.error?.message ?? json.error ?? "Delete failed";
-      return { ok: false, error: errMsg };
-    }
-    return { ok: true, error: null };
-  } catch (err) {
-    return { ok: false, error: err instanceof Error ? err.message : "Network error" };
-  }
-}
-
 function deepEqual(a: unknown, b: unknown): boolean {
   if (a === b) return true;
   if (a === null || b === null) return a === b;
