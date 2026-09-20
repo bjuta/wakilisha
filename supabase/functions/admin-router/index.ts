@@ -1,6 +1,6 @@
-// admin-router v7.4.0: Slice 3 partial retirement removes the embedded Charts route
+// admin-router v7.5.0: Registry mutation converges on caller-bound bounded commands
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-const SU=Deno.env.get("SUPABASE_URL")!;const SK=Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+const SU=Deno.env.get("SUPABASE_URL")!;const SK=Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;const AK=Deno.env.get("SUPABASE_ANON_KEY")!;
 const AO=[
   "https://wakilisha.africa",
   "https://www.wakilisha.africa",
@@ -13,9 +13,10 @@ function cR(r:Request,m="GET, PATCH, POST, DELETE, OPTIONS"):any{const o=r.heade
 async function vJ(req:Request):Promise<any>{const ah=req.headers.get("Authorization");if(!ah||!ah.startsWith("Bearer "))return null;const t=ah.replace("Bearer ","");const uc=createClient(SU,SK,{global:{headers:{Authorization:"Bearer "+t}}});
 const{data:{user},error}=await uc.auth.getUser(t);if(error||!user)return null;return{id:user.id,email:user.email};}
 async function rC(uid:string,cap:string,db?:any):Promise<boolean>{const c=db??createClient(SU,SK);const{data:roles}=await c.from("user_role_assignments").select("role_key,role_definitions!inner(role_capabilities(capability_key))").eq("user_id",uid).eq("status","active").or("expires_at.is.null,expires_at.gt.now()");if(!roles||roles.length===0)return false;if(roles.some((r:any)=>r.role_key==="administrator"))return true;const all=new Set<string>();for(const r of roles){const caps=(r.role_definitions as any)?.role_capabilities??[];for(const c of caps)all.add(c.capability_key);}return all.has(cap);}
+function cU(req:Request):any{const ah=req.headers.get("Authorization")??"";return createClient(SU,AK,{global:{headers:{Authorization:ah}},auth:{persistSession:false}});}
 const ri=()=>crypto.randomUUID().slice(0,12);const is=()=>new Date().toISOString();
-function jO(d:any,c:any,s=200){return new Response(JSON.stringify({ok:true,data:d,meta:{requestId:ri(),servedAt:is(),version:"7.4.0"}}),{status:s,headers:{...c,"Content-Type":"application/json"}});}
-function jE(code:string,msg:string,c:any,s=400,det?:string){return new Response(JSON.stringify({ok:false,error:{code,message:msg,...(det?{detail:det}:{})},meta:{requestId:ri(),servedAt:is(),version:"7.4.0"}}),{status:s,headers:{...c,"Content-Type":"application/json"}});}
+function jO(d:any,c:any,s=200){return new Response(JSON.stringify({ok:true,data:d,meta:{requestId:ri(),servedAt:is(),version:"7.5.0"}}),{status:s,headers:{...c,"Content-Type":"application/json"}});}
+function jE(code:string,msg:string,c:any,s=400,det?:string){return new Response(JSON.stringify({ok:false,error:{code,message:msg,...(det?{detail:det}:{})},meta:{requestId:ri(),servedAt:is(),version:"7.5.0"}}),{status:s,headers:{...c,"Content-Type":"application/json"}});}
 function jR(d:any,c:any,s=200){return new Response(JSON.stringify(d),{status:s,headers:{...c,"Content-Type":"application/json"}});}
 function jC(d:any,c:any,s=200){return jR(d,c,s);}
 function jCE(msg:string,c:any,det?:string,s=400){const b:any={error:msg};if(det)b.detail=det;b.requestId=ri();return jR(b,c,s);}
@@ -80,8 +81,66 @@ async function hReg(req:Request,c:any,auth:any){
   try{
     if(req.method==="GET"&&seg[0]==="entities"&&seg.length===1){const et=url.searchParams.get("entityType")??"";if(!et||!VET.includes(et))return jE("invalid_entity_type","Invalid entityType.",c,400);const tb=TM[et];const lm=Math.min(Math.max(Number(url.searchParams.get("limit"))||250,1),5000);const ob=url.searchParams.get("orderBy")||"updated_at";const asc=url.searchParams.get("ascending")==="true";const bs=1000;const rows:any[]=[];for(let from=0;from<lm;from+=bs){const to=Math.min(from+bs-1,lm-1);let q=ac.from(tb).select("*").order(ob,{ascending:asc,nullsFirst:false});if(ob!=="id")q=q.order("id",{ascending:asc});const{data,error}=await q.range(from,to);if(error)return jE("query_failed",error.message,c,500);const page=data??[];rows.push(...page);if(page.length<(to-from+1))break;}return jO(rows,c);}
     if(req.method==="GET"&&seg[0]==="entities"&&seg.length===3){const et=seg[1];const ei=seg[2];if(!VET.includes(et))return jE("invalid_entity_type","Invalid entityType.",c,400);const tb=TM[et];const{data,error}=await ac.from(tb).select("*").eq("id",ei).maybeSingle();if(error)return jE("query_failed",error.message,c,500);if(!data)return jE("not_found","Entity not found",c,404);return jO(data,c);}
-    if(req.method==="PATCH"&&seg[0]==="entities"&&seg.length===3){const et=seg[1];const ei=seg[2];if(!VET.includes(et))return jE("invalid_entity_type","Invalid entityType.",c,400);let body:any;try{body=await req.json();}catch{return jE("malformed_body","Invalid JSON body",c,400);}const eu=body._expected_updated_at;delete body._expected_updated_at;const af=EF2[et];const sp:any={};const sf:any[]=[];for(const[k,v]of Object.entries(body)){if(!af.includes(k)){sf.push({key:k,reason:"Field is not editable"});continue;}sp[k]=v;}if(Object.keys(sp).length===0){return jR({ok:true,entityType:et,entityId:ei,savedFields:[],skippedFields:sf,rejectedFields:[],warnings:sf.length>0?[sf.length+" unsupported fields not saved"]:[],meta:{requestId:ri(),servedAt:is(),version:"7.4.0"}},c);}const tb=TM[et];const{data:ce}=await ac.from(tb).select("*").eq("id",ei).maybeSingle();if(!ce)return jE("not_found","Entity not found",c,404);if(eu){const cu=String(ce.updated_at??"");if(cu&&cu!==eu)return jR({ok:false,entityType:et,entityId:ei,savedFields:[],skippedFields:sf,rejectedFields:[],warnings:[],error:{code:"stale_update",message:"Record modified by another user."},currentEntity:ce,meta:{requestId:ri(),servedAt:is(),version:"7.4.0"}},c,409);}const lmf=["living_memory_editorial_opener","living_memory_public_prompt","living_memory_editorial_label","living_memory_status"];const lmt=lmf.some((k:string)=>Object.prototype.hasOwnProperty.call(sp,k));if(lmt){const mv={...ce,...sp};if(mv.living_memory_status==="published"){const mr=["living_memory_editorial_opener","living_memory_public_prompt","living_memory_editorial_label"].filter((k:string)=>!String(mv[k]??"").trim());if(mr.length>0)return jE("invalid_living_memory","Published Living Memory requires an editorial opener, public prompt, and editorial disclosure.",c,400,mr.join(","));}sp.living_memory_updated_at=is();}const bs:any={};for(const k of Object.keys(sp))bs[k]=ce[k]??null;sp.updated_at=is();const{data,error}=await ac.from(tb).update(sp).eq("id",ei).select("*").single();if(error){const msg=error.message??"Unknown error";let ec2="save_failed";let cfe:any=null;let df:string|null=null;let dv:string|null=null;const ml=msg.toLowerCase();if(ml.includes("duplicate key")){ec2="duplicate_key";const vm=msg.match(/Key \(([^)]+)\)=\(([^)]+)\)/);if(vm){df=vm[1];dv=vm[2];}if(df&&dv&&df!=="id"){const{data:cf}=await ac.from(tb).select("id,title,slug,name,display_name,status").eq(df,dv).neq("id",ei).limit(1).maybeSingle();if(cf){const dn=cf.title||cf.name||cf.display_name||cf.slug||cf.id;cfe={id:cf.id,title:dn,slug:cf.slug,status:cf.status};}}}else if(ml.includes("foreign key")){ec2="foreign_key_violation";}else if(ml.includes("not null")){ec2="required_field_missing";}return jR({ok:false,entityType:et,entityId:ei,savedFields:[],skippedFields:sf,rejectedFields:[],warnings:[],error:{code:ec2,message:msg,conflictingEntity:cfe,duplicateField:df,duplicateValue:dv},meta:{requestId:ri(),servedAt:is(),version:"7.4.0"}},c,409);}wRA({actorId:auth.id,actorLabel:al,action:"update",entityType:et,entityId:ei,beforeValue:bs,afterValue:sp,metadata:{changed_fields:Object.keys(sp).filter(k=>k!=="updated_at")}});const svd=Object.entries(sp).filter(([k])=>k!=="updated_at").map(([k])=>({key:k,label:k,previousValue:bs[k]??null,nextValue:sp[k]}));return jO({entityType:et,entityId:ei,savedFields:svd,skippedFields:sf,rejectedFields:[],warnings:sf.length>0?[sf.length+" unsupported fields not saved"]:[],updatedEntity:data},c);}
-    if(req.method==="DELETE"&&seg[0]==="entities"&&seg.length===3){const et=seg[1];const ei=seg[2];if(!VET.includes(et))return jE("invalid_entity_type","Invalid entityType.",c,400);const tb=TM[et];const{data:ce}=await ac.from(tb).select("id,status,display_name,slug,name,title").eq("id",ei).maybeSingle();if(!ce)return jE("not_found","Entity not found",c,404);if(String(ce.status)!=="draft")return jE("not_draft","Only draft entities can be deleted.",c,400);const{error:delErr}=await ac.from(tb).delete().eq("id",ei);if(delErr)return jE("delete_failed",delErr.message,c,500);await wRA({actorId:auth.id,actorLabel:al,action:"delete",entityType:et,entityId:ei,beforeValue:ce,afterValue:{deleted:true},metadata:{}});return jO({entityType:et,entityId:ei,deleted:true},c);}
+    if(req.method==="PATCH"&&seg[0]==="entities"&&seg.length===3){
+      const et=seg[1];const ei=seg[2];
+      if(!VET.includes(et))return jE("invalid_entity_type","Invalid entityType.",c,400);
+      let body:any;try{body=await req.json();}catch{return jE("malformed_body","Invalid JSON body",c,400);}
+      const eu=String(body._expected_updated_at??"").trim();delete body._expected_updated_at;
+      const af=EF2[et];const sp:any={};const sf:any[]=[];
+      for(const[k,v]of Object.entries(body)){if(!af.includes(k)){sf.push({key:k,reason:"Field is not editable"});continue;}sp[k]=v;}
+      if(Object.keys(sp).length===0){return jR({ok:true,entityType:et,entityId:ei,savedFields:[],skippedFields:sf,rejectedFields:[],warnings:sf.length>0?[sf.length+" unsupported fields not saved"]:[],meta:{requestId:ri(),servedAt:is(),version:"7.5.0"}},c);}
+      if(!eu)return jE("expected_updated_at_required","Expected updated_at is required for Registry mutation.",c,409);
+      const tb=TM[et];
+      const{data:ce,error:ceErr}=await ac.from(tb).select("*").eq("id",ei).maybeSingle();
+      if(ceErr)return jE("query_failed",ceErr.message,c,500);
+      if(!ce)return jE("not_found","Entity not found",c,404);
+      const rpcByType:any={
+        artist:"admin_patch_registry_artist_profile_v1",
+        track:"admin_patch_registry_track_profile_v1",
+        release:"admin_patch_registry_release_profile_v1",
+        label:"admin_patch_registry_label_profile_v1",
+        genre:"admin_patch_registry_genre_profile_v1"
+      };
+      const cc=cU(req);
+      const{data,error}=await cc.rpc(rpcByType[et],{p_entity_id:ei,p_patch:sp,p_expected_updated_at:eu});
+      if(error){
+        const msg=[error.message,error.details,error.hint].filter(Boolean).join(" ");
+        if(error.code==="40001"){
+          const{data:currentEntity}=await ac.from(tb).select("*").eq("id",ei).maybeSingle();
+          return jR({ok:false,entityType:et,entityId:ei,savedFields:[],skippedFields:sf,rejectedFields:[],warnings:[],error:{code:"stale_update",message:"Record modified by another user."},currentEntity,meta:{requestId:ri(),servedAt:is(),version:"7.5.0"}},c,409);
+        }
+        let ec2="save_failed";let cfe:any=null;let df:string|null=null;let dv:string|null=null;
+        const ml=msg.toLowerCase();
+        if(error.code==="23505"||ml.includes("duplicate key")){
+          ec2="duplicate_key";
+          const vm=msg.match(/Key \(([^)]+)\)=\(([^)]+)\)/);
+          if(vm){df=vm[1];dv=vm[2];}
+          if(df&&dv&&df!=="id"){const{data:cf}=await ac.from(tb).select("id,title,slug,name,display_name,status").eq(df,dv).neq("id",ei).limit(1).maybeSingle();if(cf){const dn=cf.title||cf.name||cf.display_name||cf.slug||cf.id;cfe={id:cf.id,title:dn,slug:cf.slug,status:cf.status};}}
+        }else if(error.code==="23503"||ml.includes("foreign key"))ec2="foreign_key_violation";
+        else if(error.code==="23502"||ml.includes("not null"))ec2="required_field_missing";
+        else if(error.code==="22023")ec2="invalid_patch";
+        return jR({ok:false,entityType:et,entityId:ei,savedFields:[],skippedFields:sf,rejectedFields:[],warnings:[],error:{code:ec2,message:error.message,conflictingEntity:cfe,duplicateField:df,duplicateValue:dv},meta:{requestId:ri(),servedAt:is(),version:"7.5.0"}},c,409);
+      }
+      const updatedEntity=(Array.isArray(data)?data[0]:data)??{};
+      const svd=Object.entries(sp).map(([k,v])=>({key:k,label:k,previousValue:ce[k]??null,nextValue:(updatedEntity as any)[k]??v}));
+      return jO({entityType:et,entityId:ei,savedFields:svd,skippedFields:sf,rejectedFields:[],warnings:sf.length>0?[sf.length+" unsupported fields not saved"]:[],updatedEntity},c);
+    }
+    if(req.method==="DELETE"&&seg[0]==="entities"&&seg.length===3){
+      const et=seg[1];const ei=seg[2];
+      if(et!=="artist")return jE("unsupported_delete","Only draft Artist hard-delete remains available through the shared Registry router.",c,400);
+      let body:any={};try{body=await req.json();}catch{}
+      const eu=String(body._expected_updated_at??"").trim();
+      if(!eu)return jE("expected_updated_at_required","Expected updated_at is required for Registry deletion.",c,409);
+      const cc=cU(req);
+      const{data,error}=await cc.rpc("admin_delete_registry_draft_artist_v1",{p_artist_id:ei,p_expected_updated_at:eu});
+      if(error){
+        if(error.code==="40001")return jE("stale_update","Record modified by another user.",c,409);
+        if(error.code==="P0002")return jE("not_found","Entity not found",c,404);
+        if(error.code==="22023")return jE("delete_rejected",error.message,c,400);
+        return jE("delete_failed",error.message,c,500);
+      }
+      return jO((Array.isArray(data)?data[0]:data)??{entity_type:"artist",entity_id:ei,deleted:true},c);
+    }
     return jE("route_not_found","Registry route not found",c,404);
   }catch(err){return jE("internal_error",err instanceof Error?err.message:"Unknown error",c,500);}
 }
@@ -130,7 +189,7 @@ Deno.serve(async(req)=>{
   const section=path[0];
 
   if(section==="health"){
-    return jO({ok:true,service:"admin-router",version:"7.4.0",timestamp:is(),sections:["registry","credentials","users","content"],uptime:is()},c);
+    return jO({ok:true,service:"admin-router",version:"7.5.0",timestamp:is(),sections:["registry","credentials","users","content"],uptime:is()},c);
   }
 
   const auth=await vJ(req);
@@ -140,7 +199,7 @@ Deno.serve(async(req)=>{
   const rlKey="admin:"+auth.id;
   const rl=await ckRL(db,rlKey);
   if(!rl.allowed){
-    return new Response(JSON.stringify({ok:false,error:{code:"rate_limited",message:"Too many requests. Try again shortly."},meta:{requestId:ri(),servedAt:is(),version:"7.4.0"}}),{status:429,headers:{...c,"Content-Type":"application/json","Retry-After":"60","X-RateLimit-Remaining":String(rl.remaining),"X-RateLimit-Reset":rl.resetAt}});
+    return new Response(JSON.stringify({ok:false,error:{code:"rate_limited",message:"Too many requests. Try again shortly."},meta:{requestId:ri(),servedAt:is(),version:"7.5.0"}}),{status:429,headers:{...c,"Content-Type":"application/json","Retry-After":"60","X-RateLimit-Remaining":String(rl.remaining),"X-RateLimit-Reset":rl.resetAt}});
   }
 
   if(section==="registry")return hReg(req,c,auth);
