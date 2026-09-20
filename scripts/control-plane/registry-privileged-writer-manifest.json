@@ -276,6 +276,7 @@
       "authorization": "admin_or_manage_charts",
       "executionAuthority": "service_role_after_authorization",
       "targets": [
+        "registry_track_provider_links",
         "registry_tracks",
         "wk_chart_entries_v2"
       ],
@@ -422,7 +423,8 @@
       "targets": [
         "registry_tracks",
         "registry_track_artists",
-        "registry_release_tracks"
+        "registry_release_tracks",
+        "registry_track_provider_links"
       ],
       "riskClass": "critical",
       "disposition": "keep_converge",
@@ -940,6 +942,25 @@
       "riskClass": "medium",
       "disposition": "keep",
       "futureBoundary": "typed_registry_relationship_authority",
+      "miziziCallable": false,
+      "humanCallable": true,
+      "publicCallable": false,
+      "canonicalMutation": true,
+      "legacyDebt": false
+    },
+    {
+      "id": "registry-upsert-track-provider-link",
+      "kind": "database_function",
+      "entrypoint": "public.registry_upsert_track_provider_link(uuid,text,text,text,text[],text,text,text,text,integer,text,text,numeric,text,jsonb)",
+      "authentication": "auth_uid_or_service_role",
+      "authorization": "manage_registry_or_service_role",
+      "executionAuthority": "security_definer_direct_provider_link_upsert",
+      "targets": [
+        "registry_track_provider_links"
+      ],
+      "riskClass": "high",
+      "disposition": "keep_converge",
+      "futureBoundary": "typed_registry_provider_metadata_operation",
       "miziziCallable": false,
       "humanCallable": true,
       "publicCallable": false,
