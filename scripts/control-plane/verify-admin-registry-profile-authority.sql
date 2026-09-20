@@ -8,8 +8,7 @@ begin
     'public.admin_patch_registry_track_profile_v1(uuid,jsonb,timestamp with time zone)',
     'public.admin_patch_registry_release_profile_v1(uuid,jsonb,timestamp with time zone)',
     'public.admin_patch_registry_label_profile_v1(uuid,jsonb,timestamp with time zone)',
-    'public.admin_patch_registry_genre_profile_v1(uuid,jsonb,timestamp with time zone)',
-    'public.admin_delete_registry_draft_artist_v1(uuid,timestamp with time zone)'
+    'public.admin_patch_registry_genre_profile_v1(uuid,jsonb,timestamp with time zone)'
   ]
   loop
     if to_regprocedure(v_signature) is null then
@@ -45,7 +44,6 @@ begin
     'public.admin_patch_registry_release_profile_v1(uuid,jsonb,timestamp with time zone)',
     'public.admin_patch_registry_label_profile_v1(uuid,jsonb,timestamp with time zone)',
     'public.admin_patch_registry_genre_profile_v1(uuid,jsonb,timestamp with time zone)',
-    'public.admin_delete_registry_draft_artist_v1(uuid,timestamp with time zone)',
     'public.admin_patch_registry_release_detail_v1(uuid,text,text,text,date,text,uuid,text,text,text,timestamp with time zone)',
     'public.admin_archive_registry_music_entity_v1(text,uuid,timestamp with time zone)'
   ]
@@ -108,13 +106,20 @@ begin
     raise exception 'FAIL: Genre profile authority lost its exact target or field family';
   end if;
 
-  select pg_get_functiondef(
-    'public.admin_delete_registry_draft_artist_v1(uuid,timestamp with time zone)'::regprocedure
-  ) into v_definition;
-  if position('delete from public.registry_artists' in lower(v_definition)) = 0
-     or position('v_before.status <> ''draft''' in v_definition) = 0
-  then
-    raise exception 'FAIL: draft Artist delete authority lost its draft-only exact target';
+  if to_regprocedure(
+    'public.admin_delete_registry_draft_artist_v1(uuid,timestamp with time zone)'
+  ) is not null then
+    raise exception 'FAIL: draft Artist hard-delete authority must remain retired';
+  end if;
+
+  if not exists (
+    select 1
+    from pg_trigger
+    where tgrelid='public.registry_artists'::regclass
+      and tgname='registry_artists_resource_identity_sync'
+      and not tgisinternal
+  ) then
+    raise exception 'FAIL: Registry Artist Resource lifecycle synchronization trigger is missing';
   end if;
 end
 $$;
