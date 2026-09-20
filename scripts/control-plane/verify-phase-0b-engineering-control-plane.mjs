@@ -330,6 +330,71 @@ if (
   );
 }
 
+const adminRouterRegistry =
+  registryWriters.find(
+    (writer) =>
+      writer.id === "admin-router-registry",
+  );
+
+if (
+  adminRouterRegistry?.authentication !==
+    "request_bearer_user" ||
+  adminRouterRegistry?.authorization !==
+    "roles_and_manage_registry" ||
+  adminRouterRegistry?.executionAuthority !==
+    "service_role_registry_reads_plus_caller_jwt_bounded_admin_registry_commands" ||
+  adminRouterRegistry?.disposition !== "keep" ||
+  adminRouterRegistry?.futureBoundary !==
+    "caller_bound_bounded_admin_registry_commands" ||
+  adminRouterRegistry?.miziziCallable !== false ||
+  adminRouterRegistry?.humanCallable !== true ||
+  adminRouterRegistry?.publicCallable !== false ||
+  adminRouterRegistry?.canonicalMutation !== false ||
+  adminRouterRegistry?.legacyDebt !== false
+) {
+  throw new Error(
+    "Admin Registry router must remain a caller-bound orchestration/read boundary over bounded Registry commands.",
+  );
+}
+
+const adminRouterSource = fs.readFileSync(
+  "supabase/functions/admin-router/index.ts",
+  "utf8",
+);
+
+const adminRouterDirectCanonicalDml =
+  /\.from\(\s*["']registry_(?:artists|tracks|releases|labels|genres)["']\s*\)\s*\.\s*(insert|update|upsert|delete)\s*\(/s;
+
+if (adminRouterDirectCanonicalDml.test(adminRouterSource)) {
+  throw new Error(
+    "admin-router reintroduced direct canonical Registry DML.",
+  );
+}
+
+for (const requiredRpc of [
+  "admin_patch_registry_artist_profile_v1",
+  "admin_patch_registry_track_profile_v1",
+  "admin_patch_registry_release_profile_v1",
+  "admin_patch_registry_label_profile_v1",
+  "admin_patch_registry_genre_profile_v1",
+  "admin_delete_registry_draft_artist_v1",
+]) {
+  if (!adminRouterSource.includes(requiredRpc)) {
+    throw new Error(
+      `admin-router is missing bounded Registry command: ${requiredRpc}`,
+    );
+  }
+}
+
+if (
+  !adminRouterSource.includes("SUPABASE_ANON_KEY") ||
+  !adminRouterSource.includes("p_expected_updated_at")
+) {
+  throw new Error(
+    "admin-router Registry mutations are not bound to caller JWT plus optimistic concurrency.",
+  );
+}
+
 const providerIntake =
   registryWriters.find(
     (writer) =>
