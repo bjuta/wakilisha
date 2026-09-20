@@ -454,6 +454,41 @@ Full acceptance evidence is recorded in
 The next boundary is a separate protected runtime/transport convergence gate.
 Stage A does not activate autonomous MIZIZI authority.
 
+### Stage B typed broker convergence closure
+
+Stage B of the remaining Slice 3 MIZIZI execution-authority convergence is
+Production accepted.
+
+PR #983 merged at
+`main@a2f6a960b2257c063f270a19d5d424a418cf4657` and Production applied
+`20260918173446_mizizi_stage_b_broker_convergence_v1` exactly once.
+
+MIZIZI canonical stewardship mutation authority for Track slug, Release
+taxonomy, Release slug, Chart Track-slug, and deterministic review escalation
+now runs through narrow typed exact-grant brokers. The general MIZIZI runner no
+longer owns direct mutation DML for governed targets, review rows, canonical
+write events, execution grants, or mutation journals.
+
+The accepted Production state keeps all four Stage B operation types disabled,
+keeps active standing/exact MIZIZI grants at zero, preserves the live
+`mizizi -> postgres` transport binding, and leaves the future
+`mizizi -> mizizi_executor` binding disabled. `mizizi_executor` has the exact
+private broker EXECUTE surface required for the future transport cutover but no
+direct governed-table mutation authority.
+
+No canonical Registry or Chart data mutation, Edge deployment, frontend
+deployment, or transport cutover occurred as part of the Production migration.
+
+Full acceptance evidence is recorded in
+`docs/engineering/mizizi-slice3-stage-b-production-closure.md`.
+
+**Status**:
+`SLICE3_MIZIZI_STAGE_B_TYPED_BROKER=PRODUCTION_ACCEPTED`.
+
+The next boundary is Stage C: a separate protected narrow-executor transport
+cutover for the general runner and Artist-origin broker, followed by retirement
+of the ambient MIZIZI `postgres` binding.
+
 ### `scrape-artist-data` retirement contract
 
 Retirement must cover the whole runtime contract, not only its source directory.
