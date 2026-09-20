@@ -1,5 +1,7 @@
 # MIZIZI Registry Retirement Manifest
 
+> **20 September 2026 Slice 3 status:** `registry-enrichment-review` has zero observed Production invocations across seven bounded 24-hour windows with 45,670 `public-content-read` positive-control invocations. Exact-main dependency proof found no live caller. Repository retirement is authorized; Production deletion remains a separate post-merge gate.
+
 > **17 September 2026 Slice 3 status:** the Artist-enrichment compatibility wrappers `backfill-artist-spotify-images` and `backfill-artist-type` have satisfied replacement and traffic proof and are now authorized for retirement as one coherent family. Production deletion remains a separate post-merge gate. Historical sections below retain the earlier prerequisite state rather than being rewritten.
 
 Date: 14 September 2026
