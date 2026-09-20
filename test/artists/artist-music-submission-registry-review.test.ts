@@ -102,6 +102,21 @@ describe("Artist music submission + Registry review SLA", () => {
     expect(providerApi).toContain(
       'rCap(auth.id, "manage_registry")',
     );
+    expect(providerApi).toContain(
+      "retired_provider_release_mutation_route",
+    );
+    expect(providerApi).toContain(
+      'route === "create-shell" || route === "refresh-shell"',
+    );
+    expect(providerApi).not.toMatch(
+      /\.from\(\s*["']registry_releases["']\s*\)\s*\.\s*(insert|update|upsert|delete)\s*\(/s,
+    );
+    expect(providerApi).not.toMatch(
+      /\.from\(\s*["']registry_release_shells["']\s*\)\s*\.\s*(insert|update|upsert|delete)\s*\(/s,
+    );
+    expect(providerApi).not.toMatch(
+      /\.from\(\s*["']provider_entity_links["']\s*\)\s*\.\s*(insert|update|upsert|delete)\s*\(/s,
+    );
     expect(service).toContain(
       "validationId",
     );
