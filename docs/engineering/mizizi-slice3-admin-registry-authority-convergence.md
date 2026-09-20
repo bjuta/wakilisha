@@ -2,7 +2,7 @@
 
 Date: 2026-09-20
 
-Status: **Preview accepted; Production promotion pending**
+Status: **Production accepted**
 
 Base main:
 
@@ -223,19 +223,46 @@ Migration SHA-256 values:
 - `20260920190646...`:
   `eb059aa64c8056eaf484b34b9d84fd21e294a25fb7fb7bc9928258458ed49225`
 
-## 8. Deployment classification
+## 8. Production acceptance
 
-Before merge:
+Repository authority:
 
-- Preview SQL: accepted;
-- Preview Edge: accepted;
-- Preview runtime: accepted;
-- replay seal: accepted;
-- Production SQL: **not applied**;
-- Production `admin-router`: **not promoted**.
+- PR #998 merged to protected main;
+- exact merged main: `02e63ebf47e0c4f9248d56ca9ff8897c62d8b75a`;
+- final PR Critical Control Plane #1389: PASS;
+- final PR MIZIZI Track Production Control Plane #70: PASS;
+- final PR MIZIZI Release Production Control Plane #48: PASS;
+- protected-main Critical Control Plane #1390: PASS.
 
-Production promotion must remain separate after exact-head PR CI and
-protected-main CI are green.
+Production SQL promotion:
+
+- pre-promotion ledger: 155 / `20260920160500`;
+- exact native pending set: the three migrations documented above;
+- all three applied from exact merged main;
+- post-apply native dry run: `Remote database is up to date.`;
+- final ledger: **158 / `20260920190646`**;
+- permanent verifier: **`ADMIN_REGISTRY_PROFILE_AUTHORITY_PASS`**.
+
+Production RPC grant shape for all five bounded profile commands:
+
+- authenticated EXECUTE: true;
+- anon EXECUTE: false;
+- service_role EXECUTE: false.
+
+The temporary draft-Artist hard-delete RPC is absent.
+
+Production Edge promotion:
+
+- `admin-router` v51 -> **v52 ACTIVE**;
+- `verify_jwt=true`;
+- live deployed source is byte-for-byte identical to exact merged main;
+- live source contains the caller-bound bounded command road;
+- live source contains `retired_registry_hard_delete`;
+- live source does not contain `admin_delete_registry_draft_artist_v1`;
+- live source does not contain the retired direct core Registry update/delete road;
+- post-deploy permanent verifier: PASS.
+
+The disposable Preview may be retired after this Production evidence is sealed.
 
 ## 9. Slice 3 consequence
 
