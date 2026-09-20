@@ -211,20 +211,20 @@
       "entrypoint": "supabase/functions/provider-intake-api/index.ts",
       "authentication": "request_user_for_privileged_routes",
       "authorization": "scoped_intake_authority",
-      "executionAuthority": "service_role_after_authorization",
+      "executionAuthority": "service_role_reads_and_secret_access_plus_caller_bound_validation_rpc",
       "targets": [
-        "provider_intake_artist_staging",
-        "provider_intake_runs",
-        "registry_release_shells",
-        "registry_releases"
+        "artist_representations",
+        "registry_artists",
+        "admin_settings_secrets",
+        "record_artist_music_submission_validation"
       ],
-      "riskClass": "high",
-      "disposition": "keep_converge",
-      "futureBoundary": "provider_evidence_then_registry_admission",
+      "riskClass": "medium",
+      "disposition": "keep",
+      "futureBoundary": "provider_search_inspect_and_caller_bound_evidence_only",
       "miziziCallable": false,
       "humanCallable": true,
       "publicCallable": false,
-      "canonicalMutation": true,
+      "canonicalMutation": false,
       "legacyDebt": false
     },
     {

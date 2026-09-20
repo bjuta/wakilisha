@@ -330,6 +330,73 @@ if (
   );
 }
 
+const providerIntake =
+  registryWriters.find(
+    (writer) =>
+      writer.id === "provider-intake-api",
+  );
+
+if (
+  providerIntake?.authentication !==
+    "request_user_for_privileged_routes" ||
+  providerIntake?.authorization !==
+    "scoped_intake_authority" ||
+  providerIntake?.executionAuthority !==
+    "service_role_reads_and_secret_access_plus_caller_bound_validation_rpc" ||
+  providerIntake?.disposition !== "keep" ||
+  providerIntake?.futureBoundary !==
+    "provider_search_inspect_and_caller_bound_evidence_only" ||
+  providerIntake?.miziziCallable !== false ||
+  providerIntake?.humanCallable !== true ||
+  providerIntake?.publicCallable !== false ||
+  providerIntake?.canonicalMutation !== false ||
+  providerIntake?.legacyDebt !== false
+) {
+  throw new Error(
+    "Provider intake must remain a fail-closed provider evidence/read boundary with no canonical Registry mutation authority.",
+  );
+}
+
+const providerIntakeSource = fs.readFileSync(
+  "supabase/functions/provider-intake-api/index.ts",
+  "utf8",
+);
+
+if (
+  !providerIntakeSource.includes(
+    "retired_provider_release_mutation_route",
+  ) ||
+  !providerIntakeSource.includes(
+    'route === "create-shell" || route === "refresh-shell"',
+  )
+) {
+  throw new Error(
+    "Provider intake legacy Release mutation compatibility routes are not fail-closed.",
+  );
+}
+
+const providerIntakeDirectCanonicalDml =
+  /\.from\(\s*["']registry_(?:artists|tracks|releases|labels|genres)["']\s*\)\s*\.\s*(insert|update|upsert|delete)\s*\(/s;
+
+if (providerIntakeDirectCanonicalDml.test(providerIntakeSource)) {
+  throw new Error(
+    "provider-intake-api reintroduced direct canonical Registry DML.",
+  );
+}
+
+if (
+  /\.from\(\s*["']registry_release_shells["']\s*\)\s*\.\s*(insert|update|upsert|delete)\s*\(/s.test(
+    providerIntakeSource,
+  ) ||
+  /\.from\(\s*["']provider_entity_links["']\s*\)\s*\.\s*(insert|update|upsert|delete)\s*\(/s.test(
+    providerIntakeSource,
+  )
+) {
+  throw new Error(
+    "Provider intake retired Release mutation routes may not mutate legacy shell/link state.",
+  );
+}
+
 const publicReadWriter =
   registryWriters.find(
     (writer) =>
