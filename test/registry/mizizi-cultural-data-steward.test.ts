@@ -1055,8 +1055,8 @@ describe("MIZIZI Slice 2 Gate A-final Registry authority convergence", () => {
       /\.from\(\s*["']registry_(artists|tracks|releases|labels|genres)["']\s*\)\s*\.\s*(insert|update|upsert|delete)\s*\(/s,
     );
 
-    expect(client).toContain("expectedUpdatedAt: string");
-    expect(client).toContain("_expected_updated_at: expectedUpdatedAt");
+    expect(client).toContain("expectedUpdatedAt?: string");
+    expect(client).toContain("payload._expected_updated_at = expectedUpdatedAt");
     expect(artistsPage).toContain("artist?.updated_at");
     expect(migration).toContain("auth.uid()");
     expect(migration).toContain("current_user_has_capability('manage_registry')");
