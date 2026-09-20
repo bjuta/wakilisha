@@ -11,7 +11,7 @@ const TRIGGER_FILE = process.env.MIZIZI_TRIGGER_FILE || '';
 const ARTIFACT_DIR = process.env.MIZIZI_ARTIFACT_DIR || 'artifacts/mizizi-track-production-control-plane';
 const EXPECTED_FINGERPRINT = '551b29431700536937c26ecb1e396c3cf9314edefd88c589284cf330c9d1bb9a';
 const EXPECTED_BLOBS = {
-  'scripts/registry/agents/mizizi/run.ts': '32d745759c79aabfcbf1d1875431b3353d3af104',
+  'scripts/registry/agents/mizizi/run.ts': '045371254e510e57589c82e43267ad2e34d8257d',
   'scripts/registry/agents/mizizi/core.ts': 'c8ab1436437175cd1d7d1c451299ae2b199bc327',
   'supabase/functions/_shared/registry-track-identity.ts': '7bcab485aecc3cc7b90e2a3154d90dcee81be92c',
 };
