@@ -12,7 +12,7 @@ const EXPECTED_AUTHORITY_FINGERPRINT = 'cf71fc24d54bb71d64a469e159daaf06b137680f
 const EXPECTED_CANDIDATE_FINGERPRINT = '238a817a5e342f8311ac04fc9a6bc978f67276cb664046cddc9e375bc323e9c4';
 const EXPECTED_PROVIDER_PACKAGING_CANDIDATES = 737;
 const EXPECTED_BLOBS = {
-  'scripts/registry/agents/mizizi/run.ts': '045371254e510e57589c82e43267ad2e34d8257d',
+  'scripts/registry/agents/mizizi/run.ts': '3f6870d1605786786d78643efd0d97dc54d2d47e',
   'scripts/registry/agents/mizizi/core.ts': 'c8ab1436437175cd1d7d1c451299ae2b199bc327',
   'supabase/functions/_shared/release-taxonomy.ts': '12eaff54ac13e9b36fe3319d955d84e0d98d73a6',
 };
@@ -25,6 +25,40 @@ function run(cmd,args,opts={}) {
   const r = spawnSync(cmd,args,{encoding:'utf8',stdio:opts.capture?'pipe':'inherit',env:opts.env||process.env});
   if (r.status !== 0) throw new Error(cmd+' '+args.join(' ')+' failed'+(r.stderr?': '+r.stderr.trim():''));
   return (r.stdout||'').trim();
+}
+
+function findPayload(value, depth = 0) {
+  if (depth > 14) return null;
+  if (typeof value === 'string') {
+    try { return findPayload(JSON.parse(value), depth + 1); } catch { return null; }
+  }
+  if (Array.isArray(value)) {
+    for (const item of value) {
+      const found = findPayload(item, depth + 1);
+      if (found !== null) return found;
+    }
+    return null;
+  }
+  if (value && typeof value === 'object') {
+    if (value.payload !== undefined) return value.payload;
+    for (const child of Object.values(value)) {
+      const found = findPayload(child, depth + 1);
+      if (found !== null) return found;
+    }
+  }
+  return null;
+}
+
+function queryViaLinkedCli(sql) {
+  const wrapped = `select to_jsonb(q) as payload from (${sql.replace(/;\\s*$/, '')}) q`;
+  const raw = run(
+    'npx',
+    ['--yes','supabase@2.107.0','db','query','--linked','--agent=no','-o','json',wrapped],
+    { capture:true },
+  );
+  const payload = findPayload(JSON.parse(raw));
+  if (payload === null) throw new Error('linked Supabase CLI query did not return a parseable payload');
+  return payload;
 }
 
 async function api(method,path,body) {
@@ -51,19 +85,19 @@ function sleep(ms) {
   return new Promise(resolve=>setTimeout(resolve,ms));
 }
 
-function databaseUrl() {
+function databaseUrl(role) {
   const path = 'supabase/.temp/pooler-url';
   if (!fs.existsSync(path)) throw new Error('linked Supabase CLI did not create '+path);
   const linked = fs.readFileSync(path,'utf8').trim();
   const sanitized = linked.replace(/:\/\/([^:]+):[^@]*@/,'://$1:x@');
   const u = new URL(sanitized);
   if (!u.hostname.endsWith('.pooler.supabase.com')) throw new Error('linked Supabase CLI returned unexpected pooler host '+u.hostname);
-  u.username = 'postgres.'+PROJECT_REF;
+  u.username = role+'.'+PROJECT_REF;
   u.password = TOKEN;
   u.port = '5432';
   u.search = '';
   u.searchParams.set('options','-c jit=true');
-  console.log('Using linked Supabase pooler host: '+u.hostname+':5432');
+  console.log('Using linked Supabase pooler host: '+u.hostname+':5432 as '+role);
   return u.toString();
 }
 
@@ -75,7 +109,7 @@ function isTransientJitError(error) {
     message.includes('password authentication failed');
 }
 
-async function createJitPoolWithRetry(url) {
+async function createJitPoolWithRetry(url, expectedRole) {
   const attempts = 12;
   for (let attempt=1; attempt<=attempts; attempt+=1) {
     const pool = new pg.Pool({
@@ -88,10 +122,10 @@ async function createJitPoolWithRetry(url) {
     });
     try {
       const {rows:[session]} = await pool.query('select current_user as database_user, current_database() as database_name');
-      if (session.database_user !== 'postgres' || session.database_name !== 'postgres') {
-        throw new Error('unexpected JIT database session '+session.database_user+'@'+session.database_name);
+      if (session.database_user !== expectedRole || session.database_name !== 'postgres') {
+        throw new Error('unexpected JIT database session '+session.database_user+'@'+session.database_name+' expected '+expectedRole+'@postgres');
       }
-      console.log('PASS: JIT database session ready on attempt '+attempt+'/'+attempts);
+      console.log('PASS: JIT '+expectedRole+' database session ready on attempt '+attempt+'/'+attempts);
       return pool;
     } catch (error) {
       await pool.end().catch(()=>{});
@@ -101,6 +135,75 @@ async function createJitPoolWithRetry(url) {
     }
   }
   throw new Error('JIT database session readiness exhausted');
+}
+
+const transportAuthoritySql = `select
+ exists(
+   select 1
+   from supabase_migrations.schema_migrations
+   where version='20260920095334'
+     and name='mizizi_stage_c_narrow_executor_transport_v1'
+ ) as stage_c_applied,
+ exists(
+   select 1
+   from platform_private.system_actor_executor_bindings
+   where actor_key='mizizi'
+     and executor_kind='database_role'
+     and executor_key='postgres'
+     and status='active'
+ ) as postgres_active,
+ exists(
+   select 1
+   from platform_private.system_actor_executor_bindings
+   where actor_key='mizizi'
+     and executor_kind='database_role'
+     and executor_key='postgres'
+     and status='disabled'
+ ) as postgres_disabled,
+ exists(
+   select 1
+   from platform_private.system_actor_executor_bindings
+   where actor_key='mizizi'
+     and executor_kind='database_role'
+     and executor_key='mizizi_executor'
+     and status='active'
+ ) as executor_active,
+ exists(
+   select 1
+   from platform_private.system_actor_executor_bindings
+   where actor_key='mizizi'
+     and executor_kind='database_role'
+     and executor_key='mizizi_executor'
+     and status='disabled'
+ ) as executor_disabled`;
+
+function resolveMiziziTransportRole() {
+  const authority = queryViaLinkedCli(transportAuthoritySql);
+
+  if (authority.stage_c_applied === true) {
+    if (
+      authority.executor_active !== true ||
+      authority.postgres_disabled !== true
+    ) {
+      throw new Error(
+        'Stage C ledger is present but dedicated executor binding is not exact',
+      );
+    }
+    console.log('PASS: Stage C ledger active; JIT transport = mizizi_executor');
+    return 'mizizi_executor';
+  }
+
+  if (
+    authority.postgres_active !== true ||
+    authority.executor_disabled !== true
+  ) {
+    throw new Error(
+      'Stage C ledger is absent but Stage B transport binding is not exact',
+    );
+  }
+
+  console.log('PASS: Stage C ledger absent; exact Stage B postgres compatibility transport retained');
+  return 'postgres';
 }
 
 const releaseStateSql = [
@@ -242,12 +345,12 @@ function classifyReleaseProductionState(state) {
   if (postApplyDomainFieldsMatch(state,POST_APPLY_BASELINE) && postApplyLedgerAccepted(state,POST_APPLY_BASELINE)) return 'post_apply';
   return 'unexpected';
 }
-async function assertAcceptedPostApply(pool,state) {
+async function assertAcceptedPostApply(state) {
   if (!postApplyDomainFieldsMatch(state,POST_APPLY_BASELINE)) {
     throw new Error('release post-apply domain state drifted');
   }
   assertPostApplyLedger(state,'release post-apply baseline');
-  const {rows:[a]} = await pool.query(releaseAcceptanceSql);
+  const a = queryViaLinkedCli(releaseAcceptanceSql);
   assertFields(a,{
     events:32,
     unique_fingerprints:32,
@@ -411,6 +514,8 @@ async function main() {
     throw new Error('production temporary access must be disabled at rest; found '+(originalState||'unknown'));
   }
 
+  const transportRole = resolveMiziziTransportRole();
+
   let existing = null;
   let originalRoles = [];
   let mappingChanged = false;
@@ -421,18 +526,18 @@ async function main() {
     originalRoles = existing && Array.isArray(existing.user_roles) ? existing.user_roles : [];
 
     await api('PUT','/v1/projects/'+PROJECT_REF+'/jit-access',{state:'enabled'});
-    const roles = originalRoles.filter(r=>String(r.role||'')!=='postgres');
-    roles.push({role:'postgres',expires_at:Date.now()+60*60*1000});
+    const roles = originalRoles.filter(r=>!['postgres','mizizi_executor'].includes(String(r.role||'')));
+    roles.push({role:transportRole,expires_at:Date.now()+60*60*1000});
     await api('PUT','/v1/projects/'+PROJECT_REF+'/database/jit',{user_id:userId,roles});
     mappingChanged = true;
 
-    const url = databaseUrl();
+    const url = databaseUrl(transportRole);
     console.log('::add-mask::'+url);
-    const pool = await createJitPoolWithRetry(url);
+    const pool = await createJitPoolWithRetry(url,transportRole);
 
     try {
       console.log('\n=== 3. PRODUCTION RELEASE STATE ===');
-      const {rows:[baseline]} = await pool.query(releaseStateSql);
+      const baseline = queryViaLinkedCli(releaseStateSql);
       const productionState = classifyReleaseProductionState(baseline);
       if (productionState === 'unexpected') {
         throw new Error('production Release state is neither accepted pre-apply nor accepted post-apply: '+JSON.stringify(baseline));
@@ -441,7 +546,7 @@ async function main() {
 
       if (productionState === 'post_apply') {
         console.log('PASS: accepted historical Release taxonomy post-apply baseline detected');
-        await assertAcceptedPostApply(pool,baseline);
+        await assertAcceptedPostApply(baseline);
         fs.writeFileSync(ARTIFACT_DIR+'/state-after.json',JSON.stringify(baseline,null,2)+'\n');
         console.log('PASS: production Release taxonomy acceptance exact 32 / 0 remaining with 18 bad memberships preserved');
 
@@ -470,7 +575,7 @@ async function main() {
       await streamReadOnlyAuditWithRetry(['run','registry:mizizi:audit','--','--entity=release','--limit=0'],{DATABASE_URL:url},auditBefore);
       assertReleaseAudit(fs.readFileSync(auditBefore,'utf8'));
 
-      const {rows:[afterAudit]} = await pool.query(releaseStateSql);
+      const afterAudit = queryViaLinkedCli(releaseStateSql);
       assertFields(afterAudit,PRE_APPLY_BASELINE,'post-audit Release baseline');
       assertFields(afterAudit,{
         release_authority_fingerprint:EXPECTED_AUTHORITY_FINGERPRINT,
@@ -488,8 +593,8 @@ async function main() {
       await streamCommand('npm',['run','registry:mizizi:apply','--','--entity=release','--limit=0','--confirm=MIZIZI_APPLY'],{DATABASE_URL:url},ARTIFACT_DIR+'/apply.txt',pool);
 
       console.log('\n=== 6. EXACT PRODUCTION ACCEPTANCE ===');
-      const {rows:[accepted]} = await pool.query(releaseStateSql);
-      await assertAcceptedPostApply(pool,accepted);
+      const accepted = queryViaLinkedCli(releaseStateSql);
+      await assertAcceptedPostApply(accepted);
       fs.writeFileSync(ARTIFACT_DIR+'/state-after.json',JSON.stringify(accepted,null,2)+'\n');
       console.log('PASS: production Release taxonomy acceptance exact 32 applied / 0 remaining / 18 bad memberships preserved');
 

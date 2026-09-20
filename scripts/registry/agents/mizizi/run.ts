@@ -1996,33 +1996,6 @@ async function sendOperationalStandup(
     return;
   }
 
-  const recipients =
-    await pool.query(
-      `
-      select distinct
-        link.person_resource_id::text
-          as person_resource_id
-      from public.user_role_assignments role
-      join editorial.person_identity_links link
-        on link.user_id = role.user_id
-       and link.link_state = 'active'
-      where role.role_key = 'super_admin'
-        and role.status = 'active'
-        and (
-          role.expires_at is null
-          or role.expires_at > now()
-        )
-      order by
-        link.person_resource_id::text
-      `,
-    );
-
-  if (recipients.rowCount !== 1) {
-    throw new Error(
-      "MIZIZI standup requires exactly one active Super Admin Person recipient.",
-    );
-  }
-
   const blocked =
     stats.queued + stats.stale;
   const recommendation =
@@ -2089,30 +2062,27 @@ async function sendOperationalStandup(
       .digest("hex")
       .slice(0, 32);
 
-  await pool.query(
-    `
-    select *
-    from platform_private.send_system_message(
-      $1,
-      $2::uuid,
-      'operational_update',
-      $3,
-      '[]'::jsonb,
-      $4,
-      null,
-      null
-    )
-    `,
-    [
-      MIZIZI_AGENT_KEY,
-      String(
-        recipients.rows[0]
-          .person_resource_id,
-      ),
-      body,
-      "mizizi-standup-" + digest,
-    ],
-  );
+  const result =
+    await pool.query(
+      `
+      select *
+      from mizizi_private
+        .send_operational_standup_v1(
+          $1::text,
+          $2::text
+        )
+      `,
+      [
+        body,
+        "mizizi-standup-" + digest,
+      ],
+    );
+
+  if (result.rowCount !== 1) {
+    throw new Error(
+      "MIZIZI standup wrapper did not return one command receipt.",
+    );
+  }
 }
 
 async function main(): Promise<void> {
