@@ -560,6 +560,125 @@ begin
 end
 $$;
 
+create or replace view public.registry_relationship_endpoint_work_queue
+with (security_invoker=true)
+as
+select
+  unresolved.relationship_id,
+  unresolved.missing_side,
+  unresolved.missing_entity_type,
+  unresolved.legacy_slug,
+  unresolved.relationship_type,
+  unresolved.relationship_role,
+  unresolved.source_entity_id,
+  unresolved.target_entity_id,
+  count(alias.canonical_artist_id)::integer as alias_match_count,
+  min(alias.canonical_artist_id::text)::uuid as alias_candidate_id,
+  case
+    when count(alias.canonical_artist_id)=1 then 'ready_to_resolve'
+    when count(alias.canonical_artist_id)>1 then 'ambiguous_alias'
+    else 'missing_entity'
+  end as endpoint_work_state
+from public.registry_unresolved_relationship_endpoints unresolved
+left join public.registry_artist_aliases alias
+  on unresolved.missing_entity_type='artist'
+ and alias.alias_slug=unresolved.legacy_slug
+ and coalesce(alias.status,'active')='active'
+group by
+  unresolved.relationship_id,
+  unresolved.missing_side,
+  unresolved.missing_entity_type,
+  unresolved.legacy_slug,
+  unresolved.relationship_type,
+  unresolved.relationship_role,
+  unresolved.source_entity_id,
+  unresolved.target_entity_id;
+
+create or replace function public.resolve_registry_relationship_endpoint_from_alias(
+  p_relationship_id uuid,
+  p_endpoint_side text,
+  p_reason text
+)
+returns public.registry_entity_relationships
+language plpgsql
+security definer
+set search_path=pg_catalog,public,auth
+as $
+declare
+  v_relationship public.registry_entity_relationships%rowtype;
+  v_slug text;
+  v_candidate_id uuid;
+  v_match_count integer;
+  v_result public.registry_entity_relationships%rowtype;
+begin
+  if not (
+       auth.role()='service_role'
+       or coalesce(public.current_user_has_capability('manage_registry'),false)
+       or coalesce(public.current_user_has_capability('manage_review_queue'),false)
+       or coalesce(public.current_user_is_administrator(),false)
+     )
+  then
+    raise exception using errcode='42501',
+      message='You do not have permission to resolve Registry relationship endpoints.';
+  end if;
+
+  if p_endpoint_side not in ('source','target') then
+    raise exception using errcode='22023',
+      message='Endpoint side must be source or target.';
+  end if;
+
+  if nullif(btrim(p_reason),'') is null then
+    raise exception using errcode='22023',
+      message='A resolution reason is required.';
+  end if;
+
+  select relationship.*
+  into v_relationship
+  from public.registry_entity_relationships relationship
+  where relationship.id=p_relationship_id
+  for update;
+
+  if not found then
+    raise exception using errcode='P0002',
+      message='Registry relationship not found.';
+  end if;
+
+  v_slug:=case
+    when p_endpoint_side='source' then v_relationship.source_slug
+    else v_relationship.target_slug
+  end;
+
+  select
+    count(*)::integer,
+    min(alias.canonical_artist_id::text)::uuid
+  into v_match_count,v_candidate_id
+  from public.registry_artist_aliases alias
+  where alias.alias_slug=v_slug
+    and coalesce(alias.status,'active')='active';
+
+  if v_match_count=0 then
+    raise exception using errcode='P0002',
+      message='No active canonical artist alias match was found.';
+  end if;
+
+  if v_match_count>1 then
+    raise exception using errcode='23514',
+      message='The artist alias is ambiguous and requires manual review.';
+  end if;
+
+  select public.resolve_registry_relationship_endpoint(
+    p_relationship_id,
+    p_endpoint_side,
+    'artist',
+    v_candidate_id,
+    p_reason
+  )
+  into v_result;
+
+  return v_result;
+end
+$;
+
 create function public.admin_set_registry_artist_alias_v1(
   p_alias_slug text,
   p_canonical_artist_id uuid,
@@ -1513,8 +1632,8 @@ drop policy if exists "Admins can insert artist aliases"
 drop policy if exists "Admins can update artist aliases"
   on public.registry_artist_aliases;
 
-revoke insert,update,delete
+revoke insert,update,delete,truncate,references,trigger
 on public.registry_artist_aliases
-from authenticated,service_role;
+from PUBLIC,anon,authenticated,service_role;
 
 commit;
