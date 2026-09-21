@@ -562,6 +562,9 @@ describe("MIZIZI Cultural Data Steward", () => {
       "'track_intake_review'",
     );
     expect(migration).toContain(
+      "from public, anon, service_role;",
+    );
+    expect(migration).toContain(
       "'draft'",
     );
     expect(migration).not.toContain(

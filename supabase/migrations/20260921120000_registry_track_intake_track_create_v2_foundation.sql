@@ -1449,7 +1449,7 @@ $$;
 
 revoke all on function
   public.admin_create_registry_track_intake_identity_v1(uuid,text)
-  from public;
+  from public, anon, service_role;
 grant execute on function
   public.admin_create_registry_track_intake_identity_v1(uuid,text)
   to authenticated;
