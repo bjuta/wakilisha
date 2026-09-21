@@ -16,6 +16,7 @@ import { WkCheckbox } from "@/components/design-system/primitives/Checkbox";
 type ProviderKey = "apple_music" | "spotify";
 
 interface ArtistCredit {
+  credit_id: string;
   credit_order: number;
   credit_role: "primary" | "featured" | "unresolved";
   resolution_mode: string;
@@ -1151,6 +1152,156 @@ export default function TrackIntakePage() {
     }
   }
 
+  async function currentEnrichmentEnvelope(
+    suggestionId: string,
+  ) {
+    const data = await untypedRpc(
+      "admin_get_registry_track_intake_enrichment",
+      { p_suggestion_id: suggestionId },
+    );
+
+    return (data ?? {
+      suggestion_id: suggestionId,
+      observations: [],
+      accepted: {},
+      provider_links: [],
+    }) as EnrichmentEnvelope;
+  }
+
+  async function reconcileReviewedArtistCredits(
+    row: IntakeRow,
+    registryTrackId: string,
+  ) {
+    const credits = [...(row.artist_credits ?? [])].sort(
+      (left, right) =>
+        left.credit_order - right.credit_order ||
+        left.credit_id.localeCompare(right.credit_id),
+    );
+
+    if (
+      credits.length === 0 ||
+      credits.some(
+        (credit) =>
+          !credit.credit_id ||
+          credit.resolution_mode !== "existing_artist" ||
+          !credit.registry_artist_id,
+      )
+    ) {
+      throw new Error(
+        "Resolve every artist credit to an existing Registry artist before canonicalization.",
+      );
+    }
+
+    for (const credit of credits) {
+      await untypedRpc(
+        "admin_reconcile_registry_track_intake_credit_v1",
+        {
+          p_suggestion_id: row.suggestion_id,
+          p_source_credit_id: credit.credit_id,
+          p_registry_track_id: registryTrackId,
+        },
+      );
+    }
+  }
+
+  async function applyReviewedProfiles(
+    row: IntakeRow,
+    registryTrackId: string,
+  ) {
+    await untypedRpc(
+      "admin_admit_registry_track_intake_track_profile_v1",
+      {
+        p_suggestion_id: row.suggestion_id,
+        p_registry_track_id: registryTrackId,
+        p_allow_overwrite:
+          allowOverwrite[row.suggestion_id] === true,
+      },
+    );
+
+    const { data: trackState, error: trackStateError } =
+      await supabase
+        .from("registry_tracks")
+        .select("release_id")
+        .eq("id", registryTrackId)
+        .single();
+
+    if (trackStateError) throw trackStateError;
+
+    if (trackState?.release_id) {
+      await untypedRpc(
+        "admin_admit_registry_track_intake_release_profile_v1",
+        {
+          p_suggestion_id: row.suggestion_id,
+          p_registry_track_id: registryTrackId,
+          p_allow_overwrite:
+            allowOverwrite[row.suggestion_id] === true,
+        },
+      );
+    }
+  }
+
+  async function admitConfirmedProviderLinks(
+    suggestionId: string,
+    registryTrackId: string,
+  ) {
+    const envelope =
+      await currentEnrichmentEnvelope(suggestionId);
+
+    const links = (envelope.provider_links ?? [])
+      .filter((link) => link.match_status === "confirmed")
+      .sort(
+        (left, right) =>
+          left.provider.localeCompare(right.provider) ||
+          left.provider_entity_id.localeCompare(
+            right.provider_entity_id,
+          ),
+      );
+
+    for (const link of links) {
+      await untypedRpc(
+        "admin_admit_registry_track_provider_link_v1",
+        {
+          p_track_id: registryTrackId,
+          p_provider_key: link.provider,
+          p_provider_track_id: link.provider_entity_id,
+          p_provider_release_id: null,
+          p_provider_artist_ids: [],
+          p_isrc: null,
+          p_upc: null,
+          p_preview_url: null,
+          p_artwork_url: null,
+          p_duration_ms: null,
+          p_storefront: null,
+          p_match_method: "manual",
+          p_match_confidence:
+            Number(link.confidence_score ?? 0),
+          p_match_status: "matched",
+          p_raw_payload: {
+            authority_source: "track_intake_review",
+            suggestion_id: suggestionId,
+            provider_url: link.provider_url,
+            reviewed_match_status: link.match_status,
+          },
+        },
+      );
+    }
+  }
+
+  async function finalizeCanonicalization(
+    row: IntakeRow,
+    registryTrackId: string,
+  ) {
+    await untypedRpc(
+      "admin_finalize_registry_track_intake_v1",
+      {
+        p_suggestion_id: row.suggestion_id,
+        p_registry_track_id: registryTrackId,
+        p_review_note:
+          reviewNotes[row.suggestion_id] || null,
+      },
+    );
+  }
+
   async function createCanonicalTrack(row: IntakeRow) {
     const suggestionId = row.suggestion_id;
     const observedTitle =
@@ -1175,6 +1326,7 @@ export default function TrackIntakePage() {
       (row.artist_credits ?? []).length === 0 ||
       (row.artist_credits ?? []).some(
         (credit) =>
+          !credit.credit_id ||
           credit.resolution_mode !== "existing_artist" ||
           !credit.registry_artist_id,
       )
@@ -1185,18 +1337,51 @@ export default function TrackIntakePage() {
       return;
     }
 
-    setBusy(`canonical-create:${suggestionId}`);
+    setBusy("canonical-create:" + suggestionId);
     setError(null);
 
     try {
-      await untypedRpc(
-        "admin_create_registry_track_from_intake_enriched",
+      const identity = await untypedRpc(
+        "admin_create_registry_track_intake_identity_v1",
         {
           p_suggestion_id: suggestionId,
           p_title: title,
-          p_review_note:
-            reviewNotes[suggestionId] || null,
         },
+      );
+
+      const registryTrackId = String(
+        identity?.track?.track_id ?? "",
+      );
+
+      if (!registryTrackId) {
+        throw new Error(
+          "Track identity authority returned no Registry Track ID.",
+        );
+      }
+
+      await reconcileReviewedArtistCredits(
+        row,
+        registryTrackId,
+      );
+      await applyReviewedProfiles(
+        row,
+        registryTrackId,
+      );
+      await admitConfirmedProviderLinks(
+        suggestionId,
+        registryTrackId,
+      );
+
+      await untypedRpc(
+        "admin_activate_registry_track_intake_v1",
+        {
+          p_suggestion_id: suggestionId,
+        },
+      );
+
+      await finalizeCanonicalization(
+        row,
+        registryTrackId,
       );
 
       await loadQueue();
@@ -1223,16 +1408,21 @@ export default function TrackIntakePage() {
     setError(null);
 
     try {
-      await untypedRpc(
-        "admin_resolve_registry_track_intake_enriched",
-        {
-          p_suggestion_id: row.suggestion_id,
-          p_registry_track_id: registryTrackId,
-          p_review_note:
-            reviewNotes[row.suggestion_id] || null,
-          p_allow_overwrite:
-            allowOverwrite[row.suggestion_id] === true,
-        },
+      await reconcileReviewedArtistCredits(
+        row,
+        registryTrackId,
+      );
+      await applyReviewedProfiles(
+        row,
+        registryTrackId,
+      );
+      await admitConfirmedProviderLinks(
+        row.suggestion_id,
+        registryTrackId,
+      );
+      await finalizeCanonicalization(
+        row,
+        registryTrackId,
       );
 
       await loadQueue();

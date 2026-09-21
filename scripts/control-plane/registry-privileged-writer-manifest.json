@@ -314,27 +314,6 @@
       "legacyDebt": false
     },
     {
-      "id": "admin-create-registry-track-from-intake-enriched",
-      "kind": "database_function",
-      "entrypoint": "public.admin_create_registry_track_from_intake_enriched(uuid,text,text)",
-      "authentication": "auth_uid",
-      "authorization": "administrator_or_manage_registry",
-      "executionAuthority": "security_definer",
-      "targets": [
-        "registry_tracks",
-        "registry_track_artists",
-        "registry_canonical_write_events"
-      ],
-      "riskClass": "high",
-      "disposition": "keep_converge",
-      "futureBoundary": "typed_registry_admission_and_operation_journal",
-      "miziziCallable": false,
-      "humanCallable": true,
-      "publicCallable": false,
-      "canonicalMutation": true,
-      "legacyDebt": false
-    },
-    {
       "id": "community-admin-decide-artist-claim",
       "kind": "database_function",
       "entrypoint": "public.community_admin_decide_artist_claim(uuid,text,text,boolean,boolean,boolean,boolean)",
@@ -686,27 +665,6 @@
       "legacyDebt": false
     },
     {
-      "id": "admin-resolve-registry-track-intake-enriched",
-      "kind": "database_function",
-      "entrypoint": "public.admin_resolve_registry_track_intake_enriched(uuid,uuid,text,boolean)",
-      "authentication": "auth_uid",
-      "authorization": "administrator_or_manage_registry_plus_track_intake_state",
-      "executionAuthority": "security_definer_review_command",
-      "targets": [
-        "registry_tracks",
-        "registry_releases",
-        "registry_canonical_write_events"
-      ],
-      "riskClass": "high",
-      "disposition": "keep_converge",
-      "futureBoundary": "typed_track_release_provider_profile_admission",
-      "miziziCallable": false,
-      "humanCallable": true,
-      "publicCallable": false,
-      "canonicalMutation": true,
-      "legacyDebt": false
-    },
-    {
       "id": "admin-safe-merge-registry-artists",
       "kind": "database_function",
       "entrypoint": "public.admin_safe_merge_registry_artists(uuid,uuid,text,boolean,text)",
@@ -968,6 +926,116 @@
       "futureBoundary": "owner_internal_provider_link_upsert_behind_typed_exact_operation",
       "miziziCallable": false,
       "humanCallable": false,
+      "publicCallable": false,
+      "canonicalMutation": true,
+      "legacyDebt": false
+    },
+    {
+      "id": "admin-create-registry-track-intake-identity-v1",
+      "kind": "database_function",
+      "entrypoint": "public.admin_create_registry_track_intake_identity_v1(uuid,text)",
+      "authentication": "auth_uid",
+      "authorization": "manage_registry_plus_exact_reviewed_track_intake_identity",
+      "executionAuthority": "security_definer_orchestrator_over_caller_bound_evidence_exact_grant_operation_and_independent_verifier",
+      "targets": [
+        "registry_tracks",
+        "registry_canonical_write_events",
+        "registry_operation_write_events",
+        "registry_mutation_operations"
+      ],
+      "riskClass": "medium",
+      "disposition": "keep",
+      "futureBoundary": "typed_track_create_v2_identity_admission",
+      "miziziCallable": false,
+      "humanCallable": true,
+      "publicCallable": false,
+      "canonicalMutation": true,
+      "legacyDebt": false
+    },
+    {
+      "id": "admin-reconcile-registry-track-intake-credit-v1",
+      "kind": "database_function",
+      "entrypoint": "public.admin_reconcile_registry_track_intake_credit_v1(uuid,uuid,uuid)",
+      "authentication": "auth_uid",
+      "authorization": "manage_registry_plus_exact_reviewed_source_credit",
+      "executionAuthority": "security_definer_orchestrator_over_caller_bound_evidence_exact_grant_operation_and_independent_verifier",
+      "targets": [
+        "registry_track_artists",
+        "registry_canonical_write_events",
+        "registry_operation_write_events",
+        "registry_mutation_operations"
+      ],
+      "riskClass": "high",
+      "disposition": "keep",
+      "futureBoundary": "source_credit_scoped_reviewed_track_artist_reconciliation",
+      "miziziCallable": false,
+      "humanCallable": true,
+      "publicCallable": false,
+      "canonicalMutation": true,
+      "legacyDebt": false
+    },
+    {
+      "id": "admin-admit-registry-track-intake-track-profile-v1",
+      "kind": "database_function",
+      "entrypoint": "public.admin_admit_registry_track_intake_track_profile_v1(uuid,uuid,boolean)",
+      "authentication": "auth_uid",
+      "authorization": "manage_registry_plus_exact_reviewed_track_profile",
+      "executionAuthority": "security_definer_orchestrator_over_caller_bound_evidence_exact_grant_operation_and_independent_verifier",
+      "targets": [
+        "registry_tracks",
+        "registry_canonical_write_events",
+        "registry_operation_write_events",
+        "registry_mutation_operations"
+      ],
+      "riskClass": "medium",
+      "disposition": "keep",
+      "futureBoundary": "provider_neutral_reviewed_track_profile_admission",
+      "miziziCallable": false,
+      "humanCallable": true,
+      "publicCallable": false,
+      "canonicalMutation": true,
+      "legacyDebt": false
+    },
+    {
+      "id": "admin-admit-registry-track-intake-release-profile-v1",
+      "kind": "database_function",
+      "entrypoint": "public.admin_admit_registry_track_intake_release_profile_v1(uuid,uuid,boolean)",
+      "authentication": "auth_uid",
+      "authorization": "manage_registry_plus_exact_reviewed_release_profile",
+      "executionAuthority": "security_definer_orchestrator_over_caller_bound_evidence_exact_grant_operation_and_independent_verifier",
+      "targets": [
+        "registry_releases",
+        "registry_canonical_write_events",
+        "registry_operation_write_events",
+        "registry_mutation_operations"
+      ],
+      "riskClass": "medium",
+      "disposition": "keep",
+      "futureBoundary": "provider_neutral_reviewed_release_profile_admission",
+      "miziziCallable": false,
+      "humanCallable": true,
+      "publicCallable": false,
+      "canonicalMutation": true,
+      "legacyDebt": false
+    },
+    {
+      "id": "admin-activate-registry-track-intake-v1",
+      "kind": "database_function",
+      "entrypoint": "public.admin_activate_registry_track_intake_v1(uuid)",
+      "authentication": "auth_uid",
+      "authorization": "manage_registry_plus_exact_reviewed_credit_set",
+      "executionAuthority": "security_definer_orchestrator_over_caller_bound_evidence_exact_grant_operation_and_independent_verifier",
+      "targets": [
+        "registry_tracks",
+        "registry_canonical_write_events",
+        "registry_operation_write_events",
+        "registry_mutation_operations"
+      ],
+      "riskClass": "medium",
+      "disposition": "keep",
+      "futureBoundary": "typed_track_activation_after_exact_reviewed_credit_set",
+      "miziziCallable": false,
+      "humanCallable": true,
       "publicCallable": false,
       "canonicalMutation": true,
       "legacyDebt": false

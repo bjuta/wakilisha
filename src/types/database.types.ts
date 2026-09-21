@@ -19505,6 +19505,26 @@ export type Database = {
           result_payload: Json
         }[]
       }
+      admin_activate_registry_track_intake_v1: {
+        Args: { p_suggestion_id: string }
+        Returns: Json
+      }
+      admin_admit_registry_track_intake_release_profile_v1: {
+        Args: {
+          p_allow_overwrite?: boolean
+          p_registry_track_id: string
+          p_suggestion_id: string
+        }
+        Returns: Json
+      }
+      admin_admit_registry_track_intake_track_profile_v1: {
+        Args: {
+          p_allow_overwrite?: boolean
+          p_registry_track_id: string
+          p_suggestion_id: string
+        }
+        Returns: Json
+      }
       admin_admit_registry_track_provider_link_v1: {
         Args: {
           p_artwork_url?: string
@@ -19567,12 +19587,8 @@ export type Database = {
         Args: { p_artist_name: string; p_current_artist_id: string }
         Returns: Json
       }
-      admin_create_registry_track_from_intake_enriched: {
-        Args: {
-          p_review_note?: string
-          p_suggestion_id: string
-          p_title: string
-        }
+      admin_create_registry_track_intake_identity_v1: {
+        Args: { p_suggestion_id: string; p_title: string }
         Returns: Json
       }
       admin_decouple_registry_artist: {
@@ -19696,6 +19712,14 @@ export type Database = {
           p_artist_id: string
           p_evidence_assertion_id: string
           p_reviewed_selections: Json
+        }
+        Returns: Json
+      }
+      admin_finalize_registry_track_intake_v1: {
+        Args: {
+          p_registry_track_id: string
+          p_review_note?: string
+          p_suggestion_id: string
         }
         Returns: Json
       }
@@ -19902,6 +19926,14 @@ export type Database = {
         Args: { p_canonical_track_id: string; p_duplicate_track_ids: string[] }
         Returns: Json
       }
+      admin_reconcile_registry_track_intake_credit_v1: {
+        Args: {
+          p_registry_track_id: string
+          p_source_credit_id: string
+          p_suggestion_id: string
+        }
+        Returns: Json
+      }
       admin_record_registry_identity_transition_v1: {
         Args: {
           p_entity_type: string
@@ -19946,23 +19978,6 @@ export type Database = {
           p_alias_slug: string
           p_apply_to_existing?: boolean
           p_canonical_artist_id: string
-        }
-        Returns: Json
-      }
-      admin_resolve_registry_track_intake: {
-        Args: {
-          p_registry_track_id: string
-          p_review_note?: string
-          p_suggestion_id: string
-        }
-        Returns: Json
-      }
-      admin_resolve_registry_track_intake_enriched: {
-        Args: {
-          p_allow_overwrite?: boolean
-          p_registry_track_id: string
-          p_review_note?: string
-          p_suggestion_id: string
         }
         Returns: Json
       }
@@ -26427,10 +26442,6 @@ export type Database = {
           p_media_intake_id: string
           p_submission_resource_id: string
         }
-        Returns: Json
-      }
-      sync_registry_track_intake_artist_credits: {
-        Args: { p_registry_track_id: string; p_suggestion_id: string }
         Returns: Json
       }
       text_soundex: { Args: { "": string }; Returns: string }

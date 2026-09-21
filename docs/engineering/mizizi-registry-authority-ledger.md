@@ -491,15 +491,41 @@ The direct Registry writer query identified modern `admin_*` and domain function
 
 - `admin_apply_chart_artist_resolution_decision`
 - `admin_apply_registry_track_duplicate_repair`
-- `admin_create_registry_track_from_intake_enriched`
+- `admin_create_registry_track_intake_identity_v1`
+- `admin_reconcile_registry_track_intake_credit_v1`
+- `admin_admit_registry_track_intake_track_profile_v1`
+- `admin_admit_registry_track_intake_release_profile_v1`
+- `admin_activate_registry_track_intake_v1`
 - `admin_decouple_registry_artist`
 - `admin_merge_registry_artists`
 - `admin_resolve_chart_artist_alias`
-- `admin_resolve_registry_track_intake_enriched`
 - `admin_safe_merge_registry_artists`
 - `accept_registry_missing_artist_intake`
 
 These are not classified as vulnerabilities merely because authenticated callers can execute them. Their authorization must be preserved and eventually represented in the machine-readable writer manifest.
+
+### 7.1A Track Intake canonical authority convergence
+
+The former direct Track Intake canonical writer roads are retired:
+
+- `admin_create_registry_track_from_intake_enriched(uuid,text,text)`
+- `admin_resolve_registry_track_intake_enriched(uuid,uuid,text,boolean)`
+- `admin_resolve_registry_track_intake(uuid,uuid,text)`
+- `sync_registry_track_intake_artist_credits(uuid,uuid)`
+
+Track Intake now composes independently durable, caller-bound authority:
+
+- `registry.track.create/v2` through `admin_create_registry_track_intake_identity_v1`;
+- source-credit-scoped `registry.track_artist_credit.reviewed_reconcile/v1`;
+- provider-neutral reviewed Track profile admission;
+- provider-neutral reviewed Release profile admission when an existing Release is present;
+- governed canonical Track provider-link admission;
+- `registry.track.activate/v1` after exact reviewed-credit-set proof;
+- workflow-only `admin_finalize_registry_track_intake_v1`, which owns no canonical Registry DML.
+
+Every canonical command is evidence-bound, exact-grant journaled, independently verified, and machine-classified in the privileged-writer manifest. Review/evidence bookkeeping remains separate from canonical Registry authority.
+
+**Decision**: `KEEP GOVERNED COMMAND CHAIN / RETIRED ALTERNATE WRITERS MUST REMAIN ABSENT`.
 
 ### 7.2 Claim-created Artist path
 

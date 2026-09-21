@@ -129,3 +129,29 @@ rollback source, and permanent negative/reintroduction control before DROP.
   evidence agree.
 
 Slice 4 #991 remains blocked until that exit gate passes.
+
+
+## Track Intake create/enrichment convergence closure
+
+The Track Intake create/enrichment targets from the existing-primitive tranche are converged on branch `fix/slice3-track-intake-create-authority`.
+
+Retired alternate writers:
+
+- `admin_create_registry_track_from_intake_enriched(...)`
+- `admin_resolve_registry_track_intake_enriched(...)`
+- `admin_resolve_registry_track_intake(...)`
+- `sync_registry_track_intake_artist_credits(...)`
+
+The product caller now composes:
+
+1. Track Create V2 identity when a new Track is required;
+2. one reviewed-credit reconciliation operation per immutable source credit;
+3. provider-neutral Track reviewed-profile admission;
+4. provider-neutral Release reviewed-profile admission when an existing Release is linked;
+5. governed canonical provider-link admission;
+6. Track activation for newly created Tracks;
+7. workflow-only finalization after current child authority is proven.
+
+A consolidated real-JWT Preview acceptance proved both new-Track and existing-Track paths, changed-review reconciliation onto the same canonical credit relation, provider-link precondition enforcement, finalizer idempotency, and preservation of unrelated existing credits.
+
+This closes only the Track Intake create/enrichment roads. Other Slice 3 convergence targets remain governed by issue #962 and this programme document.

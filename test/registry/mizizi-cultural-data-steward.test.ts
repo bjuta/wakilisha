@@ -532,6 +532,326 @@ describe("MIZIZI Cultural Data Steward", () => {
     );
   });
 
+  it("reconciles reviewed credits onto existing Tracks without exact-set deletion semantics", () => {
+    const migration = read(
+      "supabase/migrations/20260921143000_registry_track_intake_existing_track_credit_reconcile_authority_v1.sql",
+    );
+    const verifier = read(
+      "scripts/control-plane/verify-registry-track-intake-existing-track-credit-reconcile-authority.sql",
+    );
+
+    expect(migration).toContain(
+      "'registry.track_artist_credit.reviewed_reconcile'",
+    );
+    expect(migration).toContain(
+      "'reconcile_registry_track_reviewed_artist_credit'",
+    );
+    expect(migration).toContain(
+      "'track_intake_review'",
+    );
+    expect(migration).toContain(
+      "'INTERNAL_FACT'",
+    );
+    expect(migration).toContain(
+      "'already_current'",
+    );
+    expect(migration).toContain(
+      "track.status in ('draft','active')",
+    );
+    expect(migration).toContain(
+      "metadata->>'source_credit_id'",
+    );
+    expect(migration).toContain(
+      "'reconcile_reviewed_credit'",
+    );
+    expect(migration).not.toContain(
+      "apple_music_ingest",
+    );
+    expect(migration).not.toContain(
+      "delete from public.registry_track_artists",
+    );
+    expect(migration).not.toContain(
+      "registry.track_artist_credit.admit",
+    );
+    expect(verifier).toContain(
+      "REGISTRY_TRACK_INTAKE_EXISTING_TRACK_CREDIT_RECONCILE_AUTHORITY_PASS",
+    );
+  });
+
+  it("adds provider-neutral reviewed Release profile authority without creating Releases or Labels", () => {
+    const migration = read(
+      "supabase/migrations/20260921140000_registry_track_intake_release_reviewed_profile_authority_v1.sql",
+    );
+    const verifier = read(
+      "scripts/control-plane/verify-registry-track-intake-release-reviewed-profile-authority.sql",
+    );
+
+    expect(migration).toContain(
+      "'registry.release.reviewed_profile.admit'",
+    );
+    expect(migration).toContain(
+      "'admit_registry_release_reviewed_profile'",
+    );
+    expect(migration).toContain(
+      "registry_track_intake_release_label_match_state_v1",
+    );
+    expect(migration).toContain(
+      "'INTERNAL_FACT'",
+    );
+    expect(migration).toContain(
+      "'label_name_observation'",
+    );
+    expect(migration).toContain(
+      "'imprint_name'",
+    );
+    expect(migration).toContain(
+      "'copyright_text'",
+    );
+    expect(migration).toContain(
+      "'provider_genre'",
+    );
+    expect(migration).not.toContain(
+      "apple_music_ingest",
+    );
+    expect(migration).not.toContain(
+      "track_intake_enriched_at",
+    );
+    expect(migration).not.toContain(
+      "insert into public.registry_releases",
+    );
+    expect(migration).not.toContain(
+      "insert into public.registry_labels",
+    );
+    expect(verifier).toContain(
+      "REGISTRY_TRACK_INTAKE_RELEASE_REVIEWED_PROFILE_AUTHORITY_PASS",
+    );
+  });
+
+  it("adds provider-neutral reviewed Track profile authority without Apple-Music provenance", () => {
+    const migration = read(
+      "supabase/migrations/20260921133000_registry_track_intake_track_reviewed_profile_authority_v1.sql",
+    );
+    const verifier = read(
+      "scripts/control-plane/verify-registry-track-intake-track-reviewed-profile-authority.sql",
+    );
+
+    expect(migration).toContain(
+      "'registry.track.reviewed_profile.admit'",
+    );
+    expect(migration).toContain(
+      "'admit_registry_track_reviewed_profile'",
+    );
+    expect(migration).toContain(
+      "'INTERNAL_FACT'",
+    );
+    expect(migration).toContain(
+      "registry_subject_state_fingerprint",
+    );
+    expect(migration).toContain(
+      "provider_genre",
+    );
+    expect(migration).toContain(
+      "p_allow_overwrite",
+    );
+    expect(migration).toContain(
+      "'track-profile-v1:'",
+    );
+    expect(migration).not.toContain(
+      "'track-intake-track-profile-v1:'",
+    );
+    expect(migration).not.toContain(
+      "apple_music_ingest",
+    );
+    expect(migration).not.toContain(
+      "track_intake_enriched_at",
+    );
+    expect(verifier).toContain(
+      "REGISTRY_TRACK_INTAKE_TRACK_REVIEWED_PROFILE_AUTHORITY_PASS",
+    );
+  });
+
+  it("adds exact reviewed Track activation without merging it into identity creation", () => {
+    const migration = read(
+      "supabase/migrations/20260921130000_registry_track_intake_track_activation_authority_v1.sql",
+    );
+    const verifier = read(
+      "scripts/control-plane/verify-registry-track-intake-track-activation-authority.sql",
+    );
+
+    expect(migration).toContain(
+      "'registry.track.activate'",
+    );
+    expect(migration).toContain(
+      "'activate_registry_track'",
+    );
+    expect(migration).toContain(
+      "registry_subject_state_fingerprint",
+    );
+    expect(migration).toContain(
+      "registry_track_intake_activation_credit_state_v1",
+    );
+    expect(migration).toContain(
+      "'from_status','draft'",
+    );
+    expect(migration).toContain(
+      "'to_status','active'",
+    );
+    expect(migration).toContain(
+      "set status='active'",
+    );
+    expect(migration).toContain(
+      "errcode='23514'",
+    );
+    expect(verifier).toContain(
+      "REGISTRY_TRACK_INTAKE_TRACK_ACTIVATION_AUTHORITY_PASS",
+    );
+  });
+
+
+  it("finalizes Track Intake workflow only after governed child authority is exact", () => {
+    const migration = read(
+      "supabase/migrations/20260921150000_registry_track_intake_workflow_finalization_v1.sql",
+    );
+    const verifier = read(
+      "scripts/control-plane/verify-registry-track-intake-workflow-finalization.sql",
+    );
+    const intakePage = read(
+      "src/pages/admin/registry/tracks/intake/page.tsx",
+    );
+
+    expect(migration).toContain(
+      "'credit_id',credit.id",
+    );
+    expect(migration).toContain(
+      "registry.track_artist_credit.reviewed_reconcile",
+    );
+    expect(migration).toContain(
+      "registry.track.create",
+    );
+    expect(migration).toContain(
+      "registry.track.activate",
+    );
+    expect(migration).toContain(
+      "registry_track_provider_links",
+    );
+    expect(migration).toContain(
+      "admin_finalize_registry_track_intake_v1",
+    );
+    expect(migration).toContain(
+      "insert into public.provider_entity_links",
+    );
+    expect(migration).not.toContain(
+      "insert into public.registry_tracks",
+    );
+    expect(migration).not.toContain(
+      "update public.registry_tracks",
+    );
+    expect(migration).not.toContain(
+      "insert into public.registry_track_artists",
+    );
+    expect(migration).not.toContain(
+      "update public.registry_track_artists",
+    );
+    expect(migration).not.toContain(
+      "update public.registry_releases",
+    );
+    expect(migration).not.toContain(
+      "insert into public.registry_track_provider_links",
+    );
+
+    expect(verifier).toContain(
+      "REGISTRY_TRACK_INTAKE_WORKFLOW_FINALIZATION_PASS",
+    );
+
+    expect(intakePage).toContain(
+      "credit_id: string",
+    );
+    expect(intakePage).toContain(
+      "admin_finalize_registry_track_intake_v1",
+    );
+  });
+
+  it("installs Track Intake Track Create V2 behind the governed Track Intake caller", () => {
+    const migration = read(
+      "supabase/migrations/20260921120000_registry_track_intake_track_create_v2_foundation.sql",
+    );
+    const verifier = read(
+      "scripts/control-plane/verify-registry-track-intake-track-create-v2-foundation.sql",
+    );
+    const intakePage = read(
+      "src/pages/admin/registry/tracks/intake/page.tsx",
+    );
+
+    expect(migration).toContain(
+      "'registry.track.create',\n  2,",
+    );
+    expect(migration).toContain(
+      "registry_track_intake_admin",
+    );
+    expect(migration).toContain(
+      "registry_track_creation_collision_state_v2",
+    );
+    expect(migration).toContain(
+      "admin_create_registry_track_intake_identity_v1",
+    );
+    expect(migration).toContain(
+      "'registry-track-create-v2'",
+    );
+    expect(migration).toContain(
+      "errcode='23514'",
+    );
+    expect(migration).toContain(
+      "'track_intake_review'",
+    );
+    expect(migration).toContain(
+      "from public, anon, service_role;",
+    );
+    expect(migration).toContain(
+      "'draft'",
+    );
+    expect(migration).not.toContain(
+      "drop function public.admin_create_registry_track_from_intake_enriched",
+    );
+    expect(migration).not.toContain(
+      "drop function public.admin_resolve_registry_track_intake_enriched",
+    );
+
+    expect(verifier).toContain(
+      "REGISTRY_TRACK_INTAKE_TRACK_CREATE_V2_FOUNDATION_PASS",
+    );
+    expect(verifier).toContain(
+      "Track Create V1 was disturbed by V2 foundation",
+    );
+
+    expect(intakePage).toContain(
+      "admin_create_registry_track_intake_identity_v1",
+    );
+    expect(intakePage).toContain(
+      "admin_reconcile_registry_track_intake_credit_v1",
+    );
+    expect(intakePage).toContain(
+      "admin_admit_registry_track_intake_track_profile_v1",
+    );
+    expect(intakePage).toContain(
+      "admin_admit_registry_track_intake_release_profile_v1",
+    );
+    expect(intakePage).toContain(
+      "admin_admit_registry_track_provider_link_v1",
+    );
+    expect(intakePage).toContain(
+      "admin_activate_registry_track_intake_v1",
+    );
+    expect(intakePage).toContain(
+      "admin_finalize_registry_track_intake_v1",
+    );
+    expect(intakePage).not.toContain(
+      "admin_create_registry_track_from_intake_enriched",
+    );
+    expect(intakePage).not.toContain(
+      "admin_resolve_registry_track_intake_enriched",
+    );
+  });
+
   it("routes production Track apply through the governed control plane", () => {
     const workflow =
       readFileSync(

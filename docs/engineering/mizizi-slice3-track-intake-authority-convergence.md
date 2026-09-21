@@ -1,0 +1,699 @@
+# MIZIZI Slice 3 — Track Intake Canonical Authority Convergence
+
+Date: 21 September 2026
+
+Status: IMPLEMENTATION AUTHORITY FREEZE
+
+Issue: #962
+
+Base merged-main authority: `01c0e5404230dbf320c8cd1a8f46ef5d0c2743a8`
+
+Branch: `fix/slice3-track-intake-create-authority`
+
+## Decision
+
+The coupled Track Intake canonicalization road must converge as one product workflow while preserving separately durable Registry operations.
+
+Current public commands:
+
+- `admin_create_registry_track_from_intake_enriched(uuid,text,text)`
+- `admin_resolve_registry_track_intake_enriched(uuid,uuid,text,boolean)`
+
+remain legitimate human-reviewed product actions, but their direct canonical Registry mutation must be retired.
+
+The replacement keeps the same one-click admin experience while orchestration moves to separate caller-JWT RPC transactions.
+
+## Why one replacement RPC is forbidden
+
+PostgreSQL executes one RPC function call in one transaction.
+
+If Track identity creation, Artist credits, enrichment, activation and workflow finalization were merely wrapped in one replacement SECURITY DEFINER function, a later failure would roll back earlier Registry operation journals and canonical receipts.
+
+That would violate the accepted materialization doctrine:
+
+- identity creation is independently durable;
+- later fact failure does not erase proven identity history;
+- every cultural fact transition retains its own exact grant, operation, canonical write event and verifier.
+
+Therefore the frontend/service layer must orchestrate the governed steps across separate transactions.
+
+## Accepted workflow
+
+### New Track
+
+1. validate the reviewed Track Intake suggestion and freeze the exact review snapshot;
+2. execute `registry.track.create/v2` through a Track-Intake-specific caller-bound broker;
+3. execute one `registry.track_artist_credit.reviewed_reconcile/v1` per reviewed resolved Artist credit;
+4. admit provider-neutral reviewed Track/Release enrichment through narrow typed operations;
+5. activate the draft Track through `registry.track.activate/v1` only after required reviewed credits and enrichment preconditions pass;
+6. finalize Track Intake workflow state and downstream playlist/contribution bookkeeping.
+
+### Existing Track
+
+1. validate the reviewed Track Intake suggestion and selected active Registry Track;
+2. admit provider-neutral reviewed Track/Release enrichment through the same typed enrichment authority;
+3. finalize Track Intake workflow state and downstream bookkeeping.
+
+No identity creation or activation occurs for an existing active Track.
+
+## Actor
+
+New broker actor:
+
+`registry_track_intake_admin`
+
+Requirements:
+
+- actor kind: automation transport identity;
+- executor binding: PostgREST `authenticator`;
+- required human capability: `manage_registry`;
+- grants are caller-bound to `auth.uid()`;
+- no standing MIZIZI grant;
+- no `service_role` public execution.
+
+The broker may issue only the operation versions explicitly listed in this design.
+
+## Reused operations
+
+Preserve the accepted operation family without rewriting established history:
+
+- `registry.track.create/v1` remains frozen for existing Chart/Discography semantics;
+- `registry.track.create/v2` is the Track Intake route-identity extension with an explicit evidence-bound reviewed slug;
+- `registry.track_artist_credit.reviewed_reconcile/v1` is the Track Intake reviewed-credit operation for both draft and active Tracks.
+
+V2 is a versioned semantic extension of Track creation, not a new generic CRUD family.
+
+Track Intake must not borrow the Chart actor or Discography actor.
+
+## Credit provenance and reconciliation
+
+The accepted shared Chart materialization path remains frozen with
+`source='chart_admission'`; Track Intake does not overload or rewrite it.
+
+Track Intake owns
+`registry.track_artist_credit.reviewed_reconcile/v1` under the
+`registry_track_intake_admin` actor. The operation is source-credit-scoped and
+works for both draft and active Tracks. It may insert one missing reviewed
+relation, update one unambiguous live/reviewable Track Intake relation, or
+produce a verified no-op when semantic state is already exact.
+
+Every canonical Track Intake credit persists `source='track_intake_review'`,
+confidence 100, and immutable `source_credit_id` metadata. The operation never
+deletes unrelated credits and never resurrects archived history.
+
+The evidence trust class is `INTERNAL_FACT` because the relationship is a
+governed human review decision. Each source credit has its own review
+fingerprint, so correcting one reviewed credit does not invalidate proven
+siblings. Activation separately binds the complete reviewed-credit-set
+fingerprint before a new Track can become active.
+
+## Lifecycle operation
+
+Add:
+
+`registry.track.activate/v1`
+
+This is required because `registry.track.create/v1` and `/v2` are deliberately draft-only and legacy Track Intake canonicalization intentionally produces an active Track.
+
+Contract:
+
+- subject: one existing Track;
+- current status must be `draft`;
+- final status: `active`;
+- exact expected Track state fingerprint required;
+- exact reviewed Track Intake evidence required;
+- all reviewed Track Intake Artist credits must already exist, be active, and match the reviewed credit set;
+- one Track row maximum;
+- human approval required;
+- independent verifier required;
+- no enrichment fields or arbitrary metadata may be written by activation.
+
+Activation is lifecycle authority, not identity creation or enrichment.
+
+## Review fingerprint partitioning
+
+Track Intake authority uses separate immutable review fingerprints by fact family. Identity creation binds only identity context, the reviewed Artist set, and approved ISRC because ISRC participates in Track identity collision authority. Artist-credit admission, reconciliation, and activation bind a credit-only snapshot and are not invalidated by unrelated Track or Release enrichment edits. Track and Release profile operations retain their own field-scoped fingerprints, while provider-link authority owns provider-link evidence independently.
+
+This prevents unrelated review changes from invalidating already-proven child operations while preserving fail-closed behavior when evidence owned by that child actually changes.
+
+## Existing-Track reviewed-credit reconciliation
+
+Existing canonical Tracks do not use the draft-Track credit-admit path and do not use Discography exact-set replacement. The accepted Discography exact-set operation is Apple Music-specific and complete-set replacement would be stronger than legacy Track Intake semantics.
+
+Track Intake therefore adds `registry.track_artist_credit.reviewed_reconcile/v1`, a one-source-credit operation over an existing active Track. It binds the current Track state, current live/reviewable candidate relation state, the exact reviewed source credit, and the immutable review fingerprint.
+
+The operation has three outcomes: insert one missing reviewed relation, update one unambiguous live/reviewable relation, or record a verified no-op when canonical semantic fields already match. It never deletes unrelated credits and never resurrects archived rows. Ambiguous live/reviewable matches fail closed for explicit cleanup. Changed review state receives a new exact operation through a review-bound idempotency hash.
+
+This preserves interruption-resume behavior at one reviewed credit per transaction while keeping existing Track history intact.
+
+## Track activation implementation
+
+Track Intake adds `registry.track.activate/v1` as a distinct lifecycle operation backed by typed capability `activate_registry_track`.
+
+Activation binds one existing draft Track through `registry_subject_state_fingerprint('track', id)`, the current immutable Track Intake review fingerprint, and an exact reviewed-vs-canonical Artist-credit-set fingerprint. The executor refuses activation unless every reviewed credit is resolved to an active Artist and the complete active canonical credit set exactly matches the reviewed set with `source='track_intake_review'`.
+
+The mutation is one row and lifecycle-only: `status='draft' → 'active'` plus the normal `updated_at` timestamp. The executor proves all other Track columns are unchanged in the same transaction. The independent verifier then binds the active Track state to the operation's after-state fingerprint and one exact canonical `activate` write event.
+
+## Provider-neutral enrichment
+
+Existing operations:
+
+- `registry.track.provider_profile.admit/v1`;
+- `registry.release.provider_profile.admit/v1`;
+
+must not be overloaded for generic Track Intake evidence. Their executor semantics are explicitly Apple-Music-shaped and stamp `source='apple_music_ingest'`.
+
+Track Intake needs narrow provider-neutral reviewed operations.
+
+### Track reviewed profile
+
+Operation candidate:
+
+`registry.track.reviewed_profile.admit/v1`
+
+Allowed fields are limited to the current Track Intake reviewed contract:
+
+- ISRC;
+- duration_ms;
+- artwork_url;
+- preview_url;
+- track_number;
+- disc_number;
+- explicit;
+- reviewed genre observation.
+
+The operation binds:
+
+- exact current Track state fingerprint;
+- exact accepted enrichment field set;
+- overwrite decision;
+- immutable Track Intake review fingerprint;
+- caller identity;
+- one Track target.
+
+No arbitrary JSON patching.
+
+### Track reviewed-profile implementation
+
+The Track half is implemented as `registry.track.reviewed_profile.admit/v1` with typed capability `admit_registry_track_reviewed_profile`.
+
+Its bounded field family is exactly the current Track Intake contract: ISRC, duration, Track artwork URL, preview URL, track number, disc number, explicit flag, and the reviewed genre observation stored under `metadata.provider_genre`. It accepts an existing draft or active Track so new-Track orchestration can enrich before activation while existing-Track resolution can enrich in place.
+
+The operation binds the whole current Track state fingerprint plus the exact reviewed field-set fingerprint. Legacy overwrite semantics are preserved for ISRC, duration and artwork. A changed reviewed field set receives a new evidence assertion and a new review-fingerprint-scoped idempotency key; an identical review replays the same exact operation. The historical `track_intake_enriched_at` metadata timestamp is not recreated because operation/evidence timestamps now carry that provenance durably.
+
+### Release reviewed profile
+
+Operation candidate:
+
+`registry.release.reviewed_profile.admit/v1`
+
+Only executes when the canonical Track already points at an existing Release.
+
+Allowed fields are limited to:
+
+- release title / normalized title;
+- release date and precision;
+- artwork URL;
+- UPC;
+- existing Label linkage when an unambiguous reviewed label match already exists;
+- label-name observation when no canonical Label match exists;
+- imprint observation;
+- copyright observation;
+- reviewed genre observation.
+
+It may not create a Release or Label.
+
+### Release reviewed-profile implementation
+
+The Release half is implemented as `registry.release.reviewed_profile.admit/v1` with typed capability `admit_registry_release_reviewed_profile`.
+
+It only operates when the selected Track already points to an existing non-archived Release. It cannot create a Release or Label. Its bounded fields are release title/normalized title, release date + precision, artwork URL, UPC, existing Label linkage, label-name observation, imprint observation, copyright observation and reviewed genre observation.
+
+Legacy overwrite semantics are preserved for release title and release date. Label linking is tightened to an exact, unambiguous active/draft Label match. The exact matching Label set is fingerprinted into the grant so a Label-catalog change invalidates a stale grant before execution. If no unique match exists, the reviewed label remains `metadata.label_name_observation` rather than creating or guessing canonical Label identity.
+
+As with Track profile admission, the whole current Release state and exact review fingerprint are bound to the grant. Changed reviewed Release facts get a new exact operation. The obsolete `track_intake_enriched_at` metadata timestamp is not recreated.
+
+## Provenance
+
+The old creator copied:
+
+- `track_intake_source_suggestion_id`;
+- `track_intake_created_at`;
+- `release_evidence`;
+
+into `registry_tracks.metadata`.
+
+Repository audit finds no live runtime consumer of those keys. Track Intake tables plus immutable Registry evidence are the durable provenance authority.
+
+The converged path therefore does not recreate those historical metadata copies.
+
+Historical rows remain untouched.
+
+## Review fingerprint
+
+Every step derives a deterministic Track Intake review fingerprint from the exact reviewed state needed by that step, including:
+
+- suggestion identity and current review status;
+- canonical Track selection where applicable;
+- approved enrichment field set;
+- reviewed Artist credit identities, roles and order;
+- confirmed provider selections relevant to finalization;
+- overwrite decision where applicable.
+
+A later step must reject when reviewed state differs from the frozen evidence it is executing.
+
+## Deterministic IDs
+
+For idempotent resume:
+
+- future Track UUID is deterministic from suggestion ID;
+- future Track↔Artist credit UUID is deterministic from suggestion ID + reviewed credit-row identity;
+- idempotency keys are scoped to suggestion + typed operation + exact target.
+
+Retries of the same reviewed state return existing operation results.
+
+Changed review state requires new evidence and cannot reuse an old exact grant.
+
+## Finalization
+
+Workflow finalization remains separate from canonical Registry mutation.
+
+It may update the Track Intake suggestion, playlist/contribution workflow state and other non-Registry operational bookkeeping required by the existing product.
+
+It must not directly mutate:
+
+- `registry_tracks`;
+- `registry_releases`;
+- `registry_track_artists`;
+- canonical provider-link Registry tables.
+
+Confirmed provider identity copying must use an accepted typed provider-link authority or a separately proven non-canonical evidence-link boundary.
+
+## Public compatibility retirement
+
+The legacy public functions are retained only until the new frontend/service orchestration has passed real-JWT Preview acceptance.
+
+After caller cutover:
+
+- direct canonical DML is removed from both legacy definitions;
+- public execution of superseded compatibility roads is revoked or the roads are dropped where dependency proof permits;
+- permanent writer inventory is updated to the new governed surfaces.
+
+## Acceptance
+
+At minimum prove on a fresh Preview:
+
+- real `registry_editor` JWT;
+- new Track flow creates draft identity through `registry.track.create/v2`;
+- every reviewed Artist credit is a separate verified exact operation;
+- failure of a later credit leaves earlier identity/credit receipts durable;
+- provider-neutral enrichment applies only reviewed allowed fields;
+- stale review fingerprint rejects;
+- overwrite=false conflict rejects;
+- overwrite=true reviewed replacement succeeds where contract permits;
+- activation rejects before required reviewed credits exist;
+- activation succeeds exactly once after prerequisites;
+- final Track is active;
+- finalization succeeds without canonical Registry DML;
+- identical retry is idempotent;
+- existing-Track resolution performs no create/activation;
+- anon and service_role cannot execute public human-review commands;
+- private grant/executor/verifier functions remain externally inaccessible;
+- canonical write events link to every Registry mutation operation;
+- legacy direct-DML roads are no longer required by the product caller.
+
+## Deployment order
+
+1. install broker/evidence/review fingerprint + `registry.track.create/v2` foundation;
+2. add source-credit-scoped `registry.track_artist_credit.reviewed_reconcile/v1` authority while preserving Chart/Discography credit semantics;
+3. add Track activation operation;
+4. add provider-neutral Track/Release reviewed-profile operations;
+5. add separate public step commands;
+6. add frontend/service orchestration;
+7. prove failure-resume and happy path with real JWT;
+8. retire/internalize old direct-DML commands;
+9. clean Preview replay + permanent verifiers;
+10. PR only after all of the above are proven.
+
+
+## Cutoff-safe implementation checkpoint — 2026-09-21
+
+This section is intentionally operational. It exists so Track Intake authority
+convergence can resume safely after an interrupted ChatGPT/tool session without
+reconstructing state from chat history or accidentally undoing accepted work.
+
+### Branch authority
+
+Working branch:
+
+`fix/slice3-track-intake-create-authority`
+
+Checkpoint head before this documentation commit:
+
+`f51e80ae9feebd80c2700cd4722d2245e8759439`
+
+Accepted main baseline for this family:
+
+`01c0e5404230dbf320c8cd1a8f46ef5d0c2743a8`
+
+No PR has been opened yet. Production has not received any Track Intake
+authority migration from this branch.
+
+### Behavioral Preview authority
+
+Disposable Supabase Preview:
+
+- branch name: `slice3-track-intake-v2-dfe0cbe2`
+- project ref: `gzulggmimoyfeemrtytm`
+- branch id: `ed874b62-25a5-4305-be27-e8e44e4402eb`
+- `with_data=false`
+
+This Preview is **behavioral proof only**. It has received exploratory hot
+repairs during runtime acceptance and must not be used as final migration
+history authority or promotion evidence.
+
+A fresh clean Preview replay from accepted main plus the final migration chain
+is mandatory before PR merge or Production promotion.
+
+### Proven runtime layers on the behavioral Preview
+
+The following Track Intake child authorities have real-JWT behavioral proof:
+
+1. Track Create V2 draft identity
+   - exact first operation
+   - idempotent replay
+   - stale reviewed identity fails fast
+   - deterministic Track identity
+2. New-Track reviewed Artist-credit admission
+   - one exact operation per reviewed source credit
+   - `source='track_intake_review'`
+   - idempotent replay
+   - stale reviewed credit fails fast
+3. Track activation
+   - blocks when reviewed credit set does not exactly match canonical credits
+   - exact activation operation
+   - idempotent replay
+4. Provider-neutral Track reviewed profile
+   - exact operation
+   - idempotent replay
+   - changed reviewed profile produces a second exact operation
+5. Provider-neutral Release reviewed profile
+   - exact operation
+   - idempotent replay
+   - changed reviewed Release profile produces a second exact operation
+   - unresolved Label text remains `metadata.label_name_observation`; no
+     canonical Label is invented
+6. Existing-Track reviewed Artist-credit reconciliation
+   - migration applied successfully
+   - permanent verifier structurally passes
+   - typed operation is high risk, existing-Track-bound, one-row limited,
+     human-approved and verifier-backed
+   - public bridge is authenticated-only; anon and service_role do not have
+     EXECUTE
+
+### Release runtime receipt IDs
+
+The isolated Release reviewed-profile behavioral proof produced:
+
+- first operation:
+  `5da411e5-2d9e-4700-a96c-7428efcd3811`
+- changed-review operation:
+  `7029d4ab-8f15-4586-bc54-dec8a0bedf2a`
+
+Both were independently re-audited as succeeded, verified operations with
+consumed grants, INTERNAL_FACT evidence, and canonical write-event causality.
+
+### Existing-Track credit semantics decision
+
+Do **not** use
+`registry.track_artist_credit_set.replace/v1` for Track Intake.
+
+That accepted Discography operation has two incompatible semantics:
+
+1. it requires `source='apple_music_ingest'`; and
+2. it replaces the complete Track Artist-credit set, while legacy Track Intake
+   reconciles only reviewed source credits and preserves unrelated existing
+   credits.
+
+Track Intake therefore owns
+`registry.track_artist_credit.reviewed_reconcile/v1`.
+
+Its durable semantics are:
+
+- exactly one reviewed source credit per operation;
+- existing active Track target;
+- insert when no live/reviewable candidate exists;
+- update one unambiguous live/reviewable candidate;
+- verified no-op receipt when semantic canonical state is already exact;
+- never delete unrelated credits;
+- never resurrect archived credit rows;
+- reject ambiguous candidates and collisions;
+- preserve `source='track_intake_review'`;
+- bind exact reviewed evidence and current Track/candidate state.
+
+### Review-fingerprint partition correction
+
+The original foundation snapshot incorrectly fingerprinted all approved
+enrichment fields together with identity and Artist-credit review. That would
+allow an unrelated Release-artwork change to stale a previously proven credit
+receipt.
+
+The unmerged migration chain has therefore been corrected before PR:
+
+- identity review snapshot owns:
+  - suggestion identity context;
+  - reviewed Artist set;
+  - approved ISRC only, because ISRC participates in identity collision
+    authority;
+- credit review snapshot owns:
+  - reviewed Artist credits only;
+- Track profile snapshot owns only Track-profile fields;
+- Release profile snapshot owns only Release-profile fields;
+- provider-link authority owns provider-link evidence independently.
+
+This correction is committed at
+`f51e80ae9feebd80c2700cd4722d2245e8759439`.
+
+The behavioral Preview still contains earlier function definitions unless
+explicitly hot-repaired. Final authority comes from a fresh clean replay of the
+corrected migration files, not from this Preview's migration ledger.
+
+### Provider-link boundary decision
+
+`public.provider_entity_links` is provider-enrichment/review evidence
+bookkeeping. Canonical provider identity belongs in
+`public.registry_track_provider_links` behind the already-accepted governed
+provider-link command
+`public.admin_admit_registry_track_provider_link_v1(...)`.
+
+Final Track Intake orchestration must therefore:
+
+1. admit every confirmed provider selection through canonical governed
+   provider-link authority; and
+2. permit workflow finalization to copy/retain `provider_entity_links` only
+   as review/evidence bookkeeping, never as canonical authority.
+
+Finalization must fail closed if a confirmed provider selection does not have
+the matching canonical governed Track provider link.
+
+### Remaining implementation sequence
+
+Do not add more canonical operation families unless a concrete semantic gap is
+proven. The remaining sequence is:
+
+1. Extend the Track Intake queue read contract to include the source Artist
+   credit UUID. Do not key authority by `credit_order`.
+2. Add a workflow-only finalizer RPC that:
+   - requires an active target Track;
+   - proves current reviewed Artist-credit child authority is complete;
+   - proves current Track reviewed-profile authority when reviewed Track fields
+     exist;
+   - proves current Release reviewed-profile authority when reviewed Release
+     fields exist and the Track has a Release;
+   - proves confirmed provider selections have matching governed canonical
+     Track provider links;
+   - updates Track Intake workflow/reviewer/note/timestamps and allowed
+     evidence bookkeeping only;
+   - performs no DML against canonical Registry Track, Release, Artist-credit,
+     or canonical provider-link tables.
+3. Cut over the Track Intake admin page:
+   - New Track:
+     Track Create V2 -> each reviewed credit admit -> Track profile -> Release
+     profile if applicable -> governed provider-link admissions -> activation
+     -> workflow finalization.
+   - Existing Track:
+     each reviewed credit reconciliation -> Track profile -> Release profile if
+     applicable -> governed provider-link admissions -> workflow finalization.
+4. Remove/retire the obsolete direct canonical-writer entrypoints only after
+   proving no live caller still depends on them:
+   - `admin_create_registry_track_from_intake_enriched`
+   - `admin_resolve_registry_track_intake_enriched`
+   - `admin_resolve_registry_track_intake`
+   - `sync_registry_track_intake_artist_credits`
+5. Update permanent verifiers, canonical writer inventory/manifest, authority
+   ledger, stewardship docs, and existing consolidated tests. Do not create a
+   forest of milestone-only tests.
+6. Apply the completed cutover to the current Preview for behavioral
+   diagnostics only.
+7. Run one consolidated real-user/JWT end-to-end acceptance rather than
+   interrupting the operator for each tiny child layer.
+8. Create a brand-new clean Preview from accepted main and replay the entire
+   final migration chain exactly.
+9. Run permanent verifiers, migration replay contract, canonical replay proof,
+   schema seal, and full CI.
+10. Only after every gate is green: open PR, audit diff/CI, merge protected main,
+    promote SQL to Production, wait for Supabase branch status to settle, then
+    run Production ledger + permanent verifier acceptance.
+11. Delete disposable Previews and update Slice 3 issue closure evidence.
+    Do not claim Slice 3 complete until the full Slice 3 exit gate is satisfied.
+
+### Current deployment checklist
+
+- SQL migration needed: **Yes**
+- Supabase Edge Function deploy needed: **No currently**
+- Production Finish update needed: **No currently**
+- Frontend deploy needed: **Yes, after Track Intake caller cutover**
+- PR needed now: **Not yet**
+- Immediate next implementation task: **queue credit UUID + workflow-only
+  finalizer + frontend orchestration**
+
+
+## Post-cutover structural checkpoint — 2026-09-21
+
+Branch head at this checkpoint: `8c1f48c15055a2de152ae1d17a3a41d2c38a7f0d`.
+
+The Track Intake admin page no longer calls either legacy enriched canonicalizer.
+Its durable orchestration is now:
+
+- new Track: Track Create V2 -> reviewed-credit reconciliation per source credit
+  -> Track profile -> Release profile when applicable -> governed provider-link
+  admission -> activation -> workflow-only finalization;
+- existing Track: reviewed-credit reconciliation per source credit -> Track
+  profile -> Release profile when applicable -> governed provider-link admission
+  -> workflow-only finalization.
+
+The final Track Intake credit model is one
+`registry.track_artist_credit.reviewed_reconcile/v1` authority for both draft
+and active Tracks. The earlier Track-Intake-specific
+`registry.track_artist_credit.admit/v1` migration and verifier were removed
+from the unmerged branch.
+
+Review evidence is partitioned into:
+
+- identity review fingerprint;
+- source-credit-scoped review fingerprint;
+- complete credit-set review fingerprint for activation;
+- Track profile fingerprint;
+- Release profile fingerprint;
+- provider-link authority evidence.
+
+The queue now exposes immutable source `credit_id`; canonical write authority
+is never keyed only by `credit_order`.
+
+`admin_finalize_registry_track_intake_v1` is workflow-only. Its permanent
+verifier forbids canonical Registry DML and requires proof of current child
+authority before canonicalization.
+
+Behavioral Preview `gzulggmimoyfeemrtytm` was hot-aligned to the final
+function semantics and received the workflow-finalization migration. The
+following permanent verifiers all pass together there:
+
+- Track Create V2 foundation;
+- reviewed-credit reconciliation;
+- Track activation;
+- Track reviewed profile;
+- Release reviewed profile;
+- workflow-only finalization.
+
+This Preview remains diagnostic-only. Final migration authority still requires
+a brand-new clean Preview replay from accepted main.
+
+Legacy direct writer functions remain installed intentionally until consolidated
+real-JWT caller acceptance succeeds. They must not be retired earlier.
+
+
+## Post-retirement behavioral acceptance checkpoint — 2026-09-21
+
+Branch head before this checkpoint commit: `60ead23ff10d9205c0a7c3d5e90f8d0063908be9`.
+
+The consolidated real-JWT behavioral acceptance passed end to end on the
+diagnostic Preview:
+
+- exact candidate authority;
+- real password login;
+- anon/service_role denial on workflow finalization;
+- new Track V2 identity;
+- draft-Track reviewed-credit reconciliation;
+- reviewed Track profile admission;
+- exact Track activation;
+- finalization blocked before canonical provider-link authority;
+- governed provider-link admission;
+- workflow-only finalization and idempotent replay;
+- existing Track reviewed-credit insert;
+- changed source-credit review updating the same canonical relation under a new
+  exact operation;
+- reviewed Track and Release profile admissions;
+- existing-Track governed provider-link admission;
+- existing-Track workflow finalization and idempotent replay;
+- durable state verification;
+- unrelated existing credit preservation.
+
+Final acceptance marker:
+
+`TRACK_INTAKE_GOVERNED_CUTOVER_REAL_JWT=PASS`
+
+The independent remote receipt audit then proved all ten canonical operations
+were `succeeded` with `verifier_status='passed'`, all ten exact grants were
+consumed and caller-bound, each operation had exactly one causal canonical
+write event, both Track Intake workflow rows finalized to the expected Track,
+both governed canonical provider links were present, and the unrelated existing
+credit remained unchanged.
+
+After that proof the following legacy direct writer roads were retired on the
+branch and diagnostic Preview:
+
+- `admin_create_registry_track_from_intake_enriched(uuid,text,text)`
+- `admin_resolve_registry_track_intake_enriched(uuid,uuid,text,boolean)`
+- `admin_resolve_registry_track_intake(uuid,uuid,text)`
+- `sync_registry_track_intake_artist_credits(uuid,uuid)`
+
+The superseded diagnostic-only Track Intake credit-admit wrapper/helpers were
+also removed from the hot Preview and are permanently forbidden by the
+retirement verifier. They are already absent from the final migration chain.
+
+Post-retirement structural acceptance is green across all of:
+
+- Track Create V2 foundation verifier;
+- reviewed-credit reconciliation verifier;
+- Track activation verifier;
+- Track reviewed-profile verifier;
+- Release reviewed-profile verifier;
+- workflow-only finalization verifier;
+- legacy-writer retirement verifier;
+- MIZIZI Track identity write-boundary verifier;
+- Phase 5A Track Intake canonical-creation verifier;
+- generated canonical Registry writer inventory.
+
+The writer manifest now classifies the five governed Track Intake canonical
+command surfaces and removes the two formerly classified legacy direct writers.
+The workflow finalizer is intentionally not a canonical writer.
+
+The current Preview remains diagnostic-only because it contains historical hot
+repairs. It is not promotion authority.
+
+### Remaining gate
+
+Before PR merge or Production promotion, create a brand-new clean Preview from
+the accepted Production/main baseline and replay the final repository migration
+chain exactly. The clean Preview must prove:
+
+1. exact baseline migration ledger;
+2. all final Track Intake migrations apply in repository order with no hot
+   repair;
+3. all permanent verifiers pass;
+4. generated canonical-writer inventory passes;
+5. migration replay contract passes;
+6. canonical replay proof and schema seal are recorded;
+7. consolidated tests and CI are green.
+
+Only then may the PR be opened/merged and Production promotion considered.
