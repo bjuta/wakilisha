@@ -532,6 +532,43 @@ describe("MIZIZI Cultural Data Steward", () => {
     );
   });
 
+  it("reconciles reviewed credits onto existing Tracks without exact-set deletion semantics", () => {
+    const migration = read(
+      "supabase/migrations/20260921143000_registry_track_intake_existing_track_credit_reconcile_authority_v1.sql",
+    );
+    const verifier = read(
+      "scripts/control-plane/verify-registry-track-intake-existing-track-credit-reconcile-authority.sql",
+    );
+
+    expect(migration).toContain(
+      "'registry.track_artist_credit.reviewed_reconcile'",
+    );
+    expect(migration).toContain(
+      "'reconcile_registry_track_reviewed_artist_credit'",
+    );
+    expect(migration).toContain(
+      "'track_intake_review'",
+    );
+    expect(migration).toContain(
+      "'INTERNAL_FACT'",
+    );
+    expect(migration).toContain(
+      "'already_current'",
+    );
+    expect(migration).toContain(
+      "'reconcile_reviewed_credit'",
+    );
+    expect(migration).not.toContain(
+      "apple_music_ingest",
+    );
+    expect(migration).not.toContain(
+      "delete from public.registry_track_artists",
+    );
+    expect(verifier).toContain(
+      "REGISTRY_TRACK_INTAKE_EXISTING_TRACK_CREDIT_RECONCILE_AUTHORITY_PASS",
+    );
+  });
+
   it("adds provider-neutral reviewed Release profile authority without creating Releases or Labels", () => {
     const migration = read(
       "supabase/migrations/20260921140000_registry_track_intake_release_reviewed_profile_authority_v1.sql",

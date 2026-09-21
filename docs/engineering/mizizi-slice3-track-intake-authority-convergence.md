@@ -122,6 +122,16 @@ Contract:
 
 Activation is lifecycle authority, not identity creation or enrichment.
 
+## Existing-Track reviewed-credit reconciliation
+
+Existing canonical Tracks do not use the draft-Track credit-admit path and do not use Discography exact-set replacement. The accepted Discography exact-set operation is Apple Music-specific and complete-set replacement would be stronger than legacy Track Intake semantics.
+
+Track Intake therefore adds `registry.track_artist_credit.reviewed_reconcile/v1`, a one-source-credit operation over an existing active Track. It binds the current Track state, current live/reviewable candidate relation state, the exact reviewed source credit, and the immutable review fingerprint.
+
+The operation has three outcomes: insert one missing reviewed relation, update one unambiguous live/reviewable relation, or record a verified no-op when canonical semantic fields already match. It never deletes unrelated credits and never resurrects archived rows. Ambiguous live/reviewable matches fail closed for explicit cleanup. Changed review state receives a new exact operation through a review-bound idempotency hash.
+
+This preserves interruption-resume behavior at one reviewed credit per transaction while keeping existing Track history intact.
+
 ## Track activation implementation
 
 Track Intake adds `registry.track.activate/v1` as a distinct lifecycle operation backed by typed capability `activate_registry_track`.
