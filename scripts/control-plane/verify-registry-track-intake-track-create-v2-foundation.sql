@@ -151,12 +151,12 @@ begin
 
   if to_regprocedure(
        'public.admin_create_registry_track_from_intake_enriched(uuid,text,text)'
-     ) is null
+     ) is not null
      or to_regprocedure(
        'public.admin_resolve_registry_track_intake_enriched(uuid,uuid,text,boolean)'
-     ) is null
+     ) is not null
   then
-    raise exception 'Track Intake legacy product road was retired before caller cutover';
+    raise exception 'Retired Track Intake legacy product road was reintroduced';
   end if;
 
   raise notice 'REGISTRY_TRACK_INTAKE_TRACK_CREATE_V2_FOUNDATION_PASS';
