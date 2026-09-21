@@ -1089,16 +1089,16 @@ to authenticated;
 
 drop policy if exists registry_track_provider_links_admin_manage
   on public.registry_track_provider_links;
-revoke insert,update,delete
+revoke insert,update,delete,truncate,references,trigger
 on public.registry_track_provider_links
-from authenticated,service_role;
+from PUBLIC,anon,authenticated,service_role;
 
 drop policy if exists registry_relationship_evidence_insert
   on public.registry_relationship_evidence;
 drop policy if exists registry_relationship_evidence_delete
   on public.registry_relationship_evidence;
-revoke insert,update,delete
+revoke insert,update,delete,truncate,references,trigger
 on public.registry_relationship_evidence
-from authenticated,service_role;
+from PUBLIC,anon,authenticated,service_role;
 
 commit;
