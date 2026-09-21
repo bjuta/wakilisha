@@ -480,26 +480,50 @@ export default function AdminChartsArtistResolutionPage() {
     setSelectedRowId(null);
 
     try {
-      const { data, error: entryError } = await supabase
-        .from("wk_chart_entries_v2")
-        .select("*")
-        .eq("edition_id", editionId)
-        .order("rank", { ascending: true });
+      const [{ data, error: entryError }, { data: identityData, error: identityError }] = await Promise.all([
+        supabase
+          .from("wk_chart_entries_v2")
+          .select("*")
+          .eq("edition_id", editionId)
+          .order("rank", { ascending: true }),
+        supabase.rpc("chart_get_entry_registry_identity_v1", {
+          p_edition_id: editionId,
+        }),
+      ]);
 
       if (entryError) throw new Error(entryError.message);
+      if (identityError) throw new Error(identityError.message);
 
-      const rows = ((data ?? []) as DbRow[]).map(toEntry);
-      setEntries(rows);
+      const identityRows = ((identityData ?? []) as DbRow[]);
+      const identityByEntry = new Map(
+        identityRows.map((row) => [
+          asString(row.entry_id),
+          {
+            trackSlug: asString(row.canonical_track_slug) || null,
+            primaryArtistSlug: asString(row.canonical_primary_artist_slug) || null,
+          },
+        ])
+      );
 
-      const ids = Array.from(new Set(rows.map((row) => row.canonicalArtistId).filter(Boolean))) as string[];
-      const slugs = Array.from(new Set(rows.map((row) => row.artistSlug).filter(Boolean))) as string[];
+      const baseRows = ((data ?? []) as DbRow[]).map(toEntry);
+      const currentPrimarySlugs = Array.from(new Set(
+        identityRows
+          .map((row) => asString(row.canonical_primary_artist_slug))
+          .filter(Boolean)
+      ));
+      const observedSlugs = Array.from(new Set(
+        baseRows.map((row) => row.artistSlug).filter(Boolean)
+      )) as string[];
+      const artistSlugs = Array.from(new Set([...currentPrimarySlugs, ...observedSlugs]));
       const artistMap = new Map<string, RegistryArtistLite>();
 
-      if (ids.length > 0) {
-        const { data: artistRows } = await supabase
+      if (artistSlugs.length > 0) {
+        const { data: artistRows, error: artistError } = await supabase
           .from("registry_artists")
           .select("id, slug, display_name, status, origin_iso2, public_image_url")
-          .in("id", ids);
+          .in("slug", artistSlugs);
+
+        if (artistError) throw new Error(artistError.message);
 
         ((artistRows ?? []) as DbRow[]).map(toRegistryArtist).forEach((artist) => {
           artistMap.set(artist.id, artist);
@@ -507,21 +531,20 @@ export default function AdminChartsArtistResolutionPage() {
         });
       }
 
-      if (slugs.length > 0) {
-        const missingSlugs = slugs.filter((slug) => !artistMap.has(slug));
-        if (missingSlugs.length > 0) {
-          const { data: slugRows } = await supabase
-            .from("registry_artists")
-            .select("id, slug, display_name, status, origin_iso2, public_image_url")
-            .in("slug", missingSlugs);
+      const rows = baseRows.map((row) => {
+        const identity = identityByEntry.get(row.id);
+        const primaryArtist = identity?.primaryArtistSlug
+          ? artistMap.get(identity.primaryArtistSlug)
+          : null;
 
-          ((slugRows ?? []) as DbRow[]).map(toRegistryArtist).forEach((artist) => {
-            artistMap.set(artist.id, artist);
-            artistMap.set(artist.slug, artist);
-          });
-        }
-      }
+        return {
+          ...row,
+          trackSlug: identity?.trackSlug ?? row.trackSlug,
+          canonicalArtistId: primaryArtist?.id ?? null,
+        };
+      });
 
+      setEntries(rows);
       setRegistryArtists(artistMap);
       await loadDecisions(editionId);
     } catch (err) {
@@ -1361,7 +1384,7 @@ export default function AdminChartsArtistResolutionPage() {
                   )}
 
                   <div className="rounded-xl border border-wk-brand/20 bg-wk-brand-soft p-3 text-[11px] leading-relaxed text-wk-text-muted">
-                    Save captures the decision. Apply inserts missing registry track credits and marks the decision resolved. It does not delete old credits or archive artists.
+                    Save captures the decision. Apply admits only non-conflicting missing Registry credits through governed authority and marks the decision resolved. Conflicting or ambiguous current credits stop for review; this surface does not delete or rewrite them.
                   </div>
                 </div>
               )}
