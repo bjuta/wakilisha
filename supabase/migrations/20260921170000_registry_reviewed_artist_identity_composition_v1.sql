@@ -1504,8 +1504,7 @@ begin
   end loop;
 
   update public.contributor_submissions
-  set entity_id=v_artist_id,
-      review_status='merged',
+  set review_status='merged',
       reviewed_by=v_user_id,
       reviewed_at=now(),
       review_note=btrim(p_review_reason),
