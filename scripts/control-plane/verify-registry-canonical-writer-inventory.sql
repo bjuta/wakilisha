@@ -83,6 +83,9 @@ begin
   classified(signature) as (
     values
       ('public.accept_registry_missing_artist_intake(uuid,text)'),
+      ('public.admin_activate_registry_track_intake_v1(uuid)'),
+      ('public.admin_admit_registry_track_intake_release_profile_v1(uuid,uuid,boolean)'),
+      ('public.admin_admit_registry_track_intake_track_profile_v1(uuid,uuid,boolean)'),
       ('public.admin_admit_registry_track_provider_link_v1(uuid,text,text,text,text[],text,text,text,text,integer,text,text,numeric,text,jsonb)'),
       ('public.admin_apply_artist_decouple_decision(uuid)'),
       ('public.admin_apply_chart_artist_resolution_decision(uuid)'),
@@ -91,7 +94,7 @@ begin
       ('public.admin_create_registry_artist_for_decouple(text,text,text,text)'),
       ('public.admin_create_registry_artist_intake_shell_v1(uuid)'),
       ('public.admin_create_registry_discography_artist_shell_v1(uuid,text)'),
-      ('public.admin_create_registry_track_from_intake_enriched(uuid,text,text)'),
+      ('public.admin_create_registry_track_intake_identity_v1(uuid,text)'),
       ('public.admin_decouple_registry_artist(uuid,jsonb,text,boolean,uuid)'),
       ('public.admin_execute_registry_artist_enrichment_evidence_admission(uuid)'),
       ('public.admin_execute_registry_artist_origin_admission(uuid,text,numeric,text,text,text,timestamp with time zone)'),
@@ -103,8 +106,8 @@ begin
       ('public.admin_patch_registry_release_detail_v1(uuid,text,text,text,date,text,uuid,text,text,text,timestamp with time zone)'),
       ('public.admin_patch_registry_release_profile_v1(uuid,jsonb,timestamp with time zone)'),
       ('public.admin_patch_registry_track_profile_v1(uuid,jsonb,timestamp with time zone)'),
+      ('public.admin_reconcile_registry_track_intake_credit_v1(uuid,uuid,uuid)'),
       ('public.admin_resolve_chart_artist_alias(text,uuid,text,boolean)'),
-      ('public.admin_resolve_registry_track_intake_enriched(uuid,uuid,text,boolean)'),
       ('public.admin_safe_merge_registry_artists(uuid,uuid,text,boolean,text)'),
       ('public.chart_admit_artist_origin_v1(uuid,text,uuid,uuid,text)'),
       ('public.chart_admit_track_provider_link_v1(uuid)'),
