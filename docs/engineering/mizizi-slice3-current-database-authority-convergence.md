@@ -1,6 +1,6 @@
 # MIZIZI Slice 3 — Current Database Authority Convergence
 
-Status: **in progress — Track Intake tranche Production accepted**
+Status: **in progress — Track Intake and Top Songs D1/D2 tranches Production accepted**
 
 Current authority checkpoint:
 
