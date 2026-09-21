@@ -1,16 +1,18 @@
 # MIZIZI Registry Authority Ledger
 
+> **21 September 2026 current authority:** Track Intake create/enrichment is Production accepted through PR #1001 on `main@dcdbe948b6dc5edc2cd31133939e45e152db7b57`. Production is `ACTIVE_HEALTHY` / `FUNCTIONS_DEPLOYED` at 166 migrations with head `20260921153000_registry_track_intake_legacy_writer_retirement_v1`. The four legacy Track Intake writer roads are retired, all ten permanent Track Intake/Registry verifiers pass, and the canonical writer inventory passes. Slice 3 remains open under #962 with 11 machine-classified convergence/retirement entries. The living remaining-work authority is `docs/engineering/mizizi-slice3-current-database-authority-convergence.md`.
+
 > **20 September 2026 Slice 3 closure:** obsolete Registry authority retirement and bypass closure is Production accepted. The final orphaned Edge writer `registry-enrichment-review` is deleted from Production, its route returns HTTP 404, all six retired Registry Edge runtimes are absent, and all nine retained governed Registry/Admin runtimes are ACTIVE. Historical sections below preserve the authority that existed when originally audited.
 
 > **17 September 2026 Slice 3 status:** `backfill-artist-spotify-images` and `backfill-artist-type` are retired repository/runtime candidates after post-convergence traffic proof. Current Admin enrichment uses `registry-enrich-artist`; the two compatibility wrappers have no current product, workflow, database, or cron caller. Historical Slice 1 / Slice 2 sections below remain evidence of the authority that existed when audited.
 
 Date: 14 September 2026
 
-Status: **Living Registry authority ledger. Slice 3 Production closure is accepted; historical audit sections remain evidence of the authority that existed when captured.**
+Status: **Living Registry authority ledger. Slice 3 obsolete-runtime retirement and completed convergence tranches are Production accepted; whole Slice 3 remains open for the remaining machine-classified writer debt. Historical audit sections remain evidence of the authority that existed when captured.**
 
 Programme authority: `docs/engineering/mizizi-registry-authority-security-convergence-programme.md`
 
-Repository baseline: `main@4d07bf5acce5eb0a414728d7c198b26f54de6cf6`
+Current repository authority: `main@dcdbe948b6dc5edc2cd31133939e45e152db7b57`
 
 Production project: WAKILISHA / `pgzizndxdyhqmtyywjmt`
 
