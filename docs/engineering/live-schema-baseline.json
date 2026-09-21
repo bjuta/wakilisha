@@ -1,16 +1,16 @@
 {
   "projectRef": "pgzizndxdyhqmtyywjmt",
   "schema": "public,editorial",
-  "generatedAt": "2026-09-21T11:30:01Z",
-  "typesSha256": "a11c2488aee9c5ad218ddefbdfe14653f14a20fae196a4b72df7a50c54bc9150",
+  "generatedAt": "2026-09-21T16:09:01Z",
+  "typesSha256": "6b45da162d8304e2a86b975a7a2bb1cd01716a253c7d6e1c48467862637fdc1d",
   "authoritativeMigrationDirectory": "supabase/migrations",
-  "migrationCount": 166,
-  "latestMigration": "20260921153000_registry_track_intake_legacy_writer_retirement_v1.sql",
+  "migrationCount": 168,
+  "latestMigration": "20260921171000_registry_chart_artist_resolution_rebase_v1.sql",
   "schemaSeal": {
     "mode": "preview",
-    "sourceProjectRef": "hkltdaousxqxyupcbzkw",
-    "migrationHead": "20260921153000",
-    "baseMainSha": "01c0e5404230dbf320c8cd1a8f46ef5d0c2743a8",
-    "previewBranchId": "2504b702-8093-49f7-b93f-4bd8b950084e"
+    "sourceProjectRef": "smdidvevfzbjqdnvxruq",
+    "migrationHead": "20260921171000",
+    "baseMainSha": "6c66091c7b8b02ad072872a2348304d9ad5b669e",
+    "previewBranchId": "fd53837f-5f22-4229-8458-be06893702a6"
   }
 }
