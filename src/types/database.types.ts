@@ -19297,7 +19297,15 @@ export type Database = {
           updated_by: string | null
           updated_by_label: string | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "publishing_items_content_kind_fkey"
+            columns: ["content_kind"]
+            isOneToOne: false
+            referencedRelation: "wk_publishing_content_kinds"
+            referencedColumns: ["kind"]
+          },
+        ]
       }
       wk_resource_index: {
         Row: {
