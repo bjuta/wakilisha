@@ -559,6 +559,9 @@ describe("MIZIZI Cultural Data Steward", () => {
       "'registry-track-create-v2'",
     );
     expect(migration).toContain(
+      "errcode='23514'",
+    );
+    expect(migration).toContain(
       "'track_intake_review'",
     );
     expect(migration).toContain(

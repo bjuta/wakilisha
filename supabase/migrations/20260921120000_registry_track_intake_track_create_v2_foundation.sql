@@ -1338,7 +1338,7 @@ begin
        or v_existing_evidence.source_payload_fingerprint
             is distinct from v_review->>'review_fingerprint'
     then
-      raise exception using errcode='40001',
+      raise exception using errcode='23514',
         message='Track Intake reviewed identity changed after the existing exact grant.';
     end if;
 
