@@ -529,7 +529,12 @@ After protected CI and merge, deploy `admin-router` and run the normal frontend 
 
 ### Decision
 
-**RETIRE in Slice 3 D2 after D1 replacement proof.**
+**PRODUCTION RETIRED. PRESERVE D1 TOP SONGS AUTHORITY AND HISTORICAL EVIDENCE.**
+
+Current Production independently confirms `admin-registry-api` is absent from
+the Edge inventory and the permanent Top Songs presentation-authority verifier
+passes. The prerequisite and deletion-proof text below remains historical
+retirement evidence; it is not an open gate.
 
 The prerequisite convergence is complete:
 
