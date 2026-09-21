@@ -313,10 +313,8 @@ begin
          v_operation_type.capability_key <>
            'create_registry_track'
          or p_subject_type <> 'track'
-         or p_required_user_capability_key not in (
-           'publish_charts',
-           'manage_registry'
-         )
+         or p_required_user_capability_key <>
+           'publish_charts'
        )
      )
      or (
@@ -325,8 +323,10 @@ begin
          v_operation_type.capability_key <>
            'admit_registry_track_artist_credit'
          or p_subject_type <> 'track_artist_credit'
-         or p_required_user_capability_key <>
-           'publish_charts'
+         or p_required_user_capability_key not in (
+           'publish_charts',
+           'manage_registry'
+         )
        )
      )
      or (
@@ -735,12 +735,22 @@ begin
     raise exception 'selected_artist_or_credit_semantics_invalid';
   end if;
 
-  select count(*)::integer,min(credit.artist_id)
-  into v_existing_primary_count,v_existing_primary_artist_id
+  select count(*)::integer
+  into v_existing_primary_count
   from public.registry_track_artists credit
   where credit.track_id=v_entry.canonical_track_id::uuid
     and credit.status<>'archived'
     and credit.is_primary is true;
+
+  if v_existing_primary_count=1 then
+    select credit.artist_id
+    into v_existing_primary_artist_id
+    from public.registry_track_artists credit
+    where credit.track_id=v_entry.canonical_track_id::uuid
+      and credit.status<>'archived'
+      and credit.is_primary is true
+    limit 1;
+  end if;
 
   if v_existing_primary_count>1 then
     raise exception using errcode='23514',
