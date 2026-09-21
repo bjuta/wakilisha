@@ -169,6 +169,14 @@ The operation binds:
 
 No arbitrary JSON patching.
 
+### Track reviewed-profile implementation
+
+The Track half is implemented as `registry.track.reviewed_profile.admit/v1` with typed capability `admit_registry_track_reviewed_profile`.
+
+Its bounded field family is exactly the current Track Intake contract: ISRC, duration, Track artwork URL, preview URL, track number, disc number, explicit flag, and the reviewed genre observation stored under `metadata.provider_genre`. It accepts an existing draft or active Track so new-Track orchestration can enrich before activation while existing-Track resolution can enrich in place.
+
+The operation binds the whole current Track state fingerprint plus the exact reviewed field-set fingerprint. Legacy overwrite semantics are preserved for ISRC, duration and artwork. A changed reviewed field set receives a new evidence assertion and a new review-fingerprint-scoped idempotency key; an identical review replays the same exact operation. The historical `track_intake_enriched_at` metadata timestamp is not recreated because operation/evidence timestamps now carry that provenance durably.
+
 ### Release reviewed profile
 
 Operation candidate:

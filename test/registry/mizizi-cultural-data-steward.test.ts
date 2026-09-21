@@ -532,6 +532,43 @@ describe("MIZIZI Cultural Data Steward", () => {
     );
   });
 
+  it("adds provider-neutral reviewed Track profile authority without Apple-Music provenance", () => {
+    const migration = read(
+      "supabase/migrations/20260921133000_registry_track_intake_track_reviewed_profile_authority_v1.sql",
+    );
+    const verifier = read(
+      "scripts/control-plane/verify-registry-track-intake-track-reviewed-profile-authority.sql",
+    );
+
+    expect(migration).toContain(
+      "'registry.track.reviewed_profile.admit'",
+    );
+    expect(migration).toContain(
+      "'admit_registry_track_reviewed_profile'",
+    );
+    expect(migration).toContain(
+      "'INTERNAL_FACT'",
+    );
+    expect(migration).toContain(
+      "registry_subject_state_fingerprint",
+    );
+    expect(migration).toContain(
+      "provider_genre",
+    );
+    expect(migration).toContain(
+      "p_allow_overwrite",
+    );
+    expect(migration).not.toContain(
+      "apple_music_ingest",
+    );
+    expect(migration).not.toContain(
+      "track_intake_enriched_at",
+    );
+    expect(verifier).toContain(
+      "REGISTRY_TRACK_INTAKE_TRACK_REVIEWED_PROFILE_AUTHORITY_PASS",
+    );
+  });
+
   it("adds exact reviewed Track activation without merging it into identity creation", () => {
     const migration = read(
       "supabase/migrations/20260921130000_registry_track_intake_track_activation_authority_v1.sql",
