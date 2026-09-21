@@ -532,6 +532,43 @@ describe("MIZIZI Cultural Data Steward", () => {
     );
   });
 
+  it("adds exact reviewed Track activation without merging it into identity creation", () => {
+    const migration = read(
+      "supabase/migrations/20260921130000_registry_track_intake_track_activation_authority_v1.sql",
+    );
+    const verifier = read(
+      "scripts/control-plane/verify-registry-track-intake-track-activation-authority.sql",
+    );
+
+    expect(migration).toContain(
+      "'registry.track.activate'",
+    );
+    expect(migration).toContain(
+      "'activate_registry_track'",
+    );
+    expect(migration).toContain(
+      "registry_subject_state_fingerprint",
+    );
+    expect(migration).toContain(
+      "registry_track_intake_activation_credit_state_v1",
+    );
+    expect(migration).toContain(
+      "'from_status','draft'",
+    );
+    expect(migration).toContain(
+      "'to_status','active'",
+    );
+    expect(migration).toContain(
+      "set status='active'",
+    );
+    expect(migration).toContain(
+      "errcode='23514'",
+    );
+    expect(verifier).toContain(
+      "REGISTRY_TRACK_INTAKE_TRACK_ACTIVATION_AUTHORITY_PASS",
+    );
+  });
+
   it("reuses Track Artist Credit V1 through Track Intake-specific provenance", () => {
     const migration = read(
       "supabase/migrations/20260921123000_registry_track_intake_artist_credit_authority_v1.sql",

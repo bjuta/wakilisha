@@ -122,6 +122,14 @@ Contract:
 
 Activation is lifecycle authority, not identity creation or enrichment.
 
+## Track activation implementation
+
+Track Intake adds `registry.track.activate/v1` as a distinct lifecycle operation backed by typed capability `activate_registry_track`.
+
+Activation binds one existing draft Track through `registry_subject_state_fingerprint('track', id)`, the current immutable Track Intake review fingerprint, and an exact reviewed-vs-canonical Artist-credit-set fingerprint. The executor refuses activation unless every reviewed credit is resolved to an active Artist and the complete active canonical credit set exactly matches the reviewed set with `source='track_intake_review'`.
+
+The mutation is one row and lifecycle-only: `status='draft' → 'active'` plus the normal `updated_at` timestamp. The executor proves all other Track columns are unchanged in the same transaction. The independent verifier then binds the active Track state to the operation's after-state fingerprint and one exact canonical `activate` write event.
+
 ## Provider-neutral enrichment
 
 Existing operations:
