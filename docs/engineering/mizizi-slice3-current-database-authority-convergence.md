@@ -20,9 +20,17 @@ Current authority checkpoint:
 This document is the living current-state companion to
 `mizizi-slice3-final-live-writer-authority-audit.md`.
 
+The current stale-contract and remaining-authority audit is:
+
+`docs/engineering/mizizi-slice3-stale-contract-and-remaining-authority-audit-20260921.md`.
+
+That dated audit supersedes the earlier five-job implementation queue below as
+the current planning authority for #962.
+
 The September 20 audit remains historical evidence. Do not rewrite its original
-findings to pretend they were made against today's runtime. Current closure and
-remaining-work truth belongs here and in dated amendments to the audit.
+findings to pretend they were made against today's runtime. Historical replay
+proofs, PRs, migrations, and closure records remain immutable. Current closure
+and remaining-work truth belongs here and in dated forward amendments.
 
 ## Production-accepted convergence since the September 20 audit
 
@@ -78,85 +86,125 @@ Acceptance completed:
 - direct-origin and public HTTPS smoke green;
 - clean Preview deleted after Production acceptance.
 
-## Current machine-classified Slice 3 debt
+## Current remaining-work authority after stale-contract audit
 
-The privileged-writer manifest now contains **11** entries still classified as
-`keep_converge`, `retire_or_internalize`, or `candidate_retire`.
+The privileged-writer manifest still contains **11** entries classified as
+`keep_converge`, `retire_or_internalize`, or `candidate_retire`, but the
+21 September stale-contract audit proves that they are **not eleven independent
+modernization jobs**.
 
-### Existing-primitive convergence roads
+The current classifications are:
 
-These should be completed before the high-blast repair/merge family because
-accepted typed primitives already exist for most of their canonical writes.
+1. **Artist Claim family — CURRENT / REBASE**
+   - preserve Claim review, representation, permissions, duplicate-resolution
+     and final lifecycle semantics;
+   - replace the stale structural assumption that the Claim RPC itself must
+     directly insert the Registry Artist;
+   - reuse governed Artist identity creation without weakening the draft-first
+     shared primitive;
+   - preserve the strong existing behavioral acceptance contract.
 
-1. Artist Claim creation family
-   - `community_admin_decide_artist_claim(...)`
-   - `community_admin_resolve_artist_claim_existing(...)`
-   - preserve claim review/representation semantics;
-   - route new canonical Artist creation through `registry.artist.create`.
+2. **Missing Artist Intake — CURRENT / REBASE + REPAIR**
+   - Production has 21 `needs_intake`, 2 `intake_in_progress`, and 49
+     unresolved Artist relationship endpoints;
+   - the current acceptance RPC is stale against the live alias schema because
+     it writes `source='manual_intake'` while Production allows only
+     `manual`, `similarity_match`, and `ingest_review`;
+   - route identity creation and alias mutation through current authority while
+     preserving typed endpoint resolution and review semantics;
+   - prove that resolving historical `popular_track/top_song` endpoints cannot
+     mutate Top Songs presentation authority.
 
-2. Missing Artist Intake
-   - `accept_registry_missing_artist_intake(...)`
-   - route Artist creation through `registry.artist.create`;
-   - preserve accepted typed relationship endpoint resolution.
+3. **Chart Artist Resolution — CURRENT / REBASE**
+   - the workflow can still create new decisions;
+   - the June-era UI incorrectly treats
+     `wk_chart_entries_v2.canonical_artist_id IS NULL` as missing canonical
+     Artist identity;
+   - current accepted identity derives from canonical Track + primary
+     Track↔Artist credit;
+   - rebase the UI and apply path onto current Track-credit authority and
+     rebuildable Chart projection.
 
-3. Chart Artist resolution
-   - `admin_apply_chart_artist_resolution_decision(...)`
-   - converge Track↔Artist mutation onto accepted reviewed credit
-     admission/reconciliation/set authority.
+4. **Artist creation for decouple — CURRENT / THIN COMPOSITION**
+   - remove the second direct Artist-creation algorithm;
+   - compose current Artist identity authority and only the domain-required
+     reviewed lifecycle consequence.
 
-4. Artist creation for decouple
-   - `admin_create_registry_artist_for_decouple(...)`
-   - replace direct canonical Artist creation with `registry.artist.create`;
-   - preserve both Chart-resolution and Artist-alias decouple callers.
+5. **Chart Artist alias resolution — STALE MONOLITH**
+   - split alias decision, Track-credit correction, Chart projection repair,
+     and true duplicate-identity handling;
+   - retire `admin_resolve_chart_artist_alias(...)` after caller cutover.
 
-5. Chart Artist alias resolution
-   - `admin_resolve_chart_artist_alias(...)`
-   - preserve alias-resolution semantics while moving canonical credit mutation
-     behind typed/journaled authority.
+6. **Track duplicate repair — CURRENT HIGH-BLAST / INTERNALIZE**
+   - retain the mature repair algorithm;
+   - place exact reviewed plan/grant/journal/verifier authority around it;
+   - preserve `registry_track_resolution_events` and current identity-lineage
+     semantics.
 
-### High-blast / retirement roads after the existing-primitive block
+7. **Artist decouple — CURRENT HIGH-BLAST / CONVERGE**
+   - keep the reviewed product command;
+   - internalize `admin_decouple_registry_artist(...)`;
+   - preserve split-event and lineage semantics.
 
-- `admin_apply_registry_track_duplicate_repair(...)`
-  - dedicated exact high-risk Track repair operation;
-- `admin_apply_artist_decouple_decision(...)`
-  - dedicated exact Artist decouple operation;
-- `admin_safe_merge_registry_artists(...)`
-  - dedicated exact high-risk Artist merge operation;
-- `admin_decouple_registry_artist(...)`
-  - internalize after the reviewed product command owns exact authority;
-- `admin_merge_registry_artists(...)`
-  - candidate retirement after dependency, bounded traffic, rollback, and
-    permanent negative proof.
+8. **Safe Artist merge — CURRENT HIGH-BLAST / INTERNALIZE**
+   - retain the mature algorithm behind exact reviewed authority;
+   - preserve `registry_artist_resolution_events action='artist_merge'` and
+     lineage semantics.
 
-## Next five jobs
+9. **Old manual Artist merge — CANDIDATE RETIRE**
+   - no current source or database-function caller was found;
+   - retire only after bounded external/runtime dependency proof and rollback
+     preservation.
 
-The next five engineering jobs, in current Slice 3 order, are:
+### Newly discovered bypass/stale-caller work inside #962
 
-1. **Artist Claim canonical-creation convergence**
-   - freeze current claim-review semantics and callers;
-   - compose accepted Artist-create authority;
-   - keep existing-Artist claim resolution semantics intact.
+The stale-contract audit also found current authority debt outside the eleven
+database-function manifest entries:
 
-2. **Missing Artist Intake convergence**
-   - freeze current knowledge-review workflow;
-   - compose typed Artist create + typed relationship endpoint resolution.
+- `registry_artist_aliases` still grants authenticated
+  INSERT/UPDATE/DELETE and the current Artist Aliases UI directly deletes alias
+  rows;
+- `registry_track_provider_links` still grants authenticated
+  INSERT/UPDATE/DELETE even though governed provider-link admission is now
+  Production accepted and no current `src/` direct writer was found;
+- `registry_relationship_evidence` still grants authenticated INSERT/DELETE;
+  current typed relationship commands already own reviewed evidence attachment,
+  so this grant needs explicit dependency proof or contraction;
+- Label and Genre detail pages still contain direct archive UPDATE calls even
+  though Production table UPDATE is already denied and accepted
+  `admin_patch_registry_*_profile_v1` commands exist.
 
-3. **Chart Artist resolution convergence**
-   - freeze reviewed resolution semantics;
-   - replace direct `registry_track_artists` mutation with exact reviewed
-     Track↔Artist authority.
+These are not reasons to reopen the shared Registry kernel. They are stale
+caller/grant cleanup required to make the final Slice 3 bypass claim true.
 
-4. **Decouple Artist-creation convergence**
-   - converge `admin_create_registry_artist_for_decouple(...)` onto
-     `registry.artist.create`;
-   - do not redesign the later high-blast decouple operation in this job.
+### Corrected implementation shape
 
-5. **Chart Artist alias-resolution convergence**
-   - preserve alias semantics;
-   - move canonical credit mutation onto typed/journaled authority.
+Work is grouped by rollback authority, not legacy function name.
 
-After those five, enter the dedicated high-blast Track duplicate repair / Artist
-decouple / Artist merge block and finally the manual-merge retirement proof.
+**Tranche A — stale low/medium authority and caller repair**
+
+- Artist Claim rebase;
+- Missing Artist Intake repair/rebase;
+- Chart Artist Resolution current-model rebase;
+- Artist creation helper convergence;
+- split/retire the Chart Artist alias monolith;
+- bounded alias state/admission authority and browser alias-DML revocation;
+- stale Label/Genre UI caller removal/rebase;
+- provider-link direct authenticated DML contraction after negative caller proof;
+- relationship-evidence grant decision/contraction after dependency proof;
+- consolidated current writer + direct-table-grant verification.
+
+**Tranche B — high-blast exact containment and retirement**
+
+- Track duplicate repair exact reviewed authority around the mature engine;
+- Artist decouple exact reviewed authority + low-level internalization;
+- safe Artist merge exact reviewed authority around the mature engine;
+- old manual Artist merge retirement after proof;
+- current Resource, lineage, and Chart-projection postcondition verification.
+
+The shared grant/journal/evidence/fingerprint/review kernel remains frozen.
+A kernel change is a separate stop-and-review decision, not an implementation
+convenience.
 
 ## Slice 3 exit gate
 
@@ -170,7 +218,13 @@ Slice 3 closes only when a fresh Production audit proves:
 - accepted human commands compose typed authority;
 - private executors do not leak `anon`, `authenticated`, or
   `service_role` execution;
-- ordinary browser canonical DML remains zero;
+- authenticated direct INSERT/UPDATE/DELETE is mechanically zero across the
+  canonical Registry mutation table set unless an explicitly documented
+  evidence-only exception survives the stale-contract audit;
+- no stale product direct-DML caller remains against a table whose write grants
+  are denied;
+- Artist Claim, Missing Artist Intake, Chart identity, Top Songs presentation,
+  Resource identity, and Identity/Projection Lineage regression contracts pass;
 - MIZIZI standing/exact grants at rest remain within the accepted zero-state
   contract;
 - no autonomous MIZIZI schedule exists;
@@ -188,6 +242,10 @@ The current Production state is already accepted. This documentation checkpoint
 requires no SQL, Edge Function, frontend, Finish, or other Production runtime
 mutation.
 
-The next mutation-bearing implementation job is:
+The next mutation-bearing implementation block is:
 
-**Artist Claim canonical-creation convergence**.
+**Tranche A — stale low/medium authority and caller repair**, as frozen in
+`mizizi-slice3-stale-contract-and-remaining-authority-audit-20260921.md`.
+
+No implementation begins from the obsolete five-job queue without first
+respecting that audit's reclassifications.
