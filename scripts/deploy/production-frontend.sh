@@ -4,7 +4,7 @@ set -euo pipefail
 RUNNER_VERSION="2"
 BASE_EXPECTED_MAIN="57e4c9de7a205bbffde0ff97c9ec40f9a46b1b65"
 BASE_PREVIEW_REF="oeownzbanzbuvuyidwqh"
-TEMPLATE_SHA256="a42b0e264bd3cc9d7b93db6c1036cc0259a73a60fddec824237c91a99a89e9dd"
+TEMPLATE_SHA256="ee5767294b3b8665c832290aeaf5d9b5eeecb804da4305c08fd32d1bed331164"
 
 SCRIPT_DIR="$(
   CDPATH= cd -- "$(dirname -- "$0")" >/dev/null 2>&1
