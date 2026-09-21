@@ -206,70 +206,104 @@ The shared grant/journal/evidence/fingerprint/review kernel remains frozen.
 A kernel change is a separate stop-and-review decision, not an implementation
 convenience.
 
-## Tranche A implementation status — 21 September 2026
+## Tranche A Production acceptance — 21 September 2026
 
-Implementation branch:
+Implementation PR:
 
-`fix/mizizi-slice3-tranche-a-stale-authority-repair`
+- PR #1006: `fix: converge Slice 3 stale Artist and Chart authority`;
+- candidate head: `bd027bd07419f00c91d604f625ec11a17cbe9e99`;
+- merged main: `9a163ddb9382287fa961e37d44f6f04806bf640d`.
 
-Candidate migrations:
+Production migrations:
 
 - `20260921170000_registry_reviewed_artist_identity_composition_v1.sql`;
-- `20260921171000_registry_chart_artist_resolution_rebase_v1.sql`.
+- `20260921171000_registry_chart_artist_resolution_rebase_v1.sql`;
+- Production migration count: 168;
+- Production migration head: `20260921171000`;
+- canonical post-promotion migration dry-run: zero pending;
+- permanent Artist convergence verifier: PASS;
+- permanent Chart materialization/runtime verifier: PASS.
 
-Current disposable Preview:
+The canonical repository promotion applied the two repository migrations from exact
+merged `main`. The promotion then stopped at post-apply generated-type equality
+because the committed schema seal still described the accepted disposable
+Preview. No migration was rerun. Production was inspected in place, both
+permanent SQL verifiers passed, and `schema:generate` regenerated the exact
+`public,editorial` type baseline from Production.
 
-- project ref: `qjqtscxezmijkioxwazy`;
-- branch id: `b3188255-79cf-44ca-bf08-7febca89c301`;
-- exact Production baseline remains 166 / `20260921153000`;
-- corrected candidate replay reaches 168 / `20260921171000`;
-- permanent Artist and Chart SQL verifiers pass on the corrected final Preview;
-- no Production SQL, Edge, or frontend deployment has occurred.
+Production schema seal:
 
-Real JWT/PostgREST behavior acceptance:
+- mode: `production`;
+- source project: `pgzizndxdyhqmtyywjmt`;
+- migration head: `20260921171000`;
+- generated type SHA-256:
+  `472186569827cdfe3d5a72b46a546db605839934abeaa8028d9e3233f911dc46`;
+- `schema:verify`: PASS;
+- repository/Production migration versions: exact;
+- pending migrations: 0.
 
-- applicant password login through Supabase Auth: PASS;
-- reviewer password login through Supabase Auth: PASS;
-- current V3 Artist Claim submission: PASS;
-- reviewer Claim approval through PostgREST: PASS;
-- Missing Artist Intake acceptance through PostgREST: PASS;
-- reviewed Artist creation preserves `create_from_artist_claim / applied`
-  provenance: PASS;
-- active Artist representation: PASS;
-- Missing Artist alias state `manual / active`: PASS;
-- typed relationship endpoint resolution: PASS;
-- merged review state: PASS;
-- exactly one governed `registry.artist.create/v1` execution per accepted flow:
-  PASS;
-- Registry Artist Resource identity/lifecycle convergence: PASS;
-- Top Songs presentation mutation: zero rows;
-- exact execution grants at rest: 0.
+Frontend acceptance:
 
-Behavior acceptance exposed one real candidate defect:
+- exact deployed main:
+  `9a163ddb9382287fa961e37d44f6f04806bf640d`;
+- Production environment authority reused the retained local `.env` and
+  `.env.local` split;
+- protected Critical suite: 365 / 365 PASS;
+- complete Production build: PASS;
+- GA4 build-output audit: PASS;
+- Preview Supabase ref in built artifact: no;
+- Production Supabase ref in built artifact: yes;
+- local/live index SHA-256:
+  `e9b9e62992b34b78825e5045cd0e77806900ab75ebf852d7c4f94b87cd834084`;
+- local/live entry:
+  `assets/index-DG1JgV36.js`;
+- local/live entry SHA-256:
+  `5b409c8f8c0fc33c41b38e88407f56549956cc57fac9ca9a11648eb1956ee047`;
+- local/live file count: 3794.
 
-- `accept_registry_missing_artist_intake` wrote the new Registry Artist UUID
-  into legacy `contributor_submissions.entity_id`, whose foreign key targets
-  `cultural_entities(id)`;
-- the function now leaves that legacy field untouched and merges the submission
-  through Registry Artist, alias, typed relationship, audit, and review
-  authority instead;
-- the permanent Missing Artist Intake verifier now rejects any return of the
-  stale `entity_id=v_artist_id` write.
+The first post-activation smoke returned HTTP 500. The deployed bytes were
+already exact. Diagnosis proved the activation had preserved restrictive local
+filesystem modes into the live web root:
 
-Replay authority is intentionally open:
+- live directories: 3569 at `700`;
+- live files: 3794 at `600`;
+- preserved rollback directories: 3569 at `755`;
+- preserved rollback files: 3794 at `644`;
+- Nginx error authority: permission denied on the live root and
+  `index.html`, followed by the SPA fallback redirect cycle.
 
-- the `20260921170000` migration bytes changed after the behavior defect was
-  found;
-- its previously committed replay receipt is therefore stale and fails the
-  migration replay contract by SHA-256;
-- the prior schema seal also points to the superseded replay authority;
-- a fresh clean replay must directly prove the corrected `170000` state and
-  then the `171000` state before either receipt or the schema seal is
-  refreshed;
-- a later final-state observation must not substitute for that earlier gate.
+The stopped deployment was recovered surgically without content rollback or
+redeployment:
 
-PR #1006 must not merge until that replay authority is truthfully resealed and
-the protected CI suite passes.
+- live directories normalized to `755`;
+- live files normalized to `644`;
+- index SHA unchanged;
+- entry SHA unchanged;
+- file count unchanged at 3794;
+- direct origin `/`: 200;
+- direct origin `/messages`: 200;
+- direct origin `/admin/messages`: 200;
+- public HTTPS `/`: 200;
+- public HTTPS `/messages`: 200;
+- public HTTPS `/admin/messages`: 200;
+- preserved remote stage cleaned after acceptance.
+
+The canonical versioned frontend deployment template is now hardened to
+normalize and assert the same `755` directory / `644` file web-serving mode
+contract on both remote stage and live activation state. The wrapper self-test
+also requires those mode-contract markers.
+
+Disposable Preview cleanup:
+
+- Preview project ref: `qjqtscxezmijkioxwazy`;
+- Preview branch id: `b3188255-79cf-44ca-bf08-7febca89c301`;
+- deleted after Production SQL, schema, frontend, and HTTP acceptance;
+- only the default Production branch remains.
+
+This closes the PR #1006 stale Artist + Chart authority block in Production.
+It does **not** close whole Slice 3. #962 remains open for the remaining
+Tranche B and separately active Slice-3-owned bypass/presentation work,
+including the current Top Songs D1 candidate.
 
 ## Slice 3 exit gate
 
