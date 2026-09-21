@@ -781,14 +781,14 @@
       "entrypoint": "public.community_admin_resolve_artist_claim_existing(uuid,uuid,text,boolean,boolean,boolean,boolean)",
       "authentication": "auth_uid",
       "authorization": "artist_claim_review_permission",
-      "executionAuthority": "security_definer_domain_wrapper",
+      "executionAuthority": "security_definer_reviewed_existing_artist_binding_delegating_to_claim_decision",
       "targets": [
         "registry_artists",
         "registry_artist_aliases"
       ],
       "riskClass": "high",
-      "disposition": "keep_converge",
-      "futureBoundary": "claim_review_domain_wrapper_over_converged_artist_identity_authority",
+      "disposition": "keep",
+      "futureBoundary": "reviewed_existing_artist_binding_plus_converged_claim_decision",
       "miziziCallable": false,
       "humanCallable": true,
       "publicCallable": false,
