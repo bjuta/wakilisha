@@ -106,6 +106,17 @@ begin
     raise exception 'FAIL: Genre profile authority lost its exact target or field family';
   end if;
 
+  if has_table_privilege('authenticated','public.registry_labels','INSERT')
+     or has_table_privilege('authenticated','public.registry_labels','UPDATE')
+     or has_table_privilege('authenticated','public.registry_labels','DELETE')
+     or has_table_privilege('authenticated','public.registry_genres','INSERT')
+     or has_table_privilege('authenticated','public.registry_genres','UPDATE')
+     or has_table_privilege('authenticated','public.registry_genres','DELETE')
+  then
+    raise exception
+      'FAIL: Label/Genre browser canonical DML road reopened outside bounded profile commands';
+  end if;
+
   if to_regprocedure(
     'public.admin_delete_registry_draft_artist_v1(uuid,timestamp with time zone)'
   ) is not null then
