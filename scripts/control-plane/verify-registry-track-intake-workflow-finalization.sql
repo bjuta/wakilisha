@@ -122,19 +122,19 @@ begin
 
   if to_regprocedure(
        'public.admin_create_registry_track_from_intake_enriched(uuid,text,text)'
-     ) is null
+     ) is not null
      or to_regprocedure(
        'public.admin_resolve_registry_track_intake_enriched(uuid,uuid,text,boolean)'
-     ) is null
+     ) is not null
      or to_regprocedure(
        'public.admin_resolve_registry_track_intake(uuid,uuid,text)'
-     ) is null
+     ) is not null
      or to_regprocedure(
        'public.sync_registry_track_intake_artist_credits(uuid,uuid)'
-     ) is null
+     ) is not null
   then
     raise exception
-      'Legacy Track Intake compatibility roads were retired before caller cutover acceptance';
+      'Retired Track Intake compatibility road was reintroduced';
   end if;
 
   raise notice 'REGISTRY_TRACK_INTAKE_WORKFLOW_FINALIZATION_PASS';
