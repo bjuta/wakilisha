@@ -696,3 +696,48 @@ The following roads are retired and covered by a permanent negative verifier:
 The machine privileged-writer manifest removes the two classified legacy direct writers and classifies the five governed Track Intake canonical command surfaces instead.
 
 This amendment does not change the disposition of any non-Track-Intake finding in the original audit.
+
+
+## 12. Current Production checkpoint — 21 September 2026
+
+The original September 20 findings above remain historical audit evidence.
+Current implementation truth is maintained in
+`mizizi-slice3-current-database-authority-convergence.md`.
+
+Current merged main:
+
+`dcdbe948b6dc5edc2cd31133939e45e152db7b57`
+
+Current Production:
+
+- project: `pgzizndxdyhqmtyywjmt`;
+- `ACTIVE_HEALTHY`;
+- `FUNCTIONS_DEPLOYED`;
+- migrations: **166**;
+- head:
+  `20260921153000_registry_track_intake_legacy_writer_retirement_v1`;
+- canonical writer inventory: PASS.
+
+Track Intake sections 5.5 and 5.9 are now Production-closed through PR #1001.
+The Track Intake frontend caller, SQL authority, replay proofs, permanent
+verifiers, and Production frontend deployment are accepted.
+
+Machine-classified remaining Slice 3 debt is now **11** manifest entries:
+
+- 9 `keep_converge`;
+- 1 `retire_or_internalize`;
+- 1 `candidate_retire`.
+
+The next existing-primitive block is:
+
+1. Artist Claim canonical-creation convergence;
+2. Missing Artist Intake convergence;
+3. Chart Artist resolution convergence;
+4. decouple Artist-creation convergence;
+5. Chart Artist alias-resolution convergence.
+
+Only after this block should the high-blast Track duplicate repair, Artist
+decouple, Artist safe-merge, lower-level decouple internalization, and old
+manual Artist-merge retirement work become the active implementation boundary.
+
+Slice 4 #991 remains blocked until #962 re-closes.
