@@ -17,7 +17,7 @@ begin
        'public.admin_create_registry_track_intake_identity_v1(uuid,text)'
      ) is null
      or to_regprocedure(
-       'platform_private.execute_registry_track_create_v2(uuid)'
+       'platform_private.execute_registry_track_create_v2(text,uuid)'
      ) is null
   then
     raise exception
