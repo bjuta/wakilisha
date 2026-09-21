@@ -1,4 +1,4 @@
--- Permanent verifier for Track Intake existing-Track Artist-credit reconciliation authority.
+-- Permanent verifier for Track Intake reviewed Artist-credit reconciliation authority.
 
 do $verify$
 declare
@@ -45,7 +45,7 @@ begin
     raise exception 'Track Intake admin actor does not advertise reviewed-credit reconciliation V1';
   end if;
 
-  if to_regprocedure('platform_private.registry_track_intake_existing_credit_candidate_state_v1(uuid,uuid,text)') is null
+  if to_regprocedure('platform_private.registry_track_intake_existing_credit_candidate_state_v1(uuid,uuid,uuid,text)') is null
      or to_regprocedure('platform_private.registry_track_intake_existing_credit_candidate_fingerprint_v1(jsonb)') is null
      or to_regprocedure('platform_private.registry_track_intake_reconciled_credit_uuid_v1(uuid,uuid)') is null
      or to_regprocedure('platform_private.record_registry_track_intake_existing_credit_evidence_v1(uuid,uuid,uuid,jsonb,text)') is null
