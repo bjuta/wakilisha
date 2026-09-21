@@ -217,48 +217,59 @@ Candidate migrations:
 - `20260921170000_registry_reviewed_artist_identity_composition_v1.sql`;
 - `20260921171000_registry_chart_artist_resolution_rebase_v1.sql`.
 
-Disposable Preview:
+Current disposable Preview:
 
-- project ref: `smdidvevfzbjqdnvxruq`;
-- branch id: `fd53837f-5f22-4229-8458-be06893702a6`;
-- native repository replay baseline: 166 / `20260921153000`;
-- native candidate apply: PASS;
-- final repository migration head: 168 / `20260921171000`;
-- native post-apply dry run: zero pending.
+- project ref: `qhgoxdflywrrdxtneeis`;
+- branch id: `1dfb7928-f115-4450-b022-438fb72aaddc`;
+- exact Production baseline remains 166 / `20260921153000`;
+- corrected candidate replay reaches 168 / `20260921171000`;
+- permanent Artist and Chart SQL verifiers pass on the corrected final Preview;
+- no Production SQL, Edge, or frontend deployment has occurred.
 
-Accepted Preview structural/runtime verification:
+Real JWT/PostgREST behavior acceptance:
 
-- Artist Studio Registry Entry structural authority: PASS;
-- Missing Artist Intake authority composition: PASS;
-- Chart materialization + Artist Resolution rebase: PASS;
-- Admin Registry profile authority: PASS;
-- canonical Registry writer inventory: PASS;
-- Identity + Projection Lineage: PASS;
-- authenticated direct mutation closed for Artist aliases, Track provider links,
-  and relationship evidence;
-- exact execution grants at rest: 0;
-- standing Chart actor grants: 0;
-- Registry Artist Resource gaps: 0;
-- Registry Artist Resource lifecycle mismatches: 0;
-- Artist merge/split lineage mismatches: 0.
+- applicant password login through Supabase Auth: PASS;
+- reviewer password login through Supabase Auth: PASS;
+- current V3 Artist Claim submission: PASS;
+- reviewer Claim approval through PostgREST: PASS;
+- Missing Artist Intake acceptance through PostgREST: PASS;
+- reviewed Artist creation preserves `create_from_artist_claim / applied`
+  provenance: PASS;
+- active Artist representation: PASS;
+- Missing Artist alias state `manual / active`: PASS;
+- typed relationship endpoint resolution: PASS;
+- merged review state: PASS;
+- exactly one governed `registry.artist.create/v1` execution per accepted flow:
+  PASS;
+- Registry Artist Resource identity/lifecycle convergence: PASS;
+- Top Songs presentation mutation: zero rows;
+- exact execution grants at rest: 0.
 
-Schema/replay seal:
+Behavior acceptance exposed one real candidate defect:
 
-- public + editorial generated type SHA-256:
-  `6b45da162d8304e2a86b975a7a2bb1cd01716a253c7d6e1c48467862637fdc1d`;
-- migration replay proofs committed for both candidate migrations;
-- `live-schema-baseline.json` sealed to the final Preview head.
+- `accept_registry_missing_artist_intake` wrote the new Registry Artist UUID
+  into legacy `contributor_submissions.entity_id`, whose foreign key targets
+  `cultural_entities(id)`;
+- the function now leaves that legacy field untouched and merges the submission
+  through Registry Artist, alias, typed relationship, audit, and review
+  authority instead;
+- the permanent Missing Artist Intake verifier now rejects any return of the
+  stale `entity_id=v_artist_id` write.
 
-One acceptance gate remains intentionally open:
+Replay authority is intentionally open:
 
-- the new reviewed Artist identity broker requires the real PostgREST transport
-  identity (`session_user=authenticator`);
-- raw Supabase SQL execution uses `postgres`, so the existing rollback-only
-  Artist Studio behavior verifier cannot truthfully exercise that transport;
-- no kernel/transport check has been weakened to make the raw-SQL harness pass;
-- real JWT/PostgREST behavior acceptance remains required before merge.
+- the `20260921170000` migration bytes changed after the behavior defect was
+  found;
+- its previously committed replay receipt is therefore stale and fails the
+  migration replay contract by SHA-256;
+- the prior schema seal also points to the superseded replay authority;
+- a fresh clean replay must directly prove the corrected `170000` state and
+  then the `171000` state before either receipt or the schema seal is
+  refreshed;
+- a later final-state observation must not substitute for that earlier gate.
 
-No Production SQL, Edge, or frontend deployment has occurred.
+PR #1006 must not merge until that replay authority is truthfully resealed and
+the protected CI suite passes.
 
 ## Slice 3 exit gate
 
