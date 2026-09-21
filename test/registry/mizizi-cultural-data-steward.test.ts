@@ -1356,6 +1356,8 @@ describe("MIZIZI Slice 2 Gate A-final Registry authority convergence", () => {
     const adminRouter = read("supabase/functions/admin-router/index.ts");
     const client = read("src/services/registry/admin/client.ts");
     const artistsPage = read("src/pages/admin/registry/artists/page.tsx");
+    const labelsPage = read("src/pages/admin/registry/labels/detail/page.tsx");
+    const genresPage = read("src/pages/admin/registry/genres/detail/page.tsx");
     const migration = read(
       "supabase/migrations/20260920173000_admin_registry_profile_authority_v1.sql",
     );
@@ -1384,6 +1386,20 @@ describe("MIZIZI Slice 2 Gate A-final Registry authority convergence", () => {
     expect(artistsPage).toContain('{ status: "archived" }');
     expect(artistsPage).toContain("Archive");
     expect(artistsPage).not.toContain("deleteRegistryEntity");
+
+    expect(labelsPage).toContain("admin_patch_registry_label_profile_v1");
+    expect(labelsPage).not.toMatch(
+      /from\(["']registry_labels["']\)\s*\.\s*(insert|update|upsert|delete)\s*\(/s,
+    );
+    expect(genresPage).toContain("admin_patch_registry_genre_profile_v1");
+    expect(genresPage).not.toMatch(
+      /from\(["']registry_genres["']\)\s*\.\s*(insert|update|upsert|delete)\s*\(/s,
+    );
+    expect(genresPage).toContain(
+      "Genre hierarchy is read-only on this profile surface.",
+    );
+    expect(genresPage).not.toContain("patchDraft({ parent_genre_id");
+
     expect(verifier).toContain("ADMIN_REGISTRY_PROFILE_AUTHORITY_PASS");
   });
 
@@ -1460,6 +1476,105 @@ describe("MIZIZI Slice 2 Gate A-final Registry authority convergence", () => {
         "typed_registry_provider_link_admission_for_registry_admin",
       humanCallable: true,
       canonicalMutation: true,
+    });
+  });
+
+  it("converges Slice 3 stale Artist and Chart writers onto accepted primitives", () => {
+    const artistAuthority = read(
+      "supabase/migrations/20260921170000_registry_reviewed_artist_identity_composition_v1.sql",
+    );
+    const chartAuthority = read(
+      "supabase/migrations/20260921171000_registry_chart_artist_resolution_rebase_v1.sql",
+    );
+    const aliasesPage = read(
+      "src/pages/admin/registry/artist-aliases/page.tsx",
+    );
+    const chartPage = read(
+      "src/pages/admin/charts/artist-resolution/page.tsx",
+    );
+    const artistVerifier = read(
+      "scripts/control-plane/verify-artist-studio-registry-entry-convergence.sql",
+    );
+    const chartVerifier = read(
+      "scripts/control-plane/verify-registry-chart-materialization-runtime.sql",
+    );
+    const inventoryVerifier = read(
+      "scripts/control-plane/verify-registry-canonical-writer-inventory.sql",
+    );
+    const manifest = JSON.parse(
+      read("scripts/control-plane/registry-privileged-writer-manifest.json"),
+    ) as { writers: Array<Record<string, unknown>> };
+
+    expect(artistAuthority).toContain("'registry.artist.create'");
+    expect(artistAuthority).toContain(
+      "execute_registry_reviewed_artist_identity_materialization_v1",
+    );
+    expect(artistAuthority).toContain(
+      "execute_registry_artist_alias_state_v1",
+    );
+    expect(artistAuthority).not.toMatch(
+      /community_admin_decide_artist_claim[\s\S]*insert\s+into\s+public\.registry_artists/i,
+    );
+    expect(artistAuthority).toContain(
+      "coalesce(alias.status,'active')='active'",
+    );
+    expect(artistAuthority).not.toContain("manual_intake");
+
+    expect(chartAuthority).toContain(
+      "'registry.track_artist_credit.admit'",
+    );
+    expect(chartAuthority).toContain("chart_artist_resolution_review");
+    expect(chartAuthority).not.toMatch(
+      /admin_apply_chart_artist_resolution_decision[\s\S]*insert\s+into\s+public\.registry_track_artists/i,
+    );
+    expect(chartAuthority).toContain("status <> 'archived'");
+    expect(chartAuthority).toContain("having count(*)=1");
+
+    expect(aliasesPage).toContain("admin_set_registry_artist_alias_v1");
+    expect(aliasesPage).not.toMatch(
+      /from\(["']registry_artist_aliases["']\)\s*\.\s*delete\s*\(/s,
+    );
+    expect(chartPage).toContain("chart_get_entry_registry_identity_v1");
+    expect(chartPage).not.toContain(
+      "rows.map((row) => row.canonicalArtistId).filter(Boolean)",
+    );
+
+    expect(artistVerifier).toContain(
+      "execute_registry_reviewed_artist_identity_materialization_v1",
+    );
+    expect(chartVerifier).toContain(
+      "REGISTRY_CHART_ARTIST_RESOLUTION_REBASE_PASS",
+    );
+    expect(inventoryVerifier).toContain(
+      "public.admin_set_registry_artist_alias_v1(text,uuid,text,text,text,text)",
+    );
+
+    expect(
+      manifest.writers.find(
+        (writer) => writer.id === "community-admin-decide-artist-claim",
+      ),
+    ).toMatchObject({
+      disposition: "keep",
+      futureBoundary:
+        "reviewed_artist_identity_materialization_plus_claim_representation_semantics",
+    });
+    expect(
+      manifest.writers.find(
+        (writer) => writer.id === "admin-apply-chart-artist-resolution-decision",
+      ),
+    ).toMatchObject({
+      disposition: "keep",
+      futureBoundary:
+        "chart_review_evidence_plus_typed_track_artist_credit_admission_fail_closed_on_conflict",
+    });
+    expect(
+      manifest.writers.find(
+        (writer) => writer.id === "admin-set-registry-artist-alias-v1",
+      ),
+    ).toMatchObject({
+      disposition: "keep",
+      canonicalMutation: true,
+      humanCallable: true,
     });
   });
 
