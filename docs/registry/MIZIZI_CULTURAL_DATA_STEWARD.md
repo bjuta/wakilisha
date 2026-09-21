@@ -461,7 +461,7 @@ The same pure Track route-identity rule is shared by the live automatic Registry
 - `chart-ingest-api`
 - `scrape-artist-data`
 
-The reviewed SQL creation authority `admin_create_registry_track_from_intake_enriched` is sealed separately by migration `20260901114500_mizizi_track_identity_write_boundary.sql`.
+Reviewed Track Intake canonicalization no longer uses the former monolithic `admin_create_registry_track_from_intake_enriched` road. New Track identity is admitted through `registry.track.create/v2`, reviewed Artist credits reconcile one source credit at a time, reviewed Track/Release profile facts use provider-neutral typed admissions, canonical provider links use the governed provider-link operation, and activation requires an exact reviewed-credit-set proof before workflow-only finalization. The former direct create/resolve/sync functions are permanently retired.
 
 The write boundary follows these rules:
 
@@ -474,7 +474,7 @@ The write boundary follows these rules:
 7. ISRC matches preserve existing canonical Track slugs instead of rewriting them from a new provider title
 8. old dirty identities remain resolvable evidence and are repaired through MIZIZI plus redirects, not destructive source rewriting
 
-The SQL migration replaces the existing function definition only. Applying the migration does not rewrite an existing Registry row.
+The Track Intake convergence migrations install typed authority and retire alternate writer entrypoints; applying the migration chain does not rewrite existing Registry rows outside explicit reviewed operations.
 
 ## Provenance contract
 
