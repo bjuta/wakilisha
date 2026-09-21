@@ -255,7 +255,7 @@ begin
     'preview_url',nullif(btrim(coalesce(p_preview_url,'')),''),
     'artwork_url',nullif(btrim(coalesce(p_artwork_url,'')),''),
     'duration_ms',p_duration_ms,
-    'storefront',lower(nullif(btrim(coalesce(p_storefront,'')),''),
+    'storefront',lower(nullif(btrim(coalesce(p_storefront,'')),'')),
     'match_method',v_match_method,
     'match_confidence',v_match_confidence,
     'match_status',v_match_status,
