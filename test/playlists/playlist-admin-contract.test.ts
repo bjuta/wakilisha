@@ -824,55 +824,93 @@ describe("Phase 5A Playlist admin product", () => {
     expect(page).toContain("track.artist_names.join");
   });
 
-  it("creates a missing canonical Registry track only through reviewed Track Intake authority", () => {
+  it("creates a missing canonical Registry track only through governed Track Intake authority", () => {
     const page = source(
       "src/pages/admin/registry/tracks/intake/page.tsx",
     );
-    const migration = source(
-      "docs/engineering/replay-baseline/legacy-migrations/20260808204500_phase_5a_track_intake_canonical_creation.sql",
+    const foundation = source(
+      "supabase/migrations/20260921120000_registry_track_intake_track_create_v2_foundation.sql",
+    );
+    const finalization = source(
+      "supabase/migrations/20260921150000_registry_track_intake_workflow_finalization_v1.sql",
+    );
+    const retirement = source(
+      "supabase/migrations/20260921153000_registry_track_intake_legacy_writer_retirement_v1.sql",
     );
     const verifier = source(
-      "scripts/control-plane/verify-phase-5a-track-intake-canonical-creation.sql",
+      "scripts/control-plane/verify-registry-track-intake-legacy-writer-retirement.sql",
     );
 
     expect(page).toContain(
-      "admin_create_registry_track_from_intake_enriched",
+      "admin_create_registry_track_intake_identity_v1",
     );
     expect(page).toContain(
-      "Create canonical track + resolve",
+      "admin_reconcile_registry_track_intake_credit_v1",
+    );
+    expect(page).toContain(
+      "admin_admit_registry_track_intake_track_profile_v1",
+    );
+    expect(page).toContain(
+      "admin_admit_registry_track_provider_link_v1",
+    );
+    expect(page).toContain(
+      "admin_activate_registry_track_intake_v1",
+    );
+    expect(page).toContain(
+      "admin_finalize_registry_track_intake_v1",
+    );
+    expect(page).not.toContain(
+      "admin_create_registry_track_from_intake_enriched",
+    );
+    expect(page).not.toContain(
+      "admin_resolve_registry_track_intake_enriched",
     );
     expect(page).toContain(
       "Save enrichment changes before creating the canonical track.",
     );
     expect(page).toContain("preferredObservedTrackTitle");
 
-    expect(migration).toContain(
-      "admin_create_registry_track_from_intake_enriched",
+    expect(foundation).toContain(
+      "'registry.track.create'",
     );
-    expect(migration).toContain(
-      "insert into public.registry_tracks",
+    expect(foundation).toContain(
+      "operation_version",
     );
-    expect(migration).toContain(
-      "insert into public.registry_track_artists",
-    );
-    expect(migration).toContain(
-      "admin_resolve_registry_track_intake_enriched",
-    );
-    expect(migration).not.toContain(
+    expect(foundation).not.toContain(
       "insert into public.registry_artists",
     );
-    expect(migration).not.toContain(
+    expect(foundation).not.toContain(
       "insert into public.registry_releases",
     );
-    expect(migration).not.toContain(
+    expect(foundation).not.toContain(
       "insert into public.registry_labels",
     );
 
-    expect(verifier).toContain(
-      "FAIL: M217 missing canonical Track Intake creation authority",
+    expect(finalization).toContain(
+      "registry_track_intake_finalization_state_v1",
     );
+    expect(finalization).not.toContain(
+      "insert into public.registry_tracks",
+    );
+    expect(finalization).not.toContain(
+      "update public.registry_track_artists",
+    );
+
+    expect(retirement).toContain(
+      "drop function public.admin_create_registry_track_from_intake_enriched",
+    );
+    expect(retirement).toContain(
+      "drop function public.admin_resolve_registry_track_intake_enriched",
+    );
+    expect(retirement).toContain(
+      "drop function public.admin_resolve_registry_track_intake",
+    );
+    expect(retirement).toContain(
+      "drop function public.sync_registry_track_intake_artist_credits",
+    );
+
     expect(verifier).toContain(
-      "FAIL: M217 can silently create adjacent Registry identities",
+      "REGISTRY_TRACK_INTAKE_LEGACY_WRITER_RETIREMENT_PASS",
     );
   });
 
