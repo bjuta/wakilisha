@@ -4,7 +4,8 @@ Status: **in progress — Track Intake tranche Production accepted**
 
 Current authority checkpoint:
 
-- protected main: `dcdbe948b6dc5edc2cd31133939e45e152db7b57`;
+- last runtime-bearing merged main / deployed frontend authority: `dcdbe948b6dc5edc2cd31133939e45e152db7b57`;
+- living documentation authority: this file on protected `main` (do not pin a self-expiring docs-only head);
 - Production project: `pgzizndxdyhqmtyywjmt`;
 - Production status: `ACTIVE_HEALTHY`;
 - Production branch status: `FUNCTIONS_DEPLOYED`;
