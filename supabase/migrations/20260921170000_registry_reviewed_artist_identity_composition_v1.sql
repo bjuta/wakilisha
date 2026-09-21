@@ -680,7 +680,7 @@ returns public.registry_entity_relationships
 language plpgsql
 security definer
 set search_path=pg_catalog,public,auth
-as $
+as $resolver$
 declare
   v_relationship public.registry_entity_relationships%rowtype;
   v_slug text;
@@ -754,7 +754,7 @@ begin
 
   return v_result;
 end
-$;
+$resolver$;
 
 create function public.admin_set_registry_artist_alias_v1(
   p_alias_slug text,
