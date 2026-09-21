@@ -56,7 +56,9 @@ begin
 
   if to_regprocedure('platform_private.registry_track_intake_current_admin_v1()') is null
      or to_regprocedure('platform_private.registry_track_intake_identity_review_snapshot_v1(uuid)') is null
-     or to_regprocedure('platform_private.registry_track_intake_credit_review_snapshot_v1(uuid)') is null
+     or to_regprocedure('platform_private.registry_track_intake_credit_set_review_snapshot_v1(uuid)') is null
+     or to_regprocedure('platform_private.registry_track_intake_credit_review_snapshot_v1(uuid,uuid)') is null
+     or to_regprocedure('platform_private.registry_track_intake_reconciled_credit_uuid_v1(uuid,uuid)') is null
      or to_regprocedure('platform_private.registry_track_intake_deterministic_track_uuid_v1(uuid)') is null
      or to_regprocedure('platform_private.registry_track_intake_reviewed_slug_v1(uuid,text)') is null
      or to_regprocedure('platform_private.registry_track_creation_collision_state_v2(uuid,text,uuid,text,text)') is null
