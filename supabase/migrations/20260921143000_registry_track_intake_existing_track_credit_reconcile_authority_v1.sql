@@ -1,4 +1,4 @@
--- MIZIZI Slice 3 Track Intake existing-Track Artist-credit reconciliation authority.
+-- MIZIZI Slice 3 Track Intake reviewed Artist-credit reconciliation authority.
 --
 -- Reconciles one reviewed Track Intake Artist credit against one existing
 -- active Registry Track without deleting unrelated credits or resurrecting
@@ -21,7 +21,7 @@ begin
      or to_regclass('public.registry_track_artists') is null
      or to_regclass('platform_private.registry_operation_types') is null
      or to_regprocedure('platform_private.registry_track_intake_current_admin_v1()') is null
-     or to_regprocedure('platform_private.registry_track_intake_credit_review_snapshot_v1(uuid)') is null
+     or to_regprocedure('platform_private.registry_track_intake_credit_review_snapshot_v1(uuid,uuid)') is null
      or to_regprocedure('platform_private.registry_subject_state_fingerprint(text,uuid)') is null
      or to_regprocedure('platform_private.registry_plan_fingerprint(jsonb)') is null
      or to_regprocedure('platform_private.begin_registry_mutation_operation(text,uuid)') is null
@@ -39,9 +39,9 @@ begin
        where operation_key='registry.track_artist_credit.reviewed_reconcile'
          and operation_version=1
      )
-     or to_regprocedure('platform_private.registry_track_intake_existing_credit_candidate_state_v1(uuid,uuid,text)') is not null
+     or to_regprocedure('platform_private.registry_track_intake_existing_credit_candidate_state_v1(uuid,uuid,uuid,text)') is not null
      or to_regprocedure('platform_private.registry_track_intake_existing_credit_candidate_fingerprint_v1(jsonb)') is not null
-     or to_regprocedure('platform_private.registry_track_intake_reconciled_credit_uuid_v1(uuid,uuid)') is not null
+     or to_regprocedure('platform_private.registry_track_intake_reconciled_credit_uuid_v1(uuid,uuid)') is null
      or to_regprocedure('platform_private.record_registry_track_intake_existing_credit_evidence_v1(uuid,uuid,uuid,jsonb,text)') is not null
      or to_regprocedure('platform_private.issue_registry_track_intake_existing_credit_grant_v1(uuid,uuid,jsonb,text)') is not null
      or to_regprocedure('platform_private.execute_registry_track_intake_existing_credit_reconcile_v1(uuid)') is not null
@@ -60,7 +60,7 @@ insert into public.capability_definitions (
 values (
   'reconcile_registry_track_reviewed_artist_credit',
   'Reconcile Registry Track reviewed Artist credit',
-  'Reconcile one exact reviewed Track Intake Artist credit against one existing Registry Track without deleting unrelated credits.',
+  'Reconcile one exact reviewed Track Intake Artist credit against one existing draft or active Registry Track without deleting unrelated credits.',
   'registry'
 );
 
@@ -109,6 +109,7 @@ where actor_key='registry_track_intake_admin';
 
 create function platform_private.registry_track_intake_existing_credit_candidate_state_v1(
   p_track_id uuid,
+  p_source_credit_id uuid,
   p_artist_id uuid,
   p_artist_slug text
 )
@@ -138,7 +139,8 @@ as $$
   where credit.track_id=p_track_id
     and credit.status in ('active','needs_review','draft')
     and (
-      credit.artist_id=p_artist_id
+      credit.metadata->>'source_credit_id'=p_source_credit_id::text
+      or credit.artist_id=p_artist_id
       or (
         nullif(btrim(p_artist_slug),'') is not null
         and lower(coalesce(credit.artist_slug,''))
@@ -163,44 +165,6 @@ as $$
     ),
     'hex'
   );
-$$;
-
-create function platform_private.registry_track_intake_reconciled_credit_uuid_v1(
-  p_track_id uuid,
-  p_source_credit_id uuid
-)
-returns uuid
-language plpgsql
-immutable
-security definer
-set search_path=pg_catalog,extensions
-as $$
-declare
-  v_hex text;
-begin
-  if p_track_id is null or p_source_credit_id is null then
-    raise exception using errcode='22023',
-      message='Track ID and Track Intake source credit ID are required.';
-  end if;
-
-  v_hex:=encode(
-    extensions.digest(
-      'track.intake.existing.credit:'||
-      p_track_id::text||':'||
-      p_source_credit_id::text,
-      'sha256'
-    ),
-    'hex'
-  );
-
-  return (
-    substr(v_hex,1,8)||'-'||
-    substr(v_hex,9,4)||'-'||
-    '5'||substr(v_hex,14,3)||'-'||
-    '8'||substr(v_hex,18,3)||'-'||
-    substr(v_hex,21,12)
-  )::uuid;
-end
 $$;
 
 create function platform_private.record_registry_track_intake_existing_credit_evidence_v1(
@@ -610,7 +574,8 @@ begin
 
   v_review:=
     platform_private.registry_track_intake_credit_review_snapshot_v1(
-      (v_plan->>'suggestion_id')::uuid
+      (v_plan->>'suggestion_id')::uuid,
+      (v_plan->>'source_credit_id')::uuid
     );
 
   if v_review->>'review_fingerprint'
@@ -634,11 +599,11 @@ begin
        select 1
        from public.registry_tracks track
        where track.id=v_target.subject_id
-         and track.status='active'
+         and track.status in ('draft','active')
      )
   then
     raise exception using errcode='42501',
-      message='Existing-Track credit reconciliation requires an active Registry Track.';
+      message='Reviewed-credit reconciliation requires an existing draft or active Registry Track.';
   end if;
 
   perform pg_catalog.pg_advisory_xact_lock(
@@ -653,6 +618,7 @@ begin
   v_candidate_state:=
     platform_private.registry_track_intake_existing_credit_candidate_state_v1(
       v_target.subject_id,
+      (v_plan->>'source_credit_id')::uuid,
       (v_desired->>'artist_id')::uuid,
       v_desired->>'artist_slug'
     );
@@ -696,7 +662,11 @@ begin
        and (v_before->>'is_featured')::boolean=(v_desired->>'is_featured')::boolean
        and (v_before->>'credit_order')::integer=(v_desired->>'credit_order')::integer
        and v_before->>'display_credit' is not distinct from v_desired->>'display_credit'
+       and v_before->>'source'='track_intake_review'
+       and (v_before->>'confidence')::integer=100
        and v_before->>'status'='active'
+       and v_before->'metadata'->>'source_credit_id'=
+           (v_plan->>'source_credit_id')
     then
       v_mode:='already_current';
       v_rows:=0;
@@ -813,7 +783,11 @@ begin
      or (v_after->>'is_featured')::boolean<>(v_desired->>'is_featured')::boolean
      or (v_after->>'credit_order')::integer<>(v_desired->>'credit_order')::integer
      or v_after->>'display_credit' is distinct from v_desired->>'display_credit'
+     or v_after->>'source'<>'track_intake_review'
+     or (v_after->>'confidence')::integer<>100
      or v_after->>'status'<>'active'
+     or v_after->'metadata'->>'source_credit_id'<>
+        (v_plan->>'source_credit_id')
   then
     raise exception using errcode='23514',
       message='Reviewed Artist-credit reconciliation did not produce exact canonical semantics.';
@@ -971,7 +945,11 @@ begin
             <>(v_desired->>'credit_order')::integer
        or v_current->>'display_credit'
             is distinct from v_desired->>'display_credit'
+       or v_current->>'source'<>'track_intake_review'
+       or (v_current->>'confidence')::integer<>100
        or v_current->>'status'<>'active'
+       or v_current->'metadata'->>'source_credit_id'<>
+          (v_plan->>'source_credit_id')
     then
       v_failure:='canonical_reviewed_credit_semantics_mismatch';
     end if;
@@ -1079,7 +1057,8 @@ declare
 begin
   v_user_id:=platform_private.registry_track_intake_current_admin_v1();
   v_review:=platform_private.registry_track_intake_credit_review_snapshot_v1(
-    p_suggestion_id
+    p_suggestion_id,
+    p_source_credit_id
   );
 
   select suggestion.*
@@ -1099,18 +1078,18 @@ begin
      )
   then
     raise exception using errcode='42501',
-      message='Track Intake item is not reviewable for this existing Registry Track.';
+      message='Track Intake item is not reviewable for this existing draft or active Registry Track.';
   end if;
 
   if not exists (
        select 1
        from public.registry_tracks track
        where track.id=p_registry_track_id
-         and track.status='active'
+         and track.status in ('draft','active')
      )
   then
     raise exception using errcode='42501',
-      message='Existing-Track credit reconciliation requires an active Registry Track.';
+      message='Reviewed-credit reconciliation requires an existing draft or active Registry Track.';
   end if;
 
   select credit.*
@@ -1191,6 +1170,7 @@ begin
   v_candidate_state:=
     platform_private.registry_track_intake_existing_credit_candidate_state_v1(
       p_registry_track_id,
+      p_source_credit_id,
       v_artist.id,
       v_artist.slug
     );
@@ -1295,13 +1275,10 @@ grant execute on function
   to authenticated;
 
 revoke all on function
-  platform_private.registry_track_intake_existing_credit_candidate_state_v1(uuid,uuid,text)
+  platform_private.registry_track_intake_existing_credit_candidate_state_v1(uuid,uuid,uuid,text)
   from public,anon,authenticated,service_role;
 revoke all on function
   platform_private.registry_track_intake_existing_credit_candidate_fingerprint_v1(jsonb)
-  from public,anon,authenticated,service_role;
-revoke all on function
-  platform_private.registry_track_intake_reconciled_credit_uuid_v1(uuid,uuid)
   from public,anon,authenticated,service_role;
 revoke all on function
   platform_private.record_registry_track_intake_existing_credit_evidence_v1(uuid,uuid,uuid,jsonb,text)
