@@ -108,8 +108,8 @@ begin
       ('public.admin_patch_registry_track_profile_v1(uuid,jsonb,timestamp with time zone)'),
       ('public.admin_reconcile_registry_track_intake_credit_v1(uuid,uuid,uuid)'),
       ('public.admin_resolve_chart_artist_alias(text,uuid,text,boolean)'),
-      ('public.admin_set_registry_artist_alias_v1(text,uuid,text,text,text,text)'),
       ('public.admin_safe_merge_registry_artists(uuid,uuid,text,boolean,text)'),
+      ('public.admin_set_registry_artist_alias_v1(text,uuid,text,text,text,text)'),
       ('public.chart_admit_artist_origin_v1(uuid,text,uuid,uuid,text)'),
       ('public.chart_admit_track_provider_link_v1(uuid)'),
       ('public.chart_create_artist_origin_shell_v1(text,text,uuid,uuid)'),
@@ -215,6 +215,7 @@ begin
   end if;
 end
 $verify$;
+
 
 do $verify_closed_table_roads$
 declare
