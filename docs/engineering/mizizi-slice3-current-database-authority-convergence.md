@@ -179,14 +179,12 @@ Slice 4 #991 remains blocked until this exit gate passes.
 The broader Supabase advisor/security programme remains owned separately by
 #992 and must not be folded into Slice 3 without an exact writer-road reason.
 
-## Current deployment checklist
+## Current deployment classification
 
-For this documentation-only checkpoint:
+The current Production state is already accepted. This documentation checkpoint
+requires no SQL, Edge Function, frontend, Finish, or other Production runtime
+mutation.
 
-- SQL migration needed: **No**;
-- Supabase Edge Function deploy needed: **No**;
-- Production frontend deploy needed: **No**;
-- Production Finish update needed: **No**;
-- PR needed: **Yes — docs-only**;
-- immediate next implementation job after this documentation checkpoint:
-  **Artist Claim canonical-creation convergence**.
+The next mutation-bearing implementation job is:
+
+**Artist Claim canonical-creation convergence**.
