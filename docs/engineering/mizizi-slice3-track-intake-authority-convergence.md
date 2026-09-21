@@ -43,7 +43,7 @@ Therefore the frontend/service layer must orchestrate the governed steps across 
 
 1. validate the reviewed Track Intake suggestion and freeze the exact review snapshot;
 2. execute `registry.track.create/v2` through a Track-Intake-specific caller-bound broker;
-3. execute one `registry.track_artist_credit.admit/v1` per reviewed resolved Artist credit;
+3. execute one `registry.track_artist_credit.reviewed_reconcile/v1` per reviewed resolved Artist credit;
 4. admit provider-neutral reviewed Track/Release enrichment through narrow typed operations;
 5. activate the draft Track through `registry.track.activate/v1` only after required reviewed credits and enrichment preconditions pass;
 6. finalize Track Intake workflow state and downstream playlist/contribution bookkeeping.
@@ -79,25 +79,33 @@ Preserve the accepted operation family without rewriting established history:
 
 - `registry.track.create/v1` remains frozen for existing Chart/Discography semantics;
 - `registry.track.create/v2` is the Track Intake route-identity extension with an explicit evidence-bound reviewed slug;
-- `registry.track_artist_credit.admit/v1` remains the accepted credit operation.
+- `registry.track_artist_credit.reviewed_reconcile/v1` is the Track Intake reviewed-credit operation for both draft and active Tracks.
 
 V2 is a versioned semantic extension of Track creation, not a new generic CRUD family.
 
 Track Intake must not borrow the Chart actor or Discography actor.
 
-## Credit provenance compatibility
+## Credit provenance and reconciliation
 
-The current shared materialization core writes Track↔Artist credit `source='chart_admission'` even though the executor accepts an actor key.
+The accepted shared Chart materialization path remains frozen with
+`source='chart_admission'`; Track Intake does not overload or rewrite it.
 
-Track Intake must not rewrite the accepted Chart V1 executor merely to change provenance. Instead, a Track-Intake-specific executor will execute the same `registry.track_artist_credit.admit/v1` contract for the `registry_track_intake_admin` actor and persist `source='track_intake_review'`. Existing Chart receipts remain untouched.
+Track Intake owns
+`registry.track_artist_credit.reviewed_reconcile/v1` under the
+`registry_track_intake_admin` actor. The operation is source-credit-scoped and
+works for both draft and active Tracks. It may insert one missing reviewed
+relation, update one unambiguous live/reviewable Track Intake relation, or
+produce a verified no-op when semantic state is already exact.
 
-## Artist-credit authority implementation
+Every canonical Track Intake credit persists `source='track_intake_review'`,
+confidence 100, and immutable `source_credit_id` metadata. The operation never
+deletes unrelated credits and never resurrects archived history.
 
-Track Intake reuses `registry.track_artist_credit.admit/v1` exactly rather than adding a new credit operation type.
-
-Each reviewed source credit row gets its own deterministic future canonical credit UUID and its own caller-bound exact grant. The Track Intake executor preserves the accepted V1 plan/verifier contract while writing `source='track_intake_review'`; the existing Chart executor and historical `source='chart_admission'` receipts remain untouched.
-
-The credit evidence trust class is `INTERNAL_FACT` because the relationship is a governed human review decision. The immutable review snapshot remains the source fingerprint. An identical retry re-enters the same succeeded operation; changed review state rejects the old grant with a non-retryable integrity error.
+The evidence trust class is `INTERNAL_FACT` because the relationship is a
+governed human review decision. Each source credit has its own review
+fingerprint, so correcting one reviewed credit does not invalidate proven
+siblings. Activation separately binds the complete reviewed-credit-set
+fingerprint before a new Track can become active.
 
 ## Lifecycle operation
 
@@ -317,7 +325,7 @@ At minimum prove on a fresh Preview:
 ## Deployment order
 
 1. install broker/evidence/review fingerprint + `registry.track.create/v2` foundation;
-2. add the Track-Intake-specific executor for `registry.track_artist_credit.admit/v1` while preserving Chart V1 output;
+2. add source-credit-scoped `registry.track_artist_credit.reviewed_reconcile/v1` authority while preserving Chart/Discography credit semantics;
 3. add Track activation operation;
 4. add provider-neutral Track/Release reviewed-profile operations;
 5. add separate public step commands;
