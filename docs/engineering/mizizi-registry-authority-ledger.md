@@ -12,7 +12,9 @@ Status: **Living Registry authority ledger. Slice 3 obsolete-runtime retirement 
 
 Programme authority: `docs/engineering/mizizi-registry-authority-security-convergence-programme.md`
 
-Last runtime-bearing repository authority / deployed frontend: `main@dcdbe948b6dc5edc2cd31133939e45e152db7b57`\n\nLiving documentation authority: this ledger on protected `main`.
+Last runtime-bearing repository authority / deployed frontend: `main@dcdbe948b6dc5edc2cd31133939e45e152db7b57`
+
+Living documentation authority: this ledger on protected `main`.
 
 Production project: WAKILISHA / `pgzizndxdyhqmtyywjmt`
 
