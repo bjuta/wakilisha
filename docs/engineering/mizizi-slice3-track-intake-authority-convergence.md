@@ -549,15 +549,19 @@ proven. The remaining sequence is:
 11. Delete disposable Previews and update Slice 3 issue closure evidence.
     Do not claim Slice 3 complete until the full Slice 3 exit gate is satisfied.
 
-### Current deployment checklist
+### Implementation-freeze deployment checklist — historical
 
-- SQL migration needed: **Yes**
-- Supabase Edge Function deploy needed: **No currently**
-- Production Finish update needed: **No currently**
-- Frontend deploy needed: **Yes, after Track Intake caller cutover**
-- PR needed now: **Not yet**
-- Immediate next implementation task: **queue credit UUID + workflow-only
-  finalizer + frontend orchestration**
+This checklist records the state before the accepted cutover and is superseded
+by the Production closure at the end of this document.
+
+At that implementation freeze:
+
+- SQL migration was still pending;
+- no Edge Function deployment was planned;
+- the frontend caller cutover was still pending;
+- the PR had not yet opened;
+- workflow finalization and frontend orchestration were still implementation
+  work.
 
 
 ## Post-cutover structural checkpoint — 2026-09-21
