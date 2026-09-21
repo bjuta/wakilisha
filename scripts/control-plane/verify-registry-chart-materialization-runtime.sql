@@ -270,3 +270,153 @@ begin
   raise notice 'REGISTRY_CHART_CALLER_JWT_CONVERGENCE_PASS';
 end
 $verify_chart_caller_jwt$;
+
+-- Slice 3 Tranche A: Chart Artist Resolution must compose existing Chart
+-- materialization authority rather than mutate canonical Track credits directly.
+do $verify_chart_artist_resolution_rebase$
+declare
+  v_definition text;
+  v_normalized text;
+begin
+  if to_regprocedure(
+       'public.admin_apply_chart_artist_resolution_decision(uuid)'
+     ) is null
+     or to_regprocedure(
+       'public.admin_resolve_chart_artist_alias(text,uuid,text,boolean)'
+     ) is null
+     or to_regprocedure(
+       'public.admin_set_registry_artist_alias_v1(text,uuid,text,text,text,text)'
+     ) is null
+  then
+    raise exception
+      'Chart Artist Resolution convergence command family is incomplete';
+  end if;
+
+  if has_function_privilege(
+       'anon',
+       'public.admin_apply_chart_artist_resolution_decision(uuid)',
+       'EXECUTE'
+     )
+     or has_function_privilege(
+       'service_role',
+       'public.admin_apply_chart_artist_resolution_decision(uuid)',
+       'EXECUTE'
+     )
+     or not has_function_privilege(
+       'authenticated',
+       'public.admin_apply_chart_artist_resolution_decision(uuid)',
+       'EXECUTE'
+     )
+     or has_function_privilege(
+       'anon',
+       'public.admin_set_registry_artist_alias_v1(text,uuid,text,text,text,text)',
+       'EXECUTE'
+     )
+     or has_function_privilege(
+       'service_role',
+       'public.admin_set_registry_artist_alias_v1(text,uuid,text,text,text,text)',
+       'EXECUTE'
+     )
+     or not has_function_privilege(
+       'authenticated',
+       'public.admin_set_registry_artist_alias_v1(text,uuid,text,text,text,text)',
+       'EXECUTE'
+     )
+  then
+    raise exception
+      'Chart Artist Resolution caller privilege boundary drifted';
+  end if;
+
+  select pg_get_functiondef(
+    'public.admin_apply_chart_artist_resolution_decision(uuid)'::regprocedure
+  )
+  into v_definition;
+
+  if v_definition ~*
+       '(insert[[:space:]]+into|update|delete[[:space:]]+from)[[:space:]]+public\.registry_track_artists'
+     or position(
+          'record_registry_chart_user_evidence_v1'
+          in v_definition
+        )=0
+     or position(
+          'issue_registry_chart_user_execution_grant_v1'
+          in v_definition
+        )=0
+     or position(
+          'execute_registry_materialization_v1'
+          in v_definition
+        )=0
+     or position(
+          'verify_registry_materialization_v1'
+          in v_definition
+        )=0
+     or position(
+          'chart_artist_resolution_review'
+          in v_definition
+        )=0
+     or position(
+          'requires reviewed credit reconciliation'
+          in v_definition
+        )=0
+  then
+    raise exception
+      'Chart Artist Resolution bypasses typed credit admission or lost fail-closed conflict handling';
+  end if;
+
+  select regexp_replace(
+    pg_get_functiondef(
+      'platform_private.issue_registry_chart_user_execution_grant_v1(uuid,text,text,uuid,jsonb,text,text,text)'::regprocedure
+    ),
+    '[[:space:]]+',
+    ' ',
+    'g'
+  )
+  into v_normalized;
+
+  if v_normalized !~
+       'p_operation_key=''registry\.track\.create''.*p_required_user_capability_key <> ''publish_charts'''
+     or v_normalized !~
+       'p_operation_key=''registry\.track_artist_credit\.admit''.*p_required_user_capability_key not in \( ''publish_charts'', ''manage_registry'' \)'
+  then
+    raise exception
+      'Chart exact-grant capability partition drifted during Artist Resolution convergence';
+  end if;
+
+  select pg_get_functiondef(
+    'public.chart_get_entry_registry_identity_v1(text)'::regprocedure
+  )
+  into v_definition;
+
+  if position(
+       'status <> ''archived'''
+       in v_definition
+     )=0
+     or position(
+          'having count(*)=1'
+          in regexp_replace(v_definition,'[[:space:]]+','','g')
+        )=0
+  then
+    raise exception
+      'Chart current Artist identity read does not require one non-archived primary credit';
+  end if;
+
+  select pg_get_functiondef(
+    'public.admin_resolve_chart_artist_alias(text,uuid,text,boolean)'::regprocedure
+  )
+  into v_definition;
+
+  if position(
+       'admin_set_registry_artist_alias_v1'
+       in v_definition
+     )=0
+     or v_definition ~*
+        '(update|delete[[:space:]]+from)[[:space:]]+public\.registry_(artists|track_artists)'
+  then
+    raise exception
+      'Chart Artist alias compatibility wrapper regained legacy canonical mutation';
+  end if;
+
+  raise notice
+    'REGISTRY_CHART_ARTIST_RESOLUTION_REBASE_PASS';
+end
+$verify_chart_artist_resolution_rebase$;
