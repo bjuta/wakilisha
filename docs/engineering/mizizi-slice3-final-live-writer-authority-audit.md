@@ -678,3 +678,21 @@ Next engineering action:
 **make the canonical-writer inventory mechanically complete, then converge the
 existing-primitive callers before designing the high-blast repair/merge
 operations.**
+
+
+## 11. Track Intake convergence amendment — 21 September 2026
+
+Sections 5.5 and 5.9 above preserve the original live-writer audit state. Their Track Intake findings are now converged.
+
+The Admin Track Intake caller no longer invokes either legacy enriched writer. Canonical mutation is split across typed, independently verified Track identity, reviewed-credit reconciliation, Track profile, Release profile, provider-link, and activation operations. Workflow finalization contains no canonical Registry DML.
+
+The following roads are retired and covered by a permanent negative verifier:
+
+- `admin_create_registry_track_from_intake_enriched(uuid,text,text)`
+- `admin_resolve_registry_track_intake_enriched(uuid,uuid,text,boolean)`
+- `admin_resolve_registry_track_intake(uuid,uuid,text)`
+- `sync_registry_track_intake_artist_credits(uuid,uuid)`
+
+The machine privileged-writer manifest removes the two classified legacy direct writers and classifies the five governed Track Intake canonical command surfaces instead.
+
+This amendment does not change the disposition of any non-Track-Intake finding in the original audit.
