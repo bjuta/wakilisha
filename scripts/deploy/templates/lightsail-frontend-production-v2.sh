@@ -206,6 +206,16 @@ rsync \
   dist/ \
   "${SSH_USER}@${HOST}:${REMOTE_STAGE}/"
 
+printf '\n=== STAGE WEB MODE CONTRACT ===\n'
+ssh \
+  -i "$SSH_KEY" \
+  -o BatchMode=yes \
+  -o StrictHostKeyChecking=accept-new \
+  "${SSH_USER}@${HOST}" \
+  "set -eu; find '$REMOTE_STAGE' -type d -exec chmod 755 {} +; find '$REMOTE_STAGE' -type f -exec chmod 644 {} +; test \"\$(find '$REMOTE_STAGE' -type d ! -perm 0755 | wc -l | tr -d ' ')\" = '0'; test \"\$(find '$REMOTE_STAGE' -type f ! -perm 0644 | wc -l | tr -d ' ')\" = '0'"
+
+echo 'STAGE_WEB_MODE_CONTRACT=PASS'
+
 REMOTE_STAGE_INDEX_SHA="$(
   ssh -i "$SSH_KEY" -o BatchMode=yes -o StrictHostKeyChecking=accept-new \
     "${SSH_USER}@${HOST}" \
@@ -260,6 +270,16 @@ ssh \
   "set -eu; sudo rsync -a --delete '$REMOTE_STAGE/' '$LIVE_ROOT/'"
 
 echo 'FRONTEND_ACTIVATION=COMPLETE'
+
+printf '\n=== LIVE WEB MODE CONTRACT ===\n'
+ssh \
+  -i "$SSH_KEY" \
+  -o BatchMode=yes \
+  -o StrictHostKeyChecking=accept-new \
+  "${SSH_USER}@${HOST}" \
+  "set -eu; sudo find '$LIVE_ROOT' -type d -exec chmod 755 {} +; sudo find '$LIVE_ROOT' -type f -exec chmod 644 {} +; test \"\$(find '$LIVE_ROOT' -type d ! -perm 0755 | wc -l | tr -d ' ')\" = '0'; test \"\$(find '$LIVE_ROOT' -type f ! -perm 0644 | wc -l | tr -d ' ')\" = '0'"
+
+echo 'LIVE_WEB_MODE_CONTRACT=PASS'
 
 printf '\n=== EXACT LIVE PARITY ===\n'
 REMOTE_INDEX_SHA="$(
