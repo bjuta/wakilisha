@@ -2,7 +2,7 @@
   "schemaVersion": 1,
   "authority": "docs/engineering/mizizi-registry-authority-ledger.md",
   "scope": "canonical_music_registry",
-  "status": "slice_3_track_intake_authority_converged",
+  "status": "slice_2_artist_enrichment_authority_converged",
   "rules": {
     "newWriterRequiresClassification": true,
     "publicReadCanonicalMutationAllowed": false,
