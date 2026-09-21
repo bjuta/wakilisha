@@ -319,14 +319,14 @@
       "entrypoint": "public.community_admin_decide_artist_claim(uuid,text,text,boolean,boolean,boolean,boolean)",
       "authentication": "auth_uid",
       "authorization": "claim_review_permission_and_identity_candidate_checks",
-      "executionAuthority": "security_definer",
+      "executionAuthority": "security_definer_domain_review_over_reviewed_artist_identity_exact_grant",
       "targets": [
         "registry_artists",
         "registry_canonical_write_events"
       ],
       "riskClass": "high",
-      "disposition": "keep_converge",
-      "futureBoundary": "domain_review_plus_registry_admission_and_operation_journal",
+      "disposition": "keep",
+      "futureBoundary": "reviewed_artist_identity_materialization_plus_claim_representation_semantics",
       "miziziCallable": false,
       "humanCallable": true,
       "publicCallable": false,
@@ -339,7 +339,7 @@
       "entrypoint": "public.accept_registry_missing_artist_intake(uuid,text)",
       "authentication": "auth_uid",
       "authorization": "administrator_or_manage_registry_plus_review_state",
-      "executionAuthority": "security_definer_review_command",
+      "executionAuthority": "security_definer_domain_review_over_reviewed_artist_identity_alias_and_relationship_commands",
       "targets": [
         "registry_artists",
         "registry_artist_aliases",
@@ -347,8 +347,8 @@
         "registry_relationship_evidence"
       ],
       "riskClass": "high",
-      "disposition": "keep_converge",
-      "futureBoundary": "typed_artist_creation_plus_typed_relationship_resolution",
+      "disposition": "keep",
+      "futureBoundary": "reviewed_artist_identity_materialization_plus_typed_alias_and_relationship_resolution",
       "miziziCallable": false,
       "humanCallable": true,
       "publicCallable": false,
@@ -384,13 +384,14 @@
       "entrypoint": "public.admin_apply_chart_artist_resolution_decision(uuid)",
       "authentication": "authenticated_capability_context",
       "authorization": "administrator_or_manage_registry_or_manage_charts",
-      "executionAuthority": "security_definer",
+      "executionAuthority": "security_definer_domain_review_over_chart_typed_exact_grant_credit_admission",
       "targets": [
-        "registry_track_artists"
+        "registry_track_artists",
+        "wk_chart_entries_v2"
       ],
       "riskClass": "high",
-      "disposition": "keep_converge",
-      "futureBoundary": "typed_track_artist_credit_operation",
+      "disposition": "keep",
+      "futureBoundary": "chart_review_evidence_plus_typed_track_artist_credit_admission_fail_closed_on_conflict",
       "miziziCallable": false,
       "humanCallable": true,
       "publicCallable": false,
@@ -447,13 +448,13 @@
       "entrypoint": "public.admin_create_registry_artist_for_decouple(text,text,text,text)",
       "authentication": "authenticated_capability_context",
       "authorization": "manage_registry",
-      "executionAuthority": "security_definer",
+      "executionAuthority": "security_definer_domain_wrapper_over_reviewed_artist_identity_exact_grant",
       "targets": [
         "registry_artists"
       ],
       "riskClass": "high",
-      "disposition": "keep_converge",
-      "futureBoundary": "typed_registry_artist_creation",
+      "disposition": "keep",
+      "futureBoundary": "reviewed_artist_identity_materialization_for_decouple",
       "miziziCallable": false,
       "humanCallable": true,
       "publicCallable": false,
@@ -649,15 +650,34 @@
       "entrypoint": "public.admin_resolve_chart_artist_alias(text,uuid,text,boolean)",
       "authentication": "authenticated_capability_context",
       "authorization": "manage_registry",
-      "executionAuthority": "security_definer",
+      "executionAuthority": "security_definer_compatibility_wrapper_over_bounded_alias_state_command",
       "targets": [
         "registry_artist_aliases",
-        "registry_artists",
-        "registry_track_artists"
+        "wk_chart_entries_v2"
       ],
       "riskClass": "high",
-      "disposition": "keep_converge",
-      "futureBoundary": "typed_alias_resolution_plus_track_artist_credit_authority",
+      "disposition": "keep",
+      "futureBoundary": "compatibility_only_over_admin_set_registry_artist_alias_v1",
+      "miziziCallable": false,
+      "humanCallable": true,
+      "publicCallable": false,
+      "canonicalMutation": true,
+      "legacyDebt": false
+    },
+    {
+      "id": "admin-set-registry-artist-alias-v1",
+      "kind": "database_function",
+      "entrypoint": "public.admin_set_registry_artist_alias_v1(text,uuid,text,text,text,text)",
+      "authentication": "auth_uid",
+      "authorization": "manage_registry",
+      "executionAuthority": "security_definer_bounded_alias_state_command",
+      "targets": [
+        "registry_artist_aliases",
+        "wk_chart_entries_v2"
+      ],
+      "riskClass": "medium",
+      "disposition": "keep",
+      "futureBoundary": "active_or_blocked_alias_state_plus_current_chart_projection_repair",
       "miziziCallable": false,
       "humanCallable": true,
       "publicCallable": false,
