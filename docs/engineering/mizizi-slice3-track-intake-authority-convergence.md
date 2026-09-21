@@ -122,6 +122,12 @@ Contract:
 
 Activation is lifecycle authority, not identity creation or enrichment.
 
+## Review fingerprint partitioning
+
+Track Intake authority uses separate immutable review fingerprints by fact family. Identity creation binds only identity context, the reviewed Artist set, and approved ISRC because ISRC participates in Track identity collision authority. Artist-credit admission, reconciliation, and activation bind a credit-only snapshot and are not invalidated by unrelated Track or Release enrichment edits. Track and Release profile operations retain their own field-scoped fingerprints, while provider-link authority owns provider-link evidence independently.
+
+This prevents unrelated review changes from invalidating already-proven child operations while preserving fail-closed behavior when evidence owned by that child actually changes.
+
 ## Existing-Track reviewed-credit reconciliation
 
 Existing canonical Tracks do not use the draft-Track credit-admit path and do not use Discography exact-set replacement. The accepted Discography exact-set operation is Apple Music-specific and complete-set replacement would be stronger than legacy Track Intake semantics.

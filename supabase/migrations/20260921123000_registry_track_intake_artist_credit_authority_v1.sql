@@ -32,7 +32,7 @@ begin
          and operation_type.enabled
      )
      or to_regprocedure('platform_private.registry_track_intake_current_admin_v1()') is null
-     or to_regprocedure('platform_private.registry_track_intake_review_snapshot_v1(uuid)') is null
+     or to_regprocedure('platform_private.registry_track_intake_credit_review_snapshot_v1(uuid)') is null
      or to_regprocedure('platform_private.registry_track_intake_deterministic_track_uuid_v1(uuid)') is null
      or to_regprocedure('platform_private.registry_track_artist_credit_collision_state_v1(uuid,uuid,uuid)') is null
      or to_regprocedure('platform_private.registry_relation_collision_fingerprint_v1(jsonb)') is null
@@ -135,7 +135,7 @@ declare
   v_assertion_id uuid;
 begin
   v_user_id:=platform_private.registry_track_intake_current_admin_v1();
-  v_review:=platform_private.registry_track_intake_review_snapshot_v1(p_suggestion_id);
+  v_review:=platform_private.registry_track_intake_credit_review_snapshot_v1(p_suggestion_id);
 
   select credit.*
   into v_source
@@ -700,7 +700,7 @@ declare
   v_credit public.registry_track_artists%rowtype;
 begin
   v_user_id:=platform_private.registry_track_intake_current_admin_v1();
-  v_review:=platform_private.registry_track_intake_review_snapshot_v1(p_suggestion_id);
+  v_review:=platform_private.registry_track_intake_credit_review_snapshot_v1(p_suggestion_id);
 
   select credit.*
   into v_source

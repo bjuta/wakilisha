@@ -75,7 +75,8 @@ begin
          and operation_version=2
      )
      or to_regprocedure('platform_private.registry_track_intake_current_admin_v1()') is not null
-     or to_regprocedure('platform_private.registry_track_intake_review_snapshot_v1(uuid)') is not null
+     or to_regprocedure('platform_private.registry_track_intake_identity_review_snapshot_v1(uuid)') is not null
+     or to_regprocedure('platform_private.registry_track_intake_credit_review_snapshot_v1(uuid)') is not null
      or to_regprocedure('platform_private.registry_track_intake_deterministic_track_uuid_v1(uuid)') is not null
      or to_regprocedure('platform_private.registry_track_intake_reviewed_slug_v1(uuid,text)') is not null
      or to_regprocedure('platform_private.registry_track_creation_collision_state_v2(uuid,text,uuid,text,text)') is not null
@@ -195,7 +196,7 @@ begin
 end
 $$;
 
-create function platform_private.registry_track_intake_review_snapshot_v1(
+create function platform_private.registry_track_intake_identity_review_snapshot_v1(
   p_suggestion_id uuid
 )
 returns jsonb
@@ -207,7 +208,7 @@ as $$
 declare
   v_user_id uuid;
   v_suggestion public.registry_provider_track_suggestions%rowtype;
-  v_fields jsonb;
+  v_identity_fields jsonb;
   v_credits jsonb;
   v_payload jsonb;
   v_fingerprint text;
@@ -240,11 +241,12 @@ begin
     ),
     '{}'::jsonb
   )
-  into v_fields
+  into v_identity_fields
   from public.registry_enrichment_suggestions enrichment
   where enrichment.registry_entity_type='track'
     and enrichment.registry_entity_id=p_suggestion_id::text
-    and enrichment.decision_status='approved';
+    and enrichment.decision_status='approved'
+    and enrichment.field_name='isrc';
 
   select coalesce(
     jsonb_agg(
@@ -306,7 +308,105 @@ begin
     'playback_kind',v_suggestion.playback_kind,
     'validation_snapshot',coalesce(v_suggestion.validation_snapshot,'{}'::jsonb),
     'submitted_track_title',v_suggestion.submitted_track_title,
-    'approved_fields',v_fields,
+    'approved_identity_fields',v_identity_fields,
+    'reviewed_credits',v_credits
+  );
+
+  v_fingerprint:=encode(
+    extensions.digest(v_payload::text,'sha256'),
+    'hex'
+  );
+
+  return v_payload || jsonb_build_object(
+    'review_fingerprint',v_fingerprint,
+    'applying_user_id',v_user_id
+  );
+end
+$$;
+
+create function platform_private.registry_track_intake_credit_review_snapshot_v1(
+  p_suggestion_id uuid
+)
+returns jsonb
+language plpgsql
+stable
+security definer
+set search_path = pg_catalog, public, platform_private, auth, extensions
+as $$
+declare
+  v_user_id uuid;
+  v_suggestion public.registry_provider_track_suggestions%rowtype;
+  v_credits jsonb;
+  v_payload jsonb;
+  v_fingerprint text;
+begin
+  v_user_id:=platform_private.registry_track_intake_current_admin_v1();
+
+  select suggestion.*
+  into v_suggestion
+  from public.registry_provider_track_suggestions suggestion
+  where suggestion.id=p_suggestion_id;
+
+  if not found then
+    raise exception using errcode='P0002',
+      message='Track Intake item does not exist.';
+  end if;
+
+  if v_suggestion.status<>'needs_review' then
+    raise exception using errcode='42501',
+      message='Track Intake Artist credits are not currently reviewable.';
+  end if;
+
+  select coalesce(
+    jsonb_agg(
+      jsonb_build_object(
+        'credit_id',credit.id,
+        'credit_order',credit.credit_order,
+        'credit_role',credit.credit_role,
+        'resolution_mode',credit.resolution_mode,
+        'registry_artist_id',credit.registry_artist_id,
+        'observed_name',credit.observed_name
+      )
+      order by credit.credit_order,credit.id
+    ),
+    '[]'::jsonb
+  )
+  into v_credits
+  from public.registry_provider_track_suggestion_artists credit
+  where credit.suggestion_id=p_suggestion_id;
+
+  if jsonb_array_length(v_credits)=0
+     or exists (
+       select 1
+       from public.registry_provider_track_suggestion_artists credit
+       left join public.registry_artists artist
+         on artist.id=credit.registry_artist_id
+       where credit.suggestion_id=p_suggestion_id
+         and (
+           credit.resolution_mode<>'existing_artist'
+           or credit.registry_artist_id is null
+           or artist.id is null
+           or artist.status<>'active'
+           or credit.credit_role not in ('primary','featured')
+         )
+     )
+     or not exists (
+       select 1
+       from public.registry_provider_track_suggestion_artists credit
+       join public.registry_artists artist
+         on artist.id=credit.registry_artist_id
+       where credit.suggestion_id=p_suggestion_id
+         and credit.credit_role='primary'
+         and credit.resolution_mode='existing_artist'
+         and artist.status='active'
+     )
+  then
+    raise exception using errcode='42501',
+      message='Resolve every Track Intake Artist credit to an active existing Registry Artist before credit authority.';
+  end if;
+
+  v_payload:=jsonb_build_object(
+    'suggestion_id',v_suggestion.id,
     'reviewed_credits',v_credits
   );
 
@@ -545,7 +645,7 @@ declare
   v_assertion_id uuid;
 begin
   v_user_id:=platform_private.registry_track_intake_current_admin_v1();
-  v_review:=platform_private.registry_track_intake_review_snapshot_v1(p_suggestion_id);
+  v_review:=platform_private.registry_track_intake_identity_review_snapshot_v1(p_suggestion_id);
 
   v_claim:=jsonb_build_object(
     'suggestion_id',p_suggestion_id,
@@ -1241,7 +1341,7 @@ declare
   v_track public.registry_tracks%rowtype;
 begin
   v_user_id:=platform_private.registry_track_intake_current_admin_v1();
-  v_review:=platform_private.registry_track_intake_review_snapshot_v1(p_suggestion_id);
+  v_review:=platform_private.registry_track_intake_identity_review_snapshot_v1(p_suggestion_id);
 
   v_title:=nullif(btrim(p_title),'');
   if v_title is null then
@@ -1291,7 +1391,7 @@ begin
       nullif(
         btrim(
           coalesce(
-            v_review->'approved_fields'->>'isrc',
+            v_review->'approved_identity_fields'->>'isrc',
             ''
           )
         ),
@@ -1458,7 +1558,7 @@ revoke all on function
   platform_private.registry_track_intake_current_admin_v1()
   from public,anon,authenticated,service_role;
 revoke all on function
-  platform_private.registry_track_intake_review_snapshot_v1(uuid)
+  platform_private.registry_track_intake_identity_review_snapshot_v1(uuid)
   from public,anon,authenticated,service_role;
 revoke all on function
   platform_private.registry_track_intake_deterministic_track_uuid_v1(uuid)

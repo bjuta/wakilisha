@@ -21,7 +21,7 @@ begin
      or to_regclass('public.registry_track_artists') is null
      or to_regclass('platform_private.registry_operation_types') is null
      or to_regprocedure('platform_private.registry_track_intake_current_admin_v1()') is null
-     or to_regprocedure('platform_private.registry_track_intake_review_snapshot_v1(uuid)') is null
+     or to_regprocedure('platform_private.registry_track_intake_credit_review_snapshot_v1(uuid)') is null
      or to_regprocedure('platform_private.registry_subject_state_fingerprint(text,uuid)') is null
      or to_regprocedure('platform_private.registry_plan_fingerprint(jsonb)') is null
      or to_regprocedure('platform_private.begin_registry_mutation_operation(text,uuid)') is null
@@ -609,7 +609,7 @@ begin
   end if;
 
   v_review:=
-    platform_private.registry_track_intake_review_snapshot_v1(
+    platform_private.registry_track_intake_credit_review_snapshot_v1(
       (v_plan->>'suggestion_id')::uuid
     );
 
@@ -1078,7 +1078,7 @@ declare
   v_verification record;
 begin
   v_user_id:=platform_private.registry_track_intake_current_admin_v1();
-  v_review:=platform_private.registry_track_intake_review_snapshot_v1(
+  v_review:=platform_private.registry_track_intake_credit_review_snapshot_v1(
     p_suggestion_id
   );
 
