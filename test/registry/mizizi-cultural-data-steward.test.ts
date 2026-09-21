@@ -708,7 +708,70 @@ describe("MIZIZI Cultural Data Steward", () => {
   });
 
 
-  it("installs Track Intake Track Create V2 without cutting over the product caller", () => {
+  it("finalizes Track Intake workflow only after governed child authority is exact", () => {
+    const migration = read(
+      "supabase/migrations/20260921150000_registry_track_intake_workflow_finalization_v1.sql",
+    );
+    const verifier = read(
+      "scripts/control-plane/verify-registry-track-intake-workflow-finalization.sql",
+    );
+    const intakePage = read(
+      "src/pages/admin/registry/tracks/intake/page.tsx",
+    );
+
+    expect(migration).toContain(
+      "'credit_id',credit.id",
+    );
+    expect(migration).toContain(
+      "registry.track_artist_credit.reviewed_reconcile",
+    );
+    expect(migration).toContain(
+      "registry.track.create",
+    );
+    expect(migration).toContain(
+      "registry.track.activate",
+    );
+    expect(migration).toContain(
+      "registry_track_provider_links",
+    );
+    expect(migration).toContain(
+      "admin_finalize_registry_track_intake_v1",
+    );
+    expect(migration).toContain(
+      "insert into public.provider_entity_links",
+    );
+    expect(migration).not.toContain(
+      "insert into public.registry_tracks",
+    );
+    expect(migration).not.toContain(
+      "update public.registry_tracks",
+    );
+    expect(migration).not.toContain(
+      "insert into public.registry_track_artists",
+    );
+    expect(migration).not.toContain(
+      "update public.registry_track_artists",
+    );
+    expect(migration).not.toContain(
+      "update public.registry_releases",
+    );
+    expect(migration).not.toContain(
+      "insert into public.registry_track_provider_links",
+    );
+
+    expect(verifier).toContain(
+      "REGISTRY_TRACK_INTAKE_WORKFLOW_FINALIZATION_PASS",
+    );
+
+    expect(intakePage).toContain(
+      "credit_id: string",
+    );
+    expect(intakePage).toContain(
+      "admin_finalize_registry_track_intake_v1",
+    );
+  });
+
+  it("installs Track Intake Track Create V2 behind the governed Track Intake caller", () => {
     const migration = read(
       "supabase/migrations/20260921120000_registry_track_intake_track_create_v2_foundation.sql",
     );
@@ -761,10 +824,31 @@ describe("MIZIZI Cultural Data Steward", () => {
     );
 
     expect(intakePage).toContain(
+      "admin_create_registry_track_intake_identity_v1",
+    );
+    expect(intakePage).toContain(
+      "admin_reconcile_registry_track_intake_credit_v1",
+    );
+    expect(intakePage).toContain(
+      "admin_admit_registry_track_intake_track_profile_v1",
+    );
+    expect(intakePage).toContain(
+      "admin_admit_registry_track_intake_release_profile_v1",
+    );
+    expect(intakePage).toContain(
+      "admin_admit_registry_track_provider_link_v1",
+    );
+    expect(intakePage).toContain(
+      "admin_activate_registry_track_intake_v1",
+    );
+    expect(intakePage).toContain(
+      "admin_finalize_registry_track_intake_v1",
+    );
+    expect(intakePage).not.toContain(
       "admin_create_registry_track_from_intake_enriched",
     );
     expect(intakePage).not.toContain(
-      "admin_create_registry_track_intake_identity_v1",
+      "admin_resolve_registry_track_intake_enriched",
     );
   });
 
