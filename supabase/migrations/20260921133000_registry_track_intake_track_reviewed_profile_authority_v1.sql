@@ -359,10 +359,9 @@ begin
     'hex'
   );
   v_idempotency_key:=
-    'track-intake-track-profile-v1:'||
-    (p_plan_payload->>'suggestion_id')||':'||
+    'track-profile-v1:'||
     p_track_id::text||':'||
-    left(p_plan_payload->>'review_fingerprint',24)||':'||
+    (p_plan_payload->>'review_fingerprint')||':'||
     case when (p_plan_payload->>'allow_overwrite')::boolean then '1' else '0' end;
 
   select execution_grant.*
@@ -1043,10 +1042,9 @@ begin
   end if;
 
   v_idempotency_key:=
-    'track-intake-track-profile-v1:'||
-    p_suggestion_id::text||':'||
+    'track-profile-v1:'||
     p_registry_track_id::text||':'||
-    left(v_review->>'review_fingerprint',24)||':'||
+    (v_review->>'review_fingerprint')||':'||
     case when p_allow_overwrite then '1' else '0' end;
 
   select execution_grant.*

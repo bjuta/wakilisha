@@ -558,6 +558,12 @@ describe("MIZIZI Cultural Data Steward", () => {
     expect(migration).toContain(
       "p_allow_overwrite",
     );
+    expect(migration).toContain(
+      "'track-profile-v1:'",
+    );
+    expect(migration).not.toContain(
+      "'track-intake-track-profile-v1:'",
+    );
     expect(migration).not.toContain(
       "apple_music_ingest",
     );
