@@ -397,7 +397,7 @@ begin
           'subject_id',p_track_id::text,
           'claim_key','registry.track.provider_link',
           'claim_payload',p_claim,
-          'trust_class','ADMIN_REVIEWED',
+          'trust_class','INTERNAL_FACT',
           'source_kind','registry_provider_link_admin',
           'source_ref',v_source_ref,
           'source_payload_fingerprint',v_source_payload_fingerprint,
@@ -426,7 +426,7 @@ begin
     p_track_id,
     'registry.track.provider_link',
     p_claim,
-    'ADMIN_REVIEWED',
+    'INTERNAL_FACT',
     'registry_provider_link_admin',
     v_source_ref,
     v_source_payload_fingerprint,
@@ -500,7 +500,7 @@ begin
   if not found
      or v_evidence.subject_type<>'track'
      or v_evidence.claim_key<>'registry.track.provider_link'
-     or v_evidence.trust_class<>'ADMIN_REVIEWED'
+     or v_evidence.trust_class<>'INTERNAL_FACT'
      or v_evidence.source_kind<>'registry_provider_link_admin'
      or v_evidence.recorded_by_principal_key<>
           'user:'||v_user_id::text
@@ -770,7 +770,7 @@ begin
      or v_evidence.subject_type<>'track'
      or v_evidence.subject_id<>v_target.subject_id
      or v_evidence.claim_key<>'registry.track.provider_link'
-     or v_evidence.trust_class<>'ADMIN_REVIEWED'
+     or v_evidence.trust_class<>'INTERNAL_FACT'
      or v_evidence.source_kind<>'registry_provider_link_admin'
      or v_evidence.assertion_fingerprint<>
           v_plan->>'evidence_assertion_fingerprint'
@@ -981,7 +981,7 @@ begin
       and assertion.subject_type='track'
       and assertion.subject_id=v_target.subject_id
       and assertion.claim_key='registry.track.provider_link'
-      and assertion.trust_class='ADMIN_REVIEWED'
+      and assertion.trust_class='INTERNAL_FACT'
       and assertion.source_kind='registry_provider_link_admin'
       and assertion.assertion_fingerprint=
           v_plan->>'evidence_assertion_fingerprint';

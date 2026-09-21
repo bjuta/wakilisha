@@ -72,7 +72,7 @@ with:
 
 - real `auth.uid()`;
 - current `manage_registry`;
-- caller-bound `ADMIN_REVIEWED` evidence;
+- caller-bound `INTERNAL_FACT` evidence;
 - one exact existing Track target;
 - exact Track state fingerprint;
 - exact pre-existing provider-link fingerprint, including the explicit

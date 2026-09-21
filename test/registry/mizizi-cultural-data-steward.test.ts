@@ -1097,7 +1097,7 @@ describe("MIZIZI Slice 2 Gate A-final Registry authority convergence", () => {
 
     expect(migration).toContain("registry_provider_link_admin");
     expect(migration).toContain("registry.track.provider_link.admit");
-    expect(migration).toContain("ADMIN_REVIEWED");
+    expect(migration).toContain("INTERNAL_FACT");
     expect(migration).toContain("required_user_capability_key");
     expect(migration).toContain("manage_registry");
     expect(migration).toContain("WK_STALE_PROVIDER_LINK");

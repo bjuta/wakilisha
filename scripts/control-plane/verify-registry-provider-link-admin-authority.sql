@@ -80,7 +80,7 @@ begin
        )
      )=0
      or position(
-       'ADMIN_REVIEWED'
+       'INTERNAL_FACT'
        in pg_get_functiondef(
          'platform_private.record_registry_provider_link_admin_evidence_v1(uuid,jsonb)'::regprocedure
        )
