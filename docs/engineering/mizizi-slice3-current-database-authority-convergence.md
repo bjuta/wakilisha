@@ -1,120 +1,165 @@
 # MIZIZI Slice 3 — Current Database Authority Convergence
 
-Status: **in progress**
+Status: **in progress — Track Intake tranche Production accepted**
 
-Authority checkpoint: protected main `61ea528bc590c3d2f56694cbd7801b1234b2a7c7`
+Current authority checkpoint:
 
-This document is the current-state companion to
+- protected main: `dcdbe948b6dc5edc2cd31133939e45e152db7b57`;
+- Production project: `pgzizndxdyhqmtyywjmt`;
+- Production status: `ACTIVE_HEALTHY`;
+- Production branch status: `FUNCTIONS_DEPLOYED`;
+- Production migration count: **166**;
+- Production migration head:
+  `20260921153000_registry_track_intake_legacy_writer_retirement_v1`;
+- machine privileged-writer manifest entries: **54**;
+- classified database-function writers: **41**;
+- permanent canonical writer discovery:
+  `REGISTRY_CANONICAL_WRITER_INVENTORY_PASS`.
+
+This document is the living current-state companion to
 `mizizi-slice3-final-live-writer-authority-audit.md`.
 
-The earlier audit remains historical evidence and must not be rewritten to
-pretend its September 20 snapshot is current. Since that snapshot:
+The September 20 audit remains historical evidence. Do not rewrite its original
+findings to pretend they were made against today's runtime. Current closure and
+remaining-work truth belongs here and in dated amendments to the audit.
 
-- privileged-writer discovery has been expanded and mechanised;
-- Chart Playback provider persistence has converged;
-- Provider Intake legacy Release mutation has failed closed;
-- Admin Registry direct service-role canonical DML has converged;
-- Production is at 158 migrations / `20260920190646`;
-- the canonical writer inventory verifier passes in Production.
+## Production-accepted convergence since the September 20 audit
 
-## Current exit surface
+The following major roads are no longer open Slice 3 debt:
 
-The current writer manifest contains 50 accepted entries on the protected-main
-checkpoint above, including 37 database-function writers. The permanent
-Production discovery gate reports:
+- Admin Registry direct service-role canonical DML convergence;
+- Provider Intake legacy direct Release mutation convergence/fail-close;
+- Chart Playback provider persistence convergence;
+- generic Track provider-link admission convergence;
+- Track Intake create/enrichment convergence.
 
-`REGISTRY_CANONICAL_WRITER_INVENTORY_PASS`
+### Track Intake Production closure
 
-Slice 3 therefore no longer has unknown-writer discovery debt. Remaining work is
-known database-function authority convergence.
+PR #1001, `fix: converge Track Intake onto governed Registry authority`, is
+merged to protected main.
 
-At the checkpoint above, 14 live database-function writers remain classified
-with one of:
+Merged main:
 
-- `keep_converge`;
-- `retire_or_internalize`;
-- `candidate_retire`.
+`dcdbe948b6dc5edc2cd31133939e45e152db7b57`
 
-## Existing-primitive convergence tranche
+Production now uses:
 
-The first tranche is deliberately limited to roads that can compose accepted
-typed authority without inventing a new high-blast operation family.
+1. Track Create V2 identity authority for new Tracks;
+2. source-credit-scoped reviewed Artist-credit reconciliation;
+3. provider-neutral reviewed Track profile admission;
+4. provider-neutral reviewed Release profile admission where applicable;
+5. governed canonical Track provider-link admission;
+6. exact Track activation after complete reviewed-credit-set proof;
+7. workflow-only finalization with no canonical Registry DML.
 
-Current targets:
+Retired Track Intake alternate writers:
 
-1. `registry_upsert_track_provider_link(...)`
-2. `admin_resolve_registry_track_intake_enriched(...)`
-3. `admin_create_registry_track_from_intake_enriched(...)`
-4. `community_admin_decide_artist_claim(...)`
-5. `community_admin_resolve_artist_claim_existing(...)`
-6. `accept_registry_missing_artist_intake(...)`
-7. `admin_apply_chart_artist_resolution_decision(...)`
-8. `admin_create_registry_artist_for_decouple(...)`
-9. `admin_resolve_chart_artist_alias(...)`
+- `admin_create_registry_track_from_intake_enriched(uuid,text,text)`;
+- `admin_resolve_registry_track_intake_enriched(uuid,uuid,text,boolean)`;
+- `admin_resolve_registry_track_intake(uuid,uuid,text)`;
+- `sync_registry_track_intake_artist_credits(uuid,uuid)`.
 
-The first bounded sub-block is generic Track provider-link admission.
+Acceptance completed:
 
-### Provider-link target authority
+- consolidated real-user/JWT Preview acceptance;
+- exact operation/grant/write-event receipt audit;
+- clean repository-versioned Preview replay from Production baseline;
+- seven migration replay proofs;
+- schema seal and migration replay contract;
+- PR CI green;
+- Production SQL promotion;
+- ten permanent Production verifiers green;
+- generated canonical writer inventory green;
+- protected-main Critical Control Plane #1397 green;
+- exact merged-main Production frontend deployment green;
+- direct-origin and public HTTPS smoke green;
+- clean Preview deleted after Production acceptance.
 
-The accepted typed operation already exists:
+## Current machine-classified Slice 3 debt
 
-`registry.track.provider_link.admit/v1`
+The privileged-writer manifest now contains **11** entries still classified as
+`keep_converge`, `retire_or_internalize`, or `candidate_retire`.
 
-Chart Playback remains independently bounded to the
-`registry_chart_admission` actor and `manage_charts`. It is not broadened or
-reused as a generic Registry transport.
+### Existing-primitive convergence roads
 
-The Registry-admin road instead uses a separate human exact-grant broker:
+These should be completed before the high-blast repair/merge family because
+accepted typed primitives already exist for most of their canonical writes.
 
-`registry_provider_link_admin`
+1. Artist Claim creation family
+   - `community_admin_decide_artist_claim(...)`
+   - `community_admin_resolve_artist_claim_existing(...)`
+   - preserve claim review/representation semantics;
+   - route new canonical Artist creation through `registry.artist.create`.
 
-with:
+2. Missing Artist Intake
+   - `accept_registry_missing_artist_intake(...)`
+   - route Artist creation through `registry.artist.create`;
+   - preserve accepted typed relationship endpoint resolution.
 
-- real `auth.uid()`;
-- current `manage_registry`;
-- caller-bound `INTERNAL_FACT` evidence;
-- one exact existing Track target;
-- exact Track state fingerprint;
-- exact pre-existing provider-link fingerprint, including the explicit
-  `absent` state;
-- `registry.track.provider_link.admit/v1`;
-- one mutation operation;
-- one causal canonical write event;
-- an independent persisted-state verifier.
+3. Chart Artist resolution
+   - `admin_apply_chart_artist_resolution_decision(...)`
+   - converge Track↔Artist mutation onto accepted reviewed credit
+     admission/reconciliation/set authority.
 
-The legacy `registry_upsert_track_provider_link(...)` implementation is not
-deleted in this sub-block. It becomes owner-internal implementation only:
-`PUBLIC`, `anon`, `authenticated`, and `service_role` lose EXECUTE.
-This preserves its established field validation/upsert behavior without
-retaining it as a second API authority.
+4. Artist creation for decouple
+   - `admin_create_registry_artist_for_decouple(...)`
+   - replace direct canonical Artist creation with `registry.artist.create`;
+   - preserve both Chart-resolution and Artist-alias decouple callers.
 
-The app caller moves to:
+5. Chart Artist alias resolution
+   - `admin_resolve_chart_artist_alias(...)`
+   - preserve alias-resolution semantics while moving canonical credit mutation
+     behind typed/journaled authority.
 
-`admin_admit_registry_track_provider_link_v1(...)`
+### High-blast / retirement roads after the existing-primitive block
 
-Retries that already match the requested exact state return the current row
-without minting another grant. A provider-link state change after grant issuance
-fails closed with `WK_STALE_PROVIDER_LINK`.
+- `admin_apply_registry_track_duplicate_repair(...)`
+  - dedicated exact high-risk Track repair operation;
+- `admin_apply_artist_decouple_decision(...)`
+  - dedicated exact Artist decouple operation;
+- `admin_safe_merge_registry_artists(...)`
+  - dedicated exact high-risk Artist merge operation;
+- `admin_decouple_registry_artist(...)`
+  - internalize after the reviewed product command owns exact authority;
+- `admin_merge_registry_artists(...)`
+  - candidate retirement after dependency, bounded traffic, rollback, and
+    permanent negative proof.
 
-## High-blast tranche after existing primitives
+## Next five jobs
 
-These remain separate because they require dedicated exact operation semantics:
+The next five engineering jobs, in current Slice 3 order, are:
 
-- `admin_apply_registry_track_duplicate_repair(...)`;
-- `admin_apply_artist_decouple_decision(...)`;
-- `admin_safe_merge_registry_artists(...)`;
-- lower-level `admin_decouple_registry_artist(...)` must be internalised.
+1. **Artist Claim canonical-creation convergence**
+   - freeze current claim-review semantics and callers;
+   - compose accepted Artist-create authority;
+   - keep existing-Artist claim resolution semantics intact.
 
-## Retirement tranche
+2. **Missing Artist Intake convergence**
+   - freeze current knowledge-review workflow;
+   - compose typed Artist create + typed relationship endpoint resolution.
 
-`admin_merge_registry_artists(...)` remains a candidate retirement road.
+3. **Chart Artist resolution convergence**
+   - freeze reviewed resolution semantics;
+   - replace direct `registry_track_artists` mutation with exact reviewed
+     Track↔Artist authority.
 
-Retirement requires current dependency proof, bounded Production traffic proof,
-rollback source, and permanent negative/reintroduction control before DROP.
+4. **Decouple Artist-creation convergence**
+   - converge `admin_create_registry_artist_for_decouple(...)` onto
+     `registry.artist.create`;
+   - do not redesign the later high-blast decouple operation in this job.
 
-## Slice 3 final exit gate
+5. **Chart Artist alias-resolution convergence**
+   - preserve alias semantics;
+   - move canonical credit mutation onto typed/journaled authority.
 
-#962 does not close until a fresh Production audit proves all of the following:
+After those five, enter the dedicated high-blast Track duplicate repair / Artist
+decouple / Artist merge block and finally the manual-merge retirement proof.
+
+## Slice 3 exit gate
+
+#962 remains open.
+
+Slice 3 closes only when a fresh Production audit proves:
 
 - no unknown canonical Registry writer;
 - no Slice-3-owned `keep_converge`, `retire_or_internalize`, or
@@ -122,36 +167,24 @@ rollback source, and permanent negative/reintroduction control before DROP.
 - accepted human commands compose typed authority;
 - private executors do not leak `anon`, `authenticated`, or
   `service_role` execution;
+- ordinary browser canonical DML remains zero;
 - MIZIZI standing/exact grants at rest remain within the accepted zero-state
   contract;
 - no autonomous MIZIZI schedule exists;
 - repository, migration ledger, runtime deployment, and Production verifier
   evidence agree.
 
-Slice 4 #991 remains blocked until that exit gate passes.
+Slice 4 #991 remains blocked until this exit gate passes.
 
+The broader Supabase advisor/security programme remains owned separately by
+#992 and must not be folded into Slice 3 without an exact writer-road reason.
 
-## Track Intake create/enrichment convergence closure
+## Current deployment classification
 
-The Track Intake create/enrichment targets from the existing-primitive tranche are converged on branch `fix/slice3-track-intake-create-authority`.
+The current Production state is already accepted. This documentation checkpoint
+requires no SQL, Edge Function, frontend, Finish, or other Production runtime
+mutation.
 
-Retired alternate writers:
+The next mutation-bearing implementation job is:
 
-- `admin_create_registry_track_from_intake_enriched(...)`
-- `admin_resolve_registry_track_intake_enriched(...)`
-- `admin_resolve_registry_track_intake(...)`
-- `sync_registry_track_intake_artist_credits(...)`
-
-The product caller now composes:
-
-1. Track Create V2 identity when a new Track is required;
-2. one reviewed-credit reconciliation operation per immutable source credit;
-3. provider-neutral Track reviewed-profile admission;
-4. provider-neutral Release reviewed-profile admission when an existing Release is linked;
-5. governed canonical provider-link admission;
-6. Track activation for newly created Tracks;
-7. workflow-only finalization after current child authority is proven.
-
-A consolidated real-JWT Preview acceptance proved both new-Track and existing-Track paths, changed-review reconciliation onto the same canonical credit relation, provider-link precondition enforcement, finalizer idempotency, and preservation of unrelated existing credits.
-
-This closes only the Track Intake create/enrichment roads. Other Slice 3 convergence targets remain governed by issue #962 and this programme document.
+**Artist Claim canonical-creation convergence**.

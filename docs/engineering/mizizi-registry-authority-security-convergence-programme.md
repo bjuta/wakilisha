@@ -1,12 +1,14 @@
 # MIZIZI Registry Authority, Security, and Primitive Convergence Programme
 
+> **21 September 2026 current checkpoint:** protected main is `dcdbe948b6dc5edc2cd31133939e45e152db7b57`; Production is `ACTIVE_HEALTHY` / `FUNCTIONS_DEPLOYED` at 166 migrations with head `20260921153000_registry_track_intake_legacy_writer_retirement_v1`. Track Intake create/enrichment is Production accepted through PR #1001. Slice 3 remains the active boundary with 11 machine-classified convergence/retirement entries; Slice 4 #991 remains blocked. The exact next-five queue is maintained in `docs/engineering/mizizi-slice3-current-database-authority-convergence.md`.
+>
 > **20 September 2026 programme correction:** Slices 1 and 2 remain Production accepted. Slice 3 retirement and MIZIZI executor convergence are accepted, but Slice 3 is reopened after a complete live-writer audit found three service-role Edge canonical writers plus additional authenticated `SECURITY DEFINER` canonical writers not completely represented in the machine privileged-writer manifest. Slice 4 #991 is blocked.
 
 Date: 14 September 2026
 
 Status: **Architectural authority. Slices 1 and 2 are Production accepted. Slice 3 is reopened for final live-writer convergence. Slice 4 is blocked.**
 
-Base repository authority: `main@dee74bf733f6888deb8eaf998d27de455bf70071`
+Current repository authority: `main@dcdbe948b6dc5edc2cd31133939e45e152db7b57`
 
 ## 1. Decision
 

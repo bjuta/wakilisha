@@ -2,24 +2,26 @@
 
 Date: 21 September 2026
 
-Status: IMPLEMENTATION AUTHORITY FREEZE
+Status: **PRODUCTION ACCEPTED**
 
 Issue: #962
 
-Base merged-main authority: `01c0e5404230dbf320c8cd1a8f46ef5d0c2743a8`
+Design base authority: `01c0e5404230dbf320c8cd1a8f46ef5d0c2743a8`
 
-Branch: `fix/slice3-track-intake-create-authority`
+Accepted merged main: `dcdbe948b6dc5edc2cd31133939e45e152db7b57`
+
+Merged PR: #1001 (`fix/slice3-track-intake-create-authority`)
 
 ## Decision
 
 The coupled Track Intake canonicalization road must converge as one product workflow while preserving separately durable Registry operations.
 
-Current public commands:
+At the design freeze, the legacy public commands were:
 
 - `admin_create_registry_track_from_intake_enriched(uuid,text,text)`
 - `admin_resolve_registry_track_intake_enriched(uuid,uuid,text,boolean)`
 
-remain legitimate human-reviewed product actions, but their direct canonical Registry mutation must be retired.
+They were legitimate human-reviewed product actions whose direct canonical Registry mutation needed retirement. They are now retired in Production.
 
 The replacement keeps the same one-click admin experience while orchestration moves to separate caller-JWT RPC transactions.
 
@@ -547,15 +549,19 @@ proven. The remaining sequence is:
 11. Delete disposable Previews and update Slice 3 issue closure evidence.
     Do not claim Slice 3 complete until the full Slice 3 exit gate is satisfied.
 
-### Current deployment checklist
+### Implementation-freeze deployment checklist — historical
 
-- SQL migration needed: **Yes**
-- Supabase Edge Function deploy needed: **No currently**
-- Production Finish update needed: **No currently**
-- Frontend deploy needed: **Yes, after Track Intake caller cutover**
-- PR needed now: **Not yet**
-- Immediate next implementation task: **queue credit UUID + workflow-only
-  finalizer + frontend orchestration**
+This checklist records the state before the accepted cutover and is superseded
+by the Production closure at the end of this document.
+
+At that implementation freeze:
+
+- SQL migration was still pending;
+- no Edge Function deployment was planned;
+- the frontend caller cutover was still pending;
+- the PR had not yet opened;
+- workflow finalization and frontend orchestration were still implementation
+  work.
 
 
 ## Post-cutover structural checkpoint — 2026-09-21
@@ -681,19 +687,55 @@ The workflow finalizer is intentionally not a canonical writer.
 The current Preview remains diagnostic-only because it contains historical hot
 repairs. It is not promotion authority.
 
-### Remaining gate
+## Production closure — 21 September 2026
 
-Before PR merge or Production promotion, create a brand-new clean Preview from
-the accepted Production/main baseline and replay the final repository migration
-chain exactly. The clean Preview must prove:
+The earlier diagnostic-Preview and remaining-gate sections above are preserved as
+execution history. Their pending statements are superseded by this closure.
 
-1. exact baseline migration ledger;
-2. all final Track Intake migrations apply in repository order with no hot
-   repair;
-3. all permanent verifiers pass;
-4. generated canonical-writer inventory passes;
-5. migration replay contract passes;
-6. canonical replay proof and schema seal are recorded;
-7. consolidated tests and CI are green.
+Accepted repository state:
 
-Only then may the PR be opened/merged and Production promotion considered.
+- PR #1001 merged;
+- merged main:
+  `dcdbe948b6dc5edc2cd31133939e45e152db7b57`;
+- proof-seal candidate:
+  `8abd0450232bfc5060ac904b921cb5294872285e`;
+- protected-main Critical Control Plane #1397: PASS.
+
+Accepted Production database state:
+
+- project: `pgzizndxdyhqmtyywjmt`;
+- status: `ACTIVE_HEALTHY`;
+- branch status: `FUNCTIONS_DEPLOYED`;
+- migration count: **166**;
+- migration head:
+  `20260921153000_registry_track_intake_legacy_writer_retirement_v1`;
+- all ten permanent Track Intake/Registry structural verifiers: PASS;
+- `REGISTRY_CANONICAL_WRITER_INVENTORY_PASS`.
+
+Accepted Production frontend state:
+
+- deployed main:
+  `dcdbe948b6dc5edc2cd31133939e45e152db7b57`;
+- Preview project ref absent from built artifact;
+- Production project ref present in built artifact;
+- local/staged/live artifact SHA and file-count parity: PASS;
+- Nginx validation: PASS;
+- direct-origin smoke: PASS;
+- public HTTPS smoke: PASS;
+- `GATE_D_PRODUCTION_FRONTEND_DEPLOY=PASS`.
+
+The clean replay Preview was deleted after Production acceptance.
+
+### Final disposition
+
+Track Intake create/enrichment is no longer Slice 3 convergence debt.
+
+The retired alternate writer roads must remain absent:
+
+- `admin_create_registry_track_from_intake_enriched(uuid,text,text)`;
+- `admin_resolve_registry_track_intake_enriched(uuid,uuid,text,boolean)`;
+- `admin_resolve_registry_track_intake(uuid,uuid,text)`;
+- `sync_registry_track_intake_artist_credits(uuid,uuid)`.
+
+Any future Track Intake canonical mutation must remain inside the accepted
+governed command chain recorded in this document.
