@@ -33,6 +33,9 @@ begin
        'platform_private.registry_plan_fingerprint(jsonb)'
      ) is null
      or to_regprocedure(
+       'platform_private.registry_identity_normalize_text_v1(text)'
+     ) is null
+     or to_regprocedure(
        'public.resolve_registry_relationship_endpoint(uuid,text,text,uuid,text)'
      ) is null
   then
@@ -110,6 +113,7 @@ declare
   v_user_id uuid:=auth.uid();
   v_operation_type platform_private.registry_operation_types%rowtype;
   v_future_id uuid;
+  v_future_hex text;
   v_collision jsonb;
   v_evidence_id uuid;
   v_evidence platform_private.registry_evidence_assertions%rowtype;
@@ -202,7 +206,22 @@ begin
       message='Registry Artist creation operation is disabled or malformed.';
   end if;
 
-  v_future_id:=gen_random_uuid();
+  v_future_hex:=encode(
+    extensions.digest(
+      p_source_kind||':'||btrim(p_source_ref)||':'||
+      p_source_payload_fingerprint,
+      'sha256'
+    ),
+    'hex'
+  );
+  v_future_id:=(
+    substr(v_future_hex,1,8)||'-'||
+    substr(v_future_hex,9,4)||'-'||
+    '5'||substr(v_future_hex,14,3)||'-'||
+    '8'||substr(v_future_hex,18,3)||'-'||
+    substr(v_future_hex,21,12)
+  )::uuid;
+
   v_collision:=
     platform_private.registry_artist_creation_collision_state_v1(
       v_future_id,
@@ -250,12 +269,35 @@ begin
     'user:'||v_user_id::text,
     v_assertion_fingerprint
   )
+  on conflict (assertion_fingerprint) do nothing
   returning id into v_evidence_id;
+
+  if v_evidence_id is null then
+    select assertion.id
+    into v_evidence_id
+    from platform_private.registry_evidence_assertions assertion
+    where assertion.assertion_fingerprint=v_assertion_fingerprint;
+  end if;
 
   select assertion.*
   into v_evidence
   from platform_private.registry_evidence_assertions assertion
   where assertion.id=v_evidence_id;
+
+  if not found
+     or v_evidence.subject_type<>'artist'
+     or v_evidence.subject_id<>v_future_id
+     or v_evidence.claim_key<>'registry.artist.identity.create'
+     or v_evidence.claim_payload<>p_claim_payload
+     or v_evidence.trust_class<>'INTERNAL_FACT'
+     or v_evidence.source_kind<>p_source_kind
+     or v_evidence.source_ref<>btrim(p_source_ref)
+     or v_evidence.source_payload_fingerprint<>p_source_payload_fingerprint
+     or v_evidence.recorded_by_principal_key<>'user:'||v_user_id::text
+  then
+    raise exception using errcode='42501',
+      message='Reviewed Artist identity evidence is not bound to the exact reviewed source.';
+  end if;
 
   v_plan:=jsonb_build_object(
     'operation_key','registry.artist.create',
