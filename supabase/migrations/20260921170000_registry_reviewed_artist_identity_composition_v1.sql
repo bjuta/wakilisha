@@ -222,6 +222,110 @@ begin
     substr(v_future_hex,21,12)
   )::uuid;
 
+  v_idempotency_key:=
+    'reviewed-artist-create:'||
+    encode(
+      extensions.digest(
+        p_source_kind||':'||btrim(p_source_ref)||':'||
+        p_source_payload_fingerprint,
+        'sha256'
+      ),
+      'hex'
+    );
+
+  perform pg_catalog.pg_advisory_xact_lock(
+    pg_catalog.hashtextextended(v_idempotency_key,0)
+  );
+
+  select execution_grant.*
+  into v_existing
+  from platform_private.registry_execution_grants execution_grant
+  where execution_grant.actor_key='registry_artist_identity_review'
+    and execution_grant.operation_key='registry.artist.create'
+    and execution_grant.operation_version=1
+    and execution_grant.idempotency_key=v_idempotency_key;
+
+  if found then
+    if v_existing.issued_by_user_id<>v_user_id
+       or v_existing.max_rows<>1
+       or v_existing.plan_payload->>'artist_id'
+            is distinct from v_future_id::text
+       or v_existing.plan_payload->>'display_name'
+            is distinct from btrim(p_display_name)
+       or v_existing.plan_payload->>'normalized_name'
+            is distinct from btrim(p_normalized_name)
+       or v_existing.plan_payload->>'slug'
+            is distinct from btrim(p_slug)
+    then
+      raise exception using errcode='23505',
+        message='Reviewed Artist identity idempotency key is bound to different authority.';
+    end if;
+
+    select assertion.*
+    into v_evidence
+    from platform_private.registry_evidence_assertions assertion
+    where assertion.id=
+      (v_existing.plan_payload->>'evidence_assertion_id')::uuid;
+
+    if not found
+       or v_evidence.subject_type<>'artist'
+       or v_evidence.subject_id<>v_future_id
+       or v_evidence.claim_key<>'registry.artist.identity.create'
+       or v_evidence.claim_payload<>p_claim_payload
+       or v_evidence.trust_class<>'INTERNAL_FACT'
+       or v_evidence.source_kind<>p_source_kind
+       or v_evidence.source_ref<>btrim(p_source_ref)
+       or v_evidence.source_payload_fingerprint<>p_source_payload_fingerprint
+       or v_evidence.recorded_by_principal_key<>'user:'||v_user_id::text
+       or v_existing.plan_payload->>'evidence_assertion_fingerprint'
+            is distinct from v_evidence.assertion_fingerprint
+    then
+      raise exception using errcode='23505',
+        message='Reviewed Artist identity retry does not match prior exact evidence.';
+    end if;
+
+    select *
+    into v_execution
+    from platform_private.execute_registry_materialization_v1(
+      'registry_artist_identity_review',
+      v_existing.id
+    );
+
+    select *
+    into v_verification
+    from platform_private.verify_registry_materialization_v1(
+      v_execution.operation_id
+    );
+
+    if v_verification.verifier_status<>'passed' then
+      raise exception using errcode='23514',
+        message='Reviewed Artist identity replay verification failed.';
+    end if;
+
+    select artist.*
+    into v_artist
+    from public.registry_artists artist
+    where artist.id=v_future_id;
+
+    if not found
+       or v_artist.slug is distinct from btrim(p_slug)
+       or v_artist.display_name is distinct from btrim(p_display_name)
+    then
+      raise exception using errcode='40001',
+        message='Reviewed Artist identity replay no longer resolves to the exact Artist.';
+    end if;
+
+    return jsonb_build_object(
+      'artist_id',v_artist.id,
+      'artist_slug',v_artist.slug,
+      'display_name',v_artist.display_name,
+      'status',v_artist.status,
+      'operation_id',v_execution.operation_id,
+      'verifier_status',v_verification.verifier_status,
+      'idempotent_replay',true
+    );
+  end if;
+
   v_collision:=
     platform_private.registry_artist_creation_collision_state_v1(
       v_future_id,
@@ -330,71 +434,40 @@ begin
     ),
     'hex'
   );
-  v_idempotency_key:=
-    'reviewed-artist-create:'||
-    encode(
-      extensions.digest(
-        p_source_kind||':'||btrim(p_source_ref)||':'||
-        p_source_payload_fingerprint,
-        'sha256'
-      ),
-      'hex'
-    );
+  insert into platform_private.registry_execution_grants (
+    actor_key,capability_key,system_actor_capability_grant_id,
+    operation_key,operation_version,plan_payload,plan_fingerprint,
+    target_set_fingerprint,max_rows,idempotency_key,status,
+    issued_by_user_id,issued_by_principal_key,policy_ruleset_version,
+    required_user_capability_key,issued_at,expires_at
+  )
+  values (
+    'registry_artist_identity_review',
+    v_operation_type.capability_key,
+    null,
+    'registry.artist.create',
+    1,
+    v_plan,
+    v_plan_fingerprint,
+    v_target_fingerprint,
+    1,
+    v_idempotency_key,
+    'active',
+    v_user_id,
+    'user:'||v_user_id::text,
+    'registry-materialization-v1',
+    p_required_user_capability_key,
+    now(),
+    now()+interval '5 minutes'
+  )
+  returning id into v_grant_id;
 
-  select execution_grant.*
-  into v_existing
-  from platform_private.registry_execution_grants execution_grant
-  where execution_grant.actor_key='registry_artist_identity_review'
-    and execution_grant.operation_key='registry.artist.create'
-    and execution_grant.operation_version=1
-    and execution_grant.idempotency_key=v_idempotency_key;
-
-  if found then
-    if v_existing.issued_by_user_id<>v_user_id
-       or v_existing.plan_fingerprint<>v_plan_fingerprint
-       or v_existing.target_set_fingerprint<>v_target_fingerprint
-       or v_existing.max_rows<>1
-    then
-      raise exception using errcode='23505',
-        message='Reviewed Artist identity idempotency key is bound to different authority.';
-    end if;
-    v_grant_id:=v_existing.id;
-  else
-    insert into platform_private.registry_execution_grants (
-      actor_key,capability_key,system_actor_capability_grant_id,
-      operation_key,operation_version,plan_payload,plan_fingerprint,
-      target_set_fingerprint,max_rows,idempotency_key,status,
-      issued_by_user_id,issued_by_principal_key,policy_ruleset_version,
-      required_user_capability_key,issued_at,expires_at
-    )
-    values (
-      'registry_artist_identity_review',
-      v_operation_type.capability_key,
-      null,
-      'registry.artist.create',
-      1,
-      v_plan,
-      v_plan_fingerprint,
-      v_target_fingerprint,
-      1,
-      v_idempotency_key,
-      'active',
-      v_user_id,
-      'user:'||v_user_id::text,
-      'registry-materialization-v1',
-      p_required_user_capability_key,
-      now(),
-      now()+interval '5 minutes'
-    )
-    returning id into v_grant_id;
-
-    insert into platform_private.registry_execution_grant_targets (
-      execution_grant_id,subject_type,subject_id,expected_state_fingerprint
-    )
-    values (
-      v_grant_id,'artist',v_future_id,null
-    );
-  end if;
+  insert into platform_private.registry_execution_grant_targets (
+    execution_grant_id,subject_type,subject_id,expected_state_fingerprint
+  )
+  values (
+    v_grant_id,'artist',v_future_id,null
+  );
 
   select *
   into v_execution
