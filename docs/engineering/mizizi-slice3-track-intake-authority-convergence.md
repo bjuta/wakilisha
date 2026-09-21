@@ -42,7 +42,7 @@ Therefore the frontend/service layer must orchestrate the governed steps across 
 ### New Track
 
 1. validate the reviewed Track Intake suggestion and freeze the exact review snapshot;
-2. execute `registry.track.create/v1` through a Track-Intake-specific caller-bound broker;
+2. execute `registry.track.create/v2` through a Track-Intake-specific caller-bound broker;
 3. execute one `registry.track_artist_credit.admit/v1` per reviewed resolved Artist credit;
 4. admit provider-neutral reviewed Track/Release enrichment through narrow typed operations;
 5. activate the draft Track through `registry.track.activate/v1` only after required reviewed credits and enrichment preconditions pass;
@@ -75,12 +75,13 @@ The broker may issue only the operation versions explicitly listed in this desig
 
 ## Reused operations
 
-Reuse without changing their cultural meaning:
+Preserve the accepted operation family without rewriting established history:
 
-- `registry.track.create/v1`;
-- `registry.track_artist_credit.admit/v1`.
+- `registry.track.create/v1` remains frozen for existing Chart/Discography semantics;
+- `registry.track.create/v2` is the Track Intake route-identity extension with an explicit evidence-bound reviewed slug;
+- `registry.track_artist_credit.admit/v1` remains the accepted credit operation.
 
-The accepted shared materialization executor remains the execution nucleus.
+V2 is a versioned semantic extension of Track creation, not a new generic CRUD family.
 
 Track Intake must not borrow the Chart actor or Discography actor.
 
@@ -88,13 +89,7 @@ Track Intake must not borrow the Chart actor or Discography actor.
 
 The current shared materialization core writes Track↔Artist credit `source='chart_admission'` even though the executor accepts an actor key.
 
-A forward migration must make that value actor-aware without changing existing Chart receipts:
-
-- `registry_chart_admission` -> `chart_admission`;
-- `registry_track_intake_admin` -> `track_intake_review`;
-- any other actor is rejected unless explicitly admitted by the executor contract.
-
-The operation itself remains `registry.track_artist_credit.admit/v1`.
+Track Intake must not rewrite the accepted Chart V1 executor merely to change provenance. Instead, a Track-Intake-specific executor will execute the same `registry.track_artist_credit.admit/v1` contract for the `registry_track_intake_admin` actor and persist `source='track_intake_review'`. Existing Chart receipts remain untouched.
 
 ## Lifecycle operation
 
@@ -102,7 +97,7 @@ Add:
 
 `registry.track.activate/v1`
 
-This is required because `registry.track.create/v1` is deliberately draft-only and legacy Track Intake canonicalization intentionally produces an active Track.
+This is required because `registry.track.create/v1` and `/v2` are deliberately draft-only and legacy Track Intake canonicalization intentionally produces an active Track.
 
 Contract:
 
@@ -251,7 +246,7 @@ After caller cutover:
 At minimum prove on a fresh Preview:
 
 - real `registry_editor` JWT;
-- new Track flow creates draft identity through `registry.track.create/v1`;
+- new Track flow creates draft identity through `registry.track.create/v2`;
 - every reviewed Artist credit is a separate verified exact operation;
 - failure of a later credit leaves earlier identity/credit receipts durable;
 - provider-neutral enrichment applies only reviewed allowed fields;
@@ -271,8 +266,8 @@ At minimum prove on a fresh Preview:
 
 ## Deployment order
 
-1. install broker/evidence/review fingerprint foundation;
-2. make shared Track-credit source actor-aware while preserving Chart output;
+1. install broker/evidence/review fingerprint + `registry.track.create/v2` foundation;
+2. add the Track-Intake-specific executor for `registry.track_artist_credit.admit/v1` while preserving Chart V1 output;
 3. add Track activation operation;
 4. add provider-neutral Track/Release reviewed-profile operations;
 5. add separate public step commands;

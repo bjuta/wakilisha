@@ -532,6 +532,60 @@ describe("MIZIZI Cultural Data Steward", () => {
     );
   });
 
+  it("installs Track Intake Track Create V2 without cutting over the product caller", () => {
+    const migration = read(
+      "supabase/migrations/20260921120000_registry_track_intake_track_create_v2_foundation.sql",
+    );
+    const verifier = read(
+      "scripts/control-plane/verify-registry-track-intake-track-create-v2-foundation.sql",
+    );
+    const intakePage = read(
+      "src/pages/admin/registry/tracks/intake/page.tsx",
+    );
+
+    expect(migration).toContain(
+      "'registry.track.create',\n  2,",
+    );
+    expect(migration).toContain(
+      "registry_track_intake_admin",
+    );
+    expect(migration).toContain(
+      "registry_track_creation_collision_state_v2",
+    );
+    expect(migration).toContain(
+      "admin_create_registry_track_intake_identity_v1",
+    );
+    expect(migration).toContain(
+      "'registry-track-create-v2'",
+    );
+    expect(migration).toContain(
+      "'track_intake_review'",
+    );
+    expect(migration).toContain(
+      "'draft'",
+    );
+    expect(migration).not.toContain(
+      "drop function public.admin_create_registry_track_from_intake_enriched",
+    );
+    expect(migration).not.toContain(
+      "drop function public.admin_resolve_registry_track_intake_enriched",
+    );
+
+    expect(verifier).toContain(
+      "REGISTRY_TRACK_INTAKE_TRACK_CREATE_V2_FOUNDATION_PASS",
+    );
+    expect(verifier).toContain(
+      "Track Create V1 was disturbed by V2 foundation",
+    );
+
+    expect(intakePage).toContain(
+      "admin_create_registry_track_from_intake_enriched",
+    );
+    expect(intakePage).not.toContain(
+      "admin_create_registry_track_intake_identity_v1",
+    );
+  });
+
   it("routes production Track apply through the governed control plane", () => {
     const workflow =
       readFileSync(
