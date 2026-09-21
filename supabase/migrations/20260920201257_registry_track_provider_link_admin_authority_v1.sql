@@ -540,6 +540,7 @@ begin
     'track_id',v_evidence.subject_id::text,
     'evidence_assertion_id',v_evidence.id::text,
     'evidence_assertion_fingerprint',v_evidence.assertion_fingerprint,
+    'trust_class',v_evidence.trust_class,
     'claim_payload',v_evidence.claim_payload,
     'expected_track_state_fingerprint',v_track_state_fingerprint,
     'expected_provider_link_fingerprint',

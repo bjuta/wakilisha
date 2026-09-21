@@ -86,6 +86,16 @@ begin
        )
      )=0
      or position(
+       '''trust_class'',v_evidence.trust_class'
+       in replace(
+         pg_get_functiondef(
+           'platform_private.issue_registry_provider_link_admin_grant_v1(uuid)'::regprocedure
+         ),
+         ' ',
+         ''
+       )
+     )=0
+     or position(
        'required_user_capability_key'
        in pg_get_functiondef(
          'platform_private.issue_registry_provider_link_admin_grant_v1(uuid)'::regprocedure
