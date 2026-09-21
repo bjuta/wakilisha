@@ -212,6 +212,45 @@ ${values}
 end
 $verify$;
 
+
+do $verify_closed_table_roads$
+declare
+  v_table text;
+  v_role text;
+  v_privilege text;
+begin
+  foreach v_table in array array[
+    'public.registry_artist_aliases',
+    'public.registry_track_provider_links',
+    'public.registry_relationship_evidence'
+  ]
+  loop
+    foreach v_role in array array[
+      'anon',
+      'authenticated',
+      'service_role'
+    ]
+    loop
+      foreach v_privilege in array array[
+        'INSERT',
+        'UPDATE',
+        'DELETE',
+        'TRUNCATE',
+        'REFERENCES',
+        'TRIGGER'
+      ]
+      loop
+        if has_table_privilege(v_role,v_table,v_privilege) then
+          raise exception
+            'STOP: stale direct Registry table privilege remains: role=% table=% privilege=%',
+            v_role,v_table,v_privilege;
+        end if;
+      end loop;
+    end loop;
+  end loop;
+end
+$verify_closed_table_roads$;
+
 select
   'REGISTRY_CANONICAL_WRITER_INVENTORY_PASS'::text as status;
 `;
