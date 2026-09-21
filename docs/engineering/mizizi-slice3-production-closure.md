@@ -1,5 +1,7 @@
 # MIZIZI Slice 3 Production Closure
 
+> **21 September 2026 current-state note:** this file remains the historical closure record for obsolete-runtime retirement and MIZIZI Stage A/B/C. Whole Slice 3 is still open. Since this record, Admin Registry, Provider Intake, Chart Playback provider persistence, generic Track provider-link admission, and Track Intake create/enrichment have converged. Current authority is `main@dcdbe948b6dc5edc2cd31133939e45e152db7b57`; Production is 166 migrations / `20260921153000_registry_track_intake_legacy_writer_retirement_v1`. Use `docs/engineering/mizizi-slice3-current-database-authority-convergence.md` for current remaining work.
+>
 > **20 September 2026 correction:** the retirement and MIZIZI Stage A/B/C evidence in this record remains accepted, but the whole Slice 3 closure decision was premature.
 > A fresh exact-main + Production audit found three live service-role Edge canonical writers plus a broader authenticated `SECURITY DEFINER` canonical-writer surface that was not completely represented in the machine privileged-writer manifest.
 > #962 is reopened and Slice 4 #991 is blocked until the complete live-writer inventory is mechanically classified and the remaining alternate/broad writer roads converge or are explicitly proven non-bypass under the original Slice 3 exit gate.
