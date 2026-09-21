@@ -610,3 +610,90 @@ a brand-new clean Preview replay from accepted main.
 
 Legacy direct writer functions remain installed intentionally until consolidated
 real-JWT caller acceptance succeeds. They must not be retired earlier.
+
+
+## Post-retirement behavioral acceptance checkpoint — 2026-09-21
+
+Branch head before this checkpoint commit: `60ead23ff10d9205c0a7c3d5e90f8d0063908be9`.
+
+The consolidated real-JWT behavioral acceptance passed end to end on the
+diagnostic Preview:
+
+- exact candidate authority;
+- real password login;
+- anon/service_role denial on workflow finalization;
+- new Track V2 identity;
+- draft-Track reviewed-credit reconciliation;
+- reviewed Track profile admission;
+- exact Track activation;
+- finalization blocked before canonical provider-link authority;
+- governed provider-link admission;
+- workflow-only finalization and idempotent replay;
+- existing Track reviewed-credit insert;
+- changed source-credit review updating the same canonical relation under a new
+  exact operation;
+- reviewed Track and Release profile admissions;
+- existing-Track governed provider-link admission;
+- existing-Track workflow finalization and idempotent replay;
+- durable state verification;
+- unrelated existing credit preservation.
+
+Final acceptance marker:
+
+`TRACK_INTAKE_GOVERNED_CUTOVER_REAL_JWT=PASS`
+
+The independent remote receipt audit then proved all ten canonical operations
+were `succeeded` with `verifier_status='passed'`, all ten exact grants were
+consumed and caller-bound, each operation had exactly one causal canonical
+write event, both Track Intake workflow rows finalized to the expected Track,
+both governed canonical provider links were present, and the unrelated existing
+credit remained unchanged.
+
+After that proof the following legacy direct writer roads were retired on the
+branch and diagnostic Preview:
+
+- `admin_create_registry_track_from_intake_enriched(uuid,text,text)`
+- `admin_resolve_registry_track_intake_enriched(uuid,uuid,text,boolean)`
+- `admin_resolve_registry_track_intake(uuid,uuid,text)`
+- `sync_registry_track_intake_artist_credits(uuid,uuid)`
+
+The superseded diagnostic-only Track Intake credit-admit wrapper/helpers were
+also removed from the hot Preview and are permanently forbidden by the
+retirement verifier. They are already absent from the final migration chain.
+
+Post-retirement structural acceptance is green across all of:
+
+- Track Create V2 foundation verifier;
+- reviewed-credit reconciliation verifier;
+- Track activation verifier;
+- Track reviewed-profile verifier;
+- Release reviewed-profile verifier;
+- workflow-only finalization verifier;
+- legacy-writer retirement verifier;
+- MIZIZI Track identity write-boundary verifier;
+- Phase 5A Track Intake canonical-creation verifier;
+- generated canonical Registry writer inventory.
+
+The writer manifest now classifies the five governed Track Intake canonical
+command surfaces and removes the two formerly classified legacy direct writers.
+The workflow finalizer is intentionally not a canonical writer.
+
+The current Preview remains diagnostic-only because it contains historical hot
+repairs. It is not promotion authority.
+
+### Remaining gate
+
+Before PR merge or Production promotion, create a brand-new clean Preview from
+the accepted Production/main baseline and replay the final repository migration
+chain exactly. The clean Preview must prove:
+
+1. exact baseline migration ledger;
+2. all final Track Intake migrations apply in repository order with no hot
+   repair;
+3. all permanent verifiers pass;
+4. generated canonical-writer inventory passes;
+5. migration replay contract passes;
+6. canonical replay proof and schema seal are recorded;
+7. consolidated tests and CI are green.
+
+Only then may the PR be opened/merged and Production promotion considered.
