@@ -84,6 +84,7 @@ begin
      or v_definition ~*
         'insert[[:space:]]+into[[:space:]]+public\.registry_artist_aliases'
      or position('manual_intake' in v_definition) > 0
+     or v_definition ~* '\\bset[[:space:]]+entity_id[[:space:]]*=[[:space:]]*v_artist_id\\b'
   then
     raise exception
       'FAIL: Missing Artist Intake bypasses accepted Artist creation, alias, or relationship authority';
