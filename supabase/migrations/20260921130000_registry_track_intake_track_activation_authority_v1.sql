@@ -20,9 +20,9 @@ begin
   if to_regclass('public.capability_definitions') is null
      or to_regclass('platform_private.registry_operation_types') is null
      or to_regprocedure('platform_private.registry_track_intake_current_admin_v1()') is null
-     or to_regprocedure('platform_private.registry_track_intake_credit_review_snapshot_v1(uuid)') is null
+     or to_regprocedure('platform_private.registry_track_intake_credit_set_review_snapshot_v1(uuid)') is null
      or to_regprocedure('platform_private.registry_track_intake_deterministic_track_uuid_v1(uuid)') is null
-     or to_regprocedure('platform_private.registry_track_intake_deterministic_credit_uuid_v1(uuid)') is null
+     or to_regprocedure('platform_private.registry_track_intake_reconciled_credit_uuid_v1(uuid,uuid)') is null
      or to_regprocedure('platform_private.registry_subject_state_fingerprint(text,uuid)') is null
      or to_regprocedure('platform_private.registry_plan_fingerprint(jsonb)') is null
      or to_regprocedure('platform_private.begin_registry_mutation_operation(text,uuid)') is null
@@ -154,7 +154,8 @@ begin
     jsonb_agg(
       jsonb_build_object(
         'credit_id',
-          platform_private.registry_track_intake_deterministic_credit_uuid_v1(
+          platform_private.registry_track_intake_reconciled_credit_uuid_v1(
+            p_track_id,
             source_credit.id
           ),
         'artist_id',source_credit.registry_artist_id,
@@ -615,7 +616,7 @@ begin
   end if;
 
   v_review:=
-    platform_private.registry_track_intake_credit_review_snapshot_v1(
+    platform_private.registry_track_intake_credit_set_review_snapshot_v1(
       (v_plan->>'suggestion_id')::uuid
     );
 
@@ -963,7 +964,7 @@ declare
   v_track public.registry_tracks%rowtype;
 begin
   v_user_id:=platform_private.registry_track_intake_current_admin_v1();
-  v_review:=platform_private.registry_track_intake_credit_review_snapshot_v1(
+  v_review:=platform_private.registry_track_intake_credit_set_review_snapshot_v1(
     p_suggestion_id
   );
   v_track_id:=
