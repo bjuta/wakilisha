@@ -261,6 +261,10 @@ begin
           in v_definition
         ) = 0
      or position(
+          'create_from_artist_claim'
+          in v_definition
+        ) = 0
+     or position(
           '''active'''
           in v_definition
         ) = 0
