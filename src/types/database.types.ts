@@ -19505,6 +19505,26 @@ export type Database = {
           result_payload: Json
         }[]
       }
+      admin_admit_registry_track_provider_link_v1: {
+        Args: {
+          p_artwork_url?: string
+          p_duration_ms?: number
+          p_isrc?: string
+          p_match_confidence?: number
+          p_match_method?: string
+          p_match_status?: string
+          p_preview_url?: string
+          p_provider_artist_ids?: string[]
+          p_provider_key: string
+          p_provider_release_id?: string
+          p_provider_track_id: string
+          p_raw_payload?: Json
+          p_storefront?: string
+          p_track_id: string
+          p_upc?: string
+        }
+        Returns: Json
+      }
       admin_apply_artist_decouple_decision: {
         Args: { p_decision_id: string }
         Returns: Json

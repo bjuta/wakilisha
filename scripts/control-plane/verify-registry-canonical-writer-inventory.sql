@@ -83,6 +83,7 @@ begin
   classified(signature) as (
     values
       ('public.accept_registry_missing_artist_intake(uuid,text)'),
+      ('public.admin_admit_registry_track_provider_link_v1(uuid,text,text,text,text[],text,text,text,text,integer,text,text,numeric,text,jsonb)'),
       ('public.admin_apply_artist_decouple_decision(uuid)'),
       ('public.admin_apply_chart_artist_resolution_decision(uuid)'),
       ('public.admin_apply_registry_track_duplicate_repair(uuid,uuid[],text,boolean)'),

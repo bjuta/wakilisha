@@ -113,7 +113,7 @@ export async function upsertTrackProviderLink(input: {
   matchStatus?: TrackProviderLink["matchStatus"];
   rawPayload?: Record<string, unknown>;
 }): Promise<TrackProviderLink> {
-  const { data, error } = await supabase.rpc("registry_upsert_track_provider_link", {
+  const { data, error } = await supabase.rpc("admin_admit_registry_track_provider_link_v1", {
     p_track_id: input.trackId,
     p_provider_key: input.providerKey,
     p_provider_track_id: input.providerTrackId,

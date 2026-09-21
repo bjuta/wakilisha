@@ -558,6 +558,76 @@ for (const forbiddenPattern of [
   }
 }
 
+const providerLinkClientSource = fs.readFileSync(
+  "src/services/registry/providerLinks.ts",
+  "utf8",
+);
+
+if (
+  !providerLinkClientSource.includes(
+    '"admin_admit_registry_track_provider_link_v1"',
+  ) ||
+  providerLinkClientSource.includes(
+    '"registry_upsert_track_provider_link"',
+  )
+) {
+  throw new Error(
+    "Registry provider-link client must use the governed admin admission RPC and may not call the legacy direct upsert.",
+  );
+}
+
+const providerLinkLegacyWriter =
+  registryWriters.find(
+    (writer) =>
+      writer.id === "registry-upsert-track-provider-link",
+  );
+
+if (
+  providerLinkLegacyWriter?.authentication !==
+    "owner_internal_only" ||
+  providerLinkLegacyWriter?.authorization !==
+    "no_external_execute" ||
+  providerLinkLegacyWriter?.executionAuthority !==
+    "owner_internal_security_definer_implementation_behind_exact_provider_link_operation" ||
+  providerLinkLegacyWriter?.disposition !== "keep" ||
+  providerLinkLegacyWriter?.futureBoundary !==
+    "owner_internal_provider_link_upsert_behind_typed_exact_operation" ||
+  providerLinkLegacyWriter?.humanCallable !== false ||
+  providerLinkLegacyWriter?.publicCallable !== false ||
+  providerLinkLegacyWriter?.canonicalMutation !== true ||
+  providerLinkLegacyWriter?.legacyDebt !== false
+) {
+  throw new Error(
+    "Legacy Registry provider-link upsert classification drifted from owner-internal exact-operation implementation.",
+  );
+}
+
+const providerLinkAdminWriter =
+  registryWriters.find(
+    (writer) =>
+      writer.id === "admin-admit-registry-track-provider-link-v1",
+  );
+
+if (
+  providerLinkAdminWriter?.entrypoint !==
+    "public.admin_admit_registry_track_provider_link_v1(uuid,text,text,text,text[],text,text,text,text,integer,text,text,numeric,text,jsonb)" ||
+  providerLinkAdminWriter?.authentication !== "auth_uid" ||
+  providerLinkAdminWriter?.authorization !== "manage_registry" ||
+  providerLinkAdminWriter?.executionAuthority !==
+    "security_definer_orchestrator_over_caller_bound_evidence_exact_grant_operation_and_independent_verifier" ||
+  providerLinkAdminWriter?.disposition !== "keep" ||
+  providerLinkAdminWriter?.futureBoundary !==
+    "typed_registry_provider_link_admission_for_registry_admin" ||
+  providerLinkAdminWriter?.humanCallable !== true ||
+  providerLinkAdminWriter?.publicCallable !== false ||
+  providerLinkAdminWriter?.canonicalMutation !== true ||
+  providerLinkAdminWriter?.legacyDebt !== false
+) {
+  throw new Error(
+    "Registry provider-link admin authority classification drifted.",
+  );
+}
+
 const miziziRunner =
   registryWriters.find(
     (writer) =>
