@@ -101,32 +101,41 @@ export default function GenreDetailPage() {
   async function handleSave() {
     if (!genre) return;
     setIsSaving(true);
-    const payload = {
-      name: draft.name,
-      parent_genre_id: draft.parent_genre_id || null,
-      description: draft.description || null,
-      status: draft.status,
-      updated_at: new Date().toISOString(),
-    };
-    const { error } = await supabase.from("registry_genres").update(payload).eq("id", genre.id);
+    const { data, error } = await supabase.rpc("admin_patch_registry_genre_profile_v1", {
+      p_entity_id: genre.id,
+      p_patch: {
+        name: draft.name,
+        description: draft.description || null,
+        status: draft.status,
+      },
+      p_expected_updated_at: genre.updated_at,
+    });
     setIsSaving(false);
     if (error) {
       addToast("error", `Save failed: ${error.message}`);
       return;
     }
-    setGenre((prev) => (prev ? { ...prev, ...payload } : prev));
+    const updated = data as GenreRecord;
+    setGenre(updated);
+    setDraft({
+      name: updated.name,
+      parent_genre_id: updated.parent_genre_id ?? "",
+      description: updated.description ?? "",
+      status: updated.status,
+    });
     setIsDirty(false);
     addToast("success", "Genre saved.");
   }
 
   async function handleDelete() {
     if (!genre) return;
-    const { error } = await supabase
-      .from("registry_genres")
-      .update({ status: "archived", updated_at: new Date().toISOString() })
-      .eq("id", genre.id);
+    const { error } = await supabase.rpc("admin_patch_registry_genre_profile_v1", {
+      p_entity_id: genre.id,
+      p_patch: { status: "archived" },
+      p_expected_updated_at: genre.updated_at,
+    });
     if (error) {
-      addToast("error", "Failed to archive genre.");
+      addToast("error", `Failed to archive genre: ${error.message}`);
       return;
     }
     addToast("info", "Genre archived.");
@@ -236,7 +245,8 @@ export default function GenreDetailPage() {
             <div className="grid gap-4 sm:grid-cols-2">
               <div>
                 <label className="block text-[11px] font-bold uppercase tracking-wider text-wk-text-muted mb-2">Parent Genre ID</label>
-                <input type="text" value={draft.parent_genre_id} onChange={(e) => patchDraft({ parent_genre_id: e.target.value })} placeholder="UUID of parent genre" className="w-full rounded-lg border border-wk-border bg-wk-bg-subtle px-3 py-2.5 text-[13px] text-wk-text placeholder:text-wk-text-faint outline-none focus:border-wk-brand font-mono" />
+                <input type="text" value={draft.parent_genre_id || "No parent"} readOnly aria-readonly="true" className="w-full rounded-lg border border-wk-border bg-wk-surface-raised px-3 py-2.5 text-[13px] text-wk-text-muted outline-none font-mono" />
+                <p className="mt-1.5 text-[10px] text-wk-text-faint">Genre hierarchy is read-only on this profile surface.</p>
               </div>
               <div>
                 <label className="block text-[11px] font-bold uppercase tracking-wider text-wk-text-muted mb-2">Status</label>
