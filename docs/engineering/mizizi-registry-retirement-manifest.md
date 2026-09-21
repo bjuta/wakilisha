@@ -545,7 +545,11 @@ The prerequisite convergence is complete:
 - current-main has no remaining product caller;
 - the initial bounded post-release Production traffic audit recorded zero invocations.
 
-D2 removes the source and standing writer classification, then keeps Production v37 only until the merged retirement contract and a final zero-traffic check authorize deployment deletion. Historical Top Songs relationship rows, evidence, migration lineage, and presentation rows are preserved.
+Historical D2 execution removed the source and standing writer classification,
+then retained Production v37 only temporarily until the merged retirement
+contract and final zero-traffic/deletion gate completed. Current Production no
+longer contains the runtime. Historical Top Songs relationship rows, evidence,
+migration lineage, and presentation rows remain preserved.
 
 ## 13. Legacy relationship authority
 
