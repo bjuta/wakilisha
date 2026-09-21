@@ -1,16 +1,30 @@
 # MIZIZI Slice 3 Candidate D2: `admin-registry-api` Retirement
 
+> **21 September 2026 current-state note — PRODUCTION ACCEPTED:** this
+> candidate has completed its retirement outcome. `admin-registry-api` is absent
+> from the current Production Edge inventory. Generic Admin Registry authority is
+> owned by the accepted `admin-router/registry` boundary; Artist Top Songs reads
+> and writes remain on `get_artist_top_songs_v1` and
+> `admin_replace_artist_top_songs_v1`. Current Production independently passes
+> the permanent Top Songs authority verifier. The traffic, fingerprint, and
+> deletion-gate sections below are preserved as the pre-retirement proof plan,
+> not as outstanding work.
+>
 Date: 17 September 2026
 
 Repository base: `main@6852c24f312deb32345977e78aece06eb8c9387d`
 
 Issue authority: #962, MIZIZI Slice 3: Obsolete Authority Retirement & Bypass Closure
 
-## Decision
+## Decision — historical and completed
 
-Retire the standalone `admin-registry-api` runtime after D1 replacement proof.
+The D2 decision was to retire the standalone `admin-registry-api` runtime after
+D1 replacement proof.
 
-This D2 repository candidate does not delete the Production deployment. Production v37 remains available only as rollback authority until this repository retirement contract is merged and a final traffic audit remains zero.
+At the repository-candidate stage, Production v37 remained temporarily available
+as rollback authority until merge plus the final traffic/deletion gate. That
+temporary state is historical: current Production no longer contains
+`admin-registry-api`.
 
 ## Replacement proof
 
@@ -91,7 +105,7 @@ This candidate:
 
 There is no SQL migration, schema change, replay seal, frontend behavior change, or Production mutation in this candidate.
 
-## Production deletion gate
+## Production deletion gate — historical completed gate
 
 Production v37 may be deleted only after:
 
@@ -107,3 +121,16 @@ After deletion:
 3. the exact canonical fingerprint above must be unchanged;
 4. D1 public-reader acceptance must remain green;
 5. Admin Top Songs must remain on the typed RPC authority.
+
+
+## Current retirement closure
+
+Current Production proof:
+
+- `admin-registry-api`: absent from the Edge deployment inventory;
+- `public-content-read`: ACTIVE;
+- permanent Top Songs presentation-authority verifier: PASS;
+- typed Top Songs read/write authority remains installed;
+- no reintroduction of the retired Edge writer is authorized.
+
+This D2 road is not remaining Slice 3 work.

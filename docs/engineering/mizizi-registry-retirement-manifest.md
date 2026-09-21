@@ -529,7 +529,12 @@ After protected CI and merge, deploy `admin-router` and run the normal frontend 
 
 ### Decision
 
-**RETIRE in Slice 3 D2 after D1 replacement proof.**
+**PRODUCTION RETIRED. PRESERVE D1 TOP SONGS AUTHORITY AND HISTORICAL EVIDENCE.**
+
+Current Production independently confirms `admin-registry-api` is absent from
+the Edge inventory and the permanent Top Songs presentation-authority verifier
+passes. The prerequisite and deletion-proof text below remains historical
+retirement evidence; it is not an open gate.
 
 The prerequisite convergence is complete:
 
@@ -540,7 +545,11 @@ The prerequisite convergence is complete:
 - current-main has no remaining product caller;
 - the initial bounded post-release Production traffic audit recorded zero invocations.
 
-D2 removes the source and standing writer classification, then keeps Production v37 only until the merged retirement contract and a final zero-traffic check authorize deployment deletion. Historical Top Songs relationship rows, evidence, migration lineage, and presentation rows are preserved.
+Historical D2 execution removed the source and standing writer classification,
+then retained Production v37 only temporarily until the merged retirement
+contract and final zero-traffic/deletion gate completed. Current Production no
+longer contains the runtime. Historical Top Songs relationship rows, evidence,
+migration lineage, and presentation rows remain preserved.
 
 ## 13. Legacy relationship authority
 

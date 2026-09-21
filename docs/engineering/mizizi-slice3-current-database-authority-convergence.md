@@ -1,6 +1,6 @@
 # MIZIZI Slice 3 — Current Database Authority Convergence
 
-Status: **in progress — Track Intake tranche Production accepted**
+Status: **in progress — Track Intake and Top Songs D1/D2 tranches Production accepted**
 
 Current authority checkpoint:
 
@@ -32,7 +32,9 @@ The following major roads are no longer open Slice 3 debt:
 - Provider Intake legacy direct Release mutation convergence/fail-close;
 - Chart Playback provider persistence convergence;
 - generic Track provider-link admission convergence;
-- Track Intake create/enrichment convergence.
+- Track Intake create/enrichment convergence;
+- Artist Top Songs D1 presentation authority + service-role boundary repair;
+- `admin-registry-api` D2 retirement.
 
 ### Track Intake Production closure
 

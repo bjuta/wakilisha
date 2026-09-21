@@ -1,6 +1,13 @@
 # MIZIZI Slice 3 D1: Top Songs Service-Role Boundary Repair
 
-Status: **LOCAL REPAIR CANDIDATE - NOT YET PRODUCTION-ACTIVE**
+> **21 September 2026 current-state note:** the service-role boundary repair
+> is part of accepted Production migration history. Current Production passes
+> `verify-mizizi-top-song-presentation-authority.sql`: direct service-role table
+> authority remains closed, the public/read RPC boundary remains available, and
+> the authenticated Admin replacement command remains the governed write path.
+> The deployment classification below is the historical repair plan.
+>
+Status: **PRODUCTION ACCEPTED**
 
 Programme issue: #962
 
@@ -54,7 +61,7 @@ No rollback of presentation data is required.
 The permanent D1 verifier is hardened to fail if any direct table authority
 returns or if the service-role RPC boundary drifts.
 
-## Deployment classification
+## Deployment classification — historical pre-acceptance plan
 
 - SQL migration needed: **Yes**
 - Edge Function deploy needed for this repair: **No**

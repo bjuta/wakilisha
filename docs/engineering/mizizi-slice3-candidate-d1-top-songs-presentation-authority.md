@@ -1,6 +1,16 @@
 # MIZIZI Slice 3 Candidate D1: Top Songs Presentation Authority
 
-Status: **LOCAL IMPLEMENTATION CANDIDATE - PREVIEW NOT YET APPLIED**
+> **21 September 2026 current-state note:** D1 is Production accepted. The
+> presentation migration `20260917121500_artist_top_song_presentation_authority_v1`
+> and the follow-up service-role boundary repair
+> `20260917121600_artist_top_song_service_role_boundary_v1` are in the accepted
+> migration history. The permanent Top Songs authority verifier passes in current
+> Production. Admin writes use `admin_replace_artist_top_songs_v1`; reads use
+> `get_artist_top_songs_v1`. The former `admin-registry-api` runtime is retired
+> and absent from the Production Edge inventory. The deployment checklist below
+> records the pre-acceptance D1 plan and is historical, not pending work.
+>
+Status: **PRODUCTION ACCEPTED — HISTORICAL DESIGN / IMPLEMENTATION RECORD**
 
 Programme issue: #962
 
@@ -56,7 +66,7 @@ Both public gateways move their Top Songs reads from relationship-slug lookup to
 
 `admin-registry-api` remains deployed during D1 as rollback authority. Its full source and Production deployment are retired only in D2 after D1 acceptance and caller/traffic proof.
 
-## Deployment classification
+## Deployment classification — historical pre-acceptance plan
 
 - SQL migration needed: **Yes**
 - Admin frontend deploy needed: **Yes**
