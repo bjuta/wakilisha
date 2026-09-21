@@ -206,6 +206,60 @@ The shared grant/journal/evidence/fingerprint/review kernel remains frozen.
 A kernel change is a separate stop-and-review decision, not an implementation
 convenience.
 
+## Tranche A implementation status — 21 September 2026
+
+Implementation branch:
+
+`fix/mizizi-slice3-tranche-a-stale-authority-repair`
+
+Candidate migrations:
+
+- `20260921170000_registry_reviewed_artist_identity_composition_v1.sql`;
+- `20260921171000_registry_chart_artist_resolution_rebase_v1.sql`.
+
+Disposable Preview:
+
+- project ref: `smdidvevfzbjqdnvxruq`;
+- branch id: `fd53837f-5f22-4229-8458-be06893702a6`;
+- native repository replay baseline: 166 / `20260921153000`;
+- native candidate apply: PASS;
+- final repository migration head: 168 / `20260921171000`;
+- native post-apply dry run: zero pending.
+
+Accepted Preview structural/runtime verification:
+
+- Artist Studio Registry Entry structural authority: PASS;
+- Missing Artist Intake authority composition: PASS;
+- Chart materialization + Artist Resolution rebase: PASS;
+- Admin Registry profile authority: PASS;
+- canonical Registry writer inventory: PASS;
+- Identity + Projection Lineage: PASS;
+- authenticated direct mutation closed for Artist aliases, Track provider links,
+  and relationship evidence;
+- exact execution grants at rest: 0;
+- standing Chart actor grants: 0;
+- Registry Artist Resource gaps: 0;
+- Registry Artist Resource lifecycle mismatches: 0;
+- Artist merge/split lineage mismatches: 0.
+
+Schema/replay seal:
+
+- public + editorial generated type SHA-256:
+  `6b45da162d8304e2a86b975a7a2bb1cd01716a253c7d6e1c48467862637fdc1d`;
+- migration replay proofs committed for both candidate migrations;
+- `live-schema-baseline.json` sealed to the final Preview head.
+
+One acceptance gate remains intentionally open:
+
+- the new reviewed Artist identity broker requires the real PostgREST transport
+  identity (`session_user=authenticator`);
+- raw Supabase SQL execution uses `postgres`, so the existing rollback-only
+  Artist Studio behavior verifier cannot truthfully exercise that transport;
+- no kernel/transport check has been weakened to make the raw-SQL harness pass;
+- real JWT/PostgREST behavior acceptance remains required before merge.
+
+No Production SQL, Edge, or frontend deployment has occurred.
+
 ## Slice 3 exit gate
 
 #962 remains open.
