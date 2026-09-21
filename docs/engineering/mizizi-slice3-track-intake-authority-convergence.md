@@ -548,3 +548,57 @@ proven. The remaining sequence is:
 - PR needed now: **Not yet**
 - Immediate next implementation task: **queue credit UUID + workflow-only
   finalizer + frontend orchestration**
+
+
+## Post-cutover structural checkpoint — 2026-09-21
+
+Branch head at this checkpoint: `8c1f48c15055a2de152ae1d17a3a41d2c38a7f0d`.
+
+The Track Intake admin page no longer calls either legacy enriched canonicalizer.
+Its durable orchestration is now:
+
+- new Track: Track Create V2 -> reviewed-credit reconciliation per source credit
+  -> Track profile -> Release profile when applicable -> governed provider-link
+  admission -> activation -> workflow-only finalization;
+- existing Track: reviewed-credit reconciliation per source credit -> Track
+  profile -> Release profile when applicable -> governed provider-link admission
+  -> workflow-only finalization.
+
+The final Track Intake credit model is one
+`registry.track_artist_credit.reviewed_reconcile/v1` authority for both draft
+and active Tracks. The earlier Track-Intake-specific
+`registry.track_artist_credit.admit/v1` migration and verifier were removed
+from the unmerged branch.
+
+Review evidence is partitioned into:
+
+- identity review fingerprint;
+- source-credit-scoped review fingerprint;
+- complete credit-set review fingerprint for activation;
+- Track profile fingerprint;
+- Release profile fingerprint;
+- provider-link authority evidence.
+
+The queue now exposes immutable source `credit_id`; canonical write authority
+is never keyed only by `credit_order`.
+
+`admin_finalize_registry_track_intake_v1` is workflow-only. Its permanent
+verifier forbids canonical Registry DML and requires proof of current child
+authority before canonicalization.
+
+Behavioral Preview `gzulggmimoyfeemrtytm` was hot-aligned to the final
+function semantics and received the workflow-finalization migration. The
+following permanent verifiers all pass together there:
+
+- Track Create V2 foundation;
+- reviewed-credit reconciliation;
+- Track activation;
+- Track reviewed profile;
+- Release reviewed profile;
+- workflow-only finalization.
+
+This Preview remains diagnostic-only. Final migration authority still requires
+a brand-new clean Preview replay from accepted main.
+
+Legacy direct writer functions remain installed intentionally until consolidated
+real-JWT caller acceptance succeeds. They must not be retired earlier.
