@@ -76,7 +76,9 @@ begin
      )
      or to_regprocedure('platform_private.registry_track_intake_current_admin_v1()') is not null
      or to_regprocedure('platform_private.registry_track_intake_identity_review_snapshot_v1(uuid)') is not null
-     or to_regprocedure('platform_private.registry_track_intake_credit_review_snapshot_v1(uuid)') is not null
+     or to_regprocedure('platform_private.registry_track_intake_credit_set_review_snapshot_v1(uuid)') is not null
+     or to_regprocedure('platform_private.registry_track_intake_credit_review_snapshot_v1(uuid,uuid)') is not null
+     or to_regprocedure('platform_private.registry_track_intake_reconciled_credit_uuid_v1(uuid,uuid)') is not null
      or to_regprocedure('platform_private.registry_track_intake_deterministic_track_uuid_v1(uuid)') is not null
      or to_regprocedure('platform_private.registry_track_intake_reviewed_slug_v1(uuid,text)') is not null
      or to_regprocedure('platform_private.registry_track_creation_collision_state_v2(uuid,text,uuid,text,text)') is not null
@@ -324,7 +326,7 @@ begin
 end
 $$;
 
-create function platform_private.registry_track_intake_credit_review_snapshot_v1(
+create function platform_private.registry_track_intake_credit_set_review_snapshot_v1(
   p_suggestion_id uuid
 )
 returns jsonb
@@ -347,12 +349,7 @@ begin
   from public.registry_provider_track_suggestions suggestion
   where suggestion.id=p_suggestion_id;
 
-  if not found then
-    raise exception using errcode='P0002',
-      message='Track Intake item does not exist.';
-  end if;
-
-  if v_suggestion.status<>'needs_review' then
+  if not found or v_suggestion.status<>'needs_review' then
     raise exception using errcode='42501',
       message='Track Intake Artist credits are not currently reviewable.';
   end if;
@@ -365,7 +362,9 @@ begin
         'credit_role',credit.credit_role,
         'resolution_mode',credit.resolution_mode,
         'registry_artist_id',credit.registry_artist_id,
-        'observed_name',credit.observed_name
+        'observed_name',credit.observed_name,
+        'artist_slug',artist.slug,
+        'artist_display_name',artist.display_name
       )
       order by credit.credit_order,credit.id
     ),
@@ -373,6 +372,8 @@ begin
   )
   into v_credits
   from public.registry_provider_track_suggestion_artists credit
+  left join public.registry_artists artist
+    on artist.id=credit.registry_artist_id
   where credit.suggestion_id=p_suggestion_id;
 
   if jsonb_array_length(v_credits)=0
@@ -419,6 +420,124 @@ begin
     'review_fingerprint',v_fingerprint,
     'applying_user_id',v_user_id
   );
+end
+$$;
+
+create function platform_private.registry_track_intake_credit_review_snapshot_v1(
+  p_suggestion_id uuid,
+  p_source_credit_id uuid
+)
+returns jsonb
+language plpgsql
+stable
+security definer
+set search_path = pg_catalog, public, platform_private, auth, extensions
+as $$
+declare
+  v_user_id uuid;
+  v_suggestion public.registry_provider_track_suggestions%rowtype;
+  v_credit public.registry_provider_track_suggestion_artists%rowtype;
+  v_artist public.registry_artists%rowtype;
+  v_payload jsonb;
+  v_fingerprint text;
+begin
+  v_user_id:=platform_private.registry_track_intake_current_admin_v1();
+
+  select suggestion.*
+  into v_suggestion
+  from public.registry_provider_track_suggestions suggestion
+  where suggestion.id=p_suggestion_id;
+
+  if not found or v_suggestion.status<>'needs_review' then
+    raise exception using errcode='42501',
+      message='Track Intake Artist credit is not currently reviewable.';
+  end if;
+
+  select credit.*
+  into v_credit
+  from public.registry_provider_track_suggestion_artists credit
+  where credit.id=p_source_credit_id
+    and credit.suggestion_id=p_suggestion_id;
+
+  if not found
+     or v_credit.resolution_mode<>'existing_artist'
+     or v_credit.registry_artist_id is null
+     or v_credit.credit_role not in ('primary','featured')
+  then
+    raise exception using errcode='42501',
+      message='Track Intake source credit is not a reviewed existing-Artist credit.';
+  end if;
+
+  select artist.*
+  into v_artist
+  from public.registry_artists artist
+  where artist.id=v_credit.registry_artist_id
+    and artist.status='active';
+
+  if not found then
+    raise exception using errcode='42501',
+      message='Track Intake reviewed Artist is no longer active.';
+  end if;
+
+  v_payload:=jsonb_build_object(
+    'suggestion_id',v_suggestion.id,
+    'source_credit_id',v_credit.id,
+    'credit_order',v_credit.credit_order,
+    'credit_role',v_credit.credit_role,
+    'resolution_mode',v_credit.resolution_mode,
+    'registry_artist_id',v_credit.registry_artist_id,
+    'observed_name',v_credit.observed_name,
+    'artist_slug',v_artist.slug,
+    'artist_display_name',v_artist.display_name
+  );
+
+  v_fingerprint:=encode(
+    extensions.digest(v_payload::text,'sha256'),
+    'hex'
+  );
+
+  return v_payload || jsonb_build_object(
+    'review_fingerprint',v_fingerprint,
+    'applying_user_id',v_user_id
+  );
+end
+$$;
+
+create function platform_private.registry_track_intake_reconciled_credit_uuid_v1(
+  p_track_id uuid,
+  p_source_credit_id uuid
+)
+returns uuid
+language plpgsql
+immutable
+security definer
+set search_path=pg_catalog,extensions
+as $$
+declare
+  v_hex text;
+begin
+  if p_track_id is null or p_source_credit_id is null then
+    raise exception using errcode='22023',
+      message='Track ID and Track Intake source credit ID are required.';
+  end if;
+
+  v_hex:=encode(
+    extensions.digest(
+      'track.intake.credit:'||
+      p_track_id::text||':'||
+      p_source_credit_id::text,
+      'sha256'
+    ),
+    'hex'
+  );
+
+  return (
+    substr(v_hex,1,8)||'-'||
+    substr(v_hex,9,4)||'-'||
+    '5'||substr(v_hex,14,3)||'-'||
+    '8'||substr(v_hex,18,3)||'-'||
+    substr(v_hex,21,12)
+  )::uuid;
 end
 $$;
 
