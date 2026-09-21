@@ -102,32 +102,42 @@ export default function LabelDetailPage() {
   async function handleSave() {
     if (!label) return;
     setIsSaving(true);
-    const payload = {
-      name: draft.name,
-      description: draft.description || null,
-      country_code: draft.country_code || null,
-      status: draft.status,
-      updated_at: new Date().toISOString(),
-    };
-    const { error } = await supabase.from("registry_labels").update(payload).eq("id", label.id);
+    const { data, error } = await supabase.rpc("admin_patch_registry_label_profile_v1", {
+      p_entity_id: label.id,
+      p_patch: {
+        name: draft.name,
+        description: draft.description || null,
+        country_code: draft.country_code || null,
+        status: draft.status,
+      },
+      p_expected_updated_at: label.updated_at,
+    });
     setIsSaving(false);
     if (error) {
       addToast("error", `Save failed: ${error.message}`);
       return;
     }
-    setLabel((prev) => (prev ? { ...prev, ...payload } : prev));
+    const updated = data as LabelRecord;
+    setLabel(updated);
+    setDraft({
+      name: updated.name,
+      description: updated.description ?? "",
+      country_code: updated.country_code ?? "",
+      status: updated.status,
+    });
     setIsDirty(false);
     addToast("success", "Label saved.");
   }
 
   async function handleDelete() {
     if (!label) return;
-    const { error } = await supabase
-      .from("registry_labels")
-      .update({ status: "archived", updated_at: new Date().toISOString() })
-      .eq("id", label.id);
+    const { error } = await supabase.rpc("admin_patch_registry_label_profile_v1", {
+      p_entity_id: label.id,
+      p_patch: { status: "archived" },
+      p_expected_updated_at: label.updated_at,
+    });
     if (error) {
-      addToast("error", "Failed to archive label.");
+      addToast("error", `Failed to archive label: ${error.message}`);
       return;
     }
     addToast("info", "Label archived.");

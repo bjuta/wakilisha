@@ -250,8 +250,20 @@ begin
        'artist_identity_resolution_required'
        in v_definition
      ) = 0
-     or v_definition !~*
+     or position(
+          'execute_registry_reviewed_artist_identity_materialization_v1'
+          in v_definition
+        ) = 0
+     or v_definition ~*
         'insert[[:space:]]+into[[:space:]]+public\.registry_artists'
+     or position(
+          'execute_registry_artist_alias_state_v1'
+          in v_definition
+        ) = 0
+     or position(
+          'create_from_artist_claim'
+          in v_definition
+        ) = 0
      or position(
           '''active'''
           in v_definition
@@ -266,7 +278,7 @@ begin
         ) > 0
   then
     raise exception
-      'FAIL: reviewed new Artist acceptance is not the only canonical Registry creation boundary';
+      'FAIL: reviewed new Artist acceptance bypasses the shared reviewed Artist identity composition';
   end if;
 
   select pg_get_functiondef(

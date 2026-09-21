@@ -109,6 +109,7 @@ begin
       ('public.admin_reconcile_registry_track_intake_credit_v1(uuid,uuid,uuid)'),
       ('public.admin_resolve_chart_artist_alias(text,uuid,text,boolean)'),
       ('public.admin_safe_merge_registry_artists(uuid,uuid,text,boolean,text)'),
+      ('public.admin_set_registry_artist_alias_v1(text,uuid,text,text,text,text)'),
       ('public.chart_admit_artist_origin_v1(uuid,text,uuid,uuid,text)'),
       ('public.chart_admit_track_provider_link_v1(uuid)'),
       ('public.chart_create_artist_origin_shell_v1(text,text,uuid,uuid)'),
@@ -214,6 +215,45 @@ begin
   end if;
 end
 $verify$;
+
+
+do $verify_closed_table_roads$
+declare
+  v_table text;
+  v_role text;
+  v_privilege text;
+begin
+  foreach v_table in array array[
+    'public.registry_artist_aliases',
+    'public.registry_track_provider_links',
+    'public.registry_relationship_evidence'
+  ]
+  loop
+    foreach v_role in array array[
+      'anon',
+      'authenticated',
+      'service_role'
+    ]
+    loop
+      foreach v_privilege in array array[
+        'INSERT',
+        'UPDATE',
+        'DELETE',
+        'TRUNCATE',
+        'REFERENCES',
+        'TRIGGER'
+      ]
+      loop
+        if has_table_privilege(v_role,v_table,v_privilege) then
+          raise exception
+            'STOP: stale direct Registry table privilege remains: role=% table=% privilege=%',
+            v_role,v_table,v_privilege;
+        end if;
+      end loop;
+    end loop;
+  end loop;
+end
+$verify_closed_table_roads$;
 
 select
   'REGISTRY_CANONICAL_WRITER_INVENTORY_PASS'::text as status;

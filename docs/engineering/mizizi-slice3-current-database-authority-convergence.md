@@ -206,6 +206,71 @@ The shared grant/journal/evidence/fingerprint/review kernel remains frozen.
 A kernel change is a separate stop-and-review decision, not an implementation
 convenience.
 
+## Tranche A implementation status — 21 September 2026
+
+Implementation branch:
+
+`fix/mizizi-slice3-tranche-a-stale-authority-repair`
+
+Candidate migrations:
+
+- `20260921170000_registry_reviewed_artist_identity_composition_v1.sql`;
+- `20260921171000_registry_chart_artist_resolution_rebase_v1.sql`.
+
+Current disposable Preview:
+
+- project ref: `qjqtscxezmijkioxwazy`;
+- branch id: `b3188255-79cf-44ca-bf08-7febca89c301`;
+- exact Production baseline remains 166 / `20260921153000`;
+- corrected candidate replay reaches 168 / `20260921171000`;
+- permanent Artist and Chart SQL verifiers pass on the corrected final Preview;
+- no Production SQL, Edge, or frontend deployment has occurred.
+
+Real JWT/PostgREST behavior acceptance:
+
+- applicant password login through Supabase Auth: PASS;
+- reviewer password login through Supabase Auth: PASS;
+- current V3 Artist Claim submission: PASS;
+- reviewer Claim approval through PostgREST: PASS;
+- Missing Artist Intake acceptance through PostgREST: PASS;
+- reviewed Artist creation preserves `create_from_artist_claim / applied`
+  provenance: PASS;
+- active Artist representation: PASS;
+- Missing Artist alias state `manual / active`: PASS;
+- typed relationship endpoint resolution: PASS;
+- merged review state: PASS;
+- exactly one governed `registry.artist.create/v1` execution per accepted flow:
+  PASS;
+- Registry Artist Resource identity/lifecycle convergence: PASS;
+- Top Songs presentation mutation: zero rows;
+- exact execution grants at rest: 0.
+
+Behavior acceptance exposed one real candidate defect:
+
+- `accept_registry_missing_artist_intake` wrote the new Registry Artist UUID
+  into legacy `contributor_submissions.entity_id`, whose foreign key targets
+  `cultural_entities(id)`;
+- the function now leaves that legacy field untouched and merges the submission
+  through Registry Artist, alias, typed relationship, audit, and review
+  authority instead;
+- the permanent Missing Artist Intake verifier now rejects any return of the
+  stale `entity_id=v_artist_id` write.
+
+Replay authority is intentionally open:
+
+- the `20260921170000` migration bytes changed after the behavior defect was
+  found;
+- its previously committed replay receipt is therefore stale and fails the
+  migration replay contract by SHA-256;
+- the prior schema seal also points to the superseded replay authority;
+- a fresh clean replay must directly prove the corrected `170000` state and
+  then the `171000` state before either receipt or the schema seal is
+  refreshed;
+- a later final-state observation must not substitute for that earlier gate.
+
+PR #1006 must not merge until that replay authority is truthfully resealed and
+the protected CI suite passes.
+
 ## Slice 3 exit gate
 
 #962 remains open.

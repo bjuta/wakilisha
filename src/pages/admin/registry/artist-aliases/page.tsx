@@ -199,6 +199,7 @@ export default function ArtistAliasesPage() {
           confidence, source, created_at, notes,
           registry_artists!inner(slug, display_name)
         `)
+        .eq("status", "active")
         .order("created_at", { ascending: false })
         .limit(300);
 
@@ -412,18 +413,31 @@ export default function ArtistAliasesPage() {
     setUnknownSlugs((prev) => prev.filter((u) => u.unknown_slug !== slug));
   }, []);
 
-  /* ──── Delete alias ──── */
+  /* ──── Block alias ──── */
   const deleteAlias = useCallback(async (id: string) => {
+    const alias = aliases.find((row) => row.id === id);
+    if (!alias) {
+      showToast("Alias is no longer available.", "error");
+      return;
+    }
+
     try {
-      const { error } = await supabase.from("registry_artist_aliases").delete().eq("id", id);
+      const { error } = await supabase.rpc("admin_set_registry_artist_alias_v1", {
+        p_alias_slug: alias.alias_slug,
+        p_canonical_artist_id: alias.canonical_artist_id,
+        p_alias_display_name: alias.alias_display_name,
+        p_source: "manual",
+        p_status: "blocked",
+        p_note: alias.notes || "Blocked from Registry Artist alias review.",
+      });
       if (error) throw error;
-      showToast("Alias removed", "success");
+      showToast("Alias blocked", "success");
       loadAliases();
       loadUnknownSlugs();
     } catch (err) {
-      showToast(err instanceof Error ? err.message : "Failed to delete alias", "error");
+      showToast(err instanceof Error ? err.message : "Failed to block alias", "error");
     }
-  }, [loadAliases, loadUnknownSlugs, showToast]);
+  }, [aliases, loadAliases, loadUnknownSlugs, showToast]);
 
   /* ──── Manual registry search ──── */
   const searchRegistryArtists = useCallback(async (

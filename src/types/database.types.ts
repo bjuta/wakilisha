@@ -19297,15 +19297,7 @@ export type Database = {
           updated_by: string | null
           updated_by_label: string | null
         }
-        Relationships: [
-          {
-            foreignKeyName: "publishing_items_content_kind_fkey"
-            columns: ["content_kind"]
-            isOneToOne: false
-            referencedRelation: "wk_publishing_content_kinds"
-            referencedColumns: ["kind"]
-          },
-        ]
+        Relationships: []
       }
       wk_resource_index: {
         Row: {
@@ -20042,6 +20034,17 @@ export type Database = {
       admin_set_mizizi_stewardship_operation_enabled_v1: {
         Args: { p_enabled: boolean; p_operation_key: string; p_reason: string }
         Returns: boolean
+      }
+      admin_set_registry_artist_alias_v1: {
+        Args: {
+          p_alias_display_name?: string
+          p_alias_slug: string
+          p_canonical_artist_id: string
+          p_note?: string
+          p_source?: string
+          p_status?: string
+        }
+        Returns: Json
       }
       admin_set_registry_artist_origin_operation_enabled: {
         Args: { p_enabled: boolean; p_reason: string }
