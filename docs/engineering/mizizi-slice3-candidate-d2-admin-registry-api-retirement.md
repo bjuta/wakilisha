@@ -16,11 +16,15 @@ Repository base: `main@6852c24f312deb32345977e78aece06eb8c9387d`
 
 Issue authority: #962, MIZIZI Slice 3: Obsolete Authority Retirement & Bypass Closure
 
-## Decision
+## Decision — historical and completed
 
-Retire the standalone `admin-registry-api` runtime after D1 replacement proof.
+The D2 decision was to retire the standalone `admin-registry-api` runtime after
+D1 replacement proof.
 
-This D2 repository candidate does not delete the Production deployment. Production v37 remains available only as rollback authority until this repository retirement contract is merged and a final traffic audit remains zero.
+At the repository-candidate stage, Production v37 remained temporarily available
+as rollback authority until merge plus the final traffic/deletion gate. That
+temporary state is historical: current Production no longer contains
+`admin-registry-api`.
 
 ## Replacement proof
 
