@@ -532,6 +532,55 @@ describe("MIZIZI Cultural Data Steward", () => {
     );
   });
 
+  it("adds provider-neutral reviewed Release profile authority without creating Releases or Labels", () => {
+    const migration = read(
+      "supabase/migrations/20260921140000_registry_track_intake_release_reviewed_profile_authority_v1.sql",
+    );
+    const verifier = read(
+      "scripts/control-plane/verify-registry-track-intake-release-reviewed-profile-authority.sql",
+    );
+
+    expect(migration).toContain(
+      "'registry.release.reviewed_profile.admit'",
+    );
+    expect(migration).toContain(
+      "'admit_registry_release_reviewed_profile'",
+    );
+    expect(migration).toContain(
+      "registry_track_intake_release_label_match_state_v1",
+    );
+    expect(migration).toContain(
+      "'INTERNAL_FACT'",
+    );
+    expect(migration).toContain(
+      "'label_name_observation'",
+    );
+    expect(migration).toContain(
+      "'imprint_name'",
+    );
+    expect(migration).toContain(
+      "'copyright_text'",
+    );
+    expect(migration).toContain(
+      "'provider_genre'",
+    );
+    expect(migration).not.toContain(
+      "apple_music_ingest",
+    );
+    expect(migration).not.toContain(
+      "track_intake_enriched_at",
+    );
+    expect(migration).not.toContain(
+      "insert into public.registry_releases",
+    );
+    expect(migration).not.toContain(
+      "insert into public.registry_labels",
+    );
+    expect(verifier).toContain(
+      "REGISTRY_TRACK_INTAKE_RELEASE_REVIEWED_PROFILE_AUTHORITY_PASS",
+    );
+  });
+
   it("adds provider-neutral reviewed Track profile authority without Apple-Music provenance", () => {
     const migration = read(
       "supabase/migrations/20260921133000_registry_track_intake_track_reviewed_profile_authority_v1.sql",

@@ -199,6 +199,16 @@ Allowed fields are limited to:
 
 It may not create a Release or Label.
 
+### Release reviewed-profile implementation
+
+The Release half is implemented as `registry.release.reviewed_profile.admit/v1` with typed capability `admit_registry_release_reviewed_profile`.
+
+It only operates when the selected Track already points to an existing non-archived Release. It cannot create a Release or Label. Its bounded fields are release title/normalized title, release date + precision, artwork URL, UPC, existing Label linkage, label-name observation, imprint observation, copyright observation and reviewed genre observation.
+
+Legacy overwrite semantics are preserved for release title and release date. Label linking is tightened to an exact, unambiguous active/draft Label match. The exact matching Label set is fingerprinted into the grant so a Label-catalog change invalidates a stale grant before execution. If no unique match exists, the reviewed label remains `metadata.label_name_observation` rather than creating or guessing canonical Label identity.
+
+As with Track profile admission, the whole current Release state and exact review fingerprint are bound to the grant. Changed reviewed Release facts get a new exact operation. The obsolete `track_intake_enriched_at` metadata timestamp is not recreated.
+
 ## Provenance
 
 The old creator copied:
