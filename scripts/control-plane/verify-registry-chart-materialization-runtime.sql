@@ -392,7 +392,7 @@ begin
        in v_definition
      )=0
      or position(
-          'having count(*)=1'
+          'havingcount(*)=1'
           in regexp_replace(v_definition,'[[:space:]]+','','g')
         )=0
   then
