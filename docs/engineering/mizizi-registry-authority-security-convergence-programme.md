@@ -8,7 +8,9 @@ Date: 14 September 2026
 
 Status: **Architectural authority. Slices 1 and 2 are Production accepted. Slice 3 is reopened for final live-writer convergence. Slice 4 is blocked.**
 
-Last runtime-bearing repository authority / deployed frontend: `main@dcdbe948b6dc5edc2cd31133939e45e152db7b57`\n\nLiving programme authority: this document on protected `main`.
+Last runtime-bearing repository authority / deployed frontend: `main@dcdbe948b6dc5edc2cd31133939e45e152db7b57`
+
+Living programme authority: this document on protected `main`.
 
 ## 1. Decision
 
