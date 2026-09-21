@@ -690,7 +690,13 @@ describe("Phase 5A Playlist admin product", () => {
       "admin_get_registry_track_intake_queue",
     );
     expect(page).toContain(
-      "admin_resolve_registry_track_intake",
+      "admin_reconcile_registry_track_intake_credit_v1",
+    );
+    expect(page).toContain(
+      "admin_finalize_registry_track_intake_v1",
+    );
+    expect(page).not.toContain(
+      "admin_resolve_registry_track_intake_enriched",
     );
     expect(page).toContain(
       "admin_reject_registry_track_intake",
