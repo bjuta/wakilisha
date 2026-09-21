@@ -34,3 +34,62 @@ select count(*) as automatically_merged_submissions
 from public.contributor_submissions
 where review_status = 'merged'
   and source_note ~ '^missing_artist_slug:';
+
+do $verify_missing_artist_intake_authority$
+declare
+  v_definition text;
+begin
+  if to_regprocedure(
+       'public.accept_registry_missing_artist_intake(uuid,text)'
+     ) is null
+     or not has_function_privilege(
+       'authenticated',
+       'public.accept_registry_missing_artist_intake(uuid,text)',
+       'EXECUTE'
+     )
+     or has_function_privilege(
+       'anon',
+       'public.accept_registry_missing_artist_intake(uuid,text)',
+       'EXECUTE'
+     )
+     or has_function_privilege(
+       'service_role',
+       'public.accept_registry_missing_artist_intake(uuid,text)',
+       'EXECUTE'
+     )
+  then
+    raise exception
+      'FAIL: Missing Artist Intake caller privilege boundary drifted';
+  end if;
+
+  select pg_get_functiondef(
+    'public.accept_registry_missing_artist_intake(uuid,text)'::regprocedure
+  )
+  into v_definition;
+
+  if position(
+       'execute_registry_reviewed_artist_identity_materialization_v1'
+       in v_definition
+     ) = 0
+     or position(
+          'execute_registry_artist_alias_state_v1'
+          in v_definition
+        ) = 0
+     or position(
+          'resolve_registry_relationship_endpoint'
+          in v_definition
+        ) = 0
+     or v_definition ~*
+        'insert[[:space:]]+into[[:space:]]+public\.registry_artists'
+     or v_definition ~*
+        'insert[[:space:]]+into[[:space:]]+public\.registry_artist_aliases'
+     or position('manual_intake' in v_definition) > 0
+  then
+    raise exception
+      'FAIL: Missing Artist Intake bypasses accepted Artist creation, alias, or relationship authority';
+  end if;
+
+  raise notice
+    'REGISTRY_MISSING_ARTIST_INTAKE_AUTHORITY_PASS';
+end
+$verify_missing_artist_intake_authority$;
