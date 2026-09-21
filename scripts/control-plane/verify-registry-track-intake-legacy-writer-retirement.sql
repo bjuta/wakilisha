@@ -22,6 +22,29 @@ begin
   end if;
 
   if to_regprocedure(
+       'public.admin_admit_registry_track_intake_credit_v1(uuid,uuid)'
+     ) is not null
+     or to_regprocedure(
+       'platform_private.execute_registry_track_intake_credit_v1(uuid)'
+     ) is not null
+     or to_regprocedure(
+       'platform_private.issue_registry_track_intake_credit_grant_v1(uuid,uuid,uuid,jsonb)'
+     ) is not null
+     or to_regprocedure(
+       'platform_private.record_registry_track_intake_credit_evidence_v1(uuid,uuid,uuid,uuid,text,integer,text)'
+     ) is not null
+     or to_regprocedure(
+       'platform_private.registry_track_intake_deterministic_credit_uuid_v1(uuid)'
+     ) is not null
+     or to_regprocedure(
+       'platform_private.registry_track_intake_existing_credit_candidate_state_v1(uuid,uuid,text)'
+     ) is not null
+  then
+    raise exception
+      'Superseded Track Intake credit-admit diagnostic authority was reintroduced';
+  end if;
+
+  if to_regprocedure(
        'public.admin_create_registry_track_intake_identity_v1(uuid,text)'
      ) is null
      or to_regprocedure(
