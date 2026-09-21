@@ -219,8 +219,8 @@ Candidate migrations:
 
 Current disposable Preview:
 
-- project ref: `qhgoxdflywrrdxtneeis`;
-- branch id: `1dfb7928-f115-4450-b022-438fb72aaddc`;
+- project ref: `qjqtscxezmijkioxwazy`;
+- branch id: `b3188255-79cf-44ca-bf08-7febca89c301`;
 - exact Production baseline remains 166 / `20260921153000`;
 - corrected candidate replay reaches 168 / `20260921171000`;
 - permanent Artist and Chart SQL verifiers pass on the corrected final Preview;
