@@ -532,6 +532,41 @@ describe("MIZIZI Cultural Data Steward", () => {
     );
   });
 
+  it("reuses Track Artist Credit V1 through Track Intake-specific provenance", () => {
+    const migration = read(
+      "supabase/migrations/20260921123000_registry_track_intake_artist_credit_authority_v1.sql",
+    );
+    const verifier = read(
+      "scripts/control-plane/verify-registry-track-intake-artist-credit-authority.sql",
+    );
+
+    expect(migration).toContain(
+      "registry.track_artist_credit.admit",
+    );
+    expect(migration).toContain(
+      "registry_track_intake_admin",
+    );
+    expect(migration).toContain(
+      "'track_intake_review'",
+    );
+    expect(migration).toContain(
+      "'INTERNAL_FACT'",
+    );
+    expect(migration).toContain(
+      "verify_registry_materialization_core_v1",
+    );
+    expect(migration).toContain(
+      "errcode='23514'",
+    );
+    expect(migration).not.toContain(
+      "create function platform_private.verify_registry_track_intake_credit",
+    );
+
+    expect(verifier).toContain(
+      "REGISTRY_TRACK_INTAKE_ARTIST_CREDIT_AUTHORITY_PASS",
+    );
+  });
+
   it("installs Track Intake Track Create V2 without cutting over the product caller", () => {
     const migration = read(
       "supabase/migrations/20260921120000_registry_track_intake_track_create_v2_foundation.sql",

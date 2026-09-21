@@ -91,6 +91,14 @@ The current shared materialization core writes Track↔Artist credit `source='ch
 
 Track Intake must not rewrite the accepted Chart V1 executor merely to change provenance. Instead, a Track-Intake-specific executor will execute the same `registry.track_artist_credit.admit/v1` contract for the `registry_track_intake_admin` actor and persist `source='track_intake_review'`. Existing Chart receipts remain untouched.
 
+## Artist-credit authority implementation
+
+Track Intake reuses `registry.track_artist_credit.admit/v1` exactly rather than adding a new credit operation type.
+
+Each reviewed source credit row gets its own deterministic future canonical credit UUID and its own caller-bound exact grant. The Track Intake executor preserves the accepted V1 plan/verifier contract while writing `source='track_intake_review'`; the existing Chart executor and historical `source='chart_admission'` receipts remain untouched.
+
+The credit evidence trust class is `INTERNAL_FACT` because the relationship is a governed human review decision. The immutable review snapshot remains the source fingerprint. An identical retry re-enters the same succeeded operation; changed review state rejects the old grant with a non-retryable integrity error.
+
 ## Lifecycle operation
 
 Add:
