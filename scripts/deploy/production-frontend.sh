@@ -4,7 +4,7 @@ set -euo pipefail
 RUNNER_VERSION="2"
 BASE_EXPECTED_MAIN="57e4c9de7a205bbffde0ff97c9ec40f9a46b1b65"
 BASE_PREVIEW_REF="oeownzbanzbuvuyidwqh"
-TEMPLATE_SHA256="1770557be8998c5bc51d198bc6c22068ddd289adf40139ea562cd84da1f1e688"
+TEMPLATE_SHA256="a42b0e264bd3cc9d7b93db6c1036cc0259a73a60fddec824237c91a99a89e9dd"
 
 SCRIPT_DIR="$(
   CDPATH= cd -- "$(dirname -- "$0")" >/dev/null 2>&1
@@ -200,6 +200,12 @@ if [ "$SELF_TEST" -eq 1 ]; then
     exit 1
   fi
 
+  grep -Fq 'STAGE_WEB_MODE_CONTRACT=PASS' "$TMP_SELF"
+  grep -Fq 'LIVE_WEB_MODE_CONTRACT=PASS' "$TMP_SELF"
+  grep -Fq 'chmod 755' "$TMP_SELF"
+  grep -Fq 'chmod 644' "$TMP_SELF"
+
+  echo 'PRODUCTION_FRONTEND_WEB_MODE_AUTHORITY=PASS'
   echo 'PRODUCTION_FRONTEND_FULL_BUILD_AUTHORITY=PASS'
   echo 'PRODUCTION_FRONTEND_RUNNER_SELF_TEST=PASS'
   exit 0
