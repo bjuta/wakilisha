@@ -1135,13 +1135,20 @@ begin
       v_artist_id::text,
       v_claim.id::text,
       'artist_claim_proposed_identities',
-      'claim_profile_lifecycle',
+      'identity',
       'registry_artists',
-      jsonb_build_object('value', v_before_artist),
-      jsonb_build_object('value', v_after_artist),
-      'apply_reviewed_artist_claim_profile',
-      'succeeded',
-      'user:' || v_actor::text
+      null,
+      jsonb_build_object(
+        'id', v_artist_id,
+        'slug', v_after_artist ->> 'slug',
+        'display_name', v_after_artist ->> 'display_name',
+        'artist_type', v_after_artist ->> 'artist_type',
+        'origin_iso2', v_after_artist ->> 'origin_iso2',
+        'status', v_after_artist ->> 'status'
+      ),
+      'create_from_artist_claim',
+      'applied',
+      v_actor::text
     );
 
   end if;
