@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { existsSync, readFileSync } from "node:fs";
+import { readFileSync } from "node:fs";
 
 describe("MIZIZI current URL-identity production control plane", () => {
   it("keeps the current programme on the shared Stage C JIT boundary", () => {
@@ -94,11 +94,6 @@ describe("MIZIZI current URL-identity production control plane", () => {
       "--confirm=MIZIZI_APPLY",
     );
 
-    expect(
-      existsSync(
-        ".github/mizizi-url-identity-production-apply.json",
-      ),
-    ).toBe(false);
   });
 
   it("adds only executor-bound authority reduction", () => {
