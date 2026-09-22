@@ -46,7 +46,11 @@ jobs:
           const grantId = "10130000-0000-4000-8000-000000000002";
           const operationKey = "registry.release_slug.canonicalize";
 
-          const jit = await openMiziziJitSession({ projectRef, token });
+          const jit = await openMiziziJitSession({
+            projectRef,
+            managementProjectRef: "pgzizndxdyhqmtyywjmt",
+            token,
+          });
 
           try {
             const before = await jit.pool.query(
