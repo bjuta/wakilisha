@@ -4,7 +4,7 @@ Date: 22 September 2026
 
 Programme issue: #1013
 
-Status: **IMPLEMENTATION CANDIDATE — audit authority accepted; Production mutation not yet authorized**
+Status: **PRODUCTION PARTIAL STOP ACCEPTED — 731 / 737 Release slug operations verified; six exact resume candidates remain; authority zero at rest**
 
 ## Purpose
 
@@ -137,6 +137,59 @@ A successful apply requires all of the following:
 - JIT mapping restored;
 - Supabase temporary access disabled.
 
-No trigger file ships with the implementation. Production mutation remains
-unavailable until a separately reviewed trigger is merged on exact main after
-Preview and migration promotion acceptance.
+## Accepted Release partial stop and forward resume
+
+The first governed Release-slug apply ran from merged trigger commit
+`80ffc7d07a041ae001bafa3f365a825016c50b44` in Production control-plane run
+`35757733981`.
+
+The run correctly failed closed after preserving every verified success:
+
+- frozen Release programme: 737 candidates;
+- original programme fingerprint:
+  `b96da159df4ffa8b19a5bb39574995a6b25cac2552823ef24af8f737fb1278be`;
+- verified Release slug operations: 731;
+- canonical Release slug write events: 731;
+- remaining provider-packaging slug candidates: 6;
+- queued review rows: 0;
+- stale apply outcomes: 6;
+- Release title observations preserved: 737;
+- Release operation after stop: disabled;
+- active standing / exact MIZIZI grants after stop: 0 / 0;
+- JIT mapping restored and Production temporary access disabled.
+
+The six stale rows are the second members of six same-Artist/base collision
+pairs. The first member of each pair had already moved to its frozen
+release-date fallback. The original dynamic planner then recomputed the
+remaining sibling as a singleton and changed its plan mid-run. No identity
+ambiguity was discovered; this was order-dependent planner state.
+
+Forward migration
+`20260922171632_mizizi_release_slug_resume_integrity_v1.sql` makes the
+date-fallback decision monotonic only when a same-Artist sibling's current slug
+is backed by a succeeded `system:mizizi` canonical-write event from
+`mizizi_private.release_slug_plan_v1`. Arbitrary date-looking slugs do not
+become authority.
+
+The six remaining repaired plans have exact fingerprint:
+
+`2be28e013ce904e2a05f5d3c368304684c08a6ad7eadfe23a99c57162d0091b2`.
+
+More importantly, the 731 stored succeeded grant plans plus those six repaired
+plans reconstruct all 737 original candidates and reproduce the original
+programme fingerprint exactly. Resume therefore remains inside the same
+reviewed candidate authority.
+
+The control plane admits only three exact Release programme states:
+
+1. pristine: 0 verified / 737 current;
+2. accepted partial: 731 verified / 6 current;
+3. accepted final: 737 verified / 0 current.
+
+Any other mixed state fails closed.
+
+A resume must not replay the 731 accepted operations. After the forward
+migration is Production accepted, a new separately reviewed human grant/trigger
+may authorize only the six unfinished rows. Final acceptance still requires
+737 verified operations, 737 canonical write events, zero remaining Release
+slug candidates, and zero authority at rest.
