@@ -2883,7 +2883,7 @@ begin
 end
 $$;
 
-create function public.admin_apply_artist_decouple_decision(
+create or replace function public.admin_apply_artist_decouple_decision(
   p_decision_id uuid
 )
 returns jsonb
