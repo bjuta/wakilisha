@@ -88,6 +88,58 @@ jobs:
           );
           NODE
 
+      - name: Query Production Postgres logs for migration actor
+        run: |
+          set -euo pipefail
+
+          AUTH="Authorization: Bearer $SUPABASE_ACCESS_TOKEN"
+
+          SQL="select
+            timestamp,
+            log_attributes['parsed.session_id'] as session_id,
+            log_attributes['parsed.user_name'] as user_name,
+            log_attributes['parsed.application_name'] as application_name,
+            log_attributes['parsed.query'] as query,
+            event_message
+          from logs
+          where source = 'postgres_logs'
+            and (
+              match(event_message, '(?i)20260922143000|close_stewardship_authority_window_v1|schema_migrations|AUDIT:.*DDL|CREATE FUNCTION|ALTER FUNCTION|GRANT EXECUTE|REVOKE')
+              or match(log_attributes['parsed.query'], '(?i)20260922143000|close_stewardship_authority_window_v1|schema_migrations|CREATE FUNCTION|ALTER FUNCTION|GRANT EXECUTE|REVOKE')
+            )
+          order by timestamp asc
+          limit 1000"
+
+          curl -fsS -G             -H "$AUTH"             -H 'Accept: application/json'             --data-urlencode "sql=$SQL"             --data-urlencode 'iso_timestamp_start=2026-09-22T15:30:00Z'             --data-urlencode 'iso_timestamp_end=2026-09-22T15:35:00Z'             "https://api.supabase.com/v1/projects/$PROD_REF/analytics/endpoints/logs"             > /tmp/postgres-migration-logs.json
+
+          node --input-type=module <<'NODE'
+          import fs from "node:fs";
+
+          const raw=JSON.parse(fs.readFileSync("/tmp/postgres-migration-logs.json","utf8"));
+          const rows=Array.isArray(raw.result)?raw.result:[];
+
+          const clean=rows.map((row)=>({
+            timestamp:row.timestamp,
+            session_id:row.session_id || null,
+            user_name:row.user_name || null,
+            application_name:row.application_name || null,
+            query:(row.query || "").slice(0,4000),
+            event_message:(row.event_message || "").slice(0,4000),
+          }));
+
+          console.log("=== PRODUCTION POSTGRES MIGRATION LOGS 15:30-15:35Z ===");
+          console.log(JSON.stringify(clean,null,2));
+
+          const existing=JSON.parse(
+            fs.readFileSync("supabase-deployment-authority-audit.json","utf8")
+          );
+          existing.postgres_migration_logs=clean;
+          fs.writeFileSync(
+            "supabase-deployment-authority-audit.json",
+            JSON.stringify(existing,null,2)+"\n"
+          );
+          NODE
+
       - name: Upload audit evidence
         uses: actions/upload-artifact@v4
         with:
