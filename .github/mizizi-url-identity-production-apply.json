@@ -3,7 +3,7 @@
   "confirm": "MIZIZI_URL_IDENTITY_PRODUCTION_APPLY",
   "programme_issue": 1013,
   "scope": "release_slug",
-  "capability_grant_id": "38a46ad7-664f-4fec-9433-ac594d982bb8",
+  "capability_grant_id": "5370b846-6523-4139-b6f7-883f50c4a011",
   "expected_candidate_count": 737,
   "expected_candidate_fingerprint": "b96da159df4ffa8b19a5bb39574995a6b25cac2552823ef24af8f737fb1278be",
   "expected_operation_key": "registry.release_slug.canonicalize",
