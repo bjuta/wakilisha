@@ -1,0 +1,16 @@
+{
+  "migration_file": "supabase/migrations/20260922054353_registry_track_duplicate_repair_authority_v1.sql",
+  "migration_sha256": "65a3012894f4eeb790fa5ba71c69fede8cdcd2a2373ea470204ab54ce7e66d31",
+  "base_main_sha": "8b3ac9fad3f804001c1612b2ff66cb6511c675c4",
+  "preview_project_ref": "brtthfzdznfsgzrrlqdv",
+  "preview_branch_id": "0b7a1052-ae96-41af-8d88-f2ee77e90959",
+  "preview_migration_head": "20260922054353",
+  "baseline_replay": "pass",
+  "candidate_apply": "pass",
+  "verifier": "pass",
+  "verifier_file": "scripts/control-plane/verify-registry-track-duplicate-repair-authority.sql",
+  "schema_types_sha256": "472186569827cdfe3d5a72b46a546db605839934abeaa8028d9e3233f911dc46",
+  "schema_migration_count": 169,
+  "schema_migration_head": "20260922054353",
+  "verified_at": "2026-09-22T08:53:00.000Z"
+}
