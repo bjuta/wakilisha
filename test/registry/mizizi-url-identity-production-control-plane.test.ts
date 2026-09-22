@@ -277,6 +277,44 @@ describe("MIZIZI current URL-identity production control plane", () => {
     );
   });
 
+  it("recognizes exact accepted-final Chart Track-slug state", () => {
+    const controlPlane = readFileSync(
+      "scripts/control-plane/mizizi-url-identity-production-control-plane.mjs",
+      "utf8",
+    );
+
+    expect(controlPlane).toContain(
+      "chartProgrammeSnapshotFromHistory",
+    );
+    expect(controlPlane).toContain(
+      '"Chart Track-slug journal/write-event parity is not exact"',
+    );
+    expect(controlPlane).toContain(
+      '"Chart Track-slug programme state is not a recognized exact boundary: "',
+    );
+    expect(controlPlane).toContain(
+      'chartState = "accepted_final"',
+    );
+    expect(controlPlane).toContain(
+      "chartCurrent.candidateCount === 0",
+    );
+    expect(controlPlane).toContain(
+      "candidateCount: EXPECTED_CHART_CANDIDATES",
+    );
+    expect(controlPlane).toContain(
+      "candidateFingerprint:",
+    );
+    expect(controlPlane).toContain(
+      "EXPECTED_CHART_CANDIDATE_FINGERPRINT",
+    );
+    expect(controlPlane).toContain(
+      "currentChartCandidates",
+    );
+    expect(controlPlane).toContain(
+      '"Chart programme state: "',
+    );
+  });
+
   it("keeps blocked Track, Release title and Chart Artist findings non-mutating", () => {
     const controlPlane = readFileSync(
       "scripts/control-plane/mizizi-url-identity-production-control-plane.mjs",
