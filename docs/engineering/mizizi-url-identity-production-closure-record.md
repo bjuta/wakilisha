@@ -22,6 +22,10 @@ canonicalization programme itself.
   `171 / 20260922143000_mizizi_url_identity_authority_window_close_v1`
 - public/editorial schema type SHA-256:
   `5d229c68d65b3360ecef98882ed059b09a2e57b43daf3343358d1231b14aa1d3`
+- canonical Production schema seal generated:
+  `2026-09-22T15:39:25Z`
+- schema-seal mode/source:
+  `production / pgzizndxdyhqmtyywjmt`
 
 The public/editorial type hash is unchanged because this migration adds only a
 private `mizizi_private` reduction primitive.
