@@ -229,6 +229,9 @@ describe("MIZIZI current URL-identity production control plane", () => {
       "2be28e013ce904e2a05f5d3c368304684c08a6ad7eadfe23a99c57162d0091b2",
     );
     expect(controlPlane).toContain(
+      "releaseProgrammeSnapshotFromHistory",
+    );
+    expect(controlPlane).not.toContain(
       "releaseProgrammeCandidateSql",
     );
     expect(controlPlane).toContain(
