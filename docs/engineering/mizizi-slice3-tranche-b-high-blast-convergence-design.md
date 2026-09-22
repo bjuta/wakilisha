@@ -443,6 +443,9 @@ Production sizing evidence at design time:
 max current Track credits for one Artist = 327
 max current Release credits for one Artist = 69
 max current Chart rows for one Artist = 54
+max modeled decouple budget at 24 replacements = 9946
+max modeled decouple budget at 31 replacements = 12725
+observed historical maximum replacement count = 2
 max combined current projection rows = 415
 p99 combined current projection rows = 108.74
 ```
@@ -459,14 +462,14 @@ The typed outer envelopes are therefore frozen as:
 - actor: `registry_artist_decouple_admin`;
 - risk: **critical**;
 - exact Artist targets: source plus at most thirty-one replacements, maximum **32**;
-- outer row ceiling: **16384**;
+- outer row ceiling: **10000**;
 - grant TTL: **300 seconds**;
 - human approval: **required**;
 - verifier: **required**.
 
-The 16384 ceiling is not the normal budget. Evidence must compute a
+The 10000 ceiling is not the normal budget. Evidence must compute a
 candidate-specific exact row budget from the frozen decision/credit/projection
-scope. The outer ceiling only prevents an unexpectedly explosive split. It conservatively covers the current independent live maxima upper bound at thirty-one replacements while avoiding a new narrow product cap.
+scope. The outer ceiling only prevents an unexpectedly explosive split. It preserves the shared Registry kernel's existing hard ceiling. The candidate-specific budget is the real limiter: large splits must be decomposed instead of bypassing the platform invariant.
 
 ### Safe Artist merge
 
