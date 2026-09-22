@@ -4,7 +4,7 @@ Date: 22 September 2026
 
 Programme issue: #1013
 
-Status: **PRODUCTION PARTIAL STOP ACCEPTED — 731 / 737 Release slug operations verified; six exact resume candidates remain; authority zero at rest**
+Status: **RELEASE SLUG FAMILY PRODUCTION CLOSED — 737 / 737 verified, zero Release candidates remain; 161 Chart Track-slug projections and 66 Track review items remain; authority zero at rest**
 
 ## Purpose
 
@@ -252,3 +252,75 @@ disabled / 0 / 0 authority with the Registry still at 731 / 731 / 6.
 The control plane now explicitly reviews the exact branch-bound human approval
 in PR mode instead of forcing operators to choose between protected CI and a
 valid approval window.
+
+
+## Final Release-slug Production closure
+
+The repaired six-row resume was authorized by the fresh human grant:
+
+`833e42c4-44ae-46f8-8014-3a38aef6235d`
+
+against exact protected main:
+
+`84e26cd90dff9d839b62138db8e336cf698d86ef`.
+
+Trigger PR **#1030** changed only the reviewed grant id. Protected PR
+preflight run `35769222291` proved:
+
+- `preflight entry authority = reviewed_human_authority`;
+- Release programme state: `accepted_partial`;
+- Registry mutation: **NO**.
+
+PR #1030 merged as:
+
+`605d08052b12478b75151c8d41ab6c29e5c6b9dd`.
+
+That exact push launched authoritative Production apply run
+`35769680464`. The run executed only the six repaired Release plans through
+the existing Stage B exact-grant / typed-operation / independent-verifier
+boundary, then reduced the human authority window before final acceptance.
+
+Final Production Release state:
+
+- verified Release-slug operations: **737**;
+- Release-slug canonical write events: **737**;
+- remaining deterministic Release-slug candidates: **0**;
+- post-apply fresh Release audit findings: **0**;
+- Release operation enabled: **false**;
+- active MIZIZI standing grants: **0**;
+- active MIZIZI exact grants: **0**;
+- human grant status: **expired**;
+- exact child grants descended from the final approval: **6**, all consumed;
+- all six mutation operations: `succeeded`;
+- all six independent verifiers: `passed`;
+- permanent verifier:
+  `MIZIZI_RELEASE_SLUG_RESUME_INTEGRITY_PASS`;
+- JIT mapping restored;
+- Production temporary access disabled at rest.
+
+The six final canonical slugs are:
+
+- `nilotic-2022-04-01`;
+- `wameyo-2025-10-10`;
+- `maybe-2022-09-23`;
+- `kesho-2023-10-27`;
+- `catch-a-vibe-2021-03-26`;
+- `son-of-the-city-2020-11-22`.
+
+No Release title was rewritten by this programme.
+
+Push Critical run `35769680551` also passed completely, including migration
+replay, browser acceptance, security/RLS, live schema drift and application
+build.
+
+### Remaining #1013 boundary
+
+Release-slug cleanup is closed. The parent programme remains open because
+Production still has:
+
+- **66** open Track `mizizi_data_hygiene` review items; and
+- **161** Chart rows whose stored Track slug differs from the current canonical
+  Track slug.
+
+Those are distinct remaining boundaries. They are not permission to reopen
+Release-slug mutation authority.
