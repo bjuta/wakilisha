@@ -1,6 +1,6 @@
 # MIZIZI Slice 3 — Current Database Authority Convergence
 
-Status: **in progress — Track Intake and Top Songs D1/D2 tranches Production accepted**
+Status: **PRODUCTION CLOSED — Slice 3 exit gate accepted on 22 September 2026**
 
 Current authority checkpoint:
 
@@ -392,3 +392,113 @@ The next mutation-bearing implementation block is:
 
 No implementation begins from the obsolete five-job queue without first
 respecting that audit's reclassifications.
+
+
+## Final Tranche B Production acceptance — 22 September 2026
+
+Implementation PR:
+
+- PR #1011: `MIZIZI Slice 3 Tranche B: complete high-blast authority convergence`;
+- final candidate head:
+  `d0c71336cf7a0cb6157a57c98479c9d2c48340b6`;
+- merged main:
+  `04405c627d1b5d2120074831fdba96abe6b08048`.
+
+Protected PR acceptance:
+
+- Critical Control Plane #1452: **PASS**;
+- MIZIZI Release Production Control Plane #77: **PASS**;
+- MIZIZI Track Production Control Plane #99: **PASS**.
+
+Production migration promotion:
+
+- project ref: `pgzizndxdyhqmtyywjmt`;
+- migration count: **170**;
+- migration head:
+  `20260922100810_mizizi_slice3_tranche_b_high_blast_convergence_v1`;
+- target migration appears exactly once;
+- canonical repository promotion: **PASS**;
+- post-promotion pending repository migrations: **0**;
+- committed `public,editorial` generated types equal live Production under
+  Supabase CLI `2.107.0`.
+
+Permanent Production verifiers:
+
+- `MIZIZI_TRANCHE_B_HIGH_BLAST_AUTHORITY_PASS`;
+- `MIZIZI_SHARED_REVIEW_AUTHORITY_PASS`;
+- `MIZIZI_IDENTITY_PROJECTION_LINEAGE_PASS`;
+- `REGISTRY_CANONICAL_WRITER_INVENTORY_PASS`.
+
+High-blast integrity:
+
+- mature Artist decouple engine SHA-256:
+  `bf2e8410e11af4207d064a800b7405045098ea0442742941a4fe5f55d026463e`;
+- mature safe Artist merge engine SHA-256:
+  `c5a595d6cd76da5df7d92d7e54449a270a3423cfffc8d8b0ce67eb85af3fd075`;
+- old destructive manual Artist merge: absent;
+- low-level public Artist decouple mutator: absent;
+- public decouple and safe-merge commands: authenticated-only;
+- private mature engines: not executable by authenticated or service_role;
+- active Artist high-blast grants at rest: **0**;
+- succeeded-but-unverified Artist high-blast operations: **0**;
+- both Artist high-blast brokers bind exactly once to `authenticator`.
+
+The shared Registry kernel was not widened. Tranche B added only the earned
+pre-insertion exact-target fingerprint helper required by immutable grant
+creation.
+
+## Final Slice 3 Production exit audit — 22 September 2026
+
+Current Production mechanically proves the Slice 3 exit gate.
+
+Writer and browser authority:
+
+- generated canonical writer inventory: **PASS**;
+- no `keep_converge`, `retire_or_internalize`, or `candidate_retire`
+  manifest debt remains;
+- the retained `scrape-artist-data / retire` manifest row is historical
+  retirement inventory whose runtime source and Production Edge runtime are
+  both absent;
+- authenticated INSERT/UPDATE/DELETE is **false** across all 12 audited
+  canonical Registry mutation tables;
+- Artist Alias UI uses `admin_set_registry_artist_alias_v1`, not direct table
+  delete;
+- Label and Genre detail pages use
+  `admin_patch_registry_*_profile_v1`, not direct table update.
+
+Retired runtime authority:
+
+- `scrape-artist-data`: absent;
+- `registry-enrichment-review`: absent;
+- `admin-registry-api`: absent;
+- `wakilisha-public-api`: absent;
+- `backfill-artist-spotify-images`: absent;
+- `backfill-artist-type`: absent.
+
+Named regression contracts:
+
+- Artist Studio / Claim / Missing Artist Intake verifier: **PASS**;
+- Registry Chart materialization/runtime verifier: **PASS**;
+- Top Songs presentation-authority verifier: **PASS**;
+- current Phase 7A Resource kernel closure verifier:
+  `PHASE_7A_KERNEL_CLOSURE_PASS`;
+- Identity/Projection Lineage verifier:
+  `MIZIZI_IDENTITY_PROJECTION_LINEAGE_PASS`.
+
+MIZIZI authority at rest:
+
+- active standing grants: **0**;
+- active exact grants: **0**;
+- unconsumed exact grants: **0**;
+- `mizizi -> mizizi_executor`: active exactly once;
+- `mizizi -> postgres`: inactive;
+- autonomous MIZIZI cron jobs: **0**.
+
+Repository, migration ledger, runtime deployment, generated schema types, and
+Production verifier evidence now agree.
+
+**Slice 3 is Production closed.**
+
+Slice 4 #991 is no longer blocked by #962. This closure does not itself grant
+new MIZIZI autonomy or mutation authority; any later runtime expansion remains
+subject to its own programme gate.
