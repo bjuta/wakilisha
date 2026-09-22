@@ -1,14 +1,16 @@
 {
   "projectRef": "pgzizndxdyhqmtyywjmt",
   "schema": "public,editorial",
-  "generatedAt": "2026-09-21T19:21:01Z",
+  "generatedAt": "2026-09-22T08:53:00Z",
   "typesSha256": "472186569827cdfe3d5a72b46a546db605839934abeaa8028d9e3233f911dc46",
   "authoritativeMigrationDirectory": "supabase/migrations",
-  "migrationCount": 168,
-  "latestMigration": "20260921171000_registry_chart_artist_resolution_rebase_v1.sql",
+  "migrationCount": 169,
+  "latestMigration": "20260922054353_registry_track_duplicate_repair_authority_v1.sql",
   "schemaSeal": {
-    "mode": "production",
-    "sourceProjectRef": "pgzizndxdyhqmtyywjmt",
-    "migrationHead": "20260921171000"
+    "mode": "preview",
+    "sourceProjectRef": "brtthfzdznfsgzrrlqdv",
+    "migrationHead": "20260922054353",
+    "baseMainSha": "8b3ac9fad3f804001c1612b2ff66cb6511c675c4",
+    "previewBranchId": "0b7a1052-ae96-41af-8d88-f2ee77e90959"
   }
 }
