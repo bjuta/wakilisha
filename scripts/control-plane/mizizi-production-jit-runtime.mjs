@@ -84,6 +84,23 @@ function findPayload(value, depth = 0) {
   return null;
 }
 
+export function linkSupabaseProject(projectRef) {
+  if (!projectRef) {
+    throw new Error("projectRef is required");
+  }
+
+  runCommand(
+    "npx",
+    [
+      "--yes",
+      "supabase@" + PINNED_SUPABASE_CLI,
+      "link",
+      "--project-ref",
+      projectRef,
+    ],
+  );
+}
+
 export function queryViaLinkedCli(sql) {
   const wrapped =
     "select to_jsonb(q) as payload from (" +
@@ -298,16 +315,7 @@ export async function openMiziziJitSession({
     );
   }
 
-  runCommand(
-    "npx",
-    [
-      "--yes",
-      "supabase@" + PINNED_SUPABASE_CLI,
-      "link",
-      "--project-ref",
-      projectRef,
-    ],
-  );
+  linkSupabaseProject(projectRef);
 
   const authority = queryViaLinkedCli(stageCAuthoritySql);
 
