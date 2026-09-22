@@ -4,11 +4,11 @@
 
 MIZIZI is the permanent WAKILISHA Registry data-hygiene agent.
 
-Current state: the preventive Track identity write boundary is production accepted. The historical Track identity apply is production accepted through PR #793 and governed run #28, and the historical Release taxonomy apply is production accepted through PR #797 and governed run #9.
+Current state: Slice 3 Registry authority convergence is Production closed. MIZIZI URL-identity stewardship has resumed under #1013 as an audit-first governed cleanup programme; mutation operations remain disabled at rest.
 
 Agent key: `mizizi`
 
-Rule-set version: `1.1.0`
+Rule-set version: `1.2.0`
 
 ## Production acceptance, 1 September 2026
 
@@ -623,3 +623,92 @@ Public APIs, search, charts, analytics, UI, and future datasets should receive c
 Credits and provider packaging belong in typed fields and relationships, not inside identity strings.
 
 That separation is what makes WAKILISHA's provenance useful rather than merely abundant.
+
+
+## Current URL-identity cleanup authority — 22 September 2026
+
+Programme issue:
+
+- #1013 — MIZIZI Track/Release URL Identity Cleanup — canonical slugs,
+  packaging noise & derived Chart sync.
+
+This is the resumed product-data hygiene programme after Slice 3 #962 closed.
+Slice 4 #991 is a separate runtime-foundation programme and does not replace
+this cleanup boundary.
+
+Current exact authority:
+
+- protected main at audit freeze:
+  `1f91d5f999e0bc8dd8eb4a998e3e923c6aedc866`;
+- Production migrations:
+  `170 / 20260922100810_mizizi_slice3_tranche_b_high_blast_convergence_v1`;
+- MIZIZI rule set: `1.2.0`;
+- active standing / exact / unconsumed MIZIZI grants:
+  `0 / 0 / 0`;
+- active executor binding:
+  `mizizi -> mizizi_executor`;
+- legacy `mizizi -> postgres` binding: inactive;
+- autonomous MIZIZI cron jobs: 0.
+
+The historical control-plane sections above remain immutable evidence of how the
+first Track and Release applies were accepted. They are not current transport
+authority. Stage C subsequently moved the JIT Production execution boundary to
+the narrow `mizizi_executor` role.
+
+### Fresh read-only Production backlog
+
+The #1013 opening audit found:
+
+- active Tracks: **2,101**;
+- open Track hygiene reviews: **66**;
+- all 66 are `track_slug_identity_noise`;
+- stale Track reviews: **0**;
+- active Releases: **841**;
+- Release taxonomy drift: **0**;
+- zero-resolvable active Releases: **13**;
+- Release slugs carrying `-(single|ep|album)`: **739**;
+- Release titles carrying provider packaging: **738**;
+- deterministic matched Release slug candidates: **737**;
+- clean-base slug candidates: **725**;
+- deterministic release-date fallback candidates: **12**;
+- unresolved Release slug collisions: **0**;
+- packaged-slug / title asymmetries requiring review/observation: **3**;
+- current Chart Track-slug projection drift rows: **161**.
+
+The four accepted stewardship operations already exist and remain disabled at
+rest:
+
+- `registry.track_slug.canonicalize/v1`;
+- `registry.release_slug.canonicalize/v1`;
+- `registry.release_taxonomy.repair/v1`;
+- `registry.chart_track_slug.synchronize/v1`.
+
+### Current title boundary
+
+Release title packaging remains observation, not automatic mutation authority.
+
+`release_title_provider_packaging` is intentionally observe-only. The
+historical Release taxonomy closure did not authorize title rewrites, and the
+current safety policy still forbids automatic changes to culturally meaningful
+titles.
+
+URL cleanup therefore does not imply a bulk Release-title rewrite. Any later
+title mutation requires separate evidence that the suffix is provider packaging
+rather than a culturally meaningful/versioned title label, plus an accepted
+bounded authority/rollback contract.
+
+### Current execution boundary
+
+A direct owner/Postgres session is not an execution substitute.
+
+Current MIZIZI plan/broker functions assert the active executor binding and
+correctly reject owner-session attempts. Production audit/apply authority uses
+the repository Track/Release control planes, which acquire temporary JIT access
+and execute through `mizizi_executor`.
+
+PR and manual-dispatch control-plane runs are preflight/read-only. Only a
+reviewed trigger-file push may enter apply mode.
+
+The #1013 first gate is therefore a fresh full-corpus preflight through the
+accepted Track and Release control planes. No operation enablement or Registry
+mutation is authorized by this documentation checkpoint.
