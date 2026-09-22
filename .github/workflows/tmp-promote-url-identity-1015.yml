@@ -1,0 +1,96 @@
+name: Temporary Promote MIZIZI URL Identity Migration
+
+on:
+  push:
+    branches:
+      - ops/tmp-promote-url-identity-1015
+    paths:
+      - ".github/workflows/tmp-promote-url-identity-1015.yml"
+
+permissions:
+  contents: write
+
+jobs:
+  promote:
+    name: exact-main-native-promotion
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      EXPECTED_MAIN: 723c7054abe5a50cc807ed791804e41e77d1880b
+      PROD_REF: pgzizndxdyhqmtyywjmt
+      TARGET: 20260922143000_mizizi_url_identity_authority_window_close_v1.sql
+      SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+      LAUNCH_BRANCH: ops/tmp-promote-url-identity-1015
+
+    steps:
+      - name: Check out launcher branch
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: true
+
+      - name: Use Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: Install repository dependencies
+        run: npm ci
+
+      - name: Materialize pinned Supabase CLI on PATH
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/wk-bin"
+          cat > "$RUNNER_TEMP/wk-bin/supabase" <<'SH'
+          #!/usr/bin/env bash
+          exec npx --yes supabase@2.107.0 "$@"
+          SH
+          chmod 700 "$RUNNER_TEMP/wk-bin/supabase"
+          echo "$RUNNER_TEMP/wk-bin" >> "$GITHUB_PATH"
+
+      - name: Switch runner to exact protected main
+        run: |
+          set -euo pipefail
+          git fetch origin refs/heads/main:refs/remotes/origin/main
+          test "$(git rev-parse refs/remotes/origin/main)" = "$EXPECTED_MAIN"
+          git switch -C main refs/remotes/origin/main
+          test "$(git branch --show-current)" = "main"
+          test "$(git rev-parse HEAD)" = "$EXPECTED_MAIN"
+          test "$(git rev-parse HEAD)" = "$(git rev-parse origin/main)"
+          test -z "$(git status --porcelain)"
+          echo "EXACT_MERGED_MAIN_LAUNCHER=PASS"
+
+      - name: Link exact Production
+        run: |
+          set -euo pipefail
+          supabase link --project-ref "$PROD_REF"
+          test -f supabase/.temp/project-ref
+          test "$(cat supabase/.temp/project-ref)" = "$PROD_REF"
+          echo "EXACT_PRODUCTION_LINK=PASS"
+
+      - name: Require exactly target migration pending
+        run: |
+          set -euo pipefail
+          DRY="$(supabase db push --dry-run --linked 2>&1)"
+          printf '%s\n' "$DRY"
+          PENDING="$(
+            {
+              printf '%s\n' "$DRY" |
+                grep -Eo '[0-9]{14}_[A-Za-z0-9_-]+\.sql' || true
+            } |
+              sort -u
+          )"
+          test "$(printf '%s\n' "$PENDING" | sed '/^$/d' | wc -l | tr -d ' ')" = "1"
+          test "$PENDING" = "$TARGET"
+          echo "EXACT_ONE_TARGET_PENDING=PASS"
+
+      - name: Run canonical repository migration promotion
+        run: |
+          set -euo pipefail
+          bash scripts/control-plane/promote-repository-migrations.sh
+
+      - name: Cleanup launcher branch
+        if: always()
+        run: |
+          set -euo pipefail
+          git push origin --delete "$LAUNCH_BRANCH" || true
