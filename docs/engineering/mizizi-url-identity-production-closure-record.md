@@ -394,3 +394,140 @@ contains:
 Issue #1013 therefore remains open for those two boundaries. Release-slug
 authority must remain closed unless new evidence creates a new separately
 reviewed programme.
+
+
+## Final Chart Track-slug Production acceptance
+
+Human approval:
+
+- grant:
+  `c5c518d4-4fbf-4ee4-9379-47b13a598add`;
+- approved main:
+  `9272ce3c31b9c4402f7b21f1f4b8aae3c48e8b8a`;
+- candidate count:
+  **161**;
+- candidate fingerprint:
+  `28a3b8362f8721ad4f35045a2cd938d265adf35373b522b492054af80eb8a910`;
+- operation:
+  `registry.chart_track_slug.synchronize/v1`.
+
+Protected trigger review:
+
+- PR:
+  **#1032**;
+- changed file:
+  `.github/mizizi-url-identity-production-apply.json`;
+- URL-identity PR preflight:
+  `35771365881`: **PASS**;
+- preflight authority mode:
+  `reviewed_human_authority`;
+- preflight current Chart Track-slug candidates:
+  **161**;
+- preflight Release programme state:
+  `accepted_final`;
+- preflight Registry mutation:
+  **NO**;
+- Critical:
+  `35771366123`: **PASS**.
+
+Merged trigger authority:
+
+`6109dc18f1e79c45d4c04a92cff51f4563daf2de`
+
+Authoritative Production apply:
+
+- workflow:
+  `MIZIZI URL Identity Production Control Plane`;
+- run:
+  `35771792617`;
+- event:
+  `push`;
+- exact head:
+  `6109dc18f1e79c45d4c04a92cff51f4563daf2de`;
+- result:
+  **PASS**;
+- evidence artifact:
+  `mizizi-url-identity-production-control-plane-35771792617`;
+- artifact id:
+  `10714830965`;
+- artifact SHA-256:
+  `965e6e5500ea00f9a78e0480e2ee61506a28a69c6ffc9a36b0069202fe1e87f9`.
+
+The accepted apply reported:
+
+- applied Chart rows: **161**;
+- queued-for-review: **0**;
+- stale outcomes: **0**;
+- Chart Artist observations remained observe-only;
+- human authority reduced before final acceptance;
+- JIT mapping restored;
+- Production temporary access disabled at rest.
+
+Independent Production proof after the run:
+
+- exact child execution grants descended from the approval:
+  **161**;
+- consumed child grants:
+  **161**;
+- succeeded + verifier-passed typed operations:
+  **161**;
+- operations with `affected_rows = 1`:
+  **161**;
+- final Chart slug exactly equals the frozen planned slug and current canonical
+  Track slug:
+  **161**;
+- mismatches:
+  **0**;
+- matching canonical write events:
+  **161**;
+- remaining Chart Track-slug drift:
+  **0**.
+
+Authority closure:
+
+- Chart operation enabled:
+  **false**;
+- final human grant status:
+  **expired**;
+- active MIZIZI standing grants:
+  **0**;
+- active exact grants:
+  **0**.
+
+Cross-family preservation:
+
+- Release verified operations:
+  **737**;
+- Release canonical write events:
+  **737**;
+- Release remaining deterministic slug candidates:
+  **0**;
+- open Track `mizizi_data_hygiene` review items:
+  **66**, unchanged.
+
+Push Critical run `35771792584`:
+**PASS** through replay, browser acceptance, security/RLS, live-schema drift and
+application build.
+
+The 91 Chart Artist-slug findings remain observe-only and were not authorized
+for mutation by this slice.
+
+### Post-Chart control-plane seal
+
+After the accepted 161-row apply, the current Chart candidate set is correctly
+zero. Future protected preflight must recognize that exact accepted-final
+boundary by reconstructing the original Chart programme from succeeded verified
+grant history and requiring the reconstructed candidate fingerprint to remain:
+
+`28a3b8362f8721ad4f35045a2cd938d265adf35373b522b492054af80eb8a910`.
+
+This prevents the closed 161-candidate authority from being silently forgotten
+or reused for future new Chart drift.
+
+### Remaining #1013 work
+
+The automatic Release-slug and derived Chart Track-slug families are closed.
+Issue #1013 remains open only for the **66** Track
+`mizizi_data_hygiene` review items.
+
+Those review rows are not automatic Track-write authority.
