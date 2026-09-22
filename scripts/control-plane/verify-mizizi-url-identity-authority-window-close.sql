@@ -41,7 +41,7 @@ begin
   if v_def !~ 'perform mizizi_private[.]assert_executor_v1[(][)]'
      or v_def !~ 'status=''expired'''
      or v_def !~ 'enabled=false'
-     or v_def ~* 'enabled[[:space:]]*=[[:space:]]*true'
+     or v_def ~* 'set[[:space:]]+enabled[[:space:]]*=[[:space:]]*true'
   then
     raise exception 'MIZIZI authority-window close function is not reduction-only';
   end if;
