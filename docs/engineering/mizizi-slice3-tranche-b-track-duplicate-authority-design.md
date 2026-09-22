@@ -2,7 +2,7 @@
 
 Date: **22 September 2026**
 
-Status: **IMPLEMENTATION CONTRACT FROZEN — MIGRATION NOT YET CREATED**
+Status: **IMPLEMENTED ON WORKING BRANCH — REPLAY / BEHAVIOR ACCEPTANCE PENDING**
 
 Programme issue: **#962 — MIZIZI Slice 3: Obsolete Authority Retirement & Bypass Closure**
 
@@ -358,11 +358,15 @@ The existing final Registry canonical writer inventory must also be updated so t
 
 This candidate changes database authority and requires a new forward migration.
 
-The migration filename must be created through:
+The migration filename was created through:
 
 `supabase migration new registry_track_duplicate_repair_authority_v1`
 
-No migration timestamp is to be invented manually.
+Canonical forward migration:
+
+`supabase/migrations/20260922054353_registry_track_duplicate_repair_authority_v1.sql`
+
+No migration timestamp was invented manually.
 
 After implementation:
 
@@ -397,3 +401,23 @@ This design checkpoint itself mutates no runtime.
 - Production mutation authorized now: **No**
 - PR needed now: **No**
 - next gate: **generate the forward migration filename, implement the frozen candidate, then clean Preview replay and behavior acceptance**
+
+
+## 18. Implementation checkpoint — 22 September 2026
+
+The branch now contains the forward migration, permanent verifier, writer-manifest convergence, focused contract tests, and deployment record.
+
+Current Production preflight remains:
+
+- 168 migrations;
+- head `20260921171000`;
+- all accepted governance/review dependencies present;
+- all new Tranche B namespaces free.
+
+Accepted mature engine body SHA-256 before internalization:
+
+`ff7ec6d997671e5f27ed2056149e56e4c913284f911e0eb943532f750e39c0e7`
+
+Migration preflight, migration proof, and the permanent verifier all bind to this body seal.
+
+Replay and real behavior acceptance remain pending. This checkpoint is not a Slice 3 or Tranche B closure record.
