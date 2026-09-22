@@ -511,30 +511,6 @@
       "legacyDebt": false
     },
     {
-      "id": "admin-decouple-registry-artist",
-      "kind": "database_function",
-      "entrypoint": "public.admin_decouple_registry_artist(uuid,jsonb,text,boolean,uuid)",
-      "authentication": "owner_internal",
-      "authorization": "exact_artist_decouple_operation_only",
-      "executionAuthority": "owner_internal_private_mature_engine",
-      "targets": [
-        "registry_artists",
-        "registry_artist_aliases",
-        "registry_tracks",
-        "registry_track_artists",
-        "registry_release_artists",
-        "registry_audit_log"
-      ],
-      "riskClass": "critical",
-      "disposition": "internalize",
-      "futureBoundary": "platform_private.apply_registry_artist_decouple_engine_v1",
-      "miziziCallable": false,
-      "humanCallable": false,
-      "publicCallable": false,
-      "canonicalMutation": true,
-      "legacyDebt": false
-    },
-    {
       "id": "admin-execute-registry-artist-enrichment-evidence-admission",
       "kind": "database_function",
       "entrypoint": "public.admin_execute_registry_artist_enrichment_evidence_admission(uuid)",
