@@ -1,9 +1,8 @@
 name: Temporary Promote MIZIZI URL Identity Migration
 
 on:
-  push:
-    branches:
-      - ops/tmp-promote-url-identity-1015
+  pull_request:
+    types: [opened, synchronize, reopened]
     paths:
       - ".github/workflows/tmp-promote-url-identity-1015.yml"
 
