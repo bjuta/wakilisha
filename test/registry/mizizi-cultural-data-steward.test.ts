@@ -2756,7 +2756,7 @@ describe("MIZIZI Slice 3 Tranche B Track duplicate repair exact authority", () =
       "registry_identity_lineage",
     );
     expect(verifier).toContain(
-      "track duplicate repair supersession lineage coverage drifted",
+      "Track duplicate repair supersession lineage coverage drifted",
     );
     expect(verifier).toContain(
       "canonical_track_has_ambiguous_current_primary_artist_credit",
