@@ -91,6 +91,27 @@ describe("MIZIZI current URL-identity production control plane", () => {
       "assertZeroAtRest",
     );
     expect(controlPlane).toContain(
+      "assertPreflightAuthority",
+    );
+    expect(controlPlane).toContain(
+      '"reviewed_human_authority"',
+    );
+    expect(controlPlane).toContain(
+      "preflight reviewed authority census",
+    );
+    expect(controlPlane).toContain(
+      "active_standing: 1",
+    );
+    expect(controlPlane).toContain(
+      "enabled_operations: 1",
+    );
+    expect(controlPlane).toContain(
+      "readReviewedTrigger(REVIEWED_TRIGGER_FILE)",
+    );
+    expect(controlPlane).toContain(
+      "PASS: preflight entry authority = ",
+    );
+    expect(controlPlane).toContain(
       "--confirm=MIZIZI_APPLY",
     );
 
