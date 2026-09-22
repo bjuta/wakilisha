@@ -695,7 +695,9 @@ Production currently proves:
 - 731 matching canonical write events;
 - six deterministic Release slug candidates still carrying provider packaging;
 - zero Release-slug review rows created by the apply;
-- all 737 Release title packaging findings remain observe-only;
+- Release title packaging remains non-mutating; after slug repair, a fresh
+  MIZIZI audit emits that title observation only while the same Release still
+  carries matching provider packaging in its slug;
 - Release operation disabled at rest;
 - active standing / exact MIZIZI grants: 0 / 0.
 
