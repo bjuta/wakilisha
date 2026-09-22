@@ -252,7 +252,7 @@ values
   array['artist']::text[],
   true,
   32,
-  16384,
+  10000,
   300,
   true,
   true,
@@ -821,9 +821,9 @@ begin
     + v_replacement_count
     + 2;
 
-  if v_row_budget<1 or v_row_budget>16384 then
+  if v_row_budget<1 or v_row_budget>10000 then
     raise exception using errcode='54000',
-      message='Artist decouple exceeds the 16384-row exact operation ceiling.';
+      message='Artist decouple exceeds the 10000-row exact operation ceiling.';
   end if;
 
   v_state_fingerprint:=
@@ -1116,7 +1116,7 @@ begin
      or v_operation_type.allowed_subject_types<>array['artist']::text[]
      or not v_operation_type.requires_existing_target
      or v_operation_type.max_targets<>32
-     or v_operation_type.max_rows_ceiling<>16384
+     or v_operation_type.max_rows_ceiling<>10000
      or v_operation_type.max_grant_ttl_seconds<>300
      or not v_operation_type.requires_human_approval
      or not v_operation_type.requires_verifier
@@ -1152,7 +1152,7 @@ begin
      or (v_claim->>'operation_version')::integer<>1
      or v_claim->>'policy_ruleset_version'<>'registry-artist-decouple-v1'
      or v_evidence.subject_id<>v_source_artist_id
-     or coalesce((v_claim->>'expected_row_budget')::integer,0) not between 1 and 16384
+     or coalesce((v_claim->>'expected_row_budget')::integer,0) not between 1 and 10000
      or coalesce(cardinality(v_replacement_ids),0) not between 2 and 31
      or v_source_artist_id=any(v_replacement_ids)
      or platform_private.registry_artist_decouple_state_fingerprint_v1(
@@ -1532,7 +1532,7 @@ begin
      or v_grant.capability_key<>'decouple_registry_artist'
      or v_grant.operation_key<>'registry.artist.decouple'
      or v_grant.operation_version<>1
-     or v_grant.max_rows not between 1 and 16384
+     or v_grant.max_rows not between 1 and 10000
      or v_grant.policy_ruleset_version<>'registry-artist-decouple-v1'
      or v_grant.required_user_capability_key<>'manage_registry'
   then
@@ -3097,7 +3097,7 @@ begin
       and operation_type.capability_key='decouple_registry_artist'
       and operation_type.risk_class='critical'
       and operation_type.max_targets=32
-      and operation_type.max_rows_ceiling=16384
+      and operation_type.max_rows_ceiling=10000
       and operation_type.max_grant_ttl_seconds=300
       and operation_type.requires_human_approval
       and operation_type.requires_verifier
