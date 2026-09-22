@@ -2,11 +2,12 @@
 
 ## Status
 
-**PRODUCTION SCHEMA ACCEPTED — governed Registry apply remains separately human-authorized.**
+**PRODUCTION SCHEMA ACCEPTED — Release slug apply is partially accepted at 731 / 737 and is fail-safe closed pending the six-row forward resume repair.**
 
 This record closes the schema/control-plane deployment shipped through PR #1015.
-It does **not** authorize or claim execution of the Release-slug or Chart Track-slug
-canonicalization programme itself.
+The later governed Release-slug trigger did execute. Its first apply preserved
+731 verified successes and then failed closed on six stale collision-family
+siblings. Chart Track-slug canonicalization remains unrun.
 
 ## Accepted repository authority
 
@@ -159,6 +160,39 @@ Post-DDL Supabase security advisor inspection found no candidate-specific
 finding for
 `mizizi_private.close_stewardship_authority_window_v1(text,uuid,text)`.
 
+## Release apply partial-stop receipt
+
+Governed run `35757733981` entered with the exact 737-candidate Release
+fingerprint and exact human authority. It completed 731 one-row operations with
+independent verifier PASS and 731 matching canonical write events.
+
+The runner reported:
+
+- `applied = 731`;
+- `stale = 6`;
+- `queued_for_review = 0`;
+- `observed_findings = 737`.
+
+The authority-window reducer then succeeded before final acceptance:
+
+- Release operation returned disabled;
+- standing grant returned expired;
+- active exact descendants: zero;
+- active standing / exact authority at rest: 0 / 0;
+- JIT mapping restored;
+- Production temporary access disabled.
+
+Final acceptance correctly failed on
+`verifiedDelta=731 expected 737`. The six successes missing from that delta
+were not lost writes; they were never executed because the dynamic Release plan
+changed after the first sibling in each collision pair had already adopted its
+date fallback.
+
+Read-only reconstruction proves the 731 stored exact plan payloads plus the six
+provenance-repaired remaining plans still produce the original 737-candidate
+fingerprint exactly. The programme therefore remains resumable without
+replaying accepted writes or widening authority.
+
 ## Current URL-identity programme boundary
 
 Accepted automatic mutation families remain only:
@@ -185,6 +219,15 @@ fingerprints, exact merged-main trigger authority, and the JIT
 - Production zero-at-rest authority: PASS
 - Edge Function deployment: none
 - frontend deployment: none
-- Production Registry cleanup mutation: **not run by this closure**
-- schema seal: Production reconciliation required in this closure PR
-- disposable Preview: delete only after this closure PR is merged
+- Production Release-slug cleanup mutation: **partial — 731 verified writes accepted, six exact rows remain**
+- Production Release-slug canonical write events: **731**
+- remaining deterministic Release-slug candidates: **6**
+- Release operation after partial stop: **disabled**
+- active MIZIZI standing/exact grants after partial stop: **0 / 0**
+- partial-run control-plane artifact: `10708079992`
+- partial-run artifact SHA-256:
+  `32e662ffbba5870c3819da96f2caff140d178d2876b5a52e74b4b6156d2e090d`
+- Chart Track-slug cleanup mutation: **not run**
+- forward repair required before resume:
+  `20260922171632_mizizi_release_slug_resume_integrity_v1.sql`
+- schema seal: public/editorial type hash remains unchanged by the private-function repair
