@@ -2901,7 +2901,7 @@ describe("MIZIZI Slice 3 Tranche B remaining high-blast convergence", () => {
 
   it("preserves the reviewed decouple decision and safe-merge public product signatures", () => {
     expect(migration).toContain(
-      "create function public.admin_apply_artist_decouple_decision",
+      "create or replace function public.admin_apply_artist_decouple_decision",
     );
     expect(migration).toContain(
       "create function public.admin_safe_merge_registry_artists",
