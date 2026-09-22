@@ -1077,7 +1077,15 @@ Deno.serve(async (req) => {
   const releasePathSegments = path.startsWith("/releases/")
     ? path.replace(/^\/releases\//, "").split("/").filter(Boolean)
     : [];
+  const trackPathSegments = path.startsWith("/tracks/")
+    ? path.replace(/^\/tracks\//, "").split("/").filter(Boolean)
+    : [];
   const isReleaseTrackPath = releasePathSegments.length === 3;
+  const isTrackIdentityPath =
+    trackPathSegments.length === 3 &&
+    /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
+      trackPathSegments[2] || "",
+    );
 
   try {
     let data: unknown;
@@ -2168,17 +2176,62 @@ Deno.serve(async (req) => {
     else if (path.startsWith("/tracks/") || isReleaseTrackPath) {
       const tSegments = isReleaseTrackPath
         ? releasePathSegments
-        : path.replace(/^\/tracks\//, "").split("/").filter(Boolean);
-      const trackSlug = tSegments[tSegments.length - 1] || "";
+        : trackPathSegments;
+      const trackSlug = isTrackIdentityPath
+        ? tSegments[1] || ""
+        : tSegments[tSegments.length - 1] || "";
       const urlArtistSlug = tSegments.length > 1 ? tSegments[0] : null;
       const urlReleaseSlug = isReleaseTrackPath ? tSegments[1] || null : null;
+      const urlTrackId = isTrackIdentityPath ? tSegments[2] || null : null;
       let track: any = null;
       let releaseScopedMembership: any = null;
       const isIsrcLookup =
         !isReleaseTrackPath &&
+        !isTrackIdentityPath &&
         trackSlug.toLowerCase().startsWith("isrc:");
 
-      if (isReleaseTrackPath) {
+      if (isTrackIdentityPath) {
+        if (!urlArtistSlug || !trackSlug || !urlTrackId) {
+          return jsonResponse(
+            { data: null, meta: { reason: "invalid_track_identity_path" } },
+            origin,
+            404,
+          );
+        }
+
+        const { data: byTrackId } = await supabase
+          .from("registry_tracks")
+          .select(MUSIC_ENTITY_SELECT)
+          .eq("id", urlTrackId)
+          .in("status", ["active", "needs_review", "draft"])
+          .maybeSingle();
+
+        if (byTrackId) {
+          const normalizedRequestedSlug = slugify(trackSlug);
+          const storedSlug = slugify(String(byTrackId.slug || ""));
+          const publicSlug = cleanPublicMusicSlug(
+            byTrackId.slug,
+            byTrackId.title,
+            urlArtistSlug,
+          );
+
+          if (
+            storedSlug !== normalizedRequestedSlug &&
+            publicSlug !== normalizedRequestedSlug
+          ) {
+            return jsonResponse(
+              {
+                data: null,
+                meta: { reason: "track_slug_not_found_for_id" },
+              },
+              origin,
+              404,
+            );
+          }
+        }
+
+        track = byTrackId ?? null;
+      } else if (isReleaseTrackPath) {
         if (!urlArtistSlug || !urlReleaseSlug || !trackSlug) {
           return jsonResponse(
             { data: null, meta: { reason: "invalid_release_track_path" } },
@@ -2299,11 +2352,28 @@ Deno.serve(async (req) => {
         track = byIsrc && byIsrc.length > 0 ? byIsrc[0] : null;
       } else {
         if (urlArtistSlug) {
-          track = await findTrackByScopedPublicSlug(
+          const scopedLookup = await findTrackByScopedPublicSlug(
             supabase,
             urlArtistSlug,
             trackSlug,
           );
+
+          if (scopedLookup.matchCount > 1) {
+            return jsonResponse(
+              {
+                data: null,
+                meta: {
+                  reason: "ambiguous_track_slug",
+                  matchCount: scopedLookup.matchCount,
+                  canonicalIdentityRequired: true,
+                },
+              },
+              origin,
+              409,
+            );
+          }
+
+          track = scopedLookup.track;
         }
 
         if (!track) {
@@ -2321,7 +2391,7 @@ Deno.serve(async (req) => {
       // v15: Chart-entry fallback — tracks not yet in registry can still have pages
       // The chart pipeline stores slugs with spaces (e.g. "baddies need love"), 
       // but the URL arrives with hyphens ("baddies-need-love"). We need to match both.
-      if (!track && !isIsrcLookup && !isReleaseTrackPath) {
+      if (!track && !isIsrcLookup && !isReleaseTrackPath && !isTrackIdentityPath) {
         const withSpaces = trackSlug.replace(/-/g, " ");
         const { data: chartEntries } = await supabase.from("wk_chart_entries_v2")
           .select("track_title, track_slug, artist_name, artist_slug, artwork_url, rank, previous_rank, movement, edition_id, total_score, release_date")
