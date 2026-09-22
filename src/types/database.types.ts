@@ -19591,16 +19591,6 @@ export type Database = {
         Args: { p_suggestion_id: string; p_title: string }
         Returns: Json
       }
-      admin_decouple_registry_artist: {
-        Args: {
-          p_archive_source?: boolean
-          p_chart_primary_artist_id?: string
-          p_note?: string
-          p_replacements: Json
-          p_source_artist_id: string
-        }
-        Returns: Json
-      }
       admin_execute_registry_artist_bio_admission: {
         Args: {
           p_artist_id: string
@@ -19795,15 +19785,6 @@ export type Database = {
       }
       admin_mark_registry_artist_intake_applied_v1: {
         Args: { p_artist_id: string; p_staging_id: string }
-        Returns: Json
-      }
-      admin_merge_registry_artists: {
-        Args: {
-          p_archive_source?: boolean
-          p_canonical_artist_id: string
-          p_note?: string
-          p_source_artist_id: string
-        }
         Returns: Json
       }
       admin_patch_registry_artist_profile_v1: {

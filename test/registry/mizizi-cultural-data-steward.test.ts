@@ -2808,3 +2808,210 @@ describe("MIZIZI Slice 3 Tranche B Track duplicate repair exact authority", () =
     expect(writer?.legacyDebt).toBe(false);
   });
 });
+
+
+describe("MIZIZI Slice 3 Tranche B remaining high-blast convergence", () => {
+  const migration = read(
+    "supabase/migrations/20260922100810_mizizi_slice3_tranche_b_high_blast_convergence_v1.sql",
+  );
+  const verifier = read(
+    "scripts/control-plane/verify-mizizi-tranche-b-high-blast-authority.sql",
+  );
+
+  it("keeps one coherent Artist high-blast migration and preserves both mature engines byte-for-byte", () => {
+    expect(migration).toContain(
+      "alter function public.admin_decouple_registry_artist",
+    );
+    expect(migration).toContain(
+      "rename to apply_registry_artist_decouple_engine_v1",
+    );
+    expect(migration).toContain(
+      "alter function public.admin_safe_merge_registry_artists",
+    );
+    expect(migration).toContain(
+      "rename to apply_registry_artist_merge_engine_v1",
+    );
+    expect(migration).not.toMatch(
+      /create\s+(?:or\s+replace\s+)?function\s+platform_private\.apply_registry_artist_(?:decouple|merge)_engine_v1/i,
+    );
+
+    for (const seal of [
+      "bf2e8410e11af4207d064a800b7405045098ea0442742941a4fe5f55d026463e",
+      "c5a595d6cd76da5df7d92d7e54449a270a3423cfffc8d8b0ce67eb85af3fd075",
+    ]) {
+      expect(migration).toContain(seal);
+      expect(verifier).toContain(seal);
+    }
+  });
+
+  it("adds only the earned pre-insertion target fingerprint primitive to the shared kernel", () => {
+    expect(migration).toContain(
+      "create function platform_private.registry_exact_target_set_fingerprint_v1",
+    );
+    expect(migration).toContain(
+      "registry_execution_target_set_fingerprint(v_grant_id)",
+    );
+    expect(migration).toContain(
+      "begin_registry_mutation_operation",
+    );
+    expect(migration).toContain(
+      "registry_operation_write_events",
+    );
+    expect(migration).not.toContain(
+      "create table platform_private.registry_execution_grants",
+    );
+    expect(migration).not.toContain(
+      "create table platform_private.registry_review_",
+    );
+    expect(migration).not.toContain(
+      "repeat('0',64)",
+    );
+    expect(migration).not.toMatch(
+      /update\s+platform_private\.registry_execution_grants\s+set\s+target_set_fingerprint/i,
+    );
+  });
+
+  it("freezes separate domain semantics over the shared exact-operation lifecycle", () => {
+    for (const token of [
+      "'registry.artist.decouple'",
+      "'decouple_registry_artist'",
+      "'registry.artist.merge'",
+      "'merge_registry_artist'",
+      "registry_artist_decouple_state_fingerprint_v1",
+      "registry_artist_merge_state_fingerprint_v1",
+      "record_registry_artist_decouple_evidence_v1",
+      "record_registry_artist_merge_evidence_v1",
+      "issue_registry_artist_decouple_grant_v1",
+      "issue_registry_artist_merge_grant_v1",
+      "execute_registry_artist_decouple_v1",
+      "execute_registry_artist_merge_v1",
+      "verify_registry_artist_decouple_v1",
+      "verify_registry_artist_merge_v1",
+    ]) {
+      expect(migration).toContain(token);
+    }
+
+    expect(migration).toContain("max_targets=32");
+    expect(migration).toContain("max_rows_ceiling=10000");
+    expect(migration).toContain("max_targets=2");
+    expect(migration).toContain("max_rows_ceiling=1024");
+    expect(migration).toContain("WK_STALE_ARTIST_DECOUPLE");
+    expect(migration).toContain("WK_STALE_ARTIST_MERGE");
+  });
+
+  it("preserves the reviewed decouple decision and safe-merge public product signatures", () => {
+    expect(migration).toContain(
+      "create or replace function public.admin_apply_artist_decouple_decision",
+    );
+    expect(migration).toContain(
+      "create function public.admin_safe_merge_registry_artists",
+    );
+    expect(migration).toContain(
+      "update public.registry_artist_decouple_decisions",
+    );
+    expect(migration).toContain(
+      "to authenticated;",
+    );
+
+    expect(verifier).toContain(
+      "Artist decouple public command grant boundary drifted",
+    );
+    expect(verifier).toContain(
+      "Safe Artist merge public command grant boundary drifted",
+    );
+  });
+
+  it("retires the old destructive manual merge road instead of wrapping it as a second merge mode", () => {
+    expect(migration).toContain(
+      "880f3fe1419b4ed9676ee0cbc14ca4b6193f0ef52475d25117df6a2325a151bd",
+    );
+    expect(migration).toContain(
+      "drop function public.admin_merge_registry_artists(uuid,uuid,text,boolean)",
+    );
+    expect(verifier).toContain(
+      "Old manual Artist merge executable authority still exists",
+    );
+
+    const manifest = JSON.parse(
+      readFileSync(
+        "scripts/control-plane/registry-privileged-writer-manifest.json",
+        "utf8",
+      ),
+    ) as {
+      writers: Array<{
+        id: string;
+        executionAuthority: string;
+        disposition: string;
+        futureBoundary: string;
+        legacyDebt: boolean;
+      }>;
+    };
+
+    expect(
+      manifest.writers.find(
+        (writer) => writer.id === "admin-merge-registry-artists",
+      ),
+    ).toBeUndefined();
+    expect(
+      manifest.writers.find(
+        (writer) => writer.id === "admin-decouple-registry-artist",
+      ),
+    ).toBeUndefined();
+  });
+
+  it("classifies only the surviving reviewed product commands as high-blast writers", () => {
+    const manifest = JSON.parse(
+      readFileSync(
+        "scripts/control-plane/registry-privileged-writer-manifest.json",
+        "utf8",
+      ),
+    ) as {
+      writers: Array<{
+        id: string;
+        executionAuthority: string;
+        disposition: string;
+        futureBoundary: string;
+        legacyDebt: boolean;
+      }>;
+    };
+
+    expect(
+      manifest.writers.find(
+        (writer) => writer.id === "admin-apply-artist-decouple-decision",
+      ),
+    ).toMatchObject({
+      executionAuthority:
+        "security_definer_reviewed_exact_grant_wrapper_over_private_mature_engine",
+      disposition: "keep",
+      futureBoundary: "reviewed_exact_artist_decouple_v1",
+      legacyDebt: false,
+    });
+
+    expect(
+      manifest.writers.find(
+        (writer) => writer.id === "admin-safe-merge-registry-artists",
+      ),
+    ).toMatchObject({
+      executionAuthority:
+        "security_definer_reviewed_exact_grant_wrapper_over_private_mature_engine",
+      disposition: "keep",
+      futureBoundary: "reviewed_exact_artist_merge_v1",
+      legacyDebt: false,
+    });
+  });
+
+  it("keeps independent credit, projection, lineage, journal and zero-at-rest verification", () => {
+    for (const token of [
+      "MIZIZI_TRANCHE_B_HIGH_BLAST_AUTHORITY_PASS",
+      "registry_track_artists",
+      "registry_release_artists",
+      "wk_chart_entries_v2",
+      "registry_identity_lineage",
+      "registry_operation_write_events",
+      "Active Artist high-blast exact grant remains at rest",
+      "Succeeded Artist high-blast operation lacks independent verifier PASS",
+    ]) {
+      expect(verifier).toContain(token);
+    }
+  });
+});

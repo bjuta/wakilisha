@@ -1,5 +1,9 @@
 # MIZIZI Slice 3 Tranche B — Track Duplicate Repair Production Closure
 
+## Current-state amendment — 22 September 2026
+
+This record remains the accepted Production closure for the Track duplicate component of Tranche B. It does **not** define the remaining Tranche B work as separate per-function families. Current authority is `docs/engineering/mizizi-slice3-tranche-b-high-blast-convergence-design.md` and draft PR #1011: Artist decouple, safe Artist merge, old manual Artist merge retirement, final verifier consolidation, one clean Preview cycle, and one remaining Tranche B Production closure execute as one coherent rollback boundary.
+
 Date: **22 September 2026**
 
 Status: **PRODUCTION ACCEPTED — bounded Track duplicate family closure**

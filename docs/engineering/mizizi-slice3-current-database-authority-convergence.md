@@ -199,8 +199,10 @@ Work is grouped by rollback authority, not legacy function name.
 
 - Track duplicate repair exact reviewed authority around the mature engine:
   **Production accepted / closed**;
-- Artist decouple exact reviewed authority + low-level internalization:
-  **next active family**;
+- Artist decouple exact reviewed authority + low-level internalization;
+- safe Artist merge exact reviewed authority around the mature engine;
+- old manual Artist merge retirement after proof;
+- these remaining items execute together as **one Tranche B completion job** under #1011;
 - safe Artist merge exact reviewed authority around the mature engine;
 - old manual Artist merge retirement after proof;
 - current Resource, lineage, and Chart-projection postcondition verification.
@@ -345,9 +347,7 @@ The committed schema seal is reconciled to Production authority at migration
 head `20260922054353` without changing generated type bytes.
 
 This closes only the **Track duplicate repair** family. #962 remains open.
-The next active Tranche B family is **Artist decouple exact reviewed authority**,
-followed by safe Artist merge containment and bounded old-manual-merge
-retirement after proof.
+The remaining Tranche B work is one coherent **high-blast convergence job** under draft PR #1011. It contains Artist decouple exact reviewed authority, safe Artist merge exact reviewed authority, old manual Artist merge retirement after proof, and one consolidated final verification/Preview/Production closure cycle. These are not separate families or separate rollback boundaries.
 
 ## Slice 3 exit gate
 
