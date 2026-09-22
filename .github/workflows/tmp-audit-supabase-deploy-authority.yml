@@ -7,7 +7,7 @@ on:
       - ".github/workflows/tmp-audit-supabase-deploy-authority.yml"
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   audit:
@@ -146,3 +146,9 @@ jobs:
           name: supabase-deployment-authority-audit
           path: supabase-deployment-authority-audit.json
           retention-days: 7
+
+      - name: Cleanup temporary audit branch
+        if: always()
+        run: |
+          set -euo pipefail
+          git push origin --delete ops/tmp-audit-supabase-deploy-authority-1013 || true
