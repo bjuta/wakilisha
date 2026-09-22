@@ -120,6 +120,37 @@ returns the operation to disabled-at-rest state.
 If the close itself cannot prove safe reduction, the workflow fails loudly and
 does not claim acceptance.
 
+## Forward repair Preview acceptance
+
+Disposable Preview:
+
+- branch: `mizizi-release-slug-resume-1013`;
+- branch id: `d64d23b3-4150-437c-8fdc-db83c8482ec7`;
+- project ref: `ltcwajcrqdbefhulzibv`;
+- parent Production: `pgzizndxdyhqmtyywjmt`;
+- baseline replay after rebase: **171 / 20260922143000**;
+- candidate canonical ledger: **172 / 20260922171632**;
+- candidate migration SHA-256:
+  `9eaa92df451c3e88eb5e25bbc1c1539c13735020f31cca356fa0a0b34bbc4c3b`;
+- permanent verifier:
+  `MIZIZI_RELEASE_SLUG_RESUME_INTEGRITY_PASS`;
+- public/editorial type SHA-256 remains
+  `5d229c68d65b3360ecef98882ed059b09a2e57b43daf3343358d1231b14aa1d3`.
+
+Real Stage C behavior acceptance ran through workflow
+`35761199065` with
+`session_user = current_user = mizizi_executor`.
+
+The provenance-backed second sibling planned
+`wk-resume-kesho-2026-02-02` with date fallback enabled. The negative-control
+date-looking sibling without a succeeded MIZIZI planner event planned the clean
+base `wk-resume-control` with date fallback disabled.
+
+The JIT mapping was restored, Production temporary access returned disabled,
+and all Preview fixture rows plus their generated Artist resource identity were
+removed. Security advisor output has no finding mentioning the repaired private
+planner, the repair migration, or `mizizi_private`.
+
 ## Production acceptance
 
 A successful apply requires all of the following:
