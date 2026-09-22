@@ -359,61 +359,6 @@ select
 from payload
 `;
 
-const releaseProgrammeCandidateSql = `
-with current_plans as (
-  ${releaseCandidateRowsSql}
-),
-succeeded_plans as (
-  select
-    grant_row.plan_payload->>'release_id' as release_id,
-    grant_row.plan_payload->>'artist_id' as artist_id,
-    grant_row.plan_payload->>'artist_slug' as artist_slug,
-    grant_row.plan_payload->>'current_slug' as current_slug,
-    grant_row.plan_payload->>'proposed_slug' as proposed_slug,
-    (
-      grant_row.plan_payload->>'uses_date_fallback'
-    )::boolean as uses_date_fallback,
-    grant_row.plan_payload->>'expected_state_fingerprint'
-      as expected_state_fingerprint
-  from platform_private.registry_execution_grants grant_row
-  join platform_private.registry_mutation_operations operation
-    on operation.execution_grant_id=grant_row.id
-  where grant_row.actor_key='mizizi'
-    and grant_row.operation_key='registry.release_slug.canonicalize'
-    and grant_row.operation_version=1
-    and operation.status='succeeded'
-    and operation.verifier_status='passed'
-),
-programme as (
-  select * from succeeded_plans
-  union all
-  select * from current_plans
-),
-payload as (
-  select coalesce(
-    jsonb_agg(
-      jsonb_build_object(
-        'release_id',release_id,
-        'artist_id',artist_id,
-        'artist_slug',artist_slug,
-        'current_slug',current_slug,
-        'proposed_slug',proposed_slug,
-        'uses_date_fallback',uses_date_fallback,
-        'expected_state_fingerprint',
-          expected_state_fingerprint
-      )
-      order by release_id
-    ),
-    '[]'::jsonb
-  ) body
-  from programme
-)
-select
-  jsonb_array_length(body)::int as candidate_count,
-  body::text as candidate_payload
-from payload
-`;
-
 const releaseEligibleCountSql = `
 select count(*)::int as candidate_count
 from public.registry_releases release
@@ -486,6 +431,85 @@ function candidateSnapshot(row) {
     candidateCount: Number(row?.candidate_count || 0),
     candidateFingerprint: sha256(payload),
   };
+}
+
+function releaseProgrammeSnapshotFromHistory(
+  currentCandidatePayload,
+) {
+  const escapedCurrent =
+    String(currentCandidatePayload || "[]").replaceAll(
+      "'",
+      "''",
+    );
+
+  const row = queryViaLinkedCli(`
+with current_plans as (
+  select
+    value->>'release_id' as release_id,
+    value->>'artist_id' as artist_id,
+    value->>'artist_slug' as artist_slug,
+    value->>'current_slug' as current_slug,
+    value->>'proposed_slug' as proposed_slug,
+    (value->>'uses_date_fallback')::boolean
+      as uses_date_fallback,
+    value->>'expected_state_fingerprint'
+      as expected_state_fingerprint
+  from jsonb_array_elements(
+    '${escapedCurrent}'::jsonb
+  )
+),
+succeeded_plans as (
+  select
+    grant_row.plan_payload->>'release_id' as release_id,
+    grant_row.plan_payload->>'artist_id' as artist_id,
+    grant_row.plan_payload->>'artist_slug' as artist_slug,
+    grant_row.plan_payload->>'current_slug' as current_slug,
+    grant_row.plan_payload->>'proposed_slug' as proposed_slug,
+    (
+      grant_row.plan_payload->>'uses_date_fallback'
+    )::boolean as uses_date_fallback,
+    grant_row.plan_payload->>'expected_state_fingerprint'
+      as expected_state_fingerprint
+  from platform_private.registry_execution_grants grant_row
+  join platform_private.registry_mutation_operations operation
+    on operation.execution_grant_id=grant_row.id
+  where grant_row.actor_key='mizizi'
+    and grant_row.operation_key='registry.release_slug.canonicalize'
+    and grant_row.operation_version=1
+    and operation.status='succeeded'
+    and operation.verifier_status='passed'
+),
+programme as (
+  select * from succeeded_plans
+  union all
+  select * from current_plans
+),
+payload as (
+  select coalesce(
+    jsonb_agg(
+      jsonb_build_object(
+        'release_id',release_id,
+        'artist_id',artist_id,
+        'artist_slug',artist_slug,
+        'current_slug',current_slug,
+        'proposed_slug',proposed_slug,
+        'uses_date_fallback',uses_date_fallback,
+        'expected_state_fingerprint',
+          expected_state_fingerprint
+      )
+      order by release_id
+    ),
+    '[]'::jsonb
+  ) body
+  from programme
+)
+select
+  jsonb_array_length(body)::int as candidate_count,
+  body::text as candidate_payload
+from payload
+`);
+
+  return candidateSnapshot(row);
 }
 
 const atRestAuthoritySql = `
@@ -576,17 +600,68 @@ async function runAudit(
 async function currentCandidateState(pool) {
   const releaseCurrentResult =
     await pool.query(releaseCandidateSql);
-  const releaseProgrammeResult =
-    await pool.query(releaseProgrammeCandidateSql);
   const chartResult =
     await pool.query(chartCandidateSql);
 
   const releaseCurrent =
     candidateSnapshot(releaseCurrentResult.rows[0]);
-  const releaseProgramme =
-    candidateSnapshot(releaseProgrammeResult.rows[0]);
   const chart =
     candidateSnapshot(chartResult.rows[0]);
+  const releaseJournal =
+    journalSnapshot(APPLY_SCOPES.release_slug);
+
+  if (
+    Number(releaseJournal.verified_operations) !==
+    Number(releaseJournal.canonical_events)
+  ) {
+    throw new Error(
+      "Release slug journal/write-event parity is not exact",
+    );
+  }
+
+  let releaseState = "";
+  let releaseProgramme = null;
+
+  if (
+    Number(releaseJournal.verified_operations) === 0 &&
+    releaseCurrent.candidateCount ===
+      EXPECTED_RELEASE_CANDIDATES &&
+    releaseCurrent.candidateFingerprint ===
+      EXPECTED_RELEASE_CANDIDATE_FINGERPRINT
+  ) {
+    releaseState = "pristine";
+    releaseProgramme = releaseCurrent;
+  } else if (
+    Number(releaseJournal.verified_operations) ===
+      ACCEPTED_RELEASE_PARTIAL_VERIFIED &&
+    releaseCurrent.candidateCount ===
+      ACCEPTED_RELEASE_PARTIAL_REMAINING &&
+    releaseCurrent.candidateFingerprint ===
+      EXPECTED_RELEASE_RESUME_CANDIDATE_FINGERPRINT
+  ) {
+    releaseState = "accepted_partial";
+    releaseProgramme =
+      releaseProgrammeSnapshotFromHistory(
+        releaseCurrentResult.rows[0]
+          ?.candidate_payload,
+      );
+  } else if (
+    Number(releaseJournal.verified_operations) ===
+      EXPECTED_RELEASE_CANDIDATES &&
+    releaseCurrent.candidateCount === 0
+  ) {
+    releaseState = "accepted_final";
+    releaseProgramme =
+      releaseProgrammeSnapshotFromHistory("[]");
+  } else {
+    throw new Error(
+      "Release slug programme state is not a recognized exact boundary: " +
+        JSON.stringify({
+          journal: releaseJournal,
+          current: releaseCurrent,
+        }),
+    );
+  }
 
   assertFields(
     releaseProgramme,
@@ -608,53 +683,6 @@ async function currentCandidateState(pool) {
     "Chart Track-slug candidate freeze",
   );
 
-  const releaseJournal =
-    journalSnapshot(APPLY_SCOPES.release_slug);
-
-  if (
-    Number(releaseJournal.verified_operations) !==
-    Number(releaseJournal.canonical_events)
-  ) {
-    throw new Error(
-      "Release slug journal/write-event parity is not exact",
-    );
-  }
-
-  let releaseState = "";
-
-  if (
-    Number(releaseJournal.verified_operations) === 0 &&
-    releaseCurrent.candidateCount ===
-      EXPECTED_RELEASE_CANDIDATES &&
-    releaseCurrent.candidateFingerprint ===
-      EXPECTED_RELEASE_CANDIDATE_FINGERPRINT
-  ) {
-    releaseState = "pristine";
-  } else if (
-    Number(releaseJournal.verified_operations) ===
-      ACCEPTED_RELEASE_PARTIAL_VERIFIED &&
-    releaseCurrent.candidateCount ===
-      ACCEPTED_RELEASE_PARTIAL_REMAINING &&
-    releaseCurrent.candidateFingerprint ===
-      EXPECTED_RELEASE_RESUME_CANDIDATE_FINGERPRINT
-  ) {
-    releaseState = "accepted_partial";
-  } else if (
-    Number(releaseJournal.verified_operations) ===
-      EXPECTED_RELEASE_CANDIDATES &&
-    releaseCurrent.candidateCount === 0
-  ) {
-    releaseState = "accepted_final";
-  } else {
-    throw new Error(
-      "Release slug programme state is not a recognized exact boundary: " +
-        JSON.stringify({
-          journal: releaseJournal,
-          current: releaseCurrent,
-        }),
-    );
-  }
-
   return {
     releaseProgramme,
     releaseCurrent,
@@ -663,6 +691,7 @@ async function currentCandidateState(pool) {
     chart,
   };
 }
+
 
 function releaseResumeMigrationApplied() {
   const state = queryViaLinkedCli(`
