@@ -2716,6 +2716,15 @@ describe("MIZIZI Slice 3 Tranche B Track duplicate repair exact authority", () =
     expect(migration).toContain(
       "Track duplicate repair exceeded its exact row budget.",
     );
+    expect(migration).toContain(
+      "v_target_fingerprint",
+    );
+    expect(migration).not.toContain(
+      "repeat('0',64)",
+    );
+    expect(migration).not.toMatch(
+      /update\s+platform_private\.registry_execution_grants\s+set\s+target_set_fingerprint/i,
+    );
   });
 
   it("keeps the public product signature while removing direct engine authority", () => {
