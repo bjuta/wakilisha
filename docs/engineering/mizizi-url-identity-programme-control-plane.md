@@ -184,7 +184,9 @@ The run correctly failed closed after preserving every verified success:
 - remaining provider-packaging slug candidates: 6;
 - queued review rows: 0;
 - stale apply outcomes: 6;
-- Release title observations preserved: 737;
+- Release title strings were not mutated; the in-run frozen audit preserved 737
+  title observations, while a fresh post-partial audit reports title packaging
+  only for the six rows whose slugs still carry matching provider packaging;
 - Release operation after stop: disabled;
 - active standing / exact MIZIZI grants after stop: 0 / 0;
 - JIT mapping restored and Production temporary access disabled.
