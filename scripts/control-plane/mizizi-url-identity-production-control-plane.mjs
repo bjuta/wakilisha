@@ -19,6 +19,8 @@ const EXPECTED_MAIN =
   process.env.MIZIZI_EXPECTED_MAIN_SHA || "";
 const TRIGGER_FILE =
   process.env.MIZIZI_TRIGGER_FILE || "";
+const REVIEWED_TRIGGER_FILE =
+  ".github/mizizi-url-identity-production-apply.json";
 const ARTIFACT_DIR =
   process.env.MIZIZI_ARTIFACT_DIR ||
   "artifacts/mizizi-url-identity-production-control-plane";
@@ -902,15 +904,15 @@ function requireUuid(value, label) {
   return text.toLowerCase();
 }
 
-function readApplyTrigger() {
-  if (!EXPECTED_MAIN || !TRIGGER_FILE) {
+function readReviewedTrigger(path) {
+  if (!path || !fs.existsSync(path)) {
     throw new Error(
       "reviewed URL-identity production trigger is missing",
     );
   }
 
   const trigger = JSON.parse(
-    fs.readFileSync(TRIGGER_FILE, "utf8"),
+    fs.readFileSync(path, "utf8"),
   );
 
   if (
@@ -953,6 +955,16 @@ function readApplyTrigger() {
     ),
     scopeConfig: scope,
   };
+}
+
+function readApplyTrigger() {
+  if (!EXPECTED_MAIN || !TRIGGER_FILE) {
+    throw new Error(
+      "reviewed URL-identity production trigger is missing",
+    );
+  }
+
+  return readReviewedTrigger(TRIGGER_FILE);
 }
 
 function assertExactMain() {
@@ -1052,6 +1064,54 @@ select
     },
     "human stewardship authority",
   );
+}
+
+function assertPreflightAuthority() {
+  const state = queryViaLinkedCli(atRestAuthoritySql);
+
+  const zeroAtRest =
+    Number(state.active_standing) === 0 &&
+    Number(state.active_exact) === 0 &&
+    Number(state.unconsumed_exact) === 0 &&
+    Number(state.enabled_operations) === 0;
+
+  if (zeroAtRest) {
+    return {
+      mode: "zero_at_rest",
+      state,
+      trigger: null,
+    };
+  }
+
+  assertFields(
+    state,
+    {
+      active_standing: 1,
+      active_exact: 0,
+      unconsumed_exact: 0,
+      enabled_operations: 1,
+    },
+    "preflight reviewed authority census",
+  );
+
+  const trigger =
+    readReviewedTrigger(REVIEWED_TRIGGER_FILE);
+
+  assertHumanAuthority(trigger);
+
+  return {
+    mode: "reviewed_human_authority",
+    state,
+    trigger: {
+      scope: trigger.scope,
+      capability_grant_id:
+        trigger.capability_grant_id,
+      expected_candidate_count:
+        trigger.expected_candidate_count,
+      expected_candidate_fingerprint:
+        trigger.expected_candidate_fingerprint,
+    },
+  };
 }
 
 function journalSnapshot(scope) {
@@ -1162,7 +1222,22 @@ async function main() {
   linkSupabaseProject(PROJECT_REF);
 
   if (MODE === "preflight") {
-    assertZeroAtRest("preflight entry authority");
+    const preflightAuthority =
+      assertPreflightAuthority();
+
+    fs.writeFileSync(
+      ARTIFACT_DIR + "/entry-authority.json",
+      JSON.stringify(
+        preflightAuthority,
+        null,
+        2,
+      ) + "\n",
+    );
+
+    console.log(
+      "PASS: preflight entry authority = " +
+        preflightAuthority.mode,
+    );
   } else {
     assertHumanAuthority(trigger);
   }
