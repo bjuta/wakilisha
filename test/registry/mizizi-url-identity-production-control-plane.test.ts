@@ -287,6 +287,9 @@ describe("MIZIZI current URL-identity production control plane", () => {
       "chartProgrammeSnapshotFromHistory",
     );
     expect(controlPlane).toContain(
+      "grant_row.plan_payload->>'expected_state_fingerprint'",
+    );
+    expect(controlPlane).toContain(
       '"Chart Track-slug journal/write-event parity is not exact"',
     );
     expect(controlPlane).toContain(
