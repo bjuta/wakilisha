@@ -40,9 +40,11 @@ export default function LyricContribution() {
   const {
     artistSlug,
     trackSlug,
+    trackId,
   } = useParams<{
     artistSlug: string;
     trackSlug: string;
+    trackId?: string;
   }>();
   const location = useLocation();
   const authUser = useAuthUser();
@@ -98,9 +100,11 @@ export default function LyricContribution() {
     }
 
     const requestedRegistryTrackId =
+      trackId ||
       new URLSearchParams(location.search)
         .get("track_id")
-        ?.trim() || "";
+        ?.trim() ||
+      "";
 
     if (requestedRegistryTrackId) {
       setLoading(true);
@@ -212,7 +216,7 @@ export default function LyricContribution() {
     setLoading(true);
     setError(null);
 
-    const request = getTrack(artistSlug, trackSlug);
+    const request = getTrack(artistSlug, trackSlug, trackId);
 
     request
       .then((apiData) => {
@@ -277,6 +281,7 @@ export default function LyricContribution() {
   }, [
     artistSlug,
     trackSlug,
+    trackId,
     location.search,
     currentTrack,
   ]);
@@ -284,6 +289,7 @@ export default function LyricContribution() {
   const canonicalTrackPath = canonicalTrackUrl(
     track?.artistSlug || artistSlug || "",
     track?.slug || trackSlug || "",
+    track?.registryTrackId || trackId,
   );
 
   const isThisTrackPlaying =
