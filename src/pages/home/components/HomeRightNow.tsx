@@ -77,7 +77,7 @@ export function HomeRightNow({ chartEntries, stories, loading }: Props) {
                 {topChart.map((entry, i) => (
                   <Link
                     key={entry.trackSlug || i}
-                    to={trackUrl(entry.trackSlug, entry.artistSlugs)}
+                    to={trackUrl(entry.trackSlug, entry.artistSlugs, entry.canonicalTrackId)}
                     className="group flex items-center gap-4 p-3 rounded-xl transition-all duration-200 hover:bg-[var(--wk-surface)] cursor-pointer border border-transparent hover:border-[var(--wk-border)]"
                   >
                     {/* Rank */}
