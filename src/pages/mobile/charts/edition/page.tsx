@@ -126,7 +126,7 @@ function MoverCard({ entry, direction }: { entry: ChartEntryRowViewModel; direct
   const isUp = direction === "up";
   return (
     <Link
-      to={trackUrl(entry.slug, entry.artistSlugs)}
+      to={trackUrl(entry.slug, entry.artistSlugs, entry.registryTrackId)}
       className="flex flex-col overflow-hidden rounded-2xl border border-[var(--wk-border)] bg-[var(--wk-surface)] active:scale-[0.98] transition-transform"
     >
       {/* Artwork header */}
@@ -630,7 +630,7 @@ export default function MobileChartEdition() {
             return (
               <Link
                 key={entry.rank}
-                to={trackUrl(entry.slug, entry.artistSlugs)}
+                to={trackUrl(entry.slug, entry.artistSlugs, entry.registryTrackId)}
                 className="group flex items-center gap-3.5 overflow-hidden rounded-2xl border border-[var(--wk-border)] bg-[var(--wk-surface)] active:scale-[0.98] active:bg-[var(--wk-surface-raised)] transition-all"
               >
                 {/* Artwork */}
