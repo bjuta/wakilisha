@@ -62,33 +62,80 @@ The behavior fixture did not contain or mutate a Registry entity.
 
 ## Production deployment provenance
 
-Immediately after merge, an independent ledger check still showed Production at
-170 migrations with the candidate absent.
+The Production migration was promoted through the repository's canonical
+exact-main path.
 
-A disposable exact-main promotion launcher was then prepared. Before its
-canonical promotion step could run, its pinned Supabase CLI
-`db push --dry-run --linked` reported:
+After PR #1015 merged as
+`723c7054abe5a50cc807ed791804e41e77d1880b`, a disposable promotion
+launcher was created on
+`ops/tmp-promote-url-identity-1015`.
 
-`Remote database is up to date.`
+An immediate commit-scoped workflow lookup returned no run, so a second
+PR-triggered launcher was created. That interpretation was wrong: the original
+push-triggered run had been delayed in GitHub's enqueue path and materialized
+afterward.
 
-An independent Production ledger read then showed the exact canonical candidate
-version present at the head.
+The authoritative first launcher was:
 
-Therefore:
+- workflow run: `35748027416`
+- job: `106814564828`
+- trigger: push
+- launcher head:
+  `380dad3b8544963226c3677b7d5b93b492702822`
 
-- the disposable launcher **did not apply** the migration;
-- the canonical promotion step in that launcher was skipped;
-- the exact external/native apply actor or process is not observable through the
-  available GitHub/Supabase connector metadata;
-- no repository workflow contains an automatic `supabase db push` path;
-- the live ledger version and name exactly match the repository migration.
+That job:
 
-Per the stopped-deployment rule, the already-completed Production mutation was
-not replayed merely to manufacture a cleaner deployment log. Closure resumed
-with read-only live-state verification.
+1. switched itself to exact protected `main`;
+2. proved
+   `HEAD = origin/main = 723c7054abe5a50cc807ed791804e41e77d1880b`;
+3. linked exact Production
+   `pgzizndxdyhqmtyywjmt`;
+4. proved exactly one pending migration:
+   `20260922143000_mizizi_url_identity_authority_window_close_v1.sql`;
+5. invoked
+   `bash scripts/control-plane/promote-repository-migrations.sh`;
+6. the canonical script ran its own parity and native dry-run gates;
+7. native `supabase db push --linked` applied the migration at
+   `2026-09-22T15:33:16Z`;
+8. the script verified zero pending migrations and emitted
+   `REPOSITORY_MIGRATION_PROMOTION_PASS`.
 
-This provenance gap must remain recorded; it is not rewritten as a successful
-canonical-script promotion.
+Production Postgres logs independently corroborate the same apply:
+
+- session:
+  `6ab29fbb.293800`;
+- database user:
+  `cli_login_postgres`;
+- application:
+  `Supavisor`;
+- exact reducer DDL began at
+  `2026-09-22T15:33:16Z`;
+- revoke/grant hardening completed by
+  `2026-09-22T15:33:17Z`.
+
+The second launcher, workflow run `35748103516`, started later. Its native
+dry-run reported `Remote database is up to date` because the first launcher
+had already completed the canonical promotion. It failed its exact pending-set
+guard and did not mutate Production.
+
+A subsequent read-only forensic audit also proved:
+
+- no Supabase GitHub Integration connection was attached to the Production
+  project through the queried Management API surface;
+- no Supabase Production action run existed in the 15:20-15:45 UTC window;
+- the merge-commit Critical workflow was running anonymous RLS tests at the
+  exact apply time and had not reached its linked Supabase CLI drift checks;
+- pinned Supabase CLI `v2.107.0` source confirms `supabase link` does not
+  apply repository migration files.
+
+Therefore the Production apply provenance is fully attributed: **the first
+exact-main disposable launcher executed the repository's canonical promotion
+script successfully**. There was no external or unexplained migration writer.
+
+The incident was orchestration ambiguity, not migration-authority drift. Its
+preventive control is now a permanent serialized Production-promotion workflow,
+with one manual dispatch, an exact main SHA, an exact reviewed pending set, and
+the same canonical script.
 
 ## Production SQL acceptance
 

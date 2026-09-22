@@ -22,6 +22,21 @@ bash scripts/control-plane/promote-repository-migrations.sh
 
 That script requires exact merged `main`, runs the native Supabase dry-run, applies the repository migration files with `supabase db push --linked`, and verifies zero pending migrations afterward.
 
+For CI-hosted promotion, the only standing launcher is
+`.github/workflows/repository-migration-production-promotion.yml`. It is
+`workflow_dispatch` only and must remain serialized under
+`repository-migration-production-promotion`. A dispatch is valid only when it
+binds:
+
+- the exact current protected-main SHA; and
+- the exact canonical migration filenames expected to be pending.
+
+Do not synthesize disposable promotion workflows merely because a newly
+triggered run is not immediately visible. GitHub Actions enqueue visibility is
+eventually consistent. Reconcile repository-wide runs before any retry or
+alternate trigger. There must never be two live promotion launchers for the
+same pending migration set.
+
 Do not use connector or API helpers that create a new migration record from raw SQL for a migration that already exists in `supabase/migrations`. In particular, repository migrations must not be promoted with a connector `apply_migration` action, because that path may assign a generated migration version instead of the filename's canonical version.
 
 The migration ledger version in production must therefore be the numeric prefix of the exact repository filename. Ledger rewriting is an incident-repair action, not a normal promotion step.
