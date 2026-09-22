@@ -1,0 +1,122 @@
+name: Temporary MIZIZI Release Resume Preview Proof
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+    paths:
+      - ".github/workflows/tmp-mizizi-release-resume-preview-proof.yml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: mizizi-production-jit-control-plane
+  queue: max
+
+jobs:
+  preview-proof:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - run: npm ci --prefer-offline --no-audit --no-fund
+
+      - name: Prove monotonic Release fallback through real mizizi_executor
+        run: |
+          set -euo pipefail
+          node --input-type=module <<'NODE'
+          import {
+            openMiziziJitSession,
+          } from "./scripts/control-plane/mizizi-production-jit-runtime.mjs";
+
+          const jit = await openMiziziJitSession({
+            projectRef: "ltcwajcrqdbefhulzibv",
+            managementProjectRef: "pgzizndxdyhqmtyywjmt",
+            token: process.env.SUPABASE_ACCESS_TOKEN,
+          });
+
+          try {
+            const identity = await jit.pool.query(
+              "select session_user,current_user"
+            );
+
+            const current = identity.rows[0];
+
+            if (
+              current.session_user !== "mizizi_executor" ||
+              current.current_user !== "mizizi_executor"
+            ) {
+              throw new Error(
+                "Preview JIT identity is not mizizi_executor: " +
+                  JSON.stringify(current)
+              );
+            }
+
+            const resumed = await jit.pool.query(
+              `
+              select
+                release_id::text,
+                proposed_slug,
+                uses_date_fallback
+              from mizizi_private.release_slug_plan_v1(
+                '33333333-3333-4333-8333-333333333333'::uuid
+              )
+              `
+            );
+
+            const control = await jit.pool.query(
+              `
+              select
+                release_id::text,
+                proposed_slug,
+                uses_date_fallback
+              from mizizi_private.release_slug_plan_v1(
+                '88888888-8888-4888-8888-888888888888'::uuid
+              )
+              `
+            );
+
+            const resumePlan = resumed.rows[0];
+            const controlPlan = control.rows[0];
+
+            if (
+              resumePlan?.proposed_slug !==
+                "wk-resume-kesho-2026-02-02" ||
+              resumePlan?.uses_date_fallback !== true
+            ) {
+              throw new Error(
+                "Provenance-backed resume plan is not monotonic: " +
+                  JSON.stringify(resumePlan)
+              );
+            }
+
+            if (
+              controlPlan?.proposed_slug !== "wk-resume-control" ||
+              controlPlan?.uses_date_fallback !== false
+            ) {
+              throw new Error(
+                "Unproven date-looking sibling gained authority: " +
+                  JSON.stringify(controlPlan)
+              );
+            }
+
+            console.log("MIZIZI_RELEASE_RESUME_PREVIEW_PASS");
+            console.log(JSON.stringify({
+              identity: current,
+              resume_plan: resumePlan,
+              negative_control: controlPlan,
+            }));
+          } finally {
+            await jit.restore();
+          }
+          NODE
