@@ -43,7 +43,7 @@ const EXPECTED_CHART_CANDIDATE_FINGERPRINT =
 
 const EXPECTED_BLOBS = {
   "scripts/registry/agents/mizizi/run.ts":
-    "81410c1330869565065c8026f2ddc57a8e29ded0",
+    "3f6870d1605786786d78643efd0d97dc54d2d47e",
   "scripts/registry/agents/mizizi/core.ts":
     "c8ab1436437175cd1d7d1c451299ae2b199bc327",
   "supabase/migrations/20260918173446_mizizi_stage_b_broker_convergence_v1.sql":
@@ -328,6 +328,7 @@ select
 from eligible
 cross join lateral
   mizizi_private.release_slug_plan_v1(eligible.id) plan
+order by plan.release_id
 `;
 
 const releaseCandidateSql = `
@@ -431,6 +432,188 @@ function candidateSnapshot(row) {
     candidateCount: Number(row?.candidate_count || 0),
     candidateFingerprint: sha256(payload),
   };
+}
+
+async function executeReleaseResumePlans(pool) {
+  const frozen = await pool.query(releaseCandidateRowsSql);
+
+  if (
+    frozen.rowCount !==
+    ACCEPTED_RELEASE_PARTIAL_REMAINING
+  ) {
+    throw new Error(
+      "Release resume exact target count drifted: " +
+        frozen.rowCount,
+    );
+  }
+
+  const receipts = [];
+
+  for (const row of frozen.rows) {
+    const releaseId =
+      String(row.release_id || "");
+    const frozenPlan = {
+      release_id: releaseId,
+      artist_id: String(row.artist_id || ""),
+      artist_slug: String(row.artist_slug || ""),
+      current_slug: String(row.current_slug || ""),
+      proposed_slug: String(row.proposed_slug || ""),
+      uses_date_fallback:
+        Boolean(row.uses_date_fallback),
+      expected_state_fingerprint:
+        String(
+          row.expected_state_fingerprint || "",
+        ),
+    };
+
+    if (
+      !releaseId ||
+      !frozenPlan.artist_id ||
+      !frozenPlan.current_slug ||
+      !frozenPlan.proposed_slug ||
+      !frozenPlan.expected_state_fingerprint
+    ) {
+      throw new Error(
+        "Release resume plan is incomplete: " +
+          JSON.stringify(frozenPlan),
+      );
+    }
+
+    const current = await pool.query(
+      `
+      select
+        release_id::text,
+        artist_id::text,
+        artist_slug,
+        current_slug,
+        proposed_slug,
+        uses_date_fallback,
+        expected_state_fingerprint
+      from mizizi_private.release_slug_plan_v1(
+        $1::uuid
+      )
+      `,
+      [releaseId],
+    );
+
+    if (current.rowCount !== 1) {
+      throw new Error(
+        "Release resume plan disappeared for " +
+          releaseId,
+      );
+    }
+
+    assertFields(
+      current.rows[0],
+      frozenPlan,
+      "Release resume plan " + releaseId,
+    );
+
+    const idempotencyKey =
+      "mizizi:release_slug_provider_packaging:resume:" +
+      sha256(JSON.stringify(frozenPlan));
+
+    const grantResult = await pool.query(
+      `
+      select *
+      from mizizi_private.issue_stewardship_execution_grant_v1(
+        $1::text,
+        $2::text,
+        $3::text
+      )
+      `,
+      [
+        APPLY_SCOPES.release_slug.operationKey,
+        releaseId,
+        idempotencyKey,
+      ],
+    );
+
+    const executionGrantId =
+      String(
+        grantResult.rows[0]?.execution_grant_id || "",
+      );
+
+    if (
+      grantResult.rowCount !== 1 ||
+      !executionGrantId
+    ) {
+      throw new Error(
+        "Release resume exact execution grant was not issued for " +
+          releaseId,
+      );
+    }
+
+    const executionResult = await pool.query(
+      `
+      select *
+      from mizizi_private.execute_stewardship_operation_v1(
+        $1::uuid
+      )
+      `,
+      [executionGrantId],
+    );
+
+    const operationId =
+      String(
+        executionResult.rows[0]?.operation_id || "",
+      );
+
+    if (
+      executionResult.rowCount !== 1 ||
+      executionResult.rows[0]?.operation_status !==
+        "succeeded" ||
+      !operationId
+    ) {
+      throw new Error(
+        "Release resume typed operation did not succeed for " +
+          releaseId,
+      );
+    }
+
+    const verificationResult = await pool.query(
+      `
+      select *
+      from mizizi_private.verify_stewardship_operation_v1(
+        $1::uuid
+      )
+      `,
+      [operationId],
+    );
+
+    if (
+      verificationResult.rowCount !== 1 ||
+      verificationResult.rows[0]?.verifier_status !==
+        "passed"
+    ) {
+      throw new Error(
+        "Release resume verifier did not pass for " +
+          releaseId,
+      );
+    }
+
+    receipts.push({
+      release_id: releaseId,
+      execution_grant_id: executionGrantId,
+      operation_id: operationId,
+      verifier_status: "passed",
+    });
+  }
+
+  fs.writeFileSync(
+    ARTIFACT_DIR + "/apply.txt",
+    JSON.stringify(
+      {
+        mode: "accepted_partial_release_resume",
+        count: receipts.length,
+        receipts,
+      },
+      null,
+      2,
+    ) + "\n",
+  );
+
+  return receipts;
 }
 
 function releaseProgrammeSnapshotFromHistory(
@@ -1130,19 +1313,29 @@ async function main() {
     );
 
     try {
-      await streamCommand(
-        "npm",
-        [
-          "run",
-          "registry:mizizi:apply",
-          "--",
-          "--entity=" + scope.entity,
-          "--limit=0",
-          "--confirm=MIZIZI_APPLY",
-        ],
-        { DATABASE_URL: jit.url },
-        ARTIFACT_DIR + "/apply.txt",
-      );
+      if (
+        scope.entity === "release" &&
+        candidates.releaseState ===
+          "accepted_partial"
+      ) {
+        await executeReleaseResumePlans(
+          jit.pool,
+        );
+      } else {
+        await streamCommand(
+          "npm",
+          [
+            "run",
+            "registry:mizizi:apply",
+            "--",
+            "--entity=" + scope.entity,
+            "--limit=0",
+            "--confirm=MIZIZI_APPLY",
+          ],
+          { DATABASE_URL: jit.url },
+          ARTIFACT_DIR + "/apply.txt",
+        );
+      }
     } catch (error) {
       primaryError = error;
     }
