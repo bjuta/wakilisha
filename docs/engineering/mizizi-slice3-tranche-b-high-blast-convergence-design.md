@@ -311,8 +311,7 @@ Independent verification must prove:
 
 ## Operation naming and primitive discipline
 
-The implementation may add domain-specific typed operations, capabilities, and
-System Actors for decouple and safe merge if the existing namespace is free.
+The implementation uses two domain-specific typed operations, capabilities, and System Actors because the existing namespaces are free and the two mutation semantics are genuinely different.
 
 Those are not new generic primitives. They are typed policy records describing
 two genuinely different high-blast operations on top of the existing shared
@@ -434,3 +433,89 @@ Unless direct evidence proves otherwise:
 - PR needed now: **Draft only for the one coherent remaining Tranche B job**
 - Preview needed now: **Not until the complete candidate exists**
 - Production mutation authorized now: **No**
+
+
+## Frozen operation envelopes
+
+Production sizing evidence at design time:
+
+```text
+max current Track credits for one Artist = 327
+max current Release credits for one Artist = 69
+max current Chart rows for one Artist = 54
+max combined current projection rows = 415
+p99 combined current projection rows = 108.74
+```
+
+Historical accepted safe merge already moved 36 Track credits and 17 Release
+credits in one operation.
+
+The typed outer envelopes are therefore frozen as:
+
+### Artist decouple
+
+- operation: `registry.artist.decouple/v1`;
+- capability: `decouple_registry_artist`;
+- actor: `registry_artist_decouple_admin`;
+- risk: **critical**;
+- exact Artist targets: source plus at most eight replacements, maximum **9**;
+- outer row ceiling: **4096**;
+- grant TTL: **300 seconds**;
+- human approval: **required**;
+- verifier: **required**.
+
+The 4096 ceiling is not the normal budget. Evidence must compute a
+candidate-specific exact row budget from the frozen decision/credit/projection
+scope. The outer ceiling only prevents an unexpectedly explosive split.
+
+### Safe Artist merge
+
+- operation: `registry.artist.merge/v1`;
+- capability: `merge_registry_artist`;
+- actor: `registry_artist_merge_admin`;
+- risk: **critical**;
+- exact Artist targets: source + canonical, maximum **2**;
+- outer row ceiling: **1024**;
+- grant TTL: **300 seconds**;
+- human approval: **required**;
+- verifier: **required**.
+
+Evidence must compute the exact candidate budget from source/canonical alias,
+credit, Chart, Track metadata, Artist lifecycle, resolution-event, and journal
+scope.
+
+## Old manual Artist merge retirement proof
+
+Production read-only proof at design time found:
+
+- no current `src/` caller;
+- no current database-function/procedure caller;
+- no view reference;
+- no trigger reference;
+- PostgreSQL function traffic counters unavailable because
+  `track_functions=none`.
+
+The old function body SHA-256 remains:
+
+`880f3fe1419b4ed9676ee0cbc14ca4b6193f0ef52475d25117df6a2325a151bd`.
+
+The old algorithm is materially inferior to the accepted safe-merge algorithm
+for historical integrity because it deletes duplicate Track/Release credit rows
+instead of archiving them and does not own the accepted
+`registry_artist_resolution_events action='artist_merge'` event contract.
+
+The forward candidate therefore retires the executable public function and
+preserves rollback source in retained migration history. The permanent
+consolidated verifier requires the old regprocedure to be absent.
+
+## Shared review composition
+
+The accepted kernel's
+`registry_execution_grant_target_review_seal` trigger creates/links one shared
+review case per exact target and records the approving human issuer against the
+immutable evidence/grant.
+
+Artist decouple therefore retains its domain-specific
+`registry_artist_decouple_decisions` row as the product decision while the
+shared kernel seals exact execution approval for source/replacement Artist
+targets. This is composition, not a second review system.
