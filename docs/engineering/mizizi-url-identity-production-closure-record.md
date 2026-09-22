@@ -287,3 +287,110 @@ branch inventory returned to **Production/main only**.
 No Registry cleanup mutation was executed by this promotion. A separate,
 freshly reviewed human approval and trigger is still required for the exact
 six-row resume.
+
+
+## Final Release-slug resume acceptance
+
+The six-row forward resume is Production accepted.
+
+Human approval:
+
+- grant:
+  `833e42c4-44ae-46f8-8014-3a38aef6235d`;
+- approved main:
+  `84e26cd90dff9d839b62138db8e336cf698d86ef`;
+- approved resume fingerprint:
+  `2be28e013ce904e2a05f5d3c368304684c08a6ad7eadfe23a99c57162d0091b2`;
+- original 737-programme fingerprint:
+  `b96da159df4ffa8b19a5bb39574995a6b25cac2552823ef24af8f737fb1278be`.
+
+Protected trigger review:
+
+- PR: **#1030**;
+- changed files: **1**;
+- changed lines: **1 addition / 1 deletion**;
+- URL-identity PR preflight:
+  `35769222291`: **PASS**;
+- preflight authority mode:
+  `reviewed_human_authority`;
+- preflight Release programme state:
+  `accepted_partial`;
+- preflight Registry mutation: **NO**;
+- Critical:
+  `35769222206`: **PASS**.
+
+Merged trigger authority:
+
+`605d08052b12478b75151c8d41ab6c29e5c6b9dd`
+
+Authoritative Production apply:
+
+- workflow:
+  `MIZIZI URL Identity Production Control Plane`;
+- run:
+  `35769680464`;
+- event:
+  `push`;
+- exact head:
+  `605d08052b12478b75151c8d41ab6c29e5c6b9dd`;
+- result:
+  **PASS**;
+- evidence artifact:
+  `mizizi-url-identity-production-control-plane-35769680464`;
+- artifact id:
+  `10713493272`;
+- artifact SHA-256:
+  `3219105d22c025e4929c71fbfba9f7fe1b410abf09feb7afbc9faeb4a555d8d8`.
+
+The control plane executed exactly six one-row Release operations. Independent
+Production inspection proves every descended exact grant was consumed, every
+operation succeeded with `affected_rows = 1`, every verifier passed, and the
+final stored slug equals the frozen planned slug.
+
+Final six slugs:
+
+- `nilotic-ep` -> `nilotic-2022-04-01`;
+- `wameyo-single` -> `wameyo-2025-10-10`;
+- `maybe-single` -> `maybe-2022-09-23`;
+- `kesho-ep` -> `kesho-2023-10-27`;
+- `catch-a-vibe-ep` -> `catch-a-vibe-2021-03-26`;
+- `son-of-the-city-ep` -> `son-of-the-city-2020-11-22`.
+
+All six matching canonical write events are
+`canonicalize_release_slug / succeeded / system:mizizi`.
+The Release title strings remain unchanged.
+
+Final Release programme ledger:
+
+- verified operations: **737**;
+- canonical write events: **737**;
+- remaining deterministic Release-slug candidates: **0**;
+- fresh post-apply Release audit findings: **0**.
+
+Authority closure:
+
+- Release operation enabled: **false**;
+- final human grant status: **expired**;
+- active MIZIZI standing grants: **0**;
+- active exact grants: **0**;
+- JIT mapping restored;
+- Production temporary access disabled at rest.
+
+Permanent verifier after the final apply:
+
+`MIZIZI_RELEASE_SLUG_RESUME_INTEGRITY_PASS`
+
+Push Critical run `35769680551`: **PASS** through replay, browser
+acceptance, security/RLS, live schema drift and application build.
+
+### Parent programme remains open
+
+This closes the Release-slug mutation family only. Current Production still
+contains:
+
+- **66** open Track `mizizi_data_hygiene` review items; and
+- **161** derived Chart Track-slug drifts.
+
+Issue #1013 therefore remains open for those two boundaries. Release-slug
+authority must remain closed unless new evidence creates a new separately
+reviewed programme.
