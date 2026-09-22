@@ -1,0 +1,112 @@
+name: Temporary Close MIZIZI Release Approval Window
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+    paths:
+      - ".github/workflows/tmp-close-mizizi-release-approval.yml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: mizizi-production-jit-control-plane
+  queue: max
+
+jobs:
+  close-window:
+    name: close-release-authority-window
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      SUPABASE_PROJECT_REF: pgzizndxdyhqmtyywjmt
+      SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+
+    steps:
+      - name: Check out exact protected main
+        uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+
+      - name: Use Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: Install dependencies
+        run: npm ci --prefer-offline --no-audit --no-fund
+
+      - name: Close mis-sequenced Release approval through real JIT executor
+        run: |
+          set -euo pipefail
+
+          test "$(git rev-parse HEAD)" = "9a6cd5342fb829179a943bc2539c52188dd46b58"
+
+          node --input-type=module <<'NODE'
+          import { openMiziziJitSession } from "./scripts/control-plane/mizizi-production-jit-runtime.mjs";
+
+          const projectRef = "pgzizndxdyhqmtyywjmt";
+          const token = process.env.SUPABASE_ACCESS_TOKEN;
+          const operationKey = "registry.release_slug.canonicalize";
+          const grantId = "15e1e4b3-f99a-4075-b3c2-14a927f14e2b";
+
+          const jit = await openMiziziJitSession({ projectRef, token });
+
+          try {
+            const identity = await jit.pool.query(
+              "select session_user,current_user"
+            );
+
+            const i = identity.rows[0];
+
+            if (
+              i.session_user !== "mizizi_executor" ||
+              i.current_user !== "mizizi_executor"
+            ) {
+              throw new Error(
+                "real JIT session is not mizizi_executor: " +
+                  JSON.stringify(i)
+              );
+            }
+
+            const result = await jit.pool.query(
+              `
+              select *
+              from mizizi_private.close_stewardship_authority_window_v1(
+                $1::text,
+                $2::uuid,
+                $3::text
+              )
+              `,
+              [
+                operationKey,
+                grantId,
+                "#1013 close mis-sequenced Release approval before reviewed trigger PR",
+              ],
+            );
+
+            if (result.rowCount !== 1) {
+              throw new Error(
+                "authority reducer did not return exactly one receipt"
+              );
+            }
+
+            const receipt = result.rows[0];
+
+            if (
+              receipt.operation_was_enabled !== true ||
+              receipt.standing_grant_status !== "expired"
+            ) {
+              throw new Error(
+                "authority reducer receipt is not exact: " +
+                  JSON.stringify(receipt)
+              );
+            }
+
+            console.log("MIZIZI_RELEASE_APPROVAL_WINDOW_CLOSE=PASS");
+            console.log(JSON.stringify({ identity: i, receipt }));
+          } finally {
+            await jit.restore();
+          }
+          NODE
