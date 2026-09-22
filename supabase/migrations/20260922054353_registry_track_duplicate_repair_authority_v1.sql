@@ -522,6 +522,7 @@ declare
   v_target_ids uuid[];
   v_target_id uuid;
   v_target_state text;
+  v_target_fingerprint text;
   v_preview jsonb;
   v_plan jsonb;
   v_plan_fingerprint text;
@@ -637,6 +638,44 @@ begin
 
   v_plan_fingerprint:=platform_private.registry_plan_fingerprint(v_plan);
 
+  select encode(
+           extensions.digest(
+             coalesce(
+               jsonb_agg(
+                 jsonb_build_object(
+                   'subject_type','track',
+                   'subject_id',target_id::text,
+                   'expected_state_fingerprint',
+                     platform_private.registry_subject_state_fingerprint(
+                       'track',
+                       target_id
+                     )
+                 )
+                 order by target_id::text
+               ),
+               '[]'::jsonb
+             )::text,
+             'sha256'
+           ),
+           'hex'
+         )
+  into v_target_fingerprint
+  from unnest(v_target_ids) target_id;
+
+  if v_target_fingerprint is null
+     or exists (
+       select 1
+       from unnest(v_target_ids) target_id
+       where platform_private.registry_subject_state_fingerprint(
+               'track',
+               target_id
+             ) is null
+     )
+  then
+    raise exception using errcode='P0002',
+      message='Exact Track duplicate repair target fingerprint is unavailable.';
+  end if;
+
   v_idempotency_key:=
     'registry-track-duplicate-repair:'||v_evidence.assertion_fingerprint;
 
@@ -651,6 +690,7 @@ begin
   if found then
     if v_existing.issued_by_user_id<>v_user_id
        or v_existing.plan_fingerprint<>v_plan_fingerprint
+       or v_existing.target_set_fingerprint<>v_target_fingerprint
        or v_existing.required_user_capability_key<>'manage_registry'
     then
       raise exception using errcode='23505',
@@ -687,7 +727,7 @@ begin
     1,
     v_plan,
     v_plan_fingerprint,
-    repeat('0',64),
+    v_target_fingerprint,
     (v_claim->>'expected_row_budget')::integer,
     v_idempotency_key,
     'active',
@@ -726,12 +766,6 @@ begin
       v_target_state
     );
   end loop;
-
-  update platform_private.registry_execution_grants
-  set target_set_fingerprint=
-        platform_private.registry_execution_target_set_fingerprint(v_grant_id),
-      updated_at=now()
-  where id=v_grant_id;
 
   return v_grant_id;
 end
