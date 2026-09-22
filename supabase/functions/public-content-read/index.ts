@@ -102,10 +102,12 @@ async function findTrackByScopedPublicSlug(
   supabase: ReturnType<typeof createClient>,
   artistSlugRaw: string | null,
   publicSlugRaw: string,
-): Promise<any | null> {
+): Promise<{ track: any | null; matchCount: number }> {
   const artistSlug = slugify(String(artistSlugRaw || ""));
   const publicSlug = slugify(String(publicSlugRaw || ""));
-  if (!artistSlug || !publicSlug) return null;
+  if (!artistSlug || !publicSlug) {
+    return { track: null, matchCount: 0 };
+  }
 
   const { data: links } = await supabase
     .from("registry_track_artists")
@@ -117,7 +119,9 @@ async function findTrackByScopedPublicSlug(
     .limit(500);
 
   const trackIds = [...new Set((links ?? []).map((row: any) => String(row.track_id)).filter(Boolean))];
-  if (trackIds.length === 0) return null;
+  if (trackIds.length === 0) {
+    return { track: null, matchCount: 0 };
+  }
 
   const { data: tracks } = await supabase
     .from("registry_tracks")
@@ -131,14 +135,11 @@ async function findTrackByScopedPublicSlug(
     return registrySlug === publicSlug || publicTrackSlug === publicSlug;
   });
 
-  return matches.sort((a: any, b: any) => {
-    const aClean = cleanPublicMusicSlug(a.slug, a.title, artistSlug) === publicSlug ? 0 : 1;
-    const bClean = cleanPublicMusicSlug(b.slug, b.title, artistSlug) === publicSlug ? 0 : 1;
-    if (aClean !== bClean) return aClean - bClean;
+  if (matches.length !== 1) {
+    return { track: null, matchCount: matches.length };
+  }
 
-    const statusRank = (status: string) => status === "active" ? 0 : status === "needs_review" ? 1 : 2;
-    return statusRank(String(a.status || "")) - statusRank(String(b.status || ""));
-  })[0] ?? null;
+  return { track: matches[0], matchCount: 1 };
 }
 
 async function findReleaseByScopedPublicSlug(
