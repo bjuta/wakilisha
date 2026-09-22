@@ -142,6 +142,106 @@ describe("MIZIZI current URL-identity production control plane", () => {
     );
   });
 
+  it("seals exact Release slug partial-stop resume integrity", () => {
+    const workflow = readFileSync(
+      ".github/workflows/mizizi-url-identity-production-control-plane.yml",
+      "utf8",
+    );
+    const migration = readFileSync(
+      "supabase/migrations/20260922171632_mizizi_release_slug_resume_integrity_v1.sql",
+      "utf8",
+    );
+    const verifier = readFileSync(
+      "scripts/control-plane/verify-mizizi-release-slug-resume-integrity.sql",
+      "utf8",
+    );
+    const runner = readFileSync(
+      "scripts/registry/agents/mizizi/run.ts",
+      "utf8",
+    );
+    const controlPlane = readFileSync(
+      "scripts/control-plane/mizizi-url-identity-production-control-plane.mjs",
+      "utf8",
+    );
+
+    expect(workflow).toContain(
+      "20260922171632_mizizi_release_slug_resume_integrity_v1.sql",
+    );
+    expect(workflow).toContain(
+      "verify-mizizi-release-slug-resume-integrity.sql",
+    );
+
+    expect(migration).toContain(
+      "v_prior_mizizi_date_fallback",
+    );
+    expect(migration).toContain(
+      "registry_canonical_write_events",
+    );
+    expect(migration).toContain(
+      "event.action='canonicalize_release_slug'",
+    );
+    expect(migration).toContain(
+      "event.status='succeeded'",
+    );
+    expect(migration).toContain(
+      "event.actor='system:mizizi'",
+    );
+    expect(migration).toContain(
+      "event.source_table='mizizi_private.release_slug_plan_v1'",
+    );
+    expect(migration).toContain(
+      "event.before_value->>'value'",
+    );
+    expect(migration).toContain(
+      "event.after_value->>'value'=other.slug",
+    );
+    expect(migration).not.toMatch(
+      /set\s+enabled\s*=\s*true/i,
+    );
+    expect(migration).not.toMatch(
+      /set\s+status\s*=\s*'active'/i,
+    );
+
+    expect(verifier).toContain(
+      "MIZIZI_RELEASE_SLUG_RESUME_INTEGRITY_PASS",
+    );
+    expect(verifier).toContain(
+      "Active MIZIZI standing authority exists at rest",
+    );
+    expect(verifier).toContain(
+      "MIZIZI Release slug operation is enabled at rest",
+    );
+
+    expect(runner).toContain(
+      "cross join lateral\n        mizizi_private.release_slug_plan_v1",
+    );
+    expect(runner).not.toContain(
+      "candidate_count = 1\n           and not existing_clean_conflict",
+    );
+
+    expect(controlPlane).toContain(
+      "ACCEPTED_RELEASE_PARTIAL_VERIFIED = 731",
+    );
+    expect(controlPlane).toContain(
+      "ACCEPTED_RELEASE_PARTIAL_REMAINING = 6",
+    );
+    expect(controlPlane).toContain(
+      "2be28e013ce904e2a05f5d3c368304684c08a6ad7eadfe23a99c57162d0091b2",
+    );
+    expect(controlPlane).toContain(
+      "releaseProgrammeCandidateSql",
+    );
+    expect(controlPlane).toContain(
+      '"accepted_partial"',
+    );
+    expect(controlPlane).toContain(
+      "expectedApplyCount",
+    );
+    expect(controlPlane).toContain(
+      "Resume migration: pending Production promotion",
+    );
+  });
+
   it("keeps blocked Track, Release title and Chart Artist findings non-mutating", () => {
     const controlPlane = readFileSync(
       "scripts/control-plane/mizizi-url-identity-production-control-plane.mjs",
