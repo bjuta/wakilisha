@@ -58,6 +58,19 @@ begin
     raise exception 'STOP: manage_registry capability authority is missing';
   end if;
 
+  if (
+    select encode(extensions.digest(p.prosrc,'sha256'),'hex')
+    from pg_proc p
+    join pg_namespace n on n.oid=p.pronamespace
+    where n.nspname='public'
+      and p.proname='admin_apply_registry_track_duplicate_repair'
+      and pg_get_function_identity_arguments(p.oid)=
+          'p_canonical_track_id uuid, p_duplicate_track_ids uuid[], p_note text, p_allow_medium_confidence boolean'
+  )<>'ff7ec6d997671e5f27ed2056149e56e4c913284f911e0eb943532f750e39c0e7'
+  then
+    raise exception 'STOP: mature Track duplicate repair engine body drifted before internalization';
+  end if;
+
   if exists (
        select 1
        from public.capability_definitions capability
@@ -1547,6 +1560,19 @@ begin
      or position('wk_chart_entries_v2' in v_engine)=0
   then
     raise exception 'Mature Registry Track duplicate repair engine contract was not preserved';
+  end if;
+
+  if (
+    select encode(extensions.digest(p.prosrc,'sha256'),'hex')
+    from pg_proc p
+    join pg_namespace n on n.oid=p.pronamespace
+    where n.nspname='platform_private'
+      and p.proname='apply_registry_track_duplicate_repair_engine_v1'
+      and pg_get_function_identity_arguments(p.oid)=
+          'p_canonical_track_id uuid, p_duplicate_track_ids uuid[], p_note text, p_allow_medium_confidence boolean'
+  )<>'ff7ec6d997671e5f27ed2056149e56e4c913284f911e0eb943532f750e39c0e7'
+  then
+    raise exception 'Mature Registry Track duplicate repair engine body hash changed during internalization';
   end if;
 
   if exists (
