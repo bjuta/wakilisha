@@ -7,10 +7,8 @@
   "migrationCount": 169,
   "latestMigration": "20260922054353_registry_track_duplicate_repair_authority_v1.sql",
   "schemaSeal": {
-    "mode": "preview",
-    "sourceProjectRef": "brtthfzdznfsgzrrlqdv",
-    "migrationHead": "20260922054353",
-    "baseMainSha": "8b3ac9fad3f804001c1612b2ff66cb6511c675c4",
-    "previewBranchId": "0b7a1052-ae96-41af-8d88-f2ee77e90959"
+    "mode": "production",
+    "sourceProjectRef": "pgzizndxdyhqmtyywjmt",
+    "migrationHead": "20260922054353"
   }
 }
