@@ -778,10 +778,35 @@ async function loadReleaseSlugPlan(
   const result =
     await pool.query(
       `
-      with eligible as materialized (
-        select r.id
+      with packaged as (
+        select
+          r.id::text as release_id,
+          r.slug as current_slug,
+          r.release_date,
+          regexp_replace(
+            r.slug,
+            '-(single|ep|album)$',
+            '',
+            'i'
+          ) as base_slug,
+          pa.artist_id::text as artist_id,
+          pa.artist_slug
         from public.registry_releases r
-        where r.status='active'
+        left join lateral (
+          select
+            ra.artist_id,
+            ra.artist_slug
+          from public.registry_release_artists ra
+          where ra.release_id = r.id
+            and ra.status = 'active'
+            and ra.is_primary is true
+          order by
+            ra.credit_order nulls last,
+            ra.created_at,
+            ra.id
+          limit 1
+        ) pa on true
+        where r.status = 'active'
           and (
             (
               r.slug ~* '-single$'
@@ -799,23 +824,67 @@ async function loadReleaseSlugPlan(
                 '[[:space:]]+-[[:space:]]+album$'
             )
           )
+      ),
+      grouped as (
+        select
+          artist_id,
+          base_slug,
+          count(*)::integer as candidate_count
+        from packaged
+        group by
+          artist_id,
+          base_slug
+      ),
+      planned as (
+        select
+          p.*,
+          g.candidate_count,
+          exists (
+            select 1
+            from public.registry_releases other
+            join public.registry_release_artists ora
+              on ora.release_id = other.id
+             and ora.status = 'active'
+             and ora.is_primary is true
+            where other.status = 'active'
+              and other.id::text <> p.release_id
+              and ora.artist_id::text = p.artist_id
+              and other.slug = p.base_slug
+          ) as existing_clean_conflict
+        from packaged p
+        join grouped g
+          on g.artist_id = p.artist_id
+         and g.base_slug = p.base_slug
       )
       select
-        plan.release_id::text as release_id,
-        plan.artist_id::text as artist_id,
-        plan.artist_slug,
-        plan.base_slug,
-        plan.proposed_slug as planned_slug,
-        plan.uses_date_fallback
-      from eligible
-      cross join lateral
-        mizizi_private.release_slug_plan_v1(
-          eligible.id
-        ) plan
+        release_id,
+        artist_id,
+        artist_slug,
+        base_slug,
+        case
+          when candidate_count = 1
+           and not existing_clean_conflict
+            then base_slug
+          when release_date is not null
+            then (
+              base_slug ||
+              '-' ||
+              to_char(
+                release_date,
+                'YYYY-MM-DD'
+              )
+            )
+          else null
+        end as planned_slug,
+        (
+          candidate_count > 1
+          or existing_clean_conflict
+        ) as uses_date_fallback
+      from planned
       order by
-        plan.artist_id,
-        plan.base_slug,
-        plan.release_id
+        artist_id,
+        base_slug,
+        release_id
       `,
     );
 
