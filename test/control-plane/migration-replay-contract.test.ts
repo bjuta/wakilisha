@@ -1,4 +1,7 @@
 import {
+  readFileSync,
+} from "node:fs";
+import {
   describe,
   expect,
   it,
@@ -368,6 +371,88 @@ describe(
               "preview",
           }),
         ).toEqual([]);
+      },
+    );
+
+    it(
+      "keeps Production migration promotion single-dispatch, serialized, and exact-main bound",
+      () => {
+        const workflow =
+          readFileSync(
+            ".github/workflows/repository-migration-production-promotion.yml",
+            "utf8",
+          );
+
+        expect(
+          workflow,
+        ).toContain(
+          "workflow_dispatch:",
+        );
+        expect(
+          workflow,
+        ).not.toContain(
+          "pull_request:",
+        );
+        expect(
+          workflow,
+        ).not.toMatch(
+          /^\s*push:\s*$/m,
+        );
+        expect(
+          workflow,
+        ).toContain(
+          "group: repository-migration-production-promotion",
+        );
+        expect(
+          workflow,
+        ).toContain(
+          "cancel-in-progress: false",
+        );
+        expect(
+          workflow,
+        ).toContain(
+          "expected_main_sha:",
+        );
+        expect(
+          workflow,
+        ).toContain(
+          "expected_pending:",
+        );
+        expect(
+          workflow,
+        ).toContain(
+          "if: github.ref == 'refs/heads/main'",
+        );
+        expect(
+          workflow,
+        ).toContain(
+          'test "$(git rev-parse HEAD)" = "$EXPECTED_MAIN_SHA"',
+        );
+        expect(
+          workflow,
+        ).toContain(
+          'test "$GITHUB_SHA" = "$EXPECTED_MAIN_SHA"',
+        );
+        expect(
+          workflow,
+        ).toContain(
+          "REPOSITORY_MIGRATION_EXACT_PENDING_SET=PASS",
+        );
+        expect(
+          workflow,
+        ).toContain(
+          "bash scripts/control-plane/promote-repository-migrations.sh",
+        );
+        expect(
+          workflow,
+        ).toContain(
+          "REPOSITORY_MIGRATION_PRODUCTION_PROMOTION=PASS",
+        );
+        expect(
+          workflow,
+        ).not.toContain(
+          "apply_migration",
+        );
       },
     );
 
