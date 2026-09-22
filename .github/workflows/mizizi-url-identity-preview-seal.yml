@@ -67,7 +67,14 @@ jobs:
           git diff --cached --name-only
 
           COUNT="$(git diff --cached --name-only | wc -l | tr -d ' ')"
-          test "$COUNT" = "5"
+          test "$COUNT" = "4"
+
+          test "$(git diff --cached --name-only | sort)" = "$(printf '%s\n' \
+            .github/workflows/mizizi-url-identity-preview-replay.yml \
+            .github/workflows/mizizi-url-identity-preview-seal.yml \
+            docs/engineering/live-schema-baseline.json \
+            docs/engineering/replay-proofs/20260922143000_mizizi_url_identity_authority_window_close_v1.sql.json \
+            | sort)"
 
       - name: Commit canonical replay seal and temporary-workflow cleanup
         run: |
