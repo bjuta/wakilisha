@@ -95,7 +95,7 @@ begin
       and operation_type.allowed_subject_types=array['artist']::text[]
       and operation_type.requires_existing_target
       and operation_type.max_targets=32
-      and operation_type.max_rows_ceiling=16384
+      and operation_type.max_rows_ceiling=10000
       and operation_type.max_grant_ttl_seconds=300
       and operation_type.requires_human_approval
       and operation_type.requires_verifier
