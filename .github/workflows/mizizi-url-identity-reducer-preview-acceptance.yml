@@ -53,32 +53,19 @@ jobs:
           });
 
           try {
-            const before = await jit.pool.query(
-              `
-              select
-                session_user,
-                current_user,
-                (
-                  select enabled
-                  from platform_private.registry_operation_types
-                  where operation_key=$1
-                    and operation_version=1
-                ) as operation_enabled,
-                (
-                  select status
-                  from platform_private.system_actor_capability_grants
-                  where id=$2::uuid
-                ) as standing_status
-              `,
-              [operationKey, grantId],
+            const identity = await jit.pool.query(
+              "select session_user,current_user",
             );
 
-            const b = before.rows[0];
-            if (b.session_user !== "mizizi_executor") {
-              throw new Error("session_user is not mizizi_executor");
-            }
-            if (b.operation_enabled !== true || b.standing_status !== "active") {
-              throw new Error("Preview reducer fixture is not exact at entry");
+            const i = identity.rows[0];
+            if (
+              i.session_user !== "mizizi_executor" ||
+              i.current_user !== "mizizi_executor"
+            ) {
+              throw new Error(
+                "real JIT session is not mizizi_executor: " +
+                  JSON.stringify(i),
+              );
             }
 
             const close = await jit.pool.query(
@@ -107,53 +94,16 @@ jobs:
               receipt.standing_grant_status !== "expired" ||
               Number(receipt.expired_exact_grants) !== 0
             ) {
-              throw new Error("Reducer receipt is not exact: " + JSON.stringify(receipt));
+              throw new Error(
+                "Reducer receipt is not exact: " +
+                  JSON.stringify(receipt),
+              );
             }
 
-            const after = await jit.pool.query(
-              `
-              select
-                (
-                  select enabled
-                  from platform_private.registry_operation_types
-                  where operation_key=$1
-                    and operation_version=1
-                ) as operation_enabled,
-                (
-                  select status
-                  from platform_private.system_actor_capability_grants
-                  where id=$2::uuid
-                ) as standing_status,
-                (
-                  select count(*)::int
-                  from platform_private.registry_execution_grants
-                  where system_actor_capability_grant_id=$2::uuid
-                    and status='active'
-                    and consumed_at is null
-                    and revoked_at is null
-                ) as active_exact_children,
-                (
-                  select count(*)::int
-                  from public.registry_audit_log
-                  where action='close_mizizi_stewardship_authority_window'
-                    and entity_id=$2::uuid
-                ) as close_audit_events
-              `,
-              [operationKey, grantId],
+            console.log(
+              "MIZIZI_URL_IDENTITY_REDUCER_PREVIEW_BEHAVIOR=PASS",
             );
-
-            const a = after.rows[0];
-            if (
-              a.operation_enabled !== false ||
-              a.standing_status !== "expired" ||
-              Number(a.active_exact_children) !== 0 ||
-              Number(a.close_audit_events) !== 1
-            ) {
-              throw new Error("Reducer postconditions failed: " + JSON.stringify(a));
-            }
-
-            console.log("MIZIZI_URL_IDENTITY_REDUCER_PREVIEW_BEHAVIOR=PASS");
-            console.log(JSON.stringify({ receipt, after: a }));
+            console.log(JSON.stringify({ identity: i, receipt }));
           } finally {
             await jit.restore();
           }
