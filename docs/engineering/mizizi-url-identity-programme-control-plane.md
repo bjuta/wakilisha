@@ -4,7 +4,7 @@ Date: 22 September 2026
 
 Programme issue: #1013
 
-Status: **RELEASE SLUG FAMILY PRODUCTION CLOSED — 737 / 737 verified, zero Release candidates remain; 161 Chart Track-slug projections and 66 Track review items remain; authority zero at rest**
+Status: **RELEASE + CHART AUTOMATIC URL-IDENTITY FAMILIES PRODUCTION CLOSED — 737 Release + 161 Chart operations verified; zero Release/Chart automatic candidates remain; 66 Track review items remain; authority zero at rest**
 
 ## Purpose
 
@@ -313,14 +313,89 @@ Push Critical run `35769680551` also passed completely, including migration
 replay, browser acceptance, security/RLS, live schema drift and application
 build.
 
+## Final Chart Track-slug Production closure
+
+The derived Chart Track-slug synchronization was authorized by human grant:
+
+`c5c518d4-4fbf-4ee4-9379-47b13a598add`
+
+against exact protected main:
+
+`9272ce3c31b9c4402f7b21f1f4b8aae3c48e8b8a`.
+
+Reviewed trigger PR **#1032** bound the exact accepted Chart programme:
+
+- candidate count: **161**;
+- candidate fingerprint:
+  `28a3b8362f8721ad4f35045a2cd938d265adf35373b522b492054af80eb8a910`;
+- operation:
+  `registry.chart_track_slug.synchronize/v1`;
+- capability:
+  `synchronize_chart_track_slug`.
+
+Protected preflight run `35771365881` passed with:
+
+- `preflight entry authority = reviewed_human_authority`;
+- exactly **161** `chart_track_slug_drift` candidates;
+- Release programme state: `accepted_final`;
+- Registry mutation: **NO**.
+
+PR #1032 merged as:
+
+`6109dc18f1e79c45d4c04a92cff51f4563daf2de`.
+
+That exact push launched authoritative Production apply run
+`35771792617`. Final independent Production proof:
+
+- exact child grants descended from the approval: **161**;
+- consumed child grants: **161**;
+- succeeded + verifier-passed operations: **161**;
+- exact final Chart-slug matches to both the frozen plan and current canonical
+  Track slug: **161**;
+- mismatches: **0**;
+- canonical Chart Track-slug write events: **161**;
+- remaining Chart Track-slug drift: **0**;
+- Chart operation enabled: **false**;
+- human approval status: **expired**;
+- active MIZIZI standing/exact grants: **0 / 0**;
+- Release programme remains **737 / 737 / 0**;
+- open Track `mizizi_data_hygiene` reviews remain **66**, untouched;
+- JIT mapping restored;
+- Production temporary access disabled at rest.
+
+Apply evidence artifact:
+
+- artifact id: `10714830965`;
+- SHA-256:
+  `965e6e5500ea00f9a78e0480e2ee61506a28a69c6ffc9a36b0069202fe1e87f9`.
+
+Push Critical run `35771792584` passed completely.
+
+The 91 `chart_artist_slug_drift` findings remain observe-only. They were not
+part of this Track-slug projection authority.
+
+### Accepted-final Chart control-plane state
+
+After successful synchronization, protected preflight must not expect the
+opening 161-row backlog to reappear. The final Chart state is exact only when:
+
+1. the Chart journal has **161 verified operations / 161 canonical events**;
+2. the current Chart Track-slug candidate set is **0**; and
+3. the 161 succeeded verified grant plans reconstructed from history reproduce
+   the original programme fingerprint exactly.
+
+Any mixed or newly divergent state fails closed. New Chart drift created by a
+future separately reviewed Track mutation is new evidence and cannot silently
+reuse this closed 161-candidate authority.
+
 ### Remaining #1013 boundary
 
-Release-slug cleanup is closed. The parent programme remains open because
-Production still has:
+Release-slug cleanup and the accepted 161-row Chart Track-slug projection are
+closed.
 
-- **66** open Track `mizizi_data_hygiene` review items; and
-- **161** Chart rows whose stored Track slug differs from the current canonical
-  Track slug.
+The parent programme remains open only for the **66** Track
+`mizizi_data_hygiene` review items. Those are review authority, not automatic
+Track mutation authority.
 
-Those are distinct remaining boundaries. They are not permission to reopen
-Release-slug mutation authority.
+Release and Chart authority must remain closed unless new evidence creates a
+new separately reviewed programme.
