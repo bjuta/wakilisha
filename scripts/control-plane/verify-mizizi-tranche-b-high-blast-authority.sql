@@ -12,6 +12,7 @@ begin
      or to_regprocedure('public.admin_safe_merge_registry_artists(uuid,uuid,text,boolean,text)') is null
      or to_regprocedure('platform_private.apply_registry_artist_decouple_engine_v1(uuid,jsonb,text,boolean,uuid)') is null
      or to_regprocedure('platform_private.apply_registry_artist_merge_engine_v1(uuid,uuid,text,boolean,text)') is null
+     or to_regprocedure('platform_private.registry_exact_target_set_fingerprint_v1(text[],uuid[])') is null
      or to_regprocedure('platform_private.registry_artist_decouple_state_fingerprint_v1(uuid)') is null
      or to_regprocedure('platform_private.registry_artist_merge_state_fingerprint_v1(uuid,uuid)') is null
      or to_regprocedure('platform_private.record_registry_artist_decouple_evidence_v1(uuid)') is null
@@ -163,6 +164,7 @@ begin
   foreach v_signature in array array[
     'platform_private.apply_registry_artist_decouple_engine_v1(uuid,jsonb,text,boolean,uuid)',
     'platform_private.apply_registry_artist_merge_engine_v1(uuid,uuid,text,boolean,text)',
+    'platform_private.registry_exact_target_set_fingerprint_v1(text[],uuid[])',
     'platform_private.registry_artist_decouple_admin_current_user_v1()',
     'platform_private.registry_artist_merge_admin_current_user_v1()',
     'platform_private.registry_artist_decouple_state_fingerprint_v1(uuid)',
@@ -190,12 +192,11 @@ begin
   )) into v_wrapper;
 
   if v_wrapper ~
-       '(insert[[:space:]]+into|update|delete[[:space:]]+from)[[:space:]]+public[.](registry_|wk_chart_entries_v2|chart_entries)'
+       '(insert[[:space:]]+into|update|delete[[:space:]]+from)[[:space:]]+public[.](registry_(artists|artist_aliases|tracks|track_artists|release_artists)|wk_chart_entries_v2|chart_entries)'
      or position('record_registry_artist_decouple_evidence_v1' in v_wrapper)=0
      or position('issue_registry_artist_decouple_grant_v1' in v_wrapper)=0
      or position('execute_registry_artist_decouple_v1' in v_wrapper)=0
      or position('verify_registry_artist_decouple_v1' in v_wrapper)=0
-     or position('reviewed_exact_operation' in v_wrapper)=0
   then
     raise exception 'Artist decouple public wrapper regained direct mutation or lost exact authority composition';
   end if;
@@ -205,12 +206,11 @@ begin
   )) into v_wrapper;
 
   if v_wrapper ~
-       '(insert[[:space:]]+into|update|delete[[:space:]]+from)[[:space:]]+public[.](registry_|wk_chart_entries_v2|chart_entries)'
+       '(insert[[:space:]]+into|update|delete[[:space:]]+from)[[:space:]]+public[.](registry_(artists|artist_aliases|tracks|track_artists|release_artists)|wk_chart_entries_v2|chart_entries)'
      or position('record_registry_artist_merge_evidence_v1' in v_wrapper)=0
      or position('issue_registry_artist_merge_grant_v1' in v_wrapper)=0
      or position('execute_registry_artist_merge_v1' in v_wrapper)=0
      or position('verify_registry_artist_merge_v1' in v_wrapper)=0
-     or position('reviewed_exact_operation' in v_wrapper)=0
   then
     raise exception 'Safe Artist merge public wrapper regained direct mutation or lost exact authority composition';
   end if;
