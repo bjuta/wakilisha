@@ -49,6 +49,12 @@ describe("MIZIZI current URL-identity production control plane", () => {
       "production temporary access must be disabled at rest",
     );
     expect(runtime).toContain(
+      "managementProjectRef = projectRef",
+    );
+    expect(runtime).toContain(
+      '"/v1/projects/" + managementProjectRef + "/jit-access"',
+    );
+    expect(runtime).toContain(
       "production temporary access disabled at rest",
     );
     expect(runtime).not.toContain("return 'postgres'");
