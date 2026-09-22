@@ -23,7 +23,7 @@ canonicalization programme itself.
 - public/editorial schema type SHA-256:
   `5d229c68d65b3360ecef98882ed059b09a2e57b43daf3343358d1231b14aa1d3`
 - canonical Production schema seal generated:
-  `2026-09-22T15:39:25Z`
+  `2026-09-22T15:39:12Z`
 - schema-seal mode/source:
   `production / pgzizndxdyhqmtyywjmt`
 
