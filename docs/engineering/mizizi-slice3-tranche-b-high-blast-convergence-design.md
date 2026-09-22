@@ -519,3 +519,25 @@ Artist decouple therefore retains its domain-specific
 `registry_artist_decouple_decisions` row as the product decision while the
 shared kernel seals exact execution approval for source/replacement Artist
 targets. This is composition, not a second review system.
+
+
+## Earned kernel delta
+
+Tranche B adds exactly one shared Registry-kernel helper:
+
+`platform_private.registry_exact_target_set_fingerprint_v1(text[],uuid[])`
+
+This primitive was earned by two independent facts:
+
+1. immutable execution grants require the final target-set fingerprint before
+   grant insertion;
+2. the Track duplicate Preview already exposed the defect caused by inserting a
+   placeholder fingerprint and attempting to repair it afterward.
+
+The helper computes the same canonical hash shape as
+`registry_execution_target_set_fingerprint(uuid)`, but from typed exact
+targets before immutable grant creation. Decouple and safe merge both use it,
+then mechanically prove the post-insertion target-set fingerprint converges to
+the precomputed value.
+
+No other generic governance primitive is added by this tranche.
