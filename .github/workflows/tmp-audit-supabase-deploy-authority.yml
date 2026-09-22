@@ -1,0 +1,96 @@
+name: Temporary Audit Supabase Deployment Authority
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+    paths:
+      - ".github/workflows/tmp-audit-supabase-deploy-authority.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  audit:
+    name: read-only-deployment-authority-audit
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+      PROD_REF: pgzizndxdyhqmtyywjmt
+      ORG_SLUG: irkpyafjfgityrsbcisq
+
+    steps:
+      - name: Check out audit branch
+        uses: actions/checkout@v4
+
+      - name: Fetch Supabase GitHub connection and action runs
+        run: |
+          set -euo pipefail
+
+          AUTH="Authorization: Bearer $SUPABASE_ACCESS_TOKEN"
+
+          curl -fsS             -H "$AUTH"             -H 'Accept: application/json'             "https://api.supabase.com/v2/organizations/$ORG_SLUG/integrations/github/connections?filter%5Bproject_ref%5D=$PROD_REF&page%5Bsize%5D=100"             > /tmp/github-connections.json
+
+          curl -fsS             -H "$AUTH"             -H 'Accept: application/json'             "https://api.supabase.com/v1/projects/$PROD_REF/actions?offset=0&limit=100"             > /tmp/action-runs.json
+
+          node --input-type=module <<'NODE'
+          import fs from "node:fs";
+
+          const conn=JSON.parse(fs.readFileSync("/tmp/github-connections.json","utf8"));
+          const runs=JSON.parse(fs.readFileSync("/tmp/action-runs.json","utf8"));
+
+          const sanitizedConnections=(conn.data||[]).map((x)=>({
+            id:x.id,
+            inserted_at:x.attributes?.inserted_at,
+            updated_at:x.attributes?.updated_at,
+            workdir:x.attributes?.workdir,
+            supabase_changes_only:x.attributes?.supabase_changes_only,
+            branch_limit:x.attributes?.branch_limit,
+            new_branch_per_pr:x.attributes?.new_branch_per_pr,
+            project_ref:x.attributes?.project?.ref,
+            project_name:x.attributes?.project?.name,
+            repository_name:x.attributes?.repository?.name,
+          }));
+
+          const windowStart=Date.parse("2026-09-22T15:20:00Z");
+          const windowEnd=Date.parse("2026-09-22T15:45:00Z");
+
+          const relevantRuns=(Array.isArray(runs)?runs:[]).filter((run)=>{
+            const t=Date.parse(run.created_at||"");
+            return Number.isFinite(t) && t>=windowStart && t<=windowEnd;
+          }).map((run)=>({
+            id:run.id,
+            branch_id:run.branch_id,
+            check_run_id:run.check_run_id,
+            created_at:run.created_at,
+            updated_at:run.updated_at,
+            workdir:run.workdir,
+            git_config:run.git_config,
+            run_steps:(run.run_steps||[]).map((s)=>({
+              name:s.name,
+              status:s.status,
+              created_at:s.created_at,
+              updated_at:s.updated_at,
+            })),
+          }));
+
+          console.log("=== GITHUB CONNECTION ===");
+          console.log(JSON.stringify(sanitizedConnections,null,2));
+          console.log("=== ACTION RUNS 15:20-15:45Z ===");
+          console.log(JSON.stringify(relevantRuns,null,2));
+
+          fs.writeFileSync(
+            "supabase-deployment-authority-audit.json",
+            JSON.stringify({
+              github_connections:sanitizedConnections,
+              action_runs:relevantRuns
+            },null,2)+"\n"
+          );
+          NODE
+
+      - name: Upload audit evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: supabase-deployment-authority-audit
+          path: supabase-deployment-authority-audit.json
+          retention-days: 7
