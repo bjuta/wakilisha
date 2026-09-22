@@ -290,6 +290,27 @@ begin
     raise exception 'Succeeded Artist high-blast operation lacks independent verifier PASS';
   end if;
 
+
+  if exists (
+    select 1
+    from platform_private.registry_mutation_operations operation_row
+    where operation_row.actor_key in (
+      'registry_artist_decouple_admin',
+      'registry_artist_merge_admin'
+    )
+      and operation_row.status='succeeded'
+      and (
+        select count(*)
+        from platform_private.registry_operation_write_events link
+        join public.registry_canonical_write_events event
+          on event.id=link.canonical_write_event_id
+        where link.operation_id=operation_row.id
+          and event.status='succeeded'
+      )<>1
+  ) then
+    raise exception 'Succeeded Artist high-blast operation lost exact canonical write-event causality';
+  end if;
+
   select count(*) into v_expected
   from public.registry_artist_resolution_events event
   where event.action='artist_merge' and event.status='success';
