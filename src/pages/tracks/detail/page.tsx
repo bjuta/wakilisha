@@ -453,6 +453,7 @@ function TrackAlbumContextSection({
   const trackActionsHref = canonicalTrackUrl(
     vm.albumArtistSlug || vm.artistSlug,
     vm.slug,
+    vm.id,
   );
   const artistNames = vm.artists.length > 0
     ? vm.artists.map((artist) => artist.name).filter(Boolean).join(", ")
@@ -697,9 +698,10 @@ function ConnectedArtists({ artists, artworkUrl }: { artists: TrackViewModel["ar
 }
 
 export default function TrackDetail() {
-  const { artistSlug, trackSlug } = useParams<{
+  const { artistSlug, trackSlug, trackId } = useParams<{
     artistSlug: string;
     trackSlug: string;
+    trackId?: string;
   }>();
   const location = useLocation();
   const { playTrack, currentTrack, isPlaying, togglePlay, playbackBackend } = usePlayer();
@@ -812,7 +814,7 @@ export default function TrackDetail() {
     setError(null);
     setTrackSaved(false);
     setTrackSaveError(null);
-    const request = getTrack(artistSlug, trackSlug);
+    const request = getTrack(artistSlug, trackSlug, trackId);
 
     request
       .then(async (apiData) => {
@@ -851,7 +853,7 @@ export default function TrackDetail() {
       });
 
     return () => { alive = false; };
-  }, [artistSlug, trackSlug, location.pathname, location.search, location.hash]);
+  }, [artistSlug, trackSlug, trackId, location.pathname, location.search, location.hash]);
 
   if (loading) {
     return (
@@ -905,6 +907,7 @@ export default function TrackDetail() {
   const canonicalPath = canonicalTrackUrl(
     canonicalArtistSlug,
     canonicalTrackSlug,
+    track.id,
   );
   const canonicalAbsoluteUrl =
     typeof window !== "undefined"
@@ -1284,7 +1287,7 @@ export default function TrackDetail() {
             <TrackLyricsSection
               trackId={track.id} trackSlug={track.slug} artistSlug={track.artistSlug} trackTitle={track.title} artistName={track.artist} lyrics={track.lyrics} lyricsContributor={track.lyricsContributor} />
 
-            <TrackRelatedTracks trackSlug={track.slug} artistSlug={track.artistSlug} artistName={track.artist} albumSlug={track.albumSlug} albumTitle={track.albumTitle} genreSlug={track.genreSlug} genreName={track.genre} />
+            <TrackRelatedTracks trackId={track.id} trackSlug={track.slug} artistSlug={track.artistSlug} artistName={track.artist} albumSlug={track.albumSlug} albumTitle={track.albumTitle} genreSlug={track.genreSlug} genreName={track.genre} />
 
             {track.artists.length > 1 && <ConnectedArtists artists={track.artists} artworkUrl={track.artworkUrl} />}
 

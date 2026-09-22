@@ -281,6 +281,7 @@ export function ChartRowExpandedPanel({
                 to={trackUrl(
                   slug,
                   artistSlugs,
+                  registryTrackId,
                 )}
                 onClick={(event) =>
                   event.stopPropagation()

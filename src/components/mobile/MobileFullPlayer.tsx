@@ -13,6 +13,7 @@ import {
 import { TrackMomentDrawer } from "@/components/feature/community/TrackMomentDrawer";
 import { TrackMomentPlaybackOverlay } from "@/components/feature/community/TrackMomentPlaybackOverlay";
 import { useUserSettings } from "@/hooks/useUserSettings";
+import { trackUrl } from "@/utils/trackUrl";
 
 function ActionMenu({
   open,
@@ -24,7 +25,15 @@ function ActionMenu({
 }: {
   open: boolean;
   onClose: () => void;
-  track: { title: string; artist: string; artworkUrl?: string };
+  track: {
+    id?: string;
+    registryTrackId?: string | null;
+    title: string;
+    artist: string;
+    artworkUrl?: string;
+    artistSlug?: string;
+    trackSlug?: string;
+  };
   saved: boolean;
   savePending: boolean;
   onSave: () => void;
@@ -36,13 +45,18 @@ function ActionMenu({
 
   const origin = typeof window !== "undefined" ? window.location.origin : "https://wakilisha.africa";
   const trackSlug = track.trackSlug || track.id || "";
-  const shareUrl = track.artistSlug && trackSlug
-    ? `${origin}/tracks/${track.artistSlug}/${trackSlug}`
-    : trackSlug
-      ? `${origin}/tracks/${trackSlug}`
-      : typeof window !== "undefined"
-        ? window.location.href
-        : origin;
+  const sharePath = trackSlug
+    ? trackUrl(
+        trackSlug,
+        track.artistSlug ? [track.artistSlug] : [],
+        track.registryTrackId,
+      )
+    : "";
+  const shareUrl = sharePath
+    ? `${origin}${sharePath}`
+    : typeof window !== "undefined"
+      ? window.location.href
+      : origin;
 
   const actions = [
     { label: "Share", icon: "Share2" as const, onClick: () => setShareOpen(true) },
@@ -190,9 +204,11 @@ export function MobileFullPlayer() {
     if (!currentTrack || savePending) return;
 
     const trackSlug = currentTrack.trackSlug || currentTrack.id;
-    const entityUrl = currentTrack.artistSlug && trackSlug
-      ? `/tracks/${currentTrack.artistSlug}/${trackSlug}`
-      : `/tracks/${trackSlug}`;
+    const entityUrl = trackUrl(
+      trackSlug,
+      currentTrack.artistSlug ? [currentTrack.artistSlug] : [],
+      currentTrack.registryTrackId,
+    );
 
     setSaveError(null);
 
@@ -568,7 +584,11 @@ export function MobileFullPlayer() {
             </p>
             {currentTrack.artistSlug && currentTrack.trackSlug ? (
               <Link
-                to={`/tracks/${currentTrack.artistSlug}/${currentTrack.trackSlug}/lyrics/contribute`}
+                to={`${trackUrl(
+                  currentTrack.trackSlug,
+                  [currentTrack.artistSlug],
+                  currentTrack.registryTrackId,
+                )}/lyrics/contribute`}
                 className="inline-flex items-center gap-2 rounded-xl bg-[var(--wk-brand)] text-white px-5 py-2.5 text-[12px] font-extrabold hover:opacity-90 transition-opacity whitespace-nowrap"
               >
                 <WkIcon name="Edit3" size={14} />
@@ -599,6 +619,7 @@ export function MobileFullPlayer() {
         onClose={() => setActionMenuOpen(false)}
         track={{
           id: currentTrack.id,
+          registryTrackId: currentTrack.registryTrackId,
           title: currentTrack.title,
           artist: currentTrack.artist,
           artworkUrl: currentTrack.artworkUrl,

@@ -10,17 +10,33 @@ import {
 } from "../src/utils/trackUrl";
 
 describe("canonical public Track and Release routes", () => {
-  it("owns exactly one canonical Track grammar", () => {
+  it("keeps readable legacy Track routes and makes Registry UUID the exact identity route", () => {
     expect(
       trackUrl("Legendary", ["Nyashinski"]),
     ).toBe("/tracks/nyashinski/legendary");
 
+    const trackId =
+      "11111111-1111-4111-8111-111111111111";
+
+    expect(
+      trackUrl(
+        "Interlude",
+        ["Wakadinali"],
+        trackId,
+      ),
+    ).toBe(
+      `/tracks/wakadinali/interlude/${trackId}`,
+    );
+
     expect(
       canonicalTrackUrl(
-        "nyashinski",
-        "legendary",
+        "wakadinali",
+        "interlude",
+        trackId,
       ),
-    ).toBe("/tracks/nyashinski/legendary");
+    ).toBe(
+      `/tracks/wakadinali/interlude/${trackId}`,
+    );
   });
 
   it("removes Release-scoped Track and compatibility redirect ownership", () => {
@@ -57,6 +73,12 @@ describe("canonical public Track and Release routes", () => {
       "utf8",
     );
 
+    expect(router).toContain(
+      'path: "/tracks/:artistSlug/:trackSlug/:trackId"',
+    );
+    expect(router).toContain(
+      'path: "/tracks/:artistSlug/:trackSlug/:trackId/lyrics/contribute"',
+    );
     expect(router).toContain(
       'path: "/tracks/:artistSlug/:trackSlug"',
     );
@@ -158,6 +180,51 @@ describe("canonical public Track and Release routes", () => {
     }
   });
 
+  it("fails closed instead of selecting the first Track from an ambiguous Artist slug", () => {
+    const edge = readFileSync(
+      "supabase/functions/public-content-read/index.ts",
+      "utf8",
+    );
+    const related = readFileSync(
+      "src/pages/tracks/detail/components/TrackRelatedTracks.tsx",
+      "utf8",
+    );
+
+    expect(edge).toContain(
+      'reason: "ambiguous_track_slug"',
+    );
+    expect(edge).toContain(
+      "canonicalIdentityRequired: true",
+    );
+    expect(edge).toContain(
+      '.eq("id", urlTrackId)',
+    );
+    expect(edge).toContain(
+      "isTrackIdentityPath",
+    );
+    const scopedTrackResolver = edge.slice(
+      edge.indexOf("async function findTrackByScopedPublicSlug("),
+      edge.indexOf("async function findReleaseByScopedPublicSlug("),
+    );
+
+    expect(scopedTrackResolver).toContain(
+      "matches.length !== 1",
+    );
+    expect(scopedTrackResolver).not.toContain(
+      "return matches.sort",
+    );
+
+    expect(related).toContain(
+      "seenTrackKeys",
+    );
+    expect(related).toContain(
+      "const trackKey = t.id ||",
+    );
+    expect(related).toContain(
+      "trackUrl(track.slug, [track.artistSlug], track.id)",
+    );
+  });
+
   it("keeps Track capability and Release context without route indirection", () => {
     const desktopRelease = readFileSync(
       "src/pages/releases/detail/components/ReleaseTracklist.tsx",
@@ -182,6 +249,7 @@ describe("canonical public Track and Release routes", () => {
       `canonicalTrackUrl(
               artistSlug,
               track.slug,
+              track.id,
             )`,
     );
     expect(desktopRelease).not.toContain(
@@ -196,6 +264,7 @@ describe("canonical public Track and Release routes", () => {
       `canonicalTrackUrl(
                   artistSlug,
                   track.slug,
+                  track.id,
                 )`,
     );
     expect(mobileRelease).not.toContain(

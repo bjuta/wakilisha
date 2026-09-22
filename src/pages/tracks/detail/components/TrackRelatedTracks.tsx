@@ -8,6 +8,7 @@ import type { RegistryDiscographyRelease } from "@/services/publicContent/client
 import { buildTrackCardBlurb } from "@/services/cultureContext/trackAdapters";
 
 interface TrackRelatedTracksProps {
+  trackId?: string;
   trackSlug: string;
   artistSlug: string;
   artistName: string;
@@ -18,6 +19,7 @@ interface TrackRelatedTracksProps {
 }
 
 interface RelatedTrack {
+  id?: string;
   slug: string;
   title: string;
   artist: string;
@@ -29,6 +31,7 @@ interface RelatedTrack {
 }
 
 export default function TrackRelatedTracks({
+  trackId,
   trackSlug,
   artistSlug,
   artistName,
@@ -51,8 +54,8 @@ export default function TrackRelatedTracks({
         if (!alive) return;
 
         const tracks: RelatedTrack[] = [];
-        const seenSlugs = new Set<string>();
-        seenSlugs.add(trackSlug);
+        const seenTrackKeys = new Set<string>();
+        seenTrackKeys.add(trackId || `slug:${trackSlug}`);
 
         // 1. Album siblings (tracks from the same release)
         if (albumSlug) {
@@ -60,9 +63,11 @@ export default function TrackRelatedTracks({
           if (albumRelease) {
             albumRelease.tracks.forEach((t) => {
               const tSlug = (t as any).slug || (t.title ? t.title.toLowerCase().replace(/[^a-z0-9]+/g, "-") : "");
-              if (tSlug && !seenSlugs.has(tSlug)) {
-                seenSlugs.add(tSlug);
+              const trackKey = t.id || `slug:${tSlug}`;
+              if (tSlug && !seenTrackKeys.has(trackKey)) {
+                seenTrackKeys.add(trackKey);
                 tracks.push({
+                  id: t.id,
                   slug: tSlug,
                   title: t.title,
                   artist: artistName,
@@ -81,9 +86,11 @@ export default function TrackRelatedTracks({
         discography.forEach((release) => {
           release.tracks.forEach((t) => {
             const tSlug = (t as any).slug || (t.title ? t.title.toLowerCase().replace(/[^a-z0-9]+/g, "-") : "");
-            if (tSlug && !seenSlugs.has(tSlug)) {
-              seenSlugs.add(tSlug);
+            const trackKey = t.id || `slug:${tSlug}`;
+            if (tSlug && !seenTrackKeys.has(trackKey)) {
+              seenTrackKeys.add(trackKey);
               tracks.push({
+                id: t.id,
                 slug: tSlug,
                 title: t.title,
                 artist: artistName,
@@ -108,7 +115,7 @@ export default function TrackRelatedTracks({
 
     load();
     return () => { alive = false; };
-  }, [trackSlug, artistSlug, artistName, albumSlug]);
+  }, [trackId, trackSlug, artistSlug, artistName, albumSlug]);
 
   if (!loading && related.length === 0) return null;
 
@@ -151,7 +158,7 @@ export default function TrackRelatedTracks({
                 </div>
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
                   {albumSiblings.slice(0, 4).map((t) => (
-                    <RelatedTrackCard key={t.slug} track={t} />
+                    <RelatedTrackCard key={t.id || t.slug} track={t} />
                   ))}
                 </div>
               </div>
@@ -168,7 +175,7 @@ export default function TrackRelatedTracks({
                 </div>
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
                   {artistTracks.slice(0, 4).map((t) => (
-                    <RelatedTrackCard key={t.slug} track={t} />
+                    <RelatedTrackCard key={t.id || t.slug} track={t} />
                   ))}
                 </div>
               </div>
@@ -189,7 +196,7 @@ function RelatedTrackCard({ track }: { track: RelatedTrack }) {
 
   return (
     <Link
-      to={trackUrl(track.slug, [track.artistSlug])}
+      to={trackUrl(track.slug, [track.artistSlug], track.id)}
       className="group border border-[var(--wk-border)] rounded-xl bg-[var(--wk-surface)] p-3 hover:border-[var(--wk-brand)]/30 hover:bg-[var(--wk-surface-raised)] transition-all duration-200"
     >
       <div className="aspect-square rounded-lg overflow-hidden bg-[var(--wk-bg)] mb-3 border border-[var(--wk-border)]">

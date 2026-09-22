@@ -219,7 +219,8 @@ Relationships:
 ### Public entity detail routes
 
 - Artist: `/artists/:artistSlug/`
-- Track: `/tracks/:artistSlug/:trackSlug/`
+- Track exact identity: `/tracks/:artistSlug/:trackSlug/:trackId/`
+- Track legacy compatibility: `/tracks/:artistSlug/:trackSlug/` only when that Artist + public slug resolves to exactly one Registry Track
 - Release: `/releases/:artistSlug/:releaseSlug/`
 - Label: `/labels/:labelSlug/`
 - Genre: `/genres/:genreSlug/`
@@ -268,11 +269,14 @@ Fields:
 
 Rules:
 
-1. One primary active slug per public entity.
-2. Historical slugs become redirects, not overwritten strings.
-3. Track and release full paths include artist context.
-4. Slug resolution must not depend on WordPress post names.
-5. Migration should preserve old public paths where possible.
+1. Registry UUID is canonical Track identity; a Track slug is public presentation and is not an entity key.
+2. Same-Artist same-title/same-slug Tracks are valid when Registry evidence identifies distinct Track entities.
+3. Exact Track URLs include `trackId`; the two-segment Artist + Track slug route is compatibility-only and must fail closed on ambiguity.
+4. One primary active slug per public entity.
+5. Historical slugs become redirects, not overwritten strings.
+6. Track and Release readable paths include Artist context.
+7. Slug resolution must not depend on WordPress post names.
+8. Migration should preserve old public paths where possible.
 
 ---
 

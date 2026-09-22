@@ -2,6 +2,7 @@ import { useState, useCallback, useEffect } from "react";
 import { Link } from "react-router-dom";
 import { usePlayer } from "@/context/PlayerContext";
 import { WkIcon } from "@/components/design-system/Icon";
+import { trackUrl } from "@/utils/trackUrl";
 import { useEntityActions } from "@/hooks/useCommunityActions";
 
 function formatTime(seconds: number) {
@@ -88,9 +89,11 @@ export default function DesktopPlayerPage() {
     if (!currentTrack || savePending) return;
 
     const trackSlug = currentTrack.trackSlug || currentTrack.id;
-    const entityUrl = currentTrack.artistSlug && trackSlug
-      ? `/tracks/${currentTrack.artistSlug}/${trackSlug}`
-      : `/tracks/${trackSlug}`;
+    const entityUrl = trackUrl(
+      trackSlug,
+      currentTrack.artistSlug ? [currentTrack.artistSlug] : [],
+      currentTrack.registryTrackId,
+    );
 
     setSaveError(null);
 

@@ -102,10 +102,12 @@ async function findTrackByScopedPublicSlug(
   supabase: ReturnType<typeof createClient>,
   artistSlugRaw: string | null,
   publicSlugRaw: string,
-): Promise<any | null> {
+): Promise<{ track: any | null; matchCount: number }> {
   const artistSlug = slugify(String(artistSlugRaw || ""));
   const publicSlug = slugify(String(publicSlugRaw || ""));
-  if (!artistSlug || !publicSlug) return null;
+  if (!artistSlug || !publicSlug) {
+    return { track: null, matchCount: 0 };
+  }
 
   const { data: links } = await supabase
     .from("registry_track_artists")
@@ -117,7 +119,9 @@ async function findTrackByScopedPublicSlug(
     .limit(500);
 
   const trackIds = [...new Set((links ?? []).map((row: any) => String(row.track_id)).filter(Boolean))];
-  if (trackIds.length === 0) return null;
+  if (trackIds.length === 0) {
+    return { track: null, matchCount: 0 };
+  }
 
   const { data: tracks } = await supabase
     .from("registry_tracks")
@@ -131,14 +135,11 @@ async function findTrackByScopedPublicSlug(
     return registrySlug === publicSlug || publicTrackSlug === publicSlug;
   });
 
-  return matches.sort((a: any, b: any) => {
-    const aClean = cleanPublicMusicSlug(a.slug, a.title, artistSlug) === publicSlug ? 0 : 1;
-    const bClean = cleanPublicMusicSlug(b.slug, b.title, artistSlug) === publicSlug ? 0 : 1;
-    if (aClean !== bClean) return aClean - bClean;
+  if (matches.length !== 1) {
+    return { track: null, matchCount: matches.length };
+  }
 
-    const statusRank = (status: string) => status === "active" ? 0 : status === "needs_review" ? 1 : 2;
-    return statusRank(String(a.status || "")) - statusRank(String(b.status || ""));
-  })[0] ?? null;
+  return { track: matches[0], matchCount: 1 };
 }
 
 async function findReleaseByScopedPublicSlug(
@@ -460,8 +461,8 @@ function normalizePublicArticleTrust(value: unknown): PublicArticleTrust {
   };
 }
 
-type ReleaseEntry = { slug: string; title: string; releaseType: string; year: string; releaseDate: string; trackCount: number; artworkUrl: string; labelName?: string; genres?: string[]; tracks: Array<{ slug?: string; artistSlug?: string; title: string; duration: string; previewUrl?: string }> };
-interface TrackOut { slug?: string; artistSlug?: string; title: string; duration: string; artists?: string; previewUrl?: string; }
+type ReleaseEntry = { slug: string; title: string; releaseType: string; year: string; releaseDate: string; trackCount: number; artworkUrl: string; labelName?: string; genres?: string[]; tracks: Array<{ id?: string; slug?: string; artistSlug?: string; title: string; duration: string; previewUrl?: string }> };
+interface TrackOut { id?: string; slug?: string; artistSlug?: string; title: string; duration: string; artists?: string; previewUrl?: string; }
 interface ReleaseOut { slug: string; title: string; releaseType: string; year: string; releaseDate: string; trackCount: number; artworkUrl: string; artist?: string; labelName?: string; genres?: string[]; tracks: TrackOut[]; }
 
 async function getArtistDiscography(supabase: ReturnType<typeof createClient>, artistId: string, artistName: string, artistSlug: string, metadataAlbums: any[], metadataEps: any[]): Promise<ReleaseEntry[]> {
@@ -499,7 +500,7 @@ async function getArtistDiscography(supabase: ReturnType<typeof createClient>, a
       const labelById = new Map((labels ?? []).map((l: any) => [String(l.id), String(l.name)]));
       for (const r of relRows as any[]) {
         const releaseTrackList = tracksByRelease.get(String(r.id)) ?? [];
-        const tracks = releaseTrackList.sort((a, b) => (a.track_number || 0) - (b.track_number || 0)).map((rt) => { const t = trackById.get(rt.track_id); if (!t) return null; const dms = Number(t.duration_ms || 0); const minutes = Math.floor(dms / 60000); const seconds = Math.floor((dms % 60000) / 1000); return { slug: String(t.slug || ""), artistSlug: primaryArtistSlugByTrack.get(String(t.id)) || artistSlug, title: String(t.title || ""), duration: dms > 0 ? `${minutes}:${String(seconds).padStart(2, "0")}` : "", previewUrl: t.preview_url || undefined }; }).filter(Boolean) as Array<{ title: string; duration: string; previewUrl?: string }>;
+        const tracks = releaseTrackList.sort((a, b) => (a.track_number || 0) - (b.track_number || 0)).map((rt) => { const t = trackById.get(rt.track_id); if (!t) return null; const dms = Number(t.duration_ms || 0); const minutes = Math.floor(dms / 60000); const seconds = Math.floor((dms % 60000) / 1000); return { id: String(t.id), slug: String(t.slug || ""), artistSlug: primaryArtistSlugByTrack.get(String(t.id)) || artistSlug, title: String(t.title || ""), duration: dms > 0 ? `${minutes}:${String(seconds).padStart(2, "0")}` : "", previewUrl: t.preview_url || undefined }; }).filter(Boolean) as Array<{ title: string; duration: string; previewUrl?: string }>;
         const trackCount = tracks.length || releaseTrackList.length;
         const releaseMeta = (r.metadata || {}) as Record<string, unknown>;
         const labelName = r.label_id ? (labelById.get(String(r.label_id)) || String(releaseMeta.record_label || "") || "Independent") : (String(releaseMeta.record_label || "") || "Independent");
@@ -1076,7 +1077,15 @@ Deno.serve(async (req) => {
   const releasePathSegments = path.startsWith("/releases/")
     ? path.replace(/^\/releases\//, "").split("/").filter(Boolean)
     : [];
+  const trackPathSegments = path.startsWith("/tracks/")
+    ? path.replace(/^\/tracks\//, "").split("/").filter(Boolean)
+    : [];
   const isReleaseTrackPath = releasePathSegments.length === 3;
+  const isTrackIdentityPath =
+    trackPathSegments.length === 3 &&
+    /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
+      trackPathSegments[2] || "",
+    );
 
   try {
     let data: unknown;
@@ -1118,7 +1127,7 @@ Deno.serve(async (req) => {
               }
               const trackMetaMap = new Map<string, { durationMs: number | null; previewUrl: string | null }>();
               for (const tr of (trackRows ?? [])) { trackMetaMap.set(tr.id, { durationMs: tr.duration_ms ?? null, previewUrl: tr.preview_url ?? null }); }
-              tracks = (relTracks ?? []).map((rt: any) => { const t = (trackRows ?? []).find((tr: any) => tr.id === rt.track_id); if (!t) return null; const meta = trackMetaMap.get(t.id); const trackArtistsList = artistsByTrack.get(t.id) || []; const nonPageArtist = trackArtistsList.filter((a) => a !== displayName); const artistsStr = nonPageArtist.length > 0 ? nonPageArtist.join(", ") : undefined; return { slug: String(t.slug || ""), artistSlug: primaryArtistSlugByTrack.get(t.id) || artistSlug, title: t.title || "", duration: formatDuration(meta?.durationMs ?? null), artists: artistsStr, previewUrl: meta?.previewUrl || undefined }; }).filter(Boolean) as TrackOut[];
+              tracks = (relTracks ?? []).map((rt: any) => { const t = (trackRows ?? []).find((tr: any) => tr.id === rt.track_id); if (!t) return null; const meta = trackMetaMap.get(t.id); const trackArtistsList = artistsByTrack.get(t.id) || []; const nonPageArtist = trackArtistsList.filter((a) => a !== displayName); const artistsStr = nonPageArtist.length > 0 ? nonPageArtist.join(", ") : undefined; return { id: String(t.id), slug: String(t.slug || ""), artistSlug: primaryArtistSlugByTrack.get(t.id) || artistSlug, title: t.title || "", duration: formatDuration(meta?.durationMs ?? null), artists: artistsStr, previewUrl: meta?.previewUrl || undefined }; }).filter(Boolean) as TrackOut[];
             }
             const { labelName, genres } = extractLabelAndGenres(rel, labelMap);
             ownReleases.push({ slug: rel.slug, title: rel.title, releaseType: releaseTypeLabelFromActiveTrackCount(tracks.length) || "Release", year: extractYear(rel.release_date), releaseDate: rel.release_date || "", trackCount: tracks.length, artworkUrl: rel.artwork_url || "", labelName, genres, tracks });
@@ -1166,7 +1175,7 @@ Deno.serve(async (req) => {
               }
               const tmm = new Map<string, { durationMs: number | null; previewUrl: string | null }>();
               for (const tr of (tRows ?? [])) { tmm.set(tr.id, { durationMs: tr.duration_ms ?? null, previewUrl: tr.preview_url ?? null }); }
-              tracks = (tRows ?? []).map((t: any) => { const meta2 = tmm.get(t.id); const tal = abt.get(t.id) || []; const npa = tal.filter((a) => a !== displayName); const as2 = npa.length > 0 ? npa.join(", ") : undefined; return { slug: String(t.slug || ""), artistSlug: primaryArtistSlugByTrack.get(t.id) || String(primaryArtistLink?.artist_slug || ""), title: t.title || "", duration: formatDuration(meta2?.durationMs ?? null), artists: as2, previewUrl: meta2?.previewUrl || undefined }; });
+              tracks = (tRows ?? []).map((t: any) => { const meta2 = tmm.get(t.id); const tal = abt.get(t.id) || []; const npa = tal.filter((a) => a !== displayName); const as2 = npa.length > 0 ? npa.join(", ") : undefined; return { id: String(t.id), slug: String(t.slug || ""), artistSlug: primaryArtistSlugByTrack.get(t.id) || String(primaryArtistLink?.artist_slug || ""), title: t.title || "", duration: formatDuration(meta2?.durationMs ?? null), artists: as2, previewUrl: meta2?.previewUrl || undefined }; });
             }
             const { labelName, genres } = extractLabelAndGenres(rel, featLabelMap);
             appearsOn.push({ slug: rel.slug, title: rel.title, releaseType: releaseTypeLabelFromActiveTrackCount(tracks.length) || "Release", year: extractYear(rel.release_date), releaseDate: rel.release_date || "", trackCount: tracks.length, artworkUrl: rel.artwork_url || "", artist: primaryArtistLink?.artist_name_text || "Various Artists", labelName, genres, tracks });
@@ -2167,17 +2176,62 @@ Deno.serve(async (req) => {
     else if (path.startsWith("/tracks/") || isReleaseTrackPath) {
       const tSegments = isReleaseTrackPath
         ? releasePathSegments
-        : path.replace(/^\/tracks\//, "").split("/").filter(Boolean);
-      const trackSlug = tSegments[tSegments.length - 1] || "";
+        : trackPathSegments;
+      const trackSlug = isTrackIdentityPath
+        ? tSegments[1] || ""
+        : tSegments[tSegments.length - 1] || "";
       const urlArtistSlug = tSegments.length > 1 ? tSegments[0] : null;
       const urlReleaseSlug = isReleaseTrackPath ? tSegments[1] || null : null;
+      const urlTrackId = isTrackIdentityPath ? tSegments[2] || null : null;
       let track: any = null;
       let releaseScopedMembership: any = null;
       const isIsrcLookup =
         !isReleaseTrackPath &&
+        !isTrackIdentityPath &&
         trackSlug.toLowerCase().startsWith("isrc:");
 
-      if (isReleaseTrackPath) {
+      if (isTrackIdentityPath) {
+        if (!urlArtistSlug || !trackSlug || !urlTrackId) {
+          return jsonResponse(
+            { data: null, meta: { reason: "invalid_track_identity_path" } },
+            origin,
+            404,
+          );
+        }
+
+        const { data: byTrackId } = await supabase
+          .from("registry_tracks")
+          .select(MUSIC_ENTITY_SELECT)
+          .eq("id", urlTrackId)
+          .in("status", ["active", "needs_review", "draft"])
+          .maybeSingle();
+
+        if (byTrackId) {
+          const normalizedRequestedSlug = slugify(trackSlug);
+          const storedSlug = slugify(String(byTrackId.slug || ""));
+          const publicSlug = cleanPublicMusicSlug(
+            byTrackId.slug,
+            byTrackId.title,
+            urlArtistSlug,
+          );
+
+          if (
+            storedSlug !== normalizedRequestedSlug &&
+            publicSlug !== normalizedRequestedSlug
+          ) {
+            return jsonResponse(
+              {
+                data: null,
+                meta: { reason: "track_slug_not_found_for_id" },
+              },
+              origin,
+              404,
+            );
+          }
+        }
+
+        track = byTrackId ?? null;
+      } else if (isReleaseTrackPath) {
         if (!urlArtistSlug || !urlReleaseSlug || !trackSlug) {
           return jsonResponse(
             { data: null, meta: { reason: "invalid_release_track_path" } },
@@ -2298,11 +2352,28 @@ Deno.serve(async (req) => {
         track = byIsrc && byIsrc.length > 0 ? byIsrc[0] : null;
       } else {
         if (urlArtistSlug) {
-          track = await findTrackByScopedPublicSlug(
+          const scopedLookup = await findTrackByScopedPublicSlug(
             supabase,
             urlArtistSlug,
             trackSlug,
           );
+
+          if (scopedLookup.matchCount > 1) {
+            return jsonResponse(
+              {
+                data: null,
+                meta: {
+                  reason: "ambiguous_track_slug",
+                  matchCount: scopedLookup.matchCount,
+                  canonicalIdentityRequired: true,
+                },
+              },
+              origin,
+              409,
+            );
+          }
+
+          track = scopedLookup.track;
         }
 
         if (!track) {
@@ -2320,7 +2391,7 @@ Deno.serve(async (req) => {
       // v15: Chart-entry fallback — tracks not yet in registry can still have pages
       // The chart pipeline stores slugs with spaces (e.g. "baddies need love"), 
       // but the URL arrives with hyphens ("baddies-need-love"). We need to match both.
-      if (!track && !isIsrcLookup && !isReleaseTrackPath) {
+      if (!track && !isIsrcLookup && !isReleaseTrackPath && !isTrackIdentityPath) {
         const withSpaces = trackSlug.replace(/-/g, " ");
         const { data: chartEntries } = await supabase.from("wk_chart_entries_v2")
           .select("track_title, track_slug, artist_name, artist_slug, artwork_url, rank, previous_rank, movement, edition_id, total_score, release_date")

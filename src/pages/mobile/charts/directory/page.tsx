@@ -290,7 +290,7 @@ export default function MobileChartsDirectory() {
       {/* Top 3 cards */}
       <div className="chart-hero-cards">
         {top3.map((entry, idx) => (
-          <Link key={`${entry.rank}-${entry.slug}`} to={trackUrl(entry.slug, entry.artistSlugs)} className="chart-hero-card mobile-pressable">
+          <Link key={`${entry.rank}-${entry.slug}`} to={trackUrl(entry.slug, entry.artistSlugs, entry.registryTrackId)} className="chart-hero-card mobile-pressable">
             <img src={entry.artworkUrl} alt="" />
             <div className="chart-hero-overlay">
               <div className={`chart-hero-rank ${rankClass(entry.rank)}`}>{entry.rank}</div>
@@ -317,7 +317,7 @@ export default function MobileChartsDirectory() {
       <div className="spec-section-hd">Positions 4–{data.stats.entries}</div>
       <div className="chart-row-list">
         {allRows.map((entry) => (
-          <Link key={`${entry.rank}-${entry.slug}`} to={trackUrl(entry.slug, entry.artistSlugs)} className="chart-row mobile-pressable">
+          <Link key={`${entry.rank}-${entry.slug}`} to={trackUrl(entry.slug, entry.artistSlugs, entry.registryTrackId)} className="chart-row mobile-pressable">
             <div className="chart-row-num">{entry.rank}</div>
             <div className="chart-row-art">
               <img src={entry.artworkUrl} alt="" />

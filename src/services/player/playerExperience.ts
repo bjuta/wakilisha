@@ -2,6 +2,7 @@ import type {
   PlaybackBackend,
   PlayerTrack,
 } from "@/context/PlayerContext";
+import { trackUrl } from "@/utils/trackUrl";
 
 export type PlayerMediaKind =
   | "music_track"
@@ -112,11 +113,19 @@ function defaultTrackPath(
     track.artistSlug &&
     track.trackSlug
   ) {
-    return `/tracks/${track.artistSlug}/${track.trackSlug}`;
+    return trackUrl(
+      track.trackSlug,
+      [track.artistSlug],
+      track.registryTrackId,
+    );
   }
 
   if (track.trackSlug) {
-    return `/tracks/${track.trackSlug}`;
+    return trackUrl(
+      track.trackSlug,
+      [],
+      track.registryTrackId,
+    );
   }
 
   return null;

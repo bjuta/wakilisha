@@ -278,7 +278,7 @@ export default function MobileCharts() {
           {top3.map((entry, i) => (
             <Link
               key={entry.rank}
-              to={trackUrl(entry.slug, entry.artistSlugs)}
+              to={trackUrl(entry.slug, entry.artistSlugs, entry.registryTrackId)}
               className="group flex items-center gap-4 rounded-xl border border-[var(--wk-border)] bg-[var(--wk-surface)] p-4 transition-all hover:border-[var(--wk-brand)]/40 active:scale-[0.98] active:opacity-80"
             >
               <div className="flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-xl bg-[var(--wk-surface-raised)]">

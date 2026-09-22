@@ -210,6 +210,7 @@ export interface RegistryDiscographyRelease {
   trackCount: number;
   artworkUrl: string;
   tracks: Array<{
+    id?: string;
     slug?: string;
     artistSlug?: string;
     title: string;

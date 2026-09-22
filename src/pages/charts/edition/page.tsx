@@ -780,7 +780,7 @@ export default function ChartEdition() {
             {top3.map((entry, idx) => (
               <Link
                 key={`${entry.rank}-${entry.slug}`}
-                to={trackUrl(entry.slug, entry.artistSlugs)}
+                to={trackUrl(entry.slug, entry.artistSlugs, entry.registryTrackId)}
                 className="chart-podium-v2-card"
               >
                 <img src={entry.artworkUrl} alt="" className="chart-podium-v2-img" />
@@ -837,7 +837,7 @@ export default function ChartEdition() {
               {/* ── Biggest climber ── */}
               {biggestUpMover ? (
                 <Link
-                  to={trackUrl(biggestUpMover.slug, biggestUpMover.artistSlugs)}
+                  to={trackUrl(biggestUpMover.slug, biggestUpMover.artistSlugs, biggestUpMover.registryTrackId)}
                   className="chart-mover-card chart-mover-card--up"
                 >
                   <div className="chart-mover-card-badge chart-mover-card-badge--up">
@@ -896,7 +896,7 @@ export default function ChartEdition() {
               {/* ── Biggest fall ── */}
               {biggestDownMover ? (
                 <Link
-                  to={trackUrl(biggestDownMover.slug, biggestDownMover.artistSlugs)}
+                  to={trackUrl(biggestDownMover.slug, biggestDownMover.artistSlugs, biggestDownMover.registryTrackId)}
                   className="chart-mover-card chart-mover-card--down"
                 >
                   <div className="chart-mover-card-badge chart-mover-card-badge--down">
@@ -1010,7 +1010,7 @@ export default function ChartEdition() {
                 {newEntries.map((entry) => (
                   <Link
                     key={`new-${entry.rank}-${entry.slug}`}
-                    to={trackUrl(entry.slug, entry.artistSlugs)}
+                    to={trackUrl(entry.slug, entry.artistSlugs, entry.registryTrackId)}
                     className="chart-sidebox-v2-row"
                   >
                     <span className="chart-sidebox-v2-row-metric">NEW</span>
@@ -1044,7 +1044,7 @@ export default function ChartEdition() {
                 {climbers.map((entry) => (
                   <Link
                     key={`climb-${entry.rank}-${entry.slug}`}
-                    to={trackUrl(entry.slug, entry.artistSlugs)}
+                    to={trackUrl(entry.slug, entry.artistSlugs, entry.registryTrackId)}
                     className="chart-sidebox-v2-row"
                   >
                     <span className="chart-sidebox-v2-row-metric">+{entry.movementAmount ?? 0}</span>

@@ -34,6 +34,7 @@ import {
   getUserSaves,
   type CommunityEntity,
 } from "@/services/community";
+import { trackUrl } from "@/utils/trackUrl";
 
 type LooseRow =
   Record<string, unknown>;
@@ -250,11 +251,13 @@ export function TrackActionsMenu({
   const trackPath =
     trackHref ||
     (
-      artistSlug && trackSlug
-        ? `/tracks/${artistSlug}/${trackSlug}`
-        : trackSlug
-          ? `/tracks/${trackSlug}`
-          : null
+      trackSlug
+        ? trackUrl(
+            trackSlug,
+            artistSlug ? [artistSlug] : [],
+            registryTrackId,
+          )
+        : null
     );
 
   const artistPath =
