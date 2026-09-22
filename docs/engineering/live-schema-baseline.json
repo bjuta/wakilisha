@@ -9,6 +9,8 @@
   "schemaSeal": {
     "mode": "preview",
     "sourceProjectRef": "ltcwajcrqdbefhulzibv",
-    "migrationHead": "20260922171632"
+    "migrationHead": "20260922171632",
+    "baseMainSha": "80ffc7d07a041ae001bafa3f365a825016c50b44",
+    "previewBranchId": "d64d23b3-4150-437c-8fdc-db83c8482ec7"
   }
 }
