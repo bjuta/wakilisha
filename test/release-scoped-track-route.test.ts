@@ -202,10 +202,15 @@ describe("canonical public Track and Release routes", () => {
     expect(edge).toContain(
       "isTrackIdentityPath",
     );
-    expect(edge).toContain(
+    const scopedTrackResolver = edge.slice(
+      edge.indexOf("async function findTrackByScopedPublicSlug("),
+      edge.indexOf("async function findReleaseByScopedPublicSlug("),
+    );
+
+    expect(scopedTrackResolver).toContain(
       "matches.length !== 1",
     );
-    expect(edge).not.toContain(
+    expect(scopedTrackResolver).not.toContain(
       "return matches.sort",
     );
 
