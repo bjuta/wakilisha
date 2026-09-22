@@ -13,6 +13,9 @@
 
 - Apply only immutable files from `supabase/migrations`.
 - Promote repository migrations only with `bash scripts/control-plane/promote-repository-migrations.sh` from exact merged `main`.
+- Launch that script through the permanent `Repository Migration Production Promotion` workflow when CI-hosted promotion is required. The workflow is manual-dispatch only, serialized by one Production-promotion concurrency key, and requires both the exact protected-main SHA and the exact reviewed pending migration filenames.
+- Maintain exactly one live promotion launcher for a reviewed pending set. An empty immediate workflow lookup is not evidence that a GitHub Actions run was not enqueued. Before creating any fallback trigger, reconcile repository-wide workflow runs for the same launcher/head and allow the enqueue state to settle.
+- A second launcher for the same pending set is prohibited unless the first launcher is conclusively completed or cancelled and live Production state has been re-read. Never let two promotion runners race on the same migration set.
 - That promotion path must show the intended repository migration filenames in the native `supabase db push --dry-run --linked` output before any write.
 - Do not use connector `apply_migration` or any raw-SQL migration helper for a migration file that already exists in the repository. Those paths may generate a different migration version and create ledger drift.
 - After promotion, require the production ledger versions to match the numeric prefixes of the repository filenames and require zero pending migrations.
