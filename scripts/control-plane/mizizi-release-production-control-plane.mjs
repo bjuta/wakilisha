@@ -419,18 +419,23 @@ function assertReleaseAudit(text) {
     'Release audit summary',
   );
 
+  if (titlePackagingCount !== slugPackagingCount) {
+    throw new Error(
+      'Release provider-packaging audit count mismatch: title=' +
+        titlePackagingCount +
+        ' slug=' +
+        slugPackagingCount,
+    );
+  }
+
   assertFields(
     {
       findings,
       observed_findings:observedFindings,
-      title_packaging_observations:titlePackagingCount,
-      slug_packaging_candidates:slugPackagingCount,
     },
     {
       findings:titlePackagingCount + slugPackagingCount,
       observed_findings:titlePackagingCount,
-      title_packaging_observations:slugPackagingCount,
-      slug_packaging_candidates:titlePackagingCount,
     },
     'Release provider-packaging audit consistency',
   );
