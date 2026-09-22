@@ -231,3 +231,59 @@ fingerprints, exact merged-main trigger authority, and the JIT
 - forward repair required before resume:
   `20260922171632_mizizi_release_slug_resume_integrity_v1.sql`
 - schema seal: public/editorial type hash remains unchanged by the private-function repair
+
+
+## Release resume repair Production promotion
+
+Repair PR **#1025** merged to protected main as:
+
+`a2157a4bba5adc2fb097092cfb5b56db250044a4`
+
+Canonical repository migration promotion ran through workflow
+`Repository Migration Production Promotion`, run
+`35766731078`, bound to that exact merged-main SHA and the exact reviewed
+pending filename:
+
+`20260922171632_mizizi_release_slug_resume_integrity_v1.sql`
+
+The promoter passed:
+
+- exact protected-main authority;
+- exact Production project link;
+- exact reviewed pending-set check;
+- canonical `scripts/control-plane/promote-repository-migrations.sh`;
+- native `supabase db push --linked`;
+- zero-pending post-promotion verification.
+
+Accepted durable Production schema state:
+
+- project ref: `pgzizndxdyhqmtyywjmt`;
+- migration count: **172**;
+- migration head: `20260922171632`;
+- repair ledger row: present;
+- permanent verifier:
+  `MIZIZI_RELEASE_SLUG_RESUME_INTEGRITY_PASS`;
+- committed public/editorial type SHA-256 remains
+  `5d229c68d65b3360ecef98882ed059b09a2e57b43daf3343358d1231b14aa1d3`;
+- the promoted repair replaces only private planner authority and introduces no
+  public/editorial type surface.
+
+Post-promotion Registry state remains deliberately unchanged:
+
+- verified Release-slug operations: **731**;
+- Release-slug canonical write events: **731**;
+- remaining deterministic Release-slug candidates: **6**;
+- Release operation enabled: **false**;
+- active standing/exact MIZIZI grants: **0 / 0**.
+
+Production security advisor inspection reports no finding naming the repaired
+Release planner, the resume-integrity migration, or `mizizi_private`.
+
+The disposable Preview branch
+`d64d23b3-4150-437c-8fdc-db83c8482ec7`
+(`ltcwajcrqdbefhulzibv`) was deleted after Production acceptance. Supabase
+branch inventory returned to **Production/main only**.
+
+No Registry cleanup mutation was executed by this promotion. A separate,
+freshly reviewed human approval and trigger is still required for the exact
+six-row resume.
