@@ -2621,3 +2621,190 @@ describe("MIZIZI Slice 3 Stage C narrow executor transport", () => {
     });
   });
 });
+
+
+describe("MIZIZI Slice 3 Tranche B Track duplicate repair exact authority", () => {
+  const migration = read(
+    "supabase/migrations/20260922054353_registry_track_duplicate_repair_authority_v1.sql",
+  );
+  const verifier = read(
+    "scripts/control-plane/verify-registry-track-duplicate-repair-authority.sql",
+  );
+
+  it("internalizes the mature engine without rewriting its domain algorithm", () => {
+    expect(migration).toContain(
+      "alter function public.admin_apply_registry_track_duplicate_repair",
+    );
+    expect(migration).toContain(
+      "set schema platform_private",
+    );
+    expect(migration).toContain(
+      "rename to apply_registry_track_duplicate_repair_engine_v1",
+    );
+    expect(migration).not.toMatch(
+      /create\s+(?:or\s+replace\s+)?function\s+platform_private\.apply_registry_track_duplicate_repair_engine_v1/i,
+    );
+    expect(migration).toContain(
+      "Mature Registry Track duplicate repair engine contract was not preserved",
+    );
+    expect(migration).toContain(
+      "ff7ec6d997671e5f27ed2056149e56e4c913284f911e0eb943532f750e39c0e7",
+    );
+    expect(verifier).toContain(
+      "ff7ec6d997671e5f27ed2056149e56e4c913284f911e0eb943532f750e39c0e7",
+    );
+  });
+
+  it("reuses shared review, exact-grant, journal and verifier primitives with kernel delta zero", () => {
+    expect(migration).toContain(
+      "'registry.track.duplicate_repair'",
+    );
+    expect(migration).toContain(
+      "'repair_registry_track_duplicate'",
+    );
+    expect(migration).toContain(
+      "'critical'",
+    );
+    expect(migration).toContain(
+      "max_targets",
+    );
+    expect(migration).toContain(
+      "registry_execution_target_set_fingerprint",
+    );
+    expect(migration).toContain(
+      "begin_registry_mutation_operation",
+    );
+    expect(migration).toContain(
+      "registry_operation_write_events",
+    );
+    expect(verifier).toContain(
+      "registry_execution_grant_target_review_seal",
+    );
+    expect(verifier).toContain(
+      "registry_execution_grants_review_authority_guard",
+    );
+    expect(migration).not.toContain(
+      "create table platform_private.registry_review_",
+    );
+    expect(migration).not.toContain(
+      "create table platform_private.registry_execution_grants",
+    );
+  });
+
+  it("freezes related repair state and enforces bounded exact execution", () => {
+    expect(migration).toContain(
+      "registry_track_duplicate_repair_state_fingerprint_v1",
+    );
+    for (const relation of [
+      "registry_tracks",
+      "registry_track_provider_links",
+      "registry_track_artists",
+      "registry_release_tracks",
+      "wk_chart_entries_v2",
+    ]) {
+      expect(migration).toContain(relation);
+    }
+    expect(migration).toContain(
+      "WK_STALE_TRACK_DUPLICATE_REPAIR",
+    );
+    expect(migration).toContain(
+      "Track duplicate repair exceeds the 16-Track exact target ceiling.",
+    );
+    expect(migration).toContain(
+      "Track duplicate repair exceeds the 64-row exact operation ceiling.",
+    );
+    expect(migration).toContain(
+      "Track duplicate repair exceeded its exact row budget.",
+    );
+    expect(migration).toContain(
+      "v_target_fingerprint",
+    );
+    expect(migration).not.toContain(
+      "repeat('0',64)",
+    );
+    expect(migration).not.toMatch(
+      /update\s+platform_private\.registry_execution_grants\s+set\s+target_set_fingerprint/i,
+    );
+  });
+
+  it("keeps the public product signature while removing direct engine authority", () => {
+    expect(migration).toContain(
+      "create function public.admin_apply_registry_track_duplicate_repair",
+    );
+    expect(migration).toContain(
+      "record_registry_track_duplicate_repair_evidence_v1",
+    );
+    expect(migration).toContain(
+      "issue_registry_track_duplicate_repair_grant_v1",
+    );
+    expect(migration).toContain(
+      "execute_registry_track_duplicate_repair_v1",
+    );
+    expect(migration).toContain(
+      "verify_registry_track_duplicate_repair_v1",
+    );
+    expect(migration).toContain(
+      "from public, anon, authenticated, service_role;",
+    );
+    expect(migration).toContain(
+      "to authenticated;",
+    );
+    expect(verifier).toContain(
+      "Private Track duplicate repair authority leaked client/service execution",
+    );
+  });
+
+  it("preserves resolution-event and current identity-lineage postconditions independently", () => {
+    expect(verifier).toContain(
+      "REGISTRY_TRACK_DUPLICATE_REPAIR_AUTHORITY_PASS",
+    );
+    expect(verifier).toContain(
+      "registry_track_resolution_events",
+    );
+    expect(verifier).toContain(
+      "registry_identity_lineage",
+    );
+    expect(verifier).toContain(
+      "Track duplicate repair supersession lineage coverage drifted",
+    );
+    expect(verifier).toContain(
+      "canonical_track_has_ambiguous_current_primary_artist_credit",
+    );
+    expect(verifier).not.toContain(
+      "canonical_artist_id is not null",
+    );
+  });
+
+  it("classifies the surviving public command as converged exact authority", () => {
+    const manifest = JSON.parse(
+      readFileSync(
+        "scripts/control-plane/registry-privileged-writer-manifest.json",
+        "utf8",
+      ),
+    ) as {
+      writers: Array<{
+        id: string;
+        executionAuthority: string;
+        disposition: string;
+        futureBoundary: string;
+        legacyDebt: boolean;
+      }>;
+    };
+
+    const writer = manifest.writers.find(
+      (candidate) =>
+        candidate.id ===
+        "admin-apply-registry-track-duplicate-repair",
+    );
+
+    expect(writer).toBeDefined();
+    expect(writer?.executionAuthority).toBe(
+      "security_definer_reviewed_exact_grant_wrapper_over_private_mature_engine",
+    );
+    expect(writer?.disposition).toBe("keep");
+    expect(writer?.futureBoundary).toBe(
+      "reviewed_exact_track_duplicate_repair_v1",
+    );
+    expect(writer?.legacyDebt).toBe(false);
+  });
+});
