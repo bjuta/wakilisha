@@ -279,3 +279,96 @@ A new Supabase development branch is a billable-resource action and therefore ha
 - PR needed now: **Not yet**
 - Production mutation authorized now: **No**
 - next gate: **focused repository tests, then disposable Preview replay after branch-cost confirmation**
+
+
+## Preview replay acceptance — 22 September 2026
+
+Disposable Preview:
+
+- branch: `slice3-tranche-b-track-duplicate-authority`
+- project ref: `thlmqyifbtwdyskbozxv`
+- branch id: `554939b5-3edd-4ca7-ba69-0c598a8af54f`
+- confirmed branch cost: **$0.01344/hour**
+
+Initial branch creation surfaced a platform parity defect: the Preview first appeared with an older migration baseline. A Production rebase was initiated before candidate replay.
+
+After rebase, baseline acceptance was proven independently of the Supabase lifecycle label:
+
+- Preview migration set exactly equaled Production: **168 / 168**;
+- Preview migration head exactly equaled Production: `20260921171000_registry_chart_artist_resolution_rebase_v1.sql`;
+- Preview Edge Function inventory exactly equaled Production: **40 / 40**, including deploy hashes and JWT settings;
+- mature duplicate-repair engine body SHA-256 exactly equaled Production:
+  `ff7ec6d997671e5f27ed2056149e56e4c913284f911e0eb943532f750e39c0e7`;
+- Artist Studio Registry Entry Convergence verifier: **PASS**;
+- Registry Chart Materialization Runtime verifier: **PASS**;
+- MIZIZI Shared Review Authority verifier: **PASS**;
+- MIZIZI Identity Projection Lineage verifier: **PASS**;
+- Registry Canonical Writer Inventory verifier: **PASS**.
+
+Supabase continued to report the branch lifecycle status as `MIGRATIONS_FAILED` despite exact migration/runtime parity and passing permanent verifiers. This is retained as a platform-status anomaly and is not treated as migration acceptance evidence by itself.
+
+### Native repository migration replay
+
+The exact repository migration was replayed with pinned Supabase CLI **2.107.0** through the repository-native linked path.
+
+Pre-apply dry run:
+
+- exactly one pending migration:
+  `20260922054353_registry_track_duplicate_repair_authority_v1.sql`.
+
+Native apply:
+
+- `supabase db push --linked`: **PASS**.
+
+Post-apply:
+
+- native dry run: **zero pending**;
+- Preview migration count: **169**;
+- Preview migration head:
+  `20260922054353_registry_track_duplicate_repair_authority_v1.sql`.
+
+No connector `apply_migration`, raw migration helper, history repair, `db pull`, or timestamp alias was used.
+
+### Post-apply permanent verifier stack
+
+On the exact 169-migration Preview:
+
+- Registry Track Duplicate Repair Authority:
+  `REGISTRY_TRACK_DUPLICATE_REPAIR_AUTHORITY_PASS`;
+- MIZIZI Shared Review Authority:
+  `MIZIZI_SHARED_REVIEW_AUTHORITY_PASS`;
+- MIZIZI Identity Projection Lineage:
+  `MIZIZI_IDENTITY_PROJECTION_LINEAGE_PASS`;
+- Registry Canonical Writer Inventory:
+  `REGISTRY_CANONICAL_WRITER_INVENTORY_PASS`.
+
+### Adversarial authority proof
+
+Post-apply Preview proves:
+
+- private moved engine body SHA-256 remains exactly
+  `ff7ec6d997671e5f27ed2056149e56e4c913284f911e0eb943532f750e39c0e7`;
+- `anon` cannot execute the private engine;
+- `authenticated` cannot execute the private engine;
+- `service_role` cannot execute the private engine;
+- `anon` cannot execute the public governed command;
+- `service_role` cannot execute the public governed command;
+- `authenticated` can execute the public governed command;
+- active Track duplicate exact grants at rest: **0**;
+- succeeded Track duplicate operations lacking verifier PASS: **0**.
+
+### Remaining acceptance gate
+
+A rollback-only SQL simulation was intentionally not accepted as the final transport proof because the MCP SQL session is `session_user=postgres`, while the governed product boundary correctly requires the accepted `authenticator` transport binding.
+
+The remaining gate is therefore one **real Supabase Auth + Data API client** execution against the disposable Preview:
+
+1. create an anonymous authenticated Preview user through Supabase Auth;
+2. grant that disposable user `registry_editor`;
+3. seed one disposable high-confidence Apple Music catalog duplicate fixture;
+4. call the public governed RPC through the real authenticated Data API;
+5. prove evidence/review/exact-grant/journal/verifier/lineage outcomes;
+6. rerun permanent verifiers and zero-active-grant checks;
+7. delete the disposable Preview after acceptance.
+
+This remaining gate is a transport/behavior proof only. Schema replay and database authority are already accepted.
