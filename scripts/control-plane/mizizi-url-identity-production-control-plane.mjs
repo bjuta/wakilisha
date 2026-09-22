@@ -261,11 +261,18 @@ function assertAudit(
   }
 
   if (entity === "chart") {
-    const after = phase === "after";
+    const trackSlug =
+      phase === "after"
+        ? 0
+        : Number(
+            expectedCurrentCandidates ??
+              EXPECTED_CHART_CANDIDATES,
+          );
+
     assertFields(
       summary,
       {
-        findings: after ? 91 : 252,
+        findings: trackSlug + 91,
         applied: 0,
         queued: 0,
         observed: 91,
@@ -288,7 +295,7 @@ function assertAudit(
         ),
       },
       {
-        trackSlug: after ? 0 : 161,
+        trackSlug,
         artistSlug: 91,
       },
       "Chart findings",
@@ -383,6 +390,15 @@ where release.status='active'
         '[[:space:]]+-[[:space:]]+album$'
     )
   )
+`;
+
+const chartEligibleCountSql = `
+select count(*)::int as candidate_count
+from public.wk_chart_entries_v2 entry
+join public.registry_tracks track
+  on track.id::text=entry.canonical_track_id
+ and track.status='active'
+where entry.track_slug is distinct from track.slug
 `;
 
 const chartCandidateSql = `
@@ -697,6 +713,81 @@ from payload
   return candidateSnapshot(row);
 }
 
+function chartProgrammeSnapshotFromHistory(
+  currentCandidatePayload,
+) {
+  const escapedCurrent =
+    String(currentCandidatePayload || "[]").replaceAll(
+      "'",
+      "''",
+    );
+
+  const row = queryViaLinkedCli(`
+with current_plans as (
+  select
+    value->>'chart_entry_id' as chart_entry_id,
+    value->>'current_track_slug' as current_track_slug,
+    value->>'canonical_track_id' as canonical_track_id,
+    value->>'canonical_track_slug' as canonical_track_slug,
+    value->>'expected_track_state_fingerprint'
+      as expected_track_state_fingerprint
+  from jsonb_array_elements(
+    '${escapedCurrent}'::jsonb
+  )
+),
+succeeded_plans as (
+  select
+    grant_row.plan_payload->>'chart_entry_id'
+      as chart_entry_id,
+    grant_row.plan_payload->>'current_track_slug'
+      as current_track_slug,
+    grant_row.plan_payload->>'canonical_track_id'
+      as canonical_track_id,
+    grant_row.plan_payload->>'canonical_track_slug'
+      as canonical_track_slug,
+    grant_row.plan_payload->>'expected_state_fingerprint'
+      as expected_track_state_fingerprint
+  from platform_private.registry_execution_grants grant_row
+  join platform_private.registry_mutation_operations operation
+    on operation.execution_grant_id=grant_row.id
+  where grant_row.actor_key='mizizi'
+    and grant_row.operation_key=
+      'registry.chart_track_slug.synchronize'
+    and grant_row.operation_version=1
+    and operation.status='succeeded'
+    and operation.verifier_status='passed'
+),
+programme as (
+  select * from succeeded_plans
+  union all
+  select * from current_plans
+),
+payload as (
+  select coalesce(
+    jsonb_agg(
+      jsonb_build_object(
+        'chart_entry_id',chart_entry_id,
+        'current_track_slug',current_track_slug,
+        'canonical_track_id',canonical_track_id,
+        'canonical_track_slug',canonical_track_slug,
+        'expected_track_state_fingerprint',
+          expected_track_state_fingerprint
+      )
+      order by chart_entry_id
+    ),
+    '[]'::jsonb
+  ) body
+  from programme
+)
+select
+  jsonb_array_length(body)::int as candidate_count,
+  body::text as candidate_payload
+from payload
+`);
+
+  return candidateSnapshot(row);
+}
+
 const atRestAuthoritySql = `
 select
   (
@@ -790,10 +881,12 @@ async function currentCandidateState(pool) {
 
   const releaseCurrent =
     candidateSnapshot(releaseCurrentResult.rows[0]);
-  const chart =
+  const chartCurrent =
     candidateSnapshot(chartResult.rows[0]);
   const releaseJournal =
     journalSnapshot(APPLY_SCOPES.release_slug);
+  const chartJournal =
+    journalSnapshot(APPLY_SCOPES.chart_track_slug);
 
   if (
     Number(releaseJournal.verified_operations) !==
@@ -801,6 +894,15 @@ async function currentCandidateState(pool) {
   ) {
     throw new Error(
       "Release slug journal/write-event parity is not exact",
+    );
+  }
+
+  if (
+    Number(chartJournal.verified_operations) !==
+    Number(chartJournal.canonical_events)
+  ) {
+    throw new Error(
+      "Chart Track-slug journal/write-event parity is not exact",
     );
   }
 
@@ -858,14 +960,44 @@ async function currentCandidateState(pool) {
     "Release slug programme freeze",
   );
 
+  let chartState = "";
+  let chartProgramme = null;
+
+  if (
+    Number(chartJournal.verified_operations) === 0 &&
+    chartCurrent.candidateCount ===
+      EXPECTED_CHART_CANDIDATES &&
+    chartCurrent.candidateFingerprint ===
+      EXPECTED_CHART_CANDIDATE_FINGERPRINT
+  ) {
+    chartState = "pristine";
+    chartProgramme = chartCurrent;
+  } else if (
+    Number(chartJournal.verified_operations) ===
+      EXPECTED_CHART_CANDIDATES &&
+    chartCurrent.candidateCount === 0
+  ) {
+    chartState = "accepted_final";
+    chartProgramme =
+      chartProgrammeSnapshotFromHistory("[]");
+  } else {
+    throw new Error(
+      "Chart Track-slug programme state is not a recognized exact boundary: " +
+        JSON.stringify({
+          journal: chartJournal,
+          current: chartCurrent,
+        }),
+    );
+  }
+
   assertFields(
-    chart,
+    chartProgramme,
     {
       candidateCount: EXPECTED_CHART_CANDIDATES,
       candidateFingerprint:
         EXPECTED_CHART_CANDIDATE_FINGERPRINT,
     },
-    "Chart Track-slug candidate freeze",
+    "Chart Track-slug programme freeze",
   );
 
   return {
@@ -873,7 +1005,10 @@ async function currentCandidateState(pool) {
     releaseCurrent,
     releaseState,
     releaseJournal,
-    chart,
+    chartProgramme,
+    chartCurrent,
+    chartState,
+    chartJournal,
   };
 }
 
@@ -1260,6 +1395,12 @@ async function main() {
       Number(
         releaseCountResult.rows[0]?.candidate_count || 0,
       );
+    const chartCountResult =
+      await jit.pool.query(chartEligibleCountSql);
+    const currentChartCandidates =
+      Number(
+        chartCountResult.rows[0]?.candidate_count || 0,
+      );
     const resumeMigrationReady =
       releaseResumeMigrationApplied();
 
@@ -1274,7 +1415,12 @@ async function main() {
       "before",
       currentReleaseCandidates,
     );
-    await runAudit(jit.url, "chart");
+    await runAudit(
+      jit.url,
+      "chart",
+      "before",
+      currentChartCandidates,
+    );
 
     if (
       MODE === "preflight" &&
@@ -1346,6 +1492,10 @@ async function main() {
       console.log(
         "Release programme state: " +
           candidates.releaseState,
+      );
+      console.log(
+        "Chart programme state: " +
+          candidates.chartState,
       );
       console.log("Registry mutation: NO");
       return;
