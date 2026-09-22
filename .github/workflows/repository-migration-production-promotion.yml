@@ -1,0 +1,163 @@
+name: Repository Migration Production Promotion
+
+on:
+  workflow_dispatch:
+    inputs:
+      expected_main_sha:
+        description: Exact protected main commit approved for Production promotion
+        required: true
+        type: string
+      expected_pending:
+        description: Comma-separated canonical migration filenames expected to be pending
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: repository-migration-production-promotion
+  cancel-in-progress: false
+
+jobs:
+  promote:
+    name: exact-main-native-promotion
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      PROD_REF: pgzizndxdyhqmtyywjmt
+      EXPECTED_MAIN_SHA: ${{ inputs.expected_main_sha }}
+      EXPECTED_PENDING: ${{ inputs.expected_pending }}
+      SUPABASE_PROJECT_REF: pgzizndxdyhqmtyywjmt
+      SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+
+    steps:
+      - name: Check out protected main
+        uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+
+      - name: Use Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: package-lock.json
+
+      - name: Install repository dependencies
+        run: npm ci --prefer-offline --no-audit --no-fund
+
+      - name: Set up pinned Supabase CLI
+        uses: supabase/setup-cli@v1
+        with:
+          version: 2.107.0
+          github-token: ${{ github.token }}
+
+      - name: Require exact protected main authority
+        run: |
+          set -euo pipefail
+
+          case "$EXPECTED_MAIN_SHA" in
+            [0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f]) ;;
+            *)
+              echo "STOP: expected_main_sha must be a full lowercase commit SHA."
+              exit 1
+              ;;
+          esac
+
+          git fetch origin refs/heads/main:refs/remotes/origin/main
+          git switch -C main refs/remotes/origin/main
+
+          test "$(git branch --show-current)" = "main"
+          test "$(git rev-parse HEAD)" = "$EXPECTED_MAIN_SHA"
+          test "$(git rev-parse HEAD)" = "$(git rev-parse refs/remotes/origin/main)"
+          test "$GITHUB_SHA" = "$EXPECTED_MAIN_SHA"
+          test -z "$(git status --porcelain)"
+
+          echo "REPOSITORY_MIGRATION_EXACT_MAIN=PASS"
+
+      - name: Link exact Production project
+        run: |
+          set -euo pipefail
+
+          supabase link --project-ref "$PROD_REF"
+
+          test -f supabase/.temp/project-ref
+          test "$(cat supabase/.temp/project-ref)" = "$PROD_REF"
+
+          echo "REPOSITORY_MIGRATION_EXACT_PRODUCTION=PASS"
+
+      - name: Require exact reviewed pending set
+        run: |
+          set -euo pipefail
+
+          EXPECTED="$(
+            printf '%s\n' "$EXPECTED_PENDING" |
+              tr ',' '\n' |
+              sed 's/^[[:space:]]*//;s/[[:space:]]*$//' |
+              sed '/^$/d' |
+              sort -u
+          )"
+
+          test -n "$EXPECTED"
+
+          while IFS= read -r name; do
+            case "$name" in
+              [0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9]_*.sql) ;;
+              *)
+                echo "STOP: non-canonical expected migration filename: $name"
+                exit 1
+                ;;
+            esac
+            test -f "supabase/migrations/$name"
+          done <<EOF
+          $EXPECTED
+          EOF
+
+          DRY="$(
+            supabase db push --dry-run --linked 2>&1
+          )"
+          printf '%s\n' "$DRY"
+
+          ACTUAL="$(
+            {
+              printf '%s\n' "$DRY" |
+                grep -Eo '[0-9]{14}_[A-Za-z0-9_-]+\.sql' || true
+            } |
+              sort -u
+          )"
+
+          if [ "$ACTUAL" != "$EXPECTED" ]; then
+            printf 'STOP: pending migration set changed.\nEXPECTED:\n%s\nACTUAL:\n%s\n'               "$EXPECTED" "$ACTUAL"
+            exit 1
+          fi
+
+          echo "REPOSITORY_MIGRATION_EXACT_PENDING_SET=PASS"
+
+      - name: Run canonical repository migration promotion
+        run: |
+          set -euo pipefail
+          bash scripts/control-plane/promote-repository-migrations.sh
+
+      - name: Record zero-pending completion
+        run: |
+          set -euo pipefail
+
+          POST="$(
+            supabase db push --dry-run --linked 2>&1
+          )"
+          printf '%s\n' "$POST"
+
+          POST_PENDING="$(
+            {
+              printf '%s\n' "$POST" |
+                grep -Eo '[0-9]{14}_[A-Za-z0-9_-]+\.sql' || true
+            } |
+              sort -u
+          )"
+
+          test -z "$POST_PENDING"
+
+          echo "REPOSITORY_MIGRATION_PRODUCTION_PROMOTION=PASS"
