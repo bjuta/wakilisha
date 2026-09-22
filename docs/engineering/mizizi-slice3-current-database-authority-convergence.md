@@ -135,11 +135,12 @@ The current classifications are:
      and true duplicate-identity handling;
    - retire `admin_resolve_chart_artist_alias(...)` after caller cutover.
 
-6. **Track duplicate repair — CURRENT HIGH-BLAST / INTERNALIZE**
-   - retain the mature repair algorithm;
-   - place exact reviewed plan/grant/journal/verifier authority around it;
-   - preserve `registry_track_resolution_events` and current identity-lineage
-     semantics.
+6. **Track duplicate repair — PRODUCTION ACCEPTED / CLOSED**
+   - mature repair algorithm internalized behind exact reviewed authority;
+   - accepted public command preserved;
+   - mature engine body seal preserved;
+   - Production verifier proves exact grants return to zero at rest and
+     event-to-lineage parity remains complete.
 
 7. **Artist decouple — CURRENT HIGH-BLAST / CONVERGE**
    - keep the reviewed product command;
@@ -196,8 +197,10 @@ Work is grouped by rollback authority, not legacy function name.
 
 **Tranche B — high-blast exact containment and retirement**
 
-- Track duplicate repair exact reviewed authority around the mature engine;
-- Artist decouple exact reviewed authority + low-level internalization;
+- Track duplicate repair exact reviewed authority around the mature engine:
+  **Production accepted / closed**;
+- Artist decouple exact reviewed authority + low-level internalization:
+  **next active family**;
 - safe Artist merge exact reviewed authority around the mature engine;
 - old manual Artist merge retirement after proof;
 - current Resource, lineage, and Chart-projection postcondition verification.
@@ -218,8 +221,8 @@ Production migrations:
 
 - `20260921170000_registry_reviewed_artist_identity_composition_v1.sql`;
 - `20260921171000_registry_chart_artist_resolution_rebase_v1.sql`;
-- Production migration count: 168;
-- Production migration head: `20260921171000`;
+- Production migration count at Tranche A closure: 168;
+- Production migration head at Tranche A closure: `20260921171000`;
 - canonical post-promotion migration dry-run: zero pending;
 - permanent Artist convergence verifier: PASS;
 - permanent Chart materialization/runtime verifier: PASS.
@@ -304,6 +307,47 @@ This closes the PR #1006 stale Artist + Chart authority block in Production.
 It does **not** close whole Slice 3. #962 remains open for the remaining
 Tranche B and separately active Slice-3-owned bypass/presentation work,
 including the current Top Songs D1 candidate.
+
+
+## Tranche B Track duplicate Production acceptance — 22 September 2026
+
+Implementation PR:
+
+- PR #1008: `MIZIZI Slice 3 Tranche B: govern Track duplicate repair authority`;
+- merged main: `6c858b7e7151f9d6cf6998b8237d9844fbbff1e7`.
+
+Production authority:
+
+- migration count: **169**;
+- migration head:
+  `20260922054353_registry_track_duplicate_repair_authority_v1`;
+- pending repository migrations: **0**;
+- Production `public,editorial` type equality: **PASS**;
+- Track duplicate authority verifier:
+  `REGISTRY_TRACK_DUPLICATE_REPAIR_AUTHORITY_PASS`;
+- shared review verifier:
+  `MIZIZI_SHARED_REVIEW_AUTHORITY_PASS`;
+- identity/projection lineage verifier:
+  `MIZIZI_IDENTITY_PROJECTION_LINEAGE_PASS`;
+- canonical writer inventory:
+  `REGISTRY_CANONICAL_WRITER_INVENTORY_PASS`.
+
+The mature duplicate-repair implementation is now private exact-authority
+engine state. The public governed command remains the product boundary.
+The accepted engine body SHA-256 remains
+`ff7ec6d997671e5f27ed2056149e56e4c913284f911e0eb943532f750e39c0e7`.
+
+The corrected R2 Preview passed real Supabase Auth -> Data API behavior,
+was then deleted after Production acceptance, and Supabase branch inventory
+returned to Production/main only.
+
+The committed schema seal is reconciled to Production authority at migration
+head `20260922054353` without changing generated type bytes.
+
+This closes only the **Track duplicate repair** family. #962 remains open.
+The next active Tranche B family is **Artist decouple exact reviewed authority**,
+followed by safe Artist merge containment and bounded old-manual-merge
+retirement after proof.
 
 ## Slice 3 exit gate
 
