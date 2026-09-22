@@ -2,10 +2,10 @@
   "operation": "mizizi_url_identity_production_apply",
   "confirm": "MIZIZI_URL_IDENTITY_PRODUCTION_APPLY",
   "programme_issue": 1013,
-  "scope": "release_slug",
-  "capability_grant_id": "833e42c4-44ae-46f8-8014-3a38aef6235d",
-  "expected_candidate_count": 737,
-  "expected_candidate_fingerprint": "b96da159df4ffa8b19a5bb39574995a6b25cac2552823ef24af8f737fb1278be",
-  "expected_operation_key": "registry.release_slug.canonicalize",
-  "expected_capability_key": "canonicalize_registry_release_slug"
+  "scope": "chart_track_slug",
+  "capability_grant_id": "c5c518d4-4fbf-4ee4-9379-47b13a598add",
+  "expected_candidate_count": 161,
+  "expected_candidate_fingerprint": "28a3b8362f8721ad4f35045a2cd938d265adf35373b522b492054af80eb8a910",
+  "expected_operation_key": "registry.chart_track_slug.synchronize",
+  "expected_capability_key": "synchronize_chart_track_slug"
 }
