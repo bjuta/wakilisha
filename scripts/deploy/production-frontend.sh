@@ -1,16 +1,16 @@
 #!/bin/bash
 set -euo pipefail
 
-RUNNER_VERSION="2"
+RUNNER_VERSION="3"
 BASE_EXPECTED_MAIN="57e4c9de7a205bbffde0ff97c9ec40f9a46b1b65"
 BASE_PREVIEW_REF="oeownzbanzbuvuyidwqh"
-TEMPLATE_SHA256="ee5767294b3b8665c832290aeaf5d9b5eeecb804da4305c08fd32d1bed331164"
+TEMPLATE_SHA256="29365ba580b53bf46b46c3530a06d3b1eb63cff76e5b05b389ad33b5adba8af2"
 
 SCRIPT_DIR="$(
   CDPATH= cd -- "$(dirname -- "$0")" >/dev/null 2>&1
   pwd
 )"
-TEMPLATE="$SCRIPT_DIR/templates/lightsail-frontend-production-v2.sh"
+TEMPLATE="$SCRIPT_DIR/templates/lightsail-frontend-production-v3.sh"
 
 EXPECTED_MAIN=""
 DEPLOY_LABEL=""
@@ -187,6 +187,11 @@ if [ "$SELF_TEST" -eq 1 ]; then
 
   if grep -Fq "$BASE_PREVIEW_REF" "$TMP_SELF"; then
     echo 'PRODUCTION_FRONTEND_RUNNER=FAIL_SELF_TEST_OLD_PREVIEW_REMAINS'
+    exit 1
+  fi
+
+  if ! grep -Fxq 'npm ci --prefer-offline --no-audit --no-fund' "$TMP_SELF"; then
+    echo 'PRODUCTION_FRONTEND_RUNNER=FAIL_SELF_TEST_DEPENDENCY_BOOTSTRAP_MISSING'
     exit 1
   fi
 
