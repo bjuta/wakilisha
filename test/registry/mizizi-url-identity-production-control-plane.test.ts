@@ -69,8 +69,8 @@ describe("MIZIZI current URL-identity production control plane", () => {
     expect(controlPlane).toContain(
       "registry.chart_track_slug.synchronize",
     );
-    expect(controlPlane).not.toContain(
-      "track_slug: {",
+    expect(controlPlane).not.toMatch(
+      /^\s*track_slug:\s*\{/m,
     );
     expect(controlPlane).toContain(
       "close_stewardship_authority_window_v1",
