@@ -687,6 +687,7 @@ export default function MobileReleaseDetail() {
                 const trackHref = canonicalTrackUrl(
                   artistSlug,
                   track.slug,
+                  track.id,
                 );
                 return (
                   <div key={track.id} className="flex items-center gap-3 px-4 py-3 border-b border-[var(--wk-divider)] last:border-b-0 active:bg-[var(--wk-surface-raised)] transition-colors">
