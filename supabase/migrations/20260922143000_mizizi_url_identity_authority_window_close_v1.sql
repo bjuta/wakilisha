@@ -95,6 +95,7 @@ declare
   v_expired integer := 0;
   v_operation_was_enabled boolean := false;
   v_changed boolean := false;
+  v_standing_status_before text;
 begin
   perform mizizi_private.assert_executor_v1();
 
@@ -129,6 +130,8 @@ begin
   from platform_private.system_actor_capability_grants standing
   where standing.id=p_capability_grant_id
   for update;
+
+  v_standing_status_before := v_standing.status;
 
   if not found
      or v_standing.actor_key<>'mizizi'
@@ -256,7 +259,7 @@ begin
       p_capability_grant_id,
       jsonb_build_object(
         'standing_grant_status',
-        case when v_standing.status='active' then 'active' else v_standing.status end,
+        v_standing_status_before,
         'operation_enabled',v_operation_was_enabled
       ),
       jsonb_build_object(
@@ -317,8 +320,8 @@ begin
   )
   into v_def;
 
-  if v_def ~* 'enabled[[:space:]]*=[[:space:]]*true'
-     or v_def ~* 'status[[:space:]]*=[[:space:]]*''active'''
+  if v_def ~* 'set[[:space:]]+enabled[[:space:]]*=[[:space:]]*true'
+     or v_def ~* 'set[[:space:]]+status[[:space:]]*=[[:space:]]*''active'''
   then
     raise exception 'STOP: authority-window close primitive contains authority-increasing assignment';
   end if;
