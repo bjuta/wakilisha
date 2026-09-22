@@ -1,0 +1,102 @@
+name: Temporary Seal MIZIZI URL Identity Production Schema
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+    paths:
+      - ".github/workflows/tmp-seal-mizizi-url-identity-production.yml"
+
+permissions:
+  contents: write
+
+jobs:
+  seal:
+    name: production-schema-seal
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      EXPECTED_MAIN: 723c7054abe5a50cc807ed791804e41e77d1880b
+      PROD_REF: pgzizndxdyhqmtyywjmt
+      SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+
+    steps:
+      - name: Check out exact closure branch
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.ref }}
+          fetch-depth: 0
+
+      - name: Use Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Prove closure branch is based on accepted Production main
+        run: |
+          set -euo pipefail
+          git fetch origin refs/heads/main:refs/remotes/origin/main
+          test "$(git rev-parse refs/remotes/origin/main)" = "$EXPECTED_MAIN"
+          test "$(git merge-base HEAD refs/remotes/origin/main)" = "$EXPECTED_MAIN"
+          echo "MIZIZI_URL_IDENTITY_CLOSURE_BASE=PASS"
+
+      - name: Generate canonical Production schema seal
+        run: |
+          set -euo pipefail
+          SUPABASE_CLI_VERSION=2.107.0 \
+          SUPABASE_TARGET_PROJECT_REF="$PROD_REF" \
+          SUPABASE_SCHEMA_SOURCE_PROJECT_REF="$PROD_REF" \
+          SCHEMA_SEAL_MODE=production \
+          bash scripts/control-plane/generate-live-schema.sh
+
+          node --input-type=module <<'NODE'
+          import fs from "node:fs";
+          const baseline=JSON.parse(
+            fs.readFileSync("docs/engineering/live-schema-baseline.json","utf8")
+          );
+          if (
+            baseline.projectRef !== "pgzizndxdyhqmtyywjmt" ||
+            baseline.migrationCount !== 171 ||
+            baseline.latestMigration !==
+              "20260922143000_mizizi_url_identity_authority_window_close_v1.sql" ||
+            baseline.typesSha256 !==
+              "5d229c68d65b3360ecef98882ed059b09a2e57b43daf3343358d1231b14aa1d3" ||
+            baseline.schemaSeal?.mode !== "production" ||
+            baseline.schemaSeal?.sourceProjectRef !== "pgzizndxdyhqmtyywjmt" ||
+            baseline.schemaSeal?.migrationHead !== "20260922143000"
+          ) {
+            throw new Error("Production schema seal is not exact");
+          }
+          console.log("MIZIZI_URL_IDENTITY_PRODUCTION_SCHEMA_SEAL=PASS");
+          NODE
+
+      - name: Remove temporary seal workflow
+        run: |
+          set -euo pipefail
+          git rm .github/workflows/tmp-seal-mizizi-url-identity-production.yml
+
+      - name: Stage only canonical schema reconciliation
+        run: |
+          set -euo pipefail
+          git add             src/types/database.types.ts             docs/engineering/live-schema-baseline.json
+
+          git diff --cached --check
+
+          FILES="$(git diff --cached --name-only | sort)"
+          printf '%s\n' "$FILES"
+
+          test "$(printf '%s\n' "$FILES" | grep -Fxc '.github/workflows/tmp-seal-mizizi-url-identity-production.yml')" = "1"
+          test "$(printf '%s\n' "$FILES" | grep -Fxc 'docs/engineering/live-schema-baseline.json')" = "1"
+
+          EXTRA="$(printf '%s\n' "$FILES" | grep -v -E '^(\.github/workflows/tmp-seal-mizizi-url-identity-production\.yml|docs/engineering/live-schema-baseline\.json|src/types/database\.types\.ts)$' || true)"
+          test -z "$EXTRA"
+
+      - name: Commit Production schema reconciliation
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git commit -m "chore: seal MIZIZI URL identity production schema"
+          git push origin "HEAD:${{ github.event.pull_request.head.ref }}"
