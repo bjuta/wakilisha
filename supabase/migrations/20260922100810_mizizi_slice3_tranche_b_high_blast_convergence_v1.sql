@@ -1495,7 +1495,7 @@ declare
   v_state_fingerprint text;
   v_result jsonb;
   v_rows integer;
-  v_engine_started_at timestamptz;
+  v_existing_audit_ids uuid[];
   v_audit_id uuid;
   v_write_event_id uuid;
 begin
@@ -1700,7 +1700,12 @@ begin
       updated_at=now()
   where id=v_operation.id;
 
-  v_engine_started_at:=clock_timestamp();
+  select coalesce(array_agg(audit.id order by audit.id),'{}'::uuid[])
+  into v_existing_audit_ids
+  from public.registry_audit_log audit
+  where audit.action='artist_credit_decoupled'
+    and audit.entity_type='registry_artist'
+    and audit.entity_id=v_source_artist_id;
 
   v_result:=platform_private.apply_registry_artist_decouple_engine_v1(
     v_source_artist_id,
@@ -1733,7 +1738,7 @@ begin
   where audit.action='artist_credit_decoupled'
     and audit.entity_type='registry_artist'
     and audit.entity_id=v_source_artist_id
-    and audit.created_at>=v_engine_started_at-interval '1 second'
+    and not (audit.id=any(v_existing_audit_ids))
   order by audit.created_at desc,audit.id desc
   limit 1;
 
@@ -1819,7 +1824,7 @@ declare
   v_state_fingerprint text;
   v_result jsonb;
   v_rows integer;
-  v_engine_started_at timestamptz;
+  v_existing_event_ids uuid[];
   v_event_id uuid;
   v_write_event_id uuid;
 begin
@@ -2011,7 +2016,11 @@ begin
       updated_at=now()
   where id=v_operation.id;
 
-  v_engine_started_at:=clock_timestamp();
+  select coalesce(array_agg(event.id order by event.id),'{}'::uuid[])
+  into v_existing_event_ids
+  from public.registry_artist_resolution_events event
+  where event.action='artist_merge'
+    and event.source_artist_id=v_source_artist_id;
 
   v_result:=platform_private.apply_registry_artist_merge_engine_v1(
     v_source_artist_id,
@@ -2043,7 +2052,7 @@ begin
   where event.action='artist_merge'
     and event.status='success'
     and event.source_artist_id=v_source_artist_id
-    and event.created_at>=v_engine_started_at-interval '1 second'
+    and not (event.id=any(v_existing_event_ids))
     and event.result->>'canonicalArtistId'=v_canonical_artist_id::text
   order by event.created_at desc,event.id desc
   limit 1;
@@ -2238,19 +2247,10 @@ begin
 
     select artist.* into v_chart_primary
     from public.registry_artists artist
-    where artist.id=coalesce(
-      nullif(v_plan->>'chart_primary_artist_id','')::uuid,
-      (
-        select (item.value->>'artist_id')::uuid
-        from jsonb_array_elements(v_plan->'selected_artists') with ordinality item(value,ordinality)
-        where nullif(item.value->>'artist_id','') is not null
-        order by
-          (lower(coalesce(item.value->>'is_primary','false')) in ('true','1','yes')) desc,
-          coalesce(nullif(item.value->>'credit_order','')::integer,item.ordinality::integer),
-          (item.value->>'artist_id')::uuid
-        limit 1
-      )
-    );
+    where artist.id=nullif(
+      v_operation.result_payload->'result'->>'chartPrimaryArtistId',
+      ''
+    )::uuid;
 
     if v_source.id is null or v_chart_primary.id is null then
       v_failure:='source_or_chart_primary_artist_missing';
@@ -2406,7 +2406,7 @@ begin
        select 1
        from public.registry_artist_aliases alias_row
        where alias_row.id=any(v_source_alias_ids)
-         and alias_row.status<>'blocked'
+         and alias_row.status is distinct from 'blocked'
      )
   then
     v_failure:='source_alias_not_blocked';
@@ -2640,7 +2640,7 @@ begin
        select 1
        from public.registry_artist_aliases alias_row
        where lower(alias_row.alias_slug)=lower(v_source.slug)
-         and alias_row.canonical_artist_id<>v_canonical_artist_id
+         and alias_row.canonical_artist_id is distinct from v_canonical_artist_id
      )
   then
     v_failure:='source_alias_not_canonicalized';
