@@ -1,0 +1,77 @@
+name: Temporary MIZIZI URL Identity Preview Seal
+
+on:
+  pull_request:
+    paths:
+      - ".github/workflows/mizizi-url-identity-preview-seal.yml"
+
+permissions:
+  contents: write
+
+jobs:
+  preview-seal:
+    name: preview-seal
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      PREVIEW_REF: lscfgarfnhfqtohcdvmg
+      PREVIEW_BRANCH_ID: d5d4610d-2613-40ce-91b5-7f398ade3b10
+      PROD_REF: pgzizndxdyhqmtyywjmt
+      MIGRATION: supabase/migrations/20260922143000_mizizi_url_identity_authority_window_close_v1.sql
+      VERIFIER: scripts/control-plane/verify-mizizi-url-identity-authority-window-close.sql
+      SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+
+    steps:
+      - name: Check out exact PR branch head
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.ref }}
+          fetch-depth: 0
+
+      - name: Configure git identity
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+      - name: Fetch protected main
+        run: |
+          set -euo pipefail
+          git fetch origin main
+          test -f "$MIGRATION"
+          test -f "$VERIFIER"
+
+      - name: Link exact disposable Preview
+        run: |
+          set -euo pipefail
+          npx --yes supabase@2.107.0 link --project-ref "$PREVIEW_REF"
+          test "$(cat supabase/.temp/project-ref)" = "$PREVIEW_REF"
+
+      - name: Record canonical Preview replay authority
+        run: |
+          set -euo pipefail
+          CONTROL_PLANE_BASE_REF=origin/main           SUPABASE_CLI_VERSION=2.107.0           SUPABASE_TARGET_PROJECT_REF="$PROD_REF"           node scripts/control-plane/record-migration-replay-proof.mjs             --migration "$MIGRATION"             --preview-project-ref "$PREVIEW_REF"             --preview-branch-id "$PREVIEW_BRANCH_ID"             --verifier-file "$VERIFIER"
+
+      - name: Remove temporary Preview workflows
+        run: |
+          set -euo pipefail
+          git rm             .github/workflows/mizizi-url-identity-preview-replay.yml             .github/workflows/mizizi-url-identity-preview-seal.yml
+
+      - name: Require exact bookkeeping scope
+        run: |
+          set -euo pipefail
+          git add             src/types/database.types.ts             docs/engineering/live-schema-baseline.json             docs/engineering/replay-proofs/20260922143000_mizizi_url_identity_authority_window_close_v1.sql.json
+
+          git diff --cached --check
+
+          printf '\nSTAGED FILES\n'
+          git diff --cached --name-only
+
+          COUNT="$(git diff --cached --name-only | wc -l | tr -d ' ')"
+          test "$COUNT" = "5"
+
+      - name: Commit canonical replay seal and temporary-workflow cleanup
+        run: |
+          set -euo pipefail
+          git commit -m "chore: seal MIZIZI URL-identity preview replay"
+          git push origin "HEAD:${{ github.event.pull_request.head.ref }}"
+          echo "MIZIZI_URL_IDENTITY_PREVIEW_SEAL=PASS"
