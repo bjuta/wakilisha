@@ -361,7 +361,7 @@
       "entrypoint": "public.admin_apply_artist_decouple_decision(uuid)",
       "authentication": "authenticated_capability_context",
       "authorization": "manage_registry_plus_reviewed_decouple_decision",
-      "executionAuthority": "security_definer_domain_wrapper",
+      "executionAuthority": "security_definer_reviewed_exact_grant_wrapper_over_private_mature_engine",
       "targets": [
         "registry_artists",
         "registry_artist_aliases",
@@ -370,8 +370,8 @@
         "registry_release_artists"
       ],
       "riskClass": "critical",
-      "disposition": "keep_converge",
-      "futureBoundary": "reviewed_decouple_command_plus_dedicated_exact_operation",
+      "disposition": "keep",
+      "futureBoundary": "reviewed_exact_artist_decouple_v1",
       "miziziCallable": false,
       "humanCallable": true,
       "publicCallable": false,
@@ -514,9 +514,9 @@
       "id": "admin-decouple-registry-artist",
       "kind": "database_function",
       "entrypoint": "public.admin_decouple_registry_artist(uuid,jsonb,text,boolean,uuid)",
-      "authentication": "authenticated_capability_context",
-      "authorization": "manage_registry",
-      "executionAuthority": "security_definer",
+      "authentication": "owner_internal",
+      "authorization": "exact_artist_decouple_operation_only",
+      "executionAuthority": "owner_internal_private_mature_engine",
       "targets": [
         "registry_artists",
         "registry_artist_aliases",
@@ -526,10 +526,10 @@
         "registry_audit_log"
       ],
       "riskClass": "critical",
-      "disposition": "retire_or_internalize",
-      "futureBoundary": "reviewed_decouple_command_plus_dedicated_exact_operation",
+      "disposition": "internalize",
+      "futureBoundary": "platform_private.apply_registry_artist_decouple_engine_v1",
       "miziziCallable": false,
-      "humanCallable": true,
+      "humanCallable": false,
       "publicCallable": false,
       "canonicalMutation": true,
       "legacyDebt": false
@@ -606,29 +606,6 @@
       "legacyDebt": false
     },
     {
-      "id": "admin-merge-registry-artists",
-      "kind": "database_function",
-      "entrypoint": "public.admin_merge_registry_artists(uuid,uuid,text,boolean)",
-      "authentication": "authenticated_capability_context",
-      "authorization": "manage_registry",
-      "executionAuthority": "security_definer",
-      "targets": [
-        "registry_artists",
-        "registry_artist_aliases",
-        "registry_tracks",
-        "registry_track_artists",
-        "registry_release_artists"
-      ],
-      "riskClass": "critical",
-      "disposition": "candidate_retire",
-      "futureBoundary": "none_after_dependency_traffic_and_rollback_proof",
-      "miziziCallable": false,
-      "humanCallable": true,
-      "publicCallable": false,
-      "canonicalMutation": true,
-      "legacyDebt": false
-    },
-    {
       "id": "admin-patch-registry-release-detail-v1",
       "kind": "database_function",
       "entrypoint": "public.admin_patch_registry_release_detail_v1(uuid,text,text,text,date,text,uuid,text,text,text,timestamp with time zone)",
@@ -695,7 +672,7 @@
       "entrypoint": "public.admin_safe_merge_registry_artists(uuid,uuid,text,boolean,text)",
       "authentication": "authenticated_capability_context",
       "authorization": "manage_registry",
-      "executionAuthority": "security_definer",
+      "executionAuthority": "security_definer_reviewed_exact_grant_wrapper_over_private_mature_engine",
       "targets": [
         "registry_artists",
         "registry_artist_aliases",
@@ -704,8 +681,8 @@
         "registry_release_artists"
       ],
       "riskClass": "critical",
-      "disposition": "keep_converge",
-      "futureBoundary": "dedicated_exact_artist_merge_operation",
+      "disposition": "keep",
+      "futureBoundary": "reviewed_exact_artist_merge_v1",
       "miziziCallable": false,
       "humanCallable": true,
       "publicCallable": false,
