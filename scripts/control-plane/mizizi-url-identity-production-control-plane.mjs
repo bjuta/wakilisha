@@ -26,23 +26,32 @@ const ARTIFACT_DIR =
 const CLOSE_MIGRATION_VERSION = "20260922143000";
 const CLOSE_MIGRATION_NAME =
   "mizizi_url_identity_authority_window_close_v1";
+const RELEASE_RESUME_MIGRATION_VERSION = "20260922171632";
+const RELEASE_RESUME_MIGRATION_NAME =
+  "mizizi_release_slug_resume_integrity_v1";
 
 const EXPECTED_RELEASE_CANDIDATES = 737;
 const EXPECTED_RELEASE_CANDIDATE_FINGERPRINT =
   "b96da159df4ffa8b19a5bb39574995a6b25cac2552823ef24af8f737fb1278be";
+const ACCEPTED_RELEASE_PARTIAL_VERIFIED = 731;
+const ACCEPTED_RELEASE_PARTIAL_REMAINING = 6;
+const EXPECTED_RELEASE_RESUME_CANDIDATE_FINGERPRINT =
+  "2be28e013ce904e2a05f5d3c368304684c08a6ad7eadfe23a99c57162d0091b2";
 const EXPECTED_CHART_CANDIDATES = 161;
 const EXPECTED_CHART_CANDIDATE_FINGERPRINT =
   "28a3b8362f8721ad4f35045a2cd938d265adf35373b522b492054af80eb8a910";
 
 const EXPECTED_BLOBS = {
   "scripts/registry/agents/mizizi/run.ts":
-    "3f6870d1605786786d78643efd0d97dc54d2d47e",
+    "81410c1330869565065c8026f2ddc57a8e29ded0",
   "scripts/registry/agents/mizizi/core.ts":
     "c8ab1436437175cd1d7d1c451299ae2b199bc327",
   "supabase/migrations/20260918173446_mizizi_stage_b_broker_convergence_v1.sql":
     "1cd6c591fe312225a8cbfa431b53063431127b77",
   "supabase/migrations/20260920095334_mizizi_stage_c_narrow_executor_transport_v1.sql":
     "b683e0097071899d9871d98b4cdde83a25be19b6",
+  "supabase/migrations/20260922171632_mizizi_release_slug_resume_integrity_v1.sql":
+    "14e5447a948f34e6f126fef73baef00098376c37",
 };
 
 const APPLY_SCOPES = {
@@ -142,7 +151,12 @@ function ruleCount(clean, ruleId) {
   return match ? Number(match[1]) : 0;
 }
 
-function assertAudit(text, entity, phase = "before") {
+function assertAudit(
+  text,
+  entity,
+  phase = "before",
+  expectedCurrentCandidates = null,
+) {
   const summary = auditSummary(text);
   const clean = summary.clean;
 
@@ -197,11 +211,18 @@ function assertAudit(text, entity, phase = "before") {
   }
 
   if (entity === "release") {
-    const after = phase === "after";
+    const slugPackaging =
+      phase === "after"
+        ? 0
+        : Number(
+            expectedCurrentCandidates ??
+              EXPECTED_RELEASE_CANDIDATES,
+          );
+
     assertFields(
       summary,
       {
-        findings: after ? 737 : 1474,
+        findings: 737 + slugPackaging,
         applied: 0,
         queued: 0,
         observed: 737,
@@ -229,7 +250,7 @@ function assertAudit(text, entity, phase = "before") {
       },
       {
         titlePackaging: 737,
-        slugPackaging: after ? 0 : 737,
+        slugPackaging,
         taxonomy: 0,
       },
       "Release findings",
@@ -273,7 +294,7 @@ function assertAudit(text, entity, phase = "before") {
   }
 }
 
-const releaseCandidateSql = `
+const releaseCandidateRowsSql = `
 with eligible as materialized (
   select release.id
   from public.registry_releases release
@@ -295,19 +316,23 @@ with eligible as materialized (
           '[[:space:]]+-[[:space:]]+album$'
       )
     )
-),
-plans as (
-  select
-    plan.release_id::text as release_id,
-    plan.artist_id::text as artist_id,
-    plan.artist_slug,
-    plan.current_slug,
-    plan.proposed_slug,
-    plan.uses_date_fallback,
-    plan.expected_state_fingerprint
-  from eligible
-  cross join lateral
-    mizizi_private.release_slug_plan_v1(eligible.id) plan
+)
+select
+  plan.release_id::text as release_id,
+  plan.artist_id::text as artist_id,
+  plan.artist_slug,
+  plan.current_slug,
+  plan.proposed_slug,
+  plan.uses_date_fallback,
+  plan.expected_state_fingerprint
+from eligible
+cross join lateral
+  mizizi_private.release_slug_plan_v1(eligible.id) plan
+`;
+
+const releaseCandidateSql = `
+with plans as (
+  ${releaseCandidateRowsSql}
 ),
 payload as (
   select coalesce(
@@ -332,6 +357,84 @@ select
   jsonb_array_length(body)::int as candidate_count,
   body::text as candidate_payload
 from payload
+`;
+
+const releaseProgrammeCandidateSql = `
+with current_plans as (
+  ${releaseCandidateRowsSql}
+),
+succeeded_plans as (
+  select
+    grant_row.plan_payload->>'release_id' as release_id,
+    grant_row.plan_payload->>'artist_id' as artist_id,
+    grant_row.plan_payload->>'artist_slug' as artist_slug,
+    grant_row.plan_payload->>'current_slug' as current_slug,
+    grant_row.plan_payload->>'proposed_slug' as proposed_slug,
+    (
+      grant_row.plan_payload->>'uses_date_fallback'
+    )::boolean as uses_date_fallback,
+    grant_row.plan_payload->>'expected_state_fingerprint'
+      as expected_state_fingerprint
+  from platform_private.registry_execution_grants grant_row
+  join platform_private.registry_mutation_operations operation
+    on operation.execution_grant_id=grant_row.id
+  where grant_row.actor_key='mizizi'
+    and grant_row.operation_key='registry.release_slug.canonicalize'
+    and grant_row.operation_version=1
+    and operation.status='succeeded'
+    and operation.verifier_status='passed'
+),
+programme as (
+  select * from succeeded_plans
+  union all
+  select * from current_plans
+),
+payload as (
+  select coalesce(
+    jsonb_agg(
+      jsonb_build_object(
+        'release_id',release_id,
+        'artist_id',artist_id,
+        'artist_slug',artist_slug,
+        'current_slug',current_slug,
+        'proposed_slug',proposed_slug,
+        'uses_date_fallback',uses_date_fallback,
+        'expected_state_fingerprint',
+          expected_state_fingerprint
+      )
+      order by release_id
+    ),
+    '[]'::jsonb
+  ) body
+  from programme
+)
+select
+  jsonb_array_length(body)::int as candidate_count,
+  body::text as candidate_payload
+from payload
+`;
+
+const releaseEligibleCountSql = `
+select count(*)::int as candidate_count
+from public.registry_releases release
+where release.status='active'
+  and (
+    (
+      release.slug ~* '-single$'
+      and release.title ~*
+        '[[:space:]]+-[[:space:]]+single$'
+    )
+    or (
+      release.slug ~* '-ep$'
+      and release.title ~*
+        '[[:space:]]+-[[:space:]]+ep$'
+    )
+    or (
+      release.slug ~* '-album$'
+      and release.title ~*
+        '[[:space:]]+-[[:space:]]+album$'
+    )
+  )
 `;
 
 const chartCandidateSql = `
@@ -435,7 +538,12 @@ function assertZeroAtRest(label) {
   return state;
 }
 
-async function runAudit(url, entity, phase = "before") {
+async function runAudit(
+  url,
+  entity,
+  phase = "before",
+  expectedCurrentCandidates = null,
+) {
   const logPath =
     ARTIFACT_DIR +
     "/" +
@@ -457,28 +565,37 @@ async function runAudit(url, entity, phase = "before") {
   );
 
   const text = fs.readFileSync(logPath, "utf8");
-  assertAudit(text, entity, phase);
+  assertAudit(
+    text,
+    entity,
+    phase,
+    expectedCurrentCandidates,
+  );
 }
 
 async function currentCandidateState(pool) {
-  const releaseResult =
+  const releaseCurrentResult =
     await pool.query(releaseCandidateSql);
+  const releaseProgrammeResult =
+    await pool.query(releaseProgrammeCandidateSql);
   const chartResult =
     await pool.query(chartCandidateSql);
 
-  const release =
-    candidateSnapshot(releaseResult.rows[0]);
+  const releaseCurrent =
+    candidateSnapshot(releaseCurrentResult.rows[0]);
+  const releaseProgramme =
+    candidateSnapshot(releaseProgrammeResult.rows[0]);
   const chart =
     candidateSnapshot(chartResult.rows[0]);
 
   assertFields(
-    release,
+    releaseProgramme,
     {
       candidateCount: EXPECTED_RELEASE_CANDIDATES,
       candidateFingerprint:
         EXPECTED_RELEASE_CANDIDATE_FINGERPRINT,
     },
-    "Release slug candidate freeze",
+    "Release slug programme freeze",
   );
 
   assertFields(
@@ -491,8 +608,75 @@ async function currentCandidateState(pool) {
     "Chart Track-slug candidate freeze",
   );
 
-  return { release, chart };
+  const releaseJournal =
+    journalSnapshot(APPLY_SCOPES.release_slug);
+
+  if (
+    Number(releaseJournal.verified_operations) !==
+    Number(releaseJournal.canonical_events)
+  ) {
+    throw new Error(
+      "Release slug journal/write-event parity is not exact",
+    );
+  }
+
+  let releaseState = "";
+
+  if (
+    Number(releaseJournal.verified_operations) === 0 &&
+    releaseCurrent.candidateCount ===
+      EXPECTED_RELEASE_CANDIDATES &&
+    releaseCurrent.candidateFingerprint ===
+      EXPECTED_RELEASE_CANDIDATE_FINGERPRINT
+  ) {
+    releaseState = "pristine";
+  } else if (
+    Number(releaseJournal.verified_operations) ===
+      ACCEPTED_RELEASE_PARTIAL_VERIFIED &&
+    releaseCurrent.candidateCount ===
+      ACCEPTED_RELEASE_PARTIAL_REMAINING &&
+    releaseCurrent.candidateFingerprint ===
+      EXPECTED_RELEASE_RESUME_CANDIDATE_FINGERPRINT
+  ) {
+    releaseState = "accepted_partial";
+  } else if (
+    Number(releaseJournal.verified_operations) ===
+      EXPECTED_RELEASE_CANDIDATES &&
+    releaseCurrent.candidateCount === 0
+  ) {
+    releaseState = "accepted_final";
+  } else {
+    throw new Error(
+      "Release slug programme state is not a recognized exact boundary: " +
+        JSON.stringify({
+          journal: releaseJournal,
+          current: releaseCurrent,
+        }),
+    );
+  }
+
+  return {
+    releaseProgramme,
+    releaseCurrent,
+    releaseState,
+    releaseJournal,
+    chart,
+  };
 }
+
+function releaseResumeMigrationApplied() {
+  const state = queryViaLinkedCli(`
+select exists(
+  select 1
+  from supabase_migrations.schema_migrations
+  where version='${RELEASE_RESUME_MIGRATION_VERSION}'
+    and name='${RELEASE_RESUME_MIGRATION_NAME}'
+) as applied
+`);
+
+  return String(state.applied) === "true";
+}
+
 
 function requireUuid(value, label) {
   const text = String(value || "");
@@ -602,6 +786,12 @@ select
   ) as close_migration_applied,
   exists(
     select 1
+    from supabase_migrations.schema_migrations
+    where version='${RELEASE_RESUME_MIGRATION_VERSION}'
+      and name='${RELEASE_RESUME_MIGRATION_NAME}'
+  ) as release_resume_migration_applied,
+  exists(
+    select 1
     from platform_private.registry_operation_types
     where operation_key='${scope.operationKey}'
       and operation_version=1
@@ -642,6 +832,7 @@ select
     state,
     {
       close_migration_applied: true,
+      release_resume_migration_applied: true,
       operation_enabled: true,
       exact_human_grant: true,
       active_standing_total: 1,
@@ -776,13 +967,78 @@ async function main() {
   let primaryError = null;
 
   try {
+    const releaseCountResult =
+      await jit.pool.query(releaseEligibleCountSql);
+    const currentReleaseCandidates =
+      Number(
+        releaseCountResult.rows[0]?.candidate_count || 0,
+      );
+    const resumeMigrationReady =
+      releaseResumeMigrationApplied();
+
     console.log(
       "\n=== 4. CURRENT FULL-CORPUS READ-ONLY AUDIT ===",
     );
 
     await runAudit(jit.url, "track");
-    await runAudit(jit.url, "release");
+    await runAudit(
+      jit.url,
+      "release",
+      "before",
+      currentReleaseCandidates,
+    );
     await runAudit(jit.url, "chart");
+
+    if (
+      MODE === "preflight" &&
+      !resumeMigrationReady
+    ) {
+      const releaseJournal =
+        journalSnapshot(APPLY_SCOPES.release_slug);
+
+      assertFields(
+        {
+          currentReleaseCandidates,
+          verified:
+            releaseJournal.verified_operations,
+          events:
+            releaseJournal.canonical_events,
+        },
+        {
+          currentReleaseCandidates:
+            ACCEPTED_RELEASE_PARTIAL_REMAINING,
+          verified:
+            ACCEPTED_RELEASE_PARTIAL_VERIFIED,
+          events:
+            ACCEPTED_RELEASE_PARTIAL_VERIFIED,
+        },
+        "pre-migration accepted Release partial stop",
+      );
+
+      fs.writeFileSync(
+        ARTIFACT_DIR + "/candidate-state.json",
+        JSON.stringify(
+          {
+            releaseState:
+              "accepted_partial_migration_pending",
+            releaseCurrentCount:
+              currentReleaseCandidates,
+            releaseJournal,
+          },
+          null,
+          2,
+        ) + "\n",
+      );
+
+      console.log(
+        "\n=== MIZIZI URL-IDENTITY REPAIR PREFLIGHT PASS ===",
+      );
+      console.log(
+        "Resume migration: pending Production promotion",
+      );
+      console.log("Registry mutation: NO");
+      return;
+    }
 
     console.log(
       "\n=== 5. EXACT CURRENT CANDIDATE FREEZE ===",
@@ -800,12 +1056,32 @@ async function main() {
       console.log(
         "\n=== MIZIZI URL-IDENTITY PRODUCTION PREFLIGHT PASS ===",
       );
+      console.log(
+        "Release programme state: " +
+          candidates.releaseState,
+      );
       console.log("Registry mutation: NO");
       return;
     }
 
     const scope = trigger.scopeConfig;
     const before = journalSnapshot(scope);
+    const expectedApplyCount =
+      scope.entity === "release"
+        ? candidates.releaseCurrent.candidateCount
+        : scope.expectedCount;
+
+    if (
+      scope.entity === "release" &&
+      !["pristine", "accepted_partial"].includes(
+        candidates.releaseState,
+      )
+    ) {
+      throw new Error(
+        "Release slug apply cannot start from " +
+          candidates.releaseState,
+      );
+    }
 
     fs.writeFileSync(
       ARTIFACT_DIR + "/state-before.json",
@@ -894,13 +1170,24 @@ async function main() {
           Number(before.canonical_events),
       },
       {
-        verifiedDelta: scope.expectedCount,
-        eventDelta: scope.expectedCount,
+        verifiedDelta: expectedApplyCount,
+        eventDelta: expectedApplyCount,
       },
       "governed operation acceptance",
     );
 
     if (scope.entity === "release") {
+      assertFields(
+        after,
+        {
+          verified_operations:
+            EXPECTED_RELEASE_CANDIDATES,
+          canonical_events:
+            EXPECTED_RELEASE_CANDIDATES,
+        },
+        "final Release programme journal",
+      );
+
       const result =
         await jit.pool.query(releaseCandidateSql);
       const state =
@@ -910,7 +1197,12 @@ async function main() {
         { candidateCount: 0 },
         "post-apply Release candidate state",
       );
-      await runAudit(jit.url, "release", "after");
+      await runAudit(
+        jit.url,
+        "release",
+        "after",
+        0,
+      );
     } else {
       const result =
         await jit.pool.query(chartCandidateSql);
