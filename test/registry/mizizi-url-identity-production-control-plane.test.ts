@@ -270,7 +270,7 @@ describe("MIZIZI current URL-identity production control plane", () => {
       "slugNoise: 66",
     );
     expect(controlPlane).toContain(
-      "titlePackaging: 737",
+      "titlePackaging: slugPackaging",
     );
     expect(controlPlane).toContain(
       "artistSlug: 91",
