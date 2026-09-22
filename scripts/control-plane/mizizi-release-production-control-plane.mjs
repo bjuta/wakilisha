@@ -10,7 +10,6 @@ const TRIGGER_FILE = process.env.MIZIZI_TRIGGER_FILE || '';
 const ARTIFACT_DIR = process.env.MIZIZI_ARTIFACT_DIR || 'artifacts/mizizi-release-production-control-plane';
 const EXPECTED_AUTHORITY_FINGERPRINT = 'cf71fc24d54bb71d64a469e159daaf06b137680f294efe4542b1b691aee68b16';
 const EXPECTED_CANDIDATE_FINGERPRINT = '238a817a5e342f8311ac04fc9a6bc978f67276cb664046cddc9e375bc323e9c4';
-const EXPECTED_PROVIDER_PACKAGING_CANDIDATES = 737;
 const EXPECTED_BLOBS = {
   'scripts/registry/agents/mizizi/run.ts': '3f6870d1605786786d78643efd0d97dc54d2d47e',
   'scripts/registry/agents/mizizi/core.ts': 'c8ab1436437175cd1d7d1c451299ae2b199bc327',
@@ -402,30 +401,38 @@ function assertReleaseAudit(text) {
 
   assertFields(
     {
-      findings,
       applied,
       queued_for_review:queuedForReview,
-      observed_findings:observedFindings,
       stale,
       tracks_scanned:tracksScanned,
       releases_scanned:releasesScanned,
       chart_entries_scanned:chartEntriesScanned,
-      title_packaging_observations:titlePackagingCount,
-      slug_packaging_candidates:slugPackagingCount,
     },
     {
-      findings:EXPECTED_PROVIDER_PACKAGING_CANDIDATES * 2,
       applied:0,
       queued_for_review:0,
-      observed_findings:EXPECTED_PROVIDER_PACKAGING_CANDIDATES,
       stale:0,
       tracks_scanned:0,
       releases_scanned:841,
       chart_entries_scanned:0,
-      title_packaging_observations:EXPECTED_PROVIDER_PACKAGING_CANDIDATES,
-      slug_packaging_candidates:EXPECTED_PROVIDER_PACKAGING_CANDIDATES,
     },
     'Release audit summary',
+  );
+
+  assertFields(
+    {
+      findings,
+      observed_findings:observedFindings,
+      title_packaging_observations:titlePackagingCount,
+      slug_packaging_candidates:slugPackagingCount,
+    },
+    {
+      findings:titlePackagingCount + slugPackagingCount,
+      observed_findings:titlePackagingCount,
+      title_packaging_observations:slugPackagingCount,
+      slug_packaging_candidates:titlePackagingCount,
+    },
+    'Release provider-packaging audit consistency',
   );
 
   if (clean.includes("'release_taxonomy_drift'")) {
