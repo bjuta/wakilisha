@@ -458,15 +458,15 @@ The typed outer envelopes are therefore frozen as:
 - capability: `decouple_registry_artist`;
 - actor: `registry_artist_decouple_admin`;
 - risk: **critical**;
-- exact Artist targets: source plus at most eight replacements, maximum **9**;
-- outer row ceiling: **4096**;
+- exact Artist targets: source plus at most thirty-one replacements, maximum **32**;
+- outer row ceiling: **16384**;
 - grant TTL: **300 seconds**;
 - human approval: **required**;
 - verifier: **required**.
 
-The 4096 ceiling is not the normal budget. Evidence must compute a
+The 16384 ceiling is not the normal budget. Evidence must compute a
 candidate-specific exact row budget from the frozen decision/credit/projection
-scope. The outer ceiling only prevents an unexpectedly explosive split.
+scope. The outer ceiling only prevents an unexpectedly explosive split. It conservatively covers the current independent live maxima upper bound at thirty-one replacements while avoiding a new narrow product cap.
 
 ### Safe Artist merge
 
