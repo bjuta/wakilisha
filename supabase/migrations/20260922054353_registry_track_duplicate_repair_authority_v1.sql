@@ -660,12 +660,12 @@ begin
            'hex'
          )
   into v_target_fingerprint
-  from unnest(v_target_ids) target_id;
+  from unnest(v_target_ids) as target(target_id);
 
   if v_target_fingerprint is null
      or exists (
        select 1
-       from unnest(v_target_ids) target_id
+       from unnest(v_target_ids) as target(target_id)
        where platform_private.registry_subject_state_fingerprint(
                'track',
                target_id
