@@ -2892,7 +2892,7 @@ describe("MIZIZI Slice 3 Tranche B remaining high-blast convergence", () => {
     }
 
     expect(migration).toContain("max_targets=32");
-    expect(migration).toContain("max_rows_ceiling=16384");
+    expect(migration).toContain("max_rows_ceiling=10000");
     expect(migration).toContain("max_targets=2");
     expect(migration).toContain("max_rows_ceiling=1024");
     expect(migration).toContain("WK_STALE_ARTIST_DECOUPLE");
