@@ -434,11 +434,17 @@ const routePaths = [
  */
 /*
  * Phase 9A.3 retires the two Release-scoped Track compatibility paths.
- * Current route authority is 177 paths.
- * The historical pre-M1 sequence, adjusted for that later retirement,
- * is therefore 163 paths and receives a new exact checksum below.
+ * That established route authority at 177 paths.
+ *
+ * Track UUID public identity adds two canonical paths:
+ * - /tracks/:artistSlug/:trackSlug/:trackId
+ * - /tracks/:artistSlug/:trackSlug/:trackId/lyrics/contribute
+ *
+ * Current route authority is therefore 179 paths. These two later Track
+ * identity paths are excluded when reconstructing the preserved historical
+ * pre-M1 sequence, which remains 163 paths with its existing exact checksum.
  */
-const expectedRoutePathCount = 177;
+const expectedRoutePathCount = 179;
 const publicAudioIndexPath = "/audio";
 const publicAudioPath = "/audio/:slug";
 const publicShowIndexPath = "/shows";
@@ -453,6 +459,9 @@ const adminVideoIndexPath = "video";
 const adminVideoDetailPath = "video/:publicationId";
 const publicVideoIndexPath = "/video";
 const publicVideoStandalonePath = "/video/:slug";
+const exactTrackPath = "/tracks/:artistSlug/:trackSlug/:trackId";
+const exactTrackLyricsContributionPath =
+  "/tracks/:artistSlug/:trackSlug/:trackId/lyrics/contribute";
 
 if (routePaths.length !== expectedRoutePathCount) {
   fail(
@@ -467,6 +476,19 @@ for (const retiredRoutePath of [
   if (routePaths.includes(retiredRoutePath)) {
     fail(
       `retired Release-scoped Track route returned: ${retiredRoutePath}`,
+    );
+  }
+}
+
+for (const [routePath, label] of [
+  [exactTrackPath, "canonical Track identity"],
+  [exactTrackLyricsContributionPath, "canonical Track Lyrics contribution"],
+]) {
+  if (
+    routePaths.filter((candidate) => candidate === routePath).length !== 1
+  ) {
+    fail(
+      `Track UUID route authority must retain exactly one ${label} route at ${routePath}`,
     );
   }
 }
@@ -521,12 +543,14 @@ const preM1RoutePaths = routePaths.filter(
     routePath !== adminVideoIndexPath &&
     routePath !== adminVideoDetailPath &&
     routePath !== publicVideoIndexPath &&
-    routePath !== publicVideoStandalonePath,
+    routePath !== publicVideoStandalonePath &&
+    routePath !== exactTrackPath &&
+    routePath !== exactTrackLyricsContributionPath,
 );
 
 if (preM1RoutePaths.length !== 163) {
   fail(
-    `expected 163 9A.3-adjusted pre-M1 route paths after removing declared Phase 6B paths, found ${preM1RoutePaths.length}`,
+    `expected 163 preserved pre-M1 route paths after removing declared later route families and Track UUID identity paths, found ${preM1RoutePaths.length}`,
   );
 }
 
@@ -581,5 +605,5 @@ if (
 
 console.log(
   "Public route splitting audit passed: " +
-  `${directLazyImports.length} lazy imports, ${expectedRoutePathCount} route paths, 9A.3-adjusted pre-M1 sequence preserved.`,
+  `${directLazyImports.length} lazy imports, ${expectedRoutePathCount} route paths, Track UUID authority sealed, preserved pre-M1 sequence unchanged.`,
 );
