@@ -4,7 +4,7 @@ Date: **22 September 2026**
 
 Programme issue: **#962**
 
-Status: **IMPLEMENTED ON WORKING BRANCH — REPLAY / BEHAVIOR ACCEPTANCE PENDING**
+Status: **PRODUCTION ACCEPTED — TRACK DUPLICATE FAMILY CLOSED**
 
 Working branch:
 
@@ -498,3 +498,62 @@ Supabase advisor comparison against Production:
 - Preview-only performance differences are `unused_index` INFO findings attributable to Preview usage statistics, not candidate-created schema objects.
 
 This closes the disposable Preview behavior gate for the Track duplicate repair family. Protected repository CI on the corrected current head remains the next merge gate.
+
+
+## Production acceptance and bounded closure — 22 September 2026
+
+Implementation PR **#1008** merged to protected main as:
+
+`6c858b7e7151f9d6cf6998b8237d9844fbbff1e7`
+
+The repository-native Production migration promoter ran from that exact merged main.
+
+Accepted durable Production state:
+
+- project ref: `pgzizndxdyhqmtyywjmt`;
+- migration count: **169**;
+- migration head:
+  `20260922054353_registry_track_duplicate_repair_authority_v1`;
+- pending repository migrations: **0**;
+- committed `public,editorial` type SHA-256:
+  `472186569827cdfe3d5a72b46a546db605839934abeaa8028d9e3233f911dc46`;
+- Production schema/type equality: **PASS**.
+
+Independent Production verifier stack:
+
+- Registry Track Duplicate Repair Authority:
+  `REGISTRY_TRACK_DUPLICATE_REPAIR_AUTHORITY_PASS`;
+- MIZIZI Shared Review Authority:
+  `MIZIZI_SHARED_REVIEW_AUTHORITY_PASS`;
+- MIZIZI Identity Projection Lineage:
+  `MIZIZI_IDENTITY_PROJECTION_LINEAGE_PASS`;
+- Registry Canonical Writer Inventory:
+  `REGISTRY_CANONICAL_WRITER_INVENTORY_PASS`.
+
+The permanent Track duplicate verifier also proves the accepted mature engine
+body seal, public/private execution boundary, exact-grant zero-at-rest
+invariant, verifier completion, event-to-lineage parity, stale-state authority,
+and row-budget authority.
+
+The committed schema seal is reconciled from Preview authority to Production
+authority after successful merged-main promotion. The generated type bytes did
+not change.
+
+Disposable R2 Preview cleanup:
+
+- project ref: `brtthfzdznfsgzrrlqdv`;
+- branch id: `0b7a1052-ae96-41af-8d88-f2ee77e90959`;
+- deletion: **PASS**;
+- remaining Supabase branch inventory: **Production/main only**.
+
+This closes only the **Track duplicate repair** family inside Tranche B.
+Programme issue **#962 remains open**.
+
+The next Tranche B family is **Artist decouple exact reviewed authority**.
+Its work must preserve the accepted Artist split event/lineage contract,
+internalize the mature low-level mutator, bind execution to frozen reviewed
+replacement/current-state authority, and independently verify Track/Release
+credits plus current Chart projection.
+
+No frontend source, Edge Function, or Production frontend deployment is part of
+this bounded closure.
