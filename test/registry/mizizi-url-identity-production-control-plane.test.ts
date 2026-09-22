@@ -155,10 +155,6 @@ describe("MIZIZI current URL-identity production control plane", () => {
       "scripts/control-plane/verify-mizizi-release-slug-resume-integrity.sql",
       "utf8",
     );
-    const runner = readFileSync(
-      "scripts/registry/agents/mizizi/run.ts",
-      "utf8",
-    );
     const controlPlane = readFileSync(
       "scripts/control-plane/mizizi-url-identity-production-control-plane.mjs",
       "utf8",
@@ -212,11 +208,26 @@ describe("MIZIZI current URL-identity production control plane", () => {
       "MIZIZI Release slug operation is enabled at rest",
     );
 
-    expect(runner).toContain(
-      "cross join lateral\n        mizizi_private.release_slug_plan_v1",
+    expect(controlPlane).toContain(
+      '"scripts/registry/agents/mizizi/run.ts":',
     );
-    expect(runner).not.toContain(
-      "candidate_count = 1\n           and not existing_clean_conflict",
+    expect(controlPlane).toContain(
+      '"3f6870d1605786786d78643efd0d97dc54d2d47e"',
+    );
+    expect(controlPlane).toContain(
+      "executeReleaseResumePlans",
+    );
+    expect(controlPlane).toContain(
+      "issue_stewardship_execution_grant_v1",
+    );
+    expect(controlPlane).toContain(
+      "execute_stewardship_operation_v1",
+    );
+    expect(controlPlane).toContain(
+      "verify_stewardship_operation_v1",
+    );
+    expect(controlPlane).toContain(
+      '"accepted_partial_release_resume"',
     );
 
     expect(controlPlane).toContain(
