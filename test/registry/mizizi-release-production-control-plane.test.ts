@@ -54,8 +54,17 @@ describe("MIZIZI Release production control plane", () => {
     expect(controlPlane).toContain(
       "238a817a5e342f8311ac04fc9a6bc978f67276cb664046cddc9e375bc323e9c4",
     );
+    expect(controlPlane).not.toContain(
+      "EXPECTED_PROVIDER_PACKAGING_CANDIDATES",
+    );
     expect(controlPlane).toContain(
-      "EXPECTED_PROVIDER_PACKAGING_CANDIDATES = 737",
+      "Release provider-packaging audit consistency",
+    );
+    expect(controlPlane).toContain(
+      "titlePackagingCount !== slugPackagingCount",
+    );
+    expect(controlPlane).toContain(
+      "findings:titlePackagingCount + slugPackagingCount",
     );
     expect(controlPlane).toContain("release_title_provider_packaging");
     expect(controlPlane).toContain("release_slug_provider_packaging");

@@ -683,6 +683,36 @@ rest:
 - `registry.release_taxonomy.repair/v1`;
 - `registry.chart_track_slug.synchronize/v1`.
 
+### Current Release-slug apply state
+
+The first governed #1013 Release-slug apply is a preserved partial success, not
+a completed run and not a rollback target.
+
+Production currently proves:
+
+- 731 succeeded + verifier-passed `registry.release_slug.canonicalize/v1`
+  operations;
+- 731 matching canonical write events;
+- six deterministic Release slug candidates still carrying provider packaging;
+- zero Release-slug review rows created by the apply;
+- Release title packaging remains non-mutating; after slug repair, a fresh
+  MIZIZI audit emits that title observation only while the same Release still
+  carries matching provider packaging in its slug;
+- Release operation disabled at rest;
+- active standing / exact MIZIZI grants: 0 / 0.
+
+The six remaining rows are one sibling from each of six original date-fallback
+collision pairs. Their original six-candidate repaired fingerprint is
+`2be28e013ce904e2a05f5d3c368304684c08a6ad7eadfe23a99c57162d0091b2`.
+
+The 731 accepted plan payloads plus those six remaining repaired plans
+reconstruct the original 737-candidate programme fingerprint
+`b96da159df4ffa8b19a5bb39574995a6b25cac2552823ef24af8f737fb1278be`.
+
+Do not replay the 731 accepted operations. Resume only after the monotonic
+Release planner repair is replay-proven and Production promoted, then issue a
+fresh bounded human grant for the exact six-row remainder.
+
 ### Current title boundary
 
 Release title packaging remains observation, not automatic mutation authority.

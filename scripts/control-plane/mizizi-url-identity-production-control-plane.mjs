@@ -26,10 +26,17 @@ const ARTIFACT_DIR =
 const CLOSE_MIGRATION_VERSION = "20260922143000";
 const CLOSE_MIGRATION_NAME =
   "mizizi_url_identity_authority_window_close_v1";
+const RELEASE_RESUME_MIGRATION_VERSION = "20260922171632";
+const RELEASE_RESUME_MIGRATION_NAME =
+  "mizizi_release_slug_resume_integrity_v1";
 
 const EXPECTED_RELEASE_CANDIDATES = 737;
 const EXPECTED_RELEASE_CANDIDATE_FINGERPRINT =
   "b96da159df4ffa8b19a5bb39574995a6b25cac2552823ef24af8f737fb1278be";
+const ACCEPTED_RELEASE_PARTIAL_VERIFIED = 731;
+const ACCEPTED_RELEASE_PARTIAL_REMAINING = 6;
+const EXPECTED_RELEASE_RESUME_CANDIDATE_FINGERPRINT =
+  "2be28e013ce904e2a05f5d3c368304684c08a6ad7eadfe23a99c57162d0091b2";
 const EXPECTED_CHART_CANDIDATES = 161;
 const EXPECTED_CHART_CANDIDATE_FINGERPRINT =
   "28a3b8362f8721ad4f35045a2cd938d265adf35373b522b492054af80eb8a910";
@@ -43,6 +50,8 @@ const EXPECTED_BLOBS = {
     "1cd6c591fe312225a8cbfa431b53063431127b77",
   "supabase/migrations/20260920095334_mizizi_stage_c_narrow_executor_transport_v1.sql":
     "b683e0097071899d9871d98b4cdde83a25be19b6",
+  "supabase/migrations/20260922171632_mizizi_release_slug_resume_integrity_v1.sql":
+    "14e5447a948f34e6f126fef73baef00098376c37",
 };
 
 const APPLY_SCOPES = {
@@ -142,7 +151,12 @@ function ruleCount(clean, ruleId) {
   return match ? Number(match[1]) : 0;
 }
 
-function assertAudit(text, entity, phase = "before") {
+function assertAudit(
+  text,
+  entity,
+  phase = "before",
+  expectedCurrentCandidates = null,
+) {
   const summary = auditSummary(text);
   const clean = summary.clean;
 
@@ -197,14 +211,21 @@ function assertAudit(text, entity, phase = "before") {
   }
 
   if (entity === "release") {
-    const after = phase === "after";
+    const slugPackaging =
+      phase === "after"
+        ? 0
+        : Number(
+            expectedCurrentCandidates ??
+              EXPECTED_RELEASE_CANDIDATES,
+          );
+
     assertFields(
       summary,
       {
-        findings: after ? 737 : 1474,
+        findings: slugPackaging * 2,
         applied: 0,
         queued: 0,
-        observed: 737,
+        observed: slugPackaging,
         stale: 0,
         tracks: 0,
         releases: 841,
@@ -228,8 +249,8 @@ function assertAudit(text, entity, phase = "before") {
         ),
       },
       {
-        titlePackaging: 737,
-        slugPackaging: after ? 0 : 737,
+        titlePackaging: slugPackaging,
+        slugPackaging,
         taxonomy: 0,
       },
       "Release findings",
@@ -273,7 +294,7 @@ function assertAudit(text, entity, phase = "before") {
   }
 }
 
-const releaseCandidateSql = `
+const releaseCandidateRowsSql = `
 with eligible as materialized (
   select release.id
   from public.registry_releases release
@@ -295,19 +316,24 @@ with eligible as materialized (
           '[[:space:]]+-[[:space:]]+album$'
       )
     )
-),
-plans as (
-  select
-    plan.release_id::text as release_id,
-    plan.artist_id::text as artist_id,
-    plan.artist_slug,
-    plan.current_slug,
-    plan.proposed_slug,
-    plan.uses_date_fallback,
-    plan.expected_state_fingerprint
-  from eligible
-  cross join lateral
-    mizizi_private.release_slug_plan_v1(eligible.id) plan
+)
+select
+  plan.release_id::text as release_id,
+  plan.artist_id::text as artist_id,
+  plan.artist_slug,
+  plan.current_slug,
+  plan.proposed_slug,
+  plan.uses_date_fallback,
+  plan.expected_state_fingerprint
+from eligible
+cross join lateral
+  mizizi_private.release_slug_plan_v1(eligible.id) plan
+order by plan.release_id
+`;
+
+const releaseCandidateSql = `
+with plans as (
+  ${releaseCandidateRowsSql}
 ),
 payload as (
   select coalesce(
@@ -332,6 +358,29 @@ select
   jsonb_array_length(body)::int as candidate_count,
   body::text as candidate_payload
 from payload
+`;
+
+const releaseEligibleCountSql = `
+select count(*)::int as candidate_count
+from public.registry_releases release
+where release.status='active'
+  and (
+    (
+      release.slug ~* '-single$'
+      and release.title ~*
+        '[[:space:]]+-[[:space:]]+single$'
+    )
+    or (
+      release.slug ~* '-ep$'
+      and release.title ~*
+        '[[:space:]]+-[[:space:]]+ep$'
+    )
+    or (
+      release.slug ~* '-album$'
+      and release.title ~*
+        '[[:space:]]+-[[:space:]]+album$'
+    )
+  )
 `;
 
 const chartCandidateSql = `
@@ -385,6 +434,267 @@ function candidateSnapshot(row) {
   };
 }
 
+async function executeReleaseResumePlans(pool) {
+  const frozen = await pool.query(releaseCandidateRowsSql);
+
+  if (
+    frozen.rowCount !==
+    ACCEPTED_RELEASE_PARTIAL_REMAINING
+  ) {
+    throw new Error(
+      "Release resume exact target count drifted: " +
+        frozen.rowCount,
+    );
+  }
+
+  const receipts = [];
+
+  for (const row of frozen.rows) {
+    const releaseId =
+      String(row.release_id || "");
+    const frozenPlan = {
+      release_id: releaseId,
+      artist_id: String(row.artist_id || ""),
+      artist_slug: String(row.artist_slug || ""),
+      current_slug: String(row.current_slug || ""),
+      proposed_slug: String(row.proposed_slug || ""),
+      uses_date_fallback:
+        Boolean(row.uses_date_fallback),
+      expected_state_fingerprint:
+        String(
+          row.expected_state_fingerprint || "",
+        ),
+    };
+
+    if (
+      !releaseId ||
+      !frozenPlan.artist_id ||
+      !frozenPlan.current_slug ||
+      !frozenPlan.proposed_slug ||
+      !frozenPlan.expected_state_fingerprint
+    ) {
+      throw new Error(
+        "Release resume plan is incomplete: " +
+          JSON.stringify(frozenPlan),
+      );
+    }
+
+    const current = await pool.query(
+      `
+      select
+        release_id::text,
+        artist_id::text,
+        artist_slug,
+        current_slug,
+        proposed_slug,
+        uses_date_fallback,
+        expected_state_fingerprint
+      from mizizi_private.release_slug_plan_v1(
+        $1::uuid
+      )
+      `,
+      [releaseId],
+    );
+
+    if (current.rowCount !== 1) {
+      throw new Error(
+        "Release resume plan disappeared for " +
+          releaseId,
+      );
+    }
+
+    assertFields(
+      current.rows[0],
+      frozenPlan,
+      "Release resume plan " + releaseId,
+    );
+
+    const idempotencyKey =
+      "mizizi:release_slug_provider_packaging:resume:" +
+      sha256(JSON.stringify(frozenPlan));
+
+    const grantResult = await pool.query(
+      `
+      select *
+      from mizizi_private.issue_stewardship_execution_grant_v1(
+        $1::text,
+        $2::text,
+        $3::text
+      )
+      `,
+      [
+        APPLY_SCOPES.release_slug.operationKey,
+        releaseId,
+        idempotencyKey,
+      ],
+    );
+
+    const executionGrantId =
+      String(
+        grantResult.rows[0]?.execution_grant_id || "",
+      );
+
+    if (
+      grantResult.rowCount !== 1 ||
+      !executionGrantId
+    ) {
+      throw new Error(
+        "Release resume exact execution grant was not issued for " +
+          releaseId,
+      );
+    }
+
+    const executionResult = await pool.query(
+      `
+      select *
+      from mizizi_private.execute_stewardship_operation_v1(
+        $1::uuid
+      )
+      `,
+      [executionGrantId],
+    );
+
+    const operationId =
+      String(
+        executionResult.rows[0]?.operation_id || "",
+      );
+
+    if (
+      executionResult.rowCount !== 1 ||
+      executionResult.rows[0]?.operation_status !==
+        "succeeded" ||
+      !operationId
+    ) {
+      throw new Error(
+        "Release resume typed operation did not succeed for " +
+          releaseId,
+      );
+    }
+
+    const verificationResult = await pool.query(
+      `
+      select *
+      from mizizi_private.verify_stewardship_operation_v1(
+        $1::uuid
+      )
+      `,
+      [operationId],
+    );
+
+    if (
+      verificationResult.rowCount !== 1 ||
+      verificationResult.rows[0]?.verifier_status !==
+        "passed"
+    ) {
+      throw new Error(
+        "Release resume verifier did not pass for " +
+          releaseId,
+      );
+    }
+
+    receipts.push({
+      release_id: releaseId,
+      execution_grant_id: executionGrantId,
+      operation_id: operationId,
+      verifier_status: "passed",
+    });
+  }
+
+  fs.writeFileSync(
+    ARTIFACT_DIR + "/apply.txt",
+    JSON.stringify(
+      {
+        mode: "accepted_partial_release_resume",
+        count: receipts.length,
+        receipts,
+      },
+      null,
+      2,
+    ) + "\n",
+  );
+
+  return receipts;
+}
+
+function releaseProgrammeSnapshotFromHistory(
+  currentCandidatePayload,
+) {
+  const escapedCurrent =
+    String(currentCandidatePayload || "[]").replaceAll(
+      "'",
+      "''",
+    );
+
+  const row = queryViaLinkedCli(`
+with current_plans as (
+  select
+    value->>'release_id' as release_id,
+    value->>'artist_id' as artist_id,
+    value->>'artist_slug' as artist_slug,
+    value->>'current_slug' as current_slug,
+    value->>'proposed_slug' as proposed_slug,
+    (value->>'uses_date_fallback')::boolean
+      as uses_date_fallback,
+    value->>'expected_state_fingerprint'
+      as expected_state_fingerprint
+  from jsonb_array_elements(
+    '${escapedCurrent}'::jsonb
+  )
+),
+succeeded_plans as (
+  select
+    grant_row.plan_payload->>'release_id' as release_id,
+    grant_row.plan_payload->>'artist_id' as artist_id,
+    grant_row.plan_payload->>'artist_slug' as artist_slug,
+    grant_row.plan_payload->>'current_slug' as current_slug,
+    grant_row.plan_payload->>'proposed_slug' as proposed_slug,
+    (
+      grant_row.plan_payload->>'uses_date_fallback'
+    )::boolean as uses_date_fallback,
+    grant_row.plan_payload->>'expected_state_fingerprint'
+      as expected_state_fingerprint
+  from platform_private.registry_execution_grants grant_row
+  join platform_private.registry_mutation_operations operation
+    on operation.execution_grant_id=grant_row.id
+  where grant_row.actor_key='mizizi'
+    and grant_row.operation_key='registry.release_slug.canonicalize'
+    and grant_row.operation_version=1
+    and operation.status='succeeded'
+    and operation.verifier_status='passed'
+),
+programme as (
+  select * from succeeded_plans
+  union all
+  select * from current_plans
+),
+payload as (
+  select coalesce(
+    jsonb_agg(
+      jsonb_build_object(
+        'release_id',release_id,
+        'artist_id',artist_id,
+        'artist_slug',artist_slug,
+        'current_slug',current_slug,
+        'proposed_slug',proposed_slug,
+        'uses_date_fallback',uses_date_fallback,
+        'expected_state_fingerprint',
+          expected_state_fingerprint
+      )
+      order by release_id
+    ),
+    '[]'::jsonb
+  ) body
+  from programme
+)
+select
+  jsonb_array_length(body)::int as candidate_count,
+  body::text as candidate_payload
+from payload
+`);
+
+  return candidateSnapshot(row);
+}
+
 const atRestAuthoritySql = `
 select
   (
@@ -435,7 +745,12 @@ function assertZeroAtRest(label) {
   return state;
 }
 
-async function runAudit(url, entity, phase = "before") {
+async function runAudit(
+  url,
+  entity,
+  phase = "before",
+  expectedCurrentCandidates = null,
+) {
   const logPath =
     ARTIFACT_DIR +
     "/" +
@@ -457,28 +772,88 @@ async function runAudit(url, entity, phase = "before") {
   );
 
   const text = fs.readFileSync(logPath, "utf8");
-  assertAudit(text, entity, phase);
+  assertAudit(
+    text,
+    entity,
+    phase,
+    expectedCurrentCandidates,
+  );
 }
 
 async function currentCandidateState(pool) {
-  const releaseResult =
+  const releaseCurrentResult =
     await pool.query(releaseCandidateSql);
   const chartResult =
     await pool.query(chartCandidateSql);
 
-  const release =
-    candidateSnapshot(releaseResult.rows[0]);
+  const releaseCurrent =
+    candidateSnapshot(releaseCurrentResult.rows[0]);
   const chart =
     candidateSnapshot(chartResult.rows[0]);
+  const releaseJournal =
+    journalSnapshot(APPLY_SCOPES.release_slug);
+
+  if (
+    Number(releaseJournal.verified_operations) !==
+    Number(releaseJournal.canonical_events)
+  ) {
+    throw new Error(
+      "Release slug journal/write-event parity is not exact",
+    );
+  }
+
+  let releaseState = "";
+  let releaseProgramme = null;
+
+  if (
+    Number(releaseJournal.verified_operations) === 0 &&
+    releaseCurrent.candidateCount ===
+      EXPECTED_RELEASE_CANDIDATES &&
+    releaseCurrent.candidateFingerprint ===
+      EXPECTED_RELEASE_CANDIDATE_FINGERPRINT
+  ) {
+    releaseState = "pristine";
+    releaseProgramme = releaseCurrent;
+  } else if (
+    Number(releaseJournal.verified_operations) ===
+      ACCEPTED_RELEASE_PARTIAL_VERIFIED &&
+    releaseCurrent.candidateCount ===
+      ACCEPTED_RELEASE_PARTIAL_REMAINING &&
+    releaseCurrent.candidateFingerprint ===
+      EXPECTED_RELEASE_RESUME_CANDIDATE_FINGERPRINT
+  ) {
+    releaseState = "accepted_partial";
+    releaseProgramme =
+      releaseProgrammeSnapshotFromHistory(
+        releaseCurrentResult.rows[0]
+          ?.candidate_payload,
+      );
+  } else if (
+    Number(releaseJournal.verified_operations) ===
+      EXPECTED_RELEASE_CANDIDATES &&
+    releaseCurrent.candidateCount === 0
+  ) {
+    releaseState = "accepted_final";
+    releaseProgramme =
+      releaseProgrammeSnapshotFromHistory("[]");
+  } else {
+    throw new Error(
+      "Release slug programme state is not a recognized exact boundary: " +
+        JSON.stringify({
+          journal: releaseJournal,
+          current: releaseCurrent,
+        }),
+    );
+  }
 
   assertFields(
-    release,
+    releaseProgramme,
     {
       candidateCount: EXPECTED_RELEASE_CANDIDATES,
       candidateFingerprint:
         EXPECTED_RELEASE_CANDIDATE_FINGERPRINT,
     },
-    "Release slug candidate freeze",
+    "Release slug programme freeze",
   );
 
   assertFields(
@@ -491,8 +866,29 @@ async function currentCandidateState(pool) {
     "Chart Track-slug candidate freeze",
   );
 
-  return { release, chart };
+  return {
+    releaseProgramme,
+    releaseCurrent,
+    releaseState,
+    releaseJournal,
+    chart,
+  };
 }
+
+
+function releaseResumeMigrationApplied() {
+  const state = queryViaLinkedCli(`
+select exists(
+  select 1
+  from supabase_migrations.schema_migrations
+  where version='${RELEASE_RESUME_MIGRATION_VERSION}'
+    and name='${RELEASE_RESUME_MIGRATION_NAME}'
+) as applied
+`);
+
+  return String(state.applied) === "true";
+}
+
 
 function requireUuid(value, label) {
   const text = String(value || "");
@@ -602,6 +998,12 @@ select
   ) as close_migration_applied,
   exists(
     select 1
+    from supabase_migrations.schema_migrations
+    where version='${RELEASE_RESUME_MIGRATION_VERSION}'
+      and name='${RELEASE_RESUME_MIGRATION_NAME}'
+  ) as release_resume_migration_applied,
+  exists(
+    select 1
     from platform_private.registry_operation_types
     where operation_key='${scope.operationKey}'
       and operation_version=1
@@ -642,6 +1044,7 @@ select
     state,
     {
       close_migration_applied: true,
+      release_resume_migration_applied: true,
       operation_enabled: true,
       exact_human_grant: true,
       active_standing_total: 1,
@@ -776,13 +1179,78 @@ async function main() {
   let primaryError = null;
 
   try {
+    const releaseCountResult =
+      await jit.pool.query(releaseEligibleCountSql);
+    const currentReleaseCandidates =
+      Number(
+        releaseCountResult.rows[0]?.candidate_count || 0,
+      );
+    const resumeMigrationReady =
+      releaseResumeMigrationApplied();
+
     console.log(
       "\n=== 4. CURRENT FULL-CORPUS READ-ONLY AUDIT ===",
     );
 
     await runAudit(jit.url, "track");
-    await runAudit(jit.url, "release");
+    await runAudit(
+      jit.url,
+      "release",
+      "before",
+      currentReleaseCandidates,
+    );
     await runAudit(jit.url, "chart");
+
+    if (
+      MODE === "preflight" &&
+      !resumeMigrationReady
+    ) {
+      const releaseJournal =
+        journalSnapshot(APPLY_SCOPES.release_slug);
+
+      assertFields(
+        {
+          currentReleaseCandidates,
+          verified:
+            releaseJournal.verified_operations,
+          events:
+            releaseJournal.canonical_events,
+        },
+        {
+          currentReleaseCandidates:
+            ACCEPTED_RELEASE_PARTIAL_REMAINING,
+          verified:
+            ACCEPTED_RELEASE_PARTIAL_VERIFIED,
+          events:
+            ACCEPTED_RELEASE_PARTIAL_VERIFIED,
+        },
+        "pre-migration accepted Release partial stop",
+      );
+
+      fs.writeFileSync(
+        ARTIFACT_DIR + "/candidate-state.json",
+        JSON.stringify(
+          {
+            releaseState:
+              "accepted_partial_migration_pending",
+            releaseCurrentCount:
+              currentReleaseCandidates,
+            releaseJournal,
+          },
+          null,
+          2,
+        ) + "\n",
+      );
+
+      console.log(
+        "\n=== MIZIZI URL-IDENTITY REPAIR PREFLIGHT PASS ===",
+      );
+      console.log(
+        "Resume migration: pending Production promotion",
+      );
+      console.log("Registry mutation: NO");
+      return;
+    }
 
     console.log(
       "\n=== 5. EXACT CURRENT CANDIDATE FREEZE ===",
@@ -800,12 +1268,32 @@ async function main() {
       console.log(
         "\n=== MIZIZI URL-IDENTITY PRODUCTION PREFLIGHT PASS ===",
       );
+      console.log(
+        "Release programme state: " +
+          candidates.releaseState,
+      );
       console.log("Registry mutation: NO");
       return;
     }
 
     const scope = trigger.scopeConfig;
     const before = journalSnapshot(scope);
+    const expectedApplyCount =
+      scope.entity === "release"
+        ? candidates.releaseCurrent.candidateCount
+        : scope.expectedCount;
+
+    if (
+      scope.entity === "release" &&
+      !["pristine", "accepted_partial"].includes(
+        candidates.releaseState,
+      )
+    ) {
+      throw new Error(
+        "Release slug apply cannot start from " +
+          candidates.releaseState,
+      );
+    }
 
     fs.writeFileSync(
       ARTIFACT_DIR + "/state-before.json",
@@ -825,19 +1313,29 @@ async function main() {
     );
 
     try {
-      await streamCommand(
-        "npm",
-        [
-          "run",
-          "registry:mizizi:apply",
-          "--",
-          "--entity=" + scope.entity,
-          "--limit=0",
-          "--confirm=MIZIZI_APPLY",
-        ],
-        { DATABASE_URL: jit.url },
-        ARTIFACT_DIR + "/apply.txt",
-      );
+      if (
+        scope.entity === "release" &&
+        candidates.releaseState ===
+          "accepted_partial"
+      ) {
+        await executeReleaseResumePlans(
+          jit.pool,
+        );
+      } else {
+        await streamCommand(
+          "npm",
+          [
+            "run",
+            "registry:mizizi:apply",
+            "--",
+            "--entity=" + scope.entity,
+            "--limit=0",
+            "--confirm=MIZIZI_APPLY",
+          ],
+          { DATABASE_URL: jit.url },
+          ARTIFACT_DIR + "/apply.txt",
+        );
+      }
     } catch (error) {
       primaryError = error;
     }
@@ -894,13 +1392,24 @@ async function main() {
           Number(before.canonical_events),
       },
       {
-        verifiedDelta: scope.expectedCount,
-        eventDelta: scope.expectedCount,
+        verifiedDelta: expectedApplyCount,
+        eventDelta: expectedApplyCount,
       },
       "governed operation acceptance",
     );
 
     if (scope.entity === "release") {
+      assertFields(
+        after,
+        {
+          verified_operations:
+            EXPECTED_RELEASE_CANDIDATES,
+          canonical_events:
+            EXPECTED_RELEASE_CANDIDATES,
+        },
+        "final Release programme journal",
+      );
+
       const result =
         await jit.pool.query(releaseCandidateSql);
       const state =
@@ -910,7 +1419,12 @@ async function main() {
         { candidateCount: 0 },
         "post-apply Release candidate state",
       );
-      await runAudit(jit.url, "release", "after");
+      await runAudit(
+        jit.url,
+        "release",
+        "after",
+        0,
+      );
     } else {
       const result =
         await jit.pool.query(chartCandidateSql);

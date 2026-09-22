@@ -1,0 +1,20 @@
+{
+  "migration_file": "supabase/migrations/20260922171632_mizizi_release_slug_resume_integrity_v1.sql",
+  "migration_sha256": "9eaa92df451c3e88eb5e25bbc1c1539c13735020f31cca356fa0a0b34bbc4c3b",
+  "base_main_sha": "80ffc7d07a041ae001bafa3f365a825016c50b44",
+  "preview_project_ref": "ltcwajcrqdbefhulzibv",
+  "preview_branch_id": "d64d23b3-4150-437c-8fdc-db83c8482ec7",
+  "preview_migration_head": "20260922171632",
+  "baseline_replay": "pass",
+  "candidate_apply": "pass",
+  "verifier": "pass",
+  "verifier_file": "scripts/control-plane/verify-mizizi-release-slug-resume-integrity.sql",
+  "behavior_acceptance": "pass",
+  "behavior_workflow_run": "35761199065",
+  "behavior_identity": "mizizi_executor",
+  "behavior_fixture_residue": 0,
+  "schema_types_sha256": "5d229c68d65b3360ecef98882ed059b09a2e57b43daf3343358d1231b14aa1d3",
+  "schema_migration_count": 172,
+  "schema_migration_head": "20260922171632",
+  "verified_at": "2026-09-22T17:35:35.253879Z"
+}
