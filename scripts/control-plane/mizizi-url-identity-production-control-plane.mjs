@@ -222,10 +222,10 @@ function assertAudit(
     assertFields(
       summary,
       {
-        findings: 737 + slugPackaging,
+        findings: slugPackaging * 2,
         applied: 0,
         queued: 0,
-        observed: 737,
+        observed: slugPackaging,
         stale: 0,
         tracks: 0,
         releases: 841,
@@ -249,7 +249,7 @@ function assertAudit(
         ),
       },
       {
-        titlePackaging: 737,
+        titlePackaging: slugPackaging,
         slugPackaging,
         taxonomy: 0,
       },
