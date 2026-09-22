@@ -307,11 +307,12 @@ const stageCAuthoritySql = `select
 
 export async function openMiziziJitSession({
   projectRef,
+  managementProjectRef = projectRef,
   token,
 }) {
-  if (!projectRef || !token) {
+  if (!projectRef || !managementProjectRef || !token) {
     throw new Error(
-      "projectRef and Supabase access token are required",
+      "projectRef, managementProjectRef and Supabase access token are required",
     );
   }
 
@@ -347,7 +348,7 @@ export async function openMiziziJitSession({
     await managementApi(
       token,
       "GET",
-      "/v1/projects/" + projectRef + "/jit-access",
+      "/v1/projects/" + managementProjectRef + "/jit-access",
     ),
   );
 
@@ -362,7 +363,7 @@ export async function openMiziziJitSession({
     await managementApi(
       token,
       "GET",
-      "/v1/projects/" + projectRef + "/database/jit/list",
+      "/v1/projects/" + managementProjectRef + "/database/jit/list",
     ),
   );
 
@@ -404,7 +405,7 @@ export async function openMiziziJitSession({
           await managementApi(
             token,
             "PUT",
-            "/v1/projects/" + projectRef + "/database/jit",
+            "/v1/projects/" + managementProjectRef + "/database/jit",
             {
               user_id: userId,
               roles: originalRoles,
@@ -415,7 +416,7 @@ export async function openMiziziJitSession({
             token,
             "DELETE",
             "/v1/projects/" +
-              projectRef +
+              managementProjectRef +
               "/database/jit/" +
               userId,
           );
@@ -432,7 +433,7 @@ export async function openMiziziJitSession({
       await managementApi(
         token,
         "PUT",
-        "/v1/projects/" + projectRef + "/jit-access",
+        "/v1/projects/" + managementProjectRef + "/jit-access",
         { state: "disabled" },
       );
     } catch (error) {
@@ -455,7 +456,7 @@ export async function openMiziziJitSession({
     await managementApi(
       token,
       "PUT",
-      "/v1/projects/" + projectRef + "/jit-access",
+      "/v1/projects/" + managementProjectRef + "/jit-access",
       { state: "enabled" },
     );
 
@@ -474,7 +475,7 @@ export async function openMiziziJitSession({
     await managementApi(
       token,
       "PUT",
-      "/v1/projects/" + projectRef + "/database/jit",
+      "/v1/projects/" + managementProjectRef + "/database/jit",
       {
         user_id: userId,
         roles,
