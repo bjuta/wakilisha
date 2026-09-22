@@ -745,7 +745,7 @@ succeeded_plans as (
       as canonical_track_id,
     grant_row.plan_payload->>'canonical_track_slug'
       as canonical_track_slug,
-    grant_row.plan_payload->>'expected_track_state_fingerprint'
+    grant_row.plan_payload->>'expected_state_fingerprint'
       as expected_track_state_fingerprint
   from platform_private.registry_execution_grants grant_row
   join platform_private.registry_mutation_operations operation
