@@ -54,6 +54,21 @@ existing public admin commands to:
 The reviewed GitHub trigger binds the exact grant id, operation, capability,
 candidate count and candidate fingerprint.
 
+Protected pull-request preflight remains strictly non-mutating, but it accepts
+two exact entry states:
+
+- **zero at rest**: no standing grant, no exact grant, and none of the four
+  stewardship operations enabled; or
+- **reviewed human authority**: exactly one active standing grant, zero active
+  exact grants, exactly one enabled stewardship operation, and the branch's
+  reviewed trigger file names that exact grant and matching operation/capability
+  with at least 30 minutes of lifetime remaining.
+
+This second state exists so the human approval can be reviewed by protected CI
+before the trigger is merged. A mismatched grant, an unrelated enabled
+operation, multiple standing grants, or any active exact child authority still
+fails closed. PR preflight never executes the apply path.
+
 Apply refuses to start unless:
 
 - exact merged `main` equals the reviewed trigger commit;
@@ -226,3 +241,14 @@ migration is Production accepted, a new separately reviewed human grant/trigger
 may authorize only the six unfinished rows. Final acceptance still requires
 737 verified operations, 737 canonical write events, zero remaining Release
 slug candidates, and zero authority at rest.
+
+The first post-repair trigger attempt exposed a sequencing defect in the
+preflight contract: a valid human approval necessarily made the old
+zero-at-rest-only PR gate fail. Trigger PR #1027 was closed without merge, and
+its approval was reduced through the accepted Stage-C reducer in temporary
+never-merge PR #1028 / workflow run `35768159746`, returning Production to
+disabled / 0 / 0 authority with the Registry still at 731 / 731 / 6.
+
+The control plane now explicitly reviews the exact branch-bound human approval
+in PR mode instead of forcing operators to choose between protected CI and a
+valid approval window.
