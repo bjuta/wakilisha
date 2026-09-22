@@ -420,3 +420,81 @@ Permanent regression contract now forbids:
 - post-issuance `UPDATE platform_private.registry_execution_grants SET target_set_fingerprint...`.
 
 The corrected unmerged migration must now be replayed from a **fresh Production-parity Preview**. The existing Preview is intentionally not patched in place because clean replay is the acceptance authority for an unmerged repository migration.
+
+
+## Real authenticated R2 acceptance — 22 September 2026
+
+The corrected immutable-grant issuer was replayed from a fresh Production-parity Preview and accepted through the real Supabase Auth -> Data API product path.
+
+Preview:
+
+- branch: `slice3-tranche-b-track-duplicate-authority-r2`
+- project ref: `brtthfzdznfsgzrrlqdv`
+- branch id: `0b7a1052-ae96-41af-8d88-f2ee77e90959`
+
+Corrected native replay:
+
+- pre-apply dry run: exactly one pending migration:
+  `20260922054353_registry_track_duplicate_repair_authority_v1.sql`;
+- native `supabase db push --linked`: **PASS**;
+- post-apply dry run: remote database up to date;
+- remote migration ledger: **169** migrations;
+- remote head: `20260922054353_registry_track_duplicate_repair_authority_v1.sql`.
+
+The corrected live issuer proves:
+
+- no zero-hash placeholder target authority;
+- no post-issuance `target_set_fingerprint` update;
+- target-set fingerprint precomputed before immutable grant insertion.
+
+### Real Auth -> Data API behavior
+
+A disposable authenticated Preview user with `registry_editor` authority invoked the existing public product RPC over the real Supabase Data API.
+
+Accepted IDs:
+
+- user: `29d87921-ec69-4777-b7ae-93eb2c75a3e3`
+- operation: `3aff8dd7-6494-4c54-be34-dbf303af70c0`
+- exact grant: `7a9ffb94-439e-4e9d-9b0b-ed4ec68d5540`
+- evidence assertion: `9728a160-ea7b-4475-be28-c01a289b9956`
+- resolution event: `37e21a9d-0a69-4cba-9c5c-795a493050a0`
+
+Behavior acceptance:
+
+- real Auth login: **PASS**;
+- duplicate preview: high confidence, zero blockers, one duplicate: **PASS**;
+- governed apply: **PASS**;
+- operation status: `succeeded`;
+- verifier status: `passed`;
+- affected rows: **2**, within exact grant max rows **2**;
+- exact grant status: `consumed`;
+- required user capability: `manage_registry`;
+- two exact Track targets each carry immutable expected-state fingerprints;
+- two shared review approvals are bound to the exact grant;
+- evidence trust class: `INTERNAL_FACT`;
+- evidence principal: exact authenticated user;
+- canonical Track remains `active`;
+- duplicate Track is `archived` with exact canonical successor metadata;
+- accepted Track resolution event: **present**;
+- Track supersession lineage: **present and causally bound to the resolution event**;
+- exactly one canonical write event is causally bound to the Registry operation;
+- active Track duplicate execution grants at rest: **0**;
+- succeeded-but-unverified Track duplicate operations: **0**.
+
+### Post-behavior permanent verification
+
+After the real authenticated mutation:
+
+- `REGISTRY_TRACK_DUPLICATE_REPAIR_AUTHORITY_PASS`;
+- `MIZIZI_SHARED_REVIEW_AUTHORITY_PASS`;
+- `MIZIZI_IDENTITY_PROJECTION_LINEAGE_PASS`;
+- `REGISTRY_CANONICAL_WRITER_INVENTORY_PASS`;
+- Artist Studio Registry Entry Convergence verifier: **PASS**;
+- Registry Chart Materialization Runtime verifier: **PASS**.
+
+Supabase advisor comparison against Production:
+
+- new security findings introduced by this candidate: **0**;
+- Preview-only performance differences are `unused_index` INFO findings attributable to Preview usage statistics, not candidate-created schema objects.
+
+This closes the disposable Preview behavior gate for the Track duplicate repair family. Protected repository CI on the corrected current head remains the next merge gate.
