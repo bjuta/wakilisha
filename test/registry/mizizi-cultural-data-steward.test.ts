@@ -2647,6 +2647,12 @@ describe("MIZIZI Slice 3 Tranche B Track duplicate repair exact authority", () =
     expect(migration).toContain(
       "Mature Registry Track duplicate repair engine contract was not preserved",
     );
+    expect(migration).toContain(
+      "ff7ec6d997671e5f27ed2056149e56e4c913284f911e0eb943532f750e39c0e7",
+    );
+    expect(verifier).toContain(
+      "ff7ec6d997671e5f27ed2056149e56e4c913284f911e0eb943532f750e39c0e7",
+    );
   });
 
   it("reuses shared review, exact-grant, journal and verifier primitives with kernel delta zero", () => {
