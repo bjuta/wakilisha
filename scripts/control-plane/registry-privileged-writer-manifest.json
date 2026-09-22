@@ -363,11 +363,19 @@
       "authorization": "manage_registry_plus_reviewed_decouple_decision",
       "executionAuthority": "security_definer_reviewed_exact_grant_wrapper_over_private_mature_engine",
       "targets": [
+        "registry_artist_decouple_decisions",
         "registry_artists",
         "registry_artist_aliases",
         "registry_tracks",
         "registry_track_artists",
-        "registry_release_artists"
+        "registry_release_artists",
+        "wk_chart_entries_v2",
+        "chart_entries",
+        "registry_audit_log",
+        "registry_identity_lineage",
+        "registry_canonical_write_events",
+        "registry_operation_write_events",
+        "registry_mutation_operations"
       ],
       "riskClass": "critical",
       "disposition": "keep",
@@ -654,7 +662,13 @@
         "registry_artist_aliases",
         "registry_tracks",
         "registry_track_artists",
-        "registry_release_artists"
+        "registry_release_artists",
+        "wk_chart_entries_v2",
+        "registry_artist_resolution_events",
+        "registry_identity_lineage",
+        "registry_canonical_write_events",
+        "registry_operation_write_events",
+        "registry_mutation_operations"
       ],
       "riskClass": "critical",
       "disposition": "keep",
