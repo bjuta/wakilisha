@@ -372,3 +372,51 @@ The remaining gate is therefore one **real Supabase Auth + Data API client** exe
 7. delete the disposable Preview after acceptance.
 
 This remaining gate is a transport/behavior proof only. Schema replay and database authority are already accepted.
+
+
+## Real authenticated behavior defect discovery — 22 September 2026
+
+The first real Auth -> Data API behavior attempt reached the governed public Track duplicate repair command and exposed a real implementation defect before PR.
+
+Observed client error:
+
+`Issued Registry execution authority is immutable; revoke it and issue a new exact grant instead.`
+
+The failed RPC transaction rolled back grant/operation creation. Post-failure Preview state proved:
+
+- Track duplicate exact grants: **0**;
+- Track duplicate mutation operations: **0**.
+
+The disposable Auth user and two-Track Apple catalog fixture created before the RPC remain Preview-only test residue and are not Production data.
+
+### Root cause
+
+The first candidate implementation issued the exact grant with a placeholder `target_set_fingerprint`, inserted exact targets, then attempted to update the already-issued grant with `registry_execution_target_set_fingerprint(grant_id)`.
+
+That violates the accepted kernel's immutable-authority contract:
+
+`platform_private.guard_registry_execution_grant_immutability()`
+
+correctly rejects mutation of issued authority fields including `target_set_fingerprint`.
+
+The defect was in the Tranche B adapter, not the shared kernel.
+
+### Smallest correction
+
+The corrected issuer now follows the accepted existing Registry exact-grant pattern:
+
+1. compute every exact Track target's current `registry_subject_state_fingerprint('track', id)`;
+2. construct the deterministically ordered exact-target JSON array;
+3. compute the final target-set SHA-256 **before grant insertion**;
+4. insert the immutable grant once with that final fingerprint;
+5. insert exact targets;
+6. rely on the existing deferred target-set integrity guard to verify equality at commit.
+
+No shared kernel, review trigger, operation journal, mature duplicate-repair engine, public RPC signature, or product caller changed.
+
+Permanent regression contract now forbids:
+
+- `repeat('0',64)` placeholder target authority;
+- post-issuance `UPDATE platform_private.registry_execution_grants SET target_set_fingerprint...`.
+
+The corrected unmerged migration must now be replayed from a **fresh Production-parity Preview**. The existing Preview is intentionally not patched in place because clean replay is the acceptance authority for an unmerged repository migration.
