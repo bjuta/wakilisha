@@ -3261,28 +3261,431 @@ async function handleRunFullPipeline(
   });
 }
 
-// COMMIT (v26 — normalizeSlug safety-net ensures every entry gets hyphenated slugs)
-async function handleCommitRun(req:Request,db:ReturnType<typeof createClient>,params:Record<string,unknown>,user:{id:string;email?:string}) {
-  const {runId,publishImmediately,notes}=params as {runId:string;publishImmediately?:boolean;notes?:string}; if(!runId)return json(req,{error:"runId_required"},400);
-  const {error:gateError}=await db.rpc("chart_assert_committable_run",{p_run_id:runId}); if(gateError)return json(req,{error:"commit_blocked_chart_run_integrity",detail:gateError.message},400);
-  const {data:run,error:runError}=await db.from("chart_ingest_runs").select("*").eq("id",runId).maybeSingle(); if(runError)return json(req,{error:"run_lookup_failed",detail:runError.message},500); if(!run)return json(req,{error:"run_not_found"},404);
-  const now=new Date().toISOString(); const editionDate=String(run.edition_date||now.split("T")[0]); const chartSize=Number(run.chart_size||20); const programId=String(run.program_id||"unknown"); const actor=user.email||user.id;
-  const {data:candidates,error:candidateError}=await db.from("chart_ingest_candidates").select("*").eq("run_id",runId).eq("status","eligible").order("created_at"); if(candidateError)return json(req,{error:"candidate_lookup_failed",detail:candidateError.message},500); if(!candidates?.length)return json(req,{error:"no_eligible_candidates"},400);
-  const ids=candidates.map(c=>String(c.id)); const {data:scores,error:scoreError}=await db.from("chart_ingest_candidate_scores").select("*").in("candidate_id",ids); if(scoreError)return json(req,{error:"score_lookup_failed",detail:scoreError.message},500);
-  const scoreMap=new Map<string,Record<string,unknown>>(); for(const s of scores||[])scoreMap.set(String(s.candidate_id),s);
-  const top=[...candidates].sort((a,b)=>{const sa=Number(scoreMap.get(String(a.id))?.final_score??0);const sb=Number(scoreMap.get(String(b.id))?.final_score??0);return sb!==sa?sb-sa:String(a.normalized_key||"").localeCompare(String(b.normalized_key||""));}).slice(0,chartSize);
-  const prevRanks=new Map<string,number>(); const prevKeys=new Set<string>();
-  try{const {data:prev}=await db.from("wk_chart_editions_v2").select("id").eq("program_id",programId).in("status",["committed","published"]).lt("edition_date",editionDate).order("edition_date",{ascending:false}).limit(1).maybeSingle();if(prev){const {data:rows}=await db.from("wk_chart_entries_v2").select("normalized_key, rank").eq("edition_id",prev.id);for(const row of rows||[]){const key=String(row.normalized_key||"");if(key){prevRanks.set(key,Number(row.rank));prevKeys.add(key);}}}}catch{}
-  const registryStats={tracks_found:0,tracks_created:0,artists_found:0,artists_created:0,links_created:0,previews_set:0,errors:0}; const materialized=new Map<string,ChartMaterializationResult>();
-  for(const c of top){const candidateId=String(c.id);try{const result=await materializeChartCandidate(db,runId,candidateId);materialized.set(candidateId,result);if(result.track_created)registryStats.tracks_created++;else registryStats.tracks_found++;for(const a of result.artists){if(a.created)registryStats.artists_created++;else registryStats.artists_found++;}registryStats.links_created+=result.credits.filter(x=>x.created).length;}catch(error){registryStats.errors++;return json(req,{error:"registry_materialization_failed",candidateId,detail:error instanceof Error?error.message:String(error),registryStats},409);}}
-  const editionId=crypto.randomUUID(); const {data:program}=await db.from("wk_chart_programs_v2").select("public_slug, public_label").eq("id",programId).maybeSingle(); const editionSlug=editionDate;
-  const {error:editionError}=await db.from("wk_chart_editions_v2").insert({id:editionId,program_id:programId,edition_slug:editionSlug,edition_label:String(program?.public_label||"Chart Edition"),edition_date:editionDate,period_start:run.period_start||editionDate,period_end:run.period_end||editionDate,entry_count:top.length,status:publishImmediately?"published":"committed",methodology_version:String(run.methodology_version||"1.0.0"),rule_set_snapshot:(run.rule_snapshot_json as Record<string,unknown>)||{},chart_size:chartSize,ingest_run_id:runId,published_at:publishImmediately?now:null,published_by:publishImmediately?actor:null,created_at:now,updated_at:now}); if(editionError)return json(req,{error:"edition_create_failed",detail:editionError.message},500);
-  const rows:Array<Record<string,unknown>>=[];
-  for(let i=0;i<top.length;i++){const c=top[i];const candidateId=String(c.id);const result=materialized.get(candidateId);if(!result){await db.from("wk_chart_editions_v2").delete().eq("id",editionId);return json(req,{error:"materialization_result_missing",candidateId},500);}const rank=i+1;const key=String(c.normalized_key||"");const previous=prevRanks.get(key)??null;let movement:string|null=null;if(previous===null)movement=prevKeys.has(key)?"reentry":"new";else if(rank===previous)movement="same";else movement=rank<previous?"up":"down";rows.push({id:crypto.randomUUID(),edition_id:editionId,rank,previous_rank:previous,movement,track_title:String(c.title||""),artist_name:String(c.artist_display||""),artwork_url:c.artwork_url||null,normalized_key:key,lead_artist_key:String(c.lead_artist_key||""),track_slug:normalizeSlug(result.track_slug),artist_slug:normalizeSlug(result.primary_artist_slug),canonical_track_id:result.track_id,total_score:Number(scoreMap.get(candidateId)?.final_score??0),carry_forward_only:Boolean(c.carry_forward_only),release_date:sanitizeDate(c.release_date as string),source_count:Number(c.source_count||0),occurrence_count:Number(c.occurrence_count||0),created_at:now,updated_at:now});}
-  const {error:entryError}=await db.from("wk_chart_entries_v2").insert(rows);if(entryError){await db.from("wk_chart_editions_v2").delete().eq("id",editionId);return json(req,{error:"entry_create_failed",detail:entryError.message},500);}
-  const status=publishImmediately?"published":"committed"; const {error:updateError}=await db.from("chart_ingest_runs").update({status,committed_at:now,commit_edition_id:editionId,notes:notes??null,updated_at:now}).eq("id",runId);if(updateError)return json(req,{error:"run_commit_state_update_failed",detail:updateError.message},500);
-  await db.from("chart_ingest_stage_events").update({status:"done",finished_at:now,message:`${top.length} entries committed.`}).eq("run_id",runId).eq("stage","commit_write"); await db.from("chart_ingest_audit_events").insert({run_id:runId,actor:user.id,actor_email:actor,action:"run_committed",new_status:status,payload_json:{editionId,editionSlug,entryCount:top.length}});
-  return json(req,{runId,status,editionId,editionSlug,entryCount:top.length,publicUrl:`/charts/${String(program?.public_slug||programId)}/${editionSlug}`,registryStats,integrity:{ok:true,warnings:[],errors:[]}});
+// COMMIT — projection-only: canonical Registry identity must already exist.
+async function handleCommitRun(
+  req: Request,
+  db: ReturnType<typeof createClient>,
+  params: Record<string, unknown>,
+  user: { id: string; email?: string },
+) {
+  const { runId, publishImmediately, notes } = params as {
+    runId?: string;
+    publishImmediately?: boolean;
+    notes?: string;
+  };
+  if (!runId) return json(req, { error: "runId_required" }, 400);
+
+  const { error: gateError } = await db.rpc("chart_assert_committable_run", {
+    p_run_id: runId,
+  });
+  if (gateError) {
+    return json(req, {
+      error: "commit_blocked_chart_run_integrity",
+      detail: gateError.message,
+    }, 400);
+  }
+
+  const { data: run, error: runError } = await db
+    .from("chart_ingest_runs")
+    .select("*")
+    .eq("id", runId)
+    .maybeSingle();
+
+  if (runError) return json(req, { error: "run_lookup_failed", detail: runError.message }, 500);
+  if (!run) return json(req, { error: "run_not_found" }, 404);
+
+  const now = new Date().toISOString();
+  const editionDate = String(run.edition_date || now.split("T")[0]);
+  const chartSize = Number(run.chart_size || 20);
+  const programId = String(run.program_id || "unknown");
+  const actor = user.email || user.id;
+
+  const { data: candidates, error: candidateError } = await db
+    .from("chart_ingest_candidates")
+    .select("*")
+    .eq("run_id", runId)
+    .eq("status", "eligible")
+    .order("created_at");
+
+  if (candidateError) {
+    return json(req, { error: "candidate_lookup_failed", detail: candidateError.message }, 500);
+  }
+  if (!candidates?.length) return json(req, { error: "no_eligible_candidates" }, 400);
+
+  const candidateIds = candidates.map((candidate) => String(candidate.id));
+
+  const [{ data: scores, error: scoreError }, { data: matches, error: matchError }] =
+    await Promise.all([
+      db
+        .from("chart_ingest_candidate_scores")
+        .select("*")
+        .eq("run_id", runId)
+        .in("candidate_id", candidateIds),
+      db
+        .from("chart_ingest_matches")
+        .select("candidate_id,canonical_entity_id,status,entity_type")
+        .eq("run_id", runId)
+        .eq("entity_type", "track")
+        .eq("status", "accepted")
+        .in("candidate_id", candidateIds),
+    ]);
+
+  if (scoreError || matchError) {
+    return json(req, {
+      error: "commit_projection_lookup_failed",
+      detail: scoreError?.message || matchError?.message,
+    }, 500);
+  }
+
+  const scoreByCandidate = new Map<string, Record<string, unknown>>();
+  for (const score of scores || []) scoreByCandidate.set(String(score.candidate_id), score);
+
+  const trackByCandidate = new Map<string, string>();
+  const candidateByTrack = new Map<string, string>();
+  for (const match of matches || []) {
+    const candidateId = String(match.candidate_id || "");
+    const trackId = String(match.canonical_entity_id || "");
+    if (!candidateId || !trackId) continue;
+
+    const existingCandidate = candidateByTrack.get(trackId);
+    if (existingCandidate && existingCandidate !== candidateId) {
+      return json(req, {
+        error: "commit_identity_invariant_failed",
+        detail: `Multiple eligible candidates resolve to Registry Track ${trackId}.`,
+      }, 409);
+    }
+
+    trackByCandidate.set(candidateId, trackId);
+    candidateByTrack.set(trackId, candidateId);
+  }
+
+  const missingIdentity = candidateIds.filter((id) => !trackByCandidate.has(id));
+  const missingScore = candidateIds.filter((id) => !scoreByCandidate.has(id));
+  if (missingIdentity.length > 0 || missingScore.length > 0) {
+    return json(req, {
+      error: "commit_identity_invariant_failed",
+      detail: "Every eligible Chart candidate must already have one accepted Registry Track UUID and one score.",
+      missingIdentityCandidateIds: missingIdentity.slice(0, 20),
+      missingScoreCandidateIds: missingScore.slice(0, 20),
+    }, 409);
+  }
+
+  const top = [...candidates]
+    .sort((a, b) => {
+      const aId = String(a.id);
+      const bId = String(b.id);
+      const scoreDelta =
+        Number(scoreByCandidate.get(bId)?.final_score || 0) -
+        Number(scoreByCandidate.get(aId)?.final_score || 0);
+      if (scoreDelta !== 0) return scoreDelta;
+      return String(trackByCandidate.get(aId) || "").localeCompare(
+        String(trackByCandidate.get(bId) || ""),
+      );
+    })
+    .slice(0, chartSize);
+
+  if (top.length !== chartSize) {
+    return json(req, {
+      error: "commit_shortlist_incomplete",
+      chartSize,
+      eligibleCount: top.length,
+    }, 409);
+  }
+
+  const topTrackIds = top.map((candidate) => trackByCandidate.get(String(candidate.id))!);
+
+  const { data: registryTracks, error: trackError } = await db
+    .from("registry_tracks")
+    .select("id,slug,title,status")
+    .in("id", topTrackIds)
+    .eq("status", "active");
+
+  if (trackError) {
+    return json(req, { error: "registry_track_projection_failed", detail: trackError.message }, 500);
+  }
+
+  const trackById = new Map<string, Record<string, unknown>>();
+  for (const track of registryTracks || []) trackById.set(String(track.id), track);
+
+  const missingActiveTracks = topTrackIds.filter((trackId) => !trackById.has(trackId));
+  if (missingActiveTracks.length > 0) {
+    return json(req, {
+      error: "commit_registry_identity_not_current",
+      trackIds: missingActiveTracks,
+    }, 409);
+  }
+
+  const { data: credits, error: creditError } = await db
+    .from("registry_track_artists")
+    .select("track_id,artist_id,artist_slug,is_primary,credit_order,status")
+    .in("track_id", topTrackIds)
+    .eq("status", "active")
+    .order("credit_order", { ascending: true });
+
+  if (creditError) {
+    return json(req, { error: "registry_credit_projection_failed", detail: creditError.message }, 500);
+  }
+
+  const creditsByTrack = new Map<string, Array<Record<string, unknown>>>();
+  const artistIds = new Set<string>();
+  for (const credit of credits || []) {
+    const trackId = String(credit.track_id || "");
+    if (!trackId) continue;
+    if (!creditsByTrack.has(trackId)) creditsByTrack.set(trackId, []);
+    creditsByTrack.get(trackId)!.push(credit);
+    if (credit.artist_id) artistIds.add(String(credit.artist_id));
+  }
+
+  const artistSlugById = new Map<string, string>();
+  for (const chunk of chunkStrings([...artistIds], 150)) {
+    const { data: artists, error } = await db
+      .from("registry_artists")
+      .select("id,slug,status")
+      .in("id", chunk)
+      .eq("status", "active");
+
+    if (error) {
+      return json(req, { error: "registry_artist_projection_failed", detail: error.message }, 500);
+    }
+    for (const artist of artists || []) {
+      artistSlugById.set(String(artist.id), String(artist.slug || ""));
+    }
+  }
+
+  const previousRankByTrack = new Map<string, number>();
+  const { data: previousEdition, error: previousEditionError } = await db
+    .from("wk_chart_editions_v2")
+    .select("id")
+    .eq("program_id", programId)
+    .in("status", ["committed", "published"])
+    .lt("edition_date", editionDate)
+    .order("edition_date", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  if (previousEditionError) {
+    return json(req, {
+      error: "commit_previous_edition_lookup_failed",
+      detail: previousEditionError.message,
+    }, 500);
+  }
+
+  if (previousEdition) {
+    const { data: previousEntries, error } = await db
+      .from("wk_chart_entries_v2")
+      .select("canonical_track_id,rank")
+      .eq("edition_id", previousEdition.id);
+
+    if (error) {
+      return json(req, {
+        error: "commit_previous_entries_lookup_failed",
+        detail: error.message,
+      }, 500);
+    }
+
+    const lineageCache = new Map<
+      string,
+      Awaited<ReturnType<typeof resolveCurrentTrackIdentity>>
+    >();
+
+    for (const entry of previousEntries || []) {
+      const historicalTrackId = String(entry.canonical_track_id || "");
+      if (!historicalTrackId) continue;
+
+      let lineage = lineageCache.get(historicalTrackId);
+      if (!lineage) {
+        lineage = await resolveCurrentTrackIdentity(db, historicalTrackId);
+        lineageCache.set(historicalTrackId, lineage);
+      }
+      if (lineage.currentTrackId) {
+        previousRankByTrack.set(lineage.currentTrackId, Number(entry.rank));
+      }
+    }
+  }
+
+  const editionId = crypto.randomUUID();
+  const { data: program, error: programError } = await db
+    .from("wk_chart_programs_v2")
+    .select("public_slug,public_label")
+    .eq("id", programId)
+    .maybeSingle();
+
+  if (programError) {
+    return json(req, { error: "program_lookup_failed", detail: programError.message }, 500);
+  }
+
+  const editionSlug = editionDate;
+  const { error: editionError } = await db.from("wk_chart_editions_v2").insert({
+    id: editionId,
+    program_id: programId,
+    edition_slug: editionSlug,
+    edition_label: String(program?.public_label || "Chart Edition"),
+    edition_date: editionDate,
+    period_start: run.period_start || editionDate,
+    period_end: run.period_end || editionDate,
+    entry_count: top.length,
+    status: publishImmediately ? "published" : "committed",
+    methodology_version: String(run.methodology_version || "1.0.0"),
+    rule_set_snapshot: (run.rule_snapshot_json as Record<string, unknown>) || {},
+    chart_size: chartSize,
+    ingest_run_id: runId,
+    published_at: publishImmediately ? now : null,
+    published_by: publishImmediately ? actor : null,
+    created_at: now,
+    updated_at: now,
+  });
+
+  if (editionError) {
+    return json(req, { error: "edition_create_failed", detail: editionError.message }, 500);
+  }
+
+  const entryRows: Array<Record<string, unknown>> = [];
+  let canonicalCreditProjectionCount = 0;
+  let presentationFallbackCount = 0;
+
+  for (let i = 0; i < top.length; i++) {
+    const candidate = top[i];
+    const candidateId = String(candidate.id);
+    const trackId = trackByCandidate.get(candidateId)!;
+    const track = trackById.get(trackId)!;
+    const rank = i + 1;
+    const previousRank = previousRankByTrack.get(trackId) ?? null;
+    const movement =
+      previousRank === null
+        ? "new"
+        : rank === previousRank
+          ? "same"
+          : rank < previousRank
+            ? "up"
+            : "down";
+
+    const trackCredits = creditsByTrack.get(trackId) || [];
+    const primaryCredit =
+      trackCredits.find((credit) => Boolean(credit.is_primary)) ||
+      trackCredits[0] ||
+      null;
+
+    const canonicalArtistSlug = primaryCredit?.artist_id
+      ? artistSlugById.get(String(primaryCredit.artist_id)) || ""
+      : String(primaryCredit?.artist_slug || "");
+
+    const artistSlug =
+      normalizeSlug(canonicalArtistSlug) ||
+      normalizeSlug(String(candidate.artist_display || ""));
+
+    if (canonicalArtistSlug) canonicalCreditProjectionCount++;
+    else presentationFallbackCount++;
+
+    const trackSlug = normalizeSlug(String(track.slug || ""));
+    if (!trackSlug) {
+      await db.from("wk_chart_editions_v2").delete().eq("id", editionId);
+      return json(req, {
+        error: "commit_registry_track_slug_missing",
+        canonicalTrackId: trackId,
+      }, 409);
+    }
+
+    entryRows.push({
+      id: crypto.randomUUID(),
+      edition_id: editionId,
+      rank,
+      previous_rank: previousRank,
+      movement,
+      track_title: String(candidate.title || ""),
+      artist_name: String(candidate.artist_display || ""),
+      artwork_url: candidate.artwork_url || null,
+      normalized_key: String(candidate.normalized_key || ""),
+      lead_artist_key: String(candidate.lead_artist_key || ""),
+      track_slug: trackSlug,
+      artist_slug: artistSlug,
+      canonical_track_id: trackId,
+      total_score: Number(scoreByCandidate.get(candidateId)?.final_score || 0),
+      carry_forward_only: Boolean(candidate.carry_forward_only),
+      release_date: sanitizeDate(candidate.release_date as string),
+      source_count: Number(candidate.source_count || 0),
+      occurrence_count: Number(candidate.occurrence_count || 0),
+      created_at: now,
+      updated_at: now,
+    });
+  }
+
+  const { error: entryError } = await db.from("wk_chart_entries_v2").insert(entryRows);
+  if (entryError) {
+    await db.from("wk_chart_editions_v2").delete().eq("id", editionId);
+    return json(req, { error: "entry_create_failed", detail: entryError.message }, 500);
+  }
+
+  const status = publishImmediately ? "published" : "committed";
+  const { error: updateError } = await db
+    .from("chart_ingest_runs")
+    .update({
+      status,
+      committed_at: now,
+      commit_edition_id: editionId,
+      notes: notes ?? null,
+      updated_at: now,
+    })
+    .eq("id", runId);
+
+  if (updateError) {
+    return json(req, { error: "run_commit_state_update_failed", detail: updateError.message }, 500);
+  }
+
+  await db
+    .from("chart_ingest_stage_events")
+    .update({
+      status: "done",
+      finished_at: now,
+      message: `${top.length} UUID-bound entries committed; Registry identity was not mutated.`,
+      metrics_json: {
+        entryCount: top.length,
+        canonicalCreditProjectionCount,
+        presentationFallbackCount,
+      },
+    })
+    .eq("run_id", runId)
+    .eq("stage", "commit_write");
+
+  await db.from("chart_ingest_audit_events").insert({
+    run_id: runId,
+    actor: user.id,
+    actor_email: actor,
+    action: "run_committed",
+    new_status: status,
+    payload_json: {
+      editionId,
+      editionSlug,
+      entryCount: top.length,
+      canonicalTrackIds: topTrackIds,
+      registryMutation: false,
+      canonicalCreditProjectionCount,
+      presentationFallbackCount,
+    },
+  });
+
+  return json(req, {
+    runId,
+    status,
+    editionId,
+    editionSlug,
+    entryCount: top.length,
+    publicUrl: `/charts/${String(program?.public_slug || programId)}/${editionSlug}`,
+    registryStats: {
+      tracks_found: top.length,
+      tracks_created: 0,
+      artists_found: canonicalCreditProjectionCount,
+      artists_created: 0,
+      links_created: 0,
+      previews_set: 0,
+      errors: 0,
+    },
+    projection: {
+      canonicalCreditProjectionCount,
+      presentationFallbackCount,
+      registryMutation: false,
+    },
+    integrity: { ok: true, warnings: [], errors: [] },
+  });
 }
 
 async function handleRunAirplayDetection(req: Request, db: ReturnType<typeof createClient>, params: Record<string, unknown>, user: { id: string; email?: string }) { return json(req, { ok: false, error: "ACRCloud credentials not configured." }); }
