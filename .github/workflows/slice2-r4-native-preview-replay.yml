@@ -14,21 +14,20 @@ concurrency:
 
 jobs:
   replay:
-    if: "${{ github.event.head_commit.message == 'ci: run slice2 r4 native preview replay' }}"
+    if: "${{ github.event.head_commit.message == 'ci: apply slice2 r4 native candidate' }}"
     runs-on: ubuntu-latest
     timeout-minutes: 30
     env:
       PREVIEW_REF: afihgsvgekjbsfgohcvz
-      BASE_MAIN_SHA: e6d20aa63e31e12638291d7f8010108e9dd9d712
       IMPLEMENTATION_SHA: 6b70940c11286bee691094abff727ccd1538d24d
       CANDIDATE: 20260923083943_music_identity_rights_slice2_authority_v1.sql
       SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
 
     steps:
-      - name: Check out exact protected main
+      - name: Check out exact implementation candidate
         uses: actions/checkout@v4
         with:
-          ref: ${{ env.BASE_MAIN_SHA }}
+          ref: ${{ env.IMPLEMENTATION_SHA }}
           fetch-depth: 0
 
       - name: Set up pinned Supabase CLI
@@ -38,65 +37,6 @@ jobs:
           github-token: ${{ github.token }}
 
       - name: Link R4 Preview
-        run: |
-          set -euo pipefail
-          supabase link --project-ref "$PREVIEW_REF"
-          test "$(cat supabase/.temp/project-ref)" = "$PREVIEW_REF"
-
-      - name: Require exact accepted baseline pending set
-        run: |
-          set -euo pipefail
-          DRY="$(supabase db push --dry-run --linked 2>&1)"
-          printf '%s\n' "$DRY"
-
-          ACTUAL="$(
-            {
-              printf '%s\n' "$DRY" |
-                grep -Eo '[0-9]{14}_[A-Za-z0-9_-]+\.sql' || true
-            } |
-              sort -u
-          )"
-
-          COUNT="$(printf '%s\n' "$ACTUAL" | sed '/^$/d' | wc -l | tr -d '[:space:]')"
-          FIRST="$(printf '%s\n' "$ACTUAL" | sed '/^$/d' | head -n 1)"
-          LAST="$(printf '%s\n' "$ACTUAL" | sed '/^$/d' | tail -n 1)"
-
-          test "$COUNT" = "84"
-          test "$FIRST" = "20260905090000_wakilisha_native_preview_acl_replay_parity.sql"
-          test "$LAST" = "20260923063254_chart_uuid_identity_authority_v1.sql"
-
-          if printf '%s\n' "$ACTUAL" | grep -F "$CANDIDATE" >/dev/null; then
-            echo "STOP: Slice 2 candidate appeared in baseline phase."
-            exit 1
-          fi
-
-          echo "SLICE2_R4_BASELINE_PENDING_SET=PASS"
-
-      - name: Native replay accepted baseline
-        run: |
-          set -euo pipefail
-          supabase db push --linked
-
-          POST="$(supabase db push --dry-run --linked 2>&1)"
-          printf '%s\n' "$POST"
-
-          POST_PENDING="$(
-            {
-              printf '%s\n' "$POST" |
-                grep -Eo '[0-9]{14}_[A-Za-z0-9_-]+\.sql' || true
-            } |
-              sort -u
-          )"
-          test -z "$POST_PENDING"
-          echo "SLICE2_R4_BASELINE_NATIVE_REPLAY=PASS"
-
-      - name: Check out exact implementation candidate
-        uses: actions/checkout@v4
-        with:
-          ref: ${{ env.IMPLEMENTATION_SHA }}
-          fetch-depth: 0
-
-      - name: Relink R4 Preview
         run: |
           set -euo pipefail
           supabase link --project-ref "$PREVIEW_REF"
@@ -136,5 +76,6 @@ jobs:
             } |
               sort -u
           )"
+
           test -z "$POST_PENDING"
           echo "SLICE2_R4_NATIVE_CANDIDATE_APPLY=PASS"
