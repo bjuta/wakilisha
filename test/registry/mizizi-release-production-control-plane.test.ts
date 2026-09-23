@@ -66,6 +66,15 @@ describe("MIZIZI Release production control plane", () => {
     expect(controlPlane).toContain(
       "findings:titlePackagingCount + slugPackagingCount",
     );
+    expect(controlPlane).toContain(
+      "(findings !== 0 || observedFindings !== 0)",
+    );
+    expect(controlPlane).toContain(
+      "titlePackaging ? Number(titlePackaging[1]) : 0",
+    );
+    expect(controlPlane).toContain(
+      "slugPackaging ? Number(slugPackaging[1]) : 0",
+    );
     expect(controlPlane).toContain("release_title_provider_packaging");
     expect(controlPlane).toContain("release_slug_provider_packaging");
     expect(controlPlane).toContain("1\\.2\\.0");
