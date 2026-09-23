@@ -76,20 +76,30 @@ left join organization_matches o using (release_id)
 order by candidate_state, n.source_label_text, n.release_id;
 
 -- Report B: retained Apple Music composer strings.
+--
+-- provider_field_observations intentionally preserves one raw payload alongside
+-- several typed field observations for the same provider item. Deduplicate here
+-- by provider item + composer string so review workload is source-level rather
+-- than field-row-level while preserving raw observation coverage separately in
+-- the engineering record.
 with composer_evidence as (
   select
-    p.id as observation_id,
     p.provider_item_id,
-    p.entity_type,
-    p.field_name,
-    p.source_path,
-    p.created_at,
     nullif(
       btrim(p.raw_payload#>>'{data,0,attributes,composerName}'),
       ''
-    ) as composer_name
+    ) as composer_name,
+    min(p.created_at) as first_observed_at,
+    max(p.created_at) as last_observed_at,
+    count(*) as retained_observation_rows
   from public.provider_field_observations p
   where p.provider = 'apple_music'
+  group by
+    p.provider_item_id,
+    nullif(
+      btrim(p.raw_payload#>>'{data,0,attributes,composerName}'),
+      ''
+    )
 ),
 nonblank as (
   select *
@@ -97,16 +107,14 @@ nonblank as (
   where composer_name is not null
 )
 select
-  observation_id,
   provider_item_id,
-  entity_type,
-  field_name,
-  source_path,
   composer_name,
-  count(*) over (partition by composer_name) as identical_observation_count,
+  retained_observation_rows,
+  count(*) over (partition by composer_name) as provider_items_with_same_string,
   'review_only_raw_composer_evidence'::text as candidate_state,
-  created_at
+  first_observed_at,
+  last_observed_at
 from nonblank
-order by composer_name, created_at, observation_id;
+order by composer_name, provider_item_id;
 
 rollback;
