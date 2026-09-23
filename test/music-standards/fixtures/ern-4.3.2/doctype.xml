@@ -2,7 +2,10 @@
 <!DOCTYPE ern [
   <!ENTITY forbidden "no">
 ]>
-<ern:NewReleaseMessage xmlns:ern="http://ddex.net/xml/ern/43">
+<ern:NewReleaseMessage
+  xmlns:ern="http://ddex.net/xml/ern/432"
+  AvsVersionId="9"
+  LanguageAndScriptCode="en">
   <ResourceList />
   <ReleaseList />
 </ern:NewReleaseMessage>

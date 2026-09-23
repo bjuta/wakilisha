@@ -1,6 +1,6 @@
 import { SaxesParser } from "saxes";
 
-const ERN_43_NAMESPACE = "http://ddex.net/xml/ern/43";
+const ERN_432_NAMESPACE = "http://ddex.net/xml/ern/432";
 const MAX_XML_BYTES = 1_000_000;
 const MAX_XML_DEPTH = 64;
 const MAX_XML_NODES = 20_000;
@@ -316,7 +316,10 @@ function resolveContributors(
       childText(contributor, "PartyReference");
 
     const roles = children(contributor, "Role")
-      .map((role) => directText(role))
+      .map(
+        (role) =>
+          childText(role, "Value") ?? directText(role),
+      )
       .filter((role): role is string => Boolean(role));
 
     return {
@@ -369,14 +372,18 @@ function parseSoundRecordings(
         return null;
       }
 
-      const resourceId = firstChild(recording, "ResourceId");
+      const isrc =
+        children(recording, "SoundRecordingEdition")
+          .map((edition) => descendantText(edition, "ISRC"))
+          .find((value): value is string => Boolean(value)) ??
+        null;
 
       return {
         resourceReference,
         title:
           childText(recording, "DisplayTitleText") ??
           descendantText(firstChild(recording, "DisplayTitle"), "TitleText"),
-        isrc: childText(resourceId, "ISRC"),
+        isrc,
         displayArtistName: childText(
           recording,
           "DisplayArtistName",
@@ -450,7 +457,7 @@ function parseReleases(
           labelPartyReference
             ? parties.get(labelPartyReference) ?? null
             : null,
-        genres: children(release, "Genre")
+        genres: children(release, "DisplayGenre")
           .map((genre) => childText(genre, "GenreText"))
           .filter((genre): genre is string => Boolean(genre)),
         resourceReferences: descendants(
@@ -476,10 +483,10 @@ export function parseErn432(xml: string): Ern432Projection {
     );
   }
 
-  if (root.namespace !== ERN_43_NAMESPACE) {
+  if (root.namespace !== ERN_432_NAMESPACE) {
     throw new Ern432AdapterError(
       "ERN_UNSUPPORTED_NAMESPACE",
-      `Expected ERN 4.3 namespace ${ERN_43_NAMESPACE}, found ${
+      `Expected ERN 4.3.2 namespace ${ERN_432_NAMESPACE}, found ${
         root.namespace || "<none>"
       }.`,
     );

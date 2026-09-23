@@ -1,32 +1,93 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <ern:NewReleaseMessage
-  xmlns:ern="http://ddex.net/xml/ern/43"
-  AvsVersionId="3">
+  xmlns:ern="http://ddex.net/xml/ern/432"
+  AvsVersionId="9"
+  LanguageAndScriptCode="en">
   <MessageHeader>
     <MessageId>MSG-ERN-432-002</MessageId>
-    <MessageSender><PartyId>PADPIDA20260923002</PartyId></MessageSender>
+    <MessageSender>
+      <PartyId>PADPIDA20260923002</PartyId>
+    </MessageSender>
+    <MessageRecipient>
+      <PartyId>PADPIDAWAKILISHA</PartyId>
+    </MessageRecipient>
     <MessageCreatedDateTime>2026-09-23T18:01:00Z</MessageCreatedDateTime>
   </MessageHeader>
+  <PartyList>
+    <Party>
+      <PartyReference>P1</PartyReference>
+      <PartyName>
+        <FullName>Fixture Artist</FullName>
+      </PartyName>
+    </Party>
+    <Party>
+      <PartyReference>P2</PartyReference>
+      <PartyName>
+        <FullName>Fixture Label</FullName>
+      </PartyName>
+    </Party>
+  </PartyList>
   <ResourceList>
     <SoundRecording>
       <ResourceReference>A1</ResourceReference>
-      <ResourceId><ISRC>KEAAA2600002</ISRC></ResourceId>
+      <Type>MusicalWorkSoundRecording</Type>
+      <SoundRecordingEdition>
+        <ResourceId>
+          <ISRC>KEAAA2600002</ISRC>
+        </ResourceId>
+      </SoundRecordingEdition>
       <DisplayTitleText>Fixture Track One</DisplayTitleText>
+      <DisplayTitle>
+        <TitleText>Fixture Track One</TitleText>
+      </DisplayTitle>
       <DisplayArtistName>Fixture Artist</DisplayArtistName>
+      <DisplayArtist SequenceNumber="1">
+        <ArtistPartyReference>P1</ArtistPartyReference>
+        <DisplayArtistRole>MainArtist</DisplayArtistRole>
+      </DisplayArtist>
+      <Duration>PT3M</Duration>
     </SoundRecording>
     <SoundRecording>
       <ResourceReference>A2</ResourceReference>
-      <ResourceId><ISRC>KEAAA2600003</ISRC></ResourceId>
+      <Type>MusicalWorkSoundRecording</Type>
+      <SoundRecordingEdition>
+        <ResourceId>
+          <ISRC>KEAAA2600003</ISRC>
+        </ResourceId>
+      </SoundRecordingEdition>
       <DisplayTitleText>Fixture Track Two</DisplayTitleText>
+      <DisplayTitle>
+        <TitleText>Fixture Track Two</TitleText>
+      </DisplayTitle>
       <DisplayArtistName>Fixture Artist</DisplayArtistName>
+      <DisplayArtist SequenceNumber="1">
+        <ArtistPartyReference>P1</ArtistPartyReference>
+        <DisplayArtistRole>MainArtist</DisplayArtistRole>
+      </DisplayArtist>
+      <Duration>PT3M30S</Duration>
     </SoundRecording>
   </ResourceList>
   <ReleaseList>
     <Release>
       <ReleaseReference>R0</ReleaseReference>
       <ReleaseType>Album</ReleaseType>
-      <ReleaseId><ICPN>1234567890123</ICPN></ReleaseId>
+      <ReleaseId>
+        <ICPN>1234567890123</ICPN>
+      </ReleaseId>
       <DisplayTitleText>Fixture Two-Track Album</DisplayTitleText>
+      <DisplayTitle>
+        <TitleText>Fixture Two-Track Album</TitleText>
+      </DisplayTitle>
+      <DisplayArtistName>Fixture Artist</DisplayArtistName>
+      <DisplayArtist SequenceNumber="1">
+        <ArtistPartyReference>P1</ArtistPartyReference>
+        <DisplayArtistRole>MainArtist</DisplayArtistRole>
+      </DisplayArtist>
+      <ReleaseLabelReference>P2</ReleaseLabelReference>
+      <DisplayGenre>
+        <GenreText>Afropop</GenreText>
+      </DisplayGenre>
+      <ReleaseDate>2026-09-23</ReleaseDate>
       <ResourceGroup>
         <ResourceGroupContentItem>
           <ReleaseResourceReference>A1</ReleaseResourceReference>
