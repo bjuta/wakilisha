@@ -392,34 +392,323 @@ async function handleFixChartArtistSlugs(req:Request,db:ReturnType<typeof create
   return json(req,{ok:true,fixed,skipped:skipped.length,total_entries:(rows||[]).length,skipped_samples:skipped.slice(0,20)});
 }
 
-async function handleReingestEdition(req:Request,db:ReturnType<typeof createClient>,params:Record<string,unknown>,user:{id:string;email?:string}) {
-  const {editionId,dryRun}=params as {editionId:string;dryRun?:boolean}; if(!editionId)return json(req,{error:"editionId_required"},400);
-  const isDryRun=dryRun!==false; const now=new Date().toISOString();
-  const {data:edition,error:editionError}=await db.from("wk_chart_editions_v2").select("id, edition_slug, ingest_run_id").eq("id",editionId).maybeSingle();
-  if(editionError)return json(req,{error:"edition_lookup_failed",detail:editionError.message},500); if(!edition)return json(req,{error:"edition_not_found"},404);
-  const runId=String(edition.ingest_run_id||"");
-  const {data:entries,error:entryError}=await db.from("wk_chart_entries_v2").select("*").eq("edition_id",editionId).order("rank",{ascending:true});
-  if(entryError)return json(req,{error:"entry_lookup_failed",detail:entryError.message},500); if(!entries?.length)return json(req,{error:"no_entries"},400);
-  const stats={total:entries.length,tracks_found:0,tracks_created:0,artists_found:0,artists_created:0,links_created:0,artist_slugs_fixed:0,track_slugs_normalized:0,canonical_ids_set:0,errors:0};
-  const repairs:Array<{id:string;track_title:string;artist_name:string;action:string}>=[];
-  for(const entry of entries){
-    const id=String(entry.id||""); const title=String(entry.track_title||""); const artist=String(entry.artist_name||""); const key=String(entry.normalized_key||""); const existing=String(entry.canonical_track_id||"");
-    try{
-      if(!runId||!key){if(existing){stats.tracks_found++;repairs.push({id,track_title:title,artist_name:artist,action:"existing_canonical_binding_preserved"});continue;}throw new Error("missing_original_run_candidate_binding");}
-      const {data:candidates,error:candidateError}=await db.from("chart_ingest_candidates").select("id").eq("run_id",runId).eq("normalized_key",key).limit(2);
-      if(candidateError)throw new Error("candidate_binding_lookup_failed:"+candidateError.message);
-      if(!candidates||candidates.length!==1){if(existing){stats.tracks_found++;repairs.push({id,track_title:title,artist_name:artist,action:"existing_canonical_binding_preserved_without_unique_candidate"});continue;}throw new Error(candidates?.length?"ambiguous_original_candidate_binding":"missing_original_candidate_binding");}
-      const candidateId=String(candidates[0].id); if(isDryRun){repairs.push({id,track_title:title,artist_name:artist,action:`would_materialize_candidate:${candidateId}`});continue;}
-      const result=await materializeChartCandidate(db,runId,candidateId); if(result.track_created)stats.tracks_created++;else stats.tracks_found++;
-      for(const a of result.artists){if(a.created)stats.artists_created++;else stats.artists_found++;} stats.links_created+=result.credits.filter(c=>c.created).length;
-      const trackSlug=normalizeSlug(result.track_slug); const artistSlug=normalizeSlug(result.primary_artist_slug);
-      if(trackSlug!==String(entry.track_slug||""))stats.track_slugs_normalized++; if(artistSlug!==String(entry.artist_slug||""))stats.artist_slugs_fixed++;
-      const {error:updateError}=await db.from("wk_chart_entries_v2").update({canonical_track_id:result.track_id,track_slug:trackSlug,artist_slug:artistSlug,updated_at:now}).eq("id",id);
-      if(updateError)throw new Error("chart_entry_update_failed:"+updateError.message); stats.canonical_ids_set++; repairs.push({id,track_title:title,artist_name:artist,action:result.track_created?`created_track:${trackSlug}`:`linked_track:${trackSlug}`});
-    }catch(error){stats.errors++;repairs.push({id,track_title:title,artist_name:artist,action:"ERROR:"+(error instanceof Error?error.message:String(error))});}
+async function handleReingestEdition(
+  req: Request,
+  db: ReturnType<typeof createClient>,
+  params: Record<string, unknown>,
+  user: { id: string; email?: string },
+) {
+  const { editionId, dryRun } = params as {
+    editionId?: string;
+    dryRun?: boolean;
+  };
+  if (!editionId) return json(req, { error: "editionId_required" }, 400);
+
+  const isDryRun = dryRun !== false;
+  const now = new Date().toISOString();
+
+  const { data: edition, error: editionError } = await db
+    .from("wk_chart_editions_v2")
+    .select("id,edition_slug,ingest_run_id")
+    .eq("id", editionId)
+    .maybeSingle();
+
+  if (editionError) {
+    return json(req, { error: "edition_lookup_failed", detail: editionError.message }, 500);
   }
-  await db.from("chart_ingest_audit_events").insert({run_id:editionId,actor:user.id,actor_email:user.email||null,action:"reingest_edition",new_status:isDryRun?"dry_run":"done",payload_json:{...stats,edition_slug:edition.edition_slug,dryRun:isDryRun},created_at:now});
-  return json(req,{ok:stats.errors===0,dry_run:isDryRun,edition_slug:String(edition.edition_slug||""),stats,repairs:repairs.slice(0,100)});
+  if (!edition) return json(req, { error: "edition_not_found" }, 404);
+
+  const { data: entries, error: entryError } = await db
+    .from("wk_chart_entries_v2")
+    .select("*")
+    .eq("edition_id", editionId)
+    .order("rank", { ascending: true });
+
+  if (entryError) {
+    return json(req, { error: "entry_lookup_failed", detail: entryError.message }, 500);
+  }
+  if (!entries?.length) return json(req, { error: "no_entries" }, 400);
+
+  const lineageByEntry = new Map<
+    string,
+    Awaited<ReturnType<typeof resolveCurrentTrackIdentity>>
+  >();
+  const currentTrackIds = new Set<string>();
+  const repairs: Array<{
+    id: string;
+    track_title: string;
+    artist_name: string;
+    action: string;
+  }> = [];
+
+  for (const entry of entries) {
+    const entryId = String(entry.id || "");
+    const trackId = String(entry.canonical_track_id || "").trim();
+
+    if (!trackId) {
+      repairs.push({
+        id: entryId,
+        track_title: String(entry.track_title || ""),
+        artist_name: String(entry.artist_name || ""),
+        action: "ERROR:missing_canonical_track_identity",
+      });
+      continue;
+    }
+
+    const lineage = await resolveCurrentTrackIdentity(db, trackId);
+    lineageByEntry.set(entryId, lineage);
+
+    if (!lineage.currentTrackId) {
+      repairs.push({
+        id: entryId,
+        track_title: String(entry.track_title || ""),
+        artist_name: String(entry.artist_name || ""),
+        action: `ERROR:canonical_track_lineage_${lineage.status}`,
+      });
+      continue;
+    }
+
+    currentTrackIds.add(lineage.currentTrackId);
+  }
+
+  const trackIds = [...currentTrackIds];
+
+  const { data: registryTracks, error: trackError } = trackIds.length > 0
+    ? await db
+      .from("registry_tracks")
+      .select("id,slug,title,status,artwork_url")
+      .in("id", trackIds)
+      .eq("status", "active")
+    : { data: [], error: null };
+
+  if (trackError) {
+    return json(req, { error: "registry_track_projection_failed", detail: trackError.message }, 500);
+  }
+
+  const trackById = new Map<string, Record<string, unknown>>();
+  for (const track of registryTracks || []) {
+    trackById.set(String(track.id), track);
+  }
+
+  const { data: credits, error: creditError } = trackIds.length > 0
+    ? await db
+      .from("registry_track_artists")
+      .select("track_id,artist_id,artist_slug,artist_name_text,display_credit,role,is_primary,is_featured,credit_order,status")
+      .in("track_id", trackIds)
+      .eq("status", "active")
+      .order("credit_order", { ascending: true })
+    : { data: [], error: null };
+
+  if (creditError) {
+    return json(req, { error: "registry_credit_projection_failed", detail: creditError.message }, 500);
+  }
+
+  const creditsByTrack = new Map<string, Array<Record<string, unknown>>>();
+  const artistIds = new Set<string>();
+  for (const credit of credits || []) {
+    const trackId = String(credit.track_id || "");
+    if (!trackId) continue;
+    if (!creditsByTrack.has(trackId)) creditsByTrack.set(trackId, []);
+    creditsByTrack.get(trackId)!.push(credit);
+    if (credit.artist_id) artistIds.add(String(credit.artist_id));
+  }
+
+  const artistById = new Map<string, { slug: string; displayName: string }>();
+  for (const chunk of chunkStrings([...artistIds], 150)) {
+    const { data: artists, error } = await db
+      .from("registry_artists")
+      .select("id,slug,display_name,status")
+      .in("id", chunk)
+      .eq("status", "active");
+
+    if (error) {
+      return json(req, { error: "registry_artist_projection_failed", detail: error.message }, 500);
+    }
+
+    for (const artist of artists || []) {
+      artistById.set(String(artist.id), {
+        slug: String(artist.slug || ""),
+        displayName: String(artist.display_name || ""),
+      });
+    }
+  }
+
+  const presentationByTrack = new Map<
+    string,
+    { artistSlug: string; artistName: string }
+  >();
+
+  for (const trackId of trackIds) {
+    const trackCredits = creditsByTrack.get(trackId) || [];
+    const routeCredit =
+      trackCredits.find((credit) => Boolean(credit.is_primary)) ||
+      trackCredits[0] ||
+      null;
+
+    const routeArtist = routeCredit?.artist_id
+      ? artistById.get(String(routeCredit.artist_id))
+      : null;
+
+    const artistSlug = normalizeSlug(
+      routeArtist?.slug || String(routeCredit?.artist_slug || ""),
+    );
+
+    const artistName = [
+      ...new Set(
+        trackCredits
+          .map((credit) => {
+            const artist = credit.artist_id
+              ? artistById.get(String(credit.artist_id))
+              : null;
+            return String(
+              credit.display_credit ||
+                artist?.displayName ||
+                credit.artist_name_text ||
+                "",
+            ).trim();
+          })
+          .filter(Boolean),
+      ),
+    ].join(", ");
+
+    if (trackCredits.length > 0 && artistSlug && artistName) {
+      presentationByTrack.set(trackId, { artistSlug, artistName });
+    }
+  }
+
+  const stats = {
+    total: entries.length,
+    tracks_found: 0,
+    tracks_created: 0,
+    artists_found: 0,
+    artists_created: 0,
+    links_created: 0,
+    artist_slugs_fixed: 0,
+    track_slugs_normalized: 0,
+    canonical_ids_set: 0,
+    errors: 0,
+  };
+
+  for (const entry of entries) {
+    const entryId = String(entry.id || "");
+    const lineage = lineageByEntry.get(entryId);
+
+    if (!lineage?.currentTrackId) {
+      stats.errors++;
+      continue;
+    }
+
+    const trackId = lineage.currentTrackId;
+    const track = trackById.get(trackId);
+    const presentation = presentationByTrack.get(trackId);
+
+    if (!track) {
+      stats.errors++;
+      repairs.push({
+        id: entryId,
+        track_title: String(entry.track_title || ""),
+        artist_name: String(entry.artist_name || ""),
+        action: `ERROR:current_registry_track_not_active:${trackId}`,
+      });
+      continue;
+    }
+
+    if (!presentation) {
+      stats.errors++;
+      repairs.push({
+        id: entryId,
+        track_title: String(entry.track_title || ""),
+        artist_name: String(entry.artist_name || ""),
+        action: `ERROR:registry_presentation_incomplete:${trackId}`,
+      });
+      continue;
+    }
+
+    const trackSlug = normalizeSlug(String(track.slug || ""));
+    if (!trackSlug) {
+      stats.errors++;
+      repairs.push({
+        id: entryId,
+        track_title: String(entry.track_title || ""),
+        artist_name: String(entry.artist_name || ""),
+        action: `ERROR:registry_track_slug_missing:${trackId}`,
+      });
+      continue;
+    }
+
+    stats.tracks_found++;
+    stats.artists_found++;
+
+    if (String(entry.canonical_track_id || "") !== trackId) {
+      stats.canonical_ids_set++;
+    }
+    if (String(entry.track_slug || "") !== trackSlug) {
+      stats.track_slugs_normalized++;
+    }
+    if (String(entry.artist_slug || "") !== presentation.artistSlug) {
+      stats.artist_slugs_fixed++;
+    }
+
+    const update = {
+      canonical_track_id: trackId,
+      track_slug: trackSlug,
+      artist_slug: presentation.artistSlug,
+      track_title: String(track.title || ""),
+      artist_name: presentation.artistName,
+      artwork_url: track.artwork_url || entry.artwork_url || null,
+      updated_at: now,
+    };
+
+    if (!isDryRun) {
+      const { error: updateError } = await db
+        .from("wk_chart_entries_v2")
+        .update(update)
+        .eq("id", entryId);
+
+      if (updateError) {
+        stats.errors++;
+        repairs.push({
+          id: entryId,
+          track_title: String(entry.track_title || ""),
+          artist_name: String(entry.artist_name || ""),
+          action: "ERROR:chart_entry_update_failed:" + updateError.message,
+        });
+        continue;
+      }
+    }
+
+    repairs.push({
+      id: entryId,
+      track_title: String(track.title || ""),
+      artist_name: presentation.artistName,
+      action:
+        `${isDryRun ? "would_project" : "projected"}_canonical_track:${trackId}`,
+    });
+  }
+
+  await db.from("chart_ingest_audit_events").insert({
+    run_id: editionId,
+    actor: user.id,
+    actor_email: user.email || null,
+    action: "reingest_edition",
+    new_status: isDryRun ? "dry_run" : stats.errors === 0 ? "done" : "needs_review",
+    payload_json: {
+      ...stats,
+      edition_slug: edition.edition_slug,
+      dryRun: isDryRun,
+      registryMutation: false,
+    },
+    created_at: now,
+  });
+
+  return json(req, {
+    ok: stats.errors === 0,
+    dry_run: isDryRun,
+    edition_slug: String(edition.edition_slug || ""),
+    registryMutation: false,
+    stats,
+    repairs: repairs.slice(0, 100),
+  }, stats.errors === 0 ? 200 : 409);
 }
 
 async function handleCreateDryRun(req: Request, db: ReturnType<typeof createClient>, params: Record<string, unknown>, user: { id: string; email?: string }) { const rq = params.request as Record<string, unknown>; if (!rq) return json(req, { error: "request_required" }, 400); const runId = crypto.randomUUID(); const ed = rq.editionDate as string; const sUrls = (rq.sourceUrls as string[]) || []; const { error: rErr } = await db.from("chart_ingest_runs").insert({ id: runId, program_id: (rq.existingSeriesId as string) || "unknown", series_slug: (rq.existingSeriesId as string) || null, market_slug: (rq.market as string) || "KE", chart_kind: (rq.chartKind as string) || "tracks", edition_date: ed, period_start: ed, period_end: ed, chart_size: (rq.chartSize as number) || 20, status: "queued", rule_snapshot_json: { chartTitle: rq.chartTitle, chartSlug: rq.chartSlug, coverStyle: rq.coverStyle || "default", saveAsRecurringSeries: rq.saveAsRecurringSeries || false, methodologyVersion: rq.methodologyVersion || "1.0.0" }, market_scope_snapshot_json: (rq.marketScopeSnapshot as object) || {}, eligibility_profile_id: (rq.eligibilityProfileId as string) || null, market_scope_id: (rq.marketScopeId as string) || null, scoring_policy_version: "1.0.1", source_policy_version: "1.0.0", eligibility_policy_version: "1.0.0", methodology_version: (rq.methodologyVersion as string) || "1.0.0", created_by: user.id, created_by_email: user.email || null }); if (rErr) return json(req, { error: "run_create_failed", detail: rErr.message }, 500); if (sUrls.length > 0) { const srs = sUrls.map((url, i) => ({ run_id: runId, provider: detectProvider(url), source_type: url.endsWith(".csv") ? "csv" : "playlist", source_url: url, storefront_or_market: (rq.market as string) || "KE", enabled: true, priority: i, fetch_status: "pending" })); await db.from("chart_ingest_run_sources").insert(srs); } const sgs = ALL_STAGES.map(s => ({ run_id: runId, stage: s, status: "idle", metrics_json: {} })); await db.from("chart_ingest_stage_events").insert(sgs); await db.from("chart_ingest_audit_events").insert({ run_id: runId, actor: user.id, actor_email: user.email || null, action: "run_created", new_status: "queued", payload_json: { sourceCount: sUrls.length } }); return json(req, { runId, status: "queued" }); }
