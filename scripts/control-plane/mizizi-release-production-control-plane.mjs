@@ -380,10 +380,6 @@ function assertReleaseAudit(text) {
     /│\s*\d+\s*│\s*'release_slug_provider_packaging'\s*│\s*(\d+)\s*│/,
   );
 
-  if (!titlePackaging || !slugPackaging) {
-    throw new Error('Release provider-packaging findings were not parseable');
-  }
-
   const [
     ,
     findings,
@@ -396,8 +392,17 @@ function assertReleaseAudit(text) {
     chartEntriesScanned,
   ] = summary.map(Number);
 
-  const titlePackagingCount = Number(titlePackaging[1]);
-  const slugPackagingCount = Number(slugPackaging[1]);
+  if (
+    (!titlePackaging || !slugPackaging) &&
+    (findings !== 0 || observedFindings !== 0)
+  ) {
+    throw new Error(
+      'Release provider-packaging findings were not parseable for a nonzero audit',
+    );
+  }
+
+  const titlePackagingCount = titlePackaging ? Number(titlePackaging[1]) : 0;
+  const slugPackagingCount = slugPackaging ? Number(slugPackaging[1]) : 0;
 
   assertFields(
     {
