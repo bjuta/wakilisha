@@ -2,7 +2,7 @@ import fs from "node:fs";
 import { spawn, spawnSync } from "node:child_process";
 import pg from "pg";
 
-const PINNED_SUPABASE_CLI = "2.107.0";
+const PINNED_SUPABASE_CLI = "2.108.0";
 
 export function runCommand(cmd, args, options = {}) {
   const result = spawnSync(cmd, args, {
