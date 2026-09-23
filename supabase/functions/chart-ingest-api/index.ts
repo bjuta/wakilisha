@@ -2753,42 +2753,61 @@ async function handleRunScoring(
 }
 
 // SHORTLIST
-async function handleRunShortlist(req: Request, db: ReturnType<typeof createClient>, params: Record<string, unknown>, user: { id: string; email?: string }) {
+async function handleRunShortlist(
+  req: Request,
+  db: ReturnType<typeof createClient>,
+  params: Record<string, unknown>,
+  _user: { id: string; email?: string },
+) {
   const { runId } = params as { runId: string };
   if (!runId) return json(req, { error: "runId_required" }, 400);
 
-  const ss = Date.now();
-  const { data: run } = await db
+  const startedAt = Date.now();
+  const now = new Date().toISOString();
+
+  const { data: run, error: runError } = await db
     .from("chart_ingest_runs")
     .select("id,status,edition_date,chart_size")
     .eq("id", runId)
     .maybeSingle();
 
+  if (runError) return json(req, { error: "run_lookup_failed", detail: runError.message }, 500);
   if (!run) return json(req, { error: "run_not_found" }, 404);
 
   await db
     .from("chart_ingest_stage_events")
-    .update({ status: "running", started_at: new Date().toISOString() })
+    .update({
+      status: "running",
+      started_at: now,
+      finished_at: null,
+      message: null,
+      error_code: null,
+      error_message: null,
+    })
     .eq("run_id", runId)
     .eq("stage", "shortlist");
 
-  const csz = (run.chart_size as number) || 20;
+  const chartSize = Number(run.chart_size || 20);
 
-  const { data: candidates } = await db
+  const { data: candidates, error: candidateError } = await db
     .from("chart_ingest_candidates")
     .select("*")
     .eq("run_id", runId)
     .eq("status", "eligible");
 
+  if (candidateError) {
+    return json(req, { error: "shortlist_candidate_lookup_failed", detail: candidateError.message }, 500);
+  }
+
   if (!candidates || candidates.length === 0) {
-    const d = Date.now() - ss;
+    const durationMs = Date.now() - startedAt;
     await db
       .from("chart_ingest_stage_events")
       .update({
         status: "done",
-        finished_at: new Date().toISOString(),
-        duration_ms: d,
-        message: "No eligible.",
+        finished_at: now,
+        duration_ms: durationMs,
+        message: "No eligible candidates.",
       })
       .eq("run_id", runId)
       .eq("stage", "shortlist");
@@ -2799,322 +2818,105 @@ async function handleRunShortlist(req: Request, db: ReturnType<typeof createClie
       shortlistedCount: 0,
       totalScored: 0,
       excludedCount: 0,
-      durationMs: d,
+      chartSize,
+      durationMs,
     });
   }
 
-  const candidateIds = new Set(candidates.map((candidate) => candidate.id as string));
+  const candidateIds = candidates.map((candidate) => String(candidate.id));
 
-  const { data: scoreRows, error: scoreErr } = await db
-    .from("chart_ingest_candidate_scores")
-    .select("*")
-    .eq("run_id", runId);
+  const [{ data: scoreRows, error: scoreError }, { data: matches, error: matchError }] =
+    await Promise.all([
+      db
+        .from("chart_ingest_candidate_scores")
+        .select("*")
+        .eq("run_id", runId)
+        .in("candidate_id", candidateIds),
+      db
+        .from("chart_ingest_matches")
+        .select("candidate_id,canonical_entity_id,status,entity_type")
+        .eq("run_id", runId)
+        .eq("entity_type", "track")
+        .eq("status", "accepted")
+        .in("candidate_id", candidateIds),
+    ]);
 
-  if (scoreErr) {
-    const d = Date.now() - ss;
+  if (scoreError || matchError) {
+    const detail = scoreError?.message || matchError?.message || "shortlist_lookup_failed";
+    return json(req, { error: "shortlist_lookup_failed", detail }, 500);
+  }
 
-    await db
-      .from("chart_ingest_stage_events")
-      .update({
-        status: "failed",
-        finished_at: new Date().toISOString(),
-        duration_ms: d,
-        message: "Shortlist score lookup failed: " + scoreErr.message,
-        error_code: "shortlist_score_lookup_failed",
-        error_message: scoreErr.message,
-      })
-      .eq("run_id", runId)
-      .eq("stage", "shortlist");
+  const scoreByCandidate = new Map<string, number>();
+  for (const score of scoreRows || []) {
+    scoreByCandidate.set(String(score.candidate_id), Number(score.final_score || 0));
+  }
 
-    await db
-      .from("chart_ingest_runs")
-      .update({
-        status: "failed",
-        error_code: "shortlist_score_lookup_failed",
-        error_message: scoreErr.message,
-        updated_at: new Date().toISOString(),
-      })
-      .eq("id", runId);
+  const trackByCandidate = new Map<string, string>();
+  const candidateByTrack = new Map<string, string>();
+  for (const match of matches || []) {
+    const candidateId = String(match.candidate_id || "");
+    const trackId = String(match.canonical_entity_id || "");
+    if (!candidateId || !trackId) continue;
 
+    const existingCandidate = candidateByTrack.get(trackId);
+    if (existingCandidate && existingCandidate !== candidateId) {
+      return json(req, {
+        ok: false,
+        runId,
+        error: "shortlist_identity_invariant_failed",
+        detail: `Multiple eligible candidates resolve to Registry Track ${trackId}.`,
+      }, 409);
+    }
+
+    trackByCandidate.set(candidateId, trackId);
+    candidateByTrack.set(trackId, candidateId);
+  }
+
+  const missingIdentity = candidateIds.filter((candidateId) => !trackByCandidate.has(candidateId));
+  const missingScore = candidateIds.filter((candidateId) => !scoreByCandidate.has(candidateId));
+
+  if (missingIdentity.length > 0 || missingScore.length > 0) {
     return json(req, {
       ok: false,
       runId,
-      error: "shortlist_score_lookup_failed",
-      detail: scoreErr.message,
-      durationMs: d,
-    }, 500);
+      error: "shortlist_invariant_failed",
+      detail: "Eligible candidates must have one accepted Registry Track UUID and one score row.",
+      missingIdentityCandidateIds: missingIdentity.slice(0, 20),
+      missingScoreCandidateIds: missingScore.slice(0, 20),
+    }, 409);
   }
 
-  const scores = (scoreRows || []).filter((score) =>
-    candidateIds.has(score.candidate_id as string)
-  );
+  const positive = candidates
+    .filter((candidate) => (scoreByCandidate.get(String(candidate.id)) || 0) > 0)
+    .sort((a, b) => {
+      const aId = String(a.id);
+      const bId = String(b.id);
+      const scoreDelta =
+        (scoreByCandidate.get(bId) || 0) - (scoreByCandidate.get(aId) || 0);
+      if (scoreDelta !== 0) return scoreDelta;
+      return String(trackByCandidate.get(aId) || "").localeCompare(
+        String(trackByCandidate.get(bId) || ""),
+      );
+    });
 
-  const nonzeroScores = (scores || []).filter((s) => Number(s.final_score) > 0).length;
-
-  if (!scores || scores.length === 0 || nonzeroScores === 0) {
-    const d = Date.now() - ss;
-    const detail = !scores || scores.length === 0
-      ? "No score rows exist for eligible candidates."
-      : "All score rows have final_score = 0.";
+  if (positive.length < chartSize) {
+    const durationMs = Date.now() - startedAt;
+    const detail = `Only ${positive.length} UUID-resolved positive-score candidates available for Chart size ${chartSize}.`;
 
     await db
       .from("chart_ingest_stage_events")
       .update({
         status: "failed",
-        finished_at: new Date().toISOString(),
-        duration_ms: d,
+        finished_at: now,
+        duration_ms: durationMs,
         message: "Shortlist blocked: " + detail,
-        error_code: "shortlist_missing_scores",
-        error_message: detail,
-      })
-      .eq("run_id", runId)
-      .eq("stage", "shortlist");
-
-    await db
-      .from("chart_ingest_runs")
-      .update({
-        status: "failed",
-        error_code: "shortlist_missing_scores",
-        error_message: detail,
-        updated_at: new Date().toISOString(),
-      })
-      .eq("id", runId);
-
-    return json(req, {
-      ok: false,
-      runId,
-      error: "shortlist_missing_scores",
-      detail,
-      shortlistedCount: 0,
-      totalScored: scores?.length || 0,
-      nonzeroScoreCount: nonzeroScores,
-      durationMs: d,
-    }, 400);
-  }
-
-  const { data: originRows, error: originErr } = await db.rpc(
-    "chart_get_run_candidate_origin_report",
-    { p_run_id: runId },
-  );
-
-  if (originErr) {
-    const d = Date.now() - ss;
-
-    await db
-      .from("chart_ingest_stage_events")
-      .update({
-        status: "failed",
-        finished_at: new Date().toISOString(),
-        duration_ms: d,
-        message: "Shortlist origin filter failed: " + originErr.message,
-        error_code: "shortlist_origin_filter_failed",
-        error_message: originErr.message,
-      })
-      .eq("run_id", runId)
-      .eq("stage", "shortlist");
-
-    await db
-      .from("chart_ingest_runs")
-      .update({
-        status: "failed",
-        error_code: "shortlist_origin_filter_failed",
-        error_message: originErr.message,
-        updated_at: new Date().toISOString(),
-      })
-      .eq("id", runId);
-
-    return json(req, {
-      ok: false,
-      runId,
-      error: "shortlist_origin_filter_failed",
-      detail: originErr.message,
-      durationMs: d,
-    }, 500);
-  }
-
-  const originByCandidate = new Map<string, Record<string, unknown>>();
-  for (const row of ((originRows || []) as Array<Record<string, unknown>>)) {
-    originByCandidate.set(row.candidate_id as string, row);
-  }
-
-  const sbc = new Map<string, { final_score: number }>();
-  for (const s of scores || []) {
-    sbc.set(s.candidate_id as string, { final_score: Number(s.final_score) || 0 });
-  }
-
-  const validCandidates = candidates.filter((candidate) => {
-    const origin = originByCandidate.get(candidate.id as string);
-    const score = sbc.get(candidate.id as string)?.final_score ?? 0;
-    return Boolean(origin?.is_country_eligible) && score > 0;
-  });
-
-  const invalidCandidates = candidates.filter((candidate) => {
-    const origin = originByCandidate.get(candidate.id as string);
-    const score = sbc.get(candidate.id as string)?.final_score ?? 0;
-    return !Boolean(origin?.is_country_eligible) || score <= 0;
-  });
-
-  const sorted = [...validCandidates].sort((a, b) => {
-    const sa = sbc.get(a.id as string)?.final_score ?? 0;
-    const sb = sbc.get(b.id as string)?.final_score ?? 0;
-    if (sb !== sa) return sb - sa;
-    return ((a.normalized_key as string) || "").localeCompare((b.normalized_key as string) || "");
-  });
-
-  const seenSongIdentities = new Map<string, Record<string, unknown>>();
-  const dedupedSorted: typeof sorted = [];
-  const duplicateCandidates: typeof sorted = [];
-
-  for (const candidate of sorted) {
-    const identityKey = candidateSongIdentityKey(candidate as Record<string, unknown>);
-    if (seenSongIdentities.has(identityKey)) {
-      duplicateCandidates.push(candidate);
-    } else {
-      seenSongIdentities.set(identityKey, candidate as Record<string, unknown>);
-      dedupedSorted.push(candidate);
-    }
-  }
-
-  const now = new Date().toISOString();
-  const sids: string[] = [];
-  const eids = new Set<string>();
-
-  for (let i = 0; i < dedupedSorted.length; i++) {
-    if (i < csz) sids.push(dedupedSorted[i].id as string);
-    else eids.add(dedupedSorted[i].id as string);
-  }
-
-  for (const invalid of invalidCandidates) {
-    eids.add(invalid.id as string);
-  }
-
-  for (const duplicate of duplicateCandidates) {
-    eids.add(duplicate.id as string);
-  }
-
-  await db
-    .from("chart_ingest_exclusions")
-    .delete()
-    .eq("run_id", runId)
-    .eq("source_stage", "shortlist")
-    .in("reason_code", ["country_mismatch", "missing_artist_country", "duplicate_track"]);
-
-  const countryExclusionRows = invalidCandidates.map((candidate) => {
-    const origin = originByCandidate.get(candidate.id as string) || {};
-    const reasonCode = (origin.reason_code as string) || "missing_artist_country";
-    return {
-      id: crypto.randomUUID(),
-      run_id: runId,
-      candidate_id: candidate.id as string,
-      reason_code: reasonCode === "country_mismatch" ? "country_mismatch" : "missing_artist_country",
-      reason_label: (origin.reason_label as string) || "Candidate does not have a resolved artist matching this chart country.",
-      severity: "hard",
-      source_stage: "shortlist",
-      details_json: {
-        normalizedKey: candidate.normalized_key,
-        title: candidate.title,
-        artistDisplay: candidate.artist_display,
-        finalScore: sbc.get(candidate.id as string)?.final_score ?? 0,
-        artists: origin.artists || [],
-      },
-      created_at: now,
-    };
-  });
-
-  const duplicateExclusionRows = duplicateCandidates.map((candidate) => ({
-    id: crypto.randomUUID(),
-    run_id: runId,
-    candidate_id: candidate.id as string,
-    reason_code: "duplicate_track",
-    reason_label: "Duplicate track identity already selected in this chart run.",
-    severity: "hard",
-    source_stage: "shortlist",
-    details_json: {
-      normalizedKey: candidate.normalized_key,
-      title: candidate.title,
-      artistDisplay: candidate.artist_display,
-      finalScore: sbc.get(candidate.id as string)?.final_score ?? 0,
-      duplicateIdentityKey: candidateSongIdentityKey(candidate as Record<string, unknown>),
-    },
-    created_at: now,
-  }));
-
-  const exclusionRows = [...countryExclusionRows, ...duplicateExclusionRows];
-
-  if (exclusionRows.length > 0) {
-    const CH = 200;
-    for (let j = 0; j < exclusionRows.length; j += CH) {
-      const { error: exErr } = await db
-        .from("chart_ingest_exclusions")
-        .insert(exclusionRows.slice(j, j + CH));
-
-      if (exErr) {
-        const d = Date.now() - ss;
-
-        await db
-          .from("chart_ingest_stage_events")
-          .update({
-            status: "failed",
-            finished_at: new Date().toISOString(),
-            duration_ms: d,
-            message: "Shortlist exclusion write failed: " + exErr.message,
-            error_code: "shortlist_exclusion_write_failed",
-            error_message: exErr.message,
-          })
-          .eq("run_id", runId)
-          .eq("stage", "shortlist");
-
-        await db
-          .from("chart_ingest_runs")
-          .update({
-            status: "failed",
-            error_code: "shortlist_exclusion_write_failed",
-            error_message: exErr.message,
-            updated_at: new Date().toISOString(),
-          })
-          .eq("id", runId);
-
-        return json(req, {
-          ok: false,
-          runId,
-          error: "shortlist_exclusion_write_failed",
-          detail: exErr.message,
-          durationMs: d,
-        }, 500);
-      }
-    }
-  }
-
-  if (sids.length < csz) {
-    const d = Date.now() - ss;
-    const detail = `Only ${sids.length} country-clean candidates available for chart size ${csz}.`;
-
-    if (eids.size > 0) {
-      const allExcluded = Array.from(eids);
-      const CH = 200;
-      for (let j = 0; j < allExcluded.length; j += CH) {
-        await db
-          .from("chart_ingest_candidates")
-          .update({ status: "excluded", updated_at: now })
-          .in("id", allExcluded.slice(j, j + CH))
-          .eq("run_id", runId);
-      }
-    }
-
-    await db
-      .from("chart_ingest_stage_events")
-      .update({
-        status: "failed",
-        finished_at: new Date().toISOString(),
-        duration_ms: d,
-        message: "Shortlist blocked: " + detail,
-        error_code: "shortlist_country_clean_incomplete",
+        error_code: "shortlist_uuid_clean_incomplete",
         error_message: detail,
         metrics_json: {
-          chartSize: csz,
-          countryCleanCandidateCount: sids.length,
-          countryFilteredCount: invalidCandidates.length,
+          chartSize,
+          positiveCandidateCount: positive.length,
           eligibleCandidateCount: candidates.length,
+          canonicalTrackCount: candidateByTrack.size,
         },
       })
       .eq("run_id", runId)
@@ -3124,52 +2926,97 @@ async function handleRunShortlist(req: Request, db: ReturnType<typeof createClie
       .from("chart_ingest_runs")
       .update({
         status: "failed",
-        error_code: "shortlist_country_clean_incomplete",
+        error_code: "shortlist_uuid_clean_incomplete",
         error_message: detail,
-        updated_at: new Date().toISOString(),
+        updated_at: now,
       })
       .eq("id", runId);
 
     return json(req, {
       ok: false,
       runId,
-      error: "shortlist_country_clean_incomplete",
+      error: "shortlist_uuid_clean_incomplete",
       detail,
-      shortlistedCount: sids.length,
-      countryFilteredCount: invalidCandidates.length,
+      shortlistedCount: positive.length,
       eligibleCandidateCount: candidates.length,
-      durationMs: d,
+      chartSize,
+      durationMs,
     }, 400);
   }
 
-  if (eids.size > 0) {
-    const allExcluded = Array.from(eids);
-    const CH = 200;
-    for (let j = 0; j < allExcluded.length; j += CH) {
+  const shortlistedIds = new Set(
+    positive.slice(0, chartSize).map((candidate) => String(candidate.id)),
+  );
+  const excludedCandidates = candidates.filter(
+    (candidate) => !shortlistedIds.has(String(candidate.id)),
+  );
+
+  await db
+    .from("chart_ingest_exclusions")
+    .delete()
+    .eq("run_id", runId)
+    .eq("source_stage", "shortlist");
+
+  if (excludedCandidates.length > 0) {
+    for (const chunk of chunkStrings(
+      excludedCandidates.map((candidate) => String(candidate.id)),
+      200,
+    )) {
       await db
         .from("chart_ingest_candidates")
         .update({ status: "excluded", updated_at: now })
-        .in("id", allExcluded.slice(j, j + CH))
+        .in("id", chunk)
         .eq("run_id", runId);
+    }
+
+    const exclusionRows = excludedCandidates.map((candidate) => {
+      const candidateId = String(candidate.id);
+      const finalScore = scoreByCandidate.get(candidateId) || 0;
+      return {
+        id: crypto.randomUUID(),
+        run_id: runId,
+        candidate_id: candidateId,
+        reason_code: finalScore <= 0 ? "nonpositive_score" : "below_chart_cutoff",
+        reason_label:
+          finalScore <= 0
+            ? "Candidate final score is not positive."
+            : "Candidate ranked below the configured Chart size cutoff.",
+        severity: "hard",
+        source_stage: "shortlist",
+        details_json: {
+          canonicalTrackId: trackByCandidate.get(candidateId),
+          finalScore,
+          chartSize,
+        },
+        created_at: now,
+      };
+    });
+
+    for (let i = 0; i < exclusionRows.length; i += 200) {
+      const { error } = await db
+        .from("chart_ingest_exclusions")
+        .insert(exclusionRows.slice(i, i + 200));
+      if (error) {
+        return json(req, { error: "shortlist_exclusion_write_failed", detail: error.message }, 500);
+      }
     }
   }
 
-  const d = Date.now() - ss;
+  const durationMs = Date.now() - startedAt;
 
   await db
     .from("chart_ingest_stage_events")
     .update({
       status: "done",
-      finished_at: new Date().toISOString(),
-      duration_ms: d,
-      message: `${sids.length} country-clean shortlisted, ${eids.size} excluded, ${invalidCandidates.length} country-filtered, ${duplicateCandidates.length} duplicate-filtered.`,
+      finished_at: now,
+      duration_ms: durationMs,
+      message: `${shortlistedIds.size} canonical Track UUIDs shortlisted; ${excludedCandidates.length} below cutoff or nonpositive.`,
       metrics_json: {
-        shortlistedCount: sids.length,
-        excludedCount: eids.size,
-        countryFilteredCount: invalidCandidates.length,
-        duplicateFilteredCount: duplicateCandidates.length,
+        shortlistedCount: shortlistedIds.size,
+        excludedCount: excludedCandidates.length,
         eligibleCandidateCount: candidates.length,
-        chartSize: csz,
+        canonicalTrackCount: candidateByTrack.size,
+        chartSize,
       },
     })
     .eq("run_id", runId)
@@ -3179,9 +3026,9 @@ async function handleRunShortlist(req: Request, db: ReturnType<typeof createClie
     .from("chart_ingest_stage_events")
     .update({
       status: "done",
-      finished_at: new Date().toISOString(),
+      finished_at: now,
       duration_ms: 0,
-      message: "Review gate passed.",
+      message: "Review gate passed with canonical Track UUID identity.",
     })
     .eq("run_id", runId)
     .eq("stage", "review_gate");
@@ -3189,13 +3036,12 @@ async function handleRunShortlist(req: Request, db: ReturnType<typeof createClie
   return json(req, {
     ok: true,
     runId,
-    shortlistedCount: sids.length,
+    shortlistedCount: shortlistedIds.size,
     totalScored: candidates.length,
-    excludedCount: eids.size,
-    countryFilteredCount: invalidCandidates.length,
-    duplicateFilteredCount: duplicateCandidates.length,
-    chartSize: csz,
-    durationMs: d,
+    excludedCount: excludedCandidates.length,
+    duplicateFilteredCount: 0,
+    chartSize,
+    durationMs,
   });
 }
 
