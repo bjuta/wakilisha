@@ -13743,6 +13743,114 @@ export type Database = {
           },
         ]
       }
+      registry_external_identifier_assertions: {
+        Row: {
+          artist_id: string | null
+          assertion_status: string
+          comparison_value: string
+          created_at: string
+          evidence_assertion_id: string | null
+          id: string
+          issuer_namespace: string | null
+          organization_resource_id: string | null
+          person_resource_id: string | null
+          release_id: string | null
+          scheme_key: string
+          source_value: string
+          superseded_by_assertion_id: string | null
+          track_id: string | null
+          updated_at: string
+          valid_from: string | null
+          valid_to: string | null
+          verification_method: string | null
+          verified_at: string | null
+          verified_by: string | null
+          work_id: string | null
+        }
+        Insert: {
+          artist_id?: string | null
+          assertion_status?: string
+          comparison_value: string
+          created_at?: string
+          evidence_assertion_id?: string | null
+          id?: string
+          issuer_namespace?: string | null
+          organization_resource_id?: string | null
+          person_resource_id?: string | null
+          release_id?: string | null
+          scheme_key: string
+          source_value: string
+          superseded_by_assertion_id?: string | null
+          track_id?: string | null
+          updated_at?: string
+          valid_from?: string | null
+          valid_to?: string | null
+          verification_method?: string | null
+          verified_at?: string | null
+          verified_by?: string | null
+          work_id?: string | null
+        }
+        Update: {
+          artist_id?: string | null
+          assertion_status?: string
+          comparison_value?: string
+          created_at?: string
+          evidence_assertion_id?: string | null
+          id?: string
+          issuer_namespace?: string | null
+          organization_resource_id?: string | null
+          person_resource_id?: string | null
+          release_id?: string | null
+          scheme_key?: string
+          source_value?: string
+          superseded_by_assertion_id?: string | null
+          track_id?: string | null
+          updated_at?: string
+          valid_from?: string | null
+          valid_to?: string | null
+          verification_method?: string | null
+          verified_at?: string | null
+          verified_by?: string | null
+          work_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "registry_external_identifier_as_superseded_by_assertion_id_fkey"
+            columns: ["superseded_by_assertion_id"]
+            isOneToOne: false
+            referencedRelation: "registry_external_identifier_assertions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "registry_external_identifier_assertions_artist_id_fkey"
+            columns: ["artist_id"]
+            isOneToOne: false
+            referencedRelation: "registry_artists"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "registry_external_identifier_assertions_release_id_fkey"
+            columns: ["release_id"]
+            isOneToOne: false
+            referencedRelation: "registry_releases"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "registry_external_identifier_assertions_track_id_fkey"
+            columns: ["track_id"]
+            isOneToOne: false
+            referencedRelation: "registry_tracks"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "registry_external_identifier_assertions_work_id_fkey"
+            columns: ["work_id"]
+            isOneToOne: false
+            referencedRelation: "registry_works"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       registry_genre_aliases: {
         Row: {
           created_at: string
@@ -14851,6 +14959,97 @@ export type Database = {
         }
         Relationships: []
       }
+      registry_rights_claims: {
+        Row: {
+          claim_status: string
+          claimant_organization_resource_id: string | null
+          claimant_person_resource_id: string | null
+          control_type: string
+          created_at: string
+          evidence_assertion_id: string | null
+          id: string
+          right_type: string
+          rights_domain: string
+          share_percentage: number | null
+          share_state: string
+          superseded_by_claim_id: string | null
+          territory_iso2: string[]
+          territory_scope: string
+          track_id: string | null
+          updated_at: string
+          usage_scope: string[]
+          valid_from: string | null
+          valid_to: string | null
+          work_id: string | null
+        }
+        Insert: {
+          claim_status?: string
+          claimant_organization_resource_id?: string | null
+          claimant_person_resource_id?: string | null
+          control_type: string
+          created_at?: string
+          evidence_assertion_id?: string | null
+          id?: string
+          right_type: string
+          rights_domain: string
+          share_percentage?: number | null
+          share_state?: string
+          superseded_by_claim_id?: string | null
+          territory_iso2?: string[]
+          territory_scope?: string
+          track_id?: string | null
+          updated_at?: string
+          usage_scope?: string[]
+          valid_from?: string | null
+          valid_to?: string | null
+          work_id?: string | null
+        }
+        Update: {
+          claim_status?: string
+          claimant_organization_resource_id?: string | null
+          claimant_person_resource_id?: string | null
+          control_type?: string
+          created_at?: string
+          evidence_assertion_id?: string | null
+          id?: string
+          right_type?: string
+          rights_domain?: string
+          share_percentage?: number | null
+          share_state?: string
+          superseded_by_claim_id?: string | null
+          territory_iso2?: string[]
+          territory_scope?: string
+          track_id?: string | null
+          updated_at?: string
+          usage_scope?: string[]
+          valid_from?: string | null
+          valid_to?: string | null
+          work_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "registry_rights_claims_superseded_by_claim_id_fkey"
+            columns: ["superseded_by_claim_id"]
+            isOneToOne: false
+            referencedRelation: "registry_rights_claims"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "registry_rights_claims_track_id_fkey"
+            columns: ["track_id"]
+            isOneToOne: false
+            referencedRelation: "registry_tracks"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "registry_rights_claims_work_id_fkey"
+            columns: ["work_id"]
+            isOneToOne: false
+            referencedRelation: "registry_works"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       registry_taxonomy_terms: {
         Row: {
           created_at: string
@@ -14958,6 +15157,88 @@ export type Database = {
           updated_at?: string
         }
         Relationships: []
+      }
+      registry_track_contributions: {
+        Row: {
+          artist_id: string | null
+          created_at: string
+          credit_order: number | null
+          credited_as: string | null
+          detail_text: string | null
+          evidence_assertion_id: string | null
+          id: string
+          instrument_key: string | null
+          organization_resource_id: string | null
+          person_resource_id: string | null
+          role_key: string
+          status: string
+          superseded_by_contribution_id: string | null
+          track_id: string
+          updated_at: string
+          valid_from: string | null
+          valid_to: string | null
+        }
+        Insert: {
+          artist_id?: string | null
+          created_at?: string
+          credit_order?: number | null
+          credited_as?: string | null
+          detail_text?: string | null
+          evidence_assertion_id?: string | null
+          id?: string
+          instrument_key?: string | null
+          organization_resource_id?: string | null
+          person_resource_id?: string | null
+          role_key: string
+          status?: string
+          superseded_by_contribution_id?: string | null
+          track_id: string
+          updated_at?: string
+          valid_from?: string | null
+          valid_to?: string | null
+        }
+        Update: {
+          artist_id?: string | null
+          created_at?: string
+          credit_order?: number | null
+          credited_as?: string | null
+          detail_text?: string | null
+          evidence_assertion_id?: string | null
+          id?: string
+          instrument_key?: string | null
+          organization_resource_id?: string | null
+          person_resource_id?: string | null
+          role_key?: string
+          status?: string
+          superseded_by_contribution_id?: string | null
+          track_id?: string
+          updated_at?: string
+          valid_from?: string | null
+          valid_to?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "registry_track_contributions_artist_id_fkey"
+            columns: ["artist_id"]
+            isOneToOne: false
+            referencedRelation: "registry_artists"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "registry_track_contributions_superseded_by_contribution_id_fkey"
+            columns: ["superseded_by_contribution_id"]
+            isOneToOne: false
+            referencedRelation: "registry_track_contributions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "registry_track_contributions_track_id_fkey"
+            columns: ["track_id"]
+            isOneToOne: false
+            referencedRelation: "registry_tracks"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       registry_track_genres: {
         Row: {
@@ -15156,6 +15437,73 @@ export type Database = {
         }
         Relationships: []
       }
+      registry_track_work_links: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          evidence_assertion_id: string | null
+          id: string
+          relationship_kind: string
+          status: string
+          superseded_by_link_id: string | null
+          track_id: string
+          updated_at: string
+          valid_from: string | null
+          valid_to: string | null
+          work_id: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          evidence_assertion_id?: string | null
+          id?: string
+          relationship_kind: string
+          status?: string
+          superseded_by_link_id?: string | null
+          track_id: string
+          updated_at?: string
+          valid_from?: string | null
+          valid_to?: string | null
+          work_id: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          evidence_assertion_id?: string | null
+          id?: string
+          relationship_kind?: string
+          status?: string
+          superseded_by_link_id?: string | null
+          track_id?: string
+          updated_at?: string
+          valid_from?: string | null
+          valid_to?: string | null
+          work_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "registry_track_work_links_superseded_by_link_id_fkey"
+            columns: ["superseded_by_link_id"]
+            isOneToOne: false
+            referencedRelation: "registry_track_work_links"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "registry_track_work_links_track_id_fkey"
+            columns: ["track_id"]
+            isOneToOne: false
+            referencedRelation: "registry_tracks"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "registry_track_work_links_work_id_fkey"
+            columns: ["work_id"]
+            isOneToOne: false
+            referencedRelation: "registry_works"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       registry_tracks: {
         Row: {
           artwork_image_id: string | null
@@ -15245,6 +15593,112 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      registry_work_contributions: {
+        Row: {
+          artist_id: string | null
+          created_at: string
+          credit_order: number | null
+          credited_as: string | null
+          evidence_assertion_id: string | null
+          id: string
+          organization_resource_id: string | null
+          person_resource_id: string | null
+          role_key: string
+          status: string
+          superseded_by_contribution_id: string | null
+          updated_at: string
+          valid_from: string | null
+          valid_to: string | null
+          work_id: string
+        }
+        Insert: {
+          artist_id?: string | null
+          created_at?: string
+          credit_order?: number | null
+          credited_as?: string | null
+          evidence_assertion_id?: string | null
+          id?: string
+          organization_resource_id?: string | null
+          person_resource_id?: string | null
+          role_key: string
+          status?: string
+          superseded_by_contribution_id?: string | null
+          updated_at?: string
+          valid_from?: string | null
+          valid_to?: string | null
+          work_id: string
+        }
+        Update: {
+          artist_id?: string | null
+          created_at?: string
+          credit_order?: number | null
+          credited_as?: string | null
+          evidence_assertion_id?: string | null
+          id?: string
+          organization_resource_id?: string | null
+          person_resource_id?: string | null
+          role_key?: string
+          status?: string
+          superseded_by_contribution_id?: string | null
+          updated_at?: string
+          valid_from?: string | null
+          valid_to?: string | null
+          work_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "registry_work_contributions_artist_id_fkey"
+            columns: ["artist_id"]
+            isOneToOne: false
+            referencedRelation: "registry_artists"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "registry_work_contributions_superseded_by_contribution_id_fkey"
+            columns: ["superseded_by_contribution_id"]
+            isOneToOne: false
+            referencedRelation: "registry_work_contributions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "registry_work_contributions_work_id_fkey"
+            columns: ["work_id"]
+            isOneToOne: false
+            referencedRelation: "registry_works"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      registry_works: {
+        Row: {
+          created_at: string
+          id: string
+          metadata: Json
+          normalized_title: string
+          status: string
+          title: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          metadata?: Json
+          normalized_title: string
+          status?: string
+          title: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          metadata?: Json
+          normalized_title?: string
+          status?: string
+          title?: string
+          updated_at?: string
+        }
+        Relationships: []
       }
       relationship_evidence: {
         Row: {
