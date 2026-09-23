@@ -1528,7 +1528,7 @@ begin
 
   return v_result;
 end
-$function$
+$function$;
 
 
 create or replace function public.chart_get_run_candidate_origin_report(
