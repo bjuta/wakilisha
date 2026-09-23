@@ -448,6 +448,30 @@ This foundation is intentionally limited to four bounded moves.
 
 ### A. Chart UUID identity correction
 
+#### Current execution-path audit
+
+Production run history and current source show two scoring surfaces:
+
+- the standalone `run-chart-scoring` path has only one recorded Production run,
+  a failed run from 4 July 2026;
+- the `chart_ingest_runs` pipeline owns the later published and dry-run history;
+- the active ingest pipeline currently normalizes and groups source observations
+  before Registry Track resolution;
+- `chart_ingest_matches` already has a canonical entity binding contract with
+  `canonical_entity_id`, match method, confidence, decision state, and
+  candidate/run identity;
+- the normal pipeline does not currently require an accepted Track match before
+  scoring;
+- `handleCommitRun` materializes Registry identity only after shortlist
+  selection, which is too late for canonical identity to govern dedupe,
+  continuity, and ranking.
+
+Therefore the correct repair is **not** to add another candidate identity column
+or to patch the dormant standalone scorer in isolation.
+
+The active pipeline must reuse `chart_ingest_matches` as the resolution
+authority and move Track resolution ahead of canonical scoring.
+
 Move canonical Registry Track resolution before canonical scoring aggregation.
 
 For resolved evidence:
@@ -464,7 +488,27 @@ For unresolved evidence:
 
 - preserve evidence;
 - group text only for matching or diagnostics;
-- do not rank it as a canonical Track until resolution succeeds.
+- create or retain a governed match/review state;
+- do not rank it as a canonical Track until Registry identity resolution or
+  governed Registry admission succeeds.
+
+The intended stage boundary is:
+
+```text
+source fetch
+  -> observation normalization
+  -> Registry Track resolution / governed admission
+  -> aggregate evidence by Registry Track UUID
+  -> eligibility
+  -> scoring
+  -> anti-gaming
+  -> shortlist
+  -> commit/publish
+```
+
+A Chart dry run must not create speculative Registry identity simply to make a
+candidate scoreable. New canonical Track admission must use existing Registry
+authority and evidence rules.
 
 Do not change scoring weights, chart methodology, anti-gaming policy, or source history in this correction.
 
