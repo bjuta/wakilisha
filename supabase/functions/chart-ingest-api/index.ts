@@ -819,6 +819,727 @@ async function handleNormalizeRun(
 // SOURCE_FETCH — unchanged from v25
 async function handleSourceFetch(req: Request, db: ReturnType<typeof createClient>, params: Record<string, unknown>, user: { id: string; email?: string }) { const { runId } = params as { runId: string }; if (!runId) return json(req, { error: "runId_required" }, 400); const { data: run } = await db.from("chart_ingest_runs").select("id,status,edition_date,chart_size").eq("id", runId).maybeSingle(); if (!run) return json(req, { error: "run_not_found" }, 404); await db.from("chart_ingest_raw_rows").delete().eq("run_id", runId); await db.from("chart_ingest_stage_events").update({ status: "running", started_at: new Date().toISOString() }).eq("run_id", runId).eq("stage", "source_fetch"); const { data: sources } = await db.from("chart_ingest_run_sources").select("*").eq("run_id", runId).eq("enabled", true).order("priority"); if (!sources || sources.length === 0) { const d = Date.now(); await db.from("chart_ingest_stage_events").update({ status: "done", finished_at: new Date().toISOString(), duration_ms: d, message: "No enabled sources." }).eq("run_id", runId).eq("stage", "source_fetch"); return json(req, { ok: true, runId, sourceCount: 0, rawRowCount: 0 }); } const ed = (run.edition_date as string) || new Date().toISOString().split("T")[0]; const cs = (run.chart_size as number) || 20; let trr = 0, tfs = 0; const aw: string[] = []; const srs: Array<{ sourceId: string; fetchedCount: number; droppedCount: number; provider: string; warnings: string[]; error: string | null }> = []; for (const source of sources) { const market = (source.storefront_or_market as string) || "KE"; const mr = Math.min(500, Math.max(cs * 5, cs + 100)); if (source.provider === "csv") { srs.push({ sourceId: source.id, fetchedCount: source.fetched_count || 0, droppedCount: 0, provider: "csv", warnings: [], error: null }); trr += source.fetched_count || 0; continue; } const fr = await fetchProviderSource(req, source.provider as string, source.source_url as string, market, mr); if (fr.error) { srs.push({ sourceId: source.id, fetchedCount: 0, droppedCount: 0, provider: source.provider, warnings: fr.warnings, error: fr.error }); tfs++; aw.push(...fr.warnings); continue; } const tracks = fr.tracks; aw.push(...fr.warnings); if (tracks.length === 0) { srs.push({ sourceId: source.id, fetchedCount: 0, droppedCount: 0, provider: source.provider, warnings: fr.warnings, error: null }); continue; } const now = new Date().toISOString(); const rrs = tracks.map(t => ({ id: crypto.randomUUID(), run_id: runId, source_id: source.id, provider: source.provider, provider_row_id: t.provider_track_id ? source.provider+":"+t.provider_track_id+":"+t.source_position : source.provider+":pos:"+t.source_position, provider_track_id: t.provider_track_id, provider_release_id: t.provider_release_id, provider_artist_ids: t.provider_artist_ids, source_position: t.source_position, title_raw: t.title, artist_raw: t.artist, release_raw: null, isrc: t.isrc, upc: null, release_date_raw: t.release_date, artwork_url: t.artwork_url, external_url: t.external_url || source.source_url || null, preview_url: t.preview_url, raw_payload_json: t.raw_payload, raw_payload_hash: null })); const CH = 100; for (let j = 0; j < rrs.length; j += CH) { await db.from("chart_ingest_raw_rows").insert(rrs.slice(j, j + CH)); } trr += rrs.length; srs.push({ sourceId: source.id, fetchedCount: rrs.length, droppedCount: 0, provider: source.provider, warnings: fr.warnings, error: null }); } const d = Date.now(); const sm = trr > 0 ? trr+" raw rows from "+(sources.length - tfs)+"/"+sources.length+" source(s)" : "All sources failed."; await db.from("chart_ingest_stage_events").update({ status: trr > 0 ? "done" : "failed", finished_at: new Date().toISOString(), duration_ms: d, message: sm }).eq("run_id", runId).eq("stage", "source_fetch"); if (trr > 0) { await db.from("chart_ingest_stage_events").update({ status: "done", finished_at: new Date().toISOString(), duration_ms: 1, message: "Raw rows persisted." }).eq("run_id", runId).eq("stage", "raw_persist"); await db.from("chart_ingest_runs").update({ status: "running", updated_at: new Date().toISOString() }).eq("id", runId); } else { await db.from("chart_ingest_runs").update({ status: "source_fetch_failed", error_code: "all_sources_failed", error_message: "Configure credentials in Settings.", updated_at: new Date().toISOString() }).eq("id", runId); } return json(req, { ok: trr > 0, runId, sourceCount: sources.length, rawRowCount: trr, failedSourceCount: tfs, sourceResults: srs, durationMs: d }); }
 
+
+type ChartTrackResolution = {
+  candidateId: string;
+  inputTrackIds: string[];
+  currentTrackId: string | null;
+  resolutionStatus: string;
+  blockingReason: string | null;
+};
+
+function chunkStrings(values: string[], size = 150): string[][] {
+  const out: string[][] = [];
+  for (let i = 0; i < values.length; i += size) out.push(values.slice(i, i + size));
+  return out;
+}
+
+function candidateTrackIdsFromReasons(value: unknown): string[] {
+  if (!Array.isArray(value)) return [];
+  return [
+    ...new Set(
+      value
+        .map((reason) => String(reason || ""))
+        .filter((reason) => reason.startsWith("candidate_track:"))
+        .map((reason) => reason.slice("candidate_track:".length))
+        .filter(Boolean),
+    ),
+  ].sort();
+}
+
+async function resolveCurrentTrackIdentity(
+  db: ReturnType<typeof createClient>,
+  trackId: string,
+): Promise<{
+  inputTrackId: string;
+  status: string;
+  currentTrackIds: string[];
+  currentTrackId: string | null;
+}> {
+  const { data, error } = await db.rpc("resolve_registry_identity_lineage_v1", {
+    p_entity_type: "track",
+    p_entity_id: trackId,
+    p_max_depth: 16,
+  });
+
+  if (error) {
+    return {
+      inputTrackId: trackId,
+      status: "unresolved",
+      currentTrackIds: [],
+      currentTrackId: null,
+    };
+  }
+
+  const payload = (data || {}) as Record<string, unknown>;
+  const status = String(payload.resolution_status || "unresolved");
+  const currentTrackIds = Array.isArray(payload.current_entity_ids)
+    ? [...new Set(payload.current_entity_ids.map((id) => String(id || "")).filter(Boolean))].sort()
+    : [];
+
+  return {
+    inputTrackId: trackId,
+    status,
+    currentTrackIds,
+    currentTrackId:
+      (status === "current" || status === "successor") && currentTrackIds.length === 1
+        ? currentTrackIds[0]
+        : null,
+  };
+}
+
+async function handleRunCanonicalMatch(
+  req: Request,
+  db: ReturnType<typeof createClient>,
+  params: Record<string, unknown>,
+  _user: { id: string; email?: string },
+) {
+  const { runId } = params as { runId: string };
+  if (!runId) return json(req, { error: "runId_required" }, 400);
+
+  const startedAt = Date.now();
+  await db
+    .from("chart_ingest_stage_events")
+    .update({
+      status: "running",
+      started_at: new Date().toISOString(),
+      finished_at: null,
+      message: null,
+      error_code: null,
+      error_message: null,
+    })
+    .eq("run_id", runId)
+    .eq("stage", "canonical_match");
+
+  const [{ data: candidates, error: candidateError }, { data: existingMatches, error: existingMatchError }] =
+    await Promise.all([
+      db
+        .from("chart_ingest_candidates")
+        .select("*")
+        .eq("run_id", runId)
+        .in("status", ["pending", "needs_review", "eligible"]),
+      db
+        .from("chart_ingest_matches")
+        .select("*")
+        .eq("run_id", runId),
+    ]);
+
+  if (candidateError || existingMatchError) {
+    const detail = candidateError?.message || existingMatchError?.message || "candidate_lookup_failed";
+    await db
+      .from("chart_ingest_stage_events")
+      .update({
+        status: "failed",
+        finished_at: new Date().toISOString(),
+        duration_ms: Date.now() - startedAt,
+        message: detail,
+        error_code: "canonical_match_lookup_failed",
+        error_message: detail,
+      })
+      .eq("run_id", runId)
+      .eq("stage", "canonical_match");
+    return json(req, { error: "canonical_match_lookup_failed", detail }, 500);
+  }
+
+  const rows = (candidates || []) as Array<Record<string, unknown>>;
+  const existingByCandidate = new Map<string, Record<string, unknown>>();
+  for (const match of (existingMatches || []) as Array<Record<string, unknown>>) {
+    existingByCandidate.set(String(match.candidate_id), match);
+  }
+
+  const isrcs = [
+    ...new Set(rows.map((candidate) => normalizeIsrc(candidate.isrc)).filter(Boolean)),
+  ].sort();
+
+  const trackIdsByIsrc = new Map<string, Set<string>>();
+  for (const chunk of chunkStrings(isrcs)) {
+    const { data: tracks, error } = await db
+      .from("registry_tracks")
+      .select("id,isrc,status")
+      .in("isrc", chunk);
+
+    if (error) {
+      return json(req, { error: "registry_isrc_lookup_failed", detail: error.message }, 500);
+    }
+
+    for (const track of tracks || []) {
+      const isrc = normalizeIsrc(track.isrc);
+      if (!isrc) continue;
+      if (!trackIdsByIsrc.has(isrc)) trackIdsByIsrc.set(isrc, new Set<string>());
+      trackIdsByIsrc.get(isrc)!.add(String(track.id));
+    }
+  }
+
+  const providerIdsNeeded = new Map<string, Set<string>>();
+  for (const candidate of rows) {
+    const providerIds = candidate.provider_ids_json;
+    if (!providerIds || typeof providerIds !== "object" || Array.isArray(providerIds)) continue;
+    for (const [providerRaw, idsRaw] of Object.entries(providerIds as Record<string, unknown>)) {
+      const provider = normalizeProviderKey(providerRaw);
+      if (!provider) continue;
+      if (!providerIdsNeeded.has(provider)) providerIdsNeeded.set(provider, new Set<string>());
+      for (const idRaw of Array.isArray(idsRaw) ? idsRaw : [idsRaw]) {
+        const id = compactIdentityPart(idRaw);
+        if (id) providerIdsNeeded.get(provider)!.add(id);
+      }
+    }
+  }
+
+  const providerLinkByAlias = new Map<
+    string,
+    { trackId: string; confidence: number; method: string }
+  >();
+
+  for (const [provider, ids] of providerIdsNeeded.entries()) {
+    if (ids.size === 0) continue;
+    const { data: links, error } = await db
+      .from("registry_track_provider_links")
+      .select("track_id,provider_key,provider_track_id,match_confidence,match_method")
+      .eq("provider_key", provider)
+      .eq("match_status", "matched");
+
+    if (error) {
+      return json(req, { error: "registry_provider_lookup_failed", detail: error.message }, 500);
+    }
+
+    for (const link of links || []) {
+      const providerTrackId = compactIdentityPart(link.provider_track_id);
+      if (!ids.has(providerTrackId)) continue;
+      providerLinkByAlias.set(`${provider}:${providerTrackId}`, {
+        trackId: String(link.track_id),
+        confidence: Math.max(0, Math.min(100, Math.round(Number(link.match_confidence || 0) * 100))),
+        method: String(link.match_method || "provider_id"),
+      });
+    }
+  }
+
+  const now = new Date().toISOString();
+  const autoMatches: Array<Record<string, unknown>> = [];
+  const noMatchCandidateIds: string[] = [];
+  let evidenceMatchedCount = 0;
+  let ambiguousEvidenceCount = 0;
+  let manualPreservedCount = 0;
+
+  for (const candidate of rows) {
+    const candidateId = String(candidate.id);
+    const existing = existingByCandidate.get(candidateId);
+
+    if (
+      existing &&
+      existing.match_method === "manual" &&
+      existing.status === "accepted" &&
+      existing.canonical_entity_id
+    ) {
+      manualPreservedCount++;
+      continue;
+    }
+
+    const trackIds = new Set<string>();
+    const reasons: string[] = [];
+    let method: "isrc" | "provider_id" | "no_match" = "no_match";
+    let confidence = 0;
+
+    const isrc = normalizeIsrc(candidate.isrc);
+    if (isrc) {
+      const byIsrc = trackIdsByIsrc.get(isrc);
+      if (byIsrc && byIsrc.size > 0) {
+        method = "isrc";
+        confidence = 100;
+        reasons.push(`evidence:isrc:${isrc}`);
+        for (const trackId of byIsrc) trackIds.add(trackId);
+      }
+    }
+
+    const providerIds = candidate.provider_ids_json;
+    if (providerIds && typeof providerIds === "object" && !Array.isArray(providerIds)) {
+      for (const [providerRaw, idsRaw] of Object.entries(providerIds as Record<string, unknown>)) {
+        const provider = normalizeProviderKey(providerRaw);
+        if (!provider) continue;
+        for (const idRaw of Array.isArray(idsRaw) ? idsRaw : [idsRaw]) {
+          const id = compactIdentityPart(idRaw);
+          if (!id) continue;
+          const link = providerLinkByAlias.get(`${provider}:${id}`);
+          if (!link) continue;
+          if (method === "no_match") method = "provider_id";
+          confidence = Math.max(confidence, link.confidence);
+          reasons.push(`evidence:provider:${provider}:${id}`);
+          trackIds.add(link.trackId);
+        }
+      }
+    }
+
+    const sortedTrackIds = [...trackIds].sort();
+    for (const trackId of sortedTrackIds) reasons.push(`candidate_track:${trackId}`);
+
+    if (sortedTrackIds.length === 0) {
+      noMatchCandidateIds.push(candidateId);
+      autoMatches.push({
+        id: existing?.id || crypto.randomUUID(),
+        run_id: runId,
+        candidate_id: candidateId,
+        entity_type: "track",
+        canonical_entity_id: null,
+        match_method: "no_match",
+        confidence: 0,
+        status: "needs_review",
+        reasons_json: ["No exact Registry Track match from ISRC or matched provider identity."],
+        decided_by: null,
+        decided_at: null,
+        decision_note: null,
+        created_at: existing?.created_at || now,
+        updated_at: now,
+      });
+      continue;
+    }
+
+    evidenceMatchedCount++;
+    if (sortedTrackIds.length > 1) ambiguousEvidenceCount++;
+
+    autoMatches.push({
+      id: existing?.id || crypto.randomUUID(),
+      run_id: runId,
+      candidate_id: candidateId,
+      entity_type: "track",
+      canonical_entity_id: sortedTrackIds.length === 1 ? sortedTrackIds[0] : null,
+      match_method: method,
+      confidence,
+      status: "pending",
+      reasons_json: reasons,
+      decided_by: null,
+      decided_at: null,
+      decision_note: null,
+      created_at: existing?.created_at || now,
+      updated_at: now,
+    });
+  }
+
+  const chunkSize = 200;
+  for (let i = 0; i < autoMatches.length; i += chunkSize) {
+    const { error } = await db
+      .from("chart_ingest_matches")
+      .upsert(autoMatches.slice(i, i + chunkSize), { onConflict: "run_id,candidate_id" });
+
+    if (error) {
+      return json(req, { error: "canonical_match_write_failed", detail: error.message }, 500);
+    }
+  }
+
+  if (noMatchCandidateIds.length > 0) {
+    for (const chunk of chunkStrings(noMatchCandidateIds, 200)) {
+      await db
+        .from("chart_ingest_candidates")
+        .update({ status: "needs_review", updated_at: now })
+        .in("id", chunk)
+        .eq("run_id", runId);
+    }
+  }
+
+  const durationMs = Date.now() - startedAt;
+  await db
+    .from("chart_ingest_stage_events")
+    .update({
+      status: "done",
+      finished_at: now,
+      duration_ms: durationMs,
+      message: `${evidenceMatchedCount} candidates nominated Registry identity; ${noMatchCandidateIds.length} have no exact identifier match.`,
+      metrics_json: {
+        candidateCount: rows.length,
+        evidenceMatchedCount,
+        noMatchCount: noMatchCandidateIds.length,
+        ambiguousEvidenceCount,
+        manualPreservedCount,
+      },
+    })
+    .eq("run_id", runId)
+    .eq("stage", "canonical_match");
+
+  return json(req, {
+    ok: true,
+    runId,
+    candidateCount: rows.length,
+    evidenceMatchedCount,
+    noMatchCount: noMatchCandidateIds.length,
+    ambiguousEvidenceCount,
+    manualPreservedCount,
+    durationMs,
+  });
+}
+
+async function handleRunEntityResolution(
+  req: Request,
+  db: ReturnType<typeof createClient>,
+  params: Record<string, unknown>,
+  _user: { id: string; email?: string },
+) {
+  const { runId } = params as { runId: string };
+  if (!runId) return json(req, { error: "runId_required" }, 400);
+
+  const startedAt = Date.now();
+  const now = new Date().toISOString();
+
+  await db
+    .from("chart_ingest_stage_events")
+    .update({
+      status: "running",
+      started_at: now,
+      finished_at: null,
+      message: null,
+      error_code: null,
+      error_message: null,
+    })
+    .eq("run_id", runId)
+    .eq("stage", "entity_resolution");
+
+  const [{ data: candidates, error: candidateError }, { data: matches, error: matchError }] =
+    await Promise.all([
+      db
+        .from("chart_ingest_candidates")
+        .select("*")
+        .eq("run_id", runId)
+        .not("status", "in", '("excluded","ignored")'),
+      db
+        .from("chart_ingest_matches")
+        .select("*")
+        .eq("run_id", runId)
+        .eq("entity_type", "track"),
+    ]);
+
+  if (candidateError || matchError) {
+    const detail = candidateError?.message || matchError?.message || "entity_resolution_lookup_failed";
+    return json(req, { error: "entity_resolution_lookup_failed", detail }, 500);
+  }
+
+  const candidateById = new Map<string, Record<string, unknown>>();
+  for (const candidate of (candidates || []) as Array<Record<string, unknown>>) {
+    candidateById.set(String(candidate.id), candidate);
+  }
+
+  const lineageCache = new Map<string, Awaited<ReturnType<typeof resolveCurrentTrackIdentity>>>();
+  const resolutionByCandidate = new Map<string, ChartTrackResolution>();
+
+  for (const match of (matches || []) as Array<Record<string, unknown>>) {
+    const candidateId = String(match.candidate_id);
+    if (!candidateById.has(candidateId)) continue;
+
+    const inputTrackIds = [
+      ...new Set([
+        ...candidateTrackIdsFromReasons(match.reasons_json),
+        ...(match.canonical_entity_id ? [String(match.canonical_entity_id)] : []),
+      ]),
+    ].sort();
+
+    if (inputTrackIds.length === 0) {
+      resolutionByCandidate.set(candidateId, {
+        candidateId,
+        inputTrackIds: [],
+        currentTrackId: null,
+        resolutionStatus: "unresolved",
+        blockingReason: "no_registry_match",
+      });
+      continue;
+    }
+
+    const currentIds = new Set<string>();
+    const statuses = new Set<string>();
+    let blockingReason: string | null = null;
+
+    for (const inputTrackId of inputTrackIds) {
+      let lineage = lineageCache.get(inputTrackId);
+      if (!lineage) {
+        lineage = await resolveCurrentTrackIdentity(db, inputTrackId);
+        lineageCache.set(inputTrackId, lineage);
+      }
+
+      statuses.add(lineage.status);
+      for (const currentId of lineage.currentTrackIds) currentIds.add(currentId);
+
+      if (
+        lineage.status === "split" ||
+        lineage.status === "retired" ||
+        lineage.status === "unresolved" ||
+        lineage.status === "cycle" ||
+        lineage.status === "max_depth"
+      ) {
+        blockingReason = `lineage_${lineage.status}`;
+      }
+    }
+
+    const currentTrackIds = [...currentIds].sort();
+    if (currentTrackIds.length !== 1) {
+      blockingReason = blockingReason || (
+        currentTrackIds.length > 1 ? "multiple_current_tracks" : "no_current_track"
+      );
+    }
+
+    resolutionByCandidate.set(candidateId, {
+      candidateId,
+      inputTrackIds,
+      currentTrackId: blockingReason === null ? currentTrackIds[0] : null,
+      resolutionStatus: [...statuses].sort().join("+") || "unresolved",
+      blockingReason,
+    });
+  }
+
+  const candidatesByCurrentTrack = new Map<string, string[]>();
+  for (const resolution of resolutionByCandidate.values()) {
+    if (!resolution.currentTrackId) continue;
+    if (!candidatesByCurrentTrack.has(resolution.currentTrackId)) {
+      candidatesByCurrentTrack.set(resolution.currentTrackId, []);
+    }
+    candidatesByCurrentTrack.get(resolution.currentTrackId)!.push(resolution.candidateId);
+  }
+
+  const matchByCandidate = new Map<string, Record<string, unknown>>();
+  for (const match of (matches || []) as Array<Record<string, unknown>>) {
+    matchByCandidate.set(String(match.candidate_id), match);
+  }
+
+  const methodWeight: Record<string, number> = {
+    canonical_history: 60,
+    manual: 50,
+    isrc: 40,
+    provider_id: 30,
+    title_artist: 20,
+    fuzzy: 10,
+    shell: 0,
+    no_match: 0,
+  };
+
+  const winnerByTrack = new Map<string, string>();
+  for (const [trackId, candidateIds] of candidatesByCurrentTrack.entries()) {
+    const sorted = [...candidateIds].sort((a, b) => {
+      const ma = matchByCandidate.get(a) || {};
+      const mb = matchByCandidate.get(b) || {};
+      const ca = candidateById.get(a) || {};
+      const cb = candidateById.get(b) || {};
+      const methodDelta =
+        (methodWeight[String(mb.match_method || "")] || 0) -
+        (methodWeight[String(ma.match_method || "")] || 0);
+      if (methodDelta !== 0) return methodDelta;
+      const confidenceDelta = Number(mb.confidence || 0) - Number(ma.confidence || 0);
+      if (confidenceDelta !== 0) return confidenceDelta;
+      const sourceDelta = Number(cb.source_count || 0) - Number(ca.source_count || 0);
+      if (sourceDelta !== 0) return sourceDelta;
+      return a.localeCompare(b);
+    });
+    winnerByTrack.set(trackId, sorted[0]);
+  }
+
+  const matchUpdates: Array<Record<string, unknown>> = [];
+  const candidateUpdates: Array<{
+    id: string;
+    status: string;
+    merged?: Record<string, unknown>;
+  }> = [];
+  const reviewIssues: Array<Record<string, unknown>> = [];
+  let acceptedCount = 0;
+  let supersededCount = 0;
+  let reviewCount = 0;
+
+  for (const candidate of (candidates || []) as Array<Record<string, unknown>>) {
+    const candidateId = String(candidate.id);
+    const match = matchByCandidate.get(candidateId);
+    const resolution = resolutionByCandidate.get(candidateId);
+
+    if (!match || !resolution || !resolution.currentTrackId) {
+      reviewCount++;
+      const issueType =
+        resolution?.blockingReason === "multiple_current_tracks" ||
+        resolution?.blockingReason?.startsWith("lineage_split")
+          ? "multiple_close_matches"
+          : "no_registry_match";
+
+      if (match) {
+        matchUpdates.push({
+          id: match.id,
+          run_id: runId,
+          candidate_id: candidateId,
+          entity_type: "track",
+          canonical_entity_id: null,
+          match_method: match.match_method || "no_match",
+          confidence: Number(match.confidence || 0),
+          status: "needs_review",
+          reasons_json: [
+            ...(Array.isArray(match.reasons_json) ? match.reasons_json : []),
+            `entity_resolution:${resolution?.blockingReason || "unresolved"}`,
+          ],
+          decided_by: match.decided_by || null,
+          decided_at: match.decided_at || null,
+          decision_note: match.decision_note || null,
+          created_at: match.created_at || now,
+          updated_at: now,
+        });
+      }
+
+      candidateUpdates.push({ id: candidateId, status: "needs_review" });
+      reviewIssues.push({
+        id: crypto.randomUUID(),
+        run_id: runId,
+        candidate_id: candidateId,
+        issue_type: issueType,
+        severity: "error",
+        blocking: true,
+        message:
+          issueType === "multiple_close_matches"
+            ? "Candidate identity resolves to multiple current Registry Tracks and requires review."
+            : "Candidate does not resolve to exactly one current Registry Track.",
+        status: "open",
+        created_at: now,
+        updated_at: now,
+      });
+      continue;
+    }
+
+    const winnerId = winnerByTrack.get(resolution.currentTrackId);
+    const isWinner = winnerId === candidateId;
+
+    if (!isWinner) {
+      supersededCount++;
+      matchUpdates.push({
+        id: match.id,
+        run_id: runId,
+        candidate_id: candidateId,
+        entity_type: "track",
+        canonical_entity_id: resolution.currentTrackId,
+        match_method: match.match_method,
+        confidence: Number(match.confidence || 0),
+        status: "superseded",
+        reasons_json: [
+          ...(Array.isArray(match.reasons_json) ? match.reasons_json : []),
+          `entity_resolution:${resolution.resolutionStatus}`,
+          `canonical_duplicate_of:${winnerId}`,
+        ],
+        decided_by: match.decided_by || null,
+        decided_at: match.decided_at || null,
+        decision_note: `Merged into candidate ${winnerId} after Registry UUID convergence.`,
+        created_at: match.created_at || now,
+        updated_at: now,
+      });
+      candidateUpdates.push({ id: candidateId, status: "ignored" });
+      continue;
+    }
+
+    const duplicateIds = (candidatesByCurrentTrack.get(resolution.currentTrackId) || [])
+      .filter((id) => id !== candidateId);
+    const duplicateCandidates = duplicateIds
+      .map((id) => candidateById.get(id))
+      .filter(Boolean) as Array<Record<string, unknown>>;
+    const allCandidates = [candidate, ...duplicateCandidates];
+    const mergedProviderIds = mergeProviderIdsJson(
+      allCandidates.map((row) => row.provider_ids_json),
+    );
+    const providerSourceCount = Object.keys(mergedProviderIds).length;
+    const mergedSourceUrls = [
+      ...new Set(
+        allCandidates.flatMap((row) =>
+          Array.isArray(row.source_urls_seen)
+            ? row.source_urls_seen.map((url) => String(url || "")).filter(Boolean)
+            : [],
+        ),
+      ),
+    ].sort();
+
+    acceptedCount++;
+    matchUpdates.push({
+      id: match.id,
+      run_id: runId,
+      candidate_id: candidateId,
+      entity_type: "track",
+      canonical_entity_id: resolution.currentTrackId,
+      match_method: match.match_method,
+      confidence: Number(match.confidence || 0),
+      status: "accepted",
+      reasons_json: [
+        ...(Array.isArray(match.reasons_json) ? match.reasons_json : []),
+        `entity_resolution:${resolution.resolutionStatus}`,
+        `canonical_track:${resolution.currentTrackId}`,
+      ],
+      decided_by: match.decided_by || null,
+      decided_at: match.decided_at || null,
+      decision_note: match.decision_note || null,
+      created_at: match.created_at || now,
+      updated_at: now,
+    });
+    candidateUpdates.push({
+      id: candidateId,
+      status: "pending",
+      merged: {
+        source_count:
+          providerSourceCount > 0
+            ? providerSourceCount
+            : Math.max(...allCandidates.map((row) => Number(row.source_count || 0))),
+        occurrence_count: allCandidates.reduce(
+          (sum, row) => sum + Number(row.occurrence_count || 0),
+          0,
+        ),
+        source_urls_seen: mergedSourceUrls,
+        provider_ids_json: mergedProviderIds,
+        streaming_qualified: allCandidates.some((row) => Boolean(row.streaming_qualified)),
+        carry_forward_only: allCandidates.every((row) => Boolean(row.carry_forward_only)),
+        updated_at: now,
+      },
+    });
+  }
+
+  await db
+    .from("chart_ingest_review_issues")
+    .delete()
+    .eq("run_id", runId)
+    .eq("status", "open")
+    .in("issue_type", ["no_registry_match", "multiple_close_matches"]);
+
+  const chunkSize = 200;
+  for (let i = 0; i < matchUpdates.length; i += chunkSize) {
+    const { error } = await db
+      .from("chart_ingest_matches")
+      .upsert(matchUpdates.slice(i, i + chunkSize), { onConflict: "run_id,candidate_id" });
+    if (error) return json(req, { error: "entity_resolution_match_write_failed", detail: error.message }, 500);
+  }
+
+  for (const update of candidateUpdates) {
+    await db
+      .from("chart_ingest_candidates")
+      .update({ status: update.status, ...(update.merged || {}), updated_at: now })
+      .eq("run_id", runId)
+      .eq("id", update.id);
+  }
+
+  for (let i = 0; i < reviewIssues.length; i += chunkSize) {
+    const { error } = await db
+      .from("chart_ingest_review_issues")
+      .insert(reviewIssues.slice(i, i + chunkSize));
+    if (error) return json(req, { error: "entity_resolution_review_write_failed", detail: error.message }, 500);
+  }
+
+  const durationMs = Date.now() - startedAt;
+  await db
+    .from("chart_ingest_stage_events")
+    .update({
+      status: "done",
+      finished_at: now,
+      duration_ms: durationMs,
+      message: `${acceptedCount} canonical Track UUIDs accepted; ${supersededCount} duplicate candidates folded into canonical identity; ${reviewCount} require review.`,
+      metrics_json: {
+        acceptedCount,
+        supersededCount,
+        reviewCount,
+        currentTrackCount: winnerByTrack.size,
+      },
+    })
+    .eq("run_id", runId)
+    .eq("stage", "entity_resolution");
+
+  return json(req, {
+    ok: true,
+    runId,
+    acceptedCount,
+    supersededCount,
+    reviewCount,
+    currentTrackCount: winnerByTrack.size,
+    durationMs,
+  });
+}
+
 // CARRY_FORWARD
 async function handleRunCarryForward(req: Request, db: ReturnType<typeof createClient>, params: Record<string, unknown>, user: { id: string; email?: string }) { const { runId } = params as { runId: string }; if (!runId) return json(req, { error: "runId_required" }, 400); const ss = Date.now(); const { data: run } = await db.from("chart_ingest_runs").select("id,status,edition_date,chart_size,program_id,series_slug").eq("id", runId).maybeSingle(); if (!run) return json(req, { error: "run_not_found" }, 404); await db.from("chart_ingest_stage_events").update({ status: "running", started_at: new Date().toISOString() }).eq("run_id", runId).eq("stage", "carry_forward"); const ed2 = (run.edition_date as string) || new Date().toISOString().split("T")[0]; const pid = (run.program_id as string) || "unknown"; const { data: ccs } = await db.from("chart_ingest_candidates").select("normalized_key").eq("run_id", runId); const fks = new Set<string>(); if (ccs) { for (const c of ccs) { if (c.normalized_key) fks.add(c.normalized_key); } } let cfc = 0, skc = 0, pec = 0; const ccds: Array<Record<string, unknown>> = []; try { const { data: pe } = await db.from("wk_chart_editions_v2").select("id").eq("program_id", pid).in("status",["committed","published"]).lt("edition_date",ed2).order("edition_date",{ascending:false}).limit(1).maybeSingle(); if (pe) { const { data: pes } = await db.from("wk_chart_entries_v2").select("normalized_key, rank, track_title, artist_name, release_date, track_slug, artist_slug, artwork_url").eq("edition_id", pe.id).order("rank",{ascending:true}); if (pes) { pec = pes.length; for (const p of pes) { const nk = (p.normalized_key as string)||""; if (!nk||nk==="::"||!nk.includes("::")) continue; if (fks.has(nk)){skc++;continue;} const cid = crypto.randomUUID(); ccds.push({ id:cid, run_id:runId, normalized_key:nk, lead_artist_key:nk.split("::")[1]??"", title:(p.track_title as string)||"", artist_display:(p.artist_name as string)||"", source_count:0, source_urls_seen:[], occurrence_count:0, release_date:sanitizeDate(p.release_date as string), candidate_type:"carry_forward", status:"eligible", version:1, carry_forward_only:true, continuity_locked:false, airplay_candidate_only:false, streaming_qualified:false, isrc:null, upc:null, artwork_url:(p.artwork_url as string)||null, external_url:null, preview_url:null, release_title:null, created_at:new Date().toISOString(), updated_at:new Date().toISOString() }); cfc++; } } } } catch (err) { console.error("[carry_forward]", err); } if (ccds.length>0) { const CH=200; for (let j=0; j<ccds.length; j+=CH) { const { error: ie } = await db.from("chart_ingest_candidates").insert(ccds.slice(j,j+CH)); if (ie) { const d=Date.now()-ss; await db.from("chart_ingest_stage_events").update({ status:"failed", finished_at:new Date().toISOString(), duration_ms:d, message:ie.message }).eq("run_id",runId).eq("stage","carry_forward"); return json(req,{error:"insert_failed",detail:ie.message},500); } } } const d=Date.now()-ss; await db.from("chart_ingest_stage_events").update({ status:"done", finished_at:new Date().toISOString(), duration_ms:d, message:cfc>0?cfc+" carry-forward from "+pec+" entries":"No carry-forward needed." }).eq("run_id",runId).eq("stage","carry_forward"); return json(req,{ok:true,runId,carryForwardCount:cfc,freshEvidenceCount:fks.size,previousEntryCount:pec,skippedExistingCount:skc,durationMs:d}); }
 
