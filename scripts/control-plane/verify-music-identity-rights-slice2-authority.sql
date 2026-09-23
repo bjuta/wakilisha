@@ -4,6 +4,7 @@ do $verify$
 declare
   v_definition text;
   v_table text;
+  v_index text;
   v_operation_count integer;
 begin
   foreach v_table in array array[
@@ -48,6 +49,24 @@ begin
        or has_table_privilege('service_role','public.' || v_table,'DELETE')
     then
       raise exception 'Music ontology Slice 2 service-role ACL is not read-only: %', v_table;
+    end if;
+  end loop;
+
+  foreach v_index in array array[
+    'registry_track_work_links_evidence_idx',
+    'registry_track_work_links_superseded_idx',
+    'registry_track_contributions_evidence_idx',
+    'registry_track_contributions_superseded_idx',
+    'registry_work_contributions_evidence_idx',
+    'registry_work_contributions_superseded_idx',
+    'registry_rights_claims_evidence_idx',
+    'registry_rights_claims_superseded_idx',
+    'registry_external_identifier_assertions_evidence_idx',
+    'registry_external_identifier_assertions_superseded_idx'
+  ]
+  loop
+    if to_regclass('public.' || v_index) is null then
+      raise exception 'Music ontology Slice 2 covering index missing: %', v_index;
     end if;
   end loop;
 
