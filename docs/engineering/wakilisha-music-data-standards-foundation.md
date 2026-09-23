@@ -593,3 +593,273 @@ The system must always be able to answer:
 > Can the resulting analytical output be reproduced from canonical UUID identity and retained evidence?
 
 If a future provider, standard, importer, AI model, or acquisition partner cannot fit through those questions without replacing WAKILISHA identity authority, the integration is wrong.
+
+
+## 13. Data dictionary v1 — current semantic authority
+
+This section is a semantic dictionary, not a migration specification. Physical
+column names may change after Preview replay, but these meanings may not be
+collapsed.
+
+### 13.1 Canonical entities
+
+| Concept | Internal authority | Identity | External mapping | Null / unknown semantics |
+| --- | --- | --- | --- | --- |
+| Person | `editorial.people` | Person UUID | DDEX Party / ISNI / IPI / IPN where applicable | absence of an external identifier means unknown |
+| Organisation | `editorial.organizations` | Organisation UUID | DDEX Party / ISNI / IPI / label, publisher, administrator roles | absence of a relationship means unknown, not "independent" |
+| Artist Persona | `registry_artists` | Artist UUID | display Artist / performer brand / provider Artist ID | Artist must not be assumed to be a legal Person |
+| Sound Recording | `registry_tracks` | Track UUID | DDEX SoundRecording / ISRC / provider Recording ID | ISRC absence or conflict does not remove Recording identity |
+| Musical Work | new typed Registry authority | Work UUID | DDEX MusicalWork / ISWC | Work may exist before ISWC is known |
+| Release | `registry_releases` | Release UUID | DDEX Release / GTIN, UPC, EAN, provider Release ID | Release type may be source-declared or inferred; identity is independent |
+| Label | `registry_labels` | Label UUID | label/imprint presentation; Organisation may be linked separately | label text without canonical link remains evidence |
+| Media Asset | `registry_media_assets` | Asset UUID | file/deliverable/resource representation | asset ownership does not imply rights ownership |
+
+### 13.2 Relationships with typed domain meaning
+
+#### Recording to Work
+
+A first-class Recording-to-Work relation is required.
+
+It must preserve at minimum:
+
+- Recording UUID;
+- Musical Work UUID;
+- relationship kind;
+- evidence/provenance;
+- confidence or verification state;
+- review state;
+- temporal/supersession history where the assertion changes.
+
+The relationship must support more than a one-to-one assumption. Medleys,
+adaptations, samples, and compound works are not grounds for flattening a
+Recording and Work into the same identity.
+
+Do not use `registry_entity_relationships` as the sole canonical authority for
+this relation. That table may project or describe graph context, but
+Recording-to-Work is a core music-domain relationship whose FK integrity should
+be database-enforceable.
+
+#### Person / Organisation to Artist Persona
+
+This relationship is governed identity evidence.
+
+A Person or Organisation may underlie, control, participate in, or be associated
+with an Artist persona, but those meanings are not interchangeable.
+
+No name-similarity process may promote this link automatically.
+
+### 13.3 Contribution semantics
+
+Contribution is an earned shared behavior, but the first physical schema should
+preserve the two domain contexts instead of forcing a generic polymorphic row.
+
+#### Recording Contribution
+
+Examples:
+
+- primary or featured performance;
+- instrumental performance;
+- producer;
+- recording engineer;
+- mixer;
+- mastering engineer;
+- conductor;
+- session musician;
+- other recording-session roles.
+
+A Recording Contribution should be able to reference:
+
+- the Recording UUID;
+- a Person or Organisation when the underlying contributor is known;
+- an Artist persona when the credited public identity is material;
+- `credited_as`;
+- role vocabulary;
+- instrument or contribution detail;
+- contribution order when meaningful;
+- evidence, review, provenance, validity, and supersession.
+
+The existing `registry_track_artists` remains public billing/presentation
+authority and must not be silently reinterpreted as complete session credits.
+
+#### Work Contribution
+
+Examples:
+
+- composer;
+- lyricist;
+- songwriter;
+- arranger;
+- adaptor;
+- translator where the Work model requires it.
+
+A Work Contribution should reference the Musical Work and the canonical Person
+or Organisation responsible for the role. An Artist persona may be retained as
+a credited/public identity, but it does not replace the underlying contributor
+identity when that identity is known.
+
+The existing `registry_authors` table is editorial/content authorship and must
+not be reused as music Work authorship.
+
+A later shared Contribution kernel may be earned only after Recording and Work
+contribution workflows prove that their lifecycle and authority are genuinely
+the same. Do not pre-abstract them now.
+
+### 13.4 Rights Claim semantics
+
+Rights Claim is an earned cross-domain primitive because the same lifecycle
+applies to Work-side and Recording-side assertions:
+
+`assertion -> evidence -> reconciliation -> canonical/resolved state`.
+
+The physical design should prefer database-enforced typed references rather
+than a generic `subject_type + subject_id + party_id` tuple.
+
+A claim should carry exactly one subject:
+
+- Recording UUID; **or**
+- Musical Work UUID.
+
+A claimant should be exactly one canonical identity:
+
+- Person UUID; **or**
+- Organisation UUID.
+
+Artist persona is presentation identity and is not sufficient as the legal
+claimant when the underlying claimant is known.
+
+Minimum semantic fields:
+
+| Field | Meaning |
+| --- | --- |
+| rights domain | Recording-side or Work-side |
+| right/share type | controlled vocabulary with standard mapping |
+| territory scope | explicit territory set, worldwide marker, or unknown |
+| usage scope | the uses to which the claim applies |
+| valid from / valid to | temporal truth, not overwrite history |
+| share state | known / unknown / disputed / not-applicable |
+| share percentage | high-precision value only when known |
+| control type | owner, controller, administrator, publisher, collecting agent, etc. as applicable |
+| claim status | asserted / supported / verified / disputed / superseded / rejected |
+| source/evidence | mandatory provenance |
+| review state | governed reconciliation |
+| supersession | non-destructive correction lineage |
+
+Rules:
+
+- unknown percentage is NULL plus explicit `unknown` state, never zero;
+- zero is a real asserted numerical value and must remain distinguishable;
+- conflicting claims may coexist;
+- the assertion universe may exceed 100 percent while disputed;
+- a resolved allocation may impose domain-specific coherence separately;
+- no financial payable, receivable, balance, or settlement amount belongs in
+  this primitive.
+
+### 13.5 External identifier semantics
+
+The external-identifier concept is shared, but its physical primitive is not yet
+sealed because WAKILISHA already has domain-specific provider identity
+authorities.
+
+Before adding a generic table, the implementation design must reconcile:
+
+- `registry_track_provider_links`;
+- provider IDs embedded in current Registry metadata;
+- `provider_entity_links`;
+- `registry_provider_sources`;
+- the Registry entity index;
+- Person and Organisation identity outside the Registry schema;
+- evidence/provenance requirements;
+- conflicting identifier assertions.
+
+Required semantics regardless of physical design:
+
+| Property | Requirement |
+| --- | --- |
+| scheme | typed scheme such as ISRC, ISWC, ISNI, IPI, IPN, GTIN, Apple, Spotify |
+| value | preserved source value plus canonical comparison form where defined |
+| issuer / namespace | explicit when the scheme requires it |
+| subject | canonical WAKILISHA UUID identity |
+| assertion status | candidate / accepted / disputed / rejected / superseded |
+| verification | method, actor, timestamp |
+| source | exact evidence/provenance |
+| validity | temporal bounds when applicable |
+| conflict | representable without deleting either identity |
+
+No global uniqueness constraint should be introduced merely because an external
+standard intends uniqueness. WAKILISHA must be able to represent incorrect,
+duplicate, stale, or disputed external assignments so that they can be
+reconciled.
+
+### 13.6 Release classification
+
+Release identity and Release classification remain separate.
+
+`single`, `ep`, and `album` are classifications of a Release UUID, not
+different entity classes.
+
+The current WAKILISHA 1 / 2-6 / 7+ taxonomy remains accepted operational
+classification authority until deliberately changed.
+
+A future source-declared Release type should be retained independently from a
+WAKILISHA inferred packaging class when both are useful. One must not silently
+overwrite the provenance of the other.
+
+### 13.7 Master semantics
+
+"Master" is not a new root entity.
+
+The architecture must distinguish:
+
+1. Sound Recording identity — `registry_tracks.id`;
+2. master or derivative media asset — `registry_media_assets.id`;
+3. master-side rights/control — Rights Claim against the Sound Recording.
+
+A remaster, radio edit, instrumental, stem, or alternate mix may require a new
+Sound Recording identity, a new Media Asset, or both depending on whether the
+underlying Recording identity changes. That decision is evidence-governed and
+must not be inferred from a filename.
+
+### 13.8 Unknown, disputed, and temporal truth
+
+The data dictionary reserves distinct meanings for:
+
+- unknown;
+- not applicable;
+- asserted;
+- supported;
+- verified;
+- canonical/resolved;
+- disputed;
+- rejected;
+- superseded;
+- historical.
+
+Do not collapse these into nullable booleans or zero values.
+
+Corrections should preserve prior assertions and effective-time history rather
+than destructively rewrite source memory.
+
+## 14. Physical-schema guardrails before implementation
+
+Any candidate schema for this foundation must satisfy all of these before a
+Production migration is considered:
+
+1. primary keys are WAKILISHA UUIDs;
+2. external identifiers are not primary keys;
+3. Person and Organisation reuse existing editorial authority;
+4. no generic Party table is introduced;
+5. core domain joins use real foreign keys where PostgreSQL can enforce them;
+6. polymorphic `type + id` references are avoided for core Work, Recording,
+   Contribution, and Rights authority when typed FKs can express the model;
+7. evidence subject vocabulary is extended deliberately for each new authority,
+   not replaced with an unrestricted text field;
+8. RLS and grants are explicit for every new public table;
+9. canonical writers use the existing Registry exact-operation / evidence /
+   verification lifecycle rather than direct browser DML;
+10. old assertions and superseded relationships remain reconstructable;
+11. percentage precision is not silently rounded;
+12. no table claims to be a financial ledger unless it obeys the separate
+    append-oriented money doctrine;
+13. standards adapters can map into and out of the model without becoming its
+    source of canonical identity.
+
