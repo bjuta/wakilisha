@@ -1,0 +1,91 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ern:NewReleaseMessage
+  xmlns:ern="http://ddex.net/xml/ern/43"
+  AvsVersionId="3"
+  LanguageAndScriptCode="en">
+  <MessageHeader>
+    <MessageId>MSG-ERN-432-001</MessageId>
+    <MessageSender>
+      <PartyId>PADPIDA20260923001</PartyId>
+    </MessageSender>
+    <MessageRecipient>
+      <PartyId>PADPIDA-WAKILISHA</PartyId>
+    </MessageRecipient>
+    <MessageCreatedDateTime>2026-09-23T18:00:00Z</MessageCreatedDateTime>
+  </MessageHeader>
+  <PartyList>
+    <Party>
+      <PartyReference>P1</PartyReference>
+      <PartyName>
+        <FullName>Fixture Artist</FullName>
+      </PartyName>
+    </Party>
+    <Party>
+      <PartyReference>P2</PartyReference>
+      <PartyName>
+        <FullName>Fixture Producer</FullName>
+      </PartyName>
+    </Party>
+    <Party>
+      <PartyReference>P3</PartyReference>
+      <PartyName>
+        <FullName>Fixture Label</FullName>
+      </PartyName>
+    </Party>
+  </PartyList>
+  <ResourceList>
+    <SoundRecording>
+      <ResourceReference>A1</ResourceReference>
+      <ResourceId>
+        <ISRC>KEAAA2600001</ISRC>
+      </ResourceId>
+      <DisplayTitleText>Fixture Track</DisplayTitleText>
+      <DisplayArtistName>Fixture Artist</DisplayArtistName>
+      <DisplayArtist SequenceNumber="1">
+        <ArtistPartyReference>P1</ArtistPartyReference>
+        <DisplayArtistRole>MainArtist</DisplayArtistRole>
+      </DisplayArtist>
+      <Contributor SequenceNumber="1">
+        <ContributorPartyReference>P2</ContributorPartyReference>
+        <Role>StudioProducer</Role>
+      </Contributor>
+    </SoundRecording>
+    <Image>
+      <ResourceReference>I1</ResourceReference>
+      <Type>FrontCoverImage</Type>
+      <TechnicalDetails>
+        <File>
+          <URI>https://media.invalid/ern432/front-cover.jpg</URI>
+        </File>
+      </TechnicalDetails>
+    </Image>
+  </ResourceList>
+  <ReleaseList>
+    <Release>
+      <ReleaseReference>R0</ReleaseReference>
+      <ReleaseType>Album</ReleaseType>
+      <ReleaseId>
+        <ICPN>0123456789012</ICPN>
+      </ReleaseId>
+      <DisplayTitleText>Fixture Album</DisplayTitleText>
+      <DisplayArtistName>Fixture Artist</DisplayArtistName>
+      <DisplayArtist SequenceNumber="1">
+        <ArtistPartyReference>P1</ArtistPartyReference>
+        <DisplayArtistRole>MainArtist</DisplayArtistRole>
+      </DisplayArtist>
+      <ReleaseLabelReference>P3</ReleaseLabelReference>
+      <ReleaseDate>2026-09-23</ReleaseDate>
+      <Genre>
+        <GenreText>Afropop</GenreText>
+      </Genre>
+      <ResourceGroup>
+        <ResourceGroupContentItem>
+          <ReleaseResourceReference>A1</ReleaseResourceReference>
+        </ResourceGroupContentItem>
+        <ResourceGroupContentItem>
+          <ReleaseResourceReference>I1</ReleaseResourceReference>
+        </ResourceGroupContentItem>
+      </ResourceGroup>
+    </Release>
+  </ReleaseList>
+</ern:NewReleaseMessage>
