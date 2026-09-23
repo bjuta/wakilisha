@@ -1,0 +1,90 @@
+name: Slice 3 External Identifier Preview Apply
+
+on:
+  push:
+    branches:
+      - feat/music-metadata-slice3-external-identifier-admission-v1
+
+permissions:
+  contents: write
+
+jobs:
+  preview:
+    if: "${{ github.event.head_commit.message == 'ci: apply slice3 external identifier preview' }}"
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      PREVIEW_REF: btxsvzovtbviuhinthxd
+      EXPECTED_MIGRATION: 20260923120155_music_identity_rights_slice3_external_identifier_admission_v1.sql
+      SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+    steps:
+      - name: Check out exact branch
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up pinned Supabase CLI
+        uses: supabase/setup-cli@v1
+        with:
+          version: 2.107.0
+          github-token: ${{ github.token }}
+
+      - name: Require Supabase access
+        run: |
+          set -euo pipefail
+          test -n "$SUPABASE_ACCESS_TOKEN"
+
+      - name: Link disposable Preview
+        run: |
+          set -euo pipefail
+          supabase link --project-ref "$PREVIEW_REF"
+          test "$(cat supabase/.temp/project-ref)" = "$PREVIEW_REF"
+
+      - name: Require exact pending migration
+        run: |
+          set -euo pipefail
+          DRY="$(supabase db push --dry-run --linked 2>&1)"
+          printf '%s\n' "$DRY"
+
+          ACTUAL="$(
+            {
+              printf '%s\n' "$DRY" |
+                grep -Eo '[0-9]{14}_[A-Za-z0-9_-]+\.sql' || true
+            } |
+              sort -u
+          )"
+
+          test "$ACTUAL" = "$EXPECTED_MIGRATION"
+          echo "SLICE3_PREVIEW_EXACT_PENDING=PASS"
+
+      - name: Apply exact candidate to Preview
+        run: |
+          set -euo pipefail
+          supabase db push --linked
+
+      - name: Require zero pending after apply
+        run: |
+          set -euo pipefail
+          POST="$(supabase db push --dry-run --linked 2>&1)"
+          printf '%s\n' "$POST"
+
+          PENDING="$(
+            {
+              printf '%s\n' "$POST" |
+                grep -Eo '[0-9]{14}_[A-Za-z0-9_-]+\.sql' || true
+            } |
+              sort -u
+          )"
+
+          test -z "$PENDING"
+          echo "SLICE3_PREVIEW_NATIVE_APPLY=PASS"
+
+      - name: Remove temporary workflow
+        run: |
+          set -euo pipefail
+          rm .github/workflows/slice3-external-identifier-preview-temp.yml
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add .github/workflows/slice3-external-identifier-preview-temp.yml
+          git commit -m "ci: remove slice3 external identifier preview workflow"
+          git push origin HEAD:feat/music-metadata-slice3-external-identifier-admission-v1
