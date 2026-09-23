@@ -108,14 +108,31 @@ function normalize_title(title: string): string { return normalizeCore(title); }
 function lead_artist_key(full_artist_line: string): string { if (!full_artist_line || !full_artist_line.trim()) return ""; let extracted = full_artist_line; const featSplit = extracted.split(/\s+(?:feat\.|ft\.|featuring)\s+/i); if (featSplit.length > 1) extracted = featSplit[0]; const collabSplit = extracted.split(/\s+(?:x|&)\s+/i); if (collabSplit.length > 1) extracted = collabSplit[0]; const commaSplit = extracted.split(/\s*,\s*/); extracted = commaSplit[0]; return normalizeCore(extracted); }
 function build_normalized_key(title: string, full_artist_line: string): string { const nt = normalize_title(title); const lk = lead_artist_key(full_artist_line); if (!nt || !lk) return ""; return nt+"::"+lk; }
 
-function compactIdentityPart(value: unknown): string {
+function normalizeProviderKey(value: unknown): string {
   const raw = typeof value === "string" || typeof value === "number" ? String(value) : "";
-  return raw.trim().toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "");
+  const normalized = raw
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "_")
+    .replace(/(^_|_$)/g, "");
+  if (normalized === "apple" || normalized === "applemusic") return "apple_music";
+  return normalized;
+}
+
+function normalizeProviderEntityId(value: unknown): string {
+  if (typeof value !== "string" && typeof value !== "number") return "";
+  return String(value).trim();
+}
+
+function canonicalIsrc(value: unknown): string {
+  if (typeof value !== "string" && typeof value !== "number") return "";
+  const normalized = String(value).trim().toUpperCase().replace(/[^A-Z0-9]/g, "");
+  return /^[A-Z]{2}[A-Z0-9]{3}[0-9]{7}$/.test(normalized) ? normalized : "";
 }
 
 function addProviderIdToBag(bag: Record<string, Set<string>>, providerRaw: unknown, idRaw: unknown): void {
-  const provider = compactIdentityPart(providerRaw);
-  const id = compactIdentityPart(idRaw);
+  const provider = normalizeProviderKey(providerRaw);
+  const id = normalizeProviderEntityId(idRaw);
   if (!provider || !id) return;
   if (!bag[provider]) bag[provider] = new Set<string>();
   bag[provider].add(id);
@@ -146,12 +163,12 @@ function providerIdentityAliasesFromJson(value: unknown): string[] {
   if (!value || typeof value !== "object" || Array.isArray(value)) return aliases;
 
   for (const [providerRaw, idsRaw] of Object.entries(value as Record<string, unknown>)) {
-    const provider = compactIdentityPart(providerRaw);
+    const provider = normalizeProviderKey(providerRaw);
     if (!provider) continue;
 
     const ids = Array.isArray(idsRaw) ? idsRaw : [idsRaw];
     for (const idRaw of ids) {
-      const id = compactIdentityPart(idRaw);
+      const id = normalizeProviderEntityId(idRaw);
       if (id) aliases.push(`provider:${provider}:${id}`);
     }
   }
@@ -168,7 +185,7 @@ function rawSongIdentityAliases(row: Record<string, unknown>, normalizedKey: str
 
   if (normalizedKey) aliases.add(`normalized:${normalizedKey}`);
 
-  const isrc = compactIdentityPart(row.isrc);
+  const isrc = canonicalIsrc(row.isrc);
   if (isrc) aliases.add(`isrc:${isrc}`);
 
   const providerMap = providerIdentityMapFromRaw(row);
@@ -180,7 +197,7 @@ function rawSongIdentityAliases(row: Record<string, unknown>, normalizedKey: str
 }
 
 function candidateSongIdentityKey(candidate: Record<string, unknown>): string {
-  const isrc = compactIdentityPart(candidate.isrc);
+  const isrc = canonicalIsrc(candidate.isrc);
   if (isrc) return `isrc:${isrc}`;
 
   const providerAliases = providerIdentityAliasesFromJson(candidate.provider_ids_json);
