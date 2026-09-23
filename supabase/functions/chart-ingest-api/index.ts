@@ -237,81 +237,11 @@ function continuityScore(pp: number | null, w = 1.0): number { if (pp === null |
 function carryForwardBonus(pp: number | null, w = 1.0, cfOnly = false): number { if (!cfOnly || pp === null || pp <= 0) return 0; return round4(Math.max(8, 18 - Math.min(10, pp - 1)) * w); }
 function airplayScore(W: number, sCount: number, dCount: number, enabled = false, maxS = 24): number { if (!enabled || sCount < 1 || dCount < 1) return 0; return round4(clamp((LN(1 + W) * 4.25 + Math.min(6, (sCount - 1) * 1.5) + Math.min(4, Math.floor(dCount / 3))), 0, maxS)); }
 
-interface AntiGamingInput {
-  identity_key: string;
-  lead_artist_key: string;
-  provisional_total: number;
-}
-interface AntiGamingResult {
-  identity_key: string;
-  anti_gaming_penalty: number;
-  lead_artist_overflow: boolean;
-  overflow_index: number;
-}
-function computeAntiGamingPenalties(
-  tracks: AntiGamingInput[],
-  maxPer = 3,
-  overflowPen = 8,
-): AntiGamingResult[] {
-  if (tracks.length === 0) return [];
-
-  const groups = new Map<string, AntiGamingInput[]>();
-  for (const track of tracks) {
-    const leadArtistKey = track.lead_artist_key || "__unknown__";
-    if (!groups.has(leadArtistKey)) groups.set(leadArtistKey, []);
-    groups.get(leadArtistKey)!.push(track);
-  }
-
-  const results = new Map<string, AntiGamingResult>();
-
-  for (const group of groups.values()) {
-    if (group.length <= maxPer) {
-      for (const track of group) {
-        results.set(track.identity_key, {
-          identity_key: track.identity_key,
-          anti_gaming_penalty: 0,
-          lead_artist_overflow: false,
-          overflow_index: 0,
-        });
-      }
-      continue;
-    }
-
-    const sorted = [...group].sort((a, b) => {
-      const scoreDelta = b.provisional_total - a.provisional_total;
-      return scoreDelta !== 0 ? scoreDelta : a.identity_key.localeCompare(b.identity_key);
-    });
-
-    for (let i = 0; i < sorted.length; i++) {
-      const track = sorted[i];
-      if (i < maxPer) {
-        results.set(track.identity_key, {
-          identity_key: track.identity_key,
-          anti_gaming_penalty: 0,
-          lead_artist_overflow: false,
-          overflow_index: 0,
-        });
-      } else {
-        const overflowIndex = i - maxPer + 1;
-        results.set(track.identity_key, {
-          identity_key: track.identity_key,
-          anti_gaming_penalty: round4(overflowIndex * overflowPen),
-          lead_artist_overflow: true,
-          overflow_index: overflowIndex,
-        });
-      }
-    }
-  }
-
-  return tracks.map(
-    (track) =>
-      results.get(track.identity_key) ?? {
-        identity_key: track.identity_key,
-        anti_gaming_penalty: 0,
-        lead_artist_overflow: false,
-        overflow_index: 0,
-      },
-  );
+interface AntiGamingInput { normalized_key: string; lead_artist_key: string; provisional_total: number; }
+interface AntiGamingResult { normalized_key: string; anti_gaming_penalty: number; lead_artist_overflow: boolean; overflow_index: number; }
+function computeAntiGamingPenalties(tracks: AntiGamingInput[], maxPer = 3, overflowPen = 8): AntiGamingResult[] {
+  if (tracks.length === 0) return []; const groups = new Map<string, AntiGamingInput[]>(); for (const t of tracks) { const k = t.lead_artist_key || "__unknown__"; if (!groups.has(k)) groups.set(k, []); groups.get(k)!.push(t); } const rm = new Map<string, AntiGamingResult>();
+  for (const [, g] of groups) { if (g.length <= maxPer) { for (const t of g) rm.set(t.normalized_key, { normalized_key: t.normalized_key, anti_gaming_penalty: 0, lead_artist_overflow: false, overflow_index: 0 }); continue; } const s = [...g].sort((a, b) => b.provisional_total - a.provisional_total); for (let i = 0; i < s.length; i++) { if (i < maxPer) rm.set(s[i].normalized_key, { normalized_key: s[i].normalized_key, anti_gaming_penalty: 0, lead_artist_overflow: false, overflow_index: 0 }); else { const oi = i - maxPer + 1; rm.set(s[i].normalized_key, { normalized_key: s[i].normalized_key, anti_gaming_penalty: round4(oi * overflowPen), lead_artist_overflow: true, overflow_index: oi }); } } } return tracks.map(t => rm.get(t.normalized_key) ?? { normalized_key: t.normalized_key, anti_gaming_penalty: 0, lead_artist_overflow: false, overflow_index: 0 });
 }
 
 function computeProvisionalScore(c: { normalized_key: string; lead_artist_key: string; source_count: number; occurrence_count: number; release_date: string | null; carry_forward_only: boolean; continuity_locked: boolean; airplay_candidate_only: boolean; }, ed: string, pp: number | null, cfg: { cross_source_mode?: string; cross_source_weight?: number; continuity_weight?: number; carry_forward_weight?: number; overlap_bonus_cap?: number; airplay_enabled?: boolean; airplay_max_score?: number; } = {}, airplayCtx?: { W: number; station_count: number; detection_count: number; } | null) { const ss = sourceScore(c.source_count); const cs = crossSourceBonus(c.source_count, cfg.cross_source_mode ?? "standard", cfg.cross_source_weight ?? 1.0); const ob = overlapBonus(c.occurrence_count, c.source_count, cfg.overlap_bonus_cap ?? 10); const rs = recencyScore(c.release_date, ed); const cont = continuityScore(pp, cfg.continuity_weight ?? 1.0); const cf = carryForwardBonus(pp, cfg.carry_forward_weight ?? 1.0, c.carry_forward_only); const ap = airplayScore(airplayCtx?.W ?? 0, airplayCtx?.station_count ?? 0, airplayCtx?.detection_count ?? 0, cfg.airplay_enabled ?? false, cfg.airplay_max_score ?? 24); const rd = c.release_date ? daysBetween(c.release_date, ed) : null; return { source_score: ss, cross_source_bonus: cs, overlap_bonus: ob, recency_score: rs, continuity_score: cont, carry_forward_bonus: cf, airplay_score: ap, provisional_total: round4(ss + cs + ob + rs + cont + cf + ap), recency_days: rd }; }
@@ -2211,7 +2141,6 @@ async function handleRunEligibility(
         .filter(Boolean) as string[];
 
       if (knownOrigins.some((origin) => allowedOrigins.has(origin))) continue;
-
       if (knownOrigins.length === 0 && unknownMode === "include") continue;
 
       originExcludedIds.push(candidateId);
@@ -2298,6 +2227,652 @@ async function handleRunEligibility(
     eligibleCount: finalEligibleCount || 0,
     durationMs,
   });
+}
+
+// SCORING
+async function handleRunScoring(req: Request, db: ReturnType<typeof createClient>, params: Record<string, unknown>, user: { id: string; email?: string }) { const { runId } = params as { runId: string }; if (!runId) return json(req, { error: "runId_required" }, 400); const ss = Date.now(); const { data: run } = await db.from("chart_ingest_runs").select("*").eq("id", runId).maybeSingle(); if (!run) return json(req, { error: "run_not_found" }, 404); await db.from("chart_ingest_stage_events").update({ status: "running", started_at: new Date().toISOString() }).eq("run_id", runId).eq("stage", "methodology_scoring"); const ed = (run.edition_date as string) || new Date().toISOString().split("T")[0]; const pid = (run.program_id as string) || "unknown"; const { data: candidates } = await db.from("chart_ingest_candidates").select("*").eq("run_id", runId).eq("status", "eligible"); if (!candidates || candidates.length === 0) { const d = Date.now() - ss; await db.from("chart_ingest_stage_events").update({ status: "done", finished_at: new Date().toISOString(), duration_ms: d, message: "No eligible candidates." }).eq("run_id", runId).eq("stage", "methodology_scoring"); return json(req, { ok: true, runId, scoredCount: 0, overflowCount: 0, durationMs: d }); } let pm = new Map<string, number>(); try { const { data: pe } = await db.from("wk_chart_editions_v2").select("id").eq("program_id", pid).in("status", ["committed","published"]).lt("edition_date", ed).order("edition_date", { ascending: false }).limit(1).maybeSingle(); if (pe) { const { data: pes } = await db.from("wk_chart_entries_v2").select("normalized_key, rank").eq("edition_id", pe.id); if (pes) { for (const p of pes) { if (p.normalized_key) pm.set(p.normalized_key, p.rank as number); } } } } catch { } const scfg = { cross_source_mode: "standard" as const, cross_source_weight: 1.0, continuity_weight: 1.0, carry_forward_weight: 1.0, overlap_bonus_cap: 10 }; const scored: Array<{ candidate_id: string; normalized_key: string; lead_artist_key: string; source_score: number; cross_source_bonus: number; overlap_bonus: number; recency_score: number; continuity_score: number; carry_forward_bonus: number; airplay_score: number; provisional_total: number; recency_days: number | null; previous_position: number | null; source_count: number; occurrence_count: number; is_carry_forward: boolean; is_airplay_candidate: boolean }> = []; for (const c of candidates) { const pp = pm.get((c.normalized_key as string) || "") ?? null; const bd = computeProvisionalScore({ normalized_key: (c.normalized_key as string) || "", lead_artist_key: (c.lead_artist_key as string) || "", source_count: (c.source_count as number) || 0, occurrence_count: (c.occurrence_count as number) || 0, release_date: (c.release_date as string) || null, carry_forward_only: !!(c.carry_forward_only), continuity_locked: !!(c.continuity_locked), airplay_candidate_only: !!(c.airplay_candidate_only) }, ed, pp, scfg, null); scored.push({ candidate_id: c.id as string, normalized_key: c.normalized_key as string, lead_artist_key: (c.lead_artist_key as string) || "", source_score: bd.source_score, cross_source_bonus: bd.cross_source_bonus, overlap_bonus: bd.overlap_bonus, recency_score: bd.recency_score, continuity_score: bd.continuity_score, carry_forward_bonus: bd.carry_forward_bonus, airplay_score: bd.airplay_score, provisional_total: bd.provisional_total, recency_days: bd.recency_days, previous_position: pp, source_count: (c.source_count as number) || 0, occurrence_count: (c.occurrence_count as number) || 0, is_carry_forward: !!(c.carry_forward_only), is_airplay_candidate: !!(c.airplay_candidate_only) }); } const ags = computeAntiGamingPenalties(scored.map(s => ({ normalized_key: s.normalized_key, lead_artist_key: s.lead_artist_key, provisional_total: s.provisional_total })), 3, 8); const agbk = new Map(ags.map(r => [r.normalized_key, r])); const n2 = new Date().toISOString(); const srs: Array<Record<string, unknown>> = []; let oc = 0; for (const s of scored) { const ag = agbk.get(s.normalized_key) ?? { anti_gaming_penalty: 0, lead_artist_overflow: false, overflow_index: 0 }; const fs = round4(s.provisional_total - ag.anti_gaming_penalty); if (ag.lead_artist_overflow) oc++; srs.push({ id: crypto.randomUUID(), run_id: runId, candidate_id: s.candidate_id, source_score: s.source_score, cross_source_bonus: s.cross_source_bonus, overlap_bonus: s.overlap_bonus, recency_score: s.recency_score, continuity_score: s.continuity_score, carry_forward_bonus: s.carry_forward_bonus, anti_gaming_penalty: ag.anti_gaming_penalty, final_score: fs, source_count: s.source_count, occurrence_count: s.occurrence_count, recency_days: s.recency_days, previous_position: s.previous_position, normalized_key: s.normalized_key, score_integrity_ok: Math.abs(round4((s.source_score + s.cross_source_bonus + s.overlap_bonus + s.recency_score + s.continuity_score + s.carry_forward_bonus + s.airplay_score - ag.anti_gaming_penalty) - fs)) < 0.001, score_integrity_delta: round4((s.source_score + s.cross_source_bonus + s.overlap_bonus + s.recency_score + s.continuity_score + s.carry_forward_bonus + s.airplay_score - ag.anti_gaming_penalty) - fs), score_payload_json: { source_score: s.source_score, cross_source_bonus: s.cross_source_bonus, overlap_bonus: s.overlap_bonus, recency_score: s.recency_score, continuity_score: s.continuity_score, carry_forward_bonus: s.carry_forward_bonus, airplay_score: s.airplay_score, anti_gaming_penalty: ag.anti_gaming_penalty, final_score: fs, source_count: s.source_count, occurrence_count: s.occurrence_count, recency_days: s.recency_days, previous_position: s.previous_position }, anti_gaming_json: { anti_gaming_penalty: ag.anti_gaming_penalty, lead_artist_overflow: ag.lead_artist_overflow, overflow_index: ag.overflow_index }, created_at: n2 }); } await db.from("chart_ingest_candidate_scores").delete().eq("run_id", runId); const SCH = 200; for (let j = 0; j < srs.length; j += SCH) {
+    const { error: scoreInsertErr } = await db.from("chart_ingest_candidate_scores").insert(srs.slice(j, j + SCH));
+    if (scoreInsertErr) {
+      const d = Date.now() - ss;
+      await db.from("chart_ingest_stage_events").update({ status: "failed", finished_at: new Date().toISOString(), duration_ms: d, message: "Score insert failed: "+scoreInsertErr.message, error_code: "score_insert_failed", error_message: scoreInsertErr.message }).eq("run_id", runId).eq("stage", "methodology_scoring");
+      await db.from("chart_ingest_runs").update({ status: "failed", error_code: "score_insert_failed", error_message: scoreInsertErr.message, updated_at: new Date().toISOString() }).eq("id", runId);
+      return json(req, { ok: false, runId, error: "score_insert_failed", detail: scoreInsertErr.message }, 500);
+    }
+  }
+
+  const nonzeroScoreCount = srs.filter((r) => Number(r.final_score) > 0).length;
+  if (nonzeroScoreCount === 0) {
+    const d = Date.now() - ss;
+    await db.from("chart_ingest_stage_events").update({ status: "failed", finished_at: new Date().toISOString(), duration_ms: d, message: "Scoring produced zero nonzero scores.", error_code: "zero_score_output", error_message: "All candidate final_score values were zero." }).eq("run_id", runId).eq("stage", "methodology_scoring");
+    await db.from("chart_ingest_runs").update({ status: "failed", error_code: "zero_score_output", error_message: "All candidate final_score values were zero.", updated_at: new Date().toISOString() }).eq("id", runId);
+    return json(req, { ok: false, runId, error: "zero_score_output", scoredCount: scored.length, nonzeroScoreCount }, 400);
+  }
+
+  const d = Date.now() - ss; await db.from("chart_ingest_stage_events").update({ status: "done", finished_at: new Date().toISOString(), duration_ms: d, message: scored.length+" scored, "+nonzeroScoreCount+" nonzero, "+oc+" overflows.", metrics_json: { scoredCount: scored.length, nonzeroScoreCount, overflowCount: oc } }).eq("run_id", runId).eq("stage", "methodology_scoring"); await db.from("chart_ingest_stage_events").update({ status: "done", finished_at: new Date().toISOString(), duration_ms: 0, message: "Anti-gaming done." }).eq("run_id", runId).eq("stage", "anti_gaming"); return json(req, { ok: true, runId, scoredCount: scored.length, nonzeroScoreCount, overflowCount: oc, airplayTrackCount: 0, durationMs: d }); }
+
+// SHORTLIST
+async function handleRunShortlist(req: Request, db: ReturnType<typeof createClient>, params: Record<string, unknown>, user: { id: string; email?: string }) {
+  const { runId } = params as { runId: string };
+  if (!runId) return json(req, { error: "runId_required" }, 400);
+
+  const ss = Date.now();
+  const { data: run } = await db
+    .from("chart_ingest_runs")
+    .select("id,status,edition_date,chart_size")
+    .eq("id", runId)
+    .maybeSingle();
+
+  if (!run) return json(req, { error: "run_not_found" }, 404);
+
+  await db
+    .from("chart_ingest_stage_events")
+    .update({ status: "running", started_at: new Date().toISOString() })
+    .eq("run_id", runId)
+    .eq("stage", "shortlist");
+
+  const csz = (run.chart_size as number) || 20;
+
+  const { data: candidates } = await db
+    .from("chart_ingest_candidates")
+    .select("*")
+    .eq("run_id", runId)
+    .eq("status", "eligible");
+
+  if (!candidates || candidates.length === 0) {
+    const d = Date.now() - ss;
+    await db
+      .from("chart_ingest_stage_events")
+      .update({
+        status: "done",
+        finished_at: new Date().toISOString(),
+        duration_ms: d,
+        message: "No eligible.",
+      })
+      .eq("run_id", runId)
+      .eq("stage", "shortlist");
+
+    return json(req, {
+      ok: true,
+      runId,
+      shortlistedCount: 0,
+      totalScored: 0,
+      excludedCount: 0,
+      durationMs: d,
+    });
+  }
+
+  const candidateIds = new Set(candidates.map((candidate) => candidate.id as string));
+
+  const { data: scoreRows, error: scoreErr } = await db
+    .from("chart_ingest_candidate_scores")
+    .select("*")
+    .eq("run_id", runId);
+
+  if (scoreErr) {
+    const d = Date.now() - ss;
+
+    await db
+      .from("chart_ingest_stage_events")
+      .update({
+        status: "failed",
+        finished_at: new Date().toISOString(),
+        duration_ms: d,
+        message: "Shortlist score lookup failed: " + scoreErr.message,
+        error_code: "shortlist_score_lookup_failed",
+        error_message: scoreErr.message,
+      })
+      .eq("run_id", runId)
+      .eq("stage", "shortlist");
+
+    await db
+      .from("chart_ingest_runs")
+      .update({
+        status: "failed",
+        error_code: "shortlist_score_lookup_failed",
+        error_message: scoreErr.message,
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", runId);
+
+    return json(req, {
+      ok: false,
+      runId,
+      error: "shortlist_score_lookup_failed",
+      detail: scoreErr.message,
+      durationMs: d,
+    }, 500);
+  }
+
+  const scores = (scoreRows || []).filter((score) =>
+    candidateIds.has(score.candidate_id as string)
+  );
+
+  const nonzeroScores = (scores || []).filter((s) => Number(s.final_score) > 0).length;
+
+  if (!scores || scores.length === 0 || nonzeroScores === 0) {
+    const d = Date.now() - ss;
+    const detail = !scores || scores.length === 0
+      ? "No score rows exist for eligible candidates."
+      : "All score rows have final_score = 0.";
+
+    await db
+      .from("chart_ingest_stage_events")
+      .update({
+        status: "failed",
+        finished_at: new Date().toISOString(),
+        duration_ms: d,
+        message: "Shortlist blocked: " + detail,
+        error_code: "shortlist_missing_scores",
+        error_message: detail,
+      })
+      .eq("run_id", runId)
+      .eq("stage", "shortlist");
+
+    await db
+      .from("chart_ingest_runs")
+      .update({
+        status: "failed",
+        error_code: "shortlist_missing_scores",
+        error_message: detail,
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", runId);
+
+    return json(req, {
+      ok: false,
+      runId,
+      error: "shortlist_missing_scores",
+      detail,
+      shortlistedCount: 0,
+      totalScored: scores?.length || 0,
+      nonzeroScoreCount: nonzeroScores,
+      durationMs: d,
+    }, 400);
+  }
+
+  const { data: originRows, error: originErr } = await db.rpc(
+    "chart_get_run_candidate_origin_report",
+    { p_run_id: runId },
+  );
+
+  if (originErr) {
+    const d = Date.now() - ss;
+
+    await db
+      .from("chart_ingest_stage_events")
+      .update({
+        status: "failed",
+        finished_at: new Date().toISOString(),
+        duration_ms: d,
+        message: "Shortlist origin filter failed: " + originErr.message,
+        error_code: "shortlist_origin_filter_failed",
+        error_message: originErr.message,
+      })
+      .eq("run_id", runId)
+      .eq("stage", "shortlist");
+
+    await db
+      .from("chart_ingest_runs")
+      .update({
+        status: "failed",
+        error_code: "shortlist_origin_filter_failed",
+        error_message: originErr.message,
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", runId);
+
+    return json(req, {
+      ok: false,
+      runId,
+      error: "shortlist_origin_filter_failed",
+      detail: originErr.message,
+      durationMs: d,
+    }, 500);
+  }
+
+  const originByCandidate = new Map<string, Record<string, unknown>>();
+  for (const row of ((originRows || []) as Array<Record<string, unknown>>)) {
+    originByCandidate.set(row.candidate_id as string, row);
+  }
+
+  const sbc = new Map<string, { final_score: number }>();
+  for (const s of scores || []) {
+    sbc.set(s.candidate_id as string, { final_score: Number(s.final_score) || 0 });
+  }
+
+  const validCandidates = candidates.filter((candidate) => {
+    const origin = originByCandidate.get(candidate.id as string);
+    const score = sbc.get(candidate.id as string)?.final_score ?? 0;
+    return Boolean(origin?.is_country_eligible) && score > 0;
+  });
+
+  const invalidCandidates = candidates.filter((candidate) => {
+    const origin = originByCandidate.get(candidate.id as string);
+    const score = sbc.get(candidate.id as string)?.final_score ?? 0;
+    return !Boolean(origin?.is_country_eligible) || score <= 0;
+  });
+
+  const sorted = [...validCandidates].sort((a, b) => {
+    const sa = sbc.get(a.id as string)?.final_score ?? 0;
+    const sb = sbc.get(b.id as string)?.final_score ?? 0;
+    if (sb !== sa) return sb - sa;
+    return ((a.normalized_key as string) || "").localeCompare((b.normalized_key as string) || "");
+  });
+
+  const seenSongIdentities = new Map<string, Record<string, unknown>>();
+  const dedupedSorted: typeof sorted = [];
+  const duplicateCandidates: typeof sorted = [];
+
+  for (const candidate of sorted) {
+    const identityKey = candidateSongIdentityKey(candidate as Record<string, unknown>);
+    if (seenSongIdentities.has(identityKey)) {
+      duplicateCandidates.push(candidate);
+    } else {
+      seenSongIdentities.set(identityKey, candidate as Record<string, unknown>);
+      dedupedSorted.push(candidate);
+    }
+  }
+
+  const now = new Date().toISOString();
+  const sids: string[] = [];
+  const eids = new Set<string>();
+
+  for (let i = 0; i < dedupedSorted.length; i++) {
+    if (i < csz) sids.push(dedupedSorted[i].id as string);
+    else eids.add(dedupedSorted[i].id as string);
+  }
+
+  for (const invalid of invalidCandidates) {
+    eids.add(invalid.id as string);
+  }
+
+  for (const duplicate of duplicateCandidates) {
+    eids.add(duplicate.id as string);
+  }
+
+  await db
+    .from("chart_ingest_exclusions")
+    .delete()
+    .eq("run_id", runId)
+    .eq("source_stage", "shortlist")
+    .in("reason_code", ["country_mismatch", "missing_artist_country", "duplicate_track"]);
+
+  const countryExclusionRows = invalidCandidates.map((candidate) => {
+    const origin = originByCandidate.get(candidate.id as string) || {};
+    const reasonCode = (origin.reason_code as string) || "missing_artist_country";
+    return {
+      id: crypto.randomUUID(),
+      run_id: runId,
+      candidate_id: candidate.id as string,
+      reason_code: reasonCode === "country_mismatch" ? "country_mismatch" : "missing_artist_country",
+      reason_label: (origin.reason_label as string) || "Candidate does not have a resolved artist matching this chart country.",
+      severity: "hard",
+      source_stage: "shortlist",
+      details_json: {
+        normalizedKey: candidate.normalized_key,
+        title: candidate.title,
+        artistDisplay: candidate.artist_display,
+        finalScore: sbc.get(candidate.id as string)?.final_score ?? 0,
+        artists: origin.artists || [],
+      },
+      created_at: now,
+    };
+  });
+
+  const duplicateExclusionRows = duplicateCandidates.map((candidate) => ({
+    id: crypto.randomUUID(),
+    run_id: runId,
+    candidate_id: candidate.id as string,
+    reason_code: "duplicate_track",
+    reason_label: "Duplicate track identity already selected in this chart run.",
+    severity: "hard",
+    source_stage: "shortlist",
+    details_json: {
+      normalizedKey: candidate.normalized_key,
+      title: candidate.title,
+      artistDisplay: candidate.artist_display,
+      finalScore: sbc.get(candidate.id as string)?.final_score ?? 0,
+      duplicateIdentityKey: candidateSongIdentityKey(candidate as Record<string, unknown>),
+    },
+    created_at: now,
+  }));
+
+  const exclusionRows = [...countryExclusionRows, ...duplicateExclusionRows];
+
+  if (exclusionRows.length > 0) {
+    const CH = 200;
+    for (let j = 0; j < exclusionRows.length; j += CH) {
+      const { error: exErr } = await db
+        .from("chart_ingest_exclusions")
+        .insert(exclusionRows.slice(j, j + CH));
+
+      if (exErr) {
+        const d = Date.now() - ss;
+
+        await db
+          .from("chart_ingest_stage_events")
+          .update({
+            status: "failed",
+            finished_at: new Date().toISOString(),
+            duration_ms: d,
+            message: "Shortlist exclusion write failed: " + exErr.message,
+            error_code: "shortlist_exclusion_write_failed",
+            error_message: exErr.message,
+          })
+          .eq("run_id", runId)
+          .eq("stage", "shortlist");
+
+        await db
+          .from("chart_ingest_runs")
+          .update({
+            status: "failed",
+            error_code: "shortlist_exclusion_write_failed",
+            error_message: exErr.message,
+            updated_at: new Date().toISOString(),
+          })
+          .eq("id", runId);
+
+        return json(req, {
+          ok: false,
+          runId,
+          error: "shortlist_exclusion_write_failed",
+          detail: exErr.message,
+          durationMs: d,
+        }, 500);
+      }
+    }
+  }
+
+  if (sids.length < csz) {
+    const d = Date.now() - ss;
+    const detail = `Only ${sids.length} country-clean candidates available for chart size ${csz}.`;
+
+    if (eids.size > 0) {
+      const allExcluded = Array.from(eids);
+      const CH = 200;
+      for (let j = 0; j < allExcluded.length; j += CH) {
+        await db
+          .from("chart_ingest_candidates")
+          .update({ status: "excluded", updated_at: now })
+          .in("id", allExcluded.slice(j, j + CH))
+          .eq("run_id", runId);
+      }
+    }
+
+    await db
+      .from("chart_ingest_stage_events")
+      .update({
+        status: "failed",
+        finished_at: new Date().toISOString(),
+        duration_ms: d,
+        message: "Shortlist blocked: " + detail,
+        error_code: "shortlist_country_clean_incomplete",
+        error_message: detail,
+        metrics_json: {
+          chartSize: csz,
+          countryCleanCandidateCount: sids.length,
+          countryFilteredCount: invalidCandidates.length,
+          eligibleCandidateCount: candidates.length,
+        },
+      })
+      .eq("run_id", runId)
+      .eq("stage", "shortlist");
+
+    await db
+      .from("chart_ingest_runs")
+      .update({
+        status: "failed",
+        error_code: "shortlist_country_clean_incomplete",
+        error_message: detail,
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", runId);
+
+    return json(req, {
+      ok: false,
+      runId,
+      error: "shortlist_country_clean_incomplete",
+      detail,
+      shortlistedCount: sids.length,
+      countryFilteredCount: invalidCandidates.length,
+      eligibleCandidateCount: candidates.length,
+      durationMs: d,
+    }, 400);
+  }
+
+  if (eids.size > 0) {
+    const allExcluded = Array.from(eids);
+    const CH = 200;
+    for (let j = 0; j < allExcluded.length; j += CH) {
+      await db
+        .from("chart_ingest_candidates")
+        .update({ status: "excluded", updated_at: now })
+        .in("id", allExcluded.slice(j, j + CH))
+        .eq("run_id", runId);
+    }
+  }
+
+  const d = Date.now() - ss;
+
+  await db
+    .from("chart_ingest_stage_events")
+    .update({
+      status: "done",
+      finished_at: new Date().toISOString(),
+      duration_ms: d,
+      message: `${sids.length} country-clean shortlisted, ${eids.size} excluded, ${invalidCandidates.length} country-filtered, ${duplicateCandidates.length} duplicate-filtered.`,
+      metrics_json: {
+        shortlistedCount: sids.length,
+        excludedCount: eids.size,
+        countryFilteredCount: invalidCandidates.length,
+        duplicateFilteredCount: duplicateCandidates.length,
+        eligibleCandidateCount: candidates.length,
+        chartSize: csz,
+      },
+    })
+    .eq("run_id", runId)
+    .eq("stage", "shortlist");
+
+  await db
+    .from("chart_ingest_stage_events")
+    .update({
+      status: "done",
+      finished_at: new Date().toISOString(),
+      duration_ms: 0,
+      message: "Review gate passed.",
+    })
+    .eq("run_id", runId)
+    .eq("stage", "review_gate");
+
+  return json(req, {
+    ok: true,
+    runId,
+    shortlistedCount: sids.length,
+    totalScored: candidates.length,
+    excludedCount: eids.size,
+    countryFilteredCount: invalidCandidates.length,
+    duplicateFilteredCount: duplicateCandidates.length,
+    chartSize: csz,
+    durationMs: d,
+  });
+}
+
+
+// FULL PIPELINE
+async function handleRunFullPipeline(req: Request, db: ReturnType<typeof createClient>, params: Record<string, unknown>, user: { id: string; email?: string }) { const { runId } = params as { runId: string }; if (!runId) return json(req, { error: "runId_required" }, 400); const start = Date.now(); const pss: Array<{ stage: string; result: string }> = []; const sfR = await handleSourceFetch(req, db, params, user); const sfB = await sfR.json() as { ok: boolean; rawRowCount: number; error?: string }; pss.push({ stage: "source_fetch", result: sfB.ok ? sfB.rawRowCount+" rows" : "FAILED: "+(sfB.error||"unknown") }); if (!sfB.ok || sfB.rawRowCount === 0) { await db.from("chart_ingest_runs").update({ status: "failed", error_message: "Pipeline stopped at source_fetch", updated_at: new Date().toISOString() }).eq("id", runId); return json(req, { ok: false, runId, status: "failed", pipelineStages: pss, durationMs: Date.now() - start }); } const nrR = await handleNormalizeRun(req, db, params, user); const nrB = await nrR.json() as { ok: boolean; uniqueCount: number; candidateCount: number }; pss.push({ stage: "normalize", result: nrB.ok ? nrB.candidateCount+" from "+nrB.uniqueCount : "FAILED" }); if (!nrB.ok || nrB.candidateCount === 0) { await db.from("chart_ingest_runs").update({ status: "failed", error_message: "Pipeline stopped at normalize", updated_at: new Date().toISOString() }).eq("id", runId); return json(req, { ok: false, runId, status: "failed", pipelineStages: pss, durationMs: Date.now() - start }); } const cfR = await handleRunCarryForward(req, db, params, user); const cfB = await cfR.json() as { carryForwardCount: number }; pss.push({ stage: "carry_forward", result: cfB.carryForwardCount+" carry-forward" }); const elR = await handleRunEligibilityWithReleaseWindow(req, db, params, user); const elB = await elR.json() as { candidateCount: number; excludedCount: number; originExcludedCount?: number }; pss.push({ stage: "eligibility", result: elB.candidateCount+" total, "+elB.excludedCount+" excluded"+(elB.originExcludedCount?" ("+elB.originExcludedCount+" origin-filtered)":"") }); const scR = await handleRunScoring(req, db, params, user); const scB = await scR.json() as { ok: boolean; scoredCount: number }; pss.push({ stage: "scoring", result: scB.ok ? scB.scoredCount+" scored" : "FAILED" }); if (!scB.ok || scB.scoredCount === 0) { await db.from("chart_ingest_runs").update({ status: "failed", error_message: "Pipeline stopped at scoring", updated_at: new Date().toISOString() }).eq("id", runId); return json(req, { ok: false, runId, status: "failed", pipelineStages: pss, durationMs: Date.now() - start }); } const slR = await handleRunShortlist(req, db, params, user); const slB = await slR.json() as { shortlistedCount: number }; pss.push({ stage: "shortlist", result: slB.shortlistedCount+" shortlisted" }); if (slB.shortlistedCount === 0) { await db.from("chart_ingest_runs").update({ status: "failed", error_message: "Pipeline stopped at shortlist", updated_at: new Date().toISOString() }).eq("id", runId); return json(req, { ok: false, runId, status: "failed", pipelineStages: pss, durationMs: Date.now() - start }); } const td = Date.now() - start; await db.from("chart_ingest_runs").update({ status: "dry_run_complete", dry_run_completed_at: new Date().toISOString(), updated_at: new Date().toISOString() }).eq("id", runId); await db.from("chart_ingest_audit_events").insert({ run_id: runId, actor: user.id, actor_email: user.email || null, action: "dry_run_complete", new_status: "dry_run_complete", payload_json: { pipelineStages: pss, totalDurationMs: td } }); return json(req, { ok: true, runId, status: "dry_run_complete", pipelineStages: pss, totalDurationMs: td }); }
+
+// COMMIT (v26 — normalizeSlug safety-net ensures every entry gets hyphenated slugs)
+async function handleCommitRun(req:Request,db:ReturnType<typeof createClient>,params:Record<string,unknown>,user:{id:string;email?:string}) {
+  const {runId,publishImmediately,notes}=params as {runId:string;publishImmediately?:boolean;notes?:string}; if(!runId)return json(req,{error:"runId_required"},400);
+  const {error:gateError}=await db.rpc("chart_assert_committable_run",{p_run_id:runId}); if(gateError)return json(req,{error:"commit_blocked_chart_run_integrity",detail:gateError.message},400);
+  const {data:run,error:runError}=await db.from("chart_ingest_runs").select("*").eq("id",runId).maybeSingle(); if(runError)return json(req,{error:"run_lookup_failed",detail:runError.message},500); if(!run)return json(req,{error:"run_not_found"},404);
+  const now=new Date().toISOString(); const editionDate=String(run.edition_date||now.split("T")[0]); const chartSize=Number(run.chart_size||20); const programId=String(run.program_id||"unknown"); const actor=user.email||user.id;
+  const {data:candidates,error:candidateError}=await db.from("chart_ingest_candidates").select("*").eq("run_id",runId).eq("status","eligible").order("created_at"); if(candidateError)return json(req,{error:"candidate_lookup_failed",detail:candidateError.message},500); if(!candidates?.length)return json(req,{error:"no_eligible_candidates"},400);
+  const ids=candidates.map(c=>String(c.id)); const {data:scores,error:scoreError}=await db.from("chart_ingest_candidate_scores").select("*").in("candidate_id",ids); if(scoreError)return json(req,{error:"score_lookup_failed",detail:scoreError.message},500);
+  const scoreMap=new Map<string,Record<string,unknown>>(); for(const s of scores||[])scoreMap.set(String(s.candidate_id),s);
+  const top=[...candidates].sort((a,b)=>{const sa=Number(scoreMap.get(String(a.id))?.final_score??0);const sb=Number(scoreMap.get(String(b.id))?.final_score??0);return sb!==sa?sb-sa:String(a.normalized_key||"").localeCompare(String(b.normalized_key||""));}).slice(0,chartSize);
+  const prevRanks=new Map<string,number>(); const prevKeys=new Set<string>();
+  try{const {data:prev}=await db.from("wk_chart_editions_v2").select("id").eq("program_id",programId).in("status",["committed","published"]).lt("edition_date",editionDate).order("edition_date",{ascending:false}).limit(1).maybeSingle();if(prev){const {data:rows}=await db.from("wk_chart_entries_v2").select("normalized_key, rank").eq("edition_id",prev.id);for(const row of rows||[]){const key=String(row.normalized_key||"");if(key){prevRanks.set(key,Number(row.rank));prevKeys.add(key);}}}}catch{}
+  const registryStats={tracks_found:0,tracks_created:0,artists_found:0,artists_created:0,links_created:0,previews_set:0,errors:0}; const materialized=new Map<string,ChartMaterializationResult>();
+  for(const c of top){const candidateId=String(c.id);try{const result=await materializeChartCandidate(db,runId,candidateId);materialized.set(candidateId,result);if(result.track_created)registryStats.tracks_created++;else registryStats.tracks_found++;for(const a of result.artists){if(a.created)registryStats.artists_created++;else registryStats.artists_found++;}registryStats.links_created+=result.credits.filter(x=>x.created).length;}catch(error){registryStats.errors++;return json(req,{error:"registry_materialization_failed",candidateId,detail:error instanceof Error?error.message:String(error),registryStats},409);}}
+  const editionId=crypto.randomUUID(); const {data:program}=await db.from("wk_chart_programs_v2").select("public_slug, public_label").eq("id",programId).maybeSingle(); const editionSlug=editionDate;
+  const {error:editionError}=await db.from("wk_chart_editions_v2").insert({id:editionId,program_id:programId,edition_slug:editionSlug,edition_label:String(program?.public_label||"Chart Edition"),edition_date:editionDate,period_start:run.period_start||editionDate,period_end:run.period_end||editionDate,entry_count:top.length,status:publishImmediately?"published":"committed",methodology_version:String(run.methodology_version||"1.0.0"),rule_set_snapshot:(run.rule_snapshot_json as Record<string,unknown>)||{},chart_size:chartSize,ingest_run_id:runId,published_at:publishImmediately?now:null,published_by:publishImmediately?actor:null,created_at:now,updated_at:now}); if(editionError)return json(req,{error:"edition_create_failed",detail:editionError.message},500);
+  const rows:Array<Record<string,unknown>>=[];
+  for(let i=0;i<top.length;i++){const c=top[i];const candidateId=String(c.id);const result=materialized.get(candidateId);if(!result){await db.from("wk_chart_editions_v2").delete().eq("id",editionId);return json(req,{error:"materialization_result_missing",candidateId},500);}const rank=i+1;const key=String(c.normalized_key||"");const previous=prevRanks.get(key)??null;let movement:string|null=null;if(previous===null)movement=prevKeys.has(key)?"reentry":"new";else if(rank===previous)movement="same";else movement=rank<previous?"up":"down";rows.push({id:crypto.randomUUID(),edition_id:editionId,rank,previous_rank:previous,movement,track_title:String(c.title||""),artist_name:String(c.artist_display||""),artwork_url:c.artwork_url||null,normalized_key:key,lead_artist_key:String(c.lead_artist_key||""),track_slug:normalizeSlug(result.track_slug),artist_slug:normalizeSlug(result.primary_artist_slug),canonical_track_id:result.track_id,total_score:Number(scoreMap.get(candidateId)?.final_score??0),carry_forward_only:Boolean(c.carry_forward_only),release_date:sanitizeDate(c.release_date as string),source_count:Number(c.source_count||0),occurrence_count:Number(c.occurrence_count||0),created_at:now,updated_at:now});}
+  const {error:entryError}=await db.from("wk_chart_entries_v2").insert(rows);if(entryError){await db.from("wk_chart_editions_v2").delete().eq("id",editionId);return json(req,{error:"entry_create_failed",detail:entryError.message},500);}
+  const status=publishImmediately?"published":"committed"; const {error:updateError}=await db.from("chart_ingest_runs").update({status,committed_at:now,commit_edition_id:editionId,notes:notes??null,updated_at:now}).eq("id",runId);if(updateError)return json(req,{error:"run_commit_state_update_failed",detail:updateError.message},500);
+  await db.from("chart_ingest_stage_events").update({status:"done",finished_at:now,message:`${top.length} entries committed.`}).eq("run_id",runId).eq("stage","commit_write"); await db.from("chart_ingest_audit_events").insert({run_id:runId,actor:user.id,actor_email:actor,action:"run_committed",new_status:status,payload_json:{editionId,editionSlug,entryCount:top.length}});
+  return json(req,{runId,status,editionId,editionSlug,entryCount:top.length,publicUrl:`/charts/${String(program?.public_slug||programId)}/${editionSlug}`,registryStats,integrity:{ok:true,warnings:[],errors:[]}});
+}
+
+async function handleRunAirplayDetection(req: Request, db: ReturnType<typeof createClient>, params: Record<string, unknown>, user: { id: string; email?: string }) { return json(req, { ok: false, error: "ACRCloud credentials not configured." }); }
+async function handleResetPipeline(req: Request, db: ReturnType<typeof createClient>, params: Record<string, unknown>, user: { id: string; email?: string }) { const { runId } = params as { runId: string }; if (!runId) return json(req, { error: "runId_required" }, 400); const now = new Date().toISOString(); await db.from("chart_ingest_stage_events").update({ status: "idle", started_at: null, finished_at: null, duration_ms: null, message: null }).eq("run_id", runId); await Promise.all([db.from("chart_ingest_raw_rows").delete().eq("run_id", runId), db.from("chart_ingest_normalized_rows").delete().eq("run_id", runId), db.from("chart_ingest_candidates").delete().eq("run_id", runId), db.from("chart_ingest_exclusions").delete().eq("run_id", runId), db.from("chart_ingest_candidate_scores").delete().eq("run_id", runId), db.from("chart_ingest_matches").delete().eq("run_id", runId), db.from("chart_ingest_review_issues").delete().eq("run_id", runId)]); await db.from("chart_ingest_runs").update({ status: "draft", dry_run_completed_at: null, updated_at: now }).eq("id", runId); return json(req, { ok: true, runId, status: "draft" }); }
+async function handleCsvList(req: Request, db: ReturnType<typeof createClient>) { return json(req, { csvs: [] }); }
+async function handleApplyRowDecision(req: Request, db: ReturnType<typeof createClient>, params: Record<string, unknown>, user: { id: string; email?: string }) { return json(req, { ok: true }); }
+
+
+async function handleGetOriginReviewQueue(req: Request, db: ReturnType<typeof createClient>, params: Record<string, unknown>) {
+  const { runId } = params as { runId: string };
+  if (!runId) return json(req, { error: "runId_required" }, 400);
+
+  const { data, error } = await db.rpc("chart_get_run_origin_review_queue_v1", {
+    p_run_id: runId,
+  });
+
+  if (error) return json(req, { error: error.message }, 500);
+
+  return json(req, { rows: data || [] });
+}
+
+async function handleGetOriginCountryOptions(req: Request, db: ReturnType<typeof createClient>, params: Record<string, unknown>) {
+  const { includeIso2 } = params as { includeIso2?: string };
+  const include = typeof includeIso2 === "string" ? includeIso2.trim().toUpperCase() : "";
+
+  const { data: artists, error: artistErr } = await db
+    .from("registry_artists")
+    .select("origin_iso2")
+    .not("origin_iso2", "is", null);
+
+  if (artistErr) return json(req, { error: artistErr.message }, 500);
+
+  const codeCounts = new Map<string, number>();
+
+  for (const artist of artists || []) {
+    const code = String((artist as { origin_iso2?: string }).origin_iso2 || "").trim().toUpperCase();
+    if (!/^[A-Z]{2}$/.test(code)) continue;
+    codeCounts.set(code, (codeCounts.get(code) || 0) + 1);
+  }
+
+  const marketLabels = new Map<string, string>();
+
+  const { data: markets } = await db
+    .from("chart_markets")
+    .select("country_code,label")
+    .not("country_code", "is", null);
+
+  for (const market of markets || []) {
+    const code = String((market as { country_code?: string }).country_code || "").trim().toUpperCase();
+    const label = String((market as { label?: string }).label || "").trim();
+    if (!/^[A-Z]{2}$/.test(code)) continue;
+    if (label) marketLabels.set(code, label);
+    if (!codeCounts.has(code)) codeCounts.set(code, 0);
+  }
+
+  if (/^[A-Z]{2}$/.test(include) && !codeCounts.has(include)) {
+    codeCounts.set(include, 0);
+  }
+
+  const options = [...codeCounts.entries()]
+    .map(([originIso2, artistCount]) => ({
+      originIso2,
+      label: marketLabels.get(originIso2) || originIso2,
+      artistCount,
+    }))
+    .sort((a, b) => {
+      if (a.originIso2 === include) return -1;
+      if (b.originIso2 === include) return 1;
+      return a.originIso2.localeCompare(b.originIso2);
+    });
+
+  return json(req, { options });
+}
+
+
+async function handleSetArtistOriginForRun(req:Request,db:ReturnType<typeof createClient>,params:Record<string,unknown>,_user:{id:string;email?:string}) {
+  const {artistId,originIso2,runId,candidateId,note}=params as {artistId:string;originIso2:string;runId:string;candidateId:string;note?:string};
+  if(!artistId)return json(req,{error:"artistId_required"},400);if(!originIso2)return json(req,{error:"originIso2_required"},400);if(!runId)return json(req,{error:"runId_required"},400);if(!candidateId)return json(req,{error:"candidateId_required"},400);
+  const {data,error}=await db.rpc("chart_admit_artist_origin_v1",{p_artist_id:artistId,p_origin_iso2:originIso2,p_run_id:runId,p_candidate_id:candidateId,p_note:note||"Resolved from chart origin queue."});
+  if(error)return json(req,{error:error.message},500);return json(req,{ok:true,result:data});
+}
+
+async function handleCreateOriginArtistShell(req:Request,db:ReturnType<typeof createClient>,params:Record<string,unknown>,_user:{id:string;email?:string}) {
+  const {artistName,originIso2,runId,candidateId}=params as {artistName:string;originIso2:string;runId:string;candidateId:string};
+  if(!artistName)return json(req,{error:"artistName_required"},400);if(!originIso2)return json(req,{error:"originIso2_required"},400);if(!runId)return json(req,{error:"runId_required"},400);if(!candidateId)return json(req,{error:"candidateId_required"},400);
+  const {data,error}=await db.rpc("chart_create_artist_origin_shell_v1",{p_artist_name:artistName,p_origin_iso2:originIso2,p_run_id:runId,p_candidate_id:candidateId});
+  if(error)return json(req,{error:error.message},500);return json(req,{ok:true,result:data});
+}
+
+async function handleResetAfterOriginResolution(req: Request, db: ReturnType<typeof createClient>, params: Record<string, unknown>) {
+  const { runId } = params as { runId: string };
+
+  if (!runId) return json(req, { error: "runId_required" }, 400);
+
+  const { data, error } = await db.rpc("chart_reset_run_after_origin_resolution_v1", {
+    p_run_id: runId,
+  });
+
+  if (error) return json(req, { error: error.message }, 500);
+
+  return json(req, { ok: true, result: data });
+}
+
+
+async function handleGetFamilyIngestPresets(req: Request, db: ReturnType<typeof createClient>) {
+  const { data, error } = await db.rpc("chart_get_family_ingest_presets_v1");
+
+  if (error) return json(req, { error: error.message }, 500);
+
+  return json(req, { presets: data || [] });
+}
+
+async function handleSaveFamilyIngestPreset(req: Request, db: ReturnType<typeof createClient>, params: Record<string, unknown>, user: { id: string; email?: string }) {
+  const { familyId, config } = params as {
+    familyId: string;
+    config: Record<string, unknown>;
+  };
+
+  if (!familyId) return json(req, { error: "familyId_required" }, 400);
+
+  const { data, error } = await db.rpc("chart_upsert_family_ingest_preset_v1", {
+    p_family_id: familyId,
+    p_config_json: config || {},
+  });
+
+  if (error) return json(req, { error: error.message }, 500);
+
+  return json(req, { ok: true, preset: data });
+}
+
+async function handleGetWeeklyBackfillPlan(req: Request, db: ReturnType<typeof createClient>, params: Record<string, unknown>) {
+  const { familyId, startDate, endDate } = params as {
+    familyId: string;
+    startDate: string;
+    endDate: string;
+  };
+
+  if (!familyId) return json(req, { error: "familyId_required" }, 400);
+  if (!startDate) return json(req, { error: "startDate_required" }, 400);
+  if (!endDate) return json(req, { error: "endDate_required" }, 400);
+
+  const { data, error } = await db.rpc("chart_get_weekly_backfill_plan_v1", {
+    p_family_id: familyId,
+    p_start_date: startDate,
+    p_end_date: endDate,
+  });
+
+  if (error) return json(req, { error: error.message }, 500);
+
+  return json(req, { plan: data || [] });
 }
 
 async function handleRunEligibilityWithReleaseWindow(req: Request, db: ReturnType<typeof createClient>, params: Record<string, unknown>, user: { id: string; email?: string }) {
