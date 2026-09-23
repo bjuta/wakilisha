@@ -25,6 +25,10 @@
       <PartyName>
         <FullName>Fixture Label</FullName>
       </PartyName>
+      <PartyId>
+        <CisacSocietyId>FIXTURE-SOCIETY</CisacSocietyId>
+        <ProprietaryId Namespace="FixtureParty">LABEL-PARTY-001</ProprietaryId>
+      </PartyId>
     </Party>
   </PartyList>
   <ResourceList>
@@ -34,6 +38,8 @@
       <SoundRecordingEdition>
         <ResourceId>
           <ISRC>KEAAA2600002</ISRC>
+          <CatalogNumber Namespace="FixtureCatalog">TRACK-001</CatalogNumber>
+          <ProprietaryId Namespace="FixtureTrack">A1-PROP-001</ProprietaryId>
         </ResourceId>
       </SoundRecordingEdition>
       <DisplayTitleText>Fixture Track One</DisplayTitleText>
@@ -72,7 +78,10 @@
       <ReleaseReference>R0</ReleaseReference>
       <ReleaseType>Album</ReleaseType>
       <ReleaseId>
+        <GRid>FIXTURE-GRID-001</GRid>
         <ICPN>1234567890123</ICPN>
+        <CatalogNumber Namespace="FixtureCatalog">ALBUM-001</CatalogNumber>
+        <ProprietaryId Namespace="FixtureRelease">R0-PROP-001</ProprietaryId>
       </ReleaseId>
       <DisplayTitleText>Fixture Two-Track Album</DisplayTitleText>
       <DisplayTitle>

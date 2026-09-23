@@ -42,7 +42,7 @@ describe("DDEX ERN 4.3.2 read-only adapter", () => {
     const result = mapErn432(xml);
 
     expect(result.adapterKey).toBe("ddex_ern_import");
-    expect(result.adapterVersion).toBe(1);
+    expect(result.adapterVersion).toBe(2);
     expect(result.externalStandard).toBe("DDEX_ERN");
     expect(result.externalVersion).toBe("4.3.2");
     expect(result.mappingProfile).toBe("music-data-dictionary/v1");
@@ -51,11 +51,62 @@ describe("DDEX ERN 4.3.2 read-only adapter", () => {
     expect(result.sourceReference).toBe("MSG-ERN-432-001");
     expect(result.payloadFingerprint).toMatch(/^[0-9a-f]{64}$/);
 
+    expect(result.data.messageContext).toEqual({
+      avsVersionId: "9",
+      releaseProfileVersionId: "Audio",
+      releaseProfileVariantVersionId: "Classical",
+      languageAndScriptCode: "en",
+    });
+
     expect(result.data.trackCandidates).toEqual([
       {
         resourceReference: "A1",
         title: "Fixture Track",
         displayArtistName: "Fixture Artist",
+        recordingType: "MusicalWorkSoundRecording",
+        duration: "PT3M",
+        editions: [
+          {
+            editionType: "NonImmersiveEdition",
+            resourceIds: [
+              {
+                isReplaced: false,
+                identifiers: [
+                  {
+                    sourceScheme: "ISRC",
+                    sourceValue: "KEAAA2600001",
+                    namespace: null,
+                  },
+                ],
+              },
+              {
+                isReplaced: null,
+                identifiers: [
+                  {
+                    sourceScheme: "ISRC",
+                    sourceValue: "KEAAA2600005",
+                    namespace: null,
+                  },
+                ],
+              },
+            ],
+          },
+          {
+            editionType: "ImmersiveEdition",
+            resourceIds: [
+              {
+                isReplaced: null,
+                identifiers: [
+                  {
+                    sourceScheme: "ISRC",
+                    sourceValue: "KEAAA2600099",
+                    namespace: null,
+                  },
+                ],
+              },
+            ],
+          },
+        ],
       },
     ]);
 
@@ -68,6 +119,13 @@ describe("DDEX ERN 4.3.2 read-only adapter", () => {
         releaseDate: "2026-09-23",
         genres: ["Afropop"],
         resourceReferences: ["A1", "A_IMG1"],
+        identifiers: [
+          {
+            sourceScheme: "ICPN",
+            sourceValue: "0123456789012",
+            namespace: null,
+          },
+        ],
       },
     ]);
 
@@ -78,6 +136,20 @@ describe("DDEX ERN 4.3.2 read-only adapter", () => {
         schemeKey: "isrc",
         sourceScheme: "ISRC",
         sourceValue: "KEAAA2600001",
+      },
+      {
+        subjectKind: "track",
+        subjectReference: "A1",
+        schemeKey: "isrc",
+        sourceScheme: "ISRC",
+        sourceValue: "KEAAA2600005",
+      },
+      {
+        subjectKind: "track",
+        subjectReference: "A1",
+        schemeKey: "isrc",
+        sourceScheme: "ISRC",
+        sourceValue: "KEAAA2600099",
       },
       {
         subjectKind: "release",
@@ -103,11 +175,164 @@ describe("DDEX ERN 4.3.2 read-only adapter", () => {
 
     expect(projection.namespace).toBe("http://ddex.net/xml/ern/432");
     expect(projection.avsVersionId).toBe("9");
+    expect(projection.releaseProfileVersionId).toBe("Audio");
+    expect(projection.releaseProfileVariantVersionId).toBe("Classical");
+    expect(projection.languageAndScriptCode).toBe("en");
     expect(projection.soundRecordings[0].isrc).toBe("KEAAA2600001");
+    expect(projection.soundRecordings[0].recordingType).toBe(
+      "MusicalWorkSoundRecording",
+    );
+    expect(projection.soundRecordings[0].duration).toBe("PT3M");
+    expect(projection.soundRecordings[0].editions).toHaveLength(2);
+    expect(
+      projection.soundRecordings[0].editions
+        .flatMap((edition) => edition.resourceIds)
+        .flatMap((resourceId) => resourceId.identifiers)
+        .filter((identifier) => identifier.sourceScheme === "ISRC")
+        .map((identifier) => identifier.sourceValue),
+    ).toEqual([
+      "KEAAA2600001",
+      "KEAAA2600005",
+      "KEAAA2600099",
+    ]);
     expect(projection.soundRecordings[0].contributors[0].roles).toEqual([
       "StudioProducer",
     ]);
     expect(projection.releases[0].genres).toEqual(["Afropop"]);
+  });
+
+  it("keeps Party identifiers as evidence without inferring canonical identity", () => {
+    const result = mapErn432(fixture("basic-release.xml"));
+
+    expect(result.data.partyIdentifierEvidence).toEqual(
+      expect.arrayContaining([
+        {
+          partyReference: "P1",
+          fullName: "Fixture Artist",
+          schemeKey: "isni",
+          sourceScheme: "ISNI",
+          sourceValue: "000000012146438X",
+          namespace: null,
+        },
+        {
+          partyReference: "P1",
+          fullName: "Fixture Artist",
+          schemeKey: "ddex_party_id",
+          sourceScheme: "DPID",
+          sourceValue: "PADPIDAARTIST001",
+          namespace: null,
+        },
+        {
+          partyReference: "P2",
+          fullName: "Fixture Producer",
+          schemeKey: "ipi",
+          sourceScheme: "IpiNameNumber",
+          sourceValue: "00123456789",
+          namespace: null,
+        },
+        {
+          partyReference: "P2",
+          fullName: "Fixture Producer",
+          schemeKey: "ipn",
+          sourceScheme: "IPN",
+          sourceValue: "IPN-FIXTURE-PRODUCER",
+          namespace: null,
+        },
+      ]),
+    );
+
+    expect(result.lossFlags).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          classification: "review_required",
+          path: "PartyList.Party[P1].PartyId.ISNI",
+        }),
+        expect.objectContaining({
+          classification: "review_required",
+          path: "PartyList.Party[P1].PartyId.DPID",
+        }),
+      ]),
+    );
+  });
+
+  it("retains valid but unmapped identifier evidence and loss-flags it", () => {
+    const result = mapErn432(fixture("multiple-recordings.xml"));
+
+    expect(result.data.partyIdentifierEvidence).toEqual(
+      expect.arrayContaining([
+        {
+          partyReference: "P2",
+          fullName: "Fixture Label",
+          schemeKey: null,
+          sourceScheme: "CisacSocietyId",
+          sourceValue: "FIXTURE-SOCIETY",
+          namespace: null,
+        },
+        {
+          partyReference: "P2",
+          fullName: "Fixture Label",
+          schemeKey: null,
+          sourceScheme: "ProprietaryId",
+          sourceValue: "LABEL-PARTY-001",
+          namespace: "FixtureParty",
+        },
+      ]),
+    );
+
+    expect(result.data.trackCandidates[0].editions[0].resourceIds[0].identifiers)
+      .toEqual(
+        expect.arrayContaining([
+          {
+            sourceScheme: "CatalogNumber",
+            sourceValue: "TRACK-001",
+            namespace: "FixtureCatalog",
+          },
+          {
+            sourceScheme: "ProprietaryId",
+            sourceValue: "A1-PROP-001",
+            namespace: "FixtureTrack",
+          },
+        ]),
+      );
+
+    expect(result.data.releaseCandidates[0].identifiers).toEqual(
+      expect.arrayContaining([
+        {
+          sourceScheme: "GRid",
+          sourceValue: "FIXTURE-GRID-001",
+          namespace: null,
+        },
+        {
+          sourceScheme: "CatalogNumber",
+          sourceValue: "ALBUM-001",
+          namespace: "FixtureCatalog",
+        },
+        {
+          sourceScheme: "ProprietaryId",
+          sourceValue: "R0-PROP-001",
+          namespace: "FixtureRelease",
+        },
+      ]),
+    );
+
+    expect(result.mappingResult).toBe("partial");
+    expect(result.lossFlags).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          classification: "partial",
+          path: "PartyList.Party[P2].PartyId.CisacSocietyId",
+        }),
+        expect.objectContaining({
+          classification: "partial",
+          path:
+            "ResourceList.SoundRecording[A1].SoundRecordingEdition[0].ResourceId[0].CatalogNumber",
+        }),
+        expect.objectContaining({
+          classification: "partial",
+          path: "ReleaseList.Release[R0].ReleaseId.GRid",
+        }),
+      ]),
+    );
   });
 
   it("keeps Display Artist, contributor and label evidence semantically distinct", () => {

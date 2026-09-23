@@ -23,9 +23,24 @@ interface XmlNode {
   text: string;
 }
 
+export type ErnPartyIdentifierSourceScheme =
+  | "ISNI"
+  | "DPID"
+  | "IpiNameNumber"
+  | "IPN"
+  | "CisacSocietyId"
+  | "ProprietaryId";
+
+export interface ErnPartyIdentifierProjection {
+  sourceScheme: ErnPartyIdentifierSourceScheme;
+  sourceValue: string;
+  namespace: string | null;
+}
+
 export interface ErnPartyProjection {
   partyReference: string;
   fullName: string | null;
+  identifiers: ErnPartyIdentifierProjection[];
 }
 
 export interface ErnDisplayArtistProjection {
@@ -40,10 +55,34 @@ export interface ErnContributorProjection {
   roles: string[];
 }
 
+export type ErnRecordingIdentifierSourceScheme =
+  | "ISRC"
+  | "CatalogNumber"
+  | "ProprietaryId";
+
+export interface ErnRecordingIdentifierProjection {
+  sourceScheme: ErnRecordingIdentifierSourceScheme;
+  sourceValue: string;
+  namespace: string | null;
+}
+
+export interface ErnRecordingResourceIdProjection {
+  isReplaced: boolean | null;
+  identifiers: ErnRecordingIdentifierProjection[];
+}
+
+export interface ErnSoundRecordingEditionProjection {
+  editionType: string | null;
+  resourceIds: ErnRecordingResourceIdProjection[];
+}
+
 export interface ErnSoundRecordingProjection {
   resourceReference: string;
   title: string | null;
   isrc: string | null;
+  recordingType: string | null;
+  duration: string | null;
+  editions: ErnSoundRecordingEditionProjection[];
   displayArtistName: string | null;
   displayArtists: ErnDisplayArtistProjection[];
   contributors: ErnContributorProjection[];
@@ -55,6 +94,18 @@ export interface ErnImageProjection {
   uri: string | null;
 }
 
+export type ErnReleaseIdentifierSourceScheme =
+  | "GRid"
+  | "ICPN"
+  | "CatalogNumber"
+  | "ProprietaryId";
+
+export interface ErnReleaseIdentifierProjection {
+  sourceScheme: ErnReleaseIdentifierSourceScheme;
+  sourceValue: string;
+  namespace: string | null;
+}
+
 export interface ErnReleaseProjection {
   releaseReference: string;
   releaseType: string | null;
@@ -62,6 +113,7 @@ export interface ErnReleaseProjection {
   displayArtistName: string | null;
   displayArtists: ErnDisplayArtistProjection[];
   icpn: string | null;
+  identifiers: ErnReleaseIdentifierProjection[];
   releaseDate: string | null;
   labelPartyReference: string | null;
   labelName: string | null;
@@ -72,6 +124,9 @@ export interface ErnReleaseProjection {
 export interface Ern432Projection {
   namespace: string;
   avsVersionId: string | null;
+  releaseProfileVersionId: string | null;
+  releaseProfileVariantVersionId: string | null;
+  languageAndScriptCode: string | null;
   messageSenderPartyId: string | null;
   messageRecipientPartyId: string | null;
   messageReference: string | null;
@@ -283,6 +338,229 @@ function descendantText(node: XmlNode | null, name: string): string | null {
   return directText(descendants(node, name)[0] ?? null);
 }
 
+function optionalBooleanAttribute(
+  node: XmlNode,
+  name: string,
+): boolean | null {
+  const raw =
+    node.attributes[name] ??
+    localAttributeValue(
+      node.attributes as unknown as Record<string, unknown>,
+      name,
+    );
+
+  if (raw === null || raw === undefined) {
+    return null;
+  }
+
+  if (raw === "true" || raw === "1") {
+    return true;
+  }
+
+  if (raw === "false" || raw === "0") {
+    return false;
+  }
+
+  return null;
+}
+
+function identifierWithNamespace(
+  node: XmlNode,
+  sourceScheme: "CatalogNumber" | "ProprietaryId",
+): ErnRecordingIdentifierProjection | null {
+  const sourceValue = directText(node);
+  if (!sourceValue) {
+    return null;
+  }
+
+  return {
+    sourceScheme,
+    sourceValue,
+    namespace:
+      node.attributes.Namespace ??
+      localAttributeValue(
+        node.attributes as unknown as Record<string, unknown>,
+        "Namespace",
+      ),
+  };
+}
+
+function parsePartyIdentifiers(
+  party: XmlNode,
+): ErnPartyIdentifierProjection[] {
+  const identifiers: ErnPartyIdentifierProjection[] = [];
+
+  for (const partyId of children(party, "PartyId")) {
+    for (const sourceScheme of [
+      "ISNI",
+      "DPID",
+      "IpiNameNumber",
+      "IPN",
+      "CisacSocietyId",
+    ] as const) {
+      const sourceValue = childText(partyId, sourceScheme);
+      if (sourceValue) {
+        identifiers.push({
+          sourceScheme,
+          sourceValue,
+          namespace: null,
+        });
+      }
+    }
+
+    for (const proprietaryId of children(
+      partyId,
+      "ProprietaryId",
+    )) {
+      const sourceValue = directText(proprietaryId);
+      if (!sourceValue) {
+        continue;
+      }
+
+      identifiers.push({
+        sourceScheme: "ProprietaryId",
+        sourceValue,
+        namespace:
+          proprietaryId.attributes.Namespace ??
+          localAttributeValue(
+            proprietaryId.attributes as unknown as Record<
+              string,
+              unknown
+            >,
+            "Namespace",
+          ),
+      });
+    }
+  }
+
+  return identifiers;
+}
+
+function parseRecordingResourceId(
+  resourceId: XmlNode,
+): ErnRecordingResourceIdProjection {
+  const identifiers: ErnRecordingIdentifierProjection[] = [];
+  const isrc = childText(resourceId, "ISRC");
+
+  if (isrc) {
+    identifiers.push({
+      sourceScheme: "ISRC",
+      sourceValue: isrc,
+      namespace: null,
+    });
+  }
+
+  const catalogNumber = firstChild(resourceId, "CatalogNumber");
+  if (catalogNumber) {
+    const parsed = identifierWithNamespace(
+      catalogNumber,
+      "CatalogNumber",
+    );
+    if (parsed) {
+      identifiers.push(parsed);
+    }
+  }
+
+  for (const proprietaryId of children(
+    resourceId,
+    "ProprietaryId",
+  )) {
+    const parsed = identifierWithNamespace(
+      proprietaryId,
+      "ProprietaryId",
+    );
+    if (parsed) {
+      identifiers.push(parsed);
+    }
+  }
+
+  return {
+    isReplaced: optionalBooleanAttribute(resourceId, "IsReplaced"),
+    identifiers,
+  };
+}
+
+function parseSoundRecordingEditions(
+  recording: XmlNode,
+): ErnSoundRecordingEditionProjection[] {
+  return children(recording, "SoundRecordingEdition").map(
+    (edition) => ({
+      editionType: childText(edition, "Type"),
+      resourceIds: children(edition, "ResourceId").map(
+        parseRecordingResourceId,
+      ),
+    }),
+  );
+}
+
+function parseReleaseIdentifiers(
+  release: XmlNode,
+): ErnReleaseIdentifierProjection[] {
+  const releaseId = firstChild(release, "ReleaseId");
+  if (!releaseId) {
+    return [];
+  }
+
+  const identifiers: ErnReleaseIdentifierProjection[] = [];
+
+  for (const sourceScheme of ["GRid", "ICPN"] as const) {
+    const sourceValue = childText(releaseId, sourceScheme);
+    if (sourceValue) {
+      identifiers.push({
+        sourceScheme,
+        sourceValue,
+        namespace: null,
+      });
+    }
+  }
+
+  const catalogNumber = firstChild(releaseId, "CatalogNumber");
+  if (catalogNumber) {
+    const sourceValue = directText(catalogNumber);
+    if (sourceValue) {
+      identifiers.push({
+        sourceScheme: "CatalogNumber",
+        sourceValue,
+        namespace:
+          catalogNumber.attributes.Namespace ??
+          localAttributeValue(
+            catalogNumber.attributes as unknown as Record<
+              string,
+              unknown
+            >,
+            "Namespace",
+          ),
+      });
+    }
+  }
+
+  for (const proprietaryId of children(
+    releaseId,
+    "ProprietaryId",
+  )) {
+    const sourceValue = directText(proprietaryId);
+    if (!sourceValue) {
+      continue;
+    }
+
+    identifiers.push({
+      sourceScheme: "ProprietaryId",
+      sourceValue,
+      namespace:
+        proprietaryId.attributes.Namespace ??
+        localAttributeValue(
+          proprietaryId.attributes as unknown as Record<
+            string,
+            unknown
+          >,
+          "Namespace",
+        ),
+    });
+  }
+
+  return identifiers;
+}
+
 function resolveDisplayArtists(
   node: XmlNode,
   parties: Map<string, string | null>,
@@ -350,6 +628,7 @@ function parseParties(root: XmlNode): ErnPartyProjection[] {
         fullName:
           descendantText(firstChild(party, "PartyName"), "FullName") ??
           descendantText(party, "FullName"),
+        identifiers: parsePartyIdentifiers(party),
       };
     })
     .filter((party): party is ErnPartyProjection => party !== null);
@@ -372,10 +651,13 @@ function parseSoundRecordings(
         return null;
       }
 
+      const editions = parseSoundRecordingEditions(recording);
       const isrc =
-        children(recording, "SoundRecordingEdition")
-          .map((edition) => descendantText(edition, "ISRC"))
-          .find((value): value is string => Boolean(value)) ??
+        editions
+          .flatMap((edition) => edition.resourceIds)
+          .flatMap((resourceId) => resourceId.identifiers)
+          .find((identifier) => identifier.sourceScheme === "ISRC")
+          ?.sourceValue ??
         null;
 
       return {
@@ -384,6 +666,9 @@ function parseSoundRecordings(
           childText(recording, "DisplayTitleText") ??
           descendantText(firstChild(recording, "DisplayTitle"), "TitleText"),
         isrc,
+        recordingType: childText(recording, "Type"),
+        duration: childText(recording, "Duration"),
+        editions,
         displayArtistName: childText(
           recording,
           "DisplayArtistName",
@@ -439,6 +724,7 @@ function parseReleases(
       const labelPartyReference =
         childText(release, "ReleaseLabelReference") ??
         descendantText(release, "LabelPartyReference");
+      const identifiers = parseReleaseIdentifiers(release);
 
       return {
         releaseReference,
@@ -448,7 +734,11 @@ function parseReleases(
           descendantText(firstChild(release, "DisplayTitle"), "TitleText"),
         displayArtistName: childText(release, "DisplayArtistName"),
         displayArtists: resolveDisplayArtists(release, parties),
-        icpn: descendantText(firstChild(release, "ReleaseId"), "ICPN"),
+        icpn:
+          identifiers.find(
+            (identifier) => identifier.sourceScheme === "ICPN",
+          )?.sourceValue ?? null,
+        identifiers,
         releaseDate:
           childText(release, "ReleaseDate") ??
           descendantText(release, "ReleaseDate"),
@@ -533,6 +823,24 @@ export function parseErn432(xml: string): Ern432Projection {
       localAttributeValue(
         root.attributes as unknown as Record<string, unknown>,
         "AvsVersionId",
+      ),
+    releaseProfileVersionId:
+      root.attributes.ReleaseProfileVersionId ??
+      localAttributeValue(
+        root.attributes as unknown as Record<string, unknown>,
+        "ReleaseProfileVersionId",
+      ),
+    releaseProfileVariantVersionId:
+      root.attributes.ReleaseProfileVariantVersionId ??
+      localAttributeValue(
+        root.attributes as unknown as Record<string, unknown>,
+        "ReleaseProfileVariantVersionId",
+      ),
+    languageAndScriptCode:
+      root.attributes.LanguageAndScriptCode ??
+      localAttributeValue(
+        root.attributes as unknown as Record<string, unknown>,
+        "LanguageAndScriptCode",
       ),
     messageSenderPartyId: descendantText(sender, "PartyId"),
     messageRecipientPartyId: descendantText(recipient, "PartyId"),
