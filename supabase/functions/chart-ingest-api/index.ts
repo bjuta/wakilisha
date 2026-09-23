@@ -3396,7 +3396,7 @@ async function handleCommitRun(
 
   const { data: registryTracks, error: trackError } = await db
     .from("registry_tracks")
-    .select("id,slug,title,status")
+    .select("id,slug,title,status,artwork_url")
     .in("id", topTrackIds)
     .eq("status", "active");
 
@@ -3417,7 +3417,7 @@ async function handleCommitRun(
 
   const { data: credits, error: creditError } = await db
     .from("registry_track_artists")
-    .select("track_id,artist_id,artist_slug,is_primary,credit_order,status")
+    .select("track_id,artist_id,artist_slug,artist_name_text,display_credit,role,is_primary,is_featured,credit_order,status")
     .in("track_id", topTrackIds)
     .eq("status", "active")
     .order("credit_order", { ascending: true });
@@ -3436,20 +3436,159 @@ async function handleCommitRun(
     if (credit.artist_id) artistIds.add(String(credit.artist_id));
   }
 
-  const artistSlugById = new Map<string, string>();
+  const artistById = new Map<string, { slug: string; displayName: string }>();
   for (const chunk of chunkStrings([...artistIds], 150)) {
     const { data: artists, error } = await db
       .from("registry_artists")
-      .select("id,slug,status")
+      .select("id,slug,display_name,status")
       .in("id", chunk)
       .eq("status", "active");
 
     if (error) {
       return json(req, { error: "registry_artist_projection_failed", detail: error.message }, 500);
     }
+
     for (const artist of artists || []) {
-      artistSlugById.set(String(artist.id), String(artist.slug || ""));
+      artistById.set(String(artist.id), {
+        slug: String(artist.slug || ""),
+        displayName: String(artist.display_name || ""),
+      });
     }
+  }
+
+  const presentationByTrack = new Map<
+    string,
+    { artistSlug: string; artistName: string }
+  >();
+  const incompletePresentation: Array<{
+    candidateId: string;
+    trackId: string;
+    missing: string[];
+  }> = [];
+
+  for (const candidate of top) {
+    const candidateId = String(candidate.id);
+    const trackId = trackByCandidate.get(candidateId)!;
+    const trackCredits = creditsByTrack.get(trackId) || [];
+    const routeCredit =
+      trackCredits.find((credit) => Boolean(credit.is_primary)) ||
+      trackCredits[0] ||
+      null;
+
+    const routeArtist = routeCredit?.artist_id
+      ? artistById.get(String(routeCredit.artist_id))
+      : null;
+
+    const artistSlug = normalizeSlug(
+      routeArtist?.slug || String(routeCredit?.artist_slug || ""),
+    );
+
+    const creditNames = [
+      ...new Set(
+        trackCredits
+          .map((credit) => {
+            const artist = credit.artist_id
+              ? artistById.get(String(credit.artist_id))
+              : null;
+
+            return String(
+              credit.display_credit ||
+                artist?.displayName ||
+                credit.artist_name_text ||
+                "",
+            ).trim();
+          })
+          .filter(Boolean),
+      ),
+    ];
+
+    const artistName = creditNames.join(", ");
+    const missing: string[] = [];
+    if (trackCredits.length === 0) missing.push("active_track_credit");
+    if (!artistSlug) missing.push("canonical_artist_slug");
+    if (!artistName) missing.push("canonical_artist_display");
+
+    if (missing.length > 0) {
+      incompletePresentation.push({ candidateId, trackId, missing });
+      continue;
+    }
+
+    presentationByTrack.set(trackId, { artistSlug, artistName });
+  }
+
+  if (incompletePresentation.length > 0) {
+    const affectedCandidateIds = incompletePresentation.map((item) => item.candidateId);
+
+    for (const chunk of chunkStrings(affectedCandidateIds, 200)) {
+      await db
+        .from("chart_ingest_candidates")
+        .update({ status: "needs_review", updated_at: now })
+        .in("id", chunk)
+        .eq("run_id", runId);
+    }
+
+    const { data: existingIssues } = await db
+      .from("chart_ingest_review_issues")
+      .select("candidate_id")
+      .eq("run_id", runId)
+      .eq("status", "open")
+      .eq("issue_type", "needs_review_metadata")
+      .in("candidate_id", affectedCandidateIds);
+
+    const alreadyOpen = new Set(
+      (existingIssues || []).map((issue) => String(issue.candidate_id || "")),
+    );
+
+    const issueRows = incompletePresentation
+      .filter((item) => !alreadyOpen.has(item.candidateId))
+      .map((item) => ({
+        id: crypto.randomUUID(),
+        run_id: runId,
+        candidate_id: item.candidateId,
+        issue_type: "needs_review_metadata",
+        severity: "error",
+        blocking: true,
+        message:
+          "Canonical Registry Track is missing presentation authority required for Chart publication.",
+        status: "open",
+        created_at: now,
+        updated_at: now,
+      }));
+
+    if (issueRows.length > 0) {
+      await db.from("chart_ingest_review_issues").insert(issueRows);
+    }
+
+    await db
+      .from("chart_ingest_stage_events")
+      .update({
+        status: "failed",
+        finished_at: now,
+        message: `${incompletePresentation.length} canonical Tracks lack Registry presentation authority.`,
+        error_code: "registry_presentation_incomplete",
+        error_message:
+          "Chart commit cannot derive public presentation from canonical Registry Track credits.",
+        metrics_json: { incompletePresentation },
+      })
+      .eq("run_id", runId)
+      .eq("stage", "commit_validate");
+
+    await db
+      .from("chart_ingest_runs")
+      .update({
+        status: "needs_review",
+        error_code: "registry_presentation_incomplete",
+        error_message:
+          "Canonical Registry presentation is incomplete for one or more shortlisted Tracks.",
+        dry_run_completed_at: null,
+        updated_at: now,
+      })
+      .eq("id", runId);
+
+    return json(req, {
+      error: "commit_registry_presentation_incomplete",
+      incompletePresentation,
+    }, 409);
   }
 
   const previousRankByTrack = new Map<string, number>();
@@ -3541,7 +3680,7 @@ async function handleCommitRun(
 
   const entryRows: Array<Record<string, unknown>> = [];
   let canonicalCreditProjectionCount = 0;
-  let presentationFallbackCount = 0;
+  const presentationFallbackCount = 0;
 
   for (let i = 0; i < top.length; i++) {
     const candidate = top[i];
@@ -3559,22 +3698,8 @@ async function handleCommitRun(
             ? "up"
             : "down";
 
-    const trackCredits = creditsByTrack.get(trackId) || [];
-    const primaryCredit =
-      trackCredits.find((credit) => Boolean(credit.is_primary)) ||
-      trackCredits[0] ||
-      null;
-
-    const canonicalArtistSlug = primaryCredit?.artist_id
-      ? artistSlugById.get(String(primaryCredit.artist_id)) || ""
-      : String(primaryCredit?.artist_slug || "");
-
-    const artistSlug =
-      normalizeSlug(canonicalArtistSlug) ||
-      normalizeSlug(String(candidate.artist_display || ""));
-
-    if (canonicalArtistSlug) canonicalCreditProjectionCount++;
-    else presentationFallbackCount++;
+    const presentation = presentationByTrack.get(trackId)!;
+    canonicalCreditProjectionCount++;
 
     const trackSlug = normalizeSlug(String(track.slug || ""));
     if (!trackSlug) {
@@ -3591,13 +3716,13 @@ async function handleCommitRun(
       rank,
       previous_rank: previousRank,
       movement,
-      track_title: String(candidate.title || ""),
-      artist_name: String(candidate.artist_display || ""),
-      artwork_url: candidate.artwork_url || null,
+      track_title: String(track.title || ""),
+      artist_name: presentation.artistName,
+      artwork_url: track.artwork_url || candidate.artwork_url || null,
       normalized_key: String(candidate.normalized_key || ""),
       lead_artist_key: String(candidate.lead_artist_key || ""),
       track_slug: trackSlug,
-      artist_slug: artistSlug,
+      artist_slug: presentation.artistSlug,
       canonical_track_id: trackId,
       total_score: Number(scoreByCandidate.get(candidateId)?.final_score || 0),
       carry_forward_only: Boolean(candidate.carry_forward_only),
