@@ -40,7 +40,7 @@ function safeError(req: Request, action: string, err: unknown): Response { const
 
 const ACTION_CAPABILITIES: Record<string, string> = {
   list_runs:"view_charts_admin",get_run:"view_charts_admin",get_stages:"view_charts_admin",get_sources:"view_charts_admin",get_candidates:"view_charts_admin",get_normalized:"view_charts_admin",get_kpis:"view_charts_admin",get_activity:"view_charts_admin",get_resource_guard:"view_charts_admin",get_review_issues:"view_charts_admin",get_matches_for_run:"view_charts_admin",validate_commit:"view_charts_admin",preflight:"view_charts_admin",csv_list:"view_charts_admin",get_origin_review_queue:"view_charts_admin",get_origin_country_options:"view_charts_admin",get_family_ingest_presets:"view_charts_admin",get_weekly_backfill_plan:"view_charts_admin",
-  create_dry_run:"manage_ingest",source_fetch:"manage_ingest",normalize_run:"manage_ingest",run_eligibility:"manage_ingest",run_carry_forward:"manage_ingest",run_scoring:"manage_ingest",run_shortlist:"manage_ingest",run_airplay_detection:"manage_ingest",run_full_pipeline:"manage_ingest",send_gaps_to_review:"manage_ingest",apply_row_decision:"manage_ingest",cancel_run:"manage_ingest",retry_run:"manage_ingest",reset_pipeline:"manage_ingest",csv_upload:"manage_ingest",csv_normalize:"manage_ingest",set_artist_origin_for_run:"manage_registry",create_origin_artist_shell:"manage_registry",reset_after_origin_resolution:"manage_ingest",save_family_ingest_preset:"manage_ingest",commit_run:"publish_charts",fix_chart_artist_slugs:"publish_charts",reingest_edition:"publish_charts"};
+  create_dry_run:"manage_ingest",source_fetch:"manage_ingest",normalize_run:"manage_ingest",run_canonical_match:"manage_ingest",run_entity_resolution:"manage_ingest",run_eligibility:"manage_ingest",run_carry_forward:"manage_ingest",run_scoring:"manage_ingest",run_shortlist:"manage_ingest",run_airplay_detection:"manage_ingest",run_full_pipeline:"manage_ingest",send_gaps_to_review:"manage_ingest",apply_row_decision:"manage_ingest",cancel_run:"manage_ingest",retry_run:"manage_ingest",reset_pipeline:"manage_ingest",csv_upload:"manage_ingest",csv_normalize:"manage_ingest",set_artist_origin_for_run:"manage_registry",create_origin_artist_shell:"manage_registry",reset_after_origin_resolution:"manage_ingest",save_family_ingest_preset:"manage_ingest",commit_run:"publish_charts",fix_chart_artist_slugs:"publish_charts",reingest_edition:"publish_charts"};
 
 Deno.serve(async (req) => {
   const cors = corsRestricted(req);
@@ -62,6 +62,8 @@ Deno.serve(async (req) => {
     if (action === "get_exclusions") return handleGetExclusions(req, db, params);
     if (action === "get_normalized") return handleGetNormalized(req, db, params);
     if (action === "normalize_run") return handleNormalizeRun(req, db, params, auth);
+    if (action === "run_canonical_match") return handleRunCanonicalMatch(req, db, params, auth);
+    if (action === "run_entity_resolution") return handleRunEntityResolution(req, db, params, auth);
     if (action === "source_fetch") return handleSourceFetch(req, db, params, auth);
     if (action === "run_eligibility") return handleRunEligibilityWithReleaseWindow(req, db, params, auth);
     if (action === "run_carry_forward") return handleRunCarryForward(req, db, params, auth);
@@ -3047,7 +3049,217 @@ async function handleRunShortlist(
 
 
 // FULL PIPELINE
-async function handleRunFullPipeline(req: Request, db: ReturnType<typeof createClient>, params: Record<string, unknown>, user: { id: string; email?: string }) { const { runId } = params as { runId: string }; if (!runId) return json(req, { error: "runId_required" }, 400); const start = Date.now(); const pss: Array<{ stage: string; result: string }> = []; const sfR = await handleSourceFetch(req, db, params, user); const sfB = await sfR.json() as { ok: boolean; rawRowCount: number; error?: string }; pss.push({ stage: "source_fetch", result: sfB.ok ? sfB.rawRowCount+" rows" : "FAILED: "+(sfB.error||"unknown") }); if (!sfB.ok || sfB.rawRowCount === 0) { await db.from("chart_ingest_runs").update({ status: "failed", error_message: "Pipeline stopped at source_fetch", updated_at: new Date().toISOString() }).eq("id", runId); return json(req, { ok: false, runId, status: "failed", pipelineStages: pss, durationMs: Date.now() - start }); } const nrR = await handleNormalizeRun(req, db, params, user); const nrB = await nrR.json() as { ok: boolean; uniqueCount: number; candidateCount: number }; pss.push({ stage: "normalize", result: nrB.ok ? nrB.candidateCount+" from "+nrB.uniqueCount : "FAILED" }); if (!nrB.ok || nrB.candidateCount === 0) { await db.from("chart_ingest_runs").update({ status: "failed", error_message: "Pipeline stopped at normalize", updated_at: new Date().toISOString() }).eq("id", runId); return json(req, { ok: false, runId, status: "failed", pipelineStages: pss, durationMs: Date.now() - start }); } const cfR = await handleRunCarryForward(req, db, params, user); const cfB = await cfR.json() as { carryForwardCount: number }; pss.push({ stage: "carry_forward", result: cfB.carryForwardCount+" carry-forward" }); const elR = await handleRunEligibilityWithReleaseWindow(req, db, params, user); const elB = await elR.json() as { candidateCount: number; excludedCount: number; originExcludedCount?: number }; pss.push({ stage: "eligibility", result: elB.candidateCount+" total, "+elB.excludedCount+" excluded"+(elB.originExcludedCount?" ("+elB.originExcludedCount+" origin-filtered)":"") }); const scR = await handleRunScoring(req, db, params, user); const scB = await scR.json() as { ok: boolean; scoredCount: number }; pss.push({ stage: "scoring", result: scB.ok ? scB.scoredCount+" scored" : "FAILED" }); if (!scB.ok || scB.scoredCount === 0) { await db.from("chart_ingest_runs").update({ status: "failed", error_message: "Pipeline stopped at scoring", updated_at: new Date().toISOString() }).eq("id", runId); return json(req, { ok: false, runId, status: "failed", pipelineStages: pss, durationMs: Date.now() - start }); } const slR = await handleRunShortlist(req, db, params, user); const slB = await slR.json() as { shortlistedCount: number }; pss.push({ stage: "shortlist", result: slB.shortlistedCount+" shortlisted" }); if (slB.shortlistedCount === 0) { await db.from("chart_ingest_runs").update({ status: "failed", error_message: "Pipeline stopped at shortlist", updated_at: new Date().toISOString() }).eq("id", runId); return json(req, { ok: false, runId, status: "failed", pipelineStages: pss, durationMs: Date.now() - start }); } const td = Date.now() - start; await db.from("chart_ingest_runs").update({ status: "dry_run_complete", dry_run_completed_at: new Date().toISOString(), updated_at: new Date().toISOString() }).eq("id", runId); await db.from("chart_ingest_audit_events").insert({ run_id: runId, actor: user.id, actor_email: user.email || null, action: "dry_run_complete", new_status: "dry_run_complete", payload_json: { pipelineStages: pss, totalDurationMs: td } }); return json(req, { ok: true, runId, status: "dry_run_complete", pipelineStages: pss, totalDurationMs: td }); }
+async function handleRunFullPipeline(
+  req: Request,
+  db: ReturnType<typeof createClient>,
+  params: Record<string, unknown>,
+  user: { id: string; email?: string },
+) {
+  const { runId } = params as { runId: string };
+  if (!runId) return json(req, { error: "runId_required" }, 400);
+
+  const startedAt = Date.now();
+  const pipelineStages: Array<{ stage: string; result: string }> = [];
+
+  async function fail(stage: string, detail: string) {
+    await db
+      .from("chart_ingest_runs")
+      .update({
+        status: "failed",
+        error_code: `pipeline_${stage}_failed`,
+        error_message: detail,
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", runId);
+
+    return json(req, {
+      ok: false,
+      runId,
+      status: "failed",
+      failedStage: stage,
+      pipelineStages,
+      durationMs: Date.now() - startedAt,
+    }, 400);
+  }
+
+  const sourceResponse = await handleSourceFetch(req, db, params, user);
+  const source = await sourceResponse.json() as {
+    ok?: boolean;
+    rawRowCount?: number;
+    error?: string;
+    detail?: string;
+  };
+  pipelineStages.push({
+    stage: "source_fetch",
+    result: source.ok ? `${source.rawRowCount || 0} rows` : `FAILED: ${source.error || "unknown"}`,
+  });
+  if (!source.ok || !source.rawRowCount) {
+    return fail("source_fetch", source.detail || source.error || "No raw source rows.");
+  }
+
+  const normalizeResponse = await handleNormalizeRun(req, db, params, user);
+  const normalized = await normalizeResponse.json() as {
+    ok?: boolean;
+    uniqueCount?: number;
+    candidateCount?: number;
+    error?: string;
+    detail?: string;
+  };
+  pipelineStages.push({
+    stage: "normalize",
+    result: normalized.ok
+      ? `${normalized.candidateCount || 0} candidates from ${normalized.uniqueCount || 0} evidence groups`
+      : `FAILED: ${normalized.error || "unknown"}`,
+  });
+  if (!normalized.ok || !normalized.candidateCount) {
+    return fail("normalize", normalized.detail || normalized.error || "No candidates.");
+  }
+
+  const matchResponse = await handleRunCanonicalMatch(req, db, params, user);
+  const matched = await matchResponse.json() as {
+    ok?: boolean;
+    evidenceMatchedCount?: number;
+    noMatchCount?: number;
+    error?: string;
+    detail?: string;
+  };
+  pipelineStages.push({
+    stage: "canonical_match",
+    result: matched.ok
+      ? `${matched.evidenceMatchedCount || 0} identifier matches; ${matched.noMatchCount || 0} unresolved`
+      : `FAILED: ${matched.error || "unknown"}`,
+  });
+  if (!matched.ok) {
+    return fail("canonical_match", matched.detail || matched.error || "Canonical matching failed.");
+  }
+
+  const resolutionResponse = await handleRunEntityResolution(req, db, params, user);
+  const resolved = await resolutionResponse.json() as {
+    ok?: boolean;
+    acceptedCount?: number;
+    supersededCount?: number;
+    reviewCount?: number;
+    error?: string;
+    detail?: string;
+  };
+  pipelineStages.push({
+    stage: "entity_resolution",
+    result: resolved.ok
+      ? `${resolved.acceptedCount || 0} accepted UUIDs; ${resolved.supersededCount || 0} folded; ${resolved.reviewCount || 0} review`
+      : `FAILED: ${resolved.error || "unknown"}`,
+  });
+  if (!resolved.ok) {
+    return fail("entity_resolution", resolved.detail || resolved.error || "Entity resolution failed.");
+  }
+
+  const carryResponse = await handleRunCarryForward(req, db, params, user);
+  const carried = await carryResponse.json() as {
+    ok?: boolean;
+    carryForwardCount?: number;
+    lineageReviewCount?: number;
+    error?: string;
+    detail?: string;
+  };
+  pipelineStages.push({
+    stage: "carry_forward",
+    result: carried.ok
+      ? `${carried.carryForwardCount || 0} UUID carry-forward; ${carried.lineageReviewCount || 0} lineage review`
+      : `FAILED: ${carried.error || "unknown"}`,
+  });
+  if (!carried.ok) {
+    return fail("carry_forward", carried.detail || carried.error || "Carry-forward failed.");
+  }
+
+  const eligibilityResponse = await handleRunEligibilityWithReleaseWindow(req, db, params, user);
+  const eligibility = await eligibilityResponse.json() as {
+    ok?: boolean;
+    candidateCount?: number;
+    eligibleCount?: number;
+    excludedCount?: number;
+    identityReviewCount?: number;
+    error?: string;
+    detail?: string;
+  };
+  pipelineStages.push({
+    stage: "eligibility_execution",
+    result: eligibility.ok
+      ? `${eligibility.eligibleCount || 0} eligible; ${eligibility.excludedCount || 0} excluded; ${eligibility.identityReviewCount || 0} identity review`
+      : `FAILED: ${eligibility.error || "unknown"}`,
+  });
+  if (!eligibility.ok) {
+    return fail("eligibility_execution", eligibility.detail || eligibility.error || "Eligibility failed.");
+  }
+
+  const scoringResponse = await handleRunScoring(req, db, params, user);
+  const scoring = await scoringResponse.json() as {
+    ok?: boolean;
+    scoredCount?: number;
+    error?: string;
+    detail?: string;
+  };
+  pipelineStages.push({
+    stage: "methodology_scoring",
+    result: scoring.ok
+      ? `${scoring.scoredCount || 0} UUID-keyed Tracks scored`
+      : `FAILED: ${scoring.error || "unknown"}`,
+  });
+  if (!scoring.ok || !scoring.scoredCount) {
+    return fail("methodology_scoring", scoring.detail || scoring.error || "No scored canonical Tracks.");
+  }
+
+  const shortlistResponse = await handleRunShortlist(req, db, params, user);
+  const shortlist = await shortlistResponse.json() as {
+    ok?: boolean;
+    shortlistedCount?: number;
+    error?: string;
+    detail?: string;
+  };
+  pipelineStages.push({
+    stage: "shortlist",
+    result: shortlist.ok
+      ? `${shortlist.shortlistedCount || 0} canonical Track UUIDs shortlisted`
+      : `FAILED: ${shortlist.error || "unknown"}`,
+  });
+  if (!shortlist.ok || !shortlist.shortlistedCount) {
+    return fail("shortlist", shortlist.detail || shortlist.error || "No complete UUID-clean shortlist.");
+  }
+
+  const totalDurationMs = Date.now() - startedAt;
+  await db
+    .from("chart_ingest_runs")
+    .update({
+      status: "dry_run_complete",
+      dry_run_completed_at: new Date().toISOString(),
+      error_code: null,
+      error_message: null,
+      updated_at: new Date().toISOString(),
+    })
+    .eq("id", runId);
+
+  await db.from("chart_ingest_audit_events").insert({
+    run_id: runId,
+    actor: user.id,
+    actor_email: user.email || null,
+    action: "dry_run_complete",
+    new_status: "dry_run_complete",
+    payload_json: {
+      pipelineStages,
+      totalDurationMs,
+      identityReviewCount:
+        Number(resolved.reviewCount || 0) + Number(carried.lineageReviewCount || 0),
+    },
+  });
+
+  return json(req, {
+    ok: true,
+    runId,
+    status: "dry_run_complete",
+    pipelineStages,
+    identityReviewCount:
+      Number(resolved.reviewCount || 0) + Number(carried.lineageReviewCount || 0),
+    totalDurationMs,
+  });
+}
 
 // COMMIT (v26 — normalizeSlug safety-net ensures every entry gets hyphenated slugs)
 async function handleCommitRun(req:Request,db:ReturnType<typeof createClient>,params:Record<string,unknown>,user:{id:string;email?:string}) {
