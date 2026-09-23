@@ -1120,17 +1120,28 @@ async function handleNormalizeRun(
 
   const invalidCandidates = candidates.filter((candidate) => candidate.status === "excluded");
   if (invalidCandidates.length > 0) {
-    const exclusionRows = invalidCandidates.map((candidate) => ({
-      id: crypto.randomUUID(),
-      run_id: runId,
-      candidate_id: candidate.id,
-      reason_code: "invalid_normalized_observation",
-      reason_label: "Normalized observation is missing required title, Artist, or source evidence.",
-      severity: "hard",
-      source_stage: "normalize",
-      details_json: {},
-      created_at: now,
-    }));
+    const exclusionRows = invalidCandidates.map((candidate) => {
+      const reasonCode =
+        !String(candidate.title || "").trim()
+          ? "missing_title"
+          : !String(candidate.artist_display || "").trim()
+            ? "missing_artist"
+            : !String(candidate.normalized_key || "").includes("::")
+              ? "invalid_normalized_key"
+              : "no_streaming_sources";
+
+      return {
+        id: crypto.randomUUID(),
+        run_id: runId,
+        candidate_id: candidate.id,
+        reason_code: reasonCode,
+        reason_label: `Normalization excluded candidate: ${reasonCode}.`,
+        severity: "hard",
+        source_stage: "normalize",
+        details_json: {},
+        created_at: now,
+      };
+    });
 
     for (let i = 0; i < exclusionRows.length; i += chunkSize) {
       await db.from("chart_ingest_exclusions").insert(exclusionRows.slice(i, i + chunkSize));
