@@ -1102,7 +1102,7 @@ async function handleRunCanonicalMatch(
 
     if (
       existing &&
-      existing.match_method === "manual" &&
+      ["manual", "shell"].includes(String(existing.match_method || "")) &&
       existing.status === "accepted" &&
       existing.canonical_entity_id
     ) {
