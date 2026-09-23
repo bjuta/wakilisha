@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <ern:NewReleaseMessage
-  xmlns:ern="http://ddex.net/xml/ern/43"
-  AvsVersionId="3"
+  xmlns:ern="http://ddex.net/xml/ern/432"
+  AvsVersionId="9"
   LanguageAndScriptCode="en">
   <MessageHeader>
     <MessageId>MSG-ERN-432-001</MessageId>
@@ -9,7 +9,7 @@
       <PartyId>PADPIDA20260923001</PartyId>
     </MessageSender>
     <MessageRecipient>
-      <PartyId>PADPIDA-WAKILISHA</PartyId>
+      <PartyId>PADPIDAWAKILISHA</PartyId>
     </MessageRecipient>
     <MessageCreatedDateTime>2026-09-23T18:00:00Z</MessageCreatedDateTime>
   </MessageHeader>
@@ -36,10 +36,16 @@
   <ResourceList>
     <SoundRecording>
       <ResourceReference>A1</ResourceReference>
-      <ResourceId>
-        <ISRC>KEAAA2600001</ISRC>
-      </ResourceId>
+      <Type>MusicalWorkSoundRecording</Type>
+      <SoundRecordingEdition>
+        <ResourceId>
+          <ISRC>KEAAA2600001</ISRC>
+        </ResourceId>
+      </SoundRecordingEdition>
       <DisplayTitleText>Fixture Track</DisplayTitleText>
+      <DisplayTitle>
+        <TitleText>Fixture Track</TitleText>
+      </DisplayTitle>
       <DisplayArtistName>Fixture Artist</DisplayArtistName>
       <DisplayArtist SequenceNumber="1">
         <ArtistPartyReference>P1</ArtistPartyReference>
@@ -47,13 +53,20 @@
       </DisplayArtist>
       <Contributor SequenceNumber="1">
         <ContributorPartyReference>P2</ContributorPartyReference>
-        <Role>StudioProducer</Role>
+        <Role>
+          <Value>StudioProducer</Value>
+        </Role>
       </Contributor>
+      <Duration>PT3M</Duration>
     </SoundRecording>
     <Image>
-      <ResourceReference>I1</ResourceReference>
+      <ResourceReference>A_IMG1</ResourceReference>
       <Type>FrontCoverImage</Type>
+      <ResourceId>
+        <ProprietaryId Namespace="WAKILISHA">IMG-1</ProprietaryId>
+      </ResourceId>
       <TechnicalDetails>
+        <TechnicalResourceDetailsReference>T_IMG1</TechnicalResourceDetailsReference>
         <File>
           <URI>https://media.invalid/ern432/front-cover.jpg</URI>
         </File>
@@ -68,22 +81,25 @@
         <ICPN>0123456789012</ICPN>
       </ReleaseId>
       <DisplayTitleText>Fixture Album</DisplayTitleText>
+      <DisplayTitle>
+        <TitleText>Fixture Album</TitleText>
+      </DisplayTitle>
       <DisplayArtistName>Fixture Artist</DisplayArtistName>
       <DisplayArtist SequenceNumber="1">
         <ArtistPartyReference>P1</ArtistPartyReference>
         <DisplayArtistRole>MainArtist</DisplayArtistRole>
       </DisplayArtist>
       <ReleaseLabelReference>P3</ReleaseLabelReference>
-      <ReleaseDate>2026-09-23</ReleaseDate>
-      <Genre>
+      <DisplayGenre>
         <GenreText>Afropop</GenreText>
-      </Genre>
+      </DisplayGenre>
+      <ReleaseDate>2026-09-23</ReleaseDate>
       <ResourceGroup>
         <ResourceGroupContentItem>
           <ReleaseResourceReference>A1</ReleaseResourceReference>
         </ResourceGroupContentItem>
         <ResourceGroupContentItem>
-          <ReleaseResourceReference>I1</ReleaseResourceReference>
+          <ReleaseResourceReference>A_IMG1</ReleaseResourceReference>
         </ResourceGroupContentItem>
       </ResourceGroup>
     </Release>

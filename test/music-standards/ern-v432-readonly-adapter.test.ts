@@ -67,7 +67,7 @@ describe("DDEX ERN 4.3.2 read-only adapter", () => {
         displayArtistName: "Fixture Artist",
         releaseDate: "2026-09-23",
         genres: ["Afropop"],
-        resourceReferences: ["A1", "I1"],
+        resourceReferences: ["A1", "A_IMG1"],
       },
     ]);
 
@@ -90,12 +90,24 @@ describe("DDEX ERN 4.3.2 read-only adapter", () => {
 
     expect(result.data.mediaEvidence).toEqual([
       {
-        resourceReference: "I1",
+        resourceReference: "A_IMG1",
         mediaKind: "image",
         imageType: "FrontCoverImage",
         uri: "https://media.invalid/ern432/front-cover.jpg",
       },
     ]);
+  });
+
+  it("projects the authoritative ERN 4.3.2 namespace, AVS and wrapper semantics", () => {
+    const projection = parseErn432(fixture("basic-release.xml"));
+
+    expect(projection.namespace).toBe("http://ddex.net/xml/ern/432");
+    expect(projection.avsVersionId).toBe("9");
+    expect(projection.soundRecordings[0].isrc).toBe("KEAAA2600001");
+    expect(projection.soundRecordings[0].contributors[0].roles).toEqual([
+      "StudioProducer",
+    ]);
+    expect(projection.releases[0].genres).toEqual(["Afropop"]);
   });
 
   it("keeps Display Artist, contributor and label evidence semantically distinct", () => {
@@ -218,6 +230,36 @@ describe("DDEX ERN 4.3.2 read-only adapter", () => {
         /\b(insert\s+into|update\s+public\.|delete\s+from|supabase\.rpc)\b/i,
       );
     }
+  });
+
+  it("keeps authoritative ERN 4.3.2 XSD validation pinned in protected CI", () => {
+    const verifier = fs.readFileSync(
+      path.join(
+        root,
+        "scripts/music-standards/verify-ern432-authoritative-conformance.sh",
+      ),
+      "utf8",
+    );
+    const workflow = fs.readFileSync(
+      path.join(root, ".github/workflows/critical-control-plane.yml"),
+      "utf8",
+    );
+
+    expect(verifier).toContain(
+      "ERN-3305%20-%20ERN%20Part%201%20Definition%20of%20messages%20v4.3.2%20XSD.zip",
+    );
+    expect(verifier).toContain(
+      "bbd5012204ea3dbf08025e58768570650d9f65775b0022f5a93770c0dd411938",
+    );
+    expect(verifier).toContain(
+      "def25b4e72696c9bbc1fed84962acc3a9bae2bc92ef25f8393c99b362aa53a6a",
+    );
+    expect(verifier).toContain(
+      "87e99fe74f57a640dce0d3247d16b3b52358562c1dbefc4617eb8a9b7360d943",
+    );
+    expect(workflow).toContain(
+      "scripts/music-standards/verify-ern432-authoritative-conformance.sh",
+    );
   });
 
   it("is wired into the protected critical contract", () => {
