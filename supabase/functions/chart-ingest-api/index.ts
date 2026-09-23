@@ -756,7 +756,11 @@ async function handleNormalizeRun(
       id: crypto.randomUUID(),
       run_id: runId,
       candidate_id: candidate.id,
-      reason: "invalid_normalized_observation",
+      reason_code: "invalid_normalized_observation",
+      reason_label: "Normalized observation is missing required title, Artist, or source evidence.",
+      severity: "hard",
+      source_stage: "normalize",
+      details_json: {},
       created_at: now,
     }));
 
