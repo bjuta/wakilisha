@@ -24,13 +24,21 @@ const mutatingSql =
   /\b(insert|update|delete|merge|create|alter|drop|truncate|grant|revoke|call)\b/i;
 const networkSql = /https?:\/\/|http_get|http_post|net\.|pg_net/i;
 
+function executableSql(sql: string): string {
+  return sql
+    .split("\n")
+    .map((line) => line.replace(/--.*$/, ""))
+    .join("\n");
+}
+
 describe("Music metadata Slice 3 read-only reports", () => {
   it("keeps every report transactionally read-only", () => {
     for (const sql of Object.values(reports)) {
       expect(sql.toLowerCase()).toContain("begin transaction read only;");
       expect(sql.toLowerCase()).toContain("rollback;");
-      expect(sql).not.toMatch(mutatingSql);
-      expect(sql).not.toMatch(networkSql);
+      const executable = executableSql(sql);
+      expect(executable).not.toMatch(mutatingSql);
+      expect(executable).not.toMatch(networkSql);
     }
   });
 
