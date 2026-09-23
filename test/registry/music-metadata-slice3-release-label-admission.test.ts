@@ -87,6 +87,9 @@ describe("Music metadata Slice 3 Release Label admission", () => {
       "platform_private.registry_execution_grants",
     );
     expect(migration).toContain(
+      "'trust_class',v_evidence.trust_class",
+    );
+    expect(migration).toContain(
       "platform_private.registry_execution_grant_targets",
     );
     expect(migration).toContain(
