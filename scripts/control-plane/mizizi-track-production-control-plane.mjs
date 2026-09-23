@@ -79,7 +79,7 @@ function queryViaLinkedCli(sql) {
   const wrapped = `select to_jsonb(q) as payload from (${sql.replace(/;\\s*$/, '')}) q`;
   const raw = run(
     'npx',
-    ['--yes','supabase@2.107.0','db','query','--linked','--agent=no','-o','json',wrapped],
+    ['--yes','supabase@2.108.0','db','query','--linked','--agent=no','-o','json',wrapped],
     { capture:true },
   );
   const payload = findPayload(JSON.parse(raw));
@@ -493,7 +493,7 @@ async function main() {
   run('npx',['vitest','run','test/registry/mizizi-cultural-data-steward.test.ts']);
 
   console.log('\n=== 2. EXISTING SUPABASE CONTROL PLANE + TEMPORARY ACCESS ===');
-  run('npx',['--yes','supabase@2.107.0','link','--project-ref',PROJECT_REF]);
+  run('npx',['--yes','supabase@2.108.0','link','--project-ref',PROJECT_REF]);
   const profile = await api('GET','/v1/profile');
   const userId = profileId(profile);
   if (!userId) throw new Error('Supabase profile did not expose a JIT user id');

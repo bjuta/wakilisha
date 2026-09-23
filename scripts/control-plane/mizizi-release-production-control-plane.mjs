@@ -52,7 +52,7 @@ function queryViaLinkedCli(sql) {
   const wrapped = `select to_jsonb(q) as payload from (${sql.replace(/;\\s*$/, '')}) q`;
   const raw = run(
     'npx',
-    ['--yes','supabase@2.107.0','db','query','--linked','--agent=no','-o','json',wrapped],
+    ['--yes','supabase@2.108.0','db','query','--linked','--agent=no','-o','json',wrapped],
     { capture:true },
   );
   const payload = findPayload(JSON.parse(raw));
@@ -380,10 +380,6 @@ function assertReleaseAudit(text) {
     /│\s*\d+\s*│\s*'release_slug_provider_packaging'\s*│\s*(\d+)\s*│/,
   );
 
-  if (!titlePackaging || !slugPackaging) {
-    throw new Error('Release provider-packaging findings were not parseable');
-  }
-
   const [
     ,
     findings,
@@ -396,8 +392,17 @@ function assertReleaseAudit(text) {
     chartEntriesScanned,
   ] = summary.map(Number);
 
-  const titlePackagingCount = Number(titlePackaging[1]);
-  const slugPackagingCount = Number(slugPackaging[1]);
+  if (
+    (!titlePackaging || !slugPackaging) &&
+    (findings !== 0 || observedFindings !== 0)
+  ) {
+    throw new Error(
+      'Release provider-packaging findings were not parseable for a nonzero audit',
+    );
+  }
+
+  const titlePackagingCount = titlePackaging ? Number(titlePackaging[1]) : 0;
+  const slugPackagingCount = slugPackaging ? Number(slugPackaging[1]) : 0;
 
   assertFields(
     {
@@ -516,7 +521,7 @@ async function main() {
   ]);
 
   console.log('\n=== 2. EXISTING SUPABASE CONTROL PLANE + TEMPORARY ACCESS ===');
-  run('npx',['--yes','supabase@2.107.0','link','--project-ref',PROJECT_REF]);
+  run('npx',['--yes','supabase@2.108.0','link','--project-ref',PROJECT_REF]);
 
   const userId = profileId(await api('GET','/v1/profile'));
   if (!userId) throw new Error('Supabase profile did not expose a JIT user id');
