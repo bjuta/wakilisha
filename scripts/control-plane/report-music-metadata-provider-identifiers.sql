@@ -6,6 +6,9 @@
 -- by whether the same provider value is assigned to more than one WAKILISHA
 -- UUID in current metadata.
 --
+-- Multiple legacy metadata keys carrying the same value on the same canonical
+-- entity are collapsed into one evidence row.
+--
 -- WAKILISHA UUID remains canonical identity.
 
 begin transaction read only;
@@ -64,50 +67,49 @@ nonblank as (
   from retained_provider_ids
   where source_value is not null
 ),
+deduplicated as (
+  select
+    entity_type,
+    entity_id,
+    scheme_key,
+    source_value,
+    array_agg(distinct source_key order by source_key) as source_keys
+  from nonblank
+  group by entity_type, entity_id, scheme_key, source_value
+),
 value_cardinality as (
   select
     entity_type,
     scheme_key,
     source_value,
-    count(distinct entity_id) as canonical_entity_count
-  from nonblank
+    count(*) as canonical_entity_count
+  from deduplicated
   group by entity_type, scheme_key, source_value
-),
-classified as (
-  select
-    n.entity_type,
-    n.entity_id,
-    n.scheme_key,
-    n.source_key,
-    n.source_value,
-    v.canonical_entity_count,
-    case
-      when v.canonical_entity_count = 1 then 'deterministic_candidate'
-      else 'review_only_duplicate_assignment'
-    end as candidate_state
-  from nonblank n
-  join value_cardinality v
-    on v.entity_type = n.entity_type
-   and v.scheme_key = n.scheme_key
-   and v.source_value = n.source_value
 )
 select
-  entity_type,
-  entity_id,
-  scheme_key,
-  source_key,
-  source_value,
-  canonical_entity_count,
-  candidate_state
-from classified
+  d.entity_type,
+  d.entity_id,
+  d.scheme_key,
+  d.source_keys,
+  d.source_value,
+  v.canonical_entity_count,
+  case
+    when v.canonical_entity_count = 1 then 'deterministic_candidate'
+    else 'review_only_duplicate_assignment'
+  end as candidate_state
+from deduplicated d
+join value_cardinality v
+  on v.entity_type = d.entity_type
+ and v.scheme_key = d.scheme_key
+ and v.source_value = d.source_value
 order by
-  case candidate_state
-    when 'review_only_duplicate_assignment' then 0
+  case
+    when v.canonical_entity_count > 1 then 0
     else 1
   end,
-  entity_type,
-  scheme_key,
-  source_value,
-  entity_id;
+  d.entity_type,
+  d.scheme_key,
+  d.source_value,
+  d.entity_id;
 
 rollback;
