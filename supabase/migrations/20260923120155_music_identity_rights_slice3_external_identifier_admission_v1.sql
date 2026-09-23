@@ -250,6 +250,7 @@ declare
   v_status text;
   v_source_keys text[]:='{}'::text[];
   v_assignment_count integer:=0;
+  v_assertion_conflict_count integer:=0;
 begin
   if p_subject_id is null or v_scheme is null or v_value is null then
     raise exception using errcode='22023',
@@ -289,8 +290,7 @@ begin
     select count(distinct artist.id)::integer
     into v_assignment_count
     from public.registry_artists artist
-    where artist.status<>'archived'
-      and nullif(btrim(artist.metadata->>'apple_music_id'),'')=v_value;
+    where nullif(btrim(artist.metadata->>'apple_music_id'),'')=v_value;
 
   elsif p_subject_type='artist' and v_scheme='spotify' then
     if nullif(btrim(v_metadata->>'spotify_artist_id'),'')=v_value then
@@ -303,8 +303,7 @@ begin
     select count(distinct artist.id)::integer
     into v_assignment_count
     from public.registry_artists artist
-    where artist.status<>'archived'
-      and (
+    where (
         nullif(btrim(artist.metadata->>'spotify_artist_id'),'')=v_value
         or nullif(btrim(artist.metadata->>'spotify_id'),'')=v_value
       );
@@ -317,8 +316,7 @@ begin
     select count(distinct track.id)::integer
     into v_assignment_count
     from public.registry_tracks track
-    where track.status<>'archived'
-      and nullif(btrim(track.metadata->>'apple_music_track_id'),'')=v_value;
+    where nullif(btrim(track.metadata->>'apple_music_track_id'),'')=v_value;
 
   elsif p_subject_type='release' and v_scheme='apple_music' then
     if nullif(btrim(v_metadata->>'apple_music_album_id'),'')=v_value then
@@ -328,12 +326,46 @@ begin
     select count(distinct release.id)::integer
     into v_assignment_count
     from public.registry_releases release
-    where release.status<>'archived'
-      and nullif(btrim(release.metadata->>'apple_music_album_id'),'')=v_value;
+    where nullif(btrim(release.metadata->>'apple_music_album_id'),'')=v_value;
 
   else
     raise exception using errcode='22023',
       message='Subject/scheme pair is outside the accepted Slice 3 retained-provider contract.';
+  end if;
+
+  if p_subject_type='artist' then
+    select count(*)::integer
+    into v_assertion_conflict_count
+    from public.registry_external_identifier_assertions assertion
+    where assertion.artist_id is not null
+      and assertion.artist_id<>p_subject_id
+      and assertion.scheme_key=v_scheme
+      and assertion.comparison_value=v_value
+      and assertion.issuer_namespace is null
+      and assertion.valid_to is null
+      and assertion.assertion_status not in ('rejected','superseded');
+  elsif p_subject_type='track' then
+    select count(*)::integer
+    into v_assertion_conflict_count
+    from public.registry_external_identifier_assertions assertion
+    where assertion.track_id is not null
+      and assertion.track_id<>p_subject_id
+      and assertion.scheme_key=v_scheme
+      and assertion.comparison_value=v_value
+      and assertion.issuer_namespace is null
+      and assertion.valid_to is null
+      and assertion.assertion_status not in ('rejected','superseded');
+  elsif p_subject_type='release' then
+    select count(*)::integer
+    into v_assertion_conflict_count
+    from public.registry_external_identifier_assertions assertion
+    where assertion.release_id is not null
+      and assertion.release_id<>p_subject_id
+      and assertion.scheme_key=v_scheme
+      and assertion.comparison_value=v_value
+      and assertion.issuer_namespace is null
+      and assertion.valid_to is null
+      and assertion.assertion_status not in ('rejected','superseded');
   end if;
 
   if cardinality(v_source_keys)=0 then
@@ -350,9 +382,12 @@ begin
     'comparison_value',v_value,
     'source_keys',to_jsonb(v_source_keys),
     'canonical_entity_count',v_assignment_count,
+    'conflicting_current_assertion_count',v_assertion_conflict_count,
     'candidate_state',
       case
-        when v_assignment_count=1 then 'deterministic_candidate'
+        when v_assignment_count=1
+         and v_assertion_conflict_count=0
+          then 'deterministic_candidate'
         else 'review_only_duplicate_assignment'
       end
   );
@@ -469,6 +504,10 @@ begin
      or jsonb_typeof(p_candidate_state)<>'object'
      or p_candidate_state->>'candidate_state'<>'deterministic_candidate'
      or coalesce((p_candidate_state->>'canonical_entity_count')::integer,0)<>1
+     or coalesce(
+          (p_candidate_state->>'conflicting_current_assertion_count')::integer,
+          0
+        )<>0
   then
     raise exception using errcode='22023',
       message='Exact deterministic external identifier candidate state is required.';
@@ -612,6 +651,10 @@ begin
           (v_evidence.claim_payload->>'canonical_entity_count')::integer,
           0
         )<>1
+     or coalesce(
+          (v_evidence.claim_payload->>'conflicting_current_assertion_count')::integer,
+          0
+        )<>0
   then
     raise exception using errcode='42501',
       message='Evidence is not caller-bound deterministic external identifier authority.';
@@ -920,6 +963,10 @@ begin
           (v_current_candidate->>'canonical_entity_count')::integer,
           0
         )<>1
+     or coalesce(
+          (v_current_candidate->>'conflicting_current_assertion_count')::integer,
+          0
+        )<>0
   then
     raise exception using errcode='P0001',
       message='WK_STALE_EXTERNAL_IDENTIFIER_CANDIDATE: retained provider identity changed after review.';
@@ -1403,6 +1450,10 @@ begin
           (v_candidate->>'canonical_entity_count')::integer,
           0
         )<>1
+     or coalesce(
+          (v_candidate->>'conflicting_current_assertion_count')::integer,
+          0
+        )<>0
   then
     raise exception using errcode='23514',
       message='WK_EXTERNAL_IDENTIFIER_REVIEW_REQUIRED: provider identifier is assigned to more than one canonical UUID.';
