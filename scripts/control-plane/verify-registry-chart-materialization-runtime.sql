@@ -198,6 +198,13 @@ begin
     'public.chart_materialize_candidate_registry_v1(uuid,uuid)'::regprocedure
   ) into v_materialize_definition;
 
+  if position('manage_registry' in v_materialize_definition)=0
+     or position('publish_charts' in v_materialize_definition)>0
+  then
+    raise exception
+      'Chart materialization regained publish-time Registry mutation authority';
+  end if;
+
   select pg_get_functiondef(
     'public.chart_admit_artist_origin_v1(uuid,text,uuid,uuid,text)'::regprocedure
   ) into v_origin_definition;
@@ -374,9 +381,10 @@ begin
   into v_normalized;
 
   if v_normalized !~
-       'p_operation_key=''registry\.track\.create''.*p_required_user_capability_key <> ''publish_charts'''
+       'p_operation_key=''registry\.track\.create''.*p_required_user_capability_key <> ''manage_registry'''
      or v_normalized !~
-       'p_operation_key=''registry\.track_artist_credit\.admit''.*p_required_user_capability_key not in \( ''publish_charts'', ''manage_registry'' \)'
+       'p_operation_key=''registry\.track_artist_credit\.admit''.*p_required_user_capability_key <> ''manage_registry'''
+     or position('publish_charts' in v_normalized)>0
   then
     raise exception
       'Chart exact-grant capability partition drifted during Artist Resolution convergence';
