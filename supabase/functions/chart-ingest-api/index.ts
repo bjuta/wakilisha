@@ -3288,7 +3288,381 @@ async function handleCommitRun(req:Request,db:ReturnType<typeof createClient>,pa
 async function handleRunAirplayDetection(req: Request, db: ReturnType<typeof createClient>, params: Record<string, unknown>, user: { id: string; email?: string }) { return json(req, { ok: false, error: "ACRCloud credentials not configured." }); }
 async function handleResetPipeline(req: Request, db: ReturnType<typeof createClient>, params: Record<string, unknown>, user: { id: string; email?: string }) { const { runId } = params as { runId: string }; if (!runId) return json(req, { error: "runId_required" }, 400); const now = new Date().toISOString(); await db.from("chart_ingest_stage_events").update({ status: "idle", started_at: null, finished_at: null, duration_ms: null, message: null }).eq("run_id", runId); await Promise.all([db.from("chart_ingest_raw_rows").delete().eq("run_id", runId), db.from("chart_ingest_normalized_rows").delete().eq("run_id", runId), db.from("chart_ingest_candidates").delete().eq("run_id", runId), db.from("chart_ingest_exclusions").delete().eq("run_id", runId), db.from("chart_ingest_candidate_scores").delete().eq("run_id", runId), db.from("chart_ingest_matches").delete().eq("run_id", runId), db.from("chart_ingest_review_issues").delete().eq("run_id", runId)]); await db.from("chart_ingest_runs").update({ status: "draft", dry_run_completed_at: null, updated_at: now }).eq("id", runId); return json(req, { ok: true, runId, status: "draft" }); }
 async function handleCsvList(req: Request, db: ReturnType<typeof createClient>) { return json(req, { csvs: [] }); }
-async function handleApplyRowDecision(req: Request, db: ReturnType<typeof createClient>, params: Record<string, unknown>, user: { id: string; email?: string }) { return json(req, { ok: true }); }
+async function handleApplyRowDecision(
+  req: Request,
+  db: ReturnType<typeof createClient>,
+  params: Record<string, unknown>,
+  user: { id: string; email?: string },
+) {
+  const {
+    runId,
+    candidateId,
+    action,
+    canonicalEntityId,
+    note,
+  } = params as {
+    runId?: string;
+    candidateId?: string;
+    action?: string;
+    canonicalEntityId?: string | null;
+    note?: string | null;
+  };
+
+  if (!runId) return json(req, { error: "runId_required" }, 400);
+  if (!candidateId) return json(req, { error: "candidateId_required" }, 400);
+  if (!action) return json(req, { error: "action_required" }, 400);
+
+  const supported = new Set([
+    "accept_canonical",
+    "change_match",
+    "attach_existing",
+    "attach_to_existing",
+    "merge_shell",
+    "create_shell",
+    "mark_duplicate",
+    "ignore",
+    "send_to_review",
+  ]);
+
+  if (!supported.has(action)) {
+    return json(req, { error: "unsupported_row_decision", action }, 400);
+  }
+
+  const now = new Date().toISOString();
+  const actor = user.email || user.id;
+
+  const [{ data: candidate, error: candidateError }, { data: existingMatch, error: matchError }] =
+    await Promise.all([
+      db
+        .from("chart_ingest_candidates")
+        .select("*")
+        .eq("run_id", runId)
+        .eq("id", candidateId)
+        .maybeSingle(),
+      db
+        .from("chart_ingest_matches")
+        .select("*")
+        .eq("run_id", runId)
+        .eq("candidate_id", candidateId)
+        .maybeSingle(),
+    ]);
+
+  if (candidateError || matchError) {
+    return json(req, {
+      error: "row_decision_lookup_failed",
+      detail: candidateError?.message || matchError?.message,
+    }, 500);
+  }
+  if (!candidate) return json(req, { error: "candidate_not_found" }, 404);
+
+  async function clearOpenReviewIssues(resolutionNote: string) {
+    await db
+      .from("chart_ingest_review_issues")
+      .update({
+        status: "resolved",
+        resolution_note: resolutionNote,
+        resolved_by: user.id,
+        resolved_at: now,
+        updated_at: now,
+      })
+      .eq("run_id", runId)
+      .eq("candidate_id", candidateId)
+      .eq("status", "open");
+  }
+
+  async function invalidateDownstreamStages() {
+    await db
+      .from("chart_ingest_stage_events")
+      .update({
+        status: "idle",
+        started_at: null,
+        finished_at: null,
+        duration_ms: null,
+        message: null,
+        error_code: null,
+        error_message: null,
+        metrics_json: {},
+      })
+      .eq("run_id", runId)
+      .in("stage", [
+        "eligibility_execution",
+        "airplay_evidence",
+        "airplay_rescue",
+        "methodology_scoring",
+        "anti_gaming",
+        "shortlist",
+        "review_gate",
+        "commit_validate",
+        "commit_write",
+        "public_verify",
+      ]);
+
+    await db.from("chart_ingest_candidate_scores").delete().eq("run_id", runId);
+    await db
+      .from("chart_ingest_runs")
+      .update({
+        status: "needs_review",
+        dry_run_completed_at: null,
+        error_code: null,
+        error_message: null,
+        updated_at: now,
+      })
+      .eq("id", runId);
+  }
+
+  async function writeMatch(input: {
+    canonicalTrackId: string | null;
+    status: "accepted" | "rejected" | "needs_review" | "superseded";
+    method: "manual" | "shell" | "no_match";
+    confidence: number;
+    reasons: string[];
+    decisionNote: string;
+  }) {
+    const row = {
+      id: existingMatch?.id || crypto.randomUUID(),
+      run_id: runId,
+      candidate_id: candidateId,
+      entity_type: "track",
+      canonical_entity_id: input.canonicalTrackId,
+      match_method: input.method,
+      confidence: input.confidence,
+      status: input.status,
+      reasons_json: input.reasons,
+      decided_by: user.id,
+      decided_at: now,
+      decision_note: input.decisionNote,
+      created_at: existingMatch?.created_at || now,
+      updated_at: now,
+    };
+
+    const { error } = await db
+      .from("chart_ingest_matches")
+      .upsert(row, { onConflict: "run_id,candidate_id" });
+
+    if (error) throw new Error("manual_match_write_failed:" + error.message);
+  }
+
+  async function resolveRequestedTrack(inputTrackId: string) {
+    const lineage = await resolveCurrentTrackIdentity(db, inputTrackId);
+    if (!lineage.currentTrackId) {
+      return {
+        ok: false as const,
+        lineage,
+        response: json(req, {
+          error: "canonical_track_not_current",
+          requestedTrackId: inputTrackId,
+          resolutionStatus: lineage.status,
+          currentTrackIds: lineage.currentTrackIds,
+        }, 409),
+      };
+    }
+
+    const { data: collision, error: collisionError } = await db
+      .from("chart_ingest_matches")
+      .select("candidate_id")
+      .eq("run_id", runId)
+      .eq("entity_type", "track")
+      .eq("status", "accepted")
+      .eq("canonical_entity_id", lineage.currentTrackId)
+      .neq("candidate_id", candidateId)
+      .limit(1)
+      .maybeSingle();
+
+    if (collisionError) {
+      throw new Error("canonical_binding_collision_lookup_failed:" + collisionError.message);
+    }
+
+    return {
+      ok: true as const,
+      lineage,
+      currentTrackId: lineage.currentTrackId,
+      collisionCandidateId: collision ? String(collision.candidate_id) : null,
+    };
+  }
+
+  let canonicalTrackId: string | null = null;
+  let resultingStatus = "needs_review";
+
+  try {
+    if (action === "ignore") {
+      await writeMatch({
+        canonicalTrackId: existingMatch?.canonical_entity_id
+          ? String(existingMatch.canonical_entity_id)
+          : null,
+        status: "rejected",
+        method: "manual",
+        confidence: 0,
+        reasons: ["manual_decision:ignore"],
+        decisionNote: note || "Candidate explicitly ignored.",
+      });
+      await db
+        .from("chart_ingest_candidates")
+        .update({ status: "ignored", updated_at: now })
+        .eq("run_id", runId)
+        .eq("id", candidateId);
+      await clearOpenReviewIssues(note || "Candidate explicitly ignored.");
+      resultingStatus = "ignored";
+    } else if (action === "send_to_review" || action === "mark_duplicate") {
+      const reason =
+        action === "mark_duplicate"
+          ? "manual_decision:duplicate_candidate"
+          : "manual_decision:send_to_review";
+
+      await writeMatch({
+        canonicalTrackId: canonicalEntityId || existingMatch?.canonical_entity_id || null,
+        status: "needs_review",
+        method: "manual",
+        confidence: Number(existingMatch?.confidence || 0),
+        reasons: [reason],
+        decisionNote:
+          note ||
+          (action === "mark_duplicate"
+            ? "Candidate marked as a potential duplicate for review."
+            : "Candidate sent to review."),
+      });
+      await db
+        .from("chart_ingest_candidates")
+        .update({ status: "needs_review", updated_at: now })
+        .eq("run_id", runId)
+        .eq("id", candidateId);
+
+      await db
+        .from("chart_ingest_review_issues")
+        .update({
+          status: "resolved",
+          resolution_note: "Superseded by a new manual review decision.",
+          resolved_by: user.id,
+          resolved_at: now,
+          updated_at: now,
+        })
+        .eq("run_id", runId)
+        .eq("candidate_id", candidateId)
+        .eq("status", "open");
+
+      const { error: issueError } = await db
+        .from("chart_ingest_review_issues")
+        .insert({
+          id: crypto.randomUUID(),
+          run_id: runId,
+          candidate_id: candidateId,
+          issue_type:
+            action === "mark_duplicate"
+              ? "multiple_close_matches"
+              : "manual_override_required",
+          severity: "warning",
+          blocking: true,
+          message:
+            action === "mark_duplicate"
+              ? "Candidate is marked as a potential duplicate and requires an explicit canonical identity decision."
+              : "Candidate requires an explicit canonical identity decision.",
+          status: "open",
+          created_at: now,
+          updated_at: now,
+        });
+
+      if (issueError) throw new Error("manual_review_issue_write_failed:" + issueError.message);
+      resultingStatus = "needs_review";
+    } else {
+      let requestedTrackId = String(
+        canonicalEntityId ||
+          existingMatch?.canonical_entity_id ||
+          "",
+      ).trim();
+
+      if (action === "create_shell") {
+        const canManageRegistry = await requireCap(db, "manage_registry");
+        if (!canManageRegistry) {
+          return json(req, {
+            error: "forbidden_registry_admission",
+            requiredCapability: "manage_registry",
+          }, 403);
+        }
+
+        const materialized = await materializeChartCandidate(db, runId, candidateId);
+        requestedTrackId = materialized.track_id;
+      }
+
+      if (!requestedTrackId) {
+        return json(req, {
+          error: "canonicalEntityId_required",
+          action,
+        }, 400);
+      }
+
+      const resolved = await resolveRequestedTrack(requestedTrackId);
+      if (!resolved.ok) return resolved.response;
+
+      if (resolved.collisionCandidateId) {
+        return json(req, {
+          error: "canonical_track_already_bound",
+          canonicalTrackId: resolved.currentTrackId,
+          existingCandidateId: resolved.collisionCandidateId,
+        }, 409);
+      }
+
+      canonicalTrackId = resolved.currentTrackId;
+      await writeMatch({
+        canonicalTrackId,
+        status: "accepted",
+        method: action === "create_shell" ? "shell" : "manual",
+        confidence: 100,
+        reasons: [
+          `manual_decision:${action}`,
+          `requested_track:${requestedTrackId}`,
+          `entity_resolution:${resolved.lineage.status}`,
+          `canonical_track:${canonicalTrackId}`,
+        ],
+        decisionNote:
+          note ||
+          (action === "create_shell"
+            ? "Governed Registry shell admitted and bound to Chart candidate."
+            : "Canonical Registry Track manually accepted."),
+      });
+      await db
+        .from("chart_ingest_candidates")
+        .update({ status: "pending", updated_at: now })
+        .eq("run_id", runId)
+        .eq("id", candidateId);
+      await clearOpenReviewIssues(
+        note || `Canonical Registry Track ${canonicalTrackId} accepted.`,
+      );
+      resultingStatus = "pending";
+    }
+
+    await invalidateDownstreamStages();
+
+    await db.from("chart_ingest_audit_events").insert({
+      run_id: runId,
+      actor: user.id,
+      actor_email: user.email || null,
+      action: "row_identity_decision",
+      new_status: resultingStatus,
+      payload_json: {
+        candidateId,
+        action,
+        canonicalTrackId,
+        note: note || null,
+      },
+      created_at: now,
+    });
+
+    return json(req, {
+      ok: true,
+      runId,
+      candidateId,
+      action,
+      canonicalTrackId,
+      candidateStatus: resultingStatus,
+      decidedBy: actor,
+      decidedAt: now,
+    });
+  } catch (error) {
+    return json(req, {
+      error: "row_decision_failed",
+      detail: error instanceof Error ? error.message : String(error),
+    }, 500);
+  }
+}
 
 
 async function handleGetOriginReviewQueue(req: Request, db: ReturnType<typeof createClient>, params: Record<string, unknown>) {
