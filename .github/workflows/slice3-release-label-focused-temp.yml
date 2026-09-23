@@ -1,0 +1,42 @@
+name: Slice 3 Release Label Focused Test
+
+on:
+  push:
+    branches:
+      - feat/music-metadata-slice3-release-label-admission-v1
+
+permissions:
+  contents: write
+
+jobs:
+  focused:
+    if: "${{ github.event.head_commit.message == 'ci: run slice3 release label focused tests' }}"
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out exact branch
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Use Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run focused registry contracts
+        run: |
+          npx vitest run             test/registry/music-metadata-slice3-readonly-reports.test.ts             test/registry/music-metadata-slice3-external-identifier-admission.test.ts             test/registry/music-metadata-slice3-release-label-admission.test.ts
+
+      - name: Remove temporary workflow
+        run: |
+          set -euo pipefail
+          rm .github/workflows/slice3-release-label-focused-temp.yml
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add .github/workflows/slice3-release-label-focused-temp.yml
+          git commit -m "ci: remove slice3 release label focused workflow"
+          git push origin HEAD:feat/music-metadata-slice3-release-label-admission-v1
