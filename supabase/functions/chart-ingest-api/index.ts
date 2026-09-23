@@ -2300,25 +2300,457 @@ async function handleRunEligibility(
 }
 
 // SCORING
-async function handleRunScoring(req: Request, db: ReturnType<typeof createClient>, params: Record<string, unknown>, user: { id: string; email?: string }) { const { runId } = params as { runId: string }; if (!runId) return json(req, { error: "runId_required" }, 400); const ss = Date.now(); const { data: run } = await db.from("chart_ingest_runs").select("*").eq("id", runId).maybeSingle(); if (!run) return json(req, { error: "run_not_found" }, 404); await db.from("chart_ingest_stage_events").update({ status: "running", started_at: new Date().toISOString() }).eq("run_id", runId).eq("stage", "methodology_scoring"); const ed = (run.edition_date as string) || new Date().toISOString().split("T")[0]; const pid = (run.program_id as string) || "unknown"; const { data: candidates } = await db.from("chart_ingest_candidates").select("*").eq("run_id", runId).eq("status", "eligible"); if (!candidates || candidates.length === 0) { const d = Date.now() - ss; await db.from("chart_ingest_stage_events").update({ status: "done", finished_at: new Date().toISOString(), duration_ms: d, message: "No eligible candidates." }).eq("run_id", runId).eq("stage", "methodology_scoring"); return json(req, { ok: true, runId, scoredCount: 0, overflowCount: 0, durationMs: d }); } let pm = new Map<string, number>(); try { const { data: pe } = await db.from("wk_chart_editions_v2").select("id").eq("program_id", pid).in("status", ["committed","published"]).lt("edition_date", ed).order("edition_date", { ascending: false }).limit(1).maybeSingle(); if (pe) { const { data: pes } = await db.from("wk_chart_entries_v2").select("normalized_key, rank").eq("edition_id", pe.id); if (pes) { for (const p of pes) { if (p.normalized_key) pm.set(p.normalized_key, p.rank as number); } } } } catch { } const scfg = { cross_source_mode: "standard" as const, cross_source_weight: 1.0, continuity_weight: 1.0, carry_forward_weight: 1.0, overlap_bonus_cap: 10 }; const scored: Array<{ candidate_id: string; normalized_key: string; lead_artist_key: string; source_score: number; cross_source_bonus: number; overlap_bonus: number; recency_score: number; continuity_score: number; carry_forward_bonus: number; airplay_score: number; provisional_total: number; recency_days: number | null; previous_position: number | null; source_count: number; occurrence_count: number; is_carry_forward: boolean; is_airplay_candidate: boolean }> = []; for (const c of candidates) { const pp = pm.get((c.normalized_key as string) || "") ?? null; const bd = computeProvisionalScore({ normalized_key: (c.normalized_key as string) || "", lead_artist_key: (c.lead_artist_key as string) || "", source_count: (c.source_count as number) || 0, occurrence_count: (c.occurrence_count as number) || 0, release_date: (c.release_date as string) || null, carry_forward_only: !!(c.carry_forward_only), continuity_locked: !!(c.continuity_locked), airplay_candidate_only: !!(c.airplay_candidate_only) }, ed, pp, scfg, null); scored.push({ candidate_id: c.id as string, normalized_key: c.normalized_key as string, lead_artist_key: (c.lead_artist_key as string) || "", source_score: bd.source_score, cross_source_bonus: bd.cross_source_bonus, overlap_bonus: bd.overlap_bonus, recency_score: bd.recency_score, continuity_score: bd.continuity_score, carry_forward_bonus: bd.carry_forward_bonus, airplay_score: bd.airplay_score, provisional_total: bd.provisional_total, recency_days: bd.recency_days, previous_position: pp, source_count: (c.source_count as number) || 0, occurrence_count: (c.occurrence_count as number) || 0, is_carry_forward: !!(c.carry_forward_only), is_airplay_candidate: !!(c.airplay_candidate_only) }); } const ags = computeAntiGamingPenalties(scored.map(s => ({ normalized_key: s.normalized_key, lead_artist_key: s.lead_artist_key, provisional_total: s.provisional_total })), 3, 8); const agbk = new Map(ags.map(r => [r.normalized_key, r])); const n2 = new Date().toISOString(); const srs: Array<Record<string, unknown>> = []; let oc = 0; for (const s of scored) { const ag = agbk.get(s.normalized_key) ?? { anti_gaming_penalty: 0, lead_artist_overflow: false, overflow_index: 0 }; const fs = round4(s.provisional_total - ag.anti_gaming_penalty); if (ag.lead_artist_overflow) oc++; srs.push({ id: crypto.randomUUID(), run_id: runId, candidate_id: s.candidate_id, source_score: s.source_score, cross_source_bonus: s.cross_source_bonus, overlap_bonus: s.overlap_bonus, recency_score: s.recency_score, continuity_score: s.continuity_score, carry_forward_bonus: s.carry_forward_bonus, anti_gaming_penalty: ag.anti_gaming_penalty, final_score: fs, source_count: s.source_count, occurrence_count: s.occurrence_count, recency_days: s.recency_days, previous_position: s.previous_position, normalized_key: s.normalized_key, score_integrity_ok: Math.abs(round4((s.source_score + s.cross_source_bonus + s.overlap_bonus + s.recency_score + s.continuity_score + s.carry_forward_bonus + s.airplay_score - ag.anti_gaming_penalty) - fs)) < 0.001, score_integrity_delta: round4((s.source_score + s.cross_source_bonus + s.overlap_bonus + s.recency_score + s.continuity_score + s.carry_forward_bonus + s.airplay_score - ag.anti_gaming_penalty) - fs), score_payload_json: { source_score: s.source_score, cross_source_bonus: s.cross_source_bonus, overlap_bonus: s.overlap_bonus, recency_score: s.recency_score, continuity_score: s.continuity_score, carry_forward_bonus: s.carry_forward_bonus, airplay_score: s.airplay_score, anti_gaming_penalty: ag.anti_gaming_penalty, final_score: fs, source_count: s.source_count, occurrence_count: s.occurrence_count, recency_days: s.recency_days, previous_position: s.previous_position }, anti_gaming_json: { anti_gaming_penalty: ag.anti_gaming_penalty, lead_artist_overflow: ag.lead_artist_overflow, overflow_index: ag.overflow_index }, created_at: n2 }); } await db.from("chart_ingest_candidate_scores").delete().eq("run_id", runId); const SCH = 200; for (let j = 0; j < srs.length; j += SCH) {
-    const { error: scoreInsertErr } = await db.from("chart_ingest_candidate_scores").insert(srs.slice(j, j + SCH));
-    if (scoreInsertErr) {
-      const d = Date.now() - ss;
-      await db.from("chart_ingest_stage_events").update({ status: "failed", finished_at: new Date().toISOString(), duration_ms: d, message: "Score insert failed: "+scoreInsertErr.message, error_code: "score_insert_failed", error_message: scoreInsertErr.message }).eq("run_id", runId).eq("stage", "methodology_scoring");
-      await db.from("chart_ingest_runs").update({ status: "failed", error_code: "score_insert_failed", error_message: scoreInsertErr.message, updated_at: new Date().toISOString() }).eq("id", runId);
-      return json(req, { ok: false, runId, error: "score_insert_failed", detail: scoreInsertErr.message }, 500);
+async function handleRunScoring(
+  req: Request,
+  db: ReturnType<typeof createClient>,
+  params: Record<string, unknown>,
+  _user: { id: string; email?: string },
+) {
+  const { runId } = params as { runId: string };
+  if (!runId) return json(req, { error: "runId_required" }, 400);
+
+  const startedAt = Date.now();
+  const { data: run, error: runError } = await db
+    .from("chart_ingest_runs")
+    .select("*")
+    .eq("id", runId)
+    .maybeSingle();
+
+  if (runError) return json(req, { error: "run_lookup_failed", detail: runError.message }, 500);
+  if (!run) return json(req, { error: "run_not_found" }, 404);
+
+  await db
+    .from("chart_ingest_stage_events")
+    .update({
+      status: "running",
+      started_at: new Date().toISOString(),
+      finished_at: null,
+      message: null,
+      error_code: null,
+      error_message: null,
+    })
+    .eq("run_id", runId)
+    .eq("stage", "methodology_scoring");
+
+  const editionDate =
+    (run.edition_date as string) || new Date().toISOString().split("T")[0];
+  const programId = (run.program_id as string) || "unknown";
+
+  const { data: candidates, error: candidateError } = await db
+    .from("chart_ingest_candidates")
+    .select("*")
+    .eq("run_id", runId)
+    .eq("status", "eligible");
+
+  if (candidateError) {
+    return json(req, { error: "scoring_candidate_lookup_failed", detail: candidateError.message }, 500);
+  }
+
+  if (!candidates || candidates.length === 0) {
+    const durationMs = Date.now() - startedAt;
+    await db
+      .from("chart_ingest_stage_events")
+      .update({
+        status: "done",
+        finished_at: new Date().toISOString(),
+        duration_ms: durationMs,
+        message: "No eligible candidates.",
+      })
+      .eq("run_id", runId)
+      .eq("stage", "methodology_scoring");
+
+    return json(req, {
+      ok: true,
+      runId,
+      scoredCount: 0,
+      overflowCount: 0,
+      durationMs,
+    });
+  }
+
+  const candidateIds = candidates.map((candidate) => String(candidate.id));
+  const { data: matches, error: matchError } = await db
+    .from("chart_ingest_matches")
+    .select("candidate_id,canonical_entity_id,status,entity_type")
+    .eq("run_id", runId)
+    .eq("entity_type", "track")
+    .eq("status", "accepted")
+    .in("candidate_id", candidateIds);
+
+  if (matchError) {
+    return json(req, { error: "scoring_identity_lookup_failed", detail: matchError.message }, 500);
+  }
+
+  const canonicalTrackByCandidate = new Map<string, string>();
+  const candidateByCanonicalTrack = new Map<string, string>();
+
+  for (const match of matches || []) {
+    const candidateId = String(match.candidate_id || "");
+    const trackId = String(match.canonical_entity_id || "");
+    if (!candidateId || !trackId) continue;
+
+    const existingCandidate = candidateByCanonicalTrack.get(trackId);
+    if (existingCandidate && existingCandidate !== candidateId) {
+      return json(req, {
+        ok: false,
+        runId,
+        error: "scoring_identity_invariant_failed",
+        detail: `Multiple eligible candidates resolve to Registry Track ${trackId}.`,
+      }, 409);
+    }
+
+    canonicalTrackByCandidate.set(candidateId, trackId);
+    candidateByCanonicalTrack.set(trackId, candidateId);
+  }
+
+  const missingIdentity = candidateIds.filter(
+    (candidateId) => !canonicalTrackByCandidate.has(candidateId),
+  );
+  if (missingIdentity.length > 0) {
+    return json(req, {
+      ok: false,
+      runId,
+      error: "scoring_identity_invariant_failed",
+      detail: `${missingIdentity.length} eligible candidates lack an accepted Registry Track UUID.`,
+      candidateIds: missingIdentity.slice(0, 20),
+    }, 409);
+  }
+
+  const previousPositionByTrack = new Map<string, number>();
+  const { data: previousEdition, error: previousEditionError } = await db
+    .from("wk_chart_editions_v2")
+    .select("id")
+    .eq("program_id", programId)
+    .in("status", ["committed", "published"])
+    .lt("edition_date", editionDate)
+    .order("edition_date", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  if (previousEditionError) {
+    return json(req, {
+      error: "scoring_previous_edition_lookup_failed",
+      detail: previousEditionError.message,
+    }, 500);
+  }
+
+  if (previousEdition) {
+    const { data: previousEntries, error } = await db
+      .from("wk_chart_entries_v2")
+      .select("canonical_track_id,rank")
+      .eq("edition_id", previousEdition.id);
+
+    if (error) {
+      return json(req, {
+        error: "scoring_previous_entry_lookup_failed",
+        detail: error.message,
+      }, 500);
+    }
+
+    const lineageCache = new Map<
+      string,
+      Awaited<ReturnType<typeof resolveCurrentTrackIdentity>>
+    >();
+
+    for (const entry of previousEntries || []) {
+      const historicalTrackId = String(entry.canonical_track_id || "");
+      if (!historicalTrackId) continue;
+
+      let lineage = lineageCache.get(historicalTrackId);
+      if (!lineage) {
+        lineage = await resolveCurrentTrackIdentity(db, historicalTrackId);
+        lineageCache.set(historicalTrackId, lineage);
+      }
+
+      if (!lineage.currentTrackId) continue;
+      previousPositionByTrack.set(lineage.currentTrackId, Number(entry.rank));
     }
   }
 
-  const nonzeroScoreCount = srs.filter((r) => Number(r.final_score) > 0).length;
-  if (nonzeroScoreCount === 0) {
-    const d = Date.now() - ss;
-    await db.from("chart_ingest_stage_events").update({ status: "failed", finished_at: new Date().toISOString(), duration_ms: d, message: "Scoring produced zero nonzero scores.", error_code: "zero_score_output", error_message: "All candidate final_score values were zero." }).eq("run_id", runId).eq("stage", "methodology_scoring");
-    await db.from("chart_ingest_runs").update({ status: "failed", error_code: "zero_score_output", error_message: "All candidate final_score values were zero.", updated_at: new Date().toISOString() }).eq("id", runId);
-    return json(req, { ok: false, runId, error: "zero_score_output", scoredCount: scored.length, nonzeroScoreCount }, 400);
+  const scoringConfig = {
+    cross_source_mode: "standard" as const,
+    cross_source_weight: 1.0,
+    continuity_weight: 1.0,
+    carry_forward_weight: 1.0,
+    overlap_bonus_cap: 10,
+  };
+
+  const scored: Array<{
+    candidate_id: string;
+    identity_key: string;
+    canonical_track_id: string;
+    normalized_key: string;
+    lead_artist_key: string;
+    source_score: number;
+    cross_source_bonus: number;
+    overlap_bonus: number;
+    recency_score: number;
+    continuity_score: number;
+    carry_forward_bonus: number;
+    airplay_score: number;
+    provisional_total: number;
+    recency_days: number | null;
+    previous_position: number | null;
+    source_count: number;
+    occurrence_count: number;
+    is_carry_forward: boolean;
+    is_airplay_candidate: boolean;
+  }> = [];
+
+  for (const candidate of candidates) {
+    const candidateId = String(candidate.id);
+    const canonicalTrackId = canonicalTrackByCandidate.get(candidateId)!;
+    const identityKey = canonicalTrackIdentityKey(canonicalTrackId);
+    const previousPosition = previousPositionByTrack.get(canonicalTrackId) ?? null;
+
+    const breakdown = computeProvisionalScore(
+      {
+        normalized_key: String(candidate.normalized_key || ""),
+        lead_artist_key: String(candidate.lead_artist_key || ""),
+        source_count: Number(candidate.source_count || 0),
+        occurrence_count: Number(candidate.occurrence_count || 0),
+        release_date: (candidate.release_date as string) || null,
+        carry_forward_only: Boolean(candidate.carry_forward_only),
+        continuity_locked: Boolean(candidate.continuity_locked),
+        airplay_candidate_only: Boolean(candidate.airplay_candidate_only),
+      },
+      editionDate,
+      previousPosition,
+      scoringConfig,
+      null,
+    );
+
+    scored.push({
+      candidate_id: candidateId,
+      identity_key: identityKey,
+      canonical_track_id: canonicalTrackId,
+      normalized_key: String(candidate.normalized_key || ""),
+      lead_artist_key: String(candidate.lead_artist_key || ""),
+      source_score: breakdown.source_score,
+      cross_source_bonus: breakdown.cross_source_bonus,
+      overlap_bonus: breakdown.overlap_bonus,
+      recency_score: breakdown.recency_score,
+      continuity_score: breakdown.continuity_score,
+      carry_forward_bonus: breakdown.carry_forward_bonus,
+      airplay_score: breakdown.airplay_score,
+      provisional_total: breakdown.provisional_total,
+      recency_days: breakdown.recency_days,
+      previous_position: previousPosition,
+      source_count: Number(candidate.source_count || 0),
+      occurrence_count: Number(candidate.occurrence_count || 0),
+      is_carry_forward: Boolean(candidate.carry_forward_only),
+      is_airplay_candidate: Boolean(candidate.airplay_candidate_only),
+    });
   }
 
-  const d = Date.now() - ss; await db.from("chart_ingest_stage_events").update({ status: "done", finished_at: new Date().toISOString(), duration_ms: d, message: scored.length+" scored, "+nonzeroScoreCount+" nonzero, "+oc+" overflows.", metrics_json: { scoredCount: scored.length, nonzeroScoreCount, overflowCount: oc } }).eq("run_id", runId).eq("stage", "methodology_scoring"); await db.from("chart_ingest_stage_events").update({ status: "done", finished_at: new Date().toISOString(), duration_ms: 0, message: "Anti-gaming done." }).eq("run_id", runId).eq("stage", "anti_gaming"); return json(req, { ok: true, runId, scoredCount: scored.length, nonzeroScoreCount, overflowCount: oc, airplayTrackCount: 0, durationMs: d }); }
+  const antiGaming = computeAntiGamingPenalties(
+    scored.map((score) => ({
+      identity_key: score.identity_key,
+      lead_artist_key: score.lead_artist_key,
+      provisional_total: score.provisional_total,
+    })),
+    3,
+    8,
+  );
+  const antiGamingByIdentity = new Map(
+    antiGaming.map((result) => [result.identity_key, result]),
+  );
+
+  const scoreRows: Array<Record<string, unknown>> = [];
+  let overflowCount = 0;
+  const now = new Date().toISOString();
+
+  for (const score of scored) {
+    const antiGamingResult = antiGamingByIdentity.get(score.identity_key) ?? {
+      identity_key: score.identity_key,
+      anti_gaming_penalty: 0,
+      lead_artist_overflow: false,
+      overflow_index: 0,
+    };
+    const finalScore = round4(
+      score.provisional_total - antiGamingResult.anti_gaming_penalty,
+    );
+
+    if (antiGamingResult.lead_artist_overflow) overflowCount++;
+
+    const integrityDelta = round4(
+      score.source_score +
+        score.cross_source_bonus +
+        score.overlap_bonus +
+        score.recency_score +
+        score.continuity_score +
+        score.carry_forward_bonus +
+        score.airplay_score -
+        antiGamingResult.anti_gaming_penalty -
+        finalScore,
+    );
+
+    scoreRows.push({
+      id: crypto.randomUUID(),
+      run_id: runId,
+      candidate_id: score.candidate_id,
+      source_score: score.source_score,
+      cross_source_bonus: score.cross_source_bonus,
+      overlap_bonus: score.overlap_bonus,
+      recency_score: score.recency_score,
+      continuity_score: score.continuity_score,
+      carry_forward_bonus: score.carry_forward_bonus,
+      anti_gaming_penalty: antiGamingResult.anti_gaming_penalty,
+      final_score: finalScore,
+      source_count: score.source_count,
+      occurrence_count: score.occurrence_count,
+      recency_days: score.recency_days,
+      previous_position: score.previous_position,
+      normalized_key: score.normalized_key,
+      score_integrity_ok: Math.abs(integrityDelta) < 0.001,
+      score_integrity_delta: integrityDelta,
+      score_payload_json: {
+        canonical_track_id: score.canonical_track_id,
+        identity_key: score.identity_key,
+        source_score: score.source_score,
+        cross_source_bonus: score.cross_source_bonus,
+        overlap_bonus: score.overlap_bonus,
+        recency_score: score.recency_score,
+        continuity_score: score.continuity_score,
+        carry_forward_bonus: score.carry_forward_bonus,
+        airplay_score: score.airplay_score,
+        anti_gaming_penalty: antiGamingResult.anti_gaming_penalty,
+        final_score: finalScore,
+        source_count: score.source_count,
+        occurrence_count: score.occurrence_count,
+        recency_days: score.recency_days,
+        previous_position: score.previous_position,
+      },
+      anti_gaming_json: {
+        canonical_track_id: score.canonical_track_id,
+        identity_key: score.identity_key,
+        anti_gaming_penalty: antiGamingResult.anti_gaming_penalty,
+        lead_artist_overflow: antiGamingResult.lead_artist_overflow,
+        overflow_index: antiGamingResult.overflow_index,
+      },
+      created_at: now,
+    });
+  }
+
+  await db.from("chart_ingest_candidate_scores").delete().eq("run_id", runId);
+
+  const chunkSize = 200;
+  for (let i = 0; i < scoreRows.length; i += chunkSize) {
+    const { error } = await db
+      .from("chart_ingest_candidate_scores")
+      .insert(scoreRows.slice(i, i + chunkSize));
+
+    if (error) {
+      const durationMs = Date.now() - startedAt;
+      await db
+        .from("chart_ingest_stage_events")
+        .update({
+          status: "failed",
+          finished_at: new Date().toISOString(),
+          duration_ms: durationMs,
+          message: "Score insert failed: " + error.message,
+          error_code: "score_insert_failed",
+          error_message: error.message,
+        })
+        .eq("run_id", runId)
+        .eq("stage", "methodology_scoring");
+
+      await db
+        .from("chart_ingest_runs")
+        .update({
+          status: "failed",
+          error_code: "score_insert_failed",
+          error_message: error.message,
+          updated_at: new Date().toISOString(),
+        })
+        .eq("id", runId);
+
+      return json(req, {
+        ok: false,
+        runId,
+        error: "score_insert_failed",
+        detail: error.message,
+      }, 500);
+    }
+  }
+
+  const nonzeroScoreCount = scoreRows.filter(
+    (row) => Number(row.final_score) > 0,
+  ).length;
+
+  if (nonzeroScoreCount === 0) {
+    const durationMs = Date.now() - startedAt;
+    await db
+      .from("chart_ingest_stage_events")
+      .update({
+        status: "failed",
+        finished_at: new Date().toISOString(),
+        duration_ms: durationMs,
+        message: "Scoring produced zero nonzero scores.",
+        error_code: "zero_score_output",
+        error_message: "All candidate final_score values were zero.",
+      })
+      .eq("run_id", runId)
+      .eq("stage", "methodology_scoring");
+
+    await db
+      .from("chart_ingest_runs")
+      .update({
+        status: "failed",
+        error_code: "zero_score_output",
+        error_message: "All candidate final_score values were zero.",
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", runId);
+
+    return json(req, {
+      ok: false,
+      runId,
+      error: "zero_score_output",
+      scoredCount: scored.length,
+      nonzeroScoreCount,
+    }, 400);
+  }
+
+  const durationMs = Date.now() - startedAt;
+  await db
+    .from("chart_ingest_stage_events")
+    .update({
+      status: "done",
+      finished_at: new Date().toISOString(),
+      duration_ms: durationMs,
+      message: `${scored.length} UUID-keyed Tracks scored, ${nonzeroScoreCount} nonzero, ${overflowCount} overflows.`,
+      metrics_json: {
+        scoredCount: scored.length,
+        nonzeroScoreCount,
+        overflowCount,
+        canonicalTrackCount: candidateByCanonicalTrack.size,
+      },
+    })
+    .eq("run_id", runId)
+    .eq("stage", "methodology_scoring");
+
+  await db
+    .from("chart_ingest_stage_events")
+    .update({
+      status: "done",
+      finished_at: new Date().toISOString(),
+      duration_ms: 0,
+      message: "Anti-gaming complete on canonical Track UUID identity.",
+    })
+    .eq("run_id", runId)
+    .eq("stage", "anti_gaming");
+
+  return json(req, {
+    ok: true,
+    runId,
+    scoredCount: scored.length,
+    nonzeroScoreCount,
+    overflowCount,
+    airplayTrackCount: 0,
+    durationMs,
+  });
+}
 
 // SHORTLIST
 async function handleRunShortlist(req: Request, db: ReturnType<typeof createClient>, params: Record<string, unknown>, user: { id: string; email?: string }) {
