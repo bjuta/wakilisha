@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ern:NewReleaseMessage
+  xmlns:ern="http://ddex.net/xml/ern/43"
+  AvsVersionId="3">
+  <MessageHeader>
+    <MessageId>MSG-ERN-432-003</MessageId>
+    <MessageSender><PartyId>PADPIDA20260923003</PartyId></MessageSender>
+  </MessageHeader>
+  <ResourceList>
+    <SoundRecording>
+      <ResourceReference>A1</ResourceReference>
+      <DisplayTitleText>Deal Fixture Track</DisplayTitleText>
+    </SoundRecording>
+  </ResourceList>
+  <ReleaseList>
+    <Release>
+      <ReleaseReference>R0</ReleaseReference>
+      <DisplayTitleText>Deal Fixture Release</DisplayTitleText>
+    </Release>
+  </ReleaseList>
+  <DealList>
+    <ReleaseDeal>
+      <DealReference>D1</DealReference>
+    </ReleaseDeal>
+  </DealList>
+</ern:NewReleaseMessage>
