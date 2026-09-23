@@ -324,7 +324,7 @@ begin
 
   return v_assertion_id;
 end
-$function$
+$function$;
 
 CREATE OR REPLACE FUNCTION platform_private.issue_registry_chart_user_execution_grant_v1(p_evidence_assertion_id uuid, p_operation_key text, p_subject_type text, p_subject_id uuid, p_plan_payload jsonb, p_required_user_capability_key text, p_idempotency_key text, p_expected_state_fingerprint text)
  RETURNS uuid
@@ -593,7 +593,7 @@ begin
 
   return v_grant_id;
 end
-$function$
+$function$;
 
 CREATE OR REPLACE FUNCTION platform_private.ensure_registry_chart_track_v1(p_run_id uuid, p_candidate_id uuid, p_title text, p_identity_artist_id uuid, p_isrc text, p_source_payload jsonb)
  RETURNS TABLE(track_id uuid, track_slug text, created boolean, operation_id uuid)
@@ -798,7 +798,7 @@ begin
   operation_id:=v_exec.operation_id;
   return next;
 end
-$function$
+$function$;
 
 CREATE OR REPLACE FUNCTION platform_private.ensure_registry_chart_track_credit_v1(p_run_id uuid, p_candidate_id uuid, p_track_id uuid, p_artist_id uuid, p_display_credit text, p_role text, p_credit_order integer, p_confidence integer, p_source_payload jsonb)
  RETURNS TABLE(credit_id uuid, created boolean, operation_id uuid)
@@ -947,7 +947,7 @@ begin
   operation_id:=v_exec.operation_id;
   return next;
 end
-$function$
+$function$;
 
 CREATE OR REPLACE FUNCTION public.chart_materialize_candidate_registry_v1(p_run_id uuid, p_candidate_id uuid)
  RETURNS jsonb
@@ -1083,7 +1083,7 @@ begin
     'credits',v_credit_results
   );
 end
-$function$
+$function$;
 
 CREATE OR REPLACE FUNCTION public.admin_apply_chart_artist_resolution_decision(p_decision_id uuid)
  RETURNS jsonb
