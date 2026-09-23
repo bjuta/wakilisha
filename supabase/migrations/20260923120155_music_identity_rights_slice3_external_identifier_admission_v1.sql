@@ -366,18 +366,18 @@ platform_private.registry_external_identifier_existing_v1(
   p_scheme_key text,
   p_comparison_value text
 )
-returns public.registry_external_identifier_assertions
+returns uuid
 language plpgsql
 stable
 security definer
 set search_path=pg_catalog,public
-as $$
+as $
 declare
-  v_row public.registry_external_identifier_assertions%rowtype;
+  v_assertion_id uuid;
 begin
   if p_subject_type='artist' then
-    select assertion.*
-    into v_row
+    select assertion.id
+    into v_assertion_id
     from public.registry_external_identifier_assertions assertion
     where assertion.artist_id=p_subject_id
       and assertion.scheme_key=p_scheme_key
@@ -396,8 +396,8 @@ begin
       assertion.id
     limit 1;
   elsif p_subject_type='track' then
-    select assertion.*
-    into v_row
+    select assertion.id
+    into v_assertion_id
     from public.registry_external_identifier_assertions assertion
     where assertion.track_id=p_subject_id
       and assertion.scheme_key=p_scheme_key
@@ -416,8 +416,8 @@ begin
       assertion.id
     limit 1;
   elsif p_subject_type='release' then
-    select assertion.*
-    into v_row
+    select assertion.id
+    into v_assertion_id
     from public.registry_external_identifier_assertions assertion
     where assertion.release_id=p_subject_id
       and assertion.scheme_key=p_scheme_key
@@ -440,9 +440,9 @@ begin
       message='Unsupported Registry identifier subject type.';
   end if;
 
-  return v_row;
+  return v_assertion_id;
 end
-$$;
+$;
 
 create function
 platform_private.record_registry_external_identifier_admin_evidence_v1(
@@ -776,7 +776,7 @@ declare
   v_subject_id uuid;
   v_scheme text;
   v_value text;
-  v_existing public.registry_external_identifier_assertions%rowtype;
+  v_existing_assertion_id uuid;
   v_inserted public.registry_external_identifier_assertions%rowtype;
   v_event_id uuid;
 begin
@@ -925,16 +925,15 @@ begin
       message='WK_STALE_EXTERNAL_IDENTIFIER_CANDIDATE: retained provider identity changed after review.';
   end if;
 
-  select *
-  into v_existing
-  from platform_private.registry_external_identifier_existing_v1(
-    v_subject_type,
-    v_subject_id,
-    v_scheme,
-    v_value
-  );
+  v_existing_assertion_id:=
+    platform_private.registry_external_identifier_existing_v1(
+      v_subject_type,
+      v_subject_id,
+      v_scheme,
+      v_value
+    );
 
-  if found then
+  if v_existing_assertion_id is not null then
     raise exception using errcode='23505',
       message='An equivalent current external identifier assertion already exists.';
   end if;
@@ -1354,6 +1353,7 @@ declare
   v_scheme text:=lower(nullif(btrim(coalesce(p_scheme_key,'')),''));
   v_value text:=nullif(btrim(coalesce(p_source_value,'')),'');
   v_candidate jsonb;
+  v_existing_assertion_id uuid;
   v_existing public.registry_external_identifier_assertions%rowtype;
   v_future_assertion_id uuid;
   v_evidence_id uuid;
@@ -1408,16 +1408,20 @@ begin
       message='WK_EXTERNAL_IDENTIFIER_REVIEW_REQUIRED: provider identifier is assigned to more than one canonical UUID.';
   end if;
 
-  select *
-  into v_existing
-  from platform_private.registry_external_identifier_existing_v1(
-    v_subject_type,
-    p_subject_id,
-    v_scheme,
-    v_value
-  );
+  v_existing_assertion_id:=
+    platform_private.registry_external_identifier_existing_v1(
+      v_subject_type,
+      p_subject_id,
+      v_scheme,
+      v_value
+    );
 
-  if found then
+  if v_existing_assertion_id is not null then
+    select assertion.*
+    into v_existing
+    from public.registry_external_identifier_assertions assertion
+    where assertion.id=v_existing_assertion_id;
+
     return to_jsonb(v_existing)||
       jsonb_build_object(
         '_authority',
