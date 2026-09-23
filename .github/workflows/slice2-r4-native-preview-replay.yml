@@ -14,7 +14,7 @@ concurrency:
 
 jobs:
   replay:
-    if: github.event.head_commit.message == 'ci: run slice2 r4 native preview replay'
+    if: "${{ github.event.head_commit.message == 'ci: run slice2 r4 native preview replay' }}"
     runs-on: ubuntu-latest
     timeout-minutes: 30
     env:
