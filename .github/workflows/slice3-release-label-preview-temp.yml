@@ -44,12 +44,10 @@ jobs:
         run: |
           set -euo pipefail
           DRY="$(supabase db push --dry-run --linked 2>&1)"
-          printf '%s
-' "$DRY"
+          printf '%s\\n' "$DRY"
           ACTUAL="$(
             {
-              printf '%s
-' "$DRY" |
+              printf '%s\\n' "$DRY" |
                 grep -Eo '[0-9]{14}_[A-Za-z0-9_-]+.sql' || true
             } |
               sort -u
@@ -66,12 +64,10 @@ jobs:
         run: |
           set -euo pipefail
           POST="$(supabase db push --dry-run --linked 2>&1)"
-          printf '%s
-' "$POST"
+          printf '%s\\n' "$POST"
           PENDING="$(
             {
-              printf '%s
-' "$POST" |
+              printf '%s\\n' "$POST" |
                 grep -Eo '[0-9]{14}_[A-Za-z0-9_-]+.sql' || true
             } |
               sort -u
