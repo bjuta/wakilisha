@@ -1,7 +1,7 @@
 -- WAKILISHA Music Identity & Rights Foundation
 -- Slice 3: read-only Release label and composer evidence report.
 --
--- Label matching is exact after punctuation/case normalization only.
+-- Label matching is exact after case and whitespace normalization only.
 -- Composer strings remain source evidence for review. This report does not
 -- split names, guess Person identity, create Works, or create Contributions.
 
@@ -21,8 +21,9 @@ normalized as (
     release_id,
     release_title,
     source_label_text,
-    lower(regexp_replace(source_label_text, '[^[:alnum:]]+', '', 'g'))
-      as normalized_source_label
+    lower(
+      regexp_replace(btrim(source_label_text), '[[:space:]]+', ' ', 'g')
+    ) as normalized_source_label
   from release_label_evidence
   where source_label_text is not null
 ),
@@ -33,8 +34,9 @@ label_matches as (
     array_agg(l.name order by l.name) as label_names
   from normalized n
   join public.registry_labels l
-    on lower(regexp_replace(l.name, '[^[:alnum:]]+', '', 'g'))
-       = n.normalized_source_label
+    on lower(
+         regexp_replace(btrim(l.name), '[[:space:]]+', ' ', 'g')
+       ) = n.normalized_source_label
   group by n.release_id
 ),
 organization_matches as (
@@ -44,8 +46,9 @@ organization_matches as (
     array_agg(o.display_name order by o.display_name) as organization_names
   from normalized n
   join editorial.organizations o
-    on lower(regexp_replace(o.display_name, '[^[:alnum:]]+', '', 'g'))
-       = n.normalized_source_label
+    on lower(
+         regexp_replace(btrim(o.display_name), '[[:space:]]+', ' ', 'g')
+       ) = n.normalized_source_label
   group by n.release_id
 )
 select
