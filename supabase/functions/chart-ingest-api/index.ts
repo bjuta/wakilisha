@@ -1070,7 +1070,310 @@ async function handleRunIdentityResolution(
   });
 }
 
-async function handleRunCarryForward(req: Request, db: ReturnType<typeof createClient>, params: Record<string, unknown>, user: { id: string; email?: string }) { const { runId } = params as { runId: string }; if (!runId) return json(req, { error: "runId_required" }, 400); const ss = Date.now(); const { data: run } = await db.from("chart_ingest_runs").select("id,status,edition_date,chart_size,program_id,series_slug").eq("id", runId).maybeSingle(); if (!run) return json(req, { error: "run_not_found" }, 404); await db.from("chart_ingest_stage_events").update({ status: "running", started_at: new Date().toISOString() }).eq("run_id", runId).eq("stage", "carry_forward"); const ed2 = (run.edition_date as string) || new Date().toISOString().split("T")[0]; const pid = (run.program_id as string) || "unknown"; const { data: ccs } = await db.from("chart_ingest_candidates").select("normalized_key").eq("run_id", runId); const fks = new Set<string>(); if (ccs) { for (const c of ccs) { if (c.normalized_key) fks.add(c.normalized_key); } } let cfc = 0, skc = 0, pec = 0; const ccds: Array<Record<string, unknown>> = []; try { const { data: pe } = await db.from("wk_chart_editions_v2").select("id").eq("program_id", pid).in("status",["committed","published"]).lt("edition_date",ed2).order("edition_date",{ascending:false}).limit(1).maybeSingle(); if (pe) { const { data: pes } = await db.from("wk_chart_entries_v2").select("normalized_key, rank, track_title, artist_name, release_date, track_slug, artist_slug, artwork_url").eq("edition_id", pe.id).order("rank",{ascending:true}); if (pes) { pec = pes.length; for (const p of pes) { const nk = (p.normalized_key as string)||""; if (!nk||nk==="::"||!nk.includes("::")) continue; if (fks.has(nk)){skc++;continue;} const cid = crypto.randomUUID(); ccds.push({ id:cid, run_id:runId, normalized_key:nk, lead_artist_key:nk.split("::")[1]??"", title:(p.track_title as string)||"", artist_display:(p.artist_name as string)||"", source_count:0, source_urls_seen:[], occurrence_count:0, release_date:sanitizeDate(p.release_date as string), candidate_type:"carry_forward", status:"eligible", version:1, carry_forward_only:true, continuity_locked:false, airplay_candidate_only:false, streaming_qualified:false, isrc:null, upc:null, artwork_url:(p.artwork_url as string)||null, external_url:null, preview_url:null, release_title:null, created_at:new Date().toISOString(), updated_at:new Date().toISOString() }); cfc++; } } } } catch (err) { console.error("[carry_forward]", err); } if (ccds.length>0) { const CH=200; for (let j=0; j<ccds.length; j+=CH) { const { error: ie } = await db.from("chart_ingest_candidates").insert(ccds.slice(j,j+CH)); if (ie) { const d=Date.now()-ss; await db.from("chart_ingest_stage_events").update({ status:"failed", finished_at:new Date().toISOString(), duration_ms:d, message:ie.message }).eq("run_id",runId).eq("stage","carry_forward"); return json(req,{error:"insert_failed",detail:ie.message},500); } } } const d=Date.now()-ss; await db.from("chart_ingest_stage_events").update({ status:"done", finished_at:new Date().toISOString(), duration_ms:d, message:cfc>0?cfc+" carry-forward from "+pec+" entries":"No carry-forward needed." }).eq("run_id",runId).eq("stage","carry_forward"); return json(req,{ok:true,runId,carryForwardCount:cfc,freshEvidenceCount:fks.size,previousEntryCount:pec,skippedExistingCount:skc,durationMs:d}); }
+async function handleRunCarryForward(
+  req: Request,
+  db: ReturnType<typeof createClient>,
+  params: Record<string, unknown>,
+  user: { id: string; email?: string },
+) {
+  const { runId } = params as { runId: string };
+  if (!runId) return json(req, { error: "runId_required" }, 400);
+
+  const started = Date.now();
+  const { data: run, error: runError } = await db
+    .from("chart_ingest_runs")
+    .select("id,status,edition_date,chart_size,program_id,series_slug")
+    .eq("id", runId)
+    .maybeSingle();
+
+  if (runError || !run) return json(req, { error: runError?.message || "run_not_found" }, run ? 500 : 404);
+
+  await db
+    .from("chart_ingest_stage_events")
+    .update({ status: "running", started_at: new Date().toISOString(), finished_at: null, error_code: null })
+    .eq("run_id", runId)
+    .eq("stage", "carry_forward");
+
+  const editionDate = (run.edition_date as string) || new Date().toISOString().split("T")[0];
+  const programId = (run.program_id as string) || "unknown";
+
+  const { data: freshMatches, error: freshMatchError } = await db
+    .from("chart_ingest_matches")
+    .select("candidate_id,canonical_entity_id,status,entity_type")
+    .eq("run_id", runId)
+    .eq("entity_type", "track")
+    .eq("status", "accepted")
+    .not("canonical_entity_id", "is", null);
+
+  if (freshMatchError) {
+    return json(req, { error: "fresh_identity_lookup_failed", detail: freshMatchError.message }, 500);
+  }
+
+  const freshTrackIds = new Set(
+    (freshMatches || []).map((row) => String((row as Record<string, unknown>).canonical_entity_id || "")).filter(Boolean),
+  );
+
+  const { data: previousEdition, error: previousEditionError } = await db
+    .from("wk_chart_editions_v2")
+    .select("id")
+    .eq("program_id", programId)
+    .in("status", ["committed", "published"])
+    .lt("edition_date", editionDate)
+    .order("edition_date", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  if (previousEditionError) {
+    return json(req, { error: "previous_edition_lookup_failed", detail: previousEditionError.message }, 500);
+  }
+
+  if (!previousEdition) {
+    const durationMs = Date.now() - started;
+    await db
+      .from("chart_ingest_stage_events")
+      .update({ status: "done", finished_at: new Date().toISOString(), duration_ms: durationMs, message: "No previous edition." })
+      .eq("run_id", runId)
+      .eq("stage", "carry_forward");
+    return json(req, { ok: true, runId, carryForwardCount: 0, freshEvidenceCount: freshTrackIds.size, previousEntryCount: 0, skippedExistingCount: 0, durationMs });
+  }
+
+  const { data: previousEntries, error: previousEntryError } = await db
+    .from("wk_chart_entries_v2")
+    .select("canonical_track_id,normalized_key,rank,track_title,artist_name,release_date,track_slug,artist_slug,artwork_url")
+    .eq("edition_id", previousEdition.id)
+    .order("rank", { ascending: true });
+
+  if (previousEntryError) {
+    return json(req, { error: "previous_entry_lookup_failed", detail: previousEntryError.message }, 500);
+  }
+
+  const entries = (previousEntries || []) as Array<Record<string, unknown>>;
+  const missingCanonical = entries.filter((row) => !row.canonical_track_id);
+
+  if (missingCanonical.length > 0) {
+    const durationMs = Date.now() - started;
+    await db
+      .from("chart_ingest_stage_events")
+      .update({
+        status: "failed",
+        finished_at: new Date().toISOString(),
+        duration_ms: durationMs,
+        error_code: "previous_edition_uuid_identity_missing",
+        message: `${missingCanonical.length} previous Chart entries lack Registry Track UUID identity.`,
+      })
+      .eq("run_id", runId)
+      .eq("stage", "carry_forward");
+    return json(req, {
+      error: "previous_edition_uuid_identity_missing",
+      count: missingCanonical.length,
+    }, 409);
+  }
+
+  const priorTrackIds = [...new Set(entries.map((row) => String(row.canonical_track_id)).filter(Boolean))];
+  const activePriorIds = new Set<string>();
+
+  for (const batch of chunkValues(priorTrackIds)) {
+    const { data, error } = await db
+      .from("registry_tracks")
+      .select("id")
+      .eq("status", "active")
+      .in("id", batch);
+    if (error) return json(req, { error: "previous_track_lookup_failed", detail: error.message }, 500);
+    for (const row of data || []) activePriorIds.add(String((row as Record<string, unknown>).id));
+  }
+
+  const lineage = new Map<string, { status: string; currentIds: string[] }>();
+  const stalePriorIds = priorTrackIds.filter((id) => !activePriorIds.has(id));
+
+  for (const batch of chunkValues(stalePriorIds, 20)) {
+    const results = await Promise.all(
+      batch.map(async (trackId) => {
+        const { data, error } = await db.rpc("resolve_registry_identity_lineage_v1", {
+          p_entity_type: "track",
+          p_entity_id: trackId,
+          p_max_depth: 16,
+        });
+        if (error) return { trackId, status: "error", currentIds: [] as string[] };
+        const payload = (data || {}) as Record<string, unknown>;
+        return {
+          trackId,
+          status: String(payload.resolution_status || "unresolved"),
+          currentIds: Array.isArray(payload.current_entity_ids)
+            ? payload.current_entity_ids.map((id) => String(id)).filter(Boolean)
+            : [],
+        };
+      }),
+    );
+    for (const result of results) lineage.set(result.trackId, result);
+  }
+
+  const unresolvedPrior = stalePriorIds.filter((id) => (lineage.get(id)?.currentIds || []).length !== 1);
+  if (unresolvedPrior.length > 0) {
+    const durationMs = Date.now() - started;
+    await db
+      .from("chart_ingest_stage_events")
+      .update({
+        status: "failed",
+        finished_at: new Date().toISOString(),
+        duration_ms: durationMs,
+        error_code: "previous_edition_uuid_lineage_unresolved",
+        message: `${unresolvedPrior.length} previous Track UUIDs do not resolve to one current Registry Track.`,
+      })
+      .eq("run_id", runId)
+      .eq("stage", "carry_forward");
+    return json(req, {
+      error: "previous_edition_uuid_lineage_unresolved",
+      trackIds: unresolvedPrior,
+    }, 409);
+  }
+
+  const candidateRows: Array<Record<string, unknown>> = [];
+  const matchRows: Array<Record<string, unknown>> = [];
+  let skippedExistingCount = 0;
+
+  for (const previous of entries) {
+    const sourceTrackId = String(previous.canonical_track_id);
+    const currentTrackId = activePriorIds.has(sourceTrackId)
+      ? sourceTrackId
+      : lineage.get(sourceTrackId)!.currentIds[0];
+
+    if (freshTrackIds.has(currentTrackId)) {
+      skippedExistingCount++;
+      continue;
+    }
+
+    const normalizedKey = String(previous.normalized_key || "");
+    if (!normalizedKey || normalizedKey === "::" || !normalizedKey.includes("::")) {
+      return json(req, {
+        error: "previous_edition_presentation_key_invalid",
+        canonicalTrackId: currentTrackId,
+      }, 409);
+    }
+
+    const candidateId = crypto.randomUUID();
+    const now = new Date().toISOString();
+
+    candidateRows.push({
+      id: candidateId,
+      run_id: runId,
+      normalized_key: normalizedKey,
+      lead_artist_key: normalizedKey.split("::")[1] ?? "",
+      title: String(previous.track_title || ""),
+      artist_display: String(previous.artist_name || ""),
+      source_count: 0,
+      source_urls_seen: [],
+      occurrence_count: 0,
+      release_date: sanitizeDate(previous.release_date as string),
+      candidate_type: "carry_forward",
+      status: "pending",
+      version: 1,
+      carry_forward_only: true,
+      continuity_locked: false,
+      airplay_candidate_only: false,
+      streaming_qualified: false,
+      isrc: null,
+      upc: null,
+      artwork_url: (previous.artwork_url as string) || null,
+      external_url: null,
+      preview_url: null,
+      release_title: null,
+      provider_ids_json: {},
+      created_at: now,
+      updated_at: now,
+    });
+
+    matchRows.push({
+      run_id: runId,
+      candidate_id: candidateId,
+      entity_type: "track",
+      canonical_entity_id: currentTrackId,
+      match_method: currentTrackId === sourceTrackId ? "canonical_id" : "lineage",
+      confidence: 100,
+      status: "accepted",
+      reasons_json: [{
+        resolution: currentTrackId === sourceTrackId ? "previous_edition_canonical_track" : "previous_edition_lineage_successor",
+        previous_track_id: sourceTrackId,
+        current_track_id: currentTrackId,
+        previous_rank: Number(previous.rank || 0),
+      }],
+      updated_at: now,
+    });
+
+    freshTrackIds.add(currentTrackId);
+  }
+
+  for (const batch of chunkValues(candidateRows, 200)) {
+    const { error } = await db.from("chart_ingest_candidates").insert(batch);
+    if (error) {
+      const durationMs = Date.now() - started;
+      await db
+        .from("chart_ingest_stage_events")
+        .update({ status: "failed", finished_at: new Date().toISOString(), duration_ms: durationMs, error_code: "carry_forward_candidate_insert_failed", message: error.message })
+        .eq("run_id", runId)
+        .eq("stage", "carry_forward");
+      return json(req, { error: "carry_forward_candidate_insert_failed", detail: error.message }, 500);
+    }
+  }
+
+  for (const batch of chunkValues(matchRows, 200)) {
+    const { error } = await db.from("chart_ingest_matches").insert(batch);
+    if (error) {
+      const insertedCandidateIds = candidateRows.map((row) => String(row.id));
+      if (insertedCandidateIds.length > 0) {
+        await db.from("chart_ingest_candidates").delete().eq("run_id", runId).in("id", insertedCandidateIds);
+      }
+      const durationMs = Date.now() - started;
+      await db
+        .from("chart_ingest_stage_events")
+        .update({ status: "failed", finished_at: new Date().toISOString(), duration_ms: durationMs, error_code: "carry_forward_match_insert_failed", message: error.message })
+        .eq("run_id", runId)
+        .eq("stage", "carry_forward");
+      return json(req, { error: "carry_forward_match_insert_failed", detail: error.message }, 500);
+    }
+  }
+
+  const carryForwardCount = candidateRows.length;
+  const durationMs = Date.now() - started;
+  await db
+    .from("chart_ingest_stage_events")
+    .update({
+      status: "done",
+      finished_at: new Date().toISOString(),
+      duration_ms: durationMs,
+      message: carryForwardCount > 0
+        ? `${carryForwardCount} UUID-authoritative carry-forward candidates from ${entries.length} previous entries.`
+        : "No carry-forward needed.",
+      metrics_json: {
+        carry_forward: carryForwardCount,
+        previous_entries: entries.length,
+        skipped_fresh_uuid: skippedExistingCount,
+      },
+    })
+    .eq("run_id", runId)
+    .eq("stage", "carry_forward");
+
+  await db.from("chart_ingest_audit_events").insert({
+    run_id: runId,
+    actor: user.id,
+    actor_email: user.email || null,
+    action: "uuid_carry_forward_complete",
+    payload_json: {
+      carryForwardCount,
+      previousEntryCount: entries.length,
+      skippedExistingCount,
+    },
+  });
+
+  return json(req, {
+    ok: true,
+    runId,
+    carryForwardCount,
+    freshEvidenceCount: freshTrackIds.size,
+    previousEntryCount: entries.length,
+    skippedExistingCount,
+    durationMs,
+  });
+}
 
 // ELIGIBILITY (v25 — ALL-ARTIST ORIGIN FILTER)
 async function handleRunEligibility(req: Request, db: ReturnType<typeof createClient>, params: Record<string, unknown>, user: { id: string; email?: string }) {
