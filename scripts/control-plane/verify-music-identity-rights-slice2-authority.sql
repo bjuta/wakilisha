@@ -332,21 +332,22 @@ begin
   into v_operation_count
   from (
     values
-      ('registry.work.create',1,'create_registry_work','medium','work',false),
-      ('registry.track_work_link.admit',1,'admit_registry_track_work_link','medium','track_work_link',false),
-      ('registry.track_contribution.admit',1,'admit_registry_track_contribution','medium','track_contribution',false),
-      ('registry.work_contribution.admit',1,'admit_registry_work_contribution','medium','work_contribution',false),
-      ('registry.rights_claim.admit',1,'admit_registry_rights_claim','high','rights_claim',false),
-      ('registry.rights_claim.reviewed_reconcile',1,'reconcile_registry_rights_claim','high','rights_claim',true),
-      ('registry.external_identifier_assertion.admit',1,'admit_registry_external_identifier_assertion','medium','external_identifier_assertion',false),
-      ('registry.external_identifier_assertion.reviewed_reconcile',1,'reconcile_registry_external_identifier_assertion','high','external_identifier_assertion',true)
+      ('registry.work.create',1,'create_registry_work','medium','work',false,false),
+      ('registry.track_work_link.admit',1,'admit_registry_track_work_link','medium','track_work_link',false,false),
+      ('registry.track_contribution.admit',1,'admit_registry_track_contribution','medium','track_contribution',false,false),
+      ('registry.work_contribution.admit',1,'admit_registry_work_contribution','medium','work_contribution',false,false),
+      ('registry.rights_claim.admit',1,'admit_registry_rights_claim','high','rights_claim',false,false),
+      ('registry.rights_claim.reviewed_reconcile',1,'reconcile_registry_rights_claim','high','rights_claim',true,false),
+      ('registry.external_identifier_assertion.admit',1,'admit_registry_external_identifier_assertion','medium','external_identifier_assertion',false,true),
+      ('registry.external_identifier_assertion.reviewed_reconcile',1,'reconcile_registry_external_identifier_assertion','high','external_identifier_assertion',true,false)
   ) expected(
     operation_key,
     operation_version,
     capability_key,
     risk_class,
     subject_type,
-    requires_existing_target
+    requires_existing_target,
+    enabled
   )
   join platform_private.registry_operation_types actual
     on actual.operation_key=expected.operation_key
@@ -360,10 +361,10 @@ begin
    and actual.max_grant_ttl_seconds=300
    and actual.requires_human_approval
    and actual.requires_verifier
-   and not actual.enabled;
+   and actual.enabled=expected.enabled;
 
   if v_operation_count <> 8 then
-    raise exception 'Slice 2 Registry operation declarations are incomplete or executable too early';
+    raise exception 'Slice 2 Registry operation declarations or enablement state drifted';
   end if;
 
   if exists (
@@ -376,12 +377,21 @@ begin
       'registry.work_contribution.admit',
       'registry.rights_claim.admit',
       'registry.rights_claim.reviewed_reconcile',
-      'registry.external_identifier_assertion.admit',
       'registry.external_identifier_assertion.reviewed_reconcile'
     )
       and enabled
   ) then
-    raise exception 'Slice 2 schema foundation exposed executable mutation authority';
+    raise exception 'Deferred Slice 2 ontology mutation authority enabled prematurely';
+  end if;
+
+  if not exists (
+    select 1
+    from platform_private.registry_operation_types
+    where operation_key='registry.external_identifier_assertion.admit'
+      and operation_version=1
+      and enabled
+  ) then
+    raise exception 'Slice 3 external identifier admission authority is not enabled';
   end if;
 
   if to_regclass('public.registry_track_artists') is null
