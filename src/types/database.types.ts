@@ -19972,6 +19972,10 @@ export type Database = {
         }
         Returns: Json
       }
+      admin_admit_registry_release_label_candidate_v1: {
+        Args: { p_label_id: string; p_release_id: string }
+        Returns: Json
+      }
       admin_admit_registry_track_intake_release_profile_v1: {
         Args: {
           p_allow_overwrite?: boolean
