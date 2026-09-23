@@ -113,8 +113,18 @@ function compactIdentityPart(value: unknown): string {
   return raw.trim().toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "");
 }
 
+function normalizeProviderKey(value: unknown): string {
+  const raw = typeof value === "string" || typeof value === "number" ? String(value) : "";
+  return raw.trim().toLowerCase().replace(/[^a-z0-9]+/g, "_").replace(/^_+|_+$/g, "");
+}
+
+function normalizeIsrc(value: unknown): string {
+  const raw = typeof value === "string" || typeof value === "number" ? String(value) : "";
+  return raw.trim().toUpperCase().replace(/[^A-Z0-9]+/g, "");
+}
+
 function addProviderIdToBag(bag: Record<string, Set<string>>, providerRaw: unknown, idRaw: unknown): void {
-  const provider = compactIdentityPart(providerRaw);
+  const provider = normalizeProviderKey(providerRaw);
   const id = compactIdentityPart(idRaw);
   if (!provider || !id) return;
   if (!bag[provider]) bag[provider] = new Set<string>();
@@ -127,6 +137,18 @@ function providerIdsJsonFromBag(bag: Record<string, Set<string>>): Record<string
   return out;
 }
 
+function mergeProviderIdsJson(values: unknown[]): Record<string, string[]> {
+  const bag: Record<string, Set<string>> = {};
+  for (const value of values) {
+    if (!value || typeof value !== "object" || Array.isArray(value)) continue;
+    for (const [provider, idsRaw] of Object.entries(value as Record<string, unknown>)) {
+      const ids = Array.isArray(idsRaw) ? idsRaw : [idsRaw];
+      for (const id of ids) addProviderIdToBag(bag, provider, id);
+    }
+  }
+  return providerIdsJsonFromBag(bag);
+}
+
 function providerIdentityMapFromRaw(row: Record<string, unknown>): Record<string, string[]> {
   const bag: Record<string, Set<string>> = {};
   addProviderIdToBag(bag, row.provider, row.provider_track_id);
@@ -134,7 +156,11 @@ function providerIdentityMapFromRaw(row: Record<string, unknown>): Record<string
   const raw = row.raw_payload_json;
   if (raw && typeof raw === "object" && !Array.isArray(raw)) {
     const payload = raw as Record<string, unknown>;
-    addProviderIdToBag(bag, payload.provider || row.provider, payload.songId || payload.trackId || payload.provider_track_id);
+    addProviderIdToBag(
+      bag,
+      payload.provider || row.provider,
+      payload.songId || payload.trackId || payload.provider_track_id,
+    );
   }
 
   return providerIdsJsonFromBag(bag);
@@ -146,7 +172,7 @@ function providerIdentityAliasesFromJson(value: unknown): string[] {
   if (!value || typeof value !== "object" || Array.isArray(value)) return aliases;
 
   for (const [providerRaw, idsRaw] of Object.entries(value as Record<string, unknown>)) {
-    const provider = compactIdentityPart(providerRaw);
+    const provider = normalizeProviderKey(providerRaw);
     if (!provider) continue;
 
     const ids = Array.isArray(idsRaw) ? idsRaw : [idsRaw];
@@ -159,41 +185,38 @@ function providerIdentityAliasesFromJson(value: unknown): string[] {
   return [...new Set(aliases)].sort();
 }
 
-function rawSongIdentityAliases(row: Record<string, unknown>, normalizedKey: string): string[] {
-  const title = (row.title_raw as string) || "";
-  const artist = (row.artist_raw as string) || "";
-  const normalizedTitle = normalize_title(title);
-  const lead = lead_artist_key(artist);
+function rawSongStrongIdentityAliases(row: Record<string, unknown>): string[] {
   const aliases = new Set<string>();
 
-  if (normalizedKey) aliases.add(`normalized:${normalizedKey}`);
-
-  const isrc = compactIdentityPart(row.isrc);
+  const isrc = normalizeIsrc(row.isrc);
   if (isrc) aliases.add(`isrc:${isrc}`);
 
   const providerMap = providerIdentityMapFromRaw(row);
   for (const alias of providerIdentityAliasesFromJson(providerMap)) aliases.add(alias);
 
-  if (normalizedTitle && lead) aliases.add(`title-lead:${normalizedTitle}::${lead}`);
-
   return [...aliases].sort();
 }
 
-function candidateSongIdentityKey(candidate: Record<string, unknown>): string {
-  const isrc = compactIdentityPart(candidate.isrc);
+function rawSongFallbackIdentityAlias(normalizedKey: string): string {
+  return normalizedKey ? `normalized:${normalizedKey}` : "";
+}
+
+function candidateEvidenceIdentityKey(candidate: Record<string, unknown>): string {
+  const isrc = normalizeIsrc(candidate.isrc);
   if (isrc) return `isrc:${isrc}`;
 
   const providerAliases = providerIdentityAliasesFromJson(candidate.provider_ids_json);
   if (providerAliases.length > 0) return providerAliases[0];
 
-  const title = normalize_title((candidate.title as string) || "");
-  const lead = lead_artist_key((candidate.artist_display as string) || "");
-  if (title && lead) return `title-lead:${title}::${lead}`;
-
   const normalizedKey = (candidate.normalized_key as string) || "";
   if (normalizedKey) return `normalized:${normalizedKey}`;
 
   return `candidate:${candidate.id || crypto.randomUUID()}`;
+}
+
+function canonicalTrackIdentityKey(trackId: unknown): string {
+  const id = typeof trackId === "string" ? trackId.trim().toLowerCase() : "";
+  return id ? `track:${id}` : "";
 }
 
 function normalizeSlug(raw: string): string { if (!raw || !raw.trim()) return ""; return raw.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/-+$/, "").replace(/^-+/, "").slice(0, 200); }
