@@ -19963,6 +19963,15 @@ export type Database = {
         Args: { p_suggestion_id: string }
         Returns: Json
       }
+      admin_admit_registry_external_identifier_candidate_v1: {
+        Args: {
+          p_scheme_key: string
+          p_source_value: string
+          p_subject_id: string
+          p_subject_type: string
+        }
+        Returns: Json
+      }
       admin_admit_registry_track_intake_release_profile_v1: {
         Args: {
           p_allow_overwrite?: boolean
