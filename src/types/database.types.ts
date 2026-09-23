@@ -19963,6 +19963,10 @@ export type Database = {
         Args: { p_suggestion_id: string }
         Returns: Json
       }
+      admin_admit_registry_artist_media_asset_candidate_v1: {
+        Args: { p_artist_id: string; p_media_asset_id: string }
+        Returns: Json
+      }
       admin_admit_registry_external_identifier_candidate_v1: {
         Args: {
           p_scheme_key: string
@@ -19990,6 +19994,10 @@ export type Database = {
           p_registry_track_id: string
           p_suggestion_id: string
         }
+        Returns: Json
+      }
+      admin_admit_registry_track_media_asset_candidate_v1: {
+        Args: { p_media_asset_id: string; p_track_id: string }
         Returns: Json
       }
       admin_admit_registry_track_provider_link_v1: {
