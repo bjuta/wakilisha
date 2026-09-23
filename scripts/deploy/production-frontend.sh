@@ -1,16 +1,16 @@
 #!/bin/bash
 set -euo pipefail
 
-RUNNER_VERSION="3"
+RUNNER_VERSION="4"
 BASE_EXPECTED_MAIN="57e4c9de7a205bbffde0ff97c9ec40f9a46b1b65"
 BASE_PREVIEW_REF="oeownzbanzbuvuyidwqh"
-TEMPLATE_SHA256="29365ba580b53bf46b46c3530a06d3b1eb63cff76e5b05b389ad33b5adba8af2"
+TEMPLATE_SHA256="0d96f981bbce31e042bb2bbfcec10daaa9a44a6832460c3e7b161209c105cc12"
 
 SCRIPT_DIR="$(
   CDPATH= cd -- "$(dirname -- "$0")" >/dev/null 2>&1
   pwd
 )"
-TEMPLATE="$SCRIPT_DIR/templates/lightsail-frontend-production-v3.sh"
+TEMPLATE="$SCRIPT_DIR/templates/lightsail-frontend-production-v4.sh"
 
 EXPECTED_MAIN=""
 DEPLOY_LABEL=""
@@ -205,6 +205,10 @@ if [ "$SELF_TEST" -eq 1 ]; then
     exit 1
   fi
 
+  grep -Fq 'PRODUCTION_GA_MEASUREMENT_ID="G-ML0E5BEL57"' "$TMP_SELF"
+  grep -Fq 'export VITE_GA_MEASUREMENT_ID="$PRODUCTION_GA_MEASUREMENT_ID"' "$TMP_SELF"
+  grep -Fq 'PRODUCTION_PUBLIC_BUILD_CONFIG=PASS' "$TMP_SELF"
+
   grep -Fq 'STAGE_WEB_MODE_CONTRACT=PASS' "$TMP_SELF"
   grep -Fq 'LIVE_WEB_MODE_CONTRACT=PASS' "$TMP_SELF"
   grep -Fq 'chmod 755' "$TMP_SELF"
@@ -212,6 +216,7 @@ if [ "$SELF_TEST" -eq 1 ]; then
 
   echo 'PRODUCTION_FRONTEND_WEB_MODE_AUTHORITY=PASS'
   echo 'PRODUCTION_FRONTEND_FULL_BUILD_AUTHORITY=PASS'
+  echo 'PRODUCTION_FRONTEND_PUBLIC_BUILD_CONFIG_AUTHORITY=PASS'
   echo 'PRODUCTION_FRONTEND_RUNNER_SELF_TEST=PASS'
   exit 0
 fi
