@@ -140,12 +140,22 @@ begin
   end if;
 
   select pg_get_functiondef(
+    'platform_private.registry_release_label_normalize_v1(text)'::regprocedure
+  )
+  into v_definition;
+
+  if position('[[:space:]]+' in v_definition)=0
+     or position('regexp_replace' in v_definition)=0
+  then
+    raise exception 'Release Label normalization contract drifted';
+  end if;
+
+  select pg_get_functiondef(
     'platform_private.registry_release_label_candidate_state_v1(uuid,uuid)'::regprocedure
   )
   into v_definition;
 
   if position('record_label' in v_definition)=0
-     or position('[[:space:]]+' in v_definition)=0
      or position('exact_label_match_count' in v_definition)=0
      or position('exact_organization_match_count' in v_definition)=0
      or position('review_only' in v_definition)=0
