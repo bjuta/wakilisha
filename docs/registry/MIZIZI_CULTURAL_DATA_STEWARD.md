@@ -625,7 +625,7 @@ Credits and provider packaging belong in typed fields and relationships, not ins
 That separation is what makes WAKILISHA's provenance useful rather than merely abundant.
 
 
-## Current URL-identity cleanup authority — 22 September 2026
+## Current URL-identity cleanup authority — 23 September 2026
 
 Programme issue:
 
@@ -638,10 +638,10 @@ this cleanup boundary.
 
 Current exact authority:
 
-- protected main at audit freeze:
-  `1f91d5f999e0bc8dd8eb4a998e3e923c6aedc866`;
+- exact deployed main:
+  `ee52a276f61ff93aff948d2a2ff2be796c3e5312`;
 - Production migrations:
-  `170 / 20260922100810_mizizi_slice3_tranche_b_high_blast_convergence_v1`;
+  `172 / 20260922171632_mizizi_release_slug_resume_integrity_v1`;
 - MIZIZI rule set: `1.2.0`;
 - active standing / exact / unconsumed MIZIZI grants:
   `0 / 0 / 0`;
@@ -655,9 +655,41 @@ first Track and Release applies were accepted. They are not current transport
 authority. Stage C subsequently moved the JIT Production execution boundary to
 the narrow `mizizi_executor` role.
 
-### Fresh read-only Production backlog
+### Track UUID public-identity closure
 
-The #1013 opening audit found:
+PR #1034 closed the public Track identity ambiguity exposed by same-Artist,
+same-slug Tracks.
+
+Current public identity authority is:
+
+- Registry Track UUID is canonical Sound Recording identity;
+- canonical Track route:
+  `/tracks/{artistSlug}/{trackSlug}/{trackId}`;
+- canonical Lyrics contribution route:
+  `/tracks/{artistSlug}/{trackSlug}/{trackId}/lyrics/contribute`;
+- readable slugs remain presentation data;
+- legacy Artist + Track-slug resolution is compatibility-only and fails closed
+  when more than one canonical Track matches;
+- Release membership never determines Track identity;
+- related content, Release tracklists, Search, Charts, Player, save/share
+  actions, and Artist discography now preserve canonical Track UUID where that
+  public identity is available.
+
+The Production frontend deployment for this closure completed from exact
+merged main `ee52a276f61ff93aff948d2a2ff2be796c3e5312`, and
+`public-content-read` Production authority is v92.
+
+This public-route closure does **not** yet make Chart scoring internally
+UUID-authoritative. The scoring pipeline still aggregates and carries
+continuity through `normalized_key` before canonical Track UUID authority is
+fully applied. That remaining semantic debt is owned by
+`docs/engineering/wakilisha-music-data-standards-foundation.md`.
+
+### Historical #1013 opening read-only backlog
+
+The 22 September #1013 opening audit found. These figures are preserved as the
+programme baseline and must not be read as a fresh 23 September Production
+inventory:
 
 - active Tracks: **2,101**;
 - open Track hygiene reviews: **66**;
