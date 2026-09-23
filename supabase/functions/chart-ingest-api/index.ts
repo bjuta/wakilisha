@@ -237,11 +237,81 @@ function continuityScore(pp: number | null, w = 1.0): number { if (pp === null |
 function carryForwardBonus(pp: number | null, w = 1.0, cfOnly = false): number { if (!cfOnly || pp === null || pp <= 0) return 0; return round4(Math.max(8, 18 - Math.min(10, pp - 1)) * w); }
 function airplayScore(W: number, sCount: number, dCount: number, enabled = false, maxS = 24): number { if (!enabled || sCount < 1 || dCount < 1) return 0; return round4(clamp((LN(1 + W) * 4.25 + Math.min(6, (sCount - 1) * 1.5) + Math.min(4, Math.floor(dCount / 3))), 0, maxS)); }
 
-interface AntiGamingInput { normalized_key: string; lead_artist_key: string; provisional_total: number; }
-interface AntiGamingResult { normalized_key: string; anti_gaming_penalty: number; lead_artist_overflow: boolean; overflow_index: number; }
-function computeAntiGamingPenalties(tracks: AntiGamingInput[], maxPer = 3, overflowPen = 8): AntiGamingResult[] {
-  if (tracks.length === 0) return []; const groups = new Map<string, AntiGamingInput[]>(); for (const t of tracks) { const k = t.lead_artist_key || "__unknown__"; if (!groups.has(k)) groups.set(k, []); groups.get(k)!.push(t); } const rm = new Map<string, AntiGamingResult>();
-  for (const [, g] of groups) { if (g.length <= maxPer) { for (const t of g) rm.set(t.normalized_key, { normalized_key: t.normalized_key, anti_gaming_penalty: 0, lead_artist_overflow: false, overflow_index: 0 }); continue; } const s = [...g].sort((a, b) => b.provisional_total - a.provisional_total); for (let i = 0; i < s.length; i++) { if (i < maxPer) rm.set(s[i].normalized_key, { normalized_key: s[i].normalized_key, anti_gaming_penalty: 0, lead_artist_overflow: false, overflow_index: 0 }); else { const oi = i - maxPer + 1; rm.set(s[i].normalized_key, { normalized_key: s[i].normalized_key, anti_gaming_penalty: round4(oi * overflowPen), lead_artist_overflow: true, overflow_index: oi }); } } } return tracks.map(t => rm.get(t.normalized_key) ?? { normalized_key: t.normalized_key, anti_gaming_penalty: 0, lead_artist_overflow: false, overflow_index: 0 });
+interface AntiGamingInput {
+  identity_key: string;
+  lead_artist_key: string;
+  provisional_total: number;
+}
+interface AntiGamingResult {
+  identity_key: string;
+  anti_gaming_penalty: number;
+  lead_artist_overflow: boolean;
+  overflow_index: number;
+}
+function computeAntiGamingPenalties(
+  tracks: AntiGamingInput[],
+  maxPer = 3,
+  overflowPen = 8,
+): AntiGamingResult[] {
+  if (tracks.length === 0) return [];
+
+  const groups = new Map<string, AntiGamingInput[]>();
+  for (const track of tracks) {
+    const leadArtistKey = track.lead_artist_key || "__unknown__";
+    if (!groups.has(leadArtistKey)) groups.set(leadArtistKey, []);
+    groups.get(leadArtistKey)!.push(track);
+  }
+
+  const results = new Map<string, AntiGamingResult>();
+
+  for (const group of groups.values()) {
+    if (group.length <= maxPer) {
+      for (const track of group) {
+        results.set(track.identity_key, {
+          identity_key: track.identity_key,
+          anti_gaming_penalty: 0,
+          lead_artist_overflow: false,
+          overflow_index: 0,
+        });
+      }
+      continue;
+    }
+
+    const sorted = [...group].sort((a, b) => {
+      const scoreDelta = b.provisional_total - a.provisional_total;
+      return scoreDelta !== 0 ? scoreDelta : a.identity_key.localeCompare(b.identity_key);
+    });
+
+    for (let i = 0; i < sorted.length; i++) {
+      const track = sorted[i];
+      if (i < maxPer) {
+        results.set(track.identity_key, {
+          identity_key: track.identity_key,
+          anti_gaming_penalty: 0,
+          lead_artist_overflow: false,
+          overflow_index: 0,
+        });
+      } else {
+        const overflowIndex = i - maxPer + 1;
+        results.set(track.identity_key, {
+          identity_key: track.identity_key,
+          anti_gaming_penalty: round4(overflowIndex * overflowPen),
+          lead_artist_overflow: true,
+          overflow_index: overflowIndex,
+        });
+      }
+    }
+  }
+
+  return tracks.map(
+    (track) =>
+      results.get(track.identity_key) ?? {
+        identity_key: track.identity_key,
+        anti_gaming_penalty: 0,
+        lead_artist_overflow: false,
+        overflow_index: 0,
+      },
+  );
 }
 
 function computeProvisionalScore(c: { normalized_key: string; lead_artist_key: string; source_count: number; occurrence_count: number; release_date: string | null; carry_forward_only: boolean; continuity_locked: boolean; airplay_candidate_only: boolean; }, ed: string, pp: number | null, cfg: { cross_source_mode?: string; cross_source_weight?: number; continuity_weight?: number; carry_forward_weight?: number; overlap_bonus_cap?: number; airplay_enabled?: boolean; airplay_max_score?: number; } = {}, airplayCtx?: { W: number; station_count: number; detection_count: number; } | null) { const ss = sourceScore(c.source_count); const cs = crossSourceBonus(c.source_count, cfg.cross_source_mode ?? "standard", cfg.cross_source_weight ?? 1.0); const ob = overlapBonus(c.occurrence_count, c.source_count, cfg.overlap_bonus_cap ?? 10); const rs = recencyScore(c.release_date, ed); const cont = continuityScore(pp, cfg.continuity_weight ?? 1.0); const cf = carryForwardBonus(pp, cfg.carry_forward_weight ?? 1.0, c.carry_forward_only); const ap = airplayScore(airplayCtx?.W ?? 0, airplayCtx?.station_count ?? 0, airplayCtx?.detection_count ?? 0, cfg.airplay_enabled ?? false, cfg.airplay_max_score ?? 24); const rd = c.release_date ? daysBetween(c.release_date, ed) : null; return { source_score: ss, cross_source_bonus: cs, overlap_bonus: ob, recency_score: rs, continuity_score: cont, carry_forward_bonus: cf, airplay_score: ap, provisional_total: round4(ss + cs + ob + rs + cont + cf + ap), recency_days: rd }; }
