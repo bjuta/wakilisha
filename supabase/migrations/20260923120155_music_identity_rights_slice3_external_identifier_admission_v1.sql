@@ -406,7 +406,7 @@ language plpgsql
 stable
 security definer
 set search_path=pg_catalog,public
-as $
+as $existing$
 declare
   v_assertion_id uuid;
 begin
@@ -477,7 +477,7 @@ begin
 
   return v_assertion_id;
 end
-$;
+$existing$;
 
 create function
 platform_private.record_registry_external_identifier_admin_evidence_v1(
