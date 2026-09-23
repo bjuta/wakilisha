@@ -144,6 +144,14 @@ create index registry_track_work_links_track_idx
 create index registry_track_work_links_work_idx
   on public.registry_track_work_links(work_id);
 
+create index registry_track_work_links_evidence_idx
+  on public.registry_track_work_links(evidence_assertion_id)
+  where evidence_assertion_id is not null;
+
+create index registry_track_work_links_superseded_idx
+  on public.registry_track_work_links(superseded_by_link_id)
+  where superseded_by_link_id is not null;
+
 create trigger touch_registry_track_work_links_updated_at
 before update on public.registry_track_work_links
 for each row
@@ -290,6 +298,14 @@ create index registry_track_contributions_artist_idx
   on public.registry_track_contributions(artist_id)
   where artist_id is not null;
 
+create index registry_track_contributions_evidence_idx
+  on public.registry_track_contributions(evidence_assertion_id)
+  where evidence_assertion_id is not null;
+
+create index registry_track_contributions_superseded_idx
+  on public.registry_track_contributions(superseded_by_contribution_id)
+  where superseded_by_contribution_id is not null;
+
 create trigger touch_registry_track_contributions_updated_at
 before update on public.registry_track_contributions
 for each row
@@ -413,6 +429,14 @@ create index registry_work_contributions_organization_idx
 create index registry_work_contributions_artist_idx
   on public.registry_work_contributions(artist_id)
   where artist_id is not null;
+
+create index registry_work_contributions_evidence_idx
+  on public.registry_work_contributions(evidence_assertion_id)
+  where evidence_assertion_id is not null;
+
+create index registry_work_contributions_superseded_idx
+  on public.registry_work_contributions(superseded_by_contribution_id)
+  where superseded_by_contribution_id is not null;
 
 create trigger touch_registry_work_contributions_updated_at
 before update on public.registry_work_contributions
@@ -608,6 +632,14 @@ create index registry_rights_claims_claimant_organization_idx
   on public.registry_rights_claims(claimant_organization_resource_id)
   where claimant_organization_resource_id is not null;
 
+create index registry_rights_claims_evidence_idx
+  on public.registry_rights_claims(evidence_assertion_id)
+  where evidence_assertion_id is not null;
+
+create index registry_rights_claims_superseded_idx
+  on public.registry_rights_claims(superseded_by_claim_id)
+  where superseded_by_claim_id is not null;
+
 create trigger touch_registry_rights_claims_updated_at
 before update on public.registry_rights_claims
 for each row
@@ -759,6 +791,14 @@ create index registry_external_identifier_assertions_scheme_value_idx
     scheme_key,
     comparison_value
   );
+
+create index registry_external_identifier_assertions_evidence_idx
+  on public.registry_external_identifier_assertions(evidence_assertion_id)
+  where evidence_assertion_id is not null;
+
+create index registry_external_identifier_assertions_superseded_idx
+  on public.registry_external_identifier_assertions(superseded_by_assertion_id)
+  where superseded_by_assertion_id is not null;
 
 create unique index registry_external_identifier_assertions_artist_accepted_key
   on public.registry_external_identifier_assertions(
