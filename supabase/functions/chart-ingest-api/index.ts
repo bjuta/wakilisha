@@ -540,10 +540,12 @@ async function handleReingestEdition(
 
   for (const trackId of trackIds) {
     const trackCredits = creditsByTrack.get(trackId) || [];
-    const routeCredit =
-      trackCredits.find((credit) => Boolean(credit.is_primary)) ||
-      trackCredits[0] ||
-      null;
+    const primaryCredits = trackCredits.filter(
+      (credit) => Boolean(credit.is_primary),
+    );
+    const routeCredit = primaryCredits.length === 1
+      ? primaryCredits[0]
+      : null;
 
     const routeArtist = routeCredit?.artist_id
       ? artistById.get(String(routeCredit.artist_id))
@@ -571,7 +573,12 @@ async function handleReingestEdition(
       ),
     ].join(", ");
 
-    if (trackCredits.length > 0 && artistSlug && artistName) {
+    if (
+      trackCredits.length > 0 &&
+      primaryCredits.length === 1 &&
+      artistSlug &&
+      artistName
+    ) {
       presentationByTrack.set(trackId, { artistSlug, artistName });
     }
   }
@@ -3759,10 +3766,12 @@ async function handleCommitRun(
     const candidateId = String(candidate.id);
     const trackId = trackByCandidate.get(candidateId)!;
     const trackCredits = creditsByTrack.get(trackId) || [];
-    const routeCredit =
-      trackCredits.find((credit) => Boolean(credit.is_primary)) ||
-      trackCredits[0] ||
-      null;
+    const primaryCredits = trackCredits.filter(
+      (credit) => Boolean(credit.is_primary),
+    );
+    const routeCredit = primaryCredits.length === 1
+      ? primaryCredits[0]
+      : null;
 
     const routeArtist = routeCredit?.artist_id
       ? artistById.get(String(routeCredit.artist_id))
@@ -3794,6 +3803,7 @@ async function handleCommitRun(
     const artistName = creditNames.join(", ");
     const missing: string[] = [];
     if (trackCredits.length === 0) missing.push("active_track_credit");
+    if (primaryCredits.length !== 1) missing.push("exact_primary_artist_credit");
     if (!artistSlug) missing.push("canonical_artist_slug");
     if (!artistName) missing.push("canonical_artist_display");
 
