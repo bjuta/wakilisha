@@ -2,6 +2,8 @@
 <ern:NewReleaseMessage
   xmlns:ern="http://ddex.net/xml/ern/432"
   AvsVersionId="9"
+  ReleaseProfileVersionId="Audio"
+  ReleaseProfileVariantVersionId="Classical"
   LanguageAndScriptCode="en">
   <MessageHeader>
     <MessageId>MSG-ERN-432-001</MessageId>
@@ -19,12 +21,20 @@
       <PartyName>
         <FullName>Fixture Artist</FullName>
       </PartyName>
+      <PartyId>
+        <ISNI>000000012146438X</ISNI>
+        <DPID>PADPIDAARTIST001</DPID>
+      </PartyId>
     </Party>
     <Party>
       <PartyReference>P2</PartyReference>
       <PartyName>
         <FullName>Fixture Producer</FullName>
       </PartyName>
+      <PartyId>
+        <IpiNameNumber>00123456789</IpiNameNumber>
+        <IPN>IPN-FIXTURE-PRODUCER</IPN>
+      </PartyId>
     </Party>
     <Party>
       <PartyReference>P3</PartyReference>
@@ -38,8 +48,18 @@
       <ResourceReference>A1</ResourceReference>
       <Type>MusicalWorkSoundRecording</Type>
       <SoundRecordingEdition>
-        <ResourceId>
+        <Type>NonImmersiveEdition</Type>
+        <ResourceId IsReplaced="false">
           <ISRC>KEAAA2600001</ISRC>
+        </ResourceId>
+        <ResourceId>
+          <ISRC>KEAAA2600005</ISRC>
+        </ResourceId>
+      </SoundRecordingEdition>
+      <SoundRecordingEdition>
+        <Type>ImmersiveEdition</Type>
+        <ResourceId>
+          <ISRC>KEAAA2600099</ISRC>
         </ResourceId>
       </SoundRecordingEdition>
       <DisplayTitleText>Fixture Track</DisplayTitleText>

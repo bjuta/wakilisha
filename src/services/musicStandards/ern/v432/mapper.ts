@@ -7,6 +7,8 @@ import type {
 import {
   parseErn432,
   type Ern432Projection,
+  type ErnReleaseIdentifierProjection,
+  type ErnSoundRecordingEditionProjection,
 } from "./parser";
 
 export interface ErnIdentifierCandidate {
@@ -15,6 +17,33 @@ export interface ErnIdentifierCandidate {
   schemeKey: "isrc" | "gtin";
   sourceScheme: "ISRC" | "ICPN";
   sourceValue: string;
+}
+
+export interface ErnPartyIdentifierEvidence {
+  partyReference: string;
+  fullName: string | null;
+  schemeKey:
+    | "isni"
+    | "ipi"
+    | "ipn"
+    | "ddex_party_id"
+    | null;
+  sourceScheme:
+    | "ISNI"
+    | "DPID"
+    | "IpiNameNumber"
+    | "IPN"
+    | "CisacSocietyId"
+    | "ProprietaryId";
+  sourceValue: string;
+  namespace: string | null;
+}
+
+export interface ErnMessageContext {
+  avsVersionId: string | null;
+  releaseProfileVersionId: string | null;
+  releaseProfileVariantVersionId: string | null;
+  languageAndScriptCode: string | null;
 }
 
 export interface ErnArtistEvidence {
@@ -53,19 +82,25 @@ export interface ErnReleaseCandidate {
   releaseDate: string | null;
   genres: string[];
   resourceReferences: string[];
+  identifiers: ErnReleaseIdentifierProjection[];
 }
 
 export interface ErnTrackCandidate {
   resourceReference: string;
   title: string | null;
   displayArtistName: string | null;
+  recordingType: string | null;
+  duration: string | null;
+  editions: ErnSoundRecordingEditionProjection[];
 }
 
 export interface Ern432MappedData {
+  messageContext: ErnMessageContext;
   releaseCandidates: ErnReleaseCandidate[];
   trackCandidates: ErnTrackCandidate[];
   artistEvidence: ErnArtistEvidence[];
   contributorEvidence: ErnContributorEvidence[];
+  partyIdentifierEvidence: ErnPartyIdentifierEvidence[];
   identifierCandidates: ErnIdentifierCandidate[];
   labelEvidence: ErnLabelEvidence[];
   mediaEvidence: ErnMediaEvidence[];
@@ -75,6 +110,24 @@ function fingerprintPayload(xml: string): string {
   return createHash("sha256")
     .update(xml, "utf8")
     .digest("hex");
+}
+
+function partySchemeKey(
+  sourceScheme: ErnPartyIdentifierEvidence["sourceScheme"],
+): ErnPartyIdentifierEvidence["schemeKey"] {
+  switch (sourceScheme) {
+    case "ISNI":
+      return "isni";
+    case "DPID":
+      return "ddex_party_id";
+    case "IpiNameNumber":
+      return "ipi";
+    case "IPN":
+      return "ipn";
+    case "CisacSocietyId":
+    case "ProprietaryId":
+      return null;
+  }
 }
 
 function dedupeLossFlags(lossFlags: MusicMappingLoss[]): MusicMappingLoss[] {
@@ -124,17 +177,63 @@ function mapProjection(
   const identifierCandidates: ErnIdentifierCandidate[] = [];
   const artistEvidence: ErnArtistEvidence[] = [];
   const contributorEvidence: ErnContributorEvidence[] = [];
+  const partyIdentifierEvidence: ErnPartyIdentifierEvidence[] = [];
   const labelEvidence: ErnLabelEvidence[] = [];
 
-  for (const track of projection.soundRecordings) {
-    if (track.isrc) {
-      identifierCandidates.push({
-        subjectKind: "track",
-        subjectReference: track.resourceReference,
-        schemeKey: "isrc",
-        sourceScheme: "ISRC",
-        sourceValue: track.isrc,
+  for (const party of projection.parties) {
+    for (const identifier of party.identifiers) {
+      const schemeKey = partySchemeKey(identifier.sourceScheme);
+
+      partyIdentifierEvidence.push({
+        partyReference: party.partyReference,
+        fullName: party.fullName,
+        schemeKey,
+        sourceScheme: identifier.sourceScheme,
+        sourceValue: identifier.sourceValue,
+        namespace: identifier.namespace,
       });
+
+      lossFlags.push({
+        path:
+          `PartyList.Party[${party.partyReference}].PartyId.` +
+          identifier.sourceScheme,
+        classification:
+          schemeKey === null ? "partial" : "review_required",
+        detail:
+          schemeKey === null
+            ? "ERN Party identifier evidence is retained, but the source identifier scheme has no direct music-data-dictionary/v1 mapping."
+            : "ERN Party identifier evidence requires typed Person, Organisation, or Artist identity resolution before canonical admission.",
+      });
+    }
+  }
+
+  for (const track of projection.soundRecordings) {
+    for (const [editionIndex, edition] of track.editions.entries()) {
+      for (const [resourceIdIndex, resourceId] of edition.resourceIds.entries()) {
+        for (const identifier of resourceId.identifiers) {
+          if (identifier.sourceScheme === "ISRC") {
+            identifierCandidates.push({
+              subjectKind: "track",
+              subjectReference: track.resourceReference,
+              schemeKey: "isrc",
+              sourceScheme: "ISRC",
+              sourceValue: identifier.sourceValue,
+            });
+            continue;
+          }
+
+          lossFlags.push({
+            path:
+              `ResourceList.SoundRecording[${track.resourceReference}]` +
+              `.SoundRecordingEdition[${editionIndex}]` +
+              `.ResourceId[${resourceIdIndex}]` +
+              `.${identifier.sourceScheme}`,
+            classification: "partial",
+            detail:
+              "ERN recording identifier evidence is retained, but the source identifier scheme has no direct music-data-dictionary/v1 Track identifier mapping.",
+          });
+        }
+      }
     }
 
     for (const artist of track.displayArtists) {
@@ -174,13 +273,25 @@ function mapProjection(
   }
 
   for (const release of projection.releases) {
-    if (release.icpn) {
-      identifierCandidates.push({
-        subjectKind: "release",
-        subjectReference: release.releaseReference,
-        schemeKey: "gtin",
-        sourceScheme: "ICPN",
-        sourceValue: release.icpn,
+    for (const identifier of release.identifiers) {
+      if (identifier.sourceScheme === "ICPN") {
+        identifierCandidates.push({
+          subjectKind: "release",
+          subjectReference: release.releaseReference,
+          schemeKey: "gtin",
+          sourceScheme: "ICPN",
+          sourceValue: identifier.sourceValue,
+        });
+        continue;
+      }
+
+      lossFlags.push({
+        path:
+          `ReleaseList.Release[${release.releaseReference}]` +
+          `.ReleaseId.${identifier.sourceScheme}`,
+        classification: "partial",
+        detail:
+          "ERN Release identifier evidence is retained, but the source identifier scheme has no direct music-data-dictionary/v1 Release identifier mapping.",
       });
     }
 
@@ -229,6 +340,13 @@ function mapProjection(
   }
 
   const data: Ern432MappedData = {
+    messageContext: {
+      avsVersionId: projection.avsVersionId,
+      releaseProfileVersionId: projection.releaseProfileVersionId,
+      releaseProfileVariantVersionId:
+        projection.releaseProfileVariantVersionId,
+      languageAndScriptCode: projection.languageAndScriptCode,
+    },
     releaseCandidates: projection.releases.map((release) => ({
       releaseReference: release.releaseReference,
       releaseType: release.releaseType,
@@ -237,14 +355,19 @@ function mapProjection(
       releaseDate: release.releaseDate,
       genres: release.genres,
       resourceReferences: release.resourceReferences,
+      identifiers: release.identifiers,
     })),
     trackCandidates: projection.soundRecordings.map((track) => ({
       resourceReference: track.resourceReference,
       title: track.title,
       displayArtistName: track.displayArtistName,
+      recordingType: track.recordingType,
+      duration: track.duration,
+      editions: track.editions,
     })),
     artistEvidence,
     contributorEvidence,
+    partyIdentifierEvidence,
     identifierCandidates,
     labelEvidence,
     mediaEvidence: projection.images.map((image) => ({
@@ -269,7 +392,7 @@ export function mapErn432(
 
   return {
     adapterKey: "ddex_ern_import",
-    adapterVersion: 1,
+    adapterVersion: 2,
     externalStandard: "DDEX_ERN",
     externalVersion: "4.3.2",
     messageOrRecordType: "NewReleaseMessage",
