@@ -513,6 +513,7 @@ begin
       ),
     'evidence_assertion_id',v_evidence.id::text,
     'evidence_assertion_fingerprint',v_evidence.assertion_fingerprint,
+    'trust_class',v_evidence.trust_class,
     'policy_ruleset_version','registry-release-label-admission-v1'
   );
 
@@ -738,11 +739,13 @@ begin
        'candidate_state_fingerprint',
        'evidence_assertion_id',
        'evidence_assertion_fingerprint',
+       'trust_class',
        'policy_ruleset_version'
      ]::text[])<>'{}'::jsonb
      or v_plan->>'operation_key'<>'registry.release.label_link.admit'
      or coalesce((v_plan->>'operation_version')::integer,0)<>1
      or v_plan->>'release_id'<>v_release_id::text
+     or v_plan->>'trust_class'<>'INTERNAL_FACT'
      or v_plan->>'policy_ruleset_version'<>
           'registry-release-label-admission-v1'
   then
