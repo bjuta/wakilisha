@@ -291,11 +291,22 @@ async function queueReview(
     );
   }
 
+  const reviewBroker =
+    finding.ruleVersion === "1.3.0" &&
+    (
+      finding.ruleId ===
+        "track_slug_credit_evidence_gap" ||
+      finding.ruleId ===
+        "track_recording_identity_conflict"
+    )
+      ? "queue_public_music_identity_review_v1"
+      : "queue_registry_review_v1";
+
   const result =
     await pool.query(
       `
       select
-        mizizi_private.queue_registry_review_v1(
+        mizizi_private.${reviewBroker}(
           $1::text,
           $2::text,
           $3::text,
