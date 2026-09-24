@@ -29,5 +29,5 @@ export function releaseTypeLabelFromActiveTrackCount(
 export function hasDedicatedPublicReleasePage(
   value: unknown,
 ): boolean {
-  return normalizeActiveTrackCount(value) >= 1;
+  return normalizeActiveTrackCount(value) >= 2;
 }
