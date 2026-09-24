@@ -44,6 +44,7 @@ export interface ErnPartyProjection {
 }
 
 export interface ErnDisplayArtistProjection {
+  sequenceNumber: number | null;
   partyReference: string | null;
   displayName: string | null;
   role: string | null;
@@ -97,6 +98,8 @@ export interface ErnSoundRecordingEditionProjection {
 export interface ErnSoundRecordingProjection {
   resourceReference: string;
   title: string | null;
+  displayTitleText: string | null;
+  structuredTitleText: string | null;
   isrc: string | null;
   recordingType: string | null;
   duration: string | null;
@@ -104,6 +107,7 @@ export interface ErnSoundRecordingProjection {
   displayArtistName: string | null;
   displayArtists: ErnDisplayArtistProjection[];
   contributors: ErnContributorProjection[];
+  unsupportedFields: string[];
 }
 
 export interface ErnTechnicalImageDetailsProjection {
@@ -112,11 +116,23 @@ export interface ErnTechnicalImageDetailsProjection {
   unsupportedFields: string[];
 }
 
+export interface ErnProprietaryIdentifierProjection {
+  sourceValue: string;
+  namespace: string | null;
+}
+
+export interface ErnImageResourceIdProjection {
+  proprietaryIds: ErnProprietaryIdentifierProjection[];
+  unsupportedFields: string[];
+}
+
 export interface ErnImageProjection {
   resourceReference: string;
   imageType: string | null;
+  resourceIds: ErnImageResourceIdProjection[];
   uri: string | null;
   technicalDetails: ErnTechnicalImageDetailsProjection[];
+  unsupportedFields: string[];
 }
 
 export type ErnReleaseIdentifierSourceScheme =
@@ -174,18 +190,18 @@ export interface ErnReleaseProjection {
   genres: string[];
   resourceReferences: string[];
   resourceGroups: ErnResourceGroupProjection[];
+  unsupportedFields: string[];
 }
 
 export interface ErnTrackReleaseProjection {
   releaseReference: string;
+  identifiers: ErnReleaseIdentifierProjection[];
   releaseResourceReference: string | null;
   linkedResourceReferences: ErnLinkedReleaseResourceReferenceProjection[];
   unsupportedFields: string[];
 }
 
-export type ErnAcceptedReleaseProfile =
-  | "Audio"
-  | "SimpleAudioSingle";
+export type ErnAcceptedReleaseProfile = "Audio";
 
 export interface Ern432Projection {
   namespace: string;
@@ -614,6 +630,48 @@ function parseRecordingResourceId(
   };
 }
 
+function parseImageResourceId(
+  resourceId: XmlNode,
+): ErnImageResourceIdProjection {
+  const proprietaryIds = children(
+    resourceId,
+    "ProprietaryId",
+  )
+    .map((proprietaryId) => {
+      const sourceValue = directText(proprietaryId);
+      if (!sourceValue) {
+        return null;
+      }
+
+      return {
+        sourceValue,
+        namespace:
+          proprietaryId.attributes.Namespace ??
+          localAttributeValue(
+            proprietaryId.attributes as unknown as Record<
+              string,
+              unknown
+            >,
+            "Namespace",
+          ),
+      };
+    })
+    .filter(
+      (
+        identifier,
+      ): identifier is ErnProprietaryIdentifierProjection =>
+        identifier !== null,
+    );
+
+  return {
+    proprietaryIds,
+    unsupportedFields: unsupportedChildNames(
+      resourceId,
+      new Set(["ProprietaryId"]),
+    ),
+  };
+}
+
 function parseFile(
   file: XmlNode | null,
 ): ErnFileProjection | null {
@@ -764,6 +822,10 @@ function resolveDisplayArtists(
       (partyReference ? parties.get(partyReference) ?? null : null);
 
     return {
+      sequenceNumber: optionalIntegerAttribute(
+        artist,
+        "SequenceNumber",
+      ),
       partyReference,
       displayName,
       role:
@@ -848,12 +910,20 @@ function parseSoundRecordings(
           .find((identifier) => identifier.sourceScheme === "ISRC")
           ?.sourceValue ??
         null;
+      const displayTitleText = childText(
+        recording,
+        "DisplayTitleText",
+      );
+      const structuredTitleText = descendantText(
+        firstChild(recording, "DisplayTitle"),
+        "TitleText",
+      );
 
       return {
         resourceReference,
-        title:
-          childText(recording, "DisplayTitleText") ??
-          descendantText(firstChild(recording, "DisplayTitle"), "TitleText"),
+        title: displayTitleText ?? structuredTitleText,
+        displayTitleText,
+        structuredTitleText,
         isrc,
         recordingType: childText(recording, "Type"),
         duration: childText(recording, "Duration"),
@@ -864,6 +934,20 @@ function parseSoundRecordings(
         ),
         displayArtists: resolveDisplayArtists(recording, parties),
         contributors: resolveContributors(recording, parties),
+        unsupportedFields: unsupportedChildNames(
+          recording,
+          new Set([
+            "ResourceReference",
+            "Type",
+            "SoundRecordingEdition",
+            "DisplayTitleText",
+            "DisplayTitle",
+            "DisplayArtistName",
+            "DisplayArtist",
+            "Contributor",
+            "Duration",
+          ]),
+        ),
       };
     })
     .filter(
@@ -1064,8 +1148,21 @@ function parseImages(root: XmlNode): ErnImageProjection[] {
       return {
         resourceReference,
         imageType: childText(image, "Type"),
+        resourceIds: children(
+          image,
+          "ResourceId",
+        ).map(parseImageResourceId),
         uri,
         technicalDetails,
+        unsupportedFields: unsupportedChildNames(
+          image,
+          new Set([
+            "ResourceReference",
+            "Type",
+            "ResourceId",
+            "TechnicalDetails",
+          ]),
+        ),
       };
     })
     .filter((image): image is ErnImageProjection => image !== null);
@@ -1091,6 +1188,10 @@ function parseReleases(
         childText(release, "ReleaseLabelReference") ??
         descendantText(release, "LabelPartyReference");
       const identifiers = parseReleaseIdentifiers(release);
+      const resourceGroups = children(
+        release,
+        "ResourceGroup",
+      ).map(parseResourceGroup);
 
       return {
         releaseReference,
@@ -1117,14 +1218,25 @@ function parseReleases(
           .map((genre) => childText(genre, "GenreText"))
           .filter((genre): genre is string => Boolean(genre)),
         resourceReferences: collectPrimaryResourceReferences(
-          children(release, "ResourceGroup").map(
-            parseResourceGroup,
-          ),
+          resourceGroups,
         ),
-        resourceGroups: children(
+        resourceGroups,
+        unsupportedFields: unsupportedChildNames(
           release,
-          "ResourceGroup",
-        ).map(parseResourceGroup),
+          new Set([
+            "ReleaseReference",
+            "ReleaseType",
+            "ReleaseId",
+            "DisplayTitleText",
+            "DisplayTitle",
+            "DisplayArtistName",
+            "DisplayArtist",
+            "ReleaseLabelReference",
+            "DisplayGenre",
+            "ReleaseDate",
+            "ResourceGroup",
+          ]),
+        ),
       };
     })
     .filter((release): release is ErnReleaseProjection => release !== null);
@@ -1150,6 +1262,7 @@ function parseTrackReleases(
 
       return {
         releaseReference,
+        identifiers: parseReleaseIdentifiers(trackRelease),
         releaseResourceReference: childText(
           trackRelease,
           "ReleaseResourceReference",
@@ -1169,6 +1282,7 @@ function parseTrackReleases(
           trackRelease,
           new Set([
             "ReleaseReference",
+            "ReleaseId",
             "ReleaseResourceReference",
             "LinkedReleaseResourceReference",
           ]),
@@ -1198,21 +1312,51 @@ function validateReleaseProfile(
     );
   }
 
-  if (profile !== "Audio" && profile !== "SimpleAudioSingle") {
+  if (profile !== "Audio") {
     throw new Ern432AdapterError(
       "ERN_PROFILE_UNSUPPORTED",
-      `WAKILISHA currently accepts only Audio and SimpleAudioSingle, found ${profile}.`,
+      `WAKILISHA currently accepts only the bounded Audio Release Profile, found ${profile}.`,
     );
   }
 
   if (projection.releases.length !== 1) {
     throw new Ern432AdapterError(
       "ERN_PROFILE_MAIN_RELEASE_COUNT_INVALID",
-      `Expected exactly one main Release for ${profile}, found ${projection.releases.length}.`,
+      `Expected exactly one main Release for Audio, found ${projection.releases.length}.`,
     );
   }
 
   const release = projection.releases[0];
+  const allowedReleaseIdSchemes = new Set([
+    "GRid",
+    "ICPN",
+    "ProprietaryId",
+  ]);
+  const hasAcceptedReleaseId = (
+    identifiers: ErnReleaseIdentifierProjection[],
+  ): boolean =>
+    identifiers.some((identifier) =>
+      allowedReleaseIdSchemes.has(identifier.sourceScheme),
+    );
+
+  if (!hasAcceptedReleaseId(release.identifiers)) {
+    throw new Ern432AdapterError(
+      "ERN_AUDIO_MAIN_RELEASE_ID_REQUIRED",
+      "The Audio main Release must be identified by GRid, ICPN, or ProprietaryId.",
+    );
+  }
+
+  const unsequencedReleaseArtist =
+    release.displayArtists.find(
+      (artist) => artist.sequenceNumber === null,
+    );
+  if (unsequencedReleaseArtist) {
+    throw new Ern432AdapterError(
+      "ERN_AUDIO_DISPLAY_ARTIST_SEQUENCE_REQUIRED",
+      "Audio Release DisplayArtist composites must be sequenced.",
+    );
+  }
+
   const soundRecordingByReference = new Map(
     projection.soundRecordings.map((recording) => [
       recording.resourceReference,
@@ -1230,16 +1374,122 @@ function validateReleaseProfile(
     "MusicalWorkSoundRecording",
     "NonMusicalWorkSoundRecording",
   ]);
-  const invalidPrimaryReferences = primaryReferences.filter(
-    (reference) => {
-      const recording = soundRecordingByReference.get(reference);
-      return (
-        !recording ||
-        !recording.recordingType ||
-        !allowedTypes.has(recording.recordingType)
+
+  if (primaryReferences.length < 1) {
+    throw new Ern432AdapterError(
+      "ERN_AUDIO_PRIMARY_RESOURCES_INVALID",
+      "Audio requires one or more primary SoundRecording resources.",
+    );
+  }
+
+  for (const reference of primaryReferences) {
+    const recording = soundRecordingByReference.get(reference);
+    if (
+      !recording ||
+      !recording.recordingType ||
+      !allowedTypes.has(recording.recordingType)
+    ) {
+      throw new Ern432AdapterError(
+        "ERN_AUDIO_PRIMARY_RESOURCES_INVALID",
+        `Audio primary resource ${reference} must resolve to a MusicalWorkSoundRecording or NonMusicalWorkSoundRecording.`,
       );
-    },
+    }
+
+    if (!recording.isrc) {
+      throw new Ern432AdapterError(
+        "ERN_AUDIO_PRIMARY_ISRC_REQUIRED",
+        `Audio primary SoundRecording ${reference} must be identified by an ISRC.`,
+      );
+    }
+
+    if (
+      !recording.displayTitleText ||
+      !recording.structuredTitleText
+    ) {
+      throw new Ern432AdapterError(
+        "ERN_AUDIO_PRIMARY_TITLE_REQUIRED",
+        `Audio primary SoundRecording ${reference} must provide both DisplayTitleText and DisplayTitle.`,
+      );
+    }
+
+    if (
+      recording.displayArtists.some(
+        (artist) => artist.sequenceNumber === null,
+      )
+    ) {
+      throw new Ern432AdapterError(
+        "ERN_AUDIO_DISPLAY_ARTIST_SEQUENCE_REQUIRED",
+        `Audio primary SoundRecording ${reference} has an unsequenced DisplayArtist.`,
+      );
+    }
+  }
+
+  const sequenceGroupTypes = new Set([
+    "Side",
+    "Component",
+    "ComponentRelease",
+    "ReleaseComponent",
+    "MultiPartWork",
+  ]);
+
+  const validateGroupSequence = (
+    group: ErnResourceGroupProjection,
+    path: string,
+  ): void => {
+    const itemSequences = group.contentItems.map(
+      (item) => item.sequenceNumber,
+    );
+    if (
+      itemSequences.some((sequence) => sequence === null) ||
+      new Set(itemSequences).size !== itemSequences.length
+    ) {
+      throw new Ern432AdapterError(
+        "ERN_AUDIO_RESOURCE_SEQUENCE_INVALID",
+        `${path} must sequence each primary ResourceGroupContentItem without duplicates.`,
+      );
+    }
+
+    for (let index = 1; index < itemSequences.length; index += 1) {
+      const previous = itemSequences[index - 1];
+      const current = itemSequences[index];
+      if (
+        previous !== null &&
+        current !== null &&
+        current <= previous
+      ) {
+        throw new Ern432AdapterError(
+          "ERN_AUDIO_RESOURCE_SEQUENCE_INVALID",
+          `${path} primary resource sequence numbers must increase monotonically.`,
+        );
+      }
+    }
+
+    group.resourceGroups.forEach((subgroup, index) => {
+      if (
+        subgroup.resourceGroupType &&
+        sequenceGroupTypes.has(subgroup.resourceGroupType) &&
+        subgroup.sequenceNumber === null
+      ) {
+        throw new Ern432AdapterError(
+          "ERN_AUDIO_RESOURCE_SEQUENCE_INVALID",
+          `${path}.ResourceGroup[${index}] must be sequenced.`,
+        );
+      }
+
+      validateGroupSequence(
+        subgroup,
+        `${path}.ResourceGroup[${index}]`,
+      );
+    });
+  };
+
+  release.resourceGroups.forEach((group, index) =>
+    validateGroupSequence(
+      group,
+      `ReleaseList.Release[${release.releaseReference}].ResourceGroup[${index}]`,
+    ),
   );
+
   const frontCoverImages = projection.images.filter(
     (image) => image.imageType === "FrontCoverImage",
   );
@@ -1252,136 +1502,95 @@ function validateReleaseProfile(
           "FrontCoverImage",
       );
 
-  if (profile === "Audio") {
-    if (
-      primaryReferences.length < 1 ||
-      invalidPrimaryReferences.length > 0
-    ) {
-      throw new Ern432AdapterError(
-        "ERN_AUDIO_PRIMARY_RESOURCES_INVALID",
-        "Audio requires one or more primary MusicalWorkSoundRecording or NonMusicalWorkSoundRecording resources.",
-      );
-    }
-
-    if (
-      frontCoverImages.length !== 1 ||
-      topLevelFrontCoverReferences.length !== 1 ||
-      topLevelFrontCoverReferences[0]?.resourceReference !==
-        frontCoverImages[0]?.resourceReference
-    ) {
-      throw new Ern432AdapterError(
-        "ERN_AUDIO_FRONT_COVER_INVALID",
-        "Audio requires exactly one FrontCoverImage linked from the top-level ResourceGroup.",
-      );
-    }
-
-    const trackReferences = projection.trackReleases.map(
-      (trackRelease) => trackRelease.releaseResourceReference,
+  if (
+    frontCoverImages.length !== 1 ||
+    topLevelFrontCoverReferences.length !== 1 ||
+    topLevelFrontCoverReferences[0]?.resourceReference !==
+      frontCoverImages[0]?.resourceReference
+  ) {
+    throw new Ern432AdapterError(
+      "ERN_AUDIO_FRONT_COVER_INVALID",
+      "Audio requires exactly one FrontCoverImage linked from the top-level ResourceGroup.",
     );
-    if (
-      projection.trackReleases.length !== primaryReferences.length ||
-      primaryReferences.some(
-        (reference) =>
-          trackReferences.filter(
-            (candidate) => candidate === reference,
-          ).length !== 1,
-      ) ||
-      trackReferences.some(
-        (reference) =>
-          reference === null ||
-          !primaryReferences.includes(reference),
-      )
-    ) {
+  }
+
+  if (topLevelFrontCoverReferences[0]?.sequenceNumber !== null) {
+    throw new Ern432AdapterError(
+      "ERN_AUDIO_FRONT_COVER_SEQUENCE_FORBIDDEN",
+      "Audio FrontCoverImage secondary resources must not be sequenced.",
+    );
+  }
+
+  const frontCoverProprietaryIds =
+    frontCoverImages[0].resourceIds.flatMap(
+      (resourceId) => resourceId.proprietaryIds,
+    );
+  if (frontCoverProprietaryIds.length < 1) {
+    throw new Ern432AdapterError(
+      "ERN_AUDIO_FRONT_COVER_ID_REQUIRED",
+      "Audio FrontCoverImage secondary resources must be identified by a ProprietaryId.",
+    );
+  }
+
+  const trackReferences = projection.trackReleases.map(
+    (trackRelease) => trackRelease.releaseResourceReference,
+  );
+  if (
+    projection.trackReleases.length !== primaryReferences.length ||
+    primaryReferences.some(
+      (reference) =>
+        trackReferences.filter(
+          (candidate) => candidate === reference,
+        ).length !== 1,
+    ) ||
+    trackReferences.some(
+      (reference) =>
+        reference === null ||
+        !primaryReferences.includes(reference),
+    )
+  ) {
+    throw new Ern432AdapterError(
+      "ERN_AUDIO_TRACK_RELEASES_INVALID",
+      "Audio requires exactly one TrackRelease for each primary resource.",
+    );
+  }
+
+  const seenTrackReleaseIds = new Set<string>();
+  for (const trackRelease of projection.trackReleases) {
+    if (!hasAcceptedReleaseId(trackRelease.identifiers)) {
       throw new Ern432AdapterError(
-        "ERN_AUDIO_TRACK_RELEASES_INVALID",
-        "Audio requires exactly one TrackRelease for each primary resource.",
+        "ERN_AUDIO_TRACK_RELEASE_ID_REQUIRED",
+        `TrackRelease ${trackRelease.releaseReference} must be identified by GRid, ICPN, or ProprietaryId.`,
       );
     }
 
-    if (
-      projection.trackReleases.some(
-        (trackRelease) =>
-          trackRelease.linkedResourceReferences.length > 0,
-      )
-    ) {
+    for (const identifier of trackRelease.identifiers) {
+      if (!allowedReleaseIdSchemes.has(identifier.sourceScheme)) {
+        continue;
+      }
+
+      const key =
+        `${identifier.sourceScheme}:` +
+        `${identifier.namespace ?? ""}:` +
+        identifier.sourceValue;
+      if (seenTrackReleaseIds.has(key)) {
+        throw new Ern432AdapterError(
+          "ERN_AUDIO_TRACK_RELEASE_ID_DUPLICATE",
+          `TrackRelease identifier ${key} is duplicated in the main release context.`,
+        );
+      }
+      seenTrackReleaseIds.add(key);
+    }
+
+    if (trackRelease.linkedResourceReferences.length > 0) {
       throw new Ern432AdapterError(
         "ERN_AUDIO_TRACK_RELEASE_SECONDARY_RESOURCE_FORBIDDEN",
         "Audio TrackReleases may not contain secondary resources.",
       );
     }
-
-    return profile;
   }
 
-  if (
-    primaryReferences.length !== 1 ||
-    invalidPrimaryReferences.length > 0
-  ) {
-    throw new Ern432AdapterError(
-      "ERN_SIMPLE_AUDIO_PRIMARY_RESOURCE_INVALID",
-      "SimpleAudioSingle requires exactly one primary MusicalWorkSoundRecording or NonMusicalWorkSoundRecording.",
-    );
-  }
-
-  if (projection.trackReleases.length !== 0) {
-    throw new Ern432AdapterError(
-      "ERN_SIMPLE_AUDIO_TRACK_RELEASE_FORBIDDEN",
-      "SimpleAudioSingle does not use TrackRelease composites.",
-    );
-  }
-
-  if (release.resourceGroups.length !== 1) {
-    throw new Ern432AdapterError(
-      "ERN_SIMPLE_AUDIO_RESOURCE_GROUP_INVALID",
-      "SimpleAudioSingle requires exactly one ResourceGroup.",
-    );
-  }
-
-  const group = release.resourceGroups[0];
-  if (
-    group.resourceGroups.length !== 0 ||
-    group.contentItems.length !== 1
-  ) {
-    throw new Ern432AdapterError(
-      "ERN_SIMPLE_AUDIO_RESOURCE_GROUP_INVALID",
-      "SimpleAudioSingle requires one ResourceGroupContentItem and no nested ResourceGroups.",
-    );
-  }
-
-  const item = group.contentItems[0];
-  if (
-    item.releaseResourceReference !== primaryReferences[0] ||
-    item.sequenceNumber === null
-  ) {
-    throw new Ern432AdapterError(
-      "ERN_SIMPLE_AUDIO_CONTENT_ITEM_INVALID",
-      "SimpleAudioSingle must sequence and reference its one primary SoundRecording.",
-    );
-  }
-
-  const contentItemFrontCoverReferences =
-    item.linkedResourceReferences.filter(
-      (reference) =>
-        imageByReference.get(reference.resourceReference)?.imageType ===
-        "FrontCoverImage",
-    );
-
-  if (
-    frontCoverImages.length !== 1 ||
-    topLevelFrontCoverReferences.length !== 1 ||
-    contentItemFrontCoverReferences.length !== 1 ||
-    topLevelFrontCoverReferences[0]?.resourceReference !==
-      frontCoverImages[0]?.resourceReference ||
-    contentItemFrontCoverReferences[0]?.resourceReference !==
-      frontCoverImages[0]?.resourceReference
-  ) {
-    throw new Ern432AdapterError(
-      "ERN_SIMPLE_AUDIO_FRONT_COVER_INVALID",
-      "The accepted SimpleAudioSingle shape requires one FrontCoverImage linked from the top-level ResourceGroup and the sole ResourceGroupContentItem.",
-    );
-  }
-
-  return profile;
+  return "Audio";
 }
 
 export function parseErn432(xml: string): Ern432Projection {

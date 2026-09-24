@@ -53,14 +53,12 @@ describe("DDEX ERN 4.3.2 read-only adapter", () => {
 
     expect(result.data.messageContext).toEqual({
       avsVersionId: "9",
-      releaseProfileVersionId: "SimpleAudioSingle",
+      releaseProfileVersionId: null,
       releaseProfileVariantVersionId: null,
       languageAndScriptCode: "en",
     });
 
-    expect(result.data.acceptedReleaseProfile).toBe(
-      "SimpleAudioSingle",
-    );
+    expect(result.data.acceptedReleaseProfile).toBeNull();
     expect(result.data.trackReleaseEvidence).toEqual([]);
 
     expect(result.data.trackCandidates).toEqual([
@@ -135,7 +133,7 @@ describe("DDEX ERN 4.3.2 read-only adapter", () => {
     expect(result.data.releaseCandidates).toEqual([
       {
         releaseReference: "R0",
-        releaseType: "Single",
+        releaseType: "Album",
         title: "Fixture Album",
         displayArtistName: "Fixture Artist",
         releaseDate: "2026-09-23",
@@ -149,17 +147,7 @@ describe("DDEX ERN 4.3.2 read-only adapter", () => {
               {
                 sequenceNumber: 1,
                 releaseResourceReference: "A1",
-                linkedResourceReferences: [
-                  {
-                    resourceReference: "A_IMG1",
-                    linkDescription: "CoverArt",
-                    languageAndScriptCode: null,
-                    namespace: null,
-                    userDefinedValue: null,
-                    sequenceNumber: null,
-                    isMultiFile: null,
-                  },
-                ],
+                linkedResourceReferences: [],
                 isBonusResource: null,
                 isInstantGratificationResource: null,
                 isPreOrderIncentiveResource: null,
@@ -227,6 +215,17 @@ describe("DDEX ERN 4.3.2 read-only adapter", () => {
         resourceReference: "A_IMG1",
         mediaKind: "image",
         imageType: "FrontCoverImage",
+        resourceIds: [
+          {
+            proprietaryIds: [
+              {
+                sourceValue: "IMG-1",
+                namespace: "WAKILISHA",
+              },
+            ],
+            unsupportedFields: [],
+          },
+        ],
         uri: "https://media.invalid/ern432/front-cover.jpg",
         technicalDetails: [
           {
@@ -247,7 +246,7 @@ describe("DDEX ERN 4.3.2 read-only adapter", () => {
 
     expect(projection.namespace).toBe("http://ddex.net/xml/ern/432");
     expect(projection.avsVersionId).toBe("9");
-    expect(projection.releaseProfileVersionId).toBe("SimpleAudioSingle");
+    expect(projection.releaseProfileVersionId).toBeNull();
     expect(projection.releaseProfileVariantVersionId).toBeNull();
     expect(projection.languageAndScriptCode).toBe("en");
     expect(projection.soundRecordings[0].isrc).toBe("KEAAA2600001");
@@ -298,17 +297,7 @@ describe("DDEX ERN 4.3.2 read-only adapter", () => {
           {
             sequenceNumber: 1,
             releaseResourceReference: "A1",
-            linkedResourceReferences: [
-              {
-                resourceReference: "A_IMG1",
-                linkDescription: "CoverArt",
-                languageAndScriptCode: null,
-                namespace: null,
-                userDefinedValue: null,
-                sequenceNumber: null,
-                isMultiFile: null,
-              },
-            ],
+            linkedResourceReferences: [],
             isBonusResource: null,
             isInstantGratificationResource: null,
             isPreOrderIncentiveResource: null,
@@ -327,6 +316,17 @@ describe("DDEX ERN 4.3.2 read-only adapter", () => {
           },
         ],
         resourceGroups: [],
+        unsupportedFields: [],
+      },
+    ]);
+    expect(projection.images[0].resourceIds).toEqual([
+      {
+        proprietaryIds: [
+          {
+            sourceValue: "IMG-1",
+            namespace: "WAKILISHA",
+          },
+        ],
         unsupportedFields: [],
       },
     ]);
@@ -589,47 +589,115 @@ describe("DDEX ERN 4.3.2 read-only adapter", () => {
     ).toEqual(["KEAAA2600002", "KEAAA2600003"]);
   });
 
-  it("accepts Audio only with one TrackRelease per primary resource", () => {
+  it("accepts only the bounded Audio profile with identified TrackReleases", () => {
     const result = mapErn432(fixture("multiple-recordings.xml"));
 
     expect(result.data.acceptedReleaseProfile).toBe("Audio");
     expect(result.data.trackReleaseEvidence).toEqual([
       {
         releaseReference: "R1",
+        identifiers: [
+          {
+            sourceScheme: "ProprietaryId",
+            sourceValue: "TRACKREL-A1-R0",
+            namespace: "WAKILISHA",
+          },
+        ],
         releaseResourceReference: "A1",
         linkedResourceReferences: [],
         unsupportedFields: [
-          "ReleaseId",
           "ReleaseLabelReference",
           "DisplayGenre",
         ],
       },
       {
         releaseReference: "R2",
+        identifiers: [
+          {
+            sourceScheme: "ProprietaryId",
+            sourceValue: "TRACKREL-A2-R0",
+            namespace: "WAKILISHA",
+          },
+        ],
         releaseResourceReference: "A2",
         linkedResourceReferences: [],
         unsupportedFields: [
-          "ReleaseId",
           "ReleaseLabelReference",
           "DisplayGenre",
         ],
       },
     ]);
+    expect(result.lossFlags).not.toContainEqual(
+      expect.objectContaining({
+        path:
+          "ReleaseList.TrackRelease[R1].ReleaseId.ProprietaryId",
+      }),
+    );
+    expect(result.lossFlags).not.toContainEqual(
+      expect.objectContaining({
+        path:
+          "ResourceList.Image[A_IMG2].ResourceId[0].ProprietaryId",
+      }),
+    );
 
-    const invalid = fixture("basic-release.xml").replace(
-      'ReleaseProfileVersionId="SimpleAudioSingle"',
-      'ReleaseProfileVersionId="Audio"',
+    const missingTrackReleases = fixture("basic-release.xml").replace(
+      'AvsVersionId="9"',
+      'AvsVersionId="9" ReleaseProfileVersionId="Audio"',
     );
     expectAdapterError(
-      () => mapErn432(invalid),
+      () => mapErn432(missingTrackReleases),
       "ERN_AUDIO_TRACK_RELEASES_INVALID",
     );
   });
 
+  it("enforces bounded Audio identifier and sequencing rules", () => {
+    const missingIsrc = fixture("multiple-recordings.xml").replace(
+      "<ISRC>KEAAA2600002</ISRC>",
+      '<ProprietaryId Namespace="FixtureTrack">NO-ISRC</ProprietaryId>',
+    );
+    expectAdapterError(
+      () => mapErn432(missingIsrc),
+      "ERN_AUDIO_PRIMARY_ISRC_REQUIRED",
+    );
+
+    const missingCoverId = fixture("multiple-recordings.xml").replace(
+      `      <ResourceId>
+        <ProprietaryId Namespace="WAKILISHA">IMG-2</ProprietaryId>
+      </ResourceId>
+`,
+      "",
+    );
+    expectAdapterError(
+      () => mapErn432(missingCoverId),
+      "ERN_AUDIO_FRONT_COVER_ID_REQUIRED",
+    );
+
+    const missingTrackReleaseId = fixture("multiple-recordings.xml").replace(
+      `      <ReleaseId>
+        <ProprietaryId Namespace="WAKILISHA">TRACKREL-A1-R0</ProprietaryId>
+      </ReleaseId>
+`,
+      "",
+    );
+    expectAdapterError(
+      () => mapErn432(missingTrackReleaseId),
+      "ERN_AUDIO_TRACK_RELEASE_ID_REQUIRED",
+    );
+
+    const unsequencedArtist = fixture("multiple-recordings.xml").replace(
+      '<DisplayArtist SequenceNumber="1">',
+      "<DisplayArtist>",
+    );
+    expectAdapterError(
+      () => mapErn432(unsequencedArtist),
+      "ERN_AUDIO_DISPLAY_ARTIST_SEQUENCE_REQUIRED",
+    );
+  });
+
   it("does not over-claim ERN profile variants", () => {
-    const invalid = fixture("basic-release.xml").replace(
-      'ReleaseProfileVersionId="SimpleAudioSingle"',
-      'ReleaseProfileVersionId="SimpleAudioSingle" ReleaseProfileVariantVersionId="Classical"',
+    const invalid = fixture("multiple-recordings.xml").replace(
+      'ReleaseProfileVersionId="Audio"',
+      'ReleaseProfileVersionId="Audio" ReleaseProfileVariantVersionId="Classical"',
     );
     expectAdapterError(
       () => mapErn432(invalid),
@@ -637,14 +705,14 @@ describe("DDEX ERN 4.3.2 read-only adapter", () => {
     );
   });
 
-  it("rejects multi-resource messages that claim SimpleAudioSingle", () => {
+  it("does not claim SimpleAudioSingle acceptance in this tranche", () => {
     const invalid = fixture("multiple-recordings.xml").replace(
       'ReleaseProfileVersionId="Audio"',
       'ReleaseProfileVersionId="SimpleAudioSingle"',
     );
     expectAdapterError(
       () => mapErn432(invalid),
-      "ERN_SIMPLE_AUDIO_PRIMARY_RESOURCE_INVALID",
+      "ERN_PROFILE_UNSUPPORTED",
     );
   });
 
@@ -766,10 +834,15 @@ describe("DDEX ERN 4.3.2 read-only adapter", () => {
     expect(verifier).toContain(
       "87e99fe74f57a640dce0d3247d16b3b52358562c1dbefc4617eb8a9b7360d943",
     );
-    expect(verifier).toContain("SimpleAudioSingle");
+    expect(verifier).toContain(
+      "ERN-3306%20-%20ERN%20Part%202%20Release%20profiles%20v2.3.1.pdf",
+    );
     expect(verifier).toContain("TrackRelease");
     expect(verifier).toContain(
-      "AUTHORITATIVE ERN 4.3.2 XSD + RELEASE PROFILE FIXTURE CONFORMANCE = PASS",
+      "AUTHORITATIVE ERN 4.3.2 XSD + BOUNDED AUDIO PROFILE ACCEPTANCE = PASS",
+    );
+    expect(verifier).not.toContain(
+      'ReleaseProfileVersionId") == "SimpleAudioSingle"',
     );
     expect(workflow).toContain(
       "scripts/music-standards/verify-ern432-authoritative-conformance.sh",

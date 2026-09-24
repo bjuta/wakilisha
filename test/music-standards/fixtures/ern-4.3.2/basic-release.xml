@@ -2,7 +2,6 @@
 <ern:NewReleaseMessage
   xmlns:ern="http://ddex.net/xml/ern/432"
   AvsVersionId="9"
-  ReleaseProfileVersionId="SimpleAudioSingle"
   LanguageAndScriptCode="en">
   <MessageHeader>
     <MessageId>MSG-ERN-432-001</MessageId>
@@ -104,7 +103,7 @@
   <ReleaseList>
     <Release>
       <ReleaseReference>R0</ReleaseReference>
-      <ReleaseType>Single</ReleaseType>
+      <ReleaseType>Album</ReleaseType>
       <ReleaseId>
         <ICPN>0123456789012</ICPN>
       </ReleaseId>
@@ -126,7 +125,6 @@
         <ResourceGroupContentItem>
           <SequenceNumber>1</SequenceNumber>
           <ReleaseResourceReference>A1</ReleaseResourceReference>
-          <LinkedReleaseResourceReference LinkDescription="CoverArt">A_IMG1</LinkedReleaseResourceReference>
         </ResourceGroupContentItem>
         <LinkedReleaseResourceReference LinkDescription="CoverArt">A_IMG1</LinkedReleaseResourceReference>
       </ResourceGroup>

@@ -8,6 +8,7 @@ import {
   parseErn432,
   type Ern432Projection,
   type ErnAcceptedReleaseProfile,
+  type ErnImageResourceIdProjection,
   type ErnLinkedReleaseResourceReferenceProjection,
   type ErnReleaseIdentifierProjection,
   type ErnResourceGroupProjection,
@@ -52,6 +53,7 @@ export interface ErnMessageContext {
 
 export interface ErnTrackReleaseEvidence {
   releaseReference: string;
+  identifiers: ErnReleaseIdentifierProjection[];
   releaseResourceReference: string | null;
   linkedResourceReferences: ErnLinkedReleaseResourceReferenceProjection[];
   unsupportedFields: string[];
@@ -82,6 +84,7 @@ export interface ErnMediaEvidence {
   resourceReference: string;
   mediaKind: "image";
   imageType: string | null;
+  resourceIds: ErnImageResourceIdProjection[];
   uri: string | null;
   technicalDetails: ErnTechnicalImageDetailsProjection[];
 }
@@ -283,6 +286,12 @@ function mapProjection(
   }
 
   for (const track of projection.soundRecordings) {
+    addUnsupportedFields(
+      lossFlags,
+      `ResourceList.SoundRecording[${track.resourceReference}]`,
+      track.unsupportedFields,
+    );
+
     for (const [editionIndex, edition] of track.editions.entries()) {
       for (const [technicalIndex, technical] of edition.technicalDetails.entries()) {
         const technicalPath =
@@ -382,6 +391,12 @@ function mapProjection(
   }
 
   for (const release of projection.releases) {
+    addUnsupportedFields(
+      lossFlags,
+      `ReleaseList.Release[${release.releaseReference}]`,
+      release.unsupportedFields,
+    );
+
     addResourceGroupLossFlags(
       lossFlags,
       release.resourceGroups,
@@ -446,6 +461,20 @@ function mapProjection(
   }
 
   for (const image of projection.images) {
+    addUnsupportedFields(
+      lossFlags,
+      `ResourceList.Image[${image.resourceReference}]`,
+      image.unsupportedFields,
+    );
+
+    image.resourceIds.forEach((resourceId, resourceIdIndex) => {
+      addUnsupportedFields(
+        lossFlags,
+        `ResourceList.Image[${image.resourceReference}].ResourceId[${resourceIdIndex}]`,
+        resourceId.unsupportedFields,
+      );
+    });
+
     image.technicalDetails.forEach(
       (technical, technicalIndex) => {
         const technicalPath =
@@ -487,13 +516,13 @@ function mapProjection(
       languageAndScriptCode: projection.languageAndScriptCode,
     },
     acceptedReleaseProfile:
-      projection.releaseProfileVersionId === "Audio" ||
-      projection.releaseProfileVersionId === "SimpleAudioSingle"
-        ? projection.releaseProfileVersionId
+      projection.releaseProfileVersionId === "Audio"
+        ? "Audio"
         : null,
     trackReleaseEvidence: projection.trackReleases.map(
       (trackRelease) => ({
         releaseReference: trackRelease.releaseReference,
+        identifiers: trackRelease.identifiers,
         releaseResourceReference:
           trackRelease.releaseResourceReference,
         linkedResourceReferences:
@@ -529,6 +558,7 @@ function mapProjection(
       resourceReference: image.resourceReference,
       mediaKind: "image" as const,
       imageType: image.imageType,
+      resourceIds: image.resourceIds,
       uri: image.uri,
       technicalDetails: image.technicalDetails,
     })),
