@@ -941,25 +941,12 @@ async function buildInternalItems(db: ReturnType<typeof createClient>): Promise<
     }
   }
 
-  const releaseById = new Map<string, Record<string, any>>();
-  for (const row of releases.data ?? []) {
-    releaseById.set(String(row.id), row as Record<string, any>);
-  }
-
   const activeTrackIds = new Set(
     (tracks.data ?? [])
       .map((track: any) => String(track.id || "").trim())
       .filter(Boolean),
   );
 
-  const releaseMembershipsByTrackId = new Map<
-    string,
-    Array<{
-      releaseId: string;
-      trackNumber: number;
-      discNumber: number;
-    }>
-  >();
   const releaseTrackCountByReleaseId =
     new Map<string, number>();
 
@@ -972,20 +959,6 @@ async function buildInternalItems(db: ReturnType<typeof createClient>): Promise<
     releaseTrackCountByReleaseId.set(
       releaseId,
       (releaseTrackCountByReleaseId.get(releaseId) || 0) + 1,
-    );
-
-    const memberships =
-      releaseMembershipsByTrackId.get(trackId) || [];
-
-    memberships.push({
-      releaseId,
-      trackNumber: Number(row.track_number || 0),
-      discNumber: Number(row.disc_number || 0),
-    });
-
-    releaseMembershipsByTrackId.set(
-      trackId,
-      memberships,
     );
   }
 
@@ -1039,99 +1012,10 @@ async function buildInternalItems(db: ReturnType<typeof createClient>): Promise<
       "",
     ).trim();
 
-    const memberships =
-      releaseMembershipsByTrackId.get(trackId) || [];
-
-    const scopedItems: Array<{
-      path: string;
-      artistSlug: string;
-      releaseSlug: string;
-      trackNumber: number;
-      discNumber: number;
-    }> = [];
-
-    for (const membership of memberships) {
-      if (
-        (releaseTrackCountByReleaseId.get(membership.releaseId) || 0) <= 1
-      ) {
-        continue;
-      }
-
-      const release =
-        releaseById.get(membership.releaseId);
-      const releaseSlug =
-        String(release?.slug || "").trim();
-
-      if (!release || !releaseSlug) continue;
-
-      const releaseMeta =
-        (release.metadata || {}) as Record<
-          string,
-          unknown
-        >;
-      const linkedReleaseArtist =
-        releaseArtistByReleaseId.get(
-          membership.releaseId,
-        );
-      const releaseArtistSlug = String(
-        releaseMeta.primary_artist_slug ||
-        releaseMeta.artist_slug ||
-        linkedReleaseArtist?.slug ||
-        "",
-      ).trim();
-
-      if (!releaseArtistSlug) continue;
-
-      scopedItems.push({
-        path: `/releases/${releaseArtistSlug}/${releaseSlug}/${row.slug}`,
-        artistSlug: releaseArtistSlug,
-        releaseSlug,
-        trackNumber: membership.trackNumber,
-        discNumber: membership.discNumber,
-      });
-    }
-
-    scopedItems.sort((left, right) => {
-      const leftArtistRank =
-        left.artistSlug === artistSlug ? 0 : 1;
-      const rightArtistRank =
-        right.artistSlug === artistSlug ? 0 : 1;
-
-      if (leftArtistRank !== rightArtistRank) {
-        return leftArtistRank - rightArtistRank;
-      }
-
-      if (left.discNumber !== right.discNumber) {
-        return left.discNumber - right.discNumber;
-      }
-
-      if (left.trackNumber !== right.trackNumber) {
-        return left.trackNumber - right.trackNumber;
-      }
-
-      return left.path.localeCompare(right.path);
-    });
-
-    if (scopedItems.length) {
-      for (const scoped of scopedItems) {
-        items.push({
-          loc: makeUrl(scoped.path),
-          lastmod: dateOnly(row.updated_at),
-          url_type: "track",
-          source_table: "registry_tracks",
-          source_id: trackId,
-        });
-      }
-
-      continue;
-    }
-
-    const standalonePath = artistSlug
-      ? `/tracks/${artistSlug}/${row.slug}`
-      : `/tracks/${row.slug}`;
+    if (!artistSlug) continue;
 
     items.push({
-      loc: makeUrl(standalonePath),
+      loc: makeUrl(`/tracks/${artistSlug}/${row.slug}`),
       lastmod: dateOnly(row.updated_at),
       url_type: "track",
       source_table: "registry_tracks",

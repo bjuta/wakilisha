@@ -100,6 +100,24 @@ function auditMetadataManifest() {
       reportError(`${route}: ${kind} metadata is missing clean entityName.`);
     }
 
+    if (
+      sourceTable === "registry_tracks" &&
+      !/^\/tracks\/[^/]+\/[^/]+$/.test(route)
+    ) {
+      reportError(
+        `${route}: Registry Track metadata must use canonical Artist-scoped Track identity.`,
+      );
+    }
+
+    if (
+      sourceTable === "registry_releases" &&
+      !/^\/releases\/[^/]+\/[^/]+$/.test(route)
+    ) {
+      reportError(
+        `${route}: Registry Release metadata must use canonical multi-track Release identity.`,
+      );
+    }
+
     if (entityName && ["artist", "track", "release", "playlist", "person", "profile"].includes(kind) && brandCount(entityName) > 0) {
       reportError(`${route}: ${kind} entityName should not include ${SITE_NAME}: "${entityName}"`);
     }

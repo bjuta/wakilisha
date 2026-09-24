@@ -63,7 +63,11 @@ function isCanonicalPublicUrl(url) {
   const parts = pathname.split("/").filter(Boolean);
 
   if (parts[0] === "tracks") {
-    return parts.length >= 3;
+    return parts.length === 3;
+  }
+
+  if (parts[0] === "releases") {
+    return parts.length === 1 || parts.length === 3;
   }
 
   return true;
@@ -86,14 +90,28 @@ function isMusicDetailUrl(url) {
     const parts = pathname.split("/").filter(Boolean);
 
     if (parts[0] === "tracks") {
-      return parts.length >= 3;
+      return parts.length === 3;
     }
 
     if (parts[0] === "releases") {
-      return parts.length === 3 || parts.length === 4;
+      return parts.length === 3;
     }
 
     return false;
+  } catch {
+    return false;
+  }
+}
+
+function isRetiredMusicIdentityUrl(url) {
+  try {
+    const pathname = new URL(url).pathname;
+    const parts = pathname.split("/").filter(Boolean);
+
+    return (
+      (parts[0] === "tracks" && parts.length !== 3) ||
+      (parts[0] === "releases" && parts.length >= 4)
+    );
   } catch {
     return false;
   }
@@ -176,6 +194,16 @@ const canonicalManifestUrls = Object.keys(metadataManifest)
 const canonicalManifestUrlSet = new Set(
   canonicalManifestUrls,
 );
+
+const retiredManifestMusicUrls = canonicalManifestUrls.filter(
+  isRetiredMusicIdentityUrl,
+);
+
+if (retiredManifestMusicUrls.length) {
+  fail(
+    `SEO metadata manifest contains retired public music identities: ${retiredManifestMusicUrls.slice(0, 10).join(", ")}`,
+  );
+}
 
 const distUrls = findDistIndexFiles(distDir)
   .map(publicUrlFromDistIndex)

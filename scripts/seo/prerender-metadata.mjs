@@ -1113,8 +1113,8 @@ async function fetchTrackMetadataManifest() {
     const parts = pagePath.split("/").filter(Boolean);
 
     return (
-      (parts[0] === "tracks" && parts.length >= 3) ||
-      (parts[0] === "releases" && parts.length >= 4)
+      parts[0] === "tracks" &&
+      parts.length === 3
     );
   });
 
@@ -1134,22 +1134,6 @@ async function fetchTrackMetadataManifest() {
         release.track_count ??
         0,
       );
-      const isReleaseScopedTrack =
-        parts[0] === "releases" &&
-        parts.length >= 4;
-
-      if (
-        isReleaseScopedTrack &&
-        (
-          !Number.isFinite(releaseTrackCount) ||
-          releaseTrackCount <= 1
-        )
-      ) {
-        NON_CANONICAL_PUBLIC_PATHS.add(
-          cleanPath(pagePath),
-        );
-        return;
-      }
 
       metadataByPath.set(cleanPath(pagePath), {
         title: firstNonEmpty(track.title),
