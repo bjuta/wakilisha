@@ -801,7 +801,7 @@ function parseTechnicalSoundRecordingDetails(
         technicalDetails,
         "LanguageAndScriptCode",
       ),
-      applicableTerritoryCode: childText(
+      applicableTerritoryCode: attributeText(
         technicalDetails,
         "ApplicableTerritoryCode",
       ),
