@@ -2,6 +2,7 @@
 <ern:NewReleaseMessage
   xmlns:ern="http://ddex.net/xml/ern/432"
   AvsVersionId="9"
+  ReleaseProfileVersionId="Audio"
   LanguageAndScriptCode="en">
   <MessageHeader>
     <MessageId>MSG-ERN-432-002</MessageId>
@@ -72,6 +73,13 @@
       </DisplayArtist>
       <Duration>PT3M30S</Duration>
     </SoundRecording>
+    <Image>
+      <ResourceReference>A_IMG2</ResourceReference>
+      <Type>FrontCoverImage</Type>
+      <ResourceId>
+        <ProprietaryId Namespace="WAKILISHA">IMG-2</ProprietaryId>
+      </ResourceId>
+    </Image>
   </ResourceList>
   <ReleaseList>
     <Release>
@@ -109,7 +117,30 @@
             <ReleaseResourceReference>A2</ReleaseResourceReference>
           </ResourceGroupContentItem>
         </ResourceGroup>
+        <LinkedReleaseResourceReference LinkDescription="CoverArt">A_IMG2</LinkedReleaseResourceReference>
       </ResourceGroup>
     </Release>
+    <TrackRelease>
+      <ReleaseReference>R1</ReleaseReference>
+      <ReleaseId>
+        <ProprietaryId Namespace="WAKILISHA">TRACKREL-A1-R0</ProprietaryId>
+      </ReleaseId>
+      <ReleaseResourceReference>A1</ReleaseResourceReference>
+      <ReleaseLabelReference>P2</ReleaseLabelReference>
+      <DisplayGenre>
+        <GenreText>Afropop</GenreText>
+      </DisplayGenre>
+    </TrackRelease>
+    <TrackRelease>
+      <ReleaseReference>R2</ReleaseReference>
+      <ReleaseId>
+        <ProprietaryId Namespace="WAKILISHA">TRACKREL-A2-R0</ProprietaryId>
+      </ReleaseId>
+      <ReleaseResourceReference>A2</ReleaseResourceReference>
+      <ReleaseLabelReference>P2</ReleaseLabelReference>
+      <DisplayGenre>
+        <GenreText>Afropop</GenreText>
+      </DisplayGenre>
+    </TrackRelease>
   </ReleaseList>
 </ern:NewReleaseMessage>

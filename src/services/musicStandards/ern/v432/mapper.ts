@@ -7,6 +7,9 @@ import type {
 import {
   parseErn432,
   type Ern432Projection,
+  type ErnAcceptedReleaseProfile,
+  type ErnImageResourceIdProjection,
+  type ErnLinkedReleaseResourceReferenceProjection,
   type ErnReleaseIdentifierProjection,
   type ErnResourceGroupProjection,
   type ErnSoundRecordingEditionProjection,
@@ -48,6 +51,14 @@ export interface ErnMessageContext {
   languageAndScriptCode: string | null;
 }
 
+export interface ErnTrackReleaseEvidence {
+  releaseReference: string;
+  identifiers: ErnReleaseIdentifierProjection[];
+  releaseResourceReference: string | null;
+  linkedResourceReferences: ErnLinkedReleaseResourceReferenceProjection[];
+  unsupportedFields: string[];
+}
+
 export interface ErnArtistEvidence {
   context: "track" | "release";
   subjectReference: string;
@@ -73,6 +84,7 @@ export interface ErnMediaEvidence {
   resourceReference: string;
   mediaKind: "image";
   imageType: string | null;
+  resourceIds: ErnImageResourceIdProjection[];
   uri: string | null;
   technicalDetails: ErnTechnicalImageDetailsProjection[];
 }
@@ -100,6 +112,8 @@ export interface ErnTrackCandidate {
 
 export interface Ern432MappedData {
   messageContext: ErnMessageContext;
+  acceptedReleaseProfile: ErnAcceptedReleaseProfile | null;
+  trackReleaseEvidence: ErnTrackReleaseEvidence[];
   releaseCandidates: ErnReleaseCandidate[];
   trackCandidates: ErnTrackCandidate[];
   artistEvidence: ErnArtistEvidence[];
@@ -224,6 +238,20 @@ function mapProjection(
   lossFlags: MusicMappingLoss[];
 } {
   const lossFlags: MusicMappingLoss[] = [];
+
+  projection.trackReleases.forEach((trackRelease) => {
+    for (const field of trackRelease.unsupportedFields) {
+      lossFlags.push({
+        path:
+          `ReleaseList.TrackRelease[${trackRelease.releaseReference}]` +
+          `.${field}`,
+        classification: "partial",
+        detail:
+          "Valid ERN TrackRelease metadata is retained only as profile structural evidence and is not promoted into WAKILISHA canonical Release or Track authority.",
+      });
+    }
+  });
+
   const identifierCandidates: ErnIdentifierCandidate[] = [];
   const artistEvidence: ErnArtistEvidence[] = [];
   const contributorEvidence: ErnContributorEvidence[] = [];
@@ -258,6 +286,12 @@ function mapProjection(
   }
 
   for (const track of projection.soundRecordings) {
+    addUnsupportedFields(
+      lossFlags,
+      `ResourceList.SoundRecording[${track.resourceReference}]`,
+      track.unsupportedFields,
+    );
+
     for (const [editionIndex, edition] of track.editions.entries()) {
       for (const [technicalIndex, technical] of edition.technicalDetails.entries()) {
         const technicalPath =
@@ -357,6 +391,12 @@ function mapProjection(
   }
 
   for (const release of projection.releases) {
+    addUnsupportedFields(
+      lossFlags,
+      `ReleaseList.Release[${release.releaseReference}]`,
+      release.unsupportedFields,
+    );
+
     addResourceGroupLossFlags(
       lossFlags,
       release.resourceGroups,
@@ -421,6 +461,20 @@ function mapProjection(
   }
 
   for (const image of projection.images) {
+    addUnsupportedFields(
+      lossFlags,
+      `ResourceList.Image[${image.resourceReference}]`,
+      image.unsupportedFields,
+    );
+
+    image.resourceIds.forEach((resourceId, resourceIdIndex) => {
+      addUnsupportedFields(
+        lossFlags,
+        `ResourceList.Image[${image.resourceReference}].ResourceId[${resourceIdIndex}]`,
+        resourceId.unsupportedFields,
+      );
+    });
+
     image.technicalDetails.forEach(
       (technical, technicalIndex) => {
         const technicalPath =
@@ -461,6 +515,21 @@ function mapProjection(
         projection.releaseProfileVariantVersionId,
       languageAndScriptCode: projection.languageAndScriptCode,
     },
+    acceptedReleaseProfile:
+      projection.releaseProfileVersionId === "Audio"
+        ? "Audio"
+        : null,
+    trackReleaseEvidence: projection.trackReleases.map(
+      (trackRelease) => ({
+        releaseReference: trackRelease.releaseReference,
+        identifiers: trackRelease.identifiers,
+        releaseResourceReference:
+          trackRelease.releaseResourceReference,
+        linkedResourceReferences:
+          trackRelease.linkedResourceReferences,
+        unsupportedFields: trackRelease.unsupportedFields,
+      }),
+    ),
     releaseCandidates: projection.releases.map((release) => ({
       releaseReference: release.releaseReference,
       releaseType: release.releaseType,
@@ -489,6 +558,7 @@ function mapProjection(
       resourceReference: image.resourceReference,
       mediaKind: "image" as const,
       imageType: image.imageType,
+      resourceIds: image.resourceIds,
       uri: image.uri,
       technicalDetails: image.technicalDetails,
     })),
@@ -508,7 +578,7 @@ export function mapErn432(
 
   return {
     adapterKey: "ddex_ern_import",
-    adapterVersion: 3,
+    adapterVersion: 4,
     externalStandard: "DDEX_ERN",
     externalVersion: "4.3.2",
     messageOrRecordType: "NewReleaseMessage",

@@ -2,8 +2,6 @@
 <ern:NewReleaseMessage
   xmlns:ern="http://ddex.net/xml/ern/432"
   AvsVersionId="9"
-  ReleaseProfileVersionId="Audio"
-  ReleaseProfileVariantVersionId="Classical"
   LanguageAndScriptCode="en">
   <MessageHeader>
     <MessageId>MSG-ERN-432-001</MessageId>
