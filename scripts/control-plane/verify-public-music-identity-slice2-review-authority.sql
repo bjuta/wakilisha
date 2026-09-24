@@ -77,7 +77,7 @@ begin
      or v_new_broker not like '%track_slug_credit_evidence_gap%'
      or v_new_broker not like '%track_recording_identity_conflict%'
      or v_new_broker not like '%human_review_required%'
-     or v_new_broker not like '%same_primary_artist_and_normalized_title_multiple_track_identities%'
+     or v_new_broker not like '%Recording-identity conflict is no longer live.%'
   then
     raise exception
       'STOP: Slice 2 broker is not bound to the exact review-only rule grammar';
