@@ -11,8 +11,8 @@ const ARTIFACT_DIR = process.env.MIZIZI_ARTIFACT_DIR || 'artifacts/mizizi-releas
 const EXPECTED_AUTHORITY_FINGERPRINT = 'cf71fc24d54bb71d64a469e159daaf06b137680f294efe4542b1b691aee68b16';
 const EXPECTED_CANDIDATE_FINGERPRINT = '238a817a5e342f8311ac04fc9a6bc978f67276cb664046cddc9e375bc323e9c4';
 const EXPECTED_BLOBS = {
-  'scripts/registry/agents/mizizi/run.ts': '3f6870d1605786786d78643efd0d97dc54d2d47e',
-  'scripts/registry/agents/mizizi/core.ts': 'c8ab1436437175cd1d7d1c451299ae2b199bc327',
+  'scripts/registry/agents/mizizi/run.ts': '304694af5e83f3d6327d9e7e1bf01510a28dd03d',
+  'scripts/registry/agents/mizizi/core.ts': '164c9b5a0431b06f8d990b0aff6c6ef8a998aacb',
   'supabase/functions/_shared/release-taxonomy.ts': 'e424dea443d7fb6ce85acca4f0c33375c56669ca',
 };
 

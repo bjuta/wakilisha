@@ -283,7 +283,7 @@ Examples:
 Auto-fixes must:
 
 1. compare the expected current value before writing
-2. preserve the old public path through `wk_slug_redirects`
+2. never create new Track or Release redirect authority; `wk_slug_redirects` is historical read-only evidence
 3. write a `registry_canonical_write_events` record
 4. repair derived downstream references that are keyed to the same canonical ID
 5. remain idempotent
@@ -683,6 +683,46 @@ Current public identity authority is:
 This routing contract does not change the Registry UUID, provenance, Release,
 Sound Recording, TrackRelease, rights, or external-identifier authorities.
 
+### Public Music Identity Slice 2 review authority — 24 September 2026
+
+Issue #1068 Slice 2 extends MIZIZI detection without granting new automatic
+Track mutation authority.
+
+Fresh read-only Production evidence on the Slice 2 opening baseline proves:
+
+- active Tracks: **2,101**;
+- existing open MIZIZI Track reviews: **66**;
+- explicit feature-marker Track slugs: **75**;
+- feature-marker Tracks already represented by open review: **63**;
+- feature-marker Tracks invisible to the old structural-credit proof model:
+  **12**;
+- same-primary-Artist + same-clean-title conflict groups: **44**;
+- active Tracks inside those conflict groups: **91**.
+
+The 12 feature-credit cases are not safe automatic repairs. Their current
+Registry credit evidence is missing, incomplete, or contradictory. Slice 2
+therefore introduces `track_slug_credit_evidence_gap/1.3.0` as review-only
+authority. The clean title slug is a review candidate, not an automatic write.
+
+The 44 / 91 recording-identity corpus is independent of slug mutation. Slice 2
+introduces `track_recording_identity_conflict/1.3.0` whenever multiple active
+Track UUIDs share a primary Artist and the same normalized clean title.
+ISRC disagreement is intentionally not used as automated proof of distinct
+canonical recordings; any ISRC evidence remains contextual for human review.
+
+The existing 1.2.0 finding versions remain unchanged. In particular, the 66
+historical `track_slug_identity_noise` reviews keep their existing
+fingerprints and are not reissued merely because Slice 2 adds review semantics.
+
+Slice 2 does not:
+
+- rewrite a Track slug;
+- merge or delete Track UUIDs;
+- infer collaborator truth from title text alone;
+- create numeric, year, UUID, or random slug suffixes;
+- create redirects;
+- treat Release membership as Track identity;
+- treat ISRC disagreement as an automatic recording-identity decision.
 
 Historical closure context retained for audit:
 

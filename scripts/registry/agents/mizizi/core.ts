@@ -22,6 +22,7 @@ export {
 export const MIZIZI_AGENT_KEY = "mizizi";
 export const MIZIZI_AGENT_LABEL = "MIZIZI Cultural Data Steward";
 export const MIZIZI_RULESET_VERSION = "1.2.0";
+export const MIZIZI_PUBLIC_IDENTITY_REVIEW_RULE_VERSION = "1.3.0";
 
 export type MiziziEntityType = "track" | "release" | "chart_entry";
 export type MiziziDisposition = "auto_fix_candidate" | "review" | "observe";
@@ -46,9 +47,17 @@ export type TrackIdentityInput = {
   id: string;
   slug: string;
   title: string;
+  isrc?: string | null;
   primaryArtistSlug?: string | null;
   primaryArtistName?: string | null;
   featuredArtists?: Array<{ slug?: string | null; name?: string | null }>;
+  recordingIdentityPeers?: Array<{
+    id: string;
+    slug: string;
+    title: string;
+    isrc?: string | null;
+    sharedPrimaryArtistSlug: string;
+  }>;
 };
 
 export type ReleaseIdentityInput = {
@@ -111,11 +120,19 @@ function containsFeaturedArtistSlug(
   });
 }
 
-function makeFinding(input: Omit<MiziziFinding, "fingerprint" | "ruleVersion">): MiziziFinding {
+function makeFinding(
+  input:
+    Omit<MiziziFinding, "fingerprint" | "ruleVersion"> & {
+      ruleVersion?: string;
+    },
+): MiziziFinding {
+  const ruleVersion =
+    input.ruleVersion ||
+    MIZIZI_RULESET_VERSION;
   const stable = JSON.stringify({
     agent: MIZIZI_AGENT_KEY,
     ruleId: input.ruleId,
-    ruleVersion: MIZIZI_RULESET_VERSION,
+    ruleVersion,
     entityType: input.entityType,
     entityId: input.entityId,
     fieldName: input.fieldName,
@@ -126,7 +143,7 @@ function makeFinding(input: Omit<MiziziFinding, "fingerprint" | "ruleVersion">):
   return {
     ...input,
     fingerprint: createHash("sha256").update(stable).digest("hex"),
-    ruleVersion: MIZIZI_RULESET_VERSION,
+    ruleVersion,
   };
 }
 
@@ -238,6 +255,50 @@ export function analyzeTrackIdentity(input: TrackIdentityInput): MiziziFinding[]
     }));
   }
 
+  if (
+    featureMarkerInSlug(input.slug) &&
+    !featureCreditStructurallyProven
+  ) {
+    const reviewCandidate =
+      slugifyIdentity(
+        featureCleanup.coreTitle,
+      );
+
+    if (
+      reviewCandidate &&
+      reviewCandidate !== input.slug
+    ) {
+      findings.push(makeFinding({
+        ruleId:
+          "track_slug_credit_evidence_gap",
+        ruleVersion:
+          MIZIZI_PUBLIC_IDENTITY_REVIEW_RULE_VERSION,
+        entityType: "track",
+        entityId: input.id,
+        fieldName: "slug",
+        currentValue: input.slug,
+        proposedValue:
+          reviewCandidate,
+        confidence: 1,
+        severity: "high",
+        disposition: "review",
+        reason:
+          "feature_credit_marker_without_structural_feature_credit_proof",
+        evidence: {
+          title: input.title,
+          removedFragments:
+            featureCleanup.removedFragments,
+          primaryArtistSlug:
+            input.primaryArtistSlug || "",
+          primaryArtistName:
+            input.primaryArtistName || "",
+          structuredFeaturedArtists:
+            input.featuredArtists || [],
+        },
+      }));
+    }
+  }
+
   if (featureCleanup.removedFragments.length > 0) {
     findings.push(makeFinding({
       ruleId: "track_title_credit_noise",
@@ -253,6 +314,43 @@ export function analyzeTrackIdentity(input: TrackIdentityInput): MiziziFinding[]
       evidence: {
         removedFragments: featureCleanup.removedFragments,
         structuredFeaturedArtists: input.featuredArtists || [],
+      },
+    }));
+  }
+
+  const recordingIdentityPeers =
+    input.recordingIdentityPeers || [];
+
+  if (recordingIdentityPeers.length > 0) {
+    const canonicalTitleSlug =
+      slugifyIdentity(
+        featureCleanup.coreTitle,
+      );
+
+    findings.push(makeFinding({
+      ruleId:
+        "track_recording_identity_conflict",
+      ruleVersion:
+        MIZIZI_PUBLIC_IDENTITY_REVIEW_RULE_VERSION,
+      entityType: "track",
+      entityId: input.id,
+      fieldName:
+        "recording_identity",
+      currentValue: input.id,
+      proposedValue:
+        "human_review_required",
+      confidence: 1,
+      severity: "high",
+      disposition: "review",
+      reason:
+        "same_primary_artist_and_normalized_title_multiple_track_identities",
+      evidence: {
+        canonicalTitleSlug,
+        isrc: input.isrc || "",
+        peers:
+          recordingIdentityPeers,
+        identityPolicy:
+          "different_isrc_is_evidence_not_automatic_distinct_recording_proof",
       },
     }));
   }

@@ -45,9 +45,9 @@ const EXPECTED_CHART_CANDIDATE_FINGERPRINT =
 
 const EXPECTED_BLOBS = {
   "scripts/registry/agents/mizizi/run.ts":
-    "3f6870d1605786786d78643efd0d97dc54d2d47e",
+    "304694af5e83f3d6327d9e7e1bf01510a28dd03d",
   "scripts/registry/agents/mizizi/core.ts":
-    "c8ab1436437175cd1d7d1c451299ae2b199bc327",
+    "164c9b5a0431b06f8d990b0aff6c6ef8a998aacb",
   "supabase/migrations/20260918173446_mizizi_stage_b_broker_convergence_v1.sql":
     "1cd6c591fe312225a8cbfa431b53063431127b77",
   "supabase/migrations/20260920095334_mizizi_stage_c_narrow_executor_transport_v1.sql":
@@ -176,7 +176,7 @@ function assertAudit(
     assertFields(
       summary,
       {
-        findings: 561,
+        findings: 664,
         applied: 0,
         queued: 0,
         observed: 495,
@@ -201,11 +201,21 @@ function assertAudit(
           clean,
           "track_slug_identity_mismatch",
         ),
+        creditEvidenceGap: ruleCount(
+          clean,
+          "track_slug_credit_evidence_gap",
+        ),
+        recordingIdentityConflict: ruleCount(
+          clean,
+          "track_recording_identity_conflict",
+        ),
       },
       {
         titleNoise: 492,
         slugNoise: 66,
         mismatch: 3,
+        creditEvidenceGap: 12,
+        recordingIdentityConflict: 91,
       },
       "Track findings",
     );
