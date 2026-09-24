@@ -46,8 +46,9 @@ export function releaseUrl(release: PublicReleaseRouteInput): string {
     release.releaseType || "",
   ).trim().toLowerCase();
   const isSingle =
-    trackCount === 1 ||
-    releaseType === "single";
+    trackCount !== null
+      ? trackCount === 1
+      : releaseType === "single";
 
   if (isSingle && release.singleTrackSlug) {
     const trackArtistSlug =
@@ -67,9 +68,10 @@ export function releaseUrl(release: PublicReleaseRouteInput): string {
   }
 
   const isKnownMultiTrack =
-    (trackCount !== null && trackCount >= 2) ||
-    releaseType === "ep" ||
-    releaseType === "album";
+    trackCount !== null
+      ? trackCount >= 2
+      : releaseType === "ep" ||
+        releaseType === "album";
 
   if (!isKnownMultiTrack) {
     return "/releases";
