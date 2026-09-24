@@ -600,6 +600,15 @@ Audit only:
 
 `npm run registry:mizizi:audit`
 
+Materialize analyzer-classified review findings without entering canonical mutation paths:
+
+`npm run registry:mizizi:review`
+
+Review mode queues only findings whose analyzer disposition is already `review`.
+It does not convert `auto_fix_candidate` findings into review work, issue
+stewardship execution grants, or call Track, Release, or Chart canonical
+mutation operations.
+
 Apply auto-fix-safe findings:
 
 `npm run registry:mizizi:apply -- --confirm=MIZIZI_APPLY`
@@ -826,3 +835,29 @@ reviewed trigger-file push may enter apply mode.
 The #1013 first gate is therefore a fresh full-corpus preflight through the
 accepted Track and Release control planes. No operation enablement or Registry
 mutation is authorized by this documentation checkpoint.
+
+
+### Public Music Identity Slice 3 review-queue opening — 24 September 2026
+
+Issue #1068 Slice 3 begins with review materialization only.
+
+Fresh Production evidence after Slice 2 closure proves:
+
+- the 66 remaining `track_slug_identity_noise` candidates are the exact
+  historical blocked review corpus and remain unchanged;
+- all 66 still have live proposed slug changes, so they must not be blindly
+  replayed through canonical Track mutation;
+- new review-only findings are 12
+  `track_slug_credit_evidence_gap/1.3.0` cases and 91
+  `track_recording_identity_conflict/1.3.0` cases;
+- current Release taxonomy candidates are 0;
+- current evidence-backed Release packaging cleanup candidates are 0;
+- 13 zero-resolvable active Releases remain a separate membership-repair
+  blocker;
+- Chart Artist-slug drift remains observe-only evidence.
+
+Slice 3 therefore introduces runner `--mode=review` as a narrower execution
+surface. In that mode MIZIZI may call the accepted bounded review broker for
+findings already classified `review`, but it must skip every
+`auto_fix_candidate` and must not enter canonical Track, Release, or Chart
+mutation operations.

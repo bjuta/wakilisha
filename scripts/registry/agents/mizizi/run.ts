@@ -17,7 +17,7 @@ import {
 } from "../../phase1-db";
 
 type EntityScope = "track" | "release" | "chart" | "all";
-type RunMode = "audit" | "apply";
+type RunMode = "audit" | "review" | "apply";
 
 type Options = {
   mode: RunMode;
@@ -189,9 +189,9 @@ function parseOptions(): Options {
     ).trim().toLowerCase() ===
       "true";
 
-  if (!["audit", "apply"].includes(mode)) {
+  if (!["audit", "review", "apply"].includes(mode)) {
     throw new Error(
-      "Unsupported --mode. Use audit or apply.",
+      "Unsupported --mode. Use audit, review, or apply.",
     );
   }
 
@@ -1460,7 +1460,7 @@ async function scanTracks(
         );
 
         if (
-          options.mode !== "apply"
+          options.mode === "audit"
         ) {
           continue;
         }
@@ -1469,6 +1469,22 @@ async function scanTracks(
           finding.disposition ===
           "observe"
         ) {
+          continue;
+        }
+
+        if (
+          options.mode === "review"
+        ) {
+          if (
+            finding.disposition ===
+              "review"
+          ) {
+            await queueReview(
+              pool,
+              finding,
+            );
+            stats.queued += 1;
+          }
           continue;
         }
 
@@ -1570,9 +1586,11 @@ async function scanReleases(
   stats: RunStats,
 ): Promise<void> {
   const releaseSlugPlan =
-    await loadReleaseSlugPlan(
-      pool,
-    );
+    options.mode === "review"
+      ? new Map<string, ReleaseSlugPlan>()
+      : await loadReleaseSlugPlan(
+          pool,
+        );
 
   let seen = 0;
   let cursorUpdatedAt: string | null =
@@ -1724,7 +1742,7 @@ async function scanReleases(
         );
 
         if (
-          options.mode !== "apply"
+          options.mode === "audit"
         ) {
           continue;
         }
@@ -1733,6 +1751,22 @@ async function scanReleases(
           effectiveFinding.disposition ===
           "observe"
         ) {
+          continue;
+        }
+
+        if (
+          options.mode === "review"
+        ) {
+          if (
+            effectiveFinding.disposition ===
+              "review"
+          ) {
+            await queueReview(
+              pool,
+              effectiveFinding,
+            );
+            stats.queued += 1;
+          }
           continue;
         }
 
@@ -1953,8 +1987,24 @@ async function scanCharts(
         );
 
         if (
-          options.mode !== "apply"
+          options.mode === "audit"
         ) {
+          continue;
+        }
+
+        if (
+          options.mode === "review"
+        ) {
+          if (
+            finding.disposition ===
+              "review"
+          ) {
+            await queueReview(
+              pool,
+              finding,
+            );
+            stats.queued += 1;
+          }
           continue;
         }
 
@@ -2319,6 +2369,12 @@ async function main(): Promise<void> {
     ) {
       console.log(
         "Audit mode completed. No Registry rows were changed.",
+      );
+    } else if (
+      options.mode === "review"
+    ) {
+      console.log(
+        "Review mode completed. No canonical Registry rows were changed.",
       );
     }
   } finally {
