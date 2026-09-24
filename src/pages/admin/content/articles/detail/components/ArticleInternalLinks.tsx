@@ -10,6 +10,10 @@ interface LinkSuggestion {
   type: "article" | "artist" | "release";
   section?: string;
   matchReason: string;
+  artistName?: string;
+  artistSlug?: string;
+  releaseType?: string;
+  trackCount?: number;
 }
 
 interface Props {
@@ -77,10 +81,97 @@ export function ArticleInternalLinks({ content, currentSlug, categories, tags, o
         const releaseConditions = searchTerms.map((term) => `title.ilike.%${term}%`).join(",");
         const { data: releases } = await supabase
           .from("registry_releases")
-          .select("slug, title, release_type")
+          .select("id, slug, title, release_type")
           .in("status", ["active", "draft"])
           .or(releaseConditions)
           .limit(5);
+
+        const releaseIds = (releases ?? [])
+          .map((release) => String(release.id || ""))
+          .filter(Boolean);
+
+        let releaseMemberships: Array<{
+          release_id: string;
+          track_id: string;
+        }> = [];
+        let releaseArtists: Array<{
+          release_id: string;
+          artist_slug: string;
+          artist_name_text: string;
+          is_primary: boolean;
+          credit_order: number;
+        }> = [];
+
+        if (releaseIds.length > 0) {
+          const [membershipResult, artistResult] = await Promise.all([
+            supabase
+              .from("registry_release_tracks")
+              .select("release_id, track_id")
+              .in("release_id", releaseIds)
+              .eq("status", "active"),
+            supabase
+              .from("registry_release_artists")
+              .select("release_id, artist_slug, artist_name_text, is_primary, credit_order")
+              .in("release_id", releaseIds)
+              .eq("status", "active")
+              .order("is_primary", { ascending: false })
+              .order("credit_order", { ascending: true }),
+          ]);
+
+          releaseMemberships =
+            (membershipResult.data ?? []) as typeof releaseMemberships;
+          releaseArtists =
+            (artistResult.data ?? []) as typeof releaseArtists;
+        }
+
+        const membershipTrackIds = [
+          ...new Set(
+            releaseMemberships
+              .map((membership) => String(membership.track_id || ""))
+              .filter(Boolean),
+          ),
+        ];
+
+        const { data: activeMembershipTracks } =
+          membershipTrackIds.length > 0
+            ? await supabase
+                .from("registry_tracks")
+                .select("id")
+                .in("id", membershipTrackIds)
+                .eq("status", "active")
+            : { data: [] as Array<{ id: string }> };
+
+        const activeTrackIds = new Set(
+          (activeMembershipTracks ?? []).map((track) => String(track.id)),
+        );
+        const trackCountByRelease = new Map<string, number>();
+
+        for (const membership of releaseMemberships) {
+          const releaseId = String(membership.release_id || "");
+          const trackId = String(membership.track_id || "");
+          if (!releaseId || !activeTrackIds.has(trackId)) continue;
+
+          trackCountByRelease.set(
+            releaseId,
+            (trackCountByRelease.get(releaseId) || 0) + 1,
+          );
+        }
+
+        const primaryArtistByRelease = new Map<
+          string,
+          { name: string; slug: string }
+        >();
+
+        for (const credit of releaseArtists) {
+          const releaseId = String(credit.release_id || "");
+          if (!releaseId || primaryArtistByRelease.has(releaseId)) continue;
+          if (!credit.is_primary) continue;
+
+          primaryArtistByRelease.set(releaseId, {
+            name: String(credit.artist_name_text || credit.artist_slug || ""),
+            slug: String(credit.artist_slug || ""),
+          });
+        }
 
         const results: LinkSuggestion[] = [];
 
@@ -109,11 +200,24 @@ export function ArticleInternalLinks({ content, currentSlug, categories, tags, o
         }
 
         for (const release of (releases ?? [])) {
-          const matchedTerm = searchTerms.find((t) => (release.title as string).toLowerCase().includes(t));
+          const releaseId = String(release.id || "");
+          const trackCount = trackCountByRelease.get(releaseId) || 0;
+          const primaryArtist = primaryArtistByRelease.get(releaseId);
+
+          if (trackCount <= 1 || !primaryArtist?.slug) continue;
+
+          const matchedTerm = searchTerms.find((t) =>
+            (release.title as string).toLowerCase().includes(t)
+          );
+
           results.push({
             slug: release.slug as string,
             title: release.title as string,
             type: "release",
+            artistName: primaryArtist.name,
+            artistSlug: primaryArtist.slug,
+            releaseType: String(release.release_type || ""),
+            trackCount,
             matchReason: matchedTerm ? `Matches "${matchedTerm}"` : "Related release",
           });
         }
@@ -140,7 +244,13 @@ export function ArticleInternalLinks({ content, currentSlug, categories, tags, o
       case "artist":
         return `/artists/${suggestion.slug}`;
       case "release":
-        return releaseUrl({ slug: suggestion.slug, artist: suggestion.title });
+        return releaseUrl({
+          slug: suggestion.slug,
+          artist: suggestion.artistName || "",
+          artistSlug: suggestion.artistSlug,
+          releaseType: suggestion.releaseType,
+          trackCount: suggestion.trackCount,
+        });
     }
   }
 

@@ -81,7 +81,7 @@ export function HomeFeatured({ chartEntries, loading }: Props) {
               return (
                 <Link
                   key={entry?.trackSlug ?? i}
-                  to={hasEntry ? trackUrl(entry!.trackSlug, entry!.artistSlugs, entry!.canonicalTrackId) : "/charts"}
+                  to={hasEntry ? trackUrl(entry!.trackSlug, entry!.artistSlugs) : "/charts"}
                   className="group relative rounded-2xl overflow-hidden border border-[var(--wk-border)] block cursor-pointer"
                   style={{
                     background: "var(--wk-surface)",

@@ -221,7 +221,7 @@ export function ChartRow({
           <div className="mb-0.5 flex min-w-0 items-start gap-2">
             {slug ? (
               <Link
-                to={trackUrl(slug, artistSlugs, registryTrackId)}
+                to={trackUrl(slug, artistSlugs)}
                 onClick={(e) => e.stopPropagation()}
                 className="min-w-0 flex-1 line-clamp-2 text-[14px] font-bold leading-tight text-[var(--wk-text)] hover:underline md:line-clamp-1"
               >

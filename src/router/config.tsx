@@ -319,8 +319,6 @@ const routes: RouteObject[] = [
       { path: "/artists/:slug", element: <ResponsivePage mobile={<ArtistDetail />} desktop={<ArtistDetail />} /> },
       { path: "/artists/:slug/manage", element: <ResponsivePage mobile={<ArtistManagePage />} desktop={<ArtistManagePage />} /> },
       { path: "/artists/:slug/updates/:updateId", element: <ResponsivePage mobile={<ArtistUpdatePage />} desktop={<ArtistUpdatePage />} /> },
-      { path: "/tracks/:artistSlug/:trackSlug/:trackId", element: <ResponsivePage mobile={<TrackDetail />} desktop={<TrackDetail />} /> },
-      { path: "/tracks/:artistSlug/:trackSlug/:trackId/lyrics/contribute", element: <LyricContribution /> },
       { path: "/tracks/:artistSlug/:trackSlug", element: <ResponsivePage mobile={<TrackDetail />} desktop={<TrackDetail />} /> },
       { path: "/tracks/:artistSlug/:trackSlug/lyrics/contribute", element: <LyricContribution /> },
       { path: "/releases", element: <ResponsivePage mobile={<Releases />} desktop={<Releases />} /> },

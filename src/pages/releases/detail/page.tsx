@@ -57,6 +57,12 @@ export default function ReleaseDetail() {
         listReleases(),
       ]);
       if (data) {
+        if (data.trackCount <= 1) {
+          setStatus("error");
+          setError("This single lives on its Track page.");
+          return;
+        }
+
         setRelease(data);
         const rel = allReleases
           .filter((r) => r.slug !== releaseSlug && (r.artist === data.artist || r.labelName === data.labelName || r.releaseType === data.releaseType))

@@ -196,7 +196,7 @@ function RelatedTrackCard({ track }: { track: RelatedTrack }) {
 
   return (
     <Link
-      to={trackUrl(track.slug, [track.artistSlug], track.id)}
+      to={trackUrl(track.slug, [track.artistSlug])}
       className="group border border-[var(--wk-border)] rounded-xl bg-[var(--wk-surface)] p-3 hover:border-[var(--wk-brand)]/30 hover:bg-[var(--wk-surface-raised)] transition-all duration-200"
     >
       <div className="aspect-square rounded-lg overflow-hidden bg-[var(--wk-bg)] mb-3 border border-[var(--wk-border)]">

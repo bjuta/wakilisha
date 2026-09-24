@@ -390,6 +390,20 @@ export default function ReleaseDetailPage() {
         release={heroData}
         trackCount={tracks.length}
         totalDurationMs={totalDurationMs}
+        singleTrackSlug={
+          tracks.length === 1 ? tracks[0]?.track_slug || null : null
+        }
+        singleTrackArtistSlug={
+          tracks.length === 1
+            ? trackArtists.find(
+                (credit) =>
+                  credit.track_id === tracks[0]?.track_id &&
+                  credit.is_primary,
+              )?.artist_slug ||
+              heroData.artist_slug ||
+              null
+            : null
+        }
         onToggleEdit={() => setEditOpen((v) => !v)}
         editOpen={editOpen}
       />

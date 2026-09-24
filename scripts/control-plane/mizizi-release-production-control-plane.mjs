@@ -13,7 +13,7 @@ const EXPECTED_CANDIDATE_FINGERPRINT = '238a817a5e342f8311ac04fc9a6bc978f67276cb
 const EXPECTED_BLOBS = {
   'scripts/registry/agents/mizizi/run.ts': '3f6870d1605786786d78643efd0d97dc54d2d47e',
   'scripts/registry/agents/mizizi/core.ts': 'c8ab1436437175cd1d7d1c451299ae2b199bc327',
-  'supabase/functions/_shared/release-taxonomy.ts': '12eaff54ac13e9b36fe3319d955d84e0d98d73a6',
+  'supabase/functions/_shared/release-taxonomy.ts': 'e424dea443d7fb6ce85acca4f0c33375c56669ca',
 };
 
 if (!['preflight','apply'].includes(MODE)) throw new Error('Unsupported control-plane mode');

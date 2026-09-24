@@ -91,9 +91,7 @@ export default function DesktopPlayerPage() {
     const trackSlug = currentTrack.trackSlug || currentTrack.id;
     const entityUrl = trackUrl(
       trackSlug,
-      currentTrack.artistSlug ? [currentTrack.artistSlug] : [],
-      currentTrack.registryTrackId,
-    );
+      currentTrack.artistSlug ? [currentTrack.artistSlug] : []);
 
     setSaveError(null);
 
