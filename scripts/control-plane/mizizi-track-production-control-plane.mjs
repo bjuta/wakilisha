@@ -11,8 +11,8 @@ const TRIGGER_FILE = process.env.MIZIZI_TRIGGER_FILE || '';
 const ARTIFACT_DIR = process.env.MIZIZI_ARTIFACT_DIR || 'artifacts/mizizi-track-production-control-plane';
 const EXPECTED_FINGERPRINT = '551b29431700536937c26ecb1e396c3cf9314edefd88c589284cf330c9d1bb9a';
 const EXPECTED_BLOBS = {
-  'scripts/registry/agents/mizizi/run.ts': '3f6870d1605786786d78643efd0d97dc54d2d47e',
-  'scripts/registry/agents/mizizi/core.ts': 'c8ab1436437175cd1d7d1c451299ae2b199bc327',
+  'scripts/registry/agents/mizizi/run.ts': '785069516432f04997085b53ef708c898d17f3c7',
+  'scripts/registry/agents/mizizi/core.ts': '164c9b5a0431b06f8d990b0aff6c6ef8a998aacb',
   'supabase/functions/_shared/registry-track-identity.ts': '7bcab485aecc3cc7b90e2a3154d90dcee81be92c',
 };
 
@@ -438,9 +438,25 @@ function assertAcceptedPostApply(state) {
 
 function assertAudit(text, before) {
   const clean = text.replace(/\x1b\[[0-9;]*m/g, '');
-  const rules = before ? [['track_slug_identity_noise',506],['track_title_credit_noise',492],['track_slug_identity_mismatch',3]] : [['track_slug_identity_noise',66],['track_title_credit_noise',492],['track_slug_identity_mismatch',3]];
+  const rules = before
+    ? [
+        ['track_slug_identity_noise',506],
+        ['track_title_credit_noise',492],
+        ['track_slug_identity_mismatch',3],
+        ['track_slug_credit_evidence_gap',12],
+        ['track_recording_identity_conflict',91],
+      ]
+    : [
+        ['track_slug_identity_noise',66],
+        ['track_title_credit_noise',492],
+        ['track_slug_identity_mismatch',3],
+        ['track_slug_credit_evidence_gap',12],
+        ['track_recording_identity_conflict',91],
+      ];
   for (const [rule,count] of rules) if (!(new RegExp(`'${rule}'\\s*\u2502\\s*${count}\\s*\u2502`)).test(clean)) throw new Error(`${rule} expected ${count}`);
-  const summary = before ? /\u2502\s*0\s*\u2502\s*1001\s*\u2502\s*0\s*\u2502\s*0\s*\u2502\s*495\s*\u2502\s*0\s*\u2502\s*2101\s*\u2502/ : /\u2502\s*0\s*\u2502\s*561\s*\u2502\s*0\s*\u2502\s*0\s*\u2502\s*495\s*\u2502\s*0\s*\u2502\s*2101\s*\u2502/;
+  const summary = before
+    ? /\u2502\s*0\s*\u2502\s*1104\s*\u2502\s*0\s*\u2502\s*0\s*\u2502\s*495\s*\u2502\s*0\s*\u2502\s*2101\s*\u2502/
+    : /\u2502\s*0\s*\u2502\s*664\s*\u2502\s*0\s*\u2502\s*0\s*\u2502\s*495\s*\u2502\s*0\s*\u2502\s*2101\s*\u2502/;
   if (!summary.test(clean) || !clean.includes('Audit mode completed. No Registry rows were changed.')) throw new Error(`${before ? 'pre' : 'post'}-apply audit summary mismatch`);
 }
 
@@ -591,7 +607,7 @@ async function main() {
           auditCurrent,
         );
         assertAudit(fs.readFileSync(auditCurrent,'utf8'),false);
-        console.log('PASS: fresh post-apply audit = 561 findings / 66 blocked candidates / 495 observe-only / 2101 Tracks');
+        console.log('PASS: fresh post-apply audit = 664 findings / 66 deterministic candidates / 12 credit-evidence reviews / 91 recording-identity reviews / 495 observe-only / 2101 Tracks');
 
         if (MODE === 'apply') {
           throw new Error('historical Track apply is already accepted; refusing repeat production mutation');
