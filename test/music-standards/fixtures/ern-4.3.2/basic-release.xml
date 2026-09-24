@@ -53,14 +53,34 @@
         <ResourceId>
           <ISRC>KEAAA2600005</ISRC>
         </ResourceId>
-        <TechnicalDetails>
+        <TechnicalDetails LanguageAndScriptCode="en" IsDefault="true">
+          <ApplicableTerritoryCode>Worldwide</ApplicableTerritoryCode>
           <TechnicalResourceDetailsReference>T_AUDIO1</TechnicalResourceDetailsReference>
           <DeliveryFile>
             <Type>AudioFile</Type>
+            <AudioCodecType>FLAC</AudioCodecType>
+            <BitRate UnitOfMeasure="kbps">2304</BitRate>
+            <NumberOfChannels>2</NumberOfChannels>
+            <SamplingRate UnitOfMeasure="Hz">96000</SamplingRate>
+            <BitsPerSample>24</BitsPerSample>
             <File>
-              <URI>file://fixture-track.wav</URI>
+              <URI>file://fixture-track-hires.flac</URI>
             </File>
+            <IsProvidedInDelivery>true</IsProvidedInDelivery>
           </DeliveryFile>
+          <DeliveryFile>
+            <Type>AudioFile</Type>
+            <AudioCodecType>AAC</AudioCodecType>
+            <BitRate UnitOfMeasure="kbps">320</BitRate>
+            <NumberOfChannels>2</NumberOfChannels>
+            <SamplingRate UnitOfMeasure="Hz">48000</SamplingRate>
+            <BitsPerSample>24</BitsPerSample>
+            <File>
+              <URI>file://fixture-track.aac</URI>
+            </File>
+            <IsProvidedInDelivery>true</IsProvidedInDelivery>
+          </DeliveryFile>
+          <HasImmersiveAudioMetadata>false</HasImmersiveAudioMetadata>
         </TechnicalDetails>
       </SoundRecordingEdition>
       <SoundRecordingEdition>
@@ -68,6 +88,23 @@
         <ResourceId>
           <ISRC>KEAAA2600099</ISRC>
         </ResourceId>
+        <TechnicalDetails IsDefault="true">
+          <TechnicalResourceDetailsReference>T_AUDIO2</TechnicalResourceDetailsReference>
+          <DeliveryFile>
+            <Type>AudioFile</Type>
+            <AudioCodecType Namespace="Dolby" UserDefinedValue="DolbyAtmos">UserDefined</AudioCodecType>
+            <BitRate UnitOfMeasure="kbps">768</BitRate>
+            <NumberOfChannels>5.1</NumberOfChannels>
+            <NumberOfAudioObjects>16</NumberOfAudioObjects>
+            <SamplingRate UnitOfMeasure="Hz">48000</SamplingRate>
+            <BitsPerSample>24</BitsPerSample>
+            <File>
+              <URI>file://fixture-track-atmos.m4a</URI>
+            </File>
+            <IsProvidedInDelivery>true</IsProvidedInDelivery>
+          </DeliveryFile>
+          <HasImmersiveAudioMetadata>true</HasImmersiveAudioMetadata>
+        </TechnicalDetails>
       </SoundRecordingEdition>
       <DisplayTitleText>Fixture Track</DisplayTitleText>
       <DisplayTitle>
