@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { useParams, Link, useNavigate } from "react-router-dom";
+import { useParams, Link } from "react-router-dom";
 import { WkIcon } from "@/components/design-system/Icon";
 import { ResponsiveMediaImage } from "@/components/media/ResponsiveMediaImage";
 import { PlayableArtwork } from "@/components/design-system/music/PlayableArtwork";
@@ -9,7 +9,7 @@ import { ReleaseSaveButton } from "@/components/releases/ReleaseSaveButton";
 import { MetaTags } from "@/components/seo/MetaTags";
 import { usePlayer } from "@/context/PlayerContext";
 import { getRelease, slugify, listReleases, releaseUrl, type PublicReleaseDetail, type PublicRelease } from "@/services/publicContent/client";
-import { canonicalTrackUrl, trackUrl } from "@/utils/trackUrl";
+import { canonicalTrackUrl } from "@/utils/trackUrl";
 import { useScrollDepthTracking } from "@/hooks/useScrollDepthTracking";
 import { MobileShareButton } from "@/components/design-system/share/ShareSheet";
 import { CommunitySection } from "@/pages/magazine/article/components/CommunitySection";
@@ -181,7 +181,6 @@ export default function MobileReleaseDetail() {
       artistSlug,
       releaseSlug,
     );
-  const navigate = useNavigate();
   const user = useAuthUser();
 
   useScrollDepthTracking({
@@ -223,14 +222,9 @@ export default function MobileReleaseDetail() {
           setError("This release does not exist in the catalog.");
           return;
         }
-        if (data.trackCount <= 1 && data.tracks[0]) {
-          navigate(
-            trackUrl(
-              data.tracks[0].slug,
-              artistSlug ? [artistSlug] : [],
-            ),
-            { replace: true },
-          );
+        if (data.trackCount <= 1) {
+          setStatus("error");
+          setError("This single lives on its Track page.");
           return;
         }
 
@@ -244,7 +238,7 @@ export default function MobileReleaseDetail() {
       });
 
     return () => { alive = false; };
-  }, [artistSlug, releaseSlug, navigate]);
+  }, [artistSlug, releaseSlug]);
 
   useEffect(() => {
     if (!release || !releaseSlug) return;
@@ -686,9 +680,7 @@ export default function MobileReleaseDetail() {
                 const isThisPlaying = isCurrentTrack && isPlaying;
                 const trackHref = canonicalTrackUrl(
                   artistSlug,
-                  track.slug,
-                  track.id,
-                );
+                  track.slug);
                 return (
                   <div key={track.id} className="flex items-center gap-3 px-4 py-3 border-b border-[var(--wk-divider)] last:border-b-0 active:bg-[var(--wk-surface-raised)] transition-colors">
                     <PlayableArtwork

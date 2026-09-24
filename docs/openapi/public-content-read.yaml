@@ -151,19 +151,24 @@ paths:
                         items:
                           $ref: "#/components/schemas/ReleaseSummary"
 
-  /releases/{slug}:
+  /releases/{artistSlug}/{releaseSlug}:
     get:
-      summary: Release detail with tracklist
+      summary: Multi-track Release detail with tracklist
+      description: One-track Releases remain Registry objects but do not own public Release detail pages.
       operationId: getReleaseDetail
       tags: [Releases]
       parameters:
-        - name: slug
+        - name: artistSlug
+          in: path
+          required: true
+          schema: { type: string }
+        - name: releaseSlug
           in: path
           required: true
           schema: { type: string }
       responses:
         "200":
-          description: Release detail
+          description: Multi-track Release detail
           content:
             application/json:
               schema:
@@ -175,22 +180,26 @@ paths:
                       release:
                         $ref: "#/components/schemas/ReleaseDetail"
         "404":
-          description: Release not found
+          description: Release not found, wrong Artist scope, or no dedicated public Release page
 
-  /tracks/{slug}:
+  /tracks/{artistSlug}/{trackSlug}:
     get:
-      summary: Track detail with chart history and appearances
+      summary: Canonical Track detail by Artist and Track slug
+      description: Registry Track UUID remains internal identity. Ambiguous Artist-scoped Track identity fails closed for human review.
       operationId: getTrackDetail
       tags: [Tracks]
       parameters:
-        - name: slug
+        - name: artistSlug
           in: path
           required: true
           schema: { type: string }
-          description: Track slug or ISRC (prefixed with "isrc:")
+        - name: trackSlug
+          in: path
+          required: true
+          schema: { type: string }
       responses:
         "200":
-          description: Track detail
+          description: Unique Track detail
           content:
             application/json:
               schema:
@@ -202,7 +211,9 @@ paths:
                       track:
                         $ref: "#/components/schemas/TrackDetail"
         "404":
-          description: Track not found
+          description: Track not found for Artist scope
+        "409":
+          description: Ambiguous Track identity; human review is required
 
   /genres:
     get:

@@ -430,21 +430,19 @@ const routePaths = [
  * Phase 8B.3 adds two route paths:\n * - /messages\n * - messages (Admin Messages Control Center)\n *\n * Phase 8B.4 Candidate B adds one Admin Field path:
  * - field
  *
- * The current authority is 179 paths. Removing the Messages paths, the Artist\n * Studio path, the Field intake path, the five declared public Audio and Show\n * paths, the two K5B Admin Video paths, and the two public Video paths must\n * still reproduce the exact 165-path pre-M1 sequence.
- */
-/*
- * Phase 9A.3 retires the two Release-scoped Track compatibility paths.
- * That established route authority at 177 paths.
+ * Phase 9A.3 later retired the two Release-scoped Track compatibility paths.
  *
- * Track UUID public identity adds two canonical paths:
- * - /tracks/:artistSlug/:trackSlug/:trackId
- * - /tracks/:artistSlug/:trackSlug/:trackId/lyrics/contribute
+ * Public music identity convergence also retires the two UUID-bearing Track
+ * paths. Registry UUID remains internal identity; the public Track grammar is:
+ * - /tracks/:artistSlug/:trackSlug
+ * - /tracks/:artistSlug/:trackSlug/lyrics/contribute
  *
- * Current route authority is therefore 179 paths. These two later Track
- * identity paths are excluded when reconstructing the preserved historical
- * pre-M1 sequence, which remains 163 paths with its existing exact checksum.
+ * Current route authority is therefore 177 paths. Removing the Messages paths,
+ * the Artist Studio path, the Field intake path, the five declared public Audio
+ * and Show paths, the two K5B Admin Video paths, and the two public Video paths
+ * reproduces the exact 163-path preserved pre-M1 sequence.
  */
-const expectedRoutePathCount = 179;
+const expectedRoutePathCount = 177;
 const publicAudioIndexPath = "/audio";
 const publicAudioPath = "/audio/:slug";
 const publicShowIndexPath = "/shows";
@@ -459,9 +457,6 @@ const adminVideoIndexPath = "video";
 const adminVideoDetailPath = "video/:publicationId";
 const publicVideoIndexPath = "/video";
 const publicVideoStandalonePath = "/video/:slug";
-const exactTrackPath = "/tracks/:artistSlug/:trackSlug/:trackId";
-const exactTrackLyricsContributionPath =
-  "/tracks/:artistSlug/:trackSlug/:trackId/lyrics/contribute";
 
 if (routePaths.length !== expectedRoutePathCount) {
   fail(
@@ -480,15 +475,13 @@ for (const retiredRoutePath of [
   }
 }
 
-for (const [routePath, label] of [
-  [exactTrackPath, "canonical Track identity"],
-  [exactTrackLyricsContributionPath, "canonical Track Lyrics contribution"],
+for (const retiredTrackIdentityPath of [
+  "/tracks/:artistSlug/:trackSlug/:trackId",
+  "/tracks/:artistSlug/:trackSlug/:trackId/lyrics/contribute",
 ]) {
-  if (
-    routePaths.filter((candidate) => candidate === routePath).length !== 1
-  ) {
+  if (routePaths.includes(retiredTrackIdentityPath)) {
     fail(
-      `Track UUID route authority must retain exactly one ${label} route at ${routePath}`,
+      `retired UUID-bearing Track route returned: ${retiredTrackIdentityPath}`,
     );
   }
 }
@@ -543,14 +536,12 @@ const preM1RoutePaths = routePaths.filter(
     routePath !== adminVideoIndexPath &&
     routePath !== adminVideoDetailPath &&
     routePath !== publicVideoIndexPath &&
-    routePath !== publicVideoStandalonePath &&
-    routePath !== exactTrackPath &&
-    routePath !== exactTrackLyricsContributionPath,
+    routePath !== publicVideoStandalonePath,
 );
 
 if (preM1RoutePaths.length !== 163) {
   fail(
-    `expected 163 preserved pre-M1 route paths after removing declared later route families and Track UUID identity paths, found ${preM1RoutePaths.length}`,
+    `expected 163 preserved pre-M1 route paths after removing declared later route families, found ${preM1RoutePaths.length}`,
   );
 }
 
@@ -605,5 +596,5 @@ if (
 
 console.log(
   "Public route splitting audit passed: " +
-  `${directLazyImports.length} lazy imports, ${expectedRoutePathCount} route paths, Track UUID authority sealed, preserved pre-M1 sequence unchanged.`,
+  `${directLazyImports.length} lazy imports, ${expectedRoutePathCount} route paths, human-readable Track authority sealed, preserved pre-M1 sequence unchanged.`,
 );

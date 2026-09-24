@@ -171,7 +171,7 @@ function LeaderboardRow({
           {/* Title row */}
           <div className="flex items-center gap-1.5">
             <Link
-              to={trackUrl(entry.slug, entry.artistSlugs, entry.registryTrackId)}
+              to={trackUrl(entry.slug, entry.artistSlugs)}
               onClick={(e) => e.stopPropagation()}
               className="truncate text-[13px] font-bold text-[var(--wk-text)] hover:text-[var(--wk-brand)] transition-colors leading-tight md:text-[14px]"
             >
@@ -306,7 +306,7 @@ function MiniEntryRow({
 }) {
   return (
     <Link
-      to={trackUrl(entry.slug, entry.artistSlugs, entry.registryTrackId)}
+      to={trackUrl(entry.slug, entry.artistSlugs)}
       className="flex items-center gap-2.5 rounded-lg p-2 transition-colors hover:bg-[var(--wk-bg)] group"
     >
       <div className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-[var(--wk-brand)] text-[10px] font-black text-[var(--wk-brand-on)] tabular-nums">

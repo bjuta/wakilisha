@@ -19,6 +19,8 @@ interface AdminReleaseHeroProps {
   release: ReleaseHeroData;
   trackCount: number;
   totalDurationMs: number;
+  singleTrackSlug?: string | null;
+  singleTrackArtistSlug?: string | null;
   onToggleEdit: () => void;
   editOpen: boolean;
 }
@@ -57,8 +59,24 @@ function releaseTypeLabel(t: string | null): string {
   return t.charAt(0).toUpperCase() + t.slice(1);
 }
 
-export default function AdminReleaseHero({ release, trackCount, totalDurationMs, onToggleEdit, editOpen }: AdminReleaseHeroProps) {
-  const publicUrl = releaseUrl({ slug: release.slug, artist: release.artist_name });
+export default function AdminReleaseHero({
+  release,
+  trackCount,
+  totalDurationMs,
+  singleTrackSlug,
+  singleTrackArtistSlug,
+  onToggleEdit,
+  editOpen,
+}: AdminReleaseHeroProps) {
+  const publicUrl = releaseUrl({
+    slug: release.slug,
+    artist: release.artist_name,
+    artistSlug: release.artist_slug,
+    trackCount,
+    releaseType: release.release_type,
+    singleTrackSlug,
+    singleTrackArtistSlug,
+  });
   const artistUrl = `/admin/registry/artists/${release.artist_slug}`;
   const labelUrl = release.label_slug ? `/admin/registry/labels/${release.label_slug}` : "";
   const artworkFailed = false;

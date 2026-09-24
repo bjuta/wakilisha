@@ -2290,8 +2290,7 @@ export function RichTextEditor({
                               track.slug,
                               track.artistSlug
                                 ? [track.artistSlug]
-                                : [],
-                            ),
+                                : []),
                           );
                           setTrackPickerOpen(false);
                           setTrackSearch("");

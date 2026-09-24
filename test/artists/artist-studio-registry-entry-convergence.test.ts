@@ -200,17 +200,7 @@ describe(
         expect(
           routeAudit,
         ).toContain(
-          "expectedRoutePathCount = 179",
-        );
-        expect(
-          routeAudit,
-        ).toContain(
-          'const exactTrackPath = "/tracks/:artistSlug/:trackSlug/:trackId"',
-        );
-        expect(
-          routeAudit,
-        ).toContain(
-          '"/tracks/:artistSlug/:trackSlug/:trackId/lyrics/contribute"',
+          "expectedRoutePathCount = 177",
         );
       },
     );
