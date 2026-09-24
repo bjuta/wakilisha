@@ -158,6 +158,128 @@ describe("MIZIZI Cultural Data Steward", () => {
     ).toBe(false);
   });
 
+  it("routes explicit feature-credit slug evidence gaps to human review without auto-mutation", () => {
+    const findings =
+      analyzeTrackIdentity({
+        id: "track-credit-gap",
+        slug:
+          "confirmation-feat-mr-ree",
+        title:
+          "Confirmation (feat. Mr Ree)",
+        primaryArtistSlug:
+          "lead-artist",
+        primaryArtistName:
+          "Lead Artist",
+        featuredArtists: [],
+      });
+
+    expect(findings).toContainEqual(
+      expect.objectContaining({
+        ruleId:
+          "track_slug_credit_evidence_gap",
+        ruleVersion: "1.3.0",
+        fieldName: "slug",
+        currentValue:
+          "confirmation-feat-mr-ree",
+        proposedValue:
+          "confirmation",
+        disposition: "review",
+        confidence: 1,
+      }),
+    );
+
+    expect(
+      findings.some(
+        (finding) =>
+          finding.ruleId ===
+            "track_slug_identity_noise" &&
+          finding.disposition ===
+            "auto_fix_candidate",
+      ),
+    ).toBe(false);
+  });
+
+  it("does not treat ordinary With, And, or X title language as feature-credit evidence", () => {
+    for (const title of [
+      "You And Me",
+      "Dance With Me",
+      "X Marks the Spot",
+    ]) {
+      const findings =
+        analyzeTrackIdentity({
+          id:
+            "track-" +
+            slugifyIdentity(title),
+          slug:
+            slugifyIdentity(title),
+          title,
+          primaryArtistSlug:
+            "lead-artist",
+          featuredArtists: [],
+        });
+
+      expect(
+        findings.some(
+          (finding) =>
+            finding.ruleId ===
+            "track_slug_credit_evidence_gap",
+        ),
+      ).toBe(false);
+    }
+  });
+
+  it("requires human recording-identity review for same-Artist same-title peers even when ISRC differs", () => {
+    const findings =
+      analyzeTrackIdentity({
+        id: "track-a",
+        slug: "same-song",
+        title: "Same Song",
+        isrc: "KEAAA2600001",
+        primaryArtistSlug:
+          "same-artist",
+        featuredArtists: [],
+        recordingIdentityPeers: [
+          {
+            id: "track-b",
+            slug: "same-song-2",
+            title: "Same Song",
+            isrc: "KEAAA2600002",
+            sharedPrimaryArtistSlug:
+              "same-artist",
+          },
+        ],
+      });
+
+    expect(findings).toContainEqual(
+      expect.objectContaining({
+        ruleId:
+          "track_recording_identity_conflict",
+        ruleVersion: "1.3.0",
+        fieldName:
+          "recording_identity",
+        currentValue: "track-a",
+        proposedValue:
+          "human_review_required",
+        disposition: "review",
+      }),
+    );
+
+    const conflict =
+      findings.find(
+        (finding) =>
+          finding.ruleId ===
+          "track_recording_identity_conflict",
+      );
+
+    expect(
+      conflict?.evidence,
+    ).toMatchObject({
+      isrc: "KEAAA2600001",
+      identityPolicy:
+        "different_isrc_is_evidence_not_automatic_distinct_recording_proof",
+    });
+  });
+
   it("derives Release taxonomy from resolvable active Track count", () => {
     const single =
       analyzeReleaseIdentity({
