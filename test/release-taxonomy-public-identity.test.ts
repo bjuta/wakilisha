@@ -56,6 +56,30 @@ describe("Release taxonomy and public identity", () => {
     ).toBe("/releases");
   });
 
+  it("treats resolved Track topology as stronger than stale stored Release type", () => {
+    expect(
+      releaseUrl({
+        slug: "stale-single-label",
+        artist: "Artist",
+        artistSlug: "artist",
+        releaseType: "Single",
+        trackCount: 2,
+      }),
+    ).toBe("/releases/artist/stale-single-label");
+
+    expect(
+      releaseUrl({
+        slug: "stale-ep-label",
+        artist: "Artist",
+        artistSlug: "artist",
+        releaseType: "EP",
+        trackCount: 1,
+        singleTrackSlug: "only-track",
+        singleTrackArtistSlug: "artist",
+      }),
+    ).toBe("/tracks/artist/only-track");
+  });
+
   it("keeps EP and Album cards on Release detail routes", () => {
     expect(
       releaseUrl({
