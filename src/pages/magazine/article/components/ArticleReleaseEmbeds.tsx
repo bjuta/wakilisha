@@ -528,9 +528,18 @@ export function ReleaseEmbedCard({ release, articleSlug }: { release: ReleaseEmb
   const [imgLoaded, setImgLoaded] = useState(false);
   const [expanded, setExpanded] = useState(false);
 
-  const resolvedReleaseUrl = release.releaseSlug && release.artist
-    ? releaseUrl({ slug: release.releaseSlug, artist: release.artist })
-    : undefined;
+  const resolvedReleaseUrl =
+    release.trackCount > 1 &&
+    release.releaseSlug &&
+    release.artist
+      ? releaseUrl({
+          slug: release.releaseSlug,
+          artist: release.artist,
+          artistSlug: release.artistSlug,
+          trackCount: release.trackCount,
+          releaseType: release.releaseType,
+        })
+      : undefined;
 
   const artistUrl = release.artistSlug
     ? `/artists/${release.artistSlug}`
