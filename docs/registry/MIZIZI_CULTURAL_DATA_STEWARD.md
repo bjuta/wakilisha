@@ -655,35 +655,33 @@ first Track and Release applies were accepted. They are not current transport
 authority. Stage C subsequently moved the JIT Production execution boundary to
 the narrow `mizizi_executor` role.
 
-### Track UUID public-identity closure
+### Public Track identity authority — superseded 24 September 2026
 
-PR #1034 closed the public Track identity ambiguity exposed by same-Artist,
-same-slug Tracks.
+PR #1034 historically made Registry Track UUID part of public Track URLs to
+resolve same-Artist, same-slug ambiguity. Issue #1068 supersedes that public
+routing decision without weakening Registry identity.
 
 Current public identity authority is:
 
-- Registry Track UUID is canonical Sound Recording identity;
+- Registry Track UUID remains canonical internal Sound Recording identity;
 - canonical Track route:
-  `/tracks/{artistSlug}/{trackSlug}/{trackId}`;
+  `/tracks/{artistSlug}/{trackSlug}`;
 - canonical Lyrics contribution route:
-  `/tracks/{artistSlug}/{trackSlug}/{trackId}/lyrics/contribute`;
-- readable slugs remain presentation data;
-- legacy Artist + Track-slug resolution is compatibility-only and fails closed
-  when more than one canonical Track matches;
+  `/tracks/{artistSlug}/{trackSlug}/lyrics/contribute`;
+- UUID-bearing Track routes are retired and are not redirect surfaces;
+- readable Artist + Track slug resolution must return exactly one canonical
+  Registry Track or fail closed;
+- same-Artist + same-normalized-title multiple Track identities require human
+  review; a different ISRC is evidence, not automatic proof of a distinct
+  canonical recording;
 - Release membership never determines Track identity;
-- related content, Release tracklists, Search, Charts, Player, save/share
-  actions, and Artist discography now preserve canonical Track UUID where that
-  public identity is available.
+- a one-track Release remains a canonical Registry Release but does not own a
+  public Release detail page;
+- multi-track Releases continue to own Artist-scoped Release detail routes;
+- Track and Release redirect infrastructure remains retired.
 
-The Production frontend deployment for this closure completed from exact
-merged main `ee52a276f61ff93aff948d2a2ff2be796c3e5312`, and
-`public-content-read` Production authority is v92.
-
-This public-route closure does **not** yet make Chart scoring internally
-UUID-authoritative. The scoring pipeline still aggregates and carries
-continuity through `normalized_key` before canonical Track UUID authority is
-fully applied. That remaining semantic debt is owned by
-`docs/engineering/wakilisha-music-data-standards-foundation.md`.
+This routing contract does not change the Registry UUID, provenance, Release,
+Sound Recording, TrackRelease, rights, or external-identifier authorities.
 
 ### Historical #1013 opening read-only backlog
 
