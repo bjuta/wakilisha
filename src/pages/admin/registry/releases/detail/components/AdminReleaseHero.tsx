@@ -58,7 +58,12 @@ function releaseTypeLabel(t: string | null): string {
 }
 
 export default function AdminReleaseHero({ release, trackCount, totalDurationMs, onToggleEdit, editOpen }: AdminReleaseHeroProps) {
-  const publicUrl = releaseUrl({ slug: release.slug, artist: release.artist_name });
+  const publicUrl = releaseUrl({
+    slug: release.slug,
+    artist: release.artist_name,
+    trackCount,
+    releaseType: release.release_type,
+  });
   const artistUrl = `/admin/registry/artists/${release.artist_slug}`;
   const labelUrl = release.label_slug ? `/admin/registry/labels/${release.label_slug}` : "";
   const artworkFailed = false;
