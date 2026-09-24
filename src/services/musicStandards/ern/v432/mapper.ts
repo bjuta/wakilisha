@@ -578,7 +578,7 @@ export function mapErn432(
 
   return {
     adapterKey: "ddex_ern_import",
-    adapterVersion: 4,
+    adapterVersion: 5,
     externalStandard: "DDEX_ERN",
     externalVersion: "4.3.2",
     messageOrRecordType: "NewReleaseMessage",
