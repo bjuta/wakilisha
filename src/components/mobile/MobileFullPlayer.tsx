@@ -48,9 +48,7 @@ function ActionMenu({
   const sharePath = trackSlug
     ? trackUrl(
         trackSlug,
-        track.artistSlug ? [track.artistSlug] : [],
-        track.registryTrackId,
-      )
+        track.artistSlug ? [track.artistSlug] : [])
     : "";
   const shareUrl = sharePath
     ? `${origin}${sharePath}`
@@ -206,9 +204,7 @@ export function MobileFullPlayer() {
     const trackSlug = currentTrack.trackSlug || currentTrack.id;
     const entityUrl = trackUrl(
       trackSlug,
-      currentTrack.artistSlug ? [currentTrack.artistSlug] : [],
-      currentTrack.registryTrackId,
-    );
+      currentTrack.artistSlug ? [currentTrack.artistSlug] : []);
 
     setSaveError(null);
 
@@ -586,9 +582,7 @@ export function MobileFullPlayer() {
               <Link
                 to={`${trackUrl(
                   currentTrack.trackSlug,
-                  [currentTrack.artistSlug],
-                  currentTrack.registryTrackId,
-                )}/lyrics/contribute`}
+                  [currentTrack.artistSlug])}/lyrics/contribute`}
                 className="inline-flex items-center gap-2 rounded-xl bg-[var(--wk-brand)] text-white px-5 py-2.5 text-[12px] font-extrabold hover:opacity-90 transition-opacity whitespace-nowrap"
               >
                 <WkIcon name="Edit3" size={14} />
