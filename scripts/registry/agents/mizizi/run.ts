@@ -34,6 +34,7 @@ type TrackRow = {
   id: string;
   slug: string;
   title: string;
+  isrc: string | null;
   updated_at: string;
   primary_artist_slug: string | null;
   primary_artist_name: string | null;
@@ -64,6 +65,8 @@ type ChartRow = {
 type ScopeCandidate = {
   id: string;
   slug: string;
+  title: string;
+  isrc: string | null;
   proposedSlug: string;
 };
 
@@ -402,6 +405,57 @@ async function loadTrackFeaturedArtists(
   return byTrack;
 }
 
+async function loadTrackPrimaryArtistSlugs(
+  pool: ReturnType<typeof createRegistryPool>,
+  trackIds: string[],
+): Promise<Map<string, string[]>> {
+  if (trackIds.length === 0) {
+    return new Map();
+  }
+
+  const result = await pool.query(
+    `
+    select
+      track_id::text,
+      artist_slug
+    from public.registry_track_artists
+    where track_id = any($1::uuid[])
+      and status = 'active'
+      and is_primary is true
+      and nullif(btrim(artist_slug), '') is not null
+    order by
+      track_id,
+      credit_order nulls last,
+      created_at,
+      id
+    `,
+    [trackIds],
+  );
+
+  const byTrack =
+    new Map<string, string[]>();
+
+  for (const row of result.rows) {
+    const trackId =
+      String(row.track_id);
+    const artistSlug =
+      String(row.artist_slug || "");
+    const list =
+      byTrack.get(trackId) || [];
+
+    if (
+      artistSlug &&
+      !list.includes(artistSlug)
+    ) {
+      list.push(artistSlug);
+    }
+
+    byTrack.set(trackId, list);
+  }
+
+  return byTrack;
+}
+
 async function loadArtistScopeCandidates(
   pool: ReturnType<typeof createRegistryPool>,
   artistSlugs: string[],
@@ -418,7 +472,8 @@ async function loadArtistScopeCandidates(
       ta.artist_slug,
       t.id::text,
       t.slug,
-      t.title
+      t.title,
+      t.isrc
     from public.registry_track_artists ta
     join public.registry_tracks t
       on t.id = ta.track_id
@@ -448,6 +503,11 @@ async function loadArtistScopeCandidates(
     list.push({
       id: String(row.id),
       slug: String(row.slug || ""),
+      title: String(row.title || ""),
+      isrc:
+        row.isrc
+          ? String(row.isrc)
+          : null,
       proposedSlug:
         slugifyIdentity(core),
     });
@@ -517,6 +577,8 @@ async function loadReleaseScopeCandidates(
         row.sibling_track_id,
       ),
       slug: String(row.slug || ""),
+      title: String(row.title || ""),
+      isrc: null,
       proposedSlug:
         slugifyIdentity(core),
     });
@@ -1208,6 +1270,7 @@ async function scanTracks(
           t.id::text,
           t.slug,
           t.title,
+          t.isrc,
           t.updated_at::text,
           pa.artist_slug
             as primary_artist_slug,
@@ -1299,10 +1362,25 @@ async function scanTracks(
           .filter(Boolean),
       ),
     ];
+    const primaryArtistScopes =
+      await loadTrackPrimaryArtistSlugs(
+        pool,
+        trackIds,
+      );
+    const allPrimaryArtistSlugs = [
+      ...new Set(
+        [
+          ...artistSlugs,
+          ...Array.from(
+            primaryArtistScopes.values(),
+          ).flat(),
+        ].filter(Boolean),
+      ),
+    ];
     const artistScope =
       await loadArtistScopeCandidates(
         pool,
-        artistSlugs,
+        allPrimaryArtistSlugs,
       );
     const releaseScope =
       await loadReleaseScopeCandidates(
@@ -1311,17 +1389,66 @@ async function scanTracks(
       );
 
     for (const row of rows) {
+      const canonicalTitleSlug =
+        slugifyIdentity(
+          stripFeatureCreditNoise(
+            row.title,
+          ).coreTitle,
+        );
+      const recordingIdentityPeers =
+        Array.from(
+          new Map(
+            (
+              primaryArtistScopes.get(
+                row.id,
+              ) || []
+            )
+              .flatMap(
+                (sharedPrimaryArtistSlug) =>
+                  (
+                    artistScope.get(
+                      sharedPrimaryArtistSlug,
+                    ) || []
+                  )
+                    .filter(
+                      (candidate) =>
+                        candidate.id !==
+                          row.id &&
+                        candidate.proposedSlug ===
+                          canonicalTitleSlug,
+                    )
+                    .map(
+                      (candidate) => [
+                        candidate.id,
+                        {
+                          id: candidate.id,
+                          slug:
+                            candidate.slug,
+                          title:
+                            candidate.title,
+                          isrc:
+                            candidate.isrc,
+                          sharedPrimaryArtistSlug,
+                        },
+                      ] as const,
+                    ),
+              ),
+          ).values(),
+        );
+
       const rowFindings =
         analyzeTrackIdentity({
           id: row.id,
           slug: row.slug,
           title: row.title,
+          isrc: row.isrc,
           primaryArtistSlug:
             row.primary_artist_slug,
           primaryArtistName:
             row.primary_artist_name,
           featuredArtists:
             featured.get(row.id) || [],
+          recordingIdentityPeers,
         });
 
       for (
