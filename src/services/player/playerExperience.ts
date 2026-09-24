@@ -115,17 +115,13 @@ function defaultTrackPath(
   ) {
     return trackUrl(
       track.trackSlug,
-      [track.artistSlug],
-      track.registryTrackId,
-    );
+      [track.artistSlug]);
   }
 
   if (track.trackSlug) {
     return trackUrl(
       track.trackSlug,
-      [],
-      track.registryTrackId,
-    );
+      []);
   }
 
   return null;
