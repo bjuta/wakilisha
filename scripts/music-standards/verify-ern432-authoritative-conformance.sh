@@ -76,4 +76,90 @@ do
     "$FILE"
 done
 
-echo "AUTHORITATIVE ERN 4.3.2 XSD FIXTURE CONFORMANCE = PASS"
+python3 - "$ROOT/test/music-standards/fixtures/ern-4.3.2/basic-release.xml" \
+  "$ROOT/test/music-standards/fixtures/ern-4.3.2/multiple-recordings.xml" <<'PYPROFILE'
+import sys
+import xml.etree.ElementTree as ET
+
+ALLOWED_AUDIO_TYPES = {
+    "MusicalWorkSoundRecording",
+    "NonMusicalWorkSoundRecording",
+}
+
+def local(tag):
+    return tag.rsplit("}", 1)[-1]
+
+def children(node, name):
+    return [child for child in list(node) if local(child.tag) == name]
+
+def first(node, name):
+    values = children(node, name)
+    return values[0] if values else None
+
+def text(node):
+    return (node.text or "").strip() if node is not None else ""
+
+def child_text(node, name):
+    return text(first(node, name))
+
+def primary_refs(group):
+    refs = []
+    for item in children(group, "ResourceGroupContentItem"):
+        ref = child_text(item, "ReleaseResourceReference")
+        if ref:
+            refs.append(ref)
+    for subgroup in children(group, "ResourceGroup"):
+        refs.extend(primary_refs(subgroup))
+    return refs
+
+def parse(path):
+    root = ET.parse(path).getroot()
+    release_list = first(root, "ReleaseList")
+    resource_list = first(root, "ResourceList")
+    releases = children(release_list, "Release")
+    track_releases = children(release_list, "TrackRelease")
+    recordings = {
+        child_text(node, "ResourceReference"): node
+        for node in children(resource_list, "SoundRecording")
+    }
+    images = {
+        child_text(node, "ResourceReference"): node
+        for node in children(resource_list, "Image")
+    }
+    return root, releases, track_releases, recordings, images
+
+root, releases, track_releases, recordings, images = parse(sys.argv[1])
+assert root.attrib.get("ReleaseProfileVersionId") == "SimpleAudioSingle"
+assert root.attrib.get("ReleaseProfileVariantVersionId") is None
+assert len(releases) == 1
+assert len(track_releases) == 0
+groups = children(releases[0], "ResourceGroup")
+assert len(groups) == 1
+assert len(children(groups[0], "ResourceGroup")) == 0
+items = children(groups[0], "ResourceGroupContentItem")
+assert len(items) == 1
+assert primary_refs(groups[0]) == ["A1"]
+assert child_text(recordings["A1"], "Type") in ALLOWED_AUDIO_TYPES
+assert [text(node) for node in children(items[0], "LinkedReleaseResourceReference")] == ["A_IMG1"]
+assert [text(node) for node in children(groups[0], "LinkedReleaseResourceReference")] == ["A_IMG1"]
+assert child_text(images["A_IMG1"], "Type") == "FrontCoverImage"
+print("PROFILE_VALIDATE=basic-release.xml:SimpleAudioSingle:PASS")
+
+root, releases, track_releases, recordings, images = parse(sys.argv[2])
+assert root.attrib.get("ReleaseProfileVersionId") == "Audio"
+assert root.attrib.get("ReleaseProfileVariantVersionId") is None
+assert len(releases) == 1
+groups = children(releases[0], "ResourceGroup")
+assert len(groups) == 1
+refs = primary_refs(groups[0])
+assert refs == ["A1", "A2"]
+assert all(child_text(recordings[ref], "Type") in ALLOWED_AUDIO_TYPES for ref in refs)
+assert [text(node) for node in children(groups[0], "LinkedReleaseResourceReference")] == ["A_IMG2"]
+assert child_text(images["A_IMG2"], "Type") == "FrontCoverImage"
+assert len(track_releases) == 2
+assert [child_text(node, "ReleaseResourceReference") for node in track_releases] == refs
+assert all(len(children(node, "LinkedReleaseResourceReference")) == 0 for node in track_releases)
+print("PROFILE_VALIDATE=multiple-recordings.xml:Audio:PASS")
+PYPROFILE
+
+echo "AUTHORITATIVE ERN 4.3.2 XSD + RELEASE PROFILE FIXTURE CONFORMANCE = PASS"
