@@ -125,7 +125,7 @@ assert len(non_technical) == 1
 non_technical = non_technical[0]
 assert non_technical.attrib.get("LanguageAndScriptCode") == "en"
 assert non_technical.attrib.get("IsDefault") == "true"
-assert text(first(non_technical, "ApplicableTerritoryCode")) == "Worldwide"
+assert non_technical.attrib.get("ApplicableTerritoryCode") == "Worldwide"
 assert text(first(non_technical, "HasImmersiveAudioMetadata")) == "false"
 
 delivery_files = children(non_technical, "DeliveryFile")
