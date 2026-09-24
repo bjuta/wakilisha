@@ -77,6 +77,104 @@ do
     "$FILE"
 done
 
+# The read-only adapter also preserves the ERN 4.3.2 technical-audio
+# evidence needed for future premium-audio product decisions. This proves
+# preservation only; it does not classify a WAKILISHA product tier.
+python3 - "$ROOT/test/music-standards/fixtures/ern-4.3.2/basic-release.xml" <<'PYTECH'
+import sys
+import xml.etree.ElementTree as ET
+
+def local(tag):
+    return tag.rsplit("}", 1)[-1]
+
+def children(node, name):
+    return [child for child in list(node) if local(child.tag) == name]
+
+def first(node, name):
+    values = children(node, name)
+    return values[0] if values else None
+
+def text(node):
+    return (node.text or "").strip() if node is not None else None
+
+root = ET.parse(sys.argv[1]).getroot()
+resource_list = first(root, "ResourceList")
+assert resource_list is not None
+
+recordings = children(resource_list, "SoundRecording")
+recording = next(
+    recording
+    for recording in recordings
+    if text(first(recording, "ResourceReference")) == "A1"
+)
+
+editions = children(recording, "SoundRecordingEdition")
+assert len(editions) == 2
+
+non_immersive = next(
+    edition for edition in editions
+    if text(first(edition, "Type")) == "NonImmersiveEdition"
+)
+immersive = next(
+    edition for edition in editions
+    if text(first(edition, "Type")) == "ImmersiveEdition"
+)
+
+non_technical = children(non_immersive, "TechnicalDetails")
+assert len(non_technical) == 1
+non_technical = non_technical[0]
+assert non_technical.attrib.get("LanguageAndScriptCode") == "en"
+assert non_technical.attrib.get("IsDefault") == "true"
+assert non_technical.attrib.get("ApplicableTerritoryCode") == "Worldwide"
+assert text(first(non_technical, "HasImmersiveAudioMetadata")) == "false"
+
+delivery_files = children(non_technical, "DeliveryFile")
+assert len(delivery_files) == 2
+
+expected = [
+    ("FLAC", "2304", "kbps", "96000", "Hz", "24",
+     "file://fixture-track-hires.flac"),
+    ("AAC", "320", "kbps", "48000", "Hz", "24",
+     "file://fixture-track.aac"),
+]
+
+for delivery, expected_values in zip(delivery_files, expected):
+    codec, bit_rate, bit_unit, sample_rate, sample_unit, bits, uri = expected_values
+    codec_node = first(delivery, "AudioCodecType")
+    bit_rate_node = first(delivery, "BitRate")
+    sample_rate_node = first(delivery, "SamplingRate")
+    file_node = first(delivery, "File")
+    assert text(codec_node) == codec
+    assert text(bit_rate_node) == bit_rate
+    assert bit_rate_node.attrib.get("UnitOfMeasure") == bit_unit
+    assert text(sample_rate_node) == sample_rate
+    assert sample_rate_node.attrib.get("UnitOfMeasure") == sample_unit
+    assert text(first(delivery, "BitsPerSample")) == bits
+    assert text(first(file_node, "URI")) == uri
+    assert text(first(delivery, "IsProvidedInDelivery")) == "true"
+
+immersive_technical = children(immersive, "TechnicalDetails")
+assert len(immersive_technical) == 1
+immersive_technical = immersive_technical[0]
+assert immersive_technical.attrib.get("IsDefault") == "true"
+assert text(first(immersive_technical, "HasImmersiveAudioMetadata")) == "true"
+
+immersive_delivery = children(immersive_technical, "DeliveryFile")
+assert len(immersive_delivery) == 1
+immersive_delivery = immersive_delivery[0]
+codec_node = first(immersive_delivery, "AudioCodecType")
+assert text(codec_node) == "UserDefined"
+assert codec_node.attrib.get("Namespace") == "Dolby"
+assert codec_node.attrib.get("UserDefinedValue") == "DolbyAtmos"
+assert text(first(immersive_delivery, "NumberOfChannels")) == "5.1"
+assert text(first(immersive_delivery, "NumberOfAudioObjects")) == "16"
+assert text(first(immersive_delivery, "BitsPerSample")) == "24"
+assert text(first(first(immersive_delivery, "File"), "URI")) == \
+    "file://fixture-track-atmos.m4a"
+
+print("TECHNICAL_AUDIO_VARIANTS=basic-release.xml:PASS")
+PYTECH
+
 # Bounded local acceptance rules below are derived from DDEX ERN Release
 # Profiles v2.3.1, especially Clauses 6.1, 6.2, 7.2-7.4 and 9.
 # This is not a claim of DDEX production-exchange certification.

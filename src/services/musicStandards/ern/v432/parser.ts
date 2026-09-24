@@ -77,14 +77,37 @@ export interface ErnFileProjection {
   unsupportedFields: string[];
 }
 
+export interface ErnTypedValueProjection {
+  value: string | null;
+  namespace: string | null;
+  userDefinedValue: string | null;
+}
+
+export interface ErnMeasuredValueProjection {
+  value: string | null;
+  unitOfMeasure: string | null;
+}
+
 export interface ErnAudioDeliveryFileProjection {
   deliveryFileType: string | null;
+  audioCodecType: ErnTypedValueProjection | null;
+  bitRate: ErnMeasuredValueProjection | null;
+  numberOfChannels: string | null;
+  numberOfAudioObjects: number | null;
+  samplingRate: ErnMeasuredValueProjection | null;
+  bitsPerSample: number | null;
+  bitDepth: number | null;
   file: ErnFileProjection | null;
+  isProvidedInDelivery: boolean | null;
   unsupportedFields: string[];
 }
 
 export interface ErnTechnicalSoundRecordingDetailsProjection {
   technicalResourceDetailsReference: string | null;
+  languageAndScriptCode: string | null;
+  applicableTerritoryCode: string | null;
+  isDefault: boolean | null;
+  hasImmersiveAudioMetadata: boolean | null;
   deliveryFiles: ErnAudioDeliveryFileProjection[];
   unsupportedFields: string[];
 }
@@ -688,15 +711,79 @@ function parseFile(
   };
 }
 
+function parseTypedValue(
+  node: XmlNode | null,
+): ErnTypedValueProjection | null {
+  if (!node) {
+    return null;
+  }
+
+  return {
+    value: directText(node),
+    namespace: attributeText(node, "Namespace"),
+    userDefinedValue: attributeText(node, "UserDefinedValue"),
+  };
+}
+
+function parseMeasuredValue(
+  node: XmlNode | null,
+): ErnMeasuredValueProjection | null {
+  if (!node) {
+    return null;
+  }
+
+  return {
+    value: directText(node),
+    unitOfMeasure: attributeText(node, "UnitOfMeasure"),
+  };
+}
+
 function parseAudioDeliveryFile(
   deliveryFile: XmlNode,
 ): ErnAudioDeliveryFileProjection {
   return {
     deliveryFileType: childText(deliveryFile, "Type"),
+    audioCodecType: parseTypedValue(
+      firstChild(deliveryFile, "AudioCodecType"),
+    ),
+    bitRate: parseMeasuredValue(
+      firstChild(deliveryFile, "BitRate"),
+    ),
+    numberOfChannels: childText(
+      deliveryFile,
+      "NumberOfChannels",
+    ),
+    numberOfAudioObjects: optionalIntegerChild(
+      deliveryFile,
+      "NumberOfAudioObjects",
+    ),
+    samplingRate: parseMeasuredValue(
+      firstChild(deliveryFile, "SamplingRate"),
+    ),
+    bitsPerSample: optionalIntegerChild(
+      deliveryFile,
+      "BitsPerSample",
+    ),
+    bitDepth: optionalIntegerChild(deliveryFile, "BitDepth"),
     file: parseFile(firstChild(deliveryFile, "File")),
+    isProvidedInDelivery: optionalBooleanChild(
+      deliveryFile,
+      "IsProvidedInDelivery",
+    ),
     unsupportedFields: unsupportedChildNames(
       deliveryFile,
-      new Set(["Type", "File"]),
+      new Set([
+        "Type",
+        "AudioCodecType",
+        "BitRate",
+        "NumberOfChannels",
+        "NumberOfAudioObjects",
+        "SamplingRate",
+        "BitsPerSample",
+        "BitDepth",
+        "File",
+        "IsProvidedInDelivery",
+      ]),
     ),
   };
 }
@@ -710,6 +797,22 @@ function parseTechnicalSoundRecordingDetails(
         technicalDetails,
         "TechnicalResourceDetailsReference",
       ),
+      languageAndScriptCode: attributeText(
+        technicalDetails,
+        "LanguageAndScriptCode",
+      ),
+      applicableTerritoryCode: attributeText(
+        technicalDetails,
+        "ApplicableTerritoryCode",
+      ),
+      isDefault: optionalBooleanAttribute(
+        technicalDetails,
+        "IsDefault",
+      ),
+      hasImmersiveAudioMetadata: optionalBooleanChild(
+        technicalDetails,
+        "HasImmersiveAudioMetadata",
+      ),
       deliveryFiles: children(
         technicalDetails,
         "DeliveryFile",
@@ -717,8 +820,10 @@ function parseTechnicalSoundRecordingDetails(
       unsupportedFields: unsupportedChildNames(
         technicalDetails,
         new Set([
+          "ApplicableTerritoryCode",
           "TechnicalResourceDetailsReference",
           "DeliveryFile",
+          "HasImmersiveAudioMetadata",
         ]),
       ),
     }),
