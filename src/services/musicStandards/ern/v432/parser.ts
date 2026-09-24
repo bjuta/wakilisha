@@ -71,9 +71,27 @@ export interface ErnRecordingResourceIdProjection {
   identifiers: ErnRecordingIdentifierProjection[];
 }
 
+export interface ErnFileProjection {
+  uri: string | null;
+  unsupportedFields: string[];
+}
+
+export interface ErnAudioDeliveryFileProjection {
+  deliveryFileType: string | null;
+  file: ErnFileProjection | null;
+  unsupportedFields: string[];
+}
+
+export interface ErnTechnicalSoundRecordingDetailsProjection {
+  technicalResourceDetailsReference: string | null;
+  deliveryFiles: ErnAudioDeliveryFileProjection[];
+  unsupportedFields: string[];
+}
+
 export interface ErnSoundRecordingEditionProjection {
   editionType: string | null;
   resourceIds: ErnRecordingResourceIdProjection[];
+  technicalDetails: ErnTechnicalSoundRecordingDetailsProjection[];
 }
 
 export interface ErnSoundRecordingProjection {
@@ -88,10 +106,17 @@ export interface ErnSoundRecordingProjection {
   contributors: ErnContributorProjection[];
 }
 
+export interface ErnTechnicalImageDetailsProjection {
+  technicalResourceDetailsReference: string | null;
+  file: ErnFileProjection | null;
+  unsupportedFields: string[];
+}
+
 export interface ErnImageProjection {
   resourceReference: string;
   imageType: string | null;
   uri: string | null;
+  technicalDetails: ErnTechnicalImageDetailsProjection[];
 }
 
 export type ErnReleaseIdentifierSourceScheme =
@@ -104,6 +129,35 @@ export interface ErnReleaseIdentifierProjection {
   sourceScheme: ErnReleaseIdentifierSourceScheme;
   sourceValue: string;
   namespace: string | null;
+}
+
+export interface ErnLinkedReleaseResourceReferenceProjection {
+  resourceReference: string;
+  linkDescription: string | null;
+  languageAndScriptCode: string | null;
+  namespace: string | null;
+  userDefinedValue: string | null;
+  sequenceNumber: number | null;
+  isMultiFile: boolean | null;
+}
+
+export interface ErnResourceGroupContentItemProjection {
+  sequenceNumber: number | null;
+  releaseResourceReference: string | null;
+  linkedResourceReferences: ErnLinkedReleaseResourceReferenceProjection[];
+  isBonusResource: boolean | null;
+  isInstantGratificationResource: boolean | null;
+  isPreOrderIncentiveResource: boolean | null;
+  unsupportedFields: string[];
+}
+
+export interface ErnResourceGroupProjection {
+  resourceGroupType: string | null;
+  sequenceNumber: number | null;
+  contentItems: ErnResourceGroupContentItemProjection[];
+  linkedResourceReferences: ErnLinkedReleaseResourceReferenceProjection[];
+  resourceGroups: ErnResourceGroupProjection[];
+  unsupportedFields: string[];
 }
 
 export interface ErnReleaseProjection {
@@ -119,6 +173,7 @@ export interface ErnReleaseProjection {
   labelName: string | null;
   genres: string[];
   resourceReferences: string[];
+  resourceGroups: ErnResourceGroupProjection[];
 }
 
 export interface Ern432Projection {
@@ -338,16 +393,83 @@ function descendantText(node: XmlNode | null, name: string): string | null {
   return directText(descendants(node, name)[0] ?? null);
 }
 
-function optionalBooleanAttribute(
+function attributeText(
   node: XmlNode,
   name: string,
-): boolean | null {
-  const raw =
+): string | null {
+  return (
     node.attributes[name] ??
     localAttributeValue(
       node.attributes as unknown as Record<string, unknown>,
       name,
-    );
+    )
+  );
+}
+
+function optionalIntegerAttribute(
+  node: XmlNode,
+  name: string,
+): number | null {
+  const raw = attributeText(node, name);
+  if (raw === null) {
+    return null;
+  }
+
+  const parsed = Number(raw);
+  return Number.isInteger(parsed) ? parsed : null;
+}
+
+function optionalIntegerChild(
+  node: XmlNode,
+  name: string,
+): number | null {
+  const raw = childText(node, name);
+  if (raw === null) {
+    return null;
+  }
+
+  const parsed = Number(raw);
+  return Number.isInteger(parsed) ? parsed : null;
+}
+
+function optionalBooleanChild(
+  node: XmlNode,
+  name: string,
+): boolean | null {
+  const raw = childText(node, name);
+  if (raw === null) {
+    return null;
+  }
+
+  if (raw === "true" || raw === "1") {
+    return true;
+  }
+
+  if (raw === "false" || raw === "0") {
+    return false;
+  }
+
+  return null;
+}
+
+function unsupportedChildNames(
+  node: XmlNode,
+  supported: ReadonlySet<string>,
+): string[] {
+  return Array.from(
+    new Set(
+      node.children
+        .map((child) => child.name)
+        .filter((name) => !supported.has(name)),
+    ),
+  );
+}
+
+function optionalBooleanAttribute(
+  node: XmlNode,
+  name: string,
+): boolean | null {
+  const raw = attributeText(node, name);
 
   if (raw === null || raw === undefined) {
     return null;
@@ -480,6 +602,59 @@ function parseRecordingResourceId(
   };
 }
 
+function parseFile(
+  file: XmlNode | null,
+): ErnFileProjection | null {
+  if (!file) {
+    return null;
+  }
+
+  return {
+    uri: childText(file, "URI"),
+    unsupportedFields: unsupportedChildNames(
+      file,
+      new Set(["URI"]),
+    ),
+  };
+}
+
+function parseAudioDeliveryFile(
+  deliveryFile: XmlNode,
+): ErnAudioDeliveryFileProjection {
+  return {
+    deliveryFileType: childText(deliveryFile, "Type"),
+    file: parseFile(firstChild(deliveryFile, "File")),
+    unsupportedFields: unsupportedChildNames(
+      deliveryFile,
+      new Set(["Type", "File"]),
+    ),
+  };
+}
+
+function parseTechnicalSoundRecordingDetails(
+  edition: XmlNode,
+): ErnTechnicalSoundRecordingDetailsProjection[] {
+  return children(edition, "TechnicalDetails").map(
+    (technicalDetails) => ({
+      technicalResourceDetailsReference: childText(
+        technicalDetails,
+        "TechnicalResourceDetailsReference",
+      ),
+      deliveryFiles: children(
+        technicalDetails,
+        "DeliveryFile",
+      ).map(parseAudioDeliveryFile),
+      unsupportedFields: unsupportedChildNames(
+        technicalDetails,
+        new Set([
+          "TechnicalResourceDetailsReference",
+          "DeliveryFile",
+        ]),
+      ),
+    }),
+  );
+}
+
 function parseSoundRecordingEditions(
   recording: XmlNode,
 ): ErnSoundRecordingEditionProjection[] {
@@ -489,6 +664,8 @@ function parseSoundRecordingEditions(
       resourceIds: children(edition, "ResourceId").map(
         parseRecordingResourceId,
       ),
+      technicalDetails:
+        parseTechnicalSoundRecordingDetails(edition),
     }),
   );
 }
@@ -683,6 +860,174 @@ function parseSoundRecordings(
     );
 }
 
+function parseTechnicalImageDetails(
+  image: XmlNode,
+): ErnTechnicalImageDetailsProjection[] {
+  return children(image, "TechnicalDetails").map(
+    (technicalDetails) => ({
+      technicalResourceDetailsReference: childText(
+        technicalDetails,
+        "TechnicalResourceDetailsReference",
+      ),
+      file: parseFile(firstChild(technicalDetails, "File")),
+      unsupportedFields: unsupportedChildNames(
+        technicalDetails,
+        new Set([
+          "TechnicalResourceDetailsReference",
+          "File",
+        ]),
+      ),
+    }),
+  );
+}
+
+function parseLinkedReleaseResourceReference(
+  reference: XmlNode,
+): ErnLinkedReleaseResourceReferenceProjection | null {
+  const resourceReference = directText(reference);
+  if (!resourceReference) {
+    return null;
+  }
+
+  return {
+    resourceReference,
+    linkDescription: attributeText(
+      reference,
+      "LinkDescription",
+    ),
+    languageAndScriptCode: attributeText(
+      reference,
+      "LanguageAndScriptCode",
+    ),
+    namespace: attributeText(reference, "Namespace"),
+    userDefinedValue: attributeText(
+      reference,
+      "UserDefinedValue",
+    ),
+    sequenceNumber: optionalIntegerAttribute(
+      reference,
+      "SequenceNumber",
+    ),
+    isMultiFile: optionalBooleanAttribute(
+      reference,
+      "IsMultiFile",
+    ),
+  };
+}
+
+function parseResourceGroupContentItem(
+  item: XmlNode,
+): ErnResourceGroupContentItemProjection {
+  return {
+    sequenceNumber: optionalIntegerChild(
+      item,
+      "SequenceNumber",
+    ),
+    releaseResourceReference: childText(
+      item,
+      "ReleaseResourceReference",
+    ),
+    linkedResourceReferences: children(
+      item,
+      "LinkedReleaseResourceReference",
+    )
+      .map(parseLinkedReleaseResourceReference)
+      .filter(
+        (
+          reference,
+        ): reference is ErnLinkedReleaseResourceReferenceProjection =>
+          reference !== null,
+      ),
+    isBonusResource: optionalBooleanChild(
+      item,
+      "IsBonusResource",
+    ),
+    isInstantGratificationResource: optionalBooleanChild(
+      item,
+      "IsInstantGratificationResource",
+    ),
+    isPreOrderIncentiveResource: optionalBooleanChild(
+      item,
+      "IsPreOrderIncentiveResource",
+    ),
+    unsupportedFields: unsupportedChildNames(
+      item,
+      new Set([
+        "SequenceNumber",
+        "ReleaseResourceReference",
+        "LinkedReleaseResourceReference",
+        "IsBonusResource",
+        "IsInstantGratificationResource",
+        "IsPreOrderIncentiveResource",
+      ]),
+    ),
+  };
+}
+
+function parseResourceGroup(
+  group: XmlNode,
+): ErnResourceGroupProjection {
+  return {
+    resourceGroupType: attributeText(
+      group,
+      "ResourceGroupType",
+    ),
+    sequenceNumber: optionalIntegerChild(
+      group,
+      "SequenceNumber",
+    ),
+    contentItems: children(
+      group,
+      "ResourceGroupContentItem",
+    ).map(parseResourceGroupContentItem),
+    linkedResourceReferences: children(
+      group,
+      "LinkedReleaseResourceReference",
+    )
+      .map(parseLinkedReleaseResourceReference)
+      .filter(
+        (
+          reference,
+        ): reference is ErnLinkedReleaseResourceReferenceProjection =>
+          reference !== null,
+      ),
+    resourceGroups: children(
+      group,
+      "ResourceGroup",
+    ).map(parseResourceGroup),
+    unsupportedFields: unsupportedChildNames(
+      group,
+      new Set([
+        "SequenceNumber",
+        "ResourceGroup",
+        "ResourceGroupContentItem",
+        "LinkedReleaseResourceReference",
+      ]),
+    ),
+  };
+}
+
+function collectPrimaryResourceReferences(
+  groups: ErnResourceGroupProjection[],
+): string[] {
+  const references: string[] = [];
+
+  for (const group of groups) {
+    for (const item of group.contentItems) {
+      if (item.releaseResourceReference) {
+        references.push(item.releaseResourceReference);
+      }
+    }
+    references.push(
+      ...collectPrimaryResourceReferences(
+        group.resourceGroups,
+      ),
+    );
+  }
+
+  return references;
+}
+
 function parseImages(root: XmlNode): ErnImageProjection[] {
   const resourceList = firstChild(root, "ResourceList");
   if (!resourceList) {
@@ -696,10 +1041,19 @@ function parseImages(root: XmlNode): ErnImageProjection[] {
         return null;
       }
 
+      const technicalDetails =
+        parseTechnicalImageDetails(image);
+      const uri =
+        technicalDetails
+          .map((details) => details.file?.uri ?? null)
+          .find((value): value is string => Boolean(value)) ??
+        null;
+
       return {
         resourceReference,
         imageType: childText(image, "Type"),
-        uri: descendantText(image, "URI"),
+        uri,
+        technicalDetails,
       };
     })
     .filter((image): image is ErnImageProjection => image !== null);
@@ -750,14 +1104,15 @@ function parseReleases(
         genres: children(release, "DisplayGenre")
           .map((genre) => childText(genre, "GenreText"))
           .filter((genre): genre is string => Boolean(genre)),
-        resourceReferences: descendants(
-          release,
-          "ReleaseResourceReference",
-        )
-          .map((reference) => directText(reference))
-          .filter((reference): reference is string =>
-            Boolean(reference),
+        resourceReferences: collectPrimaryResourceReferences(
+          children(release, "ResourceGroup").map(
+            parseResourceGroup,
           ),
+        ),
+        resourceGroups: children(
+          release,
+          "ResourceGroup",
+        ).map(parseResourceGroup),
       };
     })
     .filter((release): release is ErnReleaseProjection => release !== null);

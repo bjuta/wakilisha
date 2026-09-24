@@ -55,6 +55,15 @@
         <ResourceId>
           <ISRC>KEAAA2600005</ISRC>
         </ResourceId>
+        <TechnicalDetails>
+          <TechnicalResourceDetailsReference>T_AUDIO1</TechnicalResourceDetailsReference>
+          <DeliveryFile>
+            <Type>AudioFile</Type>
+            <File>
+              <URI>file://fixture-track.wav</URI>
+            </File>
+          </DeliveryFile>
+        </TechnicalDetails>
       </SoundRecordingEdition>
       <SoundRecordingEdition>
         <Type>ImmersiveEdition</Type>
@@ -116,11 +125,10 @@
       <ReleaseDate>2026-09-23</ReleaseDate>
       <ResourceGroup>
         <ResourceGroupContentItem>
+          <SequenceNumber>1</SequenceNumber>
           <ReleaseResourceReference>A1</ReleaseResourceReference>
         </ResourceGroupContentItem>
-        <ResourceGroupContentItem>
-          <ReleaseResourceReference>A_IMG1</ReleaseResourceReference>
-        </ResourceGroupContentItem>
+        <LinkedReleaseResourceReference LinkDescription="CoverArt">A_IMG1</LinkedReleaseResourceReference>
       </ResourceGroup>
     </Release>
   </ReleaseList>

@@ -8,7 +8,9 @@ import {
   parseErn432,
   type Ern432Projection,
   type ErnReleaseIdentifierProjection,
+  type ErnResourceGroupProjection,
   type ErnSoundRecordingEditionProjection,
+  type ErnTechnicalImageDetailsProjection,
 } from "./parser";
 
 export interface ErnIdentifierCandidate {
@@ -72,6 +74,7 @@ export interface ErnMediaEvidence {
   mediaKind: "image";
   imageType: string | null;
   uri: string | null;
+  technicalDetails: ErnTechnicalImageDetailsProjection[];
 }
 
 export interface ErnReleaseCandidate {
@@ -82,6 +85,7 @@ export interface ErnReleaseCandidate {
   releaseDate: string | null;
   genres: string[];
   resourceReferences: string[];
+  resourceGroups: ErnResourceGroupProjection[];
   identifiers: ErnReleaseIdentifierProjection[];
 }
 
@@ -128,6 +132,52 @@ function partySchemeKey(
     case "ProprietaryId":
       return null;
   }
+}
+
+function addUnsupportedFields(
+  lossFlags: MusicMappingLoss[],
+  basePath: string,
+  unsupportedFields: string[],
+): void {
+  for (const field of unsupportedFields) {
+    lossFlags.push({
+      path: `${basePath}.${field}`,
+      classification: "partial",
+      detail:
+        "Valid ERN 4.3.2 technical/resource-topology evidence is retained only at the structural boundary in this tranche and is not yet semantically projected.",
+    });
+  }
+}
+
+function addResourceGroupLossFlags(
+  lossFlags: MusicMappingLoss[],
+  groups: ErnResourceGroupProjection[],
+  basePath: string,
+): void {
+  groups.forEach((group, groupIndex) => {
+    const groupPath =
+      `${basePath}.ResourceGroup[${groupIndex}]`;
+
+    addUnsupportedFields(
+      lossFlags,
+      groupPath,
+      group.unsupportedFields,
+    );
+
+    group.contentItems.forEach((item, itemIndex) => {
+      addUnsupportedFields(
+        lossFlags,
+        `${groupPath}.ResourceGroupContentItem[${itemIndex}]`,
+        item.unsupportedFields,
+      );
+    });
+
+    addResourceGroupLossFlags(
+      lossFlags,
+      group.resourceGroups,
+      groupPath,
+    );
+  });
 }
 
 function dedupeLossFlags(lossFlags: MusicMappingLoss[]): MusicMappingLoss[] {
@@ -209,6 +259,40 @@ function mapProjection(
 
   for (const track of projection.soundRecordings) {
     for (const [editionIndex, edition] of track.editions.entries()) {
+      for (const [technicalIndex, technical] of edition.technicalDetails.entries()) {
+        const technicalPath =
+          `ResourceList.SoundRecording[${track.resourceReference}]` +
+          `.SoundRecordingEdition[${editionIndex}]` +
+          `.TechnicalDetails[${technicalIndex}]`;
+
+        addUnsupportedFields(
+          lossFlags,
+          technicalPath,
+          technical.unsupportedFields,
+        );
+
+        technical.deliveryFiles.forEach(
+          (deliveryFile, deliveryFileIndex) => {
+            const deliveryPath =
+              `${technicalPath}.DeliveryFile[${deliveryFileIndex}]`;
+
+            addUnsupportedFields(
+              lossFlags,
+              deliveryPath,
+              deliveryFile.unsupportedFields,
+            );
+
+            if (deliveryFile.file) {
+              addUnsupportedFields(
+                lossFlags,
+                `${deliveryPath}.File`,
+                deliveryFile.file.unsupportedFields,
+              );
+            }
+          },
+        );
+      }
+
       for (const [resourceIdIndex, resourceId] of edition.resourceIds.entries()) {
         for (const identifier of resourceId.identifiers) {
           if (identifier.sourceScheme === "ISRC") {
@@ -273,6 +357,12 @@ function mapProjection(
   }
 
   for (const release of projection.releases) {
+    addResourceGroupLossFlags(
+      lossFlags,
+      release.resourceGroups,
+      `ReleaseList.Release[${release.releaseReference}]`,
+    );
+
     for (const identifier of release.identifiers) {
       if (identifier.sourceScheme === "ICPN") {
         identifierCandidates.push({
@@ -330,6 +420,30 @@ function mapProjection(
     }
   }
 
+  for (const image of projection.images) {
+    image.technicalDetails.forEach(
+      (technical, technicalIndex) => {
+        const technicalPath =
+          `ResourceList.Image[${image.resourceReference}]` +
+          `.TechnicalDetails[${technicalIndex}]`;
+
+        addUnsupportedFields(
+          lossFlags,
+          technicalPath,
+          technical.unsupportedFields,
+        );
+
+        if (technical.file) {
+          addUnsupportedFields(
+            lossFlags,
+            `${technicalPath}.File`,
+            technical.file.unsupportedFields,
+          );
+        }
+      },
+    );
+  }
+
   for (const unsupportedKind of projection.unsupportedTopLevelKinds) {
     lossFlags.push({
       path: `NewReleaseMessage.${unsupportedKind}`,
@@ -355,6 +469,7 @@ function mapProjection(
       releaseDate: release.releaseDate,
       genres: release.genres,
       resourceReferences: release.resourceReferences,
+      resourceGroups: release.resourceGroups,
       identifiers: release.identifiers,
     })),
     trackCandidates: projection.soundRecordings.map((track) => ({
@@ -375,6 +490,7 @@ function mapProjection(
       mediaKind: "image" as const,
       imageType: image.imageType,
       uri: image.uri,
+      technicalDetails: image.technicalDetails,
     })),
   };
 
@@ -392,7 +508,7 @@ export function mapErn432(
 
   return {
     adapterKey: "ddex_ern_import",
-    adapterVersion: 2,
+    adapterVersion: 3,
     externalStandard: "DDEX_ERN",
     externalVersion: "4.3.2",
     messageOrRecordType: "NewReleaseMessage",
