@@ -183,11 +183,51 @@ begin
         and target_credit.status='active'
         and target_credit.is_primary is true
         and target_credit.artist_id is not null
-        and mizizi_private.public_music_identity_clean_title_slug_v1(
-              peer.title
+        and mizizi_private.slugify_identity_v1(
+              regexp_replace(
+                regexp_replace(
+                  regexp_replace(
+                    regexp_replace(
+                      mizizi_private.normalize_identity_text_v1(peer.title),
+                      '\\([^)]*\\y(feat(uring)?|ft)\\.?[[:space:]]+[^)]*\\)',
+                      ' ',
+                      'gi'
+                    ),
+                    '\\[[^]]*\\y(feat(uring)?|ft)\\.?[[:space:]]+[^]]*\\]',
+                    ' ',
+                    'gi'
+                  ),
+                  '\\{[^}]*\\y(feat(uring)?|ft)\\.?[[:space:]]+[^}]*\\}',
+                  ' ',
+                  'gi'
+                ),
+                '[[:space:]]+(-|:)?[[:space:]]*\\y(feat(uring)?|ft)\\.?[[:space:]]+.*$',
+                '',
+                'i'
+              )
             ) =
-            mizizi_private.public_music_identity_clean_title_slug_v1(
-              v_track.title
+            mizizi_private.slugify_identity_v1(
+              regexp_replace(
+                regexp_replace(
+                  regexp_replace(
+                    regexp_replace(
+                      mizizi_private.normalize_identity_text_v1(v_track.title),
+                      '\\([^)]*\\y(feat(uring)?|ft)\\.?[[:space:]]+[^)]*\\)',
+                      ' ',
+                      'gi'
+                    ),
+                    '\\[[^]]*\\y(feat(uring)?|ft)\\.?[[:space:]]+[^]]*\\]',
+                    ' ',
+                    'gi'
+                  ),
+                  '\\{[^}]*\\y(feat(uring)?|ft)\\.?[[:space:]]+[^}]*\\}',
+                  ' ',
+                  'gi'
+                ),
+                '[[:space:]]+(-|:)?[[:space:]]*\\y(feat(uring)?|ft)\\.?[[:space:]]+.*$',
+                '',
+                'i'
+              )
             )
     ) then
       raise exception using
@@ -470,51 +510,11 @@ begin
         and target_credit.status='active'
         and target_credit.is_primary is true
         and target_credit.artist_id is not null
-        and mizizi_private.slugify_identity_v1(
-              regexp_replace(
-                regexp_replace(
-                  regexp_replace(
-                    regexp_replace(
-                      mizizi_private.normalize_identity_text_v1(peer.title),
-                      '\\([^)]*\\y(feat(uring)?|ft)\\.?[[:space:]]+[^)]*\\)',
-                      ' ',
-                      'gi'
-                    ),
-                    '\\[[^]]*\\y(feat(uring)?|ft)\\.?[[:space:]]+[^]]*\\]',
-                    ' ',
-                    'gi'
-                  ),
-                  '\\{[^}]*\\y(feat(uring)?|ft)\\.?[[:space:]]+[^}]*\\}',
-                  ' ',
-                  'gi'
-                ),
-                '[[:space:]]+(-|:)?[[:space:]]*\\y(feat(uring)?|ft)\\.?[[:space:]]+.*$',
-                '',
-                'i'
-              )
+        and mizizi_private.public_music_identity_clean_title_slug_v1(
+              peer.title
             ) =
-            mizizi_private.slugify_identity_v1(
-              regexp_replace(
-                regexp_replace(
-                  regexp_replace(
-                    regexp_replace(
-                      mizizi_private.normalize_identity_text_v1(v_track.title),
-                      '\\([^)]*\\y(feat(uring)?|ft)\\.?[[:space:]]+[^)]*\\)',
-                      ' ',
-                      'gi'
-                    ),
-                    '\\[[^]]*\\y(feat(uring)?|ft)\\.?[[:space:]]+[^]]*\\]',
-                    ' ',
-                    'gi'
-                  ),
-                  '\\{[^}]*\\y(feat(uring)?|ft)\\.?[[:space:]]+[^}]*\\}',
-                  ' ',
-                  'gi'
-                ),
-                '[[:space:]]+(-|:)?[[:space:]]*\\y(feat(uring)?|ft)\\.?[[:space:]]+.*$',
-                '',
-                'i'
-              )
+            mizizi_private.public_music_identity_clean_title_slug_v1(
+              v_track.title
             )
     ) then
       raise exception using
