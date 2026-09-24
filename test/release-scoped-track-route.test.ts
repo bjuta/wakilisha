@@ -58,6 +58,22 @@ describe("canonical public Track and Release routes", () => {
       "src/services/articles/articleAdminService.ts",
       "utf8",
     );
+    const seoEdge = readFileSync(
+      "supabase/functions/seo-sitemap-admin/index.ts",
+      "utf8",
+    );
+    const prerender = readFileSync(
+      "scripts/seo/prerender-metadata.mjs",
+      "utf8",
+    );
+    const sitemapBuilder = readFileSync(
+      "scripts/seo/build-public-sitemap-html.mjs",
+      "utf8",
+    );
+    const seoAudit = readFileSync(
+      "scripts/seo/audit-prerender-output.mjs",
+      "utf8",
+    );
 
     expect(router).toContain(
       'path: "/tracks/:artistSlug/:trackSlug"',
@@ -92,6 +108,31 @@ describe("canonical public Track and Release routes", () => {
     expect(articleService).not.toContain("insertSlugRedirect");
     expect(articleService).not.toContain("lookupSlugRedirect");
     expect(articleService).not.toContain("wk_slug_redirects");
+
+    expect(seoEdge).toContain(
+      'loc: makeUrl(`/tracks/${artistSlug}/${row.slug}`)',
+    );
+    expect(seoEdge).not.toContain(
+      'path: `/releases/${releaseArtistSlug}/${releaseSlug}/${row.slug}`',
+    );
+    expect(seoEdge).not.toContain(
+      "const scopedItems:",
+    );
+    expect(prerender).toContain(
+      'parts[0] === "tracks" &&',
+    );
+    expect(prerender).toContain(
+      "parts.length === 3",
+    );
+    expect(prerender).not.toContain(
+      'parts[0] === "releases" && parts.length >= 4',
+    );
+    expect(sitemapBuilder).toContain(
+      "SEO metadata manifest contains retired public music identities",
+    );
+    expect(seoAudit).toContain(
+      "Registry Track metadata must use canonical Artist-scoped Track identity.",
+    );
 
     for (const retiredModule of [
       "src/services/slugRedirects.ts",
