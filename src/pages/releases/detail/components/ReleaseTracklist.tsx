@@ -98,9 +98,7 @@ export default function ReleaseTracklist({
             const isThisPlaying = isCurrentTrack && isPlaying;
             const trackHref = canonicalTrackUrl(
               artistSlug,
-              track.slug,
-              track.id,
-            );
+              track.slug);
 
             return (
               <div
