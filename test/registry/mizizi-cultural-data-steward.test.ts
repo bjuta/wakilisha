@@ -280,6 +280,84 @@ describe("MIZIZI Cultural Data Steward", () => {
     });
   });
 
+  it("keeps Public Music Identity Slice 2 review authority bounded to the narrow MIZIZI executor", () => {
+    const migration = readFileSync(
+      "supabase/migrations/20260924193138_public_music_identity_slice2_review_authority_v1.sql",
+      "utf8",
+    );
+    const verifier = readFileSync(
+      "scripts/control-plane/verify-public-music-identity-slice2-review-authority.sql",
+      "utf8",
+    );
+    const runner = readFileSync(
+      "scripts/registry/agents/mizizi/run.ts",
+      "utf8",
+    );
+
+    expect(migration).toContain(
+      "queue_public_music_identity_review_v1",
+    );
+    expect(migration).toContain(
+      "security definer",
+    );
+    expect(migration).toContain(
+      "perform mizizi_private.assert_executor_v1()",
+    );
+    expect(migration).toContain(
+      "p_rule_version <> '1.3.0'",
+    );
+    expect(migration).toContain(
+      "track_slug_credit_evidence_gap",
+    );
+    expect(migration).toContain(
+      "track_recording_identity_conflict",
+    );
+    expect(migration).toContain(
+      "human_review_required",
+    );
+    expect(migration).toContain(
+      "insert into public.registry_review_items",
+    );
+    expect(migration).toContain(
+      "to mizizi_executor",
+    );
+    expect(migration).toContain(
+      "from public, anon, authenticated, service_role",
+    );
+    expect(migration).not.toContain(
+      "update public.registry_tracks",
+    );
+    expect(migration).not.toContain(
+      "update public.registry_track_artists",
+    );
+    expect(migration).not.toContain(
+      "insert into public.wk_slug_redirects",
+    );
+    expect(migration).not.toContain(
+      "insert into public.registry_canonical_write_events",
+    );
+
+    expect(verifier).toContain(
+      "PUBLIC_MUSIC_IDENTITY_SLICE2_REVIEW_AUTHORITY_PASS",
+    );
+    expect(verifier).toContain(
+      "accepted MIZIZI 1.2.0 review broker semantics drifted",
+    );
+    expect(verifier).toContain(
+      "Slice 2 review broker is exposed to application roles",
+    );
+
+    expect(runner).toContain(
+      "queue_public_music_identity_review_v1",
+    );
+    expect(runner).toContain(
+      'finding.ruleVersion === "1.3.0"',
+    );
+    expect(runner).toContain(
+      "queue_registry_review_v1",
+    );
+  });
+
   it("derives Release taxonomy from resolvable active Track count", () => {
     const single =
       analyzeReleaseIdentity({
