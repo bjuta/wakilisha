@@ -190,6 +190,7 @@ export default function RegistryEntityEditorDrawer({
           .from("registry_release_tracks")
           .select("track_number, disc_number, status, track_id")
           .eq("release_id", releaseId)
+          .eq("status", "active")
           .order("disc_number")
           .order("track_number");
 
@@ -257,6 +258,40 @@ export default function RegistryEntityEditorDrawer({
 
   const displayName = String(entity[schema.displayNameField] ?? "Untitled");
   const quality = useMemo(() => calculateCompleteness(entity, schema), [entity, schema]);
+
+  const activeReleaseTracks =
+    richData?.tracks.filter((track) => track.track_status === "active") ?? [];
+  const primaryReleaseArtist =
+    richData?.releaseArtists.find((artist) => artist.is_primary) ||
+    richData?.releaseArtists[0] ||
+    null;
+  const singlePublicTrack =
+    activeReleaseTracks.length === 1 ? activeReleaseTracks[0] : null;
+  const singlePublicTrackArtist =
+    singlePublicTrack
+      ? richData?.trackArtists.find(
+          (credit) =>
+            credit.track_id === singlePublicTrack.track_id &&
+            credit.is_primary,
+        ) || null
+      : null;
+  const releasePublicUrl =
+    entityType === "release" && entity.slug && richData
+      ? releaseUrl({
+          slug: String(entity.slug),
+          artist:
+            primaryReleaseArtist?.artist_name_text ||
+            String(entity.display_name || entity.title || ""),
+          artistSlug: primaryReleaseArtist?.artist_slug || undefined,
+          releaseType: String(entity.release_type || ""),
+          trackCount: activeReleaseTracks.length,
+          singleTrackSlug: singlePublicTrack?.track_slug || null,
+          singleTrackArtistSlug:
+            singlePublicTrackArtist?.artist_slug ||
+            primaryReleaseArtist?.artist_slug ||
+            null,
+        })
+      : "";
 
   const dirtyFields = useMemo(() => {
     const result = buildChangesPayload(entity, draft, schema);
@@ -858,9 +893,9 @@ export default function RegistryEntityEditorDrawer({
 
                         {/* View public page + detail page links */}
                         <div className="flex flex-wrap items-center gap-2">
-                          {entity.slug && (
+                          {releasePublicUrl && releasePublicUrl !== "/releases" && (
                             <a
-                              href={releaseUrl({ slug: String(entity.slug), artist: String(entity.display_name || entity.title || "") })}
+                              href={releasePublicUrl}
                               target="_blank"
                               rel="noopener noreferrer"
                               className="inline-flex items-center gap-1.5 rounded-xl border border-[#dfe4d8] bg-white px-3 py-2 text-[11px] font-bold text-[#171712] hover:border-[#85c441] hover:text-[#5f8f2f] transition-colors"

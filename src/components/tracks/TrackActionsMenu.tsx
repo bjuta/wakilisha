@@ -254,9 +254,7 @@ export function TrackActionsMenu({
       trackSlug
         ? trackUrl(
             trackSlug,
-            artistSlug ? [artistSlug] : [],
-            registryTrackId,
-          )
+            artistSlug ? [artistSlug] : [])
         : null
     );
 

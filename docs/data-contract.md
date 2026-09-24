@@ -219,14 +219,19 @@ Relationships:
 ### Public entity detail routes
 
 - Artist: `/artists/:artistSlug/`
-- Track exact identity: `/tracks/:artistSlug/:trackSlug/:trackId/`
-- Track legacy compatibility: `/tracks/:artistSlug/:trackSlug/` only when that Artist + public slug resolves to exactly one Registry Track
-- Release: `/releases/:artistSlug/:releaseSlug/`
+- Track: `/tracks/:artistSlug/:trackSlug/`
+- Release: `/releases/:artistSlug/:releaseSlug/` for Releases with at least two resolvable active Tracks
 - Label: `/labels/:labelSlug/`
 - Genre: `/genres/:genreSlug/`
 - Chart series: `/charts/:seriesSlug/`
 - Chart edition: `/charts/:seriesSlug/:date/`
 - Country chart edition: `/charts/:seriesSlug/:country/:date/`
+
+A one-track Release remains a Registry Release but does not own a public
+Release detail page. Its listener-facing destination is its canonical Track.
+
+Registry UUIDs are immutable internal entity identity. They are not public URL
+segments.
 
 ### Public directories
 
@@ -244,39 +249,30 @@ Relationships:
 - `/tracks/`
 - `/releases/`
 
-The old app exposes track and release detail pages, not public track/release archive pages.
+The old app exposes Track and Release detail pages; public directory behavior
+is a separate product decision.
 
 ---
 
 ## Slug contract
 
-React should use a dedicated `entity_slugs` table.
-
-Fields:
-
-- `id`
-- `entity_type`
-- `entity_id`
-- `slug`
-- `full_path`
-- `status` — `active`, `redirect`, `retired`
-- `is_primary`
-- `locked`
-- `redirect_to_slug_id`
-- `legacy_path`
-- `created_at`
-- `updated_at`
-
 Rules:
 
-1. Registry UUID is canonical Track identity; a Track slug is public presentation and is not an entity key.
-2. Same-Artist same-title/same-slug Tracks are valid when Registry evidence identifies distinct Track entities.
-3. Exact Track URLs include `trackId`; the two-segment Artist + Track slug route is compatibility-only and must fail closed on ambiguity.
-4. One primary active slug per public entity.
-5. Historical slugs become redirects, not overwritten strings.
+1. Registry UUID is canonical machine identity; Artist-scoped Track/Release
+   slugs are human-facing public locators.
+2. Track public identity resolves from primary Artist scope plus canonical
+   Track slug to exactly one Registry Track UUID.
+3. Same primary Artist + same normalized canonical Track title + multiple
+   purported Track identities is a human-review condition. Different ISRCs do
+   not automatically prove distinct canonical recordings.
+4. A collision is never solved automatically with UUID, year, numeric, or
+   random URL suffixes.
+5. Slug cleanup must remove proven contributor/provider identity noise without
+   deleting legitimate title language.
 6. Track and Release readable paths include Artist context.
-7. Slug resolution must not depend on WordPress post names.
-8. Migration should preserve old public paths where possible.
+7. Track/Release redirect infrastructure is retired. Canonical slug changes do
+   not create replacement redirect debt.
+8. Slug resolution must not depend on WordPress post names.
 
 ---
 

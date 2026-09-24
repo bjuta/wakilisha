@@ -10,36 +10,26 @@ import {
 } from "../src/utils/trackUrl";
 
 describe("canonical public Track and Release routes", () => {
-  it("keeps readable legacy Track routes and makes Registry UUID the exact identity route", () => {
+  it("keeps Registry UUID internal and uses Artist-scoped Track URLs", () => {
     expect(
       trackUrl("Legendary", ["Nyashinski"]),
     ).toBe("/tracks/nyashinski/legendary");
-
-    const trackId =
-      "11111111-1111-4111-8111-111111111111";
-
-    expect(
-      trackUrl(
-        "Interlude",
-        ["Wakadinali"],
-        trackId,
-      ),
-    ).toBe(
-      `/tracks/wakadinali/interlude/${trackId}`,
-    );
 
     expect(
       canonicalTrackUrl(
         "wakadinali",
         "interlude",
-        trackId,
       ),
-    ).toBe(
-      `/tracks/wakadinali/interlude/${trackId}`,
+    ).toBe("/tracks/wakadinali/interlude");
+
+    const trackUrlSource = readFileSync(
+      "src/utils/trackUrl.ts",
+      "utf8",
     );
+    expect(trackUrlSource).not.toContain("trackId");
   });
 
-  it("removes Release-scoped Track and compatibility redirect ownership", () => {
+  it("retires UUID-bearing and Release-scoped Track route ownership without redirects", () => {
     const router = readFileSync(
       "src/router/config.tsx",
       "utf8",
@@ -56,8 +46,8 @@ describe("canonical public Track and Release routes", () => {
       "src/pages/releases/detail/page.tsx",
       "utf8",
     );
-    const trackUrlSource = readFileSync(
-      "src/utils/trackUrl.ts",
+    const mobileReleasePage = readFileSync(
+      "src/pages/mobile/releases/detail/page.tsx",
       "utf8",
     );
     const articlePage = readFileSync(
@@ -68,22 +58,15 @@ describe("canonical public Track and Release routes", () => {
       "src/services/articles/articleAdminService.ts",
       "utf8",
     );
-    const articleTrash = readFileSync(
-      "src/pages/admin/content/articles/trash/page.tsx",
-      "utf8",
-    );
 
-    expect(router).toContain(
-      'path: "/tracks/:artistSlug/:trackSlug/:trackId"',
-    );
-    expect(router).toContain(
-      'path: "/tracks/:artistSlug/:trackSlug/:trackId/lyrics/contribute"',
-    );
     expect(router).toContain(
       'path: "/tracks/:artistSlug/:trackSlug"',
     );
     expect(router).toContain(
       'path: "/tracks/:artistSlug/:trackSlug/lyrics/contribute"',
+    );
+    expect(router).not.toContain(
+      'path: "/tracks/:artistSlug/:trackSlug/:trackId"',
     );
     expect(router).not.toContain(
       'path: "/releases/:artistSlug/:releaseSlug/:trackSlug"',
@@ -98,78 +81,17 @@ describe("canonical public Track and Release routes", () => {
       expect(router).not.toContain(retiredOwner);
     }
 
-    for (const legacy of [
-      'path: "/artist", element: <NotFound />',
-      'path: "/release", element: <NotFound />',
-      'path: "/track", element: <NotFound />',
-      'path: "/category", element: <NotFound />',
-      'path: "/tag", element: <NotFound />',
-      'path: "/player", element: <NotFound />',
-      'path: "/authors/:slug", element: <NotFound />',
-      'path: "/:slug", element: <NotFound />',
-    ]) {
-      expect(router).toContain(legacy);
-    }
+    expect(trackPage).not.toContain("trackId } = useParams");
+    expect(lyricsPage).not.toContain("trackId,");
+    expect(releasePage).toContain("data.trackCount <= 1");
+    expect(releasePage).not.toContain("navigate(");
+    expect(mobileReleasePage).toContain("data.trackCount <= 1");
+    expect(mobileReleasePage).not.toContain("navigate(");
 
-    expect(trackUrlSource).not.toContain(
-      "releaseTrackUrl",
-    );
-    expect(trackUrlSource).not.toContain(
-      "releaseTrackCount",
-    );
-
-    for (const retiredTrackRuntime of [
-      "getReleaseTrack",
-      "resolveScopedSlugRedirect",
-      "releaseTrackUrl",
-      "cleanDirtyTrackSlug",
-    ]) {
-      expect(trackPage).not.toContain(
-        retiredTrackRuntime,
-      );
-    }
-
-    for (const retiredLyricsRuntime of [
-      "getReleaseTrack",
-      "resolveScopedSlugRedirect",
-      "releaseSlug",
-      "releaseTrackCount",
-      "useNavigate",
-    ]) {
-      expect(lyricsPage).not.toContain(
-        retiredLyricsRuntime,
-      );
-    }
-
-    expect(releasePage).not.toContain(
-      "data.trackCount <= 1",
-    );
-    expect(releasePage).not.toContain(
-      "navigate(",
-    );
-
-    expect(articlePage).not.toContain(
-      "lookupSlugRedirect",
-    );
-    expect(articlePage).not.toContain(
-      "checkingRedirect",
-    );
-    expect(articleService).not.toContain(
-      "insertSlugRedirect",
-    );
-    expect(articleService).not.toContain(
-      "lookupSlugRedirect",
-    );
-    expect(articleService).not.toContain(
-      "wk_slug_redirects",
-    );
-
-    expect(articleTrash).not.toContain(
-      "Slug redirects associated with this article",
-    );
-    expect(articleTrash).toContain(
-      "This permanently removes the article and its revisions.",
-    );
+    expect(articlePage).not.toContain("lookupSlugRedirect");
+    expect(articleService).not.toContain("insertSlugRedirect");
+    expect(articleService).not.toContain("lookupSlugRedirect");
+    expect(articleService).not.toContain("wk_slug_redirects");
 
     for (const retiredModule of [
       "src/services/slugRedirects.ts",
@@ -180,13 +102,9 @@ describe("canonical public Track and Release routes", () => {
     }
   });
 
-  it("fails closed instead of selecting the first Track from an ambiguous Artist slug", () => {
+  it("fails closed on ambiguous or wrong-Artist Track identity", () => {
     const edge = readFileSync(
       "supabase/functions/public-content-read/index.ts",
-      "utf8",
-    );
-    const related = readFileSync(
-      "src/pages/tracks/detail/components/TrackRelatedTracks.tsx",
       "utf8",
     );
 
@@ -194,38 +112,62 @@ describe("canonical public Track and Release routes", () => {
       'reason: "ambiguous_track_slug"',
     );
     expect(edge).toContain(
-      "canonicalIdentityRequired: true",
+      "identityReviewRequired: true",
     );
-    expect(edge).toContain(
-      '.eq("id", urlTrackId)',
+    expect(edge).not.toContain(
+      "canonicalIdentityRequired",
     );
-    expect(edge).toContain(
+    expect(edge).not.toContain(
       "isTrackIdentityPath",
     );
+    expect(edge).not.toContain(
+      "isReleaseTrackPath",
+    );
+    expect(edge).not.toContain(
+      '.eq("id", urlTrackId)',
+    );
+
     const scopedTrackResolver = edge.slice(
       edge.indexOf("async function findTrackByScopedPublicSlug("),
       edge.indexOf("async function findReleaseByScopedPublicSlug("),
     );
-
     expect(scopedTrackResolver).toContain(
       "matches.length !== 1",
+    );
+    expect(scopedTrackResolver).toContain(
+      '.eq("is_primary", true)',
     );
     expect(scopedTrackResolver).not.toContain(
       "return matches.sort",
     );
 
-    expect(related).toContain(
-      "seenTrackKeys",
+    const publicTrackBranch = edge.slice(
+      edge.indexOf('else if (path.startsWith("/tracks/"))'),
+      edge.indexOf('if (path.startsWith("/charts/"))'),
     );
-    expect(related).toContain(
-      "const trackKey = t.id ||",
+    expect(publicTrackBranch).not.toContain(
+      '.eq("slug", trackSlug)',
     );
-    expect(related).toContain(
-      "trackUrl(track.slug, [track.artistSlug], track.id)",
+    expect(publicTrackBranch).not.toContain(
+      "Chart-entry fallback",
+    );
+    expect(publicTrackBranch).toContain(
+      '.eq("is_primary", true)',
+    );
+
+    const releaseResolver = edge.slice(
+      edge.indexOf("async function findReleaseByScopedPublicSlug("),
+      edge.indexOf("function extractYear", edge.indexOf("async function findReleaseByScopedPublicSlug(")),
+    );
+    expect(releaseResolver).toContain(
+      '.eq("is_primary", true)',
+    );
+    expect(edge).not.toContain(
+      "byReleaseSlug",
     );
   });
 
-  it("keeps Track capability and Release context without route indirection", () => {
+  it("keeps Track capability and Release context without UUID route material", () => {
     const desktopRelease = readFileSync(
       "src/pages/releases/detail/components/ReleaseTracklist.tsx",
       "utf8",
@@ -244,36 +186,6 @@ describe("canonical public Track and Release routes", () => {
     );
     expect(mobileRelease).toContain(
       "canonicalTrackUrl(",
-    );
-    expect(desktopRelease).toContain(
-      `canonicalTrackUrl(
-              artistSlug,
-              track.slug,
-              track.id,
-            )`,
-    );
-    expect(desktopRelease).not.toContain(
-      `canonicalTrackUrl(
-              artistSlug,
-              track.slug,
-              release.slug,
-              release.trackCount,
-            )`,
-    );
-    expect(mobileRelease).toContain(
-      `canonicalTrackUrl(
-                  artistSlug,
-                  track.slug,
-                  track.id,
-                )`,
-    );
-    expect(mobileRelease).not.toContain(
-      `canonicalTrackUrl(
-                  artistSlug,
-                  track.slug,
-                  releaseSlug,
-                  release.trackCount,
-                )`,
     );
 
     for (const capability of [

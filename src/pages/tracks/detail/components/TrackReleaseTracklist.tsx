@@ -146,7 +146,7 @@ export default function TrackReleaseTracklist({
 
               {/* Track info */}
               <Link
-                to={trackUrl(track.slug, [artistSlug], track.id)}
+                to={trackUrl(track.slug, [artistSlug])}
                 className="min-w-0 block"
                 onClick={(e) => {
                   if ((e.target as HTMLElement).closest("button")) {
@@ -181,7 +181,7 @@ export default function TrackReleaseTracklist({
 
               {/* Chevron to detail page */}
               <Link
-                to={trackUrl(track.slug, [artistSlug], track.id)}
+                to={trackUrl(track.slug, [artistSlug])}
                 className="flex items-center justify-center"
               >
                 <WkIcon

@@ -280,9 +280,7 @@ export function ChartRowExpandedPanel({
               <Link
                 to={trackUrl(
                   slug,
-                  artistSlugs,
-                  registryTrackId,
-                )}
+                  artistSlugs)}
                 onClick={(event) =>
                   event.stopPropagation()
                 }

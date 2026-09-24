@@ -224,7 +224,12 @@ export default function GenreDetail() {
                 {sortedReleases.map((release) => (
                   <Link
                     key={release.slug}
-                    to={releaseUrl({ slug: release.slug, artist: release.artistName })}
+                    to={releaseUrl({
+                      slug: release.slug,
+                      artist: release.artistName,
+                      trackCount: release.trackCount,
+                      releaseType: release.releaseType,
+                    })}
                     className="group overflow-hidden rounded-xl border border-[var(--wk-border)] bg-[var(--wk-surface)] transition-all hover:border-[var(--wk-brand)]"
                   >
                     <div className="relative aspect-square bg-[var(--wk-surface-raised)]">

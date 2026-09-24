@@ -76,23 +76,8 @@ export function getLabel(
 export function getTrack(
   artistSlug: string,
   trackSlug: string,
-  trackId?: string | null,
-): Promise<PublicTrackDetail | null> {
-  const identitySuffix = trackId
-    ? `/${encodeURIComponent(trackId)}`
-    : "";
-
-  return fetchPublic<PublicTrackDetail | null>(
-    `/tracks/${encodeURIComponent(artistSlug)}/${encodeURIComponent(trackSlug)}${identitySuffix}`
-  );
-}
-
-export function getReleaseTrack(
-  artistSlug: string,
-  releaseSlug: string,
-  trackSlug: string
 ): Promise<PublicTrackDetail | null> {
   return fetchPublic<PublicTrackDetail | null>(
-    `/releases/${encodeURIComponent(artistSlug)}/${encodeURIComponent(releaseSlug)}/${encodeURIComponent(trackSlug)}`
+    `/tracks/${encodeURIComponent(artistSlug)}/${encodeURIComponent(trackSlug)}`
   );
 }
