@@ -42,7 +42,7 @@ describe("DDEX ERN 4.3.2 read-only adapter", () => {
     const result = mapErn432(xml);
 
     expect(result.adapterKey).toBe("ddex_ern_import");
-    expect(result.adapterVersion).toBe(2);
+    expect(result.adapterVersion).toBe(3);
     expect(result.externalStandard).toBe("DDEX_ERN");
     expect(result.externalVersion).toBe("4.3.2");
     expect(result.mappingProfile).toBe("music-data-dictionary/v1");
@@ -90,6 +90,22 @@ describe("DDEX ERN 4.3.2 read-only adapter", () => {
                 ],
               },
             ],
+            technicalDetails: [
+              {
+                technicalResourceDetailsReference: "T_AUDIO1",
+                deliveryFiles: [
+                  {
+                    deliveryFileType: "AudioFile",
+                    file: {
+                      uri: "file://fixture-track.wav",
+                      unsupportedFields: [],
+                    },
+                    unsupportedFields: [],
+                  },
+                ],
+                unsupportedFields: [],
+              },
+            ],
           },
           {
             editionType: "ImmersiveEdition",
@@ -105,6 +121,7 @@ describe("DDEX ERN 4.3.2 read-only adapter", () => {
                 ],
               },
             ],
+            technicalDetails: [],
           },
         ],
       },
@@ -118,7 +135,37 @@ describe("DDEX ERN 4.3.2 read-only adapter", () => {
         displayArtistName: "Fixture Artist",
         releaseDate: "2026-09-23",
         genres: ["Afropop"],
-        resourceReferences: ["A1", "A_IMG1"],
+        resourceReferences: ["A1"],
+        resourceGroups: [
+          {
+            resourceGroupType: null,
+            sequenceNumber: null,
+            contentItems: [
+              {
+                sequenceNumber: 1,
+                releaseResourceReference: "A1",
+                linkedResourceReferences: [],
+                isBonusResource: null,
+                isInstantGratificationResource: null,
+                isPreOrderIncentiveResource: null,
+                unsupportedFields: [],
+              },
+            ],
+            linkedResourceReferences: [
+              {
+                resourceReference: "A_IMG1",
+                linkDescription: "CoverArt",
+                languageAndScriptCode: null,
+                namespace: null,
+                userDefinedValue: null,
+                sequenceNumber: null,
+                isMultiFile: null,
+              },
+            ],
+            resourceGroups: [],
+            unsupportedFields: [],
+          },
+        ],
         identifiers: [
           {
             sourceScheme: "ICPN",
@@ -166,6 +213,16 @@ describe("DDEX ERN 4.3.2 read-only adapter", () => {
         mediaKind: "image",
         imageType: "FrontCoverImage",
         uri: "https://media.invalid/ern432/front-cover.jpg",
+        technicalDetails: [
+          {
+            technicalResourceDetailsReference: "T_IMG1",
+            file: {
+              uri: "https://media.invalid/ern432/front-cover.jpg",
+              unsupportedFields: [],
+            },
+            unsupportedFields: [],
+          },
+        ],
       },
     ]);
   });
@@ -185,6 +242,24 @@ describe("DDEX ERN 4.3.2 read-only adapter", () => {
     expect(projection.soundRecordings[0].duration).toBe("PT3M");
     expect(projection.soundRecordings[0].editions).toHaveLength(2);
     expect(
+      projection.soundRecordings[0].editions[0].technicalDetails,
+    ).toEqual([
+      {
+        technicalResourceDetailsReference: "T_AUDIO1",
+        deliveryFiles: [
+          {
+            deliveryFileType: "AudioFile",
+            file: {
+              uri: "file://fixture-track.wav",
+              unsupportedFields: [],
+            },
+            unsupportedFields: [],
+          },
+        ],
+        unsupportedFields: [],
+      },
+    ]);
+    expect(
       projection.soundRecordings[0].editions
         .flatMap((edition) => edition.resourceIds)
         .flatMap((resourceId) => resourceId.identifiers)
@@ -199,6 +274,47 @@ describe("DDEX ERN 4.3.2 read-only adapter", () => {
       "StudioProducer",
     ]);
     expect(projection.releases[0].genres).toEqual(["Afropop"]);
+    expect(projection.releases[0].resourceReferences).toEqual(["A1"]);
+    expect(projection.releases[0].resourceGroups).toEqual([
+      {
+        resourceGroupType: null,
+        sequenceNumber: null,
+        contentItems: [
+          {
+            sequenceNumber: 1,
+            releaseResourceReference: "A1",
+            linkedResourceReferences: [],
+            isBonusResource: null,
+            isInstantGratificationResource: null,
+            isPreOrderIncentiveResource: null,
+            unsupportedFields: [],
+          },
+        ],
+        linkedResourceReferences: [
+          {
+            resourceReference: "A_IMG1",
+            linkDescription: "CoverArt",
+            languageAndScriptCode: null,
+            namespace: null,
+            userDefinedValue: null,
+            sequenceNumber: null,
+            isMultiFile: null,
+          },
+        ],
+        resourceGroups: [],
+        unsupportedFields: [],
+      },
+    ]);
+    expect(projection.images[0].technicalDetails).toEqual([
+      {
+        technicalResourceDetailsReference: "T_IMG1",
+        file: {
+          uri: "https://media.invalid/ern432/front-cover.jpg",
+          unsupportedFields: [],
+        },
+        unsupportedFields: [],
+      },
+    ]);
   });
 
   it("keeps Party identifiers as evidence without inferring canonical identity", () => {
@@ -390,12 +506,86 @@ describe("DDEX ERN 4.3.2 read-only adapter", () => {
     expect(
       result.data.releaseCandidates[0].resourceReferences,
     ).toEqual(["A1", "A2"]);
+    expect(
+      result.data.releaseCandidates[0].resourceGroups,
+    ).toEqual([
+      {
+        resourceGroupType: null,
+        sequenceNumber: null,
+        contentItems: [],
+        linkedResourceReferences: [],
+        resourceGroups: [
+          {
+            resourceGroupType: "Component",
+            sequenceNumber: 1,
+            contentItems: [
+              {
+                sequenceNumber: 1,
+                releaseResourceReference: "A1",
+                linkedResourceReferences: [],
+                isBonusResource: null,
+                isInstantGratificationResource: null,
+                isPreOrderIncentiveResource: null,
+                unsupportedFields: [],
+              },
+              {
+                sequenceNumber: 2,
+                releaseResourceReference: "A2",
+                linkedResourceReferences: [],
+                isBonusResource: null,
+                isInstantGratificationResource: null,
+                isPreOrderIncentiveResource: null,
+                unsupportedFields: [],
+              },
+            ],
+            linkedResourceReferences: [],
+            resourceGroups: [],
+            unsupportedFields: [],
+          },
+        ],
+        unsupportedFields: [],
+      },
+    ]);
 
     expect(
       result.data.identifierCandidates
         .filter((candidate) => candidate.schemeKey === "isrc")
         .map((candidate) => candidate.sourceValue),
     ).toEqual(["KEAAA2600002", "KEAAA2600003"]);
+  });
+
+  it("keeps linked cover art secondary to the primary Release resource", () => {
+    const result = mapErn432(fixture("basic-release.xml"));
+
+    expect(result.data.releaseCandidates[0].resourceReferences).toEqual([
+      "A1",
+    ]);
+    expect(
+      result.data.releaseCandidates[0].resourceGroups[0]
+        .linkedResourceReferences,
+    ).toEqual([
+      expect.objectContaining({
+        resourceReference: "A_IMG1",
+        linkDescription: "CoverArt",
+      }),
+    ]);
+  });
+
+  it("loss-flags valid technical fields outside the bounded v1 projection", () => {
+    const xml = fixture("basic-release.xml").replace(
+      "<TechnicalResourceDetailsReference>T_IMG1</TechnicalResourceDetailsReference>",
+      "<TechnicalResourceDetailsReference>T_IMG1</TechnicalResourceDetailsReference>\n        <ImageCodecType>JPEG</ImageCodecType>",
+    );
+    const result = mapErn432(xml);
+
+    expect(result.mappingResult).toBe("partial");
+    expect(result.lossFlags).toContainEqual(
+      expect.objectContaining({
+        classification: "partial",
+        path:
+          "ResourceList.Image[A_IMG1].TechnicalDetails[0].ImageCodecType",
+      }),
+    );
   });
 
   it("is deterministic for identical bytes and mapping profile", () => {
