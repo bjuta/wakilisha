@@ -53,8 +53,7 @@
         <ResourceId>
           <ISRC>KEAAA2600005</ISRC>
         </ResourceId>
-        <TechnicalDetails LanguageAndScriptCode="en" IsDefault="true">
-          <ApplicableTerritoryCode>Worldwide</ApplicableTerritoryCode>
+        <TechnicalDetails LanguageAndScriptCode="en" ApplicableTerritoryCode="Worldwide" IsDefault="true">
           <TechnicalResourceDetailsReference>T_AUDIO1</TechnicalResourceDetailsReference>
           <DeliveryFile>
             <Type>AudioFile</Type>
