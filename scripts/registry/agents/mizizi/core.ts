@@ -21,8 +21,8 @@ export {
 
 export const MIZIZI_AGENT_KEY = "mizizi";
 export const MIZIZI_AGENT_LABEL = "MIZIZI Cultural Data Steward";
-export const MIZIZI_RULESET_VERSION = "1.3.0";
-export const MIZIZI_LEGACY_RULE_VERSION = "1.2.0";
+export const MIZIZI_RULESET_VERSION = "1.2.0";
+export const MIZIZI_PUBLIC_IDENTITY_REVIEW_RULE_VERSION = "1.3.0";
 
 export type MiziziEntityType = "track" | "release" | "chart_entry";
 export type MiziziDisposition = "auto_fix_candidate" | "review" | "observe";
@@ -128,7 +128,7 @@ function makeFinding(
 ): MiziziFinding {
   const ruleVersion =
     input.ruleVersion ||
-    MIZIZI_LEGACY_RULE_VERSION;
+    MIZIZI_RULESET_VERSION;
   const stable = JSON.stringify({
     agent: MIZIZI_AGENT_KEY,
     ruleId: input.ruleId,
@@ -272,7 +272,7 @@ export function analyzeTrackIdentity(input: TrackIdentityInput): MiziziFinding[]
         ruleId:
           "track_slug_credit_evidence_gap",
         ruleVersion:
-          MIZIZI_RULESET_VERSION,
+          MIZIZI_PUBLIC_IDENTITY_REVIEW_RULE_VERSION,
         entityType: "track",
         entityId: input.id,
         fieldName: "slug",
@@ -331,7 +331,7 @@ export function analyzeTrackIdentity(input: TrackIdentityInput): MiziziFinding[]
       ruleId:
         "track_recording_identity_conflict",
       ruleVersion:
-        MIZIZI_RULESET_VERSION,
+        MIZIZI_PUBLIC_IDENTITY_REVIEW_RULE_VERSION,
       entityType: "track",
       entityId: input.id,
       fieldName:
