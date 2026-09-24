@@ -42,7 +42,7 @@ describe("DDEX ERN 4.3.2 read-only adapter", () => {
     const result = mapErn432(xml);
 
     expect(result.adapterKey).toBe("ddex_ern_import");
-    expect(result.adapterVersion).toBe(4);
+    expect(result.adapterVersion).toBe(5);
     expect(result.externalStandard).toBe("DDEX_ERN");
     expect(result.externalVersion).toBe("4.3.2");
     expect(result.mappingProfile).toBe("music-data-dictionary/v1");
@@ -96,13 +96,61 @@ describe("DDEX ERN 4.3.2 read-only adapter", () => {
             technicalDetails: [
               {
                 technicalResourceDetailsReference: "T_AUDIO1",
+                languageAndScriptCode: "en",
+                applicableTerritoryCode: "Worldwide",
+                isDefault: true,
+                hasImmersiveAudioMetadata: false,
                 deliveryFiles: [
                   {
                     deliveryFileType: "AudioFile",
+                    audioCodecType: {
+                      value: "FLAC",
+                      namespace: null,
+                      userDefinedValue: null,
+                    },
+                    bitRate: {
+                      value: "2304",
+                      unitOfMeasure: "kbps",
+                    },
+                    numberOfChannels: "2",
+                    numberOfAudioObjects: null,
+                    samplingRate: {
+                      value: "96000",
+                      unitOfMeasure: "Hz",
+                    },
+                    bitsPerSample: 24,
+                    bitDepth: null,
                     file: {
-                      uri: "file://fixture-track.wav",
+                      uri: "file://fixture-track-hires.flac",
                       unsupportedFields: [],
                     },
+                    isProvidedInDelivery: true,
+                    unsupportedFields: [],
+                  },
+                  {
+                    deliveryFileType: "AudioFile",
+                    audioCodecType: {
+                      value: "AAC",
+                      namespace: null,
+                      userDefinedValue: null,
+                    },
+                    bitRate: {
+                      value: "320",
+                      unitOfMeasure: "kbps",
+                    },
+                    numberOfChannels: "2",
+                    numberOfAudioObjects: null,
+                    samplingRate: {
+                      value: "48000",
+                      unitOfMeasure: "Hz",
+                    },
+                    bitsPerSample: 24,
+                    bitDepth: null,
+                    file: {
+                      uri: "file://fixture-track.aac",
+                      unsupportedFields: [],
+                    },
+                    isProvidedInDelivery: true,
                     unsupportedFields: [],
                   },
                 ],
@@ -124,7 +172,44 @@ describe("DDEX ERN 4.3.2 read-only adapter", () => {
                 ],
               },
             ],
-            technicalDetails: [],
+            technicalDetails: [
+              {
+                technicalResourceDetailsReference: "T_AUDIO2",
+                languageAndScriptCode: null,
+                applicableTerritoryCode: null,
+                isDefault: true,
+                hasImmersiveAudioMetadata: true,
+                deliveryFiles: [
+                  {
+                    deliveryFileType: "AudioFile",
+                    audioCodecType: {
+                      value: "UserDefined",
+                      namespace: "Dolby",
+                      userDefinedValue: "DolbyAtmos",
+                    },
+                    bitRate: {
+                      value: "768",
+                      unitOfMeasure: "kbps",
+                    },
+                    numberOfChannels: "5.1",
+                    numberOfAudioObjects: 16,
+                    samplingRate: {
+                      value: "48000",
+                      unitOfMeasure: "Hz",
+                    },
+                    bitsPerSample: 24,
+                    bitDepth: null,
+                    file: {
+                      uri: "file://fixture-track-atmos.m4a",
+                      unsupportedFields: [],
+                    },
+                    isProvidedInDelivery: true,
+                    unsupportedFields: [],
+                  },
+                ],
+                unsupportedFields: [],
+              },
+            ],
           },
         ],
       },
@@ -260,13 +345,101 @@ describe("DDEX ERN 4.3.2 read-only adapter", () => {
     ).toEqual([
       {
         technicalResourceDetailsReference: "T_AUDIO1",
+        languageAndScriptCode: "en",
+        applicableTerritoryCode: "Worldwide",
+        isDefault: true,
+        hasImmersiveAudioMetadata: false,
         deliveryFiles: [
           {
             deliveryFileType: "AudioFile",
+            audioCodecType: {
+              value: "FLAC",
+              namespace: null,
+              userDefinedValue: null,
+            },
+            bitRate: {
+              value: "2304",
+              unitOfMeasure: "kbps",
+            },
+            numberOfChannels: "2",
+            numberOfAudioObjects: null,
+            samplingRate: {
+              value: "96000",
+              unitOfMeasure: "Hz",
+            },
+            bitsPerSample: 24,
+            bitDepth: null,
             file: {
-              uri: "file://fixture-track.wav",
+              uri: "file://fixture-track-hires.flac",
               unsupportedFields: [],
             },
+            isProvidedInDelivery: true,
+            unsupportedFields: [],
+          },
+          {
+            deliveryFileType: "AudioFile",
+            audioCodecType: {
+              value: "AAC",
+              namespace: null,
+              userDefinedValue: null,
+            },
+            bitRate: {
+              value: "320",
+              unitOfMeasure: "kbps",
+            },
+            numberOfChannels: "2",
+            numberOfAudioObjects: null,
+            samplingRate: {
+              value: "48000",
+              unitOfMeasure: "Hz",
+            },
+            bitsPerSample: 24,
+            bitDepth: null,
+            file: {
+              uri: "file://fixture-track.aac",
+              unsupportedFields: [],
+            },
+            isProvidedInDelivery: true,
+            unsupportedFields: [],
+          },
+        ],
+        unsupportedFields: [],
+      },
+    ]);
+    expect(
+      projection.soundRecordings[0].editions[1].technicalDetails,
+    ).toEqual([
+      {
+        technicalResourceDetailsReference: "T_AUDIO2",
+        languageAndScriptCode: null,
+        applicableTerritoryCode: null,
+        isDefault: true,
+        hasImmersiveAudioMetadata: true,
+        deliveryFiles: [
+          {
+            deliveryFileType: "AudioFile",
+            audioCodecType: {
+              value: "UserDefined",
+              namespace: "Dolby",
+              userDefinedValue: "DolbyAtmos",
+            },
+            bitRate: {
+              value: "768",
+              unitOfMeasure: "kbps",
+            },
+            numberOfChannels: "5.1",
+            numberOfAudioObjects: 16,
+            samplingRate: {
+              value: "48000",
+              unitOfMeasure: "Hz",
+            },
+            bitsPerSample: 24,
+            bitDepth: null,
+            file: {
+              uri: "file://fixture-track-atmos.m4a",
+              unsupportedFields: [],
+            },
+            isProvidedInDelivery: true,
             unsupportedFields: [],
           },
         ],
@@ -731,6 +904,59 @@ describe("DDEX ERN 4.3.2 read-only adapter", () => {
         linkDescription: "CoverArt",
       }),
     ]);
+  });
+
+  it("retains every premium audio delivery variant without inventing a product tier", () => {
+    const result = mapErn432(fixture("basic-release.xml"));
+    const editions = result.data.trackCandidates[0].editions;
+
+    expect(editions[0].technicalDetails[0].deliveryFiles).toHaveLength(2);
+    expect(
+      editions[0].technicalDetails[0].deliveryFiles.map((file) => ({
+        codec: file.audioCodecType,
+        bitRate: file.bitRate,
+        samplingRate: file.samplingRate,
+        bitsPerSample: file.bitsPerSample,
+        uri: file.file?.uri ?? null,
+      })),
+    ).toEqual([
+      {
+        codec: {
+          value: "FLAC",
+          namespace: null,
+          userDefinedValue: null,
+        },
+        bitRate: { value: "2304", unitOfMeasure: "kbps" },
+        samplingRate: { value: "96000", unitOfMeasure: "Hz" },
+        bitsPerSample: 24,
+        uri: "file://fixture-track-hires.flac",
+      },
+      {
+        codec: {
+          value: "AAC",
+          namespace: null,
+          userDefinedValue: null,
+        },
+        bitRate: { value: "320", unitOfMeasure: "kbps" },
+        samplingRate: { value: "48000", unitOfMeasure: "Hz" },
+        bitsPerSample: 24,
+        uri: "file://fixture-track.aac",
+      },
+    ]);
+
+    expect(
+      editions[1].technicalDetails[0].hasImmersiveAudioMetadata,
+    ).toBe(true);
+    expect(
+      editions[1].technicalDetails[0].deliveryFiles[0].audioCodecType,
+    ).toEqual({
+      value: "UserDefined",
+      namespace: "Dolby",
+      userDefinedValue: "DolbyAtmos",
+    });
+
+    expect(result.data.trackCandidates[0]).not.toHaveProperty("audioTier");
+    expect(result.data.trackCandidates[0]).not.toHaveProperty("isSpatial");
   });
 
   it("loss-flags valid technical fields outside the bounded v1 projection", () => {
