@@ -45,7 +45,7 @@ const EXPECTED_CHART_CANDIDATE_FINGERPRINT =
 
 const EXPECTED_BLOBS = {
   "scripts/registry/agents/mizizi/run.ts":
-    "785069516432f04997085b53ef708c898d17f3c7",
+    "8e9da806b854c896fe23dcb436afeca44cfc841b",
   "scripts/registry/agents/mizizi/core.ts":
     "164c9b5a0431b06f8d990b0aff6c6ef8a998aacb",
   "supabase/migrations/20260918173446_mizizi_stage_b_broker_convergence_v1.sql":
