@@ -358,6 +358,61 @@ describe("MIZIZI Cultural Data Steward", () => {
     );
   });
 
+  it("seals the Slice 2 review-broker regex hotfix against double escaping", () => {
+    const hotfix = readFileSync(
+      "supabase/migrations/20260925050859_public_music_identity_slice2_review_broker_regex_fix.sql",
+      "utf8",
+    );
+    const verifier = readFileSync(
+      "scripts/control-plane/verify-public-music-identity-slice2-review-broker-regex-fix.sql",
+      "utf8",
+    );
+
+    expect(hotfix).toContain(
+      "create or replace function mizizi_private.queue_public_music_identity_review_v1",
+    );
+    expect(hotfix).toContain(
+      String.raw`$regex$\([^)]*\y(feat(uring)?|ft)\.?[[:space:]]+[^)]*\)$regex$`,
+    );
+    expect(hotfix).toContain(
+      String.raw`$regex$[[:space:]]+(-|:)?[[:space:]]*\y(feat(uring)?|ft)\.?`,
+    );
+    expect(hotfix).not.toContain(
+      String.raw`$regex$\\([^)]*\\y`,
+    );
+    expect(hotfix).toContain(
+      "perform mizizi_private.assert_executor_v1()",
+    );
+    expect(hotfix).toContain(
+      "to mizizi_executor",
+    );
+    expect(hotfix).not.toContain(
+      "update public.registry_tracks",
+    );
+    expect(hotfix).not.toContain(
+      "update public.registry_track_artists",
+    );
+    expect(hotfix).not.toContain(
+      "insert into public.wk_slug_redirects",
+    );
+    expect(hotfix).not.toContain(
+      "insert into public.registry_canonical_write_events",
+    );
+
+    expect(verifier).toContain(
+      "44 conflict groups / 91 Tracks",
+    );
+    expect(verifier).toContain(
+      "PUBLIC_MUSIC_IDENTITY_SLICE2_REVIEW_BROKER_REGEX_FIX_PASS",
+    );
+    expect(verifier).toContain(
+      "corrected single-backslash feature regex is missing",
+    );
+    expect(verifier).toContain(
+      "doubled-backslash feature regex remains in broker definition",
+    );
+  });
+
   it("keeps Slice 3 review materialization unable to enter canonical mutation paths", () => {
     const runner = readFileSync(
       "scripts/registry/agents/mizizi/run.ts",
