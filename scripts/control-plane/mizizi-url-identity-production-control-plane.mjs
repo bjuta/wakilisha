@@ -79,7 +79,7 @@ const EXPECTED_BLOBS = {
   "supabase/migrations/20260925082706_public_music_identity_slice3_release_single_alignment_v1.sql":
     "bb2a936a8082a506d9b6e1ba94236c2b0aad446b",
   "supabase/migrations/20260925141117_public_music_identity_track_slug_zero_v2.sql":
-    "4739ada00e2a50b1cd94074024db182d5cf004a0",
+    "3686a83f65c7ac92de5e7d89c5ed906427c00a2c",
 };
 
 const APPLY_SCOPES = {
