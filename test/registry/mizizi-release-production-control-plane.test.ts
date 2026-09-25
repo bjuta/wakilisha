@@ -98,6 +98,7 @@ describe("MIZIZI Release production control plane", () => {
     expect(controlPlane).toContain("createJitPoolWithRetry");
     expect(controlPlane).toContain("streamReadOnlyAuditWithRetry");
     expect(controlPlane).toContain("EJITREQUESTFAILED");
+    expect(controlPlane).toContain("pam authentication failed");
     expect(controlPlane).toContain(
       "await streamCommand('npm',['run','registry:mizizi:apply'",
     );

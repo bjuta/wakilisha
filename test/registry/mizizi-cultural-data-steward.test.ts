@@ -1439,6 +1439,9 @@ describe("MIZIZI Cultural Data Steward", () => {
       "EJITREQUESTFAILED",
     );
     expect(controlPlane).toContain(
+      "pam authentication failed",
+    );
+    expect(controlPlane).toContain(
       "database session ready on attempt",
     );
     expect(controlPlane).toContain(

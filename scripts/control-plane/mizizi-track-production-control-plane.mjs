@@ -148,7 +148,8 @@ function isTransientJitError(error) {
     code === 'XX000' ||
     message.includes('jit provider') ||
     message.includes('temporary access') ||
-    message.includes('password authentication failed')
+    message.includes('password authentication failed') ||
+    message.includes('pam authentication failed')
   );
 }
 

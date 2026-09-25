@@ -105,7 +105,8 @@ function isTransientJitError(error) {
   const message = String(error?.message||error||'').toLowerCase();
   return code === 'EJITREQUESTFAILED' || code === '28P01' || code === 'XX000' ||
     message.includes('jit provider') || message.includes('temporary access') ||
-    message.includes('password authentication failed');
+    message.includes('password authentication failed') ||
+    message.includes('pam authentication failed');
 }
 
 async function createJitPoolWithRetry(url, expectedRole) {

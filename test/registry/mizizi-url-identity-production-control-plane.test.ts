@@ -57,6 +57,9 @@ describe("MIZIZI current URL-identity production control plane", () => {
     expect(runtime).toContain(
       "production temporary access disabled at rest",
     );
+    expect(runtime).toContain(
+      "pam authentication failed",
+    );
     expect(runtime).not.toContain("return 'postgres'");
     expect(runtime).not.toContain('role: "postgres"');
 
@@ -372,6 +375,18 @@ describe("MIZIZI current URL-identity production control plane", () => {
     );
     expect(controlPlane).toContain(
       "accepted_final_track_zero_followup",
+    );
+    expect(controlPlane).toContain(
+      "EXPECTED_RELEASE_SINGLE_TRACK_ZERO_REVIEW_FOLLOWUP_CANDIDATES = 5",
+    );
+    expect(controlPlane).toContain(
+      "cdf6933fade7380f8557523ca2f2096465498e9c356293104aaf7f0540b7a684",
+    );
+    expect(controlPlane).toContain(
+      "materialized_track_zero_followup",
+    );
+    expect(controlPlane).toContain(
+      "Release Single Track-zero review follow-up",
     );
     expect(controlPlane).toContain(
       "exact_track_zero_derived_count",
