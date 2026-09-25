@@ -23,6 +23,8 @@ const LEGACY_REVIEWED_TRIGGER_FILE =
   ".github/mizizi-url-identity-production-apply.json";
 const RELEASE_SINGLE_REVIEWED_TRIGGER_FILE =
   ".github/public-music-identity-release-single-alignment-apply.json";
+const TRACK_ZERO_REVIEWED_TRIGGER_FILE =
+  ".github/public-music-identity-track-slug-zero-apply.json";
 const ARTIFACT_DIR =
   process.env.MIZIZI_ARTIFACT_DIR ||
   "artifacts/mizizi-url-identity-production-control-plane";
@@ -37,12 +39,20 @@ const RELEASE_SINGLE_ALIGNMENT_MIGRATION_VERSION =
   "20260925082706";
 const RELEASE_SINGLE_ALIGNMENT_MIGRATION_NAME =
   "public_music_identity_slice3_release_single_alignment_v1";
+const TRACK_ZERO_MIGRATION_VERSION = "20260925141117";
+const TRACK_ZERO_MIGRATION_NAME =
+  "public_music_identity_track_slug_zero_v2";
 const EXPECTED_RELEASE_SINGLE_CANDIDATES = 80;
 const EXPECTED_RELEASE_SINGLE_CANDIDATE_FINGERPRINT =
   "8cb08c3447b0e8acaf3279ef7b0317e915783b87a7e37678976b01fd02401eab";
 const EXPECTED_RELEASE_SINGLE_REVIEWS = 35;
 const EXPECTED_RELEASE_SINGLE_REVIEW_FINGERPRINT =
   "3e6ce99990ebd2e3bb5bbfd2600748da20104696bff3ced7875e4d5fe358638d";
+const EXPECTED_TRACK_ZERO_CANDIDATES = 34;
+const EXPECTED_TRACK_ZERO_CANDIDATE_FINGERPRINT =
+  "1f178ed3aff1ac2ba998eefec42ac1f8abdb62ed4e70a93471715552399f5669";
+const EXPECTED_TRACK_ZERO_IDENTITY_NOISE_REMAINING = 32;
+const EXPECTED_TRACK_ZERO_CREDIT_GAP_REMAINING = 12;
 
 const EXPECTED_RELEASE_CANDIDATES = 737;
 const EXPECTED_RELEASE_CANDIDATE_FINGERPRINT =
@@ -68,6 +78,8 @@ const EXPECTED_BLOBS = {
     "14e5447a948f34e6f126fef73baef00098376c37",
   "supabase/migrations/20260925082706_public_music_identity_slice3_release_single_alignment_v1.sql":
     "bb2a936a8082a506d9b6e1ba94236c2b0aad446b",
+  "supabase/migrations/20260925141117_public_music_identity_track_slug_zero_v2.sql":
+    "c650db5f0c0cdf2ee5bb7e8dac231d5a368d3e40",
 };
 
 const APPLY_SCOPES = {
@@ -98,6 +110,22 @@ const APPLY_SCOPES = {
     triggerOperation: "mizizi_url_identity_production_apply",
     triggerConfirm: "MIZIZI_URL_IDENTITY_PRODUCTION_APPLY",
     programmeIssue: 1013,
+  },
+  track_slug_zero: {
+    operationKey: "registry.track_slug.canonicalize",
+    capabilityKey: "canonicalize_registry_track_slug",
+    entity: "track_slug_zero",
+    expectedCount: EXPECTED_TRACK_ZERO_CANDIDATES,
+    expectedFingerprint:
+      EXPECTED_TRACK_ZERO_CANDIDATE_FINGERPRINT,
+    eventAction: "canonicalize_track_slug",
+    maxRows: 1,
+    triggerFile: TRACK_ZERO_REVIEWED_TRIGGER_FILE,
+    triggerOperation:
+      "public_music_identity_track_slug_zero_apply",
+    triggerConfirm:
+      "PUBLIC_MUSIC_IDENTITY_TRACK_SLUG_ZERO_APPLY",
+    programmeIssue: 1068,
   },
   release_single_identity: {
     operationKey: "registry.release_single_identity.align",
@@ -356,6 +384,144 @@ function assertAudit(
   }
 }
 
+
+const trackZeroCandidateRowsSql = \`
+with primary_artist as (
+  select distinct on (credit.track_id)
+    credit.track_id,
+    credit.artist_slug
+  from public.registry_track_artists credit
+  where credit.status='active'
+    and credit.is_primary is true
+    and credit.artist_id is not null
+    and nullif(btrim(credit.artist_slug),'') is not null
+  order by
+    credit.track_id,
+    credit.credit_order nulls last,
+    credit.created_at,
+    credit.id
+)
+select
+  review.id::text as review_id,
+  track.id::text as track_id,
+  track.slug as current_slug,
+  review.candidate_payload->>'proposedValue' as proposed_slug,
+  artist.artist_slug,
+  review.source_payload->'evidence'->>'collision' as stale_blocker,
+  platform_private.registry_subject_state_fingerprint(
+    'track',
+    track.id
+  ) as state_fingerprint
+from public.registry_review_items review
+join public.registry_tracks track
+  on track.id::text=review.source_id
+ and track.status='active'
+join primary_artist artist
+  on artist.track_id=track.id
+where review.status='open'
+  and review.review_type='mizizi_data_hygiene'
+  and review.entity_type='track'
+  and review.source_payload->>'ruleId'='track_slug_identity_noise'
+  and (
+    review.source_payload->'evidence'->>'collision'
+      like 'candidate_slug_collides_with_current_community_thread:%'
+    or
+    review.source_payload->'evidence'->>'collision'
+      like 'current_community_thread_ownership_ambiguous:%'
+  )
+order by track.id
+\`;
+
+const trackZeroCandidateSql = \`
+with plans as (
+  \${trackZeroCandidateRowsSql}
+),
+payload as (
+  select coalesce(
+    jsonb_agg(
+      jsonb_build_object(
+        'review_id',review_id,
+        'track_id',track_id,
+        'current_slug',current_slug,
+        'proposed_slug',proposed_slug,
+        'artist_slug',artist_slug,
+        'stale_blocker',stale_blocker,
+        'state_fingerprint',state_fingerprint
+      )
+      order by track_id
+    ),
+    '[]'::jsonb
+  ) body
+  from plans
+)
+select
+  jsonb_array_length(body)::int as candidate_count,
+  body::text as candidate_payload
+from payload
+\`;
+
+const trackZeroClosureSql = \`
+with decisions as (
+  select
+    decision.review_item_id,
+    decision.entity_id,
+    decision.after_payload->>'capabilityGrantId' as capability_grant_id
+  from public.registry_canonicalization_decisions decision
+  where decision.decision_type=
+        'auto_resolved_stale_community_slug_blocker'
+    and decision.metadata->>'programmeKey'=
+        'public_music_identity_track_slug_zero'
+    and decision.after_payload->>'candidateFingerprint'=
+        '\${EXPECTED_TRACK_ZERO_CANDIDATE_FINGERPRINT}'
+),
+grants as (
+  select distinct capability_grant_id::uuid as id
+  from decisions
+  where capability_grant_id ~
+    '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'
+),
+operations as (
+  select operation.id, operation.result_payload
+  from platform_private.registry_execution_grants grant_row
+  join grants
+    on grants.id=grant_row.system_actor_capability_grant_id
+  join platform_private.registry_mutation_operations operation
+    on operation.execution_grant_id=grant_row.id
+  where grant_row.actor_key='mizizi'
+    and grant_row.operation_key='registry.track_slug.canonicalize'
+    and grant_row.operation_version=1
+    and operation.status='succeeded'
+    and operation.verifier_status='passed'
+),
+events as (
+  select distinct event.id
+  from operations operation
+  join public.registry_canonical_write_events event
+    on event.id::text=
+       operation.result_payload->>'canonical_write_event_id'
+  where event.actor='system:mizizi'
+    and event.action='canonicalize_track_slug'
+    and event.status='succeeded'
+)
+select
+  (select count(*)::int from decisions) as decision_count,
+  (select count(distinct review_item_id)::int from decisions)
+    as review_count,
+  (select count(distinct entity_id)::int from decisions)
+    as target_count,
+  (select count(*)::int from grants) as capability_grant_count,
+  (select count(*)::int from operations) as verified_operations,
+  (select count(*)::int from events) as canonical_events,
+  (
+    select count(*)::int
+    from public.registry_review_items review
+    where review.status='resolved'
+      and review.resolution_payload->>'programmeKey'=
+          'public_music_identity_track_slug_zero'
+      and review.resolution_payload->>'candidateFingerprint'=
+          '\${EXPECTED_TRACK_ZERO_CANDIDATE_FINGERPRINT}'
+  ) as resolved_reviews
+\`;
 
 const releaseSingleCandidateRowsSql = `
 select
