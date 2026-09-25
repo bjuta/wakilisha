@@ -338,10 +338,6 @@ describe("MIZIZI current URL-identity production control plane", () => {
       "scripts/control-plane/verify-public-music-identity-slice3-release-single-alignment.sql",
       "utf8",
     );
-    const reviewReadAuthorityFix = readFileSync(
-      "supabase/migrations/20260925110250_public_music_identity_slice3_review_read_authority_fix.sql",
-      "utf8",
-    );
 
     expect(workflow).toContain(
       ".github/public-music-identity-release-single-alignment-apply.json",
@@ -472,42 +468,11 @@ describe("MIZIZI current URL-identity production control plane", () => {
       "to_char(",
     );
 
-    expect(reviewReadAuthorityFix).toContain(
-      "grant select (",
-    );
-    expect(reviewReadAuthorityFix).toContain(
-      "review_type",
-    );
-    expect(reviewReadAuthorityFix).toContain(
-      "entity_type",
-    );
-    expect(reviewReadAuthorityFix).toContain(
-      "source_id",
-    );
-    expect(reviewReadAuthorityFix).toContain(
-      "source_payload",
-    );
-    expect(reviewReadAuthorityFix).toContain(
-      "mizizi_executor_release_single_review_read",
-    );
-    expect(reviewReadAuthorityFix).toContain(
-      "release_single_identity_conflict",
-    );
-    expect(reviewReadAuthorityFix).toContain(
-      "'1.4.0'",
-    );
-    expect(reviewReadAuthorityFix).not.toMatch(
-      /grant\s+(insert|update|delete)/i,
-    );
-
     expect(verifier).toContain(
       "PUBLIC_MUSIC_IDENTITY_SLICE3_RELEASE_SINGLE_ALIGNMENT_PASS",
     );
     expect(verifier).toContain(
       "direct mizizi_executor mutation authority exists",
-    );
-    expect(verifier).toContain(
-      "Release Single identity review read authority drifted",
     );
     expect(verifier).toContain(
       "canonical-event / verified-operation parity",

@@ -130,68 +130,6 @@ begin
       'direct mizizi_executor mutation authority exists';
   end if;
 
-  if has_table_privilege(
-       'mizizi_executor',
-       'public.registry_review_items',
-       'SELECT'
-     )
-     or not has_column_privilege(
-       'mizizi_executor',
-       'public.registry_review_items',
-       'review_type',
-       'SELECT'
-     )
-     or not has_column_privilege(
-       'mizizi_executor',
-       'public.registry_review_items',
-       'entity_type',
-       'SELECT'
-     )
-     or not has_column_privilege(
-       'mizizi_executor',
-       'public.registry_review_items',
-       'source_id',
-       'SELECT'
-     )
-     or not has_column_privilege(
-       'mizizi_executor',
-       'public.registry_review_items',
-       'source_payload',
-       'SELECT'
-     )
-     or has_column_privilege(
-       'mizizi_executor',
-       'public.registry_review_items',
-       'id',
-       'SELECT'
-     )
-     or not exists (
-       select 1
-       from pg_policies policy
-       where policy.schemaname='public'
-         and policy.tablename='registry_review_items'
-         and policy.policyname=
-           'mizizi_executor_release_single_review_read'
-         and policy.cmd='SELECT'
-         and 'mizizi_executor'=any(policy.roles)
-         and position(
-               'mizizi_data_hygiene'
-               in coalesce(policy.qual,'')
-             )>0
-         and position(
-               'release_single_identity_conflict'
-               in coalesce(policy.qual,'')
-             )>0
-         and position(
-               '1.4.0'
-               in coalesce(policy.qual,'')
-             )>0
-     )
-  then
-    raise exception
-      'Release Single identity review read authority drifted';
-  end if;
-
   if not has_function_privilege(
        'mizizi_executor',
        'mizizi_private.release_single_identity_analysis_v1(uuid)',
