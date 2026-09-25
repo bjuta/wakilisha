@@ -4,7 +4,7 @@ Date: 25 September 2026
 
 Programme issue: #1013
 
-Status: **HISTORICAL RELEASE + CHART URL-IDENTITY FAMILIES PRODUCTION CLOSED; PUBLIC MUSIC IDENTITY SLICE 2 REVIEW AUTHORITY LIVE; SLICE 3 ONE-TRACK SINGLE ALIGNMENT CANDIDATE FROZEN AT 80 AUTOMATIC + 35 RELEASE REVIEWS; SLICE 3 PRODUCTION APPLY NOT YET AUTHORIZED; AUTHORITY ZERO AT REST**
+Status: **HISTORICAL RELEASE + CHART URL-IDENTITY FAMILIES PRODUCTION CLOSED; PUBLIC MUSIC IDENTITY SLICE 2 REVIEW AUTHORITY LIVE; SLICE 3 RELEASE SINGLE PROGRAMME PRODUCTION ACCEPTED AT 80 VERIFIED ALIGNMENTS + 35 MATERIALIZED RELEASE REVIEWS; AUTHORITY ZERO AT REST**
 
 ## Purpose
 
@@ -545,18 +545,47 @@ This lane extends the existing
 `mizizi-url-identity-production-control-plane`; it does not create another
 Production workflow.
 
-The implementation PR is strictly schema/control-plane authority. It does not
-contain the later reviewed Production apply trigger. After the migration is
-merged, replay-proven and Production-applied, a real `manage_registry` user
-must open the dedicated time-bounded Single-alignment authority window. A
-separate tiny reviewed trigger PR will then bind that exact human grant to the
-80/35 programme freeze.
+The implementation and read-authority migrations are Production-applied:
 
-Until that later trigger is reviewed and merged:
+- `20260925082706_public_music_identity_slice3_release_single_alignment_v1`;
+- `20260925110250_public_music_identity_slice3_review_read_authority_fix`.
 
-- Registry data mutation: **NO**;
-- new Slice 3 Release reviews in Production: **NO**;
-- Single slug convergence in Production: **NO**;
-- Track mutation: **NO**;
-- redirects: **NO**.
+The reviewed Production trigger was PR #1081. It bound authenticated
+`manage_registry` grant `19aabe9d-9ff2-4683-b28e-197e963b4b56` to the
+exact 80/35 programme freeze and merged as
+`e344500c5bd425642040e5a76d9e00ae5579ba7e`.
+
+Production apply run `36132066234` completed the governed mutations before
+its final JavaScript acceptance transport encountered a least-privilege read
+error on `registry_canonical_write_events`. Independent Production state and
+the permanent SQL verifier proved the product result was already accepted:
+
+- verified Release Single alignment operations: **80**;
+- matching canonical-write events: **80**;
+- materialized Release reviews: **35**;
+- in-flight operations: **0**;
+- active exact MIZIZI grants: **0**;
+- active standing MIZIZI grants: **0**;
+- Release Single operation enabled: **false**;
+- permanent verifier:
+  `PUBLIC_MUSIC_IDENTITY_SLICE3_RELEASE_SINGLE_ALIGNMENT_PASS`.
+
+PR #1082 corrected only the post-apply verifier transport, keeping canonical
+event-history reads on the linked control-plane reader rather than widening
+`mizizi_executor`. Its first read-only preflight attempt hit a transient
+Supabase temporary-role connection failure; attempt 2 passed. PR #1082 merged
+as `5e2c384bee4fc40255c67a5d9f186d27eb9f9794`.
+
+The post-apply read-only preflight now reports:
+
+- Release programme state: **accepted_final**;
+- Chart programme state: **accepted_final**;
+- Release Single identity programme state: **accepted_final**;
+- Release Single review state: **materialized**;
+- Registry mutation during re-audit: **NO**;
+- JIT mapping restored and Production temporary access disabled at rest: **PASS**.
+
+Public Music Identity Slice 3 Production convergence is therefore accepted.
+Whole-programme closure evidence is recorded in
+`docs/engineering/public-music-identity-production-closure-20260925.md`.
 
