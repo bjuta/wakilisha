@@ -20262,6 +20262,10 @@ export type Database = {
         Args: { p_artist_id: string; p_staging_id: string }
         Returns: Json
       }
+      admin_open_mizizi_release_single_identity_authority_v1: {
+        Args: { p_expires_at: string; p_reason: string }
+        Returns: string
+      }
       admin_patch_registry_artist_profile_v1: {
         Args: {
           p_entity_id: string
@@ -20448,6 +20452,10 @@ export type Database = {
         Returns: Json
       }
       admin_revoke_mizizi_artist_origin_capability_grant: {
+        Args: { p_grant_id: string; p_reason: string }
+        Returns: boolean
+      }
+      admin_revoke_mizizi_release_single_identity_authority_v1: {
         Args: { p_grant_id: string; p_reason: string }
         Returns: boolean
       }
