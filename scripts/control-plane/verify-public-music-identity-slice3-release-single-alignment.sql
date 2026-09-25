@@ -340,8 +340,16 @@ begin
 
   if position('current_user_has_capability' in v_open)=0
      or position('manage_registry' in v_open)=0
-     or position('max_rows'', 2' in replace(v_open,E'\n',' '))=0
-     or position('enabled = true' in lower(replace(v_open,E'\n',' ')))=0
+     or position(
+          '''max_rows'',2'
+          in regexp_replace(v_open,'[[:space:]]+','','g')
+        )=0
+     or position(
+          'enabled=true'
+          in lower(
+            regexp_replace(v_open,'[[:space:]]+','','g')
+          )
+        )=0
   then
     raise exception
       'Release Single identity human-open authority drifted';
