@@ -1,0 +1,13 @@
+{
+  "operation": "public_music_identity_release_single_alignment_apply",
+  "confirm": "PUBLIC_MUSIC_IDENTITY_RELEASE_SINGLE_ALIGNMENT_APPLY",
+  "programme_issue": 1068,
+  "scope": "release_single_identity",
+  "capability_grant_id": "027ff61f-7a7b-4d9a-a3f1-2467206fca6d",
+  "expected_candidate_count": 80,
+  "expected_candidate_fingerprint": "8cb08c3447b0e8acaf3279ef7b0317e915783b87a7e37678976b01fd02401eab",
+  "expected_review_count": 35,
+  "expected_review_fingerprint": "3e6ce99990ebd2e3bb5bbfd2600748da20104696bff3ced7875e4d5fe358638d",
+  "expected_operation_key": "registry.release_single_identity.align",
+  "expected_capability_key": "align_registry_release_single_identity"
+}
