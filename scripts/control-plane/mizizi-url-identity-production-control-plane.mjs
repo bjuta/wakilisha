@@ -957,6 +957,38 @@ async function executeTrackSlugZeroPlans(
       );
     }
 
+    const threadGuard = await pool.query(
+      `
+      select count(*)::int as mismatches
+      from public.community_threads thread
+      where thread.entity_type='track'
+        and thread.entity_id=$1::text
+        and (
+          thread.entity_slug is distinct from $2::text
+          or thread.entity_url is distinct from
+             'https://' ||
+             'wakilisha.africa/tracks/' ||
+             $3::text ||
+             '/' ||
+             $2::text
+        )
+      `,
+      [
+        trackId,
+        String(row.proposed_slug || ""),
+        String(row.artist_slug || ""),
+      ],
+    );
+
+    if (
+      Number(threadGuard.rows[0]?.mismatches || 0) !== 0
+    ) {
+      throw new Error(
+        "Track-slug zero UUID Community pointer verification failed for " +
+          trackId,
+      );
+    }
+
     receipts.push({
       review_id: reviewId,
       track_id: trackId,
