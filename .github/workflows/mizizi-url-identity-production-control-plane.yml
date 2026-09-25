@@ -13,7 +13,6 @@ on:
       - "supabase/migrations/20260925082706_public_music_identity_slice3_release_single_alignment_v1.sql"
       - "scripts/control-plane/verify-public-music-identity-slice3-release-single-alignment.sql"
       - "supabase/migrations/20260925141117_public_music_identity_track_slug_zero_v2.sql"
-      - "scripts/control-plane/verify-public-music-identity-track-slug-zero-v2.sql"
       - "scripts/registry/agents/mizizi/run.ts"
       - "scripts/registry/agents/mizizi/core.ts"
       - "test/registry/mizizi-url-identity-production-control-plane.test.ts"
