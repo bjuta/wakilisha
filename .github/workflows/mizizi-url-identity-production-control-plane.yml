@@ -101,3 +101,131 @@ jobs:
           path: artifacts/mizizi-url-identity-production-control-plane
           if-no-files-found: ignore
           retention-days: 30
+
+
+  slice3-replay-seal:
+    name: temporary Slice 3 replay seal
+    if: >-
+      github.event_name == 'pull_request' &&
+      github.head_ref == 'feat/public-music-identity-convergence-slice3-release-single-alignment'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+      SUPABASE_CLI_VERSION: "2.107.0"
+      PREVIEW_PROJECT_REF: "vfbmulcuuonpjshxmdfg"
+      PREVIEW_BRANCH_ID: "55484dc1-8511-4623-9019-418ca63ad72e"
+      BASE_MAIN_SHA: "8997652e5e39e9ad51b31af023afff1d11b6d432"
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Use Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: Link exact preview
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -n "$SUPABASE_ACCESS_TOKEN"
+          npx --yes "supabase@$SUPABASE_CLI_VERSION" link \
+            --project-ref "$PREVIEW_PROJECT_REF"
+          test "$(cat supabase/.temp/project-ref)" = "$PREVIEW_PROJECT_REF"
+
+      - name: Wait for exact Slice 2 preview head
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          for attempt in $(seq 1 30); do
+            LEDGER="$(
+              npx --yes "supabase@$SUPABASE_CLI_VERSION" migration list --linked 2>&1 || true
+            )"
+
+            if printf '%s\n' "$LEDGER" | grep -q '20260925050859' &&
+               ! printf '%s\n' "$LEDGER" | grep -q '20260925082706'; then
+              printf '%s\n' "$LEDGER"
+              exit 0
+            fi
+
+            echo "Preview not ready at exact Slice 2 head yet (attempt $attempt/30)"
+            sleep 10
+          done
+
+          echo "STOP: preview did not settle on exact Slice 2 migration head"
+          exit 1
+
+      - name: Push canonical Slice 3 migration
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          DRY_RUN="$(
+            npx --yes "supabase@$SUPABASE_CLI_VERSION" db push --linked --dry-run 2>&1
+          )"
+          printf '%s\n' "$DRY_RUN"
+
+          printf '%s\n' "$DRY_RUN" | grep -F \
+            "20260925082706_public_music_identity_slice3_release_single_alignment_v1.sql"
+
+          PENDING_COUNT="$(
+            printf '%s\n' "$DRY_RUN" |
+              grep -Eo '[0-9]{14}_[A-Za-z0-9_]+\.sql' |
+              sort -u |
+              wc -l |
+              tr -d ' '
+          )"
+          test "$PENDING_COUNT" = "1"
+
+          npx --yes "supabase@$SUPABASE_CLI_VERSION" db push --linked
+
+          LEDGER="$(
+            npx --yes "supabase@$SUPABASE_CLI_VERSION" migration list --linked 2>&1
+          )"
+          printf '%s\n' "$LEDGER"
+
+          printf '%s\n' "$LEDGER" | grep -q '20260925082706'
+
+      - name: Generate preview schema seal
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          SUPABASE_TARGET_PROJECT_REF="pgzizndxdyhqmtyywjmt" \
+          SUPABASE_SCHEMA_SOURCE_PROJECT_REF="$PREVIEW_PROJECT_REF" \
+          SCHEMA_SEAL_MODE="preview" \
+          SCHEMA_BASE_MAIN_SHA="$BASE_MAIN_SHA" \
+          SCHEMA_PREVIEW_BRANCH_ID="$PREVIEW_BRANCH_ID" \
+          SUPABASE_CLI_VERSION="$SUPABASE_CLI_VERSION" \
+            bash scripts/control-plane/generate-live-schema.sh
+
+          mkdir -p artifacts/slice3-replay-seal
+          cp src/types/database.types.ts \
+            artifacts/slice3-replay-seal/database.types.ts
+          cp docs/engineering/live-schema-baseline.json \
+            artifacts/slice3-replay-seal/live-schema-baseline.json
+
+          shasum -a 256 \
+            supabase/migrations/20260925082706_public_music_identity_slice3_release_single_alignment_v1.sql \
+            | awk '{print $1}' \
+            > artifacts/slice3-replay-seal/migration.sha256
+
+          shasum -a 256 src/types/database.types.ts \
+            | awk '{print $1}' \
+            > artifacts/slice3-replay-seal/types.sha256
+
+          printf '%s\n' "$BASE_MAIN_SHA" \
+            > artifacts/slice3-replay-seal/base-main.sha
+
+      - name: Upload Slice 3 replay seal
+        uses: actions/upload-artifact@v4
+        with:
+          name: slice3-replay-seal-${{ github.run_id }}
+          path: artifacts/slice3-replay-seal
+          if-no-files-found: error
+          retention-days: 7
