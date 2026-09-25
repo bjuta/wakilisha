@@ -79,7 +79,7 @@ const EXPECTED_BLOBS = {
   "supabase/migrations/20260925082706_public_music_identity_slice3_release_single_alignment_v1.sql":
     "bb2a936a8082a506d9b6e1ba94236c2b0aad446b",
   "supabase/migrations/20260925141117_public_music_identity_track_slug_zero_v2.sql":
-    "c650db5f0c0cdf2ee5bb7e8dac231d5a368d3e40",
+    "4739ada00e2a50b1cd94074024db182d5cf004a0",
 };
 
 const APPLY_SCOPES = {
@@ -939,7 +939,7 @@ async function executeTrackSlugZeroPlans(
     const verificationResult = await pool.query(
       `
       select *
-      from mizizi_private.verify_stewardship_operation_v1(
+      from mizizi_private.verify_stewardship_operation_v2(
         $1::uuid
       )
       `,
