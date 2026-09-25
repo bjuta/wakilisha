@@ -356,9 +356,24 @@ begin
   end if;
 
   if position('assert_executor_v1' in v_close)=0
-     or position('status = ''expired''' in lower(replace(v_close,E'\n',' ')))=0
-     or position('enabled = false' in lower(replace(v_close,E'\n',' ')))=0
-     or position('enabled = true' in lower(replace(v_close,E'\n',' ')))>0
+     or position(
+          'status=''expired'''
+          in lower(
+            regexp_replace(v_close,'[[:space:]]+','','g')
+          )
+        )=0
+     or position(
+          'enabled=false'
+          in lower(
+            regexp_replace(v_close,'[[:space:]]+','','g')
+          )
+        )=0
+     or position(
+          'enabled=true'
+          in lower(
+            regexp_replace(v_close,'[[:space:]]+','','g')
+          )
+        )>0
   then
     raise exception
       'Release Single identity authority closer is not reduction-only';
