@@ -531,6 +531,13 @@ describe("MIZIZI Cultural Data Steward", () => {
     expect(trackControlPlane).toContain(
       "recording_identity_reviews",
     );
+    expect(
+      (
+        trackControlPlane.match(
+          /source_payload->>'ruleId'='track_slug_identity_noise'/g,
+        ) || []
+      ).length,
+    ).toBeGreaterThanOrEqual(4);
     expect(trackControlPlane).toContain(
       "review materialization exact 12 + 91 = 103 with canonical delta zero",
     );

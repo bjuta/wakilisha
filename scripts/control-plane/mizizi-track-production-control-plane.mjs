@@ -281,7 +281,7 @@ const fingerprintSql = `with payload as (
 const baselineSql = `select
  (select count(*)::int from public.registry_tracks where status='active') active_tracks,
  (select count(*)::int from public.registry_canonical_write_events where actor='mizizi' and registry_entity_type='track') events,
- (select count(*)::int from public.registry_review_items where review_type='mizizi_data_hygiene' and status='open') reviews,
+ (select count(*)::int from public.registry_review_items where review_type='mizizi_data_hygiene' and status='open' and source_payload->>'ruleId'='track_slug_identity_noise') reviews,
  (select count(*)::int from public.wk_slug_redirects where entity_type='track') redirects,
  (select count(*)::int from public.wk_slug_redirects where entity_type='track' and created_by='mizizi:1.1.0') mizizi_redirects,
  (select count(*)::int from supabase_migrations.schema_migrations) ledger_count,
@@ -294,7 +294,9 @@ const acceptanceSql = `with e as (
         count(*) filter(where t.slug=ri.source_payload->>'currentValue')::int blocked_still_old,
         count(distinct ri.source_id)::int review_tracks
  from public.registry_review_items ri left join public.registry_tracks t on t.id::text=ri.source_id
- where ri.review_type='mizizi_data_hygiene' and ri.status='open'
+ where ri.review_type='mizizi_data_hygiene'
+   and ri.status='open'
+   and ri.source_payload->>'ruleId'='track_slug_identity_noise'
 ), impact as (
  select coalesce(sum((after_value->'downstreamImpact'->>'permanentRedirects')::int),0)::int redirects,
         coalesce(sum((after_value->'downstreamImpact'->>'chartEntriesUpdated')::int),0)::int chart_rows,
@@ -308,7 +310,11 @@ const acceptanceSql = `with e as (
   when source_payload->'evidence'->>'collision'='missing_explicit_primary_artist_scope' then 'missing_primary'
   when source_payload->'evidence'->>'collision' like 'current_community_thread_ownership_ambiguous:%' then 'ambiguous_thread'
   else 'unexpected' end reason,count(*)::int count
- from public.registry_review_items where review_type='mizizi_data_hygiene' and status='open' group by 1
+ from public.registry_review_items
+ where review_type='mizizi_data_hygiene'
+   and status='open'
+   and source_payload->>'ruleId'='track_slug_identity_noise'
+ group by 1
 )
 select jsonb_build_object(
  'active_tracks',(select count(*) from public.registry_tracks where status='active'),
@@ -325,9 +331,7 @@ select jsonb_build_object(
 
 const reviewStateSql = `select jsonb_build_object(
  'open_mizizi_reviews',(select count(*)::int from public.registry_review_items where review_type='mizizi_data_hygiene' and status='open'),
- 'historical_open_reviews',(select count(*)::int from public.registry_review_items where review_type='mizizi_data_hygiene' and status='open' and not (
-   source_payload->>'ruleVersion'='1.3.0' and source_payload->>'ruleId' in ('track_slug_credit_evidence_gap','track_recording_identity_conflict')
- )),
+ 'historical_open_reviews',(select count(*)::int from public.registry_review_items where review_type='mizizi_data_hygiene' and status='open' and source_payload->>'ruleId'='track_slug_identity_noise'),
  'credit_gap_reviews',(select count(*)::int from public.registry_review_items where review_type='mizizi_data_hygiene' and status='open' and source_payload->>'ruleVersion'='1.3.0' and source_payload->>'ruleId'='track_slug_credit_evidence_gap'),
  'recording_identity_reviews',(select count(*)::int from public.registry_review_items where review_type='mizizi_data_hygiene' and status='open' and source_payload->>'ruleVersion'='1.3.0' and source_payload->>'ruleId'='track_recording_identity_conflict'),
  'canonical_events',(select count(*)::int from public.registry_canonical_write_events where actor='mizizi' and registry_entity_type='track'),
