@@ -10,13 +10,14 @@ const EXPECTED_MAIN = process.env.MIZIZI_EXPECTED_MAIN_SHA || '';
 const TRIGGER_FILE = process.env.MIZIZI_TRIGGER_FILE || '';
 const ARTIFACT_DIR = process.env.MIZIZI_ARTIFACT_DIR || 'artifacts/mizizi-track-production-control-plane';
 const EXPECTED_FINGERPRINT = '551b29431700536937c26ecb1e396c3cf9314edefd88c589284cf330c9d1bb9a';
+const EXPECTED_REVIEW_INPUT_FINGERPRINT = '6d9fa72f13ce4a5d774a457552e3cd3824475fb8a651473d5999605a3dcc29fb';
 const EXPECTED_BLOBS = {
   'scripts/registry/agents/mizizi/run.ts': '9d17f2838aeed154d3b93abbcfe687ba6c38be94',
   'scripts/registry/agents/mizizi/core.ts': '164c9b5a0431b06f8d990b0aff6c6ef8a998aacb',
   'supabase/functions/_shared/registry-track-identity.ts': '7bcab485aecc3cc7b90e2a3154d90dcee81be92c',
 };
 
-if (!['preflight', 'apply'].includes(MODE)) throw new Error('Unsupported control-plane mode');
+if (!['preflight', 'review', 'apply'].includes(MODE)) throw new Error('Unsupported control-plane mode');
 if (!TOKEN) throw new Error('SUPABASE_ACCESS_TOKEN repository secret is required');
 fs.mkdirSync(ARTIFACT_DIR, { recursive: true });
 
@@ -280,7 +281,7 @@ const fingerprintSql = `with payload as (
 const baselineSql = `select
  (select count(*)::int from public.registry_tracks where status='active') active_tracks,
  (select count(*)::int from public.registry_canonical_write_events where actor='mizizi' and registry_entity_type='track') events,
- (select count(*)::int from public.registry_review_items where review_type='mizizi_data_hygiene' and status='open') reviews,
+ (select count(*)::int from public.registry_review_items where review_type='mizizi_data_hygiene' and status='open' and source_payload->>'ruleId'='track_slug_identity_noise') reviews,
  (select count(*)::int from public.wk_slug_redirects where entity_type='track') redirects,
  (select count(*)::int from public.wk_slug_redirects where entity_type='track' and created_by='mizizi:1.1.0') mizizi_redirects,
  (select count(*)::int from supabase_migrations.schema_migrations) ledger_count,
@@ -293,7 +294,9 @@ const acceptanceSql = `with e as (
         count(*) filter(where t.slug=ri.source_payload->>'currentValue')::int blocked_still_old,
         count(distinct ri.source_id)::int review_tracks
  from public.registry_review_items ri left join public.registry_tracks t on t.id::text=ri.source_id
- where ri.review_type='mizizi_data_hygiene' and ri.status='open'
+ where ri.review_type='mizizi_data_hygiene'
+   and ri.status='open'
+   and ri.source_payload->>'ruleId'='track_slug_identity_noise'
 ), impact as (
  select coalesce(sum((after_value->'downstreamImpact'->>'permanentRedirects')::int),0)::int redirects,
         coalesce(sum((after_value->'downstreamImpact'->>'chartEntriesUpdated')::int),0)::int chart_rows,
@@ -307,7 +310,11 @@ const acceptanceSql = `with e as (
   when source_payload->'evidence'->>'collision'='missing_explicit_primary_artist_scope' then 'missing_primary'
   when source_payload->'evidence'->>'collision' like 'current_community_thread_ownership_ambiguous:%' then 'ambiguous_thread'
   else 'unexpected' end reason,count(*)::int count
- from public.registry_review_items where review_type='mizizi_data_hygiene' and status='open' group by 1
+ from public.registry_review_items
+ where review_type='mizizi_data_hygiene'
+   and status='open'
+   and source_payload->>'ruleId'='track_slug_identity_noise'
+ group by 1
 )
 select jsonb_build_object(
  'active_tracks',(select count(*) from public.registry_tracks where status='active'),
@@ -320,6 +327,19 @@ select jsonb_build_object(
  'chart_mismatches',(select count(*) from public.wk_chart_entries_v2 ce join e on ce.canonical_track_id=e.registry_entity_id::text where ce.track_slug is distinct from e.after_value->>'value'),
  'save_mismatches',(select count(*) from public.community_saves cs join e on cs.entity_type='track' and cs.entity_id=e.registry_entity_id::text where cs.entity_slug is distinct from e.after_value->>'value'),
  'ledger_count',(select count(*) from supabase_migrations.schema_migrations),'ledger_head',(select max(version) from supabase_migrations.schema_migrations)
+) state`;
+
+const reviewStateSql = `select jsonb_build_object(
+ 'open_mizizi_reviews',(select count(*)::int from public.registry_review_items where review_type='mizizi_data_hygiene' and status='open'),
+ 'historical_open_reviews',(select count(*)::int from public.registry_review_items where review_type='mizizi_data_hygiene' and status='open' and source_payload->>'ruleId'='track_slug_identity_noise'),
+ 'credit_gap_reviews',(select count(*)::int from public.registry_review_items where review_type='mizizi_data_hygiene' and status='open' and source_payload->>'ruleVersion'='1.3.0' and source_payload->>'ruleId'='track_slug_credit_evidence_gap'),
+ 'recording_identity_reviews',(select count(*)::int from public.registry_review_items where review_type='mizizi_data_hygiene' and status='open' and source_payload->>'ruleVersion'='1.3.0' and source_payload->>'ruleId'='track_recording_identity_conflict'),
+ 'canonical_events',(select count(*)::int from public.registry_canonical_write_events where actor='mizizi' and registry_entity_type='track'),
+ 'track_redirects',(select count(*)::int from public.wk_slug_redirects where entity_type='track'),
+ 'active_capability_grants',(select count(*)::int from platform_private.system_actor_capability_grants where actor_key='mizizi' and status='active' and valid_from<=now() and expires_at>now() and revoked_at is null),
+ 'active_execution_grants',(select count(*)::int from platform_private.registry_execution_grants where actor_key='mizizi' and status='active' and expires_at>now() and revoked_at is null and consumed_at is null),
+ 'ledger_count',(select count(*)::int from supabase_migrations.schema_migrations),
+ 'ledger_head',(select max(version) from supabase_migrations.schema_migrations)
 ) state`;
 
 function assertFields(actual, expected, label) {
@@ -436,6 +456,85 @@ function assertAcceptedPostApply(state) {
   }
 }
 
+function reviewMaterializationComplete(state) {
+  return (
+    Number(state?.open_mizizi_reviews) === 169 &&
+    Number(state?.historical_open_reviews) === 66 &&
+    Number(state?.credit_gap_reviews) === 12 &&
+    Number(state?.recording_identity_reviews) === 91
+  );
+}
+
+function assertReviewState(state, finalState) {
+  assertFields(
+    state,
+    {
+      historical_open_reviews:66,
+      canonical_events:440,
+      track_redirects:1148,
+      active_capability_grants:0,
+      active_execution_grants:0,
+      ledger_count:179,
+      ledger_head:'20260925050859',
+    },
+    finalState ? 'review acceptance' : 'review baseline',
+  );
+
+  const creditGap = Number(state?.credit_gap_reviews);
+  const identityConflict = Number(state?.recording_identity_reviews);
+  const openReviews = Number(state?.open_mizizi_reviews);
+
+  if (finalState) {
+    assertFields(
+      state,
+      {
+        open_mizizi_reviews:169,
+        credit_gap_reviews:12,
+        recording_identity_reviews:91,
+      },
+      'review acceptance',
+    );
+    return;
+  }
+
+  if (
+    !Number.isInteger(creditGap) ||
+    !Number.isInteger(identityConflict) ||
+    creditGap < 0 ||
+    creditGap > 12 ||
+    identityConflict < 0 ||
+    identityConflict > 91 ||
+    openReviews !== 66 + creditGap + identityConflict
+  ) {
+    throw new Error(
+      `review baseline is not a resumable subset: open=${openReviews} credit_gap=${creditGap} recording_identity=${identityConflict}`,
+    );
+  }
+}
+
+function assertReviewRun(text) {
+  const clean = text.replace(/\x1b\[[0-9;]*m/g, '');
+  for (const [rule,count] of [
+    ['track_recording_identity_conflict',91],
+    ['track_slug_identity_noise',66],
+    ['track_slug_credit_evidence_gap',12],
+  ]) {
+    if (!(new RegExp(`'${rule}'\\s*\\u2502\\s*${count}\\s*\\u2502`)).test(clean)) {
+      throw new Error(`${rule} expected ${count} in review run`);
+    }
+  }
+
+  const summary =
+    /\u2502\s*0\s*\u2502\s*664\s*\u2502\s*0\s*\u2502\s*103\s*\u2502\s*495\s*\u2502\s*0\s*\u2502\s*2101\s*\u2502/;
+
+  if (
+    !summary.test(clean) ||
+    !clean.includes('Review mode completed. No canonical Registry rows were changed.')
+  ) {
+    throw new Error('review-mode run summary mismatch');
+  }
+}
+
 function assertAudit(text, before) {
   const clean = text.replace(/\x1b\[[0-9;]*m/g, '');
   const rules = before
@@ -460,7 +559,7 @@ function assertAudit(text, before) {
   if (!summary.test(clean) || !clean.includes('Audit mode completed. No Registry rows were changed.')) throw new Error(`${before ? 'pre' : 'post'}-apply audit summary mismatch`);
 }
 
-async function streamCommand(cmd, args, env, logPath, pool) {
+async function streamCommand(cmd, args, env, logPath, pool = null, progressTarget = { events:440, reviews:66, redirects:857 }) {
   const out = fs.createWriteStream(logPath);
   const child = spawn(cmd, args, { env: { ...process.env, ...env }, stdio: ['ignore', 'pipe', 'pipe'] });
   child.stdout.on('data', d => { process.stdout.write(d); out.write(d); });
@@ -471,7 +570,7 @@ async function streamCommand(cmd, args, env, logPath, pool) {
        (select count(*)::int from public.registry_canonical_write_events where actor='mizizi' and registry_entity_type='track') events,
        (select count(*)::int from public.registry_review_items where review_type='mizizi_data_hygiene' and status='open') reviews,
        (select count(*)::int from public.wk_slug_redirects where entity_type='track' and created_by='mizizi:1.1.0') redirects`);
-      console.log(`PROGRESS events=${s.events}/440 reviews=${s.reviews}/66 redirects=${s.redirects}/857`);
+      console.log(`PROGRESS events=${s.events}/${progressTarget.events} reviews=${s.reviews}/${progressTarget.reviews} redirects=${s.redirects}/${progressTarget.redirects}`);
     } catch (e) { console.error(`PROGRESS_MONITOR ${e.code || 'UNKNOWN'} ${e.message}`); }
   }, 10000) : null;
   const code = await new Promise(resolve => child.on('close', resolve));
@@ -486,17 +585,28 @@ async function main() {
   if (run('git',['status','--porcelain'],{capture:true})) throw new Error('worktree is not clean');
   for (const [path,sha] of Object.entries(EXPECTED_BLOBS)) assertFields({sha:run('git',['hash-object',path],{capture:true})},{sha},path);
   let trigger = null;
-  if (MODE === 'apply') {
+  if (MODE === 'apply' || MODE === 'review') {
     if (!EXPECTED_MAIN || !TRIGGER_FILE) throw new Error('reviewed production trigger is missing');
     trigger = JSON.parse(fs.readFileSync(TRIGGER_FILE, 'utf8'));
+    const expectedTrigger =
+      MODE === 'review'
+        ? {
+            operation:'mizizi_track_production_review',
+            confirm:'MIZIZI_TRACK_PRODUCTION_REVIEW',
+            expected_input_fingerprint:EXPECTED_REVIEW_INPUT_FINGERPRINT,
+            expected_existing_open_reviews:66,
+            expected_credit_gap_reviews:12,
+            expected_recording_identity_reviews:91,
+          }
+        : {
+            operation:'mizizi_track_production_apply',
+            confirm:'MIZIZI_TRACK_PRODUCTION_APPLY',
+            expected_input_fingerprint:EXPECTED_FINGERPRINT,
+            enable_ssl_enforcement:true,
+          };
     assertFields(
       trigger,
-      {
-        operation:'mizizi_track_production_apply',
-        confirm:'MIZIZI_TRACK_PRODUCTION_APPLY',
-        expected_input_fingerprint:EXPECTED_FINGERPRINT,
-        enable_ssl_enforcement:true,
-      },
+      expectedTrigger,
       'production trigger',
     );
     assertFields(
@@ -533,7 +643,7 @@ async function main() {
       return;
     }
 
-    if (!trigger?.enable_ssl_enforcement) throw new Error('production trigger does not authorize permanent SSL enforcement');
+    if (MODE !== 'apply' || !trigger?.enable_ssl_enforcement) throw new Error('production temporary access unavailable; only reviewed historical apply may authorize permanent SSL enforcement');
     console.log('\n=== 2A. PERMANENT PRODUCTION SSL ENFORCEMENT ===');
     const baseline = queryViaLinkedCli(baselineSql);
     assertFields(baseline,{active_tracks:2101,events:0,reviews:0,redirects:291,mizizi_redirects:0,ledger_count:79,ledger_head:'20260901170500'},'pre-SSL baseline');
@@ -608,6 +718,68 @@ async function main() {
         );
         assertAudit(fs.readFileSync(auditCurrent,'utf8'),false);
         console.log('PASS: fresh post-apply audit = 664 findings / 66 deterministic candidates / 12 credit-evidence reviews / 91 recording-identity reviews / 495 observe-only / 2101 Tracks');
+
+        if (MODE === 'review') {
+          console.log('\n=== 6. REVIEW-ONLY PRODUCTION AUTHORITY ===');
+          const reviewFingerprintBefore = queryViaLinkedCli(fingerprintSql);
+          if (reviewFingerprintBefore.fingerprint !== EXPECTED_REVIEW_INPUT_FINGERPRINT) {
+            throw new Error(
+              `review input fingerprint drift: ${reviewFingerprintBefore.fingerprint}`,
+            );
+          }
+
+          const reviewBefore = queryViaLinkedCli(reviewStateSql).state;
+          assertReviewState(reviewBefore,false);
+          fs.writeFileSync(
+            `${ARTIFACT_DIR}/review-state-before.json`,
+            JSON.stringify(reviewBefore,null,2)+'\n',
+          );
+
+          if (reviewMaterializationComplete(reviewBefore)) {
+            console.log('PASS: review materialization was already complete; no duplicate runner execution required');
+            console.log('\n=== MIZIZI PUBLIC MUSIC IDENTITY REVIEW MATERIALIZATION PASS ===');
+            return;
+          }
+
+          console.log('\n=== 7. REAL MIZIZI REVIEW MATERIALIZATION - PRODUCTION ===');
+          const reviewLog = `${ARTIFACT_DIR}/review-materialization.txt`;
+          await streamCommand(
+            'npm',
+            ['run','registry:mizizi:review','--','--entity=track','--limit=0'],
+            {DATABASE_URL:url},
+            reviewLog,
+            pool,
+            {events:440,reviews:169,redirects:857},
+          );
+          assertReviewRun(fs.readFileSync(reviewLog,'utf8'));
+
+          console.log('\n=== 8. REVIEW-ONLY PRODUCTION ACCEPTANCE ===');
+          const reviewAfter = queryViaLinkedCli(reviewStateSql).state;
+          assertReviewState(reviewAfter,true);
+          const reviewFingerprintAfter = queryViaLinkedCli(fingerprintSql);
+          if (reviewFingerprintAfter.fingerprint !== EXPECTED_REVIEW_INPUT_FINGERPRINT) {
+            throw new Error(
+              `canonical Registry input changed during review materialization: ${reviewFingerprintAfter.fingerprint}`,
+            );
+          }
+          fs.writeFileSync(
+            `${ARTIFACT_DIR}/review-state-after.json`,
+            JSON.stringify(reviewAfter,null,2)+'\n',
+          );
+          console.log('PASS: review materialization exact 12 + 91 = 103 with canonical delta zero');
+
+          console.log('\n=== 9. FRESH POST-REVIEW READ-ONLY AUDIT ===');
+          const postReviewAudit = `${ARTIFACT_DIR}/post-review-audit.txt`;
+          await streamCommand(
+            'npm',
+            ['run','registry:mizizi:audit','--','--entity=track','--limit=0'],
+            {DATABASE_URL:url},
+            postReviewAudit,
+          );
+          assertAudit(fs.readFileSync(postReviewAudit,'utf8'),false);
+          console.log('\n=== MIZIZI PUBLIC MUSIC IDENTITY REVIEW MATERIALIZATION PASS ===');
+          return;
+        }
 
         if (MODE === 'apply') {
           throw new Error('historical Track apply is already accepted; refusing repeat production mutation');
