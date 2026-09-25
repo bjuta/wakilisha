@@ -754,7 +754,7 @@ set search_path =
   public,
   platform_private,
   mizizi_private
-as $
+as $$
 declare
   v_operation
     platform_private.registry_mutation_operations%rowtype;
@@ -1034,7 +1034,7 @@ begin
   verifier_status:='failed';
   return next;
 end
-$;
+$$;
 
 
 -- Public Music Identity Track-slug zero convergence.
