@@ -740,6 +740,303 @@ begin
 end
 $$;
 
+create function mizizi_private.verify_stewardship_operation_v2(
+  p_operation_id uuid
+)
+returns table (
+  operation_id uuid,
+  verifier_status text
+)
+language plpgsql
+security definer
+set search_path =
+  pg_catalog,
+  public,
+  platform_private,
+  mizizi_private
+as $
+declare
+  v_operation
+    platform_private.registry_mutation_operations%rowtype;
+  v_grant
+    platform_private.registry_execution_grants%rowtype;
+  v_event
+    public.registry_canonical_write_events%rowtype;
+  v_plan jsonb;
+  v_track_id uuid;
+  v_link_count integer;
+  v_failure text;
+  v_expected_path text;
+  v_expected_url text;
+begin
+  perform mizizi_private.assert_executor_v1();
+
+  if p_operation_id is null then
+    raise exception using errcode='22023',
+      message='Operation id is required.';
+  end if;
+
+  select operation.*
+  into v_operation
+  from platform_private.registry_mutation_operations operation
+  where operation.id=p_operation_id
+  for update;
+
+  if not found
+     or v_operation.actor_key<>'mizizi'
+     or v_operation.operation_version<>1
+     or v_operation.operation_key<>
+        'registry.track_slug.canonicalize'
+  then
+    raise exception using errcode='P0002',
+      message='Track-slug V2 stewardship operation not found.';
+  end if;
+
+  if v_operation.verifier_status='passed' then
+    operation_id:=v_operation.id;
+    verifier_status:='passed';
+    return next;
+    return;
+  end if;
+
+  if v_operation.status<>'succeeded'
+     or v_operation.affected_rows<>1
+  then
+    v_failure:='operation_not_succeeded_exactly_once';
+  end if;
+
+  select grant_row.*
+  into v_grant
+  from platform_private.registry_execution_grants grant_row
+  where grant_row.id=v_operation.execution_grant_id;
+
+  if v_failure is null and not found then
+    v_failure:='execution_grant_missing';
+  end if;
+
+  if v_failure is null then
+    v_plan:=v_grant.plan_payload;
+
+    begin
+      v_track_id:=(v_plan->>'track_id')::uuid;
+    exception when others then
+      v_failure:='track_plan_malformed';
+    end;
+  end if;
+
+  if v_failure is null
+     and (
+       nullif(v_plan->>'primary_artist_slug','') is null
+       or nullif(v_plan->>'proposed_slug','') is null
+     )
+  then
+    v_failure:='track_public_identity_scope_missing';
+  end if;
+
+  if v_failure is null then
+    v_expected_path:=
+      '/tracks/' ||
+      (v_plan->>'primary_artist_slug') ||
+      '/' ||
+      (v_plan->>'proposed_slug');
+
+    v_expected_url:=
+      'https://wakilisha.africa' ||
+      v_expected_path;
+  end if;
+
+  if v_failure is null
+     and not exists (
+       select 1
+       from public.registry_tracks track
+       where track.id=v_track_id
+         and track.status='active'
+         and track.slug=v_plan->>'proposed_slug'
+     )
+  then
+    v_failure:='canonical_track_slug_mismatch';
+  end if;
+
+  if v_failure is null
+     and exists (
+       select 1
+       from public.wk_chart_entries_v2 entry
+       where entry.canonical_track_id=v_track_id::text
+         and entry.track_slug is distinct from
+             v_plan->>'proposed_slug'
+     )
+  then
+    v_failure:='chart_projection_track_slug_mismatch';
+  end if;
+
+  if v_failure is null
+     and exists (
+       select 1
+       from public.community_saves save
+       where save.entity_type='track'
+         and save.entity_id=v_track_id::text
+         and (
+           save.entity_slug is distinct from
+             v_plan->>'proposed_slug'
+           or (
+             save.entity_url is not null
+             and save.entity_url is distinct from
+                 v_expected_url
+           )
+         )
+     )
+  then
+    v_failure:='community_save_track_pointer_mismatch';
+  end if;
+
+  if v_failure is null
+     and exists (
+       select 1
+       from public.community_threads thread_row
+       where thread_row.entity_type='track'
+         and thread_row.entity_id=v_track_id::text
+         and (
+           thread_row.entity_slug is distinct from
+             v_plan->>'proposed_slug'
+           or thread_row.entity_url is distinct from
+              v_expected_url
+         )
+     )
+  then
+    v_failure:='community_thread_track_pointer_mismatch';
+  end if;
+
+  if v_failure is null
+     and (
+       v_operation.result_payload->>'track_id'
+         is distinct from v_track_id::text
+       or v_operation.result_payload->>'new_slug'
+         is distinct from v_plan->>'proposed_slug'
+       or v_operation.result_payload->>'new_path'
+         is distinct from v_expected_path
+       or jsonb_array_length(
+            coalesce(
+              v_operation.result_payload->'paths',
+              '[]'::jsonb
+            )
+          )<>1
+       or v_operation.result_payload->'paths'->0->>'new_path'
+         is distinct from v_expected_path
+       or position(
+            '/releases/'
+            in coalesce(
+              v_operation.result_payload->'paths'->0->>'new_path',
+              ''
+            )
+          )>0
+     )
+  then
+    v_failure:='track_v2_result_payload_mismatch';
+  end if;
+
+  if v_failure is null then
+    select count(*)::integer
+    into v_link_count
+    from platform_private.registry_operation_write_events link
+    where link.operation_id=v_operation.id;
+
+    if v_link_count<>1 then
+      v_failure:='canonical_write_event_link_count_mismatch';
+    end if;
+  end if;
+
+  if v_failure is null then
+    select event.*
+    into v_event
+    from platform_private.registry_operation_write_events link
+    join public.registry_canonical_write_events event
+      on event.id=link.canonical_write_event_id
+    where link.operation_id=v_operation.id
+    limit 1;
+
+    if not found
+       or v_event.registry_entity_type<>'track'
+       or v_event.registry_entity_id<>v_track_id::text
+       or v_event.source_table<>
+          'mizizi_private.track_slug_plan_v1'
+       or v_event.field_name<>'slug'
+       or v_event.target_path<>
+          'public.registry_tracks.slug'
+       or v_event.action<>'canonicalize_track_slug'
+       or v_event.status<>'succeeded'
+       or v_event.actor<>'system:mizizi'
+       or v_event.after_value->>'value'
+          is distinct from v_plan->>'proposed_slug'
+       or v_event.after_value->>'public_identity_version'
+          is distinct from 'artist_scoped_track_v2'
+       or coalesce(
+            (
+              v_event.after_value
+                #>>'{downstream_impact,community_threads_updated}'
+            )::integer,
+            -1
+          )<>
+          coalesce(
+            (
+              v_operation.result_payload
+                ->>'community_threads_updated'
+            )::integer,
+            -1
+          )
+    then
+      v_failure:='canonical_write_event_causality_mismatch';
+    end if;
+  end if;
+
+  if v_failure is null then
+    update platform_private.registry_mutation_operations
+    set
+      verifier_status='passed',
+      result_payload=
+        result_payload ||
+        jsonb_build_object(
+          'verification',
+          jsonb_build_object(
+            'status','passed',
+            'verified_at',now(),
+            'verifier','track_slug_v2'
+          )
+        ),
+      updated_at=now()
+    where id=v_operation.id;
+
+    operation_id:=v_operation.id;
+    verifier_status:='passed';
+    return next;
+    return;
+  end if;
+
+  update platform_private.registry_mutation_operations
+  set
+    verifier_status='failed',
+    error_code='mizizi_track_slug_v2_verification_failed',
+    error_message=v_failure,
+    result_payload=
+      result_payload ||
+      jsonb_build_object(
+        'verification',
+        jsonb_build_object(
+          'status','failed',
+          'failure',v_failure,
+          'verified_at',now(),
+          'verifier','track_slug_v2'
+        )
+      ),
+    updated_at=now()
+  where id=v_operation.id;
+
+  operation_id:=v_operation.id;
+  verifier_status:='failed';
+  return next;
+end
+$;
+
+
 -- Public Music Identity Track-slug zero convergence.
 --
 -- V2 changes only Track-slug execution semantics. Other Stage B operations
@@ -1121,11 +1418,13 @@ $$;
 
 revoke all on function
   mizizi_private.execute_stewardship_operation_v2(uuid),
+  mizizi_private.verify_stewardship_operation_v2(uuid),
   mizizi_private.finalize_track_slug_zero_convergence_v1(uuid)
 from public, anon, authenticated, service_role;
 
 grant execute on function
   mizizi_private.execute_stewardship_operation_v2(uuid),
+  mizizi_private.verify_stewardship_operation_v2(uuid),
   mizizi_private.finalize_track_slug_zero_convergence_v1(uuid)
 to mizizi_executor;
 
@@ -1134,6 +1433,9 @@ do $postflight$
 begin
   if to_regprocedure(
        'mizizi_private.execute_stewardship_operation_v2(uuid)'
+     ) is null
+     or to_regprocedure(
+       'mizizi_private.verify_stewardship_operation_v2(uuid)'
      ) is null
      or to_regprocedure(
        'mizizi_private.finalize_track_slug_zero_convergence_v1(uuid)'
@@ -1177,6 +1479,16 @@ begin
      or has_function_privilege(
        'service_role',
        'mizizi_private.execute_stewardship_operation_v2(uuid)',
+       'EXECUTE'
+     )
+     or has_function_privilege(
+       'authenticated',
+       'mizizi_private.verify_stewardship_operation_v2(uuid)',
+       'EXECUTE'
+     )
+     or has_function_privilege(
+       'service_role',
+       'mizizi_private.verify_stewardship_operation_v2(uuid)',
        'EXECUTE'
      )
   then
