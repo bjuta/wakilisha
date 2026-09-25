@@ -105,7 +105,8 @@ function isTransientJitError(error) {
   const message = String(error?.message||error||'').toLowerCase();
   return code === 'EJITREQUESTFAILED' || code === '28P01' || code === 'XX000' ||
     message.includes('jit provider') || message.includes('temporary access') ||
-    message.includes('password authentication failed');
+    message.includes('password authentication failed') ||
+    message.includes('pam authentication failed');
 }
 
 async function createJitPoolWithRetry(url, expectedRole) {
@@ -308,6 +309,11 @@ const POST_APPLY_BASELINE = {
   mizizi_release_events:32,
 };
 
+const POST_APPLY_CROSS_PROGRAMME_REVIEW_FIELDS = new Set([
+  'open_mizizi_release_reviews',
+  'open_mizizi_reviews_total',
+]);
+
 function assertFields(actual,expected,label) {
   for (const [k,v] of Object.entries(expected)) {
     if (String(actual?.[k]) !== String(v)) throw new Error(label+' '+k+'='+actual?.[k]+' expected '+v);
@@ -318,7 +324,10 @@ function fieldsMatch(actual,expected) {
 }
 function postApplyDomainFieldsMatch(actual,expected) {
   return Object.entries(expected).every(([k,v])=>
-    k === 'ledger_count' || k === 'ledger_head' || String(actual?.[k])===String(v)
+    k === 'ledger_count' ||
+    k === 'ledger_head' ||
+    POST_APPLY_CROSS_PROGRAMME_REVIEW_FIELDS.has(k) ||
+    String(actual?.[k])===String(v)
   );
 }
 function postApplyLedgerAccepted(actual,expected=POST_APPLY_BASELINE) {

@@ -48,6 +48,12 @@ const EXPECTED_RELEASE_SINGLE_CANDIDATE_FINGERPRINT =
 const EXPECTED_RELEASE_SINGLE_REVIEWS = 35;
 const EXPECTED_RELEASE_SINGLE_REVIEW_FINGERPRINT =
   "3e6ce99990ebd2e3bb5bbfd2600748da20104696bff3ced7875e4d5fe358638d";
+const EXPECTED_RELEASE_SINGLE_TRACK_ZERO_FOLLOWUP_CANDIDATES = 6;
+const EXPECTED_RELEASE_SINGLE_TRACK_ZERO_FOLLOWUP_FINGERPRINT =
+  "f8fbbc8ddef665202ff3edf62398244395bd584e9b1cd5ed1152ec2eb2ac5b0e";
+const EXPECTED_RELEASE_SINGLE_TRACK_ZERO_REVIEW_FOLLOWUP_CANDIDATES = 5;
+const EXPECTED_RELEASE_SINGLE_TRACK_ZERO_REVIEW_FOLLOWUP_FINGERPRINT =
+  "cdf6933fade7380f8557523ca2f2096465498e9c356293104aaf7f0540b7a684";
 const EXPECTED_TRACK_ZERO_CANDIDATES = 34;
 const EXPECTED_TRACK_ZERO_CANDIDATE_FINGERPRINT =
   "1f178ed3aff1ac2ba998eefec42ac1f8abdb62ed4e70a93471715552399f5669";
@@ -1516,6 +1522,64 @@ from stats
   return candidateSnapshot(row);
 }
 
+function releaseSingleTrackZeroFollowupSnapshot(
+  currentCandidatePayload,
+) {
+  const escapedCurrent =
+    String(currentCandidatePayload || "[]").replaceAll(
+      "'",
+      "''",
+    );
+
+  const row = queryViaLinkedCli(`
+with current_plans as (
+  select value as candidate
+  from jsonb_array_elements(
+    '${escapedCurrent}'::jsonb
+  )
+),
+derived as (
+  select
+    candidate,
+    (
+      select count(*)::int
+      from public.registry_canonicalization_decisions decision
+      where decision.entity_id=
+            (candidate->>'track_id')::uuid
+        and decision.decision_type=
+            'auto_resolved_stale_community_slug_blocker'
+        and decision.metadata->>'programmeKey'=
+            'public_music_identity_track_slug_zero'
+        and decision.after_payload->>'candidateFingerprint'=
+            '${EXPECTED_TRACK_ZERO_CANDIDATE_FINGERPRINT}'
+    ) as track_zero_decisions
+  from current_plans
+)
+select
+  count(*)::int as candidate_count,
+  count(distinct candidate->>'release_id')::int
+    as distinct_release_count,
+  count(*) filter (
+    where track_zero_decisions=1
+  )::int as exact_track_zero_derived_count,
+  coalesce(sum(track_zero_decisions),0)::int
+    as track_zero_decision_count
+from derived
+`);
+
+  return {
+    candidateCount:
+      Number(row.candidate_count || 0),
+    distinctReleaseCount:
+      Number(row.distinct_release_count || 0),
+    exactTrackZeroDerivedCount:
+      Number(row.exact_track_zero_derived_count || 0),
+    trackZeroDecisionCount:
+      Number(row.track_zero_decision_count || 0),
+  };
+}
+
+
 function releaseSingleReviewProgrammeSnapshotFromHistory(
   currentCandidatePayload,
 ) {
@@ -2044,17 +2108,40 @@ async function currentCandidateState(pool) {
         reviewPendingResult.rows[0],
       );
 
+    const verified = Number(
+      releaseSingleJournal.verified_operations,
+    );
+    const currentCandidatePayload =
+      releaseSingleResult.rows[0]
+        ?.candidate_payload || "[]";
+    const reviewPendingPayload =
+      reviewPendingResult.rows[0]
+        ?.candidate_payload || "[]";
+
     releaseSingleProgramme =
       releaseSingleProgrammeSnapshotFromHistory(
-        releaseSingleResult.rows[0]
-          ?.candidate_payload,
+        verified ===
+          EXPECTED_RELEASE_SINGLE_CANDIDATES
+          ? "[]"
+          : currentCandidatePayload,
       );
 
-    releaseSingleReviewProgramme =
+    const releaseSingleReviewHistory =
       releaseSingleReviewProgrammeSnapshotFromHistory(
-        reviewPendingResult.rows[0]
-          ?.candidate_payload,
+        "[]",
       );
+    const historicalReviewMaterialized =
+      releaseSingleReviewHistory.candidateCount ===
+        EXPECTED_RELEASE_SINGLE_REVIEWS &&
+      releaseSingleReviewHistory.candidateFingerprint ===
+        EXPECTED_RELEASE_SINGLE_REVIEW_FINGERPRINT;
+
+    releaseSingleReviewProgramme =
+      historicalReviewMaterialized
+        ? releaseSingleReviewHistory
+        : releaseSingleReviewProgrammeSnapshotFromHistory(
+            reviewPendingPayload,
+          );
 
     assertFields(
       releaseSingleProgramme,
@@ -2078,38 +2165,121 @@ async function currentCandidateState(pool) {
       "Release Single identity review programme freeze",
     );
 
-    const verified = Number(
-      releaseSingleJournal.verified_operations,
-    );
-
     if (
-      verified +
-        releaseSingleCurrent.candidateCount !==
+      verified <
       EXPECTED_RELEASE_SINGLE_CANDIDATES
     ) {
+      if (
+        verified +
+          releaseSingleCurrent.candidateCount !==
+        EXPECTED_RELEASE_SINGLE_CANDIDATES
+      ) {
+        throw new Error(
+          "Release Single identity current/history count is not exact",
+        );
+      }
+
+      releaseSingleState =
+        verified === 0
+          ? "pristine"
+          : "accepted_partial";
+    } else if (
+      verified ===
+      EXPECTED_RELEASE_SINGLE_CANDIDATES
+    ) {
+      if (
+        releaseSingleCurrent.candidateCount === 0
+      ) {
+        releaseSingleState = "accepted_final";
+      } else if (
+        releaseSingleCurrent.candidateCount ===
+          EXPECTED_RELEASE_SINGLE_TRACK_ZERO_FOLLOWUP_CANDIDATES &&
+        releaseSingleCurrent.candidateFingerprint ===
+          EXPECTED_RELEASE_SINGLE_TRACK_ZERO_FOLLOWUP_FINGERPRINT
+      ) {
+        const followup =
+          releaseSingleTrackZeroFollowupSnapshot(
+            currentCandidatePayload,
+          );
+
+        assertFields(
+          followup,
+          {
+            candidateCount:
+              EXPECTED_RELEASE_SINGLE_TRACK_ZERO_FOLLOWUP_CANDIDATES,
+            distinctReleaseCount:
+              EXPECTED_RELEASE_SINGLE_TRACK_ZERO_FOLLOWUP_CANDIDATES,
+            exactTrackZeroDerivedCount:
+              EXPECTED_RELEASE_SINGLE_TRACK_ZERO_FOLLOWUP_CANDIDATES,
+            trackZeroDecisionCount:
+              EXPECTED_RELEASE_SINGLE_TRACK_ZERO_FOLLOWUP_CANDIDATES,
+          },
+          "Release Single Track-zero follow-up",
+        );
+
+        releaseSingleState =
+          "accepted_final_track_zero_followup";
+      } else {
+        throw new Error(
+          "Release Single identity post-acceptance candidate envelope is not recognized: " +
+            JSON.stringify(releaseSingleCurrent),
+        );
+      }
+    } else {
       throw new Error(
-        "Release Single identity current/history count is not exact",
+        "Release Single identity verified operation count exceeded the accepted historical programme",
       );
     }
-
-    releaseSingleState =
-      verified === 0
-        ? "pristine"
-        : verified ===
-            EXPECTED_RELEASE_SINGLE_CANDIDATES
-          ? "accepted_final"
-          : "accepted_partial";
 
     const reviewPending =
       releaseSingleReviewPending.candidateCount;
 
-    releaseSingleReviewState =
-      reviewPending ===
-        EXPECTED_RELEASE_SINGLE_REVIEWS
-        ? "pristine"
-        : reviewPending === 0
-          ? "materialized"
-          : "materialized_partial";
+    if (historicalReviewMaterialized) {
+      if (reviewPending === 0) {
+        releaseSingleReviewState = "materialized";
+      } else if (
+        reviewPending ===
+          EXPECTED_RELEASE_SINGLE_TRACK_ZERO_REVIEW_FOLLOWUP_CANDIDATES &&
+        releaseSingleReviewPending.candidateFingerprint ===
+          EXPECTED_RELEASE_SINGLE_TRACK_ZERO_REVIEW_FOLLOWUP_FINGERPRINT
+      ) {
+        const reviewFollowup =
+          releaseSingleTrackZeroFollowupSnapshot(
+            reviewPendingPayload,
+          );
+
+        assertFields(
+          reviewFollowup,
+          {
+            candidateCount:
+              EXPECTED_RELEASE_SINGLE_TRACK_ZERO_REVIEW_FOLLOWUP_CANDIDATES,
+            distinctReleaseCount:
+              EXPECTED_RELEASE_SINGLE_TRACK_ZERO_REVIEW_FOLLOWUP_CANDIDATES,
+            exactTrackZeroDerivedCount:
+              EXPECTED_RELEASE_SINGLE_TRACK_ZERO_REVIEW_FOLLOWUP_CANDIDATES,
+            trackZeroDecisionCount:
+              EXPECTED_RELEASE_SINGLE_TRACK_ZERO_REVIEW_FOLLOWUP_CANDIDATES,
+          },
+          "Release Single Track-zero review follow-up",
+        );
+
+        releaseSingleReviewState =
+          "materialized_track_zero_followup";
+      } else {
+        throw new Error(
+          "Release Single identity post-materialization review envelope is not recognized: " +
+            JSON.stringify(releaseSingleReviewPending),
+        );
+      }
+    } else {
+      releaseSingleReviewState =
+        reviewPending ===
+          EXPECTED_RELEASE_SINGLE_REVIEWS
+          ? "pristine"
+          : reviewPending === 0
+            ? "materialized"
+            : "materialized_partial";
+    }
   }
 
   return {
