@@ -1,10 +1,10 @@
 # MIZIZI URL-Identity Programme Control Plane
 
-Date: 22 September 2026
+Date: 25 September 2026
 
 Programme issue: #1013
 
-Status: **RELEASE + CHART AUTOMATIC URL-IDENTITY FAMILIES PRODUCTION CLOSED — 737 Release + 161 Chart operations verified; zero Release/Chart automatic candidates remain; 66 Track review items remain; authority zero at rest**
+Status: **HISTORICAL RELEASE + CHART URL-IDENTITY FAMILIES PRODUCTION CLOSED; PUBLIC MUSIC IDENTITY SLICE 2 REVIEW AUTHORITY LIVE; SLICE 3 ONE-TRACK SINGLE ALIGNMENT CANDIDATE FROZEN AT 80 AUTOMATIC + 35 RELEASE REVIEWS; SLICE 3 PRODUCTION APPLY NOT YET AUTHORIZED; AUTHORITY ZERO AT REST**
 
 ## Purpose
 
@@ -399,3 +399,164 @@ Track mutation authority.
 
 Release and Chart authority must remain closed unless new evidence creates a
 new separately reviewed programme.
+
+## Public Music Identity Slice 3 — one-track Single alignment candidate
+
+This section records the forward Public Music Identity convergence candidate
+prepared on 25 September 2026. It does **not** declare a Production data apply.
+
+The public product invariant is already fixed by Slice 1:
+
+- a canonical Track presents at
+  `/tracks/{artistSlug}/{trackSlug}`;
+- a multi-track Release presents at
+  `/releases/{artistSlug}/{releaseSlug}`;
+- a one-track Single does not own a second public Release page;
+- Release membership is context, not Track address;
+- the retired Release-scoped Track shape and UUID Track routes do not return.
+
+Slice 3 therefore repairs internal one-track Release identity only where the
+current Registry and Community graph proves a deterministic Track presentation.
+
+### Production corpus classification
+
+The read-only Production audit found **157** active Release slugs containing
+feature-credit tokens. Their topology is:
+
+- **148** one-track Releases;
+- **3** multi-track Releases, excluded from the one-track automatic lane;
+- **6** zero-resolvable Releases, blocked for separate repair.
+
+Within the 148 one-track Releases, **33** are already blocked by an open Track
+identity review. They are not duplicated into a second Release review while
+their Track identity remains unresolved.
+
+The remaining 115 one-track Releases divide into:
+
+- **80** safe automatic Single alignments;
+- **35** Release public-identity reviews.
+
+The 35 review targets are the union of concrete ambiguity evidence, including
+one duplicate active Single for the same canonical Track, nine Release-primary
+versus Track-primary Artist-scope mismatches, and 29 cases where both a
+Release-owned Community thread and a Track-owned thread already exist. Four
+Artist-scope mismatches overlap the dual-thread set, so those findings resolve
+to 35 unique Release review targets rather than 39.
+
+Automatic eligibility also requires exactly one distinct primary Artist UUID
+and exactly one distinct primary Artist slug on both the Release and Track,
+exact UUID/slug agreement between those scopes, no same-Artist target-slug
+collision, no unsupported Release-owned current pointer, and no malformed
+Release/Track thread route state.
+
+### Exact programme freezes
+
+Automatic Single alignment:
+
+- candidate count: **80**;
+- candidate fingerprint:
+  `8cb08c3447b0e8acaf3279ef7b0317e915783b87a7e37678976b01fd02401eab`;
+- exact per-operation row ceiling: **2**.
+
+Release conflict review programme:
+
+- review target count: **35**;
+- review fingerprint:
+  `3e6ce99990ebd2e3bb5bbfd2600748da20104696bff3ced7875e4d5fe358638d`;
+- rule:
+  `release_single_identity_conflict/1.4.0`.
+
+Both fingerprints bind the exact Release/Track identities, current and proposed
+slugs, Artist route authority, current thread ownership, relevant downstream
+pointer state, and deterministic aggregate state fingerprints.
+
+### Community topology
+
+Of the 80 automatic candidates:
+
+- **45** have no Community thread;
+- **25** have one Release-owned thread and no Track-owned thread;
+- **10** already have the canonical Track-owned thread and no Release-owned
+  thread.
+
+For the 25 movable threads, the existing thread id and all comments are
+preserved. The operation changes only the current thread owner to the canonical
+Track UUID and canonical Track route. It does not create a second thread and
+does not merge two discussions.
+
+A Release/Track dual-thread collision is review-only.
+
+### Mutation boundary
+
+The automatic operation is:
+
+`registry.release_single_identity.align/v1`
+
+with capability:
+
+`align_registry_release_single_identity`.
+
+One exact operation may change only:
+
+1. the target active Single Release slug; and
+2. at most one collision-free Community thread current owner.
+
+It must not:
+
+- mutate `registry_tracks`;
+- mutate `registry_release_tracks`;
+- rewrite Track identity;
+- create or reactivate `wk_slug_redirects`;
+- use Release-date suffix fallback;
+- merge duplicate Singles;
+- merge two Community threads;
+- bypass an existing Track identity review.
+
+The executor reuses the mature Release serialization namespace
+`mizizi:release-slug:{primaryArtistId}`, then revalidates the complete
+candidate after locking current Release, Track, membership, credit and thread
+state.
+
+Every successful mutation emits exactly one
+`align_release_single_identity` canonical-write event and requires an
+independent verifier PASS.
+
+### Review authority
+
+Ambiguous one-track cases are materialized through the bounded private review
+broker as `mizizi_data_hygiene` Release reviews. The review evidence stores
+the exact frozen programme candidate and concrete reason codes.
+
+The existing 33 Track-review-blocked Releases remain blocked by their current
+Track review rather than receiving duplicate Release review work.
+
+### Migration and control-plane integration
+
+The canonical migration filename was minted by the accepted pinned Supabase
+CLI, not hand-authored:
+
+`supabase/migrations/20260925082706_public_music_identity_slice3_release_single_alignment_v1.sql`.
+
+The permanent verifier is:
+
+`scripts/control-plane/verify-public-music-identity-slice3-release-single-alignment.sql`.
+
+This lane extends the existing
+`mizizi-url-identity-production-control-plane`; it does not create another
+Production workflow.
+
+The implementation PR is strictly schema/control-plane authority. It does not
+contain the later reviewed Production apply trigger. After the migration is
+merged, replay-proven and Production-applied, a real `manage_registry` user
+must open the dedicated time-bounded Single-alignment authority window. A
+separate tiny reviewed trigger PR will then bind that exact human grant to the
+80/35 programme freeze.
+
+Until that later trigger is reviewed and merged:
+
+- Registry data mutation: **NO**;
+- new Slice 3 Release reviews in Production: **NO**;
+- Single slug convergence in Production: **NO**;
+- Track mutation: **NO**;
+- redirects: **NO**.
+
