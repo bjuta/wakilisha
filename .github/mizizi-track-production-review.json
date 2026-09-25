@@ -1,0 +1,8 @@
+{
+  "operation": "mizizi_track_production_review",
+  "confirm": "MIZIZI_TRACK_PRODUCTION_REVIEW",
+  "expected_input_fingerprint": "6d9fa72f13ce4a5d774a457552e3cd3824475fb8a651473d5999605a3dcc29fb",
+  "expected_existing_open_reviews": 66,
+  "expected_credit_gap_reviews": 12,
+  "expected_recording_identity_reviews": 91
+}
