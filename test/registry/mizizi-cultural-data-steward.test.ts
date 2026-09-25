@@ -413,6 +413,84 @@ describe("MIZIZI Cultural Data Steward", () => {
     );
   });
 
+  it("keeps Slice 3 review materialization unable to enter canonical mutation paths", () => {
+    const runner = readFileSync(
+      "scripts/registry/agents/mizizi/run.ts",
+      "utf8",
+    );
+    const packageJson = readFileSync(
+      "package.json",
+      "utf8",
+    );
+
+    expect(runner).toContain(
+      'type RunMode = "audit" | "review" | "apply";',
+    );
+    expect(runner).toContain(
+      '["audit", "review", "apply"]',
+    );
+    expect(
+      runner.match(
+        /options\.mode === "review"/g,
+      ),
+    ).toHaveLength(5);
+    expect(runner).toContain(
+      "Review mode completed. No canonical Registry rows were changed.",
+    );
+    expect(packageJson).toContain(
+      '"registry:mizizi:review": "tsx scripts/registry/agents/mizizi/run.ts --mode=review"',
+    );
+
+    const trackGuard =
+      runner.indexOf(
+        'options.mode === "review"',
+        runner.indexOf(
+          "async function scanTracks",
+        ),
+      );
+    const trackApply =
+      runner.indexOf(
+        "await applyTrackSlug(",
+        trackGuard,
+      );
+    expect(trackGuard).toBeGreaterThan(-1);
+    expect(trackApply).toBeGreaterThan(trackGuard);
+
+    const releaseGuard =
+      runner.indexOf(
+        'options.mode === "review"',
+        runner.indexOf(
+          "async function scanReleases",
+        ),
+      );
+    const releaseApply =
+      runner.indexOf(
+        "await applyReleaseTaxonomy(",
+        releaseGuard,
+      );
+    expect(releaseGuard).toBeGreaterThan(-1);
+    expect(releaseApply).toBeGreaterThan(
+      releaseGuard,
+    );
+
+    const chartGuard =
+      runner.indexOf(
+        'options.mode === "review"',
+        runner.indexOf(
+          "async function scanCharts",
+        ),
+      );
+    const chartApply =
+      runner.indexOf(
+        "await applyChartSlug(",
+        chartGuard,
+      );
+    expect(chartGuard).toBeGreaterThan(-1);
+    expect(chartApply).toBeGreaterThan(
+      chartGuard,
+    );
+  });
+
   it("derives Release taxonomy from resolvable active Track count", () => {
     const single =
       analyzeReleaseIdentity({
