@@ -2558,7 +2558,7 @@ async function main() {
       );
 
       const guard =
-        await jit.pool.query(`
+        queryViaLinkedCli(`
 select
   (
     select count(*)::int
@@ -2644,7 +2644,7 @@ select
 `);
 
       assertFields(
-        guard.rows[0],
+        guard,
         {
           release_single_reviews:
             EXPECTED_RELEASE_SINGLE_REVIEWS,
