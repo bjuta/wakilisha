@@ -488,6 +488,81 @@ describe("MIZIZI current URL-identity production control plane", () => {
     );
   });
 
+  it("converges stale Community Track slug blockers through V2 without redirects", () => {
+    const workflow = readFileSync(
+      ".github/workflows/mizizi-url-identity-production-control-plane.yml",
+      "utf8",
+    );
+    const controlPlane = readFileSync(
+      "scripts/control-plane/mizizi-url-identity-production-control-plane.mjs",
+      "utf8",
+    );
+    const migration = readFileSync(
+      "supabase/migrations/20260925141117_public_music_identity_track_slug_zero_v2.sql",
+      "utf8",
+    );
+
+    expect(workflow).toContain(
+      ".github/public-music-identity-track-slug-zero-apply.json",
+    );
+    expect(workflow).toContain(
+      "20260925141117_public_music_identity_track_slug_zero_v2.sql",
+    );
+
+    expect(controlPlane).toContain(
+      "EXPECTED_TRACK_ZERO_CANDIDATES = 34",
+    );
+    expect(controlPlane).toContain(
+      "1f178ed3aff1ac2ba998eefec42ac1f8abdb62ed4e70a93471715552399f5669",
+    );
+    expect(controlPlane).toContain(
+      "executeTrackSlugZeroPlans",
+    );
+    expect(controlPlane).toContain(
+      "execute_stewardship_operation_v2",
+    );
+    expect(controlPlane).toContain(
+      "verify_stewardship_operation_v2",
+    );
+    expect(controlPlane).toContain(
+      "finalize_track_slug_zero_convergence_v1",
+    );
+    expect(controlPlane).toContain(
+      'trackZeroState = "accepted_final"',
+    );
+    expect(controlPlane).toContain(
+      '"Track-slug zero Production acceptance"',
+    );
+
+    expect(migration).toContain(
+      "execute_stewardship_operation_v2",
+    );
+    expect(migration).toContain(
+      "verify_stewardship_operation_v2",
+    );
+    expect(migration).toContain(
+      "community_thread_track_pointer_mismatch",
+    );
+    expect(migration).toContain(
+      "artist_scoped_track_v2",
+    );
+    expect(migration).toContain(
+      "entity_id=v_track_id::text",
+    );
+    expect(migration).toContain(
+      "finalize_track_slug_zero_convergence_v1",
+    );
+    expect(migration).toContain(
+      "public_music_identity_track_slug_zero",
+    );
+    expect(migration).toContain(
+      "1f178ed3aff1ac2ba998eefec42ac1f8abdb62ed4e70a93471715552399f5669",
+    );
+    expect(migration).not.toMatch(
+      /^\s*(?:insert\s+into|update|delete\s+from)\s+public\.wk_slug_redirects\b/im,
+    );
+  });
+
   it("keeps blocked Track, Release title and Chart Artist findings non-mutating", () => {
     const controlPlane = readFileSync(
       "scripts/control-plane/mizizi-url-identity-production-control-plane.mjs",
@@ -499,7 +574,10 @@ describe("MIZIZI current URL-identity production control plane", () => {
     );
 
     expect(controlPlane).toContain(
-      "slugNoise: 66",
+      "EXPECTED_TRACK_ZERO_IDENTITY_NOISE_REMAINING = 32",
+    );
+    expect(controlPlane).toContain(
+      "[\n        66,\n        EXPECTED_TRACK_ZERO_IDENTITY_NOISE_REMAINING,",
     );
     expect(controlPlane).toContain(
       "titlePackaging: slugPackaging",
