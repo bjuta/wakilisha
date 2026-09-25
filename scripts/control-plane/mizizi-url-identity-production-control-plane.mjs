@@ -2459,44 +2459,72 @@ async function closeAuthorityWindow(
   pool,
   trigger,
   reason,
+  applySucceeded,
 ) {
+  const isTrackZero =
+    trigger.scopeConfig.entity === "track_slug_zero";
   const isReleaseSingle =
     trigger.scopeConfig.entity ===
       "release_single_identity";
 
-  const result = isReleaseSingle
-    ? await pool.query(
-        `
-        select *
-        from mizizi_private.close_release_single_identity_authority_window_v1(
-          $1::uuid,
-          $2::text
+  const result =
+    isTrackZero && applySucceeded
+      ? await pool.query(
+          `
+          select *
+          from mizizi_private.finalize_track_slug_zero_convergence_v1(
+            $1::uuid
+          )
+          `,
+          [trigger.capability_grant_id],
         )
-        `,
-        [
-          trigger.capability_grant_id,
-          reason,
-        ],
-      )
-    : await pool.query(
-        `
-        select *
-        from mizizi_private.close_stewardship_authority_window_v1(
-          $1::text,
-          $2::uuid,
-          $3::text
-        )
-        `,
-        [
-          trigger.scopeConfig.operationKey,
-          trigger.capability_grant_id,
-          reason,
-        ],
-      );
+      : isReleaseSingle
+        ? await pool.query(
+            `
+            select *
+            from mizizi_private.close_release_single_identity_authority_window_v1(
+              $1::uuid,
+              $2::text
+            )
+            `,
+            [
+              trigger.capability_grant_id,
+              reason,
+            ],
+          )
+        : await pool.query(
+            `
+            select *
+            from mizizi_private.close_stewardship_authority_window_v1(
+              $1::text,
+              $2::uuid,
+              $3::text
+            )
+            `,
+            [
+              trigger.scopeConfig.operationKey,
+              trigger.capability_grant_id,
+              reason,
+            ],
+          );
 
   if (result.rowCount !== 1) {
     throw new Error(
       "MIZIZI authority-window close did not return one receipt",
+    );
+  }
+
+  if (isTrackZero && applySucceeded) {
+    assertFields(
+      result.rows[0],
+      {
+        resolved_reviews:
+          EXPECTED_TRACK_ZERO_CANDIDATES,
+        decision_rows:
+          EXPECTED_TRACK_ZERO_CANDIDATES,
+        standing_grant_status: "expired",
+      },
+      "Track-slug zero finalizer receipt",
     );
   }
 
@@ -2707,6 +2735,14 @@ async function main() {
         "Release Single review state: " +
           candidates.releaseSingleReviewState,
       );
+      console.log(
+        "Track-slug zero programme state: " +
+          candidates.trackZeroState,
+      );
+      console.log(
+        "Track-slug zero migration ready: " +
+          candidates.trackZeroMigrationReady,
+      );
       console.log("Registry mutation: NO");
       return;
     }
@@ -2718,7 +2754,9 @@ async function main() {
         ? candidates.releaseCurrent.candidateCount
         : scope.entity === "release_single_identity"
           ? candidates.releaseSingleCurrent.candidateCount
-          : scope.expectedCount;
+          : scope.entity === "track_slug_zero"
+            ? candidates.trackZeroCurrent.candidateCount
+            : scope.expectedCount;
 
     if (
       scope.entity === "release" &&
@@ -2744,6 +2782,32 @@ async function main() {
       );
     }
 
+    if (
+      scope.entity === "track_slug_zero" &&
+      (
+        candidates.trackZeroState !== "pristine" ||
+        !candidates.trackZeroMigrationReady
+      )
+    ) {
+      throw new Error(
+        "Track-slug zero apply cannot start from " +
+          candidates.trackZeroState +
+          " / migrationReady=" +
+          candidates.trackZeroMigrationReady,
+      );
+    }
+
+    const trackRedirectsBefore =
+      scope.entity === "track_slug_zero"
+        ? Number(
+            queryViaLinkedCli(`
+select count(*)::int as track_redirects
+from public.wk_slug_redirects
+where entity_type='track'
+`).track_redirects || 0,
+          )
+        : null;
+
     fs.writeFileSync(
       ARTIFACT_DIR + "/state-before.json",
       JSON.stringify(
@@ -2762,6 +2826,28 @@ async function main() {
     );
 
     try {
+      if (scope.entity === "track_slug_zero") {
+        const operationReceipts =
+          await executeTrackSlugZeroPlans(
+            jit.pool,
+            expectedApplyCount,
+          );
+
+        fs.writeFileSync(
+          ARTIFACT_DIR + "/apply.txt",
+          JSON.stringify(
+            {
+              mode: "track_slug_zero_v2",
+              operations_verified:
+                operationReceipts.length,
+              operation_receipts:
+                operationReceipts,
+            },
+            null,
+            2,
+          ) + "\n",
+        );
+      } else 
       if (
         scope.entity === "release_single_identity"
       ) {
@@ -2836,6 +2922,7 @@ async function main() {
           primaryError
             ? "close after failed governed URL-identity apply"
             : "close after accepted governed URL-identity apply",
+          !primaryError,
         );
 
       fs.writeFileSync(
@@ -2882,7 +2969,160 @@ async function main() {
       "governed operation acceptance",
     );
 
-    if (scope.entity === "release_single_identity") {
+    if (scope.entity === "track_slug_zero") {
+      const currentResult =
+        await jit.pool.query(trackZeroCandidateSql);
+      const current =
+        candidateSnapshot(currentResult.rows[0]);
+      const closure =
+        await trackZeroClosureSnapshot(jit.pool);
+
+      assertFields(
+        current,
+        { candidateCount: 0 },
+        "post-apply Track-slug zero candidates",
+      );
+
+      assertFields(
+        closure,
+        {
+          decisionCount:
+            EXPECTED_TRACK_ZERO_CANDIDATES,
+          reviewCount:
+            EXPECTED_TRACK_ZERO_CANDIDATES,
+          targetCount:
+            EXPECTED_TRACK_ZERO_CANDIDATES,
+          capabilityGrantCount: 1,
+          verifiedOperations:
+            EXPECTED_TRACK_ZERO_CANDIDATES,
+          canonicalEvents:
+            EXPECTED_TRACK_ZERO_CANDIDATES,
+          resolvedReviews:
+            EXPECTED_TRACK_ZERO_CANDIDATES,
+        },
+        "Track-slug zero final closure",
+      );
+
+      const guard = queryViaLinkedCli(`
+select
+  (
+    select count(*)::int
+    from public.registry_review_items review
+    where review.status='open'
+      and review.review_type='mizizi_data_hygiene'
+      and review.entity_type='track'
+      and review.source_payload->>'ruleId'=
+          'track_slug_identity_noise'
+  ) as identity_noise,
+  (
+    select count(*)::int
+    from public.registry_review_items review
+    where review.status='open'
+      and review.review_type='mizizi_data_hygiene'
+      and review.entity_type='track'
+      and review.source_payload->>'ruleId'=
+          'track_slug_credit_evidence_gap'
+  ) as credit_gap,
+  (
+    select count(*)::int
+    from public.registry_review_items review
+    where review.status='open'
+      and review.review_type='mizizi_data_hygiene'
+      and review.entity_type='track'
+      and review.source_payload->>'ruleId'=
+          'track_slug_identity_noise'
+      and (
+        review.source_payload->'evidence'->>'collision'
+          like
+          'candidate_slug_collides_with_current_community_thread:%'
+        or
+        review.source_payload->'evidence'->>'collision'
+          like
+          'current_community_thread_ownership_ambiguous:%'
+      )
+  ) as stale_community_blockers,
+  (
+    select count(*)::int
+    from public.registry_review_items review
+    join public.registry_tracks track
+      on track.id::text=review.source_id
+    join public.wk_chart_entries_v2 chart
+      on chart.canonical_track_id=review.source_id
+    where review.status='resolved'
+      and review.resolution_payload->>'programmeKey'=
+          'public_music_identity_track_slug_zero'
+      and chart.track_slug is distinct from track.slug
+  ) as chart_pointer_mismatches,
+  (
+    select count(*)::int
+    from public.registry_review_items review
+    join public.registry_tracks track
+      on track.id::text=review.source_id
+    join public.community_saves save
+      on save.entity_type='track'
+     and save.entity_id=review.source_id
+    where review.status='resolved'
+      and review.resolution_payload->>'programmeKey'=
+          'public_music_identity_track_slug_zero'
+      and save.entity_slug is distinct from track.slug
+  ) as save_pointer_mismatches,
+  (
+    select count(*)::int
+    from public.registry_review_items review
+    join public.registry_tracks track
+      on track.id::text=review.source_id
+    join public.community_threads thread
+      on thread.entity_type='track'
+     and thread.entity_id=review.source_id
+    join lateral (
+      select credit.artist_slug
+      from public.registry_track_artists credit
+      where credit.track_id=track.id
+        and credit.status='active'
+        and credit.is_primary is true
+        and credit.artist_id is not null
+        and nullif(btrim(credit.artist_slug),'') is not null
+      order by
+        credit.credit_order nulls last,
+        credit.created_at,
+        credit.id
+      limit 1
+    ) primary_artist on true
+    where review.status='resolved'
+      and review.resolution_payload->>'programmeKey'=
+          'public_music_identity_track_slug_zero'
+      and (
+        thread.entity_slug is distinct from track.slug
+        or thread.entity_url is distinct from
+          'https://wakilisha.africa/tracks/' ||
+          primary_artist.artist_slug ||
+          '/' ||
+          track.slug
+      )
+  ) as thread_pointer_mismatches,
+  (
+    select count(*)::int
+    from public.wk_slug_redirects
+    where entity_type='track'
+  ) as track_redirects
+`);
+
+      assertFields(
+        guard,
+        {
+          identity_noise:
+            EXPECTED_TRACK_ZERO_IDENTITY_NOISE_REMAINING,
+          credit_gap:
+            EXPECTED_TRACK_ZERO_CREDIT_GAP_REMAINING,
+          stale_community_blockers: 0,
+          chart_pointer_mismatches: 0,
+          save_pointer_mismatches: 0,
+          thread_pointer_mismatches: 0,
+          track_redirects: trackRedirectsBefore,
+        },
+        "Track-slug zero Production acceptance",
+      );
+    } else if (scope.entity === "release_single_identity") {
       assertFields(
         after,
         {
