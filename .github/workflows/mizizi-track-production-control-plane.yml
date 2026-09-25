@@ -9,12 +9,14 @@ on:
       - "docs/registry/MIZIZI_CULTURAL_DATA_STEWARD.md"
       - ".github/mizizi-track-production-apply.json"
       - ".github/mizizi-track-production-review.json"
+      - ".github/public-music-identity-track-slug-zero-apply.json"
   push:
     branches:
       - main
     paths:
       - ".github/mizizi-track-production-apply.json"
       - ".github/mizizi-track-production-review.json"
+      - ".github/public-music-identity-track-slug-zero-apply.json"
   workflow_dispatch:
 
 permissions:
@@ -61,17 +63,22 @@ jobs:
           CHANGED="$(git diff --name-only "${{ github.event.before }}" "${{ github.sha }}")"
           APPLY_FILE=".github/mizizi-track-production-apply.json"
           REVIEW_FILE=".github/mizizi-track-production-review.json"
+          ZERO_FILE=".github/public-music-identity-track-slug-zero-apply.json"
 
           TOTAL="$(printf '%s\n' "$CHANGED" | sed '/^$/d' | wc -l | tr -d ' ')"
           APPLY_COUNT="$(printf '%s\n' "$CHANGED" | grep -Fxc "$APPLY_FILE" || true)"
           REVIEW_COUNT="$(printf '%s\n' "$CHANGED" | grep -Fxc "$REVIEW_FILE" || true)"
+          ZERO_COUNT="$(printf '%s\n' "$CHANGED" | grep -Fxc "$ZERO_FILE" || true)"
 
-          if [ "$TOTAL" = "1" ] && [ "$APPLY_COUNT" = "1" ] && [ "$REVIEW_COUNT" = "0" ]; then
+          if [ "$TOTAL" = "1" ] && [ "$APPLY_COUNT" = "1" ] && [ "$REVIEW_COUNT" = "0" ] && [ "$ZERO_COUNT" = "0" ]; then
             echo "MIZIZI_CONTROL_PLANE_MODE=apply" >> "$GITHUB_ENV"
             echo "MIZIZI_TRIGGER_FILE=$APPLY_FILE" >> "$GITHUB_ENV"
-          elif [ "$TOTAL" = "1" ] && [ "$APPLY_COUNT" = "0" ] && [ "$REVIEW_COUNT" = "1" ]; then
+          elif [ "$TOTAL" = "1" ] && [ "$APPLY_COUNT" = "0" ] && [ "$REVIEW_COUNT" = "1" ] && [ "$ZERO_COUNT" = "0" ]; then
             echo "MIZIZI_CONTROL_PLANE_MODE=review" >> "$GITHUB_ENV"
             echo "MIZIZI_TRIGGER_FILE=$REVIEW_FILE" >> "$GITHUB_ENV"
+          elif [ "$TOTAL" = "1" ] && [ "$APPLY_COUNT" = "0" ] && [ "$REVIEW_COUNT" = "0" ] && [ "$ZERO_COUNT" = "1" ]; then
+            echo "MIZIZI_CONTROL_PLANE_MODE=zero_apply" >> "$GITHUB_ENV"
+            echo "MIZIZI_TRIGGER_FILE=$ZERO_FILE" >> "$GITHUB_ENV"
           else
             echo "STOP: Production intent push must change exactly one reviewed MIZIZI Track trigger file."
             printf '%s\n' "$CHANGED"
