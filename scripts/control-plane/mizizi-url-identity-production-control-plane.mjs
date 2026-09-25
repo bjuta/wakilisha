@@ -809,6 +809,155 @@ function candidateSnapshot(row) {
 }
 
 
+async function trackZeroClosureSnapshot(pool) {
+  const result = await pool.query(trackZeroClosureSql);
+  const row = result.rows[0] || {};
+  return {
+    decisionCount: Number(row.decision_count || 0),
+    reviewCount: Number(row.review_count || 0),
+    targetCount: Number(row.target_count || 0),
+    capabilityGrantCount: Number(
+      row.capability_grant_count || 0,
+    ),
+    verifiedOperations: Number(
+      row.verified_operations || 0,
+    ),
+    canonicalEvents: Number(
+      row.canonical_events || 0,
+    ),
+    resolvedReviews: Number(
+      row.resolved_reviews || 0,
+    ),
+  };
+}
+
+async function executeTrackSlugZeroPlans(
+  pool,
+  expectedCount,
+) {
+  const frozen =
+    await pool.query(trackZeroCandidateRowsSql);
+
+  if (frozen.rowCount !== expectedCount) {
+    throw new Error(
+      "Track-slug zero exact target count drifted: " +
+        frozen.rowCount +
+        " expected " +
+        expectedCount,
+    );
+  }
+
+  const receipts = [];
+
+  for (const row of frozen.rows) {
+    const reviewId = String(row.review_id || "");
+    const trackId = String(row.track_id || "");
+
+    if (!reviewId || !trackId) {
+      throw new Error(
+        "Track-slug zero candidate identity is incomplete",
+      );
+    }
+
+    const grantResult = await pool.query(
+      `
+      select *
+      from mizizi_private.issue_stewardship_execution_grant_v1(
+        $1::text,
+        $2::text,
+        $3::text
+      )
+      `,
+      [
+        "registry.track_slug.canonicalize",
+        trackId,
+        "public-music-track-zero:" + reviewId,
+      ],
+    );
+
+    if (grantResult.rowCount !== 1) {
+      throw new Error(
+        "Track-slug zero exact execution grant was not issued for " +
+          trackId,
+      );
+    }
+
+    const executionGrantId = String(
+      grantResult.rows[0]?.execution_grant_id || "",
+    );
+
+    if (!executionGrantId) {
+      throw new Error(
+        "Track-slug zero execution grant id is missing for " +
+          trackId,
+      );
+    }
+
+    const executionResult = await pool.query(
+      `
+      select *
+      from mizizi_private.execute_stewardship_operation_v2(
+        $1::uuid
+      )
+      `,
+      [executionGrantId],
+    );
+
+    if (
+      executionResult.rowCount !== 1 ||
+      executionResult.rows[0]?.operation_status !==
+        "succeeded"
+    ) {
+      throw new Error(
+        "Track-slug zero V2 execution did not succeed for " +
+          trackId,
+      );
+    }
+
+    const operationId = String(
+      executionResult.rows[0]?.operation_id || "",
+    );
+
+    if (!operationId) {
+      throw new Error(
+        "Track-slug zero operation id is missing for " +
+          trackId,
+      );
+    }
+
+    const verificationResult = await pool.query(
+      `
+      select *
+      from mizizi_private.verify_stewardship_operation_v1(
+        $1::uuid
+      )
+      `,
+      [operationId],
+    );
+
+    if (
+      verificationResult.rowCount !== 1 ||
+      verificationResult.rows[0]?.verifier_status !==
+        "passed"
+    ) {
+      throw new Error(
+        "Track-slug zero independent verifier failed for " +
+          trackId,
+      );
+    }
+
+    receipts.push({
+      review_id: reviewId,
+      track_id: trackId,
+      execution_grant_id: executionGrantId,
+      operation_id: operationId,
+    });
+  }
+
+  return receipts;
+}
+
+
 async function queueReleaseSingleIdentityReviews(
   pool,
   expectedPending,
@@ -1637,11 +1786,19 @@ async function currentCandidateState(pool) {
     await pool.query(releaseCandidateSql);
   const chartResult =
     await pool.query(chartCandidateSql);
+  const trackZeroResult =
+    await pool.query(trackZeroCandidateSql);
 
   const releaseCurrent =
     candidateSnapshot(releaseCurrentResult.rows[0]);
   const chartCurrent =
     candidateSnapshot(chartResult.rows[0]);
+  const trackZeroCurrent =
+    candidateSnapshot(trackZeroResult.rows[0]);
+  const trackZeroClosure =
+    await trackZeroClosureSnapshot(pool);
+  const trackZeroMigrationReady =
+    trackZeroMigrationApplied();
   const releaseJournal =
     journalSnapshot(APPLY_SCOPES.release_slug);
   const chartJournal =
@@ -1758,6 +1915,48 @@ async function currentCandidateState(pool) {
     },
     "Chart Track-slug programme freeze",
   );
+
+  let trackZeroState = "";
+
+  const trackZeroClosureEmpty =
+    Object.values(trackZeroClosure).every(
+      (value) => Number(value) === 0,
+    );
+
+  if (
+    trackZeroClosureEmpty &&
+    trackZeroCurrent.candidateCount ===
+      EXPECTED_TRACK_ZERO_CANDIDATES &&
+    trackZeroCurrent.candidateFingerprint ===
+      EXPECTED_TRACK_ZERO_CANDIDATE_FINGERPRINT
+  ) {
+    trackZeroState = "pristine";
+  } else if (
+    trackZeroCurrent.candidateCount === 0 &&
+    trackZeroClosure.decisionCount ===
+      EXPECTED_TRACK_ZERO_CANDIDATES &&
+    trackZeroClosure.reviewCount ===
+      EXPECTED_TRACK_ZERO_CANDIDATES &&
+    trackZeroClosure.targetCount ===
+      EXPECTED_TRACK_ZERO_CANDIDATES &&
+    trackZeroClosure.capabilityGrantCount === 1 &&
+    trackZeroClosure.verifiedOperations ===
+      EXPECTED_TRACK_ZERO_CANDIDATES &&
+    trackZeroClosure.canonicalEvents ===
+      EXPECTED_TRACK_ZERO_CANDIDATES &&
+    trackZeroClosure.resolvedReviews ===
+      EXPECTED_TRACK_ZERO_CANDIDATES
+  ) {
+    trackZeroState = "accepted_final";
+  } else {
+    throw new Error(
+      "Track-slug zero programme state is not a recognized exact boundary: " +
+        JSON.stringify({
+          current: trackZeroCurrent,
+          closure: trackZeroClosure,
+        }),
+    );
+  }
 
   let releaseSingleProgramme = null;
   let releaseSingleCurrent = {
@@ -1880,6 +2079,10 @@ async function currentCandidateState(pool) {
     chartCurrent,
     chartState,
     chartJournal,
+    trackZeroCurrent,
+    trackZeroClosure,
+    trackZeroState,
+    trackZeroMigrationReady,
     releaseSingleProgramme,
     releaseSingleCurrent,
     releaseSingleState,
@@ -1890,6 +2093,20 @@ async function currentCandidateState(pool) {
   };
 }
 
+
+
+function trackZeroMigrationApplied() {
+  const state = queryViaLinkedCli(`
+select exists(
+  select 1
+  from supabase_migrations.schema_migrations
+  where version='${TRACK_ZERO_MIGRATION_VERSION}'
+    and name='${TRACK_ZERO_MIGRATION_NAME}'
+) as applied
+`);
+
+  return String(state.applied) === "true";
+}
 
 
 function releaseSingleAlignmentMigrationApplied() {
@@ -2084,6 +2301,12 @@ select
     where version='${RELEASE_SINGLE_ALIGNMENT_MIGRATION_VERSION}'
       and name='${RELEASE_SINGLE_ALIGNMENT_MIGRATION_NAME}'
   ) as release_single_alignment_migration_applied,
+  exists(
+    select 1
+    from supabase_migrations.schema_migrations
+    where version='${TRACK_ZERO_MIGRATION_VERSION}'
+      and name='${TRACK_ZERO_MIGRATION_NAME}'
+  ) as track_zero_migration_applied,
   (
     select count(*)::int
     from platform_private.system_actor_capability_grants
@@ -2119,6 +2342,16 @@ select
   ) {
     throw new Error(
       "Release Single identity alignment migration is not Production applied",
+    );
+  }
+
+  if (
+    scope.entity === "track_slug_zero" &&
+    String(state.track_zero_migration_applied) !==
+      "true"
+  ) {
+    throw new Error(
+      "Track-slug zero V2 migration is not Production applied",
     );
   }
 }
