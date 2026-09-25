@@ -395,6 +395,12 @@ describe("MIZIZI current URL-identity production control plane", () => {
       "releaseSingleReviewProgrammeSnapshotFromHistory",
     );
     expect(controlPlane).toContain(
+      "const guard =\n        queryViaLinkedCli(`",
+    );
+    expect(controlPlane).not.toContain(
+      "const guard =\n        await jit.pool.query(`",
+    );
+    expect(controlPlane).toContain(
       "close_release_single_identity_authority_window_v1",
     );
     expect(controlPlane).toContain(
