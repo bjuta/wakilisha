@@ -589,3 +589,75 @@ Public Music Identity Slice 3 Production convergence is therefore accepted.
 Whole-programme closure evidence is recorded in
 `docs/engineering/public-music-identity-production-closure-20260925.md`.
 
+## Public Music Identity Track-slug zero continuation
+
+Issue #1068 was reopened after programme closure because the accepted review-only
+boundary still left 78 active governed Track slug debts. The first bounded
+continuation targets only the 34 historical Community-thread blockers whose
+original slug-collision semantics are now stale under Registry UUID-backed
+Community ownership.
+
+The exact reviewed candidate freeze is:
+
+- candidate count: **34**;
+- candidate fingerprint:
+  `1f178ed3aff1ac2ba998eefec42ac1f8abdb62ed4e70a93471715552399f5669`;
+- operation:
+  `registry.track_slug.canonicalize/v1`;
+- capability:
+  `canonicalize_registry_track_slug`.
+
+Migration
+`20260925141117_public_music_identity_track_slug_zero_v2.sql` leaves the
+historical V1 executor unchanged and adds the forward Track-slug V2 path.
+
+The V2 executor preserves one-Track exact grants and current policy planning,
+but changes current-pointer behavior to the accepted public identity contract:
+
+- canonical public Track location is
+  `/tracks/{primaryArtistSlug}/{cleanTrackSlug}`;
+- Chart rows are synchronized by canonical Track UUID;
+- Community Saves are synchronized by canonical Track UUID;
+- Community Threads are synchronized only by
+  `entity_type='track' + entity_id={Registry Track UUID}`;
+- no Release-scoped Track path is created;
+- no `wk_slug_redirects` row is inserted, updated or deleted.
+
+The dedicated
+`mizizi_private.verify_stewardship_operation_v2(uuid)` independently checks
+the canonical Track row, Chart projection, Community Save pointer, UUID-owned
+Community Thread pointer, canonical Track URL and canonical-write event
+causality before verifier PASS. The finalizer resolves exactly the 34 reviewed
+stale blockers, records canonicalization decisions with the frozen programme
+fingerprint, expires unused exact authority, disables the operation and returns
+MIZIZI to zero authority at rest.
+
+The shared URL-identity control plane now owns this lane. It freezes the exact
+34 candidates, invokes only the V2 Track executor and V2 verifier, finalizes the
+34 reviews, proves zero stale blockers remain, proves current-pointer parity,
+proves redirect count is unchanged, and accepts the post-programme Track audit
+state with 32 remaining identity-noise reviews plus 12 credit-evidence-gap
+reviews.
+
+### Admin UX boundary
+
+These grant, JIT, executor and verifier steps are implementation authority, not
+the intended admin interaction model.
+
+The admin product surface should present the review evidence, proposed canonical
+change, affected pointers and risk, then expose bounded actions such as
+Approve, Reject, Needs research, Apply selected or Apply reviewed batch. After
+human approval, the platform should automatically perform the standard
+execution envelope:
+
+`approval -> policy gateway -> exact grant -> typed executor -> independent verifier -> receipt -> authority close`.
+
+An administrator should not manually enable operation types, issue exact grants,
+invoke SQL, manage JIT transport, run verifiers or close authority windows.
+Those mechanics remain auditable and fail-closed behind the admin action.
+
+New MIZIZI mutation classes should therefore reuse this execution envelope.
+They should contribute only their candidate/plan logic, bounded typed mutation
+and independent verifier unless a genuinely new invariant requires new
+infrastructure. This is the anti-ceremony rule for the permanent operator UX.
+
