@@ -1,16 +1,16 @@
 {
   "projectRef": "pgzizndxdyhqmtyywjmt",
   "schema": "public,editorial",
-  "generatedAt": "2026-09-25T16:50:12Z",
-  "typesSha256": "62cfc74b8d27ad6668e7b56435d2a0b93bfbbf3e754b4e2ddfeda13947c05ef8",
+  "generatedAt": "2026-09-25T20:29:18Z",
+  "typesSha256": "37c26b2d3e2345b9bc06c0dca705dc072cf2e6a1ed1628c6665ee2c5780c314a",
   "authoritativeMigrationDirectory": "supabase/migrations",
-  "migrationCount": 182,
-  "latestMigration": "20260925141117_public_music_identity_track_slug_zero_v2.sql",
+  "migrationCount": 183,
+  "latestMigration": "20260925172710_public_music_identity_track_primary_from_release_v1.sql",
   "schemaSeal": {
     "mode": "preview",
-    "sourceProjectRef": "uctauoalwhwnwacbfdia",
-    "migrationHead": "20260925141117",
-    "baseMainSha": "2b58bc01e434745f7a5604bc017f23c26f7a74a8",
-    "previewBranchId": "330adc31-63f6-4d40-87b8-d3269f8fb286"
+    "sourceProjectRef": "otithjylgpqporfcsaxs",
+    "migrationHead": "20260925172710",
+    "baseMainSha": "d12860e35fdb8398852952ef5e0d70c1c142bd9a",
+    "previewBranchId": "7f0ff9ff-73b7-4806-9f83-c1c0dbf0bf16"
   }
 }

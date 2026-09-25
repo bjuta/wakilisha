@@ -20000,6 +20000,15 @@ export type Database = {
         Args: { p_media_asset_id: string; p_track_id: string }
         Returns: Json
       }
+      admin_admit_registry_track_primary_from_release_v1: {
+        Args: {
+          p_expected_artist_id: string
+          p_expected_track_state_fingerprint: string
+          p_review_id: string
+          p_track_id: string
+        }
+        Returns: Json
+      }
       admin_admit_registry_track_provider_link_v1: {
         Args: {
           p_artwork_url?: string

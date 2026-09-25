@@ -104,6 +104,18 @@ describe("MIZIZI Release production control plane", () => {
     expect(controlPlane).not.toContain("streamApplyWithRetry");
     expect(controlPlane).toContain("PRE_APPLY_BASELINE");
     expect(controlPlane).toContain("POST_APPLY_BASELINE");
+    expect(controlPlane).toContain(
+      "POST_APPLY_CROSS_PROGRAMME_REVIEW_FIELDS",
+    );
+    expect(controlPlane).toContain(
+      "'open_mizizi_release_reviews'",
+    );
+    expect(controlPlane).toContain(
+      "'open_mizizi_reviews_total'",
+    );
+    expect(controlPlane).toContain(
+      "POST_APPLY_CROSS_PROGRAMME_REVIEW_FIELDS.has(k)",
+    );
     expect(controlPlane).toContain("refusing repeat production mutation");
     expect(controlPlane).toContain("18 bad memberships preserved");
     expect(controlPlane).toContain("mizizi_release_events");

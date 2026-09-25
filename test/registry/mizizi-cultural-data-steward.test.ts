@@ -1448,6 +1448,21 @@ describe("MIZIZI Cultural Data Steward", () => {
       "POST_APPLY_BASELINE",
     );
     expect(controlPlane).toContain(
+      "POST_TRACK_ZERO_BASELINE",
+    );
+    expect(controlPlane).toContain(
+      "reviews:32",
+    );
+    expect(controlPlane).toContain(
+      "accepted Track review boundary is not recognized",
+    );
+    expect(controlPlane).toContain(
+      "[66,32].includes(identityNoise)",
+    );
+    expect(controlPlane).toContain(
+      "598 + identityNoise",
+    );
+    expect(controlPlane).toContain(
       "accepted historical Track post-apply baseline detected",
     );
     expect(controlPlane).toContain(

@@ -365,6 +365,24 @@ describe("MIZIZI current URL-identity production control plane", () => {
       "EXPECTED_RELEASE_SINGLE_CANDIDATES = 80",
     );
     expect(controlPlane).toContain(
+      "EXPECTED_RELEASE_SINGLE_TRACK_ZERO_FOLLOWUP_CANDIDATES = 6",
+    );
+    expect(controlPlane).toContain(
+      "f8fbbc8ddef665202ff3edf62398244395bd584e9b1cd5ed1152ec2eb2ac5b0e",
+    );
+    expect(controlPlane).toContain(
+      "accepted_final_track_zero_followup",
+    );
+    expect(controlPlane).toContain(
+      "exact_track_zero_derived_count",
+    );
+    expect(controlPlane).toContain(
+      "track_zero_decision_count",
+    );
+    expect(controlPlane).toContain(
+      "EXPECTED_TRACK_ZERO_CANDIDATE_FINGERPRINT",
+    );
+    expect(controlPlane).toContain(
       "8cb08c3447b0e8acaf3279ef7b0317e915783b87a7e37678976b01fd02401eab",
     );
     expect(controlPlane).toContain(

@@ -366,6 +366,11 @@ const POST_APPLY_BASELINE = {
   ledger_head:'20260914072142',
 };
 
+const POST_TRACK_ZERO_BASELINE = {
+  ...POST_APPLY_BASELINE,
+  reviews:32,
+};
+
 function fieldsMatch(actual, expected) {
   return Object.entries(expected).every(
     ([key, value]) => String(actual?.[key]) === String(value),
@@ -408,10 +413,24 @@ function classifyTrackProductionState(state) {
     postApplyDomainFieldsMatch(state, POST_APPLY_BASELINE) &&
     postApplyLedgerAccepted(state, POST_APPLY_BASELINE)
   ) return 'post_apply';
+  if (
+    postApplyDomainFieldsMatch(state, POST_TRACK_ZERO_BASELINE) &&
+    postApplyLedgerAccepted(state, POST_TRACK_ZERO_BASELINE)
+  ) return 'post_track_zero';
   return 'unexpected';
 }
 
 function assertAcceptedPostApply(state) {
+  const reviewCount = Number(state?.reviews);
+  const acceptedHistorical = reviewCount === 66;
+  const acceptedTrackZeroResidual = reviewCount === 32;
+
+  if (!acceptedHistorical && !acceptedTrackZeroResidual) {
+    throw new Error(
+      `accepted Track review boundary is not recognized: ${reviewCount}`,
+    );
+  }
+
   assertFields(
     state,
     {
@@ -419,9 +438,9 @@ function assertAcceptedPostApply(state) {
       events:440,
       unique_fingerprints:440,
       event_track_matches:440,
-      reviews:66,
-      blocked_still_old:66,
-      review_tracks:66,
+      reviews:reviewCount,
+      blocked_still_old:reviewCount,
+      review_tracks:reviewCount,
       redirects:1148,
       mizizi_redirects:857,
       chart_mismatches:0,
@@ -441,18 +460,36 @@ function assertAcceptedPostApply(state) {
     },
     'impact',
   );
+
+  const expectedClasses = acceptedTrackZeroResidual
+    ? {
+        track_collision:26,
+        missing_primary:6,
+      }
+    : {
+        thread_collision:28,
+        track_collision:26,
+        missing_primary:6,
+        ambiguous_thread:6,
+      };
+
   assertFields(
     state.classes,
-    {
-      thread_collision:28,
-      track_collision:26,
-      missing_primary:6,
-      ambiguous_thread:6,
-    },
+    expectedClasses,
     'reviews',
   );
-  if (state.classes?.unexpected) {
-    throw new Error(`unexpected review class=${state.classes.unexpected}`);
+
+  const actualClassKeys = Object.keys(
+    state.classes || {},
+  ).sort().join(',');
+  const expectedClassKeys = Object.keys(
+    expectedClasses,
+  ).sort().join(',');
+
+  if (actualClassKeys !== expectedClassKeys) {
+    throw new Error(
+      `unexpected review classes=${actualClassKeys} expected=${expectedClassKeys}`,
+    );
   }
 }
 
@@ -537,26 +574,66 @@ function assertReviewRun(text) {
 
 function assertAudit(text, before) {
   const clean = text.replace(/\x1b\[[0-9;]*m/g, '');
-  const rules = before
-    ? [
-        ['track_slug_identity_noise',506],
-        ['track_title_credit_noise',492],
-        ['track_slug_identity_mismatch',3],
-        ['track_slug_credit_evidence_gap',12],
-        ['track_recording_identity_conflict',91],
-      ]
-    : [
-        ['track_slug_identity_noise',66],
-        ['track_title_credit_noise',492],
-        ['track_slug_identity_mismatch',3],
-        ['track_slug_credit_evidence_gap',12],
-        ['track_recording_identity_conflict',91],
-      ];
-  for (const [rule,count] of rules) if (!(new RegExp(`'${rule}'\\s*\u2502\\s*${count}\\s*\u2502`)).test(clean)) throw new Error(`${rule} expected ${count}`);
-  const summary = before
-    ? /\u2502\s*0\s*\u2502\s*1104\s*\u2502\s*0\s*\u2502\s*0\s*\u2502\s*495\s*\u2502\s*0\s*\u2502\s*2101\s*\u2502/
-    : /\u2502\s*0\s*\u2502\s*664\s*\u2502\s*0\s*\u2502\s*0\s*\u2502\s*495\s*\u2502\s*0\s*\u2502\s*2101\s*\u2502/;
-  if (!summary.test(clean) || !clean.includes('Audit mode completed. No Registry rows were changed.')) throw new Error(`${before ? 'pre' : 'post'}-apply audit summary mismatch`);
+
+  const identityNoiseMatch = clean.match(
+    /'track_slug_identity_noise'\s*\u2502\s*(\d+)\s*\u2502/,
+  );
+
+  if (!identityNoiseMatch) {
+    throw new Error(
+      'track_slug_identity_noise audit count was not parseable',
+    );
+  }
+
+  const identityNoise = Number(identityNoiseMatch[1]);
+
+  if (before) {
+    if (identityNoise !== 506) {
+      throw new Error(
+        `track_slug_identity_noise expected 506, found ${identityNoise}`,
+      );
+    }
+  } else if (![66,32].includes(identityNoise)) {
+    throw new Error(
+      `track_slug_identity_noise is outside accepted post-apply boundaries: ${identityNoise}`,
+    );
+  }
+
+  const rules = [
+    ['track_title_credit_noise',492],
+    ['track_slug_identity_mismatch',3],
+    ['track_slug_credit_evidence_gap',12],
+    ['track_recording_identity_conflict',91],
+  ];
+
+  for (const [rule,count] of rules) {
+    if (
+      !(new RegExp(
+        `'${rule}'\\s*\u2502\\s*${count}\\s*\u2502`,
+      )).test(clean)
+    ) {
+      throw new Error(`${rule} expected ${count}`);
+    }
+  }
+
+  const expectedFindings = 598 + identityNoise;
+  const summary = new RegExp(
+    `\\u2502\\s*0\\s*\\u2502\\s*${expectedFindings}` +
+      `\\s*\\u2502\\s*0\\s*\\u2502\\s*0` +
+      `\\s*\\u2502\\s*495\\s*\\u2502\\s*0` +
+      `\\s*\\u2502\\s*2101\\s*\\u2502`,
+  );
+
+  if (
+    !summary.test(clean) ||
+    !clean.includes(
+      'Audit mode completed. No Registry rows were changed.',
+    )
+  ) {
+    throw new Error(
+      `${before ? 'pre' : 'post'}-apply audit summary mismatch`,
+    );
+  }
 }
 
 async function streamCommand(cmd, args, env, logPath, pool = null, progressTarget = { events:440, reviews:66, redirects:857 }) {
@@ -696,7 +773,10 @@ async function main() {
       }
       fs.writeFileSync(`${ARTIFACT_DIR}/state-before.json`,JSON.stringify(baseline,null,2)+'\n');
 
-      if (productionState === 'post_apply') {
+      if (
+        productionState === 'post_apply' ||
+        productionState === 'post_track_zero'
+      ) {
         console.log('PASS: accepted historical Track post-apply baseline detected');
 
         console.log('\n=== 4. EXACT POST-APPLY ACCEPTANCE ===');
@@ -706,7 +786,7 @@ async function main() {
           `${ARTIFACT_DIR}/state-after.json`,
           JSON.stringify(acceptedState,null,2)+'\n',
         );
-        console.log('PASS: production acceptance exact 440 / 66 / 857 with exact downstream impact');
+        console.log(`PASS: production acceptance exact 440 / ${acceptedState.reviews} / 857 with exact downstream impact`);
 
         console.log('\n=== 5. FRESH POST-APPLY READ-ONLY AUDIT ===');
         const auditCurrent = `${ARTIFACT_DIR}/post-apply-audit.txt`;
@@ -717,7 +797,7 @@ async function main() {
           auditCurrent,
         );
         assertAudit(fs.readFileSync(auditCurrent,'utf8'),false);
-        console.log('PASS: fresh post-apply audit = 664 findings / 66 deterministic candidates / 12 credit-evidence reviews / 91 recording-identity reviews / 495 observe-only / 2101 Tracks');
+        console.log(`PASS: fresh post-apply audit = ${598 + Number(acceptedState.reviews)} findings / ${acceptedState.reviews} deterministic candidates / 12 credit-evidence reviews / 91 recording-identity reviews / 495 observe-only / 2101 Tracks`);
 
         if (MODE === 'review') {
           console.log('\n=== 6. REVIEW-ONLY PRODUCTION AUTHORITY ===');
@@ -814,7 +894,7 @@ async function main() {
       const s = queryViaLinkedCli(acceptanceSql).state;
       assertAcceptedPostApply(s);
       fs.writeFileSync(`${ARTIFACT_DIR}/state-after.json`,JSON.stringify(s,null,2)+'\n');
-      console.log('PASS: production acceptance exact 440 / 66 / 857 with exact downstream impact');
+      console.log(`PASS: production acceptance exact 440 / ${s.reviews} / 857 with exact downstream impact`);
 
       console.log('\n=== 7. FRESH POST-APPLY AUDIT ===');
       const auditAfter = `${ARTIFACT_DIR}/post-apply-audit.txt`;
