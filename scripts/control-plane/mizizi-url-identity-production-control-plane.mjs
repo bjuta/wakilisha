@@ -397,38 +397,20 @@ function assertAudit(
 
 
 const trackZeroCandidateRowsSql = `
-with primary_artist as (
-  select distinct on (credit.track_id)
-    credit.track_id,
-    credit.artist_slug
-  from public.registry_track_artists credit
-  where credit.status='active'
-    and credit.is_primary is true
-    and credit.artist_id is not null
-    and nullif(btrim(credit.artist_slug),'') is not null
-  order by
-    credit.track_id,
-    credit.credit_order nulls last,
-    credit.created_at,
-    credit.id
-)
 select
   review.id::text as review_id,
   track.id::text as track_id,
   track.slug as current_slug,
   review.candidate_payload->>'proposedValue' as proposed_slug,
-  artist.artist_slug,
+  plan.primary_artist_slug as artist_slug,
   review.source_payload->'evidence'->>'collision' as stale_blocker,
-  platform_private.registry_subject_state_fingerprint(
-    'track',
-    track.id
-  ) as state_fingerprint
+  plan.expected_state_fingerprint as state_fingerprint
 from public.registry_review_items review
 join public.registry_tracks track
   on track.id::text=review.source_id
  and track.status='active'
-join primary_artist artist
-  on artist.track_id=track.id
+cross join lateral
+  mizizi_private.track_slug_plan_v1(track.id) plan
 where review.status='open'
   and review.review_type='mizizi_data_hygiene'
   and review.entity_type='track'
