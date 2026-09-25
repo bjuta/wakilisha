@@ -861,3 +861,38 @@ surface. In that mode MIZIZI may call the accepted bounded review broker for
 findings already classified `review`, but it must skip every
 `auto_fix_candidate` and must not enter canonical Track, Release, or Chart
 mutation operations.
+
+
+Production review materialization uses the existing MIZIZI Track Production
+Control Plane. The direct `registry:mizizi:review` command remains a runtime
+primitive and is not the Production operator surface.
+
+The Production review path requires a separately reviewed
+`.github/mizizi-track-production-review.json` trigger-file push. PR and manual
+workflow-dispatch runs remain preflight/read-only.
+
+The reviewed trigger binds:
+
+- exact protected `main`;
+- exact current full-row Track input fingerprint
+  `6d9fa72f13ce4a5d774a457552e3cd3824475fb8a651473d5999605a3dcc29fb`;
+- the existing 66 open historical MIZIZI Track reviews;
+- exactly 12 `track_slug_credit_evidence_gap/1.3.0` review targets;
+- exactly 91 `track_recording_identity_conflict/1.3.0` review targets.
+
+The control plane must accept partial review materialization as resumable state,
+because review-row creation is idempotent. Final acceptance is exactly 169 open
+MIZIZI Track reviews: the preserved 66 historical reviews plus 103 new Slice 3
+review rows.
+
+Review materialization must prove all of the following before closure:
+
+- Track canonical write events remain 440;
+- Track redirects remain 1,148;
+- the full-row Track input fingerprint is unchanged;
+- the fresh MIZIZI audit remains 664 findings with 66 deterministic candidates,
+  12 credit-evidence reviews, 91 recording-identity reviews, and 495
+  observe-only findings;
+- standing MIZIZI capability grants remain zero;
+- unconsumed exact MIZIZI execution grants remain zero;
+- temporary JIT access and role mapping are restored at rest.

@@ -422,6 +422,14 @@ describe("MIZIZI Cultural Data Steward", () => {
       "package.json",
       "utf8",
     );
+    const trackWorkflow = readFileSync(
+      ".github/workflows/mizizi-track-production-control-plane.yml",
+      "utf8",
+    );
+    const trackControlPlane = readFileSync(
+      "scripts/control-plane/mizizi-track-production-control-plane.mjs",
+      "utf8",
+    );
 
     expect(runner).toContain(
       'type RunMode = "audit" | "review" | "apply";',
@@ -489,6 +497,59 @@ describe("MIZIZI Cultural Data Steward", () => {
     expect(chartApply).toBeGreaterThan(
       chartGuard,
     );
+
+    expect(trackWorkflow).toContain(
+      ".github/mizizi-track-production-review.json",
+    );
+    expect(trackWorkflow).toContain(
+      "Resolve reviewed Production intent",
+    );
+    expect(trackWorkflow).toContain(
+      "MIZIZI_CONTROL_PLANE_MODE=review",
+    );
+    expect(trackControlPlane).toContain(
+      "EXPECTED_REVIEW_INPUT_FINGERPRINT",
+    );
+    expect(trackControlPlane).toContain(
+      "6d9fa72f13ce4a5d774a457552e3cd3824475fb8a651473d5999605a3dcc29fb",
+    );
+    expect(trackControlPlane).toContain(
+      "mizizi_track_production_review",
+    );
+    expect(trackControlPlane).toContain(
+      "MIZIZI_TRACK_PRODUCTION_REVIEW",
+    );
+    expect(trackControlPlane).toContain(
+      "'registry:mizizi:review'",
+    );
+    expect(trackControlPlane).toContain(
+      "open_mizizi_reviews",
+    );
+    expect(trackControlPlane).toContain(
+      "credit_gap_reviews",
+    );
+    expect(trackControlPlane).toContain(
+      "recording_identity_reviews",
+    );
+    expect(trackControlPlane).toContain(
+      "review materialization exact 12 + 91 = 103 with canonical delta zero",
+    );
+    expect(trackControlPlane).toContain(
+      "MIZIZI PUBLIC MUSIC IDENTITY REVIEW MATERIALIZATION PASS",
+    );
+
+    const reviewCommand =
+      trackControlPlane.indexOf(
+        "'registry:mizizi:review'",
+      );
+    const historicalApplyCommand =
+      trackControlPlane.indexOf(
+        "'registry:mizizi:apply'",
+      );
+    expect(reviewCommand).toBeGreaterThan(-1);
+    expect(
+      historicalApplyCommand,
+    ).toBeGreaterThan(reviewCommand);
   });
 
   it("derives Release taxonomy from resolvable active Track count", () => {
