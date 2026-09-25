@@ -979,6 +979,104 @@ describe("MIZIZI Cultural Data Steward", () => {
     );
   });
 
+
+  it("admits one reviewed Release-primary Artist onto an existing Track without overwriting credits", () => {
+    const migration = read(
+      "supabase/migrations/20260925172710_public_music_identity_track_primary_from_release_v1.sql",
+    );
+    const verifier = read(
+      "scripts/control-plane/verify-public-music-identity-track-primary-from-release-v1.sql",
+    );
+    const inventoryVerifier = read(
+      "scripts/control-plane/verify-registry-canonical-writer-inventory.sql",
+    );
+    const manifest = read(
+      "scripts/control-plane/registry-privileged-writer-manifest.json",
+    );
+
+    expect(migration).toContain(
+      "'registry.track_artist_credit.release_primary_reviewed_admit'",
+    );
+    expect(migration).toContain(
+      "'admit_registry_track_primary_from_release_review'",
+    );
+    expect(migration).toContain(
+      "'registry_release_primary_admin'",
+    );
+    expect(migration).toContain(
+      "'release_primary_review'",
+    );
+    expect(migration).toContain(
+      "'track_slug_identity_noise'",
+    );
+    expect(migration).toContain(
+      "review.source_payload->>'ruleVersion'='1.1.0'",
+    );
+    expect(migration).not.toContain(
+      "review.source_payload->>'ruleVersion'='1.2.0'",
+    );
+    expect(migration).toContain(
+      "'track_slug_credit_evidence_gap'",
+    );
+    expect(migration).toContain(
+      "review.source_payload->>'ruleVersion'='1.3.0'",
+    );
+    expect(migration).toContain(
+      "registry_track_artist_credit_collision_state_v1",
+    );
+    expect(migration).toContain(
+      "v_membership_count<>1",
+    );
+    expect(migration).toContain(
+      "v_release_primary_count<>1",
+    );
+    expect(
+      (migration.match(/and credit\.artist_id is not null/g) || []).length,
+    ).toBeGreaterThanOrEqual(3);
+    expect(migration).toContain(
+      "v_track_primary_count=0",
+    );
+    expect(migration).toContain(
+      "v_exact_current_count=1",
+    );
+    expect(migration).toContain(
+      "'already_current'",
+    );
+    expect(migration).toContain(
+      "registry_execution_target_set_fingerprint",
+    );
+    expect(migration).toContain(
+      "v_operation.status<>'authorized'",
+    );
+    expect(migration).toContain(
+      "pg_advisory_xact_lock",
+    );
+    expect(migration).toContain(
+      "insert into public.registry_track_artists",
+    );
+    expect(migration).not.toContain(
+      "update public.registry_track_artists",
+    );
+    expect(migration).not.toContain(
+      "delete from public.registry_track_artists",
+    );
+    expect(migration).not.toContain(
+      "'chart_admission'",
+    );
+    expect(migration).not.toContain(
+      "'track_intake_review'",
+    );
+    expect(verifier).toContain(
+      "PUBLIC_MUSIC_IDENTITY_TRACK_PRIMARY_FROM_RELEASE_V1_PASS",
+    );
+    expect(manifest).toContain(
+      "admin-admit-registry-track-primary-from-release-v1",
+    );
+    expect(inventoryVerifier).toContain(
+      "public.admin_admit_registry_track_primary_from_release_v1(uuid,uuid,uuid,text)",
+    );
+  });
+
   it("adds provider-neutral reviewed Release profile authority without creating Releases or Labels", () => {
     const migration = read(
       "supabase/migrations/20260921140000_registry_track_intake_release_reviewed_profile_authority_v1.sql",

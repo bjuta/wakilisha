@@ -1175,6 +1175,28 @@
       "publicCallable": false,
       "canonicalMutation": true,
       "legacyDebt": false
+    },
+    {
+      "id": "admin-admit-registry-track-primary-from-release-v1",
+      "kind": "database_function",
+      "entrypoint": "public.admin_admit_registry_track_primary_from_release_v1(uuid,uuid,uuid,text)",
+      "authentication": "auth_uid",
+      "authorization": "manage_registry_plus_exact_open_slug_review_release_primary_and_expected_track_state",
+      "executionAuthority": "security_definer_orchestrator_over_caller_bound_release_evidence_exact_grant_insert_only_operation_and_independent_verifier",
+      "targets": [
+        "registry_track_artists",
+        "registry_canonical_write_events",
+        "registry_operation_write_events",
+        "registry_mutation_operations"
+      ],
+      "riskClass": "high",
+      "disposition": "keep",
+      "futureBoundary": "reviewed_release_primary_to_track_primary_credit_admission",
+      "miziziCallable": false,
+      "humanCallable": true,
+      "publicCallable": false,
+      "canonicalMutation": true,
+      "legacyDebt": false
     }
   ]
 }
