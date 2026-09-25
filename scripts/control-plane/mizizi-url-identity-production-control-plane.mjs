@@ -396,7 +396,7 @@ function assertAudit(
 }
 
 
-const trackZeroCandidateRowsSql = \`
+const trackZeroCandidateRowsSql = `
 with primary_artist as (
   select distinct on (credit.track_id)
     credit.track_id,
@@ -441,11 +441,11 @@ where review.status='open'
       like 'current_community_thread_ownership_ambiguous:%'
   )
 order by track.id
-\`;
+`;
 
-const trackZeroCandidateSql = \`
+const trackZeroCandidateSql = `
 with plans as (
-  \${trackZeroCandidateRowsSql}
+  ${trackZeroCandidateRowsSql}
 ),
 payload as (
   select coalesce(
@@ -469,9 +469,9 @@ select
   jsonb_array_length(body)::int as candidate_count,
   body::text as candidate_payload
 from payload
-\`;
+`;
 
-const trackZeroClosureSql = \`
+const trackZeroClosureSql = `
 with decisions as (
   select
     decision.review_item_id,
@@ -483,7 +483,7 @@ with decisions as (
     and decision.metadata->>'programmeKey'=
         'public_music_identity_track_slug_zero'
     and decision.after_payload->>'candidateFingerprint'=
-        '\${EXPECTED_TRACK_ZERO_CANDIDATE_FINGERPRINT}'
+        '${EXPECTED_TRACK_ZERO_CANDIDATE_FINGERPRINT}'
 ),
 grants as (
   select distinct capability_grant_id::uuid as id
@@ -530,9 +530,9 @@ select
       and review.resolution_payload->>'programmeKey'=
           'public_music_identity_track_slug_zero'
       and review.resolution_payload->>'candidateFingerprint'=
-          '\${EXPECTED_TRACK_ZERO_CANDIDATE_FINGERPRINT}'
+          '${EXPECTED_TRACK_ZERO_CANDIDATE_FINGERPRINT}'
   ) as resolved_reviews
-\`;
+`;
 
 const releaseSingleCandidateRowsSql = `
 select
