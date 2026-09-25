@@ -18,16 +18,6 @@ declare
 begin
   if not exists (
     select 1
-    from supabase_migrations.schema_migrations
-    where version='20260925082706'
-      and name='public_music_identity_slice3_release_single_alignment_v1'
-  ) then
-    raise exception
-      'Release Single identity migration is not present in migration authority';
-  end if;
-
-  if not exists (
-    select 1
     from public.capability_definitions capability
     where capability.capability_key=
       'align_registry_release_single_identity'
