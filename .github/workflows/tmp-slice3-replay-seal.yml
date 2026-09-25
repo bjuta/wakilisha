@@ -1,0 +1,75 @@
+name: Temporary Slice 3 Replay Seal
+
+on:
+  push:
+    branches:
+      - feat/public-music-identity-convergence-slice3-release-single-alignment
+    paths:
+      - ".github/workflows/tmp-slice3-replay-seal.yml"
+
+permissions:
+  contents: write
+
+jobs:
+  seal:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+      SUPABASE_CLI_VERSION: "2.107.0"
+      PREVIEW_PROJECT_REF: "vfbmulcuuonpjshxmdfg"
+      PREVIEW_BRANCH_ID: "55484dc1-8511-4623-9019-418ca63ad72e"
+      BASE_MAIN_SHA: "8997652e5e39e9ad51b31af023afff1d11b6d432"
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: Link exact preview
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -n "$SUPABASE_ACCESS_TOKEN"
+          npx --yes "supabase@$SUPABASE_CLI_VERSION" link             --project-ref "$PREVIEW_PROJECT_REF"
+          test "$(cat supabase/.temp/project-ref)" = "$PREVIEW_PROJECT_REF"
+
+      - name: Prove exact pending migration and push canonical version
+        shell: bash
+        run: |
+          set -euo pipefail
+          DRY_RUN="$(npx --yes "supabase@$SUPABASE_CLI_VERSION" db push --linked --dry-run 2>&1)"
+          printf '%s\n' "$DRY_RUN"
+          printf '%s\n' "$DRY_RUN" | grep -F             "20260925082706_public_music_identity_slice3_release_single_alignment_v1.sql"
+          npx --yes "supabase@$SUPABASE_CLI_VERSION" db push --linked
+          npx --yes "supabase@$SUPABASE_CLI_VERSION" migration list --linked
+
+      - name: Generate preview schema seal
+        shell: bash
+        run: |
+          set -euo pipefail
+          SUPABASE_TARGET_PROJECT_REF="pgzizndxdyhqmtyywjmt"           SUPABASE_SCHEMA_SOURCE_PROJECT_REF="$PREVIEW_PROJECT_REF"           SCHEMA_SEAL_MODE="preview"           SCHEMA_BASE_MAIN_SHA="$BASE_MAIN_SHA"           SCHEMA_PREVIEW_BRANCH_ID="$PREVIEW_BRANCH_ID"           SUPABASE_CLI_VERSION="$SUPABASE_CLI_VERSION"             bash scripts/control-plane/generate-live-schema.sh
+
+          printf 'MIGRATION_SHA256='
+          shasum -a 256             supabase/migrations/20260925082706_public_music_identity_slice3_release_single_alignment_v1.sql             | awk '{print $1}'
+          printf 'TYPES_SHA256='
+          shasum -a 256 src/types/database.types.ts | awk '{print $1}'
+
+      - name: Commit generated schema artifacts
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add             src/types/database.types.ts             docs/engineering/live-schema-baseline.json
+
+          if git diff --cached --quiet; then
+            echo "STOP: replay seal produced no schema artifact changes"
+            exit 1
+          fi
+
+          git commit -m "chore: seal Slice 3 preview schema replay"
+          git push origin HEAD:feat/public-music-identity-convergence-slice3-release-single-alignment
