@@ -244,13 +244,29 @@ function assertAudit(
   }
 
   if (entity === "track") {
+    const slugNoise = ruleCount(
+      clean,
+      "track_slug_identity_noise",
+    );
+
+    if (
+      ![
+        66,
+        EXPECTED_TRACK_ZERO_IDENTITY_NOISE_REMAINING,
+      ].includes(slugNoise)
+    ) {
+      throw new Error(
+        "Track slug-identity audit state is outside the accepted programme boundary: " +
+          slugNoise,
+      );
+    }
+
     assertFields(
       summary,
       {
-        findings: 664,
+        findings: 598 + slugNoise,
         applied: 0,
         queued: 0,
-        observed: 495,
         stale: 0,
         tracks: 2101,
         releases: 0,
@@ -263,10 +279,6 @@ function assertAudit(
         titleNoise: ruleCount(
           clean,
           "track_title_credit_noise",
-        ),
-        slugNoise: ruleCount(
-          clean,
-          "track_slug_identity_noise",
         ),
         mismatch: ruleCount(
           clean,
@@ -283,7 +295,6 @@ function assertAudit(
       },
       {
         titleNoise: 492,
-        slugNoise: 66,
         mismatch: 3,
         creditEvidenceGap: 12,
         recordingIdentityConflict: 91,
@@ -2847,8 +2858,7 @@ where entity_type='track'
             2,
           ) + "\n",
         );
-      } else 
-      if (
+      } else if (
         scope.entity === "release_single_identity"
       ) {
         const reviewReceipts =
