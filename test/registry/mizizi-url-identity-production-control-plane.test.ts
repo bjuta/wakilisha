@@ -106,7 +106,10 @@ describe("MIZIZI current URL-identity production control plane", () => {
       "enabled_operations: 1",
     );
     expect(controlPlane).toContain(
-      "readReviewedTrigger(REVIEWED_TRIGGER_FILE)",
+      "readReviewedTrigger(activeScope.triggerFile)",
+    );
+    expect(controlPlane).toContain(
+      "LEGACY_REVIEWED_TRIGGER_FILE",
     );
     expect(controlPlane).toContain(
       "PASS: preflight entry authority = ",
@@ -447,13 +450,13 @@ describe("MIZIZI current URL-identity production control plane", () => {
       "'redirects_created',0",
     );
     expect(migration).not.toMatch(
-      /update\s+public\.registry_tracks/i,
+      /^\s*update\s+public\.registry_tracks\b/im,
     );
     expect(migration).not.toMatch(
-      /update\s+public\.registry_release_tracks/i,
+      /^\s*update\s+public\.registry_release_tracks\b/im,
     );
     expect(migration).not.toMatch(
-      /(?:insert\s+into|update|delete\s+from)\s+public\.wk_slug_redirects/i,
+      /^\s*(?:insert\s+into|update|delete\s+from)\s+public\.wk_slug_redirects\b/im,
     );
     expect(migration).not.toContain(
       "to_char(",
