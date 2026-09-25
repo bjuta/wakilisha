@@ -1808,6 +1808,19 @@ function readReviewedTrigger(path) {
     "production trigger",
   );
 
+  if (scope.expectedReviewCount !== undefined) {
+    assertFields(
+      trigger,
+      {
+        expected_review_count:
+          scope.expectedReviewCount,
+        expected_review_fingerprint:
+          scope.expectedReviewFingerprint,
+      },
+      "production review trigger",
+    );
+  }
+
   return {
     ...trigger,
     capability_grant_id: requireUuid(
@@ -2013,6 +2026,10 @@ limit 1
         trigger.expected_candidate_count,
       expected_candidate_fingerprint:
         trigger.expected_candidate_fingerprint,
+      expected_review_count:
+        trigger.expected_review_count ?? null,
+      expected_review_fingerprint:
+        trigger.expected_review_fingerprint ?? null,
     },
   };
 }

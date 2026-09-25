@@ -371,6 +371,12 @@ describe("MIZIZI current URL-identity production control plane", () => {
       "EXPECTED_RELEASE_SINGLE_REVIEWS = 35",
     );
     expect(controlPlane).toContain(
+      "expected_review_count",
+    );
+    expect(controlPlane).toContain(
+      "expected_review_fingerprint",
+    );
+    expect(controlPlane).toContain(
       "3e6ce99990ebd2e3bb5bbfd2600748da20104696bff3ced7875e4d5fe358638d",
     );
     expect(controlPlane).toContain(
