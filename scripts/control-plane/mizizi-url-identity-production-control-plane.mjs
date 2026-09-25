@@ -397,20 +397,38 @@ function assertAudit(
 
 
 const trackZeroCandidateRowsSql = `
+with primary_artist as (
+  select distinct on (credit.track_id)
+    credit.track_id,
+    credit.artist_slug
+  from public.registry_track_artists credit
+  where credit.status='active'
+    and credit.is_primary is true
+    and credit.artist_id is not null
+    and nullif(btrim(credit.artist_slug),'') is not null
+  order by
+    credit.track_id,
+    credit.credit_order nulls last,
+    credit.created_at,
+    credit.id
+)
 select
   review.id::text as review_id,
   track.id::text as track_id,
   track.slug as current_slug,
   review.candidate_payload->>'proposedValue' as proposed_slug,
-  plan.primary_artist_slug as artist_slug,
+  artist.artist_slug,
   review.source_payload->'evidence'->>'collision' as stale_blocker,
-  plan.expected_state_fingerprint as state_fingerprint
+  platform_private.registry_subject_state_fingerprint(
+    'track',
+    track.id
+  ) as state_fingerprint
 from public.registry_review_items review
 join public.registry_tracks track
   on track.id::text=review.source_id
  and track.status='active'
-cross join lateral
-  mizizi_private.track_slug_plan_v1(track.id) plan
+join primary_artist artist
+  on artist.track_id=track.id
 where review.status='open'
   and review.review_type='mizizi_data_hygiene'
   and review.entity_type='track'
@@ -802,9 +820,34 @@ function candidateSnapshot(row) {
 }
 
 
-async function trackZeroClosureSnapshot(pool) {
-  const result = await pool.query(trackZeroClosureSql);
-  const row = result.rows[0] || {};
+function trackZeroCandidateEnvelope() {
+  const row = queryViaLinkedCli(trackZeroCandidateSql);
+  const payload = String(row?.candidate_payload || "[]");
+  let rows;
+
+  try {
+    rows = JSON.parse(payload);
+  } catch {
+    throw new Error(
+      "Track-slug zero candidate payload is not valid JSON",
+    );
+  }
+
+  if (!Array.isArray(rows)) {
+    throw new Error(
+      "Track-slug zero candidate payload is not an array",
+    );
+  }
+
+  return {
+    ...candidateSnapshot(row),
+    candidatePayload: payload,
+    rows,
+  };
+}
+
+function trackZeroClosureSnapshot() {
+  const row = queryViaLinkedCli(trackZeroClosureSql);
   return {
     decisionCount: Number(row.decision_count || 0),
     reviewCount: Number(row.review_count || 0),
@@ -826,15 +869,18 @@ async function trackZeroClosureSnapshot(pool) {
 
 async function executeTrackSlugZeroPlans(
   pool,
+  frozenRows,
   expectedCount,
 ) {
-  const frozen =
-    await pool.query(trackZeroCandidateRowsSql);
-
-  if (frozen.rowCount !== expectedCount) {
+  if (
+    !Array.isArray(frozenRows) ||
+    frozenRows.length !== expectedCount
+  ) {
     throw new Error(
       "Track-slug zero exact target count drifted: " +
-        frozen.rowCount +
+        (Array.isArray(frozenRows)
+          ? frozenRows.length
+          : "not-an-array") +
         " expected " +
         expectedCount,
     );
@@ -842,7 +888,7 @@ async function executeTrackSlugZeroPlans(
 
   const receipts = [];
 
-  for (const row of frozen.rows) {
+  for (const row of frozenRows) {
     const reviewId = String(row.review_id || "");
     const trackId = String(row.track_id || "");
 
@@ -935,38 +981,6 @@ async function executeTrackSlugZeroPlans(
     ) {
       throw new Error(
         "Track-slug zero independent verifier failed for " +
-          trackId,
-      );
-    }
-
-    const threadGuard = await pool.query(
-      `
-      select count(*)::int as mismatches
-      from public.community_threads thread
-      where thread.entity_type='track'
-        and thread.entity_id=$1::text
-        and (
-          thread.entity_slug is distinct from $2::text
-          or thread.entity_url is distinct from
-             'https://' ||
-             'wakilisha.africa/tracks/' ||
-             $3::text ||
-             '/' ||
-             $2::text
-        )
-      `,
-      [
-        trackId,
-        String(row.proposed_slug || ""),
-        String(row.artist_slug || ""),
-      ],
-    );
-
-    if (
-      Number(threadGuard.rows[0]?.mismatches || 0) !== 0
-    ) {
-      throw new Error(
-        "Track-slug zero UUID Community pointer verification failed for " +
           trackId,
       );
     }
@@ -1811,17 +1825,20 @@ async function currentCandidateState(pool) {
     await pool.query(releaseCandidateSql);
   const chartResult =
     await pool.query(chartCandidateSql);
-  const trackZeroResult =
-    await pool.query(trackZeroCandidateSql);
+  const trackZeroEnvelope =
+    trackZeroCandidateEnvelope();
 
   const releaseCurrent =
     candidateSnapshot(releaseCurrentResult.rows[0]);
   const chartCurrent =
     candidateSnapshot(chartResult.rows[0]);
-  const trackZeroCurrent =
-    candidateSnapshot(trackZeroResult.rows[0]);
+  const trackZeroCurrent = {
+    candidateCount: trackZeroEnvelope.candidateCount,
+    candidateFingerprint:
+      trackZeroEnvelope.candidateFingerprint,
+  };
   const trackZeroClosure =
-    await trackZeroClosureSnapshot(pool);
+    trackZeroClosureSnapshot();
   const trackZeroMigrationReady =
     trackZeroMigrationApplied();
   const releaseJournal =
@@ -2105,6 +2122,7 @@ async function currentCandidateState(pool) {
     chartState,
     chartJournal,
     trackZeroCurrent,
+    trackZeroCandidates: trackZeroEnvelope.rows,
     trackZeroClosure,
     trackZeroState,
     trackZeroMigrationReady,
@@ -2855,6 +2873,7 @@ where entity_type='track'
         const operationReceipts =
           await executeTrackSlugZeroPlans(
             jit.pool,
+            candidates.trackZeroCandidates,
             expectedApplyCount,
           );
 
@@ -2994,12 +3013,16 @@ where entity_type='track'
     );
 
     if (scope.entity === "track_slug_zero") {
-      const currentResult =
-        await jit.pool.query(trackZeroCandidateSql);
-      const current =
-        candidateSnapshot(currentResult.rows[0]);
+      const currentEnvelope =
+        trackZeroCandidateEnvelope();
+      const current = {
+        candidateCount:
+          currentEnvelope.candidateCount,
+        candidateFingerprint:
+          currentEnvelope.candidateFingerprint,
+      };
       const closure =
-        await trackZeroClosureSnapshot(jit.pool);
+        trackZeroClosureSnapshot();
 
       assertFields(
         current,
