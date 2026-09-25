@@ -318,6 +318,161 @@ describe("MIZIZI current URL-identity production control plane", () => {
     );
   });
 
+  it("governs one-track Release public identity without Track mutation or redirects", () => {
+    const workflow = readFileSync(
+      ".github/workflows/mizizi-url-identity-production-control-plane.yml",
+      "utf8",
+    );
+    const controlPlane = readFileSync(
+      "scripts/control-plane/mizizi-url-identity-production-control-plane.mjs",
+      "utf8",
+    );
+    const migration = readFileSync(
+      "supabase/migrations/20260925082706_public_music_identity_slice3_release_single_alignment_v1.sql",
+      "utf8",
+    );
+    const verifier = readFileSync(
+      "scripts/control-plane/verify-public-music-identity-slice3-release-single-alignment.sql",
+      "utf8",
+    );
+
+    expect(workflow).toContain(
+      ".github/public-music-identity-release-single-alignment-apply.json",
+    );
+    expect(workflow).toContain(
+      "Resolve reviewed Production intent",
+    );
+    expect(workflow).toContain(
+      "20260925082706_public_music_identity_slice3_release_single_alignment_v1.sql",
+    );
+    expect(workflow).toContain(
+      "verify-public-music-identity-slice3-release-single-alignment.sql",
+    );
+    expect(workflow).toContain(
+      "MIZIZI_CONTROL_PLANE_MODE: preflight",
+    );
+
+    expect(controlPlane).toContain(
+      "registry.release_single_identity.align",
+    );
+    expect(controlPlane).toContain(
+      "align_registry_release_single_identity",
+    );
+    expect(controlPlane).toContain(
+      "EXPECTED_RELEASE_SINGLE_CANDIDATES = 80",
+    );
+    expect(controlPlane).toContain(
+      "8cb08c3447b0e8acaf3279ef7b0317e915783b87a7e37678976b01fd02401eab",
+    );
+    expect(controlPlane).toContain(
+      "EXPECTED_RELEASE_SINGLE_REVIEWS = 35",
+    );
+    expect(controlPlane).toContain(
+      "3e6ce99990ebd2e3bb5bbfd2600748da20104696bff3ced7875e4d5fe358638d",
+    );
+    expect(controlPlane).toContain(
+      "bb2a936a8082a506d9b6e1ba94236c2b0aad446b",
+    );
+    expect(controlPlane).toContain(
+      "queueReleaseSingleIdentityReviews",
+    );
+    expect(controlPlane).toContain(
+      "executeReleaseSingleIdentityPlans",
+    );
+    expect(controlPlane).toContain(
+      "releaseSingleProgrammeSnapshotFromHistory",
+    );
+    expect(controlPlane).toContain(
+      "releaseSingleReviewProgrammeSnapshotFromHistory",
+    );
+    expect(controlPlane).toContain(
+      "close_release_single_identity_authority_window_v1",
+    );
+    expect(controlPlane).toContain(
+      "PUBLIC_MUSIC_IDENTITY_RELEASE_SINGLE_ALIGNMENT_APPLY",
+    );
+    expect(controlPlane).toContain(
+      "programmeIssue: 1068",
+    );
+
+    expect(migration).toContain(
+      "release_single_identity_analysis_v1",
+    );
+    expect(migration).toContain(
+      "release_single_identity_candidate_v1",
+    );
+    expect(migration).toContain(
+      "release_single_identity_plan_v1",
+    );
+    expect(migration).toContain(
+      "release_single_identity_review_candidate_v1",
+    );
+    expect(migration).toContain(
+      "queue_release_single_identity_review_v1",
+    );
+    expect(migration).toContain(
+      "issue_release_single_identity_execution_grant_v1",
+    );
+    expect(migration).toContain(
+      "execute_release_single_identity_alignment_v1",
+    );
+    expect(migration).toContain(
+      "verify_release_single_identity_alignment_v1",
+    );
+    expect(migration).toContain(
+      "admin_open_mizizi_release_single_identity_authority_v1",
+    );
+    expect(migration).toContain(
+      "close_release_single_identity_authority_window_v1",
+    );
+    expect(migration).toContain(
+      "count(distinct credit.artist_slug)",
+    );
+    expect(migration).toContain(
+      "community_thread_collision",
+    );
+    expect(migration).toContain(
+      "release_single_identity_conflict",
+    );
+    expect(migration).toContain(
+      "'1.4.0'",
+    );
+    expect(migration).toContain(
+      "'/tracks/'",
+    );
+    expect(migration).toContain(
+      "align_release_single_identity",
+    );
+    expect(migration).toContain(
+      "'redirects_created',0",
+    );
+    expect(migration).not.toMatch(
+      /update\s+public\.registry_tracks/i,
+    );
+    expect(migration).not.toMatch(
+      /update\s+public\.registry_release_tracks/i,
+    );
+    expect(migration).not.toMatch(
+      /(?:insert\s+into|update|delete\s+from)\s+public\.wk_slug_redirects/i,
+    );
+    expect(migration).not.toContain(
+      "to_char(",
+    );
+
+    expect(verifier).toContain(
+      "PUBLIC_MUSIC_IDENTITY_SLICE3_RELEASE_SINGLE_ALIGNMENT_PASS",
+    );
+    expect(verifier).toContain(
+      "direct mizizi_executor mutation authority exists",
+    );
+    expect(verifier).toContain(
+      "canonical-event / verified-operation parity",
+    );
+    expect(verifier).toContain(
+      "forbidden redirect/date-suffix logic",
+    );
+  });
+
   it("keeps blocked Track, Release title and Chart Artist findings non-mutating", () => {
     const controlPlane = readFileSync(
       "scripts/control-plane/mizizi-url-identity-production-control-plane.mjs",

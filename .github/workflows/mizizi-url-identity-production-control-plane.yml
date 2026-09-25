@@ -10,6 +10,8 @@ on:
       - "supabase/migrations/20260922143000_mizizi_url_identity_authority_window_close_v1.sql"
       - "supabase/migrations/20260922171632_mizizi_release_slug_resume_integrity_v1.sql"
       - "scripts/control-plane/verify-mizizi-release-slug-resume-integrity.sql"
+      - "supabase/migrations/20260925082706_public_music_identity_slice3_release_single_alignment_v1.sql"
+      - "scripts/control-plane/verify-public-music-identity-slice3-release-single-alignment.sql"
       - "scripts/registry/agents/mizizi/run.ts"
       - "scripts/registry/agents/mizizi/core.ts"
       - "test/registry/mizizi-url-identity-production-control-plane.test.ts"
@@ -17,11 +19,13 @@ on:
       - "docs/engineering/mizizi-url-identity-programme-control-plane.md"
       - "docs/registry/MIZIZI_CULTURAL_DATA_STEWARD.md"
       - ".github/mizizi-url-identity-production-apply.json"
+      - ".github/public-music-identity-release-single-alignment-apply.json"
   push:
     branches:
       - main
     paths:
       - ".github/mizizi-url-identity-production-apply.json"
+      - ".github/public-music-identity-release-single-alignment-apply.json"
   workflow_dispatch:
 
 permissions:
@@ -39,9 +43,9 @@ jobs:
     env:
       SUPABASE_PROJECT_REF: pgzizndxdyhqmtyywjmt
       SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
-      MIZIZI_CONTROL_PLANE_MODE: ${{ github.event_name == 'push' && 'apply' || 'preflight' }}
-      MIZIZI_EXPECTED_MAIN_SHA: ${{ github.event_name == 'push' && github.sha || '' }}
-      MIZIZI_TRIGGER_FILE: ${{ github.event_name == 'push' && '.github/mizizi-url-identity-production-apply.json' || '' }}
+      MIZIZI_CONTROL_PLANE_MODE: preflight
+      MIZIZI_EXPECTED_MAIN_SHA: ""
+      MIZIZI_TRIGGER_FILE: ""
       MIZIZI_ARTIFACT_DIR: artifacts/mizizi-url-identity-production-control-plane
 
     steps:
@@ -57,6 +61,34 @@ jobs:
 
       - name: Install dependencies
         run: npm ci
+
+      - name: Resolve reviewed Production intent
+        if: github.event_name == 'push'
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          CHANGED="$(git diff --name-only "${{ github.event.before }}" "${{ github.sha }}")"
+          LEGACY_FILE=".github/mizizi-url-identity-production-apply.json"
+          SINGLE_FILE=".github/public-music-identity-release-single-alignment-apply.json"
+
+          TOTAL="$(printf '%s\n' "$CHANGED" | sed '/^$/d' | wc -l | tr -d ' ')"
+          LEGACY_COUNT="$(printf '%s\n' "$CHANGED" | grep -Fxc "$LEGACY_FILE" || true)"
+          SINGLE_COUNT="$(printf '%s\n' "$CHANGED" | grep -Fxc "$SINGLE_FILE" || true)"
+
+          if [ "$TOTAL" = "1" ] && [ "$LEGACY_COUNT" = "1" ] && [ "$SINGLE_COUNT" = "0" ]; then
+            echo "MIZIZI_CONTROL_PLANE_MODE=apply" >> "$GITHUB_ENV"
+            echo "MIZIZI_TRIGGER_FILE=$LEGACY_FILE" >> "$GITHUB_ENV"
+          elif [ "$TOTAL" = "1" ] && [ "$LEGACY_COUNT" = "0" ] && [ "$SINGLE_COUNT" = "1" ]; then
+            echo "MIZIZI_CONTROL_PLANE_MODE=apply" >> "$GITHUB_ENV"
+            echo "MIZIZI_TRIGGER_FILE=$SINGLE_FILE" >> "$GITHUB_ENV"
+          else
+            echo "STOP: Production intent push must change exactly one reviewed URL-identity trigger file."
+            printf '%s\n' "$CHANGED"
+            exit 1
+          fi
+
+          echo "MIZIZI_EXPECTED_MAIN_SHA=$GITHUB_SHA" >> "$GITHUB_ENV"
 
       - name: Run current MIZIZI URL-identity control plane
         run: node scripts/control-plane/mizizi-url-identity-production-control-plane.mjs
