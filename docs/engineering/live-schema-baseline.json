@@ -1,16 +1,16 @@
 {
   "projectRef": "pgzizndxdyhqmtyywjmt",
   "schema": "public,editorial",
-  "generatedAt": "2026-09-24T19:56:39Z",
+  "generatedAt": "2026-09-25T05:44:00Z",
   "typesSha256": "5b66c604ba2776cd9b22ba32095d09f85ac81424987678a03cafe7254fe8b9cd",
   "authoritativeMigrationDirectory": "supabase/migrations",
-  "migrationCount": 178,
-  "latestMigration": "20260924193138_public_music_identity_slice2_review_authority_v1.sql",
+  "migrationCount": 179,
+  "latestMigration": "20260925050859_public_music_identity_slice2_review_broker_regex_fix.sql",
   "schemaSeal": {
     "mode": "preview",
-    "sourceProjectRef": "ybddsuzjrsfokpzqwisu",
-    "migrationHead": "20260924193138",
-    "baseMainSha": "75ff6e8de4b97be337fad7f8c7b11600be271f4a",
-    "previewBranchId": "a6ea6ea1-af50-411e-ba32-0edca87948ea"
+    "sourceProjectRef": "vfbmulcuuonpjshxmdfg",
+    "migrationHead": "20260925050859",
+    "baseMainSha": "f16d5c2a8b3966c4eb76fb7455b27cc2bdbba4de",
+    "previewBranchId": "55484dc1-8511-4623-9019-418ca63ad72e"
   }
 }
