@@ -13,6 +13,8 @@ on:
       - "supabase/migrations/20260925082706_public_music_identity_slice3_release_single_alignment_v1.sql"
       - "scripts/control-plane/verify-public-music-identity-slice3-release-single-alignment.sql"
       - "supabase/migrations/20260925141117_public_music_identity_track_slug_zero_v2.sql"
+      - "supabase/migrations/20260925213519_public_music_identity_track_slug_primary_followup_v1.sql"
+      - "scripts/control-plane/verify-public-music-identity-track-slug-primary-followup-v1.sql"
       - "scripts/registry/agents/mizizi/run.ts"
       - "scripts/registry/agents/mizizi/core.ts"
       - "test/registry/mizizi-url-identity-production-control-plane.test.ts"
@@ -22,6 +24,7 @@ on:
       - ".github/mizizi-url-identity-production-apply.json"
       - ".github/public-music-identity-release-single-alignment-apply.json"
       - ".github/public-music-identity-track-slug-zero-apply.json"
+      - ".github/public-music-identity-track-slug-primary-followup-apply.json"
   push:
     branches:
       - main
@@ -29,6 +32,7 @@ on:
       - ".github/mizizi-url-identity-production-apply.json"
       - ".github/public-music-identity-release-single-alignment-apply.json"
       - ".github/public-music-identity-track-slug-zero-apply.json"
+      - ".github/public-music-identity-track-slug-primary-followup-apply.json"
   workflow_dispatch:
 
 permissions:
@@ -75,21 +79,26 @@ jobs:
           LEGACY_FILE=".github/mizizi-url-identity-production-apply.json"
           SINGLE_FILE=".github/public-music-identity-release-single-alignment-apply.json"
           TRACK_ZERO_FILE=".github/public-music-identity-track-slug-zero-apply.json"
+          TRACK_PRIMARY_FILE=".github/public-music-identity-track-slug-primary-followup-apply.json"
 
           TOTAL="$(printf '%s\n' "$CHANGED" | sed '/^$/d' | wc -l | tr -d ' ')"
           LEGACY_COUNT="$(printf '%s\n' "$CHANGED" | grep -Fxc "$LEGACY_FILE" || true)"
           SINGLE_COUNT="$(printf '%s\n' "$CHANGED" | grep -Fxc "$SINGLE_FILE" || true)"
           TRACK_ZERO_COUNT="$(printf '%s\n' "$CHANGED" | grep -Fxc "$TRACK_ZERO_FILE" || true)"
+          TRACK_PRIMARY_COUNT="$(printf '%s\n' "$CHANGED" | grep -Fxc "$TRACK_PRIMARY_FILE" || true)"
 
-          if [ "$TOTAL" = "1" ] && [ "$LEGACY_COUNT" = "1" ] && [ "$SINGLE_COUNT" = "0" ] && [ "$TRACK_ZERO_COUNT" = "0" ]; then
+          if [ "$TOTAL" = "1" ] && [ "$LEGACY_COUNT" = "1" ] && [ "$SINGLE_COUNT" = "0" ] && [ "$TRACK_ZERO_COUNT" = "0" ] && [ "$TRACK_PRIMARY_COUNT" = "0" ]; then
             echo "MIZIZI_CONTROL_PLANE_MODE=apply" >> "$GITHUB_ENV"
             echo "MIZIZI_TRIGGER_FILE=$LEGACY_FILE" >> "$GITHUB_ENV"
-          elif [ "$TOTAL" = "1" ] && [ "$LEGACY_COUNT" = "0" ] && [ "$SINGLE_COUNT" = "1" ] && [ "$TRACK_ZERO_COUNT" = "0" ]; then
+          elif [ "$TOTAL" = "1" ] && [ "$LEGACY_COUNT" = "0" ] && [ "$SINGLE_COUNT" = "1" ] && [ "$TRACK_ZERO_COUNT" = "0" ] && [ "$TRACK_PRIMARY_COUNT" = "0" ]; then
             echo "MIZIZI_CONTROL_PLANE_MODE=apply" >> "$GITHUB_ENV"
             echo "MIZIZI_TRIGGER_FILE=$SINGLE_FILE" >> "$GITHUB_ENV"
-          elif [ "$TOTAL" = "1" ] && [ "$LEGACY_COUNT" = "0" ] && [ "$SINGLE_COUNT" = "0" ] && [ "$TRACK_ZERO_COUNT" = "1" ]; then
+          elif [ "$TOTAL" = "1" ] && [ "$LEGACY_COUNT" = "0" ] && [ "$SINGLE_COUNT" = "0" ] && [ "$TRACK_ZERO_COUNT" = "1" ] && [ "$TRACK_PRIMARY_COUNT" = "0" ]; then
             echo "MIZIZI_CONTROL_PLANE_MODE=apply" >> "$GITHUB_ENV"
             echo "MIZIZI_TRIGGER_FILE=$TRACK_ZERO_FILE" >> "$GITHUB_ENV"
+          elif [ "$TOTAL" = "1" ] && [ "$LEGACY_COUNT" = "0" ] && [ "$SINGLE_COUNT" = "0" ] && [ "$TRACK_ZERO_COUNT" = "0" ] && [ "$TRACK_PRIMARY_COUNT" = "1" ]; then
+            echo "MIZIZI_CONTROL_PLANE_MODE=apply" >> "$GITHUB_ENV"
+            echo "MIZIZI_TRIGGER_FILE=$TRACK_PRIMARY_FILE" >> "$GITHUB_ENV"
           else
             echo "STOP: Production intent push must change exactly one reviewed URL-identity trigger file."
             printf '%s\n' "$CHANGED"
