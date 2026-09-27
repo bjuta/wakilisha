@@ -72,6 +72,8 @@ const EXPECTED_TRACK_PRIMARY_FOLLOWUP_IDENTITY_NOISE_REMAINING = 27;
 const EXPECTED_RELEASE_SINGLE_TRACK_PRIMARY_FOLLOWUP_CANDIDATES = 8;
 const EXPECTED_RELEASE_SINGLE_TRACK_PRIMARY_FOLLOWUP_PORTABLE_FINGERPRINT =
   "8ea62e193987bd875ec584caaca23a4db021e2b6644c9bede13abeb6d457f430";
+const EXPECTED_RELEASE_SINGLE_TRACK_FOLLOWUP_TOTAL_VERIFIED = 88;
+const EXPECTED_RELEASE_SINGLE_TRACK_FOLLOWUP_TOTAL_REVIEWS = 40;
 
 const EXPECTED_RELEASE_CANDIDATES = 737;
 const EXPECTED_RELEASE_CANDIDATE_FINGERPRINT =
@@ -170,21 +172,23 @@ const APPLY_SCOPES = {
     operationKey: "registry.release_single_identity.align",
     capabilityKey: "align_registry_release_single_identity",
     entity: "release_single_identity",
-    expectedCount: EXPECTED_RELEASE_SINGLE_CANDIDATES,
+    expectedCount:
+      EXPECTED_RELEASE_SINGLE_TRACK_PRIMARY_FOLLOWUP_CANDIDATES,
     expectedFingerprint:
-      EXPECTED_RELEASE_SINGLE_CANDIDATE_FINGERPRINT,
-    expectedReviewCount: EXPECTED_RELEASE_SINGLE_REVIEWS,
+      EXPECTED_RELEASE_SINGLE_TRACK_PRIMARY_FOLLOWUP_PORTABLE_FINGERPRINT,
+    expectedReviewCount:
+      EXPECTED_RELEASE_SINGLE_TRACK_ZERO_REVIEW_FOLLOWUP_CANDIDATES,
     expectedReviewFingerprint:
-      EXPECTED_RELEASE_SINGLE_REVIEW_FINGERPRINT,
+      EXPECTED_RELEASE_SINGLE_TRACK_ZERO_REVIEW_FOLLOWUP_FINGERPRINT,
     eventAction: "align_release_single_identity",
     maxRows: 2,
     triggerFile: RELEASE_SINGLE_REVIEWED_TRIGGER_FILE,
     triggerOperation:
-      "public_music_identity_release_single_alignment_apply",
+      "public_music_identity_release_single_track_followup_apply",
     triggerConfirm:
-      "PUBLIC_MUSIC_IDENTITY_RELEASE_SINGLE_ALIGNMENT_APPLY",
-    programmeIssue: 1068,
-  },
+      "PUBLIC_MUSIC_IDENTITY_RELEASE_SINGLE_TRACK_FOLLOWUP_APPLY",
+    programmeIssue: 1091,
+  }
 };
 
 if (!["preflight", "apply"].includes(MODE)) {
@@ -1029,6 +1033,153 @@ from payload
 }
 
 
+function parseCandidatePayload(payload, label) {
+  let rows;
+
+  try {
+    rows = JSON.parse(String(payload || "[]"));
+  } catch {
+    throw new Error(label + " payload is not valid JSON");
+  }
+
+  if (!Array.isArray(rows)) {
+    throw new Error(label + " payload is not an array");
+  }
+
+  return rows;
+}
+
+function releaseSingleTrackFollowupBoundarySnapshot(
+  currentCandidatePayload,
+) {
+  const escapedCurrent =
+    String(currentCandidatePayload || "[]").replaceAll(
+      "'",
+      "''",
+    );
+
+  const row = queryViaLinkedCli(`
+with current_plans as (
+  select value as candidate
+  from jsonb_array_elements(
+    '${escapedCurrent}'::jsonb
+  )
+),
+accepted_followup as (
+  select event.after_value->'programme_candidate'
+    as candidate
+  from public.registry_canonical_write_events event
+  join platform_private.registry_operation_write_events link
+    on link.canonical_write_event_id=event.id
+  join platform_private.registry_mutation_operations operation
+    on operation.id=link.operation_id
+  where event.actor='system:mizizi'
+    and event.action='align_release_single_identity'
+    and event.status='succeeded'
+    and event.source_suggestion_id like
+      'public-music-identity:release-single-track-followup:%'
+    and operation.actor_key='mizizi'
+    and operation.operation_key=
+      'registry.release_single_identity.align'
+    and operation.operation_version=1
+    and operation.status='succeeded'
+    and operation.verifier_status='passed'
+),
+programme as (
+  select candidate from accepted_followup
+  union all
+  select candidate from current_plans
+),
+stats as (
+  select
+    count(*)::int as row_count,
+    count(distinct candidate->>'release_id')::int
+      as distinct_release_count,
+    coalesce(
+      jsonb_agg(
+        candidate
+        order by candidate->>'release_id'
+      ),
+      '[]'::jsonb
+    ) as body
+  from programme
+)
+select
+  row_count as candidate_count,
+  distinct_release_count,
+  body::text as candidate_payload
+from stats
+`);
+
+  const payload =
+    String(row?.candidate_payload || "[]");
+  const rows =
+    parseCandidatePayload(
+      payload,
+      "Release Single Track follow-up",
+    );
+  const portable =
+    releaseSinglePortableHandoffSnapshot(payload);
+  const provenance =
+    releaseSingleTrackPrimaryFollowupSnapshot(
+      payload,
+    );
+
+  return {
+    candidateCount:
+      Number(row?.candidate_count || 0),
+    distinctReleaseCount:
+      Number(row?.distinct_release_count || 0),
+    candidatePayload: payload,
+    releaseIds:
+      rows
+        .map((entry) =>
+          requireUuid(
+            entry?.release_id,
+            "Release Single follow-up release_id",
+          ),
+        )
+        .sort(),
+    portableCandidateCount:
+      portable.candidateCount,
+    portableFingerprint:
+      portable.candidateFingerprint,
+    trackZeroDerivedCount:
+      provenance.trackZeroDerivedCount,
+    primaryFollowupDerivedCount:
+      provenance.primaryFollowupDerivedCount,
+    unboundCount:
+      provenance.unboundCount,
+    trackZeroDecisionCount:
+      provenance.trackZeroDecisionCount,
+    primaryFollowupDecisionCount:
+      provenance.primaryFollowupDecisionCount,
+  };
+}
+
+function releaseSingleReviewMaterializedSnapshot() {
+  const row = queryViaLinkedCli(`
+select
+  count(*)::int as review_count,
+  count(distinct review.source_id)::int
+    as distinct_release_count
+from public.registry_review_items review
+where review.review_type='mizizi_data_hygiene'
+  and review.entity_type='release'
+  and review.source_payload->>'ruleId'=
+    'release_single_identity_conflict'
+  and review.source_payload->>'ruleVersion'='1.4.0'
+`);
+
+  return {
+    reviewCount:
+      Number(row?.review_count || 0),
+    distinctReleaseCount:
+      Number(row?.distinct_release_count || 0),
+  };
+}
+
+
 function trackZeroCandidateEnvelope() {
   const row = queryViaLinkedCli(trackZeroCandidateSql);
   const payload = String(row?.candidate_payload || "[]");
@@ -1450,7 +1601,15 @@ async function queueReleaseSingleIdentityReviews(
 async function executeReleaseSingleIdentityPlans(
   pool,
   expectedCount,
+  expectedReleaseIds,
 ) {
+  const reviewedReleaseIds =
+    requireUuidList(
+      expectedReleaseIds,
+      "expected_release_ids",
+      EXPECTED_RELEASE_SINGLE_TRACK_PRIMARY_FOLLOWUP_CANDIDATES,
+    );
+
   const frozen =
     await pool.query(releaseSingleCandidateRowsSql);
 
@@ -1460,6 +1619,27 @@ async function executeReleaseSingleIdentityPlans(
         frozen.rowCount +
         " expected " +
         expectedCount,
+    );
+  }
+
+  const frozenReleaseIds =
+    frozen.rows
+      .map((row) =>
+        requireUuid(
+          row.release_id,
+          "Release Single frozen release_id",
+        ),
+      )
+      .sort();
+
+  if (
+    frozenReleaseIds.some(
+      (releaseId) =>
+        !reviewedReleaseIds.includes(releaseId),
+    )
+  ) {
+    throw new Error(
+      "Release Single current target escaped the reviewed 8-Release manifest",
     );
   }
 
@@ -1565,7 +1745,7 @@ async function executeReleaseSingleIdentityPlans(
     );
 
     const idempotencyKey =
-      "public-music-identity:release-single:" +
+      "public-music-identity:release-single-track-followup:" +
       sha256(JSON.stringify(frozenPlan));
 
     const grantResult = await pool.query(
@@ -1613,10 +1793,11 @@ async function executeReleaseSingleIdentityPlans(
       executionResult.rowCount !== 1 ||
       executionResult.rows[0]?.operation_status !==
         "succeeded" ||
+      executionResult.rows[0]?.idempotent_replay === true ||
       !operationId
     ) {
       throw new Error(
-        "Release Single identity operation did not succeed for " +
+        "Release Single identity operation did not succeed freshly for " +
           frozenPlan.release_id,
       );
     }
@@ -1642,12 +1823,39 @@ async function executeReleaseSingleIdentityPlans(
       );
     }
 
+    const replayResult = await pool.query(
+      `
+      select *
+      from mizizi_private.execute_release_single_identity_alignment_v1(
+        $1::uuid
+      )
+      `,
+      [executionGrantId],
+    );
+
+    if (
+      replayResult.rowCount !== 1 ||
+      String(replayResult.rows[0]?.operation_id || "") !==
+        operationId ||
+      replayResult.rows[0]?.operation_status !==
+        "succeeded" ||
+      replayResult.rows[0]?.verifier_status !==
+        "passed" ||
+      replayResult.rows[0]?.idempotent_replay !== true
+    ) {
+      throw new Error(
+        "Release Single identity replay/idempotence did not pass for " +
+          frozenPlan.release_id,
+      );
+    }
+
     receipts.push({
       release_id: frozenPlan.release_id,
       track_id: frozenPlan.track_id,
       execution_grant_id: executionGrantId,
       operation_id: operationId,
       verifier_status: "passed",
+      idempotent_replay: true,
     });
   }
 
@@ -2618,11 +2826,21 @@ async function currentCandidateState(pool) {
     candidateCount: 0,
     candidateFingerprint: "",
   };
+  let releaseSingleCandidates = [];
+  let releaseSinglePortableHandoff = {
+    candidateCount: 0,
+    candidateFingerprint: "",
+  };
+  let releaseSingleTrackFollowupBoundary = null;
   let releaseSingleState = "migration_pending";
   let releaseSingleReviewProgramme = null;
   let releaseSingleReviewPending = {
     candidateCount: 0,
     candidateFingerprint: "",
+  };
+  let releaseSingleReviewMaterialized = {
+    reviewCount: 0,
+    distinctReleaseCount: 0,
   };
   let releaseSingleReviewState =
     "migration_pending";
@@ -2663,37 +2881,33 @@ async function currentCandidateState(pool) {
     const currentCandidatePayload =
       releaseSingleResult.rows[0]
         ?.candidate_payload || "[]";
-    const releaseSinglePortableHandoff =
-      releaseSinglePortableHandoffSnapshot(
-        currentCandidatePayload,
-      );
     const reviewPendingPayload =
       reviewPendingResult.rows[0]
         ?.candidate_payload || "[]";
 
+    releaseSingleCandidates =
+      parseCandidatePayload(
+        currentCandidatePayload,
+        "Release Single current candidate",
+      );
+    releaseSinglePortableHandoff =
+      releaseSinglePortableHandoffSnapshot(
+        currentCandidatePayload,
+      );
+    releaseSingleReviewMaterialized =
+      releaseSingleReviewMaterializedSnapshot();
+
     releaseSingleProgramme =
-      releaseSingleProgrammeSnapshotFromHistory(
-        verified ===
-          EXPECTED_RELEASE_SINGLE_CANDIDATES
-          ? "[]"
-          : currentCandidatePayload,
-      );
-
-    const releaseSingleReviewHistory =
-      releaseSingleReviewProgrammeSnapshotFromHistory(
-        "[]",
-      );
-    const historicalReviewMaterialized =
-      releaseSingleReviewHistory.candidateCount ===
-        EXPECTED_RELEASE_SINGLE_REVIEWS &&
-      releaseSingleReviewHistory.candidateFingerprint ===
-        EXPECTED_RELEASE_SINGLE_REVIEW_FINGERPRINT;
-
-    releaseSingleReviewProgramme =
-      historicalReviewMaterialized
-        ? releaseSingleReviewHistory
-        : releaseSingleReviewProgrammeSnapshotFromHistory(
-            reviewPendingPayload,
+      verified >=
+        EXPECTED_RELEASE_SINGLE_CANDIDATES
+        ? {
+            candidateCount:
+              EXPECTED_RELEASE_SINGLE_CANDIDATES,
+            candidateFingerprint:
+              EXPECTED_RELEASE_SINGLE_CANDIDATE_FINGERPRINT,
+          }
+        : releaseSingleProgrammeSnapshotFromHistory(
+            currentCandidatePayload,
           );
 
     assertFields(
@@ -2704,18 +2918,7 @@ async function currentCandidateState(pool) {
         candidateFingerprint:
           EXPECTED_RELEASE_SINGLE_CANDIDATE_FINGERPRINT,
       },
-      "Release Single identity programme freeze",
-    );
-
-    assertFields(
-      releaseSingleReviewProgramme,
-      {
-        candidateCount:
-          EXPECTED_RELEASE_SINGLE_REVIEWS,
-        candidateFingerprint:
-          EXPECTED_RELEASE_SINGLE_REVIEW_FINGERPRINT,
-      },
-      "Release Single identity review programme freeze",
+      "Release Single identity historical programme freeze",
     );
 
     if (
@@ -2778,18 +2981,22 @@ async function currentCandidateState(pool) {
         releaseSinglePortableHandoff.candidateFingerprint ===
           EXPECTED_RELEASE_SINGLE_TRACK_PRIMARY_FOLLOWUP_PORTABLE_FINGERPRINT
       ) {
-        const followup =
-          releaseSingleTrackPrimaryFollowupSnapshot(
+        releaseSingleTrackFollowupBoundary =
+          releaseSingleTrackFollowupBoundarySnapshot(
             currentCandidatePayload,
           );
 
         assertFields(
-          followup,
+          releaseSingleTrackFollowupBoundary,
           {
             candidateCount:
               EXPECTED_RELEASE_SINGLE_TRACK_PRIMARY_FOLLOWUP_CANDIDATES,
             distinctReleaseCount:
               EXPECTED_RELEASE_SINGLE_TRACK_PRIMARY_FOLLOWUP_CANDIDATES,
+            portableCandidateCount:
+              EXPECTED_RELEASE_SINGLE_TRACK_PRIMARY_FOLLOWUP_CANDIDATES,
+            portableFingerprint:
+              EXPECTED_RELEASE_SINGLE_TRACK_PRIMARY_FOLLOWUP_PORTABLE_FINGERPRINT,
             trackZeroDerivedCount:
               EXPECTED_RELEASE_SINGLE_TRACK_ZERO_FOLLOWUP_CANDIDATES,
             primaryFollowupDerivedCount: 2,
@@ -2798,7 +3005,7 @@ async function currentCandidateState(pool) {
               EXPECTED_RELEASE_SINGLE_TRACK_ZERO_FOLLOWUP_CANDIDATES,
             primaryFollowupDecisionCount: 2,
           },
-          "Release Single Track primary-follow-up",
+          "Release Single Track follow-up boundary",
         );
 
         releaseSingleState =
@@ -2809,20 +3016,81 @@ async function currentCandidateState(pool) {
             JSON.stringify(releaseSingleCurrent),
         );
       }
+    } else if (
+      verified <=
+      EXPECTED_RELEASE_SINGLE_TRACK_FOLLOWUP_TOTAL_VERIFIED
+    ) {
+      releaseSingleTrackFollowupBoundary =
+        releaseSingleTrackFollowupBoundarySnapshot(
+          currentCandidatePayload,
+        );
+
+      assertFields(
+        releaseSingleTrackFollowupBoundary,
+        {
+          candidateCount:
+            EXPECTED_RELEASE_SINGLE_TRACK_PRIMARY_FOLLOWUP_CANDIDATES,
+          distinctReleaseCount:
+            EXPECTED_RELEASE_SINGLE_TRACK_PRIMARY_FOLLOWUP_CANDIDATES,
+          portableCandidateCount:
+            EXPECTED_RELEASE_SINGLE_TRACK_PRIMARY_FOLLOWUP_CANDIDATES,
+          portableFingerprint:
+            EXPECTED_RELEASE_SINGLE_TRACK_PRIMARY_FOLLOWUP_PORTABLE_FINGERPRINT,
+          trackZeroDerivedCount:
+            EXPECTED_RELEASE_SINGLE_TRACK_ZERO_FOLLOWUP_CANDIDATES,
+          primaryFollowupDerivedCount: 2,
+          unboundCount: 0,
+          trackZeroDecisionCount:
+            EXPECTED_RELEASE_SINGLE_TRACK_ZERO_FOLLOWUP_CANDIDATES,
+          primaryFollowupDecisionCount: 2,
+        },
+        "Release Single Track follow-up accepted/current boundary",
+      );
+
+      const acceptedFollowup =
+        verified -
+        EXPECTED_RELEASE_SINGLE_CANDIDATES;
+
+      if (
+        releaseSingleCurrent.candidateCount !==
+        EXPECTED_RELEASE_SINGLE_TRACK_PRIMARY_FOLLOWUP_CANDIDATES -
+          acceptedFollowup
+      ) {
+        throw new Error(
+          "Release Single Track follow-up current/history count is not exact",
+        );
+      }
+
+      releaseSingleState =
+        verified ===
+          EXPECTED_RELEASE_SINGLE_TRACK_FOLLOWUP_TOTAL_VERIFIED
+          ? "accepted_final_all_track_followups"
+          : "accepted_partial_track_slug_followups";
     } else {
       throw new Error(
-        "Release Single identity verified operation count exceeded the accepted historical programme",
+        "Release Single identity verified operation count exceeded the accepted programme",
       );
     }
 
-    const reviewPending =
-      releaseSingleReviewPending.candidateCount;
+    if (
+      releaseSingleReviewMaterialized.reviewCount ===
+        EXPECTED_RELEASE_SINGLE_REVIEWS &&
+      releaseSingleReviewMaterialized.distinctReleaseCount ===
+        EXPECTED_RELEASE_SINGLE_REVIEWS
+    ) {
+      releaseSingleReviewProgramme = {
+        candidateCount:
+          EXPECTED_RELEASE_SINGLE_REVIEWS,
+        candidateFingerprint:
+          EXPECTED_RELEASE_SINGLE_REVIEW_FINGERPRINT,
+      };
 
-    if (historicalReviewMaterialized) {
-      if (reviewPending === 0) {
+      if (
+        releaseSingleReviewPending.candidateCount === 0
+      ) {
         releaseSingleReviewState = "materialized";
       } else if (
-        reviewPending ===
+        releaseSingleReviewPending.candidateCount ===
           EXPECTED_RELEASE_SINGLE_TRACK_ZERO_REVIEW_FOLLOWUP_CANDIDATES &&
         releaseSingleReviewPending.candidateFingerprint ===
           EXPECTED_RELEASE_SINGLE_TRACK_ZERO_REVIEW_FOLLOWUP_FINGERPRINT
@@ -2855,12 +3123,43 @@ async function currentCandidateState(pool) {
             JSON.stringify(releaseSingleReviewPending),
         );
       }
-    } else {
+    } else if (
+      releaseSingleReviewMaterialized.reviewCount ===
+        EXPECTED_RELEASE_SINGLE_TRACK_FOLLOWUP_TOTAL_REVIEWS &&
+      releaseSingleReviewMaterialized.distinctReleaseCount ===
+        EXPECTED_RELEASE_SINGLE_TRACK_FOLLOWUP_TOTAL_REVIEWS &&
+      releaseSingleReviewPending.candidateCount === 0
+    ) {
+      releaseSingleReviewProgramme = {
+        candidateCount:
+          EXPECTED_RELEASE_SINGLE_REVIEWS,
+        candidateFingerprint:
+          EXPECTED_RELEASE_SINGLE_REVIEW_FINGERPRINT,
+      };
       releaseSingleReviewState =
-        reviewPending ===
+        "materialized_all_track_followups";
+    } else {
+      releaseSingleReviewProgramme =
+        releaseSingleReviewProgrammeSnapshotFromHistory(
+          reviewPendingPayload,
+        );
+
+      assertFields(
+        releaseSingleReviewProgramme,
+        {
+          candidateCount:
+            EXPECTED_RELEASE_SINGLE_REVIEWS,
+          candidateFingerprint:
+            EXPECTED_RELEASE_SINGLE_REVIEW_FINGERPRINT,
+        },
+        "Release Single identity review programme freeze",
+      );
+
+      releaseSingleReviewState =
+        releaseSingleReviewPending.candidateCount ===
           EXPECTED_RELEASE_SINGLE_REVIEWS
           ? "pristine"
-          : reviewPending === 0
+          : releaseSingleReviewPending.candidateCount === 0
             ? "materialized"
             : "materialized_partial";
     }
@@ -2887,10 +3186,14 @@ async function currentCandidateState(pool) {
     trackPrimaryFollowupMigrationReady,
     releaseSingleProgramme,
     releaseSingleCurrent,
+    releaseSingleCandidates,
+    releaseSinglePortableHandoff,
+    releaseSingleTrackFollowupBoundary,
     releaseSingleState,
     releaseSingleJournal,
     releaseSingleReviewProgramme,
     releaseSingleReviewPending,
+    releaseSingleReviewMaterialized,
     releaseSingleReviewState,
   };
 }
@@ -2964,6 +3267,28 @@ function requireUuid(value, label) {
   return text.toLowerCase();
 }
 
+function requireUuidList(value, label, expectedCount) {
+  if (!Array.isArray(value)) {
+    throw new Error(label + " must be an array");
+  }
+
+  const normalized =
+    value.map((entry) => requireUuid(entry, label)).sort();
+
+  if (
+    normalized.length !== expectedCount ||
+    new Set(normalized).size !== normalized.length
+  ) {
+    throw new Error(
+      label + " must contain exactly " +
+        expectedCount +
+        " unique UUIDs",
+    );
+  }
+
+  return normalized;
+}
+
 function readReviewedTrigger(path) {
   if (!path || !fs.existsSync(path)) {
     throw new Error(
@@ -3018,6 +3343,15 @@ function readReviewedTrigger(path) {
       },
       "production review trigger",
     );
+  }
+
+  if (scope.entity === "release_single_identity") {
+    trigger.expected_release_ids =
+      requireUuidList(
+        trigger.expected_release_ids,
+        "expected_release_ids",
+        scope.expectedCount,
+      );
   }
 
   return {
@@ -3666,14 +4000,83 @@ async function main() {
 
     if (
       scope.entity === "release_single_identity" &&
-      !["pristine", "accepted_partial"].includes(
-        candidates.releaseSingleState,
-      )
+      ![
+        "accepted_final_track_slug_followups",
+        "accepted_partial_track_slug_followups",
+      ].includes(candidates.releaseSingleState)
     ) {
       throw new Error(
-        "Release Single identity apply cannot start from " +
+        "Release Single Track follow-up apply cannot start from " +
           candidates.releaseSingleState,
       );
+    }
+
+    if (scope.entity === "release_single_identity") {
+      const boundary =
+        candidates.releaseSingleTrackFollowupBoundary ||
+        releaseSingleTrackFollowupBoundarySnapshot(
+          JSON.stringify(
+            candidates.releaseSingleCandidates || [],
+          ),
+        );
+
+      assertFields(
+        boundary,
+        {
+          candidateCount:
+            EXPECTED_RELEASE_SINGLE_TRACK_PRIMARY_FOLLOWUP_CANDIDATES,
+          distinctReleaseCount:
+            EXPECTED_RELEASE_SINGLE_TRACK_PRIMARY_FOLLOWUP_CANDIDATES,
+          portableCandidateCount:
+            scope.expectedCount,
+          portableFingerprint:
+            scope.expectedFingerprint,
+          trackZeroDerivedCount:
+            EXPECTED_RELEASE_SINGLE_TRACK_ZERO_FOLLOWUP_CANDIDATES,
+          primaryFollowupDerivedCount: 2,
+          unboundCount: 0,
+        },
+        "reviewed Release Single Track follow-up boundary",
+      );
+
+      const reviewedReleaseIds =
+        trigger.expected_release_ids.slice().sort();
+
+      if (
+        JSON.stringify(boundary.releaseIds) !==
+        JSON.stringify(reviewedReleaseIds)
+      ) {
+        throw new Error(
+          "Release Single Track follow-up Release manifest drifted from reviewed trigger",
+        );
+      }
+
+      const reviewBoundaryOpen =
+        candidates.releaseSingleReviewMaterialized
+          .reviewCount ===
+            EXPECTED_RELEASE_SINGLE_REVIEWS &&
+        candidates.releaseSingleReviewPending
+          .candidateCount ===
+            EXPECTED_RELEASE_SINGLE_TRACK_ZERO_REVIEW_FOLLOWUP_CANDIDATES &&
+        candidates.releaseSingleReviewPending
+          .candidateFingerprint ===
+            EXPECTED_RELEASE_SINGLE_TRACK_ZERO_REVIEW_FOLLOWUP_FINGERPRINT;
+
+      const reviewBoundaryAlreadyMaterialized =
+        candidates.releaseSingleReviewMaterialized
+          .reviewCount ===
+            EXPECTED_RELEASE_SINGLE_TRACK_FOLLOWUP_TOTAL_REVIEWS &&
+        candidates.releaseSingleReviewPending
+          .candidateCount === 0;
+
+      if (
+        !reviewBoundaryOpen &&
+        !reviewBoundaryAlreadyMaterialized
+      ) {
+        throw new Error(
+          "Release Single Track follow-up review boundary is not exact",
+        );
+      }
     }
 
     if (
@@ -3721,6 +4124,20 @@ from public.wk_slug_redirects
 where entity_type='track'
 `).track_redirects || 0,
           )
+        : null;
+
+    const releaseSingleRedirectsBefore =
+      scope.entity === "release_single_identity"
+        ? queryViaLinkedCli(`
+select
+  count(*) filter (
+    where entity_type='track'
+  )::int as track_redirects,
+  count(*) filter (
+    where entity_type='release'
+  )::int as release_redirects
+from public.wk_slug_redirects
+`)
         : null;
 
     fs.writeFileSync(
@@ -3804,6 +4221,7 @@ where entity_type='track'
           await executeReleaseSingleIdentityPlans(
             jit.pool,
             expectedApplyCount,
+            trigger.expected_release_ids,
           );
 
         fs.writeFileSync(
@@ -4311,11 +4729,11 @@ select
         after,
         {
           verified_operations:
-            EXPECTED_RELEASE_SINGLE_CANDIDATES,
+            EXPECTED_RELEASE_SINGLE_TRACK_FOLLOWUP_TOTAL_VERIFIED,
           canonical_events:
-            EXPECTED_RELEASE_SINGLE_CANDIDATES,
+            EXPECTED_RELEASE_SINGLE_TRACK_FOLLOWUP_TOTAL_VERIFIED,
         },
-        "final Release Single identity journal",
+        "final Release Single Track follow-up journal",
       );
 
       const currentResult =
@@ -4330,24 +4748,49 @@ select
       assertFields(
         current,
         { candidateCount: 0 },
-        "post-apply Release Single identity candidates",
+        "post-apply Release Single Track follow-up candidates",
       );
 
-      const programme =
-        releaseSingleProgrammeSnapshotFromHistory(
-          "[]",
+      const followupBoundary =
+        releaseSingleTrackFollowupBoundarySnapshot(
+          currentResult.rows[0]
+            ?.candidate_payload || "[]",
         );
 
       assertFields(
-        programme,
+        followupBoundary,
         {
           candidateCount:
-            EXPECTED_RELEASE_SINGLE_CANDIDATES,
-          candidateFingerprint:
-            EXPECTED_RELEASE_SINGLE_CANDIDATE_FINGERPRINT,
+            EXPECTED_RELEASE_SINGLE_TRACK_PRIMARY_FOLLOWUP_CANDIDATES,
+          distinctReleaseCount:
+            EXPECTED_RELEASE_SINGLE_TRACK_PRIMARY_FOLLOWUP_CANDIDATES,
+          portableCandidateCount:
+            EXPECTED_RELEASE_SINGLE_TRACK_PRIMARY_FOLLOWUP_CANDIDATES,
+          portableFingerprint:
+            EXPECTED_RELEASE_SINGLE_TRACK_PRIMARY_FOLLOWUP_PORTABLE_FINGERPRINT,
+          trackZeroDerivedCount:
+            EXPECTED_RELEASE_SINGLE_TRACK_ZERO_FOLLOWUP_CANDIDATES,
+          primaryFollowupDerivedCount: 2,
+          unboundCount: 0,
+          trackZeroDecisionCount:
+            EXPECTED_RELEASE_SINGLE_TRACK_ZERO_FOLLOWUP_CANDIDATES,
+          primaryFollowupDecisionCount: 2,
         },
-        "final Release Single identity programme",
+        "final Release Single Track follow-up boundary",
       );
+
+      if (
+        JSON.stringify(
+          followupBoundary.releaseIds,
+        ) !==
+        JSON.stringify(
+          trigger.expected_release_ids.slice().sort(),
+        )
+      ) {
+        throw new Error(
+          "final Release Single Track follow-up manifest drifted",
+        );
+      }
 
       const pendingReviews =
         await jit.pool.query(
@@ -4364,43 +4807,23 @@ select
         "post-apply Release Single review pending state",
       );
 
-      const reviewProgramme =
-        releaseSingleReviewProgrammeSnapshotFromHistory(
-          "[]",
-        );
+      const reviewMaterialized =
+        releaseSingleReviewMaterializedSnapshot();
 
       assertFields(
-        reviewProgramme,
+        reviewMaterialized,
         {
-          candidateCount:
-            EXPECTED_RELEASE_SINGLE_REVIEWS,
-          candidateFingerprint:
-            EXPECTED_RELEASE_SINGLE_REVIEW_FINGERPRINT,
+          reviewCount:
+            EXPECTED_RELEASE_SINGLE_TRACK_FOLLOWUP_TOTAL_REVIEWS,
+          distinctReleaseCount:
+            EXPECTED_RELEASE_SINGLE_TRACK_FOLLOWUP_TOTAL_REVIEWS,
         },
-        "final Release Single review programme",
+        "final Release Single review materialization",
       );
 
       const guard =
         queryViaLinkedCli(`
 select
-  (
-    select count(*)::int
-    from public.registry_review_items review
-    where review.review_type='mizizi_data_hygiene'
-      and review.entity_type='release'
-      and review.source_payload->>'ruleId'=
-        'release_single_identity_conflict'
-      and review.source_payload->>'ruleVersion'='1.4.0'
-  ) as release_single_reviews,
-  (
-    select count(distinct review.source_id)::int
-    from public.registry_review_items review
-    where review.review_type='mizizi_data_hygiene'
-      and review.entity_type='release'
-      and review.source_payload->>'ruleId'=
-        'release_single_identity_conflict'
-      and review.source_payload->>'ruleVersion'='1.4.0'
-  ) as release_single_review_targets,
   (
     select count(*)::int
     from public.registry_canonical_write_events event
@@ -4455,32 +4878,47 @@ select
   ) as bad_moved_threads,
   (
     select count(*)::int
-    from public.registry_canonical_write_events
-    where actor in ('mizizi','system:mizizi')
-      and registry_entity_type='track'
-  ) as track_canonical_events,
+    from public.registry_canonical_write_events event
+    where event.actor='system:mizizi'
+      and event.action='align_release_single_identity'
+      and event.status='succeeded'
+      and coalesce(
+            (event.after_value->>'redirects_created')::int,
+            0
+          )<>0
+  ) as nonzero_redirect_receipts,
   (
     select count(*)::int
     from public.wk_slug_redirects
     where entity_type='track'
-  ) as track_redirects
+  ) as track_redirects,
+  (
+    select count(*)::int
+    from public.wk_slug_redirects
+    where entity_type='release'
+  ) as release_redirects
 `);
 
       assertFields(
         guard,
         {
-          release_single_reviews:
-            EXPECTED_RELEASE_SINGLE_REVIEWS,
-          release_single_review_targets:
-            EXPECTED_RELEASE_SINGLE_REVIEWS,
           alignment_events:
-            EXPECTED_RELEASE_SINGLE_CANDIDATES,
+            EXPECTED_RELEASE_SINGLE_TRACK_FOLLOWUP_TOTAL_VERIFIED,
           bad_aligned_release_slug: 0,
           bad_moved_threads: 0,
-          track_canonical_events: 440,
-          track_redirects: 1148,
+          nonzero_redirect_receipts: 0,
+          track_redirects:
+            Number(
+              releaseSingleRedirectsBefore
+                ?.track_redirects || 0,
+            ),
+          release_redirects:
+            Number(
+              releaseSingleRedirectsBefore
+                ?.release_redirects || 0,
+            ),
         },
-        "Release Single identity Production acceptance",
+        "Release Single Track follow-up Production acceptance",
       );
 
       await runAudit(jit.url, "track", "after");

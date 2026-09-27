@@ -479,10 +479,34 @@ describe("MIZIZI current URL-identity production control plane", () => {
       "close_release_single_identity_authority_window_v1",
     );
     expect(controlPlane).toContain(
-      "PUBLIC_MUSIC_IDENTITY_RELEASE_SINGLE_ALIGNMENT_APPLY",
+      "PUBLIC_MUSIC_IDENTITY_RELEASE_SINGLE_TRACK_FOLLOWUP_APPLY",
     );
     expect(controlPlane).toContain(
-      "programmeIssue: 1068",
+      "programmeIssue: 1091",
+    );
+    expect(controlPlane).toContain(
+      "EXPECTED_RELEASE_SINGLE_TRACK_FOLLOWUP_TOTAL_VERIFIED = 88",
+    );
+    expect(controlPlane).toContain(
+      "EXPECTED_RELEASE_SINGLE_TRACK_FOLLOWUP_TOTAL_REVIEWS = 40",
+    );
+    expect(controlPlane).toContain(
+      "expected_release_ids",
+    );
+    expect(controlPlane).toContain(
+      "accepted_final_all_track_followups",
+    );
+    expect(controlPlane).toContain(
+      "accepted_partial_track_slug_followups",
+    );
+    expect(controlPlane).toContain(
+      "release-single-track-followup:",
+    );
+    expect(controlPlane).toContain(
+      "Release Single identity replay/idempotence did not pass",
+    );
+    expect(controlPlane).toContain(
+      "nonzero_redirect_receipts",
     );
 
     expect(migration).toContain(
