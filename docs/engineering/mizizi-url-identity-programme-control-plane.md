@@ -716,3 +716,42 @@ The full Release-Single candidate state fingerprints remain execution-time
 compare-and-set authority only; they intentionally include mutable state and
 therefore must not be compared across Preview and Production.
 
+
+
+## Release-Single Track-derived closure tranche (#1091)
+
+The final automatic Release-Single convergence tranche reuses the installed
+`registry.release_single_identity.align/v1` authority. No new mutation
+primitive or SQL migration is introduced.
+
+The reviewed Production boundary is exactly 8 Release identities with portable
+handoff fingerprint
+`8ea62e193987bd875ec584caaca23a4db021e2b6644c9bede13abeb6d457f430`:
+6 descend from the accepted Track-zero tranche and 2 descend from #1087.
+The reviewed trigger must bind all 8 exact Release UUIDs.
+
+PR preflight exports the full current candidate plans, including the
+environment-local Release, Track and alignment state fingerprints. Apply mode
+rechecks every full plan immediately before exact grant issuance.
+
+The same bounded authority window also materializes the remaining 5
+Release-Single conflict reviews with fingerprint
+`cdf6933fade7380f8557523ca2f2096465498e9c356293104aaf7f0540b7a684`.
+Those review rows are not automatic mutation authority.
+
+Closure requires:
+
+- 88 total verified Release-Single alignment operations: 80 historical + 8
+  Track-derived follow-ups;
+- 40 explicit Release-Single conflict reviews: 35 historical + 5 follow-ups;
+- 8/8 follow-up operations independently verified;
+- 8/8 immediate idempotent replays returning the same succeeded operation;
+- 0 remaining automatic Release-Single candidates;
+- 0 pending Release-Single review candidates;
+- 0 non-zero redirect receipts;
+- historical Track and Release redirect row counts unchanged;
+- operation disabled and MIZIZI authority zero at rest.
+
+The existing redirect table remains historical evidence only. This tranche
+must not insert, update, delete, resolve through, or resurrect redirect
+authority.
