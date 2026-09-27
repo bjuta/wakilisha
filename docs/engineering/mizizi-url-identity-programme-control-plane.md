@@ -661,3 +661,54 @@ They should contribute only their candidate/plan logic, bounded typed mutation
 and independent verifier unless a genuinely new invariant requires new
 infrastructure. This is the anti-ceremony rule for the permanent operator UX.
 
+## Public Music Identity Track-slug primary-scope follow-up
+
+- Preview acceptance after the five #1087 Track mutations freezes the Release Single automatic follow-up envelope at 8 rows with SHA-256 `09b6a3777fc7cfc8baeef1a78f6e7bdd8b0d7f627591fa0b422d15b5c1c51840`. Provenance is exactly 6 historical Track-zero decisions plus 2 #1087 primary-scope decisions, with 0 unbound candidates.
+
+Issue #1087 continues the Track-slug programme with the five historical
+`track_slug_identity_noise / 1.1.0` reviews whose only former blocker was
+`missing_explicit_primary_artist_scope` and whose primary scope was later
+resolved by the governed `registry-release-primary-review-v1` admission
+contract.
+
+The frozen follow-up envelope is:
+
+- candidate count: **5**;
+- candidate fingerprint:
+  `71d13b5535983bf937fcb0c0dbbf3b790e0961f8e8b0543c742b8d9d9f6c7cdf`;
+- operation: `registry.track_slug.canonicalize/v1`;
+- capability: `canonicalize_registry_track_slug`;
+- parent programme: #1068;
+- bounded slice: #1087.
+
+Migration
+`20260925213519_public_music_identity_track_slug_primary_followup_v1.sql`
+does not add another Track mutation primitive. It contributes only the exact
+five-row candidate manifest and a dedicated finalizer. Runtime mutation
+continues through the existing exact-grant issuer, V2 Track executor,
+independent V2 verifier and generic authority-window close.
+
+Because #1087 and the historical 34-row Track-slug-zero lane intentionally
+share the same operation and capability, the shared control plane resolves an
+active reviewed lane by the exact human capability-grant ID recorded in its
+reviewed trigger. Operation/capability equality alone is not sufficient to
+select a programme lane.
+
+The five-row finalizer requires the exact `release_primary_review` relation
+whose metadata binds the same historical Track review by `source_review_id`
+and `admission_contract=registry-release-primary-review-v1`. It resolves only
+the five frozen reviews after five verified Track operations and returns the
+shared Track-slug authority to zero at rest.
+
+Nana remains outside this slice, as do the 26 explicit Track identity
+collisions and all 12 Track slug credit-evidence-gap reviews.
+
+Two #1087 Tracks, `Djobokou` and `La Vie Est Belle`, are one-track Singles.
+Their Track convergence is expected to add two deterministic Release-Single
+alignment candidates to the six already retained from the historical
+Track-slug-zero tranche. The control plane recognizes that post-Track state
+only when the eight current Release-Single candidates split exactly into six
+historical Track-zero decision descendants and two #1087 decision descendants.
+The exact eight-row candidate fingerprint remains a Preview acceptance value
+and must be frozen before the #1087 PR is opened.
+

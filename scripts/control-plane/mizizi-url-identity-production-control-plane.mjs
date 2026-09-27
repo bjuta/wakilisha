@@ -25,6 +25,8 @@ const RELEASE_SINGLE_REVIEWED_TRIGGER_FILE =
   ".github/public-music-identity-release-single-alignment-apply.json";
 const TRACK_ZERO_REVIEWED_TRIGGER_FILE =
   ".github/public-music-identity-track-slug-zero-apply.json";
+const TRACK_PRIMARY_FOLLOWUP_REVIEWED_TRIGGER_FILE =
+  ".github/public-music-identity-track-slug-primary-followup-apply.json";
 const ARTIFACT_DIR =
   process.env.MIZIZI_ARTIFACT_DIR ||
   "artifacts/mizizi-url-identity-production-control-plane";
@@ -42,6 +44,10 @@ const RELEASE_SINGLE_ALIGNMENT_MIGRATION_NAME =
 const TRACK_ZERO_MIGRATION_VERSION = "20260925141117";
 const TRACK_ZERO_MIGRATION_NAME =
   "public_music_identity_track_slug_zero_v2";
+const TRACK_PRIMARY_FOLLOWUP_MIGRATION_VERSION =
+  "20260925213519";
+const TRACK_PRIMARY_FOLLOWUP_MIGRATION_NAME =
+  "public_music_identity_track_slug_primary_followup_v1";
 const EXPECTED_RELEASE_SINGLE_CANDIDATES = 80;
 const EXPECTED_RELEASE_SINGLE_CANDIDATE_FINGERPRINT =
   "8cb08c3447b0e8acaf3279ef7b0317e915783b87a7e37678976b01fd02401eab";
@@ -59,6 +65,13 @@ const EXPECTED_TRACK_ZERO_CANDIDATE_FINGERPRINT =
   "1f178ed3aff1ac2ba998eefec42ac1f8abdb62ed4e70a93471715552399f5669";
 const EXPECTED_TRACK_ZERO_IDENTITY_NOISE_REMAINING = 32;
 const EXPECTED_TRACK_ZERO_CREDIT_GAP_REMAINING = 12;
+const EXPECTED_TRACK_PRIMARY_FOLLOWUP_CANDIDATES = 5;
+const EXPECTED_TRACK_PRIMARY_FOLLOWUP_CANDIDATE_FINGERPRINT =
+  "71d13b5535983bf937fcb0c0dbbf3b790e0961f8e8b0543c742b8d9d9f6c7cdf";
+const EXPECTED_TRACK_PRIMARY_FOLLOWUP_IDENTITY_NOISE_REMAINING = 27;
+const EXPECTED_RELEASE_SINGLE_TRACK_PRIMARY_FOLLOWUP_CANDIDATES = 8;
+const EXPECTED_RELEASE_SINGLE_TRACK_PRIMARY_FOLLOWUP_FINGERPRINT =
+  "09b6a3777fc7cfc8baeef1a78f6e7bdd8b0d7f627591fa0b422d15b5c1c51840";
 
 const EXPECTED_RELEASE_CANDIDATES = 737;
 const EXPECTED_RELEASE_CANDIDATE_FINGERPRINT =
@@ -86,6 +99,8 @@ const EXPECTED_BLOBS = {
     "bb2a936a8082a506d9b6e1ba94236c2b0aad446b",
   "supabase/migrations/20260925141117_public_music_identity_track_slug_zero_v2.sql":
     "3686a83f65c7ac92de5e7d89c5ed906427c00a2c",
+  "supabase/migrations/20260925213519_public_music_identity_track_slug_primary_followup_v1.sql":
+    "3fba2832b2a49a93cbf990954bc2da8c56ae3d0a",
 };
 
 const APPLY_SCOPES = {
@@ -132,6 +147,24 @@ const APPLY_SCOPES = {
     triggerConfirm:
       "PUBLIC_MUSIC_IDENTITY_TRACK_SLUG_ZERO_APPLY",
     programmeIssue: 1068,
+  },
+  track_slug_primary_followup: {
+    operationKey: "registry.track_slug.canonicalize",
+    capabilityKey: "canonicalize_registry_track_slug",
+    entity: "track_slug_primary_followup",
+    expectedCount:
+      EXPECTED_TRACK_PRIMARY_FOLLOWUP_CANDIDATES,
+    expectedFingerprint:
+      EXPECTED_TRACK_PRIMARY_FOLLOWUP_CANDIDATE_FINGERPRINT,
+    eventAction: "canonicalize_track_slug",
+    maxRows: 1,
+    triggerFile:
+      TRACK_PRIMARY_FOLLOWUP_REVIEWED_TRIGGER_FILE,
+    triggerOperation:
+      "public_music_identity_track_slug_primary_followup_apply",
+    triggerConfirm:
+      "PUBLIC_MUSIC_IDENTITY_TRACK_SLUG_PRIMARY_FOLLOWUP_APPLY",
+    programmeIssue: 1087,
   },
   release_single_identity: {
     operationKey: "registry.release_single_identity.align",
@@ -259,6 +292,7 @@ function assertAudit(
       ![
         66,
         EXPECTED_TRACK_ZERO_IDENTITY_NOISE_REMAINING,
+        EXPECTED_TRACK_PRIMARY_FOLLOWUP_IDENTITY_NOISE_REMAINING,
       ].includes(slugNoise)
     ) {
       throw new Error(
@@ -537,6 +571,117 @@ select
           'public_music_identity_track_slug_zero'
       and review.resolution_payload->>'candidateFingerprint'=
           '${EXPECTED_TRACK_ZERO_CANDIDATE_FINGERPRINT}'
+  ) as resolved_reviews
+`;
+
+
+const trackPrimaryFollowupCandidateRowsSql = `
+select
+  candidate.review_id::text as review_id,
+  candidate.track_id::text as track_id,
+  candidate.current_slug,
+  candidate.proposed_slug,
+  candidate.primary_artist_slug,
+  candidate.expected_state_fingerprint
+from
+  mizizi_private.track_slug_primary_followup_candidate_v1()
+  candidate
+order by candidate.track_id
+`;
+
+const trackPrimaryFollowupCandidateSql = `
+with plans as (
+  ${trackPrimaryFollowupCandidateRowsSql}
+),
+payload as (
+  select coalesce(
+    jsonb_agg(
+      jsonb_build_object(
+        'track_id',track_id,
+        'review_id',review_id,
+        'current_slug',current_slug,
+        'proposed_slug',proposed_slug,
+        'primary_artist_slug',primary_artist_slug,
+        'expected_state_fingerprint',
+          expected_state_fingerprint
+      )
+      order by track_id
+    ),
+    '[]'::jsonb
+  ) body
+  from plans
+)
+select
+  jsonb_array_length(body)::int as candidate_count,
+  body::text as candidate_payload
+from payload
+`;
+
+const trackPrimaryFollowupClosureSql = `
+with decisions as (
+  select
+    decision.review_item_id,
+    decision.entity_id,
+    decision.after_payload->>'capabilityGrantId'
+      as capability_grant_id
+  from public.registry_canonicalization_decisions decision
+  where decision.decision_type=
+        'auto_resolved_release_primary_scope_blocker'
+    and decision.metadata->>'programmeKey'=
+        'public_music_identity_track_slug_primary_followup'
+    and decision.after_payload->>'candidateFingerprint'=
+        '${EXPECTED_TRACK_PRIMARY_FOLLOWUP_CANDIDATE_FINGERPRINT}'
+),
+grants as (
+  select distinct capability_grant_id::uuid as id
+  from decisions
+  where capability_grant_id ~
+    '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'
+),
+operations as (
+  select operation.id, operation.result_payload
+  from platform_private.registry_execution_grants grant_row
+  join grants
+    on grants.id=grant_row.system_actor_capability_grant_id
+  join platform_private.registry_mutation_operations operation
+    on operation.execution_grant_id=grant_row.id
+  where grant_row.actor_key='mizizi'
+    and grant_row.operation_key='registry.track_slug.canonicalize'
+    and grant_row.operation_version=1
+    and operation.status='succeeded'
+    and operation.verifier_status='passed'
+),
+events as (
+  select distinct event.id
+  from operations operation
+  join public.registry_canonical_write_events event
+    on event.id::text=
+       operation.result_payload->>'canonical_write_event_id'
+  where event.actor='system:mizizi'
+    and event.action='canonicalize_track_slug'
+    and event.status='succeeded'
+)
+select
+  (select count(*)::int from decisions)
+    as decision_count,
+  (select count(distinct review_item_id)::int from decisions)
+    as review_count,
+  (select count(distinct entity_id)::int from decisions)
+    as target_count,
+  (select count(*)::int from grants)
+    as capability_grant_count,
+  (select count(*)::int from operations)
+    as verified_operations,
+  (select count(*)::int from events)
+    as canonical_events,
+  (
+    select count(*)::int
+    from public.registry_review_items review
+    where review.status='resolved'
+      and review.resolution_payload->>'programmeKey'=
+          'public_music_identity_track_slug_primary_followup'
+      and review.resolution_payload->>'candidateFingerprint'=
+          '${EXPECTED_TRACK_PRIMARY_FOLLOWUP_CANDIDATE_FINGERPRINT}'
   ) as resolved_reviews
 `;
 
@@ -873,6 +1018,58 @@ function trackZeroClosureSnapshot() {
   };
 }
 
+
+function trackPrimaryFollowupCandidateEnvelope() {
+  const row =
+    queryViaLinkedCli(trackPrimaryFollowupCandidateSql);
+  const payload = String(
+    row?.candidate_payload || "[]",
+  );
+  let rows;
+
+  try {
+    rows = JSON.parse(payload);
+  } catch {
+    throw new Error(
+      "Track primary-follow-up candidate payload is not valid JSON",
+    );
+  }
+
+  if (!Array.isArray(rows)) {
+    throw new Error(
+      "Track primary-follow-up candidate payload is not an array",
+    );
+  }
+
+  return {
+    ...candidateSnapshot(row),
+    candidatePayload: payload,
+    rows,
+  };
+}
+
+function trackPrimaryFollowupClosureSnapshot() {
+  const row =
+    queryViaLinkedCli(trackPrimaryFollowupClosureSql);
+  return {
+    decisionCount: Number(row.decision_count || 0),
+    reviewCount: Number(row.review_count || 0),
+    targetCount: Number(row.target_count || 0),
+    capabilityGrantCount: Number(
+      row.capability_grant_count || 0,
+    ),
+    verifiedOperations: Number(
+      row.verified_operations || 0,
+    ),
+    canonicalEvents: Number(
+      row.canonical_events || 0,
+    ),
+    resolvedReviews: Number(
+      row.resolved_reviews || 0,
+    ),
+  };
+}
+
 async function executeTrackSlugZeroPlans(
   pool,
   frozenRows,
@@ -987,6 +1184,138 @@ async function executeTrackSlugZeroPlans(
     ) {
       throw new Error(
         "Track-slug zero independent verifier failed for " +
+          trackId,
+      );
+    }
+
+    receipts.push({
+      review_id: reviewId,
+      track_id: trackId,
+      execution_grant_id: executionGrantId,
+      operation_id: operationId,
+    });
+  }
+
+  return receipts;
+}
+
+
+
+async function executeTrackSlugPrimaryFollowupPlans(
+  pool,
+  frozenRows,
+  expectedCount,
+) {
+  if (
+    !Array.isArray(frozenRows) ||
+    frozenRows.length !== expectedCount
+  ) {
+    throw new Error(
+      "Track primary-follow-up exact target count drifted: " +
+        (Array.isArray(frozenRows)
+          ? frozenRows.length
+          : "not-an-array") +
+        " expected " +
+        expectedCount,
+    );
+  }
+
+  const receipts = [];
+
+  for (const row of frozenRows) {
+    const reviewId = String(row.review_id || "");
+    const trackId = String(row.track_id || "");
+
+    if (!reviewId || !trackId) {
+      throw new Error(
+        "Track primary-follow-up candidate identity is incomplete",
+      );
+    }
+
+    const grantResult = await pool.query(
+      `
+      select *
+      from mizizi_private.issue_stewardship_execution_grant_v1(
+        $1::text,
+        $2::text,
+        $3::text
+      )
+      `,
+      [
+        "registry.track_slug.canonicalize",
+        trackId,
+        "public-music-track-primary-followup:" +
+          reviewId,
+      ],
+    );
+
+    if (grantResult.rowCount !== 1) {
+      throw new Error(
+        "Track primary-follow-up exact execution grant was not issued for " +
+          trackId,
+      );
+    }
+
+    const executionGrantId = String(
+      grantResult.rows[0]?.execution_grant_id || "",
+    );
+
+    if (!executionGrantId) {
+      throw new Error(
+        "Track primary-follow-up execution grant id is missing for " +
+          trackId,
+      );
+    }
+
+    const executionResult = await pool.query(
+      `
+      select *
+      from mizizi_private.execute_stewardship_operation_v2(
+        $1::uuid
+      )
+      `,
+      [executionGrantId],
+    );
+
+    if (
+      executionResult.rowCount !== 1 ||
+      executionResult.rows[0]?.operation_status !==
+        "succeeded"
+    ) {
+      throw new Error(
+        "Track primary-follow-up V2 execution did not succeed for " +
+          trackId,
+      );
+    }
+
+    const operationId = String(
+      executionResult.rows[0]?.operation_id || "",
+    );
+
+    if (!operationId) {
+      throw new Error(
+        "Track primary-follow-up operation id is missing for " +
+          trackId,
+      );
+    }
+
+    const verificationResult = await pool.query(
+      `
+      select *
+      from mizizi_private.verify_stewardship_operation_v2(
+        $1::uuid
+      )
+      `,
+      [operationId],
+    );
+
+    if (
+      verificationResult.rowCount !== 1 ||
+      verificationResult.rows[0]?.verifier_status !==
+        "passed"
+    ) {
+      throw new Error(
+        "Track primary-follow-up independent verifier failed for " +
           trackId,
       );
     }
@@ -1580,6 +1909,94 @@ from derived
 }
 
 
+
+function releaseSingleTrackPrimaryFollowupSnapshot(
+  currentCandidatePayload,
+) {
+  const escapedCurrent =
+    String(currentCandidatePayload || "[]").replaceAll(
+      "'",
+      "''",
+    );
+
+  const row = queryViaLinkedCli(`
+with current_plans as (
+  select value as candidate
+  from jsonb_array_elements(
+    '${escapedCurrent}'::jsonb
+  )
+),
+derived as (
+  select
+    candidate,
+    (
+      select count(*)::int
+      from public.registry_canonicalization_decisions decision
+      where decision.entity_id=
+            (candidate->>'track_id')::uuid
+        and decision.decision_type=
+            'auto_resolved_stale_community_slug_blocker'
+        and decision.metadata->>'programmeKey'=
+            'public_music_identity_track_slug_zero'
+        and decision.after_payload->>'candidateFingerprint'=
+            '${EXPECTED_TRACK_ZERO_CANDIDATE_FINGERPRINT}'
+    ) as track_zero_decisions,
+    (
+      select count(*)::int
+      from public.registry_canonicalization_decisions decision
+      where decision.entity_id=
+            (candidate->>'track_id')::uuid
+        and decision.decision_type=
+            'auto_resolved_release_primary_scope_blocker'
+        and decision.metadata->>'programmeKey'=
+            'public_music_identity_track_slug_primary_followup'
+        and decision.after_payload->>'candidateFingerprint'=
+            '${EXPECTED_TRACK_PRIMARY_FOLLOWUP_CANDIDATE_FINGERPRINT}'
+    ) as primary_followup_decisions
+  from current_plans
+)
+select
+  count(*)::int as candidate_count,
+  count(distinct candidate->>'release_id')::int
+    as distinct_release_count,
+  count(*) filter (
+    where track_zero_decisions=1
+      and primary_followup_decisions=0
+  )::int as track_zero_derived_count,
+  count(*) filter (
+    where track_zero_decisions=0
+      and primary_followup_decisions=1
+  )::int as primary_followup_derived_count,
+  count(*) filter (
+    where track_zero_decisions +
+          primary_followup_decisions <> 1
+  )::int as unbound_count,
+  coalesce(sum(track_zero_decisions),0)::int
+    as track_zero_decision_count,
+  coalesce(sum(primary_followup_decisions),0)::int
+    as primary_followup_decision_count
+from derived
+`);
+
+  return {
+    candidateCount:
+      Number(row.candidate_count || 0),
+    distinctReleaseCount:
+      Number(row.distinct_release_count || 0),
+    trackZeroDerivedCount:
+      Number(row.track_zero_derived_count || 0),
+    primaryFollowupDerivedCount:
+      Number(row.primary_followup_derived_count || 0),
+    unboundCount:
+      Number(row.unbound_count || 0),
+    trackZeroDecisionCount:
+      Number(row.track_zero_decision_count || 0),
+    primaryFollowupDecisionCount:
+      Number(row.primary_followup_decision_count || 0),
+  };
+}
+
+
 function releaseSingleReviewProgrammeSnapshotFromHistory(
   currentCandidatePayload,
 ) {
@@ -2064,6 +2481,80 @@ async function currentCandidateState(pool) {
     );
   }
 
+
+  let trackPrimaryFollowupCurrent = {
+    candidateCount: 0,
+    candidateFingerprint: "",
+  };
+  let trackPrimaryFollowupCandidates = [];
+  let trackPrimaryFollowupClosure = {
+    decisionCount: 0,
+    reviewCount: 0,
+    targetCount: 0,
+    capabilityGrantCount: 0,
+    verifiedOperations: 0,
+    canonicalEvents: 0,
+    resolvedReviews: 0,
+  };
+  let trackPrimaryFollowupState =
+    "migration_pending";
+  const trackPrimaryFollowupMigrationReady =
+    trackPrimaryFollowupMigrationApplied();
+
+  if (trackPrimaryFollowupMigrationReady) {
+    const envelope =
+      trackPrimaryFollowupCandidateEnvelope();
+
+    trackPrimaryFollowupCurrent = {
+      candidateCount: envelope.candidateCount,
+      candidateFingerprint:
+        envelope.candidateFingerprint,
+    };
+    trackPrimaryFollowupCandidates = envelope.rows;
+    trackPrimaryFollowupClosure =
+      trackPrimaryFollowupClosureSnapshot();
+
+    const closureEmpty =
+      Object.values(
+        trackPrimaryFollowupClosure,
+      ).every((value) => Number(value) === 0);
+
+    if (
+      closureEmpty &&
+      trackPrimaryFollowupCurrent.candidateCount ===
+        EXPECTED_TRACK_PRIMARY_FOLLOWUP_CANDIDATES &&
+      trackPrimaryFollowupCurrent.candidateFingerprint ===
+        EXPECTED_TRACK_PRIMARY_FOLLOWUP_CANDIDATE_FINGERPRINT
+    ) {
+      trackPrimaryFollowupState = "pristine";
+    } else if (
+      trackPrimaryFollowupCurrent.candidateCount === 0 &&
+      trackPrimaryFollowupClosure.decisionCount ===
+        EXPECTED_TRACK_PRIMARY_FOLLOWUP_CANDIDATES &&
+      trackPrimaryFollowupClosure.reviewCount ===
+        EXPECTED_TRACK_PRIMARY_FOLLOWUP_CANDIDATES &&
+      trackPrimaryFollowupClosure.targetCount ===
+        EXPECTED_TRACK_PRIMARY_FOLLOWUP_CANDIDATES &&
+      trackPrimaryFollowupClosure.capabilityGrantCount === 1 &&
+      trackPrimaryFollowupClosure.verifiedOperations ===
+        EXPECTED_TRACK_PRIMARY_FOLLOWUP_CANDIDATES &&
+      trackPrimaryFollowupClosure.canonicalEvents ===
+        EXPECTED_TRACK_PRIMARY_FOLLOWUP_CANDIDATES &&
+      trackPrimaryFollowupClosure.resolvedReviews ===
+        EXPECTED_TRACK_PRIMARY_FOLLOWUP_CANDIDATES
+    ) {
+      trackPrimaryFollowupState = "accepted_final";
+    } else {
+      throw new Error(
+        "Track primary-follow-up programme state is not a recognized exact boundary: " +
+          JSON.stringify({
+            current: trackPrimaryFollowupCurrent,
+            closure: trackPrimaryFollowupClosure,
+          }),
+      );
+    }
+  }
+
   let releaseSingleProgramme = null;
   let releaseSingleCurrent = {
     candidateCount: 0,
@@ -2219,6 +2710,37 @@ async function currentCandidateState(pool) {
 
         releaseSingleState =
           "accepted_final_track_zero_followup";
+      } else if (
+        releaseSingleCurrent.candidateCount ===
+          EXPECTED_RELEASE_SINGLE_TRACK_PRIMARY_FOLLOWUP_CANDIDATES &&
+        releaseSingleCurrent.candidateFingerprint ===
+          EXPECTED_RELEASE_SINGLE_TRACK_PRIMARY_FOLLOWUP_FINGERPRINT
+      ) {
+        const followup =
+          releaseSingleTrackPrimaryFollowupSnapshot(
+            currentCandidatePayload,
+          );
+
+        assertFields(
+          followup,
+          {
+            candidateCount:
+              EXPECTED_RELEASE_SINGLE_TRACK_PRIMARY_FOLLOWUP_CANDIDATES,
+            distinctReleaseCount:
+              EXPECTED_RELEASE_SINGLE_TRACK_PRIMARY_FOLLOWUP_CANDIDATES,
+            trackZeroDerivedCount:
+              EXPECTED_RELEASE_SINGLE_TRACK_ZERO_FOLLOWUP_CANDIDATES,
+            primaryFollowupDerivedCount: 2,
+            unboundCount: 0,
+            trackZeroDecisionCount:
+              EXPECTED_RELEASE_SINGLE_TRACK_ZERO_FOLLOWUP_CANDIDATES,
+            primaryFollowupDecisionCount: 2,
+          },
+          "Release Single Track primary-follow-up",
+        );
+
+        releaseSingleState =
+          "accepted_final_track_slug_followups";
       } else {
         throw new Error(
           "Release Single identity post-acceptance candidate envelope is not recognized: " +
@@ -2296,6 +2818,11 @@ async function currentCandidateState(pool) {
     trackZeroClosure,
     trackZeroState,
     trackZeroMigrationReady,
+    trackPrimaryFollowupCurrent,
+    trackPrimaryFollowupCandidates,
+    trackPrimaryFollowupClosure,
+    trackPrimaryFollowupState,
+    trackPrimaryFollowupMigrationReady,
     releaseSingleProgramme,
     releaseSingleCurrent,
     releaseSingleState,
@@ -2315,6 +2842,20 @@ select exists(
   from supabase_migrations.schema_migrations
   where version='${TRACK_ZERO_MIGRATION_VERSION}'
     and name='${TRACK_ZERO_MIGRATION_NAME}'
+) as applied
+`);
+
+  return String(state.applied) === "true";
+}
+
+
+function trackPrimaryFollowupMigrationApplied() {
+  const state = queryViaLinkedCli(`
+select exists(
+  select 1
+  from supabase_migrations.schema_migrations
+  where version='${TRACK_PRIMARY_FOLLOWUP_MIGRATION_VERSION}'
+    and name='${TRACK_PRIMARY_FOLLOWUP_MIGRATION_NAME}'
 ) as applied
 `);
 
@@ -2520,6 +3061,12 @@ select
     where version='${TRACK_ZERO_MIGRATION_VERSION}'
       and name='${TRACK_ZERO_MIGRATION_NAME}'
   ) as track_zero_migration_applied,
+  exists(
+    select 1
+    from supabase_migrations.schema_migrations
+    where version='${TRACK_PRIMARY_FOLLOWUP_MIGRATION_VERSION}'
+      and name='${TRACK_PRIMARY_FOLLOWUP_MIGRATION_NAME}'
+  ) as track_primary_followup_migration_applied,
   (
     select count(*)::int
     from platform_private.system_actor_capability_grants
@@ -2567,6 +3114,18 @@ select
       "Track-slug zero V2 migration is not Production applied",
     );
   }
+
+  if (
+    scope.entity ===
+      "track_slug_primary_followup" &&
+    String(
+      state.track_primary_followup_migration_applied,
+    ) !== "true"
+  ) {
+    throw new Error(
+      "Track primary-follow-up migration is not Production applied",
+    );
+  }
 }
 
 function assertPreflightAuthority() {
@@ -2599,6 +3158,7 @@ function assertPreflightAuthority() {
 
   const active = queryViaLinkedCli(`
 select
+  id::text as capability_grant_id,
   capability_key,
   scope->>'operation_key' as operation_key
 from platform_private.system_actor_capability_grants
@@ -2610,20 +3170,39 @@ where actor_key='mizizi'
 limit 1
 `);
 
-  const activeScope = Object.values(APPLY_SCOPES).find(
-    (scope) =>
-      scope.operationKey === active.operation_key &&
-      scope.capabilityKey === active.capability_key,
-  );
+  const compatibleScopes =
+    Object.values(APPLY_SCOPES).filter(
+      (scope) =>
+        scope.operationKey === active.operation_key &&
+        scope.capabilityKey === active.capability_key,
+    );
 
-  if (!activeScope) {
+  const reviewedMatches = [];
+
+  for (const scope of compatibleScopes) {
+    if (!fs.existsSync(scope.triggerFile)) {
+      continue;
+    }
+
+    const candidate =
+      readReviewedTrigger(scope.triggerFile);
+
+    if (
+      candidate.capability_grant_id ===
+      String(active.capability_grant_id || "")
+        .toLowerCase()
+    ) {
+      reviewedMatches.push(candidate);
+    }
+  }
+
+  if (reviewedMatches.length !== 1) {
     throw new Error(
-      "active MIZIZI human authority is outside the accepted URL-identity scopes",
+      "active MIZIZI human authority does not resolve to exactly one reviewed trigger by capability-grant id",
     );
   }
 
-  const trigger =
-    readReviewedTrigger(activeScope.triggerFile);
+  const trigger = reviewedMatches[0];
 
   assertHumanAuthority(trigger);
 
@@ -2676,6 +3255,9 @@ async function closeAuthorityWindow(
 ) {
   const isTrackZero =
     trigger.scopeConfig.entity === "track_slug_zero";
+  const isTrackPrimaryFollowup =
+    trigger.scopeConfig.entity ===
+      "track_slug_primary_followup";
   const isReleaseSingle =
     trigger.scopeConfig.entity ===
       "release_single_identity";
@@ -2691,6 +3273,16 @@ async function closeAuthorityWindow(
           `,
           [trigger.capability_grant_id],
         )
+      : isTrackPrimaryFollowup && applySucceeded
+        ? await pool.query(
+            `
+            select *
+            from mizizi_private.finalize_track_slug_primary_followup_v1(
+              $1::uuid
+            )
+            `,
+            [trigger.capability_grant_id],
+          )
       : isReleaseSingle
         ? await pool.query(
             `
@@ -2738,6 +3330,20 @@ async function closeAuthorityWindow(
         standing_grant_status: "expired",
       },
       "Track-slug zero finalizer receipt",
+    );
+  }
+
+  if (isTrackPrimaryFollowup && applySucceeded) {
+    assertFields(
+      result.rows[0],
+      {
+        resolved_reviews:
+          EXPECTED_TRACK_PRIMARY_FOLLOWUP_CANDIDATES,
+        decision_rows:
+          EXPECTED_TRACK_PRIMARY_FOLLOWUP_CANDIDATES,
+        standing_grant_status: "expired",
+      },
+      "Track primary-follow-up finalizer receipt",
     );
   }
 
@@ -2956,6 +3562,14 @@ async function main() {
         "Track-slug zero migration ready: " +
           candidates.trackZeroMigrationReady,
       );
+      console.log(
+        "Track primary-follow-up programme state: " +
+          candidates.trackPrimaryFollowupState,
+      );
+      console.log(
+        "Track primary-follow-up migration ready: " +
+          candidates.trackPrimaryFollowupMigrationReady,
+      );
       console.log("Registry mutation: NO");
       return;
     }
@@ -2969,7 +3583,12 @@ async function main() {
           ? candidates.releaseSingleCurrent.candidateCount
           : scope.entity === "track_slug_zero"
             ? candidates.trackZeroCurrent.candidateCount
-            : scope.expectedCount;
+            : scope.entity ===
+                "track_slug_primary_followup"
+              ? candidates
+                  .trackPrimaryFollowupCurrent
+                  .candidateCount
+              : scope.expectedCount;
 
     if (
       scope.entity === "release" &&
@@ -3010,8 +3629,29 @@ async function main() {
       );
     }
 
+    if (
+      scope.entity ===
+        "track_slug_primary_followup" &&
+      (
+        candidates.trackPrimaryFollowupState !==
+          "pristine" ||
+        !candidates.trackPrimaryFollowupMigrationReady
+      )
+    ) {
+      throw new Error(
+        "Track primary-follow-up apply cannot start from " +
+          candidates.trackPrimaryFollowupState +
+          " / migrationReady=" +
+          candidates.trackPrimaryFollowupMigrationReady,
+      );
+    }
+
     const trackRedirectsBefore =
-      scope.entity === "track_slug_zero"
+      (
+        scope.entity === "track_slug_zero" ||
+        scope.entity ===
+          "track_slug_primary_followup"
+      )
         ? Number(
             queryViaLinkedCli(`
 select count(*)::int as track_redirects
@@ -3052,6 +3692,32 @@ where entity_type='track'
           JSON.stringify(
             {
               mode: "track_slug_zero_v2",
+              operations_verified:
+                operationReceipts.length,
+              operation_receipts:
+                operationReceipts,
+            },
+            null,
+            2,
+          ) + "\n",
+        );
+      } else if (
+        scope.entity ===
+          "track_slug_primary_followup"
+      ) {
+        const operationReceipts =
+          await executeTrackSlugPrimaryFollowupPlans(
+            jit.pool,
+            candidates.trackPrimaryFollowupCandidates,
+            expectedApplyCount,
+          );
+
+        fs.writeFileSync(
+          ARTIFACT_DIR + "/apply.txt",
+          JSON.stringify(
+            {
+              mode:
+                "track_slug_primary_followup_v1",
               operations_verified:
                 operationReceipts.length,
               operation_receipts:
@@ -3182,7 +3848,245 @@ where entity_type='track'
       "governed operation acceptance",
     );
 
-    if (scope.entity === "track_slug_zero") {
+
+    if (
+      scope.entity ===
+        "track_slug_primary_followup"
+    ) {
+      const currentEnvelope =
+        trackPrimaryFollowupCandidateEnvelope();
+      const current = {
+        candidateCount:
+          currentEnvelope.candidateCount,
+        candidateFingerprint:
+          currentEnvelope.candidateFingerprint,
+      };
+      const closure =
+        trackPrimaryFollowupClosureSnapshot();
+
+      assertFields(
+        current,
+        { candidateCount: 0 },
+        "post-apply Track primary-follow-up candidates",
+      );
+
+      assertFields(
+        closure,
+        {
+          decisionCount:
+            EXPECTED_TRACK_PRIMARY_FOLLOWUP_CANDIDATES,
+          reviewCount:
+            EXPECTED_TRACK_PRIMARY_FOLLOWUP_CANDIDATES,
+          targetCount:
+            EXPECTED_TRACK_PRIMARY_FOLLOWUP_CANDIDATES,
+          capabilityGrantCount: 1,
+          verifiedOperations:
+            EXPECTED_TRACK_PRIMARY_FOLLOWUP_CANDIDATES,
+          canonicalEvents:
+            EXPECTED_TRACK_PRIMARY_FOLLOWUP_CANDIDATES,
+          resolvedReviews:
+            EXPECTED_TRACK_PRIMARY_FOLLOWUP_CANDIDATES,
+        },
+        "Track primary-follow-up final closure",
+      );
+
+      const guard = queryViaLinkedCli(`
+select
+  (
+    select count(*)::int
+    from public.registry_review_items review
+    where review.status='open'
+      and review.review_type='mizizi_data_hygiene'
+      and review.entity_type='track'
+      and review.source_payload->>'ruleId'=
+          'track_slug_identity_noise'
+  ) as identity_noise,
+  (
+    select count(*)::int
+    from public.registry_review_items review
+    where review.status='open'
+      and review.review_type='mizizi_data_hygiene'
+      and review.entity_type='track'
+      and review.source_payload->>'ruleId'=
+          'track_slug_identity_noise'
+      and review.source_payload->'evidence'->>'collision'=
+          'missing_explicit_primary_artist_scope'
+  ) as missing_primary_scope,
+  (
+    select count(*)::int
+    from public.registry_review_items review
+    where review.status='open'
+      and review.review_type='mizizi_data_hygiene'
+      and review.entity_type='track'
+      and review.source_payload->>'ruleId'=
+          'track_slug_identity_noise'
+      and review.source_payload->'evidence'->>'collision'
+          like 'candidate_slug_collides_with_track:%'
+  ) as identity_collisions,
+  (
+    select count(*)::int
+    from public.registry_review_items review
+    where review.status='open'
+      and review.review_type='mizizi_data_hygiene'
+      and review.entity_type='track'
+      and review.source_payload->>'ruleId'=
+          'track_slug_credit_evidence_gap'
+      and review.source_payload->>'ruleVersion'='1.3.0'
+  ) as credit_gap,
+  (
+    select count(*)::int
+    from public.registry_review_items review
+    join public.registry_tracks track
+      on track.id::text=review.source_id
+    join public.wk_chart_entries_v2 chart
+      on chart.canonical_track_id=review.source_id
+    where review.status='resolved'
+      and review.resolution_payload->>'programmeKey'=
+          'public_music_identity_track_slug_primary_followup'
+      and chart.track_slug is distinct from track.slug
+  ) as chart_pointer_mismatches,
+  (
+    select count(*)::int
+    from public.registry_review_items review
+    join public.registry_tracks track
+      on track.id::text=review.source_id
+    join public.community_saves save
+      on save.entity_type='track'
+     and save.entity_id=review.source_id
+    where review.status='resolved'
+      and review.resolution_payload->>'programmeKey'=
+          'public_music_identity_track_slug_primary_followup'
+      and save.entity_slug is distinct from track.slug
+  ) as save_pointer_mismatches,
+  (
+    select count(*)::int
+    from public.registry_review_items review
+    join public.registry_tracks track
+      on track.id::text=review.source_id
+    join public.community_threads thread
+      on thread.entity_type='track'
+     and thread.entity_id=review.source_id
+    join lateral (
+      select credit.artist_slug
+      from public.registry_track_artists credit
+      where credit.track_id=track.id
+        and credit.status='active'
+        and credit.is_primary is true
+        and credit.artist_id is not null
+        and nullif(btrim(credit.artist_slug),'') is not null
+      order by
+        credit.credit_order nulls last,
+        credit.created_at,
+        credit.id
+      limit 1
+    ) primary_artist on true
+    where review.status='resolved'
+      and review.resolution_payload->>'programmeKey'=
+          'public_music_identity_track_slug_primary_followup'
+      and (
+        thread.entity_slug is distinct from track.slug
+        or thread.entity_url is distinct from
+          'https://wakilisha.africa/tracks/' ||
+          primary_artist.artist_slug ||
+          '/' ||
+          track.slug
+      )
+  ) as thread_pointer_mismatches,
+  (
+    select count(*)::int
+    from public.registry_review_items review
+    where review.id=
+      '35a58395-668e-4b19-b044-9d8af6d6910a'::uuid
+      and review.status='open'
+      and review.source_id=
+        '78c3ff76-cbeb-4e64-b2b2-8b2bb30567ab'
+  ) as nana_open,
+  (
+    select count(*)::int
+    from public.registry_releases release
+    where (
+      release.id=
+        '7a759214-4c4d-4ab4-a4e4-88989dc12194'::uuid
+      and release.slug='djobokou-feat-olibig'
+    )
+    or (
+      release.id=
+        '51bf2a25-3ad6-424c-8469-b251c666f407'::uuid
+      and release.slug='la-vie-est-belle-feat-doc-a'
+    )
+  ) as preserved_release_rows,
+  (
+    select count(*)::int
+    from public.wk_slug_redirects
+    where entity_type='track'
+  ) as track_redirects
+`);
+
+      assertFields(
+        guard,
+        {
+          identity_noise:
+            EXPECTED_TRACK_PRIMARY_FOLLOWUP_IDENTITY_NOISE_REMAINING,
+          missing_primary_scope: 1,
+          identity_collisions: 26,
+          credit_gap:
+            EXPECTED_TRACK_ZERO_CREDIT_GAP_REMAINING,
+          chart_pointer_mismatches: 0,
+          save_pointer_mismatches: 0,
+          thread_pointer_mismatches: 0,
+          nana_open: 1,
+          preserved_release_rows: 2,
+          track_redirects: trackRedirectsBefore,
+        },
+        "Track primary-follow-up Production acceptance",
+      );
+
+      const releaseSingleResult =
+        await jit.pool.query(
+          releaseSingleCandidateSql,
+        );
+      const releaseSingleCurrent =
+        candidateSnapshot(
+          releaseSingleResult.rows[0],
+        );
+
+      assertFields(
+        releaseSingleCurrent,
+        {
+          candidateCount:
+            EXPECTED_RELEASE_SINGLE_TRACK_PRIMARY_FOLLOWUP_CANDIDATES,
+          candidateFingerprint:
+            EXPECTED_RELEASE_SINGLE_TRACK_PRIMARY_FOLLOWUP_FINGERPRINT,
+        },
+        "post-Track follow-up Release Single envelope",
+      );
+
+      const downstream =
+        releaseSingleTrackPrimaryFollowupSnapshot(
+          releaseSingleResult.rows[0]
+            ?.candidate_payload || "[]",
+        );
+
+      assertFields(
+        downstream,
+        {
+          candidateCount:
+            EXPECTED_RELEASE_SINGLE_TRACK_PRIMARY_FOLLOWUP_CANDIDATES,
+          distinctReleaseCount:
+            EXPECTED_RELEASE_SINGLE_TRACK_PRIMARY_FOLLOWUP_CANDIDATES,
+          trackZeroDerivedCount:
+            EXPECTED_RELEASE_SINGLE_TRACK_ZERO_FOLLOWUP_CANDIDATES,
+          primaryFollowupDerivedCount: 2,
+          unboundCount: 0,
+          trackZeroDecisionCount:
+            EXPECTED_RELEASE_SINGLE_TRACK_ZERO_FOLLOWUP_CANDIDATES,
+          primaryFollowupDecisionCount: 2,
+        },
+        "Track follow-up Release Single provenance",
+      );
+
+      await runAudit(jit.url, "track", "after");
+    } else if (scope.entity === "track_slug_zero") {
       const currentEnvelope =
         trackZeroCandidateEnvelope();
       const current = {

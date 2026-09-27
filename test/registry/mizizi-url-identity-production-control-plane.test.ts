@@ -109,6 +109,15 @@ describe("MIZIZI current URL-identity production control plane", () => {
       "enabled_operations: 1",
     );
     expect(controlPlane).toContain(
+      "const compatibleScopes =",
+    );
+    expect(controlPlane).toContain(
+      "candidate.capability_grant_id ===",
+    );
+    expect(controlPlane).toContain(
+      "reviewedMatches.length !== 1",
+    );
+    expect(controlPlane).not.toContain(
       "readReviewedTrigger(activeScope.triggerFile)",
     );
     expect(controlPlane).toContain(
@@ -383,6 +392,9 @@ describe("MIZIZI current URL-identity production control plane", () => {
       "cdf6933fade7380f8557523ca2f2096465498e9c356293104aaf7f0540b7a684",
     );
     expect(controlPlane).toContain(
+      "09b6a3777fc7cfc8baeef1a78f6e7bdd8b0d7f627591fa0b422d15b5c1c51840",
+    );
+    expect(controlPlane).toContain(
       "materialized_track_zero_followup",
     );
     expect(controlPlane).toContain(
@@ -593,6 +605,157 @@ describe("MIZIZI current URL-identity production control plane", () => {
     );
     expect(migration).not.toMatch(
       /^\s*(?:insert\s+into|update|delete\s+from)\s+public\.wk_slug_redirects\b/im,
+    );
+  });
+
+
+  it("owns the five newly primary-scoped Track slug follow-up reviews without widening the mutation primitive", () => {
+    const migration = readFileSync(
+      "supabase/migrations/20260925213519_public_music_identity_track_slug_primary_followup_v1.sql",
+      "utf8",
+    );
+    const verifier = readFileSync(
+      "scripts/control-plane/verify-public-music-identity-track-slug-primary-followup-v1.sql",
+      "utf8",
+    );
+
+    expect(migration).toContain(
+      "track_slug_primary_followup_candidate_v1",
+    );
+    expect(migration).toContain(
+      "finalize_track_slug_primary_followup_v1",
+    );
+    expect(migration).toContain(
+      "registry.track_slug.canonicalize",
+    );
+    expect(migration).toContain(
+      "execute_stewardship_operation_v2",
+    );
+    expect(migration).toContain(
+      "verify_stewardship_operation_v2",
+    );
+    expect(migration).toContain(
+      "close_stewardship_authority_window_v1",
+    );
+    expect(migration).toContain(
+      "missing_explicit_primary_artist_scope",
+    );
+    expect(migration).toContain(
+      "release_primary_review",
+    );
+    expect(migration).toContain(
+      "registry-release-primary-review-v1",
+    );
+    expect(migration).toContain(
+      "source_review_id",
+    );
+    expect(migration).toContain(
+      "71d13b5535983bf937fcb0c0dbbf3b790e0961f8e8b0543c742b8d9d9f6c7cdf",
+    );
+    expect(migration).toContain(
+      "public_music_identity_track_slug_primary_followup",
+    );
+    expect(migration).toContain(
+      "auto_resolved_release_primary_scope_blocker",
+    );
+    expect(migration).not.toMatch(
+      /^\s*(?:insert\s+into|update|delete\s+from)\s+public\.wk_slug_redirects\b/im,
+    );
+    expect(migration).not.toContain(
+      "create or replace function mizizi_private.execute_stewardship_operation_v2",
+    );
+
+    expect(verifier).toContain(
+      "PUBLIC_MUSIC_IDENTITY_TRACK_SLUG_PRIMARY_FOLLOWUP_V1_PASS",
+    );
+    expect(verifier).toContain(
+      "v_candidate_count=5",
+    );
+    expect(verifier).toContain(
+      "v_candidate_count=0",
+    );
+    expect(verifier).toContain(
+      "v_identity_noise<>27",
+    );
+    expect(verifier).toContain(
+      "v_collision_reviews<>26",
+    );
+    expect(verifier).toContain(
+      "v_missing_primary<>1",
+    );
+    expect(verifier).toContain(
+      "v_credit_gap<>12",
+    );
+    expect(verifier).toContain(
+      "35a58395-668e-4b19-b044-9d8af6d6910a",
+    );
+  });
+
+
+  it("integrates #1087 into the shared JIT control plane without duplicating Track mutation authority", () => {
+    const workflow = readFileSync(
+      ".github/workflows/mizizi-url-identity-production-control-plane.yml",
+      "utf8",
+    );
+    const controlPlane = readFileSync(
+      "scripts/control-plane/mizizi-url-identity-production-control-plane.mjs",
+      "utf8",
+    );
+
+    expect(workflow).toContain(
+      ".github/public-music-identity-track-slug-primary-followup-apply.json",
+    );
+    expect(workflow).toContain(
+      "20260925213519_public_music_identity_track_slug_primary_followup_v1.sql",
+    );
+    expect(workflow).toContain(
+      "verify-public-music-identity-track-slug-primary-followup-v1.sql",
+    );
+
+    expect(controlPlane).toContain(
+      'TRACK_PRIMARY_FOLLOWUP_MIGRATION_VERSION =\n  "20260925213519"',
+    );
+    expect(controlPlane).toContain(
+      "EXPECTED_TRACK_PRIMARY_FOLLOWUP_CANDIDATES = 5",
+    );
+    expect(controlPlane).toContain(
+      "71d13b5535983bf937fcb0c0dbbf3b790e0961f8e8b0543c742b8d9d9f6c7cdf",
+    );
+    expect(controlPlane).toContain(
+      "track_slug_primary_followup: {",
+    );
+    expect(controlPlane).toContain(
+      "track_slug_primary_followup_candidate_v1",
+    );
+    expect(controlPlane).toContain(
+      "executeTrackSlugPrimaryFollowupPlans",
+    );
+    expect(controlPlane).toContain(
+      "public-music-track-primary-followup:",
+    );
+    expect(controlPlane).toContain(
+      "finalize_track_slug_primary_followup_v1",
+    );
+    expect(controlPlane).toContain(
+      "reviewedMatches.length !== 1",
+    );
+    expect(controlPlane).toContain(
+      "active MIZIZI human authority does not resolve to exactly one reviewed trigger by capability-grant id",
+    );
+    expect(controlPlane).toContain(
+      "EXPECTED_RELEASE_SINGLE_TRACK_PRIMARY_FOLLOWUP_CANDIDATES = 8",
+    );
+    expect(controlPlane).toContain(
+      'releaseSingleState =\n          "accepted_final_track_slug_followups"',
+    );
+    expect(controlPlane).toContain(
+      "primaryFollowupDerivedCount: 2",
+    );
+    expect(controlPlane).toContain(
+      "preserved_release_rows",
+    );
+    expect(controlPlane).toContain(
+      "nana_open",
     );
   });
 
