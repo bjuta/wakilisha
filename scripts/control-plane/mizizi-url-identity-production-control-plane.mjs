@@ -70,8 +70,8 @@ const EXPECTED_TRACK_PRIMARY_FOLLOWUP_CANDIDATE_FINGERPRINT =
   "71d13b5535983bf937fcb0c0dbbf3b790e0961f8e8b0543c742b8d9d9f6c7cdf";
 const EXPECTED_TRACK_PRIMARY_FOLLOWUP_IDENTITY_NOISE_REMAINING = 27;
 const EXPECTED_RELEASE_SINGLE_TRACK_PRIMARY_FOLLOWUP_CANDIDATES = 8;
-const EXPECTED_RELEASE_SINGLE_TRACK_PRIMARY_FOLLOWUP_FINGERPRINT =
-  "09b6a3777fc7cfc8baeef1a78f6e7bdd8b0d7f627591fa0b422d15b5c1c51840";
+const EXPECTED_RELEASE_SINGLE_TRACK_PRIMARY_FOLLOWUP_PORTABLE_FINGERPRINT =
+  "8ea62e193987bd875ec584caaca23a4db021e2b6644c9bede13abeb6d457f430";
 
 const EXPECTED_RELEASE_CANDIDATES = 737;
 const EXPECTED_RELEASE_CANDIDATE_FINGERPRINT =
@@ -967,6 +967,64 @@ function candidateSnapshot(row) {
   return {
     candidateCount: Number(row?.candidate_count || 0),
     candidateFingerprint: sha256(payload),
+  };
+}
+
+function releaseSinglePortableHandoffSnapshot(
+  currentCandidatePayload,
+) {
+  const escapedCurrent =
+    String(currentCandidatePayload || "[]").replaceAll(
+      "'",
+      "''",
+    );
+
+  const row = queryViaLinkedCli(`
+with current_plans as (
+  select value as candidate
+  from jsonb_array_elements(
+    '${escapedCurrent}'::jsonb
+  )
+),
+payload as (
+  select coalesce(
+    jsonb_agg(
+      jsonb_build_object(
+        'release_id',candidate->>'release_id',
+        'track_id',candidate->>'track_id',
+        'primary_artist_id',candidate->>'primary_artist_id',
+        'primary_artist_slug',candidate->>'primary_artist_slug',
+        'current_release_slug',candidate->>'current_release_slug',
+        'proposed_release_slug',candidate->>'proposed_release_slug',
+        'current_release_path',candidate->>'current_release_path',
+        'canonical_track_path',candidate->>'canonical_track_path',
+        'release_thread_id',
+          nullif(candidate->>'release_thread_id',''),
+        'track_thread_id',
+          nullif(candidate->>'track_thread_id',''),
+        'expected_row_budget',
+          (candidate->>'expected_row_budget')::integer
+      )
+      order by candidate->>'release_id'
+    ),
+    '[]'::jsonb
+  ) body
+  from current_plans
+)
+select
+  jsonb_array_length(body)::int as candidate_count,
+  encode(
+    extensions.digest(body::text,'sha256'),
+    'hex'
+  ) as candidate_fingerprint
+from payload
+`);
+
+  return {
+    candidateCount:
+      Number(row.candidate_count || 0),
+    candidateFingerprint:
+      String(row.candidate_fingerprint || ""),
   };
 }
 
@@ -2605,6 +2663,10 @@ async function currentCandidateState(pool) {
     const currentCandidatePayload =
       releaseSingleResult.rows[0]
         ?.candidate_payload || "[]";
+    const releaseSinglePortableHandoff =
+      releaseSinglePortableHandoffSnapshot(
+        currentCandidatePayload,
+      );
     const reviewPendingPayload =
       reviewPendingResult.rows[0]
         ?.candidate_payload || "[]";
@@ -2711,10 +2773,10 @@ async function currentCandidateState(pool) {
         releaseSingleState =
           "accepted_final_track_zero_followup";
       } else if (
-        releaseSingleCurrent.candidateCount ===
+        releaseSinglePortableHandoff.candidateCount ===
           EXPECTED_RELEASE_SINGLE_TRACK_PRIMARY_FOLLOWUP_CANDIDATES &&
-        releaseSingleCurrent.candidateFingerprint ===
-          EXPECTED_RELEASE_SINGLE_TRACK_PRIMARY_FOLLOWUP_FINGERPRINT
+        releaseSinglePortableHandoff.candidateFingerprint ===
+          EXPECTED_RELEASE_SINGLE_TRACK_PRIMARY_FOLLOWUP_PORTABLE_FINGERPRINT
       ) {
         const followup =
           releaseSingleTrackPrimaryFollowupSnapshot(
@@ -4045,20 +4107,21 @@ select
         await jit.pool.query(
           releaseSingleCandidateSql,
         );
-      const releaseSingleCurrent =
-        candidateSnapshot(
-          releaseSingleResult.rows[0],
+      const releaseSinglePortableHandoff =
+        releaseSinglePortableHandoffSnapshot(
+          releaseSingleResult.rows[0]
+            ?.candidate_payload || "[]",
         );
 
       assertFields(
-        releaseSingleCurrent,
+        releaseSinglePortableHandoff,
         {
           candidateCount:
             EXPECTED_RELEASE_SINGLE_TRACK_PRIMARY_FOLLOWUP_CANDIDATES,
           candidateFingerprint:
-            EXPECTED_RELEASE_SINGLE_TRACK_PRIMARY_FOLLOWUP_FINGERPRINT,
+            EXPECTED_RELEASE_SINGLE_TRACK_PRIMARY_FOLLOWUP_PORTABLE_FINGERPRINT,
         },
-        "post-Track follow-up Release Single envelope",
+        "post-Track follow-up Release Single portable envelope",
       );
 
       const downstream =

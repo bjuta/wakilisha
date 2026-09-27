@@ -663,7 +663,7 @@ infrastructure. This is the anti-ceremony rule for the permanent operator UX.
 
 ## Public Music Identity Track-slug primary-scope follow-up
 
-- Preview acceptance after the five #1087 Track mutations freezes the Release Single automatic follow-up envelope at 8 rows with SHA-256 `09b6a3777fc7cfc8baeef1a78f6e7bdd8b0d7f627591fa0b422d15b5c1c51840`. Provenance is exactly 6 historical Track-zero decisions plus 2 #1087 primary-scope decisions, with 0 unbound candidates.
+- Preview and Production both produce the same 8-row Release Single automatic follow-up identity envelope after the five #1087 Track mutations. The portable handoff SHA-256 is `8ea62e193987bd875ec584caaca23a4db021e2b6644c9bede13abeb6d457f430`. Provenance is exactly 6 historical Track-zero decisions plus 2 #1087 primary-scope decisions, with 0 unbound candidates. Full execution-state fingerprints remain local stale-check authority and are not used as a cross-environment acceptance hash because they include mutable row state such as `updated_at`.
 
 Issue #1087 continues the Track-slug programme with the five historical
 `track_slug_identity_noise / 1.1.0` reviews whose only former blocker was
@@ -709,6 +709,10 @@ alignment candidates to the six already retained from the historical
 Track-slug-zero tranche. The control plane recognizes that post-Track state
 only when the eight current Release-Single candidates split exactly into six
 historical Track-zero decision descendants and two #1087 decision descendants.
-The exact eight-row candidate fingerprint remains a Preview acceptance value
-and must be frozen before the #1087 PR is opened.
+The eight-row handoff is frozen across environments by stable identity,
+path, thread and exact row-budget fields. The portable handoff fingerprint is
+`8ea62e193987bd875ec584caaca23a4db021e2b6644c9bede13abeb6d457f430`.
+The full Release-Single candidate state fingerprints remain execution-time
+compare-and-set authority only; they intentionally include mutable state and
+therefore must not be compared across Preview and Production.
 
