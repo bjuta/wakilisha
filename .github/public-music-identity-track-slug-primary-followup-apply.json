@@ -1,0 +1,11 @@
+{
+  "operation": "public_music_identity_track_slug_primary_followup_apply",
+  "confirm": "PUBLIC_MUSIC_IDENTITY_TRACK_SLUG_PRIMARY_FOLLOWUP_APPLY",
+  "programme_issue": 1087,
+  "scope": "track_slug_primary_followup",
+  "capability_grant_id": "1335b932-c316-4f54-a4ac-4017001cfd40",
+  "expected_candidate_count": 5,
+  "expected_candidate_fingerprint": "71d13b5535983bf937fcb0c0dbbf3b790e0961f8e8b0543c742b8d9d9f6c7cdf",
+  "expected_operation_key": "registry.track_slug.canonicalize",
+  "expected_capability_key": "canonicalize_registry_track_slug"
+}
