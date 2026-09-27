@@ -1,13 +1,23 @@
 {
-  "operation": "public_music_identity_release_single_alignment_apply",
-  "confirm": "PUBLIC_MUSIC_IDENTITY_RELEASE_SINGLE_ALIGNMENT_APPLY",
-  "programme_issue": 1068,
+  "operation": "public_music_identity_release_single_track_followup_apply",
+  "confirm": "PUBLIC_MUSIC_IDENTITY_RELEASE_SINGLE_TRACK_FOLLOWUP_APPLY",
+  "programme_issue": 1091,
   "scope": "release_single_identity",
-  "capability_grant_id": "19aabe9d-9ff2-4683-b28e-197e963b4b56",
-  "expected_candidate_count": 80,
-  "expected_candidate_fingerprint": "8cb08c3447b0e8acaf3279ef7b0317e915783b87a7e37678976b01fd02401eab",
-  "expected_review_count": 35,
-  "expected_review_fingerprint": "3e6ce99990ebd2e3bb5bbfd2600748da20104696bff3ced7875e4d5fe358638d",
+  "capability_grant_id": "35267555-3da9-4d40-aa84-06d84baf4c67",
+  "expected_candidate_count": 8,
+  "expected_candidate_fingerprint": "8ea62e193987bd875ec584caaca23a4db021e2b6644c9bede13abeb6d457f430",
+  "expected_review_count": 5,
+  "expected_review_fingerprint": "cdf6933fade7380f8557523ca2f2096465498e9c356293104aaf7f0540b7a684",
   "expected_operation_key": "registry.release_single_identity.align",
-  "expected_capability_key": "align_registry_release_single_identity"
+  "expected_capability_key": "align_registry_release_single_identity",
+  "expected_release_ids": [
+    "20c19935-1be0-405b-9612-d10d684d3419",
+    "4cbc2295-34cd-44c4-926b-ea9eec4be45b",
+    "51bf2a25-3ad6-424c-8469-b251c666f407",
+    "7a759214-4c4d-4ab4-a4e4-88989dc12194",
+    "a9c0864e-b510-40ea-8bf3-75b9743808df",
+    "bf9253c3-345d-42d7-92cc-351541e329d4",
+    "e5493064-72e7-488c-89cc-770d6d2fe87c",
+    "f340ea8f-984b-4f1d-939c-6f9678eb110d"
+  ]
 }
