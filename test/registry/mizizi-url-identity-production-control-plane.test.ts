@@ -392,7 +392,37 @@ describe("MIZIZI current URL-identity production control plane", () => {
       "cdf6933fade7380f8557523ca2f2096465498e9c356293104aaf7f0540b7a684",
     );
     expect(controlPlane).toContain(
-      "09b6a3777fc7cfc8baeef1a78f6e7bdd8b0d7f627591fa0b422d15b5c1c51840",
+      "8ea62e193987bd875ec584caaca23a4db021e2b6644c9bede13abeb6d457f430",
+    );
+    expect(controlPlane).toContain(
+      "releaseSinglePortableHandoffSnapshot",
+    );
+
+    const portableStart = controlPlane.indexOf(
+      "function releaseSinglePortableHandoffSnapshot",
+    );
+    const portableEnd = controlPlane.indexOf(
+      "function trackZeroCandidateEnvelope",
+      portableStart,
+    );
+    const portableHelper = controlPlane.slice(
+      portableStart,
+      portableEnd,
+    );
+
+    expect(portableStart).toBeGreaterThanOrEqual(0);
+    expect(portableEnd).toBeGreaterThan(portableStart);
+    expect(portableHelper).toContain(
+      "'expected_row_budget'",
+    );
+    expect(portableHelper).not.toContain(
+      "expected_release_state_fingerprint",
+    );
+    expect(portableHelper).not.toContain(
+      "expected_track_state_fingerprint",
+    );
+    expect(portableHelper).not.toContain(
+      "alignment_state_fingerprint",
     );
     expect(controlPlane).toContain(
       "materialized_track_zero_followup",
