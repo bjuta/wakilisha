@@ -3,6 +3,7 @@ import {
   type FormEvent,
 } from "react";
 import { WkIcon } from "@/components/design-system/Icon";
+import { Modal } from "@/components/design-system/primitives/Modal";
 import {
   ArticleTrustServiceError,
   setCreditGovernance,
@@ -130,50 +131,49 @@ export function ArticleCreditGovernanceForm({
     }
   }
 
+  const footer = (
+    <div className="flex flex-wrap justify-end gap-2">
+      <button
+        type="button"
+        onClick={onClose}
+        disabled={submitting}
+        className="wk-button wk-button-secondary"
+      >
+        Cancel
+      </button>
+      <button
+        type="submit"
+        form="credit-governance-form"
+        disabled={submitting}
+        className="wk-button wk-button-primary"
+      >
+        {submitting ? (
+          <WkIcon name="Loader2" size={14} className="animate-spin" />
+        ) : (
+          <WkIcon name="ShieldCheck" size={14} />
+        )}
+        Save Governance
+      </button>
+    </div>
+  );
+
   return (
-    <div
-      className="fixed inset-0 z-[130] flex items-center justify-center bg-black/50 p-2 sm:p-4"
-      role="dialog"
-      aria-modal="true"
-      aria-labelledby="credit-governance-title"
+    <Modal
+      open
+      onClose={onClose}
+      title="Manage Credit Governance"
+      maxWidth="xl"
+      dismissable={!submitting}
+      footer={footer}
     >
-      <div className="flex max-h-[94dvh] w-full max-w-xl flex-col overflow-hidden rounded-2xl border border-wk-border bg-wk-surface shadow-2xl">
-        <header className="flex items-start justify-between gap-4 border-b border-wk-border px-5 py-4">
-          <div>
-            <div className="text-[10px] font-black uppercase tracking-[0.14em] text-wk-brand">
-              Governed Credit
-            </div>
-            <h2
-              id="credit-governance-title"
-              className="mt-1 text-[18px] font-bold text-wk-text"
-            >
-              Manage Credit Governance
-            </h2>
-            <p className="mt-1 text-[11px] leading-5 text-wk-text-muted">
-              {credit.displayNameSnapshot}
-              {" · "}
-              {versionLabel}
-              {" · Governance revision "}
-              {credit.governanceRevision}
-            </p>
-          </div>
+      <div className="mb-5">
+        <div className="text-[10px] font-black uppercase tracking-[0.14em] text-wk-brand">Governed Credit</div>
+        <p className="mt-1 text-[11px] leading-5 text-wk-text-muted">
+          {credit.displayNameSnapshot} · {versionLabel} · Governance revision {credit.governanceRevision}
+        </p>
+      </div>
+      <form id="credit-governance-form" onSubmit={handleSubmit} className="space-y-5">
 
-          <button
-            type="button"
-            onClick={onClose}
-            disabled={submitting}
-            className="wk-button wk-button-ghost wk-button-sm shrink-0"
-            aria-label="Close Credit governance form"
-          >
-            <WkIcon name="X" size={16} />
-          </button>
-        </header>
-
-        <form
-          onSubmit={handleSubmit}
-          className="flex min-h-0 flex-1 flex-col"
-        >
-          <div className="min-h-0 flex-1 space-y-5 overflow-y-auto px-5 py-5">
             {errorMessage ? (
               <div className="rounded-xl border border-wk-danger/30 bg-wk-danger-soft px-4 py-3 text-[11px] leading-5 text-wk-danger">
                 {errorMessage}
@@ -257,36 +257,6 @@ export function ArticleCreditGovernanceForm({
             <div className="rounded-xl border border-wk-info/25 bg-wk-info-soft px-4 py-3 text-[10px] leading-4 text-wk-text-muted">
               Credit governance changes public eligibility without changing Article attachment order, primary-author selection or Article Credit revision. Credit does not determine payment or payout rights.
             </div>
-          </div>
-
-          <footer className="flex flex-wrap justify-end gap-2 border-t border-wk-border px-5 py-4">
-            <button
-              type="button"
-              onClick={onClose}
-              disabled={submitting}
-              className="wk-button wk-button-secondary"
-            >
-              Cancel
-            </button>
-            <button
-              type="submit"
-              disabled={submitting}
-              className="wk-button wk-button-primary"
-            >
-              {submitting ? (
-                <WkIcon
-                  name="Loader2"
-                  size={14}
-                  className="animate-spin"
-                />
-              ) : (
-                <WkIcon name="ShieldCheck" size={14} />
-              )}
-              Save Governance
-            </button>
-          </footer>
-        </form>
-      </div>
-    </div>
-  );
-}
+      </form>
+    </Modal>
+  );}
