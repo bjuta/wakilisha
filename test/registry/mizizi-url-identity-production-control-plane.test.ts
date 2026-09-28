@@ -141,6 +141,10 @@ describe("MIZIZI current URL-identity production control plane", () => {
       "scripts/control-plane/public-music-identity-batch-a-production-control-plane.mjs",
       "utf8",
     );
+    const actualZero = readFileSync(
+      "scripts/control-plane/public-music-identity-track-actual-zero-audit.mjs",
+      "utf8",
+    );
 
     expect(workflow).toContain(
       "public_music_identity_batch_a_safe_slug",
@@ -193,6 +197,31 @@ describe("MIZIZI current URL-identity production control plane", () => {
     );
     expect(batch).not.toMatch(
       /\b(?:insert\s+into|update|delete\s+from)\s+public\.registry_review_items/i,
+    );
+
+    expect(workflow).toContain(
+      "public-music-identity-track-actual-zero-audit.mjs",
+    );
+    expect(actualZero).toContain(
+      "OPEN_SCOPED_REVIEWS=",
+    );
+    expect(actualZero).toContain(
+      "ACTIVE_FEATURE_SLUG_COUNT=",
+    );
+    expect(actualZero).toContain(
+      "ACTIVE_FEATURE_SLUG_OUTSIDE_OPEN_SCOPE=",
+    );
+    expect(actualZero).toContain(
+      "ACTIVE_ROUTE_MANIFEST_FINGERPRINT=",
+    );
+    expect(actualZero).toContain(
+      "DIRTY_PUBLIC_TRACK_ROUTE ",
+    );
+    expect(actualZero).toContain(
+      "PUBLIC_MUSIC_IDENTITY_TRACK_ACTUAL_ZERO=PASS",
+    );
+    expect(actualZero).not.toMatch(
+      /\b(?:insert\s+into|update|delete\s+from)\s+(?:public|platform_private)\./i,
     );
   });
 
