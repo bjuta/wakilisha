@@ -534,6 +534,119 @@ begin
 end
 $$;
 
+
+
+create function
+platform_private.guard_public_music_identity_track_review_resolution_v1()
+returns trigger
+language plpgsql
+security definer
+set search_path=pg_catalog,public,platform_private
+as $
+declare
+  v_decision_id uuid;
+  v_operation_id uuid;
+  v_track_id uuid;
+begin
+  if old.status='resolved'
+     or new.status is distinct from 'resolved'
+     or new.review_type<>'mizizi_data_hygiene'
+     or new.entity_type<>'track'
+     or not (
+       (
+         new.source_payload->>'ruleId'='track_slug_identity_noise'
+         and new.source_payload->>'ruleVersion'='1.1.0'
+       )
+       or
+       (
+         new.source_payload->>'ruleId'='track_slug_credit_evidence_gap'
+         and new.source_payload->>'ruleVersion'='1.3.0'
+       )
+     )
+  then
+    return new;
+  end if;
+
+  if session_user<>'mizizi_executor' then
+    raise exception using errcode='42501',
+      message='Public Music Identity Track reviews may resolve only through the verified MIZIZI finalizer.';
+  end if;
+
+  begin
+    v_decision_id:=
+      nullif(btrim(coalesce(new.resolution_payload->>'decisionId','')),'')::uuid;
+    v_operation_id:=
+      nullif(btrim(coalesce(new.resolution_payload->>'verifiedOperationId','')),'')::uuid;
+    v_track_id:=nullif(btrim(coalesce(new.source_id,'')),'')::uuid;
+  exception
+    when others then
+      raise exception using errcode='23514',
+        message='Resolution requires valid decisionId, verifiedOperationId, and Track UUID authority.';
+  end;
+
+  if v_decision_id is null
+     or v_operation_id is null
+     or v_track_id is null
+  then
+    raise exception using errcode='23514',
+      message='Resolution requires decisionId and verifiedOperationId.';
+  end if;
+
+  if not exists (
+       select 1
+       from public.registry_canonicalization_decisions decision
+       where decision.id=v_decision_id
+         and decision.review_item_id=new.id
+         and decision.entity_type='track'
+         and decision.entity_id=v_track_id
+         and decision.status='recorded'
+         and decision.metadata->>'programmeKey'=
+           'public_music_identity_track_actual_zero_v1'
+         and decision.metadata->>'decisionStage'=
+           'human_review_recorded'
+     )
+  then
+    raise exception using errcode='23514',
+      message='Resolution is not bound to the exact recorded #1094 human decision.';
+  end if;
+
+  if not exists (
+       select 1
+       from platform_private.registry_mutation_operations operation
+       join platform_private.registry_execution_grants execution_grant
+         on execution_grant.id=operation.execution_grant_id
+       join platform_private.registry_execution_grant_targets target
+         on target.execution_grant_id=execution_grant.id
+       where operation.id=v_operation_id
+         and operation.actor_key='mizizi'
+         and operation.status='succeeded'
+         and operation.verifier_status='passed'
+         and target.subject_type='track'
+         and target.subject_id=v_track_id
+         and execution_grant.plan_payload->>'reviewId'=new.id::text
+         and execution_grant.plan_payload->>'decisionId'=v_decision_id::text
+     )
+  then
+    raise exception using errcode='23514',
+      message='Resolution is not bound to one verified MIZIZI operation for this Track, review, and human decision.';
+  end if;
+
+  return new;
+end
+$;
+
+revoke all on function
+  platform_private.guard_public_music_identity_track_review_resolution_v1()
+from public;
+
+create trigger
+  registry_review_items_public_music_identity_track_resolution_guard_v1
+before update of status
+on public.registry_review_items
+for each row
+execute function
+  platform_private.guard_public_music_identity_track_review_resolution_v1();
+
 revoke all on function
   public.admin_get_public_music_identity_track_review_context_v1(uuid)
 from public;

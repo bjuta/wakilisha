@@ -3584,6 +3584,24 @@ describe("Public Music Identity #1094 human decision lifecycle", () => {
     expect(migration).not.toMatch(
       /update\s+public\.registry_review_items/i,
     );
+    expect(migration).toContain(
+      "guard_public_music_identity_track_review_resolution_v1",
+    );
+    expect(migration).toContain(
+      "registry_review_items_public_music_identity_track_resolution_guard_v1",
+    );
+    expect(migration).toContain(
+      "session_user<>'mizizi_executor'",
+    );
+    expect(migration).toContain(
+      "verifiedOperationId",
+    );
+    expect(migration).toContain(
+      "execution_grant.plan_payload->>'reviewId'",
+    );
+    expect(migration).toContain(
+      "execution_grant.plan_payload->>'decisionId'",
+    );
     expect(migration).not.toContain(
       "wk_slug_redirects",
     );
@@ -3593,6 +3611,9 @@ describe("Public Music Identity #1094 human decision lifecycle", () => {
     );
     expect(verifier).toContain(
       "Human decision capture must not resolve the review",
+    );
+    expect(verifier).toContain(
+      "Review resolution is not bound to verified MIZIZI execution and the exact human decision",
     );
 
     expect(service).toContain(

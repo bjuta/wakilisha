@@ -2,6 +2,7 @@ do $verify$
 declare
   v_context_definition text;
   v_record_definition text;
+  v_resolution_guard_definition text;
 begin
   if to_regprocedure(
        'public.admin_get_public_music_identity_track_review_context_v1(uuid)'
@@ -23,6 +24,27 @@ begin
     'public.admin_record_public_music_identity_track_review_decision_v1(uuid,text,jsonb,text,text)'::regprocedure
   )
   into v_record_definition;
+
+  if to_regprocedure(
+       'platform_private.guard_public_music_identity_track_review_resolution_v1()'
+     ) is null
+     or not exists (
+       select 1
+       from pg_trigger trigger_row
+       where trigger_row.tgrelid='public.registry_review_items'::regclass
+         and trigger_row.tgname=
+           'registry_review_items_public_music_identity_track_resolution_guard_v1'
+         and not trigger_row.tgisinternal
+     )
+  then
+    raise exception
+      'Public Music Identity review-resolution guard is missing';
+  end if;
+
+  select pg_get_functiondef(
+    'platform_private.guard_public_music_identity_track_review_resolution_v1()'::regprocedure
+  )
+  into v_resolution_guard_definition;
 
   if v_context_definition not like
        '%registry_subject_state_fingerprint%'
@@ -72,6 +94,23 @@ begin
   then
     raise exception
       'Human decision vocabulary drifted';
+  end if;
+
+  if v_resolution_guard_definition not like
+       '%session_user<>''mizizi_executor''%'
+     or v_resolution_guard_definition not like
+       '%verifiedOperationId%'
+     or v_resolution_guard_definition not like
+       '%decisionId%'
+     or v_resolution_guard_definition not like
+       '%operation.verifier_status=''passed''%'
+     or v_resolution_guard_definition not like
+       '%execution_grant.plan_payload->>''reviewId''%'
+     or v_resolution_guard_definition not like
+       '%execution_grant.plan_payload->>''decisionId''%'
+  then
+    raise exception
+      'Review resolution is not bound to verified MIZIZI execution and the exact human decision';
   end if;
 
   if v_record_definition ~*
