@@ -244,6 +244,8 @@ export function WkSelect({
       <Button
         id={id}
         type="button"
+        data-wk-select-trigger
+        aria-label={ariaLabel ?? nativeAriaLabel ?? placeholder}
         style={style}
         className={({ isFocusVisible, isPressed }) =>
           `wk-input flex w-full items-center justify-between gap-3 rounded-xl border-wk-border bg-wk-surface px-3 text-[13px] text-wk-text transition-colors ${
@@ -265,6 +267,7 @@ export function WkSelect({
       </Button>
 
       <Popover
+        data-wk-select-popover
         offset={6}
         className="overflow-hidden rounded-xl border border-wk-border-2 bg-wk-surface shadow-[var(--wk-shadow)]"
         style={{
