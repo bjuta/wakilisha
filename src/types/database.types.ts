@@ -20189,6 +20189,16 @@ export type Database = {
         }
         Returns: Json
       }
+      admin_finalize_public_music_identity_track_review_v1: {
+        Args: {
+          p_archive_event_id?: string
+          p_decision_id: string
+          p_note?: string
+          p_review_id: string
+          p_verified_operation_id?: string
+        }
+        Returns: Json
+      }
       admin_finalize_registry_track_intake_v1: {
         Args: {
           p_registry_track_id: string
