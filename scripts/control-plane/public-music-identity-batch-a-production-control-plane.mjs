@@ -335,17 +335,31 @@ function assertExactMain() {
     );
   }
 
+  runCommand("git", [
+    "fetch",
+    "--prune",
+    "origin",
+    "main",
+  ]);
+
   const head = runCommand(
     "git",
     ["rev-parse", "HEAD"],
     { capture: true },
   );
+  const main = runCommand(
+    "git",
+    ["rev-parse", "origin/main"],
+    { capture: true },
+  );
 
-  if (head !== EXPECTED_MAIN) {
+  if (head !== EXPECTED_MAIN || main !== EXPECTED_MAIN) {
     throw new Error(
-      "Batch A executor checkout " +
+      "Batch A executor is not on exact protected main: head=" +
         head +
-        " does not match expected main " +
+        " origin/main=" +
+        main +
+        " expected=" +
         EXPECTED_MAIN,
     );
   }
@@ -649,52 +663,6 @@ async function main() {
   linkSupabaseProject(PROJECT_REF);
   assertHumanAuthority(trigger);
 
-  const before = batchState();
-
-  if (
-    Number(before.safe_rows || 0) !== SAFE_SLUG_ROWS.length ||
-    Number(before.safe_ready || 0) !== SAFE_SLUG_ROWS.length ||
-    Number(before.duplicate_rows || 0) !==
-      DUPLICATE_REVIEW_IDS.length ||
-    Number(before.duplicate_resolved || 0) !==
-      DUPLICATE_REVIEW_IDS.length
-  ) {
-    fs.writeFileSync(
-      ARTIFACT_DIR + "/preflight-failed.json",
-      JSON.stringify(before, null, 2) + "\n",
-    );
-
-    throw new Error(
-      "Batch A is not ready for MIZIZI safe-slug execution. " +
-        "Expected 5 recorded safe-slug decisions and 10 fully resolved duplicate reviews.",
-    );
-  }
-
-  const safeState = parsePayload(
-    before.safe_payload,
-    "Batch A safe payload",
-  );
-
-  fs.writeFileSync(
-    ARTIFACT_DIR + "/preflight.json",
-    JSON.stringify(
-      {
-        expectedMain: EXPECTED_MAIN,
-        safeState,
-        duplicateState: parsePayload(
-          before.duplicate_payload,
-          "Batch A duplicate payload",
-        ),
-      },
-      null,
-      2,
-    ) + "\n",
-  );
-
-  const byReview = new Map(
-    safeState.map((row) => [String(row.reviewId), row]),
-  );
-
   const jit = await openMiziziJitSession({
     projectRef: PROJECT_REF,
     token: TOKEN,
@@ -707,6 +675,53 @@ async function main() {
   let restError = null;
 
   try {
+    const before = batchState();
+
+    if (
+      Number(before.safe_rows || 0) !== SAFE_SLUG_ROWS.length ||
+      Number(before.safe_ready || 0) !== SAFE_SLUG_ROWS.length ||
+      Number(before.duplicate_rows || 0) !==
+        DUPLICATE_REVIEW_IDS.length ||
+      Number(before.duplicate_resolved || 0) !==
+        DUPLICATE_REVIEW_IDS.length
+    ) {
+      fs.writeFileSync(
+        ARTIFACT_DIR + "/preflight-failed.json",
+        JSON.stringify(before, null, 2) + "\n",
+      );
+
+      throw new Error(
+        "Batch A is not ready for MIZIZI safe-slug execution. " +
+          "Expected 5 recorded safe-slug decisions and 10 fully resolved duplicate reviews.",
+      );
+    }
+
+    const safeState = parsePayload(
+      before.safe_payload,
+      "Batch A safe payload",
+    );
+
+    fs.writeFileSync(
+      ARTIFACT_DIR + "/preflight.json",
+      JSON.stringify(
+        {
+          expectedMain: EXPECTED_MAIN,
+          capabilityGrantId: trigger.capability_grant_id,
+          safeState,
+          duplicateState: parsePayload(
+            before.duplicate_payload,
+            "Batch A duplicate payload",
+          ),
+        },
+        null,
+        2,
+      ) + "\n",
+    );
+
+    const byReview = new Map(
+      safeState.map((row) => [String(row.reviewId), row]),
+    );
+
     for (const row of SAFE_SLUG_ROWS) {
       const stateRow = byReview.get(row.reviewId);
 
