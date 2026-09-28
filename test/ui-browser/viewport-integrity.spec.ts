@@ -278,7 +278,7 @@ test("finite WAKILISHA selection stays anchored and browser-chrome free inside a
     const visuallySuppressed =
       bridge.display === "none"
       || bridge.visibility === "hidden"
-      || bridge.opacity === "0"
+      || Number.parseFloat(bridge.opacity || "1") <= 0.01
       || bridge.clip !== "auto"
       || bridge.clipPath !== "none"
       || (bridge.width <= 2 && bridge.height <= 2);
