@@ -94,6 +94,86 @@ test("mobile editable controls keep a 16px floor without changing page scale", a
   }
 });
 
+test("tall shared Modal stays viewport-bound with its action footer visible", async ({
+  page,
+}, testInfo) => {
+  if (testInfo.project.name === "chromium") {
+    await page.setViewportSize({ width: 390, height: 844 });
+  }
+
+  await page.goto(FIXTURE);
+  await page
+    .getByRole("button", { name: "Open tall interaction modal" })
+    .click();
+
+  const dialog = page.getByRole("dialog", {
+    name: "Tall interaction acceptance",
+  });
+  const panel = dialog.locator("[data-wk-modal-panel]").or(
+    page.locator("[data-wk-modal-panel]"),
+  );
+  const body = page.locator("[data-wk-modal-body]");
+  const footer = page.locator("[data-wk-modal-footer]");
+  const action = page.getByRole("button", {
+    name: "Pinned modal action",
+  });
+
+  await expect(dialog).toBeVisible();
+  await expect(action).toBeVisible();
+
+  const geometry = await page.evaluate(() => {
+    const panel = document.querySelector("[data-wk-modal-panel]") as HTMLElement;
+    const body = document.querySelector("[data-wk-modal-body]") as HTMLElement;
+    const footer = document.querySelector("[data-wk-modal-footer]") as HTMLElement;
+    const action = Array.from(document.querySelectorAll("button")).find(
+      (button) => button.textContent?.trim() === "Pinned modal action",
+    ) as HTMLButtonElement;
+
+    const rect = (element: HTMLElement) => {
+      const value = element.getBoundingClientRect();
+      return {
+        top: value.top,
+        bottom: value.bottom,
+        left: value.left,
+        right: value.right,
+      };
+    };
+
+    return {
+      panel: rect(panel),
+      body: rect(body),
+      footer: rect(footer),
+      action: rect(action),
+      bodyScrollable: body.scrollHeight > body.clientHeight,
+      viewportHeight: window.visualViewport?.height ?? window.innerHeight,
+      viewportWidth: window.visualViewport?.width ?? window.innerWidth,
+    };
+  });
+
+  expect(geometry.panel.top).toBeGreaterThanOrEqual(0);
+  expect(geometry.panel.bottom).toBeLessThanOrEqual(
+    geometry.viewportHeight + 1,
+  );
+  expect(geometry.panel.left).toBeGreaterThanOrEqual(0);
+  expect(geometry.panel.right).toBeLessThanOrEqual(
+    geometry.viewportWidth + 1,
+  );
+  expect(geometry.bodyScrollable).toBe(true);
+  expect(geometry.footer.bottom).toBeLessThanOrEqual(
+    geometry.viewportHeight + 1,
+  );
+  expect(geometry.action.bottom).toBeLessThanOrEqual(
+    geometry.viewportHeight + 1,
+  );
+
+  await body.evaluate((element) => {
+    element.scrollTop = element.scrollHeight;
+  });
+  await expect(action).toBeVisible();
+  await expect(footer).toBeVisible();
+  await expect(panel).toBeVisible();
+});
+
 test("long canonical identities stay inside a bounded mobile grid", async ({
   page,
 }, testInfo) => {
