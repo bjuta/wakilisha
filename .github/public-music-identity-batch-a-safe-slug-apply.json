@@ -1,0 +1,25 @@
+{
+  "operation": "public_music_identity_batch_a_safe_slug_apply",
+  "scope": "public_music_identity_batch_a_safe_slug",
+  "programme_issue": 1094,
+  "confirm": "PUBLIC_MUSIC_IDENTITY_BATCH_A_SAFE_SLUG_APPLY",
+  "safe_review_ids": [
+    "740dbe7e-b423-4e69-b479-83dc91a76da2",
+    "74df20a4-1486-42a1-a6fe-e6b625c38728",
+    "e4150d85-72b5-4a4b-895b-59cacc81b658",
+    "78ac6974-e6a8-4759-a2be-ce3fd979ab0b",
+    "d723ff1e-31ad-42ff-9fe0-871c9b9e9b52"
+  ],
+  "duplicate_review_ids": [
+    "4894bfa2-8308-47d3-b502-6670082e0c61",
+    "909afe2e-9f56-4923-ad6a-b9fc50cb4709",
+    "6f52d662-3326-414e-a960-47ea27489564",
+    "fd29049c-03e1-4005-a5dd-c412a5d7581f",
+    "34e1696c-b7e8-45b6-8d0a-6ac7e7a89a76",
+    "40f42e78-dfe4-4450-8693-f8c7f37571eb",
+    "70e36b3f-909e-4470-acfe-8f411dda1a94",
+    "e1e7d310-54aa-421c-97d7-542ef2427608",
+    "d1cfb9fe-d338-455b-b57d-ea3c155560c9",
+    "72df403c-ad7a-46f6-8478-64640ae1600f"
+  ]
+}
