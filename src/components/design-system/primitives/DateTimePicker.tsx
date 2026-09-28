@@ -1,4 +1,10 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import {
+  Button,
+  Dialog,
+  DialogTrigger,
+  Popover,
+} from "react-aria-components";
 import {
   SearchableSelect,
   type SearchableSelectOption,
@@ -188,37 +194,11 @@ export function WkTemporalPicker({
   const [draft, setDraft] = useState<DraftDateTime>(() =>
     parseValue(value, mode),
   );
-  const rootRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (!open) return;
     setDraft(parseValue(value, mode));
   }, [mode, open, value]);
-
-  useEffect(() => {
-    if (!open) return;
-
-    function handlePointerDown(event: MouseEvent) {
-      if (
-        rootRef.current &&
-        !rootRef.current.contains(event.target as Node)
-      ) {
-        setOpen(false);
-      }
-    }
-
-    function handleKeyDown(event: KeyboardEvent) {
-      if (event.key === "Escape") setOpen(false);
-    }
-
-    document.addEventListener("mousedown", handlePointerDown);
-    document.addEventListener("keydown", handleKeyDown);
-
-    return () => {
-      document.removeEventListener("mousedown", handlePointerDown);
-      document.removeEventListener("keydown", handleKeyDown);
-    };
-  }, [open]);
 
   const monthOptions = useMemo(
     () =>
@@ -271,21 +251,18 @@ export function WkTemporalPicker({
   }
 
   return (
-    <div ref={rootRef} className={`relative ${className}`.trim()}>
-      <button
-        type="button"
-        disabled={disabled}
-        aria-haspopup="dialog"
-        aria-expanded={open}
+    <DialogTrigger
+      isOpen={open}
+      onOpenChange={setOpen}
+    >
+      <Button
+        isDisabled={disabled}
         aria-label={label}
-        onClick={() => {
-          if (!disabled) setOpen((current) => !current);
-        }}
-        className={`flex w-full items-center justify-between gap-3 rounded-xl border border-wk-border bg-wk-surface px-3.5 py-2.5 text-left transition-colors focus:border-wk-border-strong focus:outline-none focus:ring-2 focus:ring-wk-brand/15 ${
+        className={`flex w-full items-center justify-between gap-3 rounded-xl border border-wk-border bg-wk-surface px-3.5 py-2.5 text-left transition-colors focus:border-wk-border-strong focus:outline-none focus-visible:ring-2 focus-visible:ring-wk-brand/15 ${
           disabled
             ? "cursor-not-allowed opacity-50"
             : "hover:bg-wk-surface-raised"
-        } ${triggerClassName}`.trim()}
+        } ${triggerClassName} ${className}`.trim()}
       >
         <span>
           {showLabel ? (
@@ -305,20 +282,21 @@ export function WkTemporalPicker({
           aria-hidden="true"
           className={`${mode === "time" ? "ri-time-line" : "ri-calendar-2-line"} text-[17px] text-wk-text-muted`}
         />
-      </button>
+      </Button>
 
-      {open ? (
-        <div
-          role="dialog"
-          aria-label={label}
-          className="absolute left-0 top-full z-[var(--wk-z-dropdown)] mt-2 w-full min-w-[300px] rounded-2xl border border-wk-border-2 bg-wk-surface p-4 shadow-[var(--wk-shadow)] sm:min-w-[460px]"
-        >
+      <Popover
+        placement="bottom start"
+        offset={8}
+        className="w-[min(460px,calc(100vw-2rem))] overflow-visible rounded-2xl border border-wk-border-2 bg-wk-surface p-4 shadow-[var(--wk-shadow)]"
+        style={{ zIndex: "calc(var(--wk-z-modal) + 20)" }}
+      >
+        <Dialog aria-label={label} className="outline-none">
           <div className="mb-3">
             <div className="text-[12px] font-black text-wk-text">
               Choose {label.toLowerCase()}
             </div>
             <p className="mt-1 text-[11px] leading-relaxed text-wk-text-muted">
-              WAKILISHA-owned temporal controls with keyboard-accessible selection.
+              Choose the exact value using WAKILISHA controls.
             </p>
           </div>
 
@@ -411,11 +389,10 @@ export function WkTemporalPicker({
               {actionLabel(mode)}
             </button>
           </div>
-        </div>
-      ) : null}
-    </div>
-  );
-}
+        </Dialog>
+      </Popover>
+    </DialogTrigger>
+  );}
 
 export function WkDatePicker(props: WkDateTimePickerProps) {
   return <WkTemporalPicker {...props} mode="date" />;
