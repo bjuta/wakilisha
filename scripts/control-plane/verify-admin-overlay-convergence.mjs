@@ -17,6 +17,10 @@ const semanticViewportOverlays = new Map([
     "Media picker is a purpose-built large viewport workspace",
   ],
   [
+    "src/components/admin/media/MediaEditModal.tsx",
+    "Media editing is a purpose-built two-pane asset workspace",
+  ],
+  [
     "src/pages/admin/content/articles/detail/components/ArticlePreviewModal.tsx",
     "Article preview is a full-screen public-reading simulation",
   ],
