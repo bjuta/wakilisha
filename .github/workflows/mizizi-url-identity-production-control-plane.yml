@@ -138,10 +138,11 @@ jobs:
               exit 1
             }
             echo "MIZIZI_EXPECTED_MAIN_SHA=$GITHUB_SHA" >> "$GITHUB_ENV"
+            echo "MIZIZI_TRIGGER_FILE=.github/public-music-identity-batch-a-safe-slug-apply.json" >> "$GITHUB_ENV"
           fi
 
       - name: Run current MIZIZI URL-identity control plane
-        if: (github.event_name != 'workflow_dispatch' || inputs.operation == 'preflight') && env.PUBLIC_MUSIC_IDENTITY_BATCH_A_APPLY != 'true'
+        if: github.event_name != 'workflow_dispatch' || inputs.operation == 'preflight' || inputs.operation == 'public_music_identity_batch_a_safe_slug'
         run: node scripts/control-plane/mizizi-url-identity-production-control-plane.mjs
 
       - name: Run Public Music Identity Batch A safe-slug executor
