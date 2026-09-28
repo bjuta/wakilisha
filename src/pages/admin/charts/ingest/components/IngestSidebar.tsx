@@ -1,5 +1,6 @@
-import { useState, useRef, useEffect } from "react";
+import { useState } from "react";
 import { WkSurface } from "@/components/design-system/primitives/Surface";
+import { Modal } from "@/components/design-system/primitives/Modal";
 import type { ChartEligibilityProfile } from "@/services/chartsEligibility/eligibilityTypes";
 import type { IngestRun, RecentIngestActivity, ResourceGuardStatus } from "@/services/chartsIngestion/ingestStudioTypes";
 import type { StoredChartMarketScope } from "@/services/chartsMarkets/marketScopeStore";
@@ -51,19 +52,6 @@ export function IngestSidebar({
   const [fixSlugsLoading, setFixSlugsLoading] = useState(false);
   const [fixSlugsResult, setFixSlugsResult] = useState<FixArtistSlugsResult | null>(null);
   const [fixSlugsError, setFixSlugsError] = useState<string | null>(null);
-  const fixSlugsRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    function handleClick(e: MouseEvent) {
-      if (fixSlugsRef.current && !fixSlugsRef.current.contains(e.target as Node) && fixSlugsOpen) {
-        setFixSlugsOpen(false);
-      }
-    }
-    if (fixSlugsOpen) {
-      document.addEventListener("mousedown", handleClick);
-      return () => document.removeEventListener("mousedown", handleClick);
-    }
-  }, [fixSlugsOpen]);
 
   async function handleFixArtistSlugs() {
     setFixSlugsLoading(true);
@@ -186,37 +174,43 @@ export function IngestSidebar({
         )}
       </WkSurface>
 
-      {/* Fix Artist Slugs confirm dialog */}
-      {fixSlugsOpen && (
-        <div className="fixed inset-0 z-[300] flex items-center justify-center bg-black/50">
-          <div ref={fixSlugsRef} className="w-full max-w-sm rounded-xl border border-wk-border bg-wk-surface p-6 shadow-lg">
-            <div className="flex items-center gap-2">
-              <WkIcon name="Wrench" size={18} className="text-wk-brand" />
-              <h3 className="text-[15px] font-bold text-wk-text">Fix Artist Slugs</h3>
-            </div>
-            <p className="mt-2 text-[13px] text-wk-text-muted">
-              This will scan all chart entries for corrupt artist slugs (track slugs mistakenly stored in the artist_slug column) and resolve them through the registry. Running as a dry run first to preview changes.
-            </p>
-            <div className="mt-5 flex items-center justify-end gap-2">
-              <button
-                onClick={() => setFixSlugsOpen(false)}
-                disabled={fixSlugsLoading}
-                className="inline-flex items-center gap-1.5 rounded-md border border-wk-border-2 bg-wk-surface px-4 py-2 text-[13px] font-semibold text-wk-text transition-colors hover:bg-wk-surface-raised disabled:opacity-50 whitespace-nowrap cursor-pointer"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={handleFixArtistSlugs}
-                disabled={fixSlugsLoading}
-                className="inline-flex items-center gap-1.5 rounded-md bg-wk-brand px-4 py-2 text-[13px] font-semibold text-wk-brand-on transition-colors hover:opacity-90 disabled:opacity-50 whitespace-nowrap cursor-pointer"
-              >
-                {fixSlugsLoading && <span className="inline-block h-3.5 w-3.5 animate-spin rounded-full border-2 border-white/30 border-t-white" />}
-                {fixSlugsLoading ? "Scanning…" : "Run Dry Run"}
-              </button>
-            </div>
+      <Modal
+        open={fixSlugsOpen}
+        onClose={() => {
+          if (!fixSlugsLoading) setFixSlugsOpen(false);
+        }}
+        title="Fix Artist Slugs"
+        maxWidth="sm"
+        dismissable={!fixSlugsLoading}
+        footer={
+          <div className="flex items-center justify-end gap-2">
+            <button
+              onClick={() => setFixSlugsOpen(false)}
+              disabled={fixSlugsLoading}
+              className="wk-button wk-button-ghost wk-button-sm"
+            >
+              Cancel
+            </button>
+            <button
+              onClick={handleFixArtistSlugs}
+              disabled={fixSlugsLoading}
+              className="wk-button wk-button-primary wk-button-sm"
+            >
+              {fixSlugsLoading && <span className="inline-block h-3.5 w-3.5 animate-spin rounded-full border-2 border-white/30 border-t-white" />}
+              {fixSlugsLoading ? "Scanning…" : "Run Dry Run"}
+            </button>
           </div>
+        }
+      >
+        <div className="flex items-start gap-3">
+          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-wk-brand-soft text-wk-brand">
+            <WkIcon name="Wrench" size={18} />
+          </div>
+          <p className="text-[13px] leading-6 text-wk-text-muted">
+            This will scan chart entries for corrupt artist slugs and resolve them through the Registry. It runs as a dry run first so you can review the exact changes before anything is applied.
+          </p>
         </div>
-      )}
+      </Modal>
     </div>
   );
 }
