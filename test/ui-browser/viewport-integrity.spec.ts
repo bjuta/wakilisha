@@ -260,29 +260,37 @@ test("finite WAKILISHA selection stays anchored and browser-chrome free inside a
   await expect(popover).toBeVisible();
   const nativeSelectBridges = await page.locator("select").evaluateAll(
     (selects) => selects.map((element) => {
-      const rect = element.getBoundingClientRect();
-      const style = getComputedStyle(element);
+      const hiddenContainer = element.closest(
+        '[aria-hidden="true"][data-a11y-ignore="aria-hidden-focus"]',
+      ) as HTMLElement | null;
+      const rect = hiddenContainer?.getBoundingClientRect();
+      const style = hiddenContainer ? getComputedStyle(hiddenContainer) : null;
+
       return {
-        width: rect.width,
-        height: rect.height,
-        display: style.display,
-        visibility: style.visibility,
-        opacity: style.opacity,
-        clip: style.clip,
-        clipPath: style.clipPath,
+        tabIndex: element.tabIndex,
+        hiddenByReactAria: Boolean(hiddenContainer),
+        containerWidth: rect?.width ?? null,
+        containerHeight: rect?.height ?? null,
+        containerClip: style?.clip ?? null,
+        containerClipPath: style?.clipPath ?? null,
       };
     }),
   );
   expect(nativeSelectBridges.length).toBeGreaterThanOrEqual(1);
   for (const bridge of nativeSelectBridges) {
-    const visuallySuppressed =
-      bridge.display === "none"
-      || bridge.visibility === "hidden"
-      || Number.parseFloat(bridge.opacity || "1") <= 0.01
-      || bridge.clip !== "auto"
-      || bridge.clipPath !== "none"
-      || (bridge.width <= 2 && bridge.height <= 2);
-    expect(visuallySuppressed).toBe(true);
+    expect(bridge.tabIndex).toBe(-1);
+    expect(bridge.hiddenByReactAria).toBe(true);
+
+    const visuallyClipped =
+      bridge.containerClip !== "auto"
+      || bridge.containerClipPath !== "none"
+      || (
+        bridge.containerWidth !== null
+        && bridge.containerHeight !== null
+        && bridge.containerWidth <= 2
+        && bridge.containerHeight <= 2
+      );
+    expect(visuallyClipped).toBe(true);
   }
 
   const geometry = await page.evaluate(() => {
