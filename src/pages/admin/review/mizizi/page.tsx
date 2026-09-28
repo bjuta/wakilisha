@@ -790,7 +790,6 @@ function DecisionModal({
       )}
     </Modal>
   );
-  );
 }
 
 function OutcomeButton({ activeClass, label, help, onClick }: { activeClass: string; label: string; help: string; onClick: () => void }) {
