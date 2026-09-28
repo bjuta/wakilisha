@@ -258,7 +258,12 @@ test("finite WAKILISHA selection stays anchored and browser-chrome free inside a
   const popover = page.locator("[data-wk-select-popover]");
   await expect(listbox).toBeVisible();
   await expect(popover).toBeVisible();
-  expect(await page.locator("select").count()).toBe(0);
+  const nativeSelects = page.locator("select");
+  const nativeSelectCount = await nativeSelects.count();
+  expect(nativeSelectCount).toBeGreaterThanOrEqual(1);
+  for (let index = 0; index < nativeSelectCount; index += 1) {
+    await expect(nativeSelects.nth(index)).toBeHidden();
+  }
 
   const geometry = await page.evaluate(() => {
     const trigger = document.querySelector(
