@@ -12,6 +12,8 @@ const PROJECT_REF =
 const TOKEN = process.env.SUPABASE_ACCESS_TOKEN || "";
 const EXPECTED_MAIN =
   process.env.MIZIZI_EXPECTED_MAIN_SHA || "";
+const TRIGGER_FILE =
+  process.env.MIZIZI_TRIGGER_FILE || "";
 const ARTIFACT_DIR =
   process.env.MIZIZI_ARTIFACT_DIR ||
   "artifacts/public-music-identity-batch-a";
@@ -77,6 +79,56 @@ function sqlUuidArray(values) {
     "array[" +
     values.map((value) => "'" + value + "'::uuid").join(",") +
     "]::uuid[]"
+  );
+}
+
+function assertReviewedTrigger() {
+  if (!TRIGGER_FILE) return;
+
+  if (!fs.existsSync(TRIGGER_FILE)) {
+    throw new Error(
+      "Batch A reviewed trigger file is missing: " +
+        TRIGGER_FILE,
+    );
+  }
+
+  const trigger = JSON.parse(
+    fs.readFileSync(TRIGGER_FILE, "utf8"),
+  );
+
+  const expectedSafe = SAFE_SLUG_ROWS
+    .map((row) => row.reviewId)
+    .sort();
+  const expectedDuplicate = [...DUPLICATE_REVIEW_IDS].sort();
+  const actualSafe = Array.isArray(trigger.safe_review_ids)
+    ? [...trigger.safe_review_ids].map(String).sort()
+    : [];
+  const actualDuplicate = Array.isArray(
+    trigger.duplicate_review_ids,
+  )
+    ? [...trigger.duplicate_review_ids].map(String).sort()
+    : [];
+
+  if (
+    trigger.operation !==
+      "public_music_identity_batch_a_safe_slug_apply" ||
+    trigger.scope !==
+      "public_music_identity_batch_a_safe_slug" ||
+    Number(trigger.programme_issue) !== 1094 ||
+    trigger.confirm !==
+      "PUBLIC_MUSIC_IDENTITY_BATCH_A_SAFE_SLUG_APPLY" ||
+    JSON.stringify(actualSafe) !==
+      JSON.stringify(expectedSafe) ||
+    JSON.stringify(actualDuplicate) !==
+      JSON.stringify(expectedDuplicate)
+  ) {
+    throw new Error(
+      "Batch A reviewed trigger does not match the exact approved manifest.",
+    );
+  }
+
+  console.log(
+    "PASS: exact reviewed Batch A trigger manifest accepted",
   );
 }
 
@@ -397,6 +449,7 @@ async function main() {
   );
 
   assertExactMain();
+  assertReviewedTrigger();
   linkSupabaseProject(PROJECT_REF);
 
   const before = batchState();
