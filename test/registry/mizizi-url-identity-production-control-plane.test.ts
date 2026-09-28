@@ -145,6 +145,26 @@ describe("MIZIZI current URL-identity production control plane", () => {
       "scripts/control-plane/public-music-identity-track-actual-zero-audit.mjs",
       "utf8",
     );
+    const currentControlPlane = readFileSync(
+      "scripts/control-plane/mizizi-url-identity-production-control-plane.mjs",
+      "utf8",
+    );
+
+    expect(currentControlPlane).toContain(
+      "EXPECTED_BATCH_A_DUPLICATE_IDENTITY_NOISE_REMAINING = 17",
+    );
+    expect(currentControlPlane).toContain(
+      "EXPECTED_BATCH_A_SAFE_SLUG_IDENTITY_NOISE_REMAINING = 12",
+    );
+    expect(currentControlPlane).toContain(
+      "ACCEPTED_TRACK_AUDIT_SNAPSHOTS",
+    );
+    expect(currentControlPlane).toContain(
+      "recordingIdentityConflict: 71",
+    );
+    expect(currentControlPlane).toContain(
+      "tracks: 2091",
+    );
 
     expect(workflow).toContain(
       "public_music_identity_batch_a_safe_slug",
