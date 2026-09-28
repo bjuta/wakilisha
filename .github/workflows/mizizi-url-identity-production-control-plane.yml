@@ -6,6 +6,7 @@ on:
       - ".github/workflows/mizizi-url-identity-production-control-plane.yml"
       - "scripts/control-plane/mizizi-production-jit-runtime.mjs"
       - "scripts/control-plane/mizizi-url-identity-production-control-plane.mjs"
+      - "scripts/control-plane/public-music-identity-batch-a-production-control-plane.mjs"
       - "scripts/control-plane/verify-mizizi-url-identity-authority-window-close.sql"
       - "supabase/migrations/20260922143000_mizizi_url_identity_authority_window_close_v1.sql"
       - "supabase/migrations/20260922171632_mizizi_release_slug_resume_integrity_v1.sql"
@@ -34,6 +35,15 @@ on:
       - ".github/public-music-identity-track-slug-zero-apply.json"
       - ".github/public-music-identity-track-slug-primary-followup-apply.json"
   workflow_dispatch:
+    inputs:
+      operation:
+        description: Production control-plane operation
+        required: true
+        default: preflight
+        type: choice
+        options:
+          - preflight
+          - public_music_identity_batch_a_safe_slug
 
 permissions:
   contents: read
@@ -107,14 +117,35 @@ jobs:
 
           echo "MIZIZI_EXPECTED_MAIN_SHA=$GITHUB_SHA" >> "$GITHUB_ENV"
 
+      - name: Resolve manual Production operation
+        if: github.event_name == 'workflow_dispatch'
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          if [ "${{ inputs.operation }}" = "public_music_identity_batch_a_safe_slug" ]; then
+            test "$GITHUB_REF" = "refs/heads/main" || {
+              echo "STOP: Batch A mutation may run only from protected main."
+              exit 1
+            }
+            echo "MIZIZI_EXPECTED_MAIN_SHA=$GITHUB_SHA" >> "$GITHUB_ENV"
+          fi
+
       - name: Run current MIZIZI URL-identity control plane
+        if: github.event_name != 'workflow_dispatch' || inputs.operation == 'preflight'
         run: node scripts/control-plane/mizizi-url-identity-production-control-plane.mjs
+
+      - name: Run Public Music Identity Batch A safe-slug executor
+        if: github.event_name == 'workflow_dispatch' && inputs.operation == 'public_music_identity_batch_a_safe_slug'
+        run: node scripts/control-plane/public-music-identity-batch-a-production-control-plane.mjs
 
       - name: Upload URL-identity control-plane evidence
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: mizizi-url-identity-production-control-plane-${{ github.run_id }}
-          path: artifacts/mizizi-url-identity-production-control-plane
+          path: |
+            artifacts/mizizi-url-identity-production-control-plane
+            artifacts/public-music-identity-batch-a
           if-no-files-found: ignore
           retention-days: 30
