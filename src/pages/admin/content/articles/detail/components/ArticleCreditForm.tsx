@@ -4,6 +4,7 @@ import {
   type FormEvent,
 } from "react";
 import { WkIcon } from "@/components/design-system/Icon";
+import { Modal } from "@/components/design-system/primitives/Modal";
 import { useAdminUser } from "@/hooks/useAdminUser";
 import {
   ArticleTrustServiceError,
@@ -394,48 +395,54 @@ export function ArticleCreditForm({
       ? "Create Credit and Attach"
       : "Create and Attach Credit";
 
+  const footer = (
+    <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+      <button
+        type="button"
+        onClick={requestClose}
+        disabled={submitting}
+        className="wk-button wk-button-secondary"
+      >
+        Cancel
+      </button>
+      <button
+        type="submit"
+        form="article-credit-form"
+        disabled={
+          submitting ||
+          (partyKind === "current_user" && adminUser.loading)
+        }
+        className="wk-button wk-button-primary"
+      >
+        <WkIcon
+          name={submitting ? "Loader2" : "Plus"}
+          size={15}
+          className={submitting ? "animate-spin" : undefined}
+        />
+        {submitting ? "Saving Credit" : submitLabel}
+      </button>
+    </div>
+  );
+
   return (
-    <div
-      className="fixed inset-0 z-[130] flex items-center justify-center bg-black/50 p-2 sm:p-4"
-      role="dialog"
-      aria-modal="true"
-      aria-labelledby="article-credit-form-title"
+    <Modal
+      open
+      onClose={() => {
+        if (!submitting) void requestClose();
+      }}
+      title="Add a Governed Credit"
+      maxWidth="3xl"
+      dismissable={!submitting}
+      footer={footer}
     >
-      <div className="flex max-h-[94dvh] w-full max-w-3xl flex-col overflow-hidden rounded-2xl border border-wk-border bg-wk-surface shadow-2xl">
-        <header className="flex items-start justify-between gap-4 border-b border-wk-border px-5 py-4">
-          <div>
-            <div className="text-[10px] font-black uppercase tracking-[0.14em] text-wk-brand">
-              Governed Credit
-            </div>
-            <h2
-              id="article-credit-form-title"
-              className="mt-1 text-[18px] font-bold text-wk-text"
-            >
-              Add a Governed Credit
-            </h2>
-            <p className="mt-1 max-w-2xl text-[11px] leading-5 text-wk-text-muted">
-              Credit the signed-in WAKILISHA user or create an
-              external contributor, then attach one immutable
-              Credit to the current working Article version.
-            </p>
-          </div>
+      <div className="mb-5">
+        <div className="text-[10px] font-black uppercase tracking-[0.14em] text-wk-brand">Governed Credit</div>
+        <p className="mt-1 max-w-2xl text-[11px] leading-5 text-wk-text-muted">
+          Credit the signed-in WAKILISHA user or create an external contributor, then attach one immutable Credit to the current working Article version.
+        </p>
+      </div>
+      <form id="article-credit-form" onSubmit={handleSubmit} className="space-y-6">
 
-          <button
-            type="button"
-            onClick={requestClose}
-            disabled={submitting}
-            className="wk-button wk-button-ghost wk-button-sm shrink-0"
-            aria-label="Close Credit form"
-          >
-            <WkIcon name="X" size={16} />
-          </button>
-        </header>
-
-        <form
-          onSubmit={handleSubmit}
-          className="flex min-h-0 flex-1 flex-col"
-        >
-          <div className="min-h-0 flex-1 space-y-6 overflow-y-auto px-5 py-5">
             {errorMessage ? (
               <div className="rounded-xl border border-wk-danger/30 bg-wk-danger-soft px-4 py-3 text-[11px] leading-5 text-wk-danger">
                 {errorMessage}
@@ -884,47 +891,6 @@ export function ArticleCreditForm({
                 </div>
               </div>
             </section>
-          </div>
-
-          <footer className="flex flex-col-reverse gap-2 border-t border-wk-border px-5 py-4 sm:flex-row sm:justify-end">
-            <button
-              type="button"
-              onClick={requestClose}
-              disabled={submitting}
-              className="wk-button wk-button-secondary"
-            >
-              Cancel
-            </button>
-
-            <button
-              type="submit"
-              disabled={
-                submitting ||
-                (partyKind === "current_user" &&
-                  adminUser.loading)
-              }
-              className="wk-button wk-button-primary"
-            >
-              <WkIcon
-                name={
-                  submitting
-                    ? "Loader2"
-                    : "Plus"
-                }
-                size={15}
-                className={
-                  submitting
-                    ? "animate-spin"
-                    : undefined
-                }
-              />
-              {submitting
-                ? "Saving Credit"
-                : submitLabel}
-            </button>
-          </footer>
-        </form>
-      </div>
-    </div>
-  );
-}
+      </form>
+    </Modal>
+  );}
