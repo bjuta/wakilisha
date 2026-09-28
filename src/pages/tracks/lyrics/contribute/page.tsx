@@ -98,7 +98,6 @@ export default function LyricContribution() {
     }
 
     const requestedRegistryTrackId =
-      trackId ||
       new URLSearchParams(location.search)
         .get("track_id")
         ?.trim() ||

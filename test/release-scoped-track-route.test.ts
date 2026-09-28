@@ -98,7 +98,16 @@ describe("canonical public Track and Release routes", () => {
     }
 
     expect(trackPage).not.toContain("trackId } = useParams");
+    expect(trackPage).not.toContain(
+      "[artistSlug, trackSlug, trackId,",
+    );
+    expect(trackPage).not.toContain(
+      "release_slug: releaseSlug",
+    );
     expect(lyricsPage).not.toContain("trackId,");
+    expect(lyricsPage).not.toContain(
+      "trackId ||",
+    );
     expect(releasePage).toContain("data.trackCount <= 1");
     expect(releasePage).not.toContain("navigate(");
     expect(mobileReleasePage).toContain("data.trackCount <= 1");

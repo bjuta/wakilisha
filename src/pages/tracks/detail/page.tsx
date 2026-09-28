@@ -831,7 +831,6 @@ export default function TrackDetail() {
               suggested_fix: "",
               soft_404_surface: "track_detail",
               artist_slug: artistSlug,
-              release_slug: releaseSlug || "",
               track_slug: trackSlug,
             },
           });
@@ -851,7 +850,7 @@ export default function TrackDetail() {
       });
 
     return () => { alive = false; };
-  }, [artistSlug, trackSlug, trackId, location.pathname, location.search, location.hash]);
+  }, [artistSlug, trackSlug, location.pathname, location.search, location.hash]);
 
   if (loading) {
     return (
