@@ -1460,7 +1460,7 @@ describe("MIZIZI Cultural Data Steward", () => {
       "accepted Track review boundary is not recognized",
     );
     expect(controlPlane).toContain(
-      "[66,32].includes(identityNoise)",
+      "[66,32,27].includes(identityNoise)",
     );
     expect(controlPlane).toContain(
       "598 + identityNoise",
