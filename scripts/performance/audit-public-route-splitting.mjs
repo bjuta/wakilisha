@@ -437,12 +437,15 @@ const routePaths = [
  * - /tracks/:artistSlug/:trackSlug
  * - /tracks/:artistSlug/:trackSlug/lyrics/contribute
  *
- * Current route authority is therefore 177 paths. Removing the Messages paths,
- * the Artist Studio path, the Field intake path, the five declared public Audio
- * and Show paths, the two K5B Admin Video paths, and the two public Video paths
- * reproduces the exact 163-path preserved pre-M1 sequence.
+ * Dedicated MIZIZI Admin workflow adds one internal Review path:
+ * - mizizi
+ *
+ * Current route authority is therefore 178 paths. Removing the Messages paths,
+ * the Artist Studio path, the Field intake path, the Admin MIZIZI path, the five
+ * declared public Audio and Show paths, the two K5B Admin Video paths, and the
+ * two public Video paths reproduces the exact 163-path preserved pre-M1 sequence.
  */
-const expectedRoutePathCount = 177;
+const expectedRoutePathCount = 178;
 const publicAudioIndexPath = "/audio";
 const publicAudioPath = "/audio/:slug";
 const publicShowIndexPath = "/shows";
@@ -453,6 +456,7 @@ const publicFieldPath = "/field";
 const publicMessagesPath = "/messages";
 const adminMessagesPath = "messages";
 const adminFieldPath = "field";
+const adminMiziziPath = "mizizi";
 const adminVideoIndexPath = "video";
 const adminVideoDetailPath = "video/:publicationId";
 const publicVideoIndexPath = "/video";
@@ -497,6 +501,7 @@ for (const [routePath, label] of [
   [publicMessagesPath, "Messages"],
   [adminMessagesPath, "Admin Messages Control Center"],
   [adminFieldPath, "Admin Field"],
+  [adminMiziziPath, "Admin MIZIZI"],
   [adminVideoIndexPath, "Admin Video Directory"],
   [adminVideoDetailPath, "Admin Video Detail"],
   [publicVideoIndexPath, "Public Video Directory"],
@@ -533,6 +538,7 @@ const preM1RoutePaths = routePaths.filter(
     routePath !== publicMessagesPath &&
     routePath !== adminMessagesPath &&
     routePath !== adminFieldPath &&
+    routePath !== adminMiziziPath &&
     routePath !== adminVideoIndexPath &&
     routePath !== adminVideoDetailPath &&
     routePath !== publicVideoIndexPath &&
