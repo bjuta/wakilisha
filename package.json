@@ -125,6 +125,7 @@
     "registry:mizizi:review": "tsx scripts/registry/agents/mizizi/run.ts --mode=review",
     "registry:mizizi:apply": "tsx scripts/registry/agents/mizizi/run.ts --mode=apply",
     "audit:ui-chrome": "node scripts/control-plane/verify-wakilisha-ui-chrome.mjs",
+    "audit:admin-overlays": "node scripts/control-plane/verify-admin-overlay-convergence.mjs",
     "audit:viewport-integrity": "node scripts/control-plane/verify-viewport-integrity.mjs",
     "audit:ui-chrome:zero": "node scripts/control-plane/verify-wakilisha-ui-chrome.mjs --require-zero",
     "test:ui-dom": "vitest run test/ui-interactions",
