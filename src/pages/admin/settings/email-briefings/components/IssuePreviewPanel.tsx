@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect } from "react";
+import { Portal } from "@/components/base/Portal";
 import { WkIcon } from "@/components/design-system/Icon";
 
 type PreviewMode = "desktop" | "mobile";
@@ -68,7 +69,8 @@ export function IssuePreviewPanel({
   const iframeWidth = mode === "desktop" ? "100%" : "375px";
 
   return (
-    <div
+    <Portal>
+      <div
       className="fixed inset-0 z-[200] flex flex-col bg-[var(--wk-bg)]"
       role="dialog"
       aria-modal="true"
@@ -249,6 +251,7 @@ export function IssuePreviewPanel({
           <span>HTML size: {Math.round(html.length / 1024)}KB</span>
         </div>
       )}
-    </div>
+      </div>
+    </Portal>
   );
 }
