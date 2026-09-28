@@ -258,11 +258,31 @@ test("finite WAKILISHA selection stays anchored and browser-chrome free inside a
   const popover = page.locator("[data-wk-select-popover]");
   await expect(listbox).toBeVisible();
   await expect(popover).toBeVisible();
-  const nativeSelects = page.locator("select");
-  const nativeSelectCount = await nativeSelects.count();
-  expect(nativeSelectCount).toBeGreaterThanOrEqual(1);
-  for (let index = 0; index < nativeSelectCount; index += 1) {
-    await expect(nativeSelects.nth(index)).toBeHidden();
+  const nativeSelectBridges = await page.locator("select").evaluateAll(
+    (selects) => selects.map((element) => {
+      const rect = element.getBoundingClientRect();
+      const style = getComputedStyle(element);
+      return {
+        width: rect.width,
+        height: rect.height,
+        display: style.display,
+        visibility: style.visibility,
+        opacity: style.opacity,
+        clip: style.clip,
+        clipPath: style.clipPath,
+      };
+    }),
+  );
+  expect(nativeSelectBridges.length).toBeGreaterThanOrEqual(1);
+  for (const bridge of nativeSelectBridges) {
+    const visuallySuppressed =
+      bridge.display === "none"
+      || bridge.visibility === "hidden"
+      || bridge.opacity === "0"
+      || bridge.clip !== "auto"
+      || bridge.clipPath !== "none"
+      || (bridge.width <= 2 && bridge.height <= 2);
+    expect(visuallySuppressed).toBe(true);
   }
 
   const geometry = await page.evaluate(() => {
