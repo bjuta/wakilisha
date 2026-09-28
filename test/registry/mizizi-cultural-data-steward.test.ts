@@ -3575,6 +3575,12 @@ describe("Public Music Identity #1094 human decision lifecycle", () => {
     expect(migration).toContain(
       "'reviewResolved',false",
     );
+    expect(migration).toContain(
+      "recordingIdentityPeers",
+    );
+    expect(migration).toContain(
+      "canonicalTrackId must be one of the reviewed recording-identity peers.",
+    );
     expect(migration).not.toMatch(
       /update\s+public\.registry_review_items/i,
     );
@@ -3619,6 +3625,12 @@ describe("Public Music Identity #1094 human decision lifecycle", () => {
     );
     expect(page).toContain(
       "The review stays open until a governed executor",
+    );
+    expect(page).toContain(
+      "Decision recorded · execution pending",
+    );
+    expect(page).toContain(
+      "Human decision",
     );
   });
 });

@@ -168,6 +168,20 @@ begin
         order by identity_review.created_at,identity_review.id
         limit 1
       ),
+    'recordingIdentityPeers',
+      coalesce((
+        select identity_review.source_payload#>'{evidence,peers}'
+        from public.registry_review_items identity_review
+        where identity_review.review_type='mizizi_data_hygiene'
+          and identity_review.entity_type='track'
+          and identity_review.status='open'
+          and identity_review.source_id=v_track.id::text
+          and identity_review.source_payload->>'ruleId'=
+            'track_recording_identity_conflict'
+          and identity_review.source_payload->>'ruleVersion'='1.3.0'
+        order by identity_review.created_at,identity_review.id
+        limit 1
+      ),'[]'::jsonb),
     'existingDecision',
       (
         select jsonb_build_object(
@@ -217,6 +231,7 @@ declare
   v_existing public.registry_canonicalization_decisions%rowtype;
   v_decision_id uuid;
   v_related_identity_review_id uuid;
+  v_related_identity_review public.registry_review_items%rowtype;
   v_target_track_id uuid;
 begin
   if v_user_id is null
@@ -338,8 +353,8 @@ begin
       message='Track slug changed after the review was created. Re-audit before deciding.';
   end if;
 
-  select identity_review.id
-  into v_related_identity_review_id
+  select identity_review.*
+  into v_related_identity_review
   from public.registry_review_items identity_review
   where identity_review.review_type='mizizi_data_hygiene'
     and identity_review.entity_type='track'
@@ -350,6 +365,8 @@ begin
     and identity_review.source_payload->>'ruleVersion'='1.3.0'
   order by identity_review.created_at,identity_review.id
   limit 1;
+
+  v_related_identity_review_id:=v_related_identity_review.id;
 
   if v_decision_type='public_music_identity_safe_slug_repair' then
     if nullif(btrim(coalesce(v_payload->>'proposedSlug','')),'') is null
@@ -403,6 +420,21 @@ begin
     then
       raise exception using errcode='23514',
         message='Duplicate decision requires a different active canonical Track.';
+    end if;
+
+    if not exists (
+         select 1
+         from jsonb_array_elements(
+           coalesce(
+             v_related_identity_review.source_payload#>'{evidence,peers}',
+             '[]'::jsonb
+           )
+         ) peer
+         where peer->>'id'=v_target_track_id::text
+       )
+    then
+      raise exception using errcode='23514',
+        message='canonicalTrackId must be one of the reviewed recording-identity peers.';
     end if;
   elsif v_decision_type='public_music_identity_credit_correction_required' then
     if v_rule_id<>'track_slug_credit_evidence_gap' then

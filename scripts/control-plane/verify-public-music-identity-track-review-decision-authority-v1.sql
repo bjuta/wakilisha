@@ -46,6 +46,17 @@ begin
       'Public Music Identity review rule boundary drifted';
   end if;
 
+  if v_context_definition not like
+       '%recordingIdentityPeers%'
+     or v_record_definition not like
+       '%{evidence,peers}%'
+     or v_record_definition not like
+       '%canonicalTrackId must be one of the reviewed recording-identity peers.%'
+  then
+    raise exception
+      'Duplicate decision is not bound to the reviewed recording-identity peer set';
+  end if;
+
   if v_record_definition not like
        '%public_music_identity_safe_slug_repair%'
      or v_record_definition not like
