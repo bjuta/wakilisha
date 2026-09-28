@@ -16,6 +16,7 @@ interface SheetProps {
   bodyClassName?: string;
   panelClassName?: string;
   maxWidth?: "sm" | "md" | "lg" | "xl" | "2xl";
+  dismissable?: boolean;
 }
 
 export function Sheet({
@@ -28,6 +29,7 @@ export function Sheet({
   bodyClassName = "",
   panelClassName = "",
   maxWidth = "sm",
+  dismissable = true,
 }: SheetProps) {
   const rawId = useId();
   const titleId = `wk-sheet-title-${rawId.replace(/:/g, "")}`;
@@ -58,7 +60,7 @@ export function Sheet({
       onOpenChange={(nextOpen) => {
         if (!nextOpen) onClose();
       }}
-      isDismissable
+      isDismissable={dismissable}
       className={`fixed inset-0 flex min-h-0 overflow-hidden bg-[var(--wk-overlay)] ${alignmentClasses}`}
       style={{ zIndex: "var(--wk-z-modal)" }}
     >
