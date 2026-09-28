@@ -1,5 +1,6 @@
 import { useMemo } from "react";
 import { WkIcon } from "@/components/design-system/Icon";
+import { Modal } from "@/components/design-system/primitives/Modal";
 
 /* ─── Types ─── */
 
@@ -62,22 +63,22 @@ export function ArticlePublishChecklist({
         status: wc >= 50 ? "pass" : wc > 0 ? "warning" : "fail",
         detail:
           wc >= 50
-            ? `${wc} words — great`
+            ? `${wc} words: great`
             : wc > 0
-            ? `Only ${wc} words — consider writing more before publishing`
+            ? `Only ${wc} words: consider writing more before publishing`
             : "Article has no body content",
       },
       {
         id: "excerpt",
         label: "Excerpt / dek",
         status: excerpt.trim().length > 0 ? "pass" : "warning",
-        detail: excerpt.trim().length > 0 ? "Excerpt is set" : "No excerpt — will be auto-generated from content",
+        detail: excerpt.trim().length > 0 ? "Excerpt is set" : "No excerpt: will be auto-generated from content",
       },
       {
         id: "hero-image",
         label: "Hero image",
         status: heroImageUrl.trim().length > 0 ? "pass" : "warning",
-        detail: heroImageUrl.trim().length > 0 ? "Hero image is set" : "No hero image — article may look bare on listings",
+        detail: heroImageUrl.trim().length > 0 ? "Hero image is set" : "No hero image: article may look bare on listings",
       },
       {
         id: "seo-title",
@@ -90,10 +91,10 @@ export function ArticlePublishChecklist({
             : "warning",
         detail:
           seoTitle.length >= 30 && seoTitle.length <= 60
-            ? `${seoTitle.length} chars — optimal`
+            ? `${seoTitle.length} chars: optimal`
             : seoTitle.length > 0
-            ? `${seoTitle.length} chars — ideal is 30–60 for search engines`
-            : "No SEO title — article title will be used instead",
+            ? `${seoTitle.length} chars: ideal is 30–60 for search engines`
+            : "No SEO title: article title will be used instead",
       },
       {
         id: "seo-description",
@@ -106,16 +107,16 @@ export function ArticlePublishChecklist({
             : "warning",
         detail:
           seoDescription.length >= 120 && seoDescription.length <= 160
-            ? `${seoDescription.length} chars — optimal`
+            ? `${seoDescription.length} chars: optimal`
             : seoDescription.length > 0
-            ? `${seoDescription.length} chars — ideal is 120–160 for search previews`
-            : "No meta description — excerpt will be used instead",
+            ? `${seoDescription.length} chars: ideal is 120–160 for search previews`
+            : "No meta description: excerpt will be used instead",
       },
       {
         id: "categories",
         label: "Categories",
         status: categories.length > 0 ? "pass" : "warning",
-        detail: categories.length > 0 ? `${categories.length} categor${categories.length > 1 ? "ies" : "y"} assigned` : "No categories — harder for readers to discover",
+        detail: categories.length > 0 ? `${categories.length} categor${categories.length > 1 ? "ies" : "y"} assigned` : "No categories: harder for readers to discover",
       },
       {
         id: "schedule",
@@ -133,34 +134,65 @@ export function ArticlePublishChecklist({
   const passCount = items.filter((i) => i.status === "pass").length;
   const canPublish = failCount === 0;
 
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
-      <div className="w-full max-w-lg mx-4 rounded-2xl border border-[var(--wk-border)] bg-[var(--wk-surface)] shadow-lg max-h-[85vh] flex flex-col">
-        {/* Header */}
-        <div className="flex items-center justify-between px-6 py-4 border-b border-[var(--wk-border)]">
-          <div className="flex items-center gap-3">
-            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-[var(--wk-brand-soft)] text-[var(--wk-brand)]">
-              <WkIcon name="ClipboardCheck" size={20} />
-            </div>
-            <div>
-              <h3 className="text-[15px] font-bold text-[var(--wk-text)]">Pre-Publish Checklist</h3>
-              <p className="text-[11px] text-[var(--wk-text-muted)]">
-                {passCount}/{items.length} checks passed
-                {failCount > 0 && ` · ${failCount} blocking`}
-                {warningCount > 0 && ` · ${warningCount} suggestion${warningCount > 1 ? "s" : ""}`}
-              </p>
-            </div>
-          </div>
-          <button
-            onClick={onClose}
-            className="flex h-8 w-8 items-center justify-center rounded-lg hover:bg-[var(--wk-surface-raised)] transition-colors cursor-pointer"
-          >
-            <WkIcon name="X" size={16} className="text-[var(--wk-text-faint)]" />
-          </button>
-        </div>
+  const footer = (
+    <div className="flex items-center gap-3">
+      <button
+        onClick={onClose}
+        className="wk-button wk-button-secondary wk-button-sm flex-1 whitespace-nowrap"
+      >
+        Cancel
+      </button>
+      {canPublish ? (
+        <button
+          onClick={onPublishAnyway}
+          disabled={isPublishing}
+          className="wk-button wk-button-primary wk-button-sm flex-1 whitespace-nowrap"
+        >
+          {isPublishing ? (
+            <>
+              <i className="ri-loader-4-line animate-spin text-[14px]" />
+              Publishing...
+            </>
+          ) : (
+            <>
+              <WkIcon name="Globe" size={14} />
+              {warningCount > 0 ? "Publish Anyway" : "Publish Now"}
+            </>
+          )}
+        </button>
+      ) : (
+        <button
+          disabled
+          className="wk-button wk-button-sm flex-1 whitespace-nowrap opacity-40 cursor-not-allowed bg-[var(--wk-border)] text-[var(--wk-text-faint)]"
+        >
+          <WkIcon name="XCircle" size={14} />
+          Fix {failCount} issue{failCount > 1 ? "s" : ""} first
+        </button>
+      )}
+    </div>
+  );
 
-        {/* Checklist items */}
-        <div className="flex-1 overflow-y-auto px-6 py-4 space-y-1">
+  return (
+    <Modal
+      open
+      onClose={onClose}
+      title="Pre-Publish Checklist"
+      maxWidth="lg"
+      dismissable={!isPublishing}
+      footer={footer}
+    >
+      <div className="mb-4 flex items-center gap-3">
+        <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-[var(--wk-brand-soft)] text-[var(--wk-brand)]">
+          <WkIcon name="ClipboardCheck" size={20} />
+        </div>
+        <p className="text-[11px] text-[var(--wk-text-muted)]">
+          {passCount}/{items.length} checks passed
+          {failCount > 0 && ` · ${failCount} blocking`}
+          {warningCount > 0 && ` · ${warningCount} suggestion${warningCount > 1 ? "s" : ""}`}
+        </p>
+      </div>
+      <div className="space-y-1">
+
           {items.map((item) => (
             <div
               key={item.id}
@@ -213,45 +245,6 @@ export function ArticlePublishChecklist({
               </span>
             </div>
           ))}
-        </div>
-
-        {/* Footer actions */}
-        <div className="border-t border-[var(--wk-border)] px-6 py-4 flex items-center gap-3">
-          <button
-            onClick={onClose}
-            className="wk-button wk-button-secondary wk-button-sm flex-1 whitespace-nowrap cursor-pointer"
-          >
-            Cancel
-          </button>
-          {canPublish ? (
-            <button
-              onClick={onPublishAnyway}
-              disabled={isPublishing}
-              className="wk-button wk-button-primary wk-button-sm flex-1 whitespace-nowrap cursor-pointer"
-            >
-              {isPublishing ? (
-                <>
-                  <i className="ri-loader-4-line animate-spin text-[14px]" />
-                  Publishing…
-                </>
-              ) : (
-                <>
-                  <WkIcon name="Globe" size={14} />
-                  {warningCount > 0 ? "Publish Anyway" : "Publish Now"}
-                </>
-              )}
-            </button>
-          ) : (
-            <button
-              disabled
-              className="wk-button wk-button-sm flex-1 whitespace-nowrap opacity-40 cursor-not-allowed bg-[var(--wk-border)] text-[var(--wk-text-faint)]"
-            >
-              <WkIcon name="XCircle" size={14} />
-              Fix {failCount} issue{failCount > 1 ? "s" : ""} first
-            </button>
-          )}
-        </div>
       </div>
-    </div>
-  );
-}
+    </Modal>
+  );}
