@@ -2,6 +2,7 @@ import { useEffect, useState, useCallback, useMemo } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { WkIcon } from "@/components/design-system/Icon";
 import { WkSurface } from "@/components/design-system/primitives/Surface";
+import { Modal } from "@/components/design-system/primitives/Modal";
 import { supabase } from "@/lib/supabase";
 import { useRelatedEntities } from "@/hooks/useRelatedEntities";
 import AdminReleaseHero from "./components/AdminReleaseHero";
@@ -325,7 +326,7 @@ export default function ReleaseDetailPage() {
   const primaryArtist = releaseArtists.find((ra) => ra.is_primary) || releaseArtists[0];
   const artistName = primaryArtist?.artist_name_text || (release?.metadata?.artist_name as string) || "Unknown";
   const artistSlug = primaryArtist?.artist_slug || "";
-  const labelName = label?.name || "—";
+  const labelName = label?.name || "Not set";
   const labelSlug = label?.slug || "";
 
   const heroData: ReleaseHeroData | null = release ? {
@@ -562,22 +563,36 @@ export default function ReleaseDetailPage() {
         />
       </div>
 
-      {/* Delete confirmation modal */}
-      {showDelete && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
-          <div className="w-full max-w-sm mx-4 rounded-2xl border border-[var(--wk-border)] bg-[var(--wk-surface)] p-6 shadow-lg">
-            <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-xl bg-red-100 text-red-600">
-              <WkIcon name="Trash2" size={22} />
-            </div>
-            <h3 className="text-[16px] font-bold text-[var(--wk-text)] mb-2">Archive Release?</h3>
-            <p className="text-[13px] text-[var(--wk-text-muted)] mb-5">This will set the release status to "archived". You can restore it later.</p>
-            <div className="flex gap-3">
-              <button onClick={() => setShowDelete(false)} className="flex-1 rounded-lg border border-[var(--wk-border)] bg-[var(--wk-bg)] px-4 py-2.5 text-[13px] font-bold text-[var(--wk-text)] hover:bg-[var(--wk-surface-raised)] transition-colors whitespace-nowrap cursor-pointer">Cancel</button>
-              <button onClick={() => { setShowDelete(false); handleDelete(); }} className="flex-1 rounded-lg bg-red-600 text-white px-4 py-2.5 text-[13px] font-bold hover:bg-red-700 transition-colors whitespace-nowrap cursor-pointer">Yes, Archive</button>
-            </div>
+      <Modal
+        open={showDelete}
+        onClose={() => setShowDelete(false)}
+        title="Archive Release?"
+        maxWidth="sm"
+        footer={
+          <div className="flex gap-3">
+            <button
+              onClick={() => setShowDelete(false)}
+              className="wk-button wk-button-secondary wk-button-sm flex-1 whitespace-nowrap"
+            >
+              Cancel
+            </button>
+            <button
+              onClick={() => {
+                setShowDelete(false);
+                handleDelete();
+              }}
+              className="wk-button wk-button-sm flex-1 whitespace-nowrap bg-wk-danger text-white hover:opacity-90 border border-wk-danger"
+            >
+              Yes, Archive
+            </button>
           </div>
+        }
+      >
+        <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-xl bg-wk-danger-soft text-wk-danger">
+          <WkIcon name="Trash2" size={22} />
         </div>
-      )}
+        <p className="text-[13px] text-wk-text-muted">This will set the release status to "archived". You can restore it later.</p>
+      </Modal>
 
       {/* Toast container */}
       <div className="fixed bottom-6 right-6 z-50 flex flex-col gap-2 pointer-events-none">
