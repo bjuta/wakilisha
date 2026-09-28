@@ -2,7 +2,7 @@ import { useId, type ReactNode } from "react";
 import {
   Button,
   Dialog,
-  Modal,
+  Modal as AriaModal,
   ModalOverlay,
 } from "react-aria-components";
 
@@ -11,7 +11,10 @@ interface SheetProps {
   onClose: () => void;
   title?: string;
   children: ReactNode;
+  footer?: ReactNode;
   side?: "bottom" | "right";
+  bodyClassName?: string;
+  panelClassName?: string;
 }
 
 export function Sheet({
@@ -19,7 +22,10 @@ export function Sheet({
   onClose,
   title,
   children,
+  footer,
   side = "bottom",
+  bodyClassName = "",
+  panelClassName = "",
 }: SheetProps) {
   const rawId = useId();
   const titleId = `wk-sheet-title-${rawId.replace(/:/g, "")}`;
@@ -33,8 +39,8 @@ export function Sheet({
 
   const panelClasses =
     side === "bottom"
-      ? "w-full max-h-[80dvh] overflow-y-auto rounded-t-2xl"
-      : "h-full w-full max-w-sm overflow-y-auto rounded-none sm:rounded-l-2xl";
+      ? "w-full max-h-[80dvh] rounded-t-2xl"
+      : "h-dvh max-h-dvh w-full max-w-sm rounded-none sm:rounded-l-2xl";
 
   return (
     <ModalOverlay
@@ -43,38 +49,52 @@ export function Sheet({
         if (!nextOpen) onClose();
       }}
       isDismissable
-      className={`fixed inset-0 flex bg-[var(--wk-overlay)] ${alignmentClasses}`}
+      className={`fixed inset-0 flex min-h-0 overflow-hidden bg-[var(--wk-overlay)] ${alignmentClasses}`}
       style={{ zIndex: "var(--wk-z-modal)" }}
     >
-      <Modal
+      <AriaModal
         data-scroll-lock="container"
-        className={`wk-panel relative ${panelClasses} outline-none`}
+        data-wk-sheet-panel
+        className={`wk-panel relative flex min-h-0 flex-col overflow-hidden outline-none ${panelClasses} ${panelClassName}`.trim()}
       >
         <Dialog
           aria-labelledby={title ? titleId : undefined}
           aria-label={title ? undefined : "Panel"}
-          className="outline-none"
+          className="flex min-h-0 flex-1 flex-col outline-none"
         >
           {title ? (
-            <div className="flex items-center justify-between border-b border-[var(--wk-border)] px-5 py-4">
+            <div className="flex shrink-0 items-center justify-between border-b border-[var(--wk-border)] px-5 py-4">
               <h2
                 id={titleId}
-                className="text-[15px] font-bold text-[var(--wk-text)]"
+                className="min-w-0 text-[15px] font-bold text-[var(--wk-text)]"
               >
                 {title}
               </h2>
               <Button
                 slot="close"
                 aria-label="Close"
-                className="flex h-8 w-8 items-center justify-center rounded-full text-[var(--wk-text-muted)] transition-colors hover:bg-[var(--wk-surface-raised)] focus:outline-none focus-visible:ring-2 focus-visible:ring-wk-brand/20"
+                className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-[var(--wk-text-muted)] transition-colors hover:bg-[var(--wk-surface-raised)] focus:outline-none focus-visible:ring-2 focus-visible:ring-wk-brand/20"
               >
                 <i aria-hidden="true" className="ri-close-line" />
               </Button>
             </div>
           ) : null}
-          <div className="p-5">{children}</div>
+          <div
+            data-wk-sheet-body
+            className={`min-h-0 flex-1 overflow-y-auto p-5 ${bodyClassName}`.trim()}
+          >
+            {children}
+          </div>
+          {footer ? (
+            <div
+              data-wk-sheet-footer
+              className="shrink-0 border-t border-[var(--wk-border)] bg-wk-surface px-5 pb-[calc(1.25rem+env(safe-area-inset-bottom))] pt-4"
+            >
+              {footer}
+            </div>
+          ) : null}
         </Dialog>
-      </Modal>
+      </AriaModal>
     </ModalOverlay>
   );
 }
