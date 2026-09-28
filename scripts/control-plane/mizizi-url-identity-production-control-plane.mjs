@@ -27,6 +27,8 @@ const TRACK_ZERO_REVIEWED_TRIGGER_FILE =
   ".github/public-music-identity-track-slug-zero-apply.json";
 const TRACK_PRIMARY_FOLLOWUP_REVIEWED_TRIGGER_FILE =
   ".github/public-music-identity-track-slug-primary-followup-apply.json";
+const BATCH_A_REVIEWED_TRIGGER_FILE =
+  ".github/public-music-identity-batch-a-safe-slug-apply.json";
 const ARTIFACT_DIR =
   process.env.MIZIZI_ARTIFACT_DIR ||
   "artifacts/mizizi-url-identity-production-control-plane";
@@ -69,6 +71,9 @@ const EXPECTED_TRACK_PRIMARY_FOLLOWUP_CANDIDATES = 5;
 const EXPECTED_TRACK_PRIMARY_FOLLOWUP_CANDIDATE_FINGERPRINT =
   "71d13b5535983bf937fcb0c0dbbf3b790e0961f8e8b0543c742b8d9d9f6c7cdf";
 const EXPECTED_TRACK_PRIMARY_FOLLOWUP_IDENTITY_NOISE_REMAINING = 27;
+const EXPECTED_BATCH_A_SAFE_SLUG_CANDIDATES = 5;
+const EXPECTED_BATCH_A_SAFE_SLUG_CANDIDATE_FINGERPRINT =
+  "363bed8410570611a8cdf43194f7b47a0e0f380877fac342201fc48e2b6576e9";
 const EXPECTED_BATCH_A_DUPLICATE_IDENTITY_NOISE_REMAINING = 17;
 const EXPECTED_BATCH_A_SAFE_SLUG_IDENTITY_NOISE_REMAINING = 12;
 const ACCEPTED_TRACK_AUDIT_SNAPSHOTS = new Map([
@@ -237,6 +242,22 @@ const APPLY_SCOPES = {
     triggerConfirm:
       "PUBLIC_MUSIC_IDENTITY_RELEASE_SINGLE_TRACK_FOLLOWUP_APPLY",
     programmeIssue: 1091,
+  },
+  public_music_identity_batch_a_safe_slug: {
+    operationKey: "registry.track_slug.canonicalize",
+    capabilityKey: "canonicalize_registry_track_slug",
+    entity: "batch_a_safe_slug",
+    expectedCount: EXPECTED_BATCH_A_SAFE_SLUG_CANDIDATES,
+    expectedFingerprint:
+      EXPECTED_BATCH_A_SAFE_SLUG_CANDIDATE_FINGERPRINT,
+    eventAction: "canonicalize_track_slug",
+    maxRows: 1,
+    triggerFile: BATCH_A_REVIEWED_TRIGGER_FILE,
+    triggerOperation:
+      "public_music_identity_batch_a_safe_slug_apply",
+    triggerConfirm:
+      "PUBLIC_MUSIC_IDENTITY_BATCH_A_SAFE_SLUG_APPLY",
+    programmeIssue: 1094,
   }
 };
 
