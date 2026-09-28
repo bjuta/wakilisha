@@ -65,6 +65,9 @@ jobs:
       - name: Enforce WAKILISHA viewport integrity
         run: npm run audit:viewport-integrity
 
+      - name: Enforce Admin overlay primitive convergence
+        run: npm run audit:admin-overlays
+
       - name: Run WAKILISHA DOM interaction contracts
         run: npm run test:ui-dom
 
