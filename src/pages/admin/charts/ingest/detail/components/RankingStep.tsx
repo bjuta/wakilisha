@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { WkSurface } from "@/components/design-system/primitives/Surface";
+import { Modal } from "@/components/design-system/primitives/Modal";
 import { WkTag } from "@/components/design-system/primitives/Tag";
 import type { IngestCandidate } from "@/services/chartsIngestion/types";
 import { applyRankOverride, clearRankOverride, hasCapability, getDisabledReason } from "@/services/chartsIngestion/client";
@@ -182,16 +183,8 @@ function RankingProvenanceDrawer({ candidate, onClose }: {
   onClose: () => void;
 }) {
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-      <div className="max-h-[90vh] w-full max-w-md overflow-y-auto rounded-xl bg-[var(--wk-surface)] p-5">
-        <div className="flex items-center justify-between">
-          <h3 className="text-[14px] font-bold text-[var(--wk-text)]">Rank Provenance</h3>
-          <button onClick={onClose} className="flex h-7 w-7 items-center justify-center rounded-md text-[var(--wk-text-muted)] hover:bg-[var(--wk-surface-raised)]">
-            <i className="ri-close-line" />
-          </button>
-        </div>
-
-        <div className="mt-4">
+    <Modal open onClose={onClose} title="Rank Provenance" maxWidth="md">
+      <div className="mt-4">
           <div className="text-[13px] font-bold text-[var(--wk-text)]">{candidate.normalizedTitle}</div>
           <div className="text-[12px] text-[var(--wk-text-muted)]">{candidate.normalizedArtistLine}</div>
         </div>
@@ -239,7 +232,7 @@ function RankingProvenanceDrawer({ candidate, onClose }: {
             </div>
             <div className="flex items-center justify-between">
               <span>ISRC</span>
-              <span className="font-mono text-[var(--wk-text)]">{candidate.isrc ?? "—"}</span>
+              <span className="font-mono text-[var(--wk-text)]">{candidate.isrc ?? "Not set"}</span>
             </div>
             <div className="flex items-center justify-between">
               <span>Candidate Hash</span>
@@ -247,10 +240,8 @@ function RankingProvenanceDrawer({ candidate, onClose }: {
             </div>
           </div>
         </div>
-      </div>
-    </div>
-  );
-}
+    </Modal>
+  );}
 
 function ScoreRow({ label, value, total }: { label: string; value: number; total: number }) {
   const pct = total > 0 ? Math.min(100, Math.round((value / total) * 100)) : 0;
