@@ -56,6 +56,16 @@ describe("MIZIZI Admin workspace", () => {
     expect(page).toContain("admin_mizizi_workspace");
   });
 
+  it("keeps the decision modal viewport-bound with pinned actions", () => {
+    expect(page).toContain('from "@/components/design-system/primitives/Modal"');
+    expect(page).toContain("<Modal");
+    expect(page).toContain("footer={footer}");
+    expect(page).not.toContain(
+      'className="fixed inset-0 z-50 flex items-center justify-center bg-black/55 p-4"',
+    );
+    expect(page).not.toContain('max-h-[calc(92vh-150px)]');
+  });
+
   it("wires MIZIZI into Admin without replacing audit history", () => {
     expect(lazy).toContain("AdminMiziziWorkspacePage");
     expect(routes).toContain('{ path: "mizizi", element: <AdminMiziziWorkspacePage /> }');
