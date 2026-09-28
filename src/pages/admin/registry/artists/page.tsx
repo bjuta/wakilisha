@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState, useCallback } from "react";
+import { Modal } from "@/components/design-system/primitives/Modal";
 import { useSearchParams, useNavigate } from "react-router-dom";
 import { supabase } from "@/lib/supabase";
 import { type RegistryEntityProfile } from "@/services/registry/admin/types";
@@ -462,37 +463,40 @@ function ConfirmModal({
   onCancel: () => void;
   loading: boolean;
 }) {
-  if (!open) return null;
-
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
-      <div className="mx-4 w-full max-w-md rounded-2xl border border-[#dfe4d8] bg-white p-6 shadow-xl">
-        <h3 className="text-[17px] font-black text-[#171712]">{title}</h3>
-        <p className="mt-2 text-[13px] text-[#697062]">{message}</p>
-        {detail && (
-          <p className="mt-2 rounded-xl bg-[#f8f9f4] p-3 text-[11px] text-[#858c7e] font-mono max-h-32 overflow-y-auto">
-            {detail}
-          </p>
-        )}
-        <div className="mt-5 flex gap-2 justify-end">
+    <Modal
+      open={open}
+      onClose={onCancel}
+      title={title}
+      maxWidth="md"
+      dismissable={!loading}
+      footer={
+        <div className="flex justify-end gap-2">
           <button
             onClick={onCancel}
             disabled={loading}
-            className="rounded-xl border border-[#dfe4d8] bg-white px-4 py-2.5 text-[13px] font-bold text-[#171712] hover:bg-[#f8f9f4] disabled:opacity-50"
+            className="wk-button wk-button-secondary wk-button-sm"
           >
             Cancel
           </button>
           <button
             onClick={onConfirm}
             disabled={loading}
-            className="rounded-xl bg-[#f0a020] px-4 py-2.5 text-[13px] font-black text-white hover:bg-[#d4880d] disabled:opacity-50 flex items-center gap-2"
+            className="inline-flex items-center gap-2 rounded-lg bg-wk-warning px-4 py-2 text-[12px] font-black text-white hover:opacity-90 disabled:opacity-50"
           >
-            {loading && <WkIcon name="Loader2" size={14} className="animate-spin" />}
+            {loading ? <WkIcon name="Loader2" size={14} className="animate-spin" /> : null}
             {confirmLabel}
           </button>
         </div>
-      </div>
-    </div>
+      }
+    >
+      <p className="text-[13px] text-wk-text-muted">{message}</p>
+      {detail ? (
+        <p className="mt-3 max-h-32 overflow-y-auto rounded-xl bg-wk-bg-subtle p-3 font-mono text-[11px] text-wk-text-faint">
+          {detail}
+        </p>
+      ) : null}
+    </Modal>
   );
 }
 
