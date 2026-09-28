@@ -174,6 +174,122 @@ test("tall shared Modal stays viewport-bound with its action footer visible", as
   await expect(panel).toBeVisible();
 });
 
+test("anchored WAKILISHA date picker opens beside the current scrolled trigger", async ({
+  page,
+}, testInfo) => {
+  if (testInfo.project.name === "chromium") {
+    await page.setViewportSize({ width: 390, height: 844 });
+  }
+
+  await page.goto(FIXTURE);
+
+  const trigger = page.getByRole("button", { name: "Fixture date" });
+  await trigger.scrollIntoViewIfNeeded();
+  await trigger.click();
+
+  const picker = page.getByRole("dialog", { name: "Fixture date" });
+  await expect(picker).toBeVisible();
+
+  const geometry = await page.evaluate(() => {
+    const trigger = document.querySelector(
+      'button[aria-label="Fixture date"]',
+    ) as HTMLButtonElement;
+    const dialog = Array.from(
+      document.querySelectorAll('[role="dialog"]'),
+    ).find(
+      (element) => element.getAttribute("aria-label") === "Fixture date",
+    ) as HTMLElement;
+
+    const triggerRect = trigger.getBoundingClientRect();
+    const dialogRect = dialog.getBoundingClientRect();
+
+    return {
+      trigger: {
+        top: triggerRect.top,
+        bottom: triggerRect.bottom,
+        left: triggerRect.left,
+        right: triggerRect.right,
+      },
+      dialog: {
+        top: dialogRect.top,
+        bottom: dialogRect.bottom,
+        left: dialogRect.left,
+        right: dialogRect.right,
+      },
+      viewportHeight: window.visualViewport?.height ?? window.innerHeight,
+      viewportWidth: window.visualViewport?.width ?? window.innerWidth,
+    };
+  });
+
+  expect(geometry.dialog.top).toBeGreaterThanOrEqual(0);
+  expect(geometry.dialog.left).toBeGreaterThanOrEqual(0);
+  expect(geometry.dialog.bottom).toBeLessThanOrEqual(
+    geometry.viewportHeight + 1,
+  );
+  expect(geometry.dialog.right).toBeLessThanOrEqual(
+    geometry.viewportWidth + 1,
+  );
+
+  const belowGap = Math.abs(
+    geometry.dialog.top - geometry.trigger.bottom,
+  );
+  const aboveGap = Math.abs(
+    geometry.trigger.top - geometry.dialog.bottom,
+  );
+  expect(Math.min(belowGap, aboveGap)).toBeLessThanOrEqual(16);
+});
+
+test("finite WAKILISHA selection stays anchored and browser-chrome free inside a Sheet", async ({
+  page,
+}, testInfo) => {
+  if (testInfo.project.name === "chromium") {
+    await page.setViewportSize({ width: 390, height: 844 });
+  }
+
+  await page.goto(FIXTURE);
+  await page
+    .getByRole("button", { name: "Open interaction sheet" })
+    .click();
+
+  const trigger = page.getByRole("button", {
+    name: "Finite acceptance choice",
+  });
+  await trigger.click();
+
+  const listbox = page.getByRole("listbox");
+  await expect(listbox).toBeVisible();
+  expect(await page.locator("select").count()).toBe(0);
+
+  const geometry = await page.evaluate(() => {
+    const trigger = document.querySelector(
+      'button[aria-label="Finite acceptance choice"]',
+    ) as HTMLButtonElement;
+    const listbox = document.querySelector('[role="listbox"]') as HTMLElement;
+
+    const triggerRect = trigger.getBoundingClientRect();
+    const listboxRect = listbox.getBoundingClientRect();
+
+    return {
+      triggerBottom: triggerRect.bottom,
+      listboxTop: listboxRect.top,
+      listboxBottom: listboxRect.bottom,
+      listboxLeft: listboxRect.left,
+      listboxRight: listboxRect.right,
+      viewportHeight: window.visualViewport?.height ?? window.innerHeight,
+      viewportWidth: window.visualViewport?.width ?? window.innerWidth,
+    };
+  });
+
+  expect(geometry.listboxLeft).toBeGreaterThanOrEqual(0);
+  expect(geometry.listboxRight).toBeLessThanOrEqual(
+    geometry.viewportWidth + 1,
+  );
+  expect(geometry.listboxBottom).toBeLessThanOrEqual(
+    geometry.viewportHeight + 1,
+  );
+  expect(Math.abs(geometry.listboxTop - geometry.triggerBottom)).toBeLessThanOrEqual(16);
+});
+
 test("long canonical identities stay inside a bounded mobile grid", async ({
   page,
 }, testInfo) => {
