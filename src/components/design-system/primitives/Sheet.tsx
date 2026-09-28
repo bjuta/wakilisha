@@ -15,7 +15,7 @@ interface SheetProps {
   side?: "bottom" | "right";
   bodyClassName?: string;
   panelClassName?: string;
-  maxWidth?: "sm" | "md" | "lg" | "xl" | "2xl";
+  maxWidth?: "sm" | "md" | "lg" | "xl" | "2xl" | "3xl";
   dismissable?: boolean;
 }
 
@@ -47,6 +47,7 @@ export function Sheet({
     lg: "max-w-lg",
     xl: "max-w-xl",
     "2xl": "max-w-2xl",
+    "3xl": "max-w-3xl",
   };
 
   const panelClasses =
