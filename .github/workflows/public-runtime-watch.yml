@@ -33,6 +33,9 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: Install Chromium for live browser runtime probes
+        run: npx playwright install --with-deps chromium
+
       - name: Require Supabase control-plane access
         run: |
           if [ -z "$SUPABASE_ACCESS_TOKEN" ]; then
@@ -67,3 +70,6 @@ jobs:
           npx vitest run
           test/security/public-anon-content.test.ts
           test/security/public-edge-runtime.test.ts
+
+      - name: Probe live public browser runtime
+        run: node scripts/test/public-production-runtime-watch.mjs
