@@ -3630,7 +3630,7 @@ describe("Public Music Identity #1094 human decision lifecycle", () => {
     );
 
     expect(page).toContain(
-      "Public Music Identity — governed human decision",
+      "Public Music Identity: governed human decision",
     );
     expect(page).toContain(
       "public_music_identity_safe_slug_repair",

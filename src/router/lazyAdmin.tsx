@@ -308,6 +308,10 @@ export const AdminReviewQueuePage = lazy(() =>
   import("../pages/admin/review/queue/page"),
 );
 
+export const AdminMiziziWorkspacePage = lazy(() =>
+  import("../pages/admin/review/mizizi/page"),
+);
+
 export const AdminSettingsAirplay = lazy(() =>
   import("../pages/admin/settings/airplay/page"),
 );

@@ -74,6 +74,7 @@ import {
   AdminReleasesPage,
   AdminReviewLayout,
   AdminReviewQueuePage,
+  AdminMiziziWorkspacePage,
   AdminSettingsAirplay,
   AdminSettingsAudience,
   AdminSettingsAudit,
@@ -458,6 +459,7 @@ const routes: RouteObject[] = [
         path: "review",
         element: <AdminReviewLayout />,
         children: [
+          { path: "mizizi", element: <AdminMiziziWorkspacePage /> },
           { path: "queue", element: <AdminReviewQueuePage /> },
         ],
       },

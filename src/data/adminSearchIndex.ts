@@ -62,7 +62,8 @@ export const ADMIN_SEARCH_INDEX: AdminSearchItem[] = [
   { id: "media-broken", label: "Broken Links", description: "Detect and fix broken media links across the platform", path: "/admin/media/broken", icon: "LinkBreak", group: "Media", keywords: ["dead links", "404", "fix links", "link checker"] },
 
   // ── Review & Quality ──
-  { id: "review-queue", label: "Review Queue", description: "Review flagged records, relationships, and content", path: "/admin/review/queue", icon: "GitPullRequest", group: "Review & Quality", keywords: ["flagged", "pending review", "quality check", "approval"] },
+  { id: "mizizi", label: "MIZIZI", description: "Resolve current music identity and Track route issues", path: "/admin/review/mizizi", icon: "Activity", group: "Review & Quality", keywords: ["music identity", "track cleanup", "slug review", "registry hygiene"] },
+  { id: "review-queue", label: "All Reviews", description: "Browse older review queues and audit history", path: "/admin/review/queue", icon: "GitPullRequest", group: "Review & Quality", keywords: ["flagged", "review history", "quality check", "approval"] },
   { id: "relationships", label: "Entity Relationships", description: "Visual graph viewer for entity relationships across the registry", path: "/admin/relationships/viewer", icon: "Network", group: "Review & Quality", keywords: ["graph", "connections", "linked", "network view", "entity graph"] },
   { id: "duplicates", label: "Duplicate Merge", description: "Find and merge duplicate entities in the registry", path: "/admin/relationships/duplicates", icon: "Copy", group: "Review & Quality", keywords: ["deduplicate", "merge entities", "duplicate detection", "clean up"] },
 

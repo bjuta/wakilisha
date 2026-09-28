@@ -72,7 +72,8 @@ const NAV_GROUPS: NavGroup[] = [
     { path: "/admin/media/broken", label: "Broken Links", icon: "LinkBreak", badgeKey: "brokenLinks", requiredCapability: "view_broken_links" },
   ] },
   { label: "Review & Quality", icon: "GitPullRequest", visible: (can) => can("view_review_queue") || can("view_relationships"), items: [
-    { path: "/admin/review/queue", label: "Review Queue", icon: "GitPullRequest", badgeKey: "reviewQueue", requiredCapability: "view_review_queue" },
+    { path: "/admin/review/mizizi", label: "MIZIZI", icon: "Activity", requiredCapability: "view_review_queue" },
+    { path: "/admin/review/queue", label: "All Reviews", icon: "GitPullRequest", badgeKey: "reviewQueue", requiredCapability: "view_review_queue" },
     { path: "/admin/relationships/viewer", label: "Entity Relationships", icon: "Network", requiredCapability: "view_relationships" },
     { path: "/admin/relationships/duplicates", label: "Duplicate Merge", icon: "Copy", requiredCapability: "manage_relationships" },
   ] },

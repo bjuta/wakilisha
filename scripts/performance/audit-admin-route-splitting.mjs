@@ -80,9 +80,12 @@ const lazyImportCount = (
  * Phase 8B.3 adds the Messages Control Center route and its route-level AdminGuard lazily.\n * Phase 8B.4 Candidate B adds one canonical Field Admin Studio route:
  * - AdminFieldPage
  *
- * The current authority is therefore 100 lazy imports.
+ * Dedicated MIZIZI Admin workflow adds one lazy Review route:
+ * - AdminMiziziWorkspacePage
+ *
+ * The current authority is therefore 101 lazy imports.
  */
-const expectedLazyImportCount = 100;
+const expectedLazyImportCount = 101;
 
 if (lazyImportCount !== expectedLazyImportCount) {
   fail(
@@ -115,6 +118,7 @@ for (const marker of [
   "AdminMessagesPage",
   "AdminFieldPage",
   "AdminArtistClaimsPage",
+  "AdminMiziziWorkspacePage",
   "AdminAudioPage",
   "AdminAudioDetailPage",
   "AdminVideoPage",
