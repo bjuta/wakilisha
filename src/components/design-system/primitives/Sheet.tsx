@@ -15,6 +15,7 @@ interface SheetProps {
   side?: "bottom" | "right";
   bodyClassName?: string;
   panelClassName?: string;
+  maxWidth?: "sm" | "md" | "lg" | "xl" | "2xl";
 }
 
 export function Sheet({
@@ -26,6 +27,7 @@ export function Sheet({
   side = "bottom",
   bodyClassName = "",
   panelClassName = "",
+  maxWidth = "sm",
 }: SheetProps) {
   const rawId = useId();
   const titleId = `wk-sheet-title-${rawId.replace(/:/g, "")}`;
@@ -37,10 +39,18 @@ export function Sheet({
       ? "items-end justify-center"
       : "items-stretch justify-end";
 
+  const rightWidths = {
+    sm: "max-w-sm",
+    md: "max-w-md",
+    lg: "max-w-lg",
+    xl: "max-w-xl",
+    "2xl": "max-w-2xl",
+  };
+
   const panelClasses =
     side === "bottom"
       ? "w-full max-h-[80dvh] rounded-t-2xl"
-      : "h-dvh max-h-dvh w-full max-w-sm rounded-none sm:rounded-l-2xl";
+      : `h-dvh max-h-dvh w-full ${rightWidths[maxWidth]} rounded-none sm:rounded-l-2xl`;
 
   return (
     <ModalOverlay
