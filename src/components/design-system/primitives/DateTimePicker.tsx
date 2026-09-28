@@ -392,7 +392,8 @@ export function WkTemporalPicker({
         </Dialog>
       </Popover>
     </DialogTrigger>
-  );}
+  );
+}
 
 export function WkDatePicker(props: WkDateTimePickerProps) {
   return <WkTemporalPicker {...props} mode="date" />;
