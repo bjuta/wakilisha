@@ -132,6 +132,58 @@ describe("MIZIZI current URL-identity production control plane", () => {
 
   });
 
+  it("executes reviewed Public Music Identity Batch A only through the existing exact MIZIZI broker", () => {
+    const workflow = readFileSync(
+      ".github/workflows/mizizi-url-identity-production-control-plane.yml",
+      "utf8",
+    );
+    const batch = readFileSync(
+      "scripts/control-plane/public-music-identity-batch-a-production-control-plane.mjs",
+      "utf8",
+    );
+
+    expect(workflow).toContain(
+      "public_music_identity_batch_a_safe_slug",
+    );
+    expect(workflow).toContain(
+      "public-music-identity-batch-a-production-control-plane.mjs",
+    );
+    expect(workflow).toContain(
+      'test "$GITHUB_REF" = "refs/heads/main"',
+    );
+
+    expect(batch).toContain(
+      "PUBLIC_MUSIC_IDENTITY_BATCH_A_SAFE_SLUG_EXECUTOR=PASS",
+    );
+    expect(batch).toContain(
+      "issue_stewardship_execution_grant_v1",
+    );
+    expect(batch).toContain(
+      "execute_stewardship_operation_v1",
+    );
+    expect(batch).toContain(
+      "verify_stewardship_operation_v1",
+    );
+    expect(batch).toContain(
+      "public_music_identity_safe_slug_repair",
+    );
+    expect(batch).toContain(
+      "Expected 5 recorded safe-slug decisions and 10 fully resolved duplicate reviews.",
+    );
+    expect(batch).toContain(
+      "740dbe7e-b423-4e69-b479-83dc91a76da2",
+    );
+    expect(batch).toContain(
+      "d723ff1e-31ad-42ff-9fe0-871c9b9e9b52",
+    );
+    expect(batch).not.toMatch(
+      /\b(?:insert\s+into|update|delete\s+from)\s+public\.registry_tracks/i,
+    );
+    expect(batch).not.toMatch(
+      /\b(?:insert\s+into|update|delete\s+from)\s+public\.registry_review_items/i,
+    );
+  });
+
   it("adds only executor-bound authority reduction", () => {
     const migration = readFileSync(
       "supabase/migrations/20260922143000_mizizi_url_identity_authority_window_close_v1.sql",
