@@ -3,6 +3,7 @@ import { WkIcon } from "@/components/design-system/Icon";
 import { supabase } from "@/lib/supabase";
 import type { WkIconName } from "@/components/design-system/Icon";
 import { wakilishaDialog } from "@/components/design-system/primitives/DialogProvider";
+import { Modal } from "@/components/design-system/primitives/Modal";
 
 interface TaxonomyTerm {
   id: string;
@@ -616,262 +617,243 @@ export default function TaxonomyTermsPage({ title, subtitle, taxonomy, icon }: T
       )}
 
       {/* Edit/Create Modal */}
-      {showForm && (
-        <div className="fixed inset-0 z-50 flex items-start justify-center bg-black/50 pt-[10vh] overflow-y-auto">
-          <div className="w-full max-w-lg mx-4 rounded-2xl border border-wk-border bg-wk-surface shadow-lg mb-10">
-            {/* Modal header */}
-            <div className="flex items-center justify-between px-6 pt-6 pb-4 border-b border-wk-border">
-              <h3 className="text-[16px] font-bold text-wk-text">
-                {editingTerm ? `Edit ${title}` : `Add ${title}`}
-              </h3>
+      <Modal
+        open={showForm}
+        onClose={() => {
+          if (!formSubmitting) setShowForm(false);
+        }}
+        title={editingTerm ? `Edit ${title}` : `Add ${title}`}
+        maxWidth="lg"
+        dismissable={!formSubmitting}
+        footer={
+          <div className="flex items-center gap-3">
+            <button
+              onClick={handleSubmit}
+              disabled={formSubmitting || !formName.trim()}
+              className="wk-button wk-button-primary wk-button-sm flex-1 whitespace-nowrap"
+            >
+              {formSubmitting ? (
+                <>
+                  <WkIcon name="Loader2" size={14} className="animate-spin" />
+                  Saving...
+                </>
+              ) : (
+                <>
+                  <WkIcon name="Save" size={14} />
+                  {editingTerm ? "Save Changes" : "Create"}
+                </>
+              )}
+            </button>
+            <button
+              onClick={() => setShowForm(false)}
+              disabled={formSubmitting}
+              className="wk-button wk-button-secondary wk-button-sm flex-1 whitespace-nowrap"
+            >
+              Cancel
+            </button>
+          </div>
+        }
+      >
+        <div className="space-y-4">
+          <div className="space-y-2">
+            <label className="block text-[12px] font-black uppercase tracking-wider text-wk-text-muted">
+              Name
+            </label>
+            <input
+              type="text"
+              value={formName}
+              onChange={(e) => handleNameChange(e.target.value)}
+              placeholder={`Enter ${title.toLowerCase()} name...`}
+              className="w-full rounded-lg border border-wk-border bg-wk-bg-subtle px-4 py-3 text-[14px] text-wk-text placeholder:text-wk-text-faint outline-none focus:border-wk-brand transition-colors"
+              autoFocus
+            />
+          </div>
+
+          <div className="space-y-2">
+            <label className="block text-[12px] font-black uppercase tracking-wider text-wk-text-muted">
+              Slug
+            </label>
+            <div className="flex items-center gap-2">
+              <input
+                type="text"
+                value={formSlug}
+                onChange={(e) => handleSlugChange(e.target.value)}
+                placeholder={`${title.toLowerCase()}-slug`}
+                className="flex-1 rounded-lg border border-wk-border bg-wk-bg-subtle px-4 py-3 text-[13px] font-mono text-wk-text placeholder:text-wk-text-faint outline-none focus:border-wk-brand transition-colors"
+              />
               <button
-                onClick={() => setShowForm(false)}
-                className="h-8 w-8 rounded-lg border border-wk-border bg-wk-bg-subtle flex items-center justify-center text-wk-text-muted hover:text-wk-text hover:border-wk-brand transition-all cursor-pointer"
+                onClick={() => { setFormAutoSlug(true); setFormSlug(slugify(formName)); }}
+                className="h-10 w-10 rounded-lg border border-wk-border bg-wk-bg-subtle flex items-center justify-center text-wk-text-muted hover:text-wk-text hover:border-wk-brand transition-all shrink-0"
+                title="Regenerate from name"
               >
-                <WkIcon name="X" size={14} />
+                <WkIcon name="RefreshCw" size={14} />
               </button>
             </div>
+            {formAutoSlug && formName ? (
+              <p className="text-[11px] text-wk-text-faint">Auto-generated from name.</p>
+            ) : null}
+          </div>
 
-            <div className="px-6 py-5 space-y-4">
-              {/* Name */}
-              <div className="space-y-2">
-                <label className="block text-[12px] font-black uppercase tracking-wider text-wk-text-muted">
-                  Name
-                </label>
-                <input
-                  type="text"
-                  value={formName}
-                  onChange={(e) => handleNameChange(e.target.value)}
-                  placeholder={`Enter ${title.toLowerCase()} name...`}
-                  className="w-full rounded-lg border border-wk-border bg-wk-bg-subtle px-4 py-3 text-[14px] text-wk-text placeholder:text-wk-text-faint outline-none focus:border-wk-brand transition-colors"
-                  autoFocus
-                />
-              </div>
+          <div className="space-y-2">
+            <label className="block text-[12px] font-black uppercase tracking-wider text-wk-text-muted">
+              Description
+            </label>
+            <textarea
+              value={formDescription}
+              onChange={(e) => setFormDescription(e.target.value)}
+              placeholder="Optional description..."
+              rows={3}
+              maxLength={500}
+              className="w-full resize-none rounded-lg border border-wk-border bg-wk-bg-subtle px-4 py-3 text-[14px] text-wk-text placeholder:text-wk-text-faint outline-none focus:border-wk-brand transition-colors"
+            />
+            <p className="text-[11px] text-wk-text-faint">{formDescription.length}/500 characters</p>
+          </div>
 
-              {/* Slug */}
-              <div className="space-y-2">
-                <label className="block text-[12px] font-black uppercase tracking-wider text-wk-text-muted">
-                  Slug
-                </label>
-                <div className="flex items-center gap-2">
+          <div>
+            <button
+              onClick={() => setFormShowSeo(!formShowSeo)}
+              className="flex w-full items-center justify-between rounded-lg border border-wk-border bg-wk-bg-subtle px-4 py-3 text-[13px] font-semibold text-wk-text-muted hover:text-wk-text hover:border-wk-brand transition-colors"
+            >
+              <span className="flex items-center gap-2">
+                <WkIcon name="Search" size={14} className="text-wk-text-faint" />
+                SEO Metadata
+                {(formSeoTitle || formSeoDescription || formSeoKeywords) ? (
+                  <span className="inline-flex items-center rounded-full bg-wk-info-soft px-2 py-0.5 text-[10px] font-semibold text-wk-info">
+                    Set
+                  </span>
+                ) : null}
+              </span>
+              <WkIcon name={formShowSeo ? "ChevronUp" : "ChevronDown"} size={14} className="text-wk-text-faint" />
+            </button>
+
+            {formShowSeo ? (
+              <div className="mt-3 space-y-3 pl-1">
+                <div className="space-y-2">
+                  <label className="block text-[11px] font-bold text-wk-text-muted">SEO Title</label>
                   <input
                     type="text"
-                    value={formSlug}
-                    onChange={(e) => handleSlugChange(e.target.value)}
-                    placeholder={`${title.toLowerCase()}-slug`}
-                    className="flex-1 rounded-lg border border-wk-border bg-wk-bg-subtle px-4 py-3 text-[13px] font-mono text-wk-text placeholder:text-wk-text-faint outline-none focus:border-wk-brand transition-colors"
+                    value={formSeoTitle}
+                    onChange={(e) => setFormSeoTitle(e.target.value)}
+                    placeholder="Custom SEO title (60 chars max)"
+                    maxLength={60}
+                    className="w-full rounded-lg border border-wk-border bg-wk-bg-subtle px-4 py-2.5 text-[13px] text-wk-text placeholder:text-wk-text-faint outline-none focus:border-wk-brand transition-colors"
                   />
-                  <button
-                    onClick={() => { setFormAutoSlug(true); setFormSlug(slugify(formName)); }}
-                    className="h-10 w-10 rounded-lg border border-wk-border bg-wk-bg-subtle flex items-center justify-center text-wk-text-muted hover:text-wk-text hover:border-wk-brand transition-all cursor-pointer shrink-0"
-                    title="Regenerate from name"
-                  >
-                    <WkIcon name="RefreshCw" size={14} />
-                  </button>
+                  <p className="text-right text-[10px] text-wk-text-faint">{formSeoTitle.length}/60</p>
                 </div>
-                {formAutoSlug && formName && (
-                  <p className="text-[11px] text-wk-text-faint">Auto-generated from name.</p>
-                )}
-              </div>
-
-              {/* Description */}
-              <div className="space-y-2">
-                <label className="block text-[12px] font-black uppercase tracking-wider text-wk-text-muted">
-                  Description
-                </label>
-                <textarea
-                  value={formDescription}
-                  onChange={(e) => setFormDescription(e.target.value)}
-                  placeholder="Optional description..."
-                  rows={3}
-                  maxLength={500}
-                  className="w-full rounded-lg border border-wk-border bg-wk-bg-subtle px-4 py-3 text-[14px] text-wk-text placeholder:text-wk-text-faint outline-none focus:border-wk-brand transition-colors resize-none"
-                />
-                <p className="text-[11px] text-wk-text-faint">
-                  {formDescription.length}/500 characters
-                </p>
-              </div>
-
-              {/* SEO Toggle */}
-              <div>
-                <button
-                  onClick={() => setFormShowSeo(!formShowSeo)}
-                  className="flex w-full items-center justify-between rounded-lg border border-wk-border bg-wk-bg-subtle px-4 py-3 text-[13px] font-semibold text-wk-text-muted hover:text-wk-text hover:border-wk-brand transition-colors cursor-pointer"
-                >
-                  <span className="flex items-center gap-2">
-                    <WkIcon name="Search" size={14} className="text-wk-text-faint" />
-                    SEO Metadata
-                    {(formSeoTitle || formSeoDescription || formSeoKeywords) && (
-                      <span className="inline-flex items-center rounded-full bg-wk-info-soft px-2 py-0.5 text-[10px] font-semibold text-wk-info">
-                        Set
-                      </span>
-                    )}
-                  </span>
-                  <WkIcon name={formShowSeo ? "ChevronUp" : "ChevronDown"} size={14} className="text-wk-text-faint" />
-                </button>
-
-                {formShowSeo && (
-                  <div className="mt-3 space-y-3 pl-1">
-                    <div className="space-y-2">
-                      <label className="block text-[11px] font-bold text-wk-text-muted">
-                        SEO Title
-                      </label>
-                      <input
-                        type="text"
-                        value={formSeoTitle}
-                        onChange={(e) => setFormSeoTitle(e.target.value)}
-                        placeholder="Custom SEO title (60 chars max)"
-                        maxLength={60}
-                        className="w-full rounded-lg border border-wk-border bg-wk-bg-subtle px-4 py-2.5 text-[13px] text-wk-text placeholder:text-wk-text-faint outline-none focus:border-wk-brand transition-colors"
-                      />
-                      <p className="text-right text-[10px] text-wk-text-faint">{formSeoTitle.length}/60</p>
-                    </div>
-                    <div className="space-y-2">
-                      <label className="block text-[11px] font-bold text-wk-text-muted">
-                        Meta Description
-                      </label>
-                      <textarea
-                        value={formSeoDescription}
-                        onChange={(e) => setFormSeoDescription(e.target.value)}
-                        placeholder="Custom meta description (160 chars max)"
-                        rows={2}
-                        maxLength={160}
-                        className="w-full rounded-lg border border-wk-border bg-wk-bg-subtle px-4 py-2.5 text-[13px] text-wk-text placeholder:text-wk-text-faint outline-none focus:border-wk-brand transition-colors resize-none"
-                      />
-                      <p className="text-right text-[10px] text-wk-text-faint">{formSeoDescription.length}/160</p>
-                    </div>
-                    <div className="space-y-2">
-                      <label className="block text-[11px] font-bold text-wk-text-muted">
-                        Keywords
-                      </label>
-                      <input
-                        type="text"
-                        value={formSeoKeywords}
-                        onChange={(e) => setFormSeoKeywords(e.target.value)}
-                        placeholder="keyw ord1, keyword2, keyword3"
-                        className="w-full rounded-lg border border-wk-border bg-wk-bg-subtle px-4 py-2.5 text-[13px] text-wk-text placeholder:text-wk-text-faint outline-none focus:border-wk-brand transition-colors"
-                      />
-                    </div>
-                  </div>
-                )}
-              </div>
-
-              {/* Error */}
-              {formError && (
-                <div className="flex items-start gap-2 rounded-lg bg-wk-danger-soft border border-wk-danger/20 px-4 py-3 text-[13px] text-wk-danger">
-                  <WkIcon name="AlertCircle" size={15} className="shrink-0 mt-px" />
-                  {formError}
+                <div className="space-y-2">
+                  <label className="block text-[11px] font-bold text-wk-text-muted">Meta Description</label>
+                  <textarea
+                    value={formSeoDescription}
+                    onChange={(e) => setFormSeoDescription(e.target.value)}
+                    placeholder="Custom meta description (160 chars max)"
+                    rows={2}
+                    maxLength={160}
+                    className="w-full resize-none rounded-lg border border-wk-border bg-wk-bg-subtle px-4 py-2.5 text-[13px] text-wk-text placeholder:text-wk-text-faint outline-none focus:border-wk-brand transition-colors"
+                  />
+                  <p className="text-right text-[10px] text-wk-text-faint">{formSeoDescription.length}/160</p>
                 </div>
-              )}
-            </div>
-
-            {/* Actions */}
-            <div className="flex items-center gap-3 px-6 pb-6 pt-2">
-              <button
-                onClick={handleSubmit}
-                disabled={formSubmitting || !formName.trim()}
-                className="wk-button wk-button-primary wk-button-sm flex-1 whitespace-nowrap"
-              >
-                {formSubmitting ? (
-                  <>
-                    <WkIcon name="Loader2" size={14} className="animate-spin" />
-                    Saving...
-                  </>
-                ) : (
-                  <>
-                    <WkIcon name="Save" size={14} />
-                    {editingTerm ? "Save Changes" : "Create"}
-                  </>
-                )}
-              </button>
-              <button
-                onClick={() => setShowForm(false)}
-                className="wk-button wk-button-secondary wk-button-sm flex-1 whitespace-nowrap"
-              >
-                Cancel
-              </button>
-            </div>
+                <div className="space-y-2">
+                  <label className="block text-[11px] font-bold text-wk-text-muted">Keywords</label>
+                  <input
+                    type="text"
+                    value={formSeoKeywords}
+                    onChange={(e) => setFormSeoKeywords(e.target.value)}
+                    placeholder="keyword1, keyword2, keyword3"
+                    className="w-full rounded-lg border border-wk-border bg-wk-bg-subtle px-4 py-2.5 text-[13px] text-wk-text placeholder:text-wk-text-faint outline-none focus:border-wk-brand transition-colors"
+                  />
+                </div>
+              </div>
+            ) : null}
           </div>
-        </div>
-      )}
 
-      {/* Delete Confirm Modal */}
-      {showDelete && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
-          <div className="w-full max-w-sm mx-4 rounded-2xl border border-wk-border bg-wk-surface p-6 shadow-lg">
-            <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-xl bg-wk-danger-soft text-wk-danger">
-              <WkIcon name="Trash2" size={22} />
+          {formError ? (
+            <div className="flex items-start gap-2 rounded-lg border border-wk-danger/20 bg-wk-danger-soft px-4 py-3 text-[13px] text-wk-danger">
+              <WkIcon name="AlertCircle" size={15} className="shrink-0 mt-px" />
+              {formError}
             </div>
-            <h3 className="text-[16px] font-bold text-wk-text mb-2">
-              Delete {title}?
-            </h3>
-            <p className="text-[13px] text-wk-text-muted mb-5">
-              Are you sure you want to delete "{showDelete.name}"? This cannot be undone.
-            </p>
-            <div className="flex gap-3">
-              <button
-                onClick={() => setShowDelete(null)}
-                className="wk-button wk-button-secondary wk-button-sm flex-1 whitespace-nowrap"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={handleDelete}
-                disabled={deleteSubmitting}
-                className="wk-button wk-button-sm flex-1 whitespace-nowrap bg-wk-danger text-white hover:opacity-90 border border-wk-danger"
-              >
-                {deleteSubmitting ? (
-                  <>
-                    <WkIcon name="Loader2" size={14} className="animate-spin" />
-                    Deleting...
-                  </>
-                ) : (
-                  "Delete"
-                )}
-              </button>
-            </div>
-          </div>
+          ) : null}
         </div>
-      )}
+      </Modal>
 
-      {/* Bulk Delete Confirm */}
-      {showBulkDelete && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
-          <div className="w-full max-w-sm mx-4 rounded-2xl border border-wk-border bg-wk-surface p-6 shadow-lg">
-            <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-xl bg-wk-danger-soft text-wk-danger">
-              <WkIcon name="Trash2" size={22} />
-            </div>
-            <h3 className="text-[16px] font-bold text-wk-text mb-2">
-              Delete {selected.size} {title}?
-            </h3>
-            <p className="text-[13px] text-wk-text-muted mb-5">
-              Are you sure you want to permanently delete {selected.size} {title.toLowerCase()}? This action cannot be undone.
-            </p>
-            <div className="flex gap-3">
-              <button
-                onClick={() => setShowBulkDelete(false)}
-                className="wk-button wk-button-secondary wk-button-sm flex-1 whitespace-nowrap"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={handleBulkDelete}
-                disabled={deleteSubmitting}
-                className="wk-button wk-button-sm flex-1 whitespace-nowrap bg-wk-danger text-white hover:opacity-90 border border-wk-danger"
-              >
-                {deleteSubmitting ? (
-                  <>
-                    <WkIcon name="Loader2" size={14} className="animate-spin" />
-                    Deleting...
-                  </>
-                ) : (
-                  `Delete ${selected.size}`
-                )}
-              </button>
-            </div>
+      <Modal
+        open={Boolean(showDelete)}
+        onClose={() => {
+          if (!deleteSubmitting) setShowDelete(null);
+        }}
+        title={`Delete ${title}?`}
+        maxWidth="sm"
+        dismissable={!deleteSubmitting}
+        footer={
+          <div className="flex gap-3">
+            <button
+              onClick={() => setShowDelete(null)}
+              disabled={deleteSubmitting}
+              className="wk-button wk-button-secondary wk-button-sm flex-1 whitespace-nowrap"
+            >
+              Cancel
+            </button>
+            <button
+              onClick={handleDelete}
+              disabled={deleteSubmitting}
+              className="wk-button wk-button-sm flex-1 whitespace-nowrap bg-wk-danger text-white hover:opacity-90 border border-wk-danger"
+            >
+              {deleteSubmitting ? (
+                <>
+                  <WkIcon name="Loader2" size={14} className="animate-spin" />
+                  Deleting...
+                </>
+              ) : "Delete"}
+            </button>
           </div>
+        }
+      >
+        <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-xl bg-wk-danger-soft text-wk-danger">
+          <WkIcon name="Trash2" size={22} />
         </div>
-      )}
+        <p className="text-[13px] text-wk-text-muted">
+          {showDelete ? `Delete "${showDelete.name}" permanently? This cannot be undone.` : ""}
+        </p>
+      </Modal>
+
+      <Modal
+        open={showBulkDelete}
+        onClose={() => {
+          if (!deleteSubmitting) setShowBulkDelete(false);
+        }}
+        title={`Delete ${selected.size} ${title}?`}
+        maxWidth="sm"
+        dismissable={!deleteSubmitting}
+        footer={
+          <div className="flex gap-3">
+            <button
+              onClick={() => setShowBulkDelete(false)}
+              disabled={deleteSubmitting}
+              className="wk-button wk-button-secondary wk-button-sm flex-1 whitespace-nowrap"
+            >
+              Cancel
+            </button>
+            <button
+              onClick={handleBulkDelete}
+              disabled={deleteSubmitting}
+              className="wk-button wk-button-sm flex-1 whitespace-nowrap bg-wk-danger text-white hover:opacity-90 border border-wk-danger"
+            >
+              {deleteSubmitting ? (
+                <>
+                  <WkIcon name="Loader2" size={14} className="animate-spin" />
+                  Deleting...
+                </>
+              ) : `Delete ${selected.size}`}
+            </button>
+          </div>
+        }
+      >
+        <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-xl bg-wk-danger-soft text-wk-danger">
+          <WkIcon name="Trash2" size={22} />
+        </div>
+        <p className="text-[13px] text-wk-text-muted">
+          Permanently delete {selected.size} {title.toLowerCase()}? This action cannot be undone.
+        </p>
+      </Modal>
     </div>
   );
 }
