@@ -4,6 +4,7 @@
  */
 import { useState, useMemo } from "react";
 import { WkSurface } from "@/components/design-system/primitives/Surface";
+import { Modal } from "@/components/design-system/primitives/Modal";
 import type { IngestCandidate, IngestMatch, ReviewIssue, CsvImportSession } from "@/services/chartsIngestion/types";
 import { approveCandidate, excludeCandidate, restoreCandidate, hasCapability, getDisabledReason } from "@/services/chartsIngestion/client";
 import type { UserRole } from "@/services/chartsIngestion/client";
@@ -290,15 +291,8 @@ function CandidateDrawer({ candidate, match, issues, onClose }: {
   const isCsv = candidate.sourceType === "csv";
   const csvPosition = candidate.sourcePositions.csv;
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-      <div className="max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-xl bg-[var(--wk-surface)] p-5">
-        <div className="flex items-center justify-between">
-          <h3 className="text-[14px] font-bold text-[var(--wk-text)]">Candidate Detail</h3>
-          <button onClick={onClose} className="flex h-7 w-7 items-center justify-center rounded-md text-[var(--wk-text-muted)] hover:bg-[var(--wk-surface-raised)]">
-            <i className="ri-close-line" />
-          </button>
-        </div>
-        <div className="mt-4 flex items-center gap-3">
+    <Modal open onClose={onClose} title="Candidate Detail" maxWidth="lg">
+      <div className="mt-4 flex items-center gap-3">
           {candidate.artworkUrl && <img src={candidate.artworkUrl} alt="" className="h-14 w-14 rounded-lg object-cover" />}
           <div>
             <div className="text-[13px] font-bold text-[var(--wk-text)]">{candidate.normalizedTitle}</div>
@@ -311,9 +305,9 @@ function CandidateDrawer({ candidate, match, issues, onClose }: {
             { label: "Score", value: candidate.score.toFixed(1), color: "text-[var(--wk-brand)]" },
             { label: "Rank", value: String(candidate.finalRank ?? candidate.calculatedRank) },
             { label: "Match Confidence", value: `${match?.matchConfidence ?? 0}%` },
-            { label: "Match Method", value: match?.matchMethod ?? "—" },
+            { label: "Match Method", value: match?.matchMethod ?? "Not set" },
             { label: "Status", value: candidate.status },
-            { label: "Source Type", value: candidate.sourceType ?? "—" },
+            { label: "Source Type", value: candidate.sourceType ?? "Not set" },
           ].map(({ label, value, color }) => (
             <div key={label} className="rounded-lg border border-[var(--wk-border)] p-3">
               <div className="text-[10px] font-bold uppercase text-[var(--wk-text-muted)]">{label}</div>
@@ -330,7 +324,7 @@ function CandidateDrawer({ candidate, match, issues, onClose }: {
             <div className="space-y-1">
               <div className="flex items-center justify-between text-[11px]">
                 <span className="text-[var(--wk-text-muted)]">CSV Position</span>
-                <span className="font-semibold text-[var(--wk-text)]">{csvPosition ?? "—"}</span>
+                <span className="font-semibold text-[var(--wk-text)]">{csvPosition ?? "Not set"}</span>
               </div>
               <div className="flex items-center justify-between text-[11px]">
                 <span className="text-[var(--wk-text-muted)]">Raw Hash</span>
@@ -368,7 +362,5 @@ function CandidateDrawer({ candidate, match, issues, onClose }: {
             </div>
           </div>
         )}
-      </div>
-    </div>
-  );
-}
+    </Modal>
+  );}
