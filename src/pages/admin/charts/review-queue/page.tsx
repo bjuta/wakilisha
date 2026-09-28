@@ -10,6 +10,7 @@ import { AdminChartsEmptyState } from "../components/AdminChartsEmptyState";
 import { AdminChartsLoadingState } from "../components/AdminChartsLoadingState";
 import { WkSelect } from "@/components/design-system/primitives/Select";
 import { WkCheckbox } from "@/components/design-system/primitives/Checkbox";
+import { Modal } from "@/components/design-system/primitives/Modal";
 
 
 interface ReviewRowEx extends IngestResolvedRow {
@@ -132,62 +133,72 @@ export default function AdminChartsReviewQueue() {
         </div>
       )}
 
-      {/* Candidate drawer */}
-      {drawerRow && (
-        <div className="fixed inset-0 z-[200] flex items-end sm:items-center justify-center bg-black/50">
-          <div className="w-full max-w-lg rounded-t-xl sm:rounded-xl border border-wk-border bg-wk-surface p-5 shadow-xl">
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="text-[15px] font-bold text-wk-text">{drawerRow.title}</h3>
+      <Modal
+        open={Boolean(drawerRow)}
+        onClose={() => setDrawerRow(null)}
+        title={drawerRow?.title || "Review candidate"}
+        maxWidth="lg"
+        footer={
+          drawerRow ? (
+            <div className="grid gap-2 sm:grid-cols-3">
               <button
-                onClick={() => setDrawerRow(null)}
-                className="flex h-8 w-8 items-center justify-center rounded-full text-wk-text-muted hover:bg-wk-surface-raised"
+                onClick={() => applyAction(drawerRow.id, "shell")}
+                className="wk-button wk-button-ghost wk-button-sm justify-center"
               >
-                <i className="ri-close-line" />
+                <i className="ri-folder-add-line" />
+                Create Shell
+              </button>
+              <button
+                onClick={() => applyAction(drawerRow.id, "no_match")}
+                className="wk-button wk-button-sm justify-center border border-wk-danger/20 bg-wk-danger-soft text-wk-danger hover:bg-wk-danger/20"
+              >
+                <i className="ri-close-circle-line" />
+                No Match
+              </button>
+              <button
+                onClick={() => applyAction(drawerRow.id, "resolved")}
+                className="wk-button wk-button-primary wk-button-sm justify-center"
+              >
+                <i className="ri-check-line" />
+                Resolve
               </button>
             </div>
-            <div className="space-y-3">
-              <div className="grid grid-cols-2 gap-3 text-[12px]">
-                <div className="rounded-lg bg-wk-surface-raised p-2.5">
-                  <p className="text-wk-text-faint text-[10px] uppercase tracking-wider font-bold">Artist</p>
-                  <p className="mt-1 font-semibold text-wk-text">{drawerRow.artistNames.join(", ")}</p>
-                </div>
-                <div className="rounded-lg bg-wk-surface-raised p-2.5">
-                  <p className="text-wk-text-faint text-[10px] uppercase tracking-wider font-bold">Match Status</p>
-                  <p className="mt-1"><AdminChartsStatusBadge status={localActions[drawerRow.id] ?? drawerRow.matchStatus} size="sm" /></p>
-                </div>
-                <div className="rounded-lg bg-wk-surface-raised p-2.5">
-                  <p className="text-wk-text-faint text-[10px] uppercase tracking-wider font-bold">Confidence</p>
-                  <p className="mt-1 font-semibold text-wk-text">{drawerRow.confidence}%</p>
-                </div>
-                <div className="rounded-lg bg-wk-surface-raised p-2.5">
-                  <p className="text-wk-text-faint text-[10px] uppercase tracking-wider font-bold">Provider</p>
-                  <p className="mt-1 font-semibold text-wk-text capitalize">{drawerRow.sourceProvider.replace("_", " ")}</p>
-                </div>
+          ) : null
+        }
+      >
+        {drawerRow ? (
+          <div className="space-y-3">
+            <div className="grid grid-cols-2 gap-3 text-[12px]">
+              <div className="rounded-lg bg-wk-surface-raised p-2.5">
+                <p className="text-wk-text-faint text-[10px] uppercase tracking-wider font-bold">Artist</p>
+                <p className="mt-1 font-semibold text-wk-text">{drawerRow.artistNames.join(", ")}</p>
               </div>
-              {drawerRow.warnings && drawerRow.warnings.length > 0 && (
-                <div className="rounded-lg border border-wk-warning/20 bg-wk-warning-soft p-3">
-                  {drawerRow.warnings.map((w, i) => (
-                    <div key={i} className="flex items-center gap-2 text-[12px] text-wk-warning">
-                      <i className="ri-error-warning-line shrink-0" /> {w}
-                    </div>
-                  ))}
-                </div>
-              )}
-              <div className="flex gap-2 pt-2">
-                <button onClick={() => applyAction(drawerRow.id, "shell")} className="flex-1 inline-flex items-center justify-center gap-1.5 rounded-md border border-wk-border bg-wk-surface px-3 py-2 text-[12px] font-semibold text-wk-text-soft transition-colors hover:bg-wk-surface-raised whitespace-nowrap">
-                  <i className="ri-folder-add-line" /> Create Shell
-                </button>
-                <button onClick={() => applyAction(drawerRow.id, "no_match")} className="flex-1 inline-flex items-center justify-center gap-1.5 rounded-md border border-wk-danger/20 bg-wk-danger-soft px-3 py-2 text-[12px] font-semibold text-wk-danger transition-colors hover:bg-wk-danger/20 whitespace-nowrap">
-                  <i className="ri-close-circle-line" /> No Match
-                </button>
-                <button onClick={() => applyAction(drawerRow.id, "resolved")} className="flex-1 inline-flex items-center justify-center gap-1.5 rounded-md bg-wk-brand px-3 py-2 text-[12px] font-semibold text-wk-brand-on transition-colors hover:opacity-90 whitespace-nowrap">
-                  <i className="ri-check-line" /> Resolve
-                </button>
+              <div className="rounded-lg bg-wk-surface-raised p-2.5">
+                <p className="text-wk-text-faint text-[10px] uppercase tracking-wider font-bold">Match Status</p>
+                <p className="mt-1"><AdminChartsStatusBadge status={localActions[drawerRow.id] ?? drawerRow.matchStatus} size="sm" /></p>
+              </div>
+              <div className="rounded-lg bg-wk-surface-raised p-2.5">
+                <p className="text-wk-text-faint text-[10px] uppercase tracking-wider font-bold">Confidence</p>
+                <p className="mt-1 font-semibold text-wk-text">{drawerRow.confidence}%</p>
+              </div>
+              <div className="rounded-lg bg-wk-surface-raised p-2.5">
+                <p className="text-wk-text-faint text-[10px] uppercase tracking-wider font-bold">Provider</p>
+                <p className="mt-1 font-semibold text-wk-text capitalize">{drawerRow.sourceProvider.replace("_", " ")}</p>
               </div>
             </div>
+            {drawerRow.warnings && drawerRow.warnings.length > 0 ? (
+              <div className="rounded-lg border border-wk-warning/20 bg-wk-warning-soft p-3">
+                {drawerRow.warnings.map((warning, index) => (
+                  <div key={index} className="flex items-center gap-2 text-[12px] text-wk-warning">
+                    <i className="ri-error-warning-line shrink-0" />
+                    {warning}
+                  </div>
+                ))}
+              </div>
+            ) : null}
           </div>
-        </div>
-      )}
+        ) : null}
+      </Modal>
 
       <AdminChartsPageHeader
         eyebrow="Operations"
