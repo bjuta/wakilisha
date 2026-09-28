@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { WkIcon } from "@/components/design-system/Icon";
+import { Sheet } from "@/components/design-system/primitives/Sheet";
 import type { GuideSection, GuideSectionType } from "@/pages/guides/detail/sectionTypes";
 
 interface AddSectionDrawerProps {
@@ -58,89 +59,68 @@ export default function AddSectionDrawer({ isOpen, onClose, onAdd, existingCount
   if (!isOpen) return null;
 
   return (
-    <>
-      {/* Backdrop */}
-      <div className="fixed inset-0 z-40 bg-black/40" onClick={onClose} />
+    <Sheet
+      open={isOpen}
+      onClose={onClose}
+      title="Add Section"
+      side="right"
+      maxWidth="md"
+      footer={
+        <p className="text-[11px] text-[var(--wk-text-faint)]">
+          {SECTION_TEMPLATES.length} section types available
+        </p>
+      }
+    >
+      <p className="text-[11px] text-[var(--wk-text-muted)]">
+        Choose a section type to add to your guide.
+      </p>
 
-      {/* Drawer */}
-      <div className="fixed right-0 top-0 bottom-0 z-50 w-full max-w-md bg-[var(--wk-surface)] border-l border-[var(--wk-border)] shadow-xl flex flex-col">
-        {/* Header */}
-        <div className="flex items-center justify-between px-5 py-4 border-b border-[var(--wk-divider)]">
-          <div>
-            <h3 className="text-[15px] font-bold text-[var(--wk-text)]">Add Section</h3>
-            <p className="text-[11px] text-[var(--wk-text-muted)] mt-0.5">
-              Choose a section type to add to your guide
-            </p>
-          </div>
-          <button
-            onClick={onClose}
-            className="flex items-center justify-center w-8 h-8 rounded-lg hover:bg-[var(--wk-bg-subtle)] text-[var(--wk-text-faint)] hover:text-[var(--wk-text)] transition-colors cursor-pointer"
-          >
-            <WkIcon name="X" size={16} />
+      <div className="mt-4 flex items-center gap-2 rounded-lg border border-[var(--wk-border)] bg-[var(--wk-bg-subtle)] px-3 py-2">
+        <WkIcon name="Search" size={14} className="text-[var(--wk-text-faint)]" />
+        <input
+          type="text"
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          placeholder="Filter section types..."
+          className="w-full bg-transparent text-[13px] text-[var(--wk-text)] placeholder:text-[var(--wk-text-faint)] outline-none"
+        />
+        {search ? (
+          <button onClick={() => setSearch("")} className="text-[var(--wk-text-faint)] hover:text-[var(--wk-text)]">
+            <WkIcon name="X" size={14} />
           </button>
-        </div>
-
-        {/* Search */}
-        <div className="px-5 py-3 border-b border-[var(--wk-divider)]">
-          <div className="flex items-center gap-2 rounded-lg border border-[var(--wk-border)] bg-[var(--wk-bg-subtle)] px-3 py-2">
-            <WkIcon name="Search" size={14} className="text-[var(--wk-text-faint)]" />
-            <input
-              type="text"
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              placeholder="Filter section types..."
-              className="w-full bg-transparent text-[13px] text-[var(--wk-text)] placeholder:text-[var(--wk-text-faint)] outline-none"
-            />
-            {search && (
-              <button onClick={() => setSearch("")} className="text-[var(--wk-text-faint)] hover:text-[var(--wk-text)] cursor-pointer">
-                <WkIcon name="X" size={14} />
-              </button>
-            )}
-          </div>
-        </div>
-
-        {/* Section type list */}
-        <div className="flex-1 overflow-y-auto">
-          {filtered.length === 0 ? (
-            <div className="flex flex-col items-center justify-center py-16 px-5 text-center">
-              <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-[var(--wk-bg-subtle)] text-[var(--wk-text-faint)] mb-3">
-                <WkIcon name="Search" size={20} />
-              </div>
-              <p className="text-[13px] text-[var(--wk-text-muted)]">No section types match your search.</p>
-            </div>
-          ) : (
-            <div className="p-3 space-y-1">
-              {filtered.map((template) => (
-                <button
-                  key={template.type}
-                  onClick={() => handleSelect(template)}
-                  className="w-full text-left px-4 py-3 rounded-lg hover:bg-[var(--wk-bg-subtle)] transition-colors cursor-pointer group"
-                >
-                  <div className="flex items-start gap-3">
-                    <div className="flex items-center justify-center w-8 h-8 rounded-lg bg-[var(--wk-info-soft)] text-[var(--wk-info)] shrink-0 mt-0.5">
-                      <WkIcon name="Plus" size={14} />
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <div className="text-[13px] font-semibold text-[var(--wk-text)]">{template.label}</div>
-                      <div className="text-[11px] text-[var(--wk-text-muted)] mt-0.5">{template.description}</div>
-                    </div>
-                    <div className="text-[var(--wk-text-faint)] opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
-                      <WkIcon name="ArrowRight" size={14} />
-                    </div>
-                  </div>
-                </button>
-              ))}
-            </div>
-          )}
-        </div>
-
-        {/* Footer */}
-        <div className="px-5 py-3 border-t border-[var(--wk-divider)]">
-          <p className="text-[11px] text-[var(--wk-text-faint)]">
-            {SECTION_TEMPLATES.length} section types available
-          </p>
-        </div>
+        ) : null}
       </div>
-    </>
-  );
-}
+
+      {filtered.length === 0 ? (
+        <div className="flex flex-col items-center justify-center px-5 py-16 text-center">
+          <div className="mb-3 flex h-12 w-12 items-center justify-center rounded-xl bg-[var(--wk-bg-subtle)] text-[var(--wk-text-faint)]">
+            <WkIcon name="Search" size={20} />
+          </div>
+          <p className="text-[13px] text-[var(--wk-text-muted)]">No section types match your search.</p>
+        </div>
+      ) : (
+        <div className="mt-3 space-y-1">
+          {filtered.map((template) => (
+            <button
+              key={template.type}
+              onClick={() => handleSelect(template)}
+              className="group w-full rounded-lg px-4 py-3 text-left transition-colors hover:bg-[var(--wk-bg-subtle)]"
+            >
+              <div className="flex items-start gap-3">
+                <div className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-[var(--wk-info-soft)] text-[var(--wk-info)]">
+                  <WkIcon name="Plus" size={14} />
+                </div>
+                <div className="min-w-0 flex-1">
+                  <div className="text-[13px] font-semibold text-[var(--wk-text)]">{template.label}</div>
+                  <div className="mt-0.5 text-[11px] text-[var(--wk-text-muted)]">{template.description}</div>
+                </div>
+                <div className="shrink-0 text-[var(--wk-text-faint)] opacity-0 transition-opacity group-hover:opacity-100">
+                  <WkIcon name="ArrowRight" size={14} />
+                </div>
+              </div>
+            </button>
+          ))}
+        </div>
+      )}
+    </Sheet>
+  );}

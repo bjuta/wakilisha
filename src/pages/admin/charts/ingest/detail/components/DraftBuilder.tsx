@@ -6,6 +6,7 @@
  */
 import { useState } from "react";
 import { WkSurface } from "@/components/design-system/primitives/Surface";
+import { Modal } from "@/components/design-system/primitives/Modal";
 import type { IngestJob, DraftEntry, IngestCandidate, CsvImportSession } from "@/services/chartsIngestion/types";
 import {
   createDraftEdition,
@@ -354,15 +355,8 @@ export function DraftBuilder({
 function DraftEntryDrawer({ entry, onClose }: { entry: EnrichedDraftEntry; onClose: () => void }) {
   const track = entry.entryPayload?.track as Record<string, unknown> | undefined;
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-      <div className="max-h-[90vh] w-full max-w-md overflow-y-auto rounded-xl bg-[var(--wk-surface)] p-5">
-        <div className="flex items-center justify-between">
-          <h3 className="text-[14px] font-bold text-[var(--wk-text)]">Draft Entry Detail</h3>
-          <button onClick={onClose} className="flex h-7 w-7 items-center justify-center rounded-md text-[var(--wk-text-muted)] hover:bg-[var(--wk-surface-raised)]">
-            <i className="ri-close-line" />
-          </button>
-        </div>
-        <div className="mt-4 flex items-center gap-3">
+    <Modal open onClose={onClose} title="Draft Entry Detail" maxWidth="md">
+      <div className="mt-4 flex items-center gap-3">
           {(track?.artworkUrl as string) && <img src={track!.artworkUrl as string} alt="" className="h-14 w-14 rounded-lg object-cover" />}
           <div>
             <div className="text-[13px] font-bold text-[var(--wk-text)]">{String(track?.normalizedTitle ?? "Unknown")}</div>
@@ -372,10 +366,10 @@ function DraftEntryDrawer({ entry, onClose }: { entry: EnrichedDraftEntry; onClo
         <div className="mt-4 grid gap-2 sm:grid-cols-2">
           {[
             { label: "Final Rank", value: String(entry.finalRank), color: "text-[var(--wk-brand)]" },
-            { label: "Previous Rank", value: entry.displayPreviousRank !== null ? `#${entry.displayPreviousRank}` : "—" },
+            { label: "Previous Rank", value: entry.displayPreviousRank !== null ? `#${entry.displayPreviousRank}` : "Not set" },
             { label: "Movement", value: `${entry.displayMovement}${entry.displayMovementAmount && entry.displayMovementAmount > 0 && entry.displayMovement !== "new" ? ` (${entry.displayMovementAmount})` : ""}` },
-            { label: "Peak Position", value: String(entry.peakPosition ?? "—") },
-            { label: "Weeks on Chart", value: String(entry.weeksOnChart ?? "—") },
+            { label: "Peak Position", value: String(entry.peakPosition ?? "Not set") },
+            { label: "Weeks on Chart", value: String(entry.weeksOnChart ?? "Not set") },
             { label: "Score", value: entry.score.toFixed(1) },
           ].map(({ label, value, color }) => (
             <div key={label} className="rounded-lg border border-[var(--wk-border)] p-3">
@@ -416,7 +410,5 @@ function DraftEntryDrawer({ entry, onClose }: { entry: EnrichedDraftEntry; onClo
             </div>
           </div>
         )}
-      </div>
-    </div>
-  );
-}
+    </Modal>
+  );}

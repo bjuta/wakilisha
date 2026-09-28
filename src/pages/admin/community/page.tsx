@@ -1,4 +1,5 @@
 import { useEffect, useState, useCallback } from 'react';
+import { Modal } from "@/components/design-system/primitives/Modal";
 import { Link } from 'react-router-dom';
 import { WkIcon } from '@/components/design-system/Icon';
 import { AdminChartsPageHeader } from '@/pages/admin/charts/components/AdminChartsPageHeader';
@@ -243,27 +244,35 @@ export default function AdminCommunityPage() {
       )}
 
       {/* Confirm dialog */}
-      {confirmAction && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40" onClick={() => setConfirmAction(null)}>
-          <div className="bg-white rounded-xl border border-gray-200 p-6 max-w-md mx-4 shadow-2xl" onClick={(e) => e.stopPropagation()}>
-            <p className="text-[14px] font-semibold text-gray-900 mb-4">{confirmAction.message}</p>
-            <div className="flex gap-2 justify-end">
-              <button
-                onClick={() => setConfirmAction(null)}
-                className="px-4 py-2 rounded-lg text-[13px] font-semibold text-gray-600 hover:bg-gray-100 cursor-pointer"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={() => { confirmAction.onConfirm(); setConfirmAction(null); }}
-                className="px-4 py-2 rounded-lg text-[13px] font-semibold bg-red-600 text-white hover:bg-red-700 cursor-pointer"
-              >
-                Confirm
-              </button>
-            </div>
+      <Modal
+        open={Boolean(confirmAction)}
+        onClose={() => setConfirmAction(null)}
+        title="Confirm action"
+        maxWidth="md"
+        footer={
+          <div className="flex justify-end gap-2">
+            <button
+              onClick={() => setConfirmAction(null)}
+              className="wk-button wk-button-secondary wk-button-sm"
+            >
+              Cancel
+            </button>
+            <button
+              onClick={() => {
+                confirmAction?.onConfirm();
+                setConfirmAction(null);
+              }}
+              className="wk-button wk-button-sm bg-wk-danger text-white hover:opacity-90"
+            >
+              Confirm
+            </button>
           </div>
-        </div>
-      )}
+        }
+      >
+        <p className="text-[14px] font-semibold text-wk-text">
+          {confirmAction?.message ?? ""}
+        </p>
+      </Modal>
 
       <AdminChartsPageHeader
         eyebrow="Community"

@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { WkSurface } from "@/components/design-system/primitives/Surface";
 import { AdminChartsPageHeader } from "../components/AdminChartsPageHeader";
@@ -13,6 +13,7 @@ import type { ChartFamily } from "@/services/chartsPublic/client";
 import { reingestEdition } from "@/services/chartsIngestion/client";
 import type { ReingestEditionResult } from "@/services/chartsIngestion/client";
 import { WkSelect } from "@/components/design-system/primitives/Select";
+import { Modal } from "@/components/design-system/primitives/Modal";
 
 
 type AdminEditionStatus = "draft" | "published" | "archived" | "superseded" | "failed" | "cancelled" | "unknown";
@@ -141,20 +142,6 @@ export default function AdminChartsEditions() {
   const [reingestError, setReingestError] = useState<string | null>(null);
   const [reingestDialogOpen, setReingestDialogOpen] = useState(false);
   const [pendingReingestId, setPendingReingestId] = useState<string | null>(null);
-  const reingestRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    function handleClick(e: MouseEvent) {
-      if (reingestRef.current && !reingestRef.current.contains(e.target as Node) && reingestDialogOpen) {
-        setReingestDialogOpen(false);
-      }
-    }
-    if (reingestDialogOpen) {
-      document.addEventListener("mousedown", handleClick);
-      return () => document.removeEventListener("mousedown", handleClick);
-    }
-  }, [reingestDialogOpen]);
-
   async function handleReingest(editionId: string) {
     setReingestDialogOpen(false);
     setReingestingId(editionId);
@@ -599,33 +586,35 @@ export default function AdminChartsEditions() {
       )}
 
       {/* Reingest confirm dialog */}
-      {reingestDialogOpen && (
-        <div className="fixed inset-0 z-[300] flex items-center justify-center bg-black/50">
-          <div ref={reingestRef} className="w-full max-w-sm rounded-xl border border-wk-border bg-wk-surface p-6 shadow-lg">
-            <div className="flex items-center gap-2">
-              <WkIcon name="RefreshCw" size={18} className="text-wk-warning" />
-              <h3 className="text-[15px] font-bold text-wk-text">Reingest Edition</h3>
-            </div>
-            <p className="mt-2 text-[13px] text-wk-text-muted">
-              This will re-process this edition's entries through the registry. For each entry: it looks up existing registry tracks and artists, creates new ones where missing, links them up, and populates correct canonical IDs and slugs. Running as a dry run first.
-            </p>
-            <div className="mt-5 flex items-center justify-end gap-2">
-              <button
-                onClick={() => setReingestDialogOpen(false)}
-                className="inline-flex items-center gap-1.5 rounded-md border border-wk-border-2 bg-wk-surface px-4 py-2 text-[13px] font-semibold text-wk-text transition-colors hover:bg-wk-surface-raised whitespace-nowrap cursor-pointer"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={() => pendingReingestId && handleReingest(pendingReingestId)}
-                className="inline-flex items-center gap-1.5 rounded-md bg-wk-warning px-4 py-2 text-[13px] font-semibold text-white transition-colors hover:opacity-90 whitespace-nowrap cursor-pointer"
-              >
-                Run Dry Run
-              </button>
-            </div>
+      <Modal
+        open={reingestDialogOpen}
+        onClose={() => setReingestDialogOpen(false)}
+        title="Reingest Edition"
+        maxWidth="sm"
+        footer={
+          <div className="flex items-center justify-end gap-2">
+            <button
+              onClick={() => setReingestDialogOpen(false)}
+              className="wk-button wk-button-secondary wk-button-sm"
+            >
+              Cancel
+            </button>
+            <button
+              onClick={() => pendingReingestId && handleReingest(pendingReingestId)}
+              className="wk-button wk-button-sm bg-wk-warning text-white hover:opacity-90"
+            >
+              Run Dry Run
+            </button>
           </div>
+        }
+      >
+        <div className="flex items-start gap-3">
+          <WkIcon name="RefreshCw" size={18} className="mt-0.5 text-wk-warning" />
+          <p className="text-[13px] leading-5 text-wk-text-muted">
+            Re-process this edition through the Registry as a dry run. Existing Tracks and Artists are reused, missing identities are staged through the existing authority, and canonical IDs and slugs are recalculated.
+          </p>
         </div>
-      )}
+      </Modal>
     </div>
   );
 }

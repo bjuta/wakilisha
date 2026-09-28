@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { WkSurface } from "@/components/design-system/primitives/Surface";
+import { Modal } from "@/components/design-system/primitives/Modal";
 import { WkTag } from "@/components/design-system/primitives/Tag";
 import DateRangePicker, { type DateRangeValue } from "@/components/base/DateRangePicker";
 import type { IngestJob, DraftEntry, CsvImportSession } from "@/services/chartsIngestion/types";
@@ -504,16 +505,8 @@ function DraftEntryDrawer({ entry, onClose }: { entry: DraftEntry; onClose: () =
   const track = entry.entryPayload?.track as Record<string, unknown> | undefined;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-      <div className="max-h-[90vh] w-full max-w-md overflow-y-auto rounded-xl bg-[var(--wk-surface)] p-5">
-        <div className="flex items-center justify-between">
-          <h3 className="text-[14px] font-bold text-[var(--wk-text)]">Draft Entry Detail</h3>
-          <button onClick={onClose} className="flex h-7 w-7 items-center justify-center rounded-md text-[var(--wk-text-muted)] hover:bg-[var(--wk-surface-raised)]">
-            <i className="ri-close-line" />
-          </button>
-        </div>
-
-        <div className="mt-4 flex items-center gap-3">
+    <Modal open onClose={onClose} title="Draft Entry Detail" maxWidth="md">
+      <div className="mt-4 flex items-center gap-3">
           {track?.artworkUrl && (
             <img src={String(track.artworkUrl)} alt="" className="h-14 w-14 rounded-lg object-cover" />
           )}
@@ -526,10 +519,10 @@ function DraftEntryDrawer({ entry, onClose }: { entry: DraftEntry; onClose: () =
         <div className="mt-4 grid gap-3 sm:grid-cols-2">
           {[
             { label: "Final Rank", value: String(entry.finalRank), color: "text-[var(--wk-brand)]" },
-            { label: "Previous Rank", value: String(entry.previousRank ?? "—") },
+            { label: "Previous Rank", value: String(entry.previousRank ?? "Not set") },
             { label: "Movement", value: entry.movement },
-            { label: "Peak Position", value: String(entry.peakPosition ?? "—") },
-            { label: "Weeks on Chart", value: String(entry.weeksOnChart ?? "—") },
+            { label: "Peak Position", value: String(entry.peakPosition ?? "Not set") },
+            { label: "Weeks on Chart", value: String(entry.weeksOnChart ?? "Not set") },
             { label: "Score", value: entry.score.toFixed(1) },
           ].map(({ label, value, color }) => (
             <div key={label} className="rounded-lg border border-[var(--wk-border)] p-3">
@@ -583,7 +576,5 @@ function DraftEntryDrawer({ entry, onClose }: { entry: DraftEntry; onClose: () =
             <span className="font-mono text-[12px] text-[var(--wk-text-muted)]">{String(track.isrc)}</span>
           </div>
         )}
-      </div>
-    </div>
-  );
-}
+    </Modal>
+  );}

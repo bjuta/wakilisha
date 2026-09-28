@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { Portal } from "@/components/base/Portal";
 import { WkIcon } from "@/components/design-system/Icon";
 import { ImageEditor } from "./ImageEditor";
 import {
@@ -420,7 +421,8 @@ export function MediaEditModal({
     : asset.metadata?.file_size as number | undefined;
 
   return (
-    <div
+    <Portal>
+      <div
       className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4 md:p-6"
       onClick={onClose}
     >
@@ -1226,6 +1228,7 @@ export function MediaEditModal({
           {toast.msg}
         </div>
       )}
-    </div>
+      </div>
+    </Portal>
   );
 }

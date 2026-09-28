@@ -5,6 +5,7 @@
  */
 import { useState, useMemo } from "react";
 import { WkSurface } from "@/components/design-system/primitives/Surface";
+import { Modal } from "@/components/design-system/primitives/Modal";
 import type { IngestJob, IngestCandidate } from "@/services/chartsIngestion/types";
 import { applyRankOverride, clearRankOverride, hasCapability } from "@/services/chartsIngestion/client";
 import type { UserRole } from "@/services/chartsIngestion/client";
@@ -327,41 +328,38 @@ export function RankingIntegrity({
 
       {/* Detail drawer */}
       {detailCandidate && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-          <div className="max-h-[90vh] w-full max-w-md overflow-y-auto rounded-xl bg-[var(--wk-surface)] p-5">
-            <div className="flex items-center justify-between">
-              <h3 className="text-[14px] font-bold text-[var(--wk-text)]">Rank Provenance</h3>
-              <button onClick={() => setDetailCandidate(null)} className="flex h-7 w-7 items-center justify-center rounded-md text-[var(--wk-text-muted)] hover:bg-[var(--wk-surface-raised)]">
-                <i className="ri-close-line" />
-              </button>
-            </div>
-            <div className="mt-4">
-              <div className="text-[13px] font-bold text-[var(--wk-text)]">{detailCandidate.normalizedTitle}</div>
-              <div className="text-[12px] text-[var(--wk-text-muted)]">{detailCandidate.normalizedArtistLine}</div>
-            </div>
-            <div className="mt-4 space-y-1.5">
-              {Object.entries(detailCandidate.sourcePositions).map(([src, pos]) => (
-                <div key={src} className="flex items-center justify-between rounded-lg border border-[var(--wk-border)] p-2.5">
-                  <span className="text-[12px] font-semibold text-[var(--wk-text)]">{src}</span>
-                  <span className="text-[12px] text-[var(--wk-text-muted)]">Position {pos}</span>
-                </div>
-              ))}
-            </div>
-            <div className="mt-4 grid gap-2 grid-cols-2">
-              {[
-                { label: "Calculated Rank", value: detailCandidate.calculatedRank },
-                { label: "Final Rank", value: detailCandidate.finalRank ?? detailCandidate.calculatedRank },
-                { label: "Manual Override", value: detailCandidate.manualRankOverride ?? "—" },
-                { label: "Score", value: detailCandidate.score.toFixed(1) },
-              ].map(({ label, value }) => (
-                <div key={label} className="rounded-lg border border-[var(--wk-border)] p-3">
-                  <div className="text-[10px] font-bold uppercase text-[var(--wk-text-muted)]">{label}</div>
-                  <div className="mt-1 text-[13px] font-semibold text-[var(--wk-text)]">{String(value)}</div>
-                </div>
-              ))}
-            </div>
+        <Modal
+          open
+          onClose={() => setDetailCandidate(null)}
+          title="Rank Provenance"
+          maxWidth="md"
+        >
+          <div>
+            <div className="text-[13px] font-bold text-[var(--wk-text)]">{detailCandidate.normalizedTitle}</div>
+            <div className="text-[12px] text-[var(--wk-text-muted)]">{detailCandidate.normalizedArtistLine}</div>
           </div>
-        </div>
+          <div className="mt-4 space-y-1.5">
+            {Object.entries(detailCandidate.sourcePositions).map(([src, pos]) => (
+              <div key={src} className="flex items-center justify-between rounded-lg border border-[var(--wk-border)] p-2.5">
+                <span className="text-[12px] font-semibold text-[var(--wk-text)]">{src}</span>
+                <span className="text-[12px] text-[var(--wk-text-muted)]">Position {pos}</span>
+              </div>
+            ))}
+          </div>
+          <div className="mt-4 grid grid-cols-2 gap-2">
+            {[
+              { label: "Calculated Rank", value: detailCandidate.calculatedRank },
+              { label: "Final Rank", value: detailCandidate.finalRank ?? detailCandidate.calculatedRank },
+              { label: "Manual Override", value: detailCandidate.manualRankOverride ?? "Not set" },
+              { label: "Score", value: detailCandidate.score.toFixed(1) },
+            ].map(({ label, value }) => (
+              <div key={label} className="rounded-lg border border-[var(--wk-border)] p-3">
+                <div className="text-[10px] font-bold uppercase text-[var(--wk-text-muted)]">{label}</div>
+                <div className="mt-1 text-[13px] font-semibold text-[var(--wk-text)]">{String(value)}</div>
+              </div>
+            ))}
+          </div>
+        </Modal>
       )}
     </div>
   );

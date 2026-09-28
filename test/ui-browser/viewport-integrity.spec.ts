@@ -94,6 +94,237 @@ test("mobile editable controls keep a 16px floor without changing page scale", a
   }
 });
 
+test("tall shared Modal stays viewport-bound with its action footer visible", async ({
+  page,
+}, testInfo) => {
+  if (testInfo.project.name === "chromium") {
+    await page.setViewportSize({ width: 390, height: 844 });
+  }
+
+  await page.goto(FIXTURE);
+  await page
+    .getByRole("button", { name: "Open tall interaction modal" })
+    .click();
+
+  const dialog = page.getByRole("dialog", {
+    name: "Tall interaction acceptance",
+  });
+  const panel = dialog.locator("[data-wk-modal-panel]").or(
+    page.locator("[data-wk-modal-panel]"),
+  );
+  const body = page.locator("[data-wk-modal-body]");
+  const footer = page.locator("[data-wk-modal-footer]");
+  const action = page.getByRole("button", {
+    name: "Pinned modal action",
+  });
+
+  await expect(dialog).toBeVisible();
+  await expect(action).toBeVisible();
+
+  const geometry = await page.evaluate(() => {
+    const panel = document.querySelector("[data-wk-modal-panel]") as HTMLElement;
+    const body = document.querySelector("[data-wk-modal-body]") as HTMLElement;
+    const footer = document.querySelector("[data-wk-modal-footer]") as HTMLElement;
+    const action = Array.from(document.querySelectorAll("button")).find(
+      (button) => button.textContent?.trim() === "Pinned modal action",
+    ) as HTMLButtonElement;
+
+    const rect = (element: HTMLElement) => {
+      const value = element.getBoundingClientRect();
+      return {
+        top: value.top,
+        bottom: value.bottom,
+        left: value.left,
+        right: value.right,
+      };
+    };
+
+    return {
+      panel: rect(panel),
+      body: rect(body),
+      footer: rect(footer),
+      action: rect(action),
+      bodyScrollable: body.scrollHeight > body.clientHeight,
+      viewportHeight: window.visualViewport?.height ?? window.innerHeight,
+      viewportWidth: window.visualViewport?.width ?? window.innerWidth,
+    };
+  });
+
+  expect(geometry.panel.top).toBeGreaterThanOrEqual(0);
+  expect(geometry.panel.bottom).toBeLessThanOrEqual(
+    geometry.viewportHeight + 1,
+  );
+  expect(geometry.panel.left).toBeGreaterThanOrEqual(0);
+  expect(geometry.panel.right).toBeLessThanOrEqual(
+    geometry.viewportWidth + 1,
+  );
+  expect(geometry.bodyScrollable).toBe(true);
+  expect(geometry.footer.bottom).toBeLessThanOrEqual(
+    geometry.viewportHeight + 1,
+  );
+  expect(geometry.action.bottom).toBeLessThanOrEqual(
+    geometry.viewportHeight + 1,
+  );
+
+  await body.evaluate((element) => {
+    element.scrollTop = element.scrollHeight;
+  });
+  await expect(action).toBeVisible();
+  await expect(footer).toBeVisible();
+  await expect(panel).toBeVisible();
+});
+
+test("anchored WAKILISHA date picker opens beside the current scrolled trigger", async ({
+  page,
+}, testInfo) => {
+  if (testInfo.project.name === "chromium") {
+    await page.setViewportSize({ width: 390, height: 844 });
+  }
+
+  await page.goto(FIXTURE);
+
+  const trigger = page.getByRole("button", { name: "Fixture date" });
+  await trigger.scrollIntoViewIfNeeded();
+  await trigger.click();
+
+  const picker = page.getByRole("dialog", { name: "Fixture date" });
+  await expect(picker).toBeVisible();
+
+  const geometry = await page.evaluate(() => {
+    const trigger = document.querySelector(
+      'button[aria-label="Fixture date"]',
+    ) as HTMLButtonElement;
+    const popover = document.querySelector(
+      "[data-wk-temporal-popover]",
+    ) as HTMLElement;
+
+    const triggerRect = trigger.getBoundingClientRect();
+    const dialogRect = popover.getBoundingClientRect();
+
+    return {
+      trigger: {
+        top: triggerRect.top,
+        bottom: triggerRect.bottom,
+        left: triggerRect.left,
+        right: triggerRect.right,
+      },
+      dialog: {
+        top: dialogRect.top,
+        bottom: dialogRect.bottom,
+        left: dialogRect.left,
+        right: dialogRect.right,
+      },
+      viewportHeight: window.visualViewport?.height ?? window.innerHeight,
+      viewportWidth: window.visualViewport?.width ?? window.innerWidth,
+    };
+  });
+
+  expect(geometry.dialog.top).toBeGreaterThanOrEqual(0);
+  expect(geometry.dialog.left).toBeGreaterThanOrEqual(0);
+  expect(geometry.dialog.bottom).toBeLessThanOrEqual(
+    geometry.viewportHeight + 1,
+  );
+  expect(geometry.dialog.right).toBeLessThanOrEqual(
+    geometry.viewportWidth + 1,
+  );
+
+  const belowGap = Math.abs(
+    geometry.dialog.top - geometry.trigger.bottom,
+  );
+  const aboveGap = Math.abs(
+    geometry.trigger.top - geometry.dialog.bottom,
+  );
+  expect(Math.min(belowGap, aboveGap)).toBeLessThanOrEqual(16);
+});
+
+test("finite WAKILISHA selection stays anchored and browser-chrome free inside a Sheet", async ({
+  page,
+}, testInfo) => {
+  if (testInfo.project.name === "chromium") {
+    await page.setViewportSize({ width: 390, height: 844 });
+  }
+
+  await page.goto(FIXTURE);
+  await page
+    .getByRole("button", { name: "Open interaction sheet" })
+    .click();
+
+  const trigger = page.locator(
+    '[data-wk-select-trigger][aria-label="Finite acceptance choice"]',
+  );
+  await trigger.click();
+
+  const listbox = page.getByRole("listbox");
+  const popover = page.locator("[data-wk-select-popover]");
+  await expect(listbox).toBeVisible();
+  await expect(popover).toBeVisible();
+  const nativeSelectBridges = await page.locator("select").evaluateAll(
+    (selects) => selects.map((element) => {
+      const hiddenContainer = element.closest(
+        '[aria-hidden="true"][data-a11y-ignore="aria-hidden-focus"]',
+      ) as HTMLElement | null;
+      const rect = hiddenContainer?.getBoundingClientRect();
+      const style = hiddenContainer ? getComputedStyle(hiddenContainer) : null;
+
+      return {
+        tabIndex: element.tabIndex,
+        hiddenByReactAria: Boolean(hiddenContainer),
+        containerWidth: rect?.width ?? null,
+        containerHeight: rect?.height ?? null,
+        containerClip: style?.clip ?? null,
+        containerClipPath: style?.clipPath ?? null,
+      };
+    }),
+  );
+  expect(nativeSelectBridges.length).toBeGreaterThanOrEqual(1);
+  for (const bridge of nativeSelectBridges) {
+    expect(bridge.tabIndex).toBe(-1);
+    expect(bridge.hiddenByReactAria).toBe(true);
+
+    const visuallyClipped =
+      bridge.containerClip !== "auto"
+      || bridge.containerClipPath !== "none"
+      || (
+        bridge.containerWidth !== null
+        && bridge.containerHeight !== null
+        && bridge.containerWidth <= 2
+        && bridge.containerHeight <= 2
+      );
+    expect(visuallyClipped).toBe(true);
+  }
+
+  const geometry = await page.evaluate(() => {
+    const trigger = document.querySelector(
+      '[data-wk-select-trigger][aria-label="Finite acceptance choice"]',
+    ) as HTMLElement;
+    const popover = document.querySelector(
+      "[data-wk-select-popover]",
+    ) as HTMLElement;
+
+    const triggerRect = trigger.getBoundingClientRect();
+    const listboxRect = popover.getBoundingClientRect();
+
+    return {
+      triggerBottom: triggerRect.bottom,
+      listboxTop: listboxRect.top,
+      listboxBottom: listboxRect.bottom,
+      listboxLeft: listboxRect.left,
+      listboxRight: listboxRect.right,
+      viewportHeight: window.visualViewport?.height ?? window.innerHeight,
+      viewportWidth: window.visualViewport?.width ?? window.innerWidth,
+    };
+  });
+
+  expect(geometry.listboxLeft).toBeGreaterThanOrEqual(0);
+  expect(geometry.listboxRight).toBeLessThanOrEqual(
+    geometry.viewportWidth + 1,
+  );
+  expect(geometry.listboxBottom).toBeLessThanOrEqual(
+    geometry.viewportHeight + 1,
+  );
+  expect(Math.abs(geometry.listboxTop - geometry.triggerBottom)).toBeLessThanOrEqual(16);
+});
+
 test("long canonical identities stay inside a bounded mobile grid", async ({
   page,
 }, testInfo) => {

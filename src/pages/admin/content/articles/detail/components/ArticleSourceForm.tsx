@@ -4,6 +4,7 @@ import {
   type FormEvent,
 } from "react";
 import { WkIcon } from "@/components/design-system/Icon";
+import { Modal } from "@/components/design-system/primitives/Modal";
 import {
   ArticleTrustServiceError,
   createSource,
@@ -521,48 +522,51 @@ export function ArticleSourceForm({
         ? "Create and Submit Source"
         : "Create, Submit and Approve";
 
+  const footer = (
+    <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+      <button
+        type="button"
+        onClick={requestClose}
+        disabled={submitting}
+        className="wk-button wk-button-secondary"
+      >
+        Cancel
+      </button>
+      <button
+        type="submit"
+        form="article-source-form"
+        disabled={submitting || sourceTypes.length === 0}
+        className="wk-button wk-button-primary"
+      >
+        <WkIcon
+          name={submitting ? "Loader2" : "Plus"}
+          size={15}
+          className={submitting ? "animate-spin" : undefined}
+        />
+        {submitting ? "Saving Source" : submitLabel}
+      </button>
+    </div>
+  );
+
   return (
-    <div
-      className="fixed inset-0 z-[130] flex items-center justify-center bg-black/50 p-2 sm:p-4"
-      role="dialog"
-      aria-modal="true"
-      aria-labelledby="article-source-form-title"
+    <Modal
+      open
+      onClose={() => {
+        if (!submitting) void requestClose();
+      }}
+      title={"Add a Source"}
+      maxWidth="4xl"
+      dismissable={!submitting}
+      footer={footer}
     >
-      <div className="flex max-h-[94dvh] w-full max-w-4xl flex-col overflow-hidden rounded-2xl border border-wk-border bg-wk-surface shadow-2xl">
-        <header className="flex items-start justify-between gap-4 border-b border-wk-border px-5 py-4">
-          <div>
-            <div className="text-[10px] font-black uppercase tracking-[0.14em] text-wk-brand">
-              Governed Source
-            </div>
-            <h2
-              id="article-source-form-title"
-              className="mt-1 text-[18px] font-bold text-wk-text"
-            >
-              Add a Source
-            </h2>
-            <p className="mt-1 max-w-2xl text-[11px] leading-5 text-wk-text-muted">
-              Create one reusable Source. Approval
-              is one requirement for a future Citation
-              to appear publicly.
-            </p>
-          </div>
+      <div className="mb-5">
+        <div className="text-[10px] font-black uppercase tracking-[0.14em] text-wk-brand">Governed Source</div>
+        <p className="mt-1 max-w-2xl text-[11px] leading-5 text-wk-text-muted">
+          {"Create one reusable Source. Approval is one requirement for a future Citation to appear publicly."}
+        </p>
+      </div>
+      <form id="article-source-form" onSubmit={handleSubmit} className="space-y-6">
 
-          <button
-            type="button"
-            onClick={requestClose}
-            disabled={submitting}
-            className="wk-button wk-button-ghost wk-button-sm shrink-0"
-            aria-label="Close Source form"
-          >
-            <WkIcon name="X" size={16} />
-          </button>
-        </header>
-
-        <form
-          onSubmit={handleSubmit}
-          className="flex min-h-0 flex-1 flex-col"
-        >
-          <div className="min-h-0 flex-1 space-y-6 overflow-y-auto px-5 py-5">
             {errorMessage ? (
               <div className="rounded-xl border border-wk-danger/30 bg-wk-danger-soft px-4 py-3 text-[11px] leading-5 text-wk-danger">
                 {errorMessage}
@@ -1068,46 +1072,6 @@ export function ArticleSourceForm({
                 </div>
               </section>
             ) : null}
-          </div>
-
-          <footer className="flex flex-col-reverse gap-2 border-t border-wk-border px-5 py-4 sm:flex-row sm:justify-end">
-            <button
-              type="button"
-              onClick={requestClose}
-              disabled={submitting}
-              className="wk-button wk-button-secondary"
-            >
-              Cancel
-            </button>
-
-            <button
-              type="submit"
-              disabled={
-                submitting ||
-                sourceTypes.length === 0
-              }
-              className="wk-button wk-button-primary"
-            >
-              <WkIcon
-                name={
-                  submitting
-                    ? "Loader2"
-                    : "Plus"
-                }
-                size={15}
-                className={
-                  submitting
-                    ? "animate-spin"
-                    : undefined
-                }
-              />
-              {submitting
-                ? "Saving Source"
-                : submitLabel}
-            </button>
-          </footer>
-        </form>
-      </div>
-    </div>
-  );
-}
+      </form>
+    </Modal>
+  );}

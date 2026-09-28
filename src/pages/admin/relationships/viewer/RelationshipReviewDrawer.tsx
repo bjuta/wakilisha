@@ -8,6 +8,7 @@ import {
 } from "@/services/registryKnowledgeReviewService";
 import { WkSelect } from "@/components/design-system/primitives/Select";
 import { WkCheckbox } from "@/components/design-system/primitives/Checkbox";
+import { Sheet } from "@/components/design-system/primitives/Sheet";
 
 
 
@@ -126,22 +127,33 @@ export function RelationshipReviewDrawer({
     }
   };
 
-  return (
-    <div className="fixed inset-0 z-50 overflow-y-auto bg-black/40" role="dialog" aria-modal="true">
-      <div className="ml-auto w-full max-w-2xl border-l border-wk-border bg-wk-surface shadow-2xl">
-        <div className="flex items-start justify-between gap-4 border-b border-wk-border p-5">
-          <div>
-            <div className="text-[11px] font-black uppercase tracking-wide text-wk-brand">Relationship Review</div>
-            <h2 className="mt-1 text-[20px] font-black text-wk-text">{row.source_slug} and {row.target_slug}</h2>
-            <p className="mt-1 text-[12px] text-wk-text-muted">{row.relationship_type.replace(/_/g, " ")}</p>
-          </div>
-          <button onClick={onClose} disabled={saving} className="rounded-lg p-2 text-wk-text-muted hover:bg-wk-surface-raised" aria-label="Close">
-            <WkIcon name="X" size={17} />
-          </button>
-        </div>
+  const footer = (
+    <div className="flex items-center justify-end gap-2">
+      <button onClick={onClose} disabled={saving} className="rounded-lg border border-wk-border px-4 py-2 text-[12px] font-bold text-wk-text-muted">Cancel</button>
+      <button onClick={handleSave} disabled={saving || !canSave} className="inline-flex items-center gap-2 rounded-lg bg-wk-brand px-4 py-2 text-[12px] font-black text-wk-brand-on disabled:opacity-40">
+        <WkIcon name={saving ? "Loader2" : "Check"} size={14} className={saving ? "animate-spin" : ""} />
+        {publicSafe ? "Approve And Publish" : "Save Review"}
+      </button>
+    </div>
+  );
 
-        <div className="space-y-6 p-5">
-          {error ? <div className="rounded-xl border border-wk-danger/20 bg-wk-danger/10 px-4 py-3 text-[12px] font-semibold text-wk-danger">{error}</div> : null}
+  return (
+    <Sheet
+      open
+      onClose={() => {
+        if (!saving) onClose();
+      }}
+      title="Relationship Review"
+      side="right"
+      panelClassName="sm:max-w-2xl"
+      footer={footer}
+    >
+      <div className="mb-5">
+        <h2 className="text-[20px] font-black text-wk-text">{row.source_slug} and {row.target_slug}</h2>
+        <p className="mt-1 text-[12px] text-wk-text-muted">{row.relationship_type.replace(/_/g, " ")}</p>
+      </div>
+      <div className="space-y-6">
+        {error ? <div className="rounded-xl border border-wk-danger/20 bg-wk-danger/10 px-4 py-3 text-[12px] font-semibold text-wk-danger">{error}</div> : null}
 
           <section className="rounded-xl border border-wk-brand/20 bg-wk-brand-soft p-4">
             <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
@@ -236,16 +248,6 @@ export function RelationshipReviewDrawer({
             <Gate pass={gates.approved}>Human decision is approved</Gate>
             <Gate pass={gates.publicSafe}>Public use is confirmed</Gate>
           </section>
-        </div>
-
-        <div className="flex items-center justify-end gap-2 border-t border-wk-border p-4">
-          <button onClick={onClose} disabled={saving} className="rounded-lg border border-wk-border px-4 py-2 text-[12px] font-bold text-wk-text-muted">Cancel</button>
-          <button onClick={handleSave} disabled={saving || !canSave} className="inline-flex items-center gap-2 rounded-lg bg-wk-brand px-4 py-2 text-[12px] font-black text-wk-brand-on disabled:opacity-40">
-            <WkIcon name={saving ? "Loader2" : "Check"} size={14} className={saving ? "animate-spin" : ""} />
-            {publicSafe ? "Approve And Publish" : "Save Review"}
-          </button>
-        </div>
       </div>
-    </div>
-  );
-}
+    </Sheet>
+  );}

@@ -33,8 +33,41 @@ export function WkCommandSheet({
   onSecondary,
   footerNote,
 }: WkCommandSheetProps) {
+  const footer = (
+    <>
+      {footerNote ? (
+        <p className="mb-3 text-[10px] leading-relaxed text-wk-text-faint">
+          {footerNote}
+        </p>
+      ) : null}
+      <div className="flex items-center justify-end gap-2">
+        <WkButton
+          variant="ghost"
+          disabled={busy}
+          onClick={onSecondary ?? onClose}
+          className="wk-button-sm"
+        >
+          {secondaryLabel}
+        </WkButton>
+        <WkButton
+          disabled={busy || primaryDisabled}
+          onClick={() => void onPrimary()}
+          className="wk-button-sm"
+        >
+          {busy ? "Working..." : primaryLabel}
+        </WkButton>
+      </div>
+    </>
+  );
+
   return (
-    <Sheet open={open} onClose={onClose} title={title} side="right">
+    <Sheet
+      open={open}
+      onClose={onClose}
+      title={title}
+      side="right"
+      footer={footer}
+    >
       <div className="space-y-5">
         {(eyebrow || description) ? (
           <div>
@@ -52,31 +85,6 @@ export function WkCommandSheet({
         ) : null}
 
         <div>{children}</div>
-
-        <div className="border-t border-wk-divider pt-4">
-          {footerNote ? (
-            <p className="mb-3 text-[10px] leading-relaxed text-wk-text-faint">
-              {footerNote}
-            </p>
-          ) : null}
-          <div className="flex items-center justify-end gap-2">
-            <WkButton
-              variant="ghost"
-              disabled={busy}
-              onClick={onSecondary ?? onClose}
-              className="wk-button-sm"
-            >
-              {secondaryLabel}
-            </WkButton>
-            <WkButton
-              disabled={busy || primaryDisabled}
-              onClick={() => void onPrimary()}
-              className="wk-button-sm"
-            >
-              {busy ? "Working..." : primaryLabel}
-            </WkButton>
-          </div>
-        </div>
       </div>
     </Sheet>
   );

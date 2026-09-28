@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { WkSurface } from "@/components/design-system/primitives/Surface";
+import { Sheet } from "@/components/design-system/primitives/Sheet";
 import type {
   IngestJob,
   IngestSource,
@@ -133,51 +133,43 @@ export function ApiContractDrawer({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-end bg-black/50">
-      <div className="h-full w-full max-w-lg overflow-y-auto bg-[var(--wk-surface)] p-5 shadow-xl">
-        <div className="flex items-center justify-between">
-          <div>
-            <h2 className="text-[14px] font-bold text-[var(--wk-text)]">API Contract</h2>
-            <p className="mt-0.5 text-[10px] text-[var(--wk-text-muted)]">
-              Backend developer reference — exact payloads for WordPress wiring
-            </p>
-          </div>
-          <button
-            onClick={onClose}
-            className="flex h-8 w-8 items-center justify-center rounded-md text-[var(--wk-text-muted)] hover:bg-[var(--wk-surface-raised)]"
-          >
-            <i className="ri-close-line" />
-          </button>
-        </div>
+    <Sheet
+      open={open}
+      onClose={onClose}
+      title="API Contract"
+      side="right"
+      panelClassName="sm:max-w-lg"
+    >
+      <p className="text-[10px] text-[var(--wk-text-muted)]">
+        Backend developer reference: exact payloads for WordPress wiring
+      </p>
 
-        <div className="mt-4 space-y-4">
-          {sections.map((section) => (
-            <div key={section.id} className="rounded-lg border border-[var(--wk-border)]">
-              <div className="flex items-center justify-between border-b border-[var(--wk-border)] p-3">
-                <span className="text-[12px] font-semibold text-[var(--wk-text)]">{section.label}</span>
-                <button
-                  onClick={() => handleCopy(section.id, section.data)}
-                  className="flex items-center gap-1 rounded-md px-2 py-1 text-[10px] font-semibold text-[var(--wk-brand)] hover:bg-[var(--wk-brand-soft)]"
-                >
-                  <i className={copiedSection === section.id ? "ri-check-line" : "ri-file-copy-line"} />
-                  {copiedSection === section.id ? "Copied" : "Copy JSON"}
-                </button>
-              </div>
-              <div className="p-3">
-                {section.data ? (
-                  <pre className="max-h-48 overflow-y-auto text-[10px] text-[var(--wk-text-soft)]">
-                    {JSON.stringify(section.data, null, 2)}
-                  </pre>
-                ) : (
-                  <div className="text-[11px] text-[var(--wk-text-muted)] italic">
-                    No data available for this section yet.
-                  </div>
-                )}
-              </div>
+      <div className="mt-4 space-y-4">
+        {sections.map((section) => (
+          <div key={section.id} className="rounded-lg border border-[var(--wk-border)]">
+            <div className="flex items-center justify-between border-b border-[var(--wk-border)] p-3">
+              <span className="text-[12px] font-semibold text-[var(--wk-text)]">{section.label}</span>
+              <button
+                onClick={() => handleCopy(section.id, section.data)}
+                className="flex items-center gap-1 rounded-md px-2 py-1 text-[10px] font-semibold text-[var(--wk-brand)] hover:bg-[var(--wk-brand-soft)]"
+              >
+                <i className={copiedSection === section.id ? "ri-check-line" : "ri-file-copy-line"} />
+                {copiedSection === section.id ? "Copied" : "Copy JSON"}
+              </button>
             </div>
-          ))}
-        </div>
+            <div className="p-3">
+              {section.data ? (
+                <pre className="max-h-48 overflow-y-auto text-[10px] text-[var(--wk-text-soft)]">
+                  {JSON.stringify(section.data, null, 2)}
+                </pre>
+              ) : (
+                <div className="text-[11px] italic text-[var(--wk-text-muted)]">
+                  No data available for this section yet.
+                </div>
+              )}
+            </div>
+          </div>
+        ))}
       </div>
-    </div>
-  );
-}
+    </Sheet>
+  );}

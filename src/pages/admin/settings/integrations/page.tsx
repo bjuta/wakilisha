@@ -30,6 +30,9 @@ import {
 } from "@/services/adminSettings/providerCredentialStore";
 import { WkSelect } from "@/components/design-system/primitives/Select";
 import { WkUploadField } from "@/components/design-system/primitives/UploadField";
+import { WkNumberField } from "@/components/design-system/primitives/NumberField";
+import { WkPasswordField } from "@/components/design-system/primitives/Field";
+import { WakilishaToggle } from "@/components/design-system/primitives/WakilishaToggle";
 
 
 
@@ -748,12 +751,15 @@ function ProviderField({ providerKey, field, value, error, showSecret, onToggleS
         {field.label}{field.required ? " *" : ""}
       </label>
       {field.type === "toggle" ? (
-        <button type="button" onClick={() => onChange(!(value === true))} className="flex w-full items-center justify-between rounded-lg border border-[var(--wk-border)] bg-[var(--wk-bg)] px-3 py-2.5 text-left">
+        <div className="flex w-full items-center justify-between rounded-lg border border-[var(--wk-border)] bg-[var(--wk-bg)] px-3 py-2.5">
           <span className="text-[13px] font-semibold text-[var(--wk-text)]">{value === true ? "Enabled" : "Disabled"}</span>
-          <span className={`relative h-6 w-11 rounded-full transition-colors ${value === true ? "bg-[var(--wk-brand)]" : "bg-[var(--wk-border-2)]"}`}>
-            <span className={`absolute top-0.5 h-5 w-5 rounded-full bg-[var(--wk-surface)] transition-transform ${value === true ? "translate-x-[22px]" : "translate-x-0.5"}`} />
-          </span>
-        </button>
+          <WakilishaToggle
+            value={value === true}
+            onChange={(nextValue) => onChange(nextValue)}
+            size="sm"
+            ariaLabel={field.label}
+          />
+        </div>
       ) : field.type === "select" ? (
         <WkSelect id={id} value={String(value ?? "")} onChange={(value) => onChange(value)} triggerClassName="w-full rounded-lg border border-[var(--wk-border)] bg-[var(--wk-bg)] px-3 py-2 text-[13px] text-[var(--wk-text)] focus:border-[var(--wk-brand)] focus:outline-none focus:ring-1 focus:ring-[var(--wk-brand)]">
           {(field.options ?? []).map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
@@ -765,15 +771,36 @@ function ProviderField({ providerKey, field, value, error, showSecret, onToggleS
             <WkIcon name={showSecret ? "EyeOff" : "Eye"} size={14} />
           </button>
         </div>
+      ) : field.type === "number" ? (
+        <WkNumberField
+          value={String(value ?? "")}
+          onChange={(nextValue) => onChange(nextValue)}
+          min={field.validation?.min}
+          max={field.validation?.max}
+          ariaLabel={field.label}
+          placeholder={field.placeholder}
+          showSteppers={false}
+          groupClassName="h-9 rounded-lg bg-[var(--wk-bg)]"
+          inputClassName="px-3 text-left"
+        />
+      ) : isSecret ? (
+        <WkPasswordField
+          value={String(value ?? "")}
+          onChange={(nextValue) => onChange(nextValue)}
+          ariaLabel={field.label}
+          placeholder={field.placeholder}
+          autoComplete="off"
+          inputClassName="rounded-lg bg-[var(--wk-bg)]"
+        />
       ) : (
-        <div className="flex gap-2">
-          <input id={id} type={isSecret && !showSecret ? "password" : field.type === "number" ? "number" : field.type === "url" ? "url" : "text"} value={String(value ?? "")} min={field.validation?.min} max={field.validation?.max} onChange={(event) => onChange(field.type === "number" ? Number(event.target.value) : event.target.value)} placeholder={field.placeholder} className="min-w-0 flex-1 rounded-lg border border-[var(--wk-border)] bg-[var(--wk-bg)] px-3 py-2 text-[13px] text-[var(--wk-text)] focus:border-[var(--wk-brand)] focus:outline-none focus:ring-1 focus:ring-[var(--wk-brand)]" />
-          {isSecret && (
-            <button type="button" onClick={onToggleSecret} className="flex h-9 w-9 items-center justify-center rounded-lg border border-[var(--wk-border)] text-[var(--wk-text-muted)] hover:bg-[var(--wk-surface-raised)]" title="Toggle visibility">
-              <WkIcon name={showSecret ? "EyeOff" : "Eye"} size={14} />
-            </button>
-          )}
-        </div>
+        <input
+          id={id}
+          type="text"
+          value={String(value ?? "")}
+          onChange={(event) => onChange(event.target.value)}
+          placeholder={field.placeholder}
+          className="w-full rounded-lg border border-[var(--wk-border)] bg-[var(--wk-bg)] px-3 py-2 text-[13px] text-[var(--wk-text)] focus:border-[var(--wk-brand)] focus:outline-none focus:ring-1 focus:ring-[var(--wk-brand)]"
+        />
       )}
       {field.helpText && <p className="mt-1 text-[11px] text-[var(--wk-text-faint)]">{field.helpText}</p>}
       {error && <p className="mt-1 text-[11px] font-semibold text-[var(--wk-danger)]">{error}</p>}

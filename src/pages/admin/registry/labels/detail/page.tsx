@@ -2,6 +2,7 @@ import { useEffect, useState, useCallback, useMemo } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { WkIcon } from "@/components/design-system/Icon";
 import { WkSurface } from "@/components/design-system/primitives/Surface";
+import { Modal } from "@/components/design-system/primitives/Modal";
 import { supabase } from "@/lib/supabase";
 import { useRelatedEntities } from "@/hooks/useRelatedEntities";
 import type { ResolvedRelation } from "@/hooks/useRelatedEntities";
@@ -286,22 +287,36 @@ export default function LabelDetailPage() {
         </div>
       </div>
 
-      {/* Delete */}
-      {showDelete && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
-          <div className="w-full max-w-sm mx-4 rounded-2xl border border-wk-border bg-wk-surface p-6 shadow-lg">
-            <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-xl bg-wk-danger-soft text-wk-danger">
-              <WkIcon name="Trash2" size={22} />
-            </div>
-            <h3 className="text-[16px] font-bold text-wk-text mb-2">Archive Label?</h3>
-            <p className="text-[13px] text-wk-text-muted mb-5">This will set the label status to "archived". You can restore it later.</p>
-            <div className="flex gap-3">
-              <button onClick={() => setShowDelete(false)} className="wk-button wk-button-secondary wk-button-sm flex-1 whitespace-nowrap">Cancel</button>
-              <button onClick={() => { setShowDelete(false); handleDelete(); }} className="wk-button wk-button-sm flex-1 whitespace-nowrap bg-wk-danger text-white hover:opacity-90 border border-wk-danger">Yes, Archive</button>
-            </div>
+      <Modal
+        open={showDelete}
+        onClose={() => setShowDelete(false)}
+        title="Archive Label?"
+        maxWidth="sm"
+        footer={
+          <div className="flex gap-3">
+            <button
+              onClick={() => setShowDelete(false)}
+              className="wk-button wk-button-secondary wk-button-sm flex-1 whitespace-nowrap"
+            >
+              Cancel
+            </button>
+            <button
+              onClick={() => {
+                setShowDelete(false);
+                handleDelete();
+              }}
+              className="wk-button wk-button-sm flex-1 whitespace-nowrap bg-wk-danger text-white hover:opacity-90 border border-wk-danger"
+            >
+              Yes, Archive
+            </button>
           </div>
+        }
+      >
+        <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-xl bg-wk-danger-soft text-wk-danger">
+          <WkIcon name="Trash2" size={22} />
         </div>
-      )}
+        <p className="text-[13px] text-wk-text-muted">This will set the label status to "archived". You can restore it later.</p>
+      </Modal>
 
       {/* Toasts */}
       <div className="fixed bottom-6 right-6 z-50 flex flex-col gap-2 pointer-events-none">

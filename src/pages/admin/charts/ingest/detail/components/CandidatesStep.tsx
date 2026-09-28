@@ -1,5 +1,6 @@
 import { useState, useMemo } from "react";
 import { WkSurface } from "@/components/design-system/primitives/Surface";
+import { Modal } from "@/components/design-system/primitives/Modal";
 import { WkTag } from "@/components/design-system/primitives/Tag";
 import type { IngestCandidate, IngestMatch, ReviewIssue } from "@/services/chartsIngestion/types";
 import { approveCandidate, excludeCandidate, restoreCandidate, getRawItems, hasCapability, getDisabledReason } from "@/services/chartsIngestion/client";
@@ -323,15 +324,8 @@ function CandidateDetailDrawer({ candidate, match, candidateIssues, rawItems, on
   const csvPosition = candidate.sourcePositions.csv;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-      <div className="max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-xl bg-[var(--wk-surface)] p-5">
-        <div className="flex items-center justify-between">
-          <h3 className="text-[14px] font-bold text-[var(--wk-text)]">Candidate Detail</h3>
-          <button onClick={onClose} className="flex h-7 w-7 items-center justify-center rounded-md text-[var(--wk-text-muted)] hover:bg-[var(--wk-surface-raised)]">
-            <i className="ri-close-line" />
-          </button>
-        </div>
-        <div className="mt-4 flex items-center gap-3">
+    <Modal open onClose={onClose} title="Candidate Detail" maxWidth="lg">
+      <div className="mt-4 flex items-center gap-3">
           {candidate.artworkUrl && (
             <img src={candidate.artworkUrl} alt="" className="h-16 w-16 rounded-lg object-cover" />
           )}
@@ -356,7 +350,7 @@ function CandidateDetailDrawer({ candidate, match, candidateIssues, rawItems, on
           </div>
           <div className="rounded-lg border border-[var(--wk-border)] p-3">
             <div className="text-[10px] font-bold uppercase text-[var(--wk-text-muted)]">Match Method</div>
-            <div className="mt-1 text-[13px] font-semibold text-[var(--wk-text)]">{match?.matchMethod ?? "—"}</div>
+            <div className="mt-1 text-[13px] font-semibold text-[var(--wk-text)]">{match?.matchMethod ?? "Not set"}</div>
           </div>
         </div>
 
@@ -399,7 +393,7 @@ function CandidateDetailDrawer({ candidate, match, candidateIssues, rawItems, on
                   </div>
                   <div className="flex items-center justify-between text-[11px]">
                     <span className="text-[var(--wk-text-muted)]">Provider Track ID</span>
-                    <span className="font-mono text-[var(--wk-text)]">{raw.providerTrackId ?? "—"}</span>
+                    <span className="font-mono text-[var(--wk-text)]">{raw.providerTrackId ?? "Not set"}</span>
                   </div>
                   <div className="flex items-center justify-between text-[11px]">
                     <span className="text-[var(--wk-text-muted)]">Raw Hash</span>
@@ -439,7 +433,5 @@ function CandidateDetailDrawer({ candidate, match, candidateIssues, rawItems, on
             </div>
           )}
         </div>
-      </div>
-    </div>
-  );
-}
+    </Modal>
+  );}

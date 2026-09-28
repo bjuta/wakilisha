@@ -1,4 +1,5 @@
 import "@/styles/wakilisha-magazine-38-44.css";
+import { Portal } from "@/components/base/Portal";
 import { useState, useEffect, useRef, useMemo } from "react";
 import { WkIcon } from "@/components/design-system/Icon";
 import { useScrollLock } from "@/hooks/useScrollLock";
@@ -113,7 +114,8 @@ export function ArticlePreviewModal({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex flex-col bg-white">
+    <Portal>
+      <div className="fixed inset-0 z-50 flex flex-col bg-white">
       {/* Progress bar — uses modal scroll position */}
       <div className="fixed top-0 left-0 right-0 z-50 h-0.5 bg-gray-200">
         <div
@@ -368,7 +370,8 @@ export function ArticlePreviewModal({
         {/* Spacer so bottom CTA isn't cut off */}
         <div className="h-8 bg-white" />
       </div>
-    </div>
+      </div>
+    </Portal>
   );
 }
 

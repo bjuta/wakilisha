@@ -1,4 +1,4 @@
-import { useMemo, useState, useCallback, useRef, useEffect } from "react";
+import { useMemo, useState, useCallback, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { releaseUrl } from "@/utils/releaseUrl";
 import {
@@ -16,6 +16,9 @@ import { calculateCompleteness, completenessLabel, completenessTone } from "@/se
 import { supabase } from "@/lib/supabase";
 import { WkSelect } from "@/components/design-system/primitives/Select";
 import { WakilishaToggle } from "@/components/design-system/primitives/WakilishaToggle";
+import { Sheet } from "@/components/design-system/primitives/Sheet";
+import { WkNumberField } from "@/components/design-system/primitives/NumberField";
+import { WkDatePicker } from "@/components/design-system/primitives/DateTimePicker";
 
 
 interface RegistryEntityEditorDrawerProps {
@@ -163,17 +166,7 @@ export default function RegistryEntityEditorDrawer({
   const [richData, setRichData] = useState<ReleaseRichData | null>(null);
   const [richDataLoading, setRichDataLoading] = useState(false);
   const [showRichPanel, setShowRichPanel] = useState(false);
-  const drawerRef = useRef<HTMLDivElement>(null);
   const navigate = useNavigate();
-
-  // Trap focus and handle Escape
-  useEffect(() => {
-    const handleKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") onClose();
-    };
-    document.addEventListener("keydown", handleKey);
-    return () => document.removeEventListener("keydown", handleKey);
-  }, [onClose]);
 
   // Fetch release rich data
   useEffect(() => {
@@ -405,7 +398,7 @@ export default function RegistryEntityEditorDrawer({
         hour: "2-digit",
         minute: "2-digit",
       }).format(new Date(String(entity.updated_at)))
-    : "—";
+    : "Not set";
 
   const saveResultIcon = saveResult
     ? saveResult.ok
@@ -437,59 +430,85 @@ export default function RegistryEntityEditorDrawer({
     return "border-red-300 bg-red-50 text-red-800";
   };
 
+  const footer = (
+    <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+      <p className="text-xs text-[#697062]">
+        {hasChanges
+          ? `${dirtyFields.length} field${dirtyFields.length > 1 ? "s" : ""} changed. Save to persist.`
+          : "No changes to save."}
+      </p>
+      <div className="flex gap-2">
+        {hasChanges ? (
+          <button
+            type="button"
+            onClick={handleDiscard}
+            className="flex items-center gap-1.5 rounded-xl border border-[#dfe4d8] bg-white px-4 py-2.5 text-sm font-black text-[#171712] hover:border-[#85c441] hover:text-[#5f8f2f] transition-all whitespace-nowrap"
+          >
+            <i className="ri-arrow-go-back-line" />
+            Discard
+          </button>
+        ) : null}
+        <button
+          type="button"
+          onClick={handleSave}
+          disabled={saving || !hasChanges}
+          className="flex items-center gap-1.5 rounded-xl bg-[#85c441] px-5 py-2.5 text-sm font-black text-[#102006] shadow-sm transition-all hover:bg-[#76b33a] hover:shadow-md disabled:cursor-not-allowed disabled:opacity-50 disabled:shadow-none whitespace-nowrap"
+        >
+          {saving ? (
+            <>
+              <i className="ri-loader-4-line animate-spin" />
+              Saving...
+            </>
+          ) : hasChanges ? (
+            <>
+              <i className="ri-save-line" />
+              Save {dirtyFields.length} change{dirtyFields.length > 1 ? "s" : ""}
+            </>
+          ) : (
+            <>
+              <i className="ri-check-line" />
+              Saved
+            </>
+          )}
+        </button>
+      </div>
+    </div>
+  );
+
   return (
-    <div className="fixed inset-0 z-50 flex justify-end bg-black/30 backdrop-blur-sm transition-opacity">
-      <button
-        type="button"
-        aria-label="Close editor"
-        onClick={onClose}
-        className="absolute inset-0 cursor-default"
-      />
-
-      <aside
-        ref={drawerRef}
-        className="relative z-10 flex h-full w-full max-w-2xl flex-col bg-white shadow-2xl animate-[slideIn_240ms_ease-out]"
-      >
-        {/* Header */}
-        <header className="shrink-0 border-b border-[#e8ece2] bg-[#fbfcf8]">
-          <div className="h-1 bg-[#85c441]" />
-          <div className="px-5 py-4 sm:px-6 sm:py-5">
-            <div className="flex items-start justify-between gap-4">
-              <div className="min-w-0">
-                <div className="flex items-center gap-2 mb-2">
-                  <span className="inline-flex items-center gap-1 rounded-full border border-[#c5dd9e] bg-[#eef7df] px-2.5 py-1 text-[10px] font-black uppercase tracking-wider text-[#5f8f2f]">
-                    <i className="ri-database-2-line text-xs" />
-                    {entityType}
-                  </span>
-                  {hasChanges && (
-                    <span className="inline-flex items-center gap-1 rounded-full border border-amber-300 bg-amber-50 px-2 py-1 text-[10px] font-black uppercase tracking-wider text-amber-700">
-                      <span className="h-1.5 w-1.5 rounded-full bg-amber-500 animate-pulse" />
-                      Unsaved
-                    </span>
-                  )}
-                </div>
-                <h2 className="text-xl font-black tracking-tight text-[#171712] sm:text-2xl truncate">
-                  {displayName}
-                </h2>
-                <p className="mt-1 font-mono text-[11px] text-[#858c7e] truncate">
-                  {String(entity[schema.idField] ?? "")}
-                </p>
-              </div>
-              <button
-                type="button"
-                onClick={onClose}
-                className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-[#dfe4d8] bg-white text-[#71796b] hover:border-[#85c441] hover:text-[#171712] transition-colors"
-                aria-label="Close editor"
-              >
-                <i className="ri-close-line text-lg" />
-              </button>
-            </div>
-          </div>
-        </header>
-
-        {/* Scrollable body */}
-        <div className="flex-1 overflow-y-auto">
-          <div className="px-5 py-5 sm:px-6">
+    <Sheet
+      open
+      onClose={() => {
+        if (!saving) onClose();
+      }}
+      title={`Edit ${entityType}`}
+      side="right"
+      maxWidth="2xl"
+      dismissable={!saving}
+      footer={footer}
+      bodyClassName="!p-0"
+    >
+      <div className="border-b border-[#e8ece2] bg-[#fbfcf8] px-5 py-4 sm:px-6 sm:py-5">
+        <div className="mb-2 flex items-center gap-2">
+          <span className="inline-flex items-center gap-1 rounded-full border border-[#c5dd9e] bg-[#eef7df] px-2.5 py-1 text-[10px] font-black uppercase tracking-wider text-[#5f8f2f]">
+            <i className="ri-database-2-line text-xs" />
+            {entityType}
+          </span>
+          {hasChanges ? (
+            <span className="inline-flex items-center gap-1 rounded-full border border-amber-300 bg-amber-50 px-2 py-1 text-[10px] font-black uppercase tracking-wider text-amber-700">
+              <span className="h-1.5 w-1.5 rounded-full bg-amber-500 animate-pulse" />
+              Unsaved
+            </span>
+          ) : null}
+        </div>
+        <h2 className="truncate text-xl font-black tracking-tight text-[#171712] sm:text-2xl">
+          {displayName}
+        </h2>
+        <p className="mt-1 truncate font-mono text-[11px] text-[#858c7e]">
+          {String(entity[schema.idField] ?? "")}
+        </p>
+      </div>
+      <div className="px-5 py-5 sm:px-6">
 
             {/* Quality summary */}
             <div className="grid gap-3 grid-cols-2 sm:grid-cols-4 mb-6">
@@ -765,7 +784,7 @@ export default function RegistryEntityEditorDrawer({
                                     month: "2-digit",
                                     year: "numeric",
                                   }).format(new Date(String(entity[field.key])))
-                                : String(entity[field.key] ?? "—")}
+                                : String(entity[field.key] ?? "Not set")}
                             </span>
                           </div>
                         </label>
@@ -1047,58 +1066,9 @@ export default function RegistryEntityEditorDrawer({
                 )}
               </div>
             )}
-          </div>
-        </div>
-
-        {/* Footer */}
-        <footer className="shrink-0 border-t border-[#e8ece2] bg-[#fbfcf8] px-5 py-4 sm:px-6 sm:py-4">
-          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-            <p className="text-xs text-[#697062]">
-              {hasChanges
-                ? `${dirtyFields.length} field${dirtyFields.length > 1 ? "s" : ""} changed. Save to persist.`
-                : "No changes to save."}
-            </p>
-            <div className="flex gap-2">
-              {hasChanges && (
-                <button
-                  type="button"
-                  onClick={handleDiscard}
-                  className="flex items-center gap-1.5 rounded-xl border border-[#dfe4d8] bg-white px-4 py-2.5 text-sm font-black text-[#171712] hover:border-[#85c441] hover:text-[#5f8f2f] transition-all whitespace-nowrap"
-                >
-                  <i className="ri-arrow-go-back-line" />
-                  Discard
-                </button>
-              )}
-              <button
-                type="button"
-                onClick={handleSave}
-                disabled={saving || !hasChanges}
-                className="flex items-center gap-1.5 rounded-xl bg-[#85c441] px-5 py-2.5 text-sm font-black text-[#102006] shadow-sm transition-all hover:bg-[#76b33a] hover:shadow-md disabled:cursor-not-allowed disabled:opacity-50 disabled:shadow-none whitespace-nowrap"
-              >
-                {saving ? (
-                  <>
-                    <i className="ri-loader-4-line animate-spin" />
-                    Saving…
-                  </>
-                ) : hasChanges ? (
-                  <>
-                    <i className="ri-save-line" />
-                    Save {dirtyFields.length} change{dirtyFields.length > 1 ? "s" : ""}
-                  </>
-                ) : (
-                  <>
-                    <i className="ri-check-line" />
-                    Saved
-                  </>
-                )}
-              </button>
-            </div>
-          </div>
-        </footer>
-      </aside>
-    </div>
-  );
-}
+      </div>
+    </Sheet>
+  );}
 
 function ProviderMetadataChips({ metadata }: { metadata: Record<string, unknown> }) {
   const chips: Array<{ icon: string; label: string; value: string }> = [];
@@ -1257,11 +1227,48 @@ function FieldCard({
       );
     }
 
+    if (field.type === "number") {
+      return (
+        <WkNumberField
+          value={strValue}
+          onChange={(value) => onChange(String(value))}
+          ariaLabel={field.label}
+          showSteppers={false}
+          groupClassName={`h-11 bg-[#f8f9f4] ${
+            error
+              ? "border-red-400"
+              : isDirty
+                ? "border-amber-300"
+                : "border-[#dfe4d8]"
+          }`}
+          inputClassName="px-3 text-left text-sm"
+        />
+      );
+    }
+
+    if (field.type === "date") {
+      return (
+        <WkDatePicker
+          value={strValue}
+          onChange={onChange}
+          label={field.label}
+          showLabel={false}
+          triggerClassName={`h-11 bg-[#f8f9f4] text-sm ${
+            error
+              ? "border-red-400"
+              : isDirty
+                ? "border-amber-300"
+                : "border-[#dfe4d8]"
+          }`}
+        />
+      );
+    }
+
     return (
       <div className="relative">
         <input
           id={fieldId}
-          type={field.type === "number" ? "number" : field.type === "date" ? "date" : "text"}
+          type="text"
           value={strValue}
           onChange={(e) => onChange(e.target.value)}
           className={`h-11 w-full rounded-xl border bg-[#f8f9f4] px-3 text-sm outline-none transition-all focus:bg-white ${

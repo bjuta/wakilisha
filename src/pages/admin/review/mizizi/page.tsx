@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState, type Dispatch, type SetState
 import { useNavigate } from "react-router-dom";
 import { WkIcon } from "@/components/design-system/Icon";
 import { WkSurface } from "@/components/design-system/primitives/Surface";
+import { Modal } from "@/components/design-system/primitives/Modal";
 import {
   WkWorkflowRail,
   type WkWorkflowStep,
@@ -641,152 +642,153 @@ function DecisionModal({
       ? "border-wk-brand bg-wk-brand-soft text-wk-brand"
       : "border-wk-border bg-wk-surface text-wk-text hover:bg-wk-surface-raised";
 
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/55 p-4">
-      <div className="max-h-[92vh] w-full max-w-4xl overflow-hidden rounded-2xl border border-wk-border bg-wk-surface shadow-2xl">
-        <div className="flex items-start justify-between gap-4 border-b border-wk-border p-5">
-          <div>
-            <div className="text-[11px] font-black uppercase tracking-wider text-wk-brand">MIZIZI Review</div>
-            <h2 className="mt-1 text-[19px] font-black text-wk-text">{review.title || "Track review"}</h2>
-            <p className="mt-1 text-[12px] text-wk-text-muted">{humanizeSlug(artistScope(review))}</p>
-          </div>
-          <button type="button" onClick={onClose} disabled={submitting} className="wk-button wk-button-ghost wk-button-sm">Close</button>
-        </div>
-
-        <div className="max-h-[calc(92vh-150px)] overflow-y-auto p-5">
-          {detail.loading ? (
-            <div className="py-16 text-center text-[13px] text-wk-text-muted">Loading the latest Track evidence...</div>
-          ) : detail.error || !context ? (
-            <div className="rounded-xl border border-wk-danger/25 bg-wk-danger-soft p-4 text-[12px] text-wk-danger">
-              {detail.error || "This review could not be loaded."}
-            </div>
-          ) : (
-            <>
-              <section>
-                <h3 className="text-[13px] font-black text-wk-text">What MIZIZI found</h3>
-                <div className="mt-3 grid gap-3 md:grid-cols-2">
-                  <Fact label="Current slug" value={context.currentSlug} />
-                  <Fact label="Clean slug" value={context.proposedSlug || "Needs review"} />
-                  <Fact label="ISRC" value={context.isrc || "Not available"} />
-                  <Fact
-                    label="Issue"
-                    value={ruleId(review) === "track_slug_credit_evidence_gap"
-                      ? "Track credits do not fully support the route."
-                      : "Featured artist names are packaged into the route."}
-                  />
-                </div>
-
-                {credits.length ? (
-                  <div className="mt-4">
-                    <div className="text-[11px] font-black uppercase tracking-wider text-wk-text-faint">Current credits</div>
-                    <div className="mt-2 flex flex-wrap gap-2">
-                      {credits.map((entry, index) => {
-                        const credit = asObject(entry);
-                        const name =
-                          textValue(credit.artistNameText)
-                          || textValue(credit.artist_name_text)
-                          || humanizeSlug(textValue(credit.artistSlug) || textValue(credit.artist_slug));
-                        const role =
-                          credit.isPrimary === true || credit.is_primary === true
-                            ? "Primary"
-                            : credit.isFeatured === true || credit.is_featured === true
-                              ? "Featured"
-                              : textValue(credit.role) || "Credit";
-                        return (
-                          <span key={`${name}-${index}`} className="rounded-full border border-wk-border bg-wk-surface-raised px-3 py-1 text-[11px] text-wk-text">
-                            <strong>{name || "Unknown artist"}</strong>
-                            <span className="ml-1 text-wk-text-muted">{role}</span>
-                          </span>
-                        );
-                      })}
-                    </div>
-                  </div>
-                ) : null}
-              </section>
-
-              <section className="mt-6 border-t border-wk-border pt-5">
-                <h3 className="text-[13px] font-black text-wk-text">Choose the outcome</h3>
-                <p className="mt-1 text-[12px] text-wk-text-muted">
-                  Pick the answer. MIZIZI keeps the evidence and applies the approved fix in the next step.
-                </p>
-                <div className="mt-3 grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
-                  <OutcomeButton activeClass={choice("public_music_identity_safe_slug_repair")} label="Use clean slug" help="The Track is right. The route needs cleanup." onClick={() => onChooseOutcome("public_music_identity_safe_slug_repair")} />
-                  <OutcomeButton activeClass={choice("public_music_identity_true_duplicate")} label="Same recording" help="Keep one Track and retire the duplicate." onClick={() => onChooseOutcome("public_music_identity_true_duplicate")} />
-                  <OutcomeButton activeClass={choice("public_music_identity_distinct_recording")} label="Different recording" help="Keep both because the recordings are genuinely different." onClick={() => onChooseOutcome("public_music_identity_distinct_recording")} />
-                  <OutcomeButton activeClass={choice("public_music_identity_credit_correction_required")} label="Fix credits" help="The artist roles need correction first." onClick={() => onChooseOutcome("public_music_identity_credit_correction_required")} />
-                  <OutcomeButton activeClass={choice("public_music_identity_needs_more_research")} label="Need more evidence" help="Leave it open until the identity is clearer." onClick={() => onChooseOutcome("public_music_identity_needs_more_research")} />
-                  <OutcomeButton activeClass={choice("public_music_identity_retire_unresolvable")} label="Retire Track" help="Use only when the Track cannot be resolved safely." onClick={() => onChooseOutcome("public_music_identity_retire_unresolvable")} />
-                </div>
-              </section>
-
-              {form.decisionType === "public_music_identity_true_duplicate" ? (
-                <section className="mt-5 rounded-xl border border-wk-border bg-wk-surface-raised p-4">
-                  <div className="text-[12px] font-black text-wk-text">Which Track should remain?</div>
-                  {detail.peers.length ? (
-                    <div className="mt-3 grid gap-2">
-                      {detail.peers.map((peer) => (
-                        <button
-                          key={peer.id}
-                          type="button"
-                          onClick={() => onFormChange((current) => ({ ...current, canonicalTrackId: peer.id }))}
-                          className={`rounded-xl border p-3 text-left transition-colors ${
-                            form.canonicalTrackId === peer.id
-                              ? "border-wk-brand bg-wk-brand-soft"
-                              : "border-wk-border bg-wk-surface hover:bg-wk-surface-raised"
-                          }`}
-                        >
-                          <div className="text-[12px] font-black text-wk-text">{peer.title}</div>
-                          <div className="mt-1 flex flex-wrap gap-x-3 gap-y-1 text-[11px] text-wk-text-muted">
-                            {peer.slug ? <span>{peer.slug}</span> : null}
-                            {peer.isrc ? <span>ISRC {peer.isrc}</span> : null}
-                            {peer.durationMs !== null ? <span>{durationLabel(peer.durationMs)}</span> : null}
-                          </div>
-                        </button>
-                      ))}
-                    </div>
-                  ) : (
-                    <p className="mt-2 text-[12px] text-wk-warning">
-                      MIZIZI did not return a reviewed peer. Choose another outcome or refresh this item.
-                    </p>
-                  )}
-                </section>
-              ) : null}
-
-              {form.decisionType === "public_music_identity_distinct_recording" ? (
-                <section className="mt-5 grid gap-3 md:grid-cols-2">
-                  <TextField label="Clean route slug" value={form.canonicalSlug} placeholder="song-live" onChange={(value) => onFormChange((current) => ({ ...current, canonicalSlug: value }))} />
-                  <TextArea label="What makes this recording different?" value={form.semanticDistinction} placeholder="Live version, remix, acoustic version, or another proven distinction." onChange={(value) => onFormChange((current) => ({ ...current, semanticDistinction: value }))} />
-                </section>
-              ) : null}
-
-              {form.decisionType === "public_music_identity_credit_correction_required" ? (
-                <section className="mt-5">
-                  <TextArea label="Credit fix" value={form.creditEvidence} placeholder="State who should be primary and who should be featured." onChange={(value) => onFormChange((current) => ({ ...current, creditEvidence: value }))} />
-                </section>
-              ) : null}
-
-              {form.decisionType ? (
-                <section className="mt-5">
-                  <TextArea label="Note" value={form.notes} placeholder="Add anything useful for the audit trail." onChange={(value) => onFormChange((current) => ({ ...current, notes: value }))} />
-                </section>
-              ) : null}
-
-              {message ? (
-                <p className="mt-4 rounded-lg bg-wk-warning-soft px-3 py-2 text-[12px] font-semibold text-wk-warning">{message}</p>
-              ) : null}
-            </>
-          )}
-        </div>
-
-        <div className="flex flex-col gap-2 border-t border-wk-border p-5 sm:flex-row sm:items-center sm:justify-end">
-          <button type="button" onClick={onClose} disabled={submitting} className="wk-button wk-button-ghost wk-button-sm">Cancel</button>
-          <button type="button" onClick={() => void onSubmit(false)} disabled={submitting || !detail.context || !form.decisionType} className="wk-button wk-button-secondary wk-button-sm">Record Decision</button>
-          <button type="button" onClick={() => void onSubmit(true)} disabled={submitting || !detail.context || !form.decisionType} className="wk-button wk-button-primary wk-button-sm">
-            {submitting ? "Recording..." : "Record and Next"}
-          </button>
-        </div>
-      </div>
+  const footer = (
+    <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-end">
+      <button type="button" onClick={onClose} disabled={submitting} className="wk-button wk-button-ghost wk-button-sm">Cancel</button>
+      <button type="button" onClick={() => void onSubmit(false)} disabled={submitting || !detail.context || !form.decisionType} className="wk-button wk-button-secondary wk-button-sm">Record Decision</button>
+      <button type="button" onClick={() => void onSubmit(true)} disabled={submitting || !detail.context || !form.decisionType} className="wk-button wk-button-primary wk-button-sm">
+        {submitting ? "Recording..." : "Record and Next"}
+      </button>
     </div>
+  );
+
+  return (
+    <Modal
+      open
+      onClose={onClose}
+      title={review.title || "Track review"}
+      maxWidth="4xl"
+      dismissable={!submitting}
+      footer={footer}
+    >
+      <div className="mb-5">
+        <div className="text-[11px] font-black uppercase tracking-wider text-wk-brand">MIZIZI Review</div>
+        <p className="mt-1 text-[12px] text-wk-text-muted">{humanizeSlug(artistScope(review))}</p>
+      </div>
+
+      {detail.loading ? (
+        <div className="py-16 text-center text-[13px] text-wk-text-muted">Loading the latest Track evidence...</div>
+      ) : detail.error || !context ? (
+        <div className="rounded-xl border border-wk-danger/25 bg-wk-danger-soft p-4 text-[12px] text-wk-danger">
+          {detail.error || "This review could not be loaded."}
+        </div>
+      ) : (
+        <>
+          <section>
+            <h3 className="text-[13px] font-black text-wk-text">What MIZIZI found</h3>
+            <div className="mt-3 grid gap-3 md:grid-cols-2">
+              <Fact label="Current slug" value={context.currentSlug} />
+              <Fact label="Clean slug" value={context.proposedSlug || "Needs review"} />
+              <Fact label="ISRC" value={context.isrc || "Not available"} />
+              <Fact
+                label="Issue"
+                value={ruleId(review) === "track_slug_credit_evidence_gap"
+                  ? "Track credits do not fully support the route."
+                  : "Featured artist names are packaged into the route."}
+              />
+            </div>
+
+            {credits.length ? (
+              <div className="mt-4">
+                <div className="text-[11px] font-black uppercase tracking-wider text-wk-text-faint">Current credits</div>
+                <div className="mt-2 flex flex-wrap gap-2">
+                  {credits.map((entry, index) => {
+                    const credit = asObject(entry);
+                    const name =
+                      textValue(credit.artistNameText)
+                      || textValue(credit.artist_name_text)
+                      || humanizeSlug(textValue(credit.artistSlug) || textValue(credit.artist_slug));
+                    const role =
+                      credit.isPrimary === true || credit.is_primary === true
+                        ? "Primary"
+                        : credit.isFeatured === true || credit.is_featured === true
+                          ? "Featured"
+                          : textValue(credit.role) || "Credit";
+                    return (
+                      <span key={`${name}-${index}`} className="rounded-full border border-wk-border bg-wk-surface-raised px-3 py-1 text-[11px] text-wk-text">
+                        <strong>{name || "Unknown artist"}</strong>
+                        <span className="ml-1 text-wk-text-muted">{role}</span>
+                      </span>
+                    );
+                  })}
+                </div>
+              </div>
+            ) : null}
+          </section>
+
+          <section className="mt-6 border-t border-wk-border pt-5">
+            <h3 className="text-[13px] font-black text-wk-text">Choose the outcome</h3>
+            <p className="mt-1 text-[12px] text-wk-text-muted">
+              Pick the answer. MIZIZI keeps the evidence and applies the approved fix in the next step.
+            </p>
+            <div className="mt-3 grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+              <OutcomeButton activeClass={choice("public_music_identity_safe_slug_repair")} label="Use clean slug" help="The Track is right. The route needs cleanup." onClick={() => onChooseOutcome("public_music_identity_safe_slug_repair")} />
+              <OutcomeButton activeClass={choice("public_music_identity_true_duplicate")} label="Same recording" help="Keep one Track and retire the duplicate." onClick={() => onChooseOutcome("public_music_identity_true_duplicate")} />
+              <OutcomeButton activeClass={choice("public_music_identity_distinct_recording")} label="Different recording" help="Keep both because the recordings are genuinely different." onClick={() => onChooseOutcome("public_music_identity_distinct_recording")} />
+              <OutcomeButton activeClass={choice("public_music_identity_credit_correction_required")} label="Fix credits" help="The artist roles need correction first." onClick={() => onChooseOutcome("public_music_identity_credit_correction_required")} />
+              <OutcomeButton activeClass={choice("public_music_identity_needs_more_research")} label="Need more evidence" help="Leave it open until the identity is clearer." onClick={() => onChooseOutcome("public_music_identity_needs_more_research")} />
+              <OutcomeButton activeClass={choice("public_music_identity_retire_unresolvable")} label="Retire Track" help="Use only when the Track cannot be resolved safely." onClick={() => onChooseOutcome("public_music_identity_retire_unresolvable")} />
+            </div>
+          </section>
+
+          {form.decisionType === "public_music_identity_true_duplicate" ? (
+            <section className="mt-5 rounded-xl border border-wk-border bg-wk-surface-raised p-4">
+              <div className="text-[12px] font-black text-wk-text">Which Track should remain?</div>
+              {detail.peers.length ? (
+                <div className="mt-3 grid gap-2">
+                  {detail.peers.map((peer) => (
+                    <button
+                      key={peer.id}
+                      type="button"
+                      onClick={() => onFormChange((current) => ({ ...current, canonicalTrackId: peer.id }))}
+                      className={`rounded-xl border p-3 text-left transition-colors ${
+                        form.canonicalTrackId === peer.id
+                          ? "border-wk-brand bg-wk-brand-soft"
+                          : "border-wk-border bg-wk-surface hover:bg-wk-surface-raised"
+                      }`}
+                    >
+                      <div className="text-[12px] font-black text-wk-text">{peer.title}</div>
+                      <div className="mt-1 flex flex-wrap gap-x-3 gap-y-1 text-[11px] text-wk-text-muted">
+                        {peer.slug ? <span>{peer.slug}</span> : null}
+                        {peer.isrc ? <span>ISRC {peer.isrc}</span> : null}
+                        {peer.durationMs !== null ? <span>{durationLabel(peer.durationMs)}</span> : null}
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              ) : (
+                <p className="mt-2 text-[12px] text-wk-warning">
+                  MIZIZI did not return a reviewed peer. Choose another outcome or refresh this item.
+                </p>
+              )}
+            </section>
+          ) : null}
+
+          {form.decisionType === "public_music_identity_distinct_recording" ? (
+            <section className="mt-5 grid gap-3 md:grid-cols-2">
+              <TextField label="Clean route slug" value={form.canonicalSlug} placeholder="song-live" onChange={(value) => onFormChange((current) => ({ ...current, canonicalSlug: value }))} />
+              <TextArea label="What makes this recording different?" value={form.semanticDistinction} placeholder="Live version, remix, acoustic version, or another proven distinction." onChange={(value) => onFormChange((current) => ({ ...current, semanticDistinction: value }))} />
+            </section>
+          ) : null}
+
+          {form.decisionType === "public_music_identity_credit_correction_required" ? (
+            <section className="mt-5">
+              <TextArea label="Credit fix" value={form.creditEvidence} placeholder="State who should be primary and who should be featured." onChange={(value) => onFormChange((current) => ({ ...current, creditEvidence: value }))} />
+            </section>
+          ) : null}
+
+          {form.decisionType ? (
+            <section className="mt-5">
+              <TextArea label="Note" value={form.notes} placeholder="Add anything useful for the audit trail." onChange={(value) => onFormChange((current) => ({ ...current, notes: value }))} />
+            </section>
+          ) : null}
+
+          {message ? (
+            <p className="mt-4 rounded-lg bg-wk-warning-soft px-3 py-2 text-[12px] font-semibold text-wk-warning">{message}</p>
+          ) : null}
+        </>
+      )}
+    </Modal>
   );
 }
 

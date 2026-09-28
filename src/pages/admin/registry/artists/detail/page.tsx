@@ -15,6 +15,7 @@ import type { ResolvedRelation } from "@/hooks/useRelatedEntities";
 import { DiscographyPanel } from "./components/DiscographyPanel";
 import { TopSongsPanel } from "./components/TopSongsPanel";
 import { WkSelect } from "@/components/design-system/primitives/Select";
+import { Modal } from "@/components/design-system/primitives/Modal";
 
 /* ─── Types ─── */
 interface ArtistRecord {
@@ -615,26 +616,53 @@ export default function ArtistDetailPage() {
         </div>
       </div>
 
-      {/* Enrich Result Modal */}
-      {showEnrichResult && enrichResult && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
-          <div className="w-full max-w-lg mx-4 rounded-2xl border border-wk-border bg-wk-surface p-6 shadow-lg max-h-[80vh] overflow-y-auto">
-            <div className="flex items-center justify-between mb-4">
-              <div>
-                <h3 className="text-[16px] font-bold text-wk-text">
-                  {enrichMode === "type" ? "Artist Type Proposal" : "Enrichment Proposal"}
-                </h3>
-                {enrichResult.dry_run === true && (
-                  <p className="mt-1 text-[11px] text-wk-text-faint">Review these exact changes before admission.</p>
-                )}
-              </div>
+      <Modal
+        open={showEnrichResult && Boolean(enrichResult)}
+        onClose={() => {
+          if (!applyingEnrich) setShowEnrichResult(false);
+        }}
+        title={enrichMode === "type" ? "Artist Type Proposal" : "Enrichment Proposal"}
+        maxWidth="lg"
+        dismissable={!applyingEnrich}
+        footer={
+          enrichResult?.dry_run === true
+          && String(enrichResult.results?.[0]?.status) === "updated" ? (
+            <div className="flex justify-end gap-2">
               <button
                 onClick={() => setShowEnrichResult(false)}
-                className="flex h-8 w-8 items-center justify-center rounded-lg text-wk-text-faint hover:bg-wk-surface-raised"
+                disabled={applyingEnrich}
+                className="wk-button wk-button-ghost wk-button-sm"
               >
-                <WkIcon name="X" size={16} />
+                Cancel
+              </button>
+              <button
+                onClick={handleApproveEnrichment}
+                disabled={applyingEnrich}
+                className="wk-button wk-button-primary wk-button-sm"
+              >
+                {applyingEnrich ? (
+                  <>
+                    <WkIcon name="Loader2" size={14} className="animate-spin" />
+                    Admitting&hellip;
+                  </>
+                ) : (
+                  <>
+                    <WkIcon name="Check" size={14} />
+                    Approve exact changes
+                  </>
+                )}
               </button>
             </div>
+          ) : null
+        }
+      >
+        {enrichResult ? (
+          <>
+            {enrichResult.dry_run === true ? (
+              <p className="mb-4 text-[11px] text-wk-text-faint">
+                Review these exact changes before admission.
+              </p>
+            ) : null}
             {(() => {
               const result = enrichResult.results?.[0];
               if (!result) return <p className="text-[13px] text-wk-text-muted">No results returned.</p>;
@@ -657,23 +685,23 @@ export default function ArtistDetailPage() {
                     </span>
                   </div>
 
-                  {(changes.image as Record<string, unknown>) && (
+                  {(changes.image as Record<string, unknown>) ? (
                     <div className="rounded-xl border border-wk-border bg-wk-bg-subtle p-3">
-                      <p className="text-[11px] font-bold uppercase tracking-wider text-wk-text-muted mb-2">Image</p>
+                      <p className="mb-2 text-[11px] font-bold uppercase tracking-wider text-wk-text-muted">Image</p>
                       <div className="flex items-center gap-3">
-                        <div className="h-12 w-12 rounded-lg bg-wk-surface-raised overflow-hidden shrink-0">
+                        <div className="h-12 w-12 shrink-0 overflow-hidden rounded-lg bg-wk-surface-raised">
                           {(changes.image as Record<string, unknown>)?.old ? (
                             <img src={String((changes.image as Record<string, unknown>).old)} alt="Old" className="h-full w-full object-cover" />
                           ) : (
-                            <div className="h-full w-full flex items-center justify-center text-wk-text-faint text-[10px]">None</div>
+                            <div className="flex h-full w-full items-center justify-center text-[10px] text-wk-text-faint">None</div>
                           )}
                         </div>
                         <WkIcon name="ArrowRight" size={14} className="text-wk-text-faint" />
-                        <div className="h-12 w-12 rounded-lg bg-wk-surface-raised overflow-hidden shrink-0">
+                        <div className="h-12 w-12 shrink-0 overflow-hidden rounded-lg bg-wk-surface-raised">
                           {(changes.image as Record<string, unknown>)?.new ? (
                             <img src={String((changes.image as Record<string, unknown>).new)} alt="New" className="h-full w-full object-cover" />
                           ) : (
-                            <div className="h-full w-full flex items-center justify-center text-wk-text-faint text-[10px]">None</div>
+                            <div className="flex h-full w-full items-center justify-center text-[10px] text-wk-text-faint">None</div>
                           )}
                         </div>
                         <span className="text-[11px] font-bold text-wk-text-muted">
@@ -681,34 +709,34 @@ export default function ArtistDetailPage() {
                         </span>
                       </div>
                     </div>
-                  )}
+                  ) : null}
 
-                  {(changes.bio as Record<string, unknown>) && (
+                  {(changes.bio as Record<string, unknown>) ? (
                     <div className="rounded-xl border border-wk-border bg-wk-bg-subtle p-3">
-                      <p className="text-[11px] font-bold uppercase tracking-wider text-wk-text-muted mb-1">Bio</p>
-                      <p className="text-[12px] text-wk-text-muted line-clamp-6">
+                      <p className="mb-1 text-[11px] font-bold uppercase tracking-wider text-wk-text-muted">Bio</p>
+                      <p className="line-clamp-6 text-[12px] text-wk-text-muted">
                         {(changes.bio as Record<string, unknown>)?.new as string}
                       </p>
-                      <span className="text-[10px] font-bold text-wk-text-muted mt-1 block">
+                      <span className="mt-1 block text-[10px] font-bold text-wk-text-muted">
                         Source: {(changes.bio as Record<string, unknown>)?.source as string}
                       </span>
                     </div>
-                  )}
+                  ) : null}
 
-                  {(changes.genres as Record<string, unknown>) && (
+                  {(changes.genres as Record<string, unknown>) ? (
                     <div className="rounded-xl border border-wk-border bg-wk-bg-subtle p-3">
-                      <p className="text-[11px] font-bold uppercase tracking-wider text-wk-text-muted mb-2">Genres</p>
+                      <p className="mb-2 text-[11px] font-bold uppercase tracking-wider text-wk-text-muted">Genres</p>
                       <div className="flex flex-wrap gap-1">
-                        {((changes.genres as Record<string, unknown>)?.new as string[])?.map((g) => (
-                          <span key={g} className="rounded-full bg-wk-surface-raised px-2 py-0.5 text-[10px] font-bold text-wk-text">{g}</span>
+                        {((changes.genres as Record<string, unknown>)?.new as string[])?.map((genre) => (
+                          <span key={genre} className="rounded-full bg-wk-surface-raised px-2 py-0.5 text-[10px] font-bold text-wk-text">{genre}</span>
                         ))}
                       </div>
                     </div>
-                  )}
+                  ) : null}
 
-                  {(changes.type as Record<string, unknown>) && (
+                  {(changes.type as Record<string, unknown>) ? (
                     <div className="rounded-xl border border-wk-border bg-wk-bg-subtle p-3">
-                      <p className="text-[11px] font-bold uppercase tracking-wider text-wk-text-muted mb-2">Artist Type</p>
+                      <p className="mb-2 text-[11px] font-bold uppercase tracking-wider text-wk-text-muted">Artist Type</p>
                       <div className="flex items-center gap-2 text-[13px] text-wk-text">
                         <span>{String((changes.type as Record<string, unknown>).old || "unset")}</span>
                         <WkIcon name="ArrowRight" size={14} className="text-wk-text-faint" />
@@ -718,72 +746,52 @@ export default function ArtistDetailPage() {
                         Source: {String((changes.type as Record<string, unknown>).source || "review")} · {String((changes.type as Record<string, unknown>).heuristic || "")}
                       </p>
                     </div>
-                  )}
+                  ) : null}
 
-                  {result.message && (
+                  {result.message ? (
                     <p className="text-[12px] text-wk-text-muted">{String(result.message)}</p>
-                  )}
-
-                  {enrichResult.dry_run === true && status === "updated" && (
-                    <div className="flex justify-end gap-2 border-t border-wk-border pt-4">
-                      <button
-                        onClick={() => setShowEnrichResult(false)}
-                        disabled={applyingEnrich}
-                        className="wk-button wk-button-secondary wk-button-sm"
-                      >
-                        Cancel
-                      </button>
-                      <button
-                        onClick={handleApproveEnrichment}
-                        disabled={applyingEnrich}
-                        className="wk-button wk-button-primary wk-button-sm"
-                      >
-                        {applyingEnrich ? (
-                          <>
-                            <WkIcon name="Loader2" size={14} className="animate-spin" />
-                            Admitting&hellip;
-                          </>
-                        ) : (
-                          <>
-                            <WkIcon name="Check" size={14} />
-                            Approve exact changes
-                          </>
-                        )}
-                      </button>
-                    </div>
-                  )}
+                  ) : null}
                 </div>
               );
             })()}
-          </div>
-        </div>
-      )}
+          </>
+        ) : null}
+      </Modal>
 
-      {/* Delete Confirm */}
-      {showDelete && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
-          <div className="w-full max-w-sm mx-4 rounded-2xl border border-wk-border bg-wk-surface p-6 shadow-lg">
-            <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-xl bg-wk-danger-soft text-wk-danger">
-              <WkIcon name="Trash2" size={22} />
-            </div>
-            <h3 className="text-[16px] font-bold text-wk-text mb-2">Archive Artist?</h3>
-            <p className="text-[13px] text-wk-text-muted mb-5">
-              This will set the artist status to "archived". You can restore it later.
-            </p>
-            <div className="flex gap-3">
-              <button onClick={() => setShowDelete(false)} className="wk-button wk-button-secondary wk-button-sm flex-1 whitespace-nowrap">
-                Cancel
-              </button>
-              <button
-                onClick={() => { setShowDelete(false); handleDelete(); }}
-                className="wk-button wk-button-sm flex-1 whitespace-nowrap bg-wk-danger text-white hover:opacity-90 border border-wk-danger"
-              >
-                Yes, Archive
-              </button>
-            </div>
+      <Modal
+        open={showDelete}
+        onClose={() => setShowDelete(false)}
+        title="Archive Artist?"
+        maxWidth="sm"
+        footer={
+          <div className="grid grid-cols-2 gap-2">
+            <button
+              onClick={() => setShowDelete(false)}
+              className="wk-button wk-button-ghost wk-button-sm justify-center"
+            >
+              Cancel
+            </button>
+            <button
+              onClick={() => {
+                setShowDelete(false);
+                handleDelete();
+              }}
+              className="wk-button wk-button-sm justify-center border border-wk-danger bg-wk-danger text-white hover:opacity-90"
+            >
+              Yes, Archive
+            </button>
           </div>
+        }
+      >
+        <div className="flex items-start gap-3">
+          <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-wk-danger-soft text-wk-danger">
+            <WkIcon name="Trash2" size={22} />
+          </div>
+          <p className="text-[13px] leading-6 text-wk-text-muted">
+            This will set the artist status to "archived". You can restore it later.
+          </p>
         </div>
-      )}
+      </Modal>
 
       {/* Toasts */}
       <div className="fixed bottom-6 right-6 z-50 flex flex-col gap-2 pointer-events-none">
