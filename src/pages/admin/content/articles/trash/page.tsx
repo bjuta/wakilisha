@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { WkIcon } from "@/components/design-system/Icon";
 import { WkSurface } from "@/components/design-system/primitives/Surface";
+import { Modal } from "@/components/design-system/primitives/Modal";
 import {
   listTrashedArticles,
   restoreArticle,
@@ -174,38 +175,46 @@ export default function AdminTrashPage() {
       )}
 
       {/* Permanent Delete Confirm Modal */}
-      {showDeleteConfirm && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
-          <div className="w-full max-w-sm mx-4 rounded-2xl border border-wk-danger/30 bg-wk-surface p-6 shadow-lg">
-            <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-xl bg-wk-danger-soft text-wk-danger">
-              <WkIcon name="AlertTriangle" size={22} />
-            </div>
-            <h3 className="text-[16px] font-bold text-wk-text mb-2">Permanently Delete?</h3>
-            <p className="text-[13px] text-wk-text-muted mb-1">
-              This will <strong className="text-wk-danger">permanently delete</strong> "{showDeleteConfirm.title}"
-              and all its revision history. This action <strong>cannot be undone</strong>.
-            </p>
-            <p className="text-[12px] text-wk-text-soft bg-wk-bg-subtle rounded-lg px-3 py-2 mb-5 border border-wk-border/50">
-              This permanently removes the article and its revisions.
-            </p>
-            <div className="flex gap-3">
-              <button
-                onClick={() => setShowDeleteConfirm(null)}
-                className="wk-button wk-button-secondary wk-button-sm flex-1 whitespace-nowrap"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={() => handlePermanentDelete(showDeleteConfirm)}
-                className="wk-button wk-button-sm flex-1 whitespace-nowrap bg-wk-danger text-white hover:opacity-90 border border-wk-danger"
-              >
-                <WkIcon name="Trash2" size={14} />
-                Delete Forever
-              </button>
-            </div>
+      <Modal
+        open={Boolean(showDeleteConfirm)}
+        onClose={() => {
+          if (!deletingId) setShowDeleteConfirm(null);
+        }}
+        title="Permanently Delete?"
+        maxWidth="sm"
+        dismissable={!deletingId}
+        footer={
+          <div className="flex gap-3">
+            <button
+              onClick={() => setShowDeleteConfirm(null)}
+              disabled={Boolean(deletingId)}
+              className="wk-button wk-button-secondary wk-button-sm flex-1 whitespace-nowrap"
+            >
+              Cancel
+            </button>
+            <button
+              onClick={() => showDeleteConfirm && handlePermanentDelete(showDeleteConfirm)}
+              disabled={Boolean(deletingId)}
+              className="wk-button wk-button-sm flex-1 whitespace-nowrap bg-wk-danger text-white hover:opacity-90 border border-wk-danger"
+            >
+              <WkIcon name="Trash2" size={14} />
+              {deletingId ? "Deleting..." : "Delete Forever"}
+            </button>
           </div>
+        }
+      >
+        <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-xl bg-wk-danger-soft text-wk-danger">
+          <WkIcon name="AlertTriangle" size={22} />
         </div>
-      )}
+        <p className="text-[13px] text-wk-text-muted">
+          {showDeleteConfirm ? (
+            <>Permanently delete <strong className="text-wk-danger">"{showDeleteConfirm.title}"</strong> and all revision history? This cannot be undone.</>
+          ) : null}
+        </p>
+        <p className="mt-3 rounded-lg border border-wk-border/50 bg-wk-bg-subtle px-3 py-2 text-[12px] text-wk-text-soft">
+          This permanently removes the article and its revisions.
+        </p>
+      </Modal>
 
       {/* Toast Notifications */}
       <div className="fixed bottom-6 right-6 z-50 flex flex-col gap-2 pointer-events-none">
