@@ -3,6 +3,11 @@
   "scope": "public_music_identity_batch_a_safe_slug",
   "programme_issue": 1094,
   "confirm": "PUBLIC_MUSIC_IDENTITY_BATCH_A_SAFE_SLUG_APPLY",
+  "capability_grant_id": "c52081d1-4381-47c8-851a-b769ac2b8242",
+  "expected_candidate_count": 5,
+  "expected_candidate_fingerprint": "363bed8410570611a8cdf43194f7b47a0e0f380877fac342201fc48e2b6576e9",
+  "expected_operation_key": "registry.track_slug.canonicalize",
+  "expected_capability_key": "canonicalize_registry_track_slug",
   "safe_review_ids": [
     "740dbe7e-b423-4e69-b479-83dc91a76da2",
     "74df20a4-1486-42a1-a6fe-e6b625c38728",
