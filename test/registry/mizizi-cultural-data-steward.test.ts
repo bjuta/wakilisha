@@ -1460,7 +1460,7 @@ describe("MIZIZI Cultural Data Steward", () => {
       "accepted Track review boundary is not recognized",
     );
     expect(controlPlane).toContain(
-      "[66,32].includes(identityNoise)",
+      "[66,32,27].includes(identityNoise)",
     );
     expect(controlPlane).toContain(
       "598 + identityNoise",
@@ -3530,5 +3530,159 @@ describe("MIZIZI Slice 3 Tranche B remaining high-blast convergence", () => {
     ]) {
       expect(verifier).toContain(token);
     }
+  });
+});
+
+describe("Public Music Identity #1094 human decision lifecycle", () => {
+  it("records human judgment without resolving or mutating canonical Track identity", () => {
+    const migrations =
+      readdirSync("supabase/migrations").filter((name) =>
+        name.endsWith(
+          "_public_music_identity_track_review_decision_authority_v1.sql",
+        ),
+      );
+
+    expect(migrations).toHaveLength(1);
+
+    const migration = read(
+      "supabase/migrations/" + migrations[0],
+    );
+    const verifier = read(
+      "scripts/control-plane/verify-public-music-identity-track-review-decision-authority-v1.sql",
+    );
+    const service = read(
+      "src/services/adminReviewCommandCenter.ts",
+    );
+    const page = read(
+      "src/pages/admin/review/queue/page.tsx",
+    );
+
+    expect(migration).toContain(
+      "admin_get_public_music_identity_track_review_context_v1",
+    );
+    expect(migration).toContain(
+      "admin_record_public_music_identity_track_review_decision_v1",
+    );
+    expect(migration).toContain(
+      "registry_subject_state_fingerprint",
+    );
+    expect(migration).toContain(
+      "Track state changed after review context was loaded",
+    );
+    expect(migration).toContain(
+      "'public_music_identity_track_actual_zero_v1'",
+    );
+    expect(migration).toContain(
+      "'reviewResolved',false",
+    );
+    expect(migration).toContain(
+      "recordingIdentityPeers",
+    );
+    expect(migration).toContain(
+      "canonicalTrackId must be one of the reviewed recording-identity peers.",
+    );
+    expect(migration).not.toMatch(
+      /update\s+public\.registry_review_items/i,
+    );
+    expect(migration).toContain(
+      "guard_public_music_identity_track_review_resolution_v1",
+    );
+    expect(migration).toContain(
+      "guard_public_music_identity_track_review_resolution_v1()\nreturns trigger\nlanguage plpgsql\nsecurity definer\nset search_path=pg_catalog,public,platform_private\nas $guard$",
+    );
+    expect(migration).toContain(
+      "registry_review_items_public_music_identity_track_resolution_guard_v1",
+    );
+    expect(migration).toContain(
+      "session_user<>'mizizi_executor'",
+    );
+    expect(migration).toContain(
+      "verifiedOperationId",
+    );
+    expect(migration).toContain(
+      "execution_grant.plan_payload->>'reviewId'",
+    );
+    expect(migration).toContain(
+      "execution_grant.plan_payload->>'decisionId'",
+    );
+    expect(migration).not.toContain(
+      "wk_slug_redirects",
+    );
+
+    expect(verifier).toContain(
+      "PUBLIC_MUSIC_IDENTITY_TRACK_REVIEW_DECISION_AUTHORITY_V1_PASS",
+    );
+    expect(verifier).toContain(
+      "Human decision capture must not resolve the review",
+    );
+    expect(verifier).toContain(
+      "Review resolution is not bound to verified MIZIZI execution and the exact human decision",
+    );
+
+    expect(service).toContain(
+      "admin_get_public_music_identity_track_review_context_v1",
+    );
+    expect(service).toContain(
+      "admin_record_public_music_identity_track_review_decision_v1",
+    );
+    expect(service).toContain(
+      "isPublicMusicIdentityTrackReview",
+    );
+
+    expect(page).toContain(
+      "Public Music Identity — governed human decision",
+    );
+    expect(page).toContain(
+      "public_music_identity_safe_slug_repair",
+    );
+    expect(page).toContain(
+      "public_music_identity_distinct_recording",
+    );
+    expect(page).toContain(
+      "public_music_identity_true_duplicate",
+    );
+    expect(page).toContain(
+      "public_music_identity_retire_unresolvable",
+    );
+    expect(page).toContain(
+      "public_music_identity_credit_correction_required",
+    );
+    expect(page).toContain(
+      "The review stays open until a governed executor",
+    );
+    expect(page).toContain(
+      "Decision recorded · execution pending",
+    );
+    expect(page).toContain(
+      "Human decision",
+    );
+  });
+});
+
+
+describe("Public Music Identity Track production accepted-state lineage", () => {
+  it("recognizes the post-primary-follow-up 27-review Production boundary", () => {
+    const controlPlane = read(
+      "scripts/control-plane/mizizi-track-production-control-plane.mjs",
+    );
+
+    expect(controlPlane).toContain(
+      "const POST_PRIMARY_FOLLOWUP_BASELINE",
+    );
+    expect(controlPlane).toContain(
+      "reviews:27",
+    );
+    expect(controlPlane).toContain(
+      "post_primary_followup",
+    );
+    expect(controlPlane).toContain(
+      "track_collision:26",
+    );
+    expect(controlPlane).toContain(
+      "missing_primary:1",
+    );
+    expect(controlPlane).toContain(
+      "[66,32,27]",
+    );
   });
 });

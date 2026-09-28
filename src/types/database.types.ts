@@ -20213,6 +20213,10 @@ export type Database = {
         Args: { p_edition_id: string }
         Returns: Json
       }
+      admin_get_public_music_identity_track_review_context_v1: {
+        Args: { p_review_id: string }
+        Returns: Json
+      }
       admin_get_registry_artist_intake_review_v1: {
         Args: { p_staging_id: string }
         Returns: Json
@@ -20400,6 +20404,16 @@ export type Database = {
           p_registry_track_id: string
           p_source_credit_id: string
           p_suggestion_id: string
+        }
+        Returns: Json
+      }
+      admin_record_public_music_identity_track_review_decision_v1: {
+        Args: {
+          p_decision_payload: Json
+          p_decision_type: string
+          p_expected_track_state_fingerprint: string
+          p_notes: string
+          p_review_id: string
         }
         Returns: Json
       }

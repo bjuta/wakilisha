@@ -136,13 +136,38 @@ export type RegistryDecisionType =
   | "approve_featured_artist_split"
   | "needs_more_research"
   | "reject_bad_metadata"
-  | "duplicate_or_bad_source";
+  | "duplicate_or_bad_source"
+  | "public_music_identity_safe_slug_repair"
+  | "public_music_identity_distinct_recording"
+  | "public_music_identity_true_duplicate"
+  | "public_music_identity_retire_unresolvable"
+  | "public_music_identity_credit_correction_required"
+  | "public_music_identity_needs_more_research";
 
 export type RegistryReviewDecisionInput = {
   item: RegistryReviewItemRow;
   decisionType: RegistryDecisionType;
   notes: string;
   resolutionPayload?: Record<string, unknown>;
+  expectedTrackStateFingerprint?: string;
+};
+
+export type PublicMusicIdentityTrackReviewContext = {
+  reviewId: string;
+  trackId: string;
+  ruleId: string;
+  ruleVersion: string;
+  reviewStatus: string;
+  reviewUpdatedAt: string;
+  trackStateFingerprint: string;
+  currentSlug: string;
+  title: string;
+  isrc: string | null;
+  proposedSlug: string | null;
+  reviewEvidence: Record<string, unknown>;
+  activeCredits: Array<Record<string, unknown>>;
+  openRecordingIdentityReviewId: string | null;
+  existingDecision: Record<string, unknown> | null;
 };
 
 export type ReviewCommandCenterData = {
@@ -254,6 +279,53 @@ export async function loadRegistryReviewItems(filters: RegistryReviewFilters = {
   return { rows: (data ?? []) as RegistryReviewItemRow[], total: count ?? 0, limit, offset };
 }
 
+export function isPublicMusicIdentityTrackReview(
+  item: RegistryReviewItemRow,
+): boolean {
+  const source = item.source_payload ?? {};
+  const ruleId =
+    typeof source.ruleId === "string"
+      ? source.ruleId
+      : "";
+  const ruleVersion =
+    typeof source.ruleVersion === "string"
+      ? source.ruleVersion
+      : "";
+
+  return (
+    item.entity_type === "track" &&
+    item.review_type === "mizizi_data_hygiene" &&
+    (
+      (
+        ruleId === "track_slug_identity_noise" &&
+        ruleVersion === "1.1.0"
+      ) ||
+      (
+        ruleId === "track_slug_credit_evidence_gap" &&
+        ruleVersion === "1.3.0"
+      )
+    )
+  );
+}
+
+export async function loadPublicMusicIdentityTrackReviewContext(
+  reviewId: string,
+): Promise<PublicMusicIdentityTrackReviewContext> {
+  const { data, error } = await supabase.rpc(
+    "admin_get_public_music_identity_track_review_context_v1",
+    { p_review_id: reviewId },
+  );
+
+  if (error) throw error;
+  if (!data || typeof data !== "object") {
+    throw new Error(
+      "Public Music Identity review context was not returned.",
+    );
+  }
+
+  return data as PublicMusicIdentityTrackReviewContext;
+}
+
 function row(summary: StagingSummaryRow[], target: string): StagingSummaryRow {
   return summary.find((item) => item.target_entity === target) ?? { target_entity: target, ready: 0, needs_review: 0, blocked: 0, total: 0 };
 }
@@ -346,6 +418,33 @@ export async function recordRegistryReviewDecision(input: RegistryReviewDecision
   const item = input.item;
   const notes = input.notes.trim();
   const resolutionPayload = { decisionType: input.decisionType, notes, ...(input.resolutionPayload ?? {}) };
+
+  if (isPublicMusicIdentityTrackReview(item)) {
+    const expectedTrackStateFingerprint =
+      input.expectedTrackStateFingerprint?.trim();
+
+    if (!expectedTrackStateFingerprint) {
+      throw new Error(
+        "Reload this Track review before recording a Public Music Identity decision.",
+      );
+    }
+
+    const { error } = await supabase.rpc(
+      "admin_record_public_music_identity_track_review_decision_v1",
+      {
+        p_review_id: item.id,
+        p_decision_type: input.decisionType,
+        p_decision_payload: resolutionPayload,
+        p_expected_track_state_fingerprint:
+          expectedTrackStateFingerprint,
+        p_notes: notes,
+      },
+    );
+
+    if (error) throw error;
+    return;
+  }
+
   const { data: userData } = await supabase.auth.getUser();
   const decidedBy = userData.user?.id ?? null;
 

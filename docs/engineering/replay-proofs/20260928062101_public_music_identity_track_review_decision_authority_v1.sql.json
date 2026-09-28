@@ -1,0 +1,16 @@
+{
+  "migration_file": "supabase/migrations/20260928062101_public_music_identity_track_review_decision_authority_v1.sql",
+  "migration_sha256": "79f8f4fd2be58f12f795a2957d641a557fe515bc3de8d591064e14754ea00a7a",
+  "base_main_sha": "234730a5cf113233e1b7b9253a8d8ba7b256e1f5",
+  "preview_project_ref": "yujmmiknvkminxxothlc",
+  "preview_branch_id": "b2beb605-9da7-49e5-888e-240cdbeb4588",
+  "preview_migration_head": "20260928062101",
+  "baseline_replay": "pass",
+  "candidate_apply": "pass",
+  "verifier": "pass",
+  "verifier_file": "scripts/control-plane/verify-public-music-identity-track-review-decision-authority-v1.sql",
+  "schema_types_sha256": "31c4d09e7c3df1479d9f64544f051c77ab0b59cd59260c4a391f1a5999b3ad72",
+  "schema_migration_count": 185,
+  "schema_migration_head": "20260928062101",
+  "verified_at": "2026-09-28T06:54:20.310Z"
+}
