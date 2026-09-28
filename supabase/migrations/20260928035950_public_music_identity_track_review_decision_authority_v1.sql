@@ -542,7 +542,7 @@ returns trigger
 language plpgsql
 security definer
 set search_path=pg_catalog,public,platform_private
-as $
+as $guard$
 declare
   v_decision_id uuid;
   v_operation_id uuid;
@@ -633,7 +633,7 @@ begin
 
   return new;
 end
-$;
+$guard$;
 
 revoke all on function
   platform_private.guard_public_music_identity_track_review_resolution_v1()

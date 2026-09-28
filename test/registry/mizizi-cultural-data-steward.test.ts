@@ -3588,7 +3588,7 @@ describe("Public Music Identity #1094 human decision lifecycle", () => {
       "guard_public_music_identity_track_review_resolution_v1",
     );
     expect(migration).toContain(
-      "guard_public_music_identity_track_review_resolution_v1()\nreturns trigger\nlanguage plpgsql\nsecurity definer\nset search_path=pg_catalog,public,platform_private\nas $",
+      "guard_public_music_identity_track_review_resolution_v1()\nreturns trigger\nlanguage plpgsql\nsecurity definer\nset search_path=pg_catalog,public,platform_private\nas $guard$",
     );
     expect(migration).toContain(
       "registry_review_items_public_music_identity_track_resolution_guard_v1",
