@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { WkIcon } from "@/components/design-system/Icon";
+import { Modal } from "@/components/design-system/primitives/Modal";
 import {
   acceptMissingArtistIntake,
   createMissingArtistIntake,
@@ -68,54 +69,56 @@ function ActionDialog({
   );
   const [sourceUrl, setSourceUrl] = useState("");
 
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" role="dialog" aria-modal="true">
-      <div className="w-full max-w-lg rounded-2xl border border-wk-border bg-wk-surface p-5 shadow-2xl">
-        <div className="flex items-start justify-between gap-4">
-          <div>
-            <div className="text-[11px] font-black uppercase tracking-wide text-wk-brand">{mode === "create" ? "Missing Artist Intake" : "Accept Into Registry"}</div>
-            <h2 className="mt-1 text-[20px] font-black text-wk-text">{row.suggested_display_name}</h2>
-            <p className="mt-1 text-[12px] text-wk-text-muted">Legacy slug: {row.legacy_slug}</p>
-          </div>
-          <button onClick={onClose} disabled={busy} className="rounded-lg p-2 text-wk-text-muted hover:bg-wk-surface-raised hover:text-wk-text disabled:opacity-40" aria-label="Close">
-            <WkIcon name="X" size={16} />
-          </button>
-        </div>
-
-        <div className="mt-5 space-y-4">
-          {mode === "create" ? (
-            <label className="block">
-              <span className="mb-1.5 block text-[11px] font-bold text-wk-text-muted">Proposed Display Name</span>
-              <input value={displayName} onChange={(event) => setDisplayName(event.target.value)} className="w-full rounded-lg border border-wk-border bg-wk-surface-raised px-3 py-2.5 text-[13px] text-wk-text outline-none focus:border-wk-brand" />
-            </label>
-          ) : null}
-
-          <label className="block">
-            <span className="mb-1.5 block text-[11px] font-bold text-wk-text-muted">Review Reason</span>
-            <textarea value={reason} onChange={(event) => setReason(event.target.value)} rows={4} className="w-full resize-none rounded-lg border border-wk-border bg-wk-surface-raised px-3 py-2.5 text-[13px] text-wk-text outline-none focus:border-wk-brand" />
-          </label>
-
-          {mode === "create" ? (
-            <label className="block">
-              <span className="mb-1.5 block text-[11px] font-bold text-wk-text-muted">Source URL <span className="font-normal">(optional)</span></span>
-              <input value={sourceUrl} onChange={(event) => setSourceUrl(event.target.value)} placeholder="https://" className="w-full rounded-lg border border-wk-border bg-wk-surface-raised px-3 py-2.5 text-[13px] text-wk-text outline-none focus:border-wk-brand" />
-            </label>
-          ) : null}
-        </div>
-
-        <div className="mt-5 flex justify-end gap-2">
-          <button onClick={onClose} disabled={busy} className="rounded-lg border border-wk-border px-4 py-2 text-[12px] font-bold text-wk-text-muted hover:bg-wk-surface-raised disabled:opacity-40">Cancel</button>
-          <button
-            onClick={() => onSubmit({ displayName, reason, sourceUrl })}
-            disabled={busy || !reason.trim() || (mode === "create" && !displayName.trim())}
-            className="inline-flex items-center gap-2 rounded-lg bg-wk-brand px-4 py-2 text-[12px] font-black text-wk-brand-on hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-40"
-          >
-            {busy ? <WkIcon name="Loader2" size={14} className="animate-spin" /> : <WkIcon name={mode === "create" ? "Upload" : "Check"} size={14} />}
-            {mode === "create" ? "Create Intake" : "Accept Artist"}
-          </button>
-        </div>
-      </div>
+  const footer = (
+    <div className="flex justify-end gap-2">
+      <button onClick={onClose} disabled={busy} className="rounded-lg border border-wk-border px-4 py-2 text-[12px] font-bold text-wk-text-muted hover:bg-wk-surface-raised disabled:opacity-40">Cancel</button>
+      <button
+        onClick={() => onSubmit({ displayName, reason, sourceUrl })}
+        disabled={busy || !reason.trim() || (mode === "create" && !displayName.trim())}
+        className="inline-flex items-center gap-2 rounded-lg bg-wk-brand px-4 py-2 text-[12px] font-black text-wk-brand-on hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-40"
+      >
+        {busy ? <WkIcon name="Loader2" size={14} className="animate-spin" /> : <WkIcon name={mode === "create" ? "Upload" : "Check"} size={14} />}
+        {mode === "create" ? "Create Intake" : "Accept Artist"}
+      </button>
     </div>
+  );
+
+  return (
+    <Modal
+      open
+      onClose={onClose}
+      title={mode === "create" ? "Missing Artist Intake" : "Accept Into Registry"}
+      maxWidth="lg"
+      dismissable={!busy}
+      footer={footer}
+    >
+      <div>
+        <h2 className="text-[20px] font-black text-wk-text">{row.suggested_display_name}</h2>
+        <p className="mt-1 text-[12px] text-wk-text-muted">Legacy slug: {row.legacy_slug}</p>
+      </div>
+
+      <div className="mt-5 space-y-4">
+        {mode === "create" ? (
+          <label className="block">
+            <span className="mb-1.5 block text-[11px] font-bold text-wk-text-muted">Proposed Display Name</span>
+            <input value={displayName} onChange={(event) => setDisplayName(event.target.value)} className="w-full rounded-lg border border-wk-border bg-wk-surface-raised px-3 py-2.5 text-[13px] text-wk-text outline-none focus:border-wk-brand" />
+          </label>
+        ) : null}
+
+        <label className="block">
+          <span className="mb-1.5 block text-[11px] font-bold text-wk-text-muted">Review Reason</span>
+          <textarea value={reason} onChange={(event) => setReason(event.target.value)} rows={4} className="w-full resize-none rounded-lg border border-wk-border bg-wk-surface-raised px-3 py-2.5 text-[13px] text-wk-text outline-none focus:border-wk-brand" />
+        </label>
+
+        {mode === "create" ? (
+          <label className="block">
+            <span className="mb-1.5 block text-[11px] font-bold text-wk-text-muted">Source URL <span className="font-normal">(optional)</span></span>
+            <input value={sourceUrl} onChange={(event) => setSourceUrl(event.target.value)} placeholder="https://" className="w-full rounded-lg border border-wk-border bg-wk-surface-raised px-3 py-2.5 text-[13px] text-wk-text outline-none focus:border-wk-brand" />
+          </label>
+        ) : null}
+      </div>
+    </Modal>
+  );
   );
 }
 
