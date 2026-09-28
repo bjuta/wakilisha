@@ -25,6 +25,9 @@ import {
   PlaylistCoverPresentation,
 } from "@/components/media/PlaylistCoverPresentation";
 import {
+  Ch19GradientImage,
+} from "@/components/media/Ch19GradientImage";
+import {
   MetaTags,
 } from "@/components/seo/MetaTags";
 import {
