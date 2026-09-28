@@ -39,6 +39,15 @@ describe("MIZIZI Admin workspace", () => {
     expect(page).not.toContain("—");
   });
 
+  it("loads every current MIZIZI Track review before applying programme filters", () => {
+    expect(page).toContain("loadCurrentProgrammeReviews");
+    expect(page).toContain("offset,");
+    expect(page).toContain("total = page.total");
+    expect(page).toContain("offset += page.rows.length");
+    expect(page).toContain("while (offset < total)");
+    expect(page).toContain("reviews.set(review.id, review)");
+  });
+
   it("reuses the existing reviewed decision authority", () => {
     expect(page).toContain("recordRegistryReviewDecision");
     expect(page).toContain("loadPublicMusicIdentityTrackReviewContext");
