@@ -1,4 +1,4 @@
-import { useMemo, useState, useCallback, useRef, useEffect } from "react";
+import { useMemo, useState, useCallback, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { releaseUrl } from "@/utils/releaseUrl";
 import {
@@ -16,6 +16,9 @@ import { calculateCompleteness, completenessLabel, completenessTone } from "@/se
 import { supabase } from "@/lib/supabase";
 import { WkSelect } from "@/components/design-system/primitives/Select";
 import { WakilishaToggle } from "@/components/design-system/primitives/WakilishaToggle";
+import { Sheet } from "@/components/design-system/primitives/Sheet";
+import { WkNumberField } from "@/components/design-system/primitives/NumberField";
+import { WkDatePicker } from "@/components/design-system/primitives/DateTimePicker";
 
 
 interface RegistryEntityEditorDrawerProps {
@@ -163,17 +166,7 @@ export default function RegistryEntityEditorDrawer({
   const [richData, setRichData] = useState<ReleaseRichData | null>(null);
   const [richDataLoading, setRichDataLoading] = useState(false);
   const [showRichPanel, setShowRichPanel] = useState(false);
-  const drawerRef = useRef<HTMLDivElement>(null);
   const navigate = useNavigate();
-
-  // Trap focus and handle Escape
-  useEffect(() => {
-    const handleKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") onClose();
-    };
-    document.addEventListener("keydown", handleKey);
-    return () => document.removeEventListener("keydown", handleKey);
-  }, [onClose]);
 
   // Fetch release rich data
   useEffect(() => {
@@ -405,7 +398,7 @@ export default function RegistryEntityEditorDrawer({
         hour: "2-digit",
         minute: "2-digit",
       }).format(new Date(String(entity.updated_at)))
-    : "—";
+    : "Not set";
 
   const saveResultIcon = saveResult
     ? saveResult.ok
@@ -765,7 +758,7 @@ export default function RegistryEntityEditorDrawer({
                                     month: "2-digit",
                                     year: "numeric",
                                   }).format(new Date(String(entity[field.key])))
-                                : String(entity[field.key] ?? "—")}
+                                : String(entity[field.key] ?? "Not set")}
                             </span>
                           </div>
                         </label>
@@ -1257,11 +1250,48 @@ function FieldCard({
       );
     }
 
+    if (field.type === "number") {
+      return (
+        <WkNumberField
+          value={strValue}
+          onChange={(value) => onChange(String(value))}
+          ariaLabel={field.label}
+          showSteppers={false}
+          groupClassName={`h-11 bg-[#f8f9f4] ${
+            error
+              ? "border-red-400"
+              : isDirty
+                ? "border-amber-300"
+                : "border-[#dfe4d8]"
+          }`}
+          inputClassName="px-3 text-left text-sm"
+        />
+      );
+    }
+
+    if (field.type === "date") {
+      return (
+        <WkDatePicker
+          value={strValue}
+          onChange={onChange}
+          label={field.label}
+          showLabel={false}
+          triggerClassName={`h-11 bg-[#f8f9f4] text-sm ${
+            error
+              ? "border-red-400"
+              : isDirty
+                ? "border-amber-300"
+                : "border-[#dfe4d8]"
+          }`}
+        />
+      );
+    }
+
     return (
       <div className="relative">
         <input
           id={fieldId}
-          type={field.type === "number" ? "number" : field.type === "date" ? "date" : "text"}
+          type="text"
           value={strValue}
           onChange={(e) => onChange(e.target.value)}
           className={`h-11 w-full rounded-xl border bg-[#f8f9f4] px-3 text-sm outline-none transition-all focus:bg-white ${
