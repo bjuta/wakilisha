@@ -110,6 +110,36 @@ export async function getModerationStats(): Promise<ModerationStats> {
   return callAdminAnalyticsApi<ModerationStats>('moderation_stats');
 }
 
+async function logModerationEvent(
+  targetType: string,
+  targetId: string,
+  action: string,
+  reason?: string,
+): Promise<void> {
+  const {
+    data: { user },
+    error: userError,
+  } = await supabase.auth.getUser();
+
+  if (userError) throw userError;
+  if (!user) {
+    throw new Error('A signed-in moderator is required to record moderation events.');
+  }
+
+  const { error } = await supabase
+    .from('community_moderation_events')
+    .insert({
+      moderator_id: user.id,
+      target_type: targetType,
+      target_id: targetId,
+      action,
+      reason: reason ?? null,
+      metadata: {},
+    });
+
+  if (error) throw error;
+}
+
 export async function hideComment(commentId: string, reason?: string): Promise<void> {
   const { error } = await supabase
     .from('community_comments')

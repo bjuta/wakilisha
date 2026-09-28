@@ -40,6 +40,9 @@ jobs:
       - name: Install dependencies
         run: npm ci --prefer-offline --no-audit --no-fund
 
+      - name: Reject undeclared runtime identifiers
+        run: npm run audit:runtime-identifiers
+
       - name: Enforce authoritative ERN 4.3.2 XSD fixture conformance
         run: |
           MISSING_PACKAGES=""
