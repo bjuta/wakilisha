@@ -12,12 +12,14 @@ import { SearchableSelect } from "@/components/design-system/primitives/Searchab
 import { WkSelect } from "@/components/design-system/primitives/Select";
 import { Sheet } from "@/components/design-system/primitives/Sheet";
 import { Modal } from "@/components/design-system/primitives/Modal";
+import { WkDatePicker } from "@/components/design-system/primitives/DateTimePicker";
 import { WkIcon } from "@/components/design-system/Icon";
 import { initializeViewportIntegrityObserver } from "@/lib/viewport/viewportIntegrity";
 
 function InteractionFixture() {
   const [open, setOpen] = useState(false);
   const [modalOpen, setModalOpen] = useState(false);
+  const [fixtureDate, setFixtureDate] = useState("2026-09-28");
   const [value, setValue] = useState("alpha");
   const [finiteChoice, setFiniteChoice] = useState("alpha");
   const [checked, setChecked] = useState(false);
@@ -104,6 +106,18 @@ function InteractionFixture() {
       >
         Open tall interaction modal
       </button>
+
+      <div className="h-[1050px]" aria-hidden="true" />
+
+      <section data-temporal-picker-probe className="mb-8 max-w-sm">
+        <WkDatePicker
+          label="Fixture date"
+          value={fixtureDate}
+          onChange={setFixtureDate}
+          min="2020-01-01"
+          max="2030-12-31"
+        />
+      </section>
 
       <Modal
         open={modalOpen}
