@@ -149,11 +149,23 @@ describe("MIZIZI current URL-identity production control plane", () => {
       "public-music-identity-batch-a-production-control-plane.mjs",
     );
     expect(workflow).toContain(
+      ".github/public-music-identity-batch-a-safe-slug-apply.json",
+    );
+    expect(workflow).toContain(
+      "PUBLIC_MUSIC_IDENTITY_BATCH_A_APPLY",
+    );
+    expect(workflow).toContain(
       'test "$GITHUB_REF" = "refs/heads/main"',
     );
 
     expect(batch).toContain(
       "PUBLIC_MUSIC_IDENTITY_BATCH_A_SAFE_SLUG_EXECUTOR=PASS",
+    );
+    expect(batch).toContain(
+      "assertReviewedTrigger",
+    );
+    expect(batch).toContain(
+      "PUBLIC_MUSIC_IDENTITY_BATCH_A_SAFE_SLUG_APPLY",
     );
     expect(batch).toContain(
       "issue_stewardship_execution_grant_v1",
