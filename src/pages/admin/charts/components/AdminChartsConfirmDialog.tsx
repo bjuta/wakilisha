@@ -1,5 +1,5 @@
-import { useEffect, useRef } from "react";
 import { WkIcon } from "@/components/design-system/Icon";
+import { Modal } from "@/components/design-system/primitives/Modal";
 
 interface AdminChartsConfirmDialogProps {
   open: boolean;
@@ -24,52 +24,47 @@ export function AdminChartsConfirmDialog({
   onCancel,
   loading = false,
 }: AdminChartsConfirmDialogProps) {
-  const ref = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    function handleClick(e: MouseEvent) {
-      if (ref.current && !ref.current.contains(e.target as Node)) {
-        onCancel();
-      }
-    }
-    if (open) {
-      document.addEventListener("mousedown", handleClick);
-      return () => document.removeEventListener("mousedown", handleClick);
-    }
-  }, [open, onCancel]);
-
-  if (!open) return null;
-
   const confirmClasses = variant === "danger"
     ? "bg-wk-danger text-white hover:opacity-90"
     : "bg-wk-brand text-wk-brand-on hover:opacity-90";
 
-  return (
-    <div className="fixed inset-0 z-[300] flex items-center justify-center bg-black/50">
-      <div ref={ref} className="w-full max-w-sm rounded-xl border border-wk-border bg-wk-surface p-6 shadow-lg">
-        <div className="flex items-center gap-2">
-          <WkIcon name={variant === "danger" ? "AlertTriangle" : "HelpCircle"} size={18} className={variant === "danger" ? "text-wk-danger" : "text-wk-brand"} />
-          <h3 className="text-[15px] font-bold text-wk-text">{title}</h3>
-        </div>
-        <p className="mt-2 text-[13px] text-wk-text-muted">{description}</p>
-        <div className="mt-5 flex items-center justify-end gap-2">
-          <button
-            onClick={onCancel}
-            disabled={loading}
-            className="inline-flex items-center gap-1.5 rounded-md border border-wk-border-2 bg-wk-surface px-4 py-2 text-[13px] font-semibold text-wk-text transition-colors hover:bg-wk-surface-raised disabled:opacity-50 whitespace-nowrap"
-          >
-            {cancelLabel}
-          </button>
-          <button
-            onClick={onConfirm}
-            disabled={loading}
-            className={`inline-flex items-center gap-1.5 rounded-md px-4 py-2 text-[13px] font-semibold transition-colors disabled:opacity-50 whitespace-nowrap ${confirmClasses}`}
-          >
-            {loading && <WkIcon name="Loader" size={14} className="animate-spin" />}
-            {confirmLabel}
-          </button>
-        </div>
-      </div>
+  const footer = (
+    <div className="flex items-center justify-end gap-2">
+      <button
+        onClick={onCancel}
+        disabled={loading}
+        className="inline-flex items-center gap-1.5 rounded-md border border-wk-border-2 bg-wk-surface px-4 py-2 text-[13px] font-semibold text-wk-text transition-colors hover:bg-wk-surface-raised disabled:opacity-50 whitespace-nowrap"
+      >
+        {cancelLabel}
+      </button>
+      <button
+        onClick={onConfirm}
+        disabled={loading}
+        className={`inline-flex items-center gap-1.5 rounded-md px-4 py-2 text-[13px] font-semibold transition-colors disabled:opacity-50 whitespace-nowrap ${confirmClasses}`}
+      >
+        {loading && <WkIcon name="Loader" size={14} className="animate-spin" />}
+        {confirmLabel}
+      </button>
     </div>
+  );
+
+  return (
+    <Modal
+      open={open}
+      onClose={onCancel}
+      title={title}
+      maxWidth="sm"
+      dismissable={!loading}
+      footer={footer}
+    >
+      <div className="flex items-start gap-3">
+        <WkIcon
+          name={variant === "danger" ? "AlertTriangle" : "HelpCircle"}
+          size={18}
+          className={variant === "danger" ? "mt-0.5 text-wk-danger" : "mt-0.5 text-wk-brand"}
+        />
+        <p className="text-[13px] leading-5 text-wk-text-muted">{description}</p>
+      </div>
+    </Modal>
   );
 }
