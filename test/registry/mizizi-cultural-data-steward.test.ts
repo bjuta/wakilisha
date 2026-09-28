@@ -3775,3 +3775,100 @@ describe("Public Music Identity #1094 verified review finalization", () => {
     );
   });
 });
+
+describe("Public Music Identity reviewed duplicate authority V1", () => {
+  const reviewedDuplicateMigration = read(
+    "supabase/migrations/20260928135021_public_music_identity_reviewed_duplicate_authority_v1.sql",
+  );
+
+  it("preserves the mature duplicate classifier as a private base", () => {
+    expect(reviewedDuplicateMigration).toContain(
+      "set schema platform_private",
+    );
+    expect(reviewedDuplicateMigration).toContain(
+      "rename to admin_preview_registry_track_duplicate_repair_base_v1",
+    );
+    expect(reviewedDuplicateMigration).toContain(
+      "7a3ff9db9a2160dcbc45bc81ae3d3b554aab081888b09866e59ea498e3c3e761",
+    );
+    expect(reviewedDuplicateMigration).toContain(
+      "Mature Track duplicate preview body was not preserved byte-for-byte",
+    );
+  });
+
+  it("requires an exact current #1094 reviewed true-duplicate decision", () => {
+    for (const authority of [
+      "public_music_identity_true_duplicate",
+      "public_music_identity_track_actual_zero_v1",
+      "human_review_recorded",
+      "relatedRecordingIdentityReviewId",
+      "trackStateFingerprint",
+      "track_recording_identity_conflict",
+      "canonicalTrackId",
+      "reviewedHumanDecisionMatches",
+    ]) {
+      expect(reviewedDuplicateMigration).toContain(authority);
+    }
+
+    expect(reviewedDuplicateMigration).toContain(
+      "v_reviewed_match_count<>v_duplicate_count",
+    );
+    expect(reviewedDuplicateMigration).toContain(
+      "peer->>'id'=p_canonical_track_id::text",
+    );
+  });
+
+  it("removes only the machine-evidence blocker after full reviewed coverage", () => {
+    expect(reviewedDuplicateMigration).toContain(
+      "not_enough_identity_evidence",
+    );
+    expect(reviewedDuplicateMigration).toContain(
+      "jsonb_array_length(v_other_blockers)>0",
+    );
+    expect(reviewedDuplicateMigration).toContain(
+      "to_jsonb('high'::text)",
+    );
+    expect(reviewedDuplicateMigration).toContain(
+      "'coverage','all_duplicate_targets'",
+    );
+  });
+
+  it("keeps the public command authenticated and the mature base private", () => {
+    expect(reviewedDuplicateMigration).toContain(
+      "public.current_user_has_capability('manage_registry')",
+    );
+    expect(reviewedDuplicateMigration).toContain(
+      "from public, anon, service_role;",
+    );
+    expect(reviewedDuplicateMigration).toContain(
+      "to authenticated;",
+    );
+    expect(reviewedDuplicateMigration).toContain(
+      "Mature Track duplicate preview base leaked private execution",
+    );
+  });
+});
+
+describe("Public Music Identity reviewed duplicate authority V1 verifier", () => {
+  const reviewedDuplicateVerifier = read(
+    "scripts/control-plane/verify-public-music-identity-reviewed-duplicate-authority-v1.sql",
+  );
+
+  it("keeps reviewed duplicate execution read-only and independently sealed", () => {
+    expect(reviewedDuplicateVerifier).toContain(
+      "PUBLIC_MUSIC_IDENTITY_REVIEWED_DUPLICATE_AUTHORITY_V1_PASS",
+    );
+    expect(reviewedDuplicateVerifier).toContain(
+      "7a3ff9db9a2160dcbc45bc81ae3d3b554aab081888b09866e59ea498e3c3e761",
+    );
+    expect(reviewedDuplicateVerifier).toContain(
+      "public_music_identity_true_duplicate",
+    );
+    expect(reviewedDuplicateVerifier).toContain(
+      "trackstatefingerprint",
+    );
+    expect(reviewedDuplicateVerifier).toContain(
+      "Reviewed Track duplicate preview gained mutation authority",
+    );
+  });
+});
