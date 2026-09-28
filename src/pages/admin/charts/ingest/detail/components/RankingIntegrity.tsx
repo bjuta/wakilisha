@@ -5,6 +5,7 @@
  */
 import { useState, useMemo } from "react";
 import { WkSurface } from "@/components/design-system/primitives/Surface";
+import { Modal } from "@/components/design-system/primitives/Modal";
 import type { IngestJob, IngestCandidate } from "@/services/chartsIngestion/types";
 import { applyRankOverride, clearRankOverride, hasCapability } from "@/services/chartsIngestion/client";
 import type { UserRole } from "@/services/chartsIngestion/client";
@@ -327,15 +328,13 @@ export function RankingIntegrity({
 
       {/* Detail drawer */}
       {detailCandidate && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-          <div className="max-h-[90vh] w-full max-w-md overflow-y-auto rounded-xl bg-[var(--wk-surface)] p-5">
-            <div className="flex items-center justify-between">
-              <h3 className="text-[14px] font-bold text-[var(--wk-text)]">Rank Provenance</h3>
-              <button onClick={() => setDetailCandidate(null)} className="flex h-7 w-7 items-center justify-center rounded-md text-[var(--wk-text-muted)] hover:bg-[var(--wk-surface-raised)]">
-                <i className="ri-close-line" />
-              </button>
-            </div>
-            <div className="mt-4">
+        <Modal
+          open
+          onClose={() => setDetailCandidate(null)}
+          title="Rank Provenance"
+          maxWidth="md"
+        >
+          <div className="mt-4">
               <div className="text-[13px] font-bold text-[var(--wk-text)]">{detailCandidate.normalizedTitle}</div>
               <div className="text-[12px] text-[var(--wk-text-muted)]">{detailCandidate.normalizedArtistLine}</div>
             </div>
@@ -360,8 +359,8 @@ export function RankingIntegrity({
                 </div>
               ))}
             </div>
-          </div>
-        </div>
+          </
+        </Modal>
       )}
     </div>
   );
