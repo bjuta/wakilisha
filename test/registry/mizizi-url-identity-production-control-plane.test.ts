@@ -940,7 +940,13 @@ describe("MIZIZI current URL-identity production control plane", () => {
       "EXPECTED_TRACK_ZERO_IDENTITY_NOISE_REMAINING = 32",
     );
     expect(controlPlane).toContain(
-      "[\n        66,\n        EXPECTED_TRACK_ZERO_IDENTITY_NOISE_REMAINING,",
+      "ACCEPTED_TRACK_AUDIT_SNAPSHOTS",
+    );
+    expect(controlPlane).toContain(
+      "EXPECTED_BATCH_A_DUPLICATE_IDENTITY_NOISE_REMAINING = 17",
+    );
+    expect(controlPlane).toContain(
+      "EXPECTED_BATCH_A_SAFE_SLUG_IDENTITY_NOISE_REMAINING = 12",
     );
     expect(controlPlane).toContain(
       "titlePackaging: slugPackaging",
