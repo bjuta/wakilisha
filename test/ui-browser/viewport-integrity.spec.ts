@@ -251,7 +251,7 @@ test("finite WAKILISHA selection stays anchored and browser-chrome free inside a
     .getByRole("button", { name: "Open interaction sheet" })
     .click();
 
-  const trigger = page.getByRole("button", {
+  const trigger = page.getByRole("combobox", {
     name: "Finite acceptance choice",
   });
   await trigger.click();
@@ -262,8 +262,8 @@ test("finite WAKILISHA selection stays anchored and browser-chrome free inside a
 
   const geometry = await page.evaluate(() => {
     const trigger = document.querySelector(
-      'button[aria-label="Finite acceptance choice"]',
-    ) as HTMLButtonElement;
+      '[role="combobox"][aria-label="Finite acceptance choice"]',
+    ) as HTMLElement;
     const listbox = document.querySelector('[role="listbox"]') as HTMLElement;
 
     const triggerRect = trigger.getBoundingClientRect();
