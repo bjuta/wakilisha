@@ -695,6 +695,19 @@ export default function AdminPublishingDashboardPage() {
     setOwnerFilter(value);
   }
 
+  function applyOperationView(
+    view: Exclude<PublishingOperationView, "custom">,
+  ) {
+    setOperationView(view);
+    setSearchQuery("");
+    setStageFilter("all");
+    setPlanningFilter("all");
+    setContentKindFilter("all");
+    setPriorityFilter("all");
+    setChannelFilter("all");
+    setOwnerFilter("all");
+  }
+
   function clearFilters() {
     setOperationView("custom");
     setSearchQuery("");
