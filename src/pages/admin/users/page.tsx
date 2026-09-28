@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { WkIcon } from "@/components/design-system/Icon";
 import { WkSurface } from "@/components/design-system/primitives/Surface";
+import { Modal as WkModal } from "@/components/design-system/primitives/Modal";
 import { SkeletonAdminTable } from "@/components/skeletons/Skeletons";
 import { useAdminUser } from "@/hooks/useAdminUser";
 import { supabase } from "@/lib/supabase";
@@ -996,20 +997,14 @@ function ModalShell({
   onClose: () => void;
 }) {
   return (
-    <div className="fixed inset-0 z-[999] flex items-center justify-center bg-black/50 p-4">
-      <div className="w-full max-w-lg rounded-2xl border border-wk-border bg-wk-surface p-5 shadow-xl max-h-[90vh] overflow-y-auto">
-        <div className="mb-4 flex items-center justify-between">
-          <h2 className="text-[16px] font-black text-wk-text">{title}</h2>
-          <button
-            onClick={onClose}
-            className="rounded-full p-1 text-wk-text-muted hover:bg-wk-surface-raised cursor-pointer"
-          >
-            <WkIcon name="X" size={18} />
-          </button>
-        </div>
-        <div className="space-y-4">{children}</div>
-      </div>
-    </div>
+    <WkModal
+      open
+      onClose={onClose}
+      title={title}
+      maxWidth="lg"
+    >
+      <div className="space-y-4">{children}</div>
+    </WkModal>
   );
 }
 
