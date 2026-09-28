@@ -4,12 +4,15 @@ import { WkIcon, type WkIconName } from "@/components/design-system/Icon";
 import { WkSurface } from "@/components/design-system/primitives/Surface";
 import {
   formatReviewCount,
+  isPublicMusicIdentityTrackReview,
+  loadPublicMusicIdentityTrackReviewContext,
   loadRegistryReviewItems,
   loadReviewCommandCenter,
   recordRegistryReviewDecision,
   type FieldDictionaryRow,
   type MediaReviewRow,
   type PromotionEventRow,
+  type PublicMusicIdentityTrackReviewContext,
   type RegistryDecisionType,
   type RegistryReviewFilters,
   type RegistryReviewItemRow,
@@ -36,6 +39,13 @@ type DecisionState = {
   canonicalPrimaryArtistSlug: string;
   featuredArtistNames: string;
   featuredArtistSlugs: string;
+  publicMusicContext: PublicMusicIdentityTrackReviewContext | null;
+  publicMusicContextLoading: boolean;
+  proposedSlug: string;
+  canonicalSlug: string;
+  semanticDistinction: string;
+  canonicalTrackId: string;
+  creditEvidence: string;
   continueToNext: boolean;
   message: string;
   submitting: boolean;
@@ -67,6 +77,15 @@ const DECISION_OPTIONS: Array<{ value: RegistryDecisionType; label: string; help
   { value: "duplicate_or_bad_source", label: "Duplicate or bad source", help: "Record that this item should be ignored or deduplicated later." },
 ];
 
+const PUBLIC_MUSIC_IDENTITY_DECISION_OPTIONS: Array<{ value: RegistryDecisionType; label: string; help: string }> = [
+  { value: "public_music_identity_needs_more_research", label: "Needs more research", help: "Record the evidence gap and keep the review open." },
+  { value: "public_music_identity_safe_slug_repair", label: "Approve safe canonical slug repair", help: "Bind the exact reviewed clean slug. Execution still happens later through governed Track authority." },
+  { value: "public_music_identity_distinct_recording", label: "Confirm legitimately distinct recording", help: "Require an evidence-backed semantic distinction and canonical slug; no synthetic suffixes." },
+  { value: "public_music_identity_true_duplicate", label: "Confirm true duplicate identity", help: "Bind a different active canonical Track UUID. Duplicate execution remains a separate governed step." },
+  { value: "public_music_identity_retire_unresolvable", label: "Retire unresolvable canonical shell", help: "Record that the Track cannot safely own public identity and must be retired through governed lifecycle authority." },
+  { value: "public_music_identity_credit_correction_required", label: "Structured credit correction required", help: "Record the exact credit evidence that must be corrected before slug execution." },
+];
+
 const DEFAULT_REGISTRY_FILTERS: RegistryFilterState = {
   search: "",
   status: "open",
@@ -86,6 +105,13 @@ function emptyDecisionState(overrides: Partial<DecisionState> = {}): DecisionSta
     canonicalPrimaryArtistSlug: "",
     featuredArtistNames: "",
     featuredArtistSlugs: "",
+    publicMusicContext: null,
+    publicMusicContextLoading: false,
+    proposedSlug: "",
+    canonicalSlug: "",
+    semanticDistinction: "",
+    canonicalTrackId: "",
+    creditEvidence: "",
     continueToNext: true,
     message: "",
     submitting: false,
@@ -181,7 +207,40 @@ export default function AdminReviewQueuePage() {
 
   const openItem = (item: RegistryReviewItemRow) => {
     setSelectedItem(item);
-    setDecision(decisionSeedForItem(item));
+
+    if (!isPublicMusicIdentityTrackReview(item)) {
+      setDecision(decisionSeedForItem(item));
+      return;
+    }
+
+    setDecision(
+      decisionSeedForItem(item, {
+        decisionType: "public_music_identity_needs_more_research",
+        publicMusicContextLoading: true,
+      }),
+    );
+
+    loadPublicMusicIdentityTrackReviewContext(item.id)
+      .then((context) => {
+        setDecision((current) => ({
+          ...current,
+          publicMusicContext: context,
+          publicMusicContextLoading: false,
+          proposedSlug: context.proposedSlug || "",
+          canonicalSlug: context.proposedSlug || "",
+          message: "",
+        }));
+      })
+      .catch((err) => {
+        setDecision((current) => ({
+          ...current,
+          publicMusicContextLoading: false,
+          message:
+            err instanceof Error
+              ? err.message
+              : "Could not load current Track review context.",
+        }));
+      });
   };
 
   const closeItem = () => {
@@ -211,6 +270,78 @@ export default function AdminReviewQueuePage() {
       return;
     }
 
+    const publicMusicReview =
+      isPublicMusicIdentityTrackReview(selectedItem);
+
+    if (publicMusicReview) {
+      if (
+        decision.publicMusicContextLoading ||
+        !decision.publicMusicContext
+      ) {
+        setDecision((current) => ({
+          ...current,
+          message:
+            "Load the current Track review context before recording a decision.",
+        }));
+        return;
+      }
+
+      if (
+        decision.decisionType ===
+          "public_music_identity_safe_slug_repair" &&
+        !decision.proposedSlug.trim()
+      ) {
+        setDecision((current) => ({
+          ...current,
+          message:
+            "The exact reviewed proposed slug is required.",
+        }));
+        return;
+      }
+
+      if (
+        decision.decisionType ===
+          "public_music_identity_distinct_recording" &&
+        (
+          !decision.semanticDistinction.trim() ||
+          !decision.canonicalSlug.trim()
+        )
+      ) {
+        setDecision((current) => ({
+          ...current,
+          message:
+            "A semantic distinction and canonical slug are required for a distinct recording.",
+        }));
+        return;
+      }
+
+      if (
+        decision.decisionType ===
+          "public_music_identity_true_duplicate" &&
+        !decision.canonicalTrackId.trim()
+      ) {
+        setDecision((current) => ({
+          ...current,
+          message:
+            "A different active canonical Track UUID is required for a duplicate decision.",
+        }));
+        return;
+      }
+
+      if (
+        decision.decisionType ===
+          "public_music_identity_credit_correction_required" &&
+        !decision.creditEvidence.trim()
+      ) {
+        setDecision((current) => ({
+          ...current,
+          message:
+            "Describe the exact structured credit evidence that requires correction.",
+        }));
+        return;
+      }
+    }
+
     const shouldContinue = decision.continueToNext;
     setDecision((current) => ({ ...current, submitting: true, message: "" }));
     try {
@@ -218,21 +349,42 @@ export default function AdminReviewQueuePage() {
         item: selectedItem,
         decisionType: decision.decisionType,
         notes,
-        resolutionPayload: {
-          reviewedFrom: "admin_review_command_center",
-          phase: "phase2b_structured_resolution",
-          canonicalPrimaryArtistName: primaryName,
-          canonicalPrimaryArtistSlug: primarySlug,
-          primaryArtistName: primaryName,
-          primaryArtistSlug: primarySlug,
-          artistText: primaryName,
-          artistSlug: primarySlug,
-          featuredArtistNames: featuredNames,
-          featuredArtistSlugs: featuredSlugs,
-          canonicalEntitiesChanged: false,
-          publicApiChanged: false,
-          publicRenderingChanged: false,
-        },
+        expectedTrackStateFingerprint:
+          decision.publicMusicContext?.trackStateFingerprint,
+        resolutionPayload: publicMusicReview
+          ? {
+              reviewedFrom:
+                "admin_review_command_center",
+              programmeIssue: 1094,
+              proposedSlug:
+                decision.proposedSlug.trim(),
+              canonicalSlug:
+                decision.canonicalSlug.trim(),
+              semanticDistinction:
+                decision.semanticDistinction.trim(),
+              canonicalTrackId:
+                decision.canonicalTrackId.trim(),
+              creditEvidence:
+                decision.creditEvidence.trim(),
+              canonicalEntitiesChanged: false,
+              reviewResolved: false,
+              redirectMutation: false,
+            }
+          : {
+              reviewedFrom: "admin_review_command_center",
+              phase: "phase2b_structured_resolution",
+              canonicalPrimaryArtistName: primaryName,
+              canonicalPrimaryArtistSlug: primarySlug,
+              primaryArtistName: primaryName,
+              primaryArtistSlug: primarySlug,
+              artistText: primaryName,
+              artistSlug: primarySlug,
+              featuredArtistNames: featuredNames,
+              featuredArtistSlugs: featuredSlugs,
+              canonicalEntitiesChanged: false,
+              publicApiChanged: false,
+              publicRenderingChanged: false,
+            },
       });
 
       const visibleRows = data?.registryReviewItems ?? [];
@@ -403,16 +555,28 @@ function RegistryDecisionModal({ item, decision, setDecision, onClose, onSubmit 
   const sourcePayload = item.source_payload ?? {};
   const artistText = candidateString(item, "artistText");
   const artistSlug = candidateString(item, "artistSlug");
-  const selectedOption = DECISION_OPTIONS.find((option) => option.value === decision.decisionType);
-  const showStructuredFields = isStructuredDecision(decision.decisionType);
-  const showFeaturedFields = decision.decisionType === "approve_featured_artist_split";
+  const publicMusicReview =
+    isPublicMusicIdentityTrackReview(item);
+  const decisionOptions =
+    publicMusicReview
+      ? PUBLIC_MUSIC_IDENTITY_DECISION_OPTIONS
+      : DECISION_OPTIONS;
+  const selectedOption = decisionOptions.find(
+    (option) => option.value === decision.decisionType,
+  );
+  const showStructuredFields =
+    !publicMusicReview &&
+    isStructuredDecision(decision.decisionType);
+  const showFeaturedFields =
+    !publicMusicReview &&
+    decision.decisionType === "approve_featured_artist_split";
   const readiness = reviewReadiness(item);
 
   const setPreset = (decisionType: RegistryDecisionType, notes: string) => {
     setDecision((current) => ({ ...current, decisionType, notes, message: "" }));
   };
 
-  return <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/55 p-4"><div className="max-h-[90vh] w-full max-w-3xl overflow-hidden rounded-2xl border border-wk-border bg-wk-surface shadow-2xl"><div className="border-b border-wk-border p-5"><div className="flex items-start justify-between gap-4"><div><div className="text-[11px] font-black uppercase tracking-wider text-wk-brand">Registry review detail</div><h2 className="mt-1 text-[18px] font-black text-wk-text">{item.title || item.review_key || item.id}</h2><p className="mt-1 text-[12px] leading-5 text-wk-text-muted">{item.summary || "Resolve this item by recording an auditable decision. Canonical relationship tables are not mutated in Phase 2B."}</p></div><button onClick={onClose} className="wk-button wk-button-ghost wk-button-sm">Close</button></div></div><div className="max-h-[calc(90vh-170px)] overflow-y-auto p-5"><div className="grid gap-3 md:grid-cols-4"><FieldPill label="Review type" value={humanize(item.review_type || "registry_review")} /><FieldPill label="Priority" value={item.priority || "normal"} /><FieldPill label="Status" value={item.status || "open"} /><FieldPill label="Readiness" value={readiness.label} /></div><p className="mt-2 text-[11px] leading-5 text-wk-text-muted">{readiness.description}</p><div className="mt-4 grid gap-3 md:grid-cols-2"><FieldPill label="Source artist text" value={artistText || "Missing"} /><FieldPill label="Source artist slug" value={artistSlug || "Missing"} /></div><div className="mt-4 rounded-xl border border-wk-border bg-wk-surface-raised p-4"><div className="text-[11px] font-black uppercase tracking-wider text-wk-text-faint">Source reference</div><div className="mt-2 text-[12px] text-wk-text">{item.source_table || "unknown"}/{item.source_id || item.entity_id || "unknown"}</div><div className="mt-1 break-all text-[11px] text-wk-text-faint">{item.review_key || item.id}</div></div><div className="mt-4 grid gap-4 md:grid-cols-2"><JsonBlock title="Candidate payload" value={candidatePayload} /><JsonBlock title="Source payload" value={sourcePayload} /></div><div className="mt-5 rounded-xl border border-wk-border bg-wk-surface p-4"><div className="text-[12px] font-bold text-wk-text">Quick decision presets</div><div className="mt-3 grid gap-2 sm:grid-cols-2"><button type="button" onClick={() => setPreset("needs_more_research", "Needs additional source verification before canonicalization.")} className="wk-button wk-button-ghost wk-button-sm">Needs research</button><button type="button" onClick={() => setPreset("approve_primary_artist", "Verified single canonical primary artist. No canonical mutation at review stage.")} className="wk-button wk-button-ghost wk-button-sm">Approve primary</button><button type="button" onClick={() => setPreset("approve_featured_artist_split", "Verified primary artist and featured/collaborator split. No canonical mutation at review stage.")} className="wk-button wk-button-ghost wk-button-sm">Approve split</button><button type="button" onClick={() => setPreset("reject_bad_metadata", "Source metadata is not reliable enough for canonical relationships.")} className="wk-button wk-button-ghost wk-button-sm">Reject metadata</button></div></div><div className="mt-5 rounded-xl border border-wk-border bg-wk-surface p-4"><label className="block text-[12px] font-bold text-wk-text">Decision</label><WkSelect value={decision.decisionType} onChange={(value) => setDecision((current) => ({ ...current, decisionType: value as RegistryDecisionType, message: "" }))} triggerClassName="mt-2 w-full rounded-lg border border-wk-border bg-wk-surface-raised px-3 py-2 text-[13px] text-wk-text">{DECISION_OPTIONS.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}</WkSelect><p className="mt-1 text-[11px] leading-5 text-wk-text-muted">{selectedOption?.help}</p>{showStructuredFields && <div className="mt-4 rounded-xl border border-wk-border bg-wk-surface-raised p-4"><div className="text-[12px] font-bold text-wk-text">Structured canonical resolution</div><p className="mt-1 text-[11px] leading-5 text-wk-text-muted">Phase 3A will only treat an approval as actionable when this points to one clean canonical artist.</p><div className="mt-3 grid gap-3 md:grid-cols-2"><TextInput label="Canonical primary artist name" value={decision.canonicalPrimaryArtistName} placeholder="e.g. Karun" onChange={(value) => setDecision((current) => ({ ...current, canonicalPrimaryArtistName: value, message: "" }))} /><TextInput label="Canonical primary artist slug" value={decision.canonicalPrimaryArtistSlug} placeholder="e.g. karun" onChange={(value) => setDecision((current) => ({ ...current, canonicalPrimaryArtistSlug: value, message: "" }))} /></div>{showFeaturedFields && <div className="mt-3 grid gap-3 md:grid-cols-2"><TextAreaInput label="Featured/collaborator names" value={decision.featuredArtistNames} placeholder="One per line or comma-separated" rows={3} onChange={(value) => setDecision((current) => ({ ...current, featuredArtistNames: value, message: "" }))} /><TextAreaInput label="Featured/collaborator slugs" value={decision.featuredArtistSlugs} placeholder="One per line or comma-separated" rows={3} onChange={(value) => setDecision((current) => ({ ...current, featuredArtistSlugs: value, message: "" }))} /></div>}</div>}<label className="mt-4 block text-[12px] font-bold text-wk-text">Decision notes</label><textarea value={decision.notes} onChange={(event) => setDecision((current) => ({ ...current, notes: event.target.value, message: "" }))} rows={4} className="mt-2 w-full rounded-lg border border-wk-border bg-wk-surface-raised px-3 py-2 text-[13px] text-wk-text" placeholder="Explain what you verified and why this decision is safe." /><WkCheckbox checked={decision.continueToNext} onChange={(checked) => setDecision((current) => ({ ...current, continueToNext: checked }))} className="mt-4 flex items-start gap-2 text-[12px] text-wk-text-muted"> Open next visible item after recording</WkCheckbox>{decision.message && <p className="mt-2 text-[12px] font-semibold text-wk-warning">{decision.message}</p>}</div></div><div className="flex flex-col gap-2 border-t border-wk-border p-5 sm:flex-row sm:items-center sm:justify-between"><p className="text-[11px] leading-5 text-wk-text-faint">This records a structured Phase 2B.1 decision only. Phase 3 decides whether to mutate canonical relationships.</p><div className="flex gap-2"><button onClick={onClose} disabled={decision.submitting} className="wk-button wk-button-ghost wk-button-sm">Cancel</button><button onClick={onSubmit} disabled={decision.submitting} className="wk-button wk-button-primary wk-button-sm">{decision.submitting ? "Recording..." : "Record decision"}</button></div></div></div></div>;
+  return <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/55 p-4"><div className="max-h-[90vh] w-full max-w-3xl overflow-hidden rounded-2xl border border-wk-border bg-wk-surface shadow-2xl"><div className="border-b border-wk-border p-5"><div className="flex items-start justify-between gap-4"><div><div className="text-[11px] font-black uppercase tracking-wider text-wk-brand">Registry review detail</div><h2 className="mt-1 text-[18px] font-black text-wk-text">{item.title || item.review_key || item.id}</h2><p className="mt-1 text-[12px] leading-5 text-wk-text-muted">{item.summary || "Resolve this item by recording an auditable decision. Canonical relationship tables are not mutated in Phase 2B."}</p></div><button onClick={onClose} className="wk-button wk-button-ghost wk-button-sm">Close</button></div></div><div className="max-h-[calc(90vh-170px)] overflow-y-auto p-5"><div className="grid gap-3 md:grid-cols-4"><FieldPill label="Review type" value={humanize(item.review_type || "registry_review")} /><FieldPill label="Priority" value={item.priority || "normal"} /><FieldPill label="Status" value={item.status || "open"} /><FieldPill label="Readiness" value={readiness.label} /></div><p className="mt-2 text-[11px] leading-5 text-wk-text-muted">{readiness.description}</p><div className="mt-4 grid gap-3 md:grid-cols-2"><FieldPill label="Source artist text" value={artistText || "Missing"} /><FieldPill label="Source artist slug" value={artistSlug || "Missing"} /></div><div className="mt-4 rounded-xl border border-wk-border bg-wk-surface-raised p-4"><div className="text-[11px] font-black uppercase tracking-wider text-wk-text-faint">Source reference</div><div className="mt-2 text-[12px] text-wk-text">{item.source_table || "unknown"}/{item.source_id || item.entity_id || "unknown"}</div><div className="mt-1 break-all text-[11px] text-wk-text-faint">{item.review_key || item.id}</div></div><div className="mt-4 grid gap-4 md:grid-cols-2"><JsonBlock title="Candidate payload" value={candidatePayload} /><JsonBlock title="Source payload" value={sourcePayload} /></div><div className="mt-5 rounded-xl border border-wk-border bg-wk-surface p-4"><div className="text-[12px] font-bold text-wk-text">Quick decision presets</div><div className="mt-3 grid gap-2 sm:grid-cols-2">{publicMusicReview ? <><button type="button" onClick={() => setPreset("public_music_identity_needs_more_research", "Needs additional identity evidence before governed execution.")} className="wk-button wk-button-ghost wk-button-sm">Needs research</button><button type="button" onClick={() => setPreset("public_music_identity_safe_slug_repair", "Reviewed clean slug is culturally and structurally correct; execution remains governed.")} className="wk-button wk-button-ghost wk-button-sm">Safe slug repair</button><button type="button" onClick={() => setPreset("public_music_identity_distinct_recording", "Authoritative evidence proves this is a legitimately distinct recording.")} className="wk-button wk-button-ghost wk-button-sm">Distinct recording</button><button type="button" onClick={() => setPreset("public_music_identity_true_duplicate", "Authoritative evidence proves this Track is a duplicate of the selected canonical Track.")} className="wk-button wk-button-ghost wk-button-sm">True duplicate</button></> : <><button type="button" onClick={() => setPreset("needs_more_research", "Needs additional source verification before canonicalization.")} className="wk-button wk-button-ghost wk-button-sm">Needs research</button><button type="button" onClick={() => setPreset("approve_primary_artist", "Verified single canonical primary artist. No canonical mutation at review stage.")} className="wk-button wk-button-ghost wk-button-sm">Approve primary</button><button type="button" onClick={() => setPreset("approve_featured_artist_split", "Verified primary artist and featured/collaborator split. No canonical mutation at review stage.")} className="wk-button wk-button-ghost wk-button-sm">Approve split</button><button type="button" onClick={() => setPreset("reject_bad_metadata", "Source metadata is not reliable enough for canonical relationships.")} className="wk-button wk-button-ghost wk-button-sm">Reject metadata</button></>}</div></div><div className="mt-5 rounded-xl border border-wk-border bg-wk-surface p-4"><label className="block text-[12px] font-bold text-wk-text">Decision</label><WkSelect value={decision.decisionType} onChange={(value) => setDecision((current) => ({ ...current, decisionType: value as RegistryDecisionType, message: "" }))} triggerClassName="mt-2 w-full rounded-lg border border-wk-border bg-wk-surface-raised px-3 py-2 text-[13px] text-wk-text">{decisionOptions.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}</WkSelect><p className="mt-1 text-[11px] leading-5 text-wk-text-muted">{selectedOption?.help}</p>{publicMusicReview && <div className="mt-4 rounded-xl border border-wk-brand/25 bg-wk-brand-soft p-4"><div className="text-[12px] font-bold text-wk-text">Public Music Identity — governed human decision</div><p className="mt-1 text-[11px] leading-5 text-wk-text-muted">Recording this decision does not resolve the review or mutate the Track. A later governed executor must verify the accepted outcome before resolution.</p>{decision.publicMusicContextLoading ? <p className="mt-3 text-[12px] text-wk-text-muted">Loading current Track authority…</p> : decision.publicMusicContext ? <><div className="mt-3 grid gap-3 md:grid-cols-2"><FieldPill label="Current slug" value={decision.publicMusicContext.currentSlug} /><FieldPill label="Reviewed proposed slug" value={decision.publicMusicContext.proposedSlug || "None"} /><FieldPill label="Rule" value={decision.publicMusicContext.ruleId + "/" + decision.publicMusicContext.ruleVersion} /><FieldPill label="Recording identity review" value={decision.publicMusicContext.openRecordingIdentityReviewId || "None"} /></div><div className="mt-3 grid gap-4 md:grid-cols-2"><JsonBlock title="Current active credits" value={decision.publicMusicContext.activeCredits} /><JsonBlock title="Review evidence" value={decision.publicMusicContext.reviewEvidence} /></div></> : <p className="mt-3 text-[12px] text-wk-warning">Current Track authority could not be loaded.</p>}<div className="mt-4 grid gap-3 md:grid-cols-2"><TextInput label="Reviewed proposed slug" value={decision.proposedSlug} placeholder="e.g. summer" onChange={(value) => setDecision((current) => ({ ...current, proposedSlug: value, message: "" }))} />{decision.decisionType === "public_music_identity_distinct_recording" && <TextInput label="Evidence-backed canonical slug" value={decision.canonicalSlug} placeholder="e.g. song-live" onChange={(value) => setDecision((current) => ({ ...current, canonicalSlug: value, message: "" }))} />}{decision.decisionType === "public_music_identity_true_duplicate" && <TextInput label="Canonical Track UUID" value={decision.canonicalTrackId} placeholder="UUID of surviving Track" onChange={(value) => setDecision((current) => ({ ...current, canonicalTrackId: value, message: "" }))} />}</div>{decision.decisionType === "public_music_identity_distinct_recording" && <div className="mt-3"><TextAreaInput label="Semantic distinction evidence" value={decision.semanticDistinction} placeholder="What authoritative version distinction makes this recording legitimately distinct?" rows={3} onChange={(value) => setDecision((current) => ({ ...current, semanticDistinction: value, message: "" }))} /></div>}{decision.decisionType === "public_music_identity_credit_correction_required" && <div className="mt-3"><TextAreaInput label="Structured credit evidence" value={decision.creditEvidence} placeholder="State the exact primary/featured credit correction required and its evidence." rows={3} onChange={(value) => setDecision((current) => ({ ...current, creditEvidence: value, message: "" }))} /></div>}</div>}{showStructuredFields && <div className="mt-4 rounded-xl border border-wk-border bg-wk-surface-raised p-4"><div className="text-[12px] font-bold text-wk-text">Structured canonical resolution</div><p className="mt-1 text-[11px] leading-5 text-wk-text-muted">Phase 3A will only treat an approval as actionable when this points to one clean canonical artist.</p><div className="mt-3 grid gap-3 md:grid-cols-2"><TextInput label="Canonical primary artist name" value={decision.canonicalPrimaryArtistName} placeholder="e.g. Karun" onChange={(value) => setDecision((current) => ({ ...current, canonicalPrimaryArtistName: value, message: "" }))} /><TextInput label="Canonical primary artist slug" value={decision.canonicalPrimaryArtistSlug} placeholder="e.g. karun" onChange={(value) => setDecision((current) => ({ ...current, canonicalPrimaryArtistSlug: value, message: "" }))} /></div>{showFeaturedFields && <div className="mt-3 grid gap-3 md:grid-cols-2"><TextAreaInput label="Featured/collaborator names" value={decision.featuredArtistNames} placeholder="One per line or comma-separated" rows={3} onChange={(value) => setDecision((current) => ({ ...current, featuredArtistNames: value, message: "" }))} /><TextAreaInput label="Featured/collaborator slugs" value={decision.featuredArtistSlugs} placeholder="One per line or comma-separated" rows={3} onChange={(value) => setDecision((current) => ({ ...current, featuredArtistSlugs: value, message: "" }))} /></div>}</div>}<label className="mt-4 block text-[12px] font-bold text-wk-text">Decision notes</label><textarea value={decision.notes} onChange={(event) => setDecision((current) => ({ ...current, notes: event.target.value, message: "" }))} rows={4} className="mt-2 w-full rounded-lg border border-wk-border bg-wk-surface-raised px-3 py-2 text-[13px] text-wk-text" placeholder="Explain what you verified and why this decision is safe." /><WkCheckbox checked={decision.continueToNext} onChange={(checked) => setDecision((current) => ({ ...current, continueToNext: checked }))} className="mt-4 flex items-start gap-2 text-[12px] text-wk-text-muted"> Open next visible item after recording</WkCheckbox>{decision.message && <p className="mt-2 text-[12px] font-semibold text-wk-warning">{decision.message}</p>}</div></div><div className="flex flex-col gap-2 border-t border-wk-border p-5 sm:flex-row sm:items-center sm:justify-between"><p className="text-[11px] leading-5 text-wk-text-faint">{publicMusicReview ? "This records human judgment only. The review stays open until a governed executor mutates/verifies the canonical outcome and a finalizer resolves the review." : "This records a structured Phase 2B.1 decision only. Phase 3 decides whether to mutate canonical relationships."}</p><div className="flex gap-2"><button onClick={onClose} disabled={decision.submitting} className="wk-button wk-button-ghost wk-button-sm">Cancel</button><button onClick={onSubmit} disabled={decision.submitting} className="wk-button wk-button-primary wk-button-sm">{decision.submitting ? "Recording..." : "Record decision"}</button></div></div></div></div>;
 }
 
 function TextInput({ label, value, placeholder, onChange }: { label: string; value: string; placeholder?: string; onChange: (value: string) => void }) {

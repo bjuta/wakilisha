@@ -3532,3 +3532,93 @@ describe("MIZIZI Slice 3 Tranche B remaining high-blast convergence", () => {
     }
   });
 });
+
+describe("Public Music Identity #1094 human decision lifecycle", () => {
+  it("records human judgment without resolving or mutating canonical Track identity", () => {
+    const migrations =
+      readdirSync("supabase/migrations").filter((name) =>
+        name.endsWith(
+          "_public_music_identity_track_review_decision_authority_v1.sql",
+        ),
+      );
+
+    expect(migrations).toHaveLength(1);
+
+    const migration = read(
+      "supabase/migrations/" + migrations[0],
+    );
+    const verifier = read(
+      "scripts/control-plane/verify-public-music-identity-track-review-decision-authority-v1.sql",
+    );
+    const service = read(
+      "src/services/adminReviewCommandCenter.ts",
+    );
+    const page = read(
+      "src/pages/admin/review/queue/page.tsx",
+    );
+
+    expect(migration).toContain(
+      "admin_get_public_music_identity_track_review_context_v1",
+    );
+    expect(migration).toContain(
+      "admin_record_public_music_identity_track_review_decision_v1",
+    );
+    expect(migration).toContain(
+      "registry_subject_state_fingerprint",
+    );
+    expect(migration).toContain(
+      "Track state changed after review context was loaded",
+    );
+    expect(migration).toContain(
+      "'public_music_identity_track_actual_zero_v1'",
+    );
+    expect(migration).toContain(
+      "'reviewResolved',false",
+    );
+    expect(migration).not.toMatch(
+      /update\s+public\.registry_review_items/i,
+    );
+    expect(migration).not.toContain(
+      "wk_slug_redirects",
+    );
+
+    expect(verifier).toContain(
+      "PUBLIC_MUSIC_IDENTITY_TRACK_REVIEW_DECISION_AUTHORITY_V1_PASS",
+    );
+    expect(verifier).toContain(
+      "Human decision capture must not resolve the review",
+    );
+
+    expect(service).toContain(
+      "admin_get_public_music_identity_track_review_context_v1",
+    );
+    expect(service).toContain(
+      "admin_record_public_music_identity_track_review_decision_v1",
+    );
+    expect(service).toContain(
+      "isPublicMusicIdentityTrackReview",
+    );
+
+    expect(page).toContain(
+      "Public Music Identity — governed human decision",
+    );
+    expect(page).toContain(
+      "public_music_identity_safe_slug_repair",
+    );
+    expect(page).toContain(
+      "public_music_identity_distinct_recording",
+    );
+    expect(page).toContain(
+      "public_music_identity_true_duplicate",
+    );
+    expect(page).toContain(
+      "public_music_identity_retire_unresolvable",
+    );
+    expect(page).toContain(
+      "public_music_identity_credit_correction_required",
+    );
+    expect(page).toContain(
+      "The review stays open until a governed executor",
+    );
+  });
+});
