@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import { WkIcon } from "@/components/design-system/Icon";
+import { Sheet } from "@/components/design-system/primitives/Sheet";
 import {
   applyReviewedArtistDiscography,
   createGovernedDiscographyArtistShell,
@@ -783,37 +784,94 @@ export function ArtistDiscographyIntakeDrawer({
   const hasErrors = (applyResult?.errors.length ?? 0) > 0;
   const isPartialSuccess = applyResult && hasErrors;
 
+  const footer = !loading && !error && albums.length > 0 && (!applyResult || applyResult.errors.length > 0) ? (
+    <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+      <div className="flex flex-col gap-1">
+        <p className="text-[12px] font-bold text-[#171712]">
+          {mergeCount + canonCount} album{mergeCount + canonCount !== 1 ? "s" : ""} selected
+        </p>
+        <p className="text-[11px] text-[#697062]">
+          {ignoreCount} ignored
+          {unsetCount > 0 ? (
+            <span className="ml-1 text-[#b8bfb2]">· {unsetCount} unset will be skipped</span>
+          ) : null}
+        </p>
+      </div>
+      <div className="flex flex-wrap items-center justify-end gap-2">
+        <button
+          onClick={() => {
+            setApplyError(null);
+            const autoActions: Record<string, AlbumAction> = {};
+            for (const album of albums) {
+              autoActions[album.apple_music_id] = album.match_status === "existing" ? "merge" : "canonicalize";
+            }
+            setActions(autoActions);
+          }}
+          disabled={applying}
+          className="wk-button wk-button-ghost wk-button-sm"
+        >
+          Reset defaults
+        </button>
+        <button
+          onClick={() => {
+            setApplyError(null);
+            setActions({});
+          }}
+          disabled={applying}
+          className="wk-button wk-button-ghost wk-button-sm"
+        >
+          Clear all
+        </button>
+        <button
+          onClick={() => {
+            if (mergeCount > 0) {
+              setShowConfirm(true);
+            } else {
+              handleApply();
+            }
+          }}
+          disabled={applying || mergeCount + canonCount === 0}
+          className="wk-button wk-button-primary wk-button-sm"
+        >
+          {applying ? (
+            <>
+              <WkIcon name="Loader2" size={14} className="animate-spin" />
+              Applying…
+            </>
+          ) : (
+            <>
+              <WkIcon name="Zap" size={14} />
+              Apply {mergeCount + canonCount} album{mergeCount + canonCount !== 1 ? "s" : ""}
+            </>
+          )}
+        </button>
+      </div>
+    </div>
+  ) : null;
+
   return (
-    <div className="fixed inset-0 z-50 flex" role="dialog" aria-modal="true" aria-label="Discography intake">
-      {/* Backdrop */}
-      <button className="absolute inset-0 bg-black/40 cursor-default" onClick={onClose} aria-label="Close" />
-
-      {/* Drawer */}
-      <div className="relative ml-auto flex h-full w-full max-w-3xl flex-col bg-[#f7f7f2] shadow-2xl">
-        {/* Header */}
-        <div className="flex items-center justify-between border-b border-[#dfe4d8] bg-white px-6 py-4 shrink-0">
-          <div>
-            <div className="flex items-center gap-2">
-              <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-[#f0f7e8]">
-                <WkIcon name="Apple" size={16} className="text-[#5f8f2f]" />
-              </div>
-              <h2 className="text-[16px] font-black text-[#171712]">Apple Music Discography</h2>
-            </div>
-            <p className="mt-0.5 text-[11px] text-[#697062]">
-              {artistName} · Storefront {storefront.toUpperCase()}
-            </p>
+    <Sheet
+      open
+      onClose={() => {
+        if (!applying) onClose();
+      }}
+      title="Apple Music Discography"
+      side="right"
+      maxWidth="3xl"
+      dismissable={!applying}
+      bodyClassName="bg-[#f7f7f2] px-6 py-5"
+      footer={footer}
+    >
+      <div className="space-y-4">
+        <div className="flex items-center gap-3 rounded-xl border border-[#dfe4d8] bg-white p-3">
+          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-[#f0f7e8]">
+            <WkIcon name="Apple" size={16} className="text-[#5f8f2f]" />
           </div>
-          <button
-            onClick={onClose}
-            disabled={applying}
-            className="flex h-8 w-8 items-center justify-center rounded-xl border border-[#dfe4d8] text-[#71796b] hover:border-[#85c441] hover:text-[#171712] disabled:opacity-50 transition-colors"
-          >
-            <WkIcon name="X" size={15} />
-          </button>
+          <div className="min-w-0">
+            <p className="truncate text-[12px] font-bold text-[#171712]">{artistName}</p>
+            <p className="mt-0.5 text-[11px] text-[#697062]">Storefront {storefront.toUpperCase()}</p>
+          </div>
         </div>
-
-        {/* Content */}
-        <div className="flex-1 overflow-y-auto px-6 py-5 space-y-4">
           {/* Loading */}
           {loading && (
             <div className="flex flex-col items-center justify-center gap-3 py-20">
@@ -1043,68 +1101,6 @@ export function ArtistDiscographyIntakeDrawer({
           )}
         </div>
 
-        {/* Footer actions */}
-        {!loading && !error && albums.length > 0 && (!applyResult || applyResult.errors.length > 0) && (
-          <div className="shrink-0 border-t border-[#dfe4d8] bg-white px-6 py-4">
-            <div className="flex items-center justify-between gap-4">
-              <div className="flex flex-col gap-1">
-                <p className="text-[12px] font-bold text-[#171712]">
-                  {mergeCount + canonCount} album{mergeCount + canonCount !== 1 ? "s" : ""} selected
-                </p>
-                <p className="text-[11px] text-[#697062]">
-                  {ignoreCount} ignored
-                  {unsetCount > 0 && (
-                    <span className="text-[#b8bfb2] ml-1">· {unsetCount} unset will be skipped</span>
-                  )}
-                </p>
-              </div>
-              <div className="flex items-center gap-3">
-                <button
-                  onClick={() => {
-                    setApplyError(null);
-                    const autoActions: Record<string, AlbumAction> = {};
-                    for (const album of albums) {
-                      autoActions[album.apple_music_id] = album.match_status === "existing" ? "merge" : "canonicalize";
-                    }
-                    setActions(autoActions);
-                  }}
-                  disabled={applying}
-                  className="rounded-xl border border-[#dfe4d8] bg-white px-4 py-2 text-[12px] font-bold text-[#71796b] hover:border-[#85c441] disabled:opacity-50 whitespace-nowrap cursor-pointer"
-                >
-                  Reset defaults
-                </button>
-                <button
-                  onClick={() => {
-                    setApplyError(null);
-                    setActions({});
-                  }}
-                  disabled={applying}
-                  className="rounded-xl border border-[#dfe4d8] bg-white px-4 py-2 text-[12px] font-bold text-[#71796b] hover:border-[#85c441] disabled:opacity-50 whitespace-nowrap cursor-pointer"
-                >
-                  Clear all
-                </button>
-                <button
-                  onClick={() => {
-                    if (mergeCount > 0) {
-                      setShowConfirm(true);
-                    } else {
-                      handleApply();
-                    }
-                  }}
-                  disabled={applying || mergeCount + canonCount === 0}
-                  className="flex items-center gap-2 rounded-xl bg-[#5f8f2f] px-6 py-2.5 text-[13px] font-bold text-white hover:bg-[#4d7526] disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap cursor-pointer"
-                >
-                  {applying ? (
-                    <><WkIcon name="Loader2" size={14} className="animate-spin" /> Applying…</>
-                  ) : (
-                    <><WkIcon name="Zap" size={14} /> Apply {mergeCount + canonCount} album{mergeCount + canonCount !== 1 ? "s" : ""}</>
-                  )}
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
-      </div>
-    </div>
+    </Sheet>
   );
 }
