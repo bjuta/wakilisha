@@ -194,14 +194,12 @@ test("anchored WAKILISHA date picker opens beside the current scrolled trigger",
     const trigger = document.querySelector(
       'button[aria-label="Fixture date"]',
     ) as HTMLButtonElement;
-    const dialog = Array.from(
-      document.querySelectorAll('[role="dialog"]'),
-    ).find(
-      (element) => element.getAttribute("aria-label") === "Fixture date",
+    const popover = document.querySelector(
+      "[data-wk-temporal-popover]",
     ) as HTMLElement;
 
     const triggerRect = trigger.getBoundingClientRect();
-    const dialogRect = dialog.getBoundingClientRect();
+    const dialogRect = popover.getBoundingClientRect();
 
     return {
       trigger: {
@@ -251,23 +249,27 @@ test("finite WAKILISHA selection stays anchored and browser-chrome free inside a
     .getByRole("button", { name: "Open interaction sheet" })
     .click();
 
-  const trigger = page.getByRole("combobox", {
-    name: "Finite acceptance choice",
-  });
+  const trigger = page.locator(
+    '[data-wk-select-trigger][aria-label="Finite acceptance choice"]',
+  );
   await trigger.click();
 
   const listbox = page.getByRole("listbox");
+  const popover = page.locator("[data-wk-select-popover]");
   await expect(listbox).toBeVisible();
+  await expect(popover).toBeVisible();
   expect(await page.locator("select").count()).toBe(0);
 
   const geometry = await page.evaluate(() => {
     const trigger = document.querySelector(
-      '[role="combobox"][aria-label="Finite acceptance choice"]',
+      '[data-wk-select-trigger][aria-label="Finite acceptance choice"]',
     ) as HTMLElement;
-    const listbox = document.querySelector('[role="listbox"]') as HTMLElement;
+    const popover = document.querySelector(
+      "[data-wk-select-popover]",
+    ) as HTMLElement;
 
     const triggerRect = trigger.getBoundingClientRect();
-    const listboxRect = listbox.getBoundingClientRect();
+    const listboxRect = popover.getBoundingClientRect();
 
     return {
       triggerBottom: triggerRect.bottom,
